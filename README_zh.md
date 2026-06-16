@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/平台-Windows%20%7C%20macOS%20%7C%20Linux-blue" alt="Platform" />
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
   <img src="https://img.shields.io/badge/Node.js-18+-brightgreen" alt="Node.js" />
-  <a href="https://omagt.com"><img src="https://img.shields.io/badge/Website-omagt.com-blue" alt="Website" /></a>
+  <a href="https://omagt.com" target="_blank"><img src="https://img.shields.io/badge/Website-omagt.com-blue" alt="Website" /></a>
 </p>
 
 ---
