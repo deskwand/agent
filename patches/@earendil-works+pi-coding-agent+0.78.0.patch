@@ -1,0 +1,137 @@
+diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
+index 3a27d1c..6ce3f89 100644
+--- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
++++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
+@@ -55,16 +55,117 @@ function getAliases() {
+         return _aliases;
+     const __dirname = path.dirname(fileURLToPath(import.meta.url));
+     const packageIndex = path.resolve(__dirname, "../..", "index.js");
+-    const typeboxEntry = require.resolve("typebox");
+-    const typeboxCompileEntry = require.resolve("typebox/compile");
+-    const typeboxValueEntry = require.resolve("typebox/value");
+-    const packagesRoot = path.resolve(__dirname, "../../../../");
++
++    // Find pi-coding-agent's package root by walking up from __dirname.
++    // In Electron bundles __dirname points to dist-electron/main/;
++    // in unbundled dev it points into node_modules/…/extensions/.
++    // We look for node_modules/@earendil-works/pi-coding-agent at each level.
++    const packagesRoot = (() => {
++      let dir = __dirname;
++      while (true) {
++        const candidate = path.join(dir, "node_modules", "@earendil-works", "pi-coding-agent");
++        if (fs.existsSync(candidate)) return candidate;
++        const parent = path.dirname(dir);
++        if (parent === dir) break;
++        dir = parent;
++      }
++      // Last resort (should never happen)
++      return path.resolve(__dirname, "../../../../");
++    })();
++
++
++    // Resolve a module specifier (e.g. "typebox", "typebox/compile")
++    // under packagesRoot/node_modules, using package.json exports/maps.
++    const resolveModule = (specifier) => {
++        const parts = specifier.split("/");
++        // Determine package name: "@scope/name" or "name"
++        const pkgName = specifier.startsWith("@") && parts.length >= 2
++            ? parts.slice(0, 2).join("/")
++            : parts[0];
++        const subpath = pkgName === specifier
++            ? "."
++            : "./" + parts.slice(pkgName.startsWith("@") ? 2 : 1).join("/");
++        const pkgRoot = path.join(packagesRoot, "node_modules", pkgName);
++        if (!fs.existsSync(pkgRoot)) return require.resolve(specifier);
++        const pkgJsonPath = path.join(pkgRoot, "package.json");
++        if (!fs.existsSync(pkgJsonPath)) return require.resolve(specifier);
++        try {
++            const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
++            // Use exports map if available, otherwise main
++            if (typeof pkg.exports === "object" && pkg.exports !== null) {
++                const target = pkg.exports[subpath];
++                if (typeof target === "string") {
++                    const resolved = path.join(pkgRoot, target);
++                    if (fs.existsSync(resolved)) return resolved;
++                } else if (typeof target === "object" && target !== null) {
++                    const entry = target.import || target.default || target.require;
++                    if (typeof entry === "string") {
++                        const resolved = path.join(pkgRoot, entry);
++                        if (fs.existsSync(resolved)) return resolved;
++                    }
++                }
++            }
++            // Fallback to "main" field
++            if (typeof pkg.main === "string") {
++                const resolved = path.join(pkgRoot, pkg.main);
++                if (fs.existsSync(resolved)) return resolved;
++            }
++        } catch { /* ignore */ }
++        return require.resolve(specifier);
++    };
++
++    const typeboxEntry = resolveModule("typebox");
++    const typeboxCompileEntry = resolveModule("typebox/compile");
++    const typeboxValueEntry = resolveModule("typebox/value");
++
+     const resolveWorkspaceOrImport = (workspaceRelativePath, specifier) => {
++        // 1. npm-installed under packagesRoot/node_modules/<specifier>/<relPath>
++        const nmPath = path.join(packagesRoot, "node_modules", specifier, workspaceRelativePath);
++        if (fs.existsSync(nmPath)) return nmPath;
++
++        // 2. Monorepo workspace sibling
+         const workspacePath = path.join(packagesRoot, workspaceRelativePath);
+-        if (fs.existsSync(workspacePath)) {
+-            return workspacePath;
++        if (fs.existsSync(workspacePath)) return workspacePath;
++
++        // 3. Subpath specifier (e.g. @scope/pkg/sub) — try base package
++        {
++            const parts = specifier.split("/");
++            const basePkg = specifier.startsWith("@") && parts.length >= 2
++                ? parts.slice(0, 2).join("/")
++                : parts[0];
++            if (basePkg && basePkg !== specifier) {
++                const baseNmPath = path.join(packagesRoot, "node_modules", basePkg, workspaceRelativePath);
++                if (fs.existsSync(baseNmPath)) return baseNmPath;
++                // npm-installed packages don't have the monorepo top-level dir;
++                // strip "agent"/"tui"/"ai" prefix from workspaceRelativePath.
++                const relParts = workspaceRelativePath.split("/");
++                if (relParts.length > 1) {
++                    const stripped = path.join(packagesRoot, "node_modules", basePkg, ...relParts.slice(1));
++                    if (fs.existsSync(stripped)) return stripped;
++                }
++            }
++        }
++
++        // 4. Fallback: read package.json main
++        const pkgRoot = path.join(packagesRoot, "node_modules", specifier);
++        if (fs.existsSync(pkgRoot)) {
++            const pkgJsonPath = path.join(pkgRoot, "package.json");
++            if (fs.existsSync(pkgJsonPath)) {
++                try {
++                    const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
++                    const entry =
++                        (typeof pkg.exports === "object" && typeof pkg.exports["."]?.import === "string")
++                            ? pkg.exports["."].import
++                            : pkg.main;
++                    if (typeof entry === "string") {
++                        const entryPath = path.join(pkgRoot, entry);
++                        if (fs.existsSync(entryPath)) return entryPath;
++                    }
++                } catch { /* ignore */ }
++            }
+         }
+-        return fileURLToPath(import.meta.resolve(specifier));
++
++        return require.resolve(specifier);
+     };
+     const piCodingAgentEntry = packageIndex;
+     const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
+@@ -89,6 +190,7 @@ function getAliases() {
+         "@sinclair/typebox/compile": typeboxCompileEntry,
+         "@sinclair/typebox/value": typeboxValueEntry,
+     };
++
+     return _aliases;
+ }
+ /**

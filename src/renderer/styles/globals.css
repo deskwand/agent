@@ -1,0 +1,555 @@
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* ================================================================
+     Theme Presets — dark (default) + light (.light) × 3 presets
+     ================================================================ */
+
+  /* ----- Graphite (default) — cool zinc gray, VS Code Dark Modern ----- */
+  :root {
+    --color-background: #18181b;
+    --color-background-secondary: #1f1f23;
+    --color-surface: #27272a;
+    --color-surface-hover: #323237;
+    --color-surface-active: #3f3f46;
+    --color-surface-muted: #1b1b1f;
+    --color-border: #2e2e33;
+    --color-border-muted: #242428;
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-mcp: #71717a;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-elevated:
+      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --color-accent: #d4d4d8;
+    --color-accent-hover: #e4e4e7;
+    --color-accent-muted: rgba(212, 212, 216, 0.1);
+    --color-accent-foreground: #09090b;
+    --color-text-primary: #f4f4f5;
+    --color-text-secondary: #a1a1aa;
+    --color-text-muted: #71717a;
+    --color-success: #22c55e;
+    --color-warning: #eab308;
+    --color-error: #ef4444;
+  }
+  .light {
+    --color-background: #ffffff;
+    --color-background-secondary: #f8f8f8;
+    --color-surface: #ffffff;
+    --color-surface-hover: #f4f4f5;
+    --color-surface-active: #e4e4e7;
+    --color-surface-muted: #fafafa;
+    --color-border: #e4e4e7;
+    --color-border-muted: #eaeaed;
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-mcp: #71717a;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --color-accent: #18181b;
+    --color-accent-hover: #09090b;
+    --color-accent-muted: #f4f4f5;
+    --color-accent-foreground: #ffffff;
+    --color-text-primary: #09090b;
+    --color-text-secondary: #52525b;
+    --color-text-muted: #a1a1aa;
+    --color-success: #16a34a;
+    --color-warning: #ca8a04;
+    --color-error: #dc2626;
+  }
+
+  /* ----- Paper — warm brown & cream, reading-focused ----- */
+  :root[data-theme-preset="paper"] {
+    --color-background: #1c1a16;
+    --color-background-secondary: #23201b;
+    --color-surface: #2b2721;
+    --color-surface-hover: #363129;
+    --color-surface-active: #453e34;
+    --color-surface-muted: #1f1c18;
+    --color-border: #322d25;
+    --color-border-muted: #28241e;
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-mcp: #8c8272;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-elevated:
+      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --color-accent: #c4a97d;
+    --color-accent-hover: #d4bd98;
+    --color-accent-muted: rgba(196, 169, 125, 0.12);
+    --color-accent-foreground: #1a1410;
+    --color-text-primary: #ede4d5;
+    --color-text-secondary: #b8a997;
+    --color-text-muted: #8c8272;
+    --color-success: #22c55e;
+    --color-warning: #eab308;
+    --color-error: #ef4444;
+  }
+  .light[data-theme-preset="paper"] {
+    --color-background: #fdfbf7;
+    --color-background-secondary: #f7f3e8;
+    --color-surface: #fefdf9;
+    --color-surface-hover: #f5efe0;
+    --color-surface-active: #ede3cd;
+    --color-surface-muted: #faf7ef;
+    --color-border: #e5dcc8;
+    --color-border-muted: #ebe3d2;
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-mcp: #8c8272;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --color-accent: #6b5a40;
+    --color-accent-hover: #4d3f2d;
+    --color-accent-muted: #f5efe0;
+    --color-accent-foreground: #ffffff;
+    --color-text-primary: #3d3225;
+    --color-text-secondary: #6b5d48;
+    --color-text-muted: #a0947e;
+    --color-success: #16a34a;
+    --color-warning: #ca8a04;
+    --color-error: #dc2626;
+  }
+
+  /* ----- Void — pure black OLED, extreme focus ----- */
+  :root[data-theme-preset="void"] {
+    --color-background: #000000;
+    --color-background-secondary: #080808;
+    --color-surface: #111111;
+    --color-surface-hover: #1a1a1a;
+    --color-surface-active: #262626;
+    --color-surface-muted: #050505;
+    --color-border: #1f1f1f;
+    --color-border-muted: #171717;
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-mcp: #737373;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-elevated:
+      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --color-accent: #e5e5e5;
+    --color-accent-hover: #ffffff;
+    --color-accent-muted: rgba(229, 229, 229, 0.1);
+    --color-accent-foreground: #0a0a0a;
+    --color-text-primary: #fafafa;
+    --color-text-secondary: #a3a3a3;
+    --color-text-muted: #737373;
+    --color-success: #22c55e;
+    --color-warning: #eab308;
+    --color-error: #ef4444;
+  }
+  .light[data-theme-preset="void"] {
+    --color-background: #ffffff;
+    --color-background-secondary: #fafafa;
+    --color-surface: #ffffff;
+    --color-surface-hover: #f5f5f5;
+    --color-surface-active: #ebebeb;
+    --color-surface-muted: #f8f8f8;
+    --color-border: #e8e8e8;
+    --color-border-muted: #efefef;
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-mcp: #737373;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --color-accent: #0a0a0a;
+    --color-accent-hover: #000000;
+    --color-accent-muted: #f5f5f5;
+    --color-accent-foreground: #ffffff;
+    --color-text-primary: #000000;
+    --color-text-secondary: #525252;
+    --color-text-muted: #a3a3a3;
+    --color-success: #16a34a;
+    --color-warning: #ca8a04;
+    --color-error: #dc2626;
+  }
+
+  /* ----- Shared typography vars (not per-theme) ----- */
+  :root {
+    --font-size-xs: 0.75rem; /* 12px — chrome, meta, labels */
+    --font-size-body: 0.875rem; /* 14px — body, chat, headings */
+    --font-size-chat: 0.875rem; /* 14px — chat message body */
+    --line-height-chat: 1.5;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-text-primary);
+    font-family:
+      -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", sans-serif;
+    font-size: var(--font-size-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Native date / datetime pickers follow OS-level color scheme */
+  input[type="date"],
+  input[type="datetime-local"] {
+    color-scheme: light dark;
+  }
+
+  /* Custom scrollbar — only on non-macOS platforms.
+     macOS uses native overlay scrollbars which are better. */
+  @supports not (font: -apple-system-body) {
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      @apply bg-transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      @apply bg-border rounded-full;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      @apply bg-text-muted;
+    }
+  }
+
+  /* Hide scrollbar while keeping scroll functionality */
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  /* Heading sans font — for titles and headings */
+  .heading-serif {
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+
+  /* Button styles */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-150;
+    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-30;
+  }
+
+  .btn-primary {
+    @apply bg-accent text-accent-foreground hover:bg-accent-hover;
+    @apply shadow-soft;
+  }
+
+  .btn-secondary {
+    @apply bg-surface hover:bg-surface-hover text-text-primary;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent hover:bg-surface-active text-text-secondary hover:text-text-primary;
+  }
+
+  /* Input styles */
+  .input {
+    @apply w-full px-4 py-3 rounded-xl bg-surface border border-border;
+    @apply text-text-primary placeholder:text-text-muted;
+    @apply focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent focus:ring-opacity-30;
+    @apply transition-all duration-150;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-surface rounded-2xl shadow-card;
+  }
+
+  /* Tag/Chip styles - like the quick action buttons */
+  .tag {
+    @apply inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface;
+    @apply text-sm font-medium text-text-primary;
+    @apply hover:bg-surface-hover hover:shadow-soft cursor-pointer transition-all duration-150;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}
+
+@layer utilities {
+  /* Window drag region for custom titlebar */
+  .titlebar-drag {
+    -webkit-app-region: drag;
+    app-region: drag;
+  }
+
+  .titlebar-no-drag {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+
+  /* Message bubbles */
+  .message-user {
+    @apply bg-surface-hover rounded-2xl;
+    width: fit-content;
+    margin-left: auto;
+  }
+
+  /* User message text matches assistant prose sizing and font stack */
+  .message-user-text {
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
+    font-size: var(--font-size-chat);
+    line-height: var(--line-height-chat);
+    letter-spacing: -0.01em;
+  }
+
+  /* Prose styling for assistant messages - system font stack */
+  .prose-chat {
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
+    font-size: var(--font-size-chat);
+    line-height: var(--line-height-chat);
+    letter-spacing: -0.01em;
+    @apply max-w-full overflow-x-clip;
+  }
+
+  .prose-chat p {
+    margin-bottom: 0.75rem;
+  }
+
+  .prose-chat p:last-child {
+    margin-bottom: 0;
+  }
+
+  .prose-chat strong {
+    font-weight: 600;
+  }
+
+  .prose-chat em {
+    font-style: italic;
+  }
+
+  .prose-chat ul,
+  .prose-chat ol {
+    margin: 0.75rem 0;
+    padding-left: 1.5rem;
+  }
+
+  .prose-chat ul {
+    list-style: disc;
+    list-style-position: outside;
+  }
+
+  .prose-chat ul ul {
+    list-style: circle;
+  }
+
+  .prose-chat ul ul ul {
+    list-style: square;
+  }
+
+  .prose-chat ol {
+    list-style: decimal;
+    list-style-position: outside;
+  }
+
+  .prose-chat li {
+    margin-bottom: 0.2rem;
+  }
+
+  /* Tighten markdown loose-lists: avoid large gaps when li wraps content in <p> */
+  .prose-chat li > p {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .prose-chat li p {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  .prose-chat li > ul,
+  .prose-chat li > ol {
+    margin-top: 0.35rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .prose-chat h1,
+  .prose-chat h2,
+  .prose-chat h3,
+  .prose-chat h4 {
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      "PingFang SC",
+      "Microsoft YaHei",
+      sans-serif;
+    font-size: var(--font-size-body);
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .prose-chat > :first-child {
+    margin-top: 0;
+  }
+
+  .prose-chat h1 {
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+  .prose-chat h2 {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .prose-chat h3 {
+    font-weight: 600;
+  }
+  .prose-chat h4 {
+    font-weight: 600;
+  }
+
+  .prose-chat .katex-display {
+    margin: 1rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .prose-chat .katex {
+    font-size: 1.1em;
+  }
+
+  /* Prevent long inline math from overflowing the container */
+  .prose-chat .katex-html {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .prose-chat a {
+    color: theme("colors.accent.DEFAULT");
+    text-decoration-line: underline;
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.22em;
+    text-decoration-skip-ink: auto;
+  }
+
+  /* Some model outputs wrap citation links in ~...~; keep links readable */
+  .prose-chat del {
+    text-decoration: none;
+  }
+
+  .prose-chat del a {
+    text-decoration-line: underline;
+  }
+
+  .prose-chat blockquote {
+    margin: 0.75rem 0;
+    padding-left: 1rem;
+    border-left: 3px solid theme("colors.accent.DEFAULT / 40%");
+    color: theme("colors.text.secondary");
+  }
+
+  .prose-chat .footnotes {
+    margin-top: 1rem;
+    font-size: 0.875rem;
+    color: theme("colors.text.muted");
+  }
+
+  .prose-chat .footnotes ol {
+    padding-left: 1.25rem;
+  }
+
+  .prose-chat .footnotes li {
+    margin-bottom: 0.5rem;
+  }
+
+  .prose-chat .footnotes p {
+    margin: 0.25rem 0 0;
+  }
+
+  /* Code block */
+  .code-block {
+    @apply bg-surface-muted rounded-xl p-4 font-mono text-xs overflow-x-hidden whitespace-pre-wrap break-all max-w-full;
+  }
+
+  /* Override hljs theme background to use our code-block background */
+  .code-block .hljs,
+  .code-block code {
+    background: transparent;
+    border: none;
+  }
+
+  .code-block .hljs *,
+  .code-block code * {
+    border: none;
+  }
+}
+
+/* Settings panel overlay animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 200ms ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
