@@ -740,7 +740,7 @@ export type ProviderType =
   | "ollama";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
-export type ThemePreset = "graphite" | "paper" | "void";
+export type { ThemePreset } from "../../shared/theme";
 export type ProviderProfileKey =
   | "openrouter"
   | "anthropic"

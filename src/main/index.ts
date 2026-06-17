@@ -267,6 +267,10 @@ const THEME_PRESET_BG: Record<string, { dark: string; light: string }> = {
   graphite: { dark: "#18181b", light: "#ffffff" },
   paper: { dark: "#1c1a16", light: "#fdfbf7" },
   void: { dark: "#000000", light: "#ffffff" },
+  ocean: { dark: "#0c1222", light: "#f8fafc" },
+  forest: { dark: "#111810", light: "#fafbf9" },
+  ember: { dark: "#1a1512", light: "#fdfbf9" },
+  aurora: { dark: "#120f1a", light: "#faf9fd" },
 };
 
 function buildMacMenu() {
@@ -3590,7 +3594,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       }
       if (
         typeof event.payload.themePreset === "string" &&
-        ["graphite", "paper", "void"].includes(event.payload.themePreset)
+        ["graphite", "paper", "void", "ocean", "forest", "ember", "aurora"].includes(event.payload.themePreset)
       ) {
         configStore.update({
           themePreset: event.payload.themePreset as ThemePreset,

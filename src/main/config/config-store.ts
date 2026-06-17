@@ -4,6 +4,7 @@ import {
   PI_AI_CURATED_PRESETS,
 } from "../../shared/api-model-presets";
 import type { SharedProviderPreset } from "../../shared/api-model-presets";
+import { VALID_THEME_PRESETS } from "../../shared/theme";
 import { logWarn } from "../utils/logger";
 import {
   normalizeAnthropicBaseUrl,
@@ -21,7 +22,7 @@ export type ProviderType =
   | "ollama";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
-export type ThemePreset = "graphite" | "paper" | "void";
+export type { ThemePreset } from "../../shared/theme";
 export type ProviderProfileKey =
   | "openrouter"
   | "anthropic"
@@ -164,7 +165,6 @@ const PROFILE_KEYS: ProviderProfileKey[] = [
   "custom:gemini",
 ];
 const VALID_THEMES: AppTheme[] = ["dark", "light", "system"];
-const VALID_THEME_PRESETS: ThemePreset[] = ["graphite", "paper", "void"];
 
 const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
   openrouter: {

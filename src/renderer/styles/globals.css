@@ -169,6 +169,222 @@
     --color-error: #dc2626;
   }
 
+  /* ----- Ocean — steel blue + teal accent, Linear-style focus ----- */
+  :root[data-theme-preset="ocean"] {
+    --color-background: #0c1222;
+    --color-background-secondary: #111827;
+    --color-surface: #1a2332;
+    --color-surface-hover: #212d40;
+    --color-surface-active: #2a3a54;
+    --color-surface-muted: #0e1526;
+    --color-border: #1e2d45;
+    --color-border-muted: #172436;
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-mcp: #5b7a9e;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-elevated:
+      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --color-accent: #2dd4bf;
+    --color-accent-hover: #5eead4;
+    --color-accent-muted: rgba(45, 212, 191, 0.12);
+    --color-accent-foreground: #042f2e;
+    --color-text-primary: #e2e8f0;
+    --color-text-secondary: #94a3b8;
+    --color-text-muted: #64748b;
+    --color-success: #34d399;
+    --color-warning: #f59e0b;
+    --color-error: #f87171;
+  }
+  .light[data-theme-preset="ocean"] {
+    --color-background: #f8fafc;
+    --color-background-secondary: #f0f4f8;
+    --color-surface: #ffffff;
+    --color-surface-hover: #eef2f7;
+    --color-surface-active: #e2e8f0;
+    --color-surface-muted: #f4f7fb;
+    --color-border: #d9e2ec;
+    --color-border-muted: #e2e8f0;
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-mcp: #64748b;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --color-accent: #0d9488;
+    --color-accent-hover: #0f766e;
+    --color-accent-muted: #ccfbf1;
+    --color-accent-foreground: #ffffff;
+    --color-text-primary: #0f172a;
+    --color-text-secondary: #475569;
+    --color-text-muted: #94a3b8;
+    --color-success: #059669;
+    --color-warning: #d97706;
+    --color-error: #dc2626;
+  }
+
+  /* ----- Forest — pine green + sage accent, organic calm ----- */
+  :root[data-theme-preset="forest"] {
+    --color-background: #111810;
+    --color-background-secondary: #161c14;
+    --color-surface: #1d261a;
+    --color-surface-hover: #253220;
+    --color-surface-active: #304128;
+    --color-surface-muted: #131a11;
+    --color-border: #25301f;
+    --color-border-muted: #1c2518;
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-mcp: #6b7c5e;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-elevated:
+      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --color-accent: #34d399;
+    --color-accent-hover: #6ee7b7;
+    --color-accent-muted: rgba(52, 211, 153, 0.12);
+    --color-accent-foreground: #022c22;
+    --color-text-primary: #e6ede3;
+    --color-text-secondary: #9aab93;
+    --color-text-muted: #6b7c5e;
+    --color-success: #4ade80;
+    --color-warning: #d97706;
+    --color-error: #ef4444;
+  }
+  .light[data-theme-preset="forest"] {
+    --color-background: #fafbf9;
+    --color-background-secondary: #f2f6ef;
+    --color-surface: #ffffff;
+    --color-surface-hover: #eef4ea;
+    --color-surface-active: #e2ebdb;
+    --color-surface-muted: #f5f8f3;
+    --color-border: #d8e3cf;
+    --color-border-muted: #e2ebdb;
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-mcp: #6b7c5e;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --color-accent: #059669;
+    --color-accent-hover: #047857;
+    --color-accent-muted: #d1fae5;
+    --color-accent-foreground: #ffffff;
+    --color-text-primary: #1a2415;
+    --color-text-secondary: #4a5a40;
+    --color-text-muted: #8a9a80;
+    --color-success: #16a34a;
+    --color-warning: #b45309;
+    --color-error: #dc2626;
+  }
+
+  /* ----- Ember — charcoal + amber accent, warm industrial ----- */
+  :root[data-theme-preset="ember"] {
+    --color-background: #1a1512;
+    --color-background-secondary: #201b17;
+    --color-surface: #2b231d;
+    --color-surface-hover: #362d25;
+    --color-surface-active: #45392f;
+    --color-surface-muted: #1c1714;
+    --color-border: #322921;
+    --color-border-muted: #25201a;
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-mcp: #8c755e;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-elevated:
+      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --color-accent: #fb923c;
+    --color-accent-hover: #fdba74;
+    --color-accent-muted: rgba(251, 146, 60, 0.12);
+    --color-accent-foreground: #2d1600;
+    --color-text-primary: #f0e6dc;
+    --color-text-secondary: #bfaa95;
+    --color-text-muted: #8c755e;
+    --color-success: #4ade80;
+    --color-warning: #fbbf24;
+    --color-error: #ef4444;
+  }
+  .light[data-theme-preset="ember"] {
+    --color-background: #fdfbf9;
+    --color-background-secondary: #f7f3ee;
+    --color-surface: #ffffff;
+    --color-surface-hover: #f5efe6;
+    --color-surface-active: #ede3d5;
+    --color-surface-muted: #faf7f2;
+    --color-border: #e5d9c8;
+    --color-border-muted: #ebe1d2;
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-mcp: #8c755e;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --color-accent: #ea580c;
+    --color-accent-hover: #c2410c;
+    --color-accent-muted: #ffedd5;
+    --color-accent-foreground: #ffffff;
+    --color-text-primary: #3d2e1f;
+    --color-text-secondary: #6b5640;
+    --color-text-muted: #a08a70;
+    --color-success: #16a34a;
+    --color-warning: #d97706;
+    --color-error: #dc2626;
+  }
+
+  /* ----- Aurora — deep indigo + lavender accent, creative twilight ----- */
+  :root[data-theme-preset="aurora"] {
+    --color-background: #120f1a;
+    --color-background-secondary: #181424;
+    --color-surface: #211c33;
+    --color-surface-hover: #2b2442;
+    --color-surface-active: #383055;
+    --color-surface-muted: #14111d;
+    --color-border: #282241;
+    --color-border-muted: #1e1933;
+    --color-border-subtle: rgba(255, 255, 255, 0.06);
+    --color-mcp: #7e6da8;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-elevated:
+      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --color-accent: #a78bfa;
+    --color-accent-hover: #c4b5fd;
+    --color-accent-muted: rgba(167, 139, 250, 0.12);
+    --color-accent-foreground: #1a1030;
+    --color-text-primary: #e8e4f2;
+    --color-text-secondary: #a399c2;
+    --color-text-muted: #7e6da8;
+    --color-success: #2dd4bf;
+    --color-warning: #f59e0b;
+    --color-error: #f87171;
+  }
+  .light[data-theme-preset="aurora"] {
+    --color-background: #faf9fd;
+    --color-background-secondary: #f3f1fa;
+    --color-surface: #ffffff;
+    --color-surface-hover: #efecf7;
+    --color-surface-active: #e4e0f2;
+    --color-surface-muted: #f6f4fb;
+    --color-border: #dcd6ed;
+    --color-border-muted: #e5e0f2;
+    --color-border-subtle: rgba(0, 0, 0, 0.06);
+    --color-mcp: #7e6da8;
+    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
+    --color-accent: #7c3aed;
+    --color-accent-hover: #6d28d9;
+    --color-accent-muted: #ede9fe;
+    --color-accent-foreground: #ffffff;
+    --color-text-primary: #1e1640;
+    --color-text-secondary: #5a4e80;
+    --color-text-muted: #9088b0;
+    --color-success: #0d9488;
+    --color-warning: #d97706;
+    --color-error: #dc2626;
+  }
+
   /* ----- Shared typography vars (not per-theme) ----- */
   :root {
     --font-size-xs: 0.75rem; /* 12px — chrome, meta, labels */

@@ -36,6 +36,10 @@ export function SettingsGeneral() {
     },
     { value: "paper" as const, label: t("general.themePresetPaper", "Paper") },
     { value: "void" as const, label: t("general.themePresetVoid", "Void") },
+    { value: "ocean" as const, label: t("general.themePresetOcean", "Ocean") },
+    { value: "forest" as const, label: t("general.themePresetForest", "Forest") },
+    { value: "ember" as const, label: t("general.themePresetEmber", "Ember") },
+    { value: "aurora" as const, label: t("general.themePresetAurora", "Aurora") },
   ];
 
   return (
