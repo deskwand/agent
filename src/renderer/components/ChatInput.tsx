@@ -96,7 +96,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const slashMenuRef = useRef<HTMLDivElement>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const isComposingRef = useRef(false);
     const slashTriggerRef = useRef(false);
     const selectFilesRef = useRef<() => void>(() => {});
 
@@ -811,12 +810,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
               setPrompt(newValue);
             }}
-            onCompositionStart={() => {
-              isComposingRef.current = true;
-            }}
-            onCompositionEnd={() => {
-              isComposingRef.current = false;
-            }}
             onPaste={handlePaste}
             placeholder={placeholder}
             disabled={disabled}
@@ -864,12 +857,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               }
 
               if (e.key === "Enter" && !e.shiftKey) {
-                if (
-                  e.nativeEvent.isComposing ||
-                  isComposingRef.current ||
-                  e.keyCode === 229
-                )
-                  return;
+                // Block Enter during IME composition (e.g. pinyin → Chinese).
+                // isComposing is set natively by Chromium, independent of
+                // React's synthetic events — always accurate in Electron 35+.
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                 e.preventDefault();
                 handleSubmitInternal();
               }
