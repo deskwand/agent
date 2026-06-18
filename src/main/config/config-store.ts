@@ -5,6 +5,7 @@ import {
 } from "../../shared/api-model-presets";
 import type { SharedProviderPreset } from "../../shared/api-model-presets";
 import { VALID_THEME_PRESETS } from "../../shared/theme";
+import type { ThemePreset } from "../../shared/theme";
 import { logWarn } from "../utils/logger";
 import {
   normalizeAnthropicBaseUrl,
@@ -22,7 +23,7 @@ export type ProviderType =
   | "ollama";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
-export type { ThemePreset } from "../../shared/theme";
+export type { ThemePreset };
 export type ProviderProfileKey =
   | "openrouter"
   | "anthropic"

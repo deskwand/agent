@@ -1,3 +1,5 @@
+import type { ThemePreset } from "../../shared/theme";
+
 // Session types
 export interface Session {
   id: string;
@@ -740,7 +742,7 @@ export type ProviderType =
   | "ollama";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
-export type { ThemePreset } from "../../shared/theme";
+export type { ThemePreset };
 export type ProviderProfileKey =
   | "openrouter"
   | "anthropic"
