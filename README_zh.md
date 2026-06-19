@@ -5,7 +5,7 @@
 <h1 align="center">🚀 Deskwand: 你的私人 AI 智能助手桌面应用</h1>
 
 <p align="center">
-  • Deskwand — Oh My Agent • 一键安装
+  • Deskwand • 一键安装
 </p>
 
 <p align="center">
