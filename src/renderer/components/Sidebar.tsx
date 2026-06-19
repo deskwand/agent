@@ -615,7 +615,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     >
       <div className="px-4 pt-3 pb-4">
         {sessions.length > 0 && (
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex items-center gap-2 group/manage-bar">
             <div className="relative flex-1 min-w-0">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
               <input
@@ -637,7 +637,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
                 isSelectMode
                   ? "bg-accent text-accent-foreground"
-                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover opacity-0 pointer-events-none group-hover/manage-bar:opacity-100 group-hover/manage-bar:pointer-events-auto transition-opacity duration-150"
               }`}
               title={t("sidebar.manage")}
             >
