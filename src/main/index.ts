@@ -435,13 +435,12 @@ function resolveEffectiveTheme(theme: AppTheme): "dark" | "light" {
   return theme;
 }
 
-function applyNativeThemePreference(theme: AppTheme): void {
-  nativeTheme.themeSource = theme;
-}
-
 function createWindow() {
   const savedTheme = getSavedThemePreference();
-  applyNativeThemePreference(savedTheme);
+  // Leave nativeTheme.themeSource at its default ("system") so OS theme
+  // changes always trigger the "updated" event and are forwarded to the
+  // renderer as native-theme.changed. The visual theme is independently
+  // controlled by CSS and the window background color.
   const effectiveTheme = resolveEffectiveTheme(savedTheme);
   const themePreset = (configStore.get("themePreset") as string) || "graphite";
   const presetBg = THEME_PRESET_BG[themePreset] || THEME_PRESET_BG.graphite;
@@ -3571,7 +3570,6 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       ) {
         const nextTheme = event.payload.theme as AppTheme;
         configStore.update({ theme: nextTheme });
-        applyNativeThemePreference(nextTheme);
         sendToRenderer({
           type: "native-theme.changed",
           payload: { shouldUseDarkColors: nativeTheme.shouldUseDarkColors },
