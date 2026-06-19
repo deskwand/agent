@@ -45,9 +45,6 @@ export const MessageMarkdown = memo(function MessageMarkdown({
       >
         {normalizedText}
       </ReactMarkdown>
-      {isStreaming && (
-        <span className="inline-block w-2 h-4 bg-accent ml-1 animate-pulse" />
-      )}
     </div>
   );
 });
