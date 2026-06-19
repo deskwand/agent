@@ -139,6 +139,7 @@ export function ChatView() {
     isElectron,
   } = useIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [activeOperations, setActiveOperations] = useState<Operation[]>([]);
   const setGitChangeCount = useAppStore((s) => s.setGitChangeCount);
 
@@ -683,11 +684,21 @@ export function ChatView() {
     chatInputRef.current?.focus();
     // 重置跟随状态，覆盖旧会话中用户手动上滚的残留
     autoFollowRef.current = true;
+    setIsInputExpanded(false);
     const rafId = requestAnimationFrame(() => {
       scrollToBottom("auto", true);
     });
     return () => cancelAnimationFrame(rafId);
   }, [activeSessionId]);
+
+  // Scroll to bottom when input expands, so messages area follows
+  useEffect(() => {
+    if (!isInputExpanded) return;
+    const raf = requestAnimationFrame(() => {
+      scrollToBottomByButton();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [isInputExpanded]);
 
   // Load active MCP connectors
   useEffect(() => {
@@ -1073,6 +1084,8 @@ export function ChatView() {
             onCompact={handleCompact}
             onCommand={handleCommand}
             disabled={isSubmitting || isCompacting}
+            isExpanded={isInputExpanded}
+            onToggleExpand={() => setIsInputExpanded((v) => !v)}
             placeholder={t("chat.typeMessage")}
             cardClassName="p-3.5 rounded-6xl bg-background/60 backdrop-blur-sm shadow-elevated"
             textareaClassName="w-full resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
@@ -1108,6 +1121,8 @@ export function ChatView() {
                 canStop={canStop}
                 onStop={handleStop}
                 isSubmitting={isSubmitting}
+                isExpanded={isInputExpanded}
+                onToggleExpand={() => setIsInputExpanded((v) => !v)}
               />
             }
           />

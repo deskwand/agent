@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel, ProviderProfileKey } from "../types";
-import { Plus, ChevronDown, ArrowUp, Square } from "lucide-react";
+import { Plus, ChevronDown, ArrowUp, Square, Maximize2, Minimize2 } from "lucide-react";
 
 export interface ModelOptionGroup {
   profileKey: ProviderProfileKey;
@@ -26,6 +26,8 @@ export interface ChatInputBottomBarProps {
   canStop: boolean;
   onStop: () => void;
   isSubmitting: boolean;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 export function ChatInputBottomBar({
@@ -45,6 +47,8 @@ export function ChatInputBottomBar({
   canStop,
   onStop,
   isSubmitting,
+  isExpanded = false,
+  onToggleExpand,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
@@ -242,6 +246,21 @@ export function ChatInputBottomBar({
             </div>
           </div>
         </div>
+
+        {onToggleExpand && (
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+            title={isExpanded ? t("chat.collapseInput") : t("chat.expandInput")}
+          >
+            {isExpanded ? (
+              <Minimize2 className="w-4 h-4" />
+            ) : (
+              <Maximize2 className="w-4 h-4" />
+            )}
+          </button>
+        )}
 
         <button
           type={canStop ? "button" : "submit"}

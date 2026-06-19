@@ -752,6 +752,8 @@
     "compacting": "压缩会话中...",
     "compactFailed": "会话压缩失败",
     "alreadyCompacted": "会话已压缩",
+    "expandInput": "展开输入框",
+    "collapseInput": "收起输入框",
     "openCodeReview": "代码审查 · {{count}} 个文件变更"
   },
   "context": {

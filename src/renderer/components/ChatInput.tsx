@@ -50,6 +50,8 @@ interface ChatInputProps {
   cardClassName: string;
   textareaClassName: string;
   bottomSlot: React.ReactNode;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 /** Base Tailwind classes for slash command menu items. */
@@ -67,6 +69,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       cardClassName,
       textareaClassName,
       bottomSlot,
+      isExpanded = false,
+      onToggleExpand,
     },
     ref,
   ) {
@@ -108,12 +112,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       textarea.style.height = "auto";
       const computedStyle = window.getComputedStyle(textarea);
       const lineHeight = Number.parseFloat(computedStyle.lineHeight) || 24;
-      const maxHeight = lineHeight * 6;
-      const nextHeight = Math.min(textarea.scrollHeight, maxHeight);
+      const maxHeight = lineHeight * (isExpanded ? 15 : 6);
+      const minHeight = isExpanded ? lineHeight * 5 : 0;
+      const rawHeight = Math.min(textarea.scrollHeight, maxHeight);
+      const nextHeight = Math.max(rawHeight, minHeight);
       textarea.style.height = `${nextHeight}px`;
       textarea.style.overflowY =
         textarea.scrollHeight > maxHeight ? "auto" : "hidden";
-    }, []);
+    }, [isExpanded]);
 
     useEffect(() => {
       adjustTextareaHeight();
@@ -566,12 +572,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       }
       // --- end /compact ---
 
+      // Collapse back after submit if expanded
+      if (isExpanded) {
+        onToggleExpand?.();
+      }
+
       onSubmit({
         text: currentPrompt.trim(),
         images: pastedImages,
         files: attachedFiles,
       });
-    }, [prompt, pastedImages, attachedFiles, disabled, onSubmit, onCompact]);
+    }, [prompt, pastedImages, attachedFiles, disabled, onSubmit, onCompact, isExpanded, onToggleExpand]);
 
     const handleFormSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -877,9 +888,23 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   // Any other key that's not the slash filter → let onChange handle it
                 }
 
+                // Esc collapses expanded input (outside slash menu)
+                if (e.key === "Escape" && isExpanded) {
+                  e.preventDefault();
+                  onToggleExpand?.();
+                  return;
+                }
+
                 if (e.key === "Enter" && !e.shiftKey) {
                   // Block Enter during IME composition (e.g. pinyin → Chinese).
                   if (isComposingRef.current || e.keyCode === 229) return;
+                  // Expanded mode: Enter = newline, only submit on Cmd/Ctrl+Enter
+                  if (isExpanded) {
+                    if (!e.metaKey && !e.ctrlKey) return;
+                    e.preventDefault();
+                    handleSubmitInternal();
+                    return;
+                  }
                   e.preventDefault();
                   handleSubmitInternal();
                 }

@@ -752,6 +752,8 @@
     "compacting": "Compacting session...",
     "compactFailed": "Session compaction failed",
     "alreadyCompacted": "Session already compacted",
+    "expandInput": "Expand input",
+    "collapseInput": "Collapse input",
     "openCodeReview": "Code Review · {{count}} changed files"
   },
   "context": {
