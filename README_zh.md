@@ -24,8 +24,6 @@
 
 Deskwand 是一款开源的 AI 智能助手桌面应用，支持 Windows、macOS 和 Linux 一键安装，无需编程知识。
 
-<p align="center"><em>本软件由 DeepSeek V4 Pro 完成</em></p>
-
 ---
 
 <a id="核心特性"></a>

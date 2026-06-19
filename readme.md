@@ -24,8 +24,6 @@
 
 Deskwand is an open-source AI agent desktop app for Windows, macOS, and Linux. One-click install, bring your own API key — no coding required.
 
-<p align="center"><em>Built by DeepSeek V4 Pro</em></p>
-
 ---
 
 <a id="features"></a>
