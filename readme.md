@@ -5,7 +5,7 @@
 <h1 align="center">🚀 Deskwand: Your Personal AI Agent Desktop App</h1>
 
 <p align="center">
-  • Deskwand — Oh My Agent • One-Click Install
+  • Deskwand • One-Click Install
 </p>
 
 <p align="center">
