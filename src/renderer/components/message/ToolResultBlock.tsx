@@ -1,5 +1,6 @@
 // Fallback ToolResultBlock — only renders for truly orphan results (no matching tool_use anywhere)
 import { useState, memo, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, XCircle, CheckCircle2 } from "lucide-react";
 import { useAppStore } from "../../store";
 import {
@@ -44,6 +45,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
       : [],
   );
   const [expanded, setExpanded] = useState(false);
+  const { t } = useTranslation();
 
   // If a ToolUseBlock in any message already merges this result, hide this block
   const isOrphan = useMemo(() => {
@@ -91,10 +93,10 @@ export const ToolResultBlock = memo(function ToolResultBlock({
         : firstLine;
     }
     if (shouldUseScreenshotSummary(toolName, content))
-      return "Screenshot captured";
+      return t("tool.summaryScreenshot");
     if (content.length < 60) return content.trim();
     const lines = content.trim().split(/\r?\n/);
-    return `${lines.length} lines`;
+    return t("tool.summaryLines", { count: lines.length });
   };
 
   const validImages =
@@ -143,7 +145,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
         </span>
         {hasImages && (
           <span className="text-xs text-text-muted flex-shrink-0">
-            +{block.images?.length ?? 0} img
+            {t("tool.badgeImages", { count: block.images?.length ?? 0 })}
           </span>
         )}
         {expanded ? (

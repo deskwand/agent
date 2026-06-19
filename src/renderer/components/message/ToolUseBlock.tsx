@@ -1,5 +1,6 @@
 // Tool use card — collapsible, merges matching tool_result from same/other messages
 import { useState, memo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronRight,
@@ -58,6 +59,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       : null,
   );
   const [expanded, setExpanded] = useState(false);
+  const { t } = useTranslation();
 
   // Special-case tool UIs
   if (block.name === "AskUserQuestion") {
@@ -96,7 +98,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const isError = toolResult?.isError === true;
   const isSuccess = toolResult && !isError;
 
-  const label = getToolLabel(block.name, block.input);
+  const label = getToolLabel(block.name, block.input, t);
   const isMCPTool = block.name.startsWith("mcp__");
   const mcpServerName = isMCPTool
     ? block.name.match(/^mcp__(.+?)__/)?.[1]
@@ -113,10 +115,10 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         : firstLine;
     }
     if (shouldUseScreenshotSummary(block.name, content))
-      return "Screenshot captured";
+      return t("tool.summaryScreenshot");
     if (content.length < 60) return content.trim();
     const lines = content.trim().split(/\r?\n/);
-    return `${lines.length} lines`;
+    return t("tool.summaryLines", { count: lines.length });
   };
 
   const summary = getSummary();
@@ -208,7 +210,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         )}
         {validImages.length > 0 && (
           <span className="text-xs text-text-muted flex-shrink-0">
-            +{validImages.length} img
+            {t("tool.badgeImages", { count: validImages.length })}
           </span>
         )}
         {duration !== undefined && (
@@ -233,7 +235,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           {/* Input section */}
           <div className="px-3 py-2">
             <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
-              Input
+              {t("tool.sectionInput")}
             </div>
             <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all bg-surface-muted rounded-lg p-2.5">
               {JSON.stringify(block.input, null, 2)}
@@ -244,7 +246,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           {toolResult && (
             <div className="px-3 py-2">
               <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
-                Output
+                {t("tool.sectionOutput")}
               </div>
               {preferImageOutput &&
                 validImages.map((image, index) => (
