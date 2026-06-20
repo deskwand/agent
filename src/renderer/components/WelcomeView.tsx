@@ -117,8 +117,26 @@ export function WelcomeView() {
     )
       return;
 
-    const lastModel = appConfig?.model;
-    const lastProvider = appConfig?.activeProviderKey;
+    // ponytail: project-level model default, fallback to global
+    let lastModel = appConfig?.model;
+    let lastProvider = appConfig?.activeProviderKey;
+    let lastThinkingLevel = appConfig?.thinkingLevel;
+    if (workingDir) {
+      try {
+        const raw = localStorage.getItem(
+          "deskwand.pm." + encodeURIComponent(workingDir),
+        );
+        if (raw) {
+          const pd = JSON.parse(raw);
+          lastModel = pd.m || lastModel;
+          lastProvider = pd.p || lastProvider;
+          lastThinkingLevel = pd.t || lastThinkingLevel;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+
     const providerGroup = modelOptions.find(
       (g) => g.profileKey === lastProvider,
     );
@@ -136,7 +154,6 @@ export function WelcomeView() {
       setSelectedProviderProfileKey(modelOptions[0].profileKey);
     }
 
-    const lastThinkingLevel = appConfig?.thinkingLevel;
     if (
       lastThinkingLevel &&
       thinkingLevelOptions.includes(lastThinkingLevel as ThinkingLevel)
@@ -249,16 +266,40 @@ export function WelcomeView() {
               onSelectModel={(profileKey, modelId) => {
                 setSelectedModel(modelId);
                 setSelectedProviderProfileKey(profileKey);
-                window.electronAPI.config.setActiveProvider({
-                  profileKey,
-                  defaultModel: modelId,
-                });
+                // ponytail: project → localStorage only, global → electron-store
+                if (workingDir) {
+                  try {
+                    localStorage.setItem(
+                      "deskwand.pm." + encodeURIComponent(workingDir),
+                      JSON.stringify({ p: profileKey, m: modelId, t: selectedThinkingLevel }),
+                    );
+                  } catch {
+                    /* ignore */
+                  }
+                } else {
+                  window.electronAPI.config.setActiveProvider({
+                    profileKey,
+                    defaultModel: modelId,
+                  });
+                }
               }}
               thinkingLevel={selectedThinkingLevel}
               thinkingLevelOptions={thinkingLevelOptions}
               onSelectThinkingLevel={(level) => {
                 setSelectedThinkingLevel(level);
-                window.electronAPI.config.save({ thinkingLevel: level });
+                // ponytail: project → localStorage only, global → electron-store
+                if (workingDir) {
+                  try {
+                    localStorage.setItem(
+                      "deskwand.pm." + encodeURIComponent(workingDir),
+                      JSON.stringify({ p: selectedProviderProfileKey, m: selectedModel, t: level }),
+                    );
+                  } catch {
+                    /* ignore */
+                  }
+                } else {
+                  window.electronAPI.config.save({ thinkingLevel: level });
+                }
               }}
               contextUsagePercentage={0}
               contextRingColorClass="text-accent"

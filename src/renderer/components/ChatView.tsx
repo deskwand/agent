@@ -1103,17 +1103,41 @@ export function ChatView() {
                     profileKey,
                     modelId,
                   );
-                  window.electronAPI.config.setActiveProvider({
-                    profileKey,
-                    defaultModel: modelId,
-                  });
+                  // ponytail: project → localStorage only, global → electron-store
+                  if (activeSessionCwd) {
+                    try {
+                      localStorage.setItem(
+                        "deskwand.pm." + encodeURIComponent(activeSessionCwd),
+                        JSON.stringify({ p: profileKey, m: modelId, t: thinkingLevel }),
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                  } else {
+                    window.electronAPI.config.setActiveProvider({
+                      profileKey,
+                      defaultModel: modelId,
+                    });
+                  }
                 }}
                 modelMenuDisabled={!activeSession || modelOptions.length === 0}
                 thinkingLevel={thinkingLevel}
                 thinkingLevelOptions={thinkingLevelOptions}
                 onSelectThinkingLevel={(level) => {
                   setSessionThinkingLevel(activeSession.id, level);
-                  window.electronAPI.config.save({ thinkingLevel: level });
+                  // ponytail: project → localStorage only, global → electron-store
+                  if (activeSessionCwd) {
+                    try {
+                      localStorage.setItem(
+                        "deskwand.pm." + encodeURIComponent(activeSessionCwd),
+                        JSON.stringify({ p: activeProviderProfileKey, m: activeModel, t: level }),
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                  } else {
+                    window.electronAPI.config.save({ thinkingLevel: level });
+                  }
                 }}
                 contextUsagePercentage={contextUsagePercentage}
                 contextRingColorClass={contextRingColorClass}
