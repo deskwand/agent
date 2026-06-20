@@ -6,13 +6,6 @@ export interface SlashCommand {
   action: "compact";
 }
 
-// Re-export shared plugin slash types for convenience
-export type {
-  PluginSlashSkill,
-  PluginSlashCommand,
-  PluginSlashItems,
-} from "../shared/ipc-types";
-
 export const BUILTIN_COMMANDS: SlashCommand[] = [
   {
     name: "compact",

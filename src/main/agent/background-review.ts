@@ -108,7 +108,6 @@ learning opportunities.`;
         },
         this.options.pathResolver,
         undefined, // MCPManager
-        undefined, // PluginRuntimeService
         this.options.skillsAdapter,
         undefined, // ExtensionManager
         undefined, // BrowserViewManager

@@ -30,8 +30,6 @@ import { config } from "dotenv";
 import { initDatabase, closeDatabase } from "./db/database";
 import { SessionManager } from "./session/session-manager";
 import { SkillsManager } from "./skills/skills-manager";
-import { PluginCatalogService } from "./skills/plugin-catalog-service";
-import { PluginRuntimeService } from "./skills/plugin-runtime-service";
 import { MemoryService } from "./memory/memory-service";
 import { MemoryExtension } from "./memory/memory-extension";
 import {
@@ -146,7 +144,6 @@ let mainWindow: BrowserWindow | null = null;
 let browserViewManager: BrowserViewManager | null = null;
 let sessionManager: SessionManager | null = null;
 let skillsManager: SkillsManager | null = null;
-let pluginRuntimeService: PluginRuntimeService | null = null;
 let memoryService: MemoryService | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
 
@@ -988,7 +985,6 @@ app
     // Initialize database
     const db = initDatabase();
 
-    pluginRuntimeService = new PluginRuntimeService(new PluginCatalogService());
     memoryService = new MemoryService(db);
     const extensionManager = new AgentRuntimeExtensionManager([
       new MemoryExtension(memoryService),
@@ -1000,7 +996,6 @@ app
       db,
       sendToRenderer,
       extensionManager,
-      pluginRuntimeService,
     );
     skillsManager = new SkillsManager(db);
     // pi-ai handles model routing natively — no proxy warmup needed
@@ -2255,134 +2250,6 @@ ipcMain.handle("skills.validate", async (_event, skillPath: string) => {
     logError("[Skills] Error validating skill:", error);
     return { valid: false, errors: ["Validation failed"] };
   }
-});
-
-ipcMain.handle(
-  "plugins.listCatalog",
-  async (_event, options?: { installableOnly?: boolean; page?: number }) => {
-    try {
-      if (!pluginRuntimeService) {
-        throw new Error("PluginRuntimeService not initialized");
-      }
-      return await pluginRuntimeService.listCatalog(options);
-    } catch (error) {
-      logError("[Plugins] Error listing catalog:", error);
-      throw error;
-    }
-  },
-);
-
-ipcMain.handle("plugins.listInstalled", async () => {
-  try {
-    if (!pluginRuntimeService) {
-      throw new Error("PluginRuntimeService not initialized");
-    }
-    return pluginRuntimeService.listInstalled();
-  } catch (error) {
-    logError("[Plugins] Error listing installed plugins:", error);
-    throw error;
-  }
-});
-
-ipcMain.handle("plugins.install", async (_event, pluginName: string) => {
-  try {
-    if (!pluginRuntimeService) {
-      throw new Error("PluginRuntimeService not initialized");
-    }
-    const result = await pluginRuntimeService.install(pluginName);
-    sessionManager?.invalidateSkillsSetup();
-    pluginRuntimeService?.invalidateSlashItemsCache();
-    return result;
-  } catch (error) {
-    logError("[Plugins] Error installing plugin:", error);
-    throw error;
-  }
-});
-
-ipcMain.handle(
-  "plugins.setEnabled",
-  async (_event, pluginId: string, enabled: boolean) => {
-    try {
-      if (!pluginRuntimeService) {
-        throw new Error("PluginRuntimeService not initialized");
-      }
-      const result = await pluginRuntimeService.setEnabled(pluginId, enabled);
-      sessionManager?.invalidateSkillsSetup();
-      pluginRuntimeService?.invalidateSlashItemsCache();
-      return result;
-    } catch (error) {
-      logError("[Plugins] Error toggling plugin:", error);
-      throw error;
-    }
-  },
-);
-
-ipcMain.handle(
-  "plugins.setComponentEnabled",
-  async (
-    _event,
-    pluginId: string,
-    component: "skills" | "commands" | "agents" | "hooks" | "mcp",
-    enabled: boolean,
-  ) => {
-    try {
-      if (!pluginRuntimeService) {
-        throw new Error("PluginRuntimeService not initialized");
-      }
-      const result = await pluginRuntimeService.setComponentEnabled(
-        pluginId,
-        component,
-        enabled,
-      );
-      if (component === "skills") {
-        sessionManager?.invalidateSkillsSetup();
-      }
-      pluginRuntimeService?.invalidateSlashItemsCache();
-      return result;
-    } catch (error) {
-      logError("[Plugins] Error toggling plugin component:", error);
-      throw error;
-    }
-  },
-);
-
-ipcMain.handle("plugins.uninstall", async (_event, pluginId: string) => {
-  try {
-    if (!pluginRuntimeService) {
-      throw new Error("PluginRuntimeService not initialized");
-    }
-    const result = await pluginRuntimeService.uninstall(pluginId);
-    sessionManager?.invalidateSkillsSetup();
-    pluginRuntimeService?.invalidateSlashItemsCache();
-    return result;
-  } catch (error) {
-    logError("[Plugins] Error uninstalling plugin:", error);
-    throw error;
-  }
-});
-
-ipcMain.handle("plugins.listSlashItems", async () => {
-  const items = (await pluginRuntimeService?.listSlashItems()) ?? {
-    skills: [],
-    commands: [],
-  };
-  // Merge extension commands from active AgentRunner sessions
-  // (these are registered by extensions via pi.registerCommand during session creation)
-  const sessionCmds = sessionManager?.getExtensionCommands() ?? [];
-  if (sessionCmds.length > 0) {
-    const seen = new Set(items.commands.map((c) => c.name));
-    for (const cmd of sessionCmds) {
-      if (!seen.has(cmd.name)) {
-        seen.add(cmd.name);
-        items.commands.push({
-          name: cmd.name,
-          label: cmd.name,
-          description: cmd.description,
-        });
-      }
-    }
-  }
-  return items;
 });
 
 // Window control IPC handlers

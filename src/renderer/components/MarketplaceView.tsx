@@ -5,7 +5,7 @@ import { useAppStore } from "../store";
 import { SettingsConnectors } from "./settings/SettingsConnectors";
 import { SettingsSkills } from "./settings/SettingsSkills";
 
-type TabId = "connectors" | "skills" | "plugins";
+type TabId = "connectors" | "skills";
 
 export function MarketplaceView() {
   const { t } = useTranslation();
@@ -24,8 +24,7 @@ export function MarketplaceView() {
   useEffect(() => {
     if (
       storeTab === "skills" ||
-      storeTab === "connectors" ||
-      storeTab === "plugins"
+      storeTab === "connectors"
     ) {
       setActiveTab(storeTab);
       setMarketplaceTab(null);

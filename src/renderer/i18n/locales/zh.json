@@ -80,19 +80,8 @@
   "marketplace": {
     "title": "应用",
     "desc": "发现和安装 MCP 连接器与技能",
-    "tabPlugins": "插件",
     "tabSkills": "技能",
     "tabMCP": "MCP"
-  },
-  "plugins": {
-    "searchPlaceholder": "搜索插件...",
-    "importFromFolder": "从文件夹导入",
-    "noResults": "未找到匹配的插件",
-    "loadMore": "加载更多",
-    "tryLoadMore": "仅搜索已加载的插件，尝试加载更多页面？",
-    "uninstallTitle": "卸载插件",
-    "uninstallDesc": "此操作不可撤销，插件包含的所有技能和配置将被移除。",
-    "uninstallConfirm": "卸载"
   },
   "general": {
     "appearance": "外观",
@@ -736,8 +725,6 @@
     "switchModel": "切换模型",
     "slashSkills": "技能",
     "slashCommands": "命令",
-    "slashPluginSkills": "插件技能",
-    "slashPluginCommands": "插件命令",
     "thinkingLevel": "思考",
     "thinkingLevelHint": "按会话设置模型思考强度",
     "thinkingLevel.off": "关闭",

@@ -42,7 +42,6 @@ import { MCPManager } from "../mcp/mcp-manager";
 import { mcpConfigStore } from "../mcp/mcp-config-store";
 import { BrowserViewManager } from "../browser/browser-view-manager";
 import { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
-import { PluginRuntimeService } from "../skills/plugin-runtime-service";
 import { BackgroundReviewService } from "../agent/background-review";
 import { app } from "electron";
 import {
@@ -110,7 +109,6 @@ export class SessionManager {
   private agentRunner!: IAgentRunner;
   private mcpManager: MCPManager;
   private extensionManager?: AgentRuntimeExtensionManager;
-  private pluginRuntimeService?: PluginRuntimeService;
   private _userSkillsPath: string;
   private browserViewManager: BrowserViewManager | null = null;
   private activeSessions: Map<string, AbortController> = new Map();
@@ -134,7 +132,6 @@ export class SessionManager {
     db: DatabaseInstance,
     sendToRenderer: (event: ServerEvent) => void,
     extensionManager?: AgentRuntimeExtensionManager,
-    pluginRuntimeService?: PluginRuntimeService,
   ) {
     this.db = db;
     this.sendToRenderer = (event) => {
@@ -149,7 +146,6 @@ export class SessionManager {
     this.pathResolver = new PathResolver();
     this.sandboxAdapter = getSandboxAdapter();
     this.extensionManager = extensionManager;
-    this.pluginRuntimeService = pluginRuntimeService;
 
     // Store user skills path for lazy BackgroundReviewService creation
     this._userSkillsPath = path.join(app.getPath("home"), ".deskwand", "skills");
@@ -195,8 +191,7 @@ export class SessionManager {
       },
       this.pathResolver,
       this.mcpManager,
-      this.pluginRuntimeService,
-      undefined, // skillsAdapter (PI plugins don't use this)
+      undefined, // skillsAdapter
       this.extensionManager,
       this.browserViewManager ?? undefined,
     );

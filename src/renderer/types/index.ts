@@ -205,82 +205,6 @@ export interface Skill {
 
 export type SkillType = "builtin" | "mcp" | "custom" | "agent";
 
-export type PluginComponentKind =
-  | "skills"
-  | "commands"
-  | "agents"
-  | "hooks"
-  | "extensions"
-  | "mcp";
-
-export interface PluginComponentCounts {
-  skills: number;
-  commands: number;
-  agents: number;
-  hooks: number;
-  extensions: number;
-  mcp: number;
-}
-
-export interface PluginComponentEnabledState {
-  skills: boolean;
-  commands: boolean;
-  agents: boolean;
-  hooks: boolean;
-  extensions: boolean;
-  mcp: boolean;
-}
-
-export interface PluginCatalogItemV2 {
-  name: string;
-  description?: string;
-  version?: string;
-  authorName?: string;
-  installable: boolean;
-  hasManifest: boolean;
-  componentCounts: PluginComponentCounts;
-  pluginId?: string;
-  installCommand?: string;
-  detailUrl?: string;
-  catalogSource?: "deskwand-marketplace" | "pi-agent";
-  packageType?: "extension" | "skill" | "prompt" | "theme";
-  downloadCount?: number;
-  license?: string;
-  npmUrl?: string;
-  repoUrl?: string;
-}
-
-export interface PluginCatalogItem extends PluginCatalogItemV2 {
-  skillCount: number;
-  hasSkills: boolean;
-}
-
-export interface InstalledPlugin {
-  pluginId: string;
-  name: string;
-  description?: string;
-  version?: string;
-  authorName?: string;
-  enabled: boolean;
-  sourcePath: string;
-  runtimePath: string;
-  componentCounts: PluginComponentCounts;
-  componentsEnabled: PluginComponentEnabledState;
-  installedAt: number;
-  updatedAt: number;
-}
-
-export interface PluginInstallResultV2 {
-  plugin: InstalledPlugin;
-  installedSkills: string[];
-  warnings: string[];
-}
-
-export interface PluginToggleResult {
-  success: boolean;
-  plugin: InstalledPlugin;
-}
-
 export interface PluginInstallResult {
   pluginName: string;
   installedSkills: string[];
@@ -648,13 +572,6 @@ export type ServerEvent =
     }
   | { type: "sandbox.progress"; payload: SandboxSetupProgress }
   | { type: "sandbox.sync"; payload: SandboxSyncStatus }
-  | {
-      type: "plugins.runtimeApplied";
-      payload: {
-        sessionId: string;
-        plugins: Array<{ name: string; path: string }>;
-      };
-    }
   | { type: "workdir.changed"; payload: { path: string } }
   | {
       type: "session.contextInfo";

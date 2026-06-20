@@ -9,11 +9,6 @@ import type {
   Skill,
   ApiTestInput,
   ApiTestResult,
-  PluginCatalogItemV2,
-  InstalledPlugin,
-  PluginInstallResultV2,
-  PluginToggleResult,
-  PluginComponentKind,
   ScheduleTask,
   ScheduleCreateInput,
   ScheduleUpdateInput,
@@ -307,40 +302,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
       skillPath: string,
     ): Promise<{ valid: boolean; errors: string[] }> =>
       ipcRenderer.invoke("skills.validate", skillPath),
-  },
-
-  plugins: {
-    listCatalog: (options?: {
-      installableOnly?: boolean;
-      page?: number;
-    }): Promise<PluginCatalogItemV2[]> =>
-      ipcRenderer.invoke("plugins.listCatalog", options),
-    listInstalled: (): Promise<InstalledPlugin[]> =>
-      ipcRenderer.invoke("plugins.listInstalled"),
-    install: (pluginName: string): Promise<PluginInstallResultV2> =>
-      ipcRenderer.invoke("plugins.install", pluginName),
-    setEnabled: (
-      pluginId: string,
-      enabled: boolean,
-    ): Promise<PluginToggleResult> =>
-      ipcRenderer.invoke("plugins.setEnabled", pluginId, enabled),
-    setComponentEnabled: (
-      pluginId: string,
-      component: PluginComponentKind,
-      enabled: boolean,
-    ): Promise<PluginToggleResult> =>
-      ipcRenderer.invoke(
-        "plugins.setComponentEnabled",
-        pluginId,
-        component,
-        enabled,
-      ),
-    uninstall: (pluginId: string): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke("plugins.uninstall", pluginId),
-    listSlashItems: (): Promise<{
-      skills: { name: string; description: string }[];
-      commands: { name: string; label: string; description: string }[];
-    }> => ipcRenderer.invoke("plugins.listSlashItems"),
   },
 
   // Sandbox methods
@@ -746,28 +707,6 @@ declare global {
           success: boolean;
           path: string;
           error?: string;
-        }>;
-      };
-      plugins: {
-        listCatalog: (options?: {
-          installableOnly?: boolean;
-          page?: number;
-        }) => Promise<PluginCatalogItemV2[]>;
-        listInstalled: () => Promise<InstalledPlugin[]>;
-        install: (pluginName: string) => Promise<PluginInstallResultV2>;
-        setEnabled: (
-          pluginId: string,
-          enabled: boolean,
-        ) => Promise<PluginToggleResult>;
-        setComponentEnabled: (
-          pluginId: string,
-          component: PluginComponentKind,
-          enabled: boolean,
-        ) => Promise<PluginToggleResult>;
-        uninstall: (pluginId: string) => Promise<{ success: boolean }>;
-        listSlashItems: () => Promise<{
-          skills: { name: string; description: string }[];
-          commands: { name: string; label: string; description: string }[];
         }>;
       };
       sandbox: {

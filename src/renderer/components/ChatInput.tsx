@@ -15,7 +15,6 @@ import type { Skill } from "../types";
 import {
   BUILTIN_COMMANDS,
   type SlashCommand,
-  type PluginSlashItems,
 } from "../slash-commands";
 
 export interface ChatInputAttachedFile {
@@ -89,10 +88,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     // --- Slash command menu ---
     const [slashSkills, setSlashSkills] = useState<Skill[]>([]);
-    const [pluginSlashItems, setPluginSlashItems] = useState<PluginSlashItems>({
-      skills: [],
-      commands: [],
-    });
     const [showSlashMenu, setShowSlashMenu] = useState(false);
     const [slashFilter, setSlashFilter] = useState("");
     const [slashStartIndex, setSlashStartIndex] = useState(-1);
@@ -132,12 +127,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         .getAll()
         .then((skills: Skill[]) => {
           setSlashSkills(skills.filter((s) => s.enabled));
-        })
-        .catch(() => {});
-      window.electronAPI.plugins
-        ?.listSlashItems?.()
-        .then((items: PluginSlashItems) => {
-          setPluginSlashItems(items ?? { skills: [], commands: [] });
         })
         .catch(() => {});
     }, [isElectron, showSlashMenu]);
@@ -356,11 +345,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     // --- Slash menu helpers ---
     type SlashItem =
       | { category: "command"; command: SlashCommand }
-      | { category: "skill"; skill: { name: string; description?: string } }
-      | {
-          category: "pluginCommand";
-          command: { name: string; label: string; description: string };
-        };
+      | { category: "skill"; skill: { name: string; description?: string } };
 
     const filterText = slashFilter.toLowerCase();
     const filteredCommands = slashFilter
@@ -370,18 +355,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             c.description.toLowerCase().includes(filterText),
         )
       : BUILTIN_COMMANDS;
-    // Merge own skills + plugin skills into one unified "/skill:name" list.
-    // All skills use the same syntax; pi SDK's _expandSkillCommand handles expansion.
-    const seenSkillNames = new Set<string>();
+    // Build skill list from slashSkills (single source, already filtered by enabled).
     const mergedSkills: { name: string; description?: string }[] = [];
     for (const s of slashSkills) {
-      if (seenSkillNames.has(s.name)) continue;
-      seenSkillNames.add(s.name);
-      mergedSkills.push({ name: s.name, description: s.description });
-    }
-    for (const s of pluginSlashItems.skills) {
-      if (seenSkillNames.has(s.name)) continue;
-      seenSkillNames.add(s.name);
       mergedSkills.push({ name: s.name, description: s.description });
     }
 
@@ -393,22 +369,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         )
       : mergedSkills;
 
-    const filteredPluginCommands = slashFilter
-      ? pluginSlashItems.commands.filter(
-          (c) =>
-            c.name.toLowerCase().includes(filterText) ||
-            c.description.toLowerCase().includes(filterText),
-        )
-      : pluginSlashItems.commands;
-
     const filteredItems: SlashItem[] = useMemo(
       () => [
         ...filteredCommands.map((c) => ({
           category: "command" as const,
-          command: c,
-        })),
-        ...filteredPluginCommands.map((c) => ({
-          category: "pluginCommand" as const,
           command: c,
         })),
         ...filteredSkills.map((s) => ({
@@ -416,12 +380,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           skill: s,
         })),
       ],
-      [filteredCommands, filteredPluginCommands, filteredSkills],
+      [filteredCommands, filteredSkills],
     );
 
     const hasCommands = filteredCommands.length > 0;
     const hasSkills = filteredSkills.length > 0;
-    const hasPluginCommands = filteredPluginCommands.length > 0;
 
     const closeSlashMenu = useCallback(() => {
       setShowSlashMenu(false);
@@ -454,7 +417,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           closeSlashMenu();
           return;
         }
-        // skill or pluginCommand: insert text
+        // skill: insert text
         const textarea = textareaRef.current;
         if (!textarea || slashStartIndex < 0) return;
         const currentValue = textarea.value;
@@ -462,12 +425,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const before = currentValue.slice(0, slashStartIndex);
         const after = currentValue.slice(cursorPos);
         let replacement: string;
-        if (item.category === "pluginCommand") {
-          replacement = `/${item.command.name} `;
-        } else {
-          // category === "skill" — all skills use /skill:name syntax
-          replacement = `/skill:${item.skill.name} `;
-        }
+        // category === "skill" — all skills use /skill:name syntax
+        replacement = `/skill:${item.skill.name} `;
         const newValue = before + replacement + after;
         setPrompt(newValue);
         textarea.value = newValue;
@@ -689,44 +648,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   })}
                 </>
               )}
-              {hasCommands && hasPluginCommands && (
-                <div className="mx-2 my-1 border-t border-border" />
-              )}
-              {hasPluginCommands && (
-                <>
-                  <div className="px-2.5 py-1.5 text-sm text-text-muted font-medium">
-                    {t("chat.slashPluginCommands")}
-                  </div>
-                  {filteredPluginCommands.map((cmd, idx) => {
-                    const globalIdx = filteredCommands.length + idx;
-                    return (
-                      <button
-                        key={`plugin-cmd:${cmd.name}`}
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          selectSlashItem({
-                            category: "pluginCommand",
-                            command: cmd,
-                          });
-                        }}
-                        className={`${SLASH_MENU_ITEM_BASE_CLASS} ${
-                          globalIdx === slashSelectedIndex
-                            ? "bg-accent/10 text-accent"
-                            : "text-text-primary hover:bg-surface-hover"
-                        }`}
-                      >
-                        <Zap className="w-4 h-4 flex-shrink-0 text-accent" />
-                        <span className="flex-1 truncate">/{cmd.name}</span>
-                        <span className="text-sm text-text-muted truncate max-w-[12rem] hidden sm:inline">
-                          {cmd.description}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </>
-              )}
-              {(hasCommands || hasPluginCommands) && hasSkills && (
+              {hasCommands && hasSkills && (
                 <div className="mx-2 my-1 border-t border-border" />
               )}
               {hasSkills && (
@@ -737,7 +659,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   {filteredSkills.map((skill, idx) => {
                     const globalIdx =
                       filteredCommands.length +
-                      filteredPluginCommands.length +
                       idx;
                     return (
                       <button

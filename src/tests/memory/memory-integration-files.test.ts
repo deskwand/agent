@@ -22,8 +22,7 @@ describe("memory integration wiring", () => {
     const memoryExtension = readProjectFile(
       "src/main/memory/memory-extension.ts",
     );
-    expect(runner).toContain("resolveSkillPaths(session.id)");
-    expect(runner).toContain("path.join(plugin.runtimePath, 'skills')");
+    expect(runner).toContain("resolveSkillPaths()");
     expect(runner).toContain("this.extensionManager.beforeSessionRun");
     expect(runner).toContain("skillsSignature");
     expect(memoryExtension).not.toContain(

@@ -162,26 +162,3 @@ export interface RemoteSessionMapping {
   createdAt: number;
   lastActiveAt: number;
 }
-
-// ---------------------------------------------------------------------------
-// Plugin slash items
-// ---------------------------------------------------------------------------
-
-/** A plugin skill exposed in the slash-command menu. */
-export interface PluginSlashSkill {
-  name: string;
-  description: string;
-}
-
-/** A plugin command (registered via ctx.registerCommand) exposed in the slash-command menu. */
-export interface PluginSlashCommand {
-  name: string;
-  label: string;
-  description: string;
-}
-
-/** Skills + commands contributed by installed plugins for the slash-command menu. */
-export interface PluginSlashItems {
-  skills: PluginSlashSkill[];
-  commands: PluginSlashCommand[];
-}

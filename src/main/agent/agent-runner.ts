@@ -57,7 +57,6 @@ import {
 } from "../utils/artifact-parser";
 import { getDefaultShell } from "../utils/shell-resolver";
 import type { SkillsAdapter } from "../skills/skills-adapter";
-import { PluginRuntimeService } from "../skills/plugin-runtime-service";
 import { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { configStore } from "../config/config-store";
 import {
@@ -548,7 +547,6 @@ export class AgentRunner {
   ) => Promise<string | null>;
   private pathResolver: PathResolver;
   private mcpManager?: MCPManager;
-  private _pluginRuntimeService?: PluginRuntimeService;
   private _skillsAdapter?: SkillsAdapter;
   private extensionManager?: AgentRuntimeExtensionManager;
   private _browserViewManager: BrowserViewManager | null = null;
@@ -676,7 +674,7 @@ ${hints.join("\n")}
     return paths;
   }
 
-  private async resolvePluginPaths(): Promise<{
+  private async resolveSkillPaths(): Promise<{
     skillPaths: string[];
     extensionPaths: string[];
   }> {
@@ -688,30 +686,6 @@ ${hints.join("\n")}
         Boolean(item && fs.existsSync(item)),
       ),
     );
-
-    if (this._pluginRuntimeService) {
-      try {
-        const runtimePlugins =
-          await this._pluginRuntimeService.getEnabledRuntimePlugins();
-        for (const plugin of runtimePlugins) {
-          if (
-            plugin.componentsEnabled.skills &&
-            plugin.componentCounts.skills > 0
-          ) {
-            const runtimeSkillsPath = path.join(plugin.runtimePath, "skills");
-            if (fs.existsSync(runtimeSkillsPath)) {
-              mergedPaths.add(runtimeSkillsPath);
-            }
-          }
-          // Extensions are managed by pi SDK via settings.json —
-          // DefaultResourceLoader.reload() discovers and jiti-compiles them
-          // from installAndPersist()'d packages.  No additionalExtensionPaths
-          // needed.
-        }
-      } catch (error) {
-        logWarn("[AgentRunner] Failed to resolve runtime plugin paths:", error);
-      }
-    }
 
     return {
       skillPaths: Array.from(mergedPaths),
@@ -845,7 +819,6 @@ ${hints.join("\n")}
     options: AgentRunnerOptions,
     pathResolver: PathResolver,
     mcpManager?: MCPManager,
-    pluginRuntimeService?: PluginRuntimeService,
     skillsAdapter?: SkillsAdapter,
     extensionManager?: AgentRuntimeExtensionManager,
     browserViewManager?: BrowserViewManager,
@@ -855,7 +828,6 @@ ${hints.join("\n")}
     this.requestSudoPassword = options.requestSudoPassword;
     this.pathResolver = pathResolver;
     this.mcpManager = mcpManager;
-    this._pluginRuntimeService = pluginRuntimeService;
     this._skillsAdapter = skillsAdapter;
     this.extensionManager = extensionManager;
     this._browserViewManager = browserViewManager ?? null;
@@ -2376,7 +2348,7 @@ ${hints.join("\n")}
         effectiveCwd,
         apiKey,
       });
-      const { skillPaths } = await this.resolvePluginPaths();
+      const { skillPaths } = await this.resolveSkillPaths();
       const skillsSignature = JSON.stringify(
         skillPaths.map(p => {
           try {

@@ -300,7 +300,6 @@ Be thorough — fewer than 10 actions means you stopped too early.`;
       { sendToRenderer: () => {}, customTools: tools },
       this.pathResolver,
       undefined,
-      undefined,
       this.skillsAdapter,
     );
 

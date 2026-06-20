@@ -80,19 +80,8 @@
   "marketplace": {
     "title": "Marketplace",
     "desc": "Discover and install MCP connectors and skills",
-    "tabPlugins": "Plugins",
     "tabSkills": "Skills",
     "tabMCP": "MCP"
-  },
-  "plugins": {
-    "searchPlaceholder": "Search plugins...",
-    "importFromFolder": "Import from folder",
-    "noResults": "No matching plugins found",
-    "loadMore": "Load more",
-    "tryLoadMore": "Only searching loaded plugins. Try loading more pages?",
-    "uninstallTitle": "Uninstall Plugin",
-    "uninstallDesc": "This action cannot be undone. All skills and configurations from this plugin will be removed.",
-    "uninstallConfirm": "Uninstall"
   },
   "general": {
     "appearance": "Appearance",
@@ -736,8 +725,6 @@
     "switchModel": "Switch model",
     "slashSkills": "Skills",
     "slashCommands": "Commands",
-    "slashPluginSkills": "Plugin Skills",
-    "slashPluginCommands": "Plugin Commands",
     "thinkingLevel": "Thinking",
     "thinkingLevelHint": "Set model thinking level per session",
     "thinkingLevel.off": "Off",
