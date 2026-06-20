@@ -43,6 +43,7 @@ module.exports = async function afterAllArtifactBuild(buildResult) {
     .map(d => path.join(outDir, d));
 
   const createdDmgs = [];
+  const artifacts = [];
 
   for (const macDir of macOutDirs) {
     const arch = path.basename(macDir).replace('mac-', ''); // e.g. "arm64"
@@ -80,6 +81,7 @@ module.exports = async function afterAllArtifactBuild(buildResult) {
       console.log(`  ✓ DMG created: ${(dmgSize / 1024 / 1024).toFixed(1)}MB (ULMO/LZMA compressed)`);
 
       createdDmgs.push(dmgPath);
+      artifacts.push(dmgPath);
     } catch (err) {
       console.error(`[create-dmg] Failed: ${err.message}`);
       if (fs.existsSync(dmgPath)) fs.unlinkSync(dmgPath);
@@ -95,8 +97,10 @@ module.exports = async function afterAllArtifactBuild(buildResult) {
   // electron-builder skips this when mac target is "dir" instead of "dmg"
   if (createdDmgs.length > 0) {
     const crypto = require("crypto");
+    const archiver = require("archiver");
     const latestYml = path.join(outDir, "latest-mac.yml");
     const lines = [`version: ${version}`, "files:"];
+    const createdZips = [];
 
     for (const dmgPath of createdDmgs) {
       const dmgName = path.basename(dmgPath);
@@ -107,6 +111,39 @@ module.exports = async function afterAllArtifactBuild(buildResult) {
       lines.push(`  - url: ${dmgName}`);
       lines.push(`    sha512: ${sha512}`);
       lines.push(`    size: ${size}`);
+
+      // Create a .zip copy of the DMG for MacUpdater (electron-updater macOS uses Squirrel.Mac,
+      // which requires a .zip file — see MacUpdater.findFile("zip", ["pkg", "dmg"]) logic)
+      const zipName = dmgName.replace(/\.dmg$/, ".zip");
+      const zipPath = path.join(outDir, zipName);
+      console.log(`  Creating zip copy for MacUpdater: ${zipName}`);
+      try {
+        await new Promise((resolve, reject) => {
+          const output = fs.createWriteStream(zipPath);
+          const archive = archiver("zip", { zlib: { level: 9 } });
+          output.on("close", () => {
+            const zipBuf = fs.readFileSync(zipPath);
+            const zipSha512 = crypto.createHash("sha512").update(zipBuf).digest("base64");
+            const zipSize = zipBuf.length;
+            lines.push(`  - url: ${zipName}`);
+            lines.push(`    sha512: ${zipSha512}`);
+            lines.push(`    size: ${zipSize}`);
+            createdZips.push(zipPath);
+            artifacts.push(zipPath);
+            console.log(`  ✓ ${zipName} created: ${(zipSize / 1024 / 1024).toFixed(1)}MB`);
+            resolve(null);
+          });
+          archive.on("error", reject);
+          archive.pipe(output);
+          archive.file(dmgPath, { name: dmgName });
+          archive.finalize();
+        });
+      } catch (err) {
+        console.error(`  ✗ Failed to create zip for ${dmgName}: ${err.message}`);
+        console.error(`    MacUpdater will not be able to update on macOS — ensure a .zip is uploaded manually.`);
+        // Remove stale zip file if archiver left a partial one
+        if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+      }
     }
 
     // Top-level path/sha512 from the first DMG (electron-updater uses these)
@@ -117,7 +154,8 @@ module.exports = async function afterAllArtifactBuild(buildResult) {
 
     lines.push(`releaseDate: '${new Date().toISOString()}'`);
     fs.writeFileSync(latestYml, lines.join("\n") + "\n");
-    console.log(`\n  ✓ latest-mac.yml generated for ${createdDmgs.length} DMG(s)`);
+    console.log(`\n  ✓ latest-mac.yml generated for ${createdDmgs.length} DMG(s) + ${createdZips.length} zip(s)`);
+
   }
 
   // Also handle any pre-existing DMGs (if `dmg` target is used on other platforms/configs)
@@ -144,5 +182,5 @@ module.exports = async function afterAllArtifactBuild(buildResult) {
     }
   }
 
-  return createdDmgs;
+  return artifacts;
 };
