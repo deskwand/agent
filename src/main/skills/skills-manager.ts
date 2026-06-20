@@ -17,7 +17,7 @@ import type { Skill, PluginInstallResult } from "../../renderer/types";
 import type { DatabaseInstance } from "../db/database";
 import { log, logError, logWarn } from "../utils/logger";
 import { isPathWithinRoot } from "../tools/path-containment";
-import { isAgentCreated } from "./agent-manifest";
+import { isAgentCreated, removeManifestEntry } from "./agent-manifest";
 
 /**
  * Validate that a skill name is safe for use as a directory name.
@@ -374,6 +374,12 @@ export class SkillsManager {
   ): Promise<Skill[]> {
     const skills: Skill[] = [];
 
+    // Prepared statement for restoring persisted enabled state (hot path —
+    // hoisted outside the loop to avoid re-compiling SQL for every skill).
+    const getEnabledStmt = this.db.prepare(
+      "SELECT enabled FROM skills WHERE id = ?",
+    );
+
     try {
       const entries = fs.readdirSync(dir);
 
@@ -404,15 +410,31 @@ export class SkillsManager {
             const metadata = this.getSkillMetadata(entryPath);
             if (!metadata) continue;
 
+            const skillId = `${source}-${entry}`;
+
+            // Restore persisted enabled state from DB (defaults to true for
+            // newly discovered skills that haven't been saved yet)
+            let persistedEnabled = true;
+            try {
+              const row = getEnabledStmt.get(skillId) as
+                | { enabled: number }
+                | undefined;
+              if (row !== undefined) {
+                persistedEnabled = row.enabled === 1;
+              }
+            } catch {
+              // DB read can fail during CLI install — use default
+            }
+
             const skill: Skill = {
-              id: `${source}-${entry}`,
+              id: skillId,
               name: metadata.name,
               description: metadata.description,
               type:
                 source === "global" && isAgentCreated(dir, entry)
                   ? "agent"
                   : "custom",
-              enabled: true,
+              enabled: persistedEnabled,
               createdAt: Date.now(),
             };
 
@@ -552,6 +574,9 @@ export class SkillsManager {
     const skill = this.loadedSkills.get(skillId);
     if (skill) {
       skill.enabled = enabled;
+
+      // Persist to database so state survives reloads
+      this.saveSkill(skill);
 
       // Stop server if disabling an MCP skill
       if (!enabled && skill.type === "mcp") {
@@ -1024,8 +1049,9 @@ export class SkillsManager {
     // Stop MCP server if running
     await this.stopMcpServer(skillId);
 
-    // Remove from filesystem (only for custom skills in global directory)
-    if (skill.type === "custom") {
+    // Remove from filesystem for custom / agent skills in global directory
+    const isGlobalSkill = skill.type === "custom" || skill.type === "agent";
+    if (isGlobalSkill) {
       // Validate skill name before using it in path construction
       validateSkillName(skill.name);
 
@@ -1036,6 +1062,20 @@ export class SkillsManager {
       if (fs.existsSync(skillDir)) {
         fs.rmSync(skillDir, { recursive: true, force: true });
         log(`Deleted skill directory: ${skillDir}`);
+      }
+
+      // Clean up agent-manifest entry for agent-created skills.
+      // Wrapped in try/catch — a failed manifest cleanup should not block
+      // the in-memory + DB removal that follows.
+      if (skill.type === "agent") {
+        try {
+          removeManifestEntry(globalSkillsPath, skill.name);
+        } catch (err) {
+          logWarn(
+            `[Skills] Failed to clean manifest entry for ${skill.name}:`,
+            err,
+          );
+        }
       }
     }
 
