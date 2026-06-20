@@ -737,6 +737,7 @@
     "connectorCount_one": "{{count}} 个连接器",
     "connectorCount_other": "{{count}} 个连接器",
     "compacting": "压缩会话中...",
+    "compacted": "会话压缩完成",
     "compactFailed": "会话压缩失败",
     "alreadyCompacted": "会话已压缩",
     "expandInput": "展开输入框",

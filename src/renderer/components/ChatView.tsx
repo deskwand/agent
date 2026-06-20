@@ -27,7 +27,6 @@ import {
   ChevronsDown,
   ChevronDown,
   ChevronRight,
-  Target,
 } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
@@ -36,7 +35,7 @@ import {
   type ChatInputSubmitData,
 } from "./ChatInput";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
-import { OperationBar, type Operation } from "./OperationBar";
+import { ChatInputStatusBar, resolveInputStatus } from "./ChatInputStatusBar";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -102,6 +101,9 @@ export function ChatView() {
   const pendingTurns = usePendingTurns();
   const [timerTick, setTimerTick] = useState(0);
   const [steeringEvent, setSteeringEvent] = useState<{ turnId: string; text: string } | null>(null);
+  const [compactionResult, setCompactionResult] = useState<
+    "success" | "failed" | null
+  >(null);
 
   // Real-time elapsed timer for active turn
   useEffect(() => {
@@ -119,6 +121,14 @@ export function ChatView() {
       prev && activeTurn && prev.turnId === activeTurn.turnId ? prev : null,
     );
   }, [activeTurn?.turnId]);
+
+  // Auto-dismiss compaction result after timeout
+  useEffect(() => {
+    if (!compactionResult) return;
+    const timeoutMs = compactionResult === "success" ? 3000 : 5000;
+    const id = setTimeout(() => setCompactionResult(null), timeoutMs);
+    return () => clearTimeout(id);
+  }, [compactionResult]);
 
   const activeTurnElapsedMs = useMemo(() => {
     if (!activeTurn?.startedAt) return 0;
@@ -151,7 +161,7 @@ export function ChatView() {
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInput, setHasInput] = useState(false);
   const isSteerRef = useRef(false);
-  const [activeOperations, setActiveOperations] = useState<Operation[]>([]);
+  const [isCompacting, setIsCompacting] = useState(false);
   const setGitChangeCount = useAppStore((s) => s.setGitChangeCount);
 
   // Active session cwd for git diff detection
@@ -179,9 +189,6 @@ export function ChatView() {
     window.addEventListener("focus", checkGitChanges);
     return () => window.removeEventListener("focus", checkGitChanges);
   }, [checkGitChanges]);
-  const isCompacting = activeOperations.some((op) =>
-    op.id.startsWith("compact"),
-  );
   const [activeConnectors, setActiveConnectors] = useState<
     { id: string; name: string; connected: boolean; toolCount: number }[]
   >([]);
@@ -208,6 +215,31 @@ export function ChatView() {
   const pendingCount = pendingTurns.length;
   const isSessionRunning = activeSession?.status === "running";
   const canStop = isSessionRunning || hasActiveTurn || pendingCount > 0;
+
+  const inputStatus = useMemo(() => {
+    const steeringText =
+      steeringEvent && activeTurn && steeringEvent.turnId === activeTurn.turnId
+        ? steeringEvent.text.trim().replace(/\s+/g, " ").slice(0, 120)
+        : "";
+    const shouldShowThinkingIndicator =
+      hasActiveTurn &&
+      (!partialMessage || partialMessage.trim() === "") &&
+      !partialThinking;
+    return resolveInputStatus({
+      isCompacting,
+      compactionResult,
+      steeringText,
+      shouldShowThinkingIndicator,
+    });
+  }, [
+    isCompacting,
+    compactionResult,
+    hasActiveTurn,
+    partialMessage,
+    partialThinking,
+    steeringEvent,
+    activeTurn?.turnId,
+  ]);
 
   const lastInputTokens = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -846,15 +878,12 @@ export function ChatView() {
   };
 
   const handleCompact = async (instructions?: string) => {
-    if (!activeSessionId || activeOperations.length > 0 || !isElectron) return;
+    if (!activeSessionId || isCompacting || hasActiveTurn || !isElectron) {
+      return;
+    }
 
-    const opId = `compact-${Date.now()}`;
-    const op: Operation = {
-      id: opId,
-      label: t("chat.compacting"),
-      onCancel: () => handleCancelCompact(opId),
-    };
-    setActiveOperations((prev) => [...prev, op]);
+    setCompactionResult(null);
+    setIsCompacting(true);
 
     try {
       const res = await window.electronAPI!.invoke<{
@@ -865,7 +894,7 @@ export function ChatView() {
         payload: { sessionId: activeSessionId, instructions },
       });
       if (!res?.success) {
-        setActiveOperations((prev) => prev.filter((o) => o.id !== opId));
+        setCompactionResult("failed");
         setGlobalNotice({
           id: `compact-err-${Date.now()}`,
           type: "error",
@@ -874,50 +903,24 @@ export function ChatView() {
         return;
       }
       if (res?.status === "already-compacted") {
-        // Session was already compacted — show done state briefly
-        setActiveOperations((prev) =>
-          prev.map((o) =>
-            o.id === opId
-              ? {
-                  ...o,
-                  label: t("chat.alreadyCompacted"),
-                  done: true,
-                  onCancel: undefined,
-                }
-              : o,
-          ),
-        );
-        setTimeout(
-          () =>
-            setActiveOperations((prev) => prev.filter((o) => o.id !== opId)),
-          3000,
-        );
+        setCompactionResult("success");
         return;
       }
       if (res?.status === "skipped") {
-        // No pi session yet — silently dismiss
-        setActiveOperations((prev) => prev.filter((o) => o.id !== opId));
         return;
       }
     } catch {
-      setActiveOperations((prev) => prev.filter((o) => o.id !== opId));
+      setCompactionResult("failed");
       setGlobalNotice({
         id: `compact-err-${Date.now()}`,
         type: "error",
         message: t("chat.compactFailed"),
       });
       return;
+    } finally {
+      setIsCompacting(false);
     }
-    setActiveOperations((prev) => prev.filter((o) => o.id !== opId));
-  };
-
-  const handleCancelCompact = async (opId: string) => {
-    if (!activeSessionId) return;
-    await window.electronAPI!.invoke({
-      type: "session.abortCompaction",
-      payload: { sessionId: activeSessionId },
-    });
-    setActiveOperations((prev) => prev.filter((o) => o.id !== opId));
+    setCompactionResult("success");
   };
 
   const handleCommand = (action: string) => {
@@ -1079,55 +1082,12 @@ export function ChatView() {
         )}
       </div>
 
-      {/* Thinking indicator — show when active turn but no streaming content yet */}
-      {hasActiveTurn &&
-        (!partialMessage || partialMessage.trim() === "") &&
-        !partialThinking && (
-          <div>
-            <div className="max-w-[920px] mx-auto px-5 lg:px-8 py-2">
-              <div className="flex items-center gap-0.5 text-xs text-text-secondary">
-                <span>{t("chat.processing")}</span>
-                <span
-                  className="animate-bounce"
-                  style={{ animationDelay: "0ms" }}
-                >
-                  .
-                </span>
-                <span
-                  className="animate-bounce"
-                  style={{ animationDelay: "150ms" }}
-                >
-                  .
-                </span>
-                <span
-                  className="animate-bounce"
-                  style={{ animationDelay: "300ms" }}
-                >
-                  .
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-      {/* Steering event — ephemeral turn-level feedback */}
-      {steeringEvent && activeTurn && steeringEvent.turnId === activeTurn.turnId && (
-        <div>
-          <div className="max-w-[920px] mx-auto px-5 lg:px-8 py-2">
-            <div className="flex items-center gap-1.5 text-xs text-text-muted">
-              <Target className="w-3.5 h-3.5" />
-              <span>{t("steer.eventLabel")}: {steeringEvent.text}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Input */}
       <div className="bg-transparent backdrop-blur-md">
-        <div className="max-w-[760px] mx-auto">
-          <OperationBar operations={activeOperations} />
+        <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
+          <ChatInputStatusBar status={inputStatus} />
         </div>
-        <div className="max-w-[920px] mx-auto px-5 lg:px-8 py-5">
+        <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">
           <ChatInput
             ref={chatInputRef}
             onSubmit={handleSubmit}

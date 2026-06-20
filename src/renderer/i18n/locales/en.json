@@ -737,6 +737,7 @@
     "connectorCount_one": "{{count}} connector",
     "connectorCount_other": "{{count}} connectors",
     "compacting": "Compacting session...",
+    "compacted": "Session compacted",
     "compactFailed": "Session compaction failed",
     "alreadyCompacted": "Session already compacted",
     "expandInput": "Expand input",
