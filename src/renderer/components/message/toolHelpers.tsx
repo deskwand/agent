@@ -163,39 +163,3 @@ export function getToolLabel(
 
   return name;
 }
-
-/** Short action-only label for status bars / compact display — no path/command details. */
-export function getToolShortLabel(name: string, t: TFunction): string {
-  const nameLower = name.toLowerCase();
-
-  // MCP tools: keep the tool name part only
-  if (name.startsWith("mcp__")) {
-    const match = name.match(/^mcp__(.+?)__(.+)$/);
-    return match?.[2] || name;
-  }
-
-  if (nameLower === "bash" || nameLower === "execute_command") return t("tool.actionBash");
-  if (nameLower === "read" || nameLower === "read_file") return t("tool.actionRead");
-  if (nameLower === "write" || nameLower === "write_file") return t("tool.actionWrite");
-  if (nameLower === "edit" || nameLower === "edit_file") return t("tool.actionEdit");
-  if (nameLower === "grep") return t("tool.actionGrep");
-  if (nameLower === "glob") return t("tool.actionGlob");
-  if (nameLower === "websearch") return t("tool.actionWebSearch");
-  if (nameLower === "webfetch") return t("tool.actionWebFetch");
-
-  // Browser tools
-  if (nameLower === "internal_browser_navigate") return t("tool.actionBrowserNavigate");
-  if (nameLower === "internal_browser_screenshot") return t("tool.actionBrowserScreenshot");
-  if (nameLower === "internal_browser_click") return t("tool.actionBrowserClick");
-  if (nameLower === "internal_browser_fill") return t("tool.actionBrowserFill");
-  if (nameLower === "internal_browser_scroll") return t("tool.actionBrowserScroll");
-  if (nameLower === "internal_browser_hover") return t("tool.actionBrowserHover");
-  if (nameLower === "internal_browser_select") return t("tool.actionBrowserSelect");
-  if (nameLower === "internal_browser_press") return t("tool.actionBrowserPress");
-  if (nameLower === "internal_browser_snapshot") return t("tool.actionBrowserSnapshot");
-  if (nameLower === "internal_browser_evaluate") return t("tool.actionBrowserEvaluate");
-  if (nameLower === "internal_browser_wait_for") return t("tool.actionBrowserWait");
-  if (nameLower === "internal_browser_get_state") return t("tool.actionBrowserGetState");
-
-  return name;
-}

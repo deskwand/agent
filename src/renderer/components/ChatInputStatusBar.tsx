@@ -1,10 +1,8 @@
 import { useTranslation } from "react-i18next";
-import { AlertCircle, Check, Loader2, Target, Wrench } from "lucide-react";
-import { getToolShortLabel } from "./message/toolHelpers";
+import { AlertCircle, Check, Loader2, Target } from "lucide-react";
 
 export type ChatInputStatus =
   | { type: "thinking" }
-  | { type: "tool-executing"; toolName: string }
   | { type: "compacting" }
   | { type: "compaction-success" }
   | { type: "compaction-failed" }
@@ -49,10 +47,6 @@ export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
     case "thinking":
       icon = <Loader2 className="w-3 h-3 animate-spin" />;
       text = t("chat.processing");
-      break;
-    case "tool-executing":
-      icon = <Wrench className="w-3 h-3 animate-pulse" />;
-      text = `${t("chat.toolExecuting")}: ${getToolShortLabel(status.toolName, t)}`;
       break;
     case "compacting":
       icon = <Loader2 className="w-3 h-3 animate-spin" />;
@@ -115,7 +109,6 @@ export function resolveInputStatus(params: {
   compactionResult: "success" | "failed" | null;
   steeringText: string;
   shouldShowThinkingIndicator: boolean;
-  runningToolName?: string | null;
   goalStatus?: {
     status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
     objective?: string;
@@ -172,9 +165,6 @@ export function resolveInputStatus(params: {
           timeBudgetSeconds: params.goalStatus.timeBudgetSeconds,
         };
     }
-  }
-  if (params.runningToolName) {
-    return { type: "tool-executing", toolName: params.runningToolName };
   }
   if (params.shouldShowThinkingIndicator) {
     return { type: "thinking" };

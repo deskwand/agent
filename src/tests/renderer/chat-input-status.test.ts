@@ -94,37 +94,4 @@ describe("resolveInputStatus", () => {
     ).toEqual({ type: "compaction-success" });
   });
 
-  // ── tool-executing ──
-
-  it("returns tool-executing when runningToolName is set", () => {
-    expect(
-      resolveInputStatus({ ...base, runningToolName: "bash" }),
-    ).toEqual({ type: "tool-executing", toolName: "bash" });
-  });
-
-  it("tool-executing wins over thinking", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        runningToolName: "bash",
-        shouldShowThinkingIndicator: true,
-      }),
-    ).toEqual({ type: "tool-executing", toolName: "bash" });
-  });
-
-  it("tool-executing is hidden by steering", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        runningToolName: "bash",
-        steeringText: "do X",
-      }),
-    ).toEqual({ type: "steering", text: "do X" });
-  });
-
-  it("runningToolName null does not affect output", () => {
-    expect(
-      resolveInputStatus({ ...base, runningToolName: null }),
-    ).toBeNull();
-  });
 });
