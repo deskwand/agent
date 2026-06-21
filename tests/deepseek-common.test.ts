@@ -36,7 +36,7 @@ describe('deepseek-common runRg', () => {
           ':!node_modules/**',
           '.',
         ]);
-        return 'ROADMAP.md:1:# Deskwand Roadmap\n';
+        return 'ROADMAP.md:1:# DeskWand Roadmap\n';
       }
       throw new Error(`unexpected command: ${command}`);
     });
@@ -45,7 +45,7 @@ describe('deepseek-common runRg', () => {
 
     expect(
       runRg(['-n', '-F', '--max-count', '2', '-e', 'Roadmap', '--glob', '!node_modules/**', '.'])
-    ).toBe('ROADMAP.md:1:# Deskwand Roadmap');
+    ).toBe('ROADMAP.md:1:# DeskWand Roadmap');
   });
 
   it('returns no snippets when ripgrep and git grep are both unavailable', async () => {

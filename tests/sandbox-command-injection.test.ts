@@ -82,8 +82,8 @@ describe('wsl-bridge distro name validation', () => {
     expect(validateCall - methodStart).toBeLessThan(100);
   });
 
-  it('validates distro at the top of installDeskwandCodeInWSL', () => {
-    const methodStart = wslBridgeSrc.indexOf('static async installDeskwandCodeInWSL(distro: string)');
+  it('validates distro at the top of installDeskWandCodeInWSL', () => {
+    const methodStart = wslBridgeSrc.indexOf('static async installDeskWandCodeInWSL(distro: string)');
     const validateCall = wslBridgeSrc.indexOf('WSLBridge.validateDistroName(distro)', methodStart);
     expect(validateCall).toBeGreaterThan(methodStart);
     expect(validateCall - methodStart).toBeLessThan(100);

@@ -5,7 +5,7 @@
  * This script runs inside Lima VM and handles:
  * - Command execution in isolated environment
  * - File operations with path validation
- * - Deskwand-code execution
+ * - DeskWand-code execution
  *
  * Communication is via stdin/stdout JSON-RPC.
  *
@@ -352,7 +352,7 @@ class SandboxAgent {
   /**
    * Run deskwand-code CLI
    */
-  async runDeskwandCode(params: {
+  async runDeskWandCode(params: {
     prompt: string;
     cwd?: string;
     model?: string;
@@ -492,9 +492,9 @@ class SandboxAgent {
       case "copyFile":
         return this.copyFile(params as Parameters<typeof this.copyFile>[0]);
 
-      case "runDeskwandCode":
-        return this.runDeskwandCode(
-          params as Parameters<typeof this.runDeskwandCode>[0],
+      case "runDeskWandCode":
+        return this.runDeskWandCode(
+          params as Parameters<typeof this.runDeskWandCode>[0],
         );
 
       case "shutdown":

@@ -417,7 +417,7 @@ export class SessionManager {
     this.db.sessions.create({
       id: session.id,
       title: session.title,
-      deskwand_session_id: session.deskwandSessionId || null,
+      deskwand_session_id: session.deskWandSessionId || null,
       openai_thread_id: session.openaiThreadId || null,
       status: session.status,
       cwd: session.cwd || null,
@@ -459,7 +459,7 @@ export class SessionManager {
     return {
       id: row.id,
       title: row.title,
-      deskwandSessionId: row.deskwand_session_id || undefined,
+      deskWandSessionId: row.deskwand_session_id || undefined,
       openaiThreadId: row.openai_thread_id || undefined,
       status: row.status as Session["status"],
       cwd: row.cwd || undefined,
@@ -508,7 +508,7 @@ export class SessionManager {
       return {
         id: row.id,
         title: row.title,
-        deskwandSessionId: row.deskwand_session_id || undefined,
+        deskWandSessionId: row.deskwand_session_id || undefined,
         openaiThreadId: row.openai_thread_id || undefined,
         status: row.status as Session["status"],
         cwd: row.cwd || undefined,

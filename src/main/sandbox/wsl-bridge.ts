@@ -259,7 +259,7 @@ export class WSLBridge implements SandboxExecutor {
       }
 
       // Check if deskwand-code is available
-      let deskwandCodeAvailable = false;
+      let deskWandCodeAvailable = false;
       if (nodeAvailable) {
         try {
           const deskwandResult = await execFileAsync(
@@ -276,12 +276,12 @@ export class WSLBridge implements SandboxExecutor {
           );
           const output = deskwandResult.stdout.trim();
           if (output) {
-            deskwandCodeAvailable = true;
+            deskWandCodeAvailable = true;
             log("[WSL] deskwand-code found:", output);
           }
         } catch (error) {
           log("[WSL] deskwand-code not found");
-          deskwandCodeAvailable = false;
+          deskWandCodeAvailable = false;
         }
       }
 
@@ -326,7 +326,7 @@ export class WSLBridge implements SandboxExecutor {
         nodeAvailable,
         pythonAvailable,
         pipAvailable,
-        deskwandCodeAvailable,
+        deskWandCodeAvailable,
         version: nodeVersion,
         pythonVersion,
       };
@@ -618,7 +618,7 @@ export class WSLBridge implements SandboxExecutor {
       );
       log("[WSL] Skill dependencies installed successfully");
     } catch (error) {
-      // Non-critical - Deskwand can install packages on demand
+      // Non-critical - DeskWand can install packages on demand
       log(
         "[WSL] Failed to pre-install skill dependencies (will install on demand):",
         (error as Error).message,
@@ -695,7 +695,7 @@ export class WSLBridge implements SandboxExecutor {
   /**
    * Install deskwand-code in WSL
    */
-  static async installDeskwandCodeInWSL(distro: string): Promise<boolean> {
+  static async installDeskWandCodeInWSL(distro: string): Promise<boolean> {
     WSLBridge.validateDistroName(distro);
     log("[WSL] Installing deskwand-code in WSL...");
 
@@ -840,7 +840,7 @@ export class WSLBridge implements SandboxExecutor {
       }
     }
 
-    if (!status.deskwandCodeAvailable) {
+    if (!status.deskWandCodeAvailable) {
       log(
         "[WSL] deskwand-code not found in WSL (optional, Windows deskwand-code will be used)",
       );
@@ -1176,7 +1176,7 @@ export class WSLBridge implements SandboxExecutor {
   /**
    * Run deskwand-code in WSL
    */
-  async runDeskwandCode(
+  async runDeskWandCode(
     prompt: string,
     options: {
       cwd?: string;
@@ -1199,7 +1199,7 @@ export class WSLBridge implements SandboxExecutor {
     // For now, we use a simple request/response pattern
 
     const result = await this.sendRequest<{ messages: unknown[] }>(
-      "runDeskwandCode",
+      "runDeskWandCode",
       {
         prompt,
         cwd: wslCwd,

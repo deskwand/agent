@@ -33,7 +33,7 @@ module.exports = async function afterAllArtifactBuild(buildResult) {
   }
 
   const { outDir, configuration } = buildResult;
-  const productName = configuration.productName || 'Deskwand';
+  const productName = configuration.productName || 'DeskWand';
   const version = buildResult.configuration.buildVersion ||
     require(path.join(process.cwd(), 'package.json')).version;
 
@@ -108,7 +108,7 @@ module.exports = async function afterAllArtifactBuild(buildResult) {
       const sha512 = crypto.createHash("sha512").update(dmgBuf).digest("base64");
       const size = dmgBuf.length;
 
-      // Extract arch from dmg filename: Deskwand-1.0.3-mac-arm64.dmg → arm64
+      // Extract arch from dmg filename: DeskWand-1.0.3-mac-arm64.dmg → arm64
       const dmgArch = dmgName.replace(`${productName}-${version}-mac-`, "").replace(".dmg", "");
 
       lines.push(`  - url: ${dmgName}`);

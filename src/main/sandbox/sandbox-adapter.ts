@@ -202,7 +202,7 @@ export class SandboxAdapter implements SandboxExecutor {
     );
     log(
       "[SandboxAdapter]   deskwand-code:",
-      wslStatus.deskwandCodeAvailable
+      wslStatus.deskWandCodeAvailable
         ? "[OK] available"
         : "[!] not in WSL (using Windows)",
     );
@@ -233,7 +233,7 @@ export class SandboxAdapter implements SandboxExecutor {
 
     // deskwand-code in WSL is NOT needed - we use Windows-side deskwand-code
     // WSL sandbox is only for command execution (Bash, file operations)
-    if (!wslStatus.deskwandCodeAvailable) {
+    if (!wslStatus.deskWandCodeAvailable) {
       log(
         "[SandboxAdapter] deskwand-code not in WSL (not needed - Windows deskwand-code is used)",
       );
@@ -408,7 +408,7 @@ export class SandboxAdapter implements SandboxExecutor {
   }
 
   // @ts-expect-error Reserved for future use
-  private async _showDeskwandCodeInstallPrompt(
+  private async _showDeskWandCodeInstallPrompt(
     config: SandboxAdapterConfig,
     distro: string,
   ): Promise<boolean> {
@@ -419,9 +419,9 @@ export class SandboxAdapter implements SandboxExecutor {
     const result = await dialog.showMessageBox(config.mainWindow, {
       type: "question",
       title: "Install deskwand-code in WSL",
-      message: `Deskwand Agent is not installed in ${distro}.`,
+      message: `DeskWand Agent is not installed in ${distro}.`,
       detail:
-        "Deskwand Agent is required for AI agent functionality. " +
+        "DeskWand Agent is required for AI agent functionality. " +
         "Would you like to install it automatically?",
       buttons: ["Install", "Skip (use native execution)"],
       defaultId: 0,
@@ -716,12 +716,12 @@ export class SandboxAdapter implements SandboxExecutor {
     return resultPath;
   }
 
-  // ==================== Deskwand Agent Integration ====================
+  // ==================== DeskWand Agent Integration ====================
 
   /**
    * Run deskwand-code in the sandbox
    */
-  async runDeskwandCode(
+  async runDeskWandCode(
     prompt: string,
     options: {
       cwd?: string;
@@ -736,16 +736,16 @@ export class SandboxAdapter implements SandboxExecutor {
     }
 
     if (this.state.mode === "wsl" && this.executor instanceof WSLBridge) {
-      return (this.executor as WSLBridge).runDeskwandCode(prompt, options);
+      return (this.executor as WSLBridge).runDeskWandCode(prompt, options);
     }
 
     if (this.state.mode === "lima" && this.executor instanceof LimaBridge) {
-      return (this.executor as LimaBridge).runDeskwandCode(prompt, options);
+      return (this.executor as LimaBridge).runDeskWandCode(prompt, options);
     }
 
     // For native mode, we need to spawn deskwand-code directly
     // This is a simplified implementation - full streaming would be more complex
-    throw new Error("Deskwand Agent execution is only supported in WSL/Lima mode");
+    throw new Error("DeskWand Agent execution is only supported in WSL/Lima mode");
   }
 }
 

@@ -44,7 +44,7 @@ const execFileAsync = promisify(execFile);
 const PLATFORM = os.platform(); // 'darwin' for macOS, 'win32' for Windows
 writeMCPLog(`Platform detected: ${PLATFORM}`, "Bootstrap");
 
-// Get Deskwand data directory for persistent storage (~/.deskwand)
+// Get DeskWand data directory for persistent storage (~/.deskwand)
 const OPEN_COWORK_DATA_DIR = path.join(os.homedir(), ".deskwand");
 
 // Directory for storing GUI operate files (screenshots, etc.)
@@ -940,9 +940,9 @@ async function resolveCliclickPath(): Promise<string | null> {
     return envOverride;
   }
 
-  // 2) 内置随应用打包（推荐）
-  // 打包布局：Resources/tools/darwin-{arch}/bin/cliclick
-  // 旧版布局：Resources/tools/bin/cliclick
+  // 2) 内置随应用打包(推荐)
+  // 打包布局:Resources/tools/darwin-{arch}/bin/cliclick
+  // 旧版布局:Resources/tools/bin/cliclick
   const arch = process.arch === "arm64" ? "arm64" : "x64";
   const archBundled = await resolveBundledExecutable(
     path.join("tools", `darwin-${arch}`, "bin", "cliclick"),
@@ -1065,7 +1065,7 @@ let cachedPythonExec: PythonExec | null | undefined;
 
 // Check if we're in dev environment
 function isDevEnvironment(): boolean {
-  // MCP servers run as child processes — cannot use Electron's app.isPackaged
+  // MCP servers run as child processes - cannot use Electron's app.isPackaged
   // Use VITE_DEV_SERVER_URL (set during dev) or script path heuristic
   const isDev =
     !!process.env.VITE_DEV_SERVER_URL || process.env.NODE_ENV === "development";
@@ -1952,9 +1952,9 @@ async function executeCliclick(
     if (/Accessibility privileges not enabled/i.test(result.stderr || "")) {
       const hint =
         "\n\nmacOS 权限提示 / Permissions:\n" +
-        "- System Settings → Privacy & Security → Accessibility：允许 Deskwand\n" +
+        "- System Settings → Privacy & Security → Accessibility：允许 DeskWand\n" +
         "- 如果是终端运行：允许 Terminal/iTerm\n" +
-        "- 授权后请重启 Deskwand 再重试\n";
+        "- 授权后请重启 DeskWand 再重试\n";
       throw new Error(
         `cliclick cannot control UI because Accessibility permission is not enabled.${hint}`,
       );
@@ -1965,8 +1965,8 @@ async function executeCliclick(
     const baseMessage = error instanceof Error ? error.message : String(error);
     const hint =
       "\n\nmacOS 权限提示 / Permissions:\n" +
-      "- System Settings → Privacy & Security → Accessibility：允许 Deskwand\n" +
-      "- System Settings → Privacy & Security → Automation：允许 Deskwand 控制 “System Events”\n";
+      "- System Settings → Privacy & Security → Accessibility：允许 DeskWand\n" +
+      "- System Settings → Privacy & Security → Automation：允许 DeskWand 控制 \"System Events\"\n";
     throw new Error(`${baseMessage}${hint}`);
   }
 }
@@ -2038,16 +2038,16 @@ using System.Runtime.InteropServices;
 public class DpiHelper {
     [DllImport("user32.dll")]
     public static extern bool SetProcessDPIAware();
-    
+
     [DllImport("user32.dll")]
     public static extern int GetSystemMetrics(int nIndex);
-    
+
     [DllImport("gdi32.dll")]
     public static extern int GetDeviceCaps(IntPtr hdc, int nIndex);
-    
+
     [DllImport("user32.dll")]
     public static extern IntPtr GetDC(IntPtr hWnd);
-    
+
     [DllImport("user32.dll")]
     public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
 }
@@ -2100,13 +2100,13 @@ if ($targetIndex -eq 0) {
         exit 1
     }
     $screen = $screens[$targetIndex]
-    
+
     # Get DPI scaling factor
     $hdc = [DpiHelper]::GetDC([IntPtr]::Zero)
     $dpiX = [DpiHelper]::GetDeviceCaps($hdc, 88)  # LOGPIXELSX
     [DpiHelper]::ReleaseDC([IntPtr]::Zero, $hdc) | Out-Null
     $scaleFactor = $dpiX / 96.0
-    
+
     # Scale the bounds to physical pixels
     $physX = [int]($screen.Bounds.X * $scaleFactor)
     $physY = [int]($screen.Bounds.Y * $scaleFactor)
@@ -2164,16 +2164,16 @@ using System.Runtime.InteropServices;
 public class DpiInfo {
     [DllImport("gdi32.dll")]
     public static extern int GetDeviceCaps(IntPtr hdc, int nIndex);
-    
+
     [DllImport("user32.dll")]
     public static extern IntPtr GetDC(IntPtr hWnd);
-    
+
     [DllImport("user32.dll")]
     public static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
-    
+
     [DllImport("user32.dll")]
     public static extern bool SetProcessDPIAware();
-    
+
     [DllImport("user32.dll")]
     public static extern int GetSystemMetrics(int nIndex);
 }
@@ -2202,7 +2202,7 @@ foreach ($screen in $screens) {
         $physWidth = [int]($screen.Bounds.Width * $scaleFactor)
         $physHeight = [int]($screen.Bounds.Height * $scaleFactor)
     }
-    
+
     $info = @{
         index = $index
         name = $screen.DeviceName
@@ -2965,39 +2965,39 @@ async function getDisplayConfiguration(): Promise<DisplayConfiguration> {
     const appleScript = `
       use framework "AppKit"
       use scripting additions
-      
+
       set displayList to ""
       set screenCount to (current application's NSScreen's screens()'s |count|())
-      
+
       repeat with i from 1 to screenCount
         set theScreen to (current application's NSScreen's screens()'s objectAtIndex:(i - 1))
         set theFrame to theScreen's frame()
         set theVisibleFrame to theScreen's visibleFrame()
-        
+
         -- Get display name (if available)
         set displayName to "Display " & i
-        
+
         -- Check if this is the main display
         set isMain to (theScreen's isEqual:(current application's NSScreen's mainScreen())) as boolean
-        
+
         -- Get coordinates
         set originX to (current application's NSMinX(theFrame)) as integer
         set originY to (current application's NSMinY(theFrame)) as integer
         set screenWidth to (current application's NSWidth(theFrame)) as integer
         set screenHeight to (current application's NSHeight(theFrame)) as integer
-        
+
         -- Get scale factor (for Retina displays)
         set scaleFactor to (theScreen's backingScaleFactor()) as real
-        
+
         set displayInfo to "index:" & (i - 1) & ",name:" & displayName & ",isMain:" & isMain & ",width:" & screenWidth & ",height:" & screenHeight & ",originX:" & originX & ",originY:" & originY & ",scaleFactor:" & scaleFactor
-        
+
         if displayList is "" then
           set displayList to displayInfo
         else
           set displayList to displayList & "|" & displayInfo
         end if
       end repeat
-      
+
       return displayList
     `;
 
@@ -3466,7 +3466,7 @@ async function performClick(
   const cliclickPath = await resolveCliclickPath();
 
   if (!cliclickPath) {
-    // 无 cliclick 时，使用 Quartz 事件作为降级方案
+    // 无 cliclick 时,使用 Quartz 事件作为降级方案
     await performMacClickViaQuartz(
       globalX,
       globalY,
@@ -4090,7 +4090,7 @@ async function takeScreenshot(
     const baseMessage = error instanceof Error ? error.message : String(error);
     const hint =
       "\n\nmacOS 权限提示 / Permissions:\n" +
-      "- System Settings → Privacy & Security → Screen Recording：允许 Deskwand\n" +
+      "- System Settings → Privacy & Security → Screen Recording：允许 DeskWand\n" +
       "- 重新启动应用后再试 / Restart the app and try again\n";
     throw new Error(`${baseMessage}${hint}`);
   }
@@ -4319,7 +4319,7 @@ async function getMousePosition(): Promise<{
   } else {
     // macOS implementation
     const result = await executeCliclick("p");
-    // Output format: "x,y" — coordinates may be negative for displays to the left of / above main
+    // Output format: "x,y" - coordinates may be negative for displays to the left of / above main
     const match = result.stdout.trim().match(/(-?\d+),(-?\d+)/);
 
     if (!match) {
@@ -4725,7 +4725,7 @@ async function callVisionAPIWithTimeout(
 
     if (isOpenRouter) {
       headers["HTTP-Referer"] = "https://github.com/deskwand/agent";
-      headers["X-Title"] = "Deskwand";
+      headers["X-Title"] = "DeskWand";
     }
 
     return new Promise<string>((resolve, reject) => {
@@ -5080,17 +5080,17 @@ try:
     img = Image.open(json.loads(${JSON.stringify(JSON.stringify(screenshotPath.replace(/\\/g, "/")))}))
     img_width, img_height = img.size
     scale_factor = ${scaleFactor}
-    
+
     # Create a semi-transparent overlay for drawing
     overlay = Image.new('RGBA', img.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(overlay)
-    
+
     # Try to use a nice font, fallback to default
     # Platform-specific font paths
     import platform
     font = None
     small_font = None
-    
+
     if platform.system() == 'Windows':
         # Windows fonts
         font_paths = [
@@ -5105,7 +5105,7 @@ try:
             '/System/Library/Fonts/SFNSDisplay.ttf',
             '/Library/Fonts/Arial.ttf',
         ]
-    
+
     for font_path in font_paths:
         try:
             font = ImageFont.truetype(font_path, 32)
@@ -5113,27 +5113,27 @@ try:
             break
         except:
             continue
-    
+
     if font is None:
         font = ImageFont.load_default()
         small_font = ImageFont.load_default()
-    
+
     # Draw markers for each click
     clicks = ${JSON.stringify(uniqueClicks)}
-    
+
     for click in clicks:
         # Logical coordinates from click history
         logical_x, logical_y = click['x'], click['y']
         display_number = click['displayNumber']  # Use the renumbered consecutive index
-        
+
         # Convert logical coordinates to pixel coordinates for drawing
         pixel_x = int(logical_x * scale_factor)
         pixel_y = int(logical_y * scale_factor)
-        
+
         # Calculate normalized coordinates (0-1000) for display
         norm_x = round((pixel_x / img_width) * 1000)
         norm_y = round((pixel_y / img_height) * 1000)
-        
+
         # Draw circle with semi-transparent fill and bright outline
         radius = 20
         # Semi-transparent yellow fill
@@ -5143,54 +5143,54 @@ try:
             outline=(255, 200, 0, 255),  # Bright orange outline, fully opaque
             width=3
         )
-        
+
         # Draw crosshair (the exact click position) - bright and visible
         cross_size = 12
         draw.line(
-            [(pixel_x - cross_size, pixel_y), (pixel_x + cross_size, pixel_y)], 
+            [(pixel_x - cross_size, pixel_y), (pixel_x + cross_size, pixel_y)],
             fill=(255, 0, 0, 255),  # Bright red, fully opaque
             width=2
         )
         draw.line(
-            [(pixel_x, pixel_y - cross_size), (pixel_x, pixel_y + cross_size)], 
+            [(pixel_x, pixel_y - cross_size), (pixel_x, pixel_y + cross_size)],
             fill=(255, 0, 0, 255),  # Bright red, fully opaque
             width=2
         )
-        
+
         # Draw center dot for extra visibility
         dot_radius = 3
         draw.ellipse(
             [(pixel_x - dot_radius, pixel_y - dot_radius), (pixel_x + dot_radius, pixel_y + dot_radius)],
             fill=(255, 0, 0, 255)  # Bright red dot
         )
-        
+
         # Draw number label with NORMALIZED coordinates (0-1000)
         label = f"#{display_number}"
         coord_label = f"[{norm_y},{norm_x}]"
-        
+
         # Get text bounding boxes
         bbox_num = draw.textbbox((0, 0), label, font=font)
         bbox_coord = draw.textbbox((0, 0), coord_label, font=small_font)
-        
+
         num_width = bbox_num[2] - bbox_num[0]
         num_height = bbox_num[3] - bbox_num[1]
         coord_width = bbox_coord[2] - bbox_coord[0]
         coord_height = bbox_coord[3] - bbox_coord[1]
-        
+
         # Use the wider of the two labels for background width
         max_width = max(num_width, coord_width)
         total_height = num_height + coord_height + 4  # 4px spacing between lines
-        
+
         # Position label above and to the right of the marker
         label_x = pixel_x + radius + 8
         label_y = pixel_y - radius - total_height - 8
-        
+
         # Ensure label stays within image bounds
         if label_x + max_width + 10 > img_width:
             label_x = pixel_x - radius - max_width - 18
         if label_y < 0:
             label_y = pixel_y + radius + 8
-        
+
         # Draw semi-transparent background rectangle with border
         padding = 4
         # Background with transparency
@@ -5203,24 +5203,24 @@ try:
             outline=(255, 200, 0, 255),  # Orange border
             width=2
         )
-        
+
         # Draw number text in bright yellow
         draw.text((label_x, label_y), label, fill=(255, 255, 0, 255), font=font)
-        
+
         # Draw normalized coordinate text below the number in white
         coord_y = label_y + num_height + 2
         draw.text((label_x, coord_y), coord_label, fill=(255, 255, 255, 255), font=small_font)
-    
+
     # Convert back to RGB and composite with original image
     if img.mode != 'RGBA':
         img = img.convert('RGBA')
     img = Image.alpha_composite(img, overlay)
     img = img.convert('RGB')
-    
+
     # Save annotated image
     img.save('${annotatedPath.replace(/\\/g, "/").replace(/'/g, "\\'")}')
     print('SUCCESS')
-    
+
 except Exception as e:
     print(f'ERROR: {str(e)}', file=sys.stderr)
     sys.exit(1)
@@ -5312,11 +5312,11 @@ async function analyzeScreenshotWithVision(
 
     const prompt = `给我${elementDescription}的grounding坐标。
 
-**注意**：图片上可能有黄色圆圈标记，这些是之前点击过的位置（仅用于相对位置参考，它们并不一定是正确的点击位置），标记格式为"#序号"和已经归一化之后的"[y,x]"坐标。这些标记不是界面的一部分，请忽略它们，只定位实际的界面元素。
+**注意**:图片上可能有黄色圆圈标记,这些是之前点击过的位置(仅用于相对位置参考,它们并不一定是正确的点击位置),标记格式为"#序号"和已经归一化之后的"[y,x]"坐标。这些标记不是界面的一部分,请忽略它们,只定位实际的界面元素。
 
-坐标格式：归一化到0-1000，格式为[ymin, xmin, ymax, xmax]
+坐标格式:归一化到0-1000,格式为[ymin, xmin, ymax, xmax]
 
-返回JSON（不要markdown）:
+返回JSON(不要markdown):
 {"box_2d": [ymin, xmin, ymax, xmax], "confidence": <0-100>}`;
 
     writeMCPLog(`[analyzeScreenshotWithVision] Prompt: ${prompt}`);

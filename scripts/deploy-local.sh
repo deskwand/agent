@@ -7,7 +7,7 @@
 
 set -euo pipefail
 
-APP_NAME="Deskwand"
+APP_NAME="DeskWand"
 APP_PATH="/Applications/${APP_NAME}.app"
 ARTIFACT_NAME="deskwand-macos"
 

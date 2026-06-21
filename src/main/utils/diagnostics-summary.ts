@@ -76,7 +76,7 @@ export interface DiagnosticsSummary {
     sandboxEnabled: boolean;
     thinkingEnabled: boolean;
     apiKeyConfigured: boolean;
-    deskwandCodePathConfigured: boolean;
+    deskWandCodePathConfigured: boolean;
     defaultWorkdir: string | null;
   };
   sandbox: {

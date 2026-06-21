@@ -25,7 +25,7 @@ interface SandboxStatus {
     pythonAvailable?: boolean;
     pythonVersion?: string;
     pipAvailable?: boolean;
-    deskwandCodeAvailable?: boolean;
+    deskWandCodeAvailable?: boolean;
   };
   lima?: {
     available: boolean;
@@ -37,7 +37,7 @@ interface SandboxStatus {
     pythonAvailable?: boolean;
     pythonVersion?: string;
     pipAvailable?: boolean;
-    deskwandCodeAvailable?: boolean;
+    deskWandCodeAvailable?: boolean;
   };
   error?: string;
 }

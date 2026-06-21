@@ -33,7 +33,7 @@ function createConfig(): AppConfig {
         updatedAt: '2026-05-24T00:00:00.000Z',
       },
     },
-    deskwandCodePath: '',
+    deskWandCodePath: '',
     defaultWorkdir: '',
     globalSkillsPath: '',
     enableDevLogs: true,
@@ -117,7 +117,7 @@ describe('runConfigApiTest', () => {
     expect(mocks.probeWithAgentSdk).toHaveBeenCalledTimes(1);
   });
 
-  it('returns failure when Deskwand Agent executable is not found', async () => {
+  it('returns failure when DeskWand Agent executable is not found', async () => {
     const probeFailure: ApiTestResult = {
       ok: false,
       errorType: 'unknown',

@@ -124,13 +124,13 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
     <div className="flex flex-col items-center py-10 space-y-6">
       {/* Icon */}
       <div className="w-20 h-20 rounded-4xl ring-1 ring-border-subtle flex items-center justify-center shadow-sm overflow-hidden">
-        <img src={logoUrl} alt="Deskwand" className="w-full h-full object-cover" />
+        <img src={logoUrl} alt="DeskWand" className="w-full h-full object-cover" />
       </div>
 
       {/* Name + Version */}
       <div className="text-center space-y-2">
         <h1 className="text-xl font-bold tracking-tight text-text-primary select-none">
-          Deskwand
+          DeskWand
         </h1>
         <div className="flex flex-col items-center gap-1.5">
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-surface-muted text-xs font-mono text-text-muted">

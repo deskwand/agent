@@ -744,7 +744,7 @@ ${hints.join("\n")}
     }
   }
 
-  private getAppDeskwandDir(): string {
+  private getAppDeskWandDir(): string {
     return app.getPath("userData");
   }
 
@@ -752,12 +752,12 @@ ${hints.join("\n")}
     return path.join(app.getPath("home"), ".deskwand", "skills");
   }
 
-  private getUserDeskwandSkillsDir(): string {
+  private getUserDeskWandSkillsDir(): string {
     return path.join(app.getPath("home"), ".deskwand", "skills");
   }
 
   private syncUserSkillsToAppDir(appSkillsDir: string): void {
-    const userSkillsDir = this.getUserDeskwandSkillsDir();
+    const userSkillsDir = this.getUserDeskWandSkillsDir();
     if (!fs.existsSync(userSkillsDir)) {
       return;
     }
@@ -2229,9 +2229,9 @@ ${hints.join("\n")}
           ? sandboxPath
           : workingDir || process.cwd();
 
-      // Use app-specific Deskwand config directory to avoid conflicts with user settings
-      // SDK uses Deskwand_CONFIG_DIR to locate skills
-      const userDeskwandDir = this.getAppDeskwandDir();
+      // Use app-specific DeskWand config directory to avoid conflicts with user settings
+      // SDK uses DeskWand_CONFIG_DIR to locate skills
+      const userDeskWandDir = this.getAppDeskWandDir();
 
       // Skills directory setup: only run on the first query per runner instance.
       // Symlinks and directories are stable across queries; re-running every time
@@ -2241,18 +2241,18 @@ ${hints.join("\n")}
         // Set flag at start to prevent re-entrant calls from concurrent queries
         this._skillsSetupDone = true;
 
-        // Ensure app Deskwand config directory exists
-        if (!fs.existsSync(userDeskwandDir)) {
-          fs.mkdirSync(userDeskwandDir, { recursive: true });
+        // Ensure app DeskWand config directory exists
+        if (!fs.existsSync(userDeskWandDir)) {
+          fs.mkdirSync(userDeskWandDir, { recursive: true });
         }
 
-        // Ensure app Deskwand skills directory exists
+        // Ensure app DeskWand skills directory exists
         const appSkillsDir = this.getRuntimeSkillsDir();
         if (!fs.existsSync(appSkillsDir)) {
           fs.mkdirSync(appSkillsDir, { recursive: true });
         }
 
-        // Copy built-in skills to app Deskwand skills directory if they don't exist
+        // Copy built-in skills to app DeskWand skills directory if they don't exist
         const builtinSkillsPath = this.getBuiltinSkillsPath();
         if (builtinSkillsPath && fs.existsSync(builtinSkillsPath)) {
           // Symlinks into .asar archives don't work at the OS level (ENOTDIR),
@@ -2314,7 +2314,7 @@ ${hints.join("\n")}
       // Build available skills section dynamically — now handled by pi's DefaultResourceLoader
       // via additionalSkillPaths. No custom prompt building needed.
 
-      log("[AgentRunner] App deskwand dir:", userDeskwandDir);
+      log("[AgentRunner] App deskwand dir:", userDeskWandDir);
       log("[AgentRunner] User working directory:", workingDir);
 
       logTiming("before building conversation context", runStartTime);
@@ -2694,7 +2694,7 @@ This is an isolated sandbox environment. Use ${VIRTUAL_WORKSPACE_PATH} as the ro
             : "";
 
       const coworkAppendPrompt = [
-        "You are an Deskwand assistant. Be concise, accurate, and tool-capable.",
+        "You are an DeskWand assistant. Be concise, accurate, and tool-capable.",
         `CRITICAL BEHAVIORAL RULES:\n
 1. CHAT FIRST: By default, respond to the user in plain text within the conversation. Do NOT create, write, or edit files unless the user explicitly asks you to (e.g., \"create a file\", \"write this to...\", \"edit the code\", \"save as...\", mentions a specific file path, or describes code changes they want applied). For questions, summaries, explanations, analysis, and general conversation — always reply directly in chat text.\n
 2. When a request is actionable, proceed immediately with reasonable assumptions. If you need clarification, ask briefly in plain text.\n
@@ -2856,7 +2856,7 @@ Tool routing:\n
           await import("@earendil-works/pi-coding-agent");
         const resourceLoader = new DefaultResourceLoader({
           cwd: effectiveCwd,
-          agentDir: userDeskwandDir,
+          agentDir: userDeskWandDir,
           additionalSkillPaths: skillPaths,
           appendSystemPrompt: coworkAppendPrompt,
         });

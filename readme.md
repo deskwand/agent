@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="resources/logo.png" alt="Deskwand Logo" width="280" />
+  <img src="resources/logo.png" alt="DeskWand Logo" width="280" />
 </p>
 
 # DeskWand

@@ -48,7 +48,7 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
     return buildProjectedConfig({
       activeProviderKey: "openrouter",
       providers: {},
-      deskwandCodePath: "",
+      deskWandCodePath: "",
       defaultWorkdir: "",
       enableDevLogs: false,
       theme: "light",

@@ -1,5 +1,5 @@
 appId: com.deskwand.app
-productName: Deskwand
+productName: DeskWand
 directories:
   output: release
   buildResources: resources
@@ -87,8 +87,8 @@ mac:
   entitlementsInherit: resources/entitlements.mac.plist
   extendInfo:
     LSApplicationCategoryType: public.app-category.developer-tools
-    NSScreenCaptureUsageDescription: 'Deskwand needs screen recording access for GUI automation.'
-    NSAccessibilityUsageDescription: 'Deskwand needs accessibility access for GUI automation.'
+    NSScreenCaptureUsageDescription: 'DeskWand needs screen recording access for GUI automation.'
+    NSAccessibilityUsageDescription: 'DeskWand needs accessibility access for GUI automation.'
   extraResources:
     - from: .bundle-resources/mcp
       to: mcp
@@ -142,7 +142,7 @@ dmg:
   contents:
     - x: 150
       y: 220
-      name: 'Deskwand.app'
+      name: 'DeskWand.app'
     - x: 450
       y: 220
       type: link

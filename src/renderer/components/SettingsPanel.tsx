@@ -187,7 +187,7 @@ export function SettingsPanel({
               {t("settings.title")}
             </p>
             <h2 className="mt-1 text-sm font-bold tracking-[-0.03em] text-text-primary">
-              Deskwand
+              DeskWand
             </h2>
             <p className="mt-1 text-xs leading-4 text-text-muted">
               {t("settings.panelDesc")}

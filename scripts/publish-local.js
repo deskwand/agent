@@ -30,7 +30,7 @@ if (!fs.existsSync(releaseDir)) {
 }
 
 // Collect latest*.yml files and the artifacts they reference.
-// Parsing latest*.yml is more reliable than globbing Deskwand-*,
+// Parsing latest*.yml is more reliable than globbing DeskWand-*,
 // because release/ may contain stale old-version artifacts.
 const ymlFiles = fs
   .readdirSync(releaseDir, { withFileTypes: true })
@@ -92,6 +92,6 @@ for (const { name, size } of files) {
 }
 
 const pkg = require(path.join(process.cwd(), "package.json"));
-console.log(`\n📦 Deskwand v${pkg.version} → ${outDir}/`);
+console.log(`\n📦 DeskWand v${pkg.version} → ${outDir}/`);
 console.log(`   共 ${files.length} 个文件, ${(totalSize / 1024 / 1024).toFixed(1)} MB`);
 console.log(`   👉 上传此目录内容到 https://deskwand.com/ 根目录即可`);

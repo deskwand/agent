@@ -70,7 +70,7 @@ const mockedGenerateTitleWithAgentSdk = vi.mocked(generateTitleWithAgentSdk);
 
 describe('SessionManager unified title generation', () => {
   const previous = {
-    disableDeskwandUnified: process.env.COWORK_DISABLE_Deskwand_UNIFIED,
+    disableDeskWandUnified: process.env.COWORK_DISABLE_DeskWand_UNIFIED,
     provider: configStore.get('provider'),
     customProtocol: configStore.get('customProtocol'),
     apiKey: configStore.get('apiKey'),
@@ -79,7 +79,7 @@ describe('SessionManager unified title generation', () => {
   };
 
   beforeEach(() => {
-    delete process.env.COWORK_DISABLE_Deskwand_UNIFIED;
+    delete process.env.COWORK_DISABLE_DeskWand_UNIFIED;
     configStore.set('provider', 'openai');
     configStore.set('customProtocol', 'openai');
     configStore.set('apiKey', 'sk-test');
@@ -88,10 +88,10 @@ describe('SessionManager unified title generation', () => {
   });
 
   afterEach(() => {
-    if (previous.disableDeskwandUnified === undefined) {
-      delete process.env.COWORK_DISABLE_Deskwand_UNIFIED;
+    if (previous.disableDeskWandUnified === undefined) {
+      delete process.env.COWORK_DISABLE_DeskWand_UNIFIED;
     } else {
-      process.env.COWORK_DISABLE_Deskwand_UNIFIED = previous.disableDeskwandUnified;
+      process.env.COWORK_DISABLE_DeskWand_UNIFIED = previous.disableDeskWandUnified;
     }
     configStore.set('provider', previous.provider);
     configStore.set('customProtocol', previous.customProtocol);
@@ -120,7 +120,7 @@ describe('SessionManager unified title generation', () => {
   });
 
   it('routes gemini title generation through Agent SDK even when unified mode flag is disabled', async () => {
-    process.env.COWORK_DISABLE_Deskwand_UNIFIED = '1';
+    process.env.COWORK_DISABLE_DeskWand_UNIFIED = '1';
     configStore.set('provider', 'gemini');
     configStore.set('customProtocol', 'gemini');
     configStore.set('apiKey', 'AIza-test');

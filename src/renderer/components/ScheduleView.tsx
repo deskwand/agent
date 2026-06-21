@@ -111,7 +111,7 @@ export function ScheduleView() {
           <ArrowLeft className="w-5 h-5 text-text-secondary" />
         </button>
         <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
-          Deskwand
+          DeskWand
         </p>
         <h2 className="mt-0.5 text-lg font-semibold text-text-primary">
           {t("sidebar.automation")}

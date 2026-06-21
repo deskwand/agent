@@ -10,7 +10,7 @@
  *
  * Features:
  * - File system operations (create, read, modify, delete)
- * - Integration with Deskwand Agent for AI-assisted development
+ * - Integration with DeskWand Agent for AI-assisted development
  * - Test execution (unit, integration, e2e)
  * - Requirement tracking and validation
  * - Git integration for version control
@@ -986,7 +986,7 @@ async function callVisionAPI(
 
     if (isOpenRouter) {
       headers["HTTP-Referer"] = "https://github.com/deskwand/agent";
-      headers["X-Title"] = "Deskwand";
+      headers["X-Title"] = "DeskWand";
     }
 
     return new Promise<string>((resolve, reject) => {
@@ -2432,21 +2432,21 @@ async function executeGUIInteraction(
 //   }
 // }
 
-// Helper: Execute Deskwand Agent command
+// Helper: Execute DeskWand Agent command
 // @ts-expect-error - Reserved for future use
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function executeDeskwandCode(
+async function executeDeskWandCode(
   prompt: string,
   workingDir: string = WORKSPACE_DIR,
 ): Promise<string> {
   try {
     // Check if deskwand-code is available
-    const deskwandCodePath = process.env.DESKWAND_CODE_PATH || "deskwand-code";
+    const deskWandCodePath = process.env.DESKWAND_CODE_PATH || "deskwand-code";
 
     // Execute deskwand-code with the prompt
     const { stdout, stderr } = await execFileAsync(
       "bash",
-      ["-c", `${deskwandCodePath} "${prompt.replace(/"/g, '\\"')}"`],
+      ["-c", `${deskWandCodePath} "${prompt.replace(/"/g, '\\"')}"`],
       {
         cwd: workingDir,
         maxBuffer: 10 * 1024 * 1024, // 10MB buffer
@@ -2455,17 +2455,17 @@ async function executeDeskwandCode(
     );
 
     if (stderr && !stderr.includes("Warning")) {
-      writeMCPLog("[DeskwandCode] stderr:", stderr);
+      writeMCPLog("[DeskWandCode] stderr:", stderr);
     }
 
     return stdout || stderr || "Command executed successfully";
   } catch (error: unknown) {
     writeMCPLog(
-      "[DeskwandCode] Error:",
+      "[DeskWandCode] Error:",
       error instanceof Error ? error.message : String(error),
     );
     throw new Error(
-      `Deskwand Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
+      `DeskWand Agent execution failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }
@@ -3578,7 +3578,7 @@ async function main() {
   writeMCPLog("=".repeat(60));
   writeMCPLog(`Workspace: ${WORKSPACE_DIR}`);
   writeMCPLog(
-    `Deskwand Agent: ${process.env.DESKWAND_CODE_PATH || "deskwand-code (from PATH)"}`,
+    `DeskWand Agent: ${process.env.DESKWAND_CODE_PATH || "deskwand-code (from PATH)"}`,
   );
   writeMCPLog("");
   writeMCPLog("Available Tools:");

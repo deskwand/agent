@@ -1,8 +1,8 @@
-# Deskwand - Startup Script
+# DeskWand - Startup Script
 # This script starts the application.
 # Environment variables should be set in .env file or system environment.
 
-Write-Host "Starting Deskwand..." -ForegroundColor Cyan
+Write-Host "Starting DeskWand..." -ForegroundColor Cyan
 Write-Host ""
 
 # Check if .env file exists

@@ -103,7 +103,7 @@ export interface AppConfig {
   profiles: Partial<Record<ProviderProfileKey, ProviderProfile>>;
   activeProviderKey: ProviderProfileKey;
   providers: Partial<Record<ProviderProfileKey, ApiProviderConfig>>;
-  deskwandCodePath?: string;
+  deskWandCodePath?: string;
   defaultWorkdir?: string;
   enableDevLogs: boolean;
   theme: AppTheme;
@@ -121,7 +121,7 @@ export interface AppConfig {
 interface StoredConfig {
   activeProviderKey: ProviderProfileKey;
   providers: Partial<Record<ProviderProfileKey, ApiProviderConfig>>;
-  deskwandCodePath: string;
+  deskWandCodePath: string;
   defaultWorkdir: string;
   enableDevLogs: boolean;
   theme: AppTheme;
@@ -246,7 +246,7 @@ function defaultStoredConfig(): StoredConfig {
   return {
     activeProviderKey: "openrouter",
     providers: {},
-    deskwandCodePath: "",
+    deskWandCodePath: "",
     defaultWorkdir: "",
     enableDevLogs: false,
     theme: "light",
@@ -730,7 +730,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     profiles,
     activeProviderKey: activeKey,
     providers,
-    deskwandCodePath: stored.deskwandCodePath,
+    deskWandCodePath: stored.deskWandCodePath,
     defaultWorkdir: stored.defaultWorkdir,
     enableDevLogs: stored.enableDevLogs,
     theme: stored.theme,
@@ -862,8 +862,8 @@ export class ConfigStore {
     stored.activeProviderKey = targetKey;
 
     // ── Non-provider fields ──
-    if (updates.deskwandCodePath !== undefined)
-      stored.deskwandCodePath = updates.deskwandCodePath;
+    if (updates.deskWandCodePath !== undefined)
+      stored.deskWandCodePath = updates.deskWandCodePath;
     if (updates.defaultWorkdir !== undefined)
       stored.defaultWorkdir = updates.defaultWorkdir;
     if (updates.enableDevLogs !== undefined)

@@ -138,7 +138,7 @@ function initLogFile(): void {
     // Write header
     const header = `
 ================================================================================
-Deskwand Application Log
+DeskWand Application Log
 Started: ${new Date().toISOString()}
 Platform: ${process.platform}
 Arch: ${process.arch}

@@ -83,7 +83,7 @@ module.exports = async function afterPack(context) {
   // Determine the app resources path
   let resourcesDir;
   if (platform === 'darwin') {
-    // macOS: Deskwand.app/Contents/Resources/app.asar.unpacked/...
+    // macOS: DeskWand.app/Contents/Resources/app.asar.unpacked/...
     const appName = `${context.packager.appInfo.productFilename}.app`;
     resourcesDir = path.join(appOutDir, appName, 'Contents', 'Resources');
   } else {

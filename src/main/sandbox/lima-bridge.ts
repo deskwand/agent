@@ -268,14 +268,14 @@ export class LimaBridge implements SandboxExecutor {
       }
 
       // Check deskwand-code
-      let deskwandCodeAvailable = false;
+      let deskWandCodeAvailable = false;
       if (nodeAvailable) {
         try {
           await execLimaShellWithRetry(
             'bash -c "source ~/.nvm/nvm.sh 2>/dev/null; which deskwand"',
             10000,
           );
-          deskwandCodeAvailable = true;
+          deskWandCodeAvailable = true;
           log("[Lima] deskwand-code found");
         } catch {
           log("[Lima] deskwand-code not found");
@@ -290,7 +290,7 @@ export class LimaBridge implements SandboxExecutor {
         nodeAvailable,
         pythonAvailable,
         pipAvailable,
-        deskwandCodeAvailable,
+        deskWandCodeAvailable,
         version: nodeVersion,
         pythonVersion,
       };
@@ -570,7 +570,7 @@ export class LimaBridge implements SandboxExecutor {
       );
       log("[Lima] Skill dependencies installed successfully");
     } catch (error) {
-      // Non-critical - Deskwand can install packages on demand
+      // Non-critical - DeskWand can install packages on demand
       log(
         "[Lima] Failed to pre-install skill dependencies (will install on demand):",
         (error as Error).message,
@@ -581,7 +581,7 @@ export class LimaBridge implements SandboxExecutor {
   /**
    * Install deskwand-code in Lima
    */
-  static async installDeskwandCodeInLima(): Promise<boolean> {
+  static async installDeskWandCodeInLima(): Promise<boolean> {
     log("[Lima] Installing deskwand-code...");
     try {
       await execLimaShellWithRetry(
@@ -991,7 +991,7 @@ export class LimaBridge implements SandboxExecutor {
   /**
    * Run deskwand-code in Lima
    */
-  async runDeskwandCode(
+  async runDeskWandCode(
     prompt: string,
     options: {
       cwd?: string;
@@ -1006,7 +1006,7 @@ export class LimaBridge implements SandboxExecutor {
     }
 
     const result = await this.sendRequest<{ messages: unknown[] }>(
-      "runDeskwandCode",
+      "runDeskWandCode",
       {
         prompt,
         cwd: options.cwd,

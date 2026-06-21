@@ -365,7 +365,7 @@ function setupTray() {
   }
 
   tray = new Tray(resolvedIconPath);
-  tray.setToolTip("Deskwand");
+  tray.setToolTip("DeskWand");
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -948,7 +948,7 @@ app
     setDevLogsEnabled(enableDevLogs);
 
     // Log environment variables for debugging
-    log("=== Deskwand Starting ===");
+    log("=== DeskWand Starting ===");
     log("Config file:", configStore.getPath());
     log("Is configured:", configStore.isConfigured());
     log("[Runtime] Using pi-coding-agent SDK for all providers");
@@ -1182,7 +1182,7 @@ app
     const message =
       error instanceof Error ? error.message : "Unknown startup error";
     dialog.showErrorBox(
-      "Deskwand 启动失败",
+      "DeskWand 启动失败",
       `${message}\n\n请查看日志获取更多信息。`,
     );
     app.quit();
@@ -2477,7 +2477,7 @@ ipcMain.handle("logs.export", async () => {
         sandboxEnabled: !!configStore.get("sandboxEnabled"),
         thinkingEnabled: !!configStore.get("enableThinking"),
         apiKeyConfigured: !!configStore.get("apiKey"),
-        deskwandCodePathConfigured: !!configStore.get("deskwandCodePath"),
+        deskWandCodePathConfigured: !!configStore.get("deskWandCodePath"),
         defaultWorkdir: configStore.get("defaultWorkdir") || null,
       },
       sandbox: {
@@ -2576,7 +2576,7 @@ ipcMain.handle("logs.export", async () => {
       });
       archive.append(
         [
-          "Deskwand diagnostic bundle",
+          "DeskWand diagnostic bundle",
           `Exported at: ${diagnosticsSummary.exportedAt}`,
           "",
           "Included files:",

@@ -117,7 +117,7 @@ learning opportunities.`;
       const reviewSession: Session = {
         id: `bg-review-${Date.now()}`,
         title: "",
-        deskwandSessionId: "",
+        deskWandSessionId: "",
         status: "idle",
         cwd: os.homedir(),
         mountedPaths: [],

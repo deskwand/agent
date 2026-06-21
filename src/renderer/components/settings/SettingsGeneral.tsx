@@ -148,7 +148,7 @@ export function SettingsGeneral() {
       {/* About */}
       {appVer && (
         <div className="pt-4 border-t border-border">
-          <p className="text-xs text-text-muted">Deskwand v{appVer}</p>
+          <p className="text-xs text-text-muted">DeskWand v{appVer}</p>
         </div>
       )}
     </div>

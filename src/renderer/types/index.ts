@@ -4,7 +4,7 @@ import type { ThemePreset } from "../../shared/theme";
 export interface Session {
   id: string;
   title: string;
-  deskwandSessionId?: string;
+  deskWandSessionId?: string;
   openaiThreadId?: string;
   status: SessionStatus;
   cwd?: string;
@@ -752,7 +752,7 @@ export interface AppConfig {
   profiles: Partial<Record<ProviderProfileKey, ProviderProfile>>;
   activeProviderKey: ProviderProfileKey;
   providers: Partial<Record<ProviderProfileKey, ApiProviderConfig>>;
-  deskwandCodePath?: string;
+  deskWandCodePath?: string;
   defaultWorkdir?: string;
   theme?: AppTheme;
   themePreset?: ThemePreset;

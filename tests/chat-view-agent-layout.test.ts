@@ -14,9 +14,9 @@ describe('ChatView Agent-style layout', () => {
     expect(source).toContain('max-w-[920px]');
   });
 
-  it('uses a quieter header treatment with Deskwand eyebrow and compact connector badge', () => {
+  it('uses a quieter header treatment with DeskWand eyebrow and compact connector badge', () => {
     const source = readChatView();
-    expect(source).toContain('Deskwand');
+    expect(source).toContain('DeskWand');
     expect(source).toContain('bg-background/88');
     expect(source).toContain('border-border-muted');
   });

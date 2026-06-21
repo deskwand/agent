@@ -1,5 +1,5 @@
 /**
- * Auto-updater module for Deskwand.
+ * Auto-updater module for DeskWand.
  *
  * Configured for generic provider at https://file.deskwand.com.
  * Per karpathy-guidelines: self-contained, single responsibility,

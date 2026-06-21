@@ -472,7 +472,7 @@ export function SettingsAPI({
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-3">
         <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
-          Deskwand
+          DeskWand
         </p>
         <div className="flex items-center gap-2">
           <Loader2 className="h-5 w-5 animate-spin text-accent" />

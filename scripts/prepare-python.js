@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Prepare a bundled Python runtime for Deskwand (macOS/Linux).
+ * Prepare a bundled Python runtime for DeskWand (macOS/Linux).
  *
  * Goal:
  * - Bundle a standalone python3 into `resources/python/darwin-{arch}/`

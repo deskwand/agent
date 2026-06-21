@@ -11,7 +11,7 @@ const mockConfigState = vi.hoisted(() => ({
     activeProviderKey: "openrouter",
     profiles: {},
     providers: {},
-    deskwandCodePath: "",
+    deskWandCodePath: "",
     defaultWorkdir: "",
     enableDevLogs: false,
     theme: "light",

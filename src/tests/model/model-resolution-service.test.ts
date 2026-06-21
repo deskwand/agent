@@ -139,7 +139,7 @@ function buildAppConfig(): AppConfig {
     profiles: {},
     activeProviderKey: "openrouter",
     providers,
-    deskwandCodePath: "",
+    deskWandCodePath: "",
     defaultWorkdir: "",
     enableDevLogs: false,
     theme: "light",

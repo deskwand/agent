@@ -272,7 +272,7 @@ export class MCPManager {
       );
       if (!preferredNpxPath) {
         throw new Error(
-          "npx is not available. Install Node.js so Deskwand can use your system npx.cmd, or reinstall the app to restore the bundled runtime.",
+          "npx is not available. Install Node.js so DeskWand can use your system npx.cmd, or reinstall the app to restore the bundled runtime.",
         );
       }
 
@@ -1823,7 +1823,7 @@ function isProtectedConfigEnvKey(key: string): boolean {
   return (
     key.startsWith("OPENAI_") ||
     key.startsWith("ANTHROPIC_") ||
-    key.startsWith("Deskwand_") ||
+    key.startsWith("DeskWand_") ||
     key.startsWith("COWORK_")
   );
 }
