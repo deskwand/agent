@@ -29,20 +29,6 @@ export const MCP_SERVER_PRESETS: Record<
       "http://localhost:9222",
     ],
   },
-  notion: {
-    name: "Notion",
-    type: "stdio",
-    command: "npx",
-    args: ["-y", "@notionhq/notion-mcp-server"],
-    env: {
-      NOTION_TOKEN: "",
-    },
-    requiresEnv: ["NOTION_TOKEN"],
-    envDescription: {
-      NOTION_TOKEN:
-        "Notion Internal Integration Token (get from notion.so/profile/integrations)",
-    },
-  },
   "software-development": {
     name: "Software_Development",
     type: "stdio",
