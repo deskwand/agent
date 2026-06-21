@@ -752,6 +752,8 @@
     "active": "Active",
     "paused": "Paused",
     "complete": "Complete",
+    "blocked": "Blocked",
+    "budgetLimited": "Budget exhausted",
     "turn": "turn {{n}}"
   },
   "context": {

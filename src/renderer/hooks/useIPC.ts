@@ -324,6 +324,8 @@ export function useIPC() {
               iteration: event.payload.iteration,
               tokensUsed: event.payload.tokensUsed,
               tokenBudget: event.payload.tokenBudget,
+              timeUsedSeconds: event.payload.timeUsedSeconds,
+              timeBudgetSeconds: event.payload.timeBudgetSeconds,
             });
             break;
 

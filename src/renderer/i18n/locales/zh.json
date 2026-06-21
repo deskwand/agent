@@ -752,6 +752,8 @@
     "active": "执行中",
     "paused": "已暂停",
     "complete": "已完成",
+    "blocked": "已阻塞",
+    "budgetLimited": "预算耗尽",
     "turn": "第{{n}}轮"
   },
   "context": {

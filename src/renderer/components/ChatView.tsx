@@ -228,8 +228,19 @@ export function ChatView() {
       steeringEvent && activeTurn && steeringEvent.turnId === activeTurn.turnId
         ? steeringEvent.text.trim().replace(/\s+/g, " ").slice(0, 120)
         : "";
+    // Only show the thinking indicator when the active turn has NOT yet
+    // produced any assistant output. After the final stream.message arrives,
+    // partialMessage/partialThinking are cleared, but activeTurn remains set
+    // until session.status idle — we must not re-show the spinner in that gap.
+    const hasAssistantOutput =
+      hasActiveTurn &&
+      activeTurn &&
+      messages.some(
+        (m) => m.role === "assistant" && m.turnId === activeTurn.turnId,
+      );
     const shouldShowThinkingIndicator =
       hasActiveTurn &&
+      !hasAssistantOutput &&
       (!partialMessage || partialMessage.trim() === "") &&
       !partialThinking;
     return resolveInputStatus({
@@ -248,6 +259,7 @@ export function ChatView() {
     steeringEvent,
     activeTurn?.turnId,
     goalStatus,
+    messages,
   ]);
 
   const lastInputTokens = useMemo(() => {

@@ -13,9 +13,21 @@ export type ChatInputStatus =
       iteration: number;
       tokensUsed?: number;
       tokenBudget?: number;
+      timeUsedSeconds?: number;
+      timeBudgetSeconds?: number;
     }
   | { type: "goal-paused"; objective: string }
   | { type: "goal-complete"; objective: string }
+  | { type: "goal-blocked"; objective: string }
+  | {
+      type: "goal-budget-limited";
+      objective: string;
+      iteration: number;
+      tokensUsed?: number;
+      tokenBudget?: number;
+      timeUsedSeconds?: number;
+      timeBudgetSeconds?: number;
+    }
   | null;
 
 interface ChatInputStatusBarProps {
@@ -68,6 +80,16 @@ export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
       text = `${t("goal.complete")}: ${status.objective}`;
       toneClass = "text-success";
       break;
+    case "goal-blocked":
+      icon = <AlertCircle className="w-3 h-3" />;
+      text = `${t("goal.blocked")}: ${status.objective}`;
+      toneClass = "text-error";
+      break;
+    case "goal-budget-limited":
+      icon = <AlertCircle className="w-3 h-3" />;
+      text = `${t("goal.budgetLimited")}: ${status.objective} (${t("goal.turn", { n: status.iteration })})`;
+      toneClass = "text-warning";
+      break;
   }
 
   return (
@@ -88,11 +110,13 @@ export function resolveInputStatus(params: {
   steeringText: string;
   shouldShowThinkingIndicator: boolean;
   goalStatus?: {
-    status: "active" | "paused" | "complete" | "cleared";
+    status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
     objective?: string;
     iteration?: number;
     tokensUsed?: number;
     tokenBudget?: number;
+    timeUsedSeconds?: number;
+    timeBudgetSeconds?: number;
   } | null;
 }): ChatInputStatus {
   if (params.isCompacting) return { type: "compacting" };
@@ -124,6 +148,21 @@ export function resolveInputStatus(params: {
         return {
           type: "goal-complete",
           objective: params.goalStatus.objective ?? "",
+        };
+      case "blocked":
+        return {
+          type: "goal-blocked",
+          objective: params.goalStatus.objective ?? "",
+        };
+      case "budget_limited":
+        return {
+          type: "goal-budget-limited",
+          objective: params.goalStatus.objective ?? "",
+          iteration: params.goalStatus.iteration ?? 0,
+          tokensUsed: params.goalStatus.tokensUsed,
+          tokenBudget: params.goalStatus.tokenBudget,
+          timeUsedSeconds: params.goalStatus.timeUsedSeconds,
+          timeBudgetSeconds: params.goalStatus.timeBudgetSeconds,
         };
     }
   }

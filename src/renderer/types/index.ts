@@ -610,11 +610,13 @@ export type ServerEvent =
       type: "goal.status";
       payload: {
         sessionId: string;
-        status: "active" | "paused" | "complete" | "cleared";
+        status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
         objective?: string;
         iteration?: number;
         tokensUsed?: number;
         tokenBudget?: number;
+        timeUsedSeconds?: number;
+        timeBudgetSeconds?: number;
       };
     }
   | {

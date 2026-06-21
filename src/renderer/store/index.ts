@@ -44,11 +44,13 @@ export interface SessionState {
   traceSteps: TraceStep[];
   contextWindow: number;
   goalStatus?: {
-    status: "active" | "paused" | "complete" | "cleared";
+    status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
     objective?: string;
     iteration?: number;
     tokensUsed?: number;
     tokenBudget?: number;
+    timeUsedSeconds?: number;
+    timeBudgetSeconds?: number;
   };
 }
 
