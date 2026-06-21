@@ -12,90 +12,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
-
-const _IMG_EXTS = [
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".gif",
-  ".webp",
-  ".bmp",
-  ".svg",
-  ".avif",
-] as const;
-
-export const PREVIEW_EXTS = [
-  ".txt",
-  ".md",
-  ".mdx",
-  ".markdown",
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".json",
-  ".css",
-  ".html",
-  ".xml",
-  ".yaml",
-  ".yml",
-  ".toml",
-  ".ini",
-  ".cfg",
-  ".conf",
-  ".log",
-  ".csv",
-  ".sh",
-  ".py",
-  ".rb",
-  ".go",
-  ".rs",
-  ".java",
-  ".c",
-  ".cpp",
-  ".h",
-  ".swift",
-  ".sql",
-  ".env",
-  ..._IMG_EXTS,
-] as const;
-
-export const IMAGE_EXTS: Set<string> = new Set(_IMG_EXTS);
-
-export const CODE_LIKE_EXTS = new Set([
-  ".ts",
-  ".tsx",
-  ".js",
-  ".jsx",
-  ".json",
-  ".css",
-  ".html",
-  ".xml",
-  ".yaml",
-  ".yml",
-  ".toml",
-  ".ini",
-  ".cfg",
-  ".conf",
-  ".log",
-  ".sh",
-  ".py",
-  ".rb",
-  ".go",
-  ".rs",
-  ".java",
-  ".c",
-  ".cpp",
-  ".h",
-  ".swift",
-  ".sql",
-  ".env",
-  ".txt",
-  ".md",
-  ".mdx",
-  ".markdown",
-  ".csv",
-]);
+import { IMAGE_EXTS, CODE_LIKE_EXTS } from "../utils/file-types";
+import { isPreviewableExt } from "../utils/file-preview";
 
 interface FileEntry {
   name: string;
@@ -297,7 +215,7 @@ export function FileBrowser({ width }: { width: number }) {
   const handleFileOpen = useCallback((fullPath: string, fileName: string) => {
     const iDot = fileName.lastIndexOf(".");
     const ext = iDot > 0 ? fileName.slice(iDot).toLowerCase() : "";
-    if (ext && (PREVIEW_EXTS as readonly string[]).includes(ext)) {
+    if (isPreviewableExt(ext)) {
       setPreviewFile({ path: fullPath, name: fileName });
     } else {
       window.electronAPI?.openPath?.(fullPath);

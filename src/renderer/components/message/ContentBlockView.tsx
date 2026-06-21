@@ -6,6 +6,8 @@ import {
   cloneElement,
   memo,
   useMemo,
+  useState,
+  useCallback,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
@@ -31,6 +33,8 @@ import { CodeBlock } from "./CodeBlock";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolUseBlock } from "./ToolUseBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
+import { FilePreviewModal } from "../FilePreviewModal";
+import { isPreviewableExt } from "../../utils/file-preview";
 import type { ContentBlockViewProps } from "./types";
 
 const MessageMarkdown = lazy(() =>
@@ -62,44 +66,61 @@ export const ContentBlockView = memo(function ContentBlockView({
     : null;
   const currentWorkingDir = activeSession?.cwd || workingDir;
 
+  const [previewFile, setPreviewFile] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+
   const resolveFilePath = (value: string) =>
     resolvePathAgainstWorkspace(value, currentWorkingDir);
+
+  const handleFilePathClick = useCallback(
+    async (value: string) => {
+      const resolvedPath = resolveFilePath(value);
+      const iDot = value.lastIndexOf(".");
+      const ext = iDot > 0 ? value.slice(iDot).toLowerCase() : "";
+      if (isPreviewableExt(ext)) {
+        const fileName = value.split(/[/\\]/).pop() || value;
+        setPreviewFile({ path: resolvedPath, name: fileName });
+        return;
+      }
+      if (
+        typeof window === "undefined" ||
+        !window.electronAPI?.showItemInFolder
+      ) {
+        return;
+      }
+      try {
+        const revealed = await window.electronAPI.showItemInFolder(
+          resolvedPath,
+          currentWorkingDir ?? undefined,
+        );
+        if (!revealed) {
+          setGlobalNotice({
+            id: `message-card-reveal-failed-${Date.now()}`,
+            type: "warning",
+            message: t("context.revealFailed"),
+          });
+        }
+      } catch (error) {
+        setGlobalNotice({
+          id: `message-card-reveal-failed-${Date.now()}`,
+          type: "warning",
+          message:
+            error instanceof Error && error.message
+              ? error.message
+              : t("context.revealFailed"),
+        });
+      }
+    },
+    [currentWorkingDir, resolveFilePath, setGlobalNotice, t],
+  );
 
   const renderFileButton = (value: string, key?: string) => (
     <button
       key={key}
       type="button"
-      onClick={async () => {
-        if (
-          typeof window === "undefined" ||
-          !window.electronAPI?.showItemInFolder
-        ) {
-          return;
-        }
-        const resolvedPath = resolveFilePath(value);
-        try {
-          const revealed = await window.electronAPI.showItemInFolder(
-            resolvedPath,
-            currentWorkingDir ?? undefined,
-          );
-          if (!revealed) {
-            setGlobalNotice({
-              id: `message-card-reveal-failed-${Date.now()}`,
-              type: "warning",
-              message: t("context.revealFailed"),
-            });
-          }
-        } catch (error) {
-          setGlobalNotice({
-            id: `message-card-reveal-failed-${Date.now()}`,
-            type: "warning",
-            message:
-              error instanceof Error && error.message
-                ? error.message
-                : t("context.revealFailed"),
-          });
-        }
-      }}
+      onClick={() => handleFilePathClick(value)}
       className={getFileLinkButtonClassName()}
       title={resolveFilePath(value)}
     >
@@ -142,6 +163,24 @@ export const ContentBlockView = memo(function ContentBlockView({
           currentWorkingDir,
         );
         if (localFilePath) {
+          const iDot = localFilePath.lastIndexOf(".");
+          const ext = iDot > 0 ? localFilePath.slice(iDot).toLowerCase() : "";
+          if (isPreviewableExt(ext)) {
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  const fileName =
+                    localFilePath.split(/[/\\]/).pop() || localFilePath;
+                  setPreviewFile({ path: localFilePath, name: fileName });
+                }}
+                className={getFileLinkButtonClassName()}
+                title={localFilePath}
+              >
+                {children}
+              </button>
+            );
+          }
           return (
             <button
               type="button"
@@ -322,8 +361,9 @@ export const ContentBlockView = memo(function ContentBlockView({
     [currentWorkingDir, setGlobalNotice, t],
   );
 
-  switch (block.type) {
-    case "text": {
+  const content = (() => {
+    switch (block.type) {
+      case "text": {
       const textBlock = block as { type: "text"; text: string };
       const text = textBlock.text || "";
       const normalizedText = normalizeCitationMarkdownLinks(
@@ -409,9 +449,27 @@ export const ContentBlockView = memo(function ContentBlockView({
 
     case "file_attachment": {
       const fileBlock = block as FileAttachmentContent;
+      const attachmentPath = fileBlock.relativePath
+        ? `${currentWorkingDir}/${fileBlock.relativePath}`
+        : undefined;
+      const iDot = fileBlock.filename.lastIndexOf(".");
+      const attExt = iDot > 0 ? fileBlock.filename.slice(iDot).toLowerCase() : "";
+      const canPreview =
+        attachmentPath && isPreviewableExt(attExt);
 
       return (
-        <div className="flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden">
+        <div
+          className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden ${canPreview ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
+          onClick={() => {
+            if (canPreview && attachmentPath) {
+              setPreviewFile({
+                path: attachmentPath,
+                name: fileBlock.filename,
+              });
+            }
+          }}
+
+        >
           <FileText className="w-4 h-4 text-accent flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-text-primary truncate">
@@ -447,7 +505,22 @@ export const ContentBlockView = memo(function ContentBlockView({
         />
       );
 
-    default:
-      return null;
-  }
+      default:
+        return null;
+    }
+  })();
+
+  return (
+    <>
+      {content}
+      {previewFile && (
+        <FilePreviewModal
+          isOpen={true}
+          filePath={previewFile.path}
+          fileName={previewFile.name}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
+    </>
+  );
 });

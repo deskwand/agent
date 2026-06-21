@@ -8,6 +8,11 @@ import rehypeSanitize from "rehype-sanitize";
 import rehypeKatex from "rehype-katex";
 import hljs from "highlight.js";
 import { List } from "react-window";
+import type { ReadFileResult } from "../utils/file-preview";
+import { getLangFromExt } from "../utils/file-preview";
+
+// Re-export for external consumers
+export type { ReadFileResult };
 
 // Hoisted plugins (same pattern as MessageMarkdown)
 const REMARK_PLUGINS = [
@@ -25,49 +30,6 @@ const sanitizeHighlight = (html: string): string =>
     /<(?!\/?span(?:\s+class="hljs-[^"]*")?\s*\/?>)[^>]*>/g,
     (match) => match.replace(/</g, "&lt;").replace(/>/g, "&gt;"),
   );
-
-// Map file extension to highlight.js language identifier
-const LANG_MAP: Record<string, string> = {
-  ".ts": "typescript",
-  ".tsx": "tsx",
-  ".js": "javascript",
-  ".jsx": "jsx",
-  ".json": "json",
-  ".css": "css",
-  ".html": "xml",
-  ".xml": "xml",
-  ".yaml": "yaml",
-  ".yml": "yaml",
-  ".toml": "ini",
-  ".ini": "ini",
-  ".cfg": "ini",
-  ".conf": "ini",
-  ".sh": "bash",
-  ".bash": "bash",
-  ".zsh": "bash",
-  ".py": "python",
-  ".rb": "ruby",
-  ".go": "go",
-  ".rs": "rust",
-  ".java": "java",
-  ".c": "c",
-  ".cpp": "cpp",
-  ".h": "c",
-  ".hpp": "cpp",
-  ".swift": "swift",
-  ".sql": "sql",
-  ".env": "bash",
-  ".csv": "plaintext",
-};
-
-function getLangFromExt(ext: string): string {
-  return LANG_MAP[ext] || ext.slice(1) || "plaintext";
-}
-
-type ReadFileResult =
-  | { type: "text"; content: string; ext: string }
-  | { type: "image"; content: string; mimeType: string }
-  | { type: "error"; message: string };
 
 interface FilePreviewModalProps {
   isOpen: boolean;

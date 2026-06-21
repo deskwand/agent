@@ -10,7 +10,8 @@ import {
 import { getArtifactLabel, getArtifactSteps } from "../utils/artifact-steps";
 import { File, FileCode, Image, Layers } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
-import { PREVIEW_EXTS, IMAGE_EXTS, CODE_LIKE_EXTS } from "./FileBrowser";
+import { IMAGE_EXTS, CODE_LIKE_EXTS } from "../utils/file-types";
+import { isPreviewableExt } from "../utils/file-preview";
 import type { TraceStep } from "../types";
 
 const EMPTY_STEPS: TraceStep[] = [];
@@ -54,7 +55,7 @@ export function ArtifactPanel() {
     async (artifactPath: string, label: string) => {
       const dotIdx = artifactPath.lastIndexOf(".");
       const ext = dotIdx > 0 ? artifactPath.slice(dotIdx).toLowerCase() : "";
-      if (ext && (PREVIEW_EXTS as readonly string[]).includes(ext)) {
+      if (isPreviewableExt(ext)) {
         setPreviewFile({ path: artifactPath, name: label });
       } else if (canOpenPath) {
         const result = await window.electronAPI.openPath(artifactPath);
