@@ -93,6 +93,7 @@ export interface ToolResultContent {
   toolUseId: string;
   content: string;
   isError?: boolean;
+  diff?: string; // edit tool 的展示用 diff 字符串（+/- 行号前缀格式）
   images?: Array<{
     data: string; // base64 encoded image data
     mimeType: string; // e.g., 'image/png'

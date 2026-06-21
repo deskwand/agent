@@ -200,17 +200,34 @@ export const ToolResultBlock = memo(function ToolResultBlock({
               ))}
             </div>
           )}
-          {shouldShowOutputText && (
-            <pre
-              className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
-                block.isError
-                  ? "text-error bg-error/5"
-                  : "text-text-secondary bg-surface-muted"
-              } ${preferImageOutput ? "mt-2" : ""}`}
-            >
-              {block.content}
-            </pre>
-          )}
+          {block.diff ? (
+              <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted leading-snug">
+                {block.diff.split("\n").map((line, i) => {
+                  const prefix = line[0];
+                  const bgClass =
+                    prefix === "+"
+                      ? "bg-green-800/20 text-green-400"
+                      : prefix === "-"
+                        ? "bg-red-800/20 text-red-400"
+                        : "text-text-secondary";
+                  return (
+                    <div key={i} className={bgClass}>
+                      {line}
+                    </div>
+                  );
+                })}
+              </pre>
+            ) : shouldShowOutputText && (
+              <pre
+                className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
+                  block.isError
+                    ? "text-error bg-error/5"
+                    : "text-text-secondary bg-surface-muted"
+                } ${preferImageOutput ? "mt-2" : ""}`}
+              >
+                {block.content}
+              </pre>
+            )}
           {!preferImageOutput && hasImages && (
             <div className="mt-2 space-y-2">
               {validImages.map((image, index) => (

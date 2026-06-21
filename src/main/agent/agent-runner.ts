@@ -3443,6 +3443,9 @@ Tool routing:\n
                     toolUseId: toolCallId,
                     content: sanitizeOutputPaths(outputText),
                     isError,
+                    ...(typeof (event.result as { details?: Record<string, unknown> })?.details?.diff === "string"
+                      ? { diff: (event.result as { details: { diff: string } }).details.diff }
+                      : {}),
                     ...(normalizedToolResult.images.length > 0
                       ? { images: normalizedToolResult.images }
                       : {}),

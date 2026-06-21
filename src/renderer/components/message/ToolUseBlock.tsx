@@ -232,7 +232,8 @@ export const ToolUseBlock = memo(function ToolUseBlock({
             </div>
           )}
 
-          {/* Input section */}
+          {/* Input section — hidden when diff is available */}
+          {!toolResult?.diff && (
           <div className="px-3 py-2">
             <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
               {t("tool.sectionInput")}
@@ -241,13 +242,16 @@ export const ToolUseBlock = memo(function ToolUseBlock({
               {JSON.stringify(block.input, null, 2)}
             </pre>
           </div>
+          )}
 
           {/* Output section */}
           {toolResult && (
             <div className="px-3 py-2">
-              <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
-                {t("tool.sectionOutput")}
-              </div>
+              {!toolResult.diff && (
+                <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
+                  {t("tool.sectionOutput")}
+                </div>
+              )}
               {preferImageOutput &&
                 validImages.map((image, index) => (
                   <div key={index} className="mt-2 rounded-lg overflow-hidden">
@@ -259,17 +263,34 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     />
                   </div>
                 ))}
-              {shouldShowOutputText && (
-                <pre
-                  className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
-                    isError
-                      ? "text-error bg-error/5"
-                      : "text-text-secondary bg-surface-muted"
-                  } ${preferImageOutput ? "mt-2" : ""}`}
-                >
-                  {toolResult.content}
-                </pre>
-              )}
+              {toolResult.diff ? (
+                  <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted leading-snug">
+                    {toolResult.diff.split("\n").map((line, i) => {
+                      const prefix = line[0];
+                      const bgClass =
+                        prefix === "+"
+                          ? "bg-green-800/20 text-green-400"
+                          : prefix === "-"
+                            ? "bg-red-800/20 text-red-400"
+                            : "text-text-secondary";
+                      return (
+                        <div key={i} className={bgClass}>
+                          {line}
+                        </div>
+                      );
+                    })}
+                  </pre>
+                ) : shouldShowOutputText && (
+                  <pre
+                    className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
+                      isError
+                        ? "text-error bg-error/5"
+                        : "text-text-secondary bg-surface-muted"
+                    } ${preferImageOutput ? "mt-2" : ""}`}
+                  >
+                    {toolResult.content}
+                  </pre>
+                )}
               {!preferImageOutput &&
                 validImages.map((image, index) => (
                   <div key={index} className="mt-2 rounded-lg overflow-hidden">
