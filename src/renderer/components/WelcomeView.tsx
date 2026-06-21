@@ -86,7 +86,7 @@ export function WelcomeView() {
       const presetLabel =
         providerConfig.name ||
         (meta.provider === "custom"
-          ? `${API_PROVIDER_PRESETS.custom.name} / ${meta.customProtocol}`
+          ? `${API_PROVIDER_PRESETS.custom.name} / ${providerConfig.customProtocol}`
           : (
               API_PROVIDER_PRESETS as unknown as Record<
                 string,

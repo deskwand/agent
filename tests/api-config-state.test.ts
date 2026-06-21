@@ -17,7 +17,7 @@ describe('api config state helpers', () => {
     });
     expect(profileKeyToProvider('custom:gemini')).toEqual({
       provider: 'custom',
-      customProtocol: 'gemini',
+      customProtocol: 'anthropic',
     });
   });
 

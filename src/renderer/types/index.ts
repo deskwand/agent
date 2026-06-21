@@ -677,15 +677,7 @@ export type ProviderType =
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
-export type ProviderProfileKey =
-  | "openrouter"
-  | "anthropic"
-  | "deepseek"
-  | "openai"
-  | "gemini"
-  | "custom:anthropic"
-  | "custom:openai"
-  | "custom:gemini";
+export type ProviderProfileKey = string;
 export interface ProviderProfile {
   apiKey: string;
   baseUrl?: string;

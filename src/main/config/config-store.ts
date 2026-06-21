@@ -24,15 +24,7 @@ export type ProviderType =
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
-export type ProviderProfileKey =
-  | "openrouter"
-  | "anthropic"
-  | "deepseek"
-  | "openai"
-  | "gemini"
-  | "custom:anthropic"
-  | "custom:openai"
-  | "custom:gemini";
+export type ProviderProfileKey = string;
 
 export interface ProviderProfile {
   apiKey: string;
@@ -155,16 +147,6 @@ export const PROVIDER_PRESETS = API_PROVIDER_PRESETS;
 const PI_AI_CURATED: Record<string, { piProvider: string; pick: string[] }> =
   PI_AI_CURATED_PRESETS;
 
-const PROFILE_KEYS: ProviderProfileKey[] = [
-  "openrouter",
-  "anthropic",
-  "deepseek",
-  "openai",
-  "gemini",
-  "custom:anthropic",
-  "custom:openai",
-  "custom:gemini",
-];
 const VALID_THEMES: AppTheme[] = ["dark", "light", "system"];
 
 const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
@@ -264,9 +246,13 @@ function defaultStoredConfig(): StoredConfig {
 function profileKeyFromProvider(
   provider: ProviderType,
   customProtocol: CustomProtocolType = "anthropic",
+  customId?: string,
 ): ProviderProfileKey {
   if (provider !== "custom") {
-    return provider as ProviderProfileKey;
+    return provider;
+  }
+  if (customId) {
+    return `custom:${customId}`;
   }
   if (customProtocol === "openai") {
     return "custom:openai";
@@ -281,11 +267,7 @@ export function profileKeyToProvider(profileKey: ProviderProfileKey): {
   provider: ProviderType;
   customProtocol: CustomProtocolType;
 } {
-  if (profileKey === "custom:openai")
-    return { provider: "custom", customProtocol: "openai" };
-  if (profileKey === "custom:gemini")
-    return { provider: "custom", customProtocol: "gemini" };
-  if (profileKey === "custom:anthropic")
+  if (profileKey.startsWith("custom:"))
     return { provider: "custom", customProtocol: "anthropic" };
   if (profileKey === "openai")
     return { provider: "openai", customProtocol: "openai" };
@@ -293,7 +275,7 @@ export function profileKeyToProvider(profileKey: ProviderProfileKey): {
     return { provider: "deepseek", customProtocol: "openai" };
   if (profileKey === "gemini")
     return { provider: "gemini", customProtocol: "gemini" };
-  return { provider: profileKey, customProtocol: "anthropic" };
+  return { provider: profileKey as ProviderType, customProtocol: "anthropic" };
 }
 
 function defaultProtocolForProvider(
@@ -386,10 +368,7 @@ function isCustomProtocol(value: unknown): value is CustomProtocolType {
 }
 
 function isProfileKey(value: unknown): value is ProviderProfileKey {
-  return (
-    typeof value === "string" &&
-    PROFILE_KEYS.includes(value as ProviderProfileKey)
-  );
+  return typeof value === "string" && value.length > 0;
 }
 
 function isCustomProfile(profileKey: ProviderProfileKey): boolean {
@@ -439,9 +418,10 @@ function getDefaultProviderModel(
     return presetModels[0];
   }
   const profile = defaultProfiles[profileKey];
+  const modelId = profile?.model || "unknown";
   return {
-    id: profile.model,
-    label: profile.model,
+    id: modelId,
+    label: modelId,
     source: "preset",
   };
 }
@@ -482,7 +462,11 @@ export function normalizeProviderConfig(
   raw: Partial<ApiProviderConfig> | undefined,
 ): ApiProviderConfig {
   const meta = profileKeyToProvider(profileKey);
-  const fallbackProfile = defaultProfiles[profileKey];
+  const fallbackProfile = defaultProfiles[profileKey] || {
+    apiKey: "",
+    baseUrl: "",
+    model: "",
+  };
   const fallbackModel = getDefaultProviderModel(profileKey);
   const isCustomProfile = meta.provider === "custom";
   const rawModels = Array.isArray(raw?.models) ? raw.models : [];
@@ -705,7 +689,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
 
   const profiles = {} as Record<ProviderProfileKey, ProviderProfile>;
   const providers = {} as Record<ProviderProfileKey, ApiProviderConfig>;
-  for (const key of PROFILE_KEYS) {
+  for (const key of Object.keys(stored.providers)) {
     const p = normalizeProviderConfig(key, stored.providers[key]);
     const pm = p.models.find((m) => m.id === p.defaultModel) || p.models[0];
     profiles[key] = {
@@ -888,7 +872,9 @@ export class ConfigStore {
 
     stored.isConfigured =
       updates.isConfigured ??
-      PROFILE_KEYS.some((k) => !!(stored.providers[k]?.apiKey?.trim()));
+      Object.values(stored.providers).some(
+        (p) => !!(p?.apiKey?.trim()),
+      );
 
     this.store.set(stored);
   }
@@ -897,8 +883,8 @@ export class ConfigStore {
     const stored = { ...this.store.store };
     stored.providers[payload.profileKey] =
       sanitizeSaveProviderPayload(payload);
-    stored.isConfigured = PROFILE_KEYS.some(
-      (k) => !!(stored.providers[k]?.apiKey?.trim()),
+    stored.isConfigured = Object.values(stored.providers).some(
+      (p) => !!(p?.apiKey?.trim()),
     );
     this.store.set(stored);
     return this.getAll();
@@ -913,7 +899,9 @@ export class ConfigStore {
         payload.profileKey,
       );
     }
-    const remaining = PROFILE_KEYS.filter((k) => stored.providers[k]);
+    const remaining = Object.keys(stored.providers).filter(
+      (k) => stored.providers[k],
+    );
     if (remaining.length === 0) {
       // Reset only provider-related fields; keep theme, memory, sandbox, etc.
       stored.providers = {};
@@ -925,8 +913,8 @@ export class ConfigStore {
     if (stored.activeProviderKey === payload.profileKey) {
       stored.activeProviderKey = remaining[0];
     }
-    stored.isConfigured = PROFILE_KEYS.some(
-      (k) => !!(stored.providers[k]?.apiKey?.trim()),
+    stored.isConfigured = Object.values(stored.providers).some(
+      (p) => !!(p?.apiKey?.trim()),
     );
     this.store.set(stored);
     return this.getAll();
@@ -974,8 +962,7 @@ export class ConfigStore {
   }
 
   hasAnyUsableCredentials(config: AppConfig = this.getAll()): boolean {
-    return PROFILE_KEYS.some((key) => {
-      const provider = config.providers[key];
+    return Object.values(config.providers).some((provider) => {
       if (!provider) return false;
       return this.hasUsableCredentialsForProjection({
         provider: provider.provider,

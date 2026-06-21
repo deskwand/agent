@@ -66,14 +66,16 @@ function providerLabel(
   profileKey: ProviderProfileKey,
   presets: ProviderPresets,
   t: (key: string) => string,
+  config?: ApiProviderConfig,
 ): string {
-  const { provider, customProtocol } = profileKeyToProvider(profileKey);
+  const { provider } = profileKeyToProvider(profileKey);
   if (provider !== "custom") {
     return (
       (presets as unknown as Record<string, ProviderPreset>)[provider]?.name ||
       provider
     );
   }
+  const customProtocol = config?.customProtocol || "anthropic";
   if (customProtocol === "openai") return `${t("api.otherProvider")} / OpenAI`;
   if (customProtocol === "gemini") return `${t("api.otherProvider")} / Gemini`;
   return `${t("api.otherProvider")} / Anthropic`;
@@ -121,7 +123,10 @@ function createEmptyDraft(
   presets: ProviderPresets,
   customProtocol: CustomProtocolType = "anthropic",
 ): ProviderDraft {
-  const profileKey = profileKeyFromProvider(provider, customProtocol);
+  const profileKey =
+    provider === "custom"
+      ? `custom:${crypto.randomUUID()}`
+      : profileKeyFromProvider(provider, customProtocol);
   const preset = modelsPresetForDraft(provider, customProtocol, presets);
   const presetModels = sortedPresetModels(preset);
   const defaultPresetModel = presetModels[0];
@@ -268,14 +273,18 @@ export function SettingsAPI({
 
   const configuredProviders = useMemo(() => {
     const providers = appConfig?.providers || {};
-    return Object.entries(providers)
-      .filter(([profileKey, config]) =>
-        hasUsableCredentials(profileKey as ProviderProfileKey, config),
-      )
-      .map(([profileKey, config]) => ({
-        profileKey: profileKey as ProviderProfileKey,
-        config,
-      }));
+    return (
+      Object.entries(providers)
+        .filter(([profileKey, config]) =>
+          config &&
+          hasUsableCredentials(profileKey as ProviderProfileKey, config),
+        ) as Array<
+        [string, ApiProviderConfig]
+      >
+    ).map(([profileKey, config]) => ({
+      profileKey: profileKey as ProviderProfileKey,
+      config,
+    }));
   }, [appConfig]);
 
   const isCreating = originalProfileKey === null;
@@ -410,11 +419,14 @@ export function SettingsAPI({
 
   const selectCustomProtocol = (protocol: CustomProtocolType) => {
     setDraft((current) => {
-      const next = createEmptyDraft("custom", presets, protocol);
-      return {
-        ...next,
-        apiKey: current?.apiKey || "",
-      };
+      if (!current || current.provider !== "custom") {
+        const next = createEmptyDraft("custom", presets, protocol);
+        return {
+          ...next,
+          apiKey: current?.apiKey || "",
+        };
+      }
+      return { ...current, customProtocol: protocol };
     });
   };
 
@@ -422,11 +434,13 @@ export function SettingsAPI({
     setDraft((current) => {
       if (!current) return current;
       const next = { ...current, ...patch };
-      const nextProfileKey = profileKeyFromProvider(
-        next.provider,
-        next.customProtocol,
-      );
-      return { ...next, profileKey: nextProfileKey };
+      if (next.provider !== "custom") {
+        next.profileKey = profileKeyFromProvider(
+          next.provider,
+          next.customProtocol,
+        );
+      }
+      return next;
     });
   };
 
@@ -524,7 +538,7 @@ export function SettingsAPI({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-text-primary">
-                        {config.name || providerLabel(profileKey, presets, t)}
+                        {config.name || providerLabel(profileKey, presets, t, config)}
                       </p>
                       {isCustomProvider && (
                         <p className="mt-1 truncate text-xs text-text-muted">
@@ -580,7 +594,13 @@ export function SettingsAPI({
             <div className="space-y-4 px-5 py-4">
               <p className="text-sm text-text-secondary">
                 {t("api.deleteApiConfirm", {
-                  name: providerLabel(pendingDeleteProfileKey, presets, t),
+                  name:
+                    appConfig?.providers?.[pendingDeleteProfileKey]?.name ||
+                    providerLabel(
+                      pendingDeleteProfileKey,
+                      presets,
+                      t,
+                    ),
                 })}
               </p>
               <div className="flex justify-end gap-2">

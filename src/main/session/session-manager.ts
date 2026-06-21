@@ -89,16 +89,14 @@ const PROVIDER_PROFILE_KEYS: ProviderProfileKey[] = [
   "deepseek",
   "openai",
   "gemini",
-  "custom:anthropic",
-  "custom:openai",
-  "custom:gemini",
 ];
 
 function isProviderProfileKey(
   value: string | null | undefined,
 ): value is ProviderProfileKey {
-  return Boolean(
-    value && PROVIDER_PROFILE_KEYS.includes(value as ProviderProfileKey),
+  if (!value || typeof value !== "string") return false;
+  return (
+    PROVIDER_PROFILE_KEYS.includes(value) || value.startsWith("custom:")
   );
 }
 

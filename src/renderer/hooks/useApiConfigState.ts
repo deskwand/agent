@@ -36,23 +36,24 @@ export interface ApiConfigBootstrap {
   providers: Partial<Record<ProviderProfileKey, ApiProviderConfig>>;
 }
 
-const PROFILE_KEYS: ProviderProfileKey[] = [
+const WELL_KNOWN_PROVIDERS: ProviderProfileKey[] = [
   "openrouter",
   "anthropic",
   "deepseek",
   "openai",
   "gemini",
-  "custom:anthropic",
-  "custom:openai",
-  "custom:gemini",
 ];
 
 export function profileKeyFromProvider(
   provider: ProviderType,
   customProtocol: CustomProtocolType = "anthropic",
+  customId?: string,
 ): ProviderProfileKey {
   if (provider !== "custom") {
-    return provider as ProviderProfileKey;
+    return provider;
+  }
+  if (customId) {
+    return `custom:${customId}`;
   }
   if (customProtocol === "openai") {
     return "custom:openai";
@@ -67,11 +68,7 @@ export function profileKeyToProvider(profileKey: ProviderProfileKey): {
   provider: ProviderType;
   customProtocol: CustomProtocolType;
 } {
-  if (profileKey === "custom:openai")
-    return { provider: "custom", customProtocol: "openai" };
-  if (profileKey === "custom:gemini")
-    return { provider: "custom", customProtocol: "gemini" };
-  if (profileKey === "custom:anthropic")
+  if (profileKey.startsWith("custom:"))
     return { provider: "custom", customProtocol: "anthropic" };
   if (profileKey === "openai")
     return { provider: "openai", customProtocol: "openai" };
@@ -79,17 +76,19 @@ export function profileKeyToProvider(profileKey: ProviderProfileKey): {
     return { provider: "deepseek", customProtocol: "openai" };
   if (profileKey === "gemini")
     return { provider: "gemini", customProtocol: "gemini" };
-  return { provider: profileKey, customProtocol: "anthropic" };
+  return { provider: profileKey as ProviderType, customProtocol: "anthropic" };
 }
 
 function presetForProfile(
   profileKey: ProviderProfileKey,
   presets: ProviderPresets,
 ): ProviderPreset {
-  if (profileKey === "custom:openai") return presets.openai;
-  if (profileKey === "custom:gemini") return presets.gemini;
-  if (profileKey === "custom:anthropic") return presets.custom;
-  return presets[profileKey];
+  if (profileKey.startsWith("custom:openai")) return presets.openai;
+  if (profileKey.startsWith("custom:gemini")) return presets.gemini;
+  if (profileKey.startsWith("custom:")) return presets.custom;
+  return (
+    presets as unknown as Record<string, ProviderPreset>
+  )[profileKey];
 }
 
 function normalizeProfile(
@@ -118,7 +117,13 @@ export function buildApiConfigSnapshot(
   const activeProfileKey =
     config?.activeProviderKey || config?.activeProfileKey || "openrouter";
   const profiles = {} as Record<ProviderProfileKey, UIProviderProfile>;
-  for (const key of PROFILE_KEYS) {
+  const providerKeys = [
+    ...new Set([
+      ...WELL_KNOWN_PROVIDERS,
+      ...Object.keys(config?.providers || {}),
+    ]),
+  ];
+  for (const key of providerKeys) {
     const providerConfig = config?.providers?.[key];
     const modelProfile = config?.profiles?.[key];
     const providerModel = providerConfig?.models.find(
@@ -155,7 +160,7 @@ export function buildApiConfigDraftSignature(
   return JSON.stringify({
     activeProfileKey,
     enableThinking,
-    profiles: PROFILE_KEYS.map((key) => ({
+    profiles: Object.keys(profiles).map((key) => ({
       key,
       apiKey: profiles[key]?.apiKey || "",
       baseUrl: profiles[key]?.baseUrl || "",
