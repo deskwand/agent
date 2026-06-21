@@ -20,6 +20,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { app } from "electron";
+import { parse as parseYaml } from "yaml";
 import { log, logError } from "../utils/logger";
 import { configStore } from "../config/config-store";
 import { getAgentCreatedSkillNames, addManifestEntry } from "./agent-manifest";
@@ -235,9 +236,18 @@ export class CuratorService {
       let description = name;
       try {
         const content = fs.readFileSync(skillMdPath, "utf-8");
-        const descMatch = content.match(/^description:\s*(.+?)$/m);
-        if (descMatch) {
-          description = descMatch[1].replace(/^["']|["']$/g, "").trim();
+        const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        if (fmMatch) {
+          const parsed = parseYaml(fmMatch[1]);
+          if (
+            parsed &&
+            typeof parsed === "object" &&
+            typeof (parsed as Record<string, unknown>).description === "string"
+          ) {
+            description = (
+              (parsed as Record<string, unknown>).description as string
+            ).trim();
+          }
         }
       } catch {
         /* use name as fallback */

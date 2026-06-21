@@ -13,6 +13,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { app } from "electron";
+import { parse as parseYaml } from "yaml";
 import type { Skill, PluginInstallResult } from "../../renderer/types";
 import type { DatabaseInstance } from "../db/database";
 import { log, logError, logWarn } from "../utils/logger";
@@ -678,22 +679,26 @@ export class SkillsManager {
       return { valid: false, errors: ["SKILL.md not found"] };
     }
 
-    // Parse SKILL.md frontmatter
+    // Parse SKILL.md frontmatter with a proper YAML parser
     try {
       const content = fs.readFileSync(skillMdPath, "utf-8");
-      const frontMatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-      const frontMatter = frontMatterMatch ? frontMatterMatch[1] : content;
+      const frontMatter = this.parseYamlFrontMatter(content);
 
-      const nameMatch = frontMatter.match(/name:\s*["']?([^"'\r\n]+)["']?/);
-      const descMatch = frontMatter.match(
-        /description:\s*["']?([^"'\r\n]+)["']?/,
-      );
-
-      if (!nameMatch) {
-        errors.push('SKILL.md missing "name" in frontmatter');
-      }
-      if (!descMatch) {
-        errors.push('SKILL.md missing "description" in frontmatter');
+      if (!frontMatter) {
+        errors.push("SKILL.md has invalid or missing YAML frontmatter");
+      } else {
+        if (
+          typeof frontMatter.name !== "string" ||
+          !frontMatter.name.trim()
+        ) {
+          errors.push('SKILL.md missing "name" in frontmatter');
+        }
+        if (
+          typeof frontMatter.description !== "string" ||
+          !frontMatter.description.trim()
+        ) {
+          errors.push('SKILL.md missing "description" in frontmatter');
+        }
       }
     } catch (err) {
       errors.push("Failed to parse SKILL.md");
@@ -716,29 +721,43 @@ export class SkillsManager {
 
     try {
       const content = fs.readFileSync(skillMdPath, "utf-8");
+      const frontMatter = this.parseYamlFrontMatter(content);
+      if (!frontMatter) return null;
 
-      // Limit regex matching to the YAML front-matter block (between --- markers)
-      const frontMatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-      const frontMatter = frontMatterMatch ? frontMatterMatch[1] : content;
+      const name =
+        typeof frontMatter.name === "string" ? frontMatter.name.trim() : "";
+      const description =
+        typeof frontMatter.description === "string"
+          ? frontMatter.description.trim()
+          : "";
 
-      const nameMatch = frontMatter.match(/name:\s*["']?([^"'\r\n]+)["']?/);
-      const descMatch = frontMatter.match(
-        /description:\s*["']?([^"'\r\n]+)["']?/,
-      );
-
-      if (!nameMatch || !descMatch) {
-        return null;
-      }
-
-      const name = nameMatch[1].trim();
+      if (!name || !description) return null;
       validateSkillName(name);
 
-      return {
-        name,
-        description: descMatch[1].trim(),
-      };
+      return { name, description };
     } catch (error) {
       logError(`Failed to parse SKILL.md from ${skillPath}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Parse YAML front-matter from SKILL.md content.
+   * Uses a proper YAML parser to handle all standard YAML syntax,
+   * including block scalars (|, >), quoted strings with escapes,
+   * and values starting with special characters like <.
+   */
+  private parseYamlFrontMatter(
+    content: string,
+  ): Record<string, unknown> | null {
+    const fmMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    if (!fmMatch) return null;
+
+    try {
+      const parsed = parseYaml(fmMatch[1]);
+      if (typeof parsed !== "object" || parsed === null) return null;
+      return parsed as Record<string, unknown>;
+    } catch {
       return null;
     }
   }
