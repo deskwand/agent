@@ -334,10 +334,10 @@ export function ReviewPanel() {
   }
 
   // ── Normal (centered card) mode ──
-  // Backdrop is a sibling (not parent) so card layout changes don't re-composite the blur.
+  // Backdrop is a sibling (not parent) so card layout changes don't re-composite the backdrop.
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div aria-hidden className="absolute inset-0 bg-black/40 backdrop-blur-md" />
+      <div aria-hidden className="absolute inset-0 bg-black/40" />
       <div className="relative mx-4 flex flex-col overflow-hidden rounded-6xl border border-border-subtle bg-background shadow-2xl w-[1200px] max-w-[95vw] h-[85vh] max-h-[90vh]">
         {toolbar}
         {body}

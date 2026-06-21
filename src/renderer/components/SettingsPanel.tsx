@@ -166,7 +166,7 @@ export function SettingsPanel({
     <div className="flex h-full w-full overflow-hidden bg-background">
       {/* Sidebar */}
       <div
-        className={`${compactSidebar ? "w-14" : "w-52 lg:w-60"} bg-background-secondary/88 backdrop-blur-sm flex flex-col flex-shrink-0`}
+        className={`${compactSidebar ? "w-14" : "w-52 lg:w-60"} bg-background-secondary/88 flex flex-col flex-shrink-0`}
       >
         {/* Back button — settings top-left */}
         <div
@@ -236,7 +236,7 @@ export function SettingsPanel({
 
       {/* Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="flex items-center gap-3 px-4 lg:px-8 py-4 flex-shrink-0 bg-background/88 backdrop-blur-sm">
+        <div className="flex items-center gap-3 px-4 lg:px-8 py-4 flex-shrink-0 bg-background/88">
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-text-muted">
               {t("settings.title")}

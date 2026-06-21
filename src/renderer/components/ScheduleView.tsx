@@ -103,7 +103,7 @@ export function ScheduleView() {
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-background">
       {/* Header */}
-      <div className="bg-background/88 backdrop-blur-sm border-b border-border-subtle px-5 py-4 lg:px-8">
+      <div className="bg-background/88 border-b border-border-subtle px-5 py-4 lg:px-8">
         <button
           onClick={() => setShowSchedule(false)}
           className="mb-1 p-1 -ml-1 rounded-lg hover:bg-surface-hover transition-colors inline-flex"

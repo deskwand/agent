@@ -20,7 +20,7 @@ export function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 animate-fade-in">
       <div className="card w-full max-w-sm p-5 m-4 shadow-elevated animate-slide-up">
         <p className="text-sm text-text-primary">{title}</p>
         <div className="flex justify-end gap-2 mt-4">

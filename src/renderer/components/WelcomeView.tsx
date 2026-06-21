@@ -255,7 +255,7 @@ export function WelcomeView() {
           isExpanded={isInputExpanded}
           onToggleExpand={() => setIsInputExpanded((v) => !v)}
           placeholder={t("welcome.placeholder")}
-          cardClassName="rounded-6xl bg-background/60 backdrop-blur-sm shadow-elevated px-5 py-5 space-y-4"
+          cardClassName="rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4"
           textareaClassName="w-full resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-sm leading-relaxed overflow-hidden"
           bottomSlot={
             <ChatInputBottomBar

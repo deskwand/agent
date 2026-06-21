@@ -584,7 +584,7 @@ export function SettingsAPI({
       </div>
 
       {pendingDeleteProfileKey && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
           <div className="mx-4 w-full max-w-md rounded-2xl border border-border-muted bg-background shadow-xl">
             <div className="border-b border-border-muted px-5 py-4">
               <h3 className="text-sm font-medium text-text-primary">

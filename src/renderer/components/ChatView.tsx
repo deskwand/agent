@@ -1104,7 +1104,7 @@ export function ChatView() {
       </div>
 
       {/* Input */}
-      <div className="bg-transparent backdrop-blur-md">
+      <div className="bg-transparent">
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
           <ChatInputStatusBar status={inputStatus} />
         </div>
@@ -1119,7 +1119,7 @@ export function ChatView() {
             isExpanded={isInputExpanded}
             onToggleExpand={() => setIsInputExpanded((v) => !v)}
             placeholder={t("chat.typeMessage")}
-            cardClassName="p-3.5 rounded-6xl bg-background/60 backdrop-blur-sm shadow-elevated"
+            cardClassName="p-3.5 rounded-6xl bg-background/60 shadow-elevated"
             textareaClassName="w-full resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
             bottomSlot={
               <ChatInputBottomBar
