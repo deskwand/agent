@@ -6,6 +6,10 @@ export interface SlashCommand {
   action: "compact" | "goal";
 }
 
+export type SlashItem =
+  | { category: "command"; command: SlashCommand }
+  | { category: "skill"; skill: { name: string; description?: string } };
+
 export function getBuiltinCommands(
   t: (key: string) => string,
 ): SlashCommand[] {

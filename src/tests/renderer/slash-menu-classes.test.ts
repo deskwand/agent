@@ -5,11 +5,11 @@
  * and w-3.5 h-3.5 → w-4 h-4 (icon). This test guards against
  * accidental reversion or removal of those classes.
  *
- * Mirrors SLASH_MENU_ITEM_BASE_CLASS from ChatInput.tsx.
+ * Mirrors ITEM_BASE_CLASS from SlashMenu.tsx.
  */
 import { describe, it, expect } from "vitest";
 
-/** Must match SLASH_MENU_ITEM_BASE_CLASS in src/renderer/components/ChatInput.tsx */
+/** Must match ITEM_BASE_CLASS in src/renderer/components/SlashMenu.tsx */
 const SLASH_MENU_ITEM_BASE_CLASS =
   "w-full text-left px-2.5 py-2 rounded-lg text-sm transition-colors flex items-center gap-2";
 

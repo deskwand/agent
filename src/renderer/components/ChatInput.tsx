@@ -10,12 +10,14 @@ import {
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
-import { X, Sparkles, Zap } from "lucide-react";
+import { X } from "lucide-react";
 import type { Skill } from "../types";
 import {
   getBuiltinCommands,
   type SlashCommand,
+  type SlashItem,
 } from "../slash-commands";
+import { SlashMenu, type SlashTab } from "./SlashMenu";
 
 export interface ChatInputAttachedFile {
   name: string;
@@ -88,12 +90,22 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
     const [isDragging, setIsDragging] = useState(false);
 
+    const SLASH_TABS: readonly SlashTab[] = ["all", "commands", "skills"];
+
     // --- Slash command menu ---
     const [slashSkills, setSlashSkills] = useState<Skill[]>([]);
     const [showSlashMenu, setShowSlashMenu] = useState(false);
     const [slashFilter, setSlashFilter] = useState("");
     const [slashStartIndex, setSlashStartIndex] = useState(-1);
     const [slashSelectedIndex, setSlashSelectedIndex] = useState(0);
+    const [slashActiveTab, setSlashActiveTab] = useState<SlashTab>(() => {
+      try {
+        const stored = localStorage.getItem("slashActiveTab");
+        if (stored === "all" || stored === "commands" || stored === "skills")
+          return stored;
+      } catch { /* noop */ }
+      return "all";
+    });
     const slashMenuRef = useRef<HTMLDivElement>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -345,10 +357,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     selectFilesRef.current = handleFileSelect;
 
     // --- Slash menu helpers ---
-    type SlashItem =
-      | { category: "command"; command: SlashCommand }
-      | { category: "skill"; skill: { name: string; description?: string } };
-
     const filterText = slashFilter.toLowerCase();
     const builtinCommands = useMemo(() => getBuiltinCommands(t), [t]);
     const filteredCommands = slashFilter
@@ -358,36 +366,68 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             c.description.toLowerCase().includes(filterText),
         )
       : builtinCommands;
-    // Build skill list from slashSkills (single source, already filtered by enabled).
-    const mergedSkills: { name: string; description?: string }[] = [];
-    for (const s of slashSkills) {
-      mergedSkills.push({ name: s.name, description: s.description });
-    }
 
-    const filteredSkills = slashFilter
-      ? mergedSkills.filter(
-          (s) =>
-            s.name.toLowerCase().includes(filterText) ||
-            (s.description || "").toLowerCase().includes(filterText),
-        )
-      : mergedSkills;
+    // Skills filtered by current text (preserving Skill type for SlashMenu badges)
+    const filteredSlashSkills = useMemo(() => {
+      if (!slashFilter) return slashSkills;
+      const ft = slashFilter.toLowerCase();
+      return slashSkills.filter(
+        (s) =>
+          s.name.toLowerCase().includes(ft) ||
+          (s.description || "").toLowerCase().includes(ft),
+      );
+    }, [slashSkills, slashFilter]);
 
-    const filteredItems: SlashItem[] = useMemo(
-      () => [
-        ...filteredCommands.map((c) => ({
-          category: "command" as const,
-          command: c,
+    // Flattened version used for getSlashItemByIndex lookup
+    const filteredSkillsFlat = useMemo(
+      () =>
+        filteredSlashSkills.map((s) => ({
+          name: s.name,
+          description: s.description,
         })),
-        ...filteredSkills.map((s) => ({
-          category: "skill" as const,
-          skill: s,
-        })),
-      ],
-      [filteredCommands, filteredSkills],
+      [filteredSlashSkills],
     );
 
-    const hasCommands = filteredCommands.length > 0;
-    const hasSkills = filteredSkills.length > 0;
+    // Compute count of items in current tab for keyboard nav clamping
+    const visibleItemCount = useMemo(() => {
+      if (slashActiveTab === "all")
+        return filteredCommands.length + filteredSlashSkills.length;
+      if (slashActiveTab === "commands") return filteredCommands.length;
+      return filteredSlashSkills.length;
+    }, [slashActiveTab, filteredCommands.length, filteredSlashSkills.length]);
+
+    const handleTabChange = useCallback((tab: SlashTab) => {
+      setSlashActiveTab(tab);
+      setSlashSelectedIndex(0);
+      try {
+        localStorage.setItem("slashActiveTab", tab);
+      } catch { /* noop */ }
+    }, []);
+
+    // Resolve SlashItem by tab + index for keyboard Enter selection
+    const getSlashItemByIndex = (
+      tab: SlashTab,
+      idx: number,
+      cmds: SlashCommand[],
+      skills: { name: string; description?: string }[],
+    ): SlashItem | null => {
+      if (tab === "all") {
+        if (idx < cmds.length)
+          return { category: "command", command: cmds[idx] };
+        const skillIdx = idx - cmds.length;
+        if (skillIdx >= 0 && skillIdx < skills.length)
+          return { category: "skill", skill: skills[skillIdx] };
+        return null;
+      }
+      if (tab === "commands") {
+        return idx < cmds.length
+          ? { category: "command", command: cmds[idx] }
+          : null;
+      }
+      return idx < skills.length
+        ? { category: "skill", skill: skills[idx] }
+        : null;
+    };
 
     const closeSlashMenu = useCallback(() => {
       setShowSlashMenu(false);
@@ -631,86 +671,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
         {/* Input card wrapper — keeps slash menu outside card div so space-y-* doesn't add margin to textarea */}
         <div className="relative">
-          {/* Slash command menu — outside the card to avoid space-y-4 pushing textarea down */}
-          {showSlashMenu && filteredItems.length > 0 && (
-            <div
-              ref={slashMenuRef}
-              className="absolute left-0 right-0 bottom-[calc(100%+6px)] z-30 max-h-48 overflow-y-auto rounded-xl border border-border bg-background shadow-soft p-1"
-            >
-              {hasCommands && (
-                <>
-                  <div className="px-2.5 py-1.5 text-sm text-text-muted font-medium">
-                    {t("chat.slashCommands")}
-                  </div>
-                  {filteredCommands.map((cmd, idx) => {
-                    const globalIdx = idx; // commands come first
-                    return (
-                      <button
-                        key={`cmd:${cmd.name}`}
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          selectSlashItem({
-                            category: "command",
-                            command: cmd,
-                          });
-                        }}
-                        className={`${SLASH_MENU_ITEM_BASE_CLASS} ${
-                          globalIdx === slashSelectedIndex
-                            ? "bg-accent/10 text-accent"
-                            : "text-text-primary hover:bg-surface-hover"
-                        }`}
-                      >
-                        <Zap className="w-4 h-4 flex-shrink-0 text-accent" />
-                        <span className="flex-1 truncate">/{cmd.name}</span>
-                        <span className="text-sm text-text-muted truncate max-w-[12rem] hidden sm:inline">
-                          {cmd.description}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </>
-              )}
-              {hasCommands && hasSkills && (
-                <div className="mx-2 my-1 border-t border-border" />
-              )}
-              {hasSkills && (
-                <>
-                  <div className="px-2.5 py-1.5 text-sm text-text-muted font-medium">
-                    {t("chat.slashSkills")}
-                  </div>
-                  {filteredSkills.map((skill, idx) => {
-                    const globalIdx =
-                      filteredCommands.length +
-                      idx;
-                    return (
-                      <button
-                        key={`skill:${skill.name}`}
-                        type="button"
-                        onMouseDown={(e) => {
-                          e.preventDefault();
-                          selectSlashItem({ category: "skill", skill });
-                        }}
-                        className={`${SLASH_MENU_ITEM_BASE_CLASS} ${
-                          globalIdx === slashSelectedIndex
-                            ? "bg-accent/10 text-accent"
-                            : "text-text-primary hover:bg-surface-hover"
-                        }`}
-                      >
-                        <Sparkles className="w-4 h-4 flex-shrink-0 text-text-muted" />
-                        <span className="flex-1 truncate">
-                          /skill:{skill.name}
-                        </span>
-                        {skill.description && (
-                          <span className="text-sm text-text-muted truncate max-w-[12rem] hidden sm:inline">
-                            {skill.description}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </>
-              )}
+          {/* Slash command menu */}
+          {showSlashMenu && (
+            <div ref={slashMenuRef}>
+              <SlashMenu
+                commands={filteredCommands}
+                skills={filteredSlashSkills}
+                activeTab={slashActiveTab}
+                selectedIndex={slashSelectedIndex}
+                onSelect={selectSlashItem}
+                onTabChange={handleTabChange}
+              />
             </div>
           )}
           {/* Input card */}
@@ -805,11 +776,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 }
 
                 // Slash menu keyboard nav
-                if (showSlashMenu && filteredItems.length > 0) {
+                if (showSlashMenu) {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
                     setSlashSelectedIndex((prev) =>
-                      Math.min(prev + 1, filteredItems.length - 1),
+                      Math.min(prev + 1, Math.max(0, visibleItemCount - 1)),
                     );
                     return;
                   }
@@ -820,9 +791,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   }
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    if (filteredItems[slashSelectedIndex]) {
-                      selectSlashItem(filteredItems[slashSelectedIndex]);
-                    }
+                    const item = getSlashItemByIndex(
+                      slashActiveTab,
+                      slashSelectedIndex,
+                      filteredCommands,
+                      filteredSkillsFlat,
+                    );
+                    if (item) selectSlashItem(item);
                     return;
                   }
                   if (e.key === "Escape") {
@@ -830,7 +805,21 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     closeSlashMenu();
                     return;
                   }
-                  // Any other key that's not the slash filter → let onChange handle it
+                  // Tab key: cycle through tabs
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    const currentIdx = SLASH_TABS.indexOf(slashActiveTab);
+                    const nextIdx = (currentIdx + 1) % SLASH_TABS.length;
+                    handleTabChange(SLASH_TABS[nextIdx]);
+                    return;
+                  }
+                  // Cmd/Ctrl+1/2/3: switch to specific tab
+                  if ((e.metaKey || e.ctrlKey) && e.key >= "1" && e.key <= "3") {
+                    e.preventDefault();
+                    const index = Number(e.key) - 1;
+                    if (SLASH_TABS[index]) handleTabChange(SLASH_TABS[index]);
+                    return;
+                  }
                 }
 
                 // Esc collapses expanded input (outside slash menu)
