@@ -39,7 +39,7 @@
   "scripts": {
     "dev": "npm run download:node && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
     "dev:with-python": "npm run download:node && npm run prepare:python && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
-    "build": "npm run download:node && npm run prepare:gui-tools && npm run prepare:python:all && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js && electron-builder",
+    "build": "npm run download:node && npm run prepare:gui-tools && npm run prepare:python:all && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js && PATH=\"$(pwd)/scripts:$PATH\" electron-builder",
     "build:win": "node scripts/build-windows.js",
     "build:linux": "rm -rf release/linux-unpacked && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm run download:node && npm run prepare:python:all && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron-builder --linux dir && bash scripts/package-linux.sh appimage",
     "build:linux:deb": "rm -rf release/linux-unpacked && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm run download:node && npm run prepare:python:all && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron-builder --linux dir && bash scripts/package-linux.sh appimage deb",
