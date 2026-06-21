@@ -198,7 +198,7 @@
     "enterModelId": "输入模型 ID，例如：deepseek-chat、kimi-k2-thinking、gpt-5.4",
     "selectModelRequired": "请选择模型",
     "contextWindow": "上下文窗口",
-    "contextWindowPlaceholder": "自动检测",
+    "contextWindowPlaceholder": "上下文窗口大小",
     "maxOutputTokens": "最大输出 Token",
     "maxOutputTokensPlaceholder": "自动检测",
     "contextWindowHint": "留空则自动检测。仅在模型限制不正确时手动覆盖。",

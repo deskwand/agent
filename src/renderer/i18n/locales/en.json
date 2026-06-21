@@ -198,7 +198,7 @@
     "enterModelId": "Enter model ID, e.g., deepseek-chat, kimi-k2-thinking, gpt-5.4",
     "selectModelRequired": "Please select a model",
     "contextWindow": "Context Window",
-    "contextWindowPlaceholder": "Auto-detect",
+    "contextWindowPlaceholder": "Context Window Size",
     "maxOutputTokens": "Max Output Tokens",
     "maxOutputTokensPlaceholder": "Auto-detect",
     "contextWindowHint": "Leave empty for auto-detection. Override only if the model reports incorrect limits.",

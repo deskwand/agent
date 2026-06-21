@@ -781,6 +781,24 @@ export function SettingsAPI({
                               placeholder={t("api.modelId")}
                               className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
                             />
+                            <input
+                              type="number"
+                              value={item.contextWindow ?? ""}
+                              onChange={(event) =>
+                                updateModel(index, {
+                                  contextWindow:
+                                    event.target.value &&
+                                    Number(event.target.value) > 0
+                                      ? Math.round(
+                                          Number(event.target.value),
+                                        )
+                                      : undefined,
+                                })
+                              }
+                              placeholder={t("api.contextWindowPlaceholder")}
+                              title={t("api.contextWindowHint")}
+                              className="w-36 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
                             <button
                               type="button"
                               onClick={() => removeModel(index)}
