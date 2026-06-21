@@ -64,7 +64,7 @@ import {
   BROWSER_CDP_PORT,
 } from "../browser/browser-view-manager";
 import { TurnFinalizer, type TurnFinalizerOptions } from "./turn-finalizer";
-import type { Browser, Page } from "puppeteer-core";
+import type { Browser, Page, Locator } from "playwright-core";
 import {
   resolveMessageEndPayload,
   toUserFacingErrorText,
@@ -550,8 +550,9 @@ export class AgentRunner {
   private _skillsAdapter?: SkillsAdapter;
   private extensionManager?: AgentRuntimeExtensionManager;
   private _browserViewManager: BrowserViewManager | null = null;
-  private _puppeteerBrowser: Browser | null = null;
-  private _puppeteerPage: Page | null = null;
+  private _browser: Browser | null = null;
+  private _browserPage: Page | null = null;
+  private _snapshotRefMap: Map<string, { role: string; name?: string; placeholder?: string; value?: string }> | null = null;
   private activeControllers: Map<string, AbortController> = new Map();
   private piSessions: Map<string, CachedPiSession> = new Map();
   private _turnFinalizer: TurnFinalizer | null = null;
@@ -849,37 +850,101 @@ ${hints.join("\n")}
     this._customTools = options.customTools || [];
   }
 
-  // ---- puppeteer integration ----
+  // ---- browser automation (Playwright over CDP) ----
 
-  private async _getOrCreatePuppeteerPage(): Promise<Page> {
-    // Auto-show the browser panel so users see what the LLM is doing.
-    // Idempotent — no-op if already visible.
+  private _isRetryableBrowserPageError(error: unknown): boolean {
+    const text = toErrorText(error).toLowerCase();
+    return (
+      text.includes("detached frame") ||
+      text.includes("execution context was destroyed") ||
+      text.includes("cannot find context") ||
+      text.includes("target closed") ||
+      text.includes("session closed") ||
+      text.includes("most likely because of a navigation")
+    );
+  }
+
+  private _resetBrowserState(reason: string): void {
+    logWarn(`[AgentRunner] Resetting browser automation state: ${reason}`);
+    this._browserPage = null;
+    this._snapshotRefMap = null;
+    if (this._browser) {
+      try {
+        this._browser.close();
+      } catch {
+        // Ignore cleanup failures; we'll reconnect on demand.
+      }
+    }
+    this._browser = null;
+  }
+
+  private async _isBrowserPageUsable(page: Page): Promise<boolean> {
+    if (page.isClosed()) {
+      return false;
+    }
+    try {
+      // Probe frame liveness — page.title() will throw if the frame is detached
+      await page.title();
+      return true;
+    } catch (error) {
+      if (this._isRetryableBrowserPageError(error)) {
+        logWarn(
+          `[AgentRunner] Cached browser page became stale: ${toErrorText(error)}`,
+        );
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  private async _withBrowserPage<T>(
+    operation: string,
+    action: (page: Page) => Promise<T>,
+  ): Promise<T> {
+    try {
+      const page = await this._getOrCreateBrowserPage();
+      return await action(page);
+    } catch (error) {
+      if (!this._isRetryableBrowserPageError(error)) {
+        throw error;
+      }
+      logWarn(
+        `[AgentRunner] ${operation} hit stale browser state; retrying once: ${toErrorText(error)}`,
+      );
+      this._resetBrowserState(`${operation} retry`);
+      const page = await this._getOrCreateBrowserPage();
+      return await action(page);
+    }
+  }
+
+  private async _getOrCreateBrowserPage(): Promise<Page> {
     this._browserViewManager?.show();
 
-    // Cache hit: same CDP target survives navigations, so a live page
-    // object always points to the correct internal browser page.
-    if (this._puppeteerPage && !this._puppeteerPage.isClosed()) {
-      return this._puppeteerPage;
+    if (
+      this._browserPage &&
+      (await this._isBrowserPageUsable(this._browserPage))
+    ) {
+      return this._browserPage;
     }
+    this._browserPage = null;
 
-    const puppeteer = await import("puppeteer-core");
+    const { chromium } = await import("playwright-core");
 
-    if (!this._puppeteerBrowser || !this._puppeteerBrowser.connected) {
-      this._puppeteerBrowser = await puppeteer.connect({
-        browserURL: `http://127.0.0.1:${BROWSER_CDP_PORT}`,
-        defaultViewport: null,
+    if (!this._browser || !this._browser.isConnected()) {
+      this._browser = await chromium.connectOverCDP(
+        `http://127.0.0.1:${BROWSER_CDP_PORT}`,
+      );
+      this._browser.on("disconnected", () => {
+        this._browserPage = null;
+        this._browser = null;
       });
     }
 
-    // Find the internal browser page by excluding the app renderer window,
-    // devtools, and extension targets. Uses the actual app URL (set at init
-    // time) rather than a hardcoded port so dev/prod mode are both covered.
     const bvm = this._browserViewManager;
     const appUrl = bvm?.getAppWindowUrl() ?? "";
-    const pages = await this._puppeteerBrowser.pages();
+    const pages = this._browser.contexts()[0]?.pages() ?? [];
     const internalPages = pages.filter((p) => {
       const u = p.url();
-      // Exclude app renderer (dev: http://localhost:5173, prod: file://…)
       if (appUrl && (u === appUrl || u.startsWith(appUrl + "/"))) return false;
       if (u.startsWith("devtools://")) return false;
       if (u.startsWith("chrome-extension://")) return false;
@@ -892,18 +957,46 @@ ${hints.join("\n")}
       );
     }
 
-    // TODO: multi-tab – currently single-tab, always picks the first match.
-    this._puppeteerPage = internalPages[0];
-    return this._puppeteerPage;
+    this._browserPage = internalPages[0];
+    return this._browserPage;
+  }
+
+  // ---- unified locator resolution ----
+
+  /**
+   * Resolve a user-supplied selector to a Playwright Locator.
+   * Supports: @eN snapshot refs, CSS selectors, visible text.
+   */
+  private _resolveLocator(page: Page, selector: string): Locator {
+    const refMatch = /^@e(\d+)$/.exec(selector);
+    if (refMatch && this._snapshotRefMap) {
+      const info = this._snapshotRefMap.get(selector);
+      if (info) {
+        const { role, name, placeholder } = info;
+        if (role === "textbox" || role === "searchbox") {
+          if (placeholder) return page.getByPlaceholder(placeholder);
+          if (name) return page.getByRole(role as "textbox" | "searchbox", { name });
+        }
+        if (role === "button") return page.getByRole("button", { name: name || "" });
+        if (role === "link") return page.getByRole("link", { name: name || "" });
+        if (role === "checkbox") return page.getByRole("checkbox", { name: name || "" });
+        if (role === "radio") return page.getByRole("radio", { name: name || "" });
+        if (role === "combobox" || role === "listbox")
+          return page.getByRole(role as "combobox" | "listbox", { name: name || "" });
+        if (name) return page.getByRole(role as "button", { name });
+      }
+      throw new Error(`Snapshot ref "${selector}" not found in current snapshot. Run internal_browser_snapshot first.`);
+    }
+    return page.locator(selector);
+  }
+
+  private _invalidateSnapshotRefs(): void {
+    this._snapshotRefMap = null;
   }
 
   // ---- internal browser tools ----
 
-  /**
-   * Build ToolDefinitions for the in-app embedded browser.
-   * Page lifecycle tools use BrowserViewManager directly.
-   * Page interaction tools use puppeteer-core connected to Electron's CDP.
-   */
+  /** Build Playwright-powered browser automation tools. */
   private buildInternalBrowserTools(): ToolDefinition[] {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const td = (t: any): any => t;
@@ -912,40 +1005,73 @@ ${hints.join("\n")}
 
     const self = this;
 
-    // ---- helpers ----
+    const withPage = <T,>(
+      operation: string,
+      action: (page: Page) => Promise<T>,
+    ) => self._withBrowserPage(operation, action);
 
-    const getPage = () => self._getOrCreatePuppeteerPage();
-
-    // Flatten a11y tree into readable @eN [role attrs] "name" lines
-    function flattenA11y(node: unknown): string[] {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // The "name" shown in snapshot output is the accessible name (derived from
+    // label / aria-label / text content), NOT the HTML name attribute. When
+    // writing CSS selectors, inspect the real DOM or use @eN refs for targeting.
+    function flattenA11y(axNodes: Record<string, any>[]): string[] {
       const lines: string[] = [];
+      const refMap = new Map<string, { role: string; name?: string; placeholder?: string; value?: string }>();
       let refIndex = 0;
       const interactiveRoles = new Set([
         "button", "link", "textbox", "searchbox", "combobox", "listbox",
         "checkbox", "radio", "switch", "tab", "menuitem", "option",
         "slider", "spinbutton", "heading", "listitem",
       ]);
-      function walk(n: unknown, depth: number) {
-        const a = n as Record<string, unknown> | null;
-        if (!a) return;
-        const role = String(a.role ?? "").toLowerCase();
+      const nodeMap = new Map<string, typeof axNodes[0]>();
+      for (const n of axNodes) {
+        nodeMap.set(n.nodeId, n);
+      }
+      // Find root nodes: nodes whose nodeId is not referenced as childId by any other node
+      const childIdSet = new Set(axNodes.flatMap((n) => n.childIds ?? []));
+      const rootNodes = axNodes.filter((n) => !n.ignored && !childIdSet.has(n.nodeId));
+      const starts = rootNodes.length > 0 ? rootNodes : axNodes.filter((n) => !n.ignored);
+      function walk(node: typeof axNodes[0], depth: number) {
+        if (node.ignored) {
+          // Still walk children — ignored wrapper may contain interactive nodes
+          for (const cid of node.childIds ?? []) {
+            const child = nodeMap.get(cid);
+            if (child) walk(child, depth);
+          }
+          return;
+        }
+        const role = node.role?.value?.toLowerCase() ?? "";
         if (interactiveRoles.has(role)) {
           refIndex++;
+          const ref = `@e${refIndex}`;
           const indent = "  ".repeat(depth);
-          const parts: string[] = [`${indent}@e${refIndex} [${role}`];
-          if (a.name) parts.push(`name="${String(a.name)}"`);
-          if (a.value !== undefined && a.value !== "") parts.push(`value="${String(a.value)}"`);
-          if (a.checked === "mixed" || a.checked === true) parts.push("checked");
-          if (a.disabled) parts.push("disabled");
-          if (a.placeholder) parts.push(`placeholder="${String(a.placeholder)}"`);
+          const parts: string[] = [`${indent}${ref} [${role}`];
+          const name = node.name?.value;
+          if (name) parts.push(`name="${name}"`);
+          const props = node.properties ?? [];
+          const getProp = (pn: string) => props.find((p: { name: string; value?: { value?: unknown } }) => p.name === pn)?.value?.value;
+          const val = getProp("valuetext") ?? getProp("value");
+          if (val !== undefined && val !== "") parts.push(`value="${val}"`);
+          const checked = getProp("checked");
+          if (checked === "mixed" || checked === "true") parts.push("checked");
+          if (getProp("disabled") === "true") parts.push("disabled");
+          const placeholder = getProp("placeholder");
+          if (placeholder) parts.push(`placeholder="${placeholder}"`);
           lines.push(`${parts.join(" ")}]`);
+          refMap.set(ref, {
+            role,
+            name: name || undefined,
+            placeholder: placeholder || undefined,
+            value: val || undefined,
+          });
         }
-        const children = a.children as unknown[] | undefined;
-        if (Array.isArray(children)) {
-          for (const c of children) walk(c, depth + 1);
+        for (const cid of node.childIds ?? []) {
+          const child = nodeMap.get(cid);
+          if (child) walk(child, depth + (interactiveRoles.has(role) ? 1 : 0));
         }
       }
-      walk(node, 0);
+      for (const root of starts) walk(root, 0);
+      self._snapshotRefMap = refMap;
       return lines;
     }
 
@@ -958,21 +1084,13 @@ ${hints.join("\n")}
       parameters: Type.Object({
         url: Type.String({ description: "URL to navigate to" }),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { url } = params as { url: string };
-        const page = await getPage();
-        await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-        return {
-          content: [
-            { type: "text" as const, text: `Navigated to ${page.url()}` },
-          ],
-        };
+        self._invalidateSnapshotRefs();
+        return withPage("internal_browser_navigate", async (page) => {
+          await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
+          return { content: [{ type: "text" as const, text: `Navigated to ${page.url()}` }] };
+        });
       },
     };
 
@@ -981,120 +1099,87 @@ ${hints.join("\n")}
       label: "Take screenshot",
       description: "Take a screenshot of the current internal browser page.",
       parameters: Type.Object({
-        fullPage: Type.Optional(
-          Type.Boolean({ description: "Capture full scrollable page" }),
-        ),
+        fullPage: Type.Optional(Type.Boolean({ description: "Capture full scrollable page" })),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { fullPage } = params as { fullPage?: boolean };
-        const page = await getPage();
-        const buf = (await page.screenshot({
-          fullPage: fullPage ?? false,
-          type: "png",
-        })) as Buffer;
-        const base64 = buf.toString("base64");
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Screenshot captured (${(buf.length / 1024).toFixed(1)} KB)`,
-            },
-          ],
-          details: {
-            openCoworkImages: [{ data: base64, mimeType: "image/png" }],
-          },
-        };
+        return withPage("internal_browser_screenshot", async (page) => {
+          const buf = (await page.screenshot({ fullPage: fullPage ?? false, type: "png" })) as Buffer;
+          const base64 = buf.toString("base64");
+          return {
+            content: [{ type: "text" as const, text: `Screenshot captured (${(buf.length / 1024).toFixed(1)} KB)` }],
+            details: { openCoworkImages: [{ data: base64, mimeType: "image/png" }] },
+          };
+        });
       },
     };
 
     const clickTool = {
       name: "internal_browser_click",
       label: "Click element",
-      description:
-        "Click an element on the page by CSS selector or text content.",
+      description: "Click an element on the page by CSS selector, @eN snapshot ref, or text content.",
       parameters: Type.Object({
-        selector: Type.String({ description: "CSS selector or text to click" }),
+        selector: Type.String({ description: "CSS selector, @eN snapshot ref, or visible text to click" }),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { selector } = params as { selector: string };
-        const page = await getPage();
-        try {
-          await page.waitForSelector(selector, { timeout: 5000 });
-          await page.click(selector);
-        } catch {
-          // Fallback: click by visible text content (fuzzy match)
-          await page.evaluate((sel: string) => {
-            const needle = sel.toLowerCase();
-            const el = Array.from(document.querySelectorAll("*")).find((e) =>
-              (e as HTMLElement).textContent
-                ?.trim()
-                .toLowerCase()
-                .includes(needle),
-            ) as HTMLElement | undefined;
-            if (el) el.click();
-            else throw new Error(`No element found matching "${sel}"`);
-          }, selector);
-        }
-        return {
-          content: [{ type: "text" as const, text: `Clicked "${selector}"` }],
-        };
+        return withPage("internal_browser_click", async (page) => {
+          await self._resolveLocator(page, selector).click({ timeout: 5000 });
+          return { content: [{ type: "text" as const, text: `Clicked "${selector}"` }] };
+        });
       },
     };
 
     const fillTool = {
       name: "internal_browser_fill",
       label: "Fill input",
-      description:
-        "Focus an input element, clear it, then type text. Use this for form fields.",
+      description: "Fill a form field. Clears any existing content then types the text. Works with <input>, <textarea>, <select>, and contenteditable elements.",
       parameters: Type.Object({
-        selector: Type.String({ description: "CSS selector of the input element" }),
+        selector: Type.String({ description: "CSS selector or @eN ref of the input element" }),
         text: Type.String({ description: "Text to fill" }),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { selector, text } = params as { selector: string; text: string };
-        const page = await getPage();
-        await page.waitForSelector(selector, { timeout: 5000 });
-        await page.focus(selector);
-        // Clear with triple-click (most inputs) + Backspace as the fast path,
-        // then zero out via evaluate to handle textarea/contenteditable.
-        await page.click(selector, { count: 3 });
-        await page.keyboard.press("Backspace");
-        await page.evaluate((sel: string) => {
-          const el = document.querySelector(sel);
-          if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
-            const nativeSetter = Object.getOwnPropertyDescriptor(
-              Object.getPrototypeOf(el), "value",
-            )?.set;
-            nativeSetter?.call(el, "");
-            el.dispatchEvent(new Event("input", { bubbles: true }));
-          } else if (el instanceof HTMLElement && el.isContentEditable) {
-            el.textContent = "";
+        return withPage("internal_browser_fill", async (page) => {
+          // Use force:true to skip Playwright's actionability checks.
+          // On complex pages (e.g. Baidu), locator.fill() often fails with
+          // "not clickable" / "element is not visible" even though the input
+          // is perfectly functional. force:true types directly into the element
+          // while still dispatching all necessary DOM events (focus, input, change).
+          try {
+            await self._resolveLocator(page, selector).fill(text, { timeout: 5000, force: true });
+          } catch (forceErr) {
+            if (self._isRetryableBrowserPageError(forceErr)) {
+              throw forceErr; // Stale page — let _withBrowserPage retry
+            }
+            // force:true also failed — fall back to raw DOM manipulation
+            logWarn(`[AgentRunner] fill force:true failed, trying DOM fallback: ${toErrorText(forceErr)}`);
+            try {
+              await page.evaluate(({ sel, txt }: { sel: string; txt: string }) => {
+                let el = document.querySelector(sel) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+                if (!el) {
+                  // Fuzzy fallback: try to extract name= from a CSS attribute selector
+                  const m = sel.match(/\[name=["']([^"']*)["']\]/);
+                  if (m) {
+                    const all = document.querySelectorAll('input, textarea, select');
+                    el = (Array.from(all).find(
+                      (e) => e.getAttribute('name') === m[1],
+                    ) ?? null) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+                  }
+                }
+                if (!el || !("value" in el)) throw new Error(`Cannot fill: ${sel}`);
+                el.focus();
+                el.value = txt;
+                el.dispatchEvent(new Event("input", { bubbles: true }));
+                el.dispatchEvent(new Event("change", { bubbles: true }));
+              }, { sel: selector, txt: text });
+            } catch (domErr) {
+              logWarn(`[AgentRunner] fill DOM fallback also failed: ${toErrorText(domErr)}`);
+              throw forceErr; // Re-throw the force:true error
+            }
           }
-        }, selector);
-        await page.keyboard.type(text, { delay: 30 });
-        return {
-          content: [
-            { type: "text" as const, text: `Filled "${text}" into "${selector}"` },
-          ],
-        };
+          return { content: [{ type: "text" as const, text: `Filled "${text}" into "${selector}"` }] };
+        });
       },
     };
 
@@ -1106,24 +1191,12 @@ ${hints.join("\n")}
         dx: Type.Optional(Type.Number({ description: "Horizontal delta (default 0)" })),
         dy: Type.Optional(Type.Number({ description: "Vertical delta (default 0)" })),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { dx, dy } = params as { dx?: number; dy?: number };
-        const page = await getPage();
-        await page.evaluate(
-          ({ x, y }) => window.scrollBy(x ?? 0, y ?? 0),
-          { x: dx ?? 0, y: dy ?? 0 },
-        );
-        return {
-          content: [
-            { type: "text" as const, text: `Scrolled by (${dx ?? 0}, ${dy ?? 0})` },
-          ],
-        };
+        return withPage("internal_browser_scroll", async (page) => {
+          await page.evaluate(({ x, y }) => window.scrollBy(x ?? 0, y ?? 0), { x: dx ?? 0, y: dy ?? 0 });
+          return { content: [{ type: "text" as const, text: `Scrolled by (${dx ?? 0}, ${dy ?? 0})` }] };
+        });
       },
     };
 
@@ -1132,21 +1205,14 @@ ${hints.join("\n")}
       label: "Hover element",
       description: "Hover the mouse over an element.",
       parameters: Type.Object({
-        selector: Type.String({ description: "CSS selector of the element to hover" }),
+        selector: Type.String({ description: "CSS selector or @eN ref of the element to hover" }),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { selector } = params as { selector: string };
-        const page = await getPage();
-        await page.hover(selector);
-        return {
-          content: [{ type: "text" as const, text: `Hovered "${selector}"` }],
-        };
+        return withPage("internal_browser_hover", async (page) => {
+          await self._resolveLocator(page, selector).hover({ timeout: 5000 });
+          return { content: [{ type: "text" as const, text: `Hovered "${selector}"` }] };
+        });
       },
     };
 
@@ -1155,72 +1221,84 @@ ${hints.join("\n")}
       label: "Select option",
       description: "Select an option from a <select> dropdown by value or label.",
       parameters: Type.Object({
-        selector: Type.String({ description: "CSS selector of the <select> element" }),
+        selector: Type.String({ description: "CSS selector or @eN ref of the <select> element" }),
         value: Type.String({ description: "Option value or label to select" }),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { selector, value } = params as { selector: string; value: string };
-        const page = await getPage();
-        await page.select(selector, value);
-        return {
-          content: [
-            { type: "text" as const, text: `Selected "${value}" in ${selector}` },
-          ],
-        };
+        return withPage("internal_browser_select", async (page) => {
+          try {
+            await self._resolveLocator(page, selector).selectOption(value, { timeout: 5000 });
+          } catch (err) {
+            if (!self._isRetryableBrowserPageError(err)) {
+              // DOM fallback for custom select widgets (Bootstrap, React, etc.)
+              // that don't respond to native selectOption()
+              logWarn(`[AgentRunner] select locator failed, trying DOM fallback: ${toErrorText(err)}`);
+              try {
+                await page.evaluate(({ sel, val }: { sel: string; val: string }) => {
+                  const el = document.querySelector(sel) as HTMLSelectElement | null;
+                  if (!el || el.tagName !== "SELECT") throw new Error(`Not a <select>: ${sel}`);
+                  // Match by option value first, then by label text (exact, trimmed).
+                  // Playwright's selectOption(label) can match imprecisely when
+                  // multiple options share substrings.
+                  const options = Array.from(el.options);
+                  let target = options.find((o) => o.value === val);
+                  if (!target) target = options.find((o) => o.text.trim() === val.trim());
+                  if (target) {
+                    el.value = target.value;
+                    el.dispatchEvent(new Event("input", { bubbles: true }));
+                    el.dispatchEvent(new Event("change", { bubbles: true }));
+                  } else {
+                    throw new Error(`Option "${val}" not found in <select> ${sel} (checked by value and label)`);
+                  }
+                }, { sel: selector, val: value });
+              } catch (domErr) {
+                logWarn(`[AgentRunner] select DOM fallback also failed: ${toErrorText(domErr)}`);
+                throw err;
+              }
+            } else {
+              throw err;
+            }
+          }
+          return { content: [{ type: "text" as const, text: `Selected "${value}" in "${selector}"` }] };
+        });
       },
     };
 
     const pressTool = {
       name: "internal_browser_press",
       label: "Press key",
-      description:
-        "Press a keyboard key. Use for Enter, Escape, Tab, Backspace, arrow keys, or combos like Control+A.",
+      description: "Press a keyboard key. Use for Enter, Escape, Tab, Backspace, arrow keys, or combos like Control+A.",
       parameters: Type.Object({
         key: Type.String({ description: "Key to press (e.g. Enter, Escape, Tab, ArrowDown, Control+A)" }),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { key } = params as { key: string };
-        const page = await getPage();
-        await page.keyboard.press(key as import("puppeteer-core").KeyInput);
-        return {
-          content: [{ type: "text" as const, text: `Pressed "${key}"` }],
-        };
+        return withPage("internal_browser_press", async (page) => {
+          await page.keyboard.press(key as Parameters<typeof page.keyboard.press>[0]);
+          return { content: [{ type: "text" as const, text: `Pressed "${key}"` }] };
+        });
       },
     };
 
     const snapshotTool = {
       name: "internal_browser_snapshot",
       label: "Take text snapshot",
-      description:
-        "Capture an accessibility text snapshot of the current page. Returns interactive elements as @eN [role] references for use with click, fill, hover, etc.",
+      description: "Capture an accessibility text snapshot of the current page. Returns interactive elements as @eN [role] references. @eN refs can be used in subsequent click, fill, hover, and select calls within the same page. Note: the 'name' shown is the accessible name (derived from label/aria-label/text), not the HTML name attribute.",
       parameters: Type.Object({}),
-      async execute(
-        _toolCallId: any,
-        _params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
-        const page = await getPage();
-        const a11y = await page.accessibility.snapshot({ interestingOnly: true });
-        const lines = flattenA11y(a11y);
-        return {
-          content: [
-            { type: "text" as const, text: lines.join("\n").substring(0, 15000) },
-          ],
-        };
+      async execute(_tcId: any, _params: any, _signal: any, _onUpd: any, _ctx: any) {
+        return withPage("internal_browser_snapshot", async (page) => {
+          const cdp = await page.context().newCDPSession(page);
+          try {
+            await cdp.send("Accessibility.enable");
+            const { nodes } = await cdp.send("Accessibility.getFullAXTree");
+            const lines = flattenA11y(nodes);
+            const text = lines.length > 0 ? lines.join("\n").substring(0, 15000) : "(no interactive elements found)";
+            return { content: [{ type: "text" as const, text }] };
+          } finally {
+            await cdp.detach().catch(() => {});
+          }
+        });
       },
     };
 
@@ -1231,103 +1309,49 @@ ${hints.join("\n")}
       parameters: Type.Object({
         script: Type.String({ description: "JavaScript code to execute" }),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { script } = params as { script: string };
-        const page = await getPage();
-        const result = await page.evaluate(script);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text:
-                typeof result === "string" ? result : JSON.stringify(result),
-            },
-          ],
-        };
+        return withPage("internal_browser_evaluate", async (page) => {
+          const result = await page.evaluate(script);
+          return { content: [{ type: "text" as const, text: typeof result === "string" ? result : JSON.stringify(result) }] };
+        });
       },
     };
 
     const waitForTool = {
       name: "internal_browser_wait_for",
       label: "Wait for element",
-      description:
-        "Wait for text, a CSS selector, network idle, or a URL pattern. Note: 'load' state waits for the NEXT navigation to complete — if the page is already loaded it will time out.",
+      description: "Wait for text, a CSS selector, network idle, or a URL pattern.",
       parameters: Type.Object({
         text: Type.Optional(Type.String({ description: "Text to wait for" })),
-        selector: Type.Optional(
-          Type.String({ description: "CSS selector to wait for" }),
-        ),
-        timeout: Type.Optional(
-          Type.Integer({ description: "Max wait time in ms (default 10000)" }),
-        ),
-        state: Type.Optional(
-          Type.String({ description: "Wait state: 'networkidle' or 'load'" }),
-        ),
-        url: Type.Optional(
-          Type.String({ description: "URL glob pattern to wait for (e.g. **/dashboard)" }),
-        ),
+        selector: Type.Optional(Type.String({ description: "CSS selector to wait for" })),
+        timeout: Type.Optional(Type.Integer({ description: "Max wait time in ms (default 10000)" })),
+        state: Type.Optional(Type.String({ description: "Wait state: 'networkidle' or 'load'" })),
+        url: Type.Optional(Type.String({ description: "URL glob pattern to wait for (e.g. **/dashboard). Note: triggers only on navigation; the current URL is checked first — if it already matches the wait returns immediately." })),
       }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
+      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { text, selector, timeout, state, url } = params as {
-          text?: string;
-          selector?: string;
-          timeout?: number;
-          state?: string;
-          url?: string;
+          text?: string; selector?: string; timeout?: number; state?: string; url?: string;
         };
-        const page = await getPage();
-        const ms = timeout ?? 10000;
-        if (state === "networkidle") {
-          await page.waitForNetworkIdle({ timeout: ms });
-        } else if (state === "load") {
-          await page.waitForNavigation({ waitUntil: "load", timeout: ms });
-        } else if (url) {
-          await page.waitForFunction(
-            (pattern: string) => {
-              // Minimal glob: ** matches any path segment
-              const re = new RegExp(
-                "^" +
-                  pattern
-                    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-                    .replace(/\*\*/g, ".*")
-                    .replace(/\*/g, "[^/]*") +
-                  "$",
-              );
-              return re.test(window.location.href);
-            },
-            { timeout: ms },
-            url,
-          );
-        } else if (selector) {
-          await page.waitForSelector(selector, { timeout: ms });
-        } else if (text) {
-          const escaped = text.replace(/["()]/g, "\\$&");
-          await page.waitForSelector(`::-p-text("${escaped}")`, {
-            timeout: ms,
-          });
-        }
-        const what = url
-          ? `URL pattern "${url}"`
-          : state
-            ? `state "${state}"`
-            : String(selector ?? text);
-        return {
-          content: [
-            { type: "text" as const, text: `Wait satisfied for ${what}` },
-          ],
-        };
+        return withPage("internal_browser_wait_for", async (page) => {
+          const ms = timeout ?? 10000;
+          if (state === "networkidle") {
+            await page.waitForLoadState("networkidle", { timeout: ms });
+          } else if (state === "load") {
+            await page.waitForLoadState("load", { timeout: ms });
+          } else if (url) {
+            const urlRe = new RegExp("^" + url.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*") + "$");
+            if (!urlRe.test(page.url())) {
+              await page.waitForURL((u) => urlRe.test(u.toString()), { timeout: ms });
+            }
+          } else if (selector) {
+            await page.locator(selector).waitFor({ timeout: ms });
+          } else if (text) {
+            await page.getByText(text).first().waitFor({ timeout: ms });
+          }
+          const what = url ? `URL pattern "${url}"` : state ? `state "${state}"` : (selector ? `selector "${selector}"` : `text "${text}"`);
+          return { content: [{ type: "text" as const, text: `Wait satisfied for ${what}` }] };
+        });
       },
     };
 
@@ -1336,20 +1360,11 @@ ${hints.join("\n")}
       label: "Get page state",
       description: "Get the current page URL and title.",
       parameters: Type.Object({}),
-      async execute(
-        _toolCallId: any,
-        _params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
-        const page = await getPage();
-        const [url, title] = await Promise.all([page.url(), page.title()]);
-        return {
-          content: [
-            { type: "text" as const, text: JSON.stringify({ url, title }) },
-          ],
-        };
+      async execute(_tcId: any, _params: any, _signal: any, _onUpd: any, _ctx: any) {
+        return withPage("internal_browser_get_state", async (page) => {
+          const [url, title] = await Promise.all([page.url(), page.title()]);
+          return { content: [{ type: "text" as const, text: JSON.stringify({ url, title }) }] };
+        });
       },
     };
 
@@ -1368,7 +1383,6 @@ ${hints.join("\n")}
       td(getStateTool),
     ];
   }
-
   private buildWebTools(): ToolDefinition[] {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const td = (t: any): any => t;
