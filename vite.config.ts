@@ -43,6 +43,7 @@ export default defineConfig({
                 '@modelcontextprotocol/sdk',
                 'electron-updater',
                 'chokidar',
+                'fsevents',
                 'archiver',
                 'ngrok',
                 'ws',
