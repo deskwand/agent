@@ -9,6 +9,7 @@ dist-lima-agent/
 dist-mcp/
 release/
 publish/
+squashfs-root/
 # Bundled Node.js binaries
 resources/node/
 

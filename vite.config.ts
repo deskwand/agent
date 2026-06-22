@@ -51,6 +51,13 @@ export default defineConfig({
                 'dotenv',
                 'jsdom',
                 'canvas',
+                // playwright-core bundles chromium-bidi internally via lazy require;
+                // Vite's CJS plugin hoists those to top-level static requires so we
+                // must keep playwright-core external to preserve its own loader logic.
+                'playwright-core',
+                // node:sqlite was added in Node 22 and is not listed in
+                // module.builtinModules — must be externalized explicitly.
+                'node:sqlite',
               ],
               output: {
                 // Ensure consistent interop for CJS/ESM

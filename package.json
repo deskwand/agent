@@ -41,7 +41,8 @@
     "dev:with-python": "npm run download:node && npm run prepare:python && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && vite",
     "build": "npm run download:node && npm run prepare:gui-tools && npm run prepare:python:all && npm run build:wsl-agent && npm run build:lima-agent && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js && electron-builder",
     "build:win": "node scripts/build-windows.js",
-    "build:linux": "rm -rf release/linux-unpacked && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm run download:node && npm run prepare:python:all && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron-builder --linux",
+    "build:linux": "rm -rf release/linux-unpacked && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm run download:node && npm run prepare:python:all && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron-builder --linux dir && bash scripts/package-linux.sh appimage",
+    "build:linux:deb": "rm -rf release/linux-unpacked && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ npm run download:node && npm run prepare:python:all && npm run build:mcp && tsc && vite build && node scripts/pre-build-check.js && ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ electron-builder --linux dir && bash scripts/package-linux.sh appimage deb",
     "build:wsl-agent": "tsc -p src/main/sandbox/wsl-agent/tsconfig.json",
     "build:lima-agent": "tsc -p src/main/sandbox/lima-agent/tsconfig.json",
     "build:mcp": "node scripts/bundle-mcp.js",
@@ -79,6 +80,7 @@
     "archiver": "^7.0.1",
     "canvas": "^3.2.3",
     "chokidar": "^4.0.1",
+    "chromium-bidi": "^12.0.0",
     "dotenv": "^17.2.3",
     "electron-store": "^11.0.2",
     "electron-updater": "^6.3.0",
@@ -122,6 +124,7 @@
     "@typescript-eslint/parser": "^7.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "4.1.5",
+    "app-builder-bin": "^5.0.0-alpha.13",
     "autoprefixer": "^10.5.0",
     "electron": "^35.7.5",
     "electron-builder": "^26.8.1",
@@ -141,7 +144,7 @@
     "fast-xml-parser": "^5.5.6",
     "tar": "^7.5.11"
   },
-  "author": "DeskWand Team",
+  "author": "DeskWand Team <dev@deskwand.com>",
   "license": "MIT",
   "lint-staged": {
     "*.{ts,tsx}": [

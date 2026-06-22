@@ -230,6 +230,42 @@ app.commandLine.appendSwitch(
   `http://localhost:${ELECTRON_DEVTOOLS_DEBUG_PORT}`,
 );
 
+// Linux sandbox / GPU workarounds.
+//
+// Sandbox: AppImage mounts are nosuid → SUID chrome-sandbox helper cannot work.
+// deb installs have chrome-sandbox with root:root 4755 (set by postinst script).
+// Detect at runtime: only add --no-sandbox when SUID sandbox is not available.
+//
+// GPU: Vulkan/ANGLE init often fails on headless, SSH, or misconfigured
+// X11/Wayland sessions, leaving a blank white window. --disable-gpu falls back
+// to software rasterizer (slower but reliable).
+if (process.platform === "linux") {
+  // Check whether SUID sandbox is properly configured.
+  let suidSandboxOk = false;
+  try {
+    const sandboxPath = join(dirname(process.execPath), "chrome-sandbox");
+    const stats = fs.statSync(sandboxPath);
+    // SUID bit (0o4000) + owned by root (uid 0)
+    suidSandboxOk = (stats.mode & 0o4000) !== 0 && stats.uid === 0;
+  } catch {
+    // chrome-sandbox not found — no SUID sandbox available.
+  }
+
+  if (!suidSandboxOk) {
+    app.commandLine.appendSwitch("no-sandbox");
+    log("[App] Linux — SUID sandbox not available, --no-sandbox");
+  } else {
+    log("[App] Linux — SUID sandbox properly configured, keeping sandbox");
+  }
+
+  if (process.env.DESKWAND_ENABLE_GPU === "1") {
+    log("[App] Linux — GPU acceleration enabled via DESKWAND_ENABLE_GPU=1");
+  } else {
+    app.commandLine.appendSwitch("disable-gpu");
+    log("[App] Linux — --disable-gpu (set DESKWAND_ENABLE_GPU=1 to override)");
+  }
+}
+
 const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   logWarn("[App] Another instance is already running, quitting this instance");

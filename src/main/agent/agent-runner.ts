@@ -565,6 +565,7 @@ export class AgentRunner {
     servers: Record<string, unknown>;
   } | null = null;
   private _skillsSetupDone = false;
+  private _skillsSetupInProgress = false;
 
   /**
    * Clear SDK session cache for a session
@@ -592,6 +593,7 @@ export class AgentRunner {
   /** Call after the user installs / removes a skill / plugin so the next query re-links everything. */
   invalidateSkillsSetup(): void {
     this._skillsSetupDone = false;
+    this._skillsSetupInProgress = false;
     // Clear all cached pi sessions so they are recreated with fresh
     // extension commands on the next message. Without this, an existing
     // session would reuse its stale ExtensionRunner and never see newly
@@ -2254,10 +2256,9 @@ ${hints.join("\n")}
       // Symlinks and directories are stable across queries; re-running every time
       // wastes ~10-30 syscalls per query for no benefit. Call invalidateSkillsSetup()
       // to force a re-run after the user installs or removes a skill.
-      if (!this._skillsSetupDone) {
-        // Set flag at start to prevent re-entrant calls from concurrent queries
-        this._skillsSetupDone = true;
-
+      if (!this._skillsSetupDone && !this._skillsSetupInProgress) {
+        this._skillsSetupInProgress = true;
+        try {
         // Ensure app DeskWand config directory exists
         if (!fs.existsSync(userDeskWandDir)) {
           fs.mkdirSync(userDeskWandDir, { recursive: true });
@@ -2302,23 +2303,47 @@ ${hints.join("\n")}
               fs.statSync(builtinSkillPath).isDirectory() &&
               !fs.existsSync(userSkillPath)
             ) {
-              if (sourceInsideAsar) {
-                // Source is inside .asar — must copy (symlinks to asar paths fail at OS level)
-                this.copyDirectorySync(builtinSkillPath, userSkillPath);
-                log(
-                  `[AgentRunner] Copied built-in skill from asar: ${skillName}`,
-                );
-              } else {
-                // Source is a real directory — symlink for space efficiency
-                try {
-                  fs.symlinkSync(builtinSkillPath, userSkillPath, "dir");
-                  log(`[AgentRunner] Linked built-in skill: ${skillName}`);
-                } catch (err) {
-                  logWarn(
-                    `[AgentRunner] Failed to symlink ${skillName}, copying instead:`,
-                    err,
-                  );
+              try {
+                if (sourceInsideAsar) {
+                  // Source is inside .asar — must copy (symlinks to asar paths fail at OS level)
                   this.copyDirectorySync(builtinSkillPath, userSkillPath);
+                  log(
+                    `[AgentRunner] Copied built-in skill from asar: ${skillName}`,
+                  );
+                } else {
+                  // Source is a real directory — symlink for space efficiency
+                  try {
+                    fs.symlinkSync(builtinSkillPath, userSkillPath, "dir");
+                    log(`[AgentRunner] Linked built-in skill: ${skillName}`);
+                  } catch (symErr) {
+                    logWarn(
+                      `[AgentRunner] Failed to symlink ${skillName}, copying instead:`,
+                      (symErr as NodeJS.ErrnoException).code,
+                    );
+                    // Ensure the target path is clear before copying
+                    try {
+                      const lst = fs.lstatSync(userSkillPath);
+                      if (lst.isDirectory()) {
+                        fs.rmSync(userSkillPath, { recursive: true, force: true });
+                      } else {
+                        fs.unlinkSync(userSkillPath);
+                      }
+                    } catch {
+                      // Target did not exist or was already gone
+                    }
+                    this.copyDirectorySync(builtinSkillPath, userSkillPath);
+                  }
+                }
+              } catch (skillErr) {
+                logWarn(
+                  `[AgentRunner] Failed to set up built-in skill ${skillName}:`,
+                  (skillErr as NodeJS.ErrnoException).code,
+                );
+                // Clean up partial target to allow retry on next start
+                try {
+                  fs.rmSync(userSkillPath, { recursive: true, force: true });
+                } catch {
+                  // best-effort cleanup
                 }
               }
             }
@@ -2326,6 +2351,14 @@ ${hints.join("\n")}
         }
 
         this.syncUserSkillsToAppDir(appSkillsDir);
+
+        // Only mark setup done after successful completion — if we failed,
+        // the next query will retry.
+        this._skillsSetupDone = true;
+        log("[AgentRunner] Skills setup complete");
+        } finally {
+          this._skillsSetupInProgress = false;
+        }
       }
 
       // Build available skills section dynamically — now handled by pi's DefaultResourceLoader
