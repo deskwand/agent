@@ -102,6 +102,8 @@ interface AppState {
   conversationsCollapsed: boolean;
   projectsCollapsed: boolean;
   workspaceCollapsedMap: Record<string, boolean>;
+  conversationsMaxVisible: number;
+  workspaceMaxVisibleMap: Record<string, number>;
   sidebarWidth: number;
   contextPanelWidth: number;
   showSettings: boolean;
@@ -212,6 +214,8 @@ interface AppState {
   setConversationsCollapsed: (collapsed: boolean) => void;
   setProjectsCollapsed: (collapsed: boolean) => void;
   setWorkspaceCollapsedMap: (map: Record<string, boolean>) => void;
+  setConversationsMaxVisible: (count: number) => void;
+  setWorkspaceMaxVisible: (cwd: string, count: number) => void;
   setSidebarWidth: (width: number) => void;
   setContextPanelWidth: (width: number) => void;
   setShowSettings: (show: boolean) => void;
@@ -299,6 +303,8 @@ export const useAppStore = create<AppState>((set) => ({
   conversationsCollapsed: false,
   projectsCollapsed: false,
   workspaceCollapsedMap: {},
+  conversationsMaxVisible: 10,
+  workspaceMaxVisibleMap: {},
   sidebarWidth: 280,
   contextPanelWidth: 288,
   showSettings: false,
@@ -749,6 +755,15 @@ export const useAppStore = create<AppState>((set) => ({
     set({ conversationsCollapsed: collapsed }),
   setProjectsCollapsed: (collapsed) => set({ projectsCollapsed: collapsed }),
   setWorkspaceCollapsedMap: (map) => set({ workspaceCollapsedMap: map }),
+  setConversationsMaxVisible: (count) =>
+    set({ conversationsMaxVisible: count }),
+  setWorkspaceMaxVisible: (cwd, count) =>
+    set((state) => ({
+      workspaceMaxVisibleMap: {
+        ...state.workspaceMaxVisibleMap,
+        [cwd]: count,
+      },
+    })),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   setContextPanelWidth: (width) => set({ contextPanelWidth: width }),
   setShowSettings: (show) => set({ showSettings: show }),

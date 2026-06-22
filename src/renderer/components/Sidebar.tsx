@@ -21,6 +21,8 @@ import {
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 
+const DEFAULT_MAX_VISIBLE = 10;
+
 type ProjectWorkspaceGroup = {
   key: string;
   cwd: string;
@@ -42,10 +44,18 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const conversationsCollapsed = useAppStore((s) => s.conversationsCollapsed);
   const projectsCollapsed = useAppStore((s) => s.projectsCollapsed);
   const workspaceCollapsedMap = useAppStore((s) => s.workspaceCollapsedMap);
+  const conversationsMaxVisible = useAppStore((s) => s.conversationsMaxVisible);
+  const workspaceMaxVisibleMap = useAppStore((s) => s.workspaceMaxVisibleMap);
   const toggleConversations = useAppStore((s) => s.toggleConversations);
   const toggleProjects = useAppStore((s) => s.toggleProjects);
   const toggleWorkspaceCollapsed = useAppStore(
     (s) => s.toggleWorkspaceCollapsed,
+  );
+  const setConversationsMaxVisible = useAppStore(
+    (s) => s.setConversationsMaxVisible,
+  );
+  const setWorkspaceMaxVisible = useAppStore(
+    (s) => s.setWorkspaceMaxVisible,
   );
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const showSchedule = useAppStore((s) => s.showSchedule);
@@ -738,11 +748,38 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             </div>
             {!conversationsCollapsed &&
               (sortedConversationSessions.length > 0 ? (
-                <div className="space-y-0.5">
-                  {sortedConversationSessions.map((session) =>
-                    renderSessionItem(session, true),
-                  )}
-                </div>
+                <>
+                  <div className="space-y-0.5">
+                    {sortedConversationSessions
+                      .slice(0, conversationsMaxVisible)
+                      .map((session) => renderSessionItem(session, true))}
+                  </div>
+                  {sortedConversationSessions.length > DEFAULT_MAX_VISIBLE &&
+                    (conversationsMaxVisible <
+                    sortedConversationSessions.length ? (
+                      <button
+                        onClick={() =>
+                          setConversationsMaxVisible(Infinity)
+                        }
+                        className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
+                      >
+                        {t("sidebar.expandConversationsList", {
+                          count:
+                            sortedConversationSessions.length -
+                            conversationsMaxVisible,
+                        })}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          setConversationsMaxVisible(DEFAULT_MAX_VISIBLE)
+                        }
+                        className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
+                      >
+                        {t("sidebar.collapseList")}
+                      </button>
+                    ))}
+                </>
               ) : (
                 <p className="px-3 text-sm leading-5 text-text-muted">
                   {t("sidebar.noConversationsHint")}
@@ -854,11 +891,51 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
                       {!workspaceCollapsedMap[workspace.cwd] &&
                         (workspace.sessions.length > 0 ? (
-                          <div className="space-y-0.5 mt-1">
-                            {workspace.sessions.map((session) =>
-                              renderSessionItem(session, true, true),
-                            )}
-                          </div>
+                          <>
+                            <div className="space-y-0.5 mt-1">
+                              {workspace.sessions
+                                .slice(
+                                  0,
+                                  workspaceMaxVisibleMap[workspace.cwd] ?? 10,
+                                )
+                                .map((session) =>
+                                  renderSessionItem(session, true, true),
+                                )}
+                            </div>
+                            {workspace.sessions.length > DEFAULT_MAX_VISIBLE &&
+                              ((workspaceMaxVisibleMap[workspace.cwd] ??
+                                DEFAULT_MAX_VISIBLE) <
+                              workspace.sessions.length ? (
+                                <button
+                                  onClick={() =>
+                                    setWorkspaceMaxVisible(
+                                      workspace.cwd,
+                                      Infinity,
+                                    )
+                                  }
+                                  className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
+                                >
+                                  {t("sidebar.expandWorkspaceSessions", {
+                                    count:
+                                      workspace.sessions.length -
+                                      (workspaceMaxVisibleMap[workspace.cwd] ??
+                                        DEFAULT_MAX_VISIBLE),
+                                  })}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() =>
+                                    setWorkspaceMaxVisible(
+                                      workspace.cwd,
+                                      DEFAULT_MAX_VISIBLE,
+                                    )
+                                  }
+                                  className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
+                                >
+                                  {t("sidebar.collapseList")}
+                                </button>
+                              ))}
+                          </>
                         ) : (
                           <div className="mt-1 px-3 py-1 text-sm leading-5 text-text-muted">
                             {t("sidebar.noConversations")}
