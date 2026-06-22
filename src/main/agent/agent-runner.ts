@@ -2461,12 +2461,17 @@ ${hints.join("\n")}
         : { promptPrefix: undefined, customTools: [] };
 
       let contextualPrompt = prompt;
-      if (!cachedSession) {
-        // Cold start: inject recent history into prompt if available
+      let historyWasInjected = false;
+
+      // Shared helper: build a token-budgeted conversation history preamble
+      // and prepend it to contextualPrompt. Returns true if history was injected.
+      const injectHistoryPreamble = (
+        basePrompt: string,
+        logTag: string,
+      ): boolean => {
         const conversationMessages = existingMessages.filter(
           (msg) => msg.role === "user" || msg.role === "assistant",
         );
-        // Filter out messages that contain images (images can't be serialized into text preamble)
         const textOnlyMessages = conversationMessages.filter(
           (msg) =>
             !msg.content.some((c) => (c as { type?: string }).type === "image"),
@@ -2477,68 +2482,70 @@ ${hints.join("\n")}
             ? textOnlyMessages.slice(0, -1)
             : textOnlyMessages;
 
-        if (historyMessages.length > 0) {
-          // Content-aware chars-per-token estimation (CJK text uses ~1.5 chars/token vs ~4 for English)
-          const contextWindow = piModel.contextWindow || 128000;
-          const historyBudgetRatio =
-            provider === "ollama" && contextWindow < 16384 ? 0.15 : 0.3;
-          const historyTokenBudget = Math.floor(
-            contextWindow * historyBudgetRatio,
-          );
+        if (historyMessages.length === 0) return false;
 
-          // Sample recent messages to estimate chars-per-token ratio
-          const sampleText = historyMessages
-            .slice(-3)
-            .flatMap((m) =>
-              m.content
-                .filter((c) => c.type === "text")
-                .map((c) => (c as { text: string }).text),
-            )
-            .join("");
-          const charsPerToken = estimateCharsPerToken(sampleText);
-          const historyCharBudget = Math.floor(
-            historyTokenBudget * charsPerToken,
-          );
+        const contextWindow = piModel.contextWindow || 128000;
+        const historyBudgetRatio =
+          provider === "ollama" && contextWindow < 16384 ? 0.15 : 0.3;
+        const historyTokenBudget = Math.floor(
+          contextWindow * historyBudgetRatio,
+        );
 
-          const historyItems: string[] = [];
-          let charCount = 0;
-          // Build from newest to oldest, then reverse
-          for (let i = historyMessages.length - 1; i >= 0; i--) {
-            const msg = historyMessages[i];
-            const textContent = msg.content
+        const sampleText = historyMessages
+          .slice(-3)
+          .flatMap((m) =>
+            m.content
               .filter((c) => c.type === "text")
-              .map((c) => (c as { text: string }).text)
-              .join("\n");
-            const roleTag = msg.role === "user" ? "user" : "assistant";
-            const entry = `<turn role="${roleTag}">${textContent}</turn>`;
-            if (charCount + entry.length > historyCharBudget) break;
-            charCount += entry.length;
-            historyItems.unshift(entry);
-          }
+              .map((c) => (c as { text: string }).text),
+          )
+          .join("");
+        const charsPerToken = estimateCharsPerToken(sampleText);
+        const historyCharBudget = Math.floor(
+          historyTokenBudget * charsPerToken,
+        );
 
-          if (historyItems.length > 0) {
-            const trimmedCount = historyMessages.length - historyItems.length;
-            const historyNote =
-              trimmedCount > 0
-                ? `[${trimmedCount} older messages omitted]\n`
-                : "";
-            const preamble = `<conversation_history>\n${historyNote}${historyItems.join("\n")}\n</conversation_history>`;
-            contextualPrompt = `${preamble}\n\n${prompt}`;
-            log(
-              "[AgentRunner] Cold start: injecting",
-              historyItems.length,
-              "of",
-              historyMessages.length,
-              "history messages (budget:",
-              historyCharBudget,
-              "chars, used:",
-              charCount,
-              ", charsPerToken:",
-              charsPerToken.toFixed(2),
-              ")",
-            );
-          }
+        const historyItems: string[] = [];
+        let charCount = 0;
+        for (let i = historyMessages.length - 1; i >= 0; i--) {
+          const msg = historyMessages[i];
+          const textContent = msg.content
+            .filter((c) => c.type === "text")
+            .map((c) => (c as { text: string }).text)
+            .join("\n");
+          const roleTag = msg.role === "user" ? "user" : "assistant";
+          const entry = `<turn role="${roleTag}">${textContent}</turn>`;
+          if (charCount + entry.length > historyCharBudget) break;
+          charCount += entry.length;
+          historyItems.unshift(entry);
         }
+
+        if (historyItems.length === 0) return false;
+
+        const trimmedCount = historyMessages.length - historyItems.length;
+        const historyNote =
+          trimmedCount > 0
+            ? `[${trimmedCount} older messages omitted]\n`
+            : "";
+        const preamble = `<conversation_history>\n${historyNote}${historyItems.join("\n")}\n</conversation_history>`;
+        contextualPrompt = `${preamble}\n\n${basePrompt}`;
+        log(
+          `[AgentRunner] ${logTag}: injecting`,
+          historyItems.length,
+          "of",
+          historyMessages.length,
+          "history messages (budget:",
+          historyCharBudget,
+          "chars, used:",
+          charCount,
+          ", charsPerToken:",
+          charsPerToken.toFixed(2),
+          ")",
+        );
+        return true;
+      };
+
+      if (!cachedSession) {
+        historyWasInjected = injectHistoryPreamble(prompt, "Cold start");
       } else {
         // Reusing session — SDK already has the full conversation context
         logCtx("[AgentRunner] Reusing existing SDK session for:", session.id);
@@ -2860,6 +2867,15 @@ Tool routing:\n
         }
         this.piSessions.delete(session.id);
         cachedSession = undefined;
+      }
+
+      // If toolsSignature just invalidated the cached session, re-inject
+      // conversation history that was skipped above.
+      if (!cachedSession && !historyWasInjected) {
+        injectHistoryPreamble(
+          contextualPrompt,
+          "Tools change cold-start",
+        );
       }
 
       let piSession: PiAgentSession;
