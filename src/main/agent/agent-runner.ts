@@ -1749,7 +1749,6 @@ ${hints.join("\n")}
     };
 
     const thinkingStepId = uuidv4();
-    let abortedByTimeout = false;
     let turnCompletedNormally = false;
 
     try {
@@ -3118,22 +3117,7 @@ Tool routing:\n
         }
       };
 
-      // Activity-based timeout: reset the 5-min timer whenever the SDK sends events
-      const PROMPT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-      let activityTimeoutId: ReturnType<typeof setTimeout> | undefined;
-      const resetActivityTimeout = () => {
-        if (activityTimeoutId) clearTimeout(activityTimeoutId);
-        activityTimeoutId = setTimeout(() => {
-          logWarn(
-            "[AgentRunner] Prompt timed out (no activity for 5 min), aborting",
-          );
-          abortedByTimeout = true;
-          controller.abort();
-          piSession.abort().catch((e) => {
-            logWarn("[AgentRunner] pi session abort rejected on timeout:", e);
-          });
-        }, PROMPT_TIMEOUT_MS);
-      };
+
 
       const recordStreamEvent = (eventType: string) => {
         streamEventCounts.set(
@@ -3152,9 +3136,6 @@ Tool routing:\n
       const unsubscribe = piSession.subscribe((event) => {
         try {
           if (controller.signal.aborted) return;
-
-          // Reset activity timeout on meaningful events
-          resetActivityTimeout();
 
           if (event.type === "message_update") {
             const updateType = event.assistantMessageEvent.type;
@@ -3560,7 +3541,6 @@ Tool routing:\n
 
       // Execute the prompt — unsubscribe in finally to prevent event listener leak
       try {
-        resetActivityTimeout();
         if (provider === "ollama") {
           log(
             "[AgentRunner] Starting Ollama prompt",
@@ -3676,38 +3656,11 @@ Tool routing:\n
         } catch (e) {
           logWarn("[AgentRunner] unsubscribe error:", e);
         }
-        if (activityTimeoutId) clearTimeout(activityTimeoutId);
         if (ollamaColdStartTimerId) clearTimeout(ollamaColdStartTimerId);
       }
 
       logTiming("pi-coding-agent prompt completed", runStartTime);
 
-      // If the SDK swallowed the AbortError and returned void, detect timeout here
-      if (controller.signal.aborted && abortedByTimeout) {
-        logCtx(
-          "[AgentRunner] Aborted due to timeout (detected after prompt returned)",
-        );
-        const errorMsg: Message = {
-          id: uuidv4(),
-          sessionId: session.id,
-          role: "assistant",
-          turnId,
-          content: [
-            {
-              type: "text",
-              text: "**请求超时**：长时间未收到响应，操作已中止。",
-            },
-          ],
-          timestamp: Date.now(),
-          executionTimeMs: Date.now() - runStartTime,
-        };
-        this.sendMessage(session.id, errorMsg);
-        this.sendTraceUpdate(session.id, thinkingStepId, {
-          status: "error",
-          title: "Request timed out",
-        });
-        return;
-      }
       // Complete - update the initial thinking step
       this.sendTraceUpdate(session.id, thinkingStepId, {
         status: terminalErrorText ? "error" : "completed",
@@ -3718,34 +3671,11 @@ Tool routing:\n
       }
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        if (abortedByTimeout) {
-          logCtx("[AgentRunner] Aborted due to timeout");
-          const errorMsg: Message = {
-            id: uuidv4(),
-            sessionId: session.id,
-            role: "assistant",
-            turnId,
-            content: [
-              {
-                type: "text",
-                text: "**请求超时**：长时间未收到响应，操作已中止。",
-              },
-            ],
-            timestamp: Date.now(),
-            executionTimeMs: Date.now() - runStartTime,
-          };
-          this.sendMessage(session.id, errorMsg);
-          this.sendTraceUpdate(session.id, thinkingStepId, {
-            status: "error",
-            title: "Request timed out",
-          });
-        } else {
-          logCtx("[AgentRunner] Aborted by user");
-          this.sendTraceUpdate(session.id, thinkingStepId, {
-            status: "completed",
-            title: "Cancelled",
-          });
-        }
+        logCtx("[AgentRunner] Aborted");
+        this.sendTraceUpdate(session.id, thinkingStepId, {
+          status: "completed",
+          title: "Cancelled",
+        });
       } else {
         logCtxError("[AgentRunner] Error:", error);
 
@@ -3781,7 +3711,7 @@ Tool routing:\n
       this.pathResolver.unregisterSession(session.id);
 
       // pony: user-aborted → dispose cached piSession so next request starts fresh
-      if (controller.signal.aborted && !abortedByTimeout) {
+      if (controller.signal.aborted) {
         const cached = this.piSessions.get(session.id);
         if (cached) {
           this.piSessions.delete(session.id);
