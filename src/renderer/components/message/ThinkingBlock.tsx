@@ -10,31 +10,6 @@ const MessageMarkdown = lazy(() =>
   })),
 );
 
-// Render **bold** markers in thinking preview text.
-// Only handles double-asterisk bold to avoid false positives with single * in math/code.
-function renderThinkingPreview(raw: string): React.ReactNode[] {
-  const parts: React.ReactNode[] = [];
-  const regex = /\*\*(.+?)\*\*/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-  while ((match = regex.exec(raw)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(raw.slice(lastIndex, match.index));
-    }
-    parts.push(
-      <strong key={key++} className="font-semibold not-italic">
-        {match[1]}
-      </strong>,
-    );
-    lastIndex = match.index + match[0].length;
-  }
-  if (lastIndex < raw.length) {
-    parts.push(raw.slice(lastIndex));
-  }
-  return parts;
-}
-
 interface ThinkingBlockProps {
   block: { type: "thinking"; thinking: string };
 }
@@ -47,14 +22,9 @@ export const ThinkingBlock = memo(function ThinkingBlock({
   const text = block.thinking || "";
   if (!text) return null;
 
-  // Preview: first ~80 chars, clean up broken ** markers from truncation
-  let preview = text.length > 80 ? text.substring(0, 77) + "..." : text;
-  // Strip a trailing unclosed ** that truncation may have created
-  preview = preview.replace(/\*{1,2}(?:\.{3})?$/, (m) => {
-    // Keep the ... suffix if present, just remove the dangling asterisks
-    return m.endsWith("...") ? "..." : "";
-  });
-  const previewNodes = renderThinkingPreview(preview);
+  const PREVIEW_MAX_CHARS = 600;
+  const previewText =
+    text.length > PREVIEW_MAX_CHARS ? text.slice(0, PREVIEW_MAX_CHARS) : text;
 
   return (
     <div className="rounded-2xl bg-background/40 overflow-hidden">
@@ -64,13 +34,13 @@ export const ThinkingBlock = memo(function ThinkingBlock({
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
       >
         <Brain className="w-3.5 h-3.5 flex-shrink-0 pt-0.5 text-text-muted" />
-        <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
+        <div className="min-w-0 flex flex-1 items-baseline gap-x-1 overflow-hidden">
           <span className="flex-shrink-0 text-xs font-medium text-text-muted">
             {t("messageCard.thinking")}
           </span>
           {!expanded && (
-            <span className="min-w-0 max-w-full break-words text-xs text-text-muted/60 italic">
-              {previewNodes}
+            <span className="min-w-0 flex-1 truncate text-xs text-text-muted/60 italic">
+              {previewText}
             </span>
           )}
           <span
