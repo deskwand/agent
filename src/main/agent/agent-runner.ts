@@ -3129,6 +3129,9 @@ Tool routing:\n
           );
           abortedByTimeout = true;
           controller.abort();
+          piSession.abort().catch((e) => {
+            logWarn("[AgentRunner] pi session abort rejected on timeout:", e);
+          });
         }, PROMPT_TIMEOUT_MS);
       };
 
