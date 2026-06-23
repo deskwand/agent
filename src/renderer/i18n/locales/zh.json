@@ -637,6 +637,7 @@
   },
   "sidebar": {
     "recents": "最近",
+    "running": "运行中",
     "expandToView": "展开查看任务",
     "noTasks": "暂无任务",
     "noTasksHint": "开始一个新聊天，继续构建、调研或编辑文件。",

@@ -533,6 +533,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             </div>
           )}
 
+          {session.status === "running" && !isSelectMode && (
+            <span
+              className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"
+              role="status"
+              aria-label={t("sidebar.running")}
+            />
+          )}
+
           <div className="min-w-0 flex-1 flex items-center gap-2">
             <div className="text-sm font-medium leading-5 text-text-primary truncate flex-1">
               {session.title}

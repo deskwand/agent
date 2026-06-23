@@ -637,6 +637,7 @@
   },
   "sidebar": {
     "recents": "Recents",
+    "running": "Running",
     "expandToView": "Expand to view tasks",
     "noTasks": "No tasks yet",
     "noTasksHint": "Start a new chat to begin building, researching, or editing files.",
