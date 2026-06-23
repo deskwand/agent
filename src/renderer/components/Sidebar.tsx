@@ -21,7 +21,7 @@ import {
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 
-const DEFAULT_MAX_VISIBLE = 10;
+const DEFAULT_MAX_VISIBLE = 5;
 
 type ProjectWorkspaceGroup = {
   key: string;
