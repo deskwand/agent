@@ -40,6 +40,7 @@ export interface SessionState {
   pendingTurns: TurnState[];
   activeTurn: TurnState | null;
   collapsedTurns: Record<string, boolean>;
+  traceExpandedOverride?: boolean;
   executionClock: SessionExecutionClock;
   traceSteps: TraceStep[];
   contextWindow: number;
@@ -62,6 +63,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   pendingTurns: [],
   activeTurn: null,
   collapsedTurns: {},
+  traceExpandedOverride: undefined,
   executionClock: { startAt: null, endAt: null },
   traceSteps: [],
   contextWindow: 0,
@@ -196,6 +198,11 @@ interface AppState {
     collapsed: boolean,
   ) => void;
   toggleTurnCollapsed: (sessionId: string, turnId: string) => void;
+  setAllTurnsCollapsed: (sessionId: string, collapsed: boolean) => void;
+  setTraceExpandedOverride: (
+    sessionId: string,
+    override: boolean,
+  ) => void;
 
   addTraceStep: (sessionId: string, step: TraceStep) => void;
   updateTraceStep: (
@@ -705,6 +712,38 @@ export const useAppStore = create<AppState>((set) => ({
         }),
       };
     }),
+
+  setAllTurnsCollapsed: (sessionId, collapsed) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      const next: Record<string, boolean> = {};
+      for (const m of ss.messages) {
+        if (m.role !== "assistant" || !m.turnId) continue;
+        if (!Array.isArray(m.content)) continue;
+        if (
+          !m.content.some(
+            (b) =>
+              b.type === "thinking" ||
+              b.type === "tool_use" ||
+              b.type === "tool_result",
+          )
+        )
+          continue;
+        next[m.turnId] = collapsed;
+      }
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          collapsedTurns: { ...ss.collapsedTurns, ...next },
+        }),
+      };
+    }),
+
+  setTraceExpandedOverride: (sessionId, override) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        traceExpandedOverride: override,
+      }),
+    })),
 
   addTraceStep: (sessionId, step) =>
     set((state) => {

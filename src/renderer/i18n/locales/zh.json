@@ -751,6 +751,8 @@
     "alreadyCompacted": "会话已压缩",
     "expandInput": "展开输入框",
     "collapseInput": "收起输入框",
+    "expandTrace": "过程",
+    "collapseTrace": "过程",
     "openCodeReview": "代码审查 · {{count}} 个文件变更"
   },
   "steer": {

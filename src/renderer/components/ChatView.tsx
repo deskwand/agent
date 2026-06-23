@@ -147,6 +147,10 @@ export function ChatView() {
     activeSessionId ? s.sessionStates[activeSessionId] : undefined,
   );
   const toggleTurnCollapsed = useAppStore((s) => s.toggleTurnCollapsed);
+  const setAllTurnsCollapsed = useAppStore((s) => s.setAllTurnsCollapsed);
+  const setTraceExpandedOverride = useAppStore(
+    (s) => s.setTraceExpandedOverride,
+  );
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const updateSession = useAppStore((s) => s.updateSession);
   const clearActiveTurn = useAppStore((s) => s.clearActiveTurn);
@@ -213,6 +217,32 @@ export function ChatView() {
   const chatInputRef = useRef<ChatInputHandle>(null);
 
   const hasActiveTurn = Boolean(activeTurn);
+
+  // Trace expand/collapse: default from project mode, user override wins
+  const defaultTraceExpanded = activeSession?.isProjectMode ?? false;
+  const effectiveTraceExpanded =
+    sessionState?.traceExpandedOverride ?? defaultTraceExpanded;
+
+  const hasTraceContent = useMemo(() => {
+    return messages.some(
+      (m) =>
+        m.role === "assistant" &&
+        Array.isArray(m.content) &&
+        m.content.some((b) => isTraceBlock(b)),
+    );
+  }, [messages]);
+
+  const handleToggleTraceExpanded = useCallback(() => {
+    if (!activeSessionId) return;
+    const nextExpanded = !effectiveTraceExpanded;
+    setTraceExpandedOverride(activeSessionId, nextExpanded);
+    setAllTurnsCollapsed(activeSessionId, !nextExpanded);
+  }, [
+    activeSessionId,
+    effectiveTraceExpanded,
+    setTraceExpandedOverride,
+    setAllTurnsCollapsed,
+  ]);
   const goalStatus = useAppStore((s) =>
     activeSessionId
       ? s.sessionStates[activeSessionId]?.goalStatus
@@ -538,11 +568,11 @@ export function ChatView() {
           showTraceEntry && turnId
             ? !isStreaming &&
               !(activeTurn?.turnId === turnId) &&
-              (collapsedTurns[turnId] ?? true)
+              (collapsedTurns[turnId] ?? !effectiveTraceExpanded)
             : false,
       };
     });
-  }, [activeTurn?.turnId, displayedMessages, sessionState?.collapsedTurns]);
+  }, [activeTurn?.turnId, displayedMessages, sessionState?.collapsedTurns, effectiveTraceExpanded]);
 
   // Format execution time for display
   const formatExecutionTime = useCallback((ms: number): string => {
@@ -1184,6 +1214,12 @@ export function ChatView() {
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 onSteer={handleSteer}
                 hasInput={hasInput}
+                traceExpanded={effectiveTraceExpanded}
+                onToggleTrace={
+                  hasTraceContent || hasActiveTurn
+                    ? handleToggleTraceExpanded
+                    : undefined
+                }
               />
             }
           />
