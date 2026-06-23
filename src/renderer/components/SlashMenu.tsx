@@ -23,7 +23,7 @@ const TAB_LIST: { key: SlashTab; i18n: string }[] = [
 
 const SKILL_TYPE_COLORS: Record<string, string> = {
   builtin: "text-accent bg-accent/10",
-  mcp: "text-primary bg-primary/10",
+  mcp: "text-mcp bg-mcp/10",
   custom: "text-success bg-success/10",
   agent: "text-warning bg-warning/10",
 };
@@ -99,7 +99,7 @@ export function SlashMenu({
             }}
             className={`px-2.5 py-2 rounded-lg text-xs font-medium text-center transition-colors ${
               activeTab === tab.key
-                ? "bg-accent text-white"
+                ? "bg-accent text-accent-foreground"
                 : "text-text-muted hover:bg-surface-hover hover:text-text-primary"
             }`}
           >
