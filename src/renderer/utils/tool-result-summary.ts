@@ -11,7 +11,60 @@ export type CollapsedToolSummary =
   | { kind: "none" }
   | { kind: "lines"; count: number }
   | { kind: "screenshot" }
-  | { kind: "error"; text: string };
+  | { kind: "error"; text: string }
+  | { kind: "text"; text: string }
+  | { kind: "matches"; count: number }
+  | { kind: "chars"; count: number }
+  | { kind: "modified" }
+  | { kind: "exitLine"; text: string };
+
+function isFileReadTool(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === "read" || lower === "read_file";
+}
+
+function isBashTool(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === "bash" || lower === "execute_command";
+}
+
+function isModifyTool(name: string): boolean {
+  const lower = name.toLowerCase();
+  return (
+    lower === "write" ||
+    lower === "write_file" ||
+    lower === "edit" ||
+    lower === "edit_file"
+  );
+}
+
+function isMatchTool(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === "grep" || lower === "glob";
+}
+
+function isFetchTool(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === "webfetch";
+}
+
+function isWriteSuccessText(text: string): boolean {
+  return /^wrote contents to /i.test(text) || /^the file .+ has been (updated|created)/i.test(text);
+}
+
+function getFirstContentLine(text: string, maxLen = 80): string {
+  const firstLine = text.split(/\r?\n/)[0] ?? "";
+  if (firstLine.length > maxLen) {
+    return `${firstLine.substring(0, maxLen - 1)}…`;
+  }
+  return firstLine;
+}
+
+function getLastNonEmptyLine(text: string): string {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const last = lines[lines.length - 1] ?? "";
+  return last.length > 80 ? `${last.substring(0, 77)}…` : last;
+}
 
 function isScreenshotToolName(toolName?: string): boolean {
   if (!toolName) {
@@ -65,6 +118,7 @@ export function getCollapsedToolSummary(
     };
   }
 
+  // Suppress weak/boilerplate output before tool-specific dispatch
   if (
     weakSuccessPattern.test(normalized) ||
     omittedImageOutputPattern.test(normalized) ||
@@ -73,9 +127,45 @@ export function getCollapsedToolSummary(
     return { kind: "none" };
   }
 
+  const toolNameLower = (toolName || "").toLowerCase();
+
+  // File read — show first line of content
+  if (isFileReadTool(toolNameLower)) {
+    return { kind: "text", text: getFirstContentLine(normalized) };
+  }
+
+  // Bash — show last non-empty line (typically exit code or final status)
+  if (isBashTool(toolNameLower)) {
+    return { kind: "exitLine", text: getLastNonEmptyLine(normalized) };
+  }
+
+  // Write / Edit — show "modified" for short confirmation outputs
+  if (
+    isModifyTool(toolNameLower) &&
+    isWriteSuccessText(normalized)
+  ) {
+    return { kind: "modified" };
+  }
+
+  // Grep / Glob — count non-empty lines as matches
+  if (isMatchTool(toolNameLower)) {
+    const matches = normalized.split(/\r?\n/).filter((l) => l.trim()).length;
+    return { kind: "matches", count: matches };
+  }
+
+  // Webfetch — character count
+  if (isFetchTool(toolNameLower)) {
+    return { kind: "chars", count: normalized.length };
+  }
+
+  // Default — first line preview for short output, line count for long
+  const lineCount = normalized.split(/\r?\n/).length;
+  if (lineCount <= 5 && normalized.length <= 120) {
+    return { kind: "text", text: getFirstContentLine(normalized) };
+  }
   return {
     kind: "lines",
-    count: normalized.split(/\r?\n/).length,
+    count: lineCount,
   };
 }
 
@@ -83,6 +173,21 @@ export function formatCollapsedToolSummary(
   summary: CollapsedToolSummary,
   t: TFunction,
 ): string {
+  if (summary.kind === "text") {
+    return `"${summary.text}"`;
+  }
+  if (summary.kind === "matches") {
+    return t("tool.summaryMatches", { count: summary.count });
+  }
+  if (summary.kind === "chars") {
+    return t("tool.summaryChars", { count: summary.count });
+  }
+  if (summary.kind === "modified") {
+    return t("tool.summaryModified");
+  }
+  if (summary.kind === "exitLine") {
+    return summary.text;
+  }
   if (summary.kind === "lines") {
     return t("tool.summaryLines", { count: summary.count });
   }
