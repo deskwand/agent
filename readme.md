@@ -27,6 +27,7 @@ It helps you browse, use tools, create documents, connect AI models, and turn re
 
 - [Why DeskWand](#why-deskwand)
 - [Features](#features)
+  - [Autonomous Loop Agent](#autonomous-loop-agent)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Example Tasks](#example-tasks)
@@ -59,6 +60,13 @@ Instead of only asking questions, you can delegate repetitive computer work:
 - Runs as a desktop app
 - Supports Windows, macOS, and Linux
 - Designed for multi-step computer workflows
+
+### Autonomous Loop Agent
+
+- Set a high-level goal with `/goal`
+- Agent plans, executes, and auto-continues until done
+- Optional `--tokens` / `--time` budgets to cap usage
+- Real-time status bar: active, paused, complete, blocked
 
 ### Local-first Control
 

@@ -27,6 +27,7 @@ DeskWand 是一款开源桌面 AI Agent，支持 Windows、macOS 和 Linux。
 
 - [为什么选择 DeskWand](#为什么选择-deskwand)
 - [核心功能](#核心功能)
+  - [自主循环 Agent](#自主循环-agent)
 - [安装方式](#安装方式)
 - [快速开始](#快速开始)
 - [示例任务](#示例任务)
@@ -59,6 +60,12 @@ DeskWand 是一款开源桌面 AI Agent，支持 Windows、macOS 和 Linux。
 - 作为桌面应用运行
 - 支持 Windows、macOS 和 Linux
 - 面向多步骤电脑任务设计
+
+### 自主循环 Agent
+
+- `/goal` 设定高维目标，Agent 自主跑完
+- 可选 `--tokens` / `--time` 预算上限
+- 状态栏实时显示：执行中、已暂停、已完成、已阻塞
 
 ### 本地优先
 
