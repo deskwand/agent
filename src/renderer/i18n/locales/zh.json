@@ -823,11 +823,7 @@
     "noQuestions": "暂无问题",
     "question": "问题",
     "thinking": "思考",
-    "executionTime": "执行时间: {{time}}",
-    "traceExecuted": "已执行",
-    "traceExecutedWithTime": "已执行 · {{time}}",
-    "traceExecuting": "执行中",
-    "traceExecutingWithTime": "执行中 · {{time}}"
+    "executionTime": "执行时间: {{time}}"
   },
   "schedule": {
     "createTitle": "新建定时任务",

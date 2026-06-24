@@ -244,22 +244,8 @@ export function useIPC() {
               delete pendingPartials[event.payload.sessionId];
               delete pendingThinking[event.payload.sessionId];
             }
+            // Per-turn auto-expand removed; global Eye button replaces it.
             store.addMessage(event.payload.sessionId, event.payload.message);
-            // Goal active: auto-expand the turn when assistant message arrives
-            if (
-              event.payload.message.role === "assistant" &&
-              event.payload.message.turnId
-            ) {
-              const gs =
-                store.sessionStates[event.payload.sessionId]?.goalStatus;
-              if (gs?.status === "active") {
-                store.setTurnCollapsed(
-                  event.payload.sessionId,
-                  event.payload.message.turnId,
-                  false,
-                );
-              }
-            }
             break;
 
           case "stream.partial":

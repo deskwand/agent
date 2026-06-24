@@ -13,7 +13,6 @@ import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { MessageCard } from "./MessageCard";
-import { ContentBlockView } from "./message/ContentBlockView";
 import type {
   Message,
   ContentBlock,
@@ -21,13 +20,7 @@ import type {
   ProviderProfileKey,
   ApiProviderConfig,
 } from "../types";
-import {
-  Plug,
-  Clock,
-  ChevronsDown,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
+import { Plug, ChevronsDown } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
   ChatInput,
@@ -99,21 +92,10 @@ export function ChatView() {
   const { partialMessage, partialThinking } = useActivePartialContent();
   const activeTurn = useActiveTurn();
   const pendingTurns = usePendingTurns();
-  const [timerTick, setTimerTick] = useState(0);
   const [steeringEvent, setSteeringEvent] = useState<{ turnId: string; text: string } | null>(null);
   const [compactionResult, setCompactionResult] = useState<
     "success" | "failed" | null
   >(null);
-
-  // Real-time elapsed timer for active turn
-  useEffect(() => {
-    if (!activeTurn) {
-      setTimerTick(0);
-      return;
-    }
-    const id = setInterval(() => setTimerTick((t) => t + 1), 200);
-    return () => clearInterval(id);
-  }, [activeTurn?.turnId]);
 
   // Clear steering event when active turn changes
   useEffect(() => {
@@ -130,13 +112,6 @@ export function ChatView() {
     return () => clearTimeout(id);
   }, [compactionResult]);
 
-  const activeTurnElapsedMs = useMemo(() => {
-    if (!activeTurn?.startedAt) return 0;
-    // Force recalculation on each timerTick
-    void timerTick;
-    return Date.now() - activeTurn.startedAt;
-  }, [activeTurn?.startedAt, timerTick]);
-
   const appConfig = useAppConfig();
   const contextWindow = useAppStore((s) =>
     activeSessionId
@@ -146,8 +121,6 @@ export function ChatView() {
   const sessionState = useAppStore((s) =>
     activeSessionId ? s.sessionStates[activeSessionId] : undefined,
   );
-  const toggleTurnCollapsed = useAppStore((s) => s.toggleTurnCollapsed);
-  const setAllTurnsCollapsed = useAppStore((s) => s.setAllTurnsCollapsed);
   const setTraceExpandedOverride = useAppStore(
     (s) => s.setTraceExpandedOverride,
   );
@@ -234,15 +207,8 @@ export function ChatView() {
 
   const handleToggleTraceExpanded = useCallback(() => {
     if (!activeSessionId) return;
-    const nextExpanded = !effectiveTraceExpanded;
-    setTraceExpandedOverride(activeSessionId, nextExpanded);
-    setAllTurnsCollapsed(activeSessionId, !nextExpanded);
-  }, [
-    activeSessionId,
-    effectiveTraceExpanded,
-    setTraceExpandedOverride,
-    setAllTurnsCollapsed,
-  ]);
+    setTraceExpandedOverride(activeSessionId, !effectiveTraceExpanded);
+  }, [activeSessionId, effectiveTraceExpanded, setTraceExpandedOverride]);
   const goalStatus = useAppStore((s) =>
     activeSessionId
       ? s.sessionStates[activeSessionId]?.goalStatus
@@ -481,123 +447,20 @@ export function ChatView() {
   ]);
 
   const turnEntries = useMemo(() => {
-    const collapsedTurns = sessionState?.collapsedTurns ?? {};
-    const traceByTurn = new Map<
-      string,
-      Array<{
-        message: Message;
-        block: ContentBlock;
-        index: number;
-        allBlocks: ContentBlock[];
-      }>
-    >();
-    const executionTimeByTurn = new Map<string, number>();
-
-    for (const message of displayedMessages) {
-      if (
-        message.role !== "assistant" ||
-        !message.turnId ||
-        !Array.isArray(message.content)
-      )
-        continue;
-      const blocks = message.content as ContentBlock[];
-      const traceBlocks = blocks
-        .map((block, index) => ({ block, index }))
-        .filter((item) => isTraceBlock(item.block));
-      if (traceBlocks.length > 0) {
-        const existing = traceByTurn.get(message.turnId) ?? [];
-        existing.push(
-          ...traceBlocks.map((item) => ({
-            message,
-            block: item.block,
-            index: item.index,
-            allBlocks: blocks,
-          })),
-        );
-        traceByTurn.set(message.turnId, existing);
-      }
-      if (
-        typeof message.executionTimeMs === "number" &&
-        Number.isFinite(message.executionTimeMs)
-      ) {
-        executionTimeByTurn.set(
-          message.turnId,
-          Math.max(
-            executionTimeByTurn.get(message.turnId) ?? 0,
-            Math.max(0, message.executionTimeMs),
-          ),
-        );
-      }
-    }
-
-    return displayedMessages.map((message, index) => {
+    return displayedMessages.map((message) => {
       const isStreaming =
         typeof message.id === "string" && message.id.startsWith("partial-");
       const turnId = message.turnId;
       const isActiveTurn = Boolean(turnId) && activeTurn?.turnId === turnId;
-      const traceItems = turnId ? (traceByTurn.get(turnId) ?? []) : [];
-      const firstAssistantIndex =
-        turnId == null
-          ? -1
-          : displayedMessages.findIndex(
-              (item) => item.role === "assistant" && item.turnId === turnId,
-            );
-      const showTraceEntry =
-        !isActiveTurn &&
-        message.role === "assistant" &&
-        Boolean(turnId) &&
-        traceItems.length > 0 &&
-        index === firstAssistantIndex;
-      const hasNonTraceBlocks =
-        message.role !== "assistant" ||
-        !Array.isArray(message.content) ||
-        message.content.some((block) => !isTraceBlock(block));
 
       return {
         message,
         isStreaming,
         hideTraceBlocks:
-          message.role === "assistant" && Boolean(turnId) && !isActiveTurn,
-        showTraceEntry,
-        traceItems,
-        turnExecutionTimeMs: turnId
-          ? executionTimeByTurn.get(turnId)
-          : undefined,
-        renderMessageCard: isActiveTurn || hasNonTraceBlocks,
-        isTurnCollapsed:
-          showTraceEntry && turnId
-            ? !isStreaming &&
-              !(activeTurn?.turnId === turnId) &&
-              (collapsedTurns[turnId] ?? !effectiveTraceExpanded)
-            : false,
+          message.role === "assistant" && Boolean(turnId) && !isActiveTurn && !effectiveTraceExpanded,
       };
     });
-  }, [activeTurn?.turnId, displayedMessages, sessionState?.collapsedTurns, effectiveTraceExpanded]);
-
-  // Format execution time for display
-  const formatExecutionTime = useCallback((ms: number): string => {
-    if (ms < 1000) return `${ms}ms`;
-    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-    const minutes = Math.floor(ms / 60000);
-    const seconds = ((ms % 60000) / 1000).toFixed(0);
-    return `${minutes}m ${seconds}s`;
-  }, []);
-
-  const getTraceSummaryLabel = useCallback(
-    (turnId: string | undefined, turnExecutionTimeMs?: number) => {
-      if (!turnId) return t("messageCard.traceExecuted");
-      if (activeTurn?.turnId === turnId) {
-        const elapsed = activeTurnElapsedMs;
-        if (elapsed > 0) return t("messageCard.traceExecutingWithTime", { time: formatExecutionTime(elapsed) });
-        return t("messageCard.traceExecuting");
-      }
-      if (typeof turnExecutionTimeMs === "number" && turnExecutionTimeMs > 0) {
-        return t("messageCard.traceExecutedWithTime", { time: formatExecutionTime(turnExecutionTimeMs) });
-      }
-      return t("messageCard.traceExecuted");
-    },
-    [t, activeTurn?.turnId, activeTurnElapsedMs, formatExecutionTime],
-  );
+  }, [displayedMessages, activeTurn?.turnId, effectiveTraceExpanded]);
 
   const updateScrollToBottomVisibility = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -1045,76 +908,15 @@ export function ChatView() {
                 </p>
               </div>
             ) : (
-              turnEntries.map(
-                ({
-                  message,
-                  isStreaming,
-                  hideTraceBlocks,
-                  showTraceEntry,
-                  traceItems,
-                  turnExecutionTimeMs,
-                  isTurnCollapsed,
-                  renderMessageCard,
-                }) => (
-                  <div key={message.id} className="space-y-1.5">
-                    {showTraceEntry && message.turnId && (
-                      <div className="space-y-2">
-                        <button
-                          onClick={() =>
-                            toggleTurnCollapsed(
-                              message.sessionId,
-                              message.turnId!,
-                            )
-                          }
-                          className="inline-flex max-w-full items-center gap-1 px-0 py-1 text-left hover:opacity-70 transition-opacity"
-                        >
-                          <Clock className="w-3 h-3 text-text-muted flex-shrink-0" />
-                          <span className="text-xs font-medium text-text-muted truncate">
-                            {getTraceSummaryLabel(
-                              message.turnId,
-                              turnExecutionTimeMs,
-                            )}
-                          </span>
-                          {isTurnCollapsed ? (
-                            <ChevronRight className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
-                          ) : (
-                            <ChevronDown className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
-                          )}
-                        </button>
-
-                        {!isTurnCollapsed && (
-                          <div className="rounded-2xl border border-border-subtle bg-background/40 overflow-hidden animate-fade-in">
-                            <div className="px-0 py-0 space-y-1.5">
-                              {traceItems.map((item, index) => (
-                                <ContentBlockView
-                                  key={
-                                    "id" in item.block
-                                      ? `${item.message.id}-${(item.block as { id: string }).id}`
-                                      : `${item.message.id}-trace-${item.block.type}-${item.index}-${index}`
-                                  }
-                                  block={item.block}
-                                  isUser={false}
-                                  isStreaming={isStreaming}
-                                  allBlocks={item.allBlocks}
-                                  message={item.message}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {renderMessageCard && (
-                      <MessageCard
-                        message={message}
-                        isStreaming={isStreaming}
-                        hideTraceBlocks={hideTraceBlocks}
-                      />
-                    )}
-                  </div>
-                ),
-              )
+              turnEntries.map(({ message, isStreaming, hideTraceBlocks }) => (
+                <div key={message.id} className="space-y-1.5">
+                  <MessageCard
+                    message={message}
+                    isStreaming={isStreaming}
+                    hideTraceBlocks={hideTraceBlocks}
+                  />
+                </div>
+              ))
             )}
 
             <div ref={messagesEndRef} />

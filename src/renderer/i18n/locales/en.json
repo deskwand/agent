@@ -823,11 +823,7 @@
     "noQuestions": "No questions",
     "question": "Question",
     "thinking": "Thinking",
-    "executionTime": "Execution time: {{time}}",
-    "traceExecuted": "Executed",
-    "traceExecutedWithTime": "Executed · {{time}}",
-    "traceExecuting": "Running…",
-    "traceExecutingWithTime": "Running… · {{time}}"
+    "executionTime": "Execution time: {{time}}"
   },
   "schedule": {
     "createTitle": "Create Schedule",

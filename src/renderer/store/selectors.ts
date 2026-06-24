@@ -144,16 +144,6 @@ export function usePendingTurns(): TurnState[] {
   );
 }
 
-/** Returns whether the given turn is collapsed in the active session. */
-export function useIsTurnCollapsed(turnId?: string): boolean {
-  return useAppStore((s) => {
-    if (!turnId || !s.activeSessionId) return false;
-    return Boolean(
-      s.sessionStates[s.activeSessionId]?.collapsedTurns?.[turnId],
-    );
-  });
-}
-
 /**
  * Returns a summary of the execution state for the active session.
  * Combines running status, active turn, and pending count in one subscription.
