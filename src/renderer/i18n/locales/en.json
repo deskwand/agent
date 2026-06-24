@@ -1129,6 +1129,9 @@
     "labelBrowserWaitSelector": "Wait {{selector}}",
     "writeLinesBytes": "{{lines}} lines · {{size}}",
     "writeWriting": "Writing...",
-    "writeEmptyFile": "(empty file)"
+    "writeEmptyFile": "(empty file)",
+    "bashExitCode": "exit {{code}}",
+    "bashRunning": "Running...",
+    "bashNoOutput": "(no output)"
   }
 }

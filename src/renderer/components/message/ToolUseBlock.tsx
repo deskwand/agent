@@ -24,6 +24,7 @@ import type {
 import { AskUserQuestionBlock } from "./AskUserQuestionBlock";
 import { TodoWriteBlock } from "./TodoWriteBlock";
 import { WriteToolBlock, canHandleWriteInput } from "./WriteToolBlock";
+import { BashToolBlock, canHandleBashInput } from "./BashToolBlock";
 import { getToolIcon, getToolLabel } from "./toolHelpers";
 
 // Only allow safe image MIME types for data: URI rendering
@@ -76,6 +77,15 @@ export const ToolUseBlock = memo(function ToolUseBlock({
     ) {
       return (
         <WriteToolBlock block={block} allBlocks={allBlocks} message={message} />
+      );
+    }
+  }
+  if (block.name === "bash" || block.name === "execute_command") {
+    if (
+      canHandleBashInput(block.input as Record<string, unknown> | undefined)
+    ) {
+      return (
+        <BashToolBlock block={block} allBlocks={allBlocks} message={message} />
       );
     }
   }
