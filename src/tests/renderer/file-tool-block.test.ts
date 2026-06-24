@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   languageFromPath,
   formatSize,
-  canHandleWriteInput,
-} from "../../renderer/components/message/WriteToolBlock";
+  canHandleFileInput,
+  stripLineNumbers,
+} from "../../renderer/components/message/FileToolBlock";
 
 describe("languageFromPath", () => {
   it("returns typescript for .ts and .tsx", () => {
@@ -76,60 +77,92 @@ describe("formatSize", () => {
   });
 });
 
-describe("canHandleWriteInput", () => {
+describe("canHandleFileInput", () => {
   it("accepts valid input with path and string content", () => {
-    expect(canHandleWriteInput({ path: "/src/foo.ts", content: "hello" })).toBe(
+    expect(canHandleFileInput({ path: "/src/foo.ts", content: "hello" })).toBe(
       true,
     );
   });
 
   it("accepts valid input with filePath alias", () => {
     expect(
-      canHandleWriteInput({ filePath: "/src/bar.ts", content: "code" }),
+      canHandleFileInput({ filePath: "/src/bar.ts", content: "code" }),
     ).toBe(true);
   });
 
   it("accepts valid input with file_path alias", () => {
     expect(
-      canHandleWriteInput({ file_path: "/src/baz.ts", content: "code" }),
+      canHandleFileInput({ file_path: "/src/baz.ts", content: "code" }),
     ).toBe(true);
   });
 
   it("accepts input without content field (content is optional)", () => {
-    expect(canHandleWriteInput({ path: "/src/foo.ts" })).toBe(true);
+    expect(canHandleFileInput({ path: "/src/foo.ts" })).toBe(true);
   });
 
   it("rejects undefined input", () => {
-    expect(canHandleWriteInput(undefined)).toBe(false);
+    expect(canHandleFileInput(undefined)).toBe(false);
   });
 
   it("rejects input with no path", () => {
-    expect(canHandleWriteInput({ content: "hello" })).toBe(false);
+    expect(canHandleFileInput({ content: "hello" })).toBe(false);
   });
 
   it("rejects input with empty path", () => {
-    expect(canHandleWriteInput({ path: "", content: "hello" })).toBe(false);
+    expect(canHandleFileInput({ path: "", content: "hello" })).toBe(false);
   });
 
   it("rejects input with whitespace-only path", () => {
-    expect(canHandleWriteInput({ path: "   ", content: "hello" })).toBe(false);
+    expect(canHandleFileInput({ path: "   ", content: "hello" })).toBe(false);
   });
 
   it("rejects input with non-string content (object)", () => {
     expect(
-      canHandleWriteInput({ path: "/src/foo.ts", content: { foo: 1 } }),
+      canHandleFileInput({ path: "/src/foo.ts", content: { foo: 1 } }),
     ).toBe(false);
   });
 
   it("rejects input with non-string content (number)", () => {
-    expect(canHandleWriteInput({ path: "/src/foo.ts", content: 42 })).toBe(
+    expect(canHandleFileInput({ path: "/src/foo.ts", content: 42 })).toBe(
       false,
     );
   });
 
   it("rejects input with non-string content (null)", () => {
-    expect(canHandleWriteInput({ path: "/src/foo.ts", content: null })).toBe(
+    expect(canHandleFileInput({ path: "/src/foo.ts", content: null })).toBe(
       false,
     );
+  });
+});
+
+describe("stripLineNumbers", () => {
+  it("removes line number prefixes with tab separator", () => {
+    const input = "  1\timport React\n  2\tconst x = 1\n";
+    expect(stripLineNumbers(input)).toBe("import React\nconst x = 1\n");
+  });
+
+  it("removes line number prefixes with space separator", () => {
+    const input = "  1 import React\n   2 const x = 1\n";
+    expect(stripLineNumbers(input)).toBe("import React\nconst x = 1\n");
+  });
+
+  it("handles multi-digit line numbers", () => {
+    const input = " 99\tline 99\n100\tline 100\n";
+    expect(stripLineNumbers(input)).toBe("line 99\nline 100\n");
+  });
+
+  it("keeps lines without line numbers unchanged", () => {
+    const input = "plain text\nmore text\n";
+    expect(stripLineNumbers(input)).toBe("plain text\nmore text\n");
+  });
+
+  it("handles empty input", () => {
+    expect(stripLineNumbers("")).toBe("");
+  });
+
+  it("keeps content where number is immediately followed by non-whitespace", () => {
+    // "42_answer" — the number is part of code, no whitespace separator
+    const input = "42_answer\n";
+    expect(stripLineNumbers(input)).toBe("42_answer\n");
   });
 });

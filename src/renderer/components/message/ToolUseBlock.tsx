@@ -23,7 +23,7 @@ import type {
 } from "../../types";
 import { AskUserQuestionBlock } from "./AskUserQuestionBlock";
 import { TodoWriteBlock } from "./TodoWriteBlock";
-import { WriteToolBlock, canHandleWriteInput } from "./WriteToolBlock";
+import { FileToolBlock, canHandleFileInput } from "./FileToolBlock";
 import { BashToolBlock, canHandleBashInput } from "./BashToolBlock";
 import { getToolIcon, getToolLabel } from "./toolHelpers";
 
@@ -73,10 +73,29 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   }
   if (block.name === "write" || block.name === "write_file") {
     if (
-      canHandleWriteInput(block.input as Record<string, unknown> | undefined)
+      canHandleFileInput(block.input as Record<string, unknown> | undefined)
     ) {
       return (
-        <WriteToolBlock block={block} allBlocks={allBlocks} message={message} />
+        <FileToolBlock
+          block={block}
+          allBlocks={allBlocks}
+          message={message}
+          action="write"
+        />
+      );
+    }
+  }
+  if (block.name === "read" || block.name === "read_file") {
+    if (
+      canHandleFileInput(block.input as Record<string, unknown> | undefined)
+    ) {
+      return (
+        <FileToolBlock
+          block={block}
+          allBlocks={allBlocks}
+          message={message}
+          action="read"
+        />
       );
     }
   }

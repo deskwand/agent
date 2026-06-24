@@ -1,4 +1,4 @@
-// Special rendering for the write/write_file tool — shows file path + syntax-highlighted content
+// Shared rendering for read/read_file and write/write_file tools — shows file path + syntax-highlighted content
 import { useState, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -18,10 +18,11 @@ import type {
   Message,
 } from "../../types";
 
-interface WriteToolBlockProps {
+interface FileToolBlockProps {
   block: ToolUseContent;
   allBlocks?: ContentBlock[];
   message?: Message;
+  action: "read" | "write";
 }
 
 const EXT_LANG_MAP: Record<string, string> = {
@@ -67,10 +68,19 @@ export function formatSize(bytes: number): string {
 }
 
 /**
- * Check whether a write/write_file tool input can be rendered by WriteToolBlock.
+ * Strip read tool line-number prefixes from tool_result content.
+ * Input:  "  1\timport React\n  2\tconst x = 1\n"
+ * Output: "import React\nconst x = 1\n"
+ */
+export function stripLineNumbers(text: string): string {
+  return text.replace(/^[\t ]*\d+[\t ]/gm, "");
+}
+
+/**
+ * Check whether a read/read_file or write/write_file tool input can be rendered by FileToolBlock.
  * Exported so ToolUseBlock can use it to decide whether to delegate.
  */
-export function canHandleWriteInput(
+export function canHandleFileInput(
   input: Record<string, unknown> | undefined,
 ): boolean {
   if (!input) return false;
@@ -80,11 +90,12 @@ export function canHandleWriteInput(
   return content === undefined || typeof content === "string";
 }
 
-export const WriteToolBlock = memo(function WriteToolBlock({
+export const FileToolBlock = memo(function FileToolBlock({
   block,
   allBlocks,
   message,
-}: WriteToolBlockProps) {
+  action,
+}: FileToolBlockProps) {
   const traceSteps = useAppStore((s) =>
     message?.sessionId
       ? (s.sessionStates[message.sessionId]?.traceSteps ?? [])
@@ -103,18 +114,22 @@ export const WriteToolBlock = memo(function WriteToolBlock({
   const [expanded, setExpanded] = useState(false);
   const { t } = useTranslation();
 
-  // Extract path & content from input
+  // Extract path from input
   const path = ((block.input as Record<string, unknown>)?.path ||
     (block.input as Record<string, unknown>)?.filePath ||
     (block.input as Record<string, unknown>)?.file_path ||
     "") as string;
-  const rawContent = (block.input as Record<string, unknown>)?.content;
-  const content = typeof rawContent === "string" ? rawContent : "";
 
-  // If no path or content is not a plain string, fall back to generic rendering
-  if (!path || (rawContent !== undefined && typeof rawContent !== "string")) {
+  // Content source differs by action:
+  //   write → block.input.content (available immediately)
+  //   read  → toolResult.content (arrives later)
+  const isWrite = action === "write";
+  const inputRaw = (block.input as Record<string, unknown>)?.content;
+  const inputContent = typeof inputRaw === "string" ? inputRaw : "";
+
+  if (!path) return null;
+  if (isWrite && inputRaw !== undefined && typeof inputRaw !== "string")
     return null;
-  }
 
   // Find matching tool_result
   let toolResult = allBlocks?.find(
@@ -142,10 +157,25 @@ export const WriteToolBlock = memo(function WriteToolBlock({
   const isRunning = !toolResult && hasActiveTurn;
   const isError = toolResult?.isError === true;
 
-  // Stats
+  // Resolve display content based on action
+  const displayContent = isWrite
+    ? inputContent // write: from input immediately
+    : typeof toolResult?.content === "string"
+      ? stripLineNumbers(toolResult.content) // read: from result, strip prefixes
+      : "";
+
+  // Stats (for collapsed header)
   const lang = languageFromPath(path);
-  const lines = content ? content.split("\n").length : 0;
-  const sizeText = formatSize(content.length);
+  const lines = isWrite
+    ? inputContent
+      ? inputContent.split("\n").length
+      : 0
+    : toolResult
+      ? displayContent
+        ? displayContent.split("\n").length
+        : 0
+      : 0;
+  const sizeText = formatSize(displayContent.length);
 
   // Duration from trace steps
   let duration: number | undefined;
@@ -193,19 +223,22 @@ export const WriteToolBlock = memo(function WriteToolBlock({
           )}
         </div>
 
-        {/* Tool icon */}
+        {/* Tool icon — uses actual tool name for correct icon */}
         <div className="flex-shrink-0 pt-0.5 text-text-muted">
           {getToolIcon(block.name)}
         </div>
 
-        {/* Label: path + stats */}
+        {/* Label: action + path + stats */}
         <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
+          <span className="whitespace-nowrap text-xs text-text-muted">
+            {t(isWrite ? "tool.actionWrite" : "tool.actionRead")}
+          </span>
           <span className="min-w-0 max-w-full truncate text-xs font-mono text-text-secondary">
-            {shortenPath(path)}
+            · {shortenPath(path)}
           </span>
           {isRunning ? (
             <span className="whitespace-nowrap text-xs text-text-muted">
-              · {t("tool.writeWriting")}
+              · {isWrite ? t("tool.writeWriting") : t("tool.readReading")}
             </span>
           ) : (
             <span className="whitespace-nowrap text-xs text-text-muted">
@@ -256,11 +289,11 @@ export const WriteToolBlock = memo(function WriteToolBlock({
                   ? toolResult.content
                   : ""}
               </pre>
-            ) : content ? (
-              <CodeBlock language={lang}>{content}</CodeBlock>
+            ) : displayContent ? (
+              <CodeBlock language={lang}>{displayContent}</CodeBlock>
             ) : (
               <div className="text-xs text-text-muted italic py-2">
-                {t("tool.writeEmptyFile")}
+                {isWrite ? t("tool.writeEmptyFile") : t("tool.readEmptyFile")}
               </div>
             )}
           </div>

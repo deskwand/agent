@@ -1128,6 +1128,8 @@
     "writeEmptyFile": "(空文件)",
     "bashExitCode": "exit {{code}}",
     "bashRunning": "执行中...",
-    "bashNoOutput": "(无输出)"
+    "bashNoOutput": "(无输出)",
+    "readReading": "读取中...",
+    "readEmptyFile": "(空文件)"
   }
 }

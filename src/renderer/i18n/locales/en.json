@@ -1087,6 +1087,9 @@
     "sectionOutput": "Output",
     "summaryScreenshot": "Screenshot",
     "summaryLines": "{{count}} lines",
+    "summaryMatches": "{{count}} matches",
+    "summaryChars": "{{count}} chars",
+    "summaryModified": "Modified",
     "badgeImages": "+{{count}} img",
     "metaImages": "{{count}} images",
     "actionRead": "Read file",
@@ -1128,6 +1131,8 @@
     "writeEmptyFile": "(empty file)",
     "bashExitCode": "exit {{code}}",
     "bashRunning": "Running...",
-    "bashNoOutput": "(no output)"
+    "bashNoOutput": "(no output)",
+    "readReading": "Reading...",
+    "readEmptyFile": "(empty file)"
   }
 }
