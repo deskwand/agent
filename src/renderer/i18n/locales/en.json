@@ -1126,6 +1126,9 @@
     "labelBrowserPress": "Press \"{{key}}\"",
     "labelBrowserEvaluate": "JS: {{script}}",
     "labelBrowserWaitText": "Wait \"{{text}}\"",
-    "labelBrowserWaitSelector": "Wait {{selector}}"
+    "labelBrowserWaitSelector": "Wait {{selector}}",
+    "writeLinesBytes": "{{lines}} lines · {{size}}",
+    "writeWriting": "Writing...",
+    "writeEmptyFile": "(empty file)"
   }
 }

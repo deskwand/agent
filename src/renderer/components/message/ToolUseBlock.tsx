@@ -23,6 +23,7 @@ import type {
 } from "../../types";
 import { AskUserQuestionBlock } from "./AskUserQuestionBlock";
 import { TodoWriteBlock } from "./TodoWriteBlock";
+import { WriteToolBlock, canHandleWriteInput } from "./WriteToolBlock";
 import { getToolIcon, getToolLabel } from "./toolHelpers";
 
 // Only allow safe image MIME types for data: URI rendering
@@ -68,6 +69,15 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   }
   if (block.name === "TodoWrite") {
     return <TodoWriteBlock block={block} />;
+  }
+  if (block.name === "write" || block.name === "write_file") {
+    if (
+      canHandleWriteInput(block.input as Record<string, unknown> | undefined)
+    ) {
+      return (
+        <WriteToolBlock block={block} allBlocks={allBlocks} message={message} />
+      );
+    }
   }
 
   // Find matching tool_result: first in same message, then across all session messages
@@ -234,14 +244,14 @@ export const ToolUseBlock = memo(function ToolUseBlock({
 
           {/* Input section — hidden when diff is available */}
           {!toolResult?.diff && (
-          <div className="px-3 py-2">
-            <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
-              {t("tool.sectionInput")}
+            <div className="px-3 py-2">
+              <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
+                {t("tool.sectionInput")}
+              </div>
+              <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all bg-surface-muted rounded-lg p-2.5">
+                {JSON.stringify(block.input, null, 2)}
+              </pre>
             </div>
-            <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all bg-surface-muted rounded-lg p-2.5">
-              {JSON.stringify(block.input, null, 2)}
-            </pre>
-          </div>
           )}
 
           {/* Output section */}
@@ -264,23 +274,24 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                   </div>
                 ))}
               {toolResult.diff ? (
-                  <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted leading-snug">
-                    {toolResult.diff.split("\n").map((line, i) => {
-                      const prefix = line[0];
-                      const bgClass =
-                        prefix === "+"
-                          ? "bg-green-800/20 text-green-400"
-                          : prefix === "-"
-                            ? "bg-red-800/20 text-red-400"
-                            : "text-text-secondary";
-                      return (
-                        <div key={i} className={bgClass}>
-                          {line}
-                        </div>
-                      );
-                    })}
-                  </pre>
-                ) : shouldShowOutputText && (
+                <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted leading-snug">
+                  {toolResult.diff.split("\n").map((line, i) => {
+                    const prefix = line[0];
+                    const bgClass =
+                      prefix === "+"
+                        ? "bg-green-800/20 text-green-400"
+                        : prefix === "-"
+                          ? "bg-red-800/20 text-red-400"
+                          : "text-text-secondary";
+                    return (
+                      <div key={i} className={bgClass}>
+                        {line}
+                      </div>
+                    );
+                  })}
+                </pre>
+              ) : (
+                shouldShowOutputText && (
                   <pre
                     className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
                       isError
@@ -290,7 +301,8 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                   >
                     {toolResult.content}
                   </pre>
-                )}
+                )
+              )}
               {!preferImageOutput &&
                 validImages.map((image, index) => (
                   <div key={index} className="mt-2 rounded-lg overflow-hidden">

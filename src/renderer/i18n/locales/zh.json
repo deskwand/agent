@@ -1126,6 +1126,9 @@
     "labelBrowserPress": "按键 \"{{key}}\"",
     "labelBrowserEvaluate": "JS: {{script}}",
     "labelBrowserWaitText": "等待 \"{{text}}\"",
-    "labelBrowserWaitSelector": "等待 {{selector}}"
+    "labelBrowserWaitSelector": "等待 {{selector}}",
+    "writeLinesBytes": "{{lines}} 行 · {{size}}",
+    "writeWriting": "写入中...",
+    "writeEmptyFile": "(空文件)"
   }
 }
