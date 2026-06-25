@@ -451,16 +451,14 @@ export function ChatView() {
       const isStreaming =
         typeof message.id === "string" && message.id.startsWith("partial-");
       const turnId = message.turnId;
-      const isActiveTurn = Boolean(turnId) && activeTurn?.turnId === turnId;
-
       return {
         message,
         isStreaming,
         hideTraceBlocks:
-          message.role === "assistant" && Boolean(turnId) && !isActiveTurn && !effectiveTraceExpanded,
+          message.role === "assistant" && Boolean(turnId) && !effectiveTraceExpanded,
       };
     });
-  }, [displayedMessages, activeTurn?.turnId, effectiveTraceExpanded]);
+  }, [displayedMessages, effectiveTraceExpanded]);
 
   const updateScrollToBottomVisibility = useCallback(() => {
     const container = scrollContainerRef.current;
