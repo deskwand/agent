@@ -471,6 +471,16 @@
 }
 
 @layer components {
+  /* Diff line highlighting — theme-aware via color-mix */
+  .diff-add {
+    background-color: color-mix(in srgb, var(--color-success) 15%, transparent);
+    color: var(--color-success);
+  }
+  .diff-del {
+    background-color: color-mix(in srgb, var(--color-error) 15%, transparent);
+    color: var(--color-error);
+  }
+
   /* Heading font — for titles and headings */
   .heading-sans {
     font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;

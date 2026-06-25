@@ -1087,6 +1087,7 @@
     "sectionOutput": "输出",
     "summaryScreenshot": "截图",
     "summaryLines": "{{count}} 行",
+    "summaryModified": "已修改",
     "badgeImages": "+{{count}} 张图",
     "metaImages": "{{count}} 张图片",
     "actionRead": "读取文件",

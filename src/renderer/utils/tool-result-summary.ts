@@ -48,10 +48,6 @@ function isFetchTool(name: string): boolean {
   return lower === "webfetch";
 }
 
-function isWriteSuccessText(text: string): boolean {
-  return /^wrote contents to /i.test(text) || /^the file .+ has been (updated|created)/i.test(text);
-}
-
 function getFirstContentLine(text: string, maxLen = 80): string {
   const firstLine = text.split(/\r?\n/)[0] ?? "";
   if (firstLine.length > maxLen) {
@@ -139,11 +135,8 @@ export function getCollapsedToolSummary(
     return { kind: "exitLine", text: getLastNonEmptyLine(normalized) };
   }
 
-  // Write / Edit — show "modified" for short confirmation outputs
-  if (
-    isModifyTool(toolNameLower) &&
-    isWriteSuccessText(normalized)
-  ) {
+  // Write / Edit — just show modified
+  if (isModifyTool(toolNameLower)) {
     return { kind: "modified" };
   }
 

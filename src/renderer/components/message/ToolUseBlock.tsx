@@ -308,9 +308,9 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     const prefix = line[0];
                     const bgClass =
                       prefix === "+"
-                        ? "bg-green-800/20 text-green-400"
+                        ? "diff-add"
                         : prefix === "-"
-                          ? "bg-red-800/20 text-red-400"
+                          ? "diff-del"
                           : "text-text-secondary";
                     return (
                       <div key={i} className={bgClass}>
