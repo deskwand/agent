@@ -100,6 +100,14 @@ export interface ToolResultContent {
   }>;
 }
 
+/** Streaming partial tool output while a tool is still executing */
+export interface PartialToolResult {
+  content: string;
+  isError: boolean;
+  images?: Array<{ mimeType: string; data: string }>;
+  diff?: string;
+}
+
 export interface ThinkingContent {
   type: "thinking";
   thinking: string;
@@ -544,6 +552,13 @@ export type ServerEvent =
         messageId: string;
         executionTimeMs: number;
       };
+    }
+  | {
+      type: "stream.toolResultPartial";
+      payload: {
+        sessionId: string;
+        toolCallId: string;
+      } & PartialToolResult;
     }
   | {
       type: "session.status";

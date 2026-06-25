@@ -61,6 +61,12 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       ? (s.sessionStates[message.sessionId]?.activeTurn ?? null)
       : null,
   );
+  const partialToolResult = useAppStore((s) =>
+    message?.sessionId
+      ? (s.sessionStates[message.sessionId]?.partialToolResults?.[block.id] ??
+          null)
+      : null,
+  );
   const [expanded, setExpanded] = useState(false);
   const { t } = useTranslation();
 
@@ -279,6 +285,19 @@ export const ToolUseBlock = memo(function ToolUseBlock({
               </div>
               <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all bg-surface-muted rounded-lg p-2.5">
                 {JSON.stringify(block.input, null, 2)}
+              </pre>
+            </div>
+          )}
+
+          {/* Streaming output when tool is running */}
+          {isRunning && partialToolResult && partialToolResult.content && (
+            <div className="px-3 py-2">
+              <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
+                <Loader2 className="w-3 h-3 animate-spin text-accent" />
+                {t("tool.sectionStreaming")}
+              </div>
+              <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">
+                {partialToolResult.content}
               </pre>
             </div>
           )}

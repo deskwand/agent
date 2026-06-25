@@ -1090,6 +1090,7 @@
   "tool": {
     "sectionInput": "输入",
     "sectionOutput": "输出",
+    "sectionStreaming": "实时输出",
     "summaryScreenshot": "截图",
     "summaryLines": "{{count}} 行",
     "summaryModified": "已修改",

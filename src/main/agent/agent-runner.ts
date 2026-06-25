@@ -3417,10 +3417,55 @@ Tool routing:\n
               break;
             }
 
+            case "tool_execution_update": {
+              if (controller.signal.aborted) break;
+              const partialResult = event.partialResult as {
+                content?: Array<{ type: string; text?: string }>;
+                details?: {
+                  diff?: string;
+                  openCoworkImages?: Array<{ mimeType: string; data: string }>;
+                };
+              } | undefined;
+              if (!partialResult) break;
+
+              const textContent = Array.isArray(partialResult.content)
+                ? partialResult.content.find((c): c is { type: "text"; text: string } => c.type === "text")
+                : null;
+              const outputText = textContent?.text || "";
+
+              this.sendToRenderer({
+                type: "stream.toolResultPartial",
+                payload: {
+                  sessionId: session.id,
+                  toolCallId: event.toolCallId,
+                  content: sanitizeOutputPaths(outputText),
+                  isError: false,
+                  ...(typeof partialResult.details?.diff === "string"
+                    ? { diff: partialResult.details.diff }
+                    : {}),
+                  ...(partialResult.details?.openCoworkImages?.length
+                    ? { images: partialResult.details.openCoworkImages }
+                    : {}),
+                },
+              });
+              break;
+            }
+
             case "tool_execution_end": {
               if (controller.signal.aborted) break;
               const toolCallId = event.toolCallId;
               const isError = event.isError;
+
+              // Clear partial streaming output before sending final result
+              this.sendToRenderer({
+                type: "stream.toolResultPartial",
+                payload: {
+                  sessionId: session.id,
+                  toolCallId,
+                  content: "",
+                  isError: false,
+                },
+              });
               const normalizedToolResult = normalizeToolExecutionResultForUi(
                 event.result,
               );

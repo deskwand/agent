@@ -1091,6 +1091,7 @@
   "tool": {
     "sectionInput": "Input",
     "sectionOutput": "Output",
+    "sectionStreaming": "Streaming",
     "summaryScreenshot": "Screenshot",
     "summaryLines": "{{count}} lines",
     "summaryMatches": "{{count}} matches",

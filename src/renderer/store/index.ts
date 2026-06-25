@@ -10,6 +10,7 @@ import type {
   AppConfig,
   SandboxSetupProgress,
   SandboxSyncStatus,
+  PartialToolResult,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
 
@@ -43,6 +44,7 @@ export interface SessionState {
   executionClock: SessionExecutionClock;
   traceSteps: TraceStep[];
   contextWindow: number;
+  partialToolResults: Record<string, PartialToolResult>;
   goalStatus?: {
     status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
     objective?: string;
@@ -65,6 +67,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   executionClock: { startAt: null, endAt: null },
   traceSteps: [],
   contextWindow: 0,
+  partialToolResults: {},
 };
 
 // Helper to immutably update a single session's state within the record
@@ -257,6 +260,12 @@ interface AppState {
 
   // Context window actions
   setSessionContextWindow: (sessionId: string, contextWindow: number) => void;
+
+  setPartialToolResult: (
+    sessionId: string,
+    toolCallId: string,
+    result: PartialToolResult | null,
+  ) => void;
 
   // System theme actions
   setSystemDarkMode: (dark: boolean) => void;
@@ -823,6 +832,25 @@ export const useAppStore = create<AppState>((set) => ({
         contextWindow,
       }),
     })),
+
+  setPartialToolResult: (sessionId, toolCallId, result) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      const current = ss.partialToolResults;
+      if (result === null) {
+        const { [toolCallId]: _, ...rest } = current;
+        return {
+          sessionStates: patchSession(state.sessionStates, sessionId, {
+            partialToolResults: rest,
+          }),
+        };
+      }
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          partialToolResults: { ...current, [toolCallId]: result },
+        }),
+      };
+    }),
 
   // System theme actions
   setSystemDarkMode: (dark) => set({ systemDarkMode: dark }),

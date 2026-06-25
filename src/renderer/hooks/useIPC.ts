@@ -337,6 +337,24 @@ export function useIPC() {
             );
             break;
 
+          // Empty content is the clear signal sent from tool_execution_end.
+          // Normal partial updates always have non-empty content from onUpdate.
+          case "stream.toolResultPartial": {
+            const { sessionId, toolCallId, content, isError, images, diff } =
+              event.payload;
+            if (!content) {
+              store.setPartialToolResult(sessionId, toolCallId, null);
+            } else {
+              store.setPartialToolResult(sessionId, toolCallId, {
+                content,
+                isError,
+                images,
+                diff,
+              });
+            }
+            break;
+          }
+
           case "sudo.password.request":
             store.setPendingSudoPassword(event.payload);
             break;
