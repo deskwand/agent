@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import type { ServerEvent } from "../src/renderer/types";
 
 // ── Hoisted mocks (vi.mock factories run before imports) ──
-const { mockAutoUpdater, mockLogger } = vi.hoisted(() => ({
+const { mockAutoUpdater, mockLogger, mockFs } = vi.hoisted(() => ({
   mockAutoUpdater: {
     setFeedURL: vi.fn(),
     checkForUpdatesAndNotify: vi.fn(),
@@ -17,6 +17,9 @@ const { mockAutoUpdater, mockLogger } = vi.hoisted(() => ({
     logWarn: vi.fn(),
     logError: vi.fn(),
   },
+  mockFs: {
+    readFileSync: vi.fn(),
+  },
 }));
 
 vi.mock("electron-updater", () => ({
@@ -24,6 +27,11 @@ vi.mock("electron-updater", () => ({
 }));
 
 vi.mock("../src/main/utils/logger", () => mockLogger);
+
+vi.mock("fs", () => ({
+  ...mockFs,
+  default: mockFs,
+}));
 
 import { initUpdater } from "../src/main/updater";
 
@@ -151,5 +159,120 @@ describe("initUpdater", () => {
     const handler = capturedListeners.get("update-downloaded");
     handler!({ version: "2.0.0" });
     expect(sendToRenderer).toHaveBeenCalledTimes(1);
+  });
+
+  // ── Linux APPIMAGE detection ──
+
+  describe("Linux APPIMAGE detection", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockAutoUpdater.checkForUpdatesAndNotify.mockReturnValue(
+        Promise.resolve(undefined),
+      );
+      mockAutoUpdater.on.mockImplementation(
+        (event: string, handler: (...args: any[]) => void) => {
+          capturedListeners.set(event, handler);
+          return mockAutoUpdater;
+        },
+      );
+    });
+
+    it("sets forceDevUpdateConfig=true when APPIMAGE is already set on Linux", () => {
+      const originalPlatform = Object.getOwnPropertyDescriptor(
+        process,
+        "platform",
+      );
+      Object.defineProperty(process, "platform", { value: "linux" });
+      process.env.APPIMAGE = "/home/user/DeskWand.AppImage";
+
+      try {
+        initUpdater(sendToRenderer);
+        expect(mockAutoUpdater.forceDevUpdateConfig).toBe(true);
+      } finally {
+        Object.defineProperty(process, "platform", originalPlatform!);
+        delete process.env.APPIMAGE;
+      }
+    });
+
+    it("sets forceDevUpdateConfig=false when APPIMAGE is missing on Linux and mountinfo detection fails", () => {
+      const originalPlatform = Object.getOwnPropertyDescriptor(
+        process,
+        "platform",
+      );
+      Object.defineProperty(process, "platform", { value: "linux" });
+      delete process.env.APPIMAGE; // ensure not set
+
+      // Simulate mountinfo not containing an AppImage
+      mockFs.readFileSync.mockReturnValue(
+        "1 2 8:1 / / rw - ext4 /dev/sda1 rw",
+      );
+
+      try {
+        initUpdater(sendToRenderer);
+        expect(mockAutoUpdater.forceDevUpdateConfig).toBe(false);
+        expect(mockLogger.log).toHaveBeenCalledWith(
+          expect.stringContaining("APPIMAGE env is not defined"),
+        );
+      } finally {
+        Object.defineProperty(process, "platform", originalPlatform!);
+        delete process.env.APPIMAGE;
+      }
+    });
+
+    it("recovers APPIMAGE from /proc/self/mountinfo on Linux", () => {
+      const originalPlatform = Object.getOwnPropertyDescriptor(
+        process,
+        "platform",
+      );
+      Object.defineProperty(process, "platform", { value: "linux" });
+      delete process.env.APPIMAGE;
+
+      // Simulate a real AppImage mountinfo line
+      mockFs.readFileSync.mockReturnValue(
+        "100 90 0:45 / /tmp/.mount_DeskWaXYZ rw,relatime - fuse.DeskWand.AppImage /home/user/Downloads/DeskWand-1.2.3.AppImage rw",
+      );
+
+      try {
+        initUpdater(sendToRenderer);
+        expect(process.env.APPIMAGE).toBe(
+          "/home/user/Downloads/DeskWand-1.2.3.AppImage",
+        );
+        expect(mockAutoUpdater.forceDevUpdateConfig).toBe(true);
+      } finally {
+        Object.defineProperty(process, "platform", originalPlatform!);
+        delete process.env.APPIMAGE;
+      }
+    });
+
+    it("does NOT attempt AppImage detection on non-Linux platforms", () => {
+      // process.platform is 'darwin' by default — ensureAppImageEnvOnLinux
+      // must short-circuit before touching fs or APPIMAGE
+      mockFs.readFileSync.mockImplementation(() => {
+        throw new Error("should not be called on non-Linux");
+      });
+      // initUpdater() already called in outer beforeEach on darwin — no throw
+      expect(mockFs.readFileSync).not.toHaveBeenCalled();
+    });
+
+    it("handles readFileSync throwing (e.g. container without /proc)", () => {
+      const originalPlatform = Object.getOwnPropertyDescriptor(
+        process,
+        "platform",
+      );
+      Object.defineProperty(process, "platform", { value: "linux" });
+      delete process.env.APPIMAGE;
+
+      mockFs.readFileSync.mockImplementation(() => {
+        throw new Error("ENOENT");
+      });
+
+      try {
+        initUpdater(sendToRenderer);
+        expect(mockAutoUpdater.forceDevUpdateConfig).toBe(false);
+      } finally {
+        Object.defineProperty(process, "platform", originalPlatform!);
+        delete process.env.APPIMAGE;
+      }
+    });
   });
 });

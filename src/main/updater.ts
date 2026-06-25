@@ -10,17 +10,66 @@ import { autoUpdater } from "electron-updater";
 import { app } from "electron";
 import { log } from "./utils/logger";
 import type { ServerEvent } from "../renderer/types";
+import * as fs from "fs";
+
+/**
+ * On Linux, electron-updater's AppImageUpdater requires `process.env.APPIMAGE`
+ * to be set for both download and install phases. The AppImage runtime normally
+ * sets it automatically, but some launchers / desktop environments may drop it.
+ *
+ * This function attempts to recover the AppImage path from /proc/self/mountinfo.
+ */
+function ensureAppImageEnvOnLinux(): void {
+  if (process.platform !== "linux") return;
+  if (process.env.APPIMAGE) return;
+
+  // Parse /proc/self/mountinfo to find the .AppImage file backing the mount
+  try {
+    const mountinfo = fs.readFileSync("/proc/self/mountinfo", "utf8");
+    for (const line of mountinfo.split("\n")) {
+      const hyphenIdx = line.indexOf(" - ");
+      if (hyphenIdx === -1) continue;
+      // mountinfo format after " - ": <fstype> <source> <mountpoint> [super_options]
+      const afterHyphen = line.slice(hyphenIdx + 3).trim();
+      const parts = afterHyphen.split(/\s+/);
+      // parts[0] = fstype, parts[1] = source (the .AppImage file path)
+      if (parts.length >= 2 && parts[1].endsWith(".AppImage")) {
+        process.env.APPIMAGE = parts[1];
+        log("[AutoUpdater] Recovered APPIMAGE from mountinfo:", parts[1]);
+        return;
+      }
+    }
+  } catch {
+    // /proc/self/mountinfo not accessible (e.g., container / sandbox)
+  }
+
+  log(
+    "[AutoUpdater] APPIMAGE env is not defined and could not be detected. " +
+      "Auto-update on Linux requires running from a genuine AppImage. " +
+      "If you extracted the AppImage, please re-download it from https://deskwand.com.",
+  );
+}
 
 export function initUpdater(
   sendToRenderer: (event: ServerEvent) => void,
 ): void {
+  // On Linux, detect/set APPIMAGE before electron-updater initializes.
+  // If it remains unset, AppImageUpdater.isUpdaterActive() + forceDevUpdateConfig
+  // must both be false so that checkForUpdatesAndNotify is a no-op.
+  ensureAppImageEnvOnLinux();
+
   // Ensure the feed URL is always set, even if build-time publish config is missing
   autoUpdater.setFeedURL({
     provider: "generic",
     url: "https://file.deskwand.com",
   });
 
-  autoUpdater.forceDevUpdateConfig = true;
+  // Only enable forceDevUpdateConfig when the platform's updater backend is functional.
+  // On Linux without APPIMAGE, leave it false so AppImageUpdater.isUpdaterActive()
+  // returns false (skipping all update operations instead of throwing at download time).
+  const platformUpdaterAvailable =
+    process.platform !== "linux" || !!process.env.APPIMAGE;
+  autoUpdater.forceDevUpdateConfig = platformUpdaterAvailable;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = false;
   // Disable differential download on macOS to ensure consistent progress reporting.
