@@ -98,6 +98,7 @@ src/
 | 禁止 `any` 类型 | 优先使用 `unknown` + 类型守卫；确有必要的个别场景需在 PR 中注释说明理由 |
 | 禁止渲染进程使用 Node.js API | `fs`、`path`、`child_process` 等一律通过 preload + IPC 间接调用 |
 | 禁止硬编码 UI 字符串 | 所有面向用户的文字必须走 i18next；仅技术日志、错误码、console 调试输出可例外 |
+| 禁止硬编码颜色值 | 使用语义 Token（如 `bg-success`、`text-error`），适配多主题和深浅模式 |
 | 禁止直接操作 DOM | 禁止 `document.querySelector` 等；使用 React ref 或状态驱动 |
 | 禁止 `--no-verify` 跳过 hooks | 不得绕过 commitlint、lint-staged、husky |
 | 禁止 force push 到 main/dev | `git push --force` 仅允许在个人 feature 分支 |
