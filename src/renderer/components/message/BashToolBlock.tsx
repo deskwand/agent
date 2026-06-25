@@ -28,16 +28,11 @@ interface BashToolBlockProps {
 const DEFAULT_EXIT_CODE = 0;
 const ERROR_EXIT_CODE = 1;
 
-const TERMINAL_BG = "#0d1117";
-const TERMINAL_FG = "#e6edf3";
-const SUCCESS_FG = "#3fb950";
-const ERROR_FG = "#f85149";
-
-/** Build a single ansi-to-html converter (no stream, so reuse is safe) */
+/** Build a single ansi-to-html converter using CSS custom properties for theme-aware colors */
 function makeAnsiConverter() {
   return new Convert({
-    fg: TERMINAL_FG,
-    bg: TERMINAL_BG,
+    fg: "var(--color-terminal-fg)",
+    bg: "var(--color-terminal-bg)",
     newline: true,
     escapeXML: true,
   });
@@ -222,15 +217,24 @@ export const BashToolBlock = memo(function BashToolBlock({
       {expanded && !isRunning && (
         <div className="animate-fade-in mx-3 mb-3 rounded-lg overflow-hidden border border-surface-muted">
           {/* Terminal title bar */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-[#161b22]">
+          <div
+            className="flex items-center gap-2 px-3 py-1.5"
+            style={{ backgroundColor: "var(--color-terminal-titlebar-bg)" }}
+          >
             <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
             <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
-            <span className="ml-2 text-[11px] text-[#8b949e] font-medium">
+            <span
+              className="ml-2 text-[11px] font-medium"
+              style={{ color: "var(--color-terminal-titlebar-text)" }}
+            >
               bash
             </span>
             {durationText && (
-              <span className="ml-auto text-[11px] text-[#8b949e]">
+              <span
+                className="ml-auto text-[11px]"
+                style={{ color: "var(--color-terminal-titlebar-text)" }}
+              >
                 {durationText}
               </span>
             )}
@@ -239,25 +243,31 @@ export const BashToolBlock = memo(function BashToolBlock({
           {/* Command + output */}
           <div
             className="px-3 py-2 font-mono text-xs leading-snug"
-            style={{ backgroundColor: TERMINAL_BG }}
+            style={{ backgroundColor: "var(--color-terminal-bg)" }}
           >
             {/* Command line: $ cmd (green for success, red for error) */}
             <div
               className="mb-1.5"
-              style={{ color: isError ? ERROR_FG : SUCCESS_FG }}
+              style={{
+                color: isError
+                  ? "var(--color-terminal-error)"
+                  : "var(--color-terminal-success)",
+              }}
             >
               $ {cmd}
             </div>
 
-            {/* Output with ANSI coloring */}
+            {/* Output with ANSI coloring (fg applied by ansi-to-html converter) */}
             {outputHtml ? (
               <div
                 className="whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto"
-                style={{ color: TERMINAL_FG }}
                 dangerouslySetInnerHTML={{ __html: outputHtml }}
               />
             ) : (
-              <div className="italic" style={{ color: "#8b949e" }}>
+              <div
+                className="italic"
+                style={{ color: "var(--color-terminal-dim)" }}
+              >
                 {t("tool.bashNoOutput")}
               </div>
             )}

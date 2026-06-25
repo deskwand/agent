@@ -34,6 +34,13 @@
     --color-success: #22c55e;
     --color-warning: #eab308;
     --color-error: #ef4444;
+    --color-terminal-bg: #0d1117;
+    --color-terminal-fg: #e6edf3;
+    --color-terminal-titlebar-bg: #161b22;
+    --color-terminal-titlebar-text: #8b949e;
+    --color-terminal-success: #3fb950;
+    --color-terminal-error: #f85149;
+    --color-terminal-dim: #8b949e;
   }
   .light {
     --color-background: #ffffff;
@@ -59,6 +66,13 @@
     --color-success: #16a34a;
     --color-warning: #ca8a04;
     --color-error: #dc2626;
+    --color-terminal-bg: #fafbfc;
+    --color-terminal-fg: #1a1a2e;
+    --color-terminal-titlebar-bg: #e8e8ea;
+    --color-terminal-titlebar-text: #6e6e80;
+    --color-terminal-success: #16a34a;
+    --color-terminal-error: #dc2626;
+    --color-terminal-dim: #9ca3af;
   }
 
   /* ----- Paper — warm brown & cream, reading-focused ----- */
