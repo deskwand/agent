@@ -2320,6 +2320,27 @@ ipcMain.on("window.close", () => {
   }
 });
 
+// Browser fullscreen IPC handlers
+ipcMain.handle("browser.enterFullscreen", async () => {
+  try {
+    mainWindow?.setFullScreen(true);
+    return { success: true };
+  } catch (error) {
+    logError("[Browser] Error entering fullscreen:", error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle("browser.exitFullscreen", async () => {
+  try {
+    mainWindow?.setFullScreen(false);
+    return { success: true };
+  } catch (error) {
+    logError("[Browser] Error exiting fullscreen:", error);
+    return { success: false, error: String(error) };
+  }
+});
+
 // Sandbox IPC handlers
 ipcMain.handle("sandbox.getStatus", async () => {
   try {

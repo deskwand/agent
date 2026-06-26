@@ -7,6 +7,8 @@ import {
   Loader2,
   ExternalLink,
   Globe,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
@@ -119,10 +121,27 @@ export function BrowserPanel({ width }: { width: number }) {
   );
 
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
+  const isBrowserFullscreen = useAppStore((s) => s.isBrowserFullscreen);
+  const enterBrowserFullscreen = useAppStore((s) => s.enterBrowserFullscreen);
+  const exitBrowserFullscreen = useAppStore((s) => s.exitBrowserFullscreen);
 
   const handleClose = useCallback(() => {
+    if (isBrowserFullscreen) {
+      exitBrowserFullscreen();
+      window.electronAPI?.browser.exitFullscreen();
+    }
     toggleBrowserPanel();
-  }, [toggleBrowserPanel]);
+  }, [isBrowserFullscreen, exitBrowserFullscreen, toggleBrowserPanel]);
+
+  const handleToggleFullscreen = useCallback(() => {
+    if (isBrowserFullscreen) {
+      exitBrowserFullscreen();
+      window.electronAPI?.browser.exitFullscreen();
+    } else {
+      enterBrowserFullscreen();
+      window.electronAPI?.browser.enterFullscreen();
+    }
+  }, [isBrowserFullscreen, enterBrowserFullscreen, exitBrowserFullscreen]);
 
   return (
     <div
@@ -197,6 +216,24 @@ export function BrowserPanel({ width }: { width: number }) {
           title={t("browser.openExternal")}
         >
           <ExternalLink className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Fullscreen toggle */}
+        <button
+          onClick={handleToggleFullscreen}
+          disabled={!status.url || status.url === "about:blank"}
+          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+          title={
+            isBrowserFullscreen
+              ? t("browser.exitFullscreen")
+              : t("browser.enterFullscreen")
+          }
+        >
+          {isBrowserFullscreen ? (
+            <Minimize2 className="w-3.5 h-3.5" />
+          ) : (
+            <Maximize2 className="w-3.5 h-3.5" />
+          )}
         </button>
 
         {/* Close */}

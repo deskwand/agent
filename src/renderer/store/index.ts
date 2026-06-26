@@ -149,6 +149,15 @@ interface AppState {
   // System theme (from OS native theme)
   systemDarkMode: boolean;
 
+  // Browser fullscreen
+  isBrowserFullscreen: boolean;
+  browserFullscreenSnapshot: {
+    rightPanelMode: "files" | "browser" | null;
+    contextPanelWidth: number;
+  } | null;
+  enterBrowserFullscreen: () => void;
+  exitBrowserFullscreen: () => void;
+
   // Actions
   setSessions: (sessions: Session[]) => void;
   addSession: (session: Session) => void;
@@ -337,6 +346,11 @@ export const useAppStore = create<AppState>((set) => ({
   isSandboxSetupComplete: false,
   sandboxSyncStatus: null,
   systemDarkMode: false,
+  isBrowserFullscreen: false,
+  browserFullscreenSnapshot: null as {
+    rightPanelMode: "files" | "browser" | null;
+    contextPanelWidth: number;
+  } | null,
 
   // Session actions
   setSessions: (sessions) => set({ sessions }),
@@ -854,6 +868,31 @@ export const useAppStore = create<AppState>((set) => ({
 
   // System theme actions
   setSystemDarkMode: (dark) => set({ systemDarkMode: dark }),
+
+  // Browser fullscreen actions
+  enterBrowserFullscreen: () =>
+    set((state) => ({
+      browserFullscreenSnapshot: {
+        rightPanelMode: state.rightPanelMode,
+        contextPanelWidth: state.contextPanelWidth,
+      },
+      isBrowserFullscreen: true,
+    })),
+
+  exitBrowserFullscreen: () =>
+    set((state) => {
+      const snapshot = state.browserFullscreenSnapshot;
+      return {
+        isBrowserFullscreen: false,
+        browserFullscreenSnapshot: null,
+        ...(snapshot
+          ? {
+              rightPanelMode: snapshot.rightPanelMode,
+              contextPanelWidth: snapshot.contextPanelWidth,
+            }
+          : {}),
+      };
+    }),
 }));
 
 // Expose helpers for nav-server (CLI-driven UI navigation via executeJavaScript)

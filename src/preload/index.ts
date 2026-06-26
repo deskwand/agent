@@ -561,6 +561,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("browser.setBounds", x, y, w, h),
     setTheme: (theme: string, blankPageBg: string) =>
       ipcRenderer.invoke("browser.setTheme", theme, blankPageBg),
+    enterFullscreen: () => ipcRenderer.invoke("browser.enterFullscreen"),
+    exitFullscreen: () => ipcRenderer.invoke("browser.exitFullscreen"),
     onStateChanged: (
       callback: (status: {
         visible: boolean;
@@ -978,6 +980,8 @@ declare global {
           h: number,
         ) => Promise<void>;
         setTheme: (theme: string, blankPageBg: string) => Promise<void>;
+        enterFullscreen: () => Promise<{ success: boolean; error?: string }>;
+        exitFullscreen: () => Promise<{ success: boolean; error?: string }>;
         onStateChanged: (
           callback: (status: {
             visible: boolean;

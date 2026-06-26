@@ -112,6 +112,8 @@ function App() {
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const setContextPanelWidth = useAppStore((s) => s.setContextPanelWidth);
   const setRightPanelMode = useAppStore((s) => s.setRightPanelMode);
+  const isBrowserFullscreen = useAppStore((s) => s.isBrowserFullscreen);
+  const exitBrowserFullscreen = useAppStore((s) => s.exitBrowserFullscreen);
 
   const { listSessions, isElectron } = useIPC();
   useWindowSize();
@@ -244,6 +246,19 @@ function App() {
     prevRightPanelModeRef.current = rightPanelMode;
   }, [rightPanelMode]);
 
+  // When user exits system fullscreen via ESC/macOS green button while in
+  // browser-fullscreen mode, restore layout to pre-fullscreen state.
+  useEffect(() => {
+    const unsub = window.electronAPI?.window.onFullScreenChanged(
+      (isFullScreen) => {
+        if (!isFullScreen && isBrowserFullscreen) {
+          exitBrowserFullscreen();
+        }
+      },
+    );
+    return unsub;
+  }, [isBrowserFullscreen, exitBrowserFullscreen]);
+
   // Determine if we should show the sandbox setup dialog
   // Show if there's progress and setup is not complete
   const showSandboxSetup = sandboxSetupProgress && !isSandboxSetupComplete;
@@ -254,6 +269,17 @@ function App() {
       <Titlebar />
 
       {/* Main Content */}
+      {isBrowserFullscreen ? (
+        <Suspense
+          fallback={
+            <div className="flex-1 min-h-0 bg-background/60" />
+          }
+        >
+          <div className="flex-1 min-h-0">
+            <BrowserPanel width={window.innerWidth} />
+          </div>
+        </Suspense>
+      ) : (
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Sidebar — always visible across all views */}
         <>
@@ -357,6 +383,7 @@ function App() {
           </>
         )}
       </div>
+      )}
 
       {/* Permission Dialog */}
       {pendingPermission && <PermissionDialog permission={pendingPermission} />}

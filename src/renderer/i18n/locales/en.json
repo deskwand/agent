@@ -725,7 +725,9 @@
   "browser": {
     "placeholder": "Search or enter URL",
     "reload": "Reload",
-    "openExternal": "Open in external browser"
+    "openExternal": "Open in external browser",
+    "enterFullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen"
   },
   "titlebar": {
     "builtInBrowser": "Built-in Browser",

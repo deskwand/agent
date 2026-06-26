@@ -725,7 +725,9 @@
   "browser": {
     "placeholder": "搜索或输入网址",
     "reload": "刷新",
-    "openExternal": "在外部浏览器中打开"
+    "openExternal": "在外部浏览器中打开",
+    "enterFullscreen": "全屏",
+    "exitFullscreen": "退出全屏"
   },
   "titlebar": {
     "builtInBrowser": "内置浏览器",
