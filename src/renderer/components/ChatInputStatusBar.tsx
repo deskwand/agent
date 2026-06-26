@@ -3,6 +3,7 @@ import { AlertCircle, Check, Loader2, Target } from "lucide-react";
 
 export type ChatInputStatus =
   | { type: "thinking" }
+  | { type: "responding" }
   | { type: "compacting" }
   | { type: "compaction-success" }
   | { type: "compaction-failed" }
@@ -47,6 +48,11 @@ export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
     case "thinking":
       icon = <Loader2 className="w-3 h-3 animate-spin" />;
       text = t("chat.processing");
+      break;
+    case "responding":
+      icon = <Loader2 className="w-3 h-3 animate-spin" />;
+      text = t("chat.responding");
+      toneClass = "text-accent";
       break;
     case "compacting":
       icon = <Loader2 className="w-3 h-3 animate-spin" />;
@@ -109,6 +115,7 @@ export function resolveInputStatus(params: {
   compactionResult: "success" | "failed" | null;
   steeringText: string;
   shouldShowThinkingIndicator: boolean;
+  isResponding: boolean;
   goalStatus?: {
     status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
     objective?: string;
@@ -168,6 +175,9 @@ export function resolveInputStatus(params: {
   }
   if (params.shouldShowThinkingIndicator) {
     return { type: "thinking" };
+  }
+  if (params.isResponding) {
+    return { type: "responding" };
   }
   return null;
 }

@@ -7,6 +7,7 @@ describe("resolveInputStatus", () => {
     compactionResult: null as "success" | "failed" | null,
     steeringText: "",
     shouldShowThinkingIndicator: false,
+    isResponding: false,
   };
 
   it("returns null when all inputs are inactive", () => {
@@ -26,6 +27,7 @@ describe("resolveInputStatus", () => {
         compactionResult: "failed",
         steeringText: "do something",
         shouldShowThinkingIndicator: true,
+        isResponding: false,
       }),
     ).toEqual({ type: "compacting" });
   });
@@ -65,6 +67,22 @@ describe("resolveInputStatus", () => {
   it("returns thinking when shouldShowThinkingIndicator is true", () => {
     expect(
       resolveInputStatus({ ...base, shouldShowThinkingIndicator: true }),
+    ).toEqual({ type: "thinking" });
+  });
+
+  it("returns responding when isResponding is true", () => {
+    expect(
+      resolveInputStatus({ ...base, isResponding: true }),
+    ).toEqual({ type: "responding" });
+  });
+
+  it("thinking wins over responding", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        shouldShowThinkingIndicator: true,
+        isResponding: true,
+      }),
     ).toEqual({ type: "thinking" });
   });
 

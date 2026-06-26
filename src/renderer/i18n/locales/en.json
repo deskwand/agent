@@ -765,6 +765,7 @@
     "contextUsageTooltip": "Context: {{used}} / {{total}}  ({{percentage}}%)\nPrompt  {{promptNonCache}}\nCache hit rate  {{cacheHitRate}}\nCache hit  {{cacheRead}}\nOutput  {{output}}",
     "connectorCount_one": "{{count}} connector",
     "connectorCount_other": "{{count}} connectors",
+    "responding": "Outputting...",
     "compacting": "Compacting session...",
     "compacted": "Session compacted",
     "compactFailed": "Session compaction failed",

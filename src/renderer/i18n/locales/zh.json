@@ -764,6 +764,7 @@
     "contextUsageTooltip": "上下文占用：{{used}} / {{total}}  ({{percentage}}%)\n提示词  {{promptNonCache}}\n缓存命中率  {{cacheHitRate}}\n缓存命中  {{cacheRead}}\n输出  {{output}}",
     "connectorCount_one": "{{count}} 个连接器",
     "connectorCount_other": "{{count}} 个连接器",
+    "responding": "输出中...",
     "compacting": "压缩会话中...",
     "compacted": "会话压缩完成",
     "compactFailed": "会话压缩失败",

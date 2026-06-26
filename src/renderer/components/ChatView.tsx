@@ -224,6 +224,7 @@ export function ChatView() {
       steeringEvent && activeTurn && steeringEvent.turnId === activeTurn.turnId
         ? steeringEvent.text.trim().replace(/\s+/g, " ").slice(0, 120)
         : "";
+    // ?? false: TS narrows hasAssistantOutput as boolean | null because
     // Only show the thinking indicator when the active turn has NOT yet
     // produced any assistant output. After the final stream.message arrives,
     // partialMessage/partialThinking are cleared, but activeTurn remains set
@@ -239,11 +240,15 @@ export function ChatView() {
       !hasAssistantOutput &&
       (!partialMessage || partialMessage.trim() === "") &&
       !partialThinking;
+    // ?? false: TS narrows hasAssistantOutput as boolean | null because
+    // it cannot correlate hasActiveTurn with activeTurn's non-nullness.
+    const isResponding = (canStop && hasAssistantOutput) ?? false;
     return resolveInputStatus({
       isCompacting,
       compactionResult,
       steeringText,
       shouldShowThinkingIndicator,
+      isResponding,
       goalStatus,
     });
   }, [
