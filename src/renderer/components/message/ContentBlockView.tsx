@@ -230,12 +230,23 @@ export const ContentBlockView = memo(function ContentBlockView({
             rel="noreferrer"
             onClick={(event) => {
               event.preventDefault();
-              if (
-                safeHref &&
-                typeof window !== "undefined" &&
-                window.electronAPI?.openExternal
-              ) {
-                void window.electronAPI.openExternal(safeHref);
+              if (safeHref && typeof window !== "undefined") {
+                if (/^https?:\/\//i.test(safeHref)) {
+                  const store = useAppStore.getState();
+                  if (store.rightPanelMode !== "browser") {
+                    store.toggleBrowserPanel();
+                  }
+                  void window.electronAPI?.browser
+                    .navigate(safeHref)
+                    ?.catch((err: unknown) => {
+                      console.error(
+                        "[ContentBlockView] browser.navigate failed:",
+                        err,
+                      );
+                    });
+                } else if (window.electronAPI?.openExternal) {
+                  void window.electronAPI.openExternal(safeHref);
+                }
               }
             }}
             className="text-accent hover:text-accent-hover"
