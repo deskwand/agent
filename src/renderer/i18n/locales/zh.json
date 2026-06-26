@@ -203,6 +203,7 @@
     "maxOutputTokens": "最大输出 Token",
     "maxOutputTokensPlaceholder": "自动检测",
     "contextWindowHint": "留空则自动检测。仅在模型限制不正确时手动覆盖。",
+    "supportsImage": "图片",
     "saveFailed": "保存失败，请稍后重试",
     "getStarted": "开始使用",
     "saveSettings": "保存设置",

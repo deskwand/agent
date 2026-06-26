@@ -203,6 +203,7 @@
     "maxOutputTokens": "Max Output Tokens",
     "maxOutputTokensPlaceholder": "Auto-detect",
     "contextWindowHint": "Leave empty for auto-detection. Override only if the model reports incorrect limits.",
+    "supportsImage": "Image",
     "saveFailed": "Failed to save settings. Please try again.",
     "getStarted": "Get Started",
     "saveSettings": "Save Settings",

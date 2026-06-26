@@ -238,6 +238,11 @@ export class ModelResolutionService {
       piModel = { ...piModel, contextWindow, maxTokens } as Model<Api>;
     }
 
+    // Apply user-configured input override (takes highest priority)
+    if (modelSelection.matchedModel.input !== undefined) {
+      piModel = { ...piModel, input: modelSelection.matchedModel.input } as Model<Api>;
+    }
+
     return {
       providerProfileKey: providerSelection.providerProfileKey,
       providerType: providerConfig.provider,

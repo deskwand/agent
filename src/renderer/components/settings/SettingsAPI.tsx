@@ -208,6 +208,12 @@ function sanitizeDraft(
         item.maxTokens > 0
           ? Math.round(item.maxTokens)
           : undefined,
+      input:
+        item.source === "custom" &&
+        Array.isArray(item.input) &&
+        item.input.length > 0
+          ? item.input
+          : undefined,
     });
   }
   const models = Array.from(deduped.values());
@@ -1284,6 +1290,21 @@ export function SettingsAPI({
                               title={t("api.contextWindowHint")}
                               className="w-36 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
+                            <label className="flex items-center gap-1.5 text-sm text-text-secondary flex-shrink-0">
+                              <input
+                                type="checkbox"
+                                checked={item.input?.includes("image") ?? false}
+                                onChange={(e) =>
+                                  updateModel(index, {
+                                    input: e.target.checked
+                                      ? ["text", "image"]
+                                      : ["text"],
+                                  })
+                                }
+                                className="rounded"
+                              />
+                              {t("api.supportsImage")}
+                            </label>
                             <button
                               type="button"
                               onClick={() => removeModel(index)}

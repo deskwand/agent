@@ -716,6 +716,7 @@ export interface ApiProviderModel {
   source: "preset" | "custom";
   contextWindow?: number;
   maxTokens?: number;
+  input?: ("text" | "image")[];
 }
 
 export interface ApiProviderConfig {

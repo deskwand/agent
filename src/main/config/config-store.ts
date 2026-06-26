@@ -40,6 +40,7 @@ export interface ApiProviderModel {
   source: "preset" | "custom";
   contextWindow?: number;
   maxTokens?: number;
+  input?: ("text" | "image")[];
 }
 
 export interface ApiProviderConfig {
@@ -446,6 +447,9 @@ function normalizeProviderModel(
     }
     if (typeof raw?.maxTokens === "number" && raw.maxTokens > 0) {
       model.maxTokens = Math.round(raw.maxTokens);
+    }
+    if (Array.isArray(raw?.input) && raw.input.length > 0) {
+      model.input = raw.input;
     }
   }
   // Auto-resolve contextWindow for all models (preset + custom without manual override)

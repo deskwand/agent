@@ -1,4 +1,4 @@
-import { getModel, type Api, type Model } from "@earendil-works/pi-ai";
+import { getModel, getModels, getProviders, type Api, type Model } from "@earendil-works/pi-ai";
 import { isOfficialOpenAIBaseUrl } from "../config/auth-utils";
 
 const COMMON_FALLBACK_PROVIDERS = ["openai", "anthropic", "google"] as const;
@@ -131,6 +131,21 @@ function lookupModelSpecs(
   return undefined;
 }
 
+/**
+ * Look up the model by name across ALL providers in the pi-ai registry.
+ * The same model across different providers generally has the same capabilities,
+ * so provider is not a reliable differentiator for model capabilities.
+ */
+function resolveInputFromRegistry(
+  modelId: string,
+): ("text" | "image")[] | undefined {
+  for (const provider of getProviders()) {
+    const match = getModels(provider).find((m) => m.id === modelId);
+    if (match) return match.input;
+  }
+  return undefined;
+}
+
 export function buildSyntheticPiModel(
   modelId: string,
   provider: string,
@@ -151,7 +166,7 @@ export function buildSyntheticPiModel(
     provider,
     baseUrl: baseUrl || "",
     reasoning: autoReasoning,
-    input: ["text", "image"],
+    input: resolveInputFromRegistry(modelId) ?? ["text", "image"],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: contextWindow ?? knownSpecs?.contextWindow ?? 128000,
     maxTokens: maxTokens ?? knownSpecs?.maxTokens ?? 16384,
