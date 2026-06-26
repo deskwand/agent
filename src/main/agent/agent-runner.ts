@@ -1092,6 +1092,11 @@ ${hints.join("\n")}
       async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
         const { url } = params as { url: string };
         self._invalidateSnapshotRefs();
+        // file:// must go through main-process loadURL to bypass renderer sandbox
+        if (url.startsWith("file://")) {
+          bvm.navigate(url);
+          return { content: [{ type: "text" as const, text: `Navigated to ${url}` }] };
+        }
         return withPage("internal_browser_navigate", async (page) => {
           await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
           return { content: [{ type: "text" as const, text: `Navigated to ${page.url()}` }] };
@@ -2766,7 +2771,7 @@ If your answer uses linkable content from MCP tools, include a \"Sources:\" sect
 \u003c/citation_requirements>`,
         `\u003ctool_behavior\u003e\n
 Tool routing:\n
-- internal_browser_*: Use for all web browsing, interactive page operations, screenshots, form filling, and JS evaluation. The browser panel opens automatically. If it doesn't, the user may have dismissed it — they can reopen it by clicking the globe icon \ud83c\udf10 in the top toolbar.\n
+- internal_browser_*: Use for all web browsing, interactive page operations, screenshots, form filling, and JS evaluation. The browser panel opens automatically. If it doesn't, the user may have dismissed it — they can reopen it by clicking the globe icon \ud83c\udf10 in the top toolbar. Defaults to opening local files and links in the internal browser instead of the system browser.\n
 - WebSearch/WebFetch: Use for quick lookups and content fetching when full interactive browsing is unnecessary.\n
 \u003c/tool_behavior\u003e`,
         this.getBundledPathHints(),
