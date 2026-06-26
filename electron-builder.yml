@@ -92,9 +92,6 @@ mac:
       to: mcp
     - from: resources/node/darwin-${arch}
       to: node
-    # Bundled Python runtime + site-packages for GUI automation helpers (Pillow, pyobjc/Quartz)
-    - from: resources/python/darwin-${arch}
-      to: python
     # Bundled GUI helper tools (e.g. cliclick) to avoid relying on user-installed Homebrew tools
     - from: resources/tools/darwin-${arch}
       to: tools
@@ -115,8 +112,6 @@ linux:
       to: mcp
     - from: resources/node/linux-x64
       to: node
-    - from: resources/python/linux-${arch}
-      to: python
     - from: .deskwand/skills
       to: skills
 

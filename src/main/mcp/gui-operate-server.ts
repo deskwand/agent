@@ -30,12 +30,13 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 writeMCPLog("Imported MCP SDK modules", "Bootstrap");
 
-import { execFile, spawn } from "child_process";
+import { execFile, spawn, execSync } from "child_process";
 import { promisify } from "util";
 import * as os from "os";
 import * as path from "path";
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
+import * as https from "https";
 writeMCPLog("Imported Node.js built-in modules", "Bootstrap");
 
 const execFileAsync = promisify(execFile);
@@ -1276,9 +1277,101 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
     );
   }
 
-  // 2) Bundled with the app (recommended for production)
-  // Packaged layout: Resources/python/bin/python3
-  // Dev layout:      resources/python/darwin-${arch}/bin/python3
+  // 2) On-demand download from CDN (python-build-standalone, ~25-50MB)
+  // Python is no longer bundled in the installer to reduce package size.
+  // First GUI operation triggers a one-time download to ~/.deskwand/python/.
+  const pyArch = process.arch === "arm64" ? "arm64" : "x64";
+  const pyPlatform = PLATFORM === "darwin" ? "darwin" : "linux";
+  const pyRoot = path.join(os.homedir(), ".deskwand", "python", `${pyPlatform}-${pyArch}`);
+  const pyBin = path.join(pyRoot, "bin", `python${PLATFORM === "win32" ? ".exe" : "3"}`);
+
+  if (PLATFORM === "darwin" || PLATFORM === "linux") {
+    if (!(await pathExists(pyBin))) {
+      writeMCPLog(
+        `[resolvePythonExec] Python not found locally, downloading from CDN...`,
+        "Python Resolve",
+      );
+      const tmpBall = path.join(os.tmpdir(), `deskwand-python-${pyPlatform}-${pyArch}.tar.gz`);
+      const pyUrl =
+        `https://file.deskwand.com/python/${pyPlatform}-${pyArch}.tar.gz`;
+
+      writeMCPLog(
+        `[resolvePythonExec] Downloading Python from ${pyUrl} ...`,
+        "Python Resolve",
+      );
+
+      try {
+        const file = fsSync.createWriteStream(tmpBall);
+        await new Promise<void>((resolve, reject) => {
+          const req = https.get(pyUrl, { timeout: 30000 }, (res) => {
+            if (res.statusCode === 301 || res.statusCode === 302) {
+              const redirectUrl = res.headers.location;
+              res.resume(); // drain first response body
+              if (!redirectUrl) { reject(new Error("Redirect without Location header")); return; }
+              const r2 = https.get(redirectUrl, { timeout: 30000 }, (r3) => {
+                r3.pipe(file);
+                file.on("finish", () => file.close(() => resolve()));
+              });
+              r2.on("error", reject);
+              r2.on("timeout", () => { r2.destroy(); reject(new Error("Download timeout")); });
+              return;
+            }
+            if (res.statusCode !== 200) {
+              res.resume();
+              reject(new Error(`HTTP ${res.statusCode}`));
+              return;
+            }
+            res.pipe(file);
+            file.on("finish", () => file.close(() => resolve()));
+          });
+          req.on("error", reject);
+          req.on("timeout", () => { req.destroy(); reject(new Error("Download timeout")); });
+        });
+
+        fsSync.mkdirSync(path.dirname(pyRoot), { recursive: true });
+        execSync(`tar -xzf "${tmpBall}" -C "${path.dirname(pyRoot)}"`, {
+          stdio: "pipe",
+          timeout: 60000,
+        });
+        fsSync.unlinkSync(tmpBall);
+        writeMCPLog(
+          `[resolvePythonExec] Python downloaded and extracted to ${pyRoot}`,
+          "Python Resolve",
+        );
+      } catch (err) {
+        writeMCPLog(
+          `[resolvePythonExec] CDN download failed: ${err instanceof Error ? err.message : String(err)}, falling back...`,
+          "Python Resolve",
+        );
+        // Clean up partial files
+        try { if (fsSync.existsSync(tmpBall)) fsSync.unlinkSync(tmpBall); } catch {}
+      }
+    }
+
+    if (await pathExists(pyBin)) {
+      const extraSite = path.join(pyRoot, "site-packages");
+      const env: NodeJS.ProcessEnv = {
+        ...baseEnv,
+        PYTHONHOME: pyRoot,
+        PYTHONNOUSERSITE: "1",
+        PYTHONDONTWRITEBYTECODE: "1",
+        PYTHONUTF8: "1",
+      };
+      if (await pathExists(extraSite)) {
+        env.PYTHONPATH = [extraSite, baseEnv.PYTHONPATH]
+          .filter(Boolean)
+          .join(path.delimiter);
+      }
+      cachedPythonExec = { python: pyBin, pythonRoot: pyRoot, env };
+      writeMCPLog(
+        `[resolvePythonExec] Using downloaded Python: ${pyBin}`,
+        "Python Resolve",
+      );
+      return cachedPythonExec;
+    }
+  }
+
+  // 3) Bundled with the app (legacy builds that still include Python)
   if (PLATFORM === "darwin") {
     const arch = process.arch === "arm64" ? "arm64" : "x64";
     writeMCPLog(
@@ -1328,7 +1421,7 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
       return cachedPythonExec;
     }
 
-    // 3) System python (fallback)
+    // 4) System python (fallback)
     const systemPython = "/usr/bin/python3";
     writeMCPLog(
       `[resolvePythonExec] Checking system Python: ${systemPython}`,
@@ -1353,7 +1446,7 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
     }
   }
 
-  // Generic fallback for other platforms: rely on PATH if available
+  // 5) Generic fallback for other platforms: rely on PATH if available
   try {
     writeMCPLog(
       "[resolvePythonExec] Checking PATH for Python (generic fallback)",
@@ -1405,8 +1498,8 @@ async function executePython(
   if (!execInfo) {
     throw new Error(
       "Python 3 runtime not found.\n" +
-        "- Recommended (macOS): bundle Python into the app at Resources/python/bin/python3 with required packages (Pillow, pyobjc-framework-Quartz)\n" +
-        "- Or install python3 + dependencies on this machine.\n",
+        "- It will be downloaded automatically on first use from our CDN (~25-50MB).\n" +
+        "- Or install python3 + required packages (Pillow, pyobjc-framework-Quartz) on this machine.\n",
     );
   }
 

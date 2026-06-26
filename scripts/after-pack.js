@@ -147,7 +147,27 @@ module.exports = async function afterPack(context) {
     if (removed > 0) console.log(`  ✓ ${pkg}: kept ${keepDir}, removed ${removed} other prebuild dirs`);
   }
 
-  // --- 3. ngrok: remove binary (~28MB, it downloads on-demand anyway) ---
+  // --- 3. @mariozechner/clipboard: remove non-target platform native addons (~10MB) ---
+  // Package naming: clipboard-{darwin|linux|win32}-{arch}[-gnu|-msvc]
+  const clipboardDir = path.join(nmUnpacked, '@mariozechner');
+  if (fs.existsSync(clipboardDir)) {
+    const clipPlatform = platform === 'darwin' ? 'darwin' : platform === 'win32' ? 'win32' : 'linux';
+    // Build the set of clipboard-* packages to keep for this platform
+    const keepPrefixes = [`clipboard-${clipPlatform}-${archName}`];
+    if (clipPlatform === 'darwin') keepPrefixes.push('clipboard-darwin-universal');
+
+    let removed = 0;
+    for (const entry of fs.readdirSync(clipboardDir)) {
+      if (!entry.startsWith('clipboard-')) continue;
+      const shouldKeep = keepPrefixes.some((prefix) => entry === prefix || entry.startsWith(prefix + '-'));
+      if (shouldKeep) continue;
+      fs.rmSync(path.join(clipboardDir, entry), { recursive: true, force: true });
+      removed++;
+    }
+    if (removed > 0) console.log(`  ✓ clipboard: kept ${keepPrefixes.join(', ')}, removed ${removed} other platform binaries (~10MB)`);
+  }
+
+  // --- 4. ngrok: remove binary (~28MB, it downloads on-demand anyway) ---
   const ngrokPkg = path.join(nmUnpacked, 'ngrok');
   if (fs.existsSync(ngrokPkg)) {
     const ngrokBin = path.join(ngrokPkg, 'bin');

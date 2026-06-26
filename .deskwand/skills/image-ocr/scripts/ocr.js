@@ -11,12 +11,57 @@
  *   node ocr.js <image-path> --json           # JSON 输出（含置信度）
  */
 
-const { createWorker } = require("tesseract.js");
 const path = require("path");
 const fs = require("fs");
 const os = require("os");
 const https = require("https");
 const { pipeline } = require("stream/promises");
+
+// ─── 自动安装 tesseract.js（首次运行 / 包体积优化） ─────
+// tesseract.js-core (WASM 引擎, ~43MB) 不再预装到安装包中。
+// 首次 OCR 使用时自动 npm install 到用户本地缓存。
+function ensureTesseract() {
+  const CACHE_ROOT = path.join(os.homedir(), ".deskwand", "skill-deps", "image-ocr");
+  const cacheNodeModules = path.join(CACHE_ROOT, "node_modules");
+
+  try {
+    return require("tesseract.js");
+  } catch {
+    // 模块缺失，自动安装
+  }
+
+  if (!fs.existsSync(cacheNodeModules)) {
+    const { execSync } = require("child_process");
+    const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
+    const pkgJson = path.join(CACHE_ROOT, "package.json");
+    if (!fs.existsSync(pkgJson)) {
+      fs.mkdirSync(CACHE_ROOT, { recursive: true });
+      fs.writeFileSync(pkgJson, JSON.stringify({ private: true }));
+    }
+    process.stderr.write("[image-ocr] 首次使用，安装 OCR 引擎 (~43MB) ...\n");
+    try {
+      execSync(`${npmCmd} install tesseract.js`, {
+        cwd: CACHE_ROOT,
+        stdio: ["ignore", "pipe", "pipe"],
+        timeout: 120000,
+      });
+      process.stderr.write("[image-ocr] 安装完成，开始识别 ...\n");
+    } catch (e) {
+      process.stderr.write(`[image-ocr] 安装失败: ${e.message}\n`);
+      process.stderr.write("[image-ocr] 请检查网络连接后重试，或手动执行:\n");
+      process.stderr.write(`[image-ocr]   cd "${CACHE_ROOT}" && npm install tesseract.js\n`);
+      process.exit(2);
+    }
+  }
+
+  // 将缓存目录加入 Node 模块搜索路径
+  require.main.paths.unshift(cacheNodeModules);
+  return require("tesseract.js");
+}
+
+const tesseract = ensureTesseract();
+const { createWorker } = tesseract;
+// ─── 自动安装结束 ────────────────────────────────────────
 
 // ─── 配置 ───────────────────────────────────────────────
 const MODELS = {
