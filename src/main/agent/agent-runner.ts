@@ -59,6 +59,7 @@ import { getDefaultShell } from "../utils/shell-resolver";
 import type { SkillsAdapter } from "../skills/skills-adapter";
 import { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { configStore } from "../config/config-store";
+import crypto from "node:crypto";
 import { createVisionDescribeTool } from "./tools/vision-describe";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
 import {
@@ -3651,6 +3652,95 @@ Tool routing:\n
                 })
             : [];
 
+        // When the main model cannot view images but the user pasted images,
+        // save them to disk under the session working directory so the
+        // vision_describe tool can access them. Files persist across rounds.
+        let imageGuidancePrefix = "";
+        if (
+          !modelSupportsImages &&
+          hasImages &&
+          lastUserMsg?.role === "user"
+        ) {
+          const userImages = (
+            lastUserMsg.content as ContentBlock[]
+          ).filter(
+            (c) => c.type === "image",
+          ) as Array<{
+            type: "image";
+            source: { data: string; media_type: string };
+          }>;
+
+          if (userImages.length > 0) {
+            const visionConfigured =
+              visionModelConfig?.enabled &&
+              Boolean(visionModelConfig.model?.trim());
+
+            if (visionConfigured) {
+              try {
+                const imagesDir = path.join(
+                  effectiveCwd,
+                  ".deskwand",
+                  "vision_images",
+                );
+                fs.mkdirSync(imagesDir, { recursive: true });
+                const paths: string[] = [];
+
+                for (let i = 0; i < userImages.length; i++) {
+                  const mimeParts =
+                    userImages[i].source.media_type.split("/");
+                  const ext =
+                    mimeParts[1] === "jpeg" ? "jpg" : mimeParts[1] || "jpg";
+                  const hash = crypto
+                    .createHash("sha256")
+                    .update(userImages[i].source.data)
+                    .digest("hex")
+                    .slice(0, 12);
+                  const filename = `user_image_${hash}.${ext}`;
+                  const relPath = path.join(
+                    ".deskwand",
+                    "vision_images",
+                    filename,
+                  );
+                  fs.writeFileSync(
+                    path.join(effectiveCwd, relPath),
+                    Buffer.from(userImages[i].source.data, "base64"),
+                  );
+                  paths.push(relPath);
+                }
+
+                const samples =
+                  paths.length <= 3
+                    ? paths
+                        .map((p) => `  vision_describe(path="${p}")`)
+                        .join("\n")
+                    : `  vision_describe(path="${paths[0]}")\n  ... and ${paths.length - 1} more`;
+
+                imageGuidancePrefix =
+                  `[User sent ${userImages.length} image(s). ` +
+                  `This model cannot view images directly. ` +
+                  `Call vision_describe to examine each one:\n${samples}]\n\n`;
+
+                log(
+                  `[AgentRunner] Saved ${userImages.length} image(s) to ${imagesDir}`,
+                );
+              } catch (err) {
+                logError(
+                  `[AgentRunner] Failed to save user images to disk:`,
+                  err,
+                );
+                imageGuidancePrefix =
+                  `[User sent ${userImages.length} image(s). ` +
+                  `Failed to save them for viewing: ${err instanceof Error ? err.message : String(err)}]\n\n`;
+              }
+            } else {
+              imageGuidancePrefix =
+                `[User sent ${userImages.length} image(s), but this model cannot ` +
+                `view images and no vision model is configured. ` +
+                `Suggest the user configure one in Settings > Vision Model.]\n\n`;
+            }
+          }
+        }
+
         // Try extension command interception with the raw user prompt.
         // The pi SDK's _tryExecuteExtensionCommand checks text.startsWith("/"),
         // but deskwand wraps the prompt with history/preamble (contextualPrompt),
@@ -3690,6 +3780,12 @@ Tool routing:\n
               extCmds.map((c) => c.name),
             );
           }
+        }
+
+        // Prepend image guidance to the final prompt if user sent images
+        // to a non-multimodal model.
+        if (imageGuidancePrefix) {
+          finalPrompt = imageGuidancePrefix + finalPrompt;
         }
 
         // pony: Promise.race against abort signal so cancel() can interrupt a stuck prompt()
