@@ -1156,5 +1156,16 @@
     "bashNoOutput": "(no output)",
     "readReading": "Reading...",
     "readEmptyFile": "(empty file)"
+  },
+  "imageLightbox": {
+    "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied",
+    "openExternal": "Open",
+    "loadFailed": "Failed to load",
+    "imageCount": "{{current}} / {{total}}",
+    "copyFailed": "Copy failed",
+    "prev": "Previous",
+    "next": "Next"
   }
 }

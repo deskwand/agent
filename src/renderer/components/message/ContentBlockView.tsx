@@ -27,6 +27,7 @@ import type {
   ToolUseContent,
   ToolResultContent,
   FileAttachmentContent,
+  ImageContent,
 } from "../../types";
 import { FileText } from "lucide-react";
 import { CodeBlock } from "./CodeBlock";
@@ -34,6 +35,7 @@ import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolUseBlock } from "./ToolUseBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
 import { FilePreviewModal } from "../FilePreviewModal";
+import { ImageLightbox, type ImageSource } from "../ImageLightbox";
 import { isPreviewableExt } from "../../utils/file-preview";
 import type { ContentBlockViewProps } from "./types";
 
@@ -70,6 +72,8 @@ export const ContentBlockView = memo(function ContentBlockView({
     path: string;
     name: string;
   } | null>(null);
+  const [lightboxImages, setLightboxImages] = useState<ImageSource[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const resolveFilePath = (value: string) =>
     resolvePathAgainstWorkspace(value, currentWorkingDir);
@@ -446,13 +450,35 @@ export const ContentBlockView = memo(function ContentBlockView({
       const { source } = imageBlock;
       const imageSrc = `data:${source.media_type};base64,${source.data}`;
 
+      const handleImageClick = () => {
+        if (!allBlocks) return;
+        const allImages: ImageSource[] = allBlocks
+          .filter(
+            (b): b is ImageContent =>
+              b.type === "image" &&
+              b.source?.media_type != null &&
+              b.source?.data != null &&
+              ALLOWED_IMAGE_TYPES.has(b.source.media_type),
+          )
+          .map((b) => ({
+            src: `data:${b.source.media_type};base64,${b.source.data}`,
+          }));
+        if (allImages.length === 0) return;
+        const clickedIdx = allImages.findIndex(
+          (img) => img.src === imageSrc,
+        );
+        setLightboxImages(allImages);
+        setLightboxIndex(clickedIdx >= 0 ? clickedIdx : 0);
+      };
+
       return (
         <div className={`${isUser ? "inline-block" : ""}`}>
           <img
             src={imageSrc}
             alt={t("messageCard.pastedContentAlt")}
-            className="w-full max-w-full rounded-lg border border-border"
+            className="w-full max-w-full rounded-lg border border-border cursor-pointer hover:opacity-90 transition-opacity"
             style={{ maxHeight: "600px", objectFit: "contain" }}
+            onClick={handleImageClick}
           />
         </div>
       );
@@ -532,6 +558,12 @@ export const ContentBlockView = memo(function ContentBlockView({
           onClose={() => setPreviewFile(null)}
         />
       )}
+      <ImageLightbox
+        isOpen={lightboxImages.length > 0}
+        images={lightboxImages}
+        startIndex={lightboxIndex}
+        onClose={() => setLightboxImages([])}
+      />
     </>
   );
 });

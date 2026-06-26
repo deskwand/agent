@@ -1153,5 +1153,16 @@
     "bashNoOutput": "(无输出)",
     "readReading": "读取中...",
     "readEmptyFile": "(空文件)"
+  },
+  "imageLightbox": {
+    "close": "关闭",
+    "copy": "复制",
+    "copied": "已复制",
+    "openExternal": "用默认程序打开",
+    "loadFailed": "图片加载失败",
+    "imageCount": "{{current}} / {{total}}",
+    "copyFailed": "复制失败",
+    "prev": "上一张",
+    "next": "下一张"
   }
 }

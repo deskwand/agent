@@ -131,6 +131,7 @@ export const MessageCard = memo(function MessageCard({
                     isStreaming &&
                     (block.type !== "text" || index === lastTextBlockIndex)
                   }
+                  allBlocks={visibleBlocks}
                 />
               ))
             )}

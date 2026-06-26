@@ -10,7 +10,8 @@ import {
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
-import { X } from "lucide-react";
+import { X, Image as ImageIcon } from "lucide-react";
+import { ImageLightbox, type ImageSource } from "./ImageLightbox";
 import type { Skill } from "../types";
 import {
   getBuiltinCommands,
@@ -89,6 +90,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       [],
     );
     const [isDragging, setIsDragging] = useState(false);
+    const [previewIndex, setPreviewIndex] = useState(-1);
+    const [attachPreview, setAttachPreview] = useState<{
+      images: ImageSource[];
+      startIndex: number;
+    } | null>(null);
 
     const SLASH_TABS: readonly SlashTab[] = ["all", "commands", "skills"];
 
@@ -113,6 +119,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const selectFilesRef = useRef<() => void>(() => {});
     /** Tracks whether an IME (e.g. Chinese Pinyin) composition is in progress. */
     const isComposingRef = useRef(false);
+    /** Token to cancel stale async attaches when user clicks another image. */
+    const attachLoadTokenRef = useRef(0);
 
     // --- Auto-resize textarea ---
     const adjustTextareaHeight = useCallback(() => {
@@ -323,6 +331,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         updated.splice(index, 1);
         return updated;
       });
+      // Close lightbox if removing the currently previewed image
+      setPreviewIndex((prev) => {
+        if (prev === index) return -1;
+        if (prev > index) return prev - 1;
+        return prev;
+      });
     };
 
     const removeFile = (index: number) => {
@@ -330,6 +344,28 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const updated = [...prev];
         updated.splice(index, 1);
         return updated;
+      });
+      // Close attach lightbox if the removed file is the only image being previewed
+      setAttachPreview((prev) => {
+        if (!prev) return null;
+        // Recompute remaining image indices after removal
+        const surviving = attachedFiles
+          .map((f, i) => ({ f, i }))
+          .filter(({ f, i }) => {
+            if (i === index) return false;
+            return (
+              f.type.startsWith("image/") ||
+              /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(f.name || "")
+            );
+          });
+        if (surviving.length === 0) return null;
+        const newImages = surviving.map(({ f }) => ({
+          src: "",
+          name: f.name,
+          filePath: f.path || undefined,
+        }));
+        const newStart = Math.min(prev.startIndex, newImages.length - 1);
+        return { images: newImages, startIndex: newStart };
       });
     };
 
@@ -612,7 +648,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     return (
-      <form
+      <>
+        <form
         onSubmit={handleFormSubmit}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -630,7 +667,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 <img
                   src={img.url}
                   alt={t("common.pastedImageAlt", { index: index + 1 })}
-                  className="w-full aspect-square object-cover rounded-lg border border-border block"
+                  className="w-full aspect-square object-cover rounded-lg border border-border block cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setPreviewIndex(index)}
                 />
                 <button
                   type="button"
@@ -647,25 +685,124 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         {/* File attachments */}
         {attachedFiles.length > 0 && (
           <div className="space-y-2 mb-3">
-            {attachedFiles.map((file, index) => (
-              <div
-                key={file.path || `attached-file-${index}`}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-text-primary truncate">
-                    {file.name}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeFile(index)}
-                  className="w-6 h-6 rounded-full bg-error/10 hover:bg-error/20 text-error flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            {attachedFiles.map((file, index) => {
+              const isImage =
+                file.type.startsWith("image/") ||
+                /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(file.name || "");
+
+              const handleAttachFileClick = async () => {
+                if (!isImage) return;
+                const token = ++attachLoadTokenRef.current;
+                const imageFiles = attachedFiles
+                  .map<{ file: ChatInputAttachedFile; idx: number } | null>(
+                    (f, i) => {
+                      const img =
+                        f.type.startsWith("image/") ||
+                        /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(
+                          f.name || "",
+                        );
+                      return img ? { file: f, idx: i } : null;
+                    },
+                  )
+                  .filter((x): x is NonNullable<typeof x> => x !== null);
+                if (imageFiles.length === 0) return;
+
+                const startIdx = imageFiles.findIndex(
+                  (x) => x.idx === index,
+                );
+
+                const initialImages: ImageSource[] = imageFiles.map((f) => ({
+                  src: "",
+                  name: f.file.name,
+                  filePath: f.file.path || undefined,
+                }));
+                setAttachPreview({
+                  images: initialImages,
+                  startIndex: startIdx >= 0 ? startIdx : 0,
+                });
+
+                const loadedImages = await Promise.all(
+                  imageFiles.map(async (f) => {
+                    try {
+                      if (f.file.inlineDataBase64) {
+                        return {
+                          src: `data:${f.file.type};base64,${f.file.inlineDataBase64}`,
+                          name: f.file.name,
+                          filePath: f.file.path || undefined,
+                        };
+                      }
+                      if (f.file.path && window.electronAPI?.readFile) {
+                        const result = await window.electronAPI.readFile(
+                          f.file.path,
+                        );
+                        if (result) {
+                          const ext = f.file.name
+                            .split(".")
+                            .pop()
+                            ?.toLowerCase();
+                          const mime =
+                            f.file.type ||
+                            (ext && `image/${ext === "jpg" ? "jpeg" : ext}`) ||
+                            "image/png";
+                          return {
+                            src: `data:${mime};base64,${result}`,
+                            name: f.file.name,
+                            filePath: f.file.path || undefined,
+                          };
+                        }
+                      }
+                      return {
+                        src: "",
+                        name: f.file.name,
+                        filePath: f.file.path || undefined,
+                        error: true,
+                      };
+                    } catch {
+                      return {
+                        src: "",
+                        name: f.file.name,
+                        filePath: f.file.path || undefined,
+                        error: true,
+                      };
+                    }
+                  }),
+                );
+
+                // Discard results if a newer click started loading
+                if (token !== attachLoadTokenRef.current) return;
+                setAttachPreview({
+                  images: loadedImages,
+                  startIndex: startIdx >= 0 ? startIdx : 0,
+                });
+              };
+
+              return (
+                <div
+                  key={file.path || `attached-file-${index}`}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group ${isImage ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
+                  onClick={handleAttachFileClick}
                 >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-text-primary truncate">
+                      {isImage && (
+                        <ImageIcon className="w-3.5 h-3.5 inline mr-1.5 text-accent" />
+                      )}
+                      {file.name}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFile(index);
+                    }}
+                    className="w-6 h-6 rounded-full bg-error/10 hover:bg-error/20 text-error flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 
@@ -848,6 +985,25 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           </div>
         </div>
       </form>
+      <ImageLightbox
+        isOpen={previewIndex >= 0 && previewIndex < pastedImages.length}
+        images={pastedImages.map((img) => ({ src: img.url }))}
+        startIndex={previewIndex}
+        onClose={() => setPreviewIndex(-1)}
+      />
+      {attachPreview && (
+        <ImageLightbox
+          isOpen={true}
+          images={attachPreview.images}
+          startIndex={attachPreview.startIndex}
+          onClose={() => setAttachPreview(null)}
+          loading={
+            attachPreview.images.length > 0 &&
+            attachPreview.images.every((img) => !img.src)
+          }
+        />
+      )}
+      </>
     );
   },
 );
