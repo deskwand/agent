@@ -36,7 +36,7 @@ const SKILL_TYPE_ICONS: Record<string, string> = {
 };
 
 export const SLASH_MENU_CONTAINER_CLASS =
-  "absolute left-0 right-0 bottom-[calc(100%+6px)] z-30 rounded-xl border border-border bg-background shadow-soft flex h-52";
+  "absolute left-0 right-0 bottom-[calc(100%+6px)] z-30 rounded-xl border border-border bg-background shadow-soft flex flex-col h-52";
 
 export function SlashMenu({
   commands,
@@ -87,106 +87,63 @@ export function SlashMenu({
 
   return (
     <div className={SLASH_MENU_CONTAINER_CLASS}>
-      {/* Left sidebar */}
-      <div className="flex flex-col p-2 border-r border-border min-w-[84px] bg-surface-muted/50 rounded-l-xl select-none">
-        {/* Filter section */}
-        <span className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-          {t("chat.slashFilterLabel")}
-        </span>
-        <div className="flex flex-col gap-1">
-          {visibleTabs.map((tab) => {
-            const count =
-              tab.key === "all"
-                ? commandItems.length + skillItems.length
-                : tab.key === "commands"
-                  ? commandItems.length
-                  : skillItems.length;
-            const tabIcon =
-              tab.key === "all" ? (
-                <List className="w-3.5 h-3.5 flex-shrink-0" />
-              ) : tab.key === "commands" ? (
-                <Zap className="w-3.5 h-3.5 flex-shrink-0" />
-              ) : (
-                <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
-              );
-            const tabLabel =
-              tab.key === "all"
-                ? t("chat.slashAll")
-                : tab.key === "commands"
-                  ? t("chat.slashTabCommands")
-                  : t("chat.slashTabSkills");
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  onTabChange(tab.key);
-                }}
-                className={`flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition-colors ${
+      {/* Top tab bar */}
+      <div className="flex items-center gap-1 px-2 pt-2 pb-0 select-none shrink-0">
+        {visibleTabs.map((tab) => {
+          const count =
+            tab.key === "all"
+              ? commandItems.length + skillItems.length
+              : tab.key === "commands"
+                ? commandItems.length
+                : skillItems.length;
+          const tabIcon =
+            tab.key === "all" ? (
+              <List className="w-3.5 h-3.5 flex-shrink-0" />
+            ) : tab.key === "commands" ? (
+              <Zap className="w-3.5 h-3.5 flex-shrink-0" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
+            );
+          const tabLabel =
+            tab.key === "all"
+              ? t("chat.slashAll")
+              : tab.key === "commands"
+                ? t("chat.slashTabCommands")
+                : t("chat.slashTabSkills");
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onTabChange(tab.key);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === tab.key
+                  ? "bg-accent text-accent-foreground"
+                  : "text-text-muted hover:bg-surface-hover hover:text-text-primary"
+              }`}
+            >
+              {tabIcon}
+              <span className="truncate">{tabLabel}</span>
+              <span
+                className={`text-[10px] leading-none flex-shrink-0 ${
                   activeTab === tab.key
-                    ? "bg-accent text-accent-foreground"
-                    : "text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                    ? "text-accent/60"
+                    : "text-text-muted/50"
                 }`}
               >
-                <span className="flex items-center gap-1.5 truncate">
-                  {tabIcon}
-                  <span className="truncate">{tabLabel}</span>
-                </span>
-                <span
-                  className={`text-[10px] leading-none ml-1 flex-shrink-0 ${
-                    activeTab === tab.key
-                      ? "text-accent-foreground/70"
-                      : "text-text-muted/60"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Divider */}
-        <div className="mx-1 my-2 border-t border-border" />
-
-        {/* Shortcuts section */}
-        <span className="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-          {t("chat.slashShortcutLabel")}
-        </span>
-        <div className="flex flex-col gap-0.5 px-2 text-[10px] text-text-muted leading-relaxed">
-          <span className="flex items-center gap-1.5">
-            <kbd className="inline-flex items-center justify-center w-4 h-4 rounded bg-surface-hover text-[9px] font-mono text-text-muted">
-              ↑↓
-            </kbd>
-            {t("chat.slashShortcutNavigate")}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <kbd className="inline-flex items-center justify-center w-4 h-4 rounded bg-surface-hover text-[9px] font-mono text-text-muted">
-              ↵
-            </kbd>
-            {t("chat.slashShortcutSelect")}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <kbd className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded bg-surface-hover text-[9px] font-mono text-text-muted">
-              Tab
-            </kbd>
-            {t("chat.slashShortcutSwitch")}
-          </span>
-        </div>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Total count */}
-        <span className="text-center text-[9px] text-text-muted/60 leading-none pb-0.5">
-          {t("chat.slashTotalItems", {
-            count: commandItems.length + skillItems.length,
-          })}
-        </span>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Right content area */}
+      {/* Divider below tabs */}
+      <div className="mx-2 border-t border-border shrink-0" />
+
+      {/* Content area */}
       <div className="flex-1 overflow-y-auto p-1.5">
         {isEmpty ? (
           <div className="flex items-center justify-center h-16 text-sm text-text-muted">
