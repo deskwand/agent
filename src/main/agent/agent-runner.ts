@@ -2846,7 +2846,7 @@ Tool routing:\n
         visionModelConfig.model?.trim()
       ) {
         try {
-          visionTool = createVisionDescribeTool(visionModelConfig);
+          visionTool = createVisionDescribeTool(visionModelConfig, effectiveCwd);
           log("[AgentRunner] Vision model configured:", visionModelConfig.provider, visionModelConfig.model);
         } catch (err) {
           logWarn("[AgentRunner] Failed to create vision tool:", err);

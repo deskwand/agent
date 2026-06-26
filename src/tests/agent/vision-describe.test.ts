@@ -119,12 +119,13 @@ describe("vision_describe tool execute — error branches", () => {
     const { createVisionDescribeTool } = await import(
       "../../main/agent/tools/vision-describe"
     );
+    const workspaceDir = process.cwd();
     const tool = createVisionDescribeTool({
       enabled: true,
       provider: "openai" as const,
       apiKey: "sk-test",
       model: "gpt-4o",
-    });
+    }, workspaceDir);
     return tool.execute(
       "call-1",
       params,
@@ -198,12 +199,13 @@ describe("vision_describe tool execute — error branches", () => {
       const { createVisionDescribeTool } = await import(
         "../../main/agent/tools/vision-describe"
       );
+      const workspaceDir = process.cwd();
       const tool = createVisionDescribeTool({
         enabled: true,
         provider: "openai" as const,
         apiKey: "sk-test",
         model: "gpt-4o",
-      });
+      }, workspaceDir);
       const result = await tool.execute(
         "call-rel",
         { path: "test-relative-vision.png" },

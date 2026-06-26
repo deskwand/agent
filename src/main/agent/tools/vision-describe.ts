@@ -265,6 +265,7 @@ async function callVisionModel(
 
 export function createVisionDescribeTool(
   visionConfig: VisionModelConfig,
+  workspaceDir: string,
 ): ToolDefinition {
   // Workaround for SDK ToolDefinition type strictness — the SDK uses opaque
   // branded types that don't match the plain TypeBox schema types at type level.
@@ -292,10 +293,11 @@ export function createVisionDescribeTool(
     ) {
       const { path: filePath } = params as { path: string };
 
-      // Resolve path
+      // Resolve path relative to session workspace (pi-ai SDK does not
+      // chdir(), so process.cwd() is unreliable for custom tool execution)
       const resolved = path.isAbsolute(filePath)
         ? filePath
-        : path.resolve(process.cwd(), filePath);
+        : path.resolve(workspaceDir, filePath);
 
       // Check file exists
       if (!fs.existsSync(resolved)) {
