@@ -9,6 +9,15 @@ export type SharedProviderType =
 
 export type SharedCustomProtocolType = "anthropic" | "openai" | "gemini";
 
+export interface VisionModelConfig {
+  enabled: boolean;
+  provider: SharedProviderType;
+  customProtocol?: SharedCustomProtocolType;
+  apiKey: string;
+  baseUrl?: string;
+  model: string;
+}
+
 export interface SharedProviderPreset {
   name: string;
   baseUrl: string;

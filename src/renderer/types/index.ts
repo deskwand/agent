@@ -691,6 +691,14 @@ export type ProviderType =
   | "gemini"
   | "ollama";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
+export interface VisionModelConfig {
+  enabled: boolean;
+  provider: ProviderType;
+  customProtocol?: CustomProtocolType;
+  apiKey: string;
+  baseUrl?: string;
+  model: string;
+}
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
 export type ProviderProfileKey = string;
@@ -773,6 +781,7 @@ export interface AppConfig {
   thinkingLevel?: string;
   autoSkillLearning?: boolean;
   isConfigured: boolean;
+  visionModel?: VisionModelConfig;
 }
 
 export interface ProviderPreset {

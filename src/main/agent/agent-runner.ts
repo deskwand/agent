@@ -59,6 +59,8 @@ import { getDefaultShell } from "../utils/shell-resolver";
 import type { SkillsAdapter } from "../skills/skills-adapter";
 import { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { configStore } from "../config/config-store";
+import { createVisionDescribeTool } from "./tools/vision-describe";
+import type { VisionModelConfig } from "../../shared/api-model-presets";
 import {
   BrowserViewManager,
   BROWSER_CDP_PORT,
@@ -2831,10 +2833,30 @@ Tool routing:\n
       // 0.78.0 SDK: tools is string[] (tool name filter), customTools overrides built-in tools.
       // Extract the wrapped bash tool to inject our sudo/timeout interceptors
       const wrappedBashTool = wrappedTools.find((t) => t.name === "bash");
+
+      // Register vision_describe tool if a vision model is configured and enabled.
+      // Config is read once at session initialization to keep the tool list stable
+      // (tool list changes would invalidate the prompt cache).
+      const visionModelConfig: VisionModelConfig | undefined =
+        configStore.get("visionModel") as VisionModelConfig | undefined;
+      let visionTool: ToolDefinition | undefined;
+      if (
+        visionModelConfig?.enabled &&
+        visionModelConfig.model?.trim()
+      ) {
+        try {
+          visionTool = createVisionDescribeTool(visionModelConfig);
+          log("[AgentRunner] Vision model configured:", visionModelConfig.provider, visionModelConfig.model);
+        } catch (err) {
+          logWarn("[AgentRunner] Failed to create vision tool:", err);
+        }
+      }
+
       const allCustomTools = [
         ...customTools,
         ...this._customTools, // background review tools
         ...(wrappedBashTool ? [wrappedBashTool] : []),
+        ...(visionTool ? [visionTool] : []),
       ];
 
       // Diagnostic: log tools being passed to SDK (helps debug Ollama tool use)

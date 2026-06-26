@@ -3,7 +3,7 @@ import {
   API_PROVIDER_PRESETS,
   PI_AI_CURATED_PRESETS,
 } from "../../shared/api-model-presets";
-import type { SharedProviderPreset } from "../../shared/api-model-presets";
+import type { SharedProviderPreset, VisionModelConfig } from "../../shared/api-model-presets";
 import { VALID_THEME_PRESETS } from "../../shared/theme";
 import type { ThemePreset } from "../../shared/theme";
 import { logWarn } from "../utils/logger";
@@ -107,6 +107,7 @@ export interface AppConfig {
   thinkingLevel: string;
   autoSkillLearning: boolean;
   isConfigured: boolean;
+  visionModel?: VisionModelConfig;
 }
 
 // ── StoredConfig: what actually hits disk (no root projection dupes) ─
@@ -125,6 +126,7 @@ interface StoredConfig {
   thinkingLevel: string;
   autoSkillLearning: boolean;
   isConfigured: boolean;
+  visionModel?: VisionModelConfig;
 }
 
 export interface LegacyEnvBridgeSnapshot {
@@ -240,6 +242,7 @@ function defaultStoredConfig(): StoredConfig {
     thinkingLevel: "medium",
     autoSkillLearning: true,
     isConfigured: false,
+    visionModel: undefined,
   };
 }
 
@@ -726,6 +729,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     thinkingLevel: stored.thinkingLevel,
     autoSkillLearning: stored.autoSkillLearning,
     isConfigured: stored.isConfigured,
+    visionModel: stored.visionModel,
   };
 }
 
@@ -869,6 +873,8 @@ export class ConfigStore {
       stored.thinkingLevel = updates.thinkingLevel;
     if (updates.autoSkillLearning !== undefined)
       stored.autoSkillLearning = updates.autoSkillLearning;
+    if (updates.visionModel !== undefined)
+      stored.visionModel = updates.visionModel;
 
     stored.isConfigured =
       updates.isConfigured ??
