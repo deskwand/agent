@@ -487,11 +487,22 @@ export function ChatView() {
     const isProgrammatic = Date.now() < programmaticScrollUntilRef.current;
 
     if (isProgrammatic) {
+      // Programmatic scrolls always go to bottom. If we are NOT at bottom
+      // during a programmatic window, this scroll event MUST be from the user
+      // scrolling up — respect it instead of eating it.
       if (isAtBottom) {
-        autoFollowRef.current = true;
+        // Programmatic scroll to bottom: don't override user's autoFollowRef
+        // (could be false if user already scrolled away before this event).
+        setShowScrollToBottom(false);
+        return;
       }
-      setShowScrollToBottom(false);
-      return;
+      // Not at bottom during programmatic window. If a smooth programmatic
+      // scroll is in progress, intermediate frames are expected and don't
+      // indicate user intent to break auto-follow. Otherwise the user scrolled
+      // up — respect it by falling through.
+      if (isScrollingRef.current) {
+        return;
+      }
     }
 
     autoFollowRef.current = isAtBottom;
@@ -567,10 +578,13 @@ export function ChatView() {
     const isStreamingTick =
       partialLength !== prevPartialLengthRef.current && !hasNewMessage;
 
-    // Streaming tick: keep following unless the user explicitly scrolled away
+    // Streaming tick: keep following unless the user explicitly scrolled away.
+    // Mark as programmatic so the resulting scroll event does NOT reset
+    // autoFollowRef back to true (race with user's scroll-up event).
     if (isStreamingTick && autoFollowRef.current) {
       const container = scrollContainerRef.current;
       if (container) {
+        markProgrammaticScroll(100);
         container.scrollTop = container.scrollHeight;
       }
     }
@@ -865,8 +879,12 @@ export function ChatView() {
     autoFollowRef.current = true;
     isUserAtBottomRef.current = true;
     setShowScrollToBottom(false);
+    isScrollingRef.current = true;
     markProgrammaticScroll(400);
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 300);
   };
 
   if (!activeSession) {
