@@ -243,7 +243,8 @@ export function ChatView() {
       (!partialMessage || partialMessage.trim() === "");
     // ?? false: TS narrows hasAssistantOutput as boolean | null because
     // it cannot correlate hasActiveTurn with activeTurn's non-nullness.
-    const isResponding = (canStop && hasAssistantOutput) ?? false;
+    const isResponding =
+      (canStop && hasAssistantOutput && !!partialMessage?.trim()) ?? false;
     // isSending only matters before the turn starts; after that,
     // thinking/responding takes over.
     return resolveInputStatus({
