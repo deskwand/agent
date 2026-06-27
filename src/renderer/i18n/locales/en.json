@@ -1114,6 +1114,7 @@
     "summaryMatches": "{{count}} matches",
     "summaryChars": "{{count}} chars",
     "summaryModified": "Modified",
+    "summaryDiff": "+{{added}} -{{removed}}",
     "badgeImages": "+{{count}} img",
     "metaImages": "{{count}} images",
     "actionRead": "Read file",

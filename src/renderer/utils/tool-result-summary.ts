@@ -16,6 +16,7 @@ export type CollapsedToolSummary =
   | { kind: "matches"; count: number }
   | { kind: "chars"; count: number }
   | { kind: "modified" }
+  | { kind: "diff"; added: number; removed: number }
   | { kind: "exitLine"; text: string };
 
 function isFileReadTool(name: string): boolean {
@@ -100,6 +101,7 @@ export function getCollapsedToolSummary(
   content: unknown,
   isError = false,
   hasToolResult = true,
+  diff?: string,
 ): CollapsedToolSummary {
   const normalized = typeof content === "string" ? content.trim() : "";
 
@@ -145,8 +147,20 @@ export function getCollapsedToolSummary(
     return { kind: "exitLine", text: getLastNonEmptyLine(normalized) };
   }
 
-  // Write / Edit — just show modified
+  // Write / Edit — show diff line counts when available, otherwise "modified"
   if (isModifyTool(toolNameLower)) {
+    if (diff) {
+      let added = 0;
+      let removed = 0;
+      for (const line of diff.split("\n")) {
+        if (line.startsWith("+") && !line.startsWith("+++ ")) {
+          added++;
+        } else if (line.startsWith("-") && !line.startsWith("--- ")) {
+          removed++;
+        }
+      }
+      return { kind: "diff", added, removed };
+    }
     return { kind: "modified" };
   }
 
@@ -194,6 +208,12 @@ export function formatCollapsedToolSummary(
   }
   if (summary.kind === "modified") {
     return t("tool.summaryModified");
+  }
+  if (summary.kind === "diff") {
+    return t("tool.summaryDiff", {
+      added: summary.added,
+      removed: summary.removed,
+    });
   }
   if (summary.kind === "exitLine") {
     return summary.text;

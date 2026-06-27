@@ -7,7 +7,9 @@ import {
 describe("getCollapsedToolSummary", () => {
   // --- read / read_file ---
   it("shows first line for read tool", () => {
-    expect(getCollapsedToolSummary("read", "line1\nline2\nline3", false)).toEqual({
+    expect(
+      getCollapsedToolSummary("read", "line1\nline2\nline3", false),
+    ).toEqual({
       kind: "text",
       text: "line1",
     });
@@ -15,7 +17,11 @@ describe("getCollapsedToolSummary", () => {
 
   it("shows first line for read_file", () => {
     expect(
-      getCollapsedToolSummary("read_file", "import { useState }\n\nconst x = 1", false),
+      getCollapsedToolSummary(
+        "read_file",
+        "import { useState }\n\nconst x = 1",
+        false,
+      ),
     ).toEqual({ kind: "text", text: "import { useState }" });
   });
 
@@ -29,22 +35,33 @@ describe("getCollapsedToolSummary", () => {
 
   // --- bash / execute_command ---
   it("shows last non-empty line for bash", () => {
-    expect(getCollapsedToolSummary("bash", "building...\ncompiling...\nexit 0", false)).toEqual({
+    expect(
+      getCollapsedToolSummary(
+        "bash",
+        "building...\ncompiling...\nexit 0",
+        false,
+      ),
+    ).toEqual({
       kind: "exitLine",
       text: "exit 0",
     });
   });
 
   it("shows last line for execute_command", () => {
-    expect(
-      getCollapsedToolSummary("execute_command", "ok", false),
-    ).toEqual({ kind: "exitLine", text: "ok" });
+    expect(getCollapsedToolSummary("execute_command", "ok", false)).toEqual({
+      kind: "exitLine",
+      text: "ok",
+    });
   });
 
   // --- write / edit ---
   it("shows modified for write confirmation", () => {
     expect(
-      getCollapsedToolSummary("write", "Wrote contents to /path/to/file.ts", false),
+      getCollapsedToolSummary(
+        "write",
+        "Wrote contents to /path/to/file.ts",
+        false,
+      ),
     ).toEqual({ kind: "modified" });
   });
 
@@ -56,6 +73,89 @@ describe("getCollapsedToolSummary", () => {
         false,
       ),
     ).toEqual({ kind: "modified" });
+  });
+
+  // --- edit with diff ---
+  it("counts added and removed lines from unified diff for edit", () => {
+    const diff = [
+      "--- a/src/foo.ts",
+      "+++ b/src/foo.ts",
+      "@@ -1,5 +1,4 @@",
+      " unchanged",
+      "-removed line",
+      "+added line",
+      "+another added",
+      " unchanged",
+    ].join("\n");
+    expect(
+      getCollapsedToolSummary("edit", "file updated", false, true, diff),
+    ).toEqual({ kind: "diff", added: 2, removed: 1 });
+  });
+
+  it("counts diff for edit_file", () => {
+    const diff = [
+      "--- a/src/bar.ts",
+      "+++ b/src/bar.ts",
+      "@@ -1,3 +1,5 @@",
+      "-old1",
+      "-old2",
+      "+new1",
+      "+new2",
+      "+new3",
+    ].join("\n");
+    expect(
+      getCollapsedToolSummary("edit_file", "ok", false, true, diff),
+    ).toEqual({ kind: "diff", added: 3, removed: 2 });
+  });
+
+  it("falls back to modified when edit has no diff", () => {
+    expect(
+      getCollapsedToolSummary("edit", "file updated", false, true, undefined),
+    ).toEqual({ kind: "modified" });
+  });
+
+  it("returns diff with zero removed for add-only changes", () => {
+    const diff = [
+      "--- a/src/foo.ts",
+      "+++ b/src/foo.ts",
+      "@@ -3,0 +3,2 @@",
+      "+new1",
+      "+new2",
+    ].join("\n");
+    expect(getCollapsedToolSummary("edit", "ok", false, true, diff)).toEqual({
+      kind: "diff",
+      added: 2,
+      removed: 0,
+    });
+  });
+
+  it("returns diff with zero added for remove-only changes", () => {
+    const diff = [
+      "--- a/src/foo.ts",
+      "+++ b/src/foo.ts",
+      "@@ -3,2 +3,0 @@",
+      "-old1",
+      "-old2",
+    ].join("\n");
+    expect(getCollapsedToolSummary("edit", "ok", false, true, diff)).toEqual({
+      kind: "diff",
+      added: 0,
+      removed: 2,
+    });
+  });
+
+  it("ignores diff header lines (+++ and ---)", () => {
+    const diff = [
+      "--- a/src/foo.ts",
+      "+++ b/src/foo.ts",
+      "@@ -1,2 +1,3 @@",
+      "+newline",
+    ].join("\n");
+    expect(getCollapsedToolSummary("edit", "ok", false, true, diff)).toEqual({
+      kind: "diff",
+      added: 1,
+      removed: 0,
+    });
   });
 
   // --- grep / glob ---
@@ -73,9 +173,10 @@ describe("getCollapsedToolSummary", () => {
 
   // --- webfetch ---
   it("counts chars for webfetch", () => {
-    expect(
-      getCollapsedToolSummary("webfetch", "hello world", false),
-    ).toEqual({ kind: "chars", count: 11 });
+    expect(getCollapsedToolSummary("webfetch", "hello world", false)).toEqual({
+      kind: "chars",
+      count: 11,
+    });
   });
 
   // --- vision_describe ---
@@ -101,11 +202,7 @@ describe("getCollapsedToolSummary", () => {
 
   it("counts lines without prefix for vision_describe fallback", () => {
     expect(
-      getCollapsedToolSummary(
-        "vision_describe",
-        "Line one.\nLine two.",
-        false,
-      ),
+      getCollapsedToolSummary("vision_describe", "Line one.\nLine two.", false),
     ).toEqual({ kind: "lines", count: 2 });
   });
 
@@ -146,14 +243,25 @@ describe("getCollapsedToolSummary", () => {
 
   // --- edge cases ---
   it("returns none for empty or non-string content", () => {
-    expect(getCollapsedToolSummary("read", "", false)).toEqual({ kind: "none" });
-    expect(getCollapsedToolSummary("read", null, false)).toEqual({ kind: "none" });
-    expect(getCollapsedToolSummary("read", 42, false)).toEqual({ kind: "none" });
+    expect(getCollapsedToolSummary("read", "", false)).toEqual({
+      kind: "none",
+    });
+    expect(getCollapsedToolSummary("read", null, false)).toEqual({
+      kind: "none",
+    });
+    expect(getCollapsedToolSummary("read", 42, false)).toEqual({
+      kind: "none",
+    });
   });
 
   it("returns none when the tool result is missing", () => {
     expect(
-      getCollapsedToolSummary("internal_browser_screenshot", undefined, false, false),
+      getCollapsedToolSummary(
+        "internal_browser_screenshot",
+        undefined,
+        false,
+        false,
+      ),
     ).toEqual({ kind: "none" });
   });
 
@@ -187,13 +295,17 @@ describe("getCollapsedToolSummary", () => {
 });
 
 describe("formatCollapsedToolSummary", () => {
-  const t = (key: string, options?: { count?: number }) => {
+  const t = (
+    key: string,
+    options?: { count?: number; added?: number; removed?: number },
+  ) => {
     const map: Record<string, string> = {
       "tool.summaryLines": `${options?.count} lines`,
       "tool.summaryScreenshot": "Screenshot",
       "tool.summaryMatches": `${options?.count} matches`,
       "tool.summaryChars": `${options?.count} chars`,
       "tool.summaryModified": "Modified",
+      "tool.summaryDiff": `+${options?.added} -${options?.removed}`,
     };
     return map[key] || key;
   };
@@ -220,9 +332,18 @@ describe("formatCollapsedToolSummary", () => {
   });
 
   it("formats modified summaries through i18n", () => {
+    expect(formatCollapsedToolSummary({ kind: "modified" }, t as never)).toBe(
+      "Modified",
+    );
+  });
+
+  it("formats diff summaries through i18n", () => {
     expect(
-      formatCollapsedToolSummary({ kind: "modified" }, t as never),
-    ).toBe("Modified");
+      formatCollapsedToolSummary(
+        { kind: "diff", added: 3, removed: 1 },
+        t as never,
+      ),
+    ).toBe("+3 -1");
   });
 
   it("formats exitLine summaries directly", () => {

@@ -64,7 +64,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const partialToolResult = useAppStore((s) =>
     message?.sessionId
       ? (s.sessionStates[message.sessionId]?.partialToolResults?.[block.id] ??
-          null)
+        null)
       : null,
   );
   const [expanded, setExpanded] = useState(false);
@@ -153,6 +153,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
     toolResult?.content,
     isError,
     Boolean(toolResult),
+    toolResult?.diff,
   );
   const collapsedSummaryText = formatCollapsedToolSummary(collapsedSummary, t);
 
@@ -254,7 +255,13 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           <span className="min-w-0 max-w-full truncate text-xs font-mono text-text-secondary">
             {label}
           </span>
-          {!isRunning && collapsedSummaryText && (
+          {!isRunning && collapsedSummary.kind === "diff" && (
+            <span className="whitespace-nowrap text-xs text-text-muted inline-flex items-center gap-1">
+              · <span className="diff-add rounded-sm px-0.5">+{collapsedSummary.added}</span>
+              <span className="diff-del rounded-sm px-0.5">-{collapsedSummary.removed}</span>
+            </span>
+          )}
+          {!isRunning && collapsedSummary.kind !== "diff" && collapsedSummaryText && (
             <span
               className={`whitespace-nowrap text-xs ${
                 isError ? "text-error" : "text-text-muted"
