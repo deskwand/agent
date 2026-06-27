@@ -569,6 +569,7 @@ export class AgentRunner {
   } | null = null;
   private _skillsSetupDone = false;
   private _skillsSetupInProgress = false;
+  private _currentWorkspace: string | null = null;
 
   /**
    * Clear SDK session cache for a session
@@ -1116,8 +1117,29 @@ ${hints.join("\n")}
         return withPage("internal_browser_screenshot", async (page) => {
           const buf = (await page.screenshot({ fullPage: fullPage ?? false, type: "png" })) as Buffer;
           const base64 = buf.toString("base64");
+          // Save to disk so vision_describe can read it in the same turn
+          const filename = `browser_screenshot_${Date.now()}.png`;
+          const visionDir = path.join(self._currentWorkspace!, ".deskwand", "vision_images");
+          fs.mkdirSync(visionDir, { recursive: true });
+          fs.writeFileSync(path.join(visionDir, filename), buf);
+          // Prune old browser screenshots, keep last 20
+          try {
+            const existing = fs.readdirSync(visionDir)
+              .filter((f) => f.startsWith("browser_screenshot_") && f.endsWith(".png"))
+              .map((f) => ({
+                name: f,
+                mtime: fs.statSync(path.join(visionDir, f)).mtimeMs,
+              }))
+              .sort((a, b) => b.mtime - a.mtime);
+            for (const f of existing.slice(20)) {
+              fs.unlinkSync(path.join(visionDir, f.name));
+            }
+          } catch {
+            // Non-critical, ignore cleanup errors
+          }
+          const relPath = `.deskwand/vision_images/${filename}`;
           return {
-            content: [{ type: "text" as const, text: `Screenshot captured (${(buf.length / 1024).toFixed(1)} KB)` }],
+            content: [{ type: "text" as const, text: `Screenshot saved (${(buf.length / 1024).toFixed(1)} KB). Use vision_describe(path="${relPath}") to examine it.` }],
             details: { openCoworkImages: [{ data: base64, mimeType: "image/png" }] },
           };
         });
@@ -2254,6 +2276,7 @@ ${hints.join("\n")}
         useSandboxIsolation && sandboxPath
           ? sandboxPath
           : workingDir || app.getPath("userData");
+      this._currentWorkspace = effectiveCwd;
 
       // Use app-specific DeskWand config directory to avoid conflicts with user settings
       // SDK uses DeskWand_CONFIG_DIR to locate skills
