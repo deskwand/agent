@@ -254,6 +254,7 @@ export function WelcomeView() {
           disabled={isSubmitting}
           isExpanded={isInputExpanded}
           onToggleExpand={() => setIsInputExpanded((v) => !v)}
+          slashMenuDirection="down"
           placeholder={t("welcome.placeholder")}
           cardClassName="rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4"
           textareaClassName="w-full resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-sm leading-relaxed overflow-hidden"
@@ -265,8 +266,10 @@ export function WelcomeView() {
               activeProviderProfileKey={selectedProviderProfileKey}
               onSelectModel={(profileKey, modelId) => {
                 // Validate modelId exists in modelOptions before applying
-                const group = modelOptions.find(g => g.profileKey === profileKey);
-                if (!group?.items.some(i => i.id === modelId)) return;
+                const group = modelOptions.find(
+                  (g) => g.profileKey === profileKey,
+                );
+                if (!group?.items.some((i) => i.id === modelId)) return;
                 setSelectedModel(modelId);
                 setSelectedProviderProfileKey(profileKey);
                 // ponytail: project → localStorage only, global → electron-store
@@ -274,7 +277,11 @@ export function WelcomeView() {
                   try {
                     localStorage.setItem(
                       "deskwand.pm." + encodeURIComponent(workingDir),
-                      JSON.stringify({ p: profileKey, m: modelId, t: selectedThinkingLevel }),
+                      JSON.stringify({
+                        p: profileKey,
+                        m: modelId,
+                        t: selectedThinkingLevel,
+                      }),
                     );
                   } catch {
                     /* ignore */
@@ -295,7 +302,11 @@ export function WelcomeView() {
                   try {
                     localStorage.setItem(
                       "deskwand.pm." + encodeURIComponent(workingDir),
-                      JSON.stringify({ p: selectedProviderProfileKey, m: selectedModel, t: level }),
+                      JSON.stringify({
+                        p: selectedProviderProfileKey,
+                        m: selectedModel,
+                        t: level,
+                      }),
                     );
                   } catch {
                     /* ignore */

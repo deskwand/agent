@@ -55,6 +55,7 @@ interface ChatInputProps {
   bottomSlot: React.ReactNode;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  slashMenuDirection?: "up" | "down";
 }
 
 /** Base Tailwind classes for slash command menu items. */
@@ -75,6 +76,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       bottomSlot,
       isExpanded = false,
       onToggleExpand,
+      slashMenuDirection,
     },
     ref,
   ) {
@@ -109,7 +111,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const stored = localStorage.getItem("slashActiveTab");
         if (stored === "all" || stored === "commands" || stored === "skills")
           return stored;
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
       return "all";
     });
     const [recencyVersion, setRecencyVersion] = useState(0);
@@ -447,7 +451,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       setSlashSelectedIndex(0);
       try {
         localStorage.setItem("slashActiveTab", tab);
-      } catch { /* noop */ }
+      } catch {
+        /* noop */
+      }
     }, []);
 
     // Resolve SlashItem by tab + index for keyboard Enter selection
@@ -658,7 +664,16 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         images: pastedImages,
         files: attachedFiles,
       });
-    }, [prompt, pastedImages, attachedFiles, disabled, onSubmit, onCompact, isExpanded, onToggleExpand]);
+    }, [
+      prompt,
+      pastedImages,
+      attachedFiles,
+      disabled,
+      onSubmit,
+      onCompact,
+      isExpanded,
+      onToggleExpand,
+    ]);
 
     const handleFormSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -668,359 +683,363 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     return (
       <>
         <form
-        onSubmit={handleFormSubmit}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className="relative w-full"
-      >
-        {/* Image previews */}
-        {pastedImages.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-3">
-            {pastedImages.map((img, index) => (
-              <div
-                key={img.url || `pasted-image-${index}`}
-                className="relative group"
-              >
-                <img
-                  src={img.url}
-                  alt={t("common.pastedImageAlt", { index: index + 1 })}
-                  className="w-full aspect-square object-cover rounded-lg border border-border block cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setPreviewIndex(index)}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeImage(index)}
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-error text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+          onSubmit={handleFormSubmit}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className="relative w-full"
+        >
+          {/* Image previews */}
+          {pastedImages.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-3">
+              {pastedImages.map((img, index) => (
+                <div
+                  key={img.url || `pasted-image-${index}`}
+                  className="relative group"
                 >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+                  <img
+                    src={img.url}
+                    alt={t("common.pastedImageAlt", { index: index + 1 })}
+                    className="w-full aspect-square object-cover rounded-lg border border-border block cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setPreviewIndex(index)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(index)}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-error text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {/* File attachments */}
-        {attachedFiles.length > 0 && (
-          <div className="space-y-2 mb-3">
-            {attachedFiles.map((file, index) => {
-              const isImage =
-                file.type.startsWith("image/") ||
-                /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(file.name || "");
+          {/* File attachments */}
+          {attachedFiles.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {attachedFiles.map((file, index) => {
+                const isImage =
+                  file.type.startsWith("image/") ||
+                  /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(file.name || "");
 
-              const handleAttachFileClick = async () => {
-                if (!isImage) return;
-                const token = ++attachLoadTokenRef.current;
-                const imageFiles = attachedFiles
-                  .map<{ file: ChatInputAttachedFile; idx: number } | null>(
-                    (f, i) => {
-                      const img =
-                        f.type.startsWith("image/") ||
-                        /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(
-                          f.name || "",
-                        );
-                      return img ? { file: f, idx: i } : null;
-                    },
-                  )
-                  .filter((x): x is NonNullable<typeof x> => x !== null);
-                if (imageFiles.length === 0) return;
+                const handleAttachFileClick = async () => {
+                  if (!isImage) return;
+                  const token = ++attachLoadTokenRef.current;
+                  const imageFiles = attachedFiles
+                    .map<{ file: ChatInputAttachedFile; idx: number } | null>(
+                      (f, i) => {
+                        const img =
+                          f.type.startsWith("image/") ||
+                          /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(
+                            f.name || "",
+                          );
+                        return img ? { file: f, idx: i } : null;
+                      },
+                    )
+                    .filter((x): x is NonNullable<typeof x> => x !== null);
+                  if (imageFiles.length === 0) return;
 
-                const startIdx = imageFiles.findIndex(
-                  (x) => x.idx === index,
-                );
+                  const startIdx = imageFiles.findIndex((x) => x.idx === index);
 
-                const initialImages: ImageSource[] = imageFiles.map((f) => ({
-                  src: "",
-                  name: f.file.name,
-                  filePath: f.file.path || undefined,
-                }));
-                setAttachPreview({
-                  images: initialImages,
-                  startIndex: startIdx >= 0 ? startIdx : 0,
-                });
+                  const initialImages: ImageSource[] = imageFiles.map((f) => ({
+                    src: "",
+                    name: f.file.name,
+                    filePath: f.file.path || undefined,
+                  }));
+                  setAttachPreview({
+                    images: initialImages,
+                    startIndex: startIdx >= 0 ? startIdx : 0,
+                  });
 
-                const loadedImages = await Promise.all(
-                  imageFiles.map(async (f) => {
-                    try {
-                      if (f.file.inlineDataBase64) {
-                        return {
-                          src: `data:${f.file.type};base64,${f.file.inlineDataBase64}`,
-                          name: f.file.name,
-                          filePath: f.file.path || undefined,
-                        };
-                      }
-                      if (f.file.path && window.electronAPI?.readFile) {
-                        const result = await window.electronAPI.readFile(
-                          f.file.path,
-                        );
-                        if (result) {
-                          const ext = f.file.name
-                            .split(".")
-                            .pop()
-                            ?.toLowerCase();
-                          const mime =
-                            f.file.type ||
-                            (ext && `image/${ext === "jpg" ? "jpeg" : ext}`) ||
-                            "image/png";
+                  const loadedImages = await Promise.all(
+                    imageFiles.map(async (f) => {
+                      try {
+                        if (f.file.inlineDataBase64) {
                           return {
-                            src: `data:${mime};base64,${result}`,
+                            src: `data:${f.file.type};base64,${f.file.inlineDataBase64}`,
                             name: f.file.name,
                             filePath: f.file.path || undefined,
                           };
                         }
+                        if (f.file.path && window.electronAPI?.readFile) {
+                          const result = await window.electronAPI.readFile(
+                            f.file.path,
+                          );
+                          if (result) {
+                            const ext = f.file.name
+                              .split(".")
+                              .pop()
+                              ?.toLowerCase();
+                            const mime =
+                              f.file.type ||
+                              (ext &&
+                                `image/${ext === "jpg" ? "jpeg" : ext}`) ||
+                              "image/png";
+                            return {
+                              src: `data:${mime};base64,${result}`,
+                              name: f.file.name,
+                              filePath: f.file.path || undefined,
+                            };
+                          }
+                        }
+                        return {
+                          src: "",
+                          name: f.file.name,
+                          filePath: f.file.path || undefined,
+                          error: true,
+                        };
+                      } catch {
+                        return {
+                          src: "",
+                          name: f.file.name,
+                          filePath: f.file.path || undefined,
+                          error: true,
+                        };
                       }
-                      return {
-                        src: "",
-                        name: f.file.name,
-                        filePath: f.file.path || undefined,
-                        error: true,
-                      };
-                    } catch {
-                      return {
-                        src: "",
-                        name: f.file.name,
-                        filePath: f.file.path || undefined,
-                        error: true,
-                      };
-                    }
-                  }),
-                );
+                    }),
+                  );
 
-                // Discard results if a newer click started loading
-                if (token !== attachLoadTokenRef.current) return;
-                setAttachPreview({
-                  images: loadedImages,
-                  startIndex: startIdx >= 0 ? startIdx : 0,
-                });
-              };
+                  // Discard results if a newer click started loading
+                  if (token !== attachLoadTokenRef.current) return;
+                  setAttachPreview({
+                    images: loadedImages,
+                    startIndex: startIdx >= 0 ? startIdx : 0,
+                  });
+                };
 
-              return (
-                <div
-                  key={file.path || `attached-file-${index}`}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group ${isImage ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
-                  onClick={handleAttachFileClick}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-text-primary truncate">
-                      {isImage && (
-                        <ImageIcon className="w-3.5 h-3.5 inline mr-1.5 text-accent" />
-                      )}
-                      {file.name}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFile(index);
-                    }}
-                    className="w-6 h-6 rounded-full bg-error/10 hover:bg-error/20 text-error flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                return (
+                  <div
+                    key={file.path || `attached-file-${index}`}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group ${isImage ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
+                    onClick={handleAttachFileClick}
                   >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Input card wrapper — keeps slash menu outside card div so space-y-* doesn't add margin to textarea */}
-        <div className="relative">
-          {/* Slash command menu */}
-          {showSlashMenu && (
-            <div ref={slashMenuRef}>
-              <SlashMenu
-                commands={filteredCommands}
-                skills={filteredSlashSkills}
-                activeTab={slashActiveTab}
-                selectedIndex={slashSelectedIndex}
-                onSelect={selectSlashItem}
-                onTabChange={handleTabChange}
-              />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-text-primary truncate">
+                        {isImage && (
+                          <ImageIcon className="w-3.5 h-3.5 inline mr-1.5 text-accent" />
+                        )}
+                        {file.name}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeFile(index);
+                      }}
+                      className="w-6 h-6 rounded-full bg-error/10 hover:bg-error/20 text-error flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
-          {/* Input card */}
-          <div
-            className={`transition-colors ${isDragging ? "ring-2 ring-accent bg-accent/5" : ""} ${cardClassName}`}
-          >
-            <textarea
-              ref={textareaRef}
-              value={prompt}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                onInputChange?.(newValue.trim().length > 0);
-                const textarea = textareaRef.current;
-                const isComposing = isComposingRef.current;
 
-                // Slash menu trigger: onKeyDown sets slashTriggerRef when '/' is pressed
-                if (slashTriggerRef.current) {
-                  slashTriggerRef.current = false;
-                  if (textarea) {
-                    const cursorPos = textarea.selectionStart;
-                    const charBefore =
-                      cursorPos > 1 ? newValue[cursorPos - 2] : "";
-                    // Trigger only at start of input or after space, and not after another /
-                    if (
-                      (cursorPos <= 1 ||
-                        charBefore === " " ||
-                        charBefore === "\n") &&
-                      charBefore !== "/"
-                    ) {
-                      setSlashStartIndex(cursorPos - 1);
-                      setSlashFilter("");
-                      setSlashSelectedIndex(0);
-                      setShowSlashMenu(true);
+          {/* Input card wrapper — keeps slash menu outside card div so space-y-* doesn't add margin to textarea */}
+          <div className="relative">
+            {/* Slash command menu */}
+            {showSlashMenu && (
+              <div ref={slashMenuRef}>
+                <SlashMenu
+                  commands={filteredCommands}
+                  skills={filteredSlashSkills}
+                  activeTab={slashActiveTab}
+                  selectedIndex={slashSelectedIndex}
+                  onSelect={selectSlashItem}
+                  onTabChange={handleTabChange}
+                  direction={slashMenuDirection}
+                />
+              </div>
+            )}
+            {/* Input card */}
+            <div
+              className={`transition-colors ${isDragging ? "ring-2 ring-accent bg-accent/5" : ""} ${cardClassName}`}
+            >
+              <textarea
+                ref={textareaRef}
+                value={prompt}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  onInputChange?.(newValue.trim().length > 0);
+                  const textarea = textareaRef.current;
+                  const isComposing = isComposingRef.current;
+
+                  // Slash menu trigger: onKeyDown sets slashTriggerRef when '/' is pressed
+                  if (slashTriggerRef.current) {
+                    slashTriggerRef.current = false;
+                    if (textarea) {
+                      const cursorPos = textarea.selectionStart;
+                      const charBefore =
+                        cursorPos > 1 ? newValue[cursorPos - 2] : "";
+                      // Trigger only at start of input or after space, and not after another /
+                      if (
+                        (cursorPos <= 1 ||
+                          charBefore === " " ||
+                          charBefore === "\n") &&
+                        charBefore !== "/"
+                      ) {
+                        setSlashStartIndex(cursorPos - 1);
+                        setSlashFilter("");
+                        setSlashSelectedIndex(0);
+                        setShowSlashMenu(true);
+                      }
                     }
                   }
-                }
 
-                // Filter while slash menu is open.
-                // During IME composition, selectionStart is locked to the
-                // composition-range start; use selectionEnd to include the
-                // composed (pinyin) text so filtering works in real time.
-                if (showSlashMenu && textarea) {
-                  const endPos = isComposing
-                    ? textarea.selectionEnd
-                    : textarea.selectionStart;
-                  const query = newValue.slice(slashStartIndex + 1, endPos);
+                  // Filter while slash menu is open.
+                  // During IME composition, selectionStart is locked to the
+                  // composition-range start; use selectionEnd to include the
+                  // composed (pinyin) text so filtering works in real time.
+                  if (showSlashMenu && textarea) {
+                    const endPos = isComposing
+                      ? textarea.selectionEnd
+                      : textarea.selectionStart;
+                    const query = newValue.slice(slashStartIndex + 1, endPos);
+                    if (
+                      !isComposing &&
+                      (query.includes(" ") || query.includes("\n"))
+                    ) {
+                      closeSlashMenu();
+                    } else {
+                      setSlashFilter(query);
+                      setSlashSelectedIndex(0);
+                    }
+                  }
+
+                  // Detect if / was deleted → close menu.
+                  // Skip this check during composition — selectionStart is
+                  // locked to the composition start and may falsely trigger.
+                  if (showSlashMenu && textarea && !isComposing) {
+                    if (textarea.selectionStart <= slashStartIndex) {
+                      closeSlashMenu();
+                    }
+                  }
+
+                  setPrompt(newValue);
+                }}
+                onPaste={handlePaste}
+                placeholder={placeholder}
+                disabled={disabled}
+                rows={1}
+                className={textareaClassName}
+                onCompositionStart={() => {
+                  isComposingRef.current = true;
+                }}
+                onCompositionEnd={() => {
+                  isComposingRef.current = false;
+                  // onChange fires after compositionend with correct
+                  // selectionStart, so no explicit re-filter needed here.
+                }}
+                onKeyDown={(e) => {
+                  // Detect '/' key for slash menu trigger (before any state check)
                   if (
-                    !isComposing &&
-                    (query.includes(" ") || query.includes("\n"))
+                    e.key === "/" &&
+                    !isComposingRef.current &&
+                    !e.ctrlKey &&
+                    !e.metaKey &&
+                    !e.altKey
                   ) {
-                    closeSlashMenu();
-                  } else {
-                    setSlashFilter(query);
-                    setSlashSelectedIndex(0);
+                    slashTriggerRef.current = true;
                   }
-                }
 
-                // Detect if / was deleted → close menu.
-                // Skip this check during composition — selectionStart is
-                // locked to the composition start and may falsely trigger.
-                if (showSlashMenu && textarea && !isComposing) {
-                  if (textarea.selectionStart <= slashStartIndex) {
-                    closeSlashMenu();
+                  // Slash menu keyboard nav
+                  if (showSlashMenu) {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setSlashSelectedIndex((prev) =>
+                        Math.min(prev + 1, Math.max(0, visibleItemCount - 1)),
+                      );
+                      return;
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setSlashSelectedIndex((prev) => Math.max(prev - 1, 0));
+                      return;
+                    }
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      const item = getSlashItemByIndex(
+                        slashActiveTab,
+                        slashSelectedIndex,
+                        filteredCommands,
+                        filteredSkillsFlat,
+                      );
+                      if (item) selectSlashItem(item);
+                      return;
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      closeSlashMenu();
+                      return;
+                    }
+                    // Tab key: cycle through tabs
+                    if (e.key === "Tab") {
+                      e.preventDefault();
+                      const currentIdx = SLASH_TABS.indexOf(slashActiveTab);
+                      const nextIdx = (currentIdx + 1) % SLASH_TABS.length;
+                      handleTabChange(SLASH_TABS[nextIdx]);
+                      return;
+                    }
+                    // Cmd/Ctrl+1/2/3: switch to specific tab
+                    if (
+                      (e.metaKey || e.ctrlKey) &&
+                      e.key >= "1" &&
+                      e.key <= "3"
+                    ) {
+                      e.preventDefault();
+                      const index = Number(e.key) - 1;
+                      if (SLASH_TABS[index]) handleTabChange(SLASH_TABS[index]);
+                      return;
+                    }
                   }
-                }
 
-                setPrompt(newValue);
-              }}
-              onPaste={handlePaste}
-              placeholder={placeholder}
-              disabled={disabled}
-              rows={1}
-              className={textareaClassName}
-              onCompositionStart={() => {
-                isComposingRef.current = true;
-              }}
-              onCompositionEnd={() => {
-                isComposingRef.current = false;
-                // onChange fires after compositionend with correct
-                // selectionStart, so no explicit re-filter needed here.
-              }}
-              onKeyDown={(e) => {
-                // Detect '/' key for slash menu trigger (before any state check)
-                if (
-                  e.key === "/" &&
-                  !isComposingRef.current &&
-                  !e.ctrlKey &&
-                  !e.metaKey &&
-                  !e.altKey
-                ) {
-                  slashTriggerRef.current = true;
-                }
-
-                // Slash menu keyboard nav
-                if (showSlashMenu) {
-                  if (e.key === "ArrowDown") {
+                  // Esc collapses expanded input (outside slash menu)
+                  if (e.key === "Escape" && isExpanded) {
                     e.preventDefault();
-                    setSlashSelectedIndex((prev) =>
-                      Math.min(prev + 1, Math.max(0, visibleItemCount - 1)),
-                    );
+                    onToggleExpand?.();
                     return;
                   }
-                  if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setSlashSelectedIndex((prev) => Math.max(prev - 1, 0));
-                    return;
-                  }
+
                   if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    const item = getSlashItemByIndex(
-                      slashActiveTab,
-                      slashSelectedIndex,
-                      filteredCommands,
-                      filteredSkillsFlat,
-                    );
-                    if (item) selectSlashItem(item);
-                    return;
-                  }
-                  if (e.key === "Escape") {
-                    e.preventDefault();
-                    closeSlashMenu();
-                    return;
-                  }
-                  // Tab key: cycle through tabs
-                  if (e.key === "Tab") {
-                    e.preventDefault();
-                    const currentIdx = SLASH_TABS.indexOf(slashActiveTab);
-                    const nextIdx = (currentIdx + 1) % SLASH_TABS.length;
-                    handleTabChange(SLASH_TABS[nextIdx]);
-                    return;
-                  }
-                  // Cmd/Ctrl+1/2/3: switch to specific tab
-                  if ((e.metaKey || e.ctrlKey) && e.key >= "1" && e.key <= "3") {
-                    e.preventDefault();
-                    const index = Number(e.key) - 1;
-                    if (SLASH_TABS[index]) handleTabChange(SLASH_TABS[index]);
-                    return;
-                  }
-                }
-
-                // Esc collapses expanded input (outside slash menu)
-                if (e.key === "Escape" && isExpanded) {
-                  e.preventDefault();
-                  onToggleExpand?.();
-                  return;
-                }
-
-                if (e.key === "Enter" && !e.shiftKey) {
-                  // Block Enter during IME composition (e.g. pinyin → Chinese).
-                  if (isComposingRef.current || e.keyCode === 229) return;
-                  // Expanded mode: Enter = newline, only submit on Cmd/Ctrl+Enter
-                  if (isExpanded) {
-                    if (!e.metaKey && !e.ctrlKey) return;
+                    // Block Enter during IME composition (e.g. pinyin → Chinese).
+                    if (isComposingRef.current || e.keyCode === 229) return;
+                    // Expanded mode: Enter = newline, only submit on Cmd/Ctrl+Enter
+                    if (isExpanded) {
+                      if (!e.metaKey && !e.ctrlKey) return;
+                      e.preventDefault();
+                      handleSubmitInternal();
+                      return;
+                    }
                     e.preventDefault();
                     handleSubmitInternal();
-                    return;
                   }
-                  e.preventDefault();
-                  handleSubmitInternal();
-                }
-              }}
-            />
-            {bottomSlot}
+                }}
+              />
+              {bottomSlot}
+            </div>
           </div>
-        </div>
-      </form>
-      <ImageLightbox
-        isOpen={previewIndex >= 0 && previewIndex < pastedImages.length}
-        images={pastedImages.map((img) => ({ src: img.url }))}
-        startIndex={previewIndex}
-        onClose={() => setPreviewIndex(-1)}
-      />
-      {attachPreview && (
+        </form>
         <ImageLightbox
-          isOpen={true}
-          images={attachPreview.images}
-          startIndex={attachPreview.startIndex}
-          onClose={() => setAttachPreview(null)}
-          loading={
-            attachPreview.images.length > 0 &&
-            attachPreview.images.every((img) => !img.src)
-          }
+          isOpen={previewIndex >= 0 && previewIndex < pastedImages.length}
+          images={pastedImages.map((img) => ({ src: img.url }))}
+          startIndex={previewIndex}
+          onClose={() => setPreviewIndex(-1)}
         />
-      )}
+        {attachPreview && (
+          <ImageLightbox
+            isOpen={true}
+            images={attachPreview.images}
+            startIndex={attachPreview.startIndex}
+            onClose={() => setAttachPreview(null)}
+            loading={
+              attachPreview.images.length > 0 &&
+              attachPreview.images.every((img) => !img.src)
+            }
+          />
+        )}
       </>
     );
   },
@@ -1074,6 +1093,8 @@ function sortByRecency<T>(
       withoutRecency.push(item);
     }
   }
-  withRecency.sort((a, b) => (recency[getKey(b)] ?? 0) - (recency[getKey(a)] ?? 0));
+  withRecency.sort(
+    (a, b) => (recency[getKey(b)] ?? 0) - (recency[getKey(a)] ?? 0),
+  );
   return withRecency.concat(withoutRecency);
 }

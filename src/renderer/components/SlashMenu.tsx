@@ -13,6 +13,7 @@ interface SlashMenuProps {
   selectedIndex: number;
   onSelect: (item: SlashItem) => void;
   onTabChange: (tab: SlashTab) => void;
+  direction?: "up" | "down";
 }
 
 const TAB_LIST: { key: SlashTab; i18n: string }[] = [
@@ -36,7 +37,7 @@ const SKILL_TYPE_ICONS: Record<string, string> = {
 };
 
 export const SLASH_MENU_CONTAINER_CLASS =
-  "absolute left-0 right-0 bottom-[calc(100%+6px)] z-30 rounded-xl border border-border bg-background shadow-soft flex flex-col h-52";
+  "absolute left-0 right-0 z-30 rounded-xl border border-border bg-background shadow-soft flex flex-col h-[28rem] max-h-[60vh]";
 
 export function SlashMenu({
   commands,
@@ -45,6 +46,7 @@ export function SlashMenu({
   selectedIndex,
   onSelect,
   onTabChange,
+  direction = "up",
 }: SlashMenuProps) {
   const { t } = useTranslation();
 
@@ -86,7 +88,13 @@ export function SlashMenu({
   }, [activeTab, hasCommands, hasSkills, onTabChange]);
 
   return (
-    <div className={SLASH_MENU_CONTAINER_CLASS}>
+    <div
+      className={`${SLASH_MENU_CONTAINER_CLASS} ${
+        direction === "down"
+          ? "top-[calc(100%+6px)]"
+          : "bottom-[calc(100%+6px)]"
+      }`}
+    >
       {/* Top tab bar */}
       <div className="flex items-center gap-1 px-2 pt-2 pb-0 select-none shrink-0">
         {visibleTabs.map((tab) => {
@@ -160,21 +168,23 @@ export function SlashMenu({
                 {commandItems.map((item, idx) => {
                   if (item.category !== "command") return null;
                   return (
-                  <MenuItem
-                    key={`cmd:${item.command.name}`}
-                    index={idx}
-                    selectedIndex={selectedIndex}
-                    onSelect={() => onSelect(item)}
-                    label={`/${item.command.name}`}
-                    description={item.command.description}
-                    icon={<Zap className="w-4 h-4 text-accent flex-shrink-0" />}
-                    badge={
-                      <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-                        {t("chat.slashTabCommands")}
-                      </span>
-                    }
-                  />
-                );
+                    <MenuItem
+                      key={`cmd:${item.command.name}`}
+                      index={idx}
+                      selectedIndex={selectedIndex}
+                      onSelect={() => onSelect(item)}
+                      label={`/${item.command.name}`}
+                      description={item.command.description}
+                      icon={
+                        <Zap className="w-4 h-4 text-accent flex-shrink-0" />
+                      }
+                      badge={
+                        <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                          {t("chat.slashTabCommands")}
+                        </span>
+                      }
+                    />
+                  );
                 })}
               </div>
             )}
@@ -188,9 +198,7 @@ export function SlashMenu({
                 </div>
                 {skillItems.map((item, idx) => {
                   if (item.category !== "skill") return null;
-                  const skill = skills.find(
-                    (s) => s.name === item.skill.name,
-                  );
+                  const skill = skills.find((s) => s.name === item.skill.name);
                   const type = skill?.type ?? "builtin";
                   return (
                     <MenuItem
@@ -228,15 +236,11 @@ export function SlashMenu({
                   onSelect={() => onSelect(item)}
                   label={`/${item.command.name}`}
                   description={item.command.description}
-                  icon={
-                    <Zap className="w-4 h-4 text-accent flex-shrink-0" />
-                  }
+                  icon={<Zap className="w-4 h-4 text-accent flex-shrink-0" />}
                 />
               );
             }
-            const skill = skills.find(
-              (s) => s.name === item.skill.name,
-            );
+            const skill = skills.find((s) => s.name === item.skill.name);
             const type = skill?.type ?? "builtin";
             return (
               <MenuItem
@@ -301,12 +305,17 @@ function MenuItem({
       }`}
     >
       {icon}
-      <span className="flex-1 truncate">{label}</span>
-      {description && (
-        <span className="text-xs text-text-muted truncate max-w-[12rem] hidden sm:inline">
-          {description}
-        </span>
-      )}
+      <span className="flex-1 truncate">
+        {label}
+        {description ? (
+          <span className="text-xs text-text-muted hidden sm:inline">
+            {" "}
+            — {description}
+          </span>
+        ) : (
+          ""
+        )}
+      </span>
       {badge}
     </button>
   );
