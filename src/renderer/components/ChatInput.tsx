@@ -960,6 +960,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       return;
                     }
                     if (e.key === "Enter" && !e.shiftKey) {
+                      // During IME composition, let Enter finalize the IME
+                      // instead of selecting a slash item. The
+                      // compositionend → onChange chain will update the
+                      // filter, so the user can press Enter again to select.
+                      if (isComposingRef.current || e.keyCode === 229) return;
                       e.preventDefault();
                       const item = getSlashItemByIndex(
                         slashActiveTab,
