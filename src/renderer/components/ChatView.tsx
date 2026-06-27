@@ -181,7 +181,6 @@ export function ChatView() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottomRef = useRef(true);
   const autoFollowRef = useRef(true);
-  const programmaticScrollUntilRef = useRef(0);
   const prevMessageCountRef = useRef(0);
   const prevPartialLengthRef = useRef(0);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -480,36 +479,10 @@ export function ChatView() {
     return isAtBottom;
   }, []);
 
-  const markProgrammaticScroll = useCallback((durationMs: number = 120) => {
-    programmaticScrollUntilRef.current = Date.now() + durationMs;
-  }, []);
-
   const syncAutoFollowState = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-
     const isAtBottom = updateScrollToBottomVisibility();
-    const isProgrammatic = Date.now() < programmaticScrollUntilRef.current;
-
-    if (isProgrammatic) {
-      // Programmatic scrolls always go to bottom. If we are NOT at bottom
-      // during a programmatic window, this scroll event MUST be from the user
-      // scrolling up — respect it instead of eating it.
-      if (isAtBottom) {
-        // Programmatic scroll to bottom: don't override user's autoFollowRef
-        // (could be false if user already scrolled away before this event).
-        setShowScrollToBottom(false);
-        return;
-      }
-      // Not at bottom during programmatic window. If a smooth programmatic
-      // scroll is in progress, intermediate frames are expected and don't
-      // indicate user intent to break auto-follow. Otherwise the user scrolled
-      // up — respect it by falling through.
-      if (isScrollingRef.current) {
-        return;
-      }
-    }
-
     autoFollowRef.current = isAtBottom;
     setShowScrollToBottom(!autoFollowRef.current);
   }, [updateScrollToBottomVisibility]);
@@ -532,7 +505,6 @@ export function ChatView() {
 
         // Mark as scrolling to prevent concurrent scrolls
         isScrollingRef.current = true;
-        markProgrammaticScroll(behavior === "smooth" ? 400 : 120);
 
         messagesEndRef.current?.scrollIntoView({ behavior });
 
@@ -560,10 +532,18 @@ export function ChatView() {
     const container = scrollContainerRef.current;
     if (!container) return;
     syncAutoFollowState();
-    // 用户阅读旧消息时，阻止新消息自动滚动打断视线
     const onScroll = () => syncAutoFollowState();
     container.addEventListener("scroll", onScroll, { passive: true });
-    return () => container.removeEventListener("scroll", onScroll);
+    // ponytail: wheel fires before any pixel moves — beats the 80px isAtBottom
+    // threshold race with incoming stream tokens during high-speed scrolling.
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) autoFollowRef.current = false;
+    };
+    container.addEventListener("wheel", onWheel, { passive: true });
+    return () => {
+      container.removeEventListener("scroll", onScroll);
+      container.removeEventListener("wheel", onWheel);
+    };
   }, [syncAutoFollowState]);
 
   useEffect(() => {
@@ -589,7 +569,6 @@ export function ChatView() {
     if (isStreamingTick && autoFollowRef.current) {
       const container = scrollContainerRef.current;
       if (container) {
-        markProgrammaticScroll(100);
         container.scrollTop = container.scrollHeight;
       }
     }
@@ -603,7 +582,6 @@ export function ChatView() {
       autoFollowRef.current = true;
       const container = scrollContainerRef.current;
       if (container) {
-        markProgrammaticScroll(400);
         container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
       }
     }
@@ -881,15 +859,11 @@ export function ChatView() {
   }, []);
 
   const scrollToBottomByButton = () => {
+    if (isScrollingRef.current) return;
     autoFollowRef.current = true;
     isUserAtBottomRef.current = true;
     setShowScrollToBottom(false);
-    isScrollingRef.current = true;
-    markProgrammaticScroll(400);
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    setTimeout(() => {
-      isScrollingRef.current = false;
-    }, 300);
   };
 
   if (!activeSession) {
