@@ -1154,7 +1154,9 @@
     "bashRunning": "执行中...",
     "bashNoOutput": "(无输出)",
     "readReading": "读取中...",
-    "readEmptyFile": "(空文件)"
+    "readEmptyFile": "(空文件)",
+    "actionVisionDescribe": "描述图片",
+    "labelVisionDescribe": "描述了 {{path}}"
   },
   "imageLightbox": {
     "close": "关闭",

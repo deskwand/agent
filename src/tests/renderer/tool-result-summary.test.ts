@@ -78,6 +78,43 @@ describe("getCollapsedToolSummary", () => {
     ).toEqual({ kind: "chars", count: 11 });
   });
 
+  // --- vision_describe ---
+  it("shows line count for vision_describe description", () => {
+    expect(
+      getCollapsedToolSummary(
+        "vision_describe",
+        "[Image description of screenshot.png]\n\nA dark-themed code editor with syntax highlighting visible.",
+        false,
+      ),
+    ).toEqual({ kind: "lines", count: 1 });
+  });
+
+  it("counts multiple lines for vision_describe output", () => {
+    expect(
+      getCollapsedToolSummary(
+        "vision_describe",
+        "[Image description of test.png]\n\nLine one.\nLine two.\nLine three.",
+        false,
+      ),
+    ).toEqual({ kind: "lines", count: 3 });
+  });
+
+  it("counts lines without prefix for vision_describe fallback", () => {
+    expect(
+      getCollapsedToolSummary(
+        "vision_describe",
+        "Line one.\nLine two.",
+        false,
+      ),
+    ).toEqual({ kind: "lines", count: 2 });
+  });
+
+  it("returns none for empty vision_describe output", () => {
+    expect(getCollapsedToolSummary("vision_describe", "", false)).toEqual({
+      kind: "none",
+    });
+  });
+
   // --- screenshot ---
   it("returns screenshot summary for screenshot tools", () => {
     expect(

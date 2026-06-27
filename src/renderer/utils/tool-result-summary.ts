@@ -48,6 +48,16 @@ function isFetchTool(name: string): boolean {
   return lower === "webfetch";
 }
 
+function isVisionDescribeTool(name: string): boolean {
+  return name.toLowerCase() === "vision_describe";
+}
+
+/** Strip the [Image description of xxx]\n\n prefix from vision_describe output */
+function stripVisionDescribePrefix(text: string): string {
+  const match = text.match(/^\[Image description of .+?\]\n\n/);
+  return match ? text.slice(match[0].length) : text;
+}
+
 function getFirstContentLine(text: string, maxLen = 80): string {
   const firstLine = text.split(/\r?\n/)[0] ?? "";
   if (firstLine.length > maxLen) {
@@ -149,6 +159,13 @@ export function getCollapsedToolSummary(
   // Webfetch — character count
   if (isFetchTool(toolNameLower)) {
     return { kind: "chars", count: normalized.length };
+  }
+
+  // Vision describe — show line count (avoid duplicating label text in summary)
+  if (isVisionDescribeTool(toolNameLower)) {
+    const description = stripVisionDescribePrefix(normalized);
+    const lineCount = description.split(/\r?\n/).filter((l) => l.trim()).length;
+    return { kind: "lines", count: lineCount || 1 };
   }
 
   // Default — first line preview for short output, line count for long

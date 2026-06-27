@@ -1157,7 +1157,9 @@
     "bashRunning": "Running...",
     "bashNoOutput": "(no output)",
     "readReading": "Reading...",
-    "readEmptyFile": "(empty file)"
+    "readEmptyFile": "(empty file)",
+    "actionVisionDescribe": "Describe image",
+    "labelVisionDescribe": "Described {{path}}"
   },
   "imageLightbox": {
     "close": "Close",

@@ -8,6 +8,7 @@ import {
   Search,
   Globe,
   FolderSearch,
+  Eye,
 } from "lucide-react";
 
 /** Map a tool name to a small icon element */
@@ -25,6 +26,7 @@ export function getToolIcon(name: string) {
   if (n === "glob") return <FolderSearch className="w-3.5 h-3.5" />;
   if (n === "websearch") return <Globe className="w-3.5 h-3.5" />;
   if (n === "webfetch") return <Globe className="w-3.5 h-3.5" />;
+  if (n === "vision_describe") return <Eye className="w-3.5 h-3.5" />;
   if (n.startsWith("internal_browser"))
     return <Globe className="w-3.5 h-3.5" />;
   return <Terminal className="w-3.5 h-3.5" />;
@@ -160,6 +162,14 @@ export function getToolLabel(
   }
   if (nameLower === "internal_browser_get_state")
     return t("tool.actionBrowserGetState");
+
+  // --- Vision tools ---
+  if (nameLower === "vision_describe") {
+    const p = String(inp.path || "");
+    return p
+      ? t("tool.labelVisionDescribe", { path: shortenPath(p) })
+      : t("tool.actionVisionDescribe");
+  }
 
   return name;
 }

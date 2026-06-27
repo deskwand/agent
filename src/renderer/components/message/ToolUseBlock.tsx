@@ -1,5 +1,5 @@
 // Tool use card — collapsible, merges matching tool_result from same/other messages
-import { useState, memo } from "react";
+import { useState, useMemo, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -156,6 +156,17 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   );
   const collapsedSummaryText = formatCollapsedToolSummary(collapsedSummary, t);
 
+  const isVisionDescribe = block.name === "vision_describe";
+
+  // Strip the [Image description of xxx]\n\n prefix from vision_describe output
+  const visionDescriptionText = useMemo(() => {
+    if (!isVisionDescribe || !toolResult?.content) return null;
+    const text =
+      typeof toolResult.content === "string" ? toolResult.content : "";
+    const match = text.match(/^\[Image description of .+?\]\n\n/);
+    return match ? text.slice(match[0].length) : text;
+  }, [isVisionDescribe, toolResult?.content]);
+
   const validImages =
     toolResult?.images?.filter(
       (image) =>
@@ -277,8 +288,8 @@ export const ToolUseBlock = memo(function ToolUseBlock({
             </div>
           )}
 
-          {/* Input section — hidden when diff is available */}
-          {!toolResult?.diff && (
+          {/* Input section — hidden when diff is available, always hidden for vision_describe */}
+          {!toolResult?.diff && !isVisionDescribe && (
             <div className="px-3 py-2">
               <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
                 {t("tool.sectionInput")}
@@ -305,7 +316,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           {/* Output section */}
           {toolResult && (
             <div className="px-3 py-2">
-              {!toolResult.diff && (
+              {!toolResult.diff && !isVisionDescribe && (
                 <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
                   {t("tool.sectionOutput")}
                 </div>
@@ -347,7 +358,9 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                         : "text-text-secondary bg-surface-muted"
                     } ${preferImageOutput ? "mt-2" : ""}`}
                   >
-                    {toolResult.content}
+                    {isVisionDescribe && visionDescriptionText !== null
+                      ? visionDescriptionText
+                      : toolResult.content}
                   </pre>
                 )
               )}
