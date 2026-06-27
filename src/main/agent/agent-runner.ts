@@ -763,6 +763,10 @@ ${hints.join("\n")}
     return path.join(app.getPath("home"), ".deskwand", "skills");
   }
 
+  private getUserVisionImagesDir(): string {
+    return path.join(app.getPath("home"), ".deskwand", "vision_images");
+  }
+
   private syncUserSkillsToAppDir(appSkillsDir: string): void {
     const userSkillsDir = this.getUserDeskWandSkillsDir();
     if (!fs.existsSync(userSkillsDir)) {
@@ -1119,9 +1123,10 @@ ${hints.join("\n")}
           const base64 = buf.toString("base64");
           // Save to disk so vision_describe can read it in the same turn
           const filename = `browser_screenshot_${Date.now()}.png`;
-          const visionDir = path.join(self._currentWorkspace!, ".deskwand", "vision_images");
+          const visionDir = self.getUserVisionImagesDir();
           fs.mkdirSync(visionDir, { recursive: true });
-          fs.writeFileSync(path.join(visionDir, filename), buf);
+          const absPath = path.join(visionDir, filename);
+          fs.writeFileSync(absPath, buf);
           // Prune old browser screenshots, keep last 20
           try {
             const existing = fs.readdirSync(visionDir)
@@ -1137,9 +1142,8 @@ ${hints.join("\n")}
           } catch {
             // Non-critical, ignore cleanup errors
           }
-          const relPath = `.deskwand/vision_images/${filename}`;
           return {
-            content: [{ type: "text" as const, text: `Screenshot saved (${(buf.length / 1024).toFixed(1)} KB). Use vision_describe(path="${relPath}") to examine it.` }],
+            content: [{ type: "text" as const, text: `Screenshot saved (${(buf.length / 1024).toFixed(1)} KB). Use vision_describe(path="${absPath}") to examine it.` }],
             details: { openCoworkImages: [{ data: base64, mimeType: "image/png" }] },
           };
         });
@@ -3705,11 +3709,7 @@ Tool routing:\n
 
             if (visionConfigured) {
               try {
-                const imagesDir = path.join(
-                  effectiveCwd,
-                  ".deskwand",
-                  "vision_images",
-                );
+                const imagesDir = this.getUserVisionImagesDir();
                 fs.mkdirSync(imagesDir, { recursive: true });
                 const paths: string[] = [];
 
@@ -3724,16 +3724,12 @@ Tool routing:\n
                     .digest("hex")
                     .slice(0, 12);
                   const filename = `user_image_${hash}.${ext}`;
-                  const relPath = path.join(
-                    ".deskwand",
-                    "vision_images",
-                    filename,
-                  );
+                  const absPath = path.join(imagesDir, filename);
                   fs.writeFileSync(
-                    path.join(effectiveCwd, relPath),
+                    absPath,
                     Buffer.from(userImages[i].source.data, "base64"),
                   );
-                  paths.push(relPath);
+                  paths.push(absPath);
                 }
 
                 const samples =
