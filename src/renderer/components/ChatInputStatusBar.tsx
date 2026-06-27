@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { AlertCircle, Check, Loader2, Target } from "lucide-react";
 
 export type ChatInputStatus =
+  | { type: "sending" }
   | { type: "thinking" }
   | { type: "responding" }
   | { type: "compacting" }
@@ -38,16 +39,22 @@ interface ChatInputStatusBarProps {
 export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
 
-  if (!status) return null;
-
+  // Always render a fixed-height container to prevent layout jump
   let icon: React.ReactNode = null;
   let text = "";
   let toneClass = "text-text-muted";
 
-  switch (status.type) {
+  if (status) {
+    switch (status.type) {
+    case "sending":
+      icon = <Loader2 className="w-3 h-3 animate-spin" />;
+      text = t("chat.sending");
+      toneClass = "text-accent";
+      break;
     case "thinking":
       icon = <Loader2 className="w-3 h-3 animate-spin" />;
       text = t("chat.processing");
+      toneClass = "text-accent";
       break;
     case "responding":
       icon = <Loader2 className="w-3 h-3 animate-spin" />;
@@ -57,6 +64,7 @@ export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
     case "compacting":
       icon = <Loader2 className="w-3 h-3 animate-spin" />;
       text = t("chat.compacting");
+      toneClass = "text-accent";
       break;
     case "compaction-success":
       icon = <Check className="w-3 h-3" />;
@@ -96,6 +104,7 @@ export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
       text = `${t("goal.budgetLimited")}: ${status.objective} (${t("goal.turn", { n: status.iteration })})`;
       toneClass = "text-warning";
       break;
+    }
   }
 
   return (
@@ -111,6 +120,7 @@ export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
 /** Pure function: resolve the single highest-priority input-area status.
  *  Testable without mounting ChatView. */
 export function resolveInputStatus(params: {
+  isSending: boolean;
   isCompacting: boolean;
   compactionResult: "success" | "failed" | null;
   steeringText: string;
@@ -127,6 +137,7 @@ export function resolveInputStatus(params: {
   } | null;
 }): ChatInputStatus {
   if (params.isCompacting) return { type: "compacting" };
+  if (params.isSending) return { type: "sending" };
   if (params.compactionResult === "failed") {
     return { type: "compaction-failed" };
   }

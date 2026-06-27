@@ -235,15 +235,20 @@ export function ChatView() {
       messages.some(
         (m) => m.role === "assistant" && m.turnId === activeTurn.turnId,
       );
+    // Show thinking indicator as long as active turn has produced no
+    // assistant message — even when partialThinking is streaming, so
+    // the user always sees a status during extended thinking phases.
     const shouldShowThinkingIndicator =
       hasActiveTurn &&
       !hasAssistantOutput &&
-      (!partialMessage || partialMessage.trim() === "") &&
-      !partialThinking;
+      (!partialMessage || partialMessage.trim() === "");
     // ?? false: TS narrows hasAssistantOutput as boolean | null because
     // it cannot correlate hasActiveTurn with activeTurn's non-nullness.
     const isResponding = (canStop && hasAssistantOutput) ?? false;
+    // isSending only matters before the turn starts; after that,
+    // thinking/responding takes over.
     return resolveInputStatus({
+      isSending: isSubmitting && !hasActiveTurn,
       isCompacting,
       compactionResult,
       steeringText,

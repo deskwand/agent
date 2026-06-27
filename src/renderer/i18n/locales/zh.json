@@ -735,7 +735,8 @@
   },
   "chat": {
     "sendMessage": "发送消息",
-    "processing": "思考中",
+    "processing": "思考中…",
+    "sending": "发送中…",
     "stop": "停止",
     "typeMessage": "输入消息，按 / 使用快捷命令...",
     "loadingConversation": "加载聊天中...",

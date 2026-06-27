@@ -3,6 +3,7 @@ import { resolveInputStatus } from "../../renderer/components/ChatInputStatusBar
 
 describe("resolveInputStatus", () => {
   const base = {
+    isSending: false,
     isCompacting: false,
     compactionResult: null as "success" | "failed" | null,
     steeringText: "",
@@ -20,9 +21,16 @@ describe("resolveInputStatus", () => {
     });
   });
 
+  it("returns sending when isSending is true", () => {
+    expect(
+      resolveInputStatus({ ...base, isSending: true }),
+    ).toEqual({ type: "sending" });
+  });
+
   it("compacting wins over everything else", () => {
     expect(
       resolveInputStatus({
+        isSending: true,
         isCompacting: true,
         compactionResult: "failed",
         steeringText: "do something",

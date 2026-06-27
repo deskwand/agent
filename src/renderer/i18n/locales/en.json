@@ -735,7 +735,8 @@
   },
   "chat": {
     "sendMessage": "Send message",
-    "processing": "Thinking",
+    "processing": "Thinking…",
+    "sending": "Sending…",
     "stop": "Stop",
     "typeMessage": "Type a message, press / for shortcuts...",
     "loadingConversation": "Loading chat...",
