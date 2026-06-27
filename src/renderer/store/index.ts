@@ -13,6 +13,7 @@ import type {
   PartialToolResult,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
+import { SIDEBAR_DEFAULT_MAX_VISIBLE } from "../constants";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
@@ -319,7 +320,7 @@ export const useAppStore = create<AppState>((set) => ({
   conversationsCollapsed: false,
   projectsCollapsed: false,
   workspaceCollapsedMap: {},
-  conversationsMaxVisible: 10,
+  conversationsMaxVisible: SIDEBAR_DEFAULT_MAX_VISIBLE,
   workspaceMaxVisibleMap: {},
   sidebarWidth: 280,
   contextPanelWidth: 288,

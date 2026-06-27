@@ -20,8 +20,7 @@ import {
 } from "lucide-react";
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
-
-const DEFAULT_MAX_VISIBLE = 5;
+import { SIDEBAR_DEFAULT_MAX_VISIBLE } from "../constants";
 
 type ProjectWorkspaceGroup = {
   key: string;
@@ -762,7 +761,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       .slice(0, conversationsMaxVisible)
                       .map((session) => renderSessionItem(session, true))}
                   </div>
-                  {sortedConversationSessions.length > DEFAULT_MAX_VISIBLE &&
+                  {sortedConversationSessions.length > SIDEBAR_DEFAULT_MAX_VISIBLE &&
                     (conversationsMaxVisible <
                     sortedConversationSessions.length ? (
                       <button
@@ -780,7 +779,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                     ) : (
                       <button
                         onClick={() =>
-                          setConversationsMaxVisible(DEFAULT_MAX_VISIBLE)
+                          setConversationsMaxVisible(SIDEBAR_DEFAULT_MAX_VISIBLE)
                         }
                         className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
                       >
@@ -904,15 +903,15 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                               {workspace.sessions
                                 .slice(
                                   0,
-                                  workspaceMaxVisibleMap[workspace.cwd] ?? 10,
+                                  workspaceMaxVisibleMap[workspace.cwd] ?? SIDEBAR_DEFAULT_MAX_VISIBLE,
                                 )
                                 .map((session) =>
                                   renderSessionItem(session, true, true),
                                 )}
                             </div>
-                            {workspace.sessions.length > DEFAULT_MAX_VISIBLE &&
+                            {workspace.sessions.length > SIDEBAR_DEFAULT_MAX_VISIBLE &&
                               ((workspaceMaxVisibleMap[workspace.cwd] ??
-                                DEFAULT_MAX_VISIBLE) <
+                                SIDEBAR_DEFAULT_MAX_VISIBLE) <
                               workspace.sessions.length ? (
                                 <button
                                   onClick={() =>
@@ -927,7 +926,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                                     count:
                                       workspace.sessions.length -
                                       (workspaceMaxVisibleMap[workspace.cwd] ??
-                                        DEFAULT_MAX_VISIBLE),
+                                        SIDEBAR_DEFAULT_MAX_VISIBLE),
                                   })}
                                 </button>
                               ) : (
@@ -935,7 +934,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                                   onClick={() =>
                                     setWorkspaceMaxVisible(
                                       workspace.cwd,
-                                      DEFAULT_MAX_VISIBLE,
+                                      SIDEBAR_DEFAULT_MAX_VISIBLE,
                                     )
                                   }
                                   className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
