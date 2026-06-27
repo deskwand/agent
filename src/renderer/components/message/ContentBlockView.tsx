@@ -51,6 +51,19 @@ function normalizeCitationMarkdownLinks(markdown: string): string {
   return markdown.replace(/~\[(.+?)\]\(([^)\s]+)\)~/g, "[$1]($2)");
 }
 
+/** Determine whether a code fence should render as inline <code> or <CodeBlock>. */
+export function getCodeRenderMode(
+  className: string | undefined,
+  children: unknown,
+): { isInline: boolean; codeContent: string; language: string | undefined } {
+  const codeContent =
+    typeof children === "string" ? children : String(children ?? "");
+  const match = /language-([\w+#.-]+)/.exec(className || "");
+  // Inline only when: no language specifier AND single-line (no \n)
+  const isInline = !match && !codeContent.includes("\n");
+  return { isInline, codeContent, language: match?.[1] };
+}
+
 export const ContentBlockView = memo(function ContentBlockView({
   block,
   isUser,
@@ -274,12 +287,10 @@ export const ContentBlockView = memo(function ContentBlockView({
         className?: string;
         children?: React.ReactNode;
       }) {
-        const match = /language-([\w+#.-]+)/.exec(className || "");
-        const isInline = !match;
+        const { isInline, codeContent, language } = getCodeRenderMode(className, children);
 
         if (isInline) {
-          const raw = String(children);
-          const parts = splitTextByFileMentions(raw);
+          const parts = splitTextByFileMentions(codeContent);
           if (parts.length === 1 && parts[0]?.type === "file") {
             return renderFileButton(parts[0].value);
           }
@@ -288,14 +299,14 @@ export const ContentBlockView = memo(function ContentBlockView({
               className="px-1.5 py-0.5 rounded bg-surface-muted text-accent font-mono text-xs"
               {...props}
             >
-              {children}
+              {codeContent}
             </code>
           );
         }
 
         return (
-          <CodeBlock language={match[1]}>
-            {String(children).replace(/\n$/, "")}
+          <CodeBlock language={language || ""}>
+            {codeContent.replace(/^\n+|\n+$/g, "")}
           </CodeBlock>
         );
       },
