@@ -623,7 +623,7 @@ function createWindow() {
         logError("[App] Failed to load dev server URL:", error);
       }
     })();
-    // mainWindow.webContents.openDevTools(); // Commented out - open manually with Cmd+Option+I if needed
+    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(join(__dirname, "../../dist/index.html"));
   }
