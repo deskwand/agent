@@ -112,6 +112,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       } catch { /* noop */ }
       return "all";
     });
+    const [recencyVersion, setRecencyVersion] = useState(0);
     const slashMenuRef = useRef<HTMLDivElement>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -395,24 +396,33 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     // --- Slash menu helpers ---
     const filterText = slashFilter.toLowerCase();
     const builtinCommands = useMemo(() => getBuiltinCommands(t), [t]);
-    const filteredCommands = slashFilter
-      ? builtinCommands.filter(
-          (c) =>
-            c.name.toLowerCase().includes(filterText) ||
-            c.description.toLowerCase().includes(filterText),
-        )
-      : builtinCommands;
+    const filteredCommands = useMemo(() => {
+      const recency = loadSlashRecency();
+      const cmds = slashFilter
+        ? builtinCommands.filter(
+            (c) =>
+              c.name.toLowerCase().includes(filterText) ||
+              c.description.toLowerCase().includes(filterText),
+          )
+        : builtinCommands;
+      return sortByRecency(cmds, (c) => `cmd:${c.name}`, recency);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [builtinCommands, slashFilter, recencyVersion]);
 
     // Skills filtered by current text (preserving Skill type for SlashMenu badges)
     const filteredSlashSkills = useMemo(() => {
-      if (!slashFilter) return slashSkills;
-      const ft = slashFilter.toLowerCase();
-      return slashSkills.filter(
-        (s) =>
-          s.name.toLowerCase().includes(ft) ||
-          (s.description || "").toLowerCase().includes(ft),
-      );
-    }, [slashSkills, slashFilter]);
+      const recency = loadSlashRecency();
+      const skills = !slashFilter
+        ? slashSkills
+        : slashSkills.filter((s) => {
+            const ft = slashFilter.toLowerCase();
+            return (
+              s.name.toLowerCase().includes(ft) ||
+              (s.description || "").toLowerCase().includes(ft)
+            );
+          });
+      return sortByRecency(skills, (s) => `skill:${s.name}`, recency);
+    }, [slashSkills, slashFilter, recencyVersion]);
 
     // Flattened version used for getSlashItemByIndex lookup
     const filteredSkillsFlat = useMemo(
@@ -490,6 +500,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const selectSlashItem = useCallback(
       (item: SlashItem) => {
+        // Record recency before any early-return path
+        saveSlashRecency(
+          item.category === "command"
+            ? `cmd:${item.command.name}`
+            : `skill:${item.skill.name}`,
+        );
+        setRecencyVersion((v) => v + 1);
+
         if (item.category === "command") {
           if (item.command.action === "compact") {
             onCommand?.(item.command.action);
@@ -1007,3 +1025,55 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
   },
 );
+
+/* ─── Slash recency helpers ─── */
+
+/** Read recent slash usage from localStorage. Returns {} on any error. */
+function loadSlashRecency(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem("slashRecency");
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
+      return {};
+    return parsed as Record<string, number>;
+  } catch {
+    return {};
+  }
+}
+
+/** Write/update a recency entry, trim to max 10. Failures are silent. */
+function saveSlashRecency(key: string): void {
+  try {
+    const recency = loadSlashRecency();
+    recency[key] = Date.now();
+    const entries = Object.entries(recency)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+    localStorage.setItem(
+      "slashRecency",
+      JSON.stringify(Object.fromEntries(entries)),
+    );
+  } catch {
+    /* localStorage full or disabled — silently ignore */
+  }
+}
+
+/** Sort items: those present in recency first (by desc timestamp), rest unchanged. */
+function sortByRecency<T>(
+  items: T[],
+  getKey: (item: T) => string,
+  recency: Record<string, number>,
+): T[] {
+  const withRecency: T[] = [];
+  const withoutRecency: T[] = [];
+  for (const item of items) {
+    if (recency[getKey(item)] != null) {
+      withRecency.push(item);
+    } else {
+      withoutRecency.push(item);
+    }
+  }
+  withRecency.sort((a, b) => (recency[getKey(b)] ?? 0) - (recency[getKey(a)] ?? 0));
+  return withRecency.concat(withoutRecency);
+}
