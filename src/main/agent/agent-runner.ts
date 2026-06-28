@@ -569,7 +569,6 @@ export class AgentRunner {
   } | null = null;
   private _skillsSetupDone = false;
   private _skillsSetupInProgress = false;
-  private _currentWorkspace: string | null = null;
 
   /**
    * Clear SDK session cache for a session
@@ -2280,7 +2279,6 @@ ${hints.join("\n")}
         useSandboxIsolation && sandboxPath
           ? sandboxPath
           : workingDir || app.getPath("userData");
-      this._currentWorkspace = effectiveCwd;
 
       // Use app-specific DeskWand config directory to avoid conflicts with user settings
       // SDK uses DeskWand_CONFIG_DIR to locate skills
