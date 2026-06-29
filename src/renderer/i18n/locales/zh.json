@@ -409,7 +409,18 @@
         "ollama_model_loading": "模型 {{model}} 可能仍在加载中，稍后再试深度验证。",
         "model_cold_start": "模型可能仍在加载到 GPU/CPU 内存中。大型模型（7B+）首次使用可能需要 30–120 秒，请稍后重试。"
       }
-    }
+    },
+    "oauthSectionTitle": "订阅账号接入",
+    "oauthConnected": "已连接",
+    "oauthConnectedDesc": "{{provider}} 订阅已连接",
+    "oauthLoginBtn": "连接",
+    "oauthDisconnect": "断开连接",
+    "oauthDisconnectConfirm": "确定要断开 {{name}} 的连接吗？",
+    "oauthLoggingIn": "连接中...",
+    "oauthOpenAIDesc": "通过 ChatGPT 订阅接入",
+    "oauthGitHubDesc": "通过 GitHub Copilot 订阅接入",
+    "oauthAnthropicDesc": "通过 Claude Max 订阅接入",
+    "oauthAnthropicNote": "需要 Claude Max 订阅 + 额外用量额度，Claude Pro 不可用"
   },
   "window": {
     "minimize": "最小化",

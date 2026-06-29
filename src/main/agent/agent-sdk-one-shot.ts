@@ -20,11 +20,11 @@ import {
 import { log, logWarn } from "../utils/logger";
 import { normalizeGeneratedTitle } from "../session/session-title-utils";
 import { getSharedAuthStorage } from "./shared-auth";
+import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import {
   applyPiModelRuntimeOverrides,
   buildSyntheticPiModel,
   inferPiApi,
-  resolvePiModelString,
   resolvePiRegistryModel,
   resolvePiRouteProtocol,
   resolveSyntheticPiModelFallback,
@@ -213,10 +213,20 @@ export async function runPiAiOneShot(
     signal?: AbortSignal;
   },
 ): Promise<{ text: string; hasThinking: boolean; durationMs: number }> {
-  const modelString = resolvePiModelString(config);
-  const keyProvider = config.customProtocol || config.provider || "anthropic";
-  const parts = modelString.split("/");
-  const provider = parts.length >= 2 ? parts[0] : keyProvider || "anthropic";
+  // For OAuth providers, map to the actual pi-ai provider ID
+  // (e.g. oauth:openai-codex → openai-codex) so the correct model
+  // entry (with codex baseUrl + api type) is used from pi-ai's registry.
+  const activeIsOAuth = config.provider === "oauth";
+  const oauthPiProvider = activeIsOAuth && config.activeProviderKey
+    ? extractOAuthProviderId(config.activeProviderKey)
+    : undefined;
+  const effectiveProvider = oauthPiProvider || config.provider || "anthropic";
+  const defaultModel = config.providers?.[config.activeProviderKey]?.models?.[0]?.id;
+  const modelId = config.model?.trim() || defaultModel || "claude-sonnet-4-6";
+  const modelString = modelId.includes("/")
+    ? modelId
+    : `${effectiveProvider}/${modelId}`;
+  const keyProvider = oauthPiProvider || config.customProtocol || config.provider || "anthropic";
 
   // Normalize base URL for OpenAI-compatible providers (strips copy-pasted endpoint suffixes)
   const routeProtocol = resolvePiRouteProtocol(
@@ -275,13 +285,18 @@ export async function runPiAiOneShot(
   const resolvedModel = piModel!;
 
   // Set API key via AuthStorage (for agent sessions) AND env vars (for pi-ai completeSimple)
-  const apiKey = config.apiKey?.trim();
+  let apiKey: string | undefined = config.apiKey?.trim();
+  // For OAuth providers, fetch the access token from auth.json
+  if (!apiKey && activeIsOAuth && oauthPiProvider) {
+    const authStorage = getSharedAuthStorage();
+    apiKey = (await authStorage.getApiKey(oauthPiProvider)) || undefined;
+  }
   if (apiKey) {
     const authStorage = getSharedAuthStorage();
     // Set for the config provider
-    authStorage.setRuntimeApiKey(provider, apiKey);
+    authStorage.setRuntimeApiKey(effectiveProvider, apiKey);
     // Also set for the model's native provider if different
-    if (resolvedModel.provider !== provider) {
+    if (resolvedModel.provider !== effectiveProvider) {
       authStorage.setRuntimeApiKey(resolvedModel.provider, apiKey);
     }
   }

@@ -409,7 +409,18 @@
         "ollama_model_loading": "Model {{model}} may still be loading. Try the deep check again in a moment.",
         "model_cold_start": "The model may still be loading into GPU/CPU memory. Large models (7B+) can take 30–120 seconds on first use. Try again shortly."
       }
-    }
+    },
+    "oauthSectionTitle": "Subscription Login",
+    "oauthConnected": "Connected",
+    "oauthConnectedDesc": "Connected via {{provider}} subscription",
+    "oauthLoginBtn": "Connect",
+    "oauthDisconnect": "Disconnect",
+    "oauthDisconnectConfirm": "Disconnect {{name}}?",
+    "oauthLoggingIn": "Connecting...",
+    "oauthOpenAIDesc": "Connect via ChatGPT subscription",
+    "oauthGitHubDesc": "Connect via GitHub Copilot subscription",
+    "oauthAnthropicDesc": "Connect via Claude Max subscription",
+    "oauthAnthropicNote": "Requires Claude Max subscription with extra usage credits. Claude Pro is not supported."
   },
   "window": {
     "minimize": "Minimize",

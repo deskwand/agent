@@ -539,6 +539,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("memory.setEnabled", enabled),
   },
 
+  // OAuth methods
+  auth: {
+    login: (providerId: string, force?: boolean): Promise<void> =>
+      ipcRenderer.invoke("auth.login", providerId, force),
+    logout: (providerId: string): Promise<void> =>
+      ipcRenderer.invoke("auth.logout", providerId),
+    status: (providerId: string): Promise<import("../shared/ipc-types").OAuthStatusResult> =>
+      ipcRenderer.invoke("auth.status", providerId),
+  },
+
   // Browser panel methods
   browser: {
     toggle: (): Promise<{
@@ -899,6 +909,11 @@ declare global {
         setEnabled: (
           enabled: boolean,
         ) => Promise<{ success: boolean; enabled: boolean }>;
+      };
+      auth: {
+        login: (providerId: string, force?: boolean) => Promise<void>;
+        logout: (providerId: string) => Promise<void>;
+        status: (providerId: string) => Promise<import("../shared/ipc-types").OAuthStatusResult>;
       };
       browser: {
         toggle: () => Promise<{

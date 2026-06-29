@@ -9,6 +9,8 @@ import type {
   ProviderType,
 } from "../config/config-store";
 import { fetchOllamaModelInfo } from "../config/ollama-api";
+import { getSharedAuthStorage } from "../agent/shared-auth";
+import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import {
   applyPiModelRuntimeOverrides,
   buildSyntheticPiModel,
@@ -161,8 +163,15 @@ export class ModelResolutionService {
       notes.push("normalized_openai_compatible_base_url");
     }
 
+    // For OAuth providers, map to the actual pi-ai provider ID
+    // (e.g. oauth:openai-codex → openai-codex) so the correct
+    // baseUrl + api type is used from pi-ai's registry.
+    const oauthProviderId =
+      providerConfig.provider === "oauth"
+        ? extractOAuthProviderId(providerSelection.providerProfileKey)
+        : undefined;
     const modelString = resolvePiModelString({
-      provider: providerConfig.provider,
+      provider: oauthProviderId || providerConfig.provider,
       customProtocol: providerConfig.customProtocol,
       model: modelSelection.modelId,
       defaultModel: input.appConfig.model,
@@ -243,13 +252,26 @@ export class ModelResolutionService {
       piModel = { ...piModel, input: modelSelection.matchedModel.input } as Model<Api>;
     }
 
+    // Resolve API key: for OAuth providers, fetch from AuthStorage (auto-refresh)
+    let resolvedApiKey: string | undefined = providerConfig.apiKey?.trim() || undefined;
+    if (providerConfig.provider === "oauth") {
+      const oauthProviderId =
+        extractOAuthProviderId(providerSelection.providerProfileKey);
+      resolvedApiKey = await getSharedAuthStorage().getApiKey(oauthProviderId!);
+      if (!resolvedApiKey) {
+        throw new Error(
+          `OAuth token not available for ${oauthProviderId}. Please log in via Settings → API.`,
+        );
+      }
+    }
+
     return {
       providerProfileKey: providerSelection.providerProfileKey,
       providerType: providerConfig.provider,
       customProtocol: providerConfig.customProtocol,
       protocol,
       modelId: modelSelection.modelId,
-      apiKey: providerConfig.apiKey?.trim() || undefined,
+      apiKey: resolvedApiKey,
       baseUrl,
       contextWindow,
       maxTokens,

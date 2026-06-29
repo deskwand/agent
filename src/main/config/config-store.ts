@@ -12,6 +12,7 @@ import {
   shouldUseAnthropicAuthToken,
 } from "./auth-utils";
 import { resolveModelContextWindow } from "../agent/pi-model-resolution";
+import { isOAuthProfileKey } from "../../shared/oauth-utils";
 
 export type ProviderType =
   | "openrouter"
@@ -20,7 +21,8 @@ export type ProviderType =
   | "custom"
   | "openai"
   | "gemini"
-  | "ollama";
+  | "ollama"
+  | "oauth";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
@@ -271,6 +273,8 @@ export function profileKeyToProvider(profileKey: ProviderProfileKey): {
   provider: ProviderType;
   customProtocol: CustomProtocolType;
 } {
+  if (isOAuthProfileKey(profileKey))
+    return { provider: "oauth" as ProviderType, customProtocol: "anthropic" };
   if (profileKey.startsWith("custom:"))
     return { provider: "custom", customProtocol: "anthropic" };
   if (profileKey === "openai")
@@ -363,7 +367,9 @@ function isProviderType(value: unknown): value is ProviderType {
     value === "deepseek" ||
     value === "custom" ||
     value === "openai" ||
-    value === "gemini"
+    value === "gemini" ||
+    value === "ollama" ||
+    value === "oauth"
   );
 }
 
@@ -475,7 +481,7 @@ export function normalizeProviderConfig(
     model: "",
   };
   const fallbackModel = getDefaultProviderModel(profileKey);
-  const isCustomProfile = meta.provider === "custom";
+  const isCustomProfile = meta.provider === "custom" || meta.provider === "oauth";
   const rawModels = Array.isArray(raw?.models) ? raw.models : [];
   const deduped = new Map<string, ApiProviderModel>();
 
@@ -540,6 +546,31 @@ function sanitizeSaveProviderPayload(
 ): ApiProviderConfig {
   const profileKey = payload.profileKey;
   const meta = profileKeyToProvider(profileKey);
+
+  if (meta.provider === "oauth") {
+    // OAuth: preserve models & defaultModel from payload.
+    // Credentials live in auth.json, not here.
+    const raw = payload.config;
+    const rawModels: ApiProviderModel[] = Array.isArray(raw?.models)
+      ? raw.models.map((m) => ({ ...m }))
+      : [];
+    const defaultModel =
+      toNonEmptyString(raw?.defaultModel) || rawModels[0]?.id || "";
+    return {
+      provider: "oauth",
+      customProtocol: meta.customProtocol,
+      name:
+        typeof raw?.name === "string"
+          ? raw.name.trim() || undefined
+          : undefined,
+      apiKey: "",
+      baseUrl: "",
+      defaultModel,
+      models: rawModels,
+      updatedAt: nowISO(),
+    };
+  }
+
   const normalized = normalizeProviderConfig(profileKey, payload.config);
 
   if (meta.provider !== "custom") {
@@ -801,7 +832,11 @@ export class ConfigStore {
       if (updates.provider !== undefined) merged.provider = updates.provider;
       if (updates.customProtocol !== undefined)
         merged.customProtocol = updates.customProtocol;
-      if (updates.apiKey !== undefined) merged.apiKey = updates.apiKey;
+      if (updates.apiKey !== undefined) {
+        if (merged.provider !== "oauth") {
+          merged.apiKey = updates.apiKey;
+        }
+      }
       if (updates.baseUrl !== undefined) merged.baseUrl = updates.baseUrl;
 
       // Model selection / update
@@ -883,7 +918,7 @@ export class ConfigStore {
     stored.isConfigured =
       updates.isConfigured ??
       Object.values(stored.providers).some(
-        (p) => !!(p?.apiKey?.trim()),
+        (p) => !!(p?.apiKey?.trim()) || p?.provider === "oauth",
       );
 
     this.store.set(stored);
@@ -894,7 +929,7 @@ export class ConfigStore {
     stored.providers[payload.profileKey] =
       sanitizeSaveProviderPayload(payload);
     stored.isConfigured = Object.values(stored.providers).some(
-      (p) => !!(p?.apiKey?.trim()),
+      (p) => !!(p?.apiKey?.trim()) || p?.provider === "oauth",
     );
     this.store.set(stored);
     return this.getAll();
@@ -902,7 +937,7 @@ export class ConfigStore {
 
   deleteProvider(payload: { profileKey: ProviderProfileKey }): AppConfig {
     const stored = { ...this.store.store };
-    if (isCustomProfile(payload.profileKey)) {
+    if (isCustomProfile(payload.profileKey) || isOAuthProfileKey(payload.profileKey)) {
       delete stored.providers[payload.profileKey];
     } else {
       stored.providers[payload.profileKey] = clearProviderConfig(
@@ -924,7 +959,7 @@ export class ConfigStore {
       stored.activeProviderKey = remaining[0];
     }
     stored.isConfigured = Object.values(stored.providers).some(
-      (p) => !!(p?.apiKey?.trim()),
+      (p) => !!(p?.apiKey?.trim()) || p?.provider === "oauth",
     );
     this.store.set(stored);
     return this.getAll();
@@ -956,9 +991,14 @@ export class ConfigStore {
     provider: ProviderType;
     apiKey?: string;
     baseUrl?: string;
+    /** OAuth providers are usable only after login (which saves models). */
+    models?: ReadonlyArray<{ id: string }>;
   }): boolean {
     if (input.provider === "ollama") {
       return Boolean(input.baseUrl?.trim());
+    }
+    if (input.provider === "oauth") {
+      return (input.models?.length ?? 0) > 0;
     }
     return Boolean(input.apiKey?.trim());
   }
@@ -968,6 +1008,7 @@ export class ConfigStore {
       provider: config.provider,
       apiKey: config.apiKey,
       baseUrl: config.baseUrl,
+      models: config.providers?.[config.activeProviderKey]?.models,
     });
   }
 
@@ -978,6 +1019,7 @@ export class ConfigStore {
         provider: provider.provider,
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
+        models: provider.models,
       });
     });
   }
