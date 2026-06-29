@@ -36,6 +36,7 @@ function hasUsableProviderConfig(
 ): boolean {
   if (!config.defaultModel.trim()) return false;
   const { provider } = profileKeyToProvider(profileKey);
+  if (provider === "oauth") return true;
   if (provider === "ollama") {
     return Boolean(config.baseUrl?.trim());
   }
@@ -223,49 +224,30 @@ export function ChatView() {
       steeringEvent && activeTurn && steeringEvent.turnId === activeTurn.turnId
         ? steeringEvent.text.trim().replace(/\s+/g, " ").slice(0, 120)
         : "";
-    // ?? false: TS narrows hasAssistantOutput as boolean | null because
-    // Only show the thinking indicator when the active turn has NOT yet
-    // produced any assistant output. After the final stream.message arrives,
-    // partialMessage/partialThinking are cleared, but activeTurn remains set
-    // until session.status idle — we must not re-show the spinner in that gap.
-    const hasAssistantOutput =
-      hasActiveTurn &&
-      activeTurn &&
-      messages.some(
-        (m) => m.role === "assistant" && m.turnId === activeTurn.turnId,
-      );
-    // Show thinking indicator as long as active turn has produced no
-    // assistant message — even when partialThinking is streaming, so
-    // the user always sees a status during extended thinking phases.
-    const shouldShowThinkingIndicator =
-      hasActiveTurn &&
-      !hasAssistantOutput &&
-      (!partialMessage || partialMessage.trim() === "");
-    // ?? false: TS narrows hasAssistantOutput as boolean | null because
-    // it cannot correlate hasActiveTurn with activeTurn's non-nullness.
-    const isResponding =
-      (canStop && hasAssistantOutput && !!partialMessage?.trim()) ?? false;
-    // isSending only matters before the turn starts; after that,
-    // thinking/responding takes over.
+    // Mirror the stop button: whenever canStop is true the status bar
+    // must show a non-null indicator so the user never sees a blank bar
+    // while the session is running / a turn is active or pending.
+    const hasStreamingText = !!partialMessage?.trim();
     return resolveInputStatus({
-      isSending: isSubmitting && !hasActiveTurn,
+      isSending: isSubmitting && !canStop,
       isCompacting,
       compactionResult,
       steeringText,
-      shouldShowThinkingIndicator,
-      isResponding,
+      // Guard with hasActiveTurn: once the turn ends we don't show
+      // "thinking" during the brief idle-window before session settles.
+      shouldShowThinkingIndicator: canStop && hasActiveTurn && !hasStreamingText,
+      isResponding: canStop && hasStreamingText,
       goalStatus,
     });
   }, [
     isCompacting,
     compactionResult,
+    canStop,
     hasActiveTurn,
     partialMessage,
-    partialThinking,
     steeringEvent,
     activeTurn?.turnId,
     goalStatus,
-    messages,
   ]);
 
   const lastInputTokens = useMemo(() => {
