@@ -109,6 +109,7 @@ import { listRecentWorkspaceFiles } from "./utils/recent-workspace-files";
 import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
+import { initOAuthService } from "./auth/oauth-service";
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -1388,6 +1389,9 @@ ipcMain.on("client-event", async (_event, data: ClientEvent) => {
     });
   }
 });
+
+// ── OAuth IPC handlers ──
+initOAuthService();
 
 ipcMain.handle("client-invoke", async (_event, data: ClientEvent) => {
   return handleClientEvent(data);

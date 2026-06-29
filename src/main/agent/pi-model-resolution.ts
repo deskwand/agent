@@ -43,6 +43,7 @@ export function resolvePiRouteProtocol(
   provider?: string,
   customProtocol?: string,
 ): string {
+  if (provider === "oauth") return "openai";
   if (provider === "custom") {
     if (customProtocol === "openai" || customProtocol === "gemini") {
       return customProtocol;

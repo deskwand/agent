@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import { useAppStore } from "../store";
+import { isOAuthProfileKey } from "../../shared/oauth-utils";
 import type {
   ApiProviderConfig,
   AppConfig,
@@ -68,6 +69,8 @@ export function profileKeyToProvider(profileKey: ProviderProfileKey): {
   provider: ProviderType;
   customProtocol: CustomProtocolType;
 } {
+  if (isOAuthProfileKey(profileKey))
+    return { provider: "oauth", customProtocol: "anthropic" };
   if (profileKey.startsWith("custom:"))
     return { provider: "custom", customProtocol: "anthropic" };
   if (profileKey === "openai")

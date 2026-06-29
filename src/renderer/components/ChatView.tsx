@@ -36,6 +36,7 @@ function hasUsableProviderConfig(
 ): boolean {
   if (!config.defaultModel.trim()) return false;
   const { provider } = profileKeyToProvider(profileKey);
+  if (provider === "oauth") return true;
   if (provider === "ollama") {
     return Boolean(config.baseUrl?.trim());
   }

@@ -689,7 +689,8 @@ export type ProviderType =
   | "custom"
   | "openai"
   | "gemini"
-  | "ollama";
+  | "ollama"
+  | "oauth";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export interface VisionModelConfig {
   enabled: boolean;

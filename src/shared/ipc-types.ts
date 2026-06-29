@@ -162,3 +162,14 @@ export interface RemoteSessionMapping {
   createdAt: number;
   lastActiveAt: number;
 }
+
+// ---------------------------------------------------------------------------
+// OAuth
+// ---------------------------------------------------------------------------
+
+/** Result of an OAuth status query. */
+export interface OAuthStatusResult {
+  loggedIn: boolean;
+  expiresAt?: number;
+  providerName: string;
+}

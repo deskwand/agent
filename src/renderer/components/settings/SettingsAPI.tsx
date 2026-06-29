@@ -18,6 +18,7 @@ import {
   profileKeyFromProvider,
   profileKeyToProvider,
 } from "../../hooks/useApiConfigState";
+import { oauthProfileKey } from "../../../shared/oauth-utils";
 import type {
   ApiProviderConfig,
   ApiProviderModel,
@@ -55,6 +56,75 @@ const PROVIDER_ORDER: ProviderChoice[] = [
   "gemini",
   "custom",
 ];
+
+const OAUTH_PROVIDER_MODELS: Record<string, Array<{ id: string; name: string }>> = {
+  "openai-codex": [
+    { id: "gpt-5.5", name: "gpt-5.5" },
+    { id: "gpt-5.4", name: "gpt-5.4" },
+    { id: "gpt-5.4-mini", name: "gpt-5.4-mini" },
+    { id: "gpt-5.3-codex", name: "gpt-5.3-codex" },
+    { id: "gpt-5.3-codex-spark", name: "gpt-5.3-codex-spark" },
+    { id: "gpt-5.2", name: "gpt-5.2" },
+  ],
+  "github-copilot": [
+    { id: "claude-opus-4.7", name: "claude-opus-4.7" },
+    { id: "claude-opus-4.6", name: "claude-opus-4.6" },
+    { id: "claude-opus-4.5", name: "claude-opus-4.5" },
+    { id: "claude-sonnet-4.6", name: "claude-sonnet-4.6" },
+    { id: "claude-sonnet-4.5", name: "claude-sonnet-4.5" },
+    { id: "claude-haiku-4.5", name: "claude-haiku-4.5" },
+    { id: "gpt-5.4", name: "gpt-5.4" },
+    { id: "gpt-5.4-mini", name: "gpt-5.4-mini" },
+  ],
+  "anthropic": [
+    { id: "claude-opus-4-6", name: "claude-opus-4-6" },
+    { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+    { id: "claude-haiku-4-5", name: "claude-haiku-4-5" },
+    { id: "claude-sonnet-4-5", name: "claude-sonnet-4-5" },
+    { id: "claude-3-7-sonnet-latest", name: "claude-3-7-sonnet-latest" },
+  ],
+};
+
+const OAUTH_PROVIDERS = [
+  {
+    id: "openai-codex",
+    name: "OpenAI Codex",
+    descriptionKey: "api.oauthOpenAIDesc",
+    noteKey: "",
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+        <path d="M12 2L21 7.5V17.5L12 23L3 17.5V7.5L12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M12 7L17 10V16L12 19L7 16V10L12 7Z" fill="currentColor" opacity="0.3" />
+      </svg>
+    ),
+  },
+  {
+    id: "github-copilot",
+    name: "GitHub Copilot",
+    descriptionKey: "api.oauthGitHubDesc",
+    noteKey: "",
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+        <circle cx="9" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="15" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="12" cy="12" r="2" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    descriptionKey: "api.oauthAnthropicDesc",
+    noteKey: "api.oauthAnthropicNote",
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+        <path d="M12 3L20 9V15L12 21L4 15V9L12 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M17 9L12 12.5L7 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12 12.5V18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+] as const;
 
 function sortedPresetModels(
   preset: ProviderPreset,
@@ -104,18 +174,25 @@ function modelsPresetForDraft(
     if (customProtocol === "gemini") return presets.gemini;
     return presets.custom;
   }
+  if (provider === "oauth") {
+    return { name: "OAuth", models: [], baseUrl: "", keyPlaceholder: "", keyHint: "" };
+  }
   return (presets as unknown as Record<string, ProviderPreset>)[provider];
 }
 
-function requiresApiKey(): boolean {
+function requiresApiKey(provider?: ProviderType): boolean {
+  if (provider === "oauth") return false;
   return true;
 }
 
 function hasUsableCredentials(
-  _profileKey: ProviderProfileKey,
+  profileKey: ProviderProfileKey,
   config: ApiProviderConfig,
 ): boolean {
   if (!config.defaultModel.trim()) return false;
+  // OAuth providers store credentials in auth.json, not apiKey field
+  if (profileKey.startsWith("oauth:")) return true;
+  // OAuth providers are validated via auth.json, not config apiKey (which is always "")
   const apiKey = config.apiKey.trim();
   return Boolean(apiKey);
 }
@@ -177,7 +254,7 @@ function sanitizeDraft(
   );
   const presetModels = sortedPresetModels(preset);
 
-  if (draft.provider !== "custom") {
+  if (draft.provider !== "custom" && draft.provider !== "oauth") {
     return {
       ...draft,
       name: draft.name.trim(),
@@ -273,6 +350,14 @@ export function SettingsAPI({
   const [visionError, setVisionError] = useState("");
   const [visionSuccess, setVisionSuccess] = useState("");
 
+  // ── OAuth state ──
+  const [oauthStatuses, setOAuthStatuses] = useState<
+    Record<string, { loggedIn: boolean; expiresAt?: number; providerName: string }>
+  >({});
+  const [oauthLoading, setOAuthLoading] = useState<Record<string, boolean>>({});
+  const [oauthErrors, setOAuthErrors] = useState<Record<string, string>>({});
+  const [pendingOAuthLogoutProviderId, setPendingOAuthLogoutProviderId] = useState<string | null>(null);
+
   const isVisionConfigured = !!(appConfig?.visionModel?.model?.trim());
 
   useEffect(() => {
@@ -295,6 +380,16 @@ export function SettingsAPI({
       if (nextConfig.visionModel) {
         setVisionDraft(nextConfig.visionModel);
       }
+      // Load OAuth statuses
+      const statuses: Record<string, unknown> = {};
+      for (const provider of OAUTH_PROVIDERS) {
+        try {
+          statuses[provider.id] = await window.electronAPI.auth.status(provider.id);
+        } catch {
+          statuses[provider.id] = { loggedIn: false, providerName: provider.name };
+        }
+      }
+      setOAuthStatuses(statuses as typeof oauthStatuses);
       setIsLoadingConfig(false);
     })();
     return () => {
@@ -359,7 +454,7 @@ export function SettingsAPI({
         return;
       }
     }
-    if (requiresApiKey() && !sanitized.apiKey) {
+    if (requiresApiKey(sanitized.provider) && !sanitized.apiKey) {
       setError(t("api.enterApiKey"));
       return;
     }
@@ -560,6 +655,112 @@ export function SettingsAPI({
     });
   };
 
+  // ── OAuth handlers ──
+  const handleOAuthLogin = async (providerId: string) => {
+    if (!window.electronAPI) return;
+    setOAuthLoading((prev) => ({ ...prev, [providerId]: true }));
+    setOAuthErrors((prev) => {
+      const next = { ...prev };
+      delete next[providerId];
+      return next;
+    });
+    try {
+      // Only force re-auth if the existing token has expired
+      const currentStatus = oauthStatuses[providerId];
+      const force = Boolean(
+        currentStatus?.loggedIn &&
+        currentStatus?.expiresAt &&
+        Date.now() / 1000 > currentStatus.expiresAt,
+      );
+      await window.electronAPI.auth.login(providerId, force);
+
+      // Save OAuth provider to ConfigStore FIRST, before updating UI status.
+      // If saveProvider or setActiveProvider fails, the UI won't show
+      // a misleading "connected" state.
+      const models = OAUTH_PROVIDER_MODELS[providerId];
+      if (models?.length) {
+        const profileKey: ProviderProfileKey = oauthProfileKey(providerId);
+        const providerInfo = OAUTH_PROVIDERS.find((p) => p.id === providerId);
+        await window.electronAPI.config.saveProvider({
+          profileKey,
+          config: {
+            provider: "oauth",
+            customProtocol: "anthropic",
+            name: providerInfo?.name || providerId,
+            apiKey: "", // credentials live in auth.json
+            baseUrl: "",
+            defaultModel: models[0].id,
+            models: models.map((m) => ({
+              id: m.id,
+              label: m.name || m.id,
+              source: "preset" as const,
+            })),
+            updatedAt: new Date().toISOString(),
+          },
+        });
+        // Switch active provider to the newly logged-in OAuth provider
+        await window.electronAPI.config.setActiveProvider({
+          profileKey,
+          defaultModel: models[0].id,
+        });
+        const updatedConfig = await window.electronAPI.config.get();
+        applyConfig(updatedConfig);
+      } else {
+        // If no known models, log a warning but still let the user proceed.
+        // The model selector may be empty — they can refine models later.
+        console.warn(`[OAuth] No preset models for ${providerId}; provider saved without models.`);
+      }
+
+      // Only update UI after config save succeeded
+      const status = await window.electronAPI.auth.status(providerId);
+      setOAuthStatuses((prev) => ({ ...prev, [providerId]: status }));
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Login failed";
+      setOAuthErrors((prev) => ({ ...prev, [providerId]: message }));
+    } finally {
+      setOAuthLoading((prev) => ({ ...prev, [providerId]: false }));
+    }
+  };
+
+  const handleOAuthLogout = async (providerId: string) => {
+    if (!window.electronAPI) return;
+    await window.electronAPI.auth.logout(providerId);
+    setOAuthStatuses((prev) => ({
+      ...prev,
+      [providerId]: {
+        loggedIn: false,
+        providerName: prev[providerId]?.providerName || providerId,
+      },
+    }));
+    // Reset any stale error from a previous login attempt
+    setOAuthErrors((prev) => {
+      const next = { ...prev };
+      delete next[providerId];
+      return next;
+    });
+    // Remove provider from ConfigStore so it disappears from model selector
+    try {
+      const profileKey: ProviderProfileKey = oauthProfileKey(providerId);
+      const deleted = await window.electronAPI.config.deleteProvider({
+        profileKey,
+      });
+      applyConfig(deleted.config);
+    } catch {
+      // Provider may not exist in config yet — ignore
+    }
+  };
+
+  const confirmDisconnectOAuth = async (providerId: string) => {
+    if (!window.electronAPI) return;
+    setPendingOAuthLogoutProviderId(null);
+    await handleOAuthLogout(providerId);
+  };
+
+  const closeOAuthDisconnectDialog = () => {
+    setPendingOAuthLogoutProviderId(null);
+  };
+
   const updateDraft = (patch: Partial<ProviderDraft>) => {
     setDraft((current) => {
       if (!current) return current;
@@ -740,6 +941,85 @@ export function SettingsAPI({
               {t("api.addApi")}
             </button>
           )}
+
+          {/* ── OAuth Section ── */}
+          <div className="mt-6 border-t border-border-muted pt-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
+                {t("api.oauthSectionTitle")}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {OAUTH_PROVIDERS.map((provider) => {
+                const status = oauthStatuses[provider.id];
+                const loading = oauthLoading[provider.id] || false;
+                const isConnected = status?.loggedIn;
+
+                return (
+                  <div
+                    key={provider.id}
+                    className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 ${
+                      isConnected
+                        ? "border-success/30 bg-success/5"
+                        : "border-border-muted bg-surface"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="text-lg flex-shrink-0 text-text-primary">{provider.icon}</span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-text-primary">
+                            {provider.name}
+                          </span>
+                          {isConnected && (
+                            <span className="inline-flex items-center gap-1 text-xs text-success">
+                              <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                              {t("api.oauthConnected")}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-text-muted mt-0.5">
+                          {isConnected
+                            ? t("api.oauthConnectedDesc", {
+                                provider: provider.name,
+                              })
+                            : t(provider.descriptionKey)}
+                        </div>
+                        {!isConnected && provider.noteKey && (
+                          <div className="text-xs text-warning mt-1">
+                            {t(provider.noteKey)}
+                          </div>
+                        )}
+                        {oauthErrors[provider.id] && (
+                          <div className="text-xs text-error mt-1">
+                            {oauthErrors[provider.id]}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {isConnected ? (
+                      <button
+                        type="button"
+                        onClick={() => setPendingOAuthLogoutProviderId(provider.id)}
+                        className="rounded-lg border border-border-muted px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-error flex-shrink-0"
+                      >
+                        {t("api.oauthDisconnect")}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => void handleOAuthLogin(provider.id)}
+                        disabled={loading}
+                        className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50 flex-shrink-0"
+                      >
+                        {loading ? t("api.oauthLoggingIn") : t("api.oauthLoginBtn")}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1053,6 +1333,47 @@ export function SettingsAPI({
           </div>
         </div>
       )}
+
+      {pendingOAuthLogoutProviderId && (() => {
+        const pid = pendingOAuthLogoutProviderId;
+        const p = OAUTH_PROVIDERS.find((pp) => pp.id === pid);
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+            <div className="mx-4 w-full max-w-md rounded-2xl border border-border-muted bg-background shadow-xl">
+              <div className="border-b border-border-muted px-5 py-4">
+                <h3 className="text-sm font-medium text-text-primary">
+                  {t("api.oauthDisconnect")}
+                </h3>
+              </div>
+              <div className="space-y-4 px-5 py-4">
+                <p className="text-sm text-text-secondary">
+                  {t("api.oauthDisconnectConfirm", {
+                    name: p?.name || pid,
+                  })}
+                </p>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closeOAuthDisconnectDialog}
+                    className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                  >
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void confirmDisconnectOAuth(pid);
+                    }}
+                    className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90"
+                  >
+                    {t("api.oauthDisconnect")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {pendingDeleteProfileKey && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
