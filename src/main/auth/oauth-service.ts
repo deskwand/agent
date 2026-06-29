@@ -100,6 +100,7 @@ function showBrowserDialog(opts: {
       maximizable: false,
       alwaysOnTop: true,
       title: opts.title,
+      // contextIsolation disabled to read __dialogResult via executeJavaScript (data: URL, no XSS risk)
       webPreferences: { nodeIntegration: false, contextIsolation: false },
     });
 
@@ -135,45 +136,12 @@ ${inputHtml}
   });
 }
 
-function showAuthBrowserWindow(url: string): Promise<void> {
-  return new Promise((resolve) => {
-    const win = new BrowserWindow({
-      width: 800,
-      height: 700,
-      title: "Authorize",
-      webPreferences: { nodeIntegration: false, contextIsolation: true },
-    });
-
-    let resolved = false;
-    const done = () => {
-      if (resolved) return;
-      resolved = true;
-      clearTimeout(timeout);
-      try { win.close(); } catch { /* ignore */ }
-      resolve();
-    };
-
-    const timeout = setTimeout(done, 120_000); // 2 min fallback
-
-    win.webContents.on("will-redirect", (_event, url) => {
-      if (url.startsWith("http://localhost:") || url.startsWith("https://localhost:")) {
-        done();
-      }
-    });
-
-    win.webContents.on("did-fail-load", () => {
-      done();
-    });
-
-    win.on("closed", done);
-    void win.loadURL(url);
-  });
-}
-
 function createOAuthCallbacks(): OAuthLoginCallbacks {
   return {
     onAuth: (info) => {
-      void showAuthBrowserWindow(info.url);
+      // Redirects to localhost callback handled by pi-ai's local server.
+      // Requires system proxy to bypass localhost (NO_PROXY=localhost,127.0.0.1).
+      void shell.openExternal(info.url);
     },
 
     onDeviceCode: (info) => {
