@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { List, useDynamicRowHeight } from "react-window";
 import {
   useActiveSessionId,
   useCurrentSession,
@@ -177,16 +178,17 @@ export function ChatView() {
   const headerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const connectorMeasureRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const listRef = useRef<{ element: HTMLDivElement; scrollToRow(config: { index: number; align?: string; behavior?: string }): void } | null>(null);
+  const dynamicRowHeight = useDynamicRowHeight({
+    defaultRowHeight: 200,
+    key: activeSessionId ?? undefined,
+  });
   const isUserAtBottomRef = useRef(true);
   const autoFollowRef = useRef(true);
   const prevMessageCountRef = useRef(0);
   const prevPartialLengthRef = useRef(0);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollRequestRef = useRef<number | null>(null);
-  const isScrollingRef = useRef(false);
+  const isSmoothScrollingRef = useRef(false);
   const chatInputRef = useRef<ChatInputHandle>(null);
 
   const hasActiveTurn = Boolean(activeTurn);
@@ -452,93 +454,52 @@ export function ChatView() {
     });
   }, [displayedMessages, effectiveTraceExpanded]);
 
-  const updateScrollToBottomVisibility = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return true;
+  const syncAutoFollowState = useCallback(() => {
+    const container = listRef.current?.element;
+    if (!container) return;
     const distanceToBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
     const isAtBottom = distanceToBottom <= 80;
     isUserAtBottomRef.current = isAtBottom;
-    return isAtBottom;
+    autoFollowRef.current = isAtBottom;
+    setShowScrollToBottom(!isAtBottom);
   }, []);
 
-  const syncAutoFollowState = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const isAtBottom = updateScrollToBottomVisibility();
-    autoFollowRef.current = isAtBottom;
-    setShowScrollToBottom(!autoFollowRef.current);
-  }, [updateScrollToBottomVisibility]);
-
-  // Debounced scroll function to prevent scroll conflicts
-  const scrollToBottom = useRef(
-    (behavior: ScrollBehavior = "auto", immediate: boolean = false) => {
-      // Cancel any pending scroll requests
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = null;
-      }
-      if (scrollRequestRef.current) {
-        cancelAnimationFrame(scrollRequestRef.current);
-        scrollRequestRef.current = null;
-      }
-
-      const performScroll = () => {
-        if (!autoFollowRef.current) return;
-
-        // Mark as scrolling to prevent concurrent scrolls
-        isScrollingRef.current = true;
-
-        messagesEndRef.current?.scrollIntoView({ behavior });
-
-        // Reset scrolling flag after a short delay
-        setTimeout(
-          () => {
-            isScrollingRef.current = false;
-          },
-          behavior === "smooth" ? 300 : 50,
-        );
-      };
-
-      if (immediate) {
-        performScroll();
-      } else {
-        // Use RAF + timeout for debouncing
-        scrollRequestRef.current = requestAnimationFrame(() => {
-          scrollTimeoutRef.current = setTimeout(performScroll, 16); // ~1 frame delay
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = "auto") => {
+      if (!autoFollowRef.current) return;
+      const container = listRef.current?.element;
+      if (!container) return;
+      if (behavior === "smooth") {
+        isSmoothScrollingRef.current = true;
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
         });
+        setTimeout(() => { isSmoothScrollingRef.current = false; }, 350);
+      } else {
+        container.scrollTop = container.scrollHeight;
       }
     },
-  ).current;
+    [],
+  );
 
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
+  // Sync scroll state on manual scroll; pass onScroll/onWheel to List props below
+  const handleVirtualScroll = useCallback(() => {
     syncAutoFollowState();
-    const onScroll = () => syncAutoFollowState();
-    container.addEventListener("scroll", onScroll, { passive: true });
-    // ponytail: wheel fires before any pixel moves — beats the 80px isAtBottom
-    // threshold race with incoming stream tokens during high-speed scrolling.
-    const onWheel = (e: WheelEvent) => {
-      if (e.deltaY < 0) autoFollowRef.current = false;
-    };
-    container.addEventListener("wheel", onWheel, { passive: true });
-    return () => {
-      container.removeEventListener("scroll", onScroll);
-      container.removeEventListener("wheel", onWheel);
-    };
   }, [syncAutoFollowState]);
 
-  useEffect(() => {
-    updateScrollToBottomVisibility();
-  }, [
-    updateScrollToBottomVisibility,
-    messages.length,
-    partialMessage.length,
-    partialThinking.length,
-    displayedMessages.length,
-  ]);
+  const handleVirtualWheel = useCallback((e: React.WheelEvent) => {
+    if (e.deltaY < 0) autoFollowRef.current = false;
+  }, []);
 
+  useEffect(() => {
+    const container = listRef.current?.element;
+    if (!container) return;
+    syncAutoFollowState();
+  }, [syncAutoFollowState, messages.length]);
+
+  // Streaming scroll: keep following during token ticks unless user scrolled away
   useEffect(() => {
     const messageCount = messages.length;
     const partialLength = partialMessage.length + partialThinking.length;
@@ -546,78 +507,47 @@ export function ChatView() {
     const isStreamingTick =
       partialLength !== prevPartialLengthRef.current && !hasNewMessage;
 
-    // Streaming tick: keep following unless the user explicitly scrolled away.
-    // Mark as programmatic so the resulting scroll event does NOT reset
-    // autoFollowRef back to true (race with user's scroll-up event).
-    if (isStreamingTick && autoFollowRef.current) {
-      const container = scrollContainerRef.current;
+    if (isStreamingTick && autoFollowRef.current && !isSmoothScrollingRef.current) {
+      const container = listRef.current?.element;
       if (container) {
         container.scrollTop = container.scrollHeight;
       }
     }
 
-    // Own new message: scroll directly to bottom, bypassing scroll guards
-    // (useEffect B runs after useEffect A flips isUserAtBottomRef=false,
-    //  so we must scroll before the isUserAtBottomRef check)
     const isOwnNewMessage =
       hasNewMessage && messages[messages.length - 1]?.role === "user";
     if (isOwnNewMessage) {
       autoFollowRef.current = true;
-      const container = scrollContainerRef.current;
+      const container = listRef.current?.element;
       if (container) {
-        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: "smooth",
+        });
       }
     }
 
-    // Skip scroll if already scrolling (prevent non-streaming conflicts)
-    if (isScrollingRef.current) {
-      prevMessageCountRef.current = messageCount;
-      prevPartialLengthRef.current = partialLength;
-      return;
-    }
-
-    if (autoFollowRef.current) {
-      if (!isStreamingTick && !isOwnNewMessage) {
-        // New message from others or message change - keep following until user scrolls away
-        const behavior: ScrollBehavior = hasNewMessage ? "smooth" : "auto";
-        scrollToBottom(behavior, false);
-      }
+    if (autoFollowRef.current && !isStreamingTick && !isOwnNewMessage && hasNewMessage) {
+      scrollToBottom(hasNewMessage ? "smooth" : "auto");
     }
 
     prevMessageCountRef.current = messageCount;
     prevPartialLengthRef.current = partialLength;
-  }, [messages.length, partialMessage.length, partialThinking.length]);
+  }, [
+    messages.length,
+    partialMessage.length,
+    partialThinking.length,
+    scrollToBottom,
+  ]);
 
-  // Additional scroll trigger for content height changes (e.g., TodoWrite expand/collapse)
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    const messagesContainer = messagesContainerRef.current;
-    if (!container || !messagesContainer) return;
+  // react-window's useDynamicRowHeight handles content height changes via ResizeObserver internally.
+  // No separate ResizeObserver needed.
 
-    const resizeObserver = new ResizeObserver(() => {
-      // Don't interfere with ongoing scrolls
-      if (!isScrollingRef.current && autoFollowRef.current) {
-        // Scroll to bottom when content height changes while auto-follow is active
-        scrollToBottom("auto", false);
-      }
-    });
-
-    resizeObserver.observe(messagesContainer);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, []); // ResizeObserver is stable — no need to recreate on message count changes
-
-  // Cleanup scroll timeouts on unmount
+  // Cleanup scroll state on unmount
   useEffect(() => {
     return () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-      if (scrollRequestRef.current) {
-        cancelAnimationFrame(scrollRequestRef.current);
-      }
+      prevMessageCountRef.current = 0;
+      prevPartialLengthRef.current = 0;
     };
   }, []);
 
@@ -627,7 +557,7 @@ export function ChatView() {
     autoFollowRef.current = true;
     setIsInputExpanded(false);
     const rafId = requestAnimationFrame(() => {
-      scrollToBottom("auto", true);
+      scrollToBottom("auto");
     });
     return () => cancelAnimationFrame(rafId);
   }, [activeSessionId]);
@@ -636,7 +566,7 @@ export function ChatView() {
   useEffect(() => {
     if (!isInputExpanded) return;
     const raf = requestAnimationFrame(() => {
-      scrollToBottomByButton();
+      scrollToBottom("smooth");
     });
     return () => cancelAnimationFrame(raf);
   }, [isInputExpanded]);
@@ -841,14 +771,6 @@ export function ChatView() {
     chatInputRef.current?.submit();
   }, []);
 
-  const scrollToBottomByButton = () => {
-    if (isScrollingRef.current) return;
-    autoFollowRef.current = true;
-    isUserAtBottomRef.current = true;
-    setShowScrollToBottom(false);
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
   if (!activeSession) {
     return (
       <div className="flex-1 flex items-center justify-center text-text-muted">
@@ -856,6 +778,33 @@ export function ChatView() {
       </div>
     );
   }
+
+  const MessageRow = useCallback(
+    ({
+      index,
+      style,
+      turnEntries: entries,
+    }: {
+      index: number;
+      style: React.CSSProperties;
+      turnEntries: typeof turnEntries;
+    }) => {
+      const entry = entries[index];
+      if (!entry) return null;
+      return (
+        <div style={style}>
+          <div className="chat-message-item space-y-1.5 py-2.5">
+            <MessageCard
+              message={entry.message}
+              isStreaming={entry.isStreaming}
+              hideTraceBlocks={entry.hideTraceBlocks}
+            />
+          </div>
+        </div>
+      );
+    },
+    [],
+  );
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-background">
@@ -872,44 +821,41 @@ export function ChatView() {
 
       {/* Messages */}
       <div className="relative flex-1 min-h-0 min-w-0">
-        <div
-          ref={scrollContainerRef}
-          className="h-full min-h-0 overflow-y-auto overflow-x-hidden"
-          style={{ overflowAnchor: "none" }}
-        >
-          <div
-            ref={messagesContainerRef}
-            className="w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
-          >
-            {displayedMessages.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-28 text-text-muted space-y-3 text-center">
-                <p className="text-xs uppercase tracking-[0.16em] text-text-muted/80">
-                  DeskWand
-                </p>
-                <p className="text-base text-text-secondary">
-                  {t("chat.startConversation")}
-                </p>
-              </div>
-            ) : (
-              turnEntries.map(({ message, isStreaming, hideTraceBlocks }) => (
-                <div key={message.id} className="space-y-1.5">
-                  <MessageCard
-                    message={message}
-                    isStreaming={isStreaming}
-                    hideTraceBlocks={hideTraceBlocks}
-                  />
-                </div>
-              ))
-            )}
-
-            <div ref={messagesEndRef} />
+        {displayedMessages.length === 0 ? (
+          <div className="h-full w-full max-w-[920px] mx-auto px-5 lg:px-8 flex items-center justify-center">
+            <div className="flex flex-col items-center text-text-muted space-y-3 text-center">
+              <p className="text-xs uppercase tracking-[0.16em] text-text-muted/80">
+                DeskWand
+              </p>
+              <p className="text-base text-text-secondary">
+                {t("chat.startConversation")}
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="h-full w-full max-w-[920px] mx-auto px-5 lg:px-8">
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <List
+              {...{
+                listRef: listRef as any,
+                rowComponent: MessageRow as any,
+                rowProps: { turnEntries } as any,
+                rowCount: turnEntries.length,
+                rowHeight: dynamicRowHeight as any,
+                className: "h-full min-h-0",
+                style: { overflowAnchor: "none" },
+                overscanCount: 3,
+                onScroll: handleVirtualScroll as any,
+                onWheel: handleVirtualWheel as any,
+              }}
+            />
+          </div>
+        )}
 
         {showScrollToBottom && (
           <button
             type="button"
-            onClick={scrollToBottomByButton}
+            onClick={() => scrollToBottom("smooth")}
             aria-label="Scroll to bottom"
             className="absolute right-5 lg:right-8 bottom-6 z-20 w-10 h-10 rounded-full bg-surface text-text-secondary hover:bg-surface-hover hover:text-text-primary shadow-elevated transition-colors flex items-center justify-center"
           >

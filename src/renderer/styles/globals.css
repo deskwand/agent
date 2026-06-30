@@ -736,6 +736,12 @@
     margin: 0.25rem 0 0;
   }
 
+  /* Performance: skip layout/paint for off-screen message items */
+  .chat-message-item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 200px;
+  }
+
   /* Code block */
   .code-block {
     @apply bg-surface-muted rounded-xl p-4 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-w-full;
