@@ -13,7 +13,7 @@ import type {
   PartialToolResult,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
-import { SIDEBAR_DEFAULT_MAX_VISIBLE } from "../constants";
+
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
@@ -103,11 +103,6 @@ interface AppState {
   // UI state
   isLoading: boolean;
   sidebarCollapsed: boolean;
-  conversationsCollapsed: boolean;
-  projectsCollapsed: boolean;
-  workspaceCollapsedMap: Record<string, boolean>;
-  conversationsMaxVisible: number;
-  workspaceMaxVisibleMap: Record<string, number>;
   sidebarWidth: number;
   contextPanelWidth: number;
   showSettings: boolean;
@@ -146,6 +141,9 @@ interface AppState {
 
   // Sandbox sync (per-session)
   sandboxSyncStatus: SandboxSyncStatus | null;
+
+  // Task slots — running/completed sessions pinned above the sidebar list
+  taskSlots: TaskSlot[];
 
   // System theme (from OS native theme)
   systemDarkMode: boolean;
@@ -218,15 +216,7 @@ interface AppState {
 
   setLoading: (loading: boolean) => void;
   toggleSidebar: () => void;
-  toggleConversations: () => void;
-  toggleProjects: () => void;
-  toggleWorkspaceCollapsed: (cwd: string) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  setConversationsCollapsed: (collapsed: boolean) => void;
-  setProjectsCollapsed: (collapsed: boolean) => void;
-  setWorkspaceCollapsedMap: (map: Record<string, boolean>) => void;
-  setConversationsMaxVisible: (count: number) => void;
-  setWorkspaceMaxVisible: (cwd: string, count: number) => void;
   setSidebarWidth: (width: number) => void;
   setContextPanelWidth: (width: number) => void;
   setShowSettings: (show: boolean) => void;
@@ -277,6 +267,10 @@ interface AppState {
     result: PartialToolResult | null,
   ) => void;
 
+  // Task slot actions
+  setTaskSlots: (slots: TaskSlot[]) => void;
+  removeTaskSlot: (sessionId: string) => void;
+
   // System theme actions
   setSystemDarkMode: (dark: boolean) => void;
 }
@@ -317,11 +311,6 @@ export const useAppStore = create<AppState>((set) => ({
   sessionStates: {},
   isLoading: false,
   sidebarCollapsed: false,
-  conversationsCollapsed: false,
-  projectsCollapsed: false,
-  workspaceCollapsedMap: {},
-  conversationsMaxVisible: SIDEBAR_DEFAULT_MAX_VISIBLE,
-  workspaceMaxVisibleMap: {},
   sidebarWidth: 280,
   contextPanelWidth: 288,
   showSettings: false,
@@ -346,6 +335,7 @@ export const useAppStore = create<AppState>((set) => ({
   sandboxSetupProgress: null,
   isSandboxSetupComplete: false,
   sandboxSyncStatus: null,
+  taskSlots: [],
   systemDarkMode: false,
   isBrowserFullscreen: false,
   browserFullscreenSnapshot: null as {
@@ -742,31 +732,7 @@ export const useAppStore = create<AppState>((set) => ({
   setLoading: (loading) => set({ isLoading: loading }),
   toggleSidebar: () =>
     set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
-  toggleConversations: () =>
-    set((state) => ({ conversationsCollapsed: !state.conversationsCollapsed })),
-  toggleProjects: () =>
-    set((state) => ({ projectsCollapsed: !state.projectsCollapsed })),
-  toggleWorkspaceCollapsed: (cwd) =>
-    set((state) => ({
-      workspaceCollapsedMap: {
-        ...state.workspaceCollapsedMap,
-        [cwd]: !state.workspaceCollapsedMap[cwd],
-      },
-    })),
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
-  setConversationsCollapsed: (collapsed) =>
-    set({ conversationsCollapsed: collapsed }),
-  setProjectsCollapsed: (collapsed) => set({ projectsCollapsed: collapsed }),
-  setWorkspaceCollapsedMap: (map) => set({ workspaceCollapsedMap: map }),
-  setConversationsMaxVisible: (count) =>
-    set({ conversationsMaxVisible: count }),
-  setWorkspaceMaxVisible: (cwd, count) =>
-    set((state) => ({
-      workspaceMaxVisibleMap: {
-        ...state.workspaceMaxVisibleMap,
-        [cwd]: count,
-      },
-    })),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   setContextPanelWidth: (width) => set({ contextPanelWidth: width }),
   setShowSettings: (show) => set({ showSettings: show }),
@@ -840,6 +806,13 @@ export const useAppStore = create<AppState>((set) => ({
   // Sandbox sync actions
   setSandboxSyncStatus: (status) => set({ sandboxSyncStatus: status }),
 
+  // Task slot actions
+  setTaskSlots: (slots) => set({ taskSlots: slots }),
+  removeTaskSlot: (sessionId) =>
+    set((state) => ({
+      taskSlots: state.taskSlots.filter((s) => s.sessionId !== sessionId),
+    })),
+
   // Context window actions
   setSessionContextWindow: (sessionId, contextWindow) =>
     set((state) => ({
@@ -895,6 +868,11 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 }));
+
+export interface TaskSlot {
+  sessionId: string;
+  completed: boolean;
+}
 
 // Expose helpers for nav-server (CLI-driven UI navigation via executeJavaScript)
 if (typeof window !== "undefined") {

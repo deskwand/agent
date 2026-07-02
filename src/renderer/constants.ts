@@ -1,2 +1,1 @@
-/** Sidebar default visible session count (collapsed state). */
-export const SIDEBAR_DEFAULT_MAX_VISIBLE = 5;
+// Constants removed — previously contained SIDEBAR_DEFAULT_MAX_VISIBLE

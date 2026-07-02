@@ -384,7 +384,7 @@ export class SessionManager {
     return {
       id: uuidv4(),
       title,
-      status: "idle",
+      status: "running",
       cwd: effectiveCwd,
       mountedPaths: this.buildMountedPaths(effectiveCwd),
       allowedTools: allowedTools || [

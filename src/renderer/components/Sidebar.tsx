@@ -3,31 +3,20 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import {
-  ChevronRight,
-  ChevronDown,
   Trash2,
   Settings,
   Clock3,
   Store,
   Search as SearchIcon,
-  Plus,
   ListChecks,
   Check,
   Folder,
-  SquarePen,
   Archive,
   Globe,
+  ChevronDown,
 } from "lucide-react";
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
-import { SIDEBAR_DEFAULT_MAX_VISIBLE } from "../constants";
-
-type ProjectWorkspaceGroup = {
-  key: string;
-  cwd: string;
-  workspaceName: string;
-  sessions: Session[];
-};
 
 export function Sidebar({ width = 280 }: { width?: number }) {
   const { t, i18n } = useTranslation();
@@ -40,22 +29,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const workingDir = useAppStore((s) => s.workingDir);
   const setWorkingDir = useAppStore((s) => s.setWorkingDir);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
-  const conversationsCollapsed = useAppStore((s) => s.conversationsCollapsed);
-  const projectsCollapsed = useAppStore((s) => s.projectsCollapsed);
-  const workspaceCollapsedMap = useAppStore((s) => s.workspaceCollapsedMap);
-  const conversationsMaxVisible = useAppStore((s) => s.conversationsMaxVisible);
-  const workspaceMaxVisibleMap = useAppStore((s) => s.workspaceMaxVisibleMap);
-  const toggleConversations = useAppStore((s) => s.toggleConversations);
-  const toggleProjects = useAppStore((s) => s.toggleProjects);
-  const toggleWorkspaceCollapsed = useAppStore(
-    (s) => s.toggleWorkspaceCollapsed,
-  );
-  const setConversationsMaxVisible = useAppStore(
-    (s) => s.setConversationsMaxVisible,
-  );
-  const setWorkspaceMaxVisible = useAppStore(
-    (s) => s.setWorkspaceMaxVisible,
-  );
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const showSchedule = useAppStore((s) => s.showSchedule);
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
@@ -63,6 +36,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
+  const taskSlots = useAppStore((s) => s.taskSlots);
+  const removeTaskSlot = useAppStore((s) => s.removeTaskSlot);
+  const setTaskSlots = useAppStore((s) => s.setTaskSlots);
 
   const {
     invoke,
@@ -74,11 +50,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     getSessionTraceSteps,
     changeWorkingDir,
     createProject,
-    deleteProject,
     isElectron,
   } = useIPC();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [projectFilter, setProjectFilter] = useState<string | null>(null);
+  const [projectExpandedMap, setProjectExpandedMap] = useState<
+    Record<string, boolean>
+  >({});
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showProjectActions, setShowProjectActions] = useState(false);
@@ -93,7 +72,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [hoveredTimeSessionId, setHoveredTimeSessionId] = useState<
     string | null
   >(null);
-  const [openedProjectCwds, setOpenedProjectCwds] = useState<string[]>([]);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     message: string;
     onConfirm: () => void;
@@ -120,33 +98,18 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       : activeSessions;
   }, [activeSessions, normalizedQuery]);
 
-  const { conversationSessions, projectSessions } = useMemo(() => {
-    const conversation: Session[] = [];
-    const project: Session[] = [];
-
-    for (const session of filteredSessions) {
-      if (session.isProjectMode) {
-        project.push(session);
-      } else {
-        conversation.push(session);
-      }
+  // Unique project names with their cwds for the ▾ menu
+  const projectEntries = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of activeSessions) {
+      if (!s.isProjectMode || !s.cwd || isDefaultWorkspacePath(s.cwd)) continue;
+      const name = getWorkspaceName(s.cwd);
+      if (!map.has(name)) map.set(name, s.cwd);
     }
-
-    return { conversationSessions: conversation, projectSessions: project };
-  }, [filteredSessions]);
-
-  const sortedConversationSessions = useMemo(
-    () =>
-      [...conversationSessions].sort(
-        (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
-      ),
-    [conversationSessions],
-  );
-
-  const groupedProjectWorkspaces = useMemo(
-    () => groupProjectSessionsByWorkspace(projectSessions, openedProjectCwds),
-    [projectSessions, openedProjectCwds],
-  );
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, cwd]) => ({ name, cwd }));
+  }, [activeSessions]);
 
   useEffect(() => {
     if (sidebarCollapsed && isSelectMode) {
@@ -168,18 +131,67 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   }, [isSelectMode]);
 
   useEffect(() => {
-    if (isSelectMode) {
-      setSelectedIds(new Set());
+    if (!normalizedQuery) {
+      setProjectFilter(null);
     }
-  }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [normalizedQuery]);
 
+  // Sync taskSlots with session running/completed status.
+  // Guard: only trigger on sessions change; taskSlots updates from this effect
+  // should not cause re-entry that clears slots before runningIds are checked.
+  const prevSessionsRef = useRef(sessions);
   useEffect(() => {
-    const cwd = normalizeWorkspacePath(workingDir);
-    if (!cwd || isDefaultWorkspacePath(cwd)) return;
-    setOpenedProjectCwds((prev) =>
-      prev.includes(cwd) ? prev : [cwd, ...prev],
+    const sessionsChanged = prevSessionsRef.current !== sessions;
+    prevSessionsRef.current = sessions;
+
+    const runningIds = new Set(
+      sessions.filter((s) => s.status === "running").map((s) => s.id),
     );
-  }, [workingDir]);
+    const allIds = new Set(sessions.filter((s) => !s.archived).map((s) => s.id));
+    const currentSlotMap = new Map(taskSlots.map((s) => [s.sessionId, s.completed]));
+
+    let slots = [...taskSlots];
+    let changed = false;
+
+    // Remove slots for archived/deleted sessions (only when sessions actually changed)
+    if (sessionsChanged) {
+      const filtered = slots.filter((s) => allIds.has(s.sessionId));
+      if (filtered.length !== slots.length) {
+        slots = filtered;
+        changed = true;
+      }
+    }
+
+    // Add newly running sessions (only when sessions changed and there are runners)
+    if (sessionsChanged && runningIds.size > 0) {
+      for (const id of runningIds) {
+        if (!currentSlotMap.has(id)) {
+          slots = [{ sessionId: id, completed: false }, ...slots];
+          changed = true;
+        }
+      }
+    }
+
+    // Transition completed ↔ running (only when sessions changed)
+    if (sessionsChanged) {
+      slots = slots.map((slot) => {
+        const running = runningIds.has(slot.sessionId);
+        if (running && slot.completed) {
+          changed = true;
+          return { ...slot, completed: false };
+        }
+        if (!running && !slot.completed) {
+          changed = true;
+          return { ...slot, completed: true };
+        }
+        return slot;
+      });
+    }
+
+    if (changed) {
+      setTaskSlots(slots);
+    }
+  }, [sessions, taskSlots, setTaskSlots]);
 
   const exitSelectMode = useCallback(() => {
     setIsSelectMode(false);
@@ -350,20 +362,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     [deleteSession, t],
   );
 
-  const rememberProjectPath = useCallback((rawPath: string) => {
-    const cwd = normalizeWorkspacePath(rawPath);
-    if (!cwd || isDefaultWorkspacePath(cwd)) return;
-    setOpenedProjectCwds((prev) =>
-      prev.includes(cwd) ? prev : [cwd, ...prev],
-    );
-  }, []);
-
-  const forgetProjectPath = useCallback((rawPath: string) => {
-    const cwd = normalizeWorkspacePath(rawPath);
-    if (!cwd) return;
-    setOpenedProjectCwds((prev) => prev.filter((item) => item !== cwd));
-  }, []);
-
   const handleSelectProjectDir = useCallback(
     async (currentPath?: string) => {
       const result = await changeWorkingDir(
@@ -371,9 +369,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         currentPath || workingDir || undefined,
       );
       if (!result?.success) return;
-      rememberProjectPath(result.path);
+      setWorkingDir(result.path);
+      handleNewSession();
     },
-    [changeWorkingDir, rememberProjectPath, workingDir],
+    [changeWorkingDir, handleNewSession, setWorkingDir, workingDir],
   );
 
   const handleOpenProject = useCallback(async () => {
@@ -419,7 +418,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         return;
       }
 
-      rememberProjectPath(result.path);
       if (isElectron) {
         await invoke<{ success: boolean; path: string; error?: string }>({
           type: "workdir.set",
@@ -438,45 +436,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     invoke,
     isElectron,
     projectName,
-    rememberProjectPath,
     setGlobalNotice,
     t,
   ]);
-
-  const handleDeleteProject = useCallback(
-    (cwd: string) => {
-      const normalizedCwd = normalizeWorkspacePath(cwd);
-      if (!normalizedCwd) return;
-      setDeleteConfirm({
-        message: t("sidebar.deleteProjectConfirmWithName", {
-          name: getWorkspaceName(normalizedCwd),
-        }),
-        onConfirm: async () => {
-          try {
-            const result = await deleteProject(normalizedCwd);
-            if (!result.success) {
-              setGlobalNotice({
-                id: `notice-project-delete-failed-${Date.now()}`,
-                type: "error",
-                message: result.error || t("sidebar.deleteProjectFailed"),
-              });
-              return;
-            }
-            forgetProjectPath(normalizedCwd);
-            setDeleteConfirm(null);
-          } catch (error) {
-            console.error("[Sidebar] Failed to delete project:", error);
-            setGlobalNotice({
-              id: `notice-project-delete-failed-${Date.now()}`,
-              type: "error",
-              message: t("sidebar.deleteProjectFailed"),
-            });
-          }
-        },
-      });
-    },
-    [deleteProject, forgetProjectPath, setGlobalNotice, t],
-  );
 
   const handleNewSessionInProject = useCallback(
     async (cwd: string) => {
@@ -486,16 +448,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           payload: { path: cwd },
         });
       }
-      rememberProjectPath(cwd);
       handleNewSession();
     },
-    [handleNewSession, invoke, isElectron, rememberProjectPath],
+    [handleNewSession, invoke, isElectron],
   );
 
   const renderSessionItem = (
     session: Session,
     showRelativeTime: boolean,
-    indent = false,
   ) => {
     const isActive = activeSessionId === session.id;
     const isSelected = selectedIds.has(session.id);
@@ -519,7 +479,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         }`}
       >
         <div className="flex items-center gap-2">
-          {indent && <div className="w-3.5 flex-shrink-0" />}
           {isSelectMode && (
             <div
               className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
@@ -534,7 +493,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
           {session.status === "running" && !isSelectMode && (
             <span
-              className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0"
+              className="w-2 h-2 rounded-full bg-accent animate-pulse flex-shrink-0"
               role="status"
               aria-label={t("sidebar.running")}
             />
@@ -544,6 +503,16 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             <div className="text-sm font-medium leading-5 text-text-primary truncate flex-1">
               {session.title}
             </div>
+            {session.isProjectMode &&
+              session.cwd &&
+              !isDefaultWorkspacePath(session.cwd) && (
+                <span
+                  className="text-[10px] bg-surface-muted text-text-muted px-1.5 py-0.5 rounded flex-shrink-0 truncate max-w-[80px]"
+                  title={getWorkspaceName(session.cwd)}
+                >
+                  {getWorkspaceName(session.cwd)}
+                </span>
+              )}
 
             {showRelativeTime && !isSelectMode && (
               <div
@@ -630,19 +599,81 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       className="bg-surface/96 flex flex-col overflow-hidden"
       style={{ width: `${width}px` }}
     >
-      <div className="px-4 pt-3 pb-4">
+      <div className="px-4 pt-3 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t("sidebar.searchPlaceholder")}
+              className="w-full rounded-xl border border-transparent bg-surface-muted pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border focus:bg-background transition-colors"
+            />
+          </div>
+          <div className="relative flex flex-shrink-0">
+            <button
+              onClick={() => {
+                setWorkingDir(null);
+                handleNewSession();
+              }}
+              className="h-8 px-2.5 rounded-l-xl bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-colors whitespace-nowrap"
+            >
+              + {t("sidebar.newChat")}
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowProjectActions((prev) => !prev);
+              }}
+              className="w-5 h-8 rounded-r-xl bg-accent text-accent-foreground hover:bg-accent/90 transition-colors border-l border-accent-foreground/20 flex items-center justify-center"
+            >
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            {showProjectActions && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border-muted bg-background shadow-lg p-1"
+              >
+                {projectEntries.length > 0 && (
+                  <>
+                    <div className="px-2.5 py-1.5 text-[10px] text-text-muted uppercase tracking-wide">
+                      {t("sidebar.newSessionInProject")}
+                    </div>
+                    {projectEntries.map(({ name, cwd }) => (
+                      <button
+                        key={cwd}
+                        onClick={() => {
+                          setShowProjectActions(false);
+                          void handleNewSessionInProject(cwd);
+                        }}
+                        className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors flex items-center gap-2"
+                      >
+                        <Folder className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                        <span className="truncate">{name}</span>
+                      </button>
+                    ))}
+                    <div className="mx-1 my-1 border-t border-border-muted" />
+                  </>
+                )}
+                <button
+                  onClick={() => void handleNewProject()}
+                  className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
+                >
+                  {t("sidebar.newProject")}
+                </button>
+                <button
+                  onClick={() => void handleOpenProject()}
+                  className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
+                >
+                  {t("sidebar.openProject")}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
         {sessions.length > 0 && (
-          <div className="mt-3 flex items-center gap-2 group/manage-bar">
-            <div className="relative flex-1 min-w-0">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t("sidebar.search")}
-                className="w-full rounded-xl border border-transparent bg-surface-muted pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border focus:bg-background transition-colors"
-              />
-            </div>
+          <div className="flex justify-end mt-1.5">
             <button
               onClick={() => {
                 if (isSelectMode) {
@@ -654,7 +685,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
                 isSelectMode
                   ? "bg-accent text-accent-foreground"
-                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover opacity-0 pointer-events-none group-hover/manage-bar:opacity-100 group-hover/manage-bar:pointer-events-auto transition-opacity duration-150"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
               }`}
               title={t("sidebar.manage")}
             >
@@ -664,7 +695,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         )}
       </div>
 
-      {/* Marketplace & Automation shortcuts */}
+      {/* Marketplace & Automation & Browser shortcuts */}
       <div className="px-3 pb-1 space-y-0.5">
         <button
           onClick={() => {
@@ -700,10 +731,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             {t("sidebar.automation")}
           </span>
         </button>
-      </div>
-
-      {/* Browser toggle */}
-      <div className="px-3 pb-1">
         <button
           onClick={() => {
             setShowSettings(false);
@@ -721,242 +748,330 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <div className="space-y-4">
-          {/* Chats section */}
-          <section className="group/chat-section">
-            <div className="px-3 pb-2 flex items-center justify-between gap-2">
-              <div className="text-sm font-medium leading-5 text-text-secondary">
-                {t("sidebar.conversations")}
-              </div>
-              <div className="flex items-center gap-1 opacity-0 pointer-events-none group-hover/chat-section:opacity-100 group-hover/chat-section:pointer-events-auto transition-opacity duration-150">
-                <button
-                  onClick={() => toggleConversations()}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-                  title={
-                    conversationsCollapsed
-                      ? t("sidebar.expandConversations")
-                      : t("sidebar.collapseConversations")
-                  }
-                >
-                  {conversationsCollapsed ? (
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  )}
-                </button>
-                <button
-                  onClick={() => { setWorkingDir(null); handleNewSession(); }}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-                  title={t("sidebar.newTask")}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
+        {/* Task slot area */}
+        {taskSlots.length > 0 && (
+          <div className="mb-4">
+            <div className="px-3 pb-1.5">
+              <span className="text-sm font-medium leading-5 text-text-secondary">
+                {t("sidebar.currentTasks")}
+              </span>
             </div>
-            {!conversationsCollapsed &&
-              (sortedConversationSessions.length > 0 ? (
-                <>
-                  <div className="space-y-0.5">
-                    {sortedConversationSessions
-                      .slice(0, conversationsMaxVisible)
-                      .map((session) => renderSessionItem(session, true))}
-                  </div>
-                  {sortedConversationSessions.length > SIDEBAR_DEFAULT_MAX_VISIBLE &&
-                    (conversationsMaxVisible <
-                    sortedConversationSessions.length ? (
+            <div className="space-y-0.5 max-h-40 overflow-y-auto">
+            {taskSlots.map((slot) => {
+              const session = sessions.find((s) => s.id === slot.sessionId);
+              if (!session) return null;
+              return (
+                <div
+                  key={slot.sessionId}
+                  onClick={() => void handleSessionClick(slot.sessionId)}
+                  className={`group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors ${
+                    !slot.completed
+                      ? "bg-accent-muted/10 border-l-[3px] border-l-accent"
+                      : "border border-dashed border-border-muted bg-surface-muted/30"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    {!slot.completed && (
+                      <span
+                        className="w-2 h-2 rounded-full bg-accent animate-pulse flex-shrink-0"
+                        role="status"
+                        aria-label={t("sidebar.running")}
+                      />
+                    )}
+                    <span className="text-sm font-medium leading-5 text-text-primary truncate flex-1">
+                      {session.title}
+                    </span>
+                    {session.isProjectMode &&
+                      session.cwd &&
+                      !isDefaultWorkspacePath(session.cwd) && (
+                        <span className="text-[10px] bg-surface-muted text-text-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                          {getWorkspaceName(session.cwd)}
+                        </span>
+                      )}
+                    {slot.completed ? (
                       <button
-                        onClick={() =>
-                          setConversationsMaxVisible(Infinity)
-                        }
-                        className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeTaskSlot(slot.sessionId);
+                        }}
+                        className="w-5 h-5 rounded-full bg-accent text-accent-foreground flex items-center justify-center flex-shrink-0 hover:brightness-90 transition-[filter]"
+                        title={t("sidebar.taskCompleted")}
                       >
-                        {t("sidebar.expandConversationsList", {
-                          count:
-                            sortedConversationSessions.length -
-                            conversationsMaxVisible,
-                        })}
+                        <Check className="w-3 h-3" />
                       </button>
                     ) : (
-                      <button
-                        onClick={() =>
-                          setConversationsMaxVisible(SIDEBAR_DEFAULT_MAX_VISIBLE)
-                        }
-                        className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
-                      >
-                        {t("sidebar.collapseList")}
-                      </button>
-                    ))}
-                </>
-              ) : (
-                <p className="px-3 text-sm leading-5 text-text-muted">
-                  {t("sidebar.noConversationsHint")}
-                </p>
-              ))}
-          </section>
-
-          {/* Projects section */}
-          <section className="group/project-section">
-            <div className="px-3 pb-2 flex items-center justify-between gap-2 relative">
-              <div className="text-sm font-medium leading-5 text-text-secondary">
-                {t("sidebar.projects")}
-              </div>
-              <div className="flex items-center gap-1 opacity-0 pointer-events-none group-hover/project-section:opacity-100 group-hover/project-section:pointer-events-auto transition-opacity duration-150">
-                <button
-                  onClick={() => toggleProjects()}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-                  title={
-                    projectsCollapsed
-                      ? t("sidebar.expandProjects")
-                      : t("sidebar.collapseProjects")
-                  }
-                >
-                  {projectsCollapsed ? (
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  ) : (
-                    <ChevronDown className="w-3.5 h-3.5" />
-                  )}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowProjectActions((prev) => !prev);
-                  }}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-                  title={t("sidebar.projects")}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              {showProjectActions && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute right-0 top-7 z-20 w-40 rounded-lg border border-border-muted bg-background shadow-lg p-1"
-                >
-                  <button
-                    onClick={() => void handleNewProject()}
-                    className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
-                  >
-                    {t("sidebar.newProject")}
-                  </button>
-                  <button
-                    onClick={() => void handleOpenProject()}
-                    className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
-                  >
-                    {t("sidebar.openProject")}
-                  </button>
+                      <span className="w-5 flex-shrink-0" />
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+              );
+            })}
+          </div>
+          </div>
+        )}
 
-            {!projectsCollapsed &&
-              (groupedProjectWorkspaces.length > 0 ? (
-                <div className="space-y-3">
-                  {groupedProjectWorkspaces.map((workspace) => (
-                    <section key={workspace.key}>
-                      <div
-                        className="group/project relative px-3 py-1.5 rounded-lg hover:bg-surface-hover/60 transition-colors cursor-pointer"
-                        onClick={() => toggleWorkspaceCollapsed(workspace.cwd)}
-                      >
-                        <div className="flex items-center gap-2 pr-20">
-                          <Folder className="w-3.5 h-3.5 flex-shrink-0 text-text-muted" />
-                          <span
-                            className="text-sm font-medium text-text-primary truncate"
-                            title={workspace.cwd}
-                          >
-                            {workspace.workspaceName}
-                          </span>
-                          {workspaceCollapsedMap[workspace.cwd] ? (
-                            <ChevronRight className="w-3 h-3 flex-shrink-0 text-text-muted" />
-                          ) : (
-                            <ChevronDown className="w-3 h-3 flex-shrink-0 text-text-muted" />
+        <div className="space-y-0.5">
+          {/* Search-driven Chip filter */}
+          {normalizedQuery &&
+            (() => {
+              const matchedProjects = getMatchedProjectNames(
+                activeSessions,
+                normalizedQuery,
+              );
+              if (matchedProjects.size === 0) return null;
+              return (
+                <div className="px-3 pb-2">
+                  <div className="text-[10px] text-text-muted mb-1 ml-0.5">
+                    {t("sidebar.filterByProject")}
+                  </div>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {Array.from(matchedProjects).map((name) => {
+                      const isActive = projectFilter === name;
+                      return (
+                        <button
+                          key={name}
+                          onClick={() =>
+                            setProjectFilter(isActive ? null : name)
+                          }
+                          className={`px-2 py-0.5 rounded-full text-[10px] transition-colors ${
+                            isActive
+                              ? "bg-accent text-accent-foreground"
+                              : "bg-surface-muted text-text-secondary hover:bg-accent hover:text-accent-foreground"
+                          }`}
+                        >
+                          <Folder className="w-3 h-3 inline mr-0.5 -mt-px" />
+                          {name}
+                          {isActive && (
+                            <span className="ml-0.5 opacity-70">✕</span>
                           )}
-                        </div>
-
-                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 pointer-events-none transition-opacity group-hover/project:opacity-100 group-hover/project:pointer-events-auto">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleNewSessionInProject(workspace.cwd);
-                            }}
-                            className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-active transition-colors"
-                            title={t("sidebar.newTask")}
-                          >
-                            <SquarePen className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteProject(workspace.cwd);
-                            }}
-                            className="w-6 h-6 rounded-md flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-colors"
-                            title={t("common.delete")}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {!workspaceCollapsedMap[workspace.cwd] &&
-                        (workspace.sessions.length > 0 ? (
-                          <>
-                            <div className="space-y-0.5 mt-1">
-                              {workspace.sessions
-                                .slice(
-                                  0,
-                                  workspaceMaxVisibleMap[workspace.cwd] ?? SIDEBAR_DEFAULT_MAX_VISIBLE,
-                                )
-                                .map((session) =>
-                                  renderSessionItem(session, true, true),
-                                )}
-                            </div>
-                            {workspace.sessions.length > SIDEBAR_DEFAULT_MAX_VISIBLE &&
-                              ((workspaceMaxVisibleMap[workspace.cwd] ??
-                                SIDEBAR_DEFAULT_MAX_VISIBLE) <
-                              workspace.sessions.length ? (
-                                <button
-                                  onClick={() =>
-                                    setWorkspaceMaxVisible(
-                                      workspace.cwd,
-                                      Infinity,
-                                    )
-                                  }
-                                  className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
-                                >
-                                  {t("sidebar.expandWorkspaceSessions", {
-                                    count:
-                                      workspace.sessions.length -
-                                      (workspaceMaxVisibleMap[workspace.cwd] ??
-                                        SIDEBAR_DEFAULT_MAX_VISIBLE),
-                                  })}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() =>
-                                    setWorkspaceMaxVisible(
-                                      workspace.cwd,
-                                      SIDEBAR_DEFAULT_MAX_VISIBLE,
-                                    )
-                                  }
-                                  className="w-full text-sm text-text-muted hover:text-text-primary cursor-pointer px-3 py-1.5 transition-colors text-left"
-                                >
-                                  {t("sidebar.collapseList")}
-                                </button>
-                              ))}
-                          </>
-                        ) : (
-                          <div className="mt-1 px-3 py-1 text-sm leading-5 text-text-muted">
-                            {t("sidebar.noConversations")}
-                          </div>
-                        ))}
-                    </section>
-                  ))}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              ) : (
-                <p className="px-3 text-sm leading-5 text-text-muted">
-                  {t("sidebar.noProjectsHint")}
-                </p>
-              ))}
-          </section>
+              );
+            })()}
+
+          {/* Session list header */}
+          <div className="px-3 pb-1.5 flex items-center justify-between">
+            <span className="text-sm font-medium leading-5 text-text-secondary">
+              {t("sidebar.allSessions")}
+            </span>
+          </div>
+
+          {/* Session list */}
+          {(() => {
+            const taskSlotIds = new Set(taskSlots.map((s) => s.sessionId));
+            const sorted = sortFlattenedSessions(
+              activeSessions,
+              taskSlotIds,
+            );
+            const filtered = (() => {
+              if (!normalizedQuery && !projectFilter) return sorted;
+              return sorted.filter((s) => {
+                if (projectFilter && !sessionMatchesProject(s, projectFilter))
+                  return false;
+                if (normalizedQuery && !sessionMatchesQuery(s, normalizedQuery))
+                  return false;
+                return true;
+              });
+            })();
+
+            if (filtered.length === 0) {
+              return (
+                <div className="px-3 py-6 text-center">
+                  <p className="text-sm text-text-muted">
+                    {t("sidebar.emptyTitle")}
+                  </p>
+                  {activeSessions.length === 0 && (
+                    <p className="text-xs text-text-muted mt-1">
+                      {t("sidebar.emptyHint")}
+                    </p>
+                  )}
+                </div>
+              );
+            }
+
+            // Build groups: project sessions grouped by cwd, chat sessions as one group
+            const MAX_PROJECT_VISIBLE = 5;
+            const isSearching = !!(normalizedQuery || projectFilter);
+
+            const items: RenderItem[] = [];
+            let lastProject = "";
+            let hasRenderedGroup = false;
+            let projectSeen = 0; // count of sessions seen for current project
+            let projectTotal = 0; // total sessions in current project
+            let sawExpandedProject = false;
+            let chatSeen = 0;
+            const CHAT_EXPAND_KEY = "__chats__";
+            const chatsExpanded = projectExpandedMap[CHAT_EXPAND_KEY];
+
+            // Total chat sessions for expand/collapse counting
+            const chatTotal = filtered.filter(
+              (s) => !s.isProjectMode || !s.cwd || isDefaultWorkspacePath(s.cwd),
+            ).length;
+
+            for (const session of filtered) {
+              const pName =
+                session.isProjectMode &&
+                session.cwd &&
+                !isDefaultWorkspacePath(session.cwd)
+                  ? getWorkspaceName(session.cwd)
+                  : "";
+
+              if (pName && pName !== lastProject) {
+                // Transition to a new project
+                // Insert collapse button for previous expanded project if needed
+                if (sawExpandedProject && projectSeen > MAX_PROJECT_VISIBLE) {
+                  items.push({
+                    type: "collapse",
+                    key: `collapse-${lastProject}`,
+                    projectName: lastProject,
+                  });
+                }
+                sawExpandedProject = false;
+                // Insert divider
+                if (hasRenderedGroup) {
+                  items.push({ type: "divider", key: `div-${pName}` });
+                }
+                projectSeen = 0;
+                projectTotal = 0;
+                lastProject = pName;
+                // Count total sessions in this project
+                projectTotal = filtered.filter((s) => {
+                  if (!s.isProjectMode || !s.cwd || isDefaultWorkspacePath(s.cwd)) return false;
+                  return getWorkspaceName(s.cwd) === pName;
+                }).length;
+              } else if (!pName && lastProject) {
+                // Transition from project to chat sessions
+                if (sawExpandedProject && projectSeen > MAX_PROJECT_VISIBLE) {
+                  items.push({
+                    type: "collapse",
+                    key: `collapse-${lastProject}`,
+                    projectName: lastProject,
+                  });
+                }
+                sawExpandedProject = false;
+                items.push({ type: "divider", key: `div-chat` });
+                chatSeen = 0;
+                lastProject = "";
+              }
+
+              // Truncation: for project sessions, only show first N unless expanded or searching
+              let shouldSkip = false;
+              let shouldExpand: number | null = null;
+              if (pName && !isSearching) {
+                projectSeen++;
+                if (!projectExpandedMap[pName]) {
+                  if (projectSeen > MAX_PROJECT_VISIBLE) shouldSkip = true;
+                  else if (projectSeen === MAX_PROJECT_VISIBLE && projectTotal > MAX_PROJECT_VISIBLE) {
+                    shouldExpand = projectTotal - MAX_PROJECT_VISIBLE;
+                  }
+                } else {
+                  sawExpandedProject = true;
+                }
+              }
+
+              // Truncation: for chat sessions, same rule
+              if (!pName && !isSearching) {
+                chatSeen++;
+                if (!chatsExpanded) {
+                  if (chatSeen > MAX_PROJECT_VISIBLE) shouldSkip = true;
+                  else if (chatSeen === MAX_PROJECT_VISIBLE && chatTotal > MAX_PROJECT_VISIBLE) {
+                    shouldExpand = chatTotal - MAX_PROJECT_VISIBLE;
+                  }
+                }
+              }
+
+              if (shouldSkip) continue;
+
+              items.push({ type: "session", key: session.id, session });
+              hasRenderedGroup = true;
+
+              // Insert expand button AFTER the N-th session
+              if (shouldExpand !== null) {
+                const expandKey = pName || CHAT_EXPAND_KEY;
+                items.push({
+                  type: "expand",
+                  key: `expand-${expandKey}`,
+                  projectName: expandKey,
+                  count: shouldExpand,
+                });
+              }
+            }
+
+            // Handle collapse for the last project group
+            if (sawExpandedProject && projectSeen > MAX_PROJECT_VISIBLE) {
+              items.push({
+                type: "collapse",
+                key: `collapse-${lastProject}`,
+                projectName: lastProject,
+              });
+            }
+
+            // Handle collapse for chat section
+            if (chatsExpanded && chatSeen > MAX_PROJECT_VISIBLE) {
+              items.push({
+                type: "collapse",
+                key: `collapse-${CHAT_EXPAND_KEY}`,
+                projectName: CHAT_EXPAND_KEY,
+              });
+            }
+
+            return (
+              <>
+                {items.map((item) => {
+                    switch (item.type) {
+                      case "divider":
+                        return (
+                          <div
+                            key={item.key}
+                            className="mx-3 my-0.5 border-t border-dashed border-border-muted"
+                          />
+                        );
+                      case "expand":
+                        return (
+                          <button
+                            key={item.key}
+                            onClick={() =>
+                              setProjectExpandedMap((prev) => ({
+                                ...prev,
+                                [item.projectName!]: true,
+                              }))
+                            }
+                            className="w-full text-center text-xs text-text-muted hover:text-text-secondary py-1 transition-colors"
+                          >
+                            {t("sidebar.expandProject", { count: item.count })}
+                          </button>
+                        );
+                      case "collapse":
+                        return (
+                          <button
+                            key={item.key}
+                            onClick={() =>
+                              setProjectExpandedMap((prev) => {
+                                const next = { ...prev };
+                                delete next[item.projectName!];
+                                return next;
+                              })
+                            }
+                            className="w-full text-center text-xs text-text-muted hover:text-text-secondary py-1 transition-colors"
+                          >
+                            {t("sidebar.collapseProject")}
+                          </button>
+                        );
+                      case "session":
+                        return (
+                          <div key={item.key}>
+                            {renderSessionItem(item.session!, true)}
+                          </div>
+                        );
+                    }
+                  })
+                }
+              </>
+            );
+          })()}
         </div>
       </div>
 
@@ -1113,42 +1228,100 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   );
 }
 
-function groupProjectSessionsByWorkspace(
+interface RenderItem {
+  type: "divider" | "session" | "expand" | "collapse";
+  key: string;
+  session?: Session;
+  projectName?: string;
+  count?: number;
+}
+
+function sortFlattenedSessions(
   sessions: Session[],
-  openedProjectCwds: string[],
-): ProjectWorkspaceGroup[] {
+  taskSlotIds: Set<string>,
+): Session[] {
+  const available = sessions.filter((s) => !taskSlotIds.has(s.id));
+
+  const projectSessions: Session[] = [];
+  const chatSessions: Session[] = [];
+
+  for (const s of available) {
+    if (s.isProjectMode && s.cwd && !isDefaultWorkspacePath(s.cwd)) {
+      projectSessions.push(s);
+    } else {
+      chatSessions.push(s);
+    }
+  }
+
+  // Group project sessions by cwd, sort groups by latest session time
   const grouped = new Map<string, Session[]>();
-
-  for (const session of sessions) {
-    const cwd = normalizeWorkspacePath(session.cwd);
-    if (!cwd || isDefaultWorkspacePath(cwd)) continue;
-    const existing = grouped.get(cwd) || [];
-    existing.push(session);
-    grouped.set(cwd, existing);
+  for (const s of projectSessions) {
+    const cwd = normalizeWorkspacePath(s.cwd);
+    if (!cwd) continue;
+    const arr = grouped.get(cwd) || [];
+    arr.push(s);
+    grouped.set(cwd, arr);
   }
 
-  for (const cwd of openedProjectCwds) {
-    const normalized = normalizeWorkspacePath(cwd);
-    if (!normalized || grouped.has(normalized)) continue;
-    grouped.set(normalized, []);
+  // Sort each group internally by updatedAt desc
+  for (const arr of grouped.values()) {
+    arr.sort(
+      (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
+    );
   }
 
-  const workspaces = Array.from(grouped.entries()).map(
-    ([cwd, workspaceSessions]) => ({
-      key: cwd,
-      cwd,
-      workspaceName: getWorkspaceName(cwd),
-      sessions: workspaceSessions.sort(
-        (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
-      ),
-    }),
-  );
-
-  return workspaces.sort((a, b) => {
-    const aLatest = a.sessions[0]?.updatedAt || a.sessions[0]?.createdAt || 0;
-    const bLatest = b.sessions[0]?.updatedAt || b.sessions[0]?.createdAt || 0;
+  // Sort groups by their most recent session
+  const sortedGroups = Array.from(grouped.entries()).sort(([, a], [, b]) => {
+    const aLatest = a[0]?.updatedAt || a[0]?.createdAt || 0;
+    const bLatest = b[0]?.updatedAt || b[0]?.createdAt || 0;
     return bLatest - aLatest;
   });
+
+  // Chat sessions first, sorted by time
+  chatSessions.sort(
+    (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
+  );
+  const result: Session[] = [...chatSessions];
+
+  // Project sessions after, grouped by workspace
+  for (let i = 0; i < sortedGroups.length; i++) {
+    result.push(...sortedGroups[i][1]);
+  }
+
+  return result;
+}
+
+/** Returns Set of project names that match the search query (for Chip display). */
+function getMatchedProjectNames(
+  sessions: Session[],
+  query: string,
+): Set<string> {
+  const names = new Set<string>();
+  if (!query) return names;
+  for (const s of sessions) {
+    if (!s.isProjectMode || !s.cwd || isDefaultWorkspacePath(s.cwd)) continue;
+    const name = getWorkspaceName(s.cwd).toLowerCase();
+    if (name.includes(query)) {
+      names.add(getWorkspaceName(s.cwd));
+    }
+  }
+  return names;
+}
+
+/** Check if a session matches the search query (title OR project name). */
+function sessionMatchesQuery(session: Session, query: string): boolean {
+  const q = query.toLowerCase();
+  if (session.title.toLowerCase().includes(q)) return true;
+  if (session.cwd && !isDefaultWorkspacePath(session.cwd)) {
+    if (getWorkspaceName(session.cwd).toLowerCase().includes(q)) return true;
+  }
+  return false;
+}
+
+/** Check if a session belongs to a given project (by workspace folder name). */
+function sessionMatchesProject(session: Session, projectName: string): boolean {
+  if (!session.cwd || isDefaultWorkspacePath(session.cwd)) return false;
+  return getWorkspaceName(session.cwd) === projectName;
 }
 
 function getWorkspaceName(cwd: string): string {
