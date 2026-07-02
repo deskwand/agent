@@ -8,7 +8,6 @@ import {
   Store,
   Clock3,
   Search as SearchIcon,
-  ListChecks,
   Check,
   Folder,
   Archive,
@@ -39,9 +38,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const {
     invoke,
     deleteSession,
-    batchDeleteSessions,
     archiveSession,
-    batchArchiveSessions,
     getSessionMessages,
     getSessionTraceSteps,
     changeWorkingDir,
@@ -54,8 +51,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [projectExpandedMap, setProjectExpandedMap] = useState<
     Record<string, boolean>
   >({});
-  const [isSelectMode, setIsSelectMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -87,14 +82,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     () => sessions.filter((s) => !s.archived),
     [sessions],
   );
-  const filteredSessions = useMemo(() => {
-    return normalizedQuery
-      ? activeSessions.filter((session) =>
-          session.title.toLowerCase().includes(normalizedQuery),
-        )
-      : activeSessions;
-  }, [activeSessions, normalizedQuery]);
-
   // Unique project names with their cwds for the ▾ menu
   const projectEntries = useMemo(() => {
     const map = new Map<string, string>();
@@ -109,29 +96,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   }, [activeSessions]);
 
   useEffect(() => {
-    if (sidebarCollapsed && isSelectMode) {
-      setIsSelectMode(false);
-      setSelectedIds(new Set());
-    }
-  }, [sidebarCollapsed, isSelectMode]);
-
-  useEffect(() => {
     if (sidebarCollapsed) {
       setShowSettingsMenu(false);
     }
   }, [sidebarCollapsed]);
-
-  useEffect(() => {
-    if (!isSelectMode) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsSelectMode(false);
-        setSelectedIds(new Set());
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSelectMode]);
 
   useEffect(() => {
     if (!normalizedQuery) {
@@ -195,80 +163,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       setTaskSlots(slots);
     }
   }, [sessions, taskSlots, setTaskSlots]);
-
-  const exitSelectMode = useCallback(() => {
-    setIsSelectMode(false);
-    setSelectedIds(new Set());
-  }, []);
-
-  const toggleSelectSession = useCallback((sessionId: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(sessionId)) {
-        next.delete(sessionId);
-      } else {
-        next.add(sessionId);
-      }
-      return next;
-    });
-  }, []);
-
-  const visibleSessionIds = useMemo(
-    () => filteredSessions.map((s) => s.id),
-    [filteredSessions],
-  );
-
-  const allVisibleSelected =
-    visibleSessionIds.length > 0 &&
-    visibleSessionIds.every((id) => selectedIds.has(id));
-
-  const toggleSelectAll = useCallback(() => {
-    if (allVisibleSelected) {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        for (const id of visibleSessionIds) {
-          next.delete(id);
-        }
-        return next;
-      });
-    } else {
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        for (const id of visibleSessionIds) {
-          next.add(id);
-        }
-        return next;
-      });
-    }
-  }, [allVisibleSelected, visibleSessionIds]);
-
-  const handleBatchDelete = useCallback(() => {
-    const visibleSet = new Set(visibleSessionIds);
-    const ids = Array.from(selectedIds).filter((id) => visibleSet.has(id));
-    if (ids.length === 0) return;
-    setDeleteConfirm({
-      message: t("sidebar.batchDeleteConfirm", { count: ids.length }),
-      onConfirm: () => {
-        batchDeleteSessions(ids);
-        exitSelectMode();
-        setDeleteConfirm(null);
-      },
-    });
-  }, [selectedIds, visibleSessionIds, batchDeleteSessions, exitSelectMode, t]);
-
-  const handleBatchArchive = useCallback(() => {
-    const visibleSet = new Set(visibleSessionIds);
-    const ids = Array.from(selectedIds).filter((id) => visibleSet.has(id));
-    if (ids.length === 0) return;
-    setDeleteConfirm({
-      message: t("sidebar.batchArchiveConfirm", { count: ids.length }),
-      onConfirm: () => {
-        batchArchiveSessions(ids);
-        exitSelectMode();
-        setDeleteConfirm(null);
-      },
-    });
-  }, [selectedIds, visibleSessionIds, batchArchiveSessions, exitSelectMode, t]);
 
   const handleSessionClick = useCallback(
     async (sessionId: string) => {
@@ -461,40 +355,19 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     showRelativeTime: boolean,
   ) => {
     const isActive = activeSessionId === session.id;
-    const isSelected = selectedIds.has(session.id);
 
     return (
       <div
         key={session.id}
-        onClick={() => {
-          if (isSelectMode) {
-            toggleSelectSession(session.id);
-          } else {
-            void handleSessionClick(session.id);
-          }
-        }}
+        onClick={() => void handleSessionClick(session.id)}
         className={`group relative cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors border-l-[3px] border-l-transparent ${
-          isSelectMode && isSelected
-            ? "bg-accent-muted/20"
-            : isActive && !isSelectMode
-              ? "bg-surface-active border-l-accent"
-              : "hover:bg-surface-hover/60"
+          isActive
+            ? "bg-surface-active border-l-accent"
+            : "hover:bg-surface-hover/60"
         }`}
       >
         <div className="flex items-center gap-2">
-          {isSelectMode && (
-            <div
-              className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
-                isSelected
-                  ? "bg-accent text-accent-foreground"
-                  : "border border-border-muted bg-background"
-              }`}
-            >
-              {isSelected && <Check className="w-2.5 h-2.5" />}
-            </div>
-          )}
-
-          {session.status === "running" && !isSelectMode && (
+          {session.status === "running" && (
             <span
               className="w-2 h-2 rounded-full bg-accent animate-pulse flex-shrink-0"
               role="status"
@@ -517,7 +390,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 </span>
               )}
 
-            {showRelativeTime && !isSelectMode && (
+            {showRelativeTime && (
               <div
                 className="ml-auto min-w-[3.5rem] h-6 flex-shrink-0 relative"
                 onMouseEnter={() => setHoveredTimeSessionId(session.id)}
@@ -675,27 +548,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             )}
           </div>
         </div>
-        {sessions.length > 0 && (
-          <div className="flex justify-end mt-1.5">
-            <button
-              onClick={() => {
-                if (isSelectMode) {
-                  exitSelectMode();
-                } else {
-                  setIsSelectMode(true);
-                }
-              }}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                isSelectMode
-                  ? "bg-accent text-accent-foreground"
-                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-              }`}
-              title={t("sidebar.manage")}
-            >
-              <ListChecks className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
@@ -1026,49 +878,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         </div>
       </div>
 
-      {isSelectMode ? (
-        <div className="px-3 py-3">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <button
-                onClick={toggleSelectAll}
-                className="text-sm font-medium text-accent hover:text-accent/80 transition-colors"
-              >
-                {allVisibleSelected
-                  ? t("sidebar.deselectAll")
-                  : t("sidebar.selectAll")}
-              </button>
-              <span className="text-sm text-text-muted">
-                {t("sidebar.nSelected", { count: selectedIds.size })}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={exitSelectMode}
-                className="flex-1 px-3 py-2 rounded-xl text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors"
-              >
-                {t("sidebar.cancel")}
-              </button>
-              <button
-                onClick={handleBatchArchive}
-                disabled={selectedIds.size === 0}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-accent/90 text-accent-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Archive className="w-3.5 h-3.5" />
-                {t("sidebar.archive")}
-              </button>
-              <button
-                onClick={handleBatchDelete}
-                disabled={selectedIds.size === 0}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-error text-white hover:bg-error/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                {t("common.delete")}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
         <div className="px-3 py-3 relative">
           <div className="flex items-center gap-2 rounded-2xl bg-background/50 px-3 py-2.5">
             <button
@@ -1147,7 +956,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             </>
           )}
         </div>
-      )}
 
       {deleteConfirm && (
         <div
