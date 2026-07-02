@@ -335,7 +335,7 @@ export const useAppStore = create<AppState>((set) => ({
   sandboxSetupProgress: null,
   isSandboxSetupComplete: false,
   sandboxSyncStatus: null,
-  taskSlots: [],
+  taskSlots: loadTaskSlots(),
   systemDarkMode: false,
   isBrowserFullscreen: false,
   browserFullscreenSnapshot: null as {
@@ -807,11 +807,16 @@ export const useAppStore = create<AppState>((set) => ({
   setSandboxSyncStatus: (status) => set({ sandboxSyncStatus: status }),
 
   // Task slot actions
-  setTaskSlots: (slots) => set({ taskSlots: slots }),
+  setTaskSlots: (slots) => {
+    persistTaskSlots(slots);
+    set({ taskSlots: slots });
+  },
   removeTaskSlot: (sessionId) =>
-    set((state) => ({
-      taskSlots: state.taskSlots.filter((s) => s.sessionId !== sessionId),
-    })),
+    set((state) => {
+      const next = state.taskSlots.filter((s) => s.sessionId !== sessionId);
+      persistTaskSlots(next);
+      return { taskSlots: next };
+    }),
 
   // Context window actions
   setSessionContextWindow: (sessionId, contextWindow) =>
@@ -872,6 +877,37 @@ export const useAppStore = create<AppState>((set) => ({
 export interface TaskSlot {
   sessionId: string;
   completed: boolean;
+}
+
+const TASK_SLOTS_KEY = "deskwand.taskSlots";
+
+function isTaskSlot(s: unknown): s is TaskSlot {
+  return (
+    s !== null &&
+    typeof s === "object" &&
+    typeof (s as Record<string, unknown>).sessionId === "string" &&
+    typeof (s as Record<string, unknown>).completed === "boolean"
+  );
+}
+
+function loadTaskSlots(): TaskSlot[] {
+  try {
+    const raw = localStorage.getItem(TASK_SLOTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isTaskSlot);
+  } catch {
+    return [];
+  }
+}
+
+function persistTaskSlots(slots: TaskSlot[]): void {
+  try {
+    localStorage.setItem(TASK_SLOTS_KEY, JSON.stringify(slots));
+  } catch {
+    /* ignore */
+  }
 }
 
 // Expose helpers for nav-server (CLI-driven UI navigation via executeJavaScript)

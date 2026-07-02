@@ -124,8 +124,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     let slots = [...taskSlots];
     let changed = false;
 
-    // Remove slots for archived/deleted sessions (only when sessions actually changed)
-    if (sessionsChanged) {
+    // Remove slots for archived/deleted sessions (only when sessions actually changed
+    // and sessions are loaded — guard against empty sessions on initial mount)
+    if (sessionsChanged && allIds.size > 0) {
       const filtered = slots.filter((s) => allIds.has(s.sessionId));
       if (filtered.length !== slots.length) {
         slots = filtered;
