@@ -467,7 +467,6 @@ export function ChatView() {
 
   const scrollToBottom = useCallback(
     (behavior: ScrollBehavior = "auto") => {
-      if (!autoFollowRef.current) return;
       const container = listRef.current?.element;
       if (!container) return;
       if (behavior === "smooth") {
