@@ -550,6 +550,47 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         </div>
       </div>
 
+      {/* Search-driven Chip filter */}
+      {normalizedQuery &&
+        (() => {
+          const matchedProjects = getMatchedProjectNames(
+            activeSessions,
+            normalizedQuery,
+          );
+          if (matchedProjects.size === 0) return null;
+          return (
+            <div className="px-4 pt-2">
+              <div className="text-[10px] text-text-muted mb-1 ml-0.5">
+                {t("sidebar.filterByProject")}
+              </div>
+              <div className="flex gap-1.5 flex-wrap">
+                {Array.from(matchedProjects).map((name) => {
+                  const isActive = projectFilter === name;
+                  return (
+                    <button
+                      key={name}
+                      onClick={() =>
+                        setProjectFilter(isActive ? null : name)
+                      }
+                      className={`px-2 py-0.5 rounded-full text-[10px] transition-colors ${
+                        isActive
+                          ? "bg-accent text-accent-foreground"
+                          : "bg-surface-muted text-text-secondary hover:bg-accent hover:text-accent-foreground"
+                      }`}
+                    >
+                      <Folder className="w-3 h-3 inline mr-0.5 -mt-px" />
+                      {name}
+                      {isActive && (
+                        <span className="ml-0.5 opacity-70">✕</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
       <div className="flex-1 overflow-y-auto px-3 py-4">
         {/* Task slot area */}
         {taskSlots.length > 0 && (
@@ -614,47 +655,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         )}
 
         <div className="space-y-0.5">
-          {/* Search-driven Chip filter */}
-          {normalizedQuery &&
-            (() => {
-              const matchedProjects = getMatchedProjectNames(
-                activeSessions,
-                normalizedQuery,
-              );
-              if (matchedProjects.size === 0) return null;
-              return (
-                <div className="px-3 pb-2">
-                  <div className="text-[10px] text-text-muted mb-1 ml-0.5">
-                    {t("sidebar.filterByProject")}
-                  </div>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {Array.from(matchedProjects).map((name) => {
-                      const isActive = projectFilter === name;
-                      return (
-                        <button
-                          key={name}
-                          onClick={() =>
-                            setProjectFilter(isActive ? null : name)
-                          }
-                          className={`px-2 py-0.5 rounded-full text-[10px] transition-colors ${
-                            isActive
-                              ? "bg-accent text-accent-foreground"
-                              : "bg-surface-muted text-text-secondary hover:bg-accent hover:text-accent-foreground"
-                          }`}
-                        >
-                          <Folder className="w-3 h-3 inline mr-0.5 -mt-px" />
-                          {name}
-                          {isActive && (
-                            <span className="ml-0.5 opacity-70">✕</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
           {/* Session list header */}
           <div className="px-3 pb-1.5 flex items-center justify-between">
             <span className="text-sm font-medium leading-5 text-text-secondary">
@@ -733,6 +733,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   });
                 }
                 sawExpandedProject = false;
+                // If transitioning from chat to first project, insert chat collapse
+                if (lastProject === "" && chatsExpanded && chatSeen > MAX_PROJECT_VISIBLE) {
+                  items.push({
+                    type: "collapse",
+                    key: `collapse-${CHAT_EXPAND_KEY}`,
+                    projectName: CHAT_EXPAND_KEY,
+                  });
+                }
                 // Insert divider
                 if (hasRenderedGroup) {
                   items.push({ type: "divider", key: `div-${pName}` });
@@ -812,8 +820,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               });
             }
 
-            // Handle collapse for chat section
-            if (chatsExpanded && chatSeen > MAX_PROJECT_VISIBLE) {
+            // Handle collapse for chat section (only if no projects followed chat)
+            if (lastProject === "" && chatsExpanded && chatSeen > MAX_PROJECT_VISIBLE) {
               items.push({
                 type: "collapse",
                 key: `collapse-${CHAT_EXPAND_KEY}`,
