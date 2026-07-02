@@ -736,6 +736,30 @@
     margin: 0.25rem 0 0;
   }
 
+  .prose-chat pre {
+    margin: 0.75rem 0;
+    padding: 0.875rem 1rem;
+    border-radius: 10px;
+    background: var(--color-surface-muted);
+    overflow-x: auto;
+  }
+
+  .prose-chat pre code {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+    background: transparent;
+    padding: 0;
+  }
+
+  .prose-chat :not(pre) > code {
+    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.8125rem;
+    padding: 0.125rem 0.25rem;
+    border-radius: 4px;
+    background: var(--color-surface-muted);
+  }
+
   /* Performance: skip layout/paint for off-screen message items */
   .chat-message-item {
     content-visibility: auto;

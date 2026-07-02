@@ -262,9 +262,7 @@ export function FilePreviewModal({
             </div>
           ) : isMarkdown ? (
             <div className="flex-1 overflow-y-auto">
-              <div
-                className={`prose prose-sm max-w-none text-text-primary ${document.documentElement.classList.contains("dark") ? "prose-invert" : ""}`}
-              >
+              <div className="prose-chat text-text-primary">
                 <ReactMarkdown
                   remarkPlugins={
                     REMARK_PLUGINS as unknown as Parameters<
