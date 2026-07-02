@@ -5,14 +5,13 @@ import { useIPC } from "../hooks/useIPC";
 import {
   Trash2,
   Settings,
-  Clock3,
   Store,
+  Clock3,
   Search as SearchIcon,
   ListChecks,
   Check,
   Folder,
   Archive,
-  Globe,
   ChevronDown,
 } from "lucide-react";
 import type { Session } from "../types";
@@ -30,12 +29,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const setWorkingDir = useAppStore((s) => s.setWorkingDir);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
-  const showSchedule = useAppStore((s) => s.showSchedule);
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
-  const showMarketplace = useAppStore((s) => s.showMarketplace);
   const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
-  const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
   const taskSlots = useAppStore((s) => s.taskSlots);
   const removeTaskSlot = useAppStore((s) => s.removeTaskSlot);
   const setTaskSlots = useAppStore((s) => s.setTaskSlots);
@@ -62,6 +58,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   useEffect(() => {
     if (!showProjectActions) return;
@@ -117,6 +114,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       setSelectedIds(new Set());
     }
   }, [sidebarCollapsed, isSelectMode]);
+
+  useEffect(() => {
+    if (sidebarCollapsed) {
+      setShowSettingsMenu(false);
+    }
+  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!isSelectMode) return;
@@ -695,58 +698,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         )}
       </div>
 
-      {/* Marketplace & Automation & Browser shortcuts */}
-      <div className="px-3 pb-1 space-y-0.5">
-        <button
-          onClick={() => {
-            setShowSettings(false);
-            setShowSchedule(false);
-            setShowMarketplace(true);
-          }}
-          className={`w-full flex items-center gap-2 rounded-xl px-3 py-1.5 text-left transition-colors ${
-            showMarketplace
-              ? "bg-accent/10 text-accent"
-              : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-          }`}
-        >
-          <Store className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm font-medium leading-5 truncate">
-            {t("sidebar.marketplace")}
-          </span>
-        </button>
-        <button
-          onClick={() => {
-            setShowSettings(false);
-            setShowMarketplace(false);
-            setShowSchedule(true);
-          }}
-          className={`w-full flex items-center gap-2 rounded-xl px-3 py-1.5 text-left transition-colors ${
-            showSchedule
-              ? "bg-accent/10 text-accent"
-              : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-          }`}
-        >
-          <Clock3 className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm font-medium leading-5 truncate">
-            {t("sidebar.automation")}
-          </span>
-        </button>
-        <button
-          onClick={() => {
-            setShowSettings(false);
-            setShowSchedule(false);
-            setShowMarketplace(false);
-            toggleBrowserPanel();
-          }}
-          className="w-full flex items-center gap-2 rounded-xl px-3 py-1.5 text-left text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-        >
-          <Globe className="w-4 h-4 flex-shrink-0" />
-          <span className="text-sm font-medium leading-5 truncate">
-            {t("sidebar.browser")}
-          </span>
-        </button>
-      </div>
-
       <div className="flex-1 overflow-y-auto px-3 py-4">
         {/* Task slot area */}
         {taskSlots.length > 0 && (
@@ -1118,24 +1069,83 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           </div>
         </div>
       ) : (
-        <div className="px-3 py-3">
+        <div className="px-3 py-3 relative">
           <div className="flex items-center gap-2 rounded-2xl bg-background/50 px-3 py-2.5">
             <button
-              onClick={() => {
-                setShowMarketplace(false);
-                setShowSchedule(false);
-                setShowSettings(true);
-              }}
+              onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+              onKeyDown={(e) => { if (e.key === 'Escape') setShowSettingsMenu(false); }}
               className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
+              aria-expanded={showSettingsMenu}
+              aria-haspopup="menu"
             >
               <Settings className="w-4 h-4 flex-shrink-0" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="text-sm font-medium text-text-primary">
                   {t("sidebar.settings")}
                 </div>
               </div>
+              <ChevronDown
+                className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
+                  showSettingsMenu ? "rotate-180" : ""
+                }`}
+              />
             </button>
           </div>
+
+          {showSettingsMenu && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowSettingsMenu(false)}
+              />
+              <div
+                className="absolute bottom-full left-3 right-3 mb-1 z-50 rounded-xl border border-border-muted bg-background shadow-lg p-1"
+                role="menu"
+                onKeyDown={(e) => { if (e.key === 'Escape') setShowSettingsMenu(false); }}
+              >
+                <button
+                  onClick={() => {
+                    setShowSettingsMenu(false);
+                    setShowSettings(false);
+                    setShowSchedule(false);
+                    setShowMarketplace(true);
+                  }}
+                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
+                  role="menuitem"
+                >
+                  <Store className="w-4 h-4 flex-shrink-0" />
+                  {t("sidebar.marketplace")}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSettingsMenu(false);
+                    setShowSettings(false);
+                    setShowMarketplace(false);
+                    setShowSchedule(true);
+                  }}
+                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
+                  role="menuitem"
+                >
+                  <Clock3 className="w-4 h-4 flex-shrink-0" />
+                  {t("sidebar.automation")}
+                </button>
+                <div className="mx-1 my-0.5 border-t border-border-muted" />
+                <button
+                  onClick={() => {
+                    setShowSettingsMenu(false);
+                    setShowMarketplace(false);
+                    setShowSchedule(false);
+                    setShowSettings(true);
+                  }}
+                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
+                  role="menuitem"
+                >
+                  <Settings className="w-4 h-4 flex-shrink-0" />
+                  {t("sidebar.settings")}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 
