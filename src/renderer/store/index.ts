@@ -304,6 +304,47 @@ const defaultSettings: Settings = {
   autoSkillLearning: true,
 };
 
+export interface TaskSlot {
+  sessionId: string;
+  completed: boolean;
+}
+
+const TASK_SLOTS_KEY = "deskwand.taskSlots";
+
+function isTaskSlot(s: unknown): s is TaskSlot {
+  return (
+    s !== null &&
+    typeof s === "object" &&
+    typeof (s as Record<string, unknown>).sessionId === "string" &&
+    typeof (s as Record<string, unknown>).completed === "boolean"
+  );
+}
+
+function loadTaskSlots(): TaskSlot[] {
+  try {
+    const raw = localStorage.getItem(TASK_SLOTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isTaskSlot);
+  } catch {
+    return [];
+  }
+}
+
+function persistTaskSlots(slots: TaskSlot[]): void {
+  try {
+    const next = JSON.stringify(slots);
+    if (localStorage.getItem(TASK_SLOTS_KEY) === next) return;
+    localStorage.setItem(TASK_SLOTS_KEY, next);
+  } catch {
+    /* ignore */
+  }
+}
+
+// NOTE: TaskSlot helpers above MUST stay before create(). loadTaskSlots() is
+// called synchronously during store init — if TASK_SLOTS_KEY were below it
+// would be in the Temporal Dead Zone and always return [].
 export const useAppStore = create<AppState>((set) => ({
   // Initial state
   sessions: [],
@@ -873,42 +914,6 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 }));
-
-export interface TaskSlot {
-  sessionId: string;
-  completed: boolean;
-}
-
-const TASK_SLOTS_KEY = "deskwand.taskSlots";
-
-function isTaskSlot(s: unknown): s is TaskSlot {
-  return (
-    s !== null &&
-    typeof s === "object" &&
-    typeof (s as Record<string, unknown>).sessionId === "string" &&
-    typeof (s as Record<string, unknown>).completed === "boolean"
-  );
-}
-
-function loadTaskSlots(): TaskSlot[] {
-  try {
-    const raw = localStorage.getItem(TASK_SLOTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isTaskSlot);
-  } catch {
-    return [];
-  }
-}
-
-function persistTaskSlots(slots: TaskSlot[]): void {
-  try {
-    localStorage.setItem(TASK_SLOTS_KEY, JSON.stringify(slots));
-  } catch {
-    /* ignore */
-  }
-}
 
 // Expose helpers for nav-server (CLI-driven UI navigation via executeJavaScript)
 if (typeof window !== "undefined") {
