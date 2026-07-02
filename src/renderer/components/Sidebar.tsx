@@ -878,84 +878,84 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         </div>
       </div>
 
-        <div className="px-3 py-3 relative">
-          <div className="flex items-center gap-2 rounded-2xl bg-background/50 px-3 py-2.5">
-            <button
-              onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-              onKeyDown={(e) => { if (e.key === 'Escape') setShowSettingsMenu(false); }}
-              className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
-              aria-expanded={showSettingsMenu}
-              aria-haspopup="menu"
-            >
-              <Settings className="w-4 h-4 flex-shrink-0" />
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text-primary">
-                  {t("sidebar.settings")}
-                </div>
+      <div className="px-3 py-3 relative">
+        <div className="flex items-center gap-2 rounded-2xl bg-background/50 px-3 py-2.5">
+          <button
+            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setShowSettingsMenu(false); }}
+            className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
+            aria-expanded={showSettingsMenu}
+            aria-haspopup="menu"
+          >
+            <Settings className="w-4 h-4 flex-shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-medium text-text-primary">
+                {t("sidebar.settings")}
               </div>
-              <ChevronDown
-                className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
-                  showSettingsMenu ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-          </div>
-
-          {showSettingsMenu && (
-            <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setShowSettingsMenu(false)}
-              />
-              <div
-                className="absolute bottom-full left-3 right-3 mb-1 z-50 rounded-xl border border-border-muted bg-background shadow-lg p-1"
-                role="menu"
-                onKeyDown={(e) => { if (e.key === 'Escape') setShowSettingsMenu(false); }}
-              >
-                <button
-                  onClick={() => {
-                    setShowSettingsMenu(false);
-                    setShowSettings(false);
-                    setShowSchedule(false);
-                    setShowMarketplace(true);
-                  }}
-                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
-                  role="menuitem"
-                >
-                  <Store className="w-4 h-4 flex-shrink-0" />
-                  {t("sidebar.marketplace")}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowSettingsMenu(false);
-                    setShowSettings(false);
-                    setShowMarketplace(false);
-                    setShowSchedule(true);
-                  }}
-                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
-                  role="menuitem"
-                >
-                  <Clock3 className="w-4 h-4 flex-shrink-0" />
-                  {t("sidebar.automation")}
-                </button>
-                <div className="mx-1 my-0.5 border-t border-border-muted" />
-                <button
-                  onClick={() => {
-                    setShowSettingsMenu(false);
-                    setShowMarketplace(false);
-                    setShowSchedule(false);
-                    setShowSettings(true);
-                  }}
-                  className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
-                  role="menuitem"
-                >
-                  <Settings className="w-4 h-4 flex-shrink-0" />
-                  {t("sidebar.settings")}
-                </button>
-              </div>
-            </>
-          )}
+            </div>
+            <ChevronDown
+              className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
+                showSettingsMenu ? "rotate-180" : ""
+              }`}
+            />
+          </button>
         </div>
+
+        {showSettingsMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setShowSettingsMenu(false)}
+            />
+            <div
+              className="absolute bottom-full left-3 right-3 mb-1 z-50 rounded-xl border border-border-muted bg-background shadow-lg p-1"
+              role="menu"
+              onKeyDown={(e) => { if (e.key === 'Escape') setShowSettingsMenu(false); }}
+            >
+              <button
+                onClick={() => {
+                  setShowSettingsMenu(false);
+                  setShowSettings(false);
+                  setShowSchedule(false);
+                  setShowMarketplace(true);
+                }}
+                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
+                role="menuitem"
+              >
+                <Store className="w-4 h-4 flex-shrink-0" />
+                {t("sidebar.marketplace")}
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettingsMenu(false);
+                  setShowSettings(false);
+                  setShowMarketplace(false);
+                  setShowSchedule(true);
+                }}
+                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
+                role="menuitem"
+              >
+                <Clock3 className="w-4 h-4 flex-shrink-0" />
+                {t("sidebar.automation")}
+              </button>
+              <div className="mx-1 my-0.5 border-t border-border-muted" />
+              <button
+                onClick={() => {
+                  setShowSettingsMenu(false);
+                  setShowMarketplace(false);
+                  setShowSchedule(false);
+                  setShowSettings(true);
+                }}
+                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
+                role="menuitem"
+              >
+                <Settings className="w-4 h-4 flex-shrink-0" />
+                {t("sidebar.settings")}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
       {deleteConfirm && (
         <div
