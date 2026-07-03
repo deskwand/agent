@@ -760,11 +760,6 @@
     background: var(--color-surface-muted);
   }
 
-  /* Performance: skip layout/paint for off-screen message items */
-  .chat-message-item {
-    content-visibility: auto;
-    contain-intrinsic-size: auto 200px;
-  }
 
   /* Code block */
   .code-block {
