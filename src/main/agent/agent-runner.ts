@@ -21,7 +21,12 @@ import {
   type ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
-import { getSharedAuthStorage, ModelRegistry } from "./shared-auth";
+import {
+  getSharedAuthStorage,
+  ensureFreshOAuthToken,
+  ModelRegistry,
+} from "./shared-auth";
+import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import type {
   Session,
   Message,
@@ -2173,6 +2178,12 @@ ${hints.join("\n")}
       }
 
       logTiming("before pi-ai model resolution", runStartTime);
+
+      // Pre-refresh OAuth token so the SDK picks up a fresh key
+      if (session.providerProfileKey?.startsWith("oauth:")) {
+        const oauthId = extractOAuthProviderId(session.providerProfileKey);
+        if (oauthId) await ensureFreshOAuthToken(oauthId);
+      }
 
       const resolvedRuntime = await modelResolutionService.resolve({
         sessionProviderProfileKey: session.providerProfileKey,

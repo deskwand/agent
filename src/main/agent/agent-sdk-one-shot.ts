@@ -19,7 +19,7 @@ import {
 } from "../config/auth-utils";
 import { log, logWarn } from "../utils/logger";
 import { normalizeGeneratedTitle } from "../session/session-title-utils";
-import { getSharedAuthStorage } from "./shared-auth";
+import { getSharedAuthStorage, ensureFreshOAuthToken } from "./shared-auth";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import {
   applyPiModelRuntimeOverrides,
@@ -217,16 +217,19 @@ export async function runPiAiOneShot(
   // (e.g. oauth:openai-codex → openai-codex) so the correct model
   // entry (with codex baseUrl + api type) is used from pi-ai's registry.
   const activeIsOAuth = config.provider === "oauth";
-  const oauthPiProvider = activeIsOAuth && config.activeProviderKey
-    ? extractOAuthProviderId(config.activeProviderKey)
-    : undefined;
+  const oauthPiProvider =
+    activeIsOAuth && config.activeProviderKey
+      ? extractOAuthProviderId(config.activeProviderKey)
+      : undefined;
   const effectiveProvider = oauthPiProvider || config.provider || "anthropic";
-  const defaultModel = config.providers?.[config.activeProviderKey]?.models?.[0]?.id;
+  const defaultModel =
+    config.providers?.[config.activeProviderKey]?.models?.[0]?.id;
   const modelId = config.model?.trim() || defaultModel || "claude-sonnet-4-6";
   const modelString = modelId.includes("/")
     ? modelId
     : `${effectiveProvider}/${modelId}`;
-  const keyProvider = oauthPiProvider || config.customProtocol || config.provider || "anthropic";
+  const keyProvider =
+    oauthPiProvider || config.customProtocol || config.provider || "anthropic";
 
   // Normalize base URL for OpenAI-compatible providers (strips copy-pasted endpoint suffixes)
   const routeProtocol = resolvePiRouteProtocol(
@@ -288,8 +291,7 @@ export async function runPiAiOneShot(
   let apiKey: string | undefined = config.apiKey?.trim();
   // For OAuth providers, fetch the access token from auth.json
   if (!apiKey && activeIsOAuth && oauthPiProvider) {
-    const authStorage = getSharedAuthStorage();
-    apiKey = (await authStorage.getApiKey(oauthPiProvider)) || undefined;
+    apiKey = (await ensureFreshOAuthToken(oauthPiProvider)) || undefined;
   }
   if (apiKey) {
     const authStorage = getSharedAuthStorage();
