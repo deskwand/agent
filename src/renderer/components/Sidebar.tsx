@@ -12,6 +12,7 @@ import {
   Folder,
   Archive,
   ChevronDown,
+  SquarePen,
 } from "lucide-react";
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
@@ -494,9 +495,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 setWorkingDir(null);
                 handleNewSession();
               }}
-              className="h-8 px-2.5 rounded-l-xl bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-colors whitespace-nowrap"
+              className="h-8 w-8 rounded-l-xl bg-accent text-accent-foreground hover:bg-accent/90 transition-colors flex items-center justify-center"
+              title={t("sidebar.newChat")}
             >
-              + {t("sidebar.newChat")}
+              <SquarePen className="w-4 h-4" />
             </button>
             <button
               onClick={(e) => {
