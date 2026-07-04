@@ -6,6 +6,7 @@ import { useIPC } from "../../hooks/useIPC";
 import type { Session } from "../../types";
 import type { ResultFileEntry } from "../../utils/tool-display-blocks";
 import { shortenPath } from "./toolHelpers";
+import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import { FilePreviewModal } from "../FilePreviewModal";
 import { ConfirmDialog } from "../ConfirmDialog";
 
@@ -169,17 +170,21 @@ export const ArtifactCard = memo(function ArtifactCard({
     setRevertConfirm(null);
   }, [revertConfirm, doRevert, files]);
 
+  const resolvePath = (p: string) =>
+    activeSessionCwd ? resolvePathAgainstWorkspace(p, activeSessionCwd) : p;
+
   const handleClickFile = useCallback(
     (file: ResultFileEntry) => {
       if (revertedFiles.has(file.path)) return;
+      const resolvedPath = resolvePath(file.path);
       if (isNew(file) || !isGitRepo) {
-        setPreviewFile(file);
+        setPreviewFile({ ...file, path: resolvedPath });
       } else {
-        setReviewTargetFile(file.path);
+        setReviewTargetFile(resolvedPath);
         setReviewOpen(true);
       }
     },
-    [revertedFiles, isGitRepo, setReviewTargetFile, setReviewOpen],
+    [revertedFiles, isGitRepo, resolvePath, setReviewTargetFile, setReviewOpen],
   );
 
   const handleReviewAll = useCallback(() => {
@@ -237,7 +242,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                       className="ml-2 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!reverted) handleCopyPath(file.path);
+                        if (!reverted) handleCopyPath(resolvePath(file.path));
                       }}
                       role="button"
                       tabIndex={-1}
@@ -310,7 +315,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                       className="ml-2 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (!reverted) handleCopyPath(file.path);
+                        if (!reverted) handleCopyPath(resolvePath(file.path));
                       }}
                       role="button"
                       tabIndex={-1}
@@ -382,7 +387,7 @@ export const ArtifactCard = memo(function ArtifactCard({
         title={
           revertConfirm?.type === "file"
             ? t("artifactCard.confirmRevertFile", {
-                path: revertConfirm.file.path,
+                path: resolvePath(revertConfirm.file.path),
               })
             : t("artifactCard.confirmRevertRound")
         }
