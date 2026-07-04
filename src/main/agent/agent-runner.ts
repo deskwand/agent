@@ -76,6 +76,7 @@ import type { Browser, Page, Locator } from "playwright-core";
 import {
   resolveMessageEndPayload,
   toUserFacingErrorText,
+  getErrorSuffix,
 } from "./agent-runner-message-end";
 import { buildPiSessionRuntimeSignature } from "./pi-session-runtime";
 import { ThinkTagStreamParser } from "./think-tag-parser";
@@ -3381,11 +3382,7 @@ Tool routing:\n
                     content: [
                       {
                         type: "text",
-                        text: `**Error**: ${resolvedPayload.errorText}\n\n${
-                          /\b4\d{2}\b/.test(resolvedPayload.errorText)
-                            ? "_请检查配置后重试。_"
-                            : "_Agent 正在自动重试，请稍候..._"
-                        }`,
+                        text: `**Error**: ${resolvedPayload.errorText}\n\n${getErrorSuffix(resolvedPayload.errorText)}`,
                       },
                     ],
                     timestamp: Date.now(),
