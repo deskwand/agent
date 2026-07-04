@@ -483,9 +483,13 @@ export function normalizeProviderConfig(
   const fallbackModel = getDefaultProviderModel(profileKey);
   const isCustomProfile = meta.provider === "custom" || meta.provider === "oauth";
   const rawModels = Array.isArray(raw?.models) ? raw.models : [];
+  // TODO: The openrouter special-case should move to provider metadata
+  // (e.g. meta.preserveDynamicModels) once a second provider needs it.
+  const preserveRawModels =
+    isCustomProfile || (profileKey === "openrouter" && rawModels.length > 0);
   const deduped = new Map<string, ApiProviderModel>();
 
-  if (isCustomProfile) {
+  if (preserveRawModels) {
     for (const item of rawModels) {
       const normalized = normalizeProviderModel(item, "");
       if (normalized) {
@@ -497,16 +501,16 @@ export function normalizeProviderConfig(
     }
   }
 
-  const models = isCustomProfile
+  const models = preserveRawModels
     ? Array.from(deduped.values())
     : getSortedPresetModels(profileKey);
   const dm = toNonEmptyString(raw?.defaultModel);
-  const defaultModelCandidate = isCustomProfile
+  const defaultModelCandidate = preserveRawModels
     ? dm || models[0]?.id || fallbackProfile.model
     : dm && models.some((m) => m.id === raw?.defaultModel)
       ? dm
       : fallbackModel.id || fallbackProfile.model;
-  const defaultModel = isCustomProfile
+  const defaultModel = preserveRawModels
     ? deduped.has(defaultModelCandidate)
       ? defaultModelCandidate
       : models[0]?.id || fallbackProfile.model
@@ -574,6 +578,8 @@ function sanitizeSaveProviderPayload(
   const normalized = normalizeProviderConfig(profileKey, payload.config);
 
   if (meta.provider !== "custom") {
+    const preserveOpenRouterModels =
+      meta.provider === "openrouter" && normalized.models.length > 0;
     return {
       ...normalized,
       provider: meta.provider,
@@ -583,7 +589,12 @@ function sanitizeSaveProviderPayload(
           ? payload.config.apiKey.trim()
           : "",
       baseUrl: normalizeProviderConfig(profileKey, undefined).baseUrl,
-      defaultModel: getDefaultProviderModel(profileKey).id,
+      defaultModel: preserveOpenRouterModels
+        ? normalized.defaultModel
+        : getDefaultProviderModel(profileKey).id,
+      models: preserveOpenRouterModels
+        ? normalized.models
+        : getSortedPresetModels(profileKey),
       updatedAt: nowISO(),
     };
   }
@@ -937,7 +948,9 @@ export class ConfigStore {
 
   deleteProvider(payload: { profileKey: ProviderProfileKey }): AppConfig {
     const stored = { ...this.store.store };
-    if (isCustomProfile(payload.profileKey) || isOAuthProfileKey(payload.profileKey)) {
+    const removedEntirely =
+      isCustomProfile(payload.profileKey) || isOAuthProfileKey(payload.profileKey);
+    if (removedEntirely) {
       delete stored.providers[payload.profileKey];
     } else {
       stored.providers[payload.profileKey] = clearProviderConfig(
@@ -956,7 +969,17 @@ export class ConfigStore {
       return this.getAll();
     }
     if (stored.activeProviderKey === payload.profileKey) {
-      stored.activeProviderKey = remaining[0];
+      const fallbackKey = remaining.find((key) => {
+        const target = stored.providers[key];
+        if (!target) return false;
+        return this.hasUsableCredentialsForProjection({
+          provider: target.provider,
+          apiKey: target.apiKey,
+          baseUrl: target.baseUrl,
+          models: target.models,
+        });
+      });
+      stored.activeProviderKey = fallbackKey || remaining[0];
     }
     stored.isConfigured = Object.values(stored.providers).some(
       (p) => !!(p?.apiKey?.trim()) || p?.provider === "oauth",

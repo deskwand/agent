@@ -420,7 +420,10 @@
     "oauthOpenAIDesc": "Connect via ChatGPT subscription",
     "oauthGitHubDesc": "Connect via GitHub Copilot subscription",
     "oauthAnthropicDesc": "Connect via Claude Max subscription",
-    "oauthAnthropicNote": "Requires Claude Max subscription with extra usage credits. Claude Pro is not supported."
+    "oauthAnthropicNote": "Requires Claude Max subscription with extra usage credits. Claude Pro is not supported.",
+    "oauthOpenRouterDesc": "Connect via your OpenRouter account",
+    "oauthOpenRouterFallbackNotice": "Connected to OpenRouter. Model sync failed, so the built-in fallback list is being used.",
+    "oauthOpenRouterModelLoadError": "OpenRouter did not return any usable models."
   },
   "window": {
     "minimize": "Minimize",
@@ -747,6 +750,8 @@
     "startFailed": "Failed to start session. Please try again.",
     "noModel": "No model",
     "switchModel": "Switch model",
+    "searchModel": "Search models...",
+    "noModelMatch": "No matching models",
     "slashSkills": "Skills",
     "slashCommands": "Commands",
     "slashAll": "All",

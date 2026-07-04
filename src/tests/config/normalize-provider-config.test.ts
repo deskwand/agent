@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeProviderConfig,
   buildProjectedConfig,
+  ConfigStore,
 } from "../../main/config/config-store";
 import type { ProviderProfileKey } from "../../main/config/config-store";
 
@@ -82,6 +83,91 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
 });
 
 // --------------- buildProjectedConfig — visionModel ---------------
+
+describe("ConfigStore.saveProvider — openrouter dynamic models", () => {
+  it("preserves fetched OpenRouter models and default model", () => {
+    const store = new ConfigStore();
+
+    store.saveProvider({
+      profileKey: "openrouter",
+      config: {
+        provider: "openrouter",
+        customProtocol: "anthropic",
+        apiKey: "sk-or-v1-test",
+        baseUrl: "https://openrouter.ai/api/v1",
+        defaultModel: "openrouter/alpha-free",
+        models: [
+          {
+            id: "openrouter/alpha-free",
+            label: "Alpha Free (Free)",
+            source: "preset",
+          },
+          {
+            id: "openrouter/beta-paid",
+            label: "Beta Paid",
+            source: "preset",
+          },
+        ],
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      },
+    });
+
+    const saved = store.getAll().providers.openrouter;
+    expect(saved?.defaultModel).toBe("openrouter/alpha-free");
+    expect(saved?.models).toEqual([
+      {
+        id: "openrouter/alpha-free",
+        label: "Alpha Free (Free)",
+        source: "preset",
+      },
+      {
+        id: "openrouter/beta-paid",
+        label: "Beta Paid",
+        source: "preset",
+      },
+    ]);
+  });
+
+  it("falls back to another configured provider when clearing the active OpenRouter config", () => {
+    const store = new ConfigStore();
+
+    store.saveProvider({
+      profileKey: "openrouter",
+      config: {
+        provider: "openrouter",
+        customProtocol: "anthropic",
+        apiKey: "sk-or-v1-test",
+        baseUrl: "https://openrouter.ai/api/v1",
+        defaultModel: "openrouter/alpha-free",
+        models: [
+          {
+            id: "openrouter/alpha-free",
+            label: "Alpha Free (Free)",
+            source: "preset",
+          },
+        ],
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      },
+    });
+    store.saveProvider({
+      profileKey: "anthropic",
+      config: {
+        provider: "anthropic",
+        customProtocol: "anthropic",
+        apiKey: "sk-ant-test",
+        baseUrl: "https://api.anthropic.com",
+        defaultModel: "claude-sonnet-4-6",
+        models: [],
+        updatedAt: "2024-01-01T00:00:00.000Z",
+      },
+    });
+    store.setActiveProvider({ profileKey: "openrouter" });
+
+    const updated = store.deleteProvider({ profileKey: "openrouter" });
+
+    expect(updated.activeProviderKey).toBe("anthropic");
+  });
+});
 
 describe("buildProjectedConfig — visionModel pass-through", () => {
   function stub(overrides: Partial<ReturnType<typeof buildProjectedConfig>> = {}) {

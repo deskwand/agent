@@ -173,3 +173,26 @@ export interface OAuthStatusResult {
   expiresAt?: number;
   providerName: string;
 }
+
+export interface OpenRouterAuthStatusResult {
+  loggedIn: boolean;
+  providerName: string;
+}
+
+export interface OpenRouterLoginResult {
+  apiKey: string;
+  providerName: string;
+}
+
+export interface OpenRouterModelsResult {
+  models: Array<{
+    id: string;
+    label: string;
+    source: "preset" | "custom";
+    contextWindow?: number;
+    maxTokens?: number;
+    input?: ("text" | "image")[];
+  }>;
+  usedFallback: boolean;
+  error?: string;
+}

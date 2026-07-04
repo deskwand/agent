@@ -264,6 +264,11 @@ export class ModelResolutionService {
         );
       }
     }
+    if (!resolvedApiKey && providerConfig.provider !== "ollama") {
+      throw new Error(
+        `API key not configured for ${providerSelection.providerProfileKey}. Please update Settings → API.`,
+      );
+    }
 
     return {
       providerProfileKey: providerSelection.providerProfileKey,

@@ -234,4 +234,33 @@ describe("ModelResolutionService", () => {
     expect(result.modelId).toBe("claude-sonnet-4-6");
     expect(result.trace.modelSource).toBe("provider.defaultModel");
   });
+
+  it("resolves a standard OpenRouter provider with a stored API key", async () => {
+    const result = await service.resolve({
+      sessionProviderProfileKey: "openrouter",
+      sessionModel: "anthropic/claude-sonnet-4-6",
+      appConfig: buildAppConfig(),
+    });
+
+    expect(result.providerProfileKey).toBe("openrouter");
+    expect(result.providerType).toBe("openrouter");
+    expect(result.apiKey).toBe("or-key");
+    expect(result.baseUrl).toBe("https://openrouter.ai/api/v1");
+  });
+
+  it("fails when a standard OpenRouter provider has no API key", async () => {
+    const appConfig = buildAppConfig();
+    appConfig.providers.openrouter = {
+      ...appConfig.providers.openrouter!,
+      apiKey: "",
+    };
+
+    await expect(
+      service.resolve({
+        sessionProviderProfileKey: "openrouter",
+        sessionModel: "anthropic/claude-sonnet-4-6",
+        appConfig,
+      }),
+    ).rejects.toThrow(/api key/i);
+  });
 });

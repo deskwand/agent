@@ -249,6 +249,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       baseUrl?: string;
     }): Promise<ProviderModelInfo[]> =>
       ipcRenderer.invoke("config.listModels", payload),
+    fetchOpenRouterModels: (): Promise<import("../shared/ipc-types").OpenRouterModelsResult> =>
+      ipcRenderer.invoke("config.fetchOpenRouterModels"),
     diagnose: (input: DiagnosticInput): Promise<DiagnosticResult> =>
       ipcRenderer.invoke("config.diagnose", input),
     discoverLocal: (payload?: {
@@ -554,6 +556,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("auth.status", providerId),
   },
 
+  openrouterAuth: {
+    login: (): Promise<import("../shared/ipc-types").OpenRouterLoginResult> =>
+      ipcRenderer.invoke("openrouterAuth.login"),
+    logout: (): Promise<void> => ipcRenderer.invoke("openrouterAuth.logout"),
+    status: (): Promise<import("../shared/ipc-types").OpenRouterAuthStatusResult> =>
+      ipcRenderer.invoke("openrouterAuth.status"),
+  },
+
   // Browser panel methods
   browser: {
     toggle: (): Promise<{
@@ -677,6 +687,7 @@ declare global {
           apiKey: string;
           baseUrl?: string;
         }) => Promise<ProviderModelInfo[]>;
+        fetchOpenRouterModels: () => Promise<import("../shared/ipc-types").OpenRouterModelsResult>;
         diagnose: (input: DiagnosticInput) => Promise<DiagnosticResult>;
         discoverLocal: (payload?: {
           baseUrl?: string;
@@ -923,6 +934,11 @@ declare global {
         login: (providerId: string, force?: boolean) => Promise<void>;
         logout: (providerId: string) => Promise<void>;
         status: (providerId: string) => Promise<import("../shared/ipc-types").OAuthStatusResult>;
+      };
+      openrouterAuth: {
+        login: () => Promise<import("../shared/ipc-types").OpenRouterLoginResult>;
+        logout: () => Promise<void>;
+        status: () => Promise<import("../shared/ipc-types").OpenRouterAuthStatusResult>;
       };
       browser: {
         toggle: () => Promise<{

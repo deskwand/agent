@@ -110,6 +110,8 @@ import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
 import { initOAuthService } from "./auth/oauth-service";
+import { openRouterPkceService } from "./auth/openrouter-pkce-service";
+import { fetchOpenRouterModels } from "./config/openrouter-models";
 import {
   countChangedFilesFromPorcelain,
   partitionArtifactPaths,
@@ -1397,6 +1399,15 @@ ipcMain.on("client-event", async (_event, data: ClientEvent) => {
 
 // ── OAuth IPC handlers ──
 initOAuthService();
+ipcMain.handle("openrouterAuth.login", async () => {
+  return openRouterPkceService.login();
+});
+ipcMain.handle("openrouterAuth.logout", async () => {
+  return openRouterPkceService.logout();
+});
+ipcMain.handle("openrouterAuth.status", async () => {
+  return openRouterPkceService.status();
+});
 
 ipcMain.handle("client-invoke", async (_event, data: ClientEvent) => {
   return handleClientEvent(data);
@@ -2007,6 +2018,10 @@ ipcMain.handle("config.getPresets", async () => {
     logError("[Config] Error getting presets:", error);
     return PROVIDER_PRESETS;
   }
+});
+
+ipcMain.handle("config.fetchOpenRouterModels", async () => {
+  return await fetchOpenRouterModels();
 });
 
 const buildAgentRuntimeSignature = (config: AppConfig): string =>

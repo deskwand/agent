@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel, ProviderProfileKey } from "../types";
 import { Plus, ChevronDown, ArrowUp, Square, Maximize2, Minimize2, Target, Eye, EyeOff } from "lucide-react";
@@ -60,7 +60,23 @@ export function ChatInputBottomBar({
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
+  const [modelSearch, setModelSearch] = useState("");
   const [thinkingMenuOpen, setThinkingMenuOpen] = useState(false);
+
+  const filteredModelOptions = useMemo(() => {
+    if (!modelSearch.trim()) return modelOptions;
+    const q = modelSearch.toLowerCase();
+    return modelOptions
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(
+          (item) =>
+            item.name.toLowerCase().includes(q) ||
+            item.id.toLowerCase().includes(q)
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [modelOptions, modelSearch]);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const thinkingMenuRef = useRef<HTMLDivElement>(null);
 
@@ -72,6 +88,7 @@ export function ChatInputBottomBar({
         !modelMenuRef.current.contains(e.target as Node)
       ) {
         setModelMenuOpen(false);
+        setModelSearch("");
       }
       if (
         thinkingMenuRef.current &&
@@ -167,7 +184,10 @@ export function ChatInputBottomBar({
               type="button"
               onClick={() => {
                 if (modelMenuDisabled || modelOptions.length === 0) return;
-                setModelMenuOpen((v) => !v);
+                setModelMenuOpen((v) => {
+                  if (v) setModelSearch("");
+                  return !v;
+                });
               }}
               disabled={modelMenuDisabled || modelOptions.length === 0}
               className="inline-flex h-full items-center gap-1 text-text-primary max-w-[14rem] disabled:opacity-50"
@@ -180,43 +200,62 @@ export function ChatInputBottomBar({
               <ChevronDown className="w-3 h-3 text-text-muted" />
             </button>
             <div
-              className={`absolute right-0 bottom-[calc(100%+8px)] z-30 min-w-[12rem] max-w-[16rem] rounded-xl border border-border bg-background shadow-soft p-1 transition duration-150 ease-out ${
+              className={`absolute right-0 bottom-[calc(100%+8px)] z-30 min-w-[12rem] max-w-[16rem] rounded-xl border border-border bg-background shadow-soft transition duration-150 ease-out ${
                 modelMenuOpen
                   ? "opacity-100 translate-y-0 visible"
                   : "opacity-0 translate-y-2 invisible pointer-events-none"
               }`}
             >
-              {modelOptions.map((group) => (
-                <div key={group.profileKey} className="mb-1 last:mb-0">
-                  <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
-                    {group.groupLabel}
+              <div className="p-1.5 pb-0">
+                <input
+                  type="text"
+                  value={modelSearch}
+                  onChange={(e) => setModelSearch(e.target.value)}
+                  placeholder={t("chat.searchModel")}
+                  className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <div className="max-h-[280px] overflow-y-auto p-1">
+                {filteredModelOptions.length === 0 ? (
+                  <div className="px-2.5 py-3 text-xs text-text-muted text-center">
+                    {t("chat.noModelMatch")}
                   </div>
-                  {group.items.map((item) => (
-                    <button
-                      key={`${group.profileKey}:${item.id}`}
-                      type="button"
-                      onClick={() => {
-                        onSelectModel(group.profileKey, item.id);
-                        setModelMenuOpen(false);
-                      }}
-                      className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
-                        group.profileKey === activeProviderProfileKey &&
-                        item.id === model
-                          ? "bg-accent text-background"
-                          : "text-text-primary hover:bg-surface-hover"
-                      }`}
-                      role="option"
-                      aria-selected={
-                        group.profileKey === activeProviderProfileKey &&
-                        item.id === model
-                      }
-                      title={item.name}
-                    >
-                      {item.name}
-                    </button>
-                  ))}
-                </div>
-              ))}
+                ) : (
+                  filteredModelOptions.map((group) => (
+                    <div key={group.profileKey} className="mb-1 last:mb-0">
+                      <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
+                        {group.groupLabel}
+                      </div>
+                      {group.items.map((item) => (
+                        <button
+                          key={`${group.profileKey}:${item.id}`}
+                          type="button"
+                          onClick={() => {
+                            onSelectModel(group.profileKey, item.id);
+                            setModelMenuOpen(false);
+                            setModelSearch("");
+                          }}
+                          className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
+                            group.profileKey === activeProviderProfileKey &&
+                            item.id === model
+                              ? "bg-accent text-background"
+                              : "text-text-primary hover:bg-surface-hover"
+                          }`}
+                          role="option"
+                          aria-selected={
+                            group.profileKey === activeProviderProfileKey &&
+                            item.id === model
+                          }
+                          title={item.name}
+                        >
+                          {item.name}
+                        </button>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
           <div

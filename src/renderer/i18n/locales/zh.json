@@ -420,7 +420,10 @@
     "oauthOpenAIDesc": "通过 ChatGPT 订阅接入",
     "oauthGitHubDesc": "通过 GitHub Copilot 订阅接入",
     "oauthAnthropicDesc": "通过 Claude Max 订阅接入",
-    "oauthAnthropicNote": "需要 Claude Max 订阅 + 额外用量额度，Claude Pro 不可用"
+    "oauthAnthropicNote": "需要 Claude Max 订阅 + 额外用量额度，Claude Pro 不可用",
+    "oauthOpenRouterDesc": "通过 OpenRouter 账号接入",
+    "oauthOpenRouterFallbackNotice": "OpenRouter 已连接，但模型同步失败，当前已回退到内置模型列表。",
+    "oauthOpenRouterModelLoadError": "OpenRouter 没有返回可用模型。"
   },
   "window": {
     "minimize": "最小化",
@@ -747,6 +750,8 @@
     "startFailed": "启动会话失败，请稍后重试。",
     "noModel": "无模型",
     "switchModel": "切换模型",
+    "searchModel": "搜索模型...",
+    "noModelMatch": "无匹配模型",
     "slashSkills": "技能",
     "slashCommands": "命令",
     "slashAll": "全部",

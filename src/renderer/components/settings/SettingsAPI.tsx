@@ -124,6 +124,20 @@ const OAUTH_PROVIDERS = [
       </svg>
     ),
   },
+  {
+    id: "openrouter",
+    name: "OpenRouter",
+    descriptionKey: "api.oauthOpenRouterDesc",
+    noteKey: "",
+    icon: (
+      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
+        <path d="M5 6.5H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M5 12H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M5 17.5H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="8" cy="12" r="2.5" fill="currentColor" opacity="0.35" />
+      </svg>
+    ),
+  },
 ] as const;
 
 function sortedPresetModels(
@@ -384,7 +398,9 @@ export function SettingsAPI({
       const statuses: Record<string, unknown> = {};
       for (const provider of OAUTH_PROVIDERS) {
         try {
-          statuses[provider.id] = await window.electronAPI.auth.status(provider.id);
+          statuses[provider.id] = provider.id === "openrouter"
+            ? await window.electronAPI.openrouterAuth.status()
+            : await window.electronAPI.auth.status(provider.id);
         } catch {
           statuses[provider.id] = { loggedIn: false, providerName: provider.name };
         }
@@ -665,6 +681,51 @@ export function SettingsAPI({
       return next;
     });
     try {
+      if (providerId === "openrouter") {
+        const loginResult = await window.electronAPI.openrouterAuth.login();
+        const modelsResult = await window.electronAPI.config.fetchOpenRouterModels();
+        const providerInfo = OAUTH_PROVIDERS.find((p) => p.id === providerId);
+        const models = modelsResult.models;
+        const defaultModel = models[0]?.id;
+        if (!defaultModel) {
+          throw new Error(t("api.oauthOpenRouterModelLoadError"));
+        }
+        await window.electronAPI.config.saveProvider({
+          profileKey: "openrouter",
+          config: {
+            provider: "openrouter",
+            customProtocol: "anthropic",
+            name: providerInfo?.name || providerId,
+            apiKey: loginResult.apiKey,
+            baseUrl: presets.openrouter.baseUrl,
+            defaultModel,
+            models,
+            updatedAt: new Date().toISOString(),
+          },
+        });
+        await window.electronAPI.config.setActiveProvider({
+          profileKey: "openrouter",
+          defaultModel,
+        });
+        const updatedConfig = await window.electronAPI.config.get();
+        applyConfig(updatedConfig);
+        const status = await window.electronAPI.openrouterAuth.status();
+        setOAuthStatuses((prev) => ({ ...prev, [providerId]: status }));
+        if (modelsResult.usedFallback) {
+          const fallbackMsg = t("api.oauthOpenRouterFallbackNotice");
+          setSuccessMessage(
+            modelsResult.error
+              ? `${fallbackMsg} (${modelsResult.error})`
+              : fallbackMsg,
+          );
+          console.warn(
+            "[OpenRouter] Model fetch fell back to presets:",
+            modelsResult.error || "unknown reason",
+          );
+        }
+        return;
+      }
+
       // Only force re-auth if the existing token has expired
       const currentStatus = oauthStatuses[providerId];
       const force = Boolean(
@@ -725,7 +786,11 @@ export function SettingsAPI({
 
   const handleOAuthLogout = async (providerId: string) => {
     if (!window.electronAPI) return;
-    await window.electronAPI.auth.logout(providerId);
+    if (providerId === "openrouter") {
+      await window.electronAPI.openrouterAuth.logout();
+    } else {
+      await window.electronAPI.auth.logout(providerId);
+    }
     setOAuthStatuses((prev) => ({
       ...prev,
       [providerId]: {
@@ -741,7 +806,9 @@ export function SettingsAPI({
     });
     // Remove provider from ConfigStore so it disappears from model selector
     try {
-      const profileKey: ProviderProfileKey = oauthProfileKey(providerId);
+      const profileKey: ProviderProfileKey = providerId === "openrouter"
+        ? "openrouter"
+        : oauthProfileKey(providerId);
       const deleted = await window.electronAPI.config.deleteProvider({
         profileKey,
       });
@@ -958,6 +1025,7 @@ export function SettingsAPI({
                 return (
                   <div
                     key={provider.id}
+                    data-testid={`${provider.id}-oauth-card`}
                     className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 ${
                       isConnected
                         ? "border-success/30 bg-success/5"
@@ -1000,6 +1068,7 @@ export function SettingsAPI({
                     {isConnected ? (
                       <button
                         type="button"
+                        data-testid={`${provider.id}-oauth-disconnect`}
                         onClick={() => setPendingOAuthLogoutProviderId(provider.id)}
                         className="rounded-lg border border-border-muted px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-error flex-shrink-0"
                       >
@@ -1008,6 +1077,7 @@ export function SettingsAPI({
                     ) : (
                       <button
                         type="button"
+                        data-testid={`${provider.id}-oauth-connect`}
                         onClick={() => void handleOAuthLogin(provider.id)}
                         disabled={loading}
                         className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50 flex-shrink-0"
