@@ -115,11 +115,15 @@ SCRIPT
   # (root:root with SUID) is correctly recorded in the deb archive.
   # The postinst script handles this at install time, but we also
   # set it at build time for consistency.
-  fakeroot -- env STAGING="$STAGING" INSTALL_DIR="$INSTALL_DIR" OUTPUT="$OUTPUT" sh -c '
-    chown root:root "$STAGING$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
-    chmod 4755 "$STAGING$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
-    dpkg-deb --build "$STAGING" "$OUTPUT"
-  '
+  cat > "$STAGING/build-deb.sh" << 'FAKEROOT_SCRIPT'
+#!/bin/sh
+set -e
+chown root:root "$1$2/chrome-sandbox" 2>/dev/null || true
+chmod 4755 "$1$2/chrome-sandbox" 2>/dev/null || true
+dpkg-deb --build "$1" "$3"
+FAKEROOT_SCRIPT
+  chmod +x "$STAGING/build-deb.sh"
+  fakeroot -- "$STAGING/build-deb.sh" "$STAGING" "$INSTALL_DIR" "$OUTPUT"
 
   rm -rf "$STAGING"
   echo "✅ deb built: $OUTPUT"
