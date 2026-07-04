@@ -611,9 +611,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 <div
                   key={slot.sessionId}
                   onClick={() => void handleSessionClick(slot.sessionId)}
-                  className={`group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors ${
+                  className={`group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors border-l-[3px] border-l-transparent ${
                     activeSessionId === slot.sessionId
-                      ? "bg-surface-active border-l-[3px] border-l-accent"
+                      ? "bg-surface-active border-l-accent"
                       : ""
                   }`}
                 >
