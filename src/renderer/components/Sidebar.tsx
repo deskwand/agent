@@ -610,9 +610,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   key={slot.sessionId}
                   onClick={() => void handleSessionClick(slot.sessionId)}
                   className={`group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors ${
-                    !slot.completed
-                      ? "bg-accent-muted/10 border-l-[3px] border-l-accent"
-                      : "border border-dashed border-border-muted bg-surface-muted/30"
+                    activeSessionId === slot.sessionId
+                      ? "bg-surface-active border-l-[3px] border-l-accent"
+                      : ""
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -623,7 +623,13 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                         aria-label={t("sidebar.running")}
                       />
                     )}
-                    <span className="text-sm font-medium leading-5 text-text-primary truncate flex-1">
+                    <span
+                      className={`text-sm font-medium leading-5 truncate flex-1 ${
+                        activeSessionId === slot.sessionId || !slot.completed
+                          ? "text-text-primary"
+                          : "text-text-muted"
+                      }`}
+                    >
                       {session.title}
                     </span>
                     {session.isProjectMode &&
