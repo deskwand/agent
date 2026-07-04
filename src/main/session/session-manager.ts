@@ -91,12 +91,14 @@ const PROVIDER_PROFILE_KEYS: ProviderProfileKey[] = [
   "gemini",
 ];
 
-function isProviderProfileKey(
+export function isProviderProfileKey(
   value: string | null | undefined,
 ): value is ProviderProfileKey {
   if (!value || typeof value !== "string") return false;
   return (
-    PROVIDER_PROFILE_KEYS.includes(value) || value.startsWith("custom:")
+    PROVIDER_PROFILE_KEYS.includes(value) ||
+    value.startsWith("custom:") ||
+    value.startsWith("oauth:")
   );
 }
 

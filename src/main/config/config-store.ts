@@ -949,7 +949,7 @@ export class ConfigStore {
   deleteProvider(payload: { profileKey: ProviderProfileKey }): AppConfig {
     const stored = { ...this.store.store };
     const removedEntirely =
-      isCustomProfile(payload.profileKey) || isOAuthProfileKey(payload.profileKey);
+      isCustomProfile(payload.profileKey) || isOAuthProfileKey(payload.profileKey) || payload.profileKey === "openrouter";
     if (removedEntirely) {
       delete stored.providers[payload.profileKey];
     } else {
