@@ -646,7 +646,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                         className="w-3.5 h-3.5 text-accent/50 hover:text-accent flex-shrink-0 cursor-pointer transition-colors"
                         role="button"
                         tabIndex={0}
-                        title={t("sidebar.taskCompleted")}
+                        aria-label={t("sidebar.taskCompleted")}
                         onClick={(e) => {
                           e.stopPropagation();
                           removeTaskSlot(slot.sessionId);
