@@ -146,6 +146,8 @@ function toSideBySide(
 export function ReviewPanel() {
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const setReviewOpen = useAppStore((s) => s.setReviewOpen);
+  const reviewTargetFile = useAppStore((s) => s.reviewTargetFile);
+  const setReviewTargetFile = useAppStore((s) => s.setReviewTargetFile);
 
   const activeSessionCwd = useAppStore((s) => {
     if (!activeSessionId) return undefined;
@@ -214,12 +216,38 @@ export function ReviewPanel() {
     [], // stable, reads cwd via ref
   );
 
-  // Auto-select first file when diff files are loaded
+  // Auto-select first file (or target file) when diff files are loaded
   useEffect(() => {
     if (diffFiles.length > 0 && !selectedFile) {
+      // If a target file was set (e.g., from ArtifactCard), select it
+      if (reviewTargetFile) {
+        // reviewTargetFile may be absolute while diffFiles use relative paths
+        const match = diffFiles.find(
+          (f) => f.path === reviewTargetFile || reviewTargetFile.endsWith("/" + f.path),
+        );
+        if (match) {
+          loadFileDiff(match.path);
+          return;
+        }
+        setReviewTargetFile(null);
+      }
       loadFileDiff(diffFiles[0].path);
     }
-  }, [diffFiles, selectedFile, loadFileDiff]);
+  }, [diffFiles, selectedFile, loadFileDiff, reviewTargetFile, setReviewTargetFile]);
+
+  // Clear reviewTargetFile once the file has been selected
+  useEffect(() => {
+    if (selectedFile && reviewTargetFile) {
+      setReviewTargetFile(null);
+    }
+  }, [selectedFile, reviewTargetFile, setReviewTargetFile]);
+
+  // When reviewTargetFile is set while panel is already open, reset selection
+  useEffect(() => {
+    if (reviewTargetFile) {
+      setSelectedFile(null);
+    }
+  }, [reviewTargetFile]);
 
   const handleClose = useCallback(() => {
     setReviewOpen(false);

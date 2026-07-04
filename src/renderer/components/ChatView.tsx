@@ -19,7 +19,10 @@ import type {
   ThinkingLevel,
   ProviderProfileKey,
   ApiProviderConfig,
+  ToolUseContent,
 } from "../types";
+import { collectResultFiles } from "../utils/tool-display-blocks";
+import type { ResultFileEntry } from "../utils/tool-display-blocks";
 import { Plug, ChevronsDown, Loader2 } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
@@ -595,15 +598,64 @@ export function ChatView() {
   // after repeated prepends; v1 only windows older history from the top.
 
   const visibleTurnEntries = useMemo(() => {
+    // Single pass: detect turn-end indices, latest non-partial assistant,
+    // and collect artifact files across all messages in each turn.
+    const turnEndIds = new Set<string>();
+    const turnArtifactFiles = new Map<string, ResultFileEntry[]>();
+    let latestAssistantId: string | null = null;
+    let currentTurnToolUses: ToolUseContent[] = [];
+
+    for (let i = 0; i < visibleMessages.length; i++) {
+      const msg = visibleMessages[i];
+      if (!msg) continue;
+
+      // Collect tool_use blocks from assistant messages in the current turn
+      if (msg.role === "assistant") {
+        const rawContent = msg.content as unknown;
+        const blocks = Array.isArray(rawContent)
+          ? (rawContent as ContentBlock[])
+          : [];
+        const toolUses = blocks.filter(
+          (b): b is ToolUseContent => b.type === "tool_use",
+        );
+        currentTurnToolUses.push(...toolUses);
+
+        const msgId = String(msg.id);
+        const isPartial = msgId.startsWith("partial-");
+        if (isPartial) continue;
+        latestAssistantId = msgId;
+        const next = visibleMessages[i + 1];
+        if (!next || next.role === "user") {
+          turnEndIds.add(msgId);
+          // Store aggregated files for this turn-end
+          if (currentTurnToolUses.length > 0) {
+            turnArtifactFiles.set(
+              msgId,
+              collectResultFiles(currentTurnToolUses),
+            );
+          }
+          currentTurnToolUses = []; // Reset for next turn
+        }
+      }
+    }
+
     return visibleMessages.map((message) => {
       const isStreaming =
         typeof message.id === "string" && message.id.startsWith("partial-");
+      const msgId = String(message.id);
       const turnId = message.turnId;
       return {
         message,
         isStreaming,
+        isTurnEnd: turnEndIds.has(msgId),
+        // Partial messages (streaming) and the last completed assistant are the latest round.
+        // Partial messages must be treated as latest-round so that process summaries
+        // keep their natural order instead of being pushed to the end.
+        isLatestRound:
+          msgId.startsWith("partial-") || msgId === latestAssistantId,
         hideTraceBlocks:
           message.role === "assistant" && Boolean(turnId) && !effectiveTraceExpanded,
+        artifactFiles: turnArtifactFiles.get(msgId) ?? [],
       };
     });
   }, [visibleMessages, effectiveTraceExpanded]);
@@ -1160,12 +1212,14 @@ export function ChatView() {
                 </p>
               </div>
             ) : (
-              visibleTurnEntries.map(({ message, isStreaming, hideTraceBlocks }) => (
+              visibleTurnEntries.map(({ message, isStreaming, hideTraceBlocks, isLatestRound, artifactFiles }) => (
                 <div key={message.id} className="space-y-1.5">
                   <MessageCard
                     message={message}
                     isStreaming={isStreaming}
                     hideTraceBlocks={hideTraceBlocks}
+                    isLatestRound={isLatestRound}
+                    artifactFiles={artifactFiles}
                   />
                 </div>
               ))

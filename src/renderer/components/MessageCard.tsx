@@ -14,14 +14,20 @@ import {
   filterAssistantVisibleBlocks,
   orderAssistantDisplayBlocks,
 } from "../utils/tool-display-blocks";
+import type { ResultFileEntry } from "../utils/tool-display-blocks";
 import { ContentBlockView } from "./message/ContentBlockView";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
+import { ArtifactCard } from "./message/ArtifactCard";
 
 interface MessageCardProps {
   message: Message;
   isStreaming?: boolean;
   hideTraceBlocks?: boolean;
+  /** Whether this turn is the latest (actively streaming or just completed) */
+  isLatestRound?: boolean;
+  /** Files changed in this turn (aggregated by ChatView) */
+  artifactFiles?: ResultFileEntry[];
 }
 
 function isTraceBlock(block: ContentBlock): boolean {
@@ -32,6 +38,8 @@ export const MessageCard = memo(function MessageCard({
   message,
   isStreaming,
   hideTraceBlocks = false,
+  isLatestRound = false,
+  artifactFiles = [],
 }: MessageCardProps) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
@@ -73,8 +81,39 @@ export const MessageCard = memo(function MessageCard({
   }, [visibleBlocks]);
   const groupedDisplayBlocks = useMemo(() => {
     const blocks = buildToolDisplayBlocks(visibleBlocks);
-    return isUser ? blocks : orderAssistantDisplayBlocks(blocks);
-  }, [isUser, visibleBlocks]);
+    // Keep natural block order for the latest round so process summaries appear
+    // in context. Reorder historical (completed) messages to group content first,
+    // then results, then process summaries.
+    if (isUser || isLatestRound) return blocks;
+    return orderAssistantDisplayBlocks(blocks);
+  }, [isUser, isLatestRound, visibleBlocks]);
+
+  // Group consecutive summary blocks so they render with tighter spacing,
+  // matching inline text rhythm (historical messages where blocks are reordered).
+  const renderGroups = useMemo(() => {
+    type Group =
+      | { kind: "single"; block: (typeof groupedDisplayBlocks)[number] }
+      | { kind: "summary-group"; blocks: typeof groupedDisplayBlocks };
+    const groups: Group[] = [];
+    let pending: typeof groupedDisplayBlocks = [];
+
+    const flush = () => {
+      if (pending.length === 0) return;
+      groups.push({ kind: "summary-group", blocks: [...pending] });
+      pending = [];
+    };
+
+    for (const b of groupedDisplayBlocks) {
+      if (b.type === "process-summary" || b.type === "result-summary") {
+        pending.push(b);
+      } else {
+        flush();
+        groups.push({ kind: "single", block: b });
+      }
+    }
+    flush();
+    return groups;
+  }, [groupedDisplayBlocks]);
 
   // Extract text content for copying
   const getTextContent = () =>
@@ -160,41 +199,40 @@ export const MessageCard = memo(function MessageCard({
       ) : (
         // Assistant message — no bubble, direct content (Agent style)
         <div className="space-y-1.5">
-          {groupedDisplayBlocks.map((displayBlock, index) => {
-            const prevBlock = index > 0 ? groupedDisplayBlocks[index - 1] : null;
-            const prevIsSummary =
-              prevBlock?.type === "process-summary" ||
-              prevBlock?.type === "result-summary";
-
-            if (displayBlock.type === "process-summary") {
+          {renderGroups.map((group, gi) => {
+            if (group.kind === "summary-group") {
               return (
-                <div
-                  key={`process-${index}`}
-                  className={prevIsSummary ? "!m-0" : ""}
-                >
-                  <ProcessSummaryBlock
-                    block={displayBlock}
-                    allBlocks={visibleBlocks}
-                    message={message}
-                  />
-                </div>
-              );
-            }
-            if (displayBlock.type === "result-summary") {
-              return (
-                <div
-                  key={`result-${index}`}
-                  className={prevIsSummary ? "!m-0" : ""}
-                >
-                  <ResultSummaryBlock
-                    block={displayBlock}
-                    allBlocks={visibleBlocks}
-                    message={message}
-                  />
+                <div key={`sg-${gi}`} className="space-y-0.5">
+                  {group.blocks.map((b, bi) => {
+                    if (b.type === "process-summary") {
+                      return (
+                        <ProcessSummaryBlock
+                          key={`proc-${gi}-${bi}`}
+                          block={b}
+                          allBlocks={visibleBlocks}
+                          message={message}
+                        />
+                      );
+                    }
+                    if (b.type === "result-summary") {
+                      return (
+                        <ResultSummaryBlock
+                          key={`res-${gi}-${bi}`}
+                          block={b}
+                          allBlocks={visibleBlocks}
+                          message={message}
+                        />
+                      );
+                    }
+                    return null;
+                  })}
                 </div>
               );
             }
 
+            // Non-summary blocks are always content blocks
+            const displayBlock = group.block;
+            if (displayBlock.type !== "content") return null;
             const { block } = displayBlock;
             if (
               block.type === "tool_result" &&
@@ -207,19 +245,25 @@ export const MessageCard = memo(function MessageCard({
                 key={
                   "id" in block
                     ? (block as { id: string }).id
-                    : `block-${block.type}-${index}`
+                    : `block-${block.type}-${gi}`
                 }
                 block={block}
                 isUser={isUser}
                 isStreaming={
                   isStreaming &&
-                  (block.type !== "text" || index === lastTextBlockIndex)
+                  (block.type !== "text" || gi === lastTextBlockIndex)
                 }
                 allBlocks={visibleBlocks}
                 message={message}
               />
             );
           })}
+          {artifactFiles.length > 0 ? (
+            <ArtifactCard
+              files={artifactFiles}
+              isLatestRound={isLatestRound}
+            />
+          ) : null}
         </div>
       )}
     </div>

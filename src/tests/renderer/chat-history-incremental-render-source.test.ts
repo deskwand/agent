@@ -25,7 +25,7 @@ describe("ChatView incremental history wiring", () => {
       "displayedMessages.slice(visibleMessageStartIndex)",
     );
     expect(source).toContain(
-      "visibleTurnEntries.map(({ message, isStreaming, hideTraceBlocks }) => (",
+      "visibleTurnEntries.map(({ message, isStreaming, hideTraceBlocks, isLatestRound, artifactFiles }) => (",
     );
   });
 

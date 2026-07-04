@@ -1166,6 +1166,7 @@
       "readFiles_one": "已读取 {{count}} 个文件",
       "readFiles_other": "已读取 {{count}} 个文件",
       "searchedCode": "已搜索了代码",
+      "browsedWeb": "已浏览了网页",
       "executedCommands_one": "已执行了 {{count}} 条命令",
       "executedCommands_other": "已执行了 {{count}} 条命令",
       "usedTools_one": "已使用 {{count}} 个工具",
@@ -1188,5 +1189,21 @@
     "copyFailed": "复制失败",
     "prev": "上一张",
     "next": "下一张"
+  },
+  "artifactCard": {
+    "title": "本轮产物",
+    "editedFiles": "编辑的文件",
+    "newFiles": "新建的文件",
+    "reviewChanges": "审核变更",
+    "revertRound": "撤销本轮变更",
+    "revertFile": "撤销此文件",
+    "copyPath": "复制路径",
+    "copyPathSuccess": "已复制",
+    "confirmRevertRound": "确定撤销本轮所有文件变更？此操作不可撤销。",
+    "confirmRevertFile": "确定撤销 {{path}} 的变更？",
+    "reverted": "已撤销",
+    "noChanges": "本轮无文件变更",
+    "revertFailed": "撤销失败",
+    "desktopOnly": "仅桌面端可用"
   }
 }

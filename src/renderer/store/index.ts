@@ -112,6 +112,7 @@ interface AppState {
   marketplaceTab: string | null;
   rightPanelMode: "files" | "browser" | null;
   isReviewOpen: boolean;
+  reviewTargetFile: string | null;
   isArtifactPanelOpen: boolean;
   fileBrowserRoot: string | null;
   gitChangeCount: number;
@@ -226,6 +227,7 @@ interface AppState {
   setMarketplaceTab: (tab: string | null) => void;
   setRightPanelMode: (mode: "files" | "browser" | null) => void;
   setReviewOpen: (open: boolean) => void;
+  setReviewTargetFile: (path: string | null) => void;
   toggleArtifactPanel: () => void;
   setArtifactPanelOpen: (open: boolean) => void;
   toggleFileBrowser: () => void;
@@ -361,6 +363,7 @@ export const useAppStore = create<AppState>((set) => ({
   marketplaceTab: null,
   rightPanelMode: null as "files" | "browser" | null,
   isReviewOpen: false,
+  reviewTargetFile: null,
   isArtifactPanelOpen: false,
   fileBrowserRoot: null,
   gitChangeCount: 0,
@@ -783,6 +786,7 @@ export const useAppStore = create<AppState>((set) => ({
   setMarketplaceTab: (tab) => set({ marketplaceTab: tab }),
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
   setReviewOpen: (open) => set({ isReviewOpen: open }),
+  setReviewTargetFile: (path) => set({ reviewTargetFile: path }),
   toggleArtifactPanel: () =>
     set((state) => ({ isArtifactPanelOpen: !state.isArtifactPanelOpen })),
   setArtifactPanelOpen: (open) => set({ isArtifactPanelOpen: open }),

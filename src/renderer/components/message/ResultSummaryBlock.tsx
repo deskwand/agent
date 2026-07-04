@@ -1,9 +1,8 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Pencil } from "lucide-react";
 import type { Message, ContentBlock } from "../../types";
 import {
-  collectResultFiles,
   formatResultSummaryLabel,
   type DisplayBlock,
 } from "../../utils/tool-display-blocks";
@@ -23,7 +22,7 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
 }: ResultSummaryBlockProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const files = useMemo(() => collectResultFiles(block.items), [block.items]);
+  const files = block.files;
 
   return (
     <div className="overflow-hidden">
@@ -33,8 +32,8 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
         aria-expanded={expanded}
         className="group flex w-full items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] transition-colors hover:bg-surface-hover/40"
       >
-        <Pencil className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
-        <span className="min-w-0 truncate font-medium text-text-primary">
+        <span className="inline-flex items-center gap-1 min-w-0 truncate font-medium text-text-primary">
+          <Pencil className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
           {formatResultSummaryLabel(block.summary, t)}
         </span>
         <span className="inline-flex w-3.5 flex-shrink-0 items-center justify-center text-text-muted">

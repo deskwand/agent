@@ -44,7 +44,7 @@ function toolResult(
 }
 
 describe("filterAssistantVisibleBlocks", () => {
-  it("keeps thinking blocks when trace blocks are visible", () => {
+  it("always removes thinking blocks regardless of trace visibility", () => {
     const blocks: ContentBlock[] = [
       { type: "thinking", thinking: "internal" },
       { type: "text", text: "Visible" },
@@ -52,8 +52,8 @@ describe("filterAssistantVisibleBlocks", () => {
       toolResult("read-1", { content: "ok" }),
     ];
 
+    // thinking should be removed even when trace blocks are visible
     expect(filterAssistantVisibleBlocks(blocks, false)).toEqual([
-      { type: "thinking", thinking: "internal" },
       { type: "text", text: "Visible" },
       toolUse("read-1", "read", { path: "src/a.ts" }),
       toolResult("read-1", { content: "ok" }),
@@ -83,6 +83,7 @@ describe("orderAssistantDisplayBlocks", () => {
         summary: {
           readCount: 1,
           hasSearch: false,
+          hasBrowse: false,
           commandCount: 0,
           usedToolCount: 0,
         },
@@ -95,6 +96,7 @@ describe("orderAssistantDisplayBlocks", () => {
         type: "result-summary",
         items: [toolUse("edit-1", "edit", { path: "src/a.ts" })],
         summary: { editedFiles: 1, writtenFiles: 0 },
+        files: [],
       },
     ]);
 
@@ -123,6 +125,7 @@ describe("buildToolDisplayBlocks", () => {
       summary: {
         readCount: 1,
         hasSearch: true,
+        hasBrowse: false,
         commandCount: 1,
         usedToolCount: 0,
       },
@@ -190,13 +193,14 @@ describe("buildToolDisplayBlocks", () => {
       summary: {
         readCount: 1,
         hasSearch: false,
+        hasBrowse: false,
         commandCount: 0,
         usedToolCount: 0,
       },
     });
   });
 
-  it("keeps failed tools out of grouped summaries", () => {
+  it("includes failed tools in grouped summaries", () => {
     const blocks = buildToolDisplayBlocks([
       toolUse("read-1", "read", { path: "src/a.ts" }),
       toolResult("read-1", {
@@ -207,10 +211,13 @@ describe("buildToolDisplayBlocks", () => {
 
     expect(blocks).toHaveLength(1);
     expect(blocks[0]).toMatchObject({
-      type: "content",
-      block: {
-        type: "tool_use",
-        id: "read-1",
+      type: "process-summary",
+      summary: {
+        readCount: 1,
+        hasSearch: false,
+        hasBrowse: false,
+        commandCount: 0,
+        usedToolCount: 0,
       },
     });
   });
@@ -222,6 +229,7 @@ describe("formatProcessSummaryLabel", () => {
       "tool.grouped.readFiles_one": `${options?.count} file read`,
       "tool.grouped.readFiles_other": `${options?.count} files read`,
       "tool.grouped.searchedCode": "searched code",
+      "tool.grouped.browsedWeb": "browsed the web",
       "tool.grouped.executedCommands_one": `executed ${options?.count} command`,
       "tool.grouped.executedCommands_other": `executed ${options?.count} commands`,
       "tool.grouped.usedTools_one": `used ${options?.count} tool`,
@@ -238,6 +246,7 @@ describe("formatProcessSummaryLabel", () => {
         {
           readCount: 2,
           hasSearch: true,
+          hasBrowse: false,
           commandCount: 1,
           usedToolCount: 0,
         },
@@ -252,12 +261,36 @@ describe("formatProcessSummaryLabel", () => {
         {
           readCount: 0,
           hasSearch: true,
+          hasBrowse: false,
           commandCount: 0,
           usedToolCount: 0,
         },
         t,
       ),
     ).toBe("searched code");
+  });
+
+  it("formats browse-only process summaries", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("wb-1", "websearch", { query: "test" }),
+      toolResult("wb-1", { content: "ok" }),
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: {
+        readCount: 0,
+        hasSearch: false,
+        hasBrowse: true,
+        commandCount: 0,
+        usedToolCount: 0,
+      },
+    });
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+    expect(formatProcessSummaryLabel(blocks[0].summary, t)).toBe(
+      "browsed the web",
+    );
   });
 
   it("formats generic tool-only process summaries", () => {

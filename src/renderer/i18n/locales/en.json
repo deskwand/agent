@@ -1169,10 +1169,11 @@
       "readFiles_one": "Read {{count}} file",
       "readFiles_other": "Read {{count}} files",
       "searchedCode": "Searched the code",
-      "executedCommands_one": "executed {{count}} command",
-      "executedCommands_other": "executed {{count}} commands",
-      "usedTools_one": "used {{count}} tool",
-      "usedTools_other": "used {{count}} tools",
+      "browsedWeb": "Browsed the web",
+      "executedCommands_one": "Executed {{count}} command",
+      "executedCommands_other": "Executed {{count}} commands",
+      "usedTools_one": "Used {{count}} tool",
+      "usedTools_other": "Used {{count}} tools",
       "modifiedFiles_one": "Modified {{count}} file",
       "modifiedFiles_other": "Modified {{count}} files",
       "writtenFiles_one": "Wrote {{count}} file",
@@ -1191,5 +1192,21 @@
     "copyFailed": "Copy failed",
     "prev": "Previous",
     "next": "Next"
+  },
+  "artifactCard": {
+    "title": "Round Artifacts",
+    "editedFiles": "Edited Files",
+    "newFiles": "New Files",
+    "reviewChanges": "Review Changes",
+    "revertRound": "Revert Round Changes",
+    "revertFile": "Revert File",
+    "copyPath": "Copy Path",
+    "copyPathSuccess": "Copied",
+    "confirmRevertRound": "Revert all file changes from this round? This cannot be undone.",
+    "confirmRevertFile": "Revert changes to {{path}}?",
+    "reverted": "Reverted",
+    "noChanges": "No file changes this round",
+    "revertFailed": "Revert failed",
+    "desktopOnly": "Desktop only"
   }
 }

@@ -5,6 +5,7 @@ import { extractFilePathFromToolInput } from "./tool-output-path";
 export interface ProcessSummary {
   readCount: number;
   hasSearch: boolean;
+  hasBrowse: boolean;
   commandCount: number;
   usedToolCount: number;
 }
@@ -34,6 +35,7 @@ export type DisplayBlock =
       type: "result-summary";
       items: ToolUseContent[];
       summary: ResultSummary;
+      files: ResultFileEntry[];
     };
 
 const PROCESS_TOOLS = new Set([
@@ -61,15 +63,27 @@ const PROCESS_TOOLS = new Set([
 ]);
 
 const SEARCH_TOOLS = new Set([
-  // grep/glob = code search, websearch/webfetch = web search,
-  // browser inspect tools = page inspection — all unified as "search"
+  // grep/glob = code search only; web/browser tools are BROWSE_TOOLS
   "grep",
   "glob",
+]);
+
+const BROWSE_TOOLS = new Set([
+  // web fetch/search + all browser automation tools
   "websearch",
   "webfetch",
+  "internal_browser_navigate",
+  "internal_browser_screenshot",
+  "internal_browser_click",
+  "internal_browser_fill",
+  "internal_browser_scroll",
+  "internal_browser_hover",
+  "internal_browser_select",
+  "internal_browser_press",
   "internal_browser_snapshot",
-  "internal_browser_get_state",
   "internal_browser_evaluate",
+  "internal_browser_wait_for",
+  "internal_browser_get_state",
 ]);
 
 const RESULT_TOOLS = new Set(["edit", "edit_file", "write", "write_file"]);
@@ -100,6 +114,7 @@ function getToolKind(name: string): "process" | "result" | null {
 function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   const readPaths = new Set<string>();
   let hasSearch = false;
+  let hasBrowse = false;
   let commandCount = 0;
   let usedToolCount = 0;
 
@@ -117,8 +132,12 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
       }
       countedAsSpecific = true;
     }
-    if (SEARCH_TOOLS.has(lower) || lower.startsWith("internal_browser")) {
+    if (SEARCH_TOOLS.has(lower)) {
       hasSearch = true;
+      countedAsSpecific = true;
+    }
+    if (BROWSE_TOOLS.has(lower)) {
+      hasBrowse = true;
       countedAsSpecific = true;
     }
     if (lower === "bash" || lower === "execute_command") {
@@ -133,6 +152,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   return {
     readCount: readPaths.size,
     hasSearch,
+    hasBrowse,
     commandCount,
     usedToolCount,
   };
@@ -176,6 +196,7 @@ function buildSummaryBlock(
         type: "result-summary",
         items,
         summary: buildResultSummary(items),
+        files: collectResultFiles(items),
       };
 }
 
@@ -201,7 +222,8 @@ export function filterAssistantVisibleBlocks(
   hideTraceBlocks: boolean,
 ): ContentBlock[] {
   return blocks.filter((block) => {
-    if (hideTraceBlocks && isThinkingBlock(block)) {
+    // thinking blocks are internal reasoning, never shown to users
+    if (isThinkingBlock(block)) {
       return false;
     }
     if (hideTraceBlocks && isToolTraceBlock(block)) {
@@ -245,11 +267,9 @@ export function buildToolDisplayBlocks(blocks: ContentBlock[]): DisplayBlock[] {
     }
 
     const resultIndex = findToolResultIndex(blocks, index, block.id);
-    const toolResult =
-      resultIndex >= 0 ? (blocks[resultIndex] as ToolResultContent) : undefined;
     const kind = getToolKind(block.name);
 
-    if (toolResult?.isError || kind === null) {
+    if (kind === null) {
       flush();
       displayBlocks.push({ type: "content", block });
       if (resultIndex >= 0) {
@@ -318,6 +338,9 @@ export function formatProcessSummaryLabel(
   if (summary.hasSearch) {
     fragments.push(t("tool.grouped.searchedCode"));
   }
+  if (summary.hasBrowse) {
+    fragments.push(t("tool.grouped.browsedWeb"));
+  }
   if (summary.commandCount > 0) {
     fragments.push(
       t(pluralKey("tool.grouped.executedCommands", summary.commandCount), {
@@ -338,7 +361,7 @@ export function formatProcessSummaryLabel(
 
 export type ProcessSummaryFragment = {
   text: string;
-  iconType: "read" | "search" | "command" | "tool";
+  iconType: "read" | "search" | "browse" | "command" | "tool";
 };
 
 export function getProcessSummaryFragments(
@@ -359,6 +382,12 @@ export function getProcessSummaryFragments(
     fragments.push({
       text: t("tool.grouped.searchedCode"),
       iconType: "search",
+    });
+  }
+  if (summary.hasBrowse) {
+    fragments.push({
+      text: t("tool.grouped.browsedWeb"),
+      iconType: "browse",
     });
   }
   if (summary.commandCount > 0) {

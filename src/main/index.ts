@@ -110,6 +110,11 @@ import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
 import { initOAuthService } from "./auth/oauth-service";
+import {
+  countChangedFilesFromPorcelain,
+  partitionArtifactPaths,
+  toRepoRelativePath,
+} from "./git-artifact-utils";
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -1791,18 +1796,96 @@ ipcMain.handle(
 ipcMain.handle("git.hasChanges", async (_event, dirPath?: string) => {
   if (!dirPath) return { isRepo: false, changeCount: 0 };
   try {
-    const { exec } = await import("child_process");
+    const { execFile } = await import("child_process");
     const { promisify } = await import("util");
-    const { stdout } = await promisify(exec)("git diff HEAD --name-only", {
-      cwd: dirPath,
-      timeout: 5000,
-    });
-    const files = [...new Set(stdout.trim().split("\n").filter(Boolean))];
-    return { isRepo: true, changeCount: files.length };
+    const { stdout } = await promisify(execFile)(
+      "git",
+      ["status", "--porcelain"],
+      {
+        cwd: dirPath,
+        timeout: 5000,
+      },
+    );
+    return {
+      isRepo: true,
+      changeCount: countChangedFilesFromPorcelain(stdout),
+    };
   } catch {
     return { isRepo: false, changeCount: 0 };
   }
 });
+
+ipcMain.handle(
+  "git.revertFiles",
+  async (_event, cwd: string, paths: string[]) => {
+    if (!cwd || !paths || paths.length === 0) {
+      return { success: false, error: "Missing cwd or paths" };
+    }
+    try {
+      const { execFile } = await import("child_process");
+      const { unlink } = await import("fs/promises");
+      const { promisify } = await import("util");
+
+      const repoRelativePaths = paths
+        .map((path) => toRepoRelativePath(cwd, path))
+        .filter((path) => path && path !== ".");
+
+      const trackedStdout =
+        repoRelativePaths.length > 0
+          ? (
+              await promisify(execFile)(
+                "git",
+                ["ls-files", "--", ...repoRelativePaths],
+                {
+                  cwd,
+                  timeout: 5000,
+                },
+              )
+            ).stdout
+          : "";
+
+      const trackedRepoRelativePaths = new Set(
+        trackedStdout
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean),
+      );
+
+      const { trackedRelativePaths, untrackedAbsolutePaths } =
+        partitionArtifactPaths(cwd, paths, trackedRepoRelativePaths);
+
+      if (trackedRelativePaths.length > 0) {
+        await promisify(execFile)(
+          "git",
+          ["checkout", "--", ...trackedRelativePaths],
+          {
+            cwd,
+            timeout: 10000,
+          },
+        );
+      }
+
+      if (untrackedAbsolutePaths.length > 0) {
+        const results = await Promise.allSettled(
+          untrackedAbsolutePaths.map((path) => unlink(path)),
+        );
+        const failed = results.filter((result) => result.status === "rejected");
+        if (failed.length > 0) {
+          return {
+            success: false,
+            error: `Failed to delete ${failed.length} file(s)`,
+          };
+        }
+      }
+
+      return { success: true };
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : String(err);
+      return { success: false, error: message };
+    }
+  },
+);
 
 ipcMain.handle(
   "artifacts.listRecentFiles",

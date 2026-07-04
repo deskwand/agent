@@ -196,6 +196,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
       dirPath?: string,
     ): Promise<{ isRepo: boolean; changeCount: number }> =>
       ipcRenderer.invoke("git.hasChanges", dirPath),
+    revertFiles: (
+      cwd: string,
+      paths: string[],
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke("git.revertFiles", cwd, paths),
   },
 
   artifacts: {
@@ -637,6 +642,10 @@ declare global {
         hasChanges: (
           dirPath?: string,
         ) => Promise<{ isRepo: boolean; changeCount: number }>;
+        revertFiles: (
+          cwd: string,
+          paths: string[],
+        ) => Promise<{ success: boolean; error?: string }>;
       };
       artifacts: {
         listRecentFiles: (
