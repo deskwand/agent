@@ -46,7 +46,7 @@ const PROCESS_TOOLS = new Set([
   "bash",
   "execute_command",
   "websearch",
-  "webfetch",
+  "web_fetch",
   "vision_describe",
   "internal_browser_navigate",
   "internal_browser_screenshot",
@@ -71,7 +71,7 @@ const SEARCH_TOOLS = new Set([
 const BROWSE_TOOLS = new Set([
   // web fetch/search + all browser automation tools
   "websearch",
-  "webfetch",
+  "web_fetch",
   "internal_browser_navigate",
   "internal_browser_screenshot",
   "internal_browser_click",
