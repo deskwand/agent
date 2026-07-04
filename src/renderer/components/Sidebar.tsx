@@ -495,7 +495,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 setWorkingDir(null);
                 handleNewSession();
               }}
-              className="h-8 w-8 rounded-l-xl bg-accent text-accent-foreground hover:bg-accent/90 transition-colors flex items-center justify-center"
+              className="h-8 w-8 rounded-l-xl bg-surface-muted text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
               title={t("sidebar.newChat")}
             >
               <SquarePen className="w-4 h-4" />
@@ -505,7 +505,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 e.stopPropagation();
                 setShowProjectActions((prev) => !prev);
               }}
-              className="w-5 h-8 rounded-r-xl bg-accent text-accent-foreground hover:bg-accent/90 transition-colors border-l border-accent-foreground/20 flex items-center justify-center"
+              className="w-5 h-8 rounded-r-xl bg-surface-muted text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors border-l border-surface-hover flex items-center justify-center"
             >
               <ChevronDown className="w-3 h-3" />
             </button>
@@ -642,16 +642,23 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                         </span>
                       )}
                     {slot.completed ? (
-                      <button
+                      <Check
+                        className="w-3.5 h-3.5 text-accent/50 hover:text-accent flex-shrink-0 cursor-pointer transition-colors"
+                        role="button"
+                        tabIndex={0}
+                        title={t("sidebar.taskCompleted")}
                         onClick={(e) => {
                           e.stopPropagation();
                           removeTaskSlot(slot.sessionId);
                         }}
-                        className="w-5 h-5 rounded-full bg-accent text-accent-foreground flex items-center justify-center flex-shrink-0 hover:brightness-90 transition-[filter]"
-                        title={t("sidebar.taskCompleted")}
-                      >
-                        <Check className="w-3 h-3" />
-                      </button>
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            removeTaskSlot(slot.sessionId);
+                          }
+                        }}
+                      />
                     ) : (
                       <span className="w-5 flex-shrink-0" />
                     )}
