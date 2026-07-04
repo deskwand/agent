@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
 #
-# package-linux.sh — Build AppImage and/or deb from linux-unpacked
+# package-linux.sh — Build deb from linux-unpacked
 #
 # Usage:
-#   ./scripts/package-linux.sh appimage          # AppImage only
-#   ./scripts/package-linux.sh deb               # deb only
-#   ./scripts/package-linux.sh appimage deb      # both
+#   ./scripts/package-linux.sh deb
 #
 # Prerequisites:
-#   - release/linux-unpacked already built (electron-builder --linux dir)
-#   - appimagetool in PATH (for AppImage)
+#   - release/linux-unpacked already built (electron-builder --linux --x64)
+#     Note: AppImage is now built directly by electron-builder (built-in Fuse2).
 #   - fakeroot + dpkg-deb (for deb)
 #
 set -euo pipefail
@@ -22,65 +20,6 @@ PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION=$(node -e "console.log(require('$PROJECT_DIR/package.json').version)")
 APP_NAME="deskwand"
 ARCH="amd64"
-
-# ──────────────────────────────────────────────
-# AppImage
-# ──────────────────────────────────────────────
-build_appimage() {
-  local OUTPUT="$RELEASE_DIR/DeskWand-${VERSION}-linux-x86_64.AppImage"
-
-  echo "📦 Building AppImage..."
-  echo "   Output: $OUTPUT"
-
-  # appimagetool requires a .desktop file and icon inside the AppDir.
-  # Create them from the resources that already exist in linux-unpacked.
-  local DESKTOP_FILE="$UNPACKED_DIR/deskwand.desktop"
-  cat > "$DESKTOP_FILE" << DESKTOPEOF
-[Desktop Entry]
-Name=DeskWand
-Comment=AI Agent Desktop App
-Exec=deskwand
-Icon=deskwand
-Type=Application
-Categories=Development;
-Terminal=false
-DESKTOPEOF
-
-  # Icon: appimagetool needs it at AppDir root (matching the .desktop Icon= name).
-  # It's not bundled by electron-builder (linux.icon is build-time only), so
-  # we copy from the project source tree.
-  local SRC_ICON="$PROJECT_DIR/resources/icon.png"
-  if [ -f "$SRC_ICON" ]; then
-    cp "$SRC_ICON" "$UNPACKED_DIR/deskwand.png"
-  else
-    echo "⚠️  icon not found at $SRC_ICON — AppImage will have no icon"
-  fi
-
-  # appimagetool's arch auto-detection is brittle when the AppDir contains
-  # directories like resources/node/lib or resources/python/lib that confuse
-  # its heuristic.  Force x86_64 via ARCH and --runtime-file.
-  local RUNTIME_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/deskwand-build"
-  local RUNTIME_FILE="$RUNTIME_DIR/runtime-x86_64"
-  if [ ! -f "$RUNTIME_FILE" ]; then
-    mkdir -p "$RUNTIME_DIR"
-    echo "   Downloading AppImage runtime..."
-    curl -sSfL "https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64" -o "$RUNTIME_FILE" || {
-      echo "❌ Failed to download AppImage runtime (GitHub may be unreachable)" >&2
-      exit 1
-    }
-    chmod +x "$RUNTIME_FILE"
-  fi
-
-  ARCH=x86_64 appimagetool "$UNPACKED_DIR" "$OUTPUT" \
-    --runtime-file "$RUNTIME_FILE" \
-    --no-appstream
-
-  # Clean up temporary files we added to the AppDir
-  rm -f "$DESKTOP_FILE" "$UNPACKED_DIR/deskwand.png"
-
-  chmod +x "$OUTPUT"
-  echo "✅ AppImage built: $OUTPUT"
-}
 
 # ──────────────────────────────────────────────
 # deb
@@ -176,11 +115,11 @@ SCRIPT
   # (root:root with SUID) is correctly recorded in the deb archive.
   # The postinst script handles this at install time, but we also
   # set it at build time for consistency.
-  fakeroot -- bash -c "
-    chown root:root '$STAGING${INSTALL_DIR}/chrome-sandbox' 2>/dev/null || true
-    chmod 4755 '$STAGING${INSTALL_DIR}/chrome-sandbox' 2>/dev/null || true
-    dpkg-deb --build '$STAGING' '$OUTPUT'
-  "
+  fakeroot -- env STAGING="$STAGING" INSTALL_DIR="$INSTALL_DIR" OUTPUT="$OUTPUT" sh -c '
+    chown root:root "$STAGING$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+    chmod 4755 "$STAGING$INSTALL_DIR/chrome-sandbox" 2>/dev/null || true
+    dpkg-deb --build "$STAGING" "$OUTPUT"
+  '
 
   rm -rf "$STAGING"
   echo "✅ deb built: $OUTPUT"
@@ -192,12 +131,12 @@ SCRIPT
 
 if [ ! -d "$UNPACKED_DIR" ]; then
   echo "❌ linux-unpacked not found at $UNPACKED_DIR"
-  echo "   Run 'electron-builder --linux dir' first."
+  echo "   Run 'electron-builder --linux --x64' first."
   exit 1
 fi
 
 if [ $# -eq 0 ]; then
-  echo "Usage: $0 <appimage|deb> [appimage|deb]"
+  echo "Usage: $0 deb"
   exit 1
 fi
 
@@ -205,13 +144,6 @@ mkdir -p "$RELEASE_DIR"
 
 for target in "$@"; do
   case "$target" in
-    appimage)
-      if ! command -v appimagetool &>/dev/null; then
-        echo "❌ appimagetool not found in PATH"
-        exit 1
-      fi
-      build_appimage
-      ;;
     deb)
       if ! command -v fakeroot &>/dev/null; then
         echo "❌ fakeroot not found (required for SUID chrome-sandbox)"
@@ -220,7 +152,7 @@ for target in "$@"; do
       build_deb
       ;;
     *)
-      echo "❌ Unknown target: $target (use appimage or deb)"
+      echo "❌ Unknown target: $target (use deb)"
       exit 1
       ;;
   esac
