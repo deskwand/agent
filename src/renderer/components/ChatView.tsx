@@ -20,7 +20,7 @@ import type {
   ProviderProfileKey,
   ApiProviderConfig,
 } from "../types";
-import { Plug, ChevronsDown } from "lucide-react";
+import { Plug, ChevronsDown, Loader2 } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
   ChatInput,
@@ -83,6 +83,125 @@ function appendMergedLiveBlock(
 
   target.push(block);
 }
+
+export interface TurnRange {
+  start: number;
+  end: number;
+}
+
+export function buildTurnRanges(messages: Message[]): TurnRange[] {
+  if (messages.length === 0) return [];
+
+  const userIndexes = messages.flatMap((message, index) =>
+    message.role === "user" ? [index] : [],
+  );
+
+  if (userIndexes.length === 0) {
+    // System-only conversation (for example a preamble) — treat as a single turn.
+    return [{ start: 0, end: messages.length }];
+  }
+
+  return userIndexes.map((userIndex, index) => ({
+    start: index === 0 ? 0 : userIndex,
+    end: userIndexes[index + 1] ?? messages.length,
+  }));
+}
+
+export function getInitialVisibleTurnStart(
+  totalTurns: number,
+  initialVisibleTurns: number,
+): number {
+  return Math.max(totalTurns - initialVisibleTurns, 0);
+}
+
+export function getPreviousVisibleTurnStart(
+  currentStart: number,
+  prependTurns: number,
+): number {
+  return Math.max(currentStart - prependTurns, 0);
+}
+
+export function getPrependedVisibleTurnStart(
+  currentStart: number,
+  turnCount: number,
+  prependTurns: number,
+): number {
+  if (turnCount <= 0) return 0;
+  return getPreviousVisibleTurnStart(
+    Math.min(currentStart, turnCount - 1),
+    prependTurns,
+  );
+}
+
+export function getEffectiveVisibleTurnStart(
+  activeSessionId: string | null,
+  initializedSessionId: string | null,
+  turnCount: number,
+  visibleTurnStartIndex: number,
+  initialVisibleTurns: number,
+): number {
+  if (turnCount === 0) return 0;
+  if (
+    shouldInitializeVisibleTurns(
+      activeSessionId,
+      initializedSessionId,
+      turnCount,
+    )
+  ) {
+    return getInitialVisibleTurnStart(turnCount, initialVisibleTurns);
+  }
+  return Math.min(visibleTurnStartIndex, turnCount - 1);
+}
+
+export function getVisibleMessageStartIndex(
+  turnRanges: TurnRange[],
+  visibleTurnStartIndex: number,
+): number {
+  return turnRanges[visibleTurnStartIndex]?.start ?? 0;
+}
+
+export function shouldInitializeVisibleTurns(
+  activeSessionId: string | null,
+  initializedSessionId: string | null,
+  turnCount: number,
+): boolean {
+  return Boolean(activeSessionId) && activeSessionId !== initializedSessionId && turnCount > 0;
+}
+
+export function canLoadOlderTurns(
+  isLoadingOlder: boolean,
+  visibleTurnStartIndex: number,
+): boolean {
+  return !isLoadingOlder && visibleTurnStartIndex > 0;
+}
+
+export function didSessionHistoryScopeChange(
+  previousSessionId: string | null,
+  activeSessionId: string | null,
+): boolean {
+  return previousSessionId !== activeSessionId;
+}
+
+export function shouldAutoFillViewport(
+  scrollHeight: number,
+  clientHeight: number,
+  visibleTurnStartIndex: number,
+): boolean {
+  return visibleTurnStartIndex > 0 && scrollHeight <= clientHeight;
+}
+
+export function getAnchoredScrollTop(
+  previousScrollTop: number,
+  previousScrollHeight: number,
+  nextScrollHeight: number,
+): number {
+  return previousScrollTop + (nextScrollHeight - previousScrollHeight);
+}
+
+const INITIAL_VISIBLE_TURNS = 8;
+const PREPEND_TURNS = 6;
+// Fire a little before the user hits absolute top to hide prepend latency.
+const LOAD_OLDER_THRESHOLD_PX = 160;
 
 export function ChatView() {
   const { t } = useTranslation();
@@ -173,6 +292,8 @@ export function ChatView() {
   >([]);
   const [showConnectorLabel, setShowConnectorLabel] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [visibleTurnStartIndex, setVisibleTurnStartIndex] = useState(0);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
   const headerRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -188,6 +309,14 @@ export function ChatView() {
   const scrollRequestRef = useRef<number | null>(null);
   const isScrollingRef = useRef(false);
   const chatInputRef = useRef<ChatInputHandle>(null);
+  const previousSessionIdRef = useRef<string | null>(null);
+  const initializedSessionIdRef = useRef<string | null>(null);
+  const pendingPrependAnchorRef = useRef<{
+    scrollHeight: number;
+    scrollTop: number;
+  } | null>(null);
+  const isLoadingOlderRef = useRef(false);
+  const turnCountRef = useRef(0);
 
   const hasActiveTurn = Boolean(activeTurn);
 
@@ -438,8 +567,35 @@ export function ChatView() {
     partialThinking,
   ]);
 
-  const turnEntries = useMemo(() => {
-    return displayedMessages.map((message) => {
+  const turnRanges = useMemo(() => buildTurnRanges(displayedMessages), [displayedMessages]);
+  turnCountRef.current = turnRanges.length;
+
+  const effectiveVisibleTurnStartIndex = useMemo(
+    () =>
+      getEffectiveVisibleTurnStart(
+        activeSessionId,
+        initializedSessionIdRef.current,
+        turnRanges.length,
+        visibleTurnStartIndex,
+        INITIAL_VISIBLE_TURNS,
+      ),
+    [activeSessionId, turnRanges.length, visibleTurnStartIndex],
+  );
+
+  const visibleMessageStartIndex = useMemo(
+    () => getVisibleMessageStartIndex(turnRanges, effectiveVisibleTurnStartIndex),
+    [turnRanges, effectiveVisibleTurnStartIndex],
+  );
+
+  const visibleMessages = useMemo(() =>
+    displayedMessages.slice(visibleMessageStartIndex),
+    [displayedMessages, visibleMessageStartIndex],
+  );
+  // TODO: add bottom-side reclamation if very long sessions still degrade
+  // after repeated prepends; v1 only windows older history from the top.
+
+  const visibleTurnEntries = useMemo(() => {
+    return visibleMessages.map((message) => {
       const isStreaming =
         typeof message.id === "string" && message.id.startsWith("partial-");
       const turnId = message.turnId;
@@ -450,7 +606,66 @@ export function ChatView() {
           message.role === "assistant" && Boolean(turnId) && !effectiveTraceExpanded,
       };
     });
-  }, [displayedMessages, effectiveTraceExpanded]);
+  }, [visibleMessages, effectiveTraceExpanded]);
+
+  useEffect(() => {
+    if (
+      !didSessionHistoryScopeChange(previousSessionIdRef.current, activeSessionId)
+    ) {
+      return;
+    }
+
+    previousSessionIdRef.current = activeSessionId;
+    initializedSessionIdRef.current = null;
+    pendingPrependAnchorRef.current = null;
+    isLoadingOlderRef.current = false;
+    setIsLoadingOlder(false);
+    setVisibleTurnStartIndex(0);
+  }, [activeSessionId]);
+
+  useEffect(() => {
+    if (
+      !activeSessionId ||
+      !shouldInitializeVisibleTurns(
+        activeSessionId,
+        initializedSessionIdRef.current,
+        turnRanges.length,
+      )
+    ) {
+      return;
+    }
+    initializedSessionIdRef.current = activeSessionId;
+    setVisibleTurnStartIndex(
+      getInitialVisibleTurnStart(turnRanges.length, INITIAL_VISIBLE_TURNS),
+    );
+  }, [activeSessionId, turnRanges.length]);
+
+  const loadOlderTurns = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (
+      !container ||
+      !canLoadOlderTurns(
+        isLoadingOlderRef.current,
+        effectiveVisibleTurnStartIndex,
+      )
+    ) {
+      return;
+    }
+
+    isLoadingOlderRef.current = true;
+    pendingPrependAnchorRef.current = {
+      scrollHeight: container.scrollHeight,
+      scrollTop: container.scrollTop,
+    };
+    setIsLoadingOlder(true);
+    setVisibleTurnStartIndex((currentStart) =>
+      getPrependedVisibleTurnStart(
+        currentStart,
+        turnCountRef.current,
+        PREPEND_TURNS,
+      ),
+    );
+  }, [effectiveVisibleTurnStartIndex]);
 
   const updateScrollToBottomVisibility = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -515,7 +730,12 @@ export function ChatView() {
     const container = scrollContainerRef.current;
     if (!container) return;
     syncAutoFollowState();
-    const onScroll = () => syncAutoFollowState();
+    const onScroll = () => {
+      syncAutoFollowState();
+      if (container.scrollTop <= LOAD_OLDER_THRESHOLD_PX) {
+        loadOlderTurns();
+      }
+    };
     container.addEventListener("scroll", onScroll, { passive: true });
     // ponytail: wheel fires before any pixel moves — beats the 80px isAtBottom
     // threshold race with incoming stream tokens during high-speed scrolling.
@@ -527,7 +747,7 @@ export function ChatView() {
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("wheel", onWheel);
     };
-  }, [syncAutoFollowState]);
+  }, [loadOlderTurns, syncAutoFollowState]);
 
   useEffect(() => {
     updateScrollToBottomVisibility();
@@ -537,6 +757,45 @@ export function ChatView() {
     partialMessage.length,
     partialThinking.length,
     displayedMessages.length,
+  ]);
+
+  useEffect(() => {
+    const anchor = pendingPrependAnchorRef.current;
+    const container = scrollContainerRef.current;
+    if (!anchor || !container) return;
+
+    container.scrollTop = getAnchoredScrollTop(
+      anchor.scrollTop,
+      anchor.scrollHeight,
+      container.scrollHeight,
+    );
+    pendingPrependAnchorRef.current = null;
+    isLoadingOlderRef.current = false;
+    setIsLoadingOlder(false);
+  }, [visibleTurnStartIndex]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || isLoadingOlder) return;
+
+    const rafId = requestAnimationFrame(() => {
+      if (
+        shouldAutoFillViewport(
+          container.scrollHeight,
+          container.clientHeight,
+          effectiveVisibleTurnStartIndex,
+        )
+      ) {
+        loadOlderTurns();
+      }
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [
+    displayedMessages.length,
+    effectiveVisibleTurnStartIndex,
+    isLoadingOlder,
+    loadOlderTurns,
   ]);
 
   useEffect(() => {
@@ -872,6 +1131,16 @@ export function ChatView() {
 
       {/* Messages */}
       <div className="relative flex-1 min-h-0 min-w-0">
+        {isLoadingOlder && displayedMessages.length > 0 && (
+          <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center">
+            <div className="rounded-full bg-background/85 px-3 py-1 shadow-elevated backdrop-blur-sm">
+              <Loader2
+                aria-hidden="true"
+                className="h-4 w-4 animate-spin text-text-muted"
+              />
+            </div>
+          </div>
+        )}
         <div
           ref={scrollContainerRef}
           className="h-full min-h-0 overflow-y-auto overflow-x-hidden"
@@ -891,7 +1160,7 @@ export function ChatView() {
                 </p>
               </div>
             ) : (
-              turnEntries.map(({ message, isStreaming, hideTraceBlocks }) => (
+              visibleTurnEntries.map(({ message, isStreaming, hideTraceBlocks }) => (
                 <div key={message.id} className="space-y-1.5">
                   <MessageCard
                     message={message}
