@@ -39,12 +39,14 @@ interface ToolUseBlockProps {
   block: ToolUseContent;
   allBlocks?: ContentBlock[];
   message?: Message;
+  showIcon?: boolean;
 }
 
 export const ToolUseBlock = memo(function ToolUseBlock({
   block,
   allBlocks,
   message,
+  showIcon = true,
 }: ToolUseBlockProps) {
   const traceSteps = useAppStore((s) =>
     message?.sessionId
@@ -87,6 +89,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           allBlocks={allBlocks}
           message={message}
           action="write"
+          showIcon={showIcon}
         />
       );
     }
@@ -101,6 +104,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           allBlocks={allBlocks}
           message={message}
           action="read"
+          showIcon={showIcon}
         />
       );
     }
@@ -110,7 +114,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       canHandleBashInput(block.input as Record<string, unknown> | undefined)
     ) {
       return (
-        <BashToolBlock block={block} allBlocks={allBlocks} message={message} />
+        <BashToolBlock block={block} allBlocks={allBlocks} message={message} showIcon={showIcon} />
       );
     }
   }
@@ -246,9 +250,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         </div>
 
         {/* Tool icon */}
-        <div className="flex-shrink-0 pt-0.5 text-text-muted">
-          {getToolIcon(block.name)}
-        </div>
+        {showIcon ? (
+          <div className="flex-shrink-0 pt-0.5 text-text-muted">
+            {getToolIcon(block.name)}
+          </div>
+        ) : null}
 
         {/* Content cluster */}
         <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">

@@ -22,11 +22,8 @@ interface BashToolBlockProps {
   block: ToolUseContent;
   allBlocks?: ContentBlock[];
   message?: Message;
+  showIcon?: boolean;
 }
-
-/** Exit code to infer when `isError` is unset and the tool has completed */
-const DEFAULT_EXIT_CODE = 0;
-const ERROR_EXIT_CODE = 1;
 
 /** Build a single ansi-to-html converter using CSS custom properties for theme-aware colors */
 function makeAnsiConverter() {
@@ -59,6 +56,7 @@ export const BashToolBlock = memo(function BashToolBlock({
   block,
   allBlocks,
   message,
+  showIcon = true,
 }: BashToolBlockProps) {
   const traceSteps = useAppStore((s) =>
     message?.sessionId
@@ -114,7 +112,6 @@ export const BashToolBlock = memo(function BashToolBlock({
   const hasActiveTurn = Boolean(activeTurn);
   const isRunning = !toolResult && hasActiveTurn;
   const isError = toolResult?.isError === true;
-  const exitCode = isError ? ERROR_EXIT_CODE : DEFAULT_EXIT_CODE;
 
   // Output text (for ANSI→HTML conversion)
   const outputText =
@@ -181,9 +178,11 @@ export const BashToolBlock = memo(function BashToolBlock({
         </div>
 
         {/* Tool icon */}
+        {showIcon ? (
         <div className="flex-shrink-0 pt-0.5 text-text-muted">
           {getToolIcon(block.name)}
         </div>
+        ) : null}
 
         {/* Label: $ command · exit N — hidden when expanded (terminal panel shows it) */}
         <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
@@ -196,11 +195,7 @@ export const BashToolBlock = memo(function BashToolBlock({
                 <span className="whitespace-nowrap text-xs text-text-muted">
                   · {t("tool.bashRunning")}
                 </span>
-              ) : (
-                <span className="whitespace-nowrap text-xs text-text-muted">
-                  · {t("tool.bashExitCode", { code: exitCode })}
-                </span>
-              )}
+              ) : null}
             </>
           )}
           <span

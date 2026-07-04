@@ -9,7 +9,14 @@ import type {
   ToolUseContent,
   ToolResultContent,
 } from "../types";
+import {
+  buildToolDisplayBlocks,
+  filterAssistantVisibleBlocks,
+  orderAssistantDisplayBlocks,
+} from "../utils/tool-display-blocks";
 import { ContentBlockView } from "./message/ContentBlockView";
+import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
+import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
 
 interface MessageCardProps {
   message: Message;
@@ -18,11 +25,7 @@ interface MessageCardProps {
 }
 
 function isTraceBlock(block: ContentBlock): boolean {
-  return (
-    block.type === "thinking" ||
-    block.type === "tool_use" ||
-    block.type === "tool_result"
-  );
+  return block.type === "tool_use" || block.type === "tool_result";
 }
 
 export const MessageCard = memo(function MessageCard({
@@ -38,9 +41,11 @@ export const MessageCard = memo(function MessageCard({
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
     : [{ type: "text", text: String(rawContent ?? "") } as ContentBlock];
-  const visibleBlocks = hideTraceBlocks
-    ? contentBlocks.filter((block) => !isTraceBlock(block))
-    : contentBlocks;
+  const visibleBlocks = isUser
+    ? hideTraceBlocks
+      ? contentBlocks.filter((block) => !isTraceBlock(block))
+      : contentBlocks
+    : filterAssistantVisibleBlocks(contentBlocks, hideTraceBlocks);
   const lastTextBlockIndex = useMemo(() => {
     let idx = -1;
     visibleBlocks.forEach((b, i) => {
@@ -66,6 +71,10 @@ export const MessageCard = memo(function MessageCard({
     }
     return ids;
   }, [visibleBlocks]);
+  const groupedDisplayBlocks = useMemo(() => {
+    const blocks = buildToolDisplayBlocks(visibleBlocks);
+    return isUser ? blocks : orderAssistantDisplayBlocks(blocks);
+  }, [isUser, visibleBlocks]);
 
   // Extract text content for copying
   const getTextContent = () =>
@@ -151,8 +160,42 @@ export const MessageCard = memo(function MessageCard({
       ) : (
         // Assistant message — no bubble, direct content (Agent style)
         <div className="space-y-1.5">
-          {visibleBlocks.map((block, index) => {
-            // Skip tool_result blocks that are merged into their tool_use card
+          {groupedDisplayBlocks.map((displayBlock, index) => {
+            const prevBlock = index > 0 ? groupedDisplayBlocks[index - 1] : null;
+            const prevIsSummary =
+              prevBlock?.type === "process-summary" ||
+              prevBlock?.type === "result-summary";
+
+            if (displayBlock.type === "process-summary") {
+              return (
+                <div
+                  key={`process-${index}`}
+                  className={prevIsSummary ? "!m-0" : ""}
+                >
+                  <ProcessSummaryBlock
+                    block={displayBlock}
+                    allBlocks={visibleBlocks}
+                    message={message}
+                  />
+                </div>
+              );
+            }
+            if (displayBlock.type === "result-summary") {
+              return (
+                <div
+                  key={`result-${index}`}
+                  className={prevIsSummary ? "!m-0" : ""}
+                >
+                  <ResultSummaryBlock
+                    block={displayBlock}
+                    allBlocks={visibleBlocks}
+                    message={message}
+                  />
+                </div>
+              );
+            }
+
+            const { block } = displayBlock;
             if (
               block.type === "tool_result" &&
               mergedResultIds.has((block as ToolResultContent).toolUseId)

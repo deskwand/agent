@@ -23,6 +23,7 @@ interface FileToolBlockProps {
   allBlocks?: ContentBlock[];
   message?: Message;
   action: "read" | "write";
+  showIcon?: boolean;
 }
 
 const EXT_LANG_MAP: Record<string, string> = {
@@ -95,6 +96,7 @@ export const FileToolBlock = memo(function FileToolBlock({
   allBlocks,
   message,
   action,
+  showIcon = true,
 }: FileToolBlockProps) {
   const traceSteps = useAppStore((s) =>
     message?.sessionId
@@ -224,9 +226,11 @@ export const FileToolBlock = memo(function FileToolBlock({
         </div>
 
         {/* Tool icon — uses actual tool name for correct icon */}
+        {showIcon ? (
         <div className="flex-shrink-0 pt-0.5 text-text-muted">
           {getToolIcon(block.name)}
         </div>
+        ) : null}
 
         {/* Label: action + path + stats */}
         <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
@@ -274,7 +278,7 @@ export const FileToolBlock = memo(function FileToolBlock({
           {/* File path header */}
           <div className="flex items-center gap-2 px-3 py-1.5">
             <span className="text-text-muted flex-shrink-0">
-              {getToolIcon(block.name)}
+              {showIcon ? getToolIcon(block.name) : null}
             </span>
             <span className="text-xs font-mono text-text-secondary truncate">
               {path}

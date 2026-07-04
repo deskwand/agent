@@ -1164,7 +1164,22 @@
     "readReading": "Reading...",
     "readEmptyFile": "(empty file)",
     "actionVisionDescribe": "Describe image",
-    "labelVisionDescribe": "Described {{path}}"
+    "labelVisionDescribe": "Described {{path}}",
+    "grouped": {
+      "readFiles_one": "Read {{count}} file",
+      "readFiles_other": "Read {{count}} files",
+      "searchedCode": "Searched the code",
+      "executedCommands_one": "executed {{count}} command",
+      "executedCommands_other": "executed {{count}} commands",
+      "usedTools_one": "used {{count}} tool",
+      "usedTools_other": "used {{count}} tools",
+      "modifiedFiles_one": "Modified {{count}} file",
+      "modifiedFiles_other": "Modified {{count}} files",
+      "writtenFiles_one": "Wrote {{count}} file",
+      "writtenFiles_other": "Wrote {{count}} files",
+      "joinAnd": " and ",
+      "joinComma": ", "
+    }
   },
   "imageLightbox": {
     "close": "Close",

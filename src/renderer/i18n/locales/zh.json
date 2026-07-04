@@ -1161,7 +1161,22 @@
     "readReading": "读取中...",
     "readEmptyFile": "(空文件)",
     "actionVisionDescribe": "描述图片",
-    "labelVisionDescribe": "描述了 {{path}}"
+    "labelVisionDescribe": "描述了 {{path}}",
+    "grouped": {
+      "readFiles_one": "已读取 {{count}} 个文件",
+      "readFiles_other": "已读取 {{count}} 个文件",
+      "searchedCode": "已搜索了代码",
+      "executedCommands_one": "已执行了 {{count}} 条命令",
+      "executedCommands_other": "已执行了 {{count}} 条命令",
+      "usedTools_one": "已使用 {{count}} 个工具",
+      "usedTools_other": "已使用 {{count}} 个工具",
+      "modifiedFiles_one": "已修改 {{count}} 个文件",
+      "modifiedFiles_other": "已修改 {{count}} 个文件",
+      "writtenFiles_one": "已写入 {{count}} 个文件",
+      "writtenFiles_other": "已写入 {{count}} 个文件",
+      "joinAnd": "并",
+      "joinComma": "、"
+    }
   },
   "imageLightbox": {
     "close": "关闭",
