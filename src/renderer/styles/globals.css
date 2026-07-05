@@ -737,7 +737,7 @@
   }
 
   .prose-chat pre {
-    margin: 0.75rem 0;
+    margin: 0.375rem 0;
     padding: 0.875rem 1rem;
     border-radius: 10px;
     background: var(--color-surface-muted);
@@ -764,6 +764,11 @@
   /* Code block */
   .code-block {
     @apply bg-surface-muted rounded-xl p-4 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-w-full;
+  }
+
+  /* Override prose pre padding inside CodeBlock - tighter spacing */
+  .prose-chat .code-block {
+    padding: 0.125rem 1rem;
   }
 
   /* Override hljs theme background to use our code-block background */
