@@ -84,6 +84,7 @@ src/
 ### 提交规范
 
 - **Conventional Commits**，允许 type：`build | chore | ci | docs | feat | fix | merge | perf | refactor | revert | style | test`
+- **提交信息必须使用英文**，标题不超过 72 字符，正文每行不超过 72 字符
 - commitlint + husky 在 commit 时自动校验格式
 - PR 分支策略：功能/修复 → `dev`；紧急修复 → `main`
 
