@@ -629,7 +629,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       className={`text-sm font-medium leading-5 truncate flex-1 ${
                         activeSessionId === slot.sessionId || !slot.completed
                           ? "text-text-primary"
-                          : "text-text-muted"
+                          : "text-text-secondary"
                       }`}
                     >
                       {session.title}
