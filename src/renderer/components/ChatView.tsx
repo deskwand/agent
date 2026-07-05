@@ -846,7 +846,6 @@ export function ChatView() {
     updateScrollToBottomVisibility,
     messages.length,
     partialMessage.length,
-    partialThinking.length,
     displayedMessages.length,
   ]);
 
@@ -891,7 +890,9 @@ export function ChatView() {
 
   useEffect(() => {
     const messageCount = messages.length;
-    const partialLength = partialMessage.length + partialThinking.length;
+    // Only track visible content: thinking blocks are always filtered out
+    // by filterAssistantVisibleBlocks (see tool-display-blocks.ts)
+    const partialLength = partialMessage.length;
     const hasNewMessage = messageCount !== prevMessageCountRef.current;
     const isStreamingTick =
       partialLength !== prevPartialLengthRef.current && !hasNewMessage;
@@ -936,7 +937,7 @@ export function ChatView() {
 
     prevMessageCountRef.current = messageCount;
     prevPartialLengthRef.current = partialLength;
-  }, [messages.length, partialMessage.length, partialThinking.length]);
+  }, [messages.length, partialMessage.length]);
 
   // Additional scroll trigger for content height changes (e.g., TodoWrite expand/collapse)
   useEffect(() => {
