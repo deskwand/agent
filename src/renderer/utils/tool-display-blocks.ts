@@ -38,6 +38,11 @@ export type DisplayBlock =
       files: ResultFileEntry[];
     };
 
+export type ProcessSummaryDisplayBlock = Extract<
+  DisplayBlock,
+  { type: "process-summary" }
+>;
+
 const PROCESS_TOOLS = new Set([
   "read",
   "read_file",
@@ -111,6 +116,10 @@ function getToolKind(name: string): "process" | "result" | null {
   return null;
 }
 
+export function isProcessToolUse(item: ToolUseContent): boolean {
+  return getToolKind(item.name) === "process";
+}
+
 function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   const readPaths = new Set<string>();
   let hasSearch = false;
@@ -179,6 +188,16 @@ function buildResultSummary(items: ToolUseContent[]): ResultSummary {
   return {
     editedFiles: editedFiles.size,
     writtenFiles: writtenFiles.size,
+  };
+}
+
+export function buildProcessSummaryDisplayBlock(
+  items: ToolUseContent[],
+): ProcessSummaryDisplayBlock {
+  return {
+    type: "process-summary",
+    items,
+    summary: buildProcessSummary(items),
   };
 }
 

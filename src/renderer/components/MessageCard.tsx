@@ -28,6 +28,8 @@ interface MessageCardProps {
   isLatestRound?: boolean;
   /** Files changed in this turn (aggregated by ChatView) */
   artifactFiles?: ResultFileEntry[];
+  /** Hide process summaries when ChatView renders a turn-level summary. */
+  suppressProcessSummaries?: boolean;
 }
 
 function isTraceBlock(block: ContentBlock): boolean {
@@ -40,6 +42,7 @@ export const MessageCard = memo(function MessageCard({
   hideTraceBlocks = false,
   isLatestRound = false,
   artifactFiles = [],
+  suppressProcessSummaries = false,
 }: MessageCardProps) {
   const { t } = useTranslation();
   const isUser = message.role === "user";
@@ -80,13 +83,16 @@ export const MessageCard = memo(function MessageCard({
     return ids;
   }, [visibleBlocks]);
   const groupedDisplayBlocks = useMemo(() => {
-    const blocks = buildToolDisplayBlocks(visibleBlocks);
+    const blocks = buildToolDisplayBlocks(visibleBlocks).filter(
+      (block) =>
+        !suppressProcessSummaries || block.type !== "process-summary",
+    );
     // Keep natural block order for the latest round so process summaries appear
     // in context. Reorder historical (completed) messages to group content first,
     // then results, then process summaries.
     if (isUser || isLatestRound) return blocks;
     return orderAssistantDisplayBlocks(blocks);
-  }, [isUser, isLatestRound, visibleBlocks]);
+  }, [isUser, isLatestRound, suppressProcessSummaries, visibleBlocks]);
 
   // Group consecutive summary blocks so they render with tighter spacing,
   // matching inline text rhythm (historical messages where blocks are reordered).

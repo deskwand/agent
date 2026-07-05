@@ -13,6 +13,7 @@ import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { MessageCard } from "./MessageCard";
+import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import type {
   Message,
   ContentBlock,
@@ -21,8 +22,15 @@ import type {
   ApiProviderConfig,
   ToolUseContent,
 } from "../types";
-import { collectResultFiles } from "../utils/tool-display-blocks";
-import type { ResultFileEntry } from "../utils/tool-display-blocks";
+import {
+  buildProcessSummaryDisplayBlock,
+  collectResultFiles,
+  isProcessToolUse,
+} from "../utils/tool-display-blocks";
+import type {
+  ProcessSummaryDisplayBlock,
+  ResultFileEntry,
+} from "../utils/tool-display-blocks";
 import { Plug, ChevronsDown, Loader2 } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
@@ -613,8 +621,9 @@ export function ChatView() {
 
   // Merge pure-tool messages (no text blocks) into the preceding assistant
   // message so buildToolDisplayBlocks can group all tool_use/tool_result together.
-  const mergedMessages = useMemo(() => {
+  const { messages: mergedMessages, hoistedProcessSummaryTurnIds } = useMemo(() => {
     const result: Message[] = [];
+    const hoistedTurnIds = new Set<string>();
 
     for (const msg of visibleMessages) {
       if (msg.role === "assistant") {
@@ -636,6 +645,9 @@ export function ChatView() {
                 ...prev,
                 content: [...prevBlocks, ...blocks],
               };
+              if (typeof msg.turnId === "string") {
+                hoistedTurnIds.add(msg.turnId);
+              }
               merged = true;
               break;
             }
@@ -647,22 +659,28 @@ export function ChatView() {
       result.push(msg);
     }
 
-    return result;
+    return {
+      messages: result,
+      hoistedProcessSummaryTurnIds: hoistedTurnIds,
+    };
   }, [visibleMessages]);
 
   const visibleTurnEntries = useMemo(() => {
     // Single pass: detect turn-end indices, latest non-partial assistant,
-    // and collect artifact files across all messages in each turn.
+    // collect artifact files, and build one turn-level process summary anchor.
     const turnEndIds = new Set<string>();
     const turnArtifactFiles = new Map<string, ResultFileEntry[]>();
+    const turnProcessSummaries = new Map<string, ProcessSummaryDisplayBlock>();
+    const turnsWithProcessSummary = new Set<string>();
     let latestAssistantId: string | null = null;
     let currentTurnToolUses: ToolUseContent[] = [];
+    let currentTurnProcessToolUses: ToolUseContent[] = [];
 
     for (let i = 0; i < mergedMessages.length; i++) {
       const msg = mergedMessages[i];
       if (!msg) continue;
 
-      // Collect tool_use blocks from assistant messages in the current turn
+      // Collect tool_use blocks from assistant messages in the current turn.
       if (msg.role === "assistant") {
         const rawContent = msg.content as unknown;
         const blocks = Array.isArray(rawContent)
@@ -672,6 +690,9 @@ export function ChatView() {
           (b): b is ToolUseContent => b.type === "tool_use",
         );
         currentTurnToolUses.push(...toolUses);
+        currentTurnProcessToolUses.push(
+          ...toolUses.filter(isProcessToolUse),
+        );
 
         const msgId = String(msg.id);
         const isPartial = msgId.startsWith("partial-");
@@ -680,14 +701,25 @@ export function ChatView() {
         const next = mergedMessages[i + 1];
         if (!next || next.role === "user") {
           turnEndIds.add(msgId);
-          // Store aggregated files for this turn-end
           if (currentTurnToolUses.length > 0) {
             turnArtifactFiles.set(
               msgId,
               collectResultFiles(currentTurnToolUses),
             );
           }
-          currentTurnToolUses = []; // Reset for next turn
+          if (
+            currentTurnProcessToolUses.length > 0 &&
+            typeof msg.turnId === "string" &&
+            hoistedProcessSummaryTurnIds.has(msg.turnId)
+          ) {
+            turnProcessSummaries.set(
+              msgId,
+              buildProcessSummaryDisplayBlock(currentTurnProcessToolUses),
+            );
+            turnsWithProcessSummary.add(msg.turnId);
+          }
+          currentTurnToolUses = [];
+          currentTurnProcessToolUses = [];
         }
       }
     }
@@ -709,9 +741,17 @@ export function ChatView() {
         hideTraceBlocks:
           message.role === "assistant" && Boolean(turnId) && !effectiveTraceExpanded,
         artifactFiles: turnArtifactFiles.get(msgId) ?? [],
+        turnProcessSummary:
+          message.role === "assistant" && effectiveTraceExpanded
+            ? turnProcessSummaries.get(msgId)
+            : undefined,
+        suppressProcessSummaries:
+          message.role === "assistant" &&
+          typeof turnId === "string" &&
+          turnsWithProcessSummary.has(turnId),
       };
     });
-  }, [mergedMessages, effectiveTraceExpanded]);
+  }, [mergedMessages, effectiveTraceExpanded, hoistedProcessSummaryTurnIds]);
 
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,
@@ -1277,14 +1317,29 @@ export function ChatView() {
                 </p>
               </div>
             ) : (
-              visibleTurnEntries.map(({ message, isStreaming, hideTraceBlocks, isLatestRound, artifactFiles }) => (
+              visibleTurnEntries.map(({
+                message,
+                isStreaming,
+                hideTraceBlocks,
+                isLatestRound,
+                artifactFiles,
+                turnProcessSummary,
+                suppressProcessSummaries,
+              }) => (
                 <div key={message.id} className="space-y-1.5">
+                  {turnProcessSummary ? (
+                    <ProcessSummaryBlock
+                      block={turnProcessSummary}
+                      message={message}
+                    />
+                  ) : null}
                   <MessageCard
                     message={message}
                     isStreaming={isStreaming}
                     hideTraceBlocks={hideTraceBlocks}
                     isLatestRound={isLatestRound}
                     artifactFiles={artifactFiles}
+                    suppressProcessSummaries={suppressProcessSummaries}
                   />
                 </div>
               ))
