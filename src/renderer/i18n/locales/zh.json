@@ -1167,6 +1167,7 @@
     "readEmptyFile": "(空文件)",
     "actionVisionDescribe": "描述图片",
     "labelVisionDescribe": "描述了 {{path}}",
+    "labelVisionDescribeWithPrompt": "描述了 {{path}}（{{prompt}}）",
     "grouped": {
       "readFiles_one": "已读取 {{count}} 个文件",
       "readFiles_other": "已读取 {{count}} 个文件",

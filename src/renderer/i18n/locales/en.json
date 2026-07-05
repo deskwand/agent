@@ -1170,6 +1170,7 @@
     "readEmptyFile": "(empty file)",
     "actionVisionDescribe": "Describe image",
     "labelVisionDescribe": "Described {{path}}",
+    "labelVisionDescribeWithPrompt": "Described {{path}} ({{prompt}})",
     "grouped": {
       "readFiles_one": "Read {{count}} file",
       "readFiles_other": "Read {{count}} files",

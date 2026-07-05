@@ -185,6 +185,131 @@ describe("vision_describe tool execute — error branches", () => {
     expect((result.content[0] as { type: string; text?: string }).text).toContain("<svg>");
   });
 
+  it("accepts optional prompt parameter in params", async () => {
+    const { createVisionDescribeTool } = await import(
+      "../../main/agent/tools/vision-describe"
+    );
+    const pngPath = path.join(tempDir, "prompt-test.png");
+    const buf = Buffer.alloc(64, 0);
+    buf[0] = 0x89;
+    buf[1] = 0x50;
+    buf[2] = 0x4e;
+    buf[3] = 0x47;
+    fs.writeFileSync(pngPath, buf);
+
+    const workspaceDir = process.cwd();
+    const tool = createVisionDescribeTool({
+      enabled: true,
+      provider: "openai" as const,
+      apiKey: "sk-test",
+      model: "gpt-4o",
+    }, workspaceDir);
+
+    // Should not throw — prompt is optional, passes through to execute
+    const result = await tool.execute(
+      "call-prompt",
+      { path: pngPath, prompt: "Extract only numeric values" },
+      undefined,
+      undefined,
+      {} as any,
+    );
+    // Will fail at API call since key is fake, but should not be a schema error
+    expect(result.content[0].type).toBe("text");
+    const text = (result.content[0] as { type: string; text: string }).text;
+    expect(text).not.toContain("Error: Not a recognized image format");
+    expect(text).not.toContain("Error: File not found");
+  });
+
+  it("sends custom prompt to vision API when provided", async () => {
+    const { createVisionDescribeTool } = await import(
+      "../../main/agent/tools/vision-describe"
+    );
+    const pngPath = path.join(tempDir, "prompt-send-test.png");
+    const buf = Buffer.alloc(64, 0);
+    buf[0] = 0x89;
+    buf[1] = 0x50;
+    buf[2] = 0x4e;
+    buf[3] = 0x47;
+    fs.writeFileSync(pngPath, buf);
+
+    const customPrompt = "Extract only Chinese characters";
+    let capturedBody: string | null = null;
+    const originalFetch = global.fetch;
+    global.fetch = ((_url: string, init: RequestInit) => {
+      capturedBody = (init as { body?: string }).body || null;
+      // Return ok response with fake content so the tool doesn't error out
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "Fake: extracted Chinese" } }],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    }) as typeof global.fetch;
+
+    try {
+      const tool = createVisionDescribeTool(
+        {
+          enabled: true,
+          provider: "openai" as const,
+          apiKey: "sk-test",
+          model: "gpt-4o",
+        },
+        process.cwd(),
+      );
+
+      const result = await tool.execute(
+        "call-send-prompt",
+        { path: pngPath, prompt: customPrompt },
+        undefined,
+        undefined,
+        {} as any,
+      );
+      expect(result.content[0].type).toBe("text");
+      // Verify the custom prompt was sent in the API request body
+      expect(capturedBody).not.toBeNull();
+      expect(capturedBody!).toContain(customPrompt);
+      expect(capturedBody!).not.toContain("Please describe this image in detail");
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("treats empty string prompt same as no prompt", async () => {
+    const { createVisionDescribeTool } = await import(
+      "../../main/agent/tools/vision-describe"
+    );
+    const pngPath = path.join(tempDir, "empty-prompt-test.png");
+    const buf = Buffer.alloc(64, 0);
+    buf[0] = 0x89;
+    buf[1] = 0x50;
+    buf[2] = 0x4e;
+    buf[3] = 0x47;
+    fs.writeFileSync(pngPath, buf);
+
+    const workspaceDir = process.cwd();
+    const tool = createVisionDescribeTool({
+      enabled: true,
+      provider: "openai" as const,
+      apiKey: "sk-test",
+      model: "gpt-4o",
+    }, workspaceDir);
+
+    // With empty prompt — should not throw or reject the parameter
+    const result = await tool.execute(
+      "call-empty-prompt",
+      { path: pngPath, prompt: "" },
+      undefined,
+      undefined,
+      {} as any,
+    );
+    expect(result.content[0].type).toBe("text");
+    const text = (result.content[0] as { type: string; text: string }).text;
+    expect(text).not.toContain("Error: Not a recognized image format");
+    expect(text).not.toContain("Error: File not found");
+  });
+
   it("handles relative paths by resolving against cwd", async () => {
     // Write a known image to cwd and test relative path
     const pngPath = path.join(process.cwd(), "test-relative-vision.png");

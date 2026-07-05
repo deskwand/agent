@@ -60,6 +60,12 @@ export function detectImageMimeType(filePath: string): string | null {
   }
 }
 
+// ── Constants ──────────────────────────────────────────────────────
+
+const DEFAULT_VISION_PROMPT =
+  "Please describe this image in detail, in the same language as the content shown in the image. " +
+  "If the image contains text, transcribe it completely.";
+
 // ── API helpers ─────────────────────────────────────────────────────
 
 function protocolForProvider(
@@ -84,6 +90,7 @@ async function callAnthropicVision(
   base64Image: string,
   mimeType: string,
   signal?: AbortSignal,
+  userPrompt?: string,
 ): Promise<string> {
   const baseUrl = config.baseUrl || "https://api.anthropic.com";
   const url = `${baseUrl.replace(/\/$/, "")}/v1/messages`;
@@ -112,7 +119,7 @@ async function callAnthropicVision(
             },
             {
               type: "text",
-              text: "Please describe this image in detail, in the same language as the content shown in the image. If the image contains text, transcribe it completely.",
+              text: userPrompt || DEFAULT_VISION_PROMPT,
             },
           ],
         },
@@ -142,6 +149,7 @@ async function callOpenAIVision(
   base64Image: string,
   mimeType: string,
   signal?: AbortSignal,
+  userPrompt?: string,
 ): Promise<string> {
   const baseUrl = config.baseUrl || "https://api.openai.com/v1";
   const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
@@ -167,7 +175,7 @@ async function callOpenAIVision(
             },
             {
               type: "text",
-              text: "Please describe this image in detail, in the same language as the content shown in the image. If the image contains text, transcribe it completely.",
+              text: userPrompt || DEFAULT_VISION_PROMPT,
             },
           ],
         },
@@ -194,6 +202,7 @@ async function callGeminiVision(
   base64Image: string,
   mimeType: string,
   signal?: AbortSignal,
+  userPrompt?: string,
 ): Promise<string> {
   const baseUrl =
     config.baseUrl || "https://generativelanguage.googleapis.com";
@@ -213,7 +222,7 @@ async function callGeminiVision(
               },
             },
             {
-              text: "Please describe this image in detail, in the same language as the content shown in the image. If the image contains text, transcribe it completely.",
+              text: userPrompt || DEFAULT_VISION_PROMPT,
             },
           ],
         },
@@ -246,16 +255,17 @@ async function callVisionModel(
   base64Image: string,
   mimeType: string,
   signal?: AbortSignal,
+  userPrompt?: string,
 ): Promise<string> {
   const protocol = protocolForProvider(config.provider, config.customProtocol);
 
   switch (protocol) {
     case "anthropic":
-      return callAnthropicVision(config, base64Image, mimeType, signal);
+      return callAnthropicVision(config, base64Image, mimeType, signal, userPrompt);
     case "openai":
-      return callOpenAIVision(config, base64Image, mimeType, signal);
+      return callOpenAIVision(config, base64Image, mimeType, signal, userPrompt);
     case "gemini":
-      return callGeminiVision(config, base64Image, mimeType, signal);
+      return callGeminiVision(config, base64Image, mimeType, signal, userPrompt);
     default:
       throw new Error(`Unsupported vision protocol: ${protocol}`);
   }
@@ -278,11 +288,20 @@ export function createVisionDescribeTool(
     description:
       "Read an image file and return a detailed text description using a dedicated vision model. " +
       "Use this tool when you need to see or read the contents of an image file (PNG, JPEG, GIF, WebP, BMP, SVG). " +
+      "Optionally pass a 'prompt' parameter with specific instructions (e.g. extract only error text, read Chinese content, describe layout) " +
+      "to get more targeted results instead of a general description. " +
       "The tool returns a plain text description of the image contents, including any text present in the image.",
     parameters: Type.Object({
       path: Type.String({
         description: "Path to the image file to describe (relative or absolute)",
       }),
+      prompt: Type.Optional(Type.String({
+        description:
+          "Custom instruction for the vision model about what to look for in this image. " +
+          "When provided, replaces the default description prompt. " +
+          "Use to extract specific information, focus on particular areas, " +
+          "or ask targeted questions about the image.",
+      })),
     }),
     async execute(
       _toolCallId: unknown,
@@ -291,7 +310,10 @@ export function createVisionDescribeTool(
       _onUpdate: ((update: unknown) => void) | undefined,
       _ctx: unknown,
     ) {
-      const { path: filePath } = params as { path: string };
+      const { path: filePath, prompt: userPrompt } = params as {
+        path: string;
+        prompt?: string;
+      };
 
       // Resolve path relative to session workspace (pi-ai SDK does not
       // chdir(), so process.cwd() is unreliable for custom tool execution)
@@ -376,6 +398,7 @@ export function createVisionDescribeTool(
           base64Image,
           mimeType,
           signal ?? AbortSignal.timeout(60_000),
+          userPrompt,
         );
         log(
           `[VisionDescribe] Vision model returned ${description.length} chars`,

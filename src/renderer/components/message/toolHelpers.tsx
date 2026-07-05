@@ -166,6 +166,13 @@ export function getToolLabel(
   // --- Vision tools ---
   if (nameLower === "vision_describe") {
     const p = String(inp.path || "");
+    const prompt = String(inp.prompt || "");
+    if (p && prompt) {
+      return t("tool.labelVisionDescribeWithPrompt", {
+        path: shortenPath(p),
+        prompt: prompt.length > 40 ? prompt.slice(0, 37) + "…" : prompt,
+      });
+    }
     return p
       ? t("tool.labelVisionDescribe", { path: shortenPath(p) })
       : t("tool.actionVisionDescribe");
