@@ -2,6 +2,7 @@ import type {
   AgentRuntimeExtension,
   BeforeSessionRunResult,
 } from "../extensions/agent-runtime-extension";
+import { logError } from "../utils/logger";
 import type { MemoryService } from "./memory-service";
 
 export class MemoryExtension implements AgentRuntimeExtension {
@@ -34,11 +35,19 @@ export class MemoryExtension implements AgentRuntimeExtension {
     if (!this.memoryService.isEnabled() || !session.memoryEnabled) {
       return;
     }
-    await this.memoryService.enqueueIngestion({
-      session,
-      prompt,
-      messages,
-    });
+    try {
+      void this.memoryService
+        .enqueueIngestion({
+          session,
+          prompt,
+          messages,
+        })
+        .catch((error) => {
+          logError("[MemoryExtension] Background ingestion failed:", error);
+        });
+    } catch (error) {
+      logError("[MemoryExtension] Background ingestion failed:", error);
+    }
   }
 
   async onSessionDeleted({
