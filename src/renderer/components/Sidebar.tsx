@@ -618,13 +618,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    {!slot.completed && (
-                      <span
-                        className="w-2 h-2 rounded-full bg-accent animate-pulse flex-shrink-0"
-                        role="status"
-                        aria-label={t("sidebar.running")}
-                      />
-                    )}
                     <span
                       className={`text-sm font-medium leading-5 truncate flex-1 ${activeSessionId === slot.sessionId || !slot.completed ? 'text-text-primary' : 'text-text-secondary'}`}
                     >
@@ -637,11 +630,16 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                           {getWorkspaceName(session.cwd)}
                         </span>
                       )}
-                    {slot.completed ? (
+                    <div className="relative w-5 h-5 flex-shrink-0">
+                      <span
+                        className={`absolute inset-0 m-auto w-2 h-2 rounded-full bg-accent transition-all duration-300 ${slot.completed ? 'opacity-0 scale-0' : 'opacity-100 scale-100 animate-pulse'}`}
+                        role="status"
+                        aria-label={t("sidebar.running")}
+                      />
                       <Check
-                        className="w-3.5 h-3.5 text-accent/50 hover:text-accent flex-shrink-0 cursor-pointer transition-colors"
+                        className={`absolute inset-0 m-auto w-3.5 h-3.5 text-accent/50 hover:text-accent transition-all duration-300 ${slot.completed ? 'opacity-100 scale-100 cursor-pointer' : 'opacity-0 scale-0 pointer-events-none'}`}
                         role="button"
-                        tabIndex={0}
+                        tabIndex={slot.completed ? 0 : -1}
                         aria-label={t("sidebar.taskCompleted")}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -655,9 +653,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                           }
                         }}
                       />
-                    ) : (
-                      <span className="w-5 flex-shrink-0" />
-                    )}
+                    </div>
                   </div>
                 </div>
               );
