@@ -29,6 +29,7 @@ describe("SessionState unified store", () => {
       const state = useAppStore.getState();
       expect(state.sessions).toHaveLength(1);
       expect(state.sessionStates["s1"]).toBeDefined();
+      expect(state.sessionStates["s1"].historyHydrated).toBe(true);
       expect(state.sessionStates["s1"].messages).toEqual([]);
       expect(state.sessionStates["s1"].partialMessage).toBe("");
       expect(state.sessionStates["s1"].partialThinking).toBe("");
@@ -143,6 +144,16 @@ describe("SessionState unified store", () => {
       expect(useAppStore.getState().sessionStates["s1"].messages).toHaveLength(
         2,
       );
+      expect(useAppStore.getState().sessionStates["s1"].historyHydrated).toBe(
+        true,
+      );
+    });
+
+    it("should not mark a session hydrated when only context metadata arrives", () => {
+      useAppStore.getState().setSessionContextWindow("s-meta", 32000);
+      expect(
+        useAppStore.getState().sessionStates["s-meta"].historyHydrated,
+      ).toBe(false);
     });
   });
 

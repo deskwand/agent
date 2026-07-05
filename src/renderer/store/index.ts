@@ -35,6 +35,7 @@ export interface SessionExecutionClock {
 
 // Unified per-session state that replaces 8 parallel xxxBySession Maps
 export interface SessionState {
+  historyHydrated: boolean;
   messages: Message[];
   partialByTurn: Record<string, { message: string; thinking: string }>;
   partialMessage: string;
@@ -58,6 +59,7 @@ export interface SessionState {
 }
 
 const DEFAULT_SESSION_STATE: SessionState = {
+  historyHydrated: false,
   messages: [],
   partialByTurn: {},
   partialMessage: "",
@@ -395,7 +397,7 @@ export const useAppStore = create<AppState>((set) => ({
       sessions: [session, ...state.sessions],
       sessionStates: {
         ...state.sessionStates,
-        [session.id]: { ...DEFAULT_SESSION_STATE },
+        [session.id]: { ...DEFAULT_SESSION_STATE, historyHydrated: true },
       },
     })),
 
@@ -560,7 +562,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   setMessages: (sessionId, messages) =>
     set((state) => ({
-      sessionStates: patchSession(state.sessionStates, sessionId, { messages }),
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        messages,
+        historyHydrated: true,
+      }),
     })),
 
   setPartialMessage: (sessionId, partial, turnId) =>
@@ -769,6 +774,7 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       sessionStates: patchSession(state.sessionStates, sessionId, {
         traceSteps: steps,
+        historyHydrated: true,
       }),
     })),
 
@@ -932,7 +938,7 @@ if (typeof window !== "undefined") {
     };
   };
 
-  w.__navigate = (page: string, tab?: string, sessionId?: string) => {
+  w.__navigate = async (page: string, tab?: string, sessionId?: string) => {
     const store = useAppStore.getState();
     if (page === "welcome") {
       store.setShowSettings(false);
@@ -945,6 +951,30 @@ if (typeof window !== "undefined") {
       const exists = store.sessions.some((s) => s.id === sessionId);
       if (!exists) return false;
       store.setShowSettings(false);
+      const hasHydratedState =
+        store.sessionStates[sessionId]?.historyHydrated === true;
+      if (!hasHydratedState && typeof window.electronAPI?.invoke === "function") {
+        try {
+          const [messages, traceSteps] = await Promise.all([
+            window.electronAPI.invoke({
+              type: "session.getMessages",
+              payload: { sessionId },
+            }),
+            window.electronAPI.invoke({
+              type: "session.getTraceSteps",
+              payload: { sessionId },
+            }),
+          ]);
+          store.setMessages(sessionId, Array.isArray(messages) ? messages : []);
+          store.setTraceSteps(
+            sessionId,
+            Array.isArray(traceSteps) ? traceSteps : [],
+          );
+        } catch {
+          store.setMessages(sessionId, []);
+          store.setTraceSteps(sessionId, []);
+        }
+      }
       store.setActiveSession(sessionId);
     }
     return true;

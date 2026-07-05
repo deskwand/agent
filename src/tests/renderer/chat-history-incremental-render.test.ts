@@ -11,6 +11,7 @@ import {
   getPreviousVisibleTurnStart,
   getVisibleMessageStartIndex,
   shouldAutoFillViewport,
+  shouldShowHydratingHistoryState,
   shouldInitializeVisibleTurns,
 } from "../../renderer/components/ChatView";
 
@@ -141,5 +142,20 @@ describe("chat history incremental render helpers", () => {
 
   it("keeps the same anchor when scroll height does not change", () => {
     expect(getAnchoredScrollTop(200, 900, 900)).toBe(200);
+  });
+
+  it("treats a session with no hydrated store state as loading instead of empty", () => {
+    expect(
+      shouldShowHydratingHistoryState("session-2", true, false, 0),
+    ).toBe(true);
+    expect(
+      shouldShowHydratingHistoryState("session-2", true, true, 0),
+    ).toBe(false);
+    expect(
+      shouldShowHydratingHistoryState("session-2", true, false, 1),
+    ).toBe(false);
+    expect(
+      shouldShowHydratingHistoryState("session-2", true, true, 0),
+    ).toBe(false);
   });
 });

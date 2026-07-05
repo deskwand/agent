@@ -3,6 +3,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 const navServerPath = path.resolve(process.cwd(), 'src/main/nav-server.ts');
+const rendererStorePath = path.resolve(process.cwd(), 'src/renderer/store/index.ts');
 
 describe('nav-server sessionId validation', () => {
   it('rejects sessionId with disallowed characters', () => {
@@ -37,10 +38,18 @@ describe('nav-server sessionId validation', () => {
 
   it('returns 400 for invalid sessionId format in navigate endpoint', () => {
     const source = fs.readFileSync(navServerPath, 'utf8');
-    expect(source).toContain("'Invalid session id format'");
+    expect(source).toContain('error: "Invalid session id format"');
     // The validation check must appear before the window/JS execution
     const validationIdx = source.indexOf('Invalid session id format');
     const execJSIdx = source.indexOf('window.__navigate');
     expect(validationIdx).toBeLessThan(execJSIdx);
+  });
+
+  it('hydrates session history before direct renderer session navigation', () => {
+    const source = fs.readFileSync(rendererStorePath, 'utf8');
+    expect(source).toContain('w.__navigate = async (page: string, tab?: string, sessionId?: string) => {');
+    expect(source).toContain('type: "session.getMessages"');
+    expect(source).toContain('type: "session.getTraceSteps"');
+    expect(source).toContain('store.setMessages(sessionId, Array.isArray(messages) ? messages : []);');
   });
 });

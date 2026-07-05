@@ -201,6 +201,20 @@ export function getAnchoredScrollTop(
   return previousScrollTop + (nextScrollHeight - previousScrollHeight);
 }
 
+export function shouldShowHydratingHistoryState(
+  activeSessionId: string | null,
+  hasActiveSession: boolean,
+  hasHistoryHydrated: boolean,
+  displayedMessageCount: number,
+): boolean {
+  return Boolean(
+    activeSessionId &&
+      hasActiveSession &&
+      !hasHistoryHydrated &&
+      displayedMessageCount === 0,
+  );
+}
+
 const INITIAL_VISIBLE_TURNS = 8;
 const PREPEND_TURNS = 6;
 // Fire a little before the user hits absolute top to hide prepend latency.
@@ -614,7 +628,7 @@ export function ChatView() {
           let merged = false;
           for (let j = result.length - 1; j >= 0; j--) {
             const prev = result[j];
-            if (prev && prev.role === "assistant") {
+            if (prev && prev.role === "assistant" && prev.turnId === msg.turnId) {
               const prevBlocks = Array.isArray(prev.content)
                 ? (prev.content as unknown as ContentBlock[])
                 : [];
@@ -698,6 +712,13 @@ export function ChatView() {
       };
     });
   }, [mergedMessages, effectiveTraceExpanded]);
+
+  const isHydratingHistoryState = shouldShowHydratingHistoryState(
+    activeSessionId,
+    Boolean(activeSession),
+    Boolean(sessionState?.historyHydrated),
+    displayedMessages.length,
+  );
 
   useEffect(() => {
     if (
@@ -1248,7 +1269,11 @@ export function ChatView() {
                   DeskWand
                 </p>
                 <p className="text-base text-text-secondary">
-                  {t("chat.startConversation")}
+                  {t(
+                    isHydratingHistoryState
+                      ? "chat.loadingConversation"
+                      : "chat.startConversation",
+                  )}
                 </p>
               </div>
             ) : (
