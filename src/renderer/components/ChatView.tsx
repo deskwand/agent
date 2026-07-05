@@ -597,6 +597,45 @@ export function ChatView() {
   // TODO: add bottom-side reclamation if very long sessions still degrade
   // after repeated prepends; v1 only windows older history from the top.
 
+  // Merge pure-tool messages (no text blocks) into the preceding assistant
+  // message so buildToolDisplayBlocks can group all tool_use/tool_result together.
+  const mergedMessages = useMemo(() => {
+    const result: Message[] = [];
+
+    for (const msg of visibleMessages) {
+      if (msg.role === "assistant") {
+        const blocks = Array.isArray(msg.content)
+          ? (msg.content as unknown as ContentBlock[])
+          : [];
+        const hasText = blocks.some((b) => b.type === "text");
+        
+        if (!hasText && blocks.length > 0) {
+          // Pure-tool message — merge into the preceding assistant message
+          let merged = false;
+          for (let j = result.length - 1; j >= 0; j--) {
+            const prev = result[j];
+            if (prev && prev.role === "assistant") {
+              const prevBlocks = Array.isArray(prev.content)
+                ? (prev.content as unknown as ContentBlock[])
+                : [];
+              result[j] = {
+                ...prev,
+                content: [...prevBlocks, ...blocks],
+              };
+              merged = true;
+              break;
+            }
+          }
+          if (merged) continue;
+          // No preceding assistant (e.g. first message in turn is a tool) — keep as-is
+        }
+      }
+      result.push(msg);
+    }
+
+    return result;
+  }, [visibleMessages]);
+
   const visibleTurnEntries = useMemo(() => {
     // Single pass: detect turn-end indices, latest non-partial assistant,
     // and collect artifact files across all messages in each turn.
@@ -605,8 +644,8 @@ export function ChatView() {
     let latestAssistantId: string | null = null;
     let currentTurnToolUses: ToolUseContent[] = [];
 
-    for (let i = 0; i < visibleMessages.length; i++) {
-      const msg = visibleMessages[i];
+    for (let i = 0; i < mergedMessages.length; i++) {
+      const msg = mergedMessages[i];
       if (!msg) continue;
 
       // Collect tool_use blocks from assistant messages in the current turn
@@ -624,7 +663,7 @@ export function ChatView() {
         const isPartial = msgId.startsWith("partial-");
         if (isPartial) continue;
         latestAssistantId = msgId;
-        const next = visibleMessages[i + 1];
+        const next = mergedMessages[i + 1];
         if (!next || next.role === "user") {
           turnEndIds.add(msgId);
           // Store aggregated files for this turn-end
@@ -639,7 +678,7 @@ export function ChatView() {
       }
     }
 
-    return visibleMessages.map((message) => {
+    return mergedMessages.map((message) => {
       const isStreaming =
         typeof message.id === "string" && message.id.startsWith("partial-");
       const msgId = String(message.id);
@@ -658,7 +697,7 @@ export function ChatView() {
         artifactFiles: turnArtifactFiles.get(msgId) ?? [],
       };
     });
-  }, [visibleMessages, effectiveTraceExpanded]);
+  }, [mergedMessages, effectiveTraceExpanded]);
 
   useEffect(() => {
     if (
