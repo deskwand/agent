@@ -378,7 +378,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           )}
 
           <div className="min-w-0 flex-1 flex items-center gap-2">
-            <div className="text-sm font-medium leading-5 text-text-primary truncate flex-1">
+            <div className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? 'text-text-primary' : 'text-text-secondary'}`}>
               {session.title}
             </div>
             {session.isProjectMode &&
@@ -626,11 +626,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       />
                     )}
                     <span
-                      className={`text-sm font-medium leading-5 truncate flex-1 ${
-                        activeSessionId === slot.sessionId || !slot.completed
-                          ? "text-text-primary"
-                          : "text-text-secondary"
-                      }`}
+                      className={`text-sm font-medium leading-5 truncate flex-1 ${activeSessionId === slot.sessionId || !slot.completed ? 'text-text-primary' : 'text-text-secondary'}`}
                     >
                       {session.title}
                     </span>
