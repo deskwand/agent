@@ -19,6 +19,450 @@ import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
 
+let sharedIpcInitialized = false;
+
+function installSharedIpcBridge(): void {
+  if (sharedIpcInitialized) {
+    return;
+  }
+  sharedIpcInitialized = true;
+  // --- RAF batching for high-frequency events ---
+  const pendingPartials: Record<string, Record<string, string[]>> = {};
+  let partialRafId: number | null = null;
+
+  const pendingThinking: Record<string, Record<string, string[]>> = {};
+  let thinkingRafId: number | null = null;
+
+  const flushPartials = () => {
+    partialRafId = null;
+    const store = useAppStore.getState();
+    for (const sessionId in pendingPartials) {
+      for (const turnId in pendingPartials[sessionId]) {
+        const chunks = pendingPartials[sessionId][turnId];
+        if (chunks.length > 0) {
+          store.setPartialMessage(
+            sessionId,
+            chunks.join(""),
+            turnId === "__default__" ? undefined : turnId,
+          );
+          pendingPartials[sessionId][turnId] = [];
+        }
+      }
+    }
+  };
+
+  const bufferPartial = (sessionId: string, delta: string, turnId?: string) => {
+    const key = turnId || "__default__";
+    if (!pendingPartials[sessionId]) pendingPartials[sessionId] = {};
+    if (!pendingPartials[sessionId][key]) pendingPartials[sessionId][key] = [];
+    pendingPartials[sessionId][key].push(delta);
+    if (partialRafId === null) {
+      partialRafId = requestAnimationFrame(flushPartials);
+    }
+  };
+
+  const flushThinking = () => {
+    thinkingRafId = null;
+    const store = useAppStore.getState();
+    for (const sessionId in pendingThinking) {
+      for (const turnId in pendingThinking[sessionId]) {
+        const chunks = pendingThinking[sessionId][turnId];
+        if (chunks.length > 0) {
+          store.setPartialThinking(
+            sessionId,
+            chunks.join(""),
+            turnId === "__default__" ? undefined : turnId,
+          );
+          pendingThinking[sessionId][turnId] = [];
+        }
+      }
+    }
+  };
+
+  const bufferThinking = (
+    sessionId: string,
+    delta: string,
+    turnId?: string,
+  ) => {
+    const key = turnId || "__default__";
+    if (!pendingThinking[sessionId]) pendingThinking[sessionId] = {};
+    if (!pendingThinking[sessionId][key]) pendingThinking[sessionId][key] = [];
+    pendingThinking[sessionId][key].push(delta);
+    if (thinkingRafId === null) {
+      thinkingRafId = requestAnimationFrame(flushThinking);
+    }
+  };
+
+  type TraceAction =
+    | { kind: "add"; sessionId: string; step: TraceStep }
+    | {
+        kind: "update";
+        sessionId: string;
+        stepId: string;
+        updates: Partial<TraceStep>;
+      };
+  let pendingTraces: TraceAction[] = [];
+  let traceRafId: number | null = null;
+
+  const flushTraces = () => {
+    traceRafId = null;
+    const store = useAppStore.getState();
+    for (const action of pendingTraces) {
+      if (action.kind === "add") {
+        store.addTraceStep(action.sessionId, action.step);
+      } else {
+        store.updateTraceStep(action.sessionId, action.stepId, action.updates);
+      }
+    }
+    pendingTraces = [];
+  };
+
+  const bufferTrace = (action: TraceAction) => {
+    pendingTraces.push(action);
+    if (traceRafId === null) {
+      traceRafId = requestAnimationFrame(flushTraces);
+    }
+  };
+
+  const applyConfigSnapshot = (config: AppConfig, isConfigured: boolean) => {
+    const store = useAppStore.getState();
+    const isInitialConfigStatus = !store.hasSeenInitialConfigStatus;
+    store.setIsConfigured(isConfigured);
+    store.setAppConfig(config);
+    store.setSettings({ theme: config.theme || "light" });
+    if (config.themePreset) {
+      store.setSettings({ themePreset: config.themePreset });
+    }
+    store.setSettings({
+      autoSkillLearning: config.autoSkillLearning ?? false,
+    });
+    if (isInitialConfigStatus) {
+      store.markInitialConfigStatusSeen();
+    }
+  };
+
+  const invoke = async <T>(event: ClientEvent): Promise<T> => {
+    return window.electronAPI.invoke<T>(event);
+  };
+
+  window.electronAPI.on((event: ServerEvent) => {
+    const store = useAppStore.getState();
+
+    try {
+      switch (event.type) {
+        case "session.list":
+          store.setSessions(event.payload.sessions);
+          // Auto-restore last session with messages loaded (avoid white screen on restart)
+          (async () => {
+            try {
+              // Restore contextWindows from model configs
+              if (event.payload.contextWindows) {
+                for (const [sessionId, cw] of Object.entries(
+                  event.payload.contextWindows,
+                )) {
+                  if (typeof cw === "number")
+                    store.setSessionContextWindow(sessionId, cw);
+                }
+              }
+              const lastId = localStorage.getItem("deskwand.lastSessionId");
+              if (
+                lastId &&
+                event.payload.sessions.some((s) => s.id === lastId)
+              ) {
+                if (store.activeSessionId !== lastId) {
+                  const [messages, steps] = await Promise.all([
+                    invoke<Message[]>({
+                      type: "session.getMessages",
+                      payload: { sessionId: lastId },
+                    }),
+                    invoke<TraceStep[]>({
+                      type: "session.getTraceSteps",
+                      payload: { sessionId: lastId },
+                    }),
+                  ]);
+                  if (messages) store.setMessages(lastId, messages);
+                  if (steps) store.setTraceSteps(lastId, steps);
+                  store.setActiveSession(lastId);
+                }
+              } else if (
+                store.activeSessionId &&
+                !event.payload.sessions.some(
+                  (s) => s.id === store.activeSessionId,
+                )
+              ) {
+                store.setActiveSession(null);
+              }
+            } catch {
+              /* silent fallback */
+            }
+          })();
+          break;
+
+        case "session.status":
+          console.log("[useIPC] session.status received:", event.payload);
+          store.updateSession(event.payload.sessionId, {
+            status: event.payload.status,
+          });
+          if (event.payload.status !== "running") {
+            store.finishExecutionClock(event.payload.sessionId);
+            store.setLoading(false);
+            store.clearActiveTurn(event.payload.sessionId);
+            store.clearPendingTurns(event.payload.sessionId);
+            store.clearQueuedMessages(event.payload.sessionId);
+            console.log(
+              "[useIPC] session.status non-running cleanup done:",
+              event.payload,
+            );
+          }
+          break;
+
+        case "session.update":
+          store.updateSession(event.payload.sessionId, event.payload.updates);
+          break;
+
+        case "stream.message": {
+          // Clear only this turn's pending buffers to avoid wiping queued turns
+          const completedTurnId =
+            event.payload.message.turnId || event.payload.turnId;
+          if (completedTurnId) {
+            delete pendingPartials[event.payload.sessionId]?.[completedTurnId];
+            delete pendingThinking[event.payload.sessionId]?.[completedTurnId];
+          } else {
+            delete pendingPartials[event.payload.sessionId];
+            delete pendingThinking[event.payload.sessionId];
+          }
+          // Per-turn auto-expand removed; global Eye button replaces it.
+          store.addMessage(event.payload.sessionId, event.payload.message);
+          break;
+        }
+
+        case "stream.partial":
+          bufferPartial(
+            event.payload.sessionId,
+            event.payload.delta,
+            event.payload.turnId,
+          );
+          break;
+
+        case "stream.thinking":
+          bufferThinking(
+            event.payload.sessionId,
+            event.payload.delta,
+            event.payload.turnId,
+          );
+          break;
+
+        case "trace.step": {
+          if (
+            event.payload.step.type === "thinking" &&
+            event.payload.step.status === "running"
+          ) {
+            const currentState = useAppStore.getState();
+            const ss = currentState.sessionStates[event.payload.sessionId];
+            const pending = ss?.pendingTurns || [];
+            const activeTurn = ss?.activeTurn;
+            if (pending.length > 0) {
+              store.activateNextTurn(
+                event.payload.sessionId,
+                event.payload.step.id,
+              );
+            } else if (activeTurn) {
+              // 绑定真实 stepId，避免 mock stepId 导致无法清理
+              store.updateActiveTurnStep(
+                event.payload.sessionId,
+                event.payload.step.id,
+              );
+            }
+          }
+          bufferTrace({
+            kind: "add",
+            sessionId: event.payload.sessionId,
+            step: event.payload.step,
+          });
+          break;
+        }
+
+        case "trace.update":
+          bufferTrace({
+            kind: "update",
+            sessionId: event.payload.sessionId,
+            stepId: event.payload.stepId,
+            updates: event.payload.updates,
+          });
+          break;
+
+        case "goal.status":
+          store.setGoalStatus(event.payload.sessionId, {
+            status: event.payload.status,
+            objective: event.payload.objective,
+            iteration: event.payload.iteration,
+            tokensUsed: event.payload.tokensUsed,
+            tokenBudget: event.payload.tokenBudget,
+            timeUsedSeconds: event.payload.timeUsedSeconds,
+            timeBudgetSeconds: event.payload.timeBudgetSeconds,
+          });
+          break;
+
+        case "permission.request":
+          store.setPendingPermission(event.payload);
+          break;
+
+        case "permission.dismiss": {
+          const currentPermission = useAppStore.getState().pendingPermission;
+          if (currentPermission?.toolUseId === event.payload.toolUseId) {
+            store.setPendingPermission(null);
+          }
+          break;
+        }
+
+        case "stream.executionTime":
+          store.updateMessage(event.payload.sessionId, event.payload.messageId, {
+            executionTimeMs: event.payload.executionTimeMs,
+          });
+          break;
+
+        // Empty content is the clear signal sent from tool_execution_end.
+        // Normal partial updates always have non-empty content from onUpdate.
+        case "stream.toolResultPartial": {
+          const { sessionId, toolCallId, content, isError, images, diff } =
+            event.payload;
+          if (!content) {
+            store.setPartialToolResult(sessionId, toolCallId, null);
+          } else {
+            store.setPartialToolResult(sessionId, toolCallId, {
+              content,
+              isError,
+              images,
+              diff,
+            });
+          }
+          break;
+        }
+
+        case "sudo.password.request":
+          store.setPendingSudoPassword(event.payload);
+          break;
+
+        case "sudo.password.dismiss": {
+          const currentSudo = useAppStore.getState().pendingSudoPassword;
+          if (currentSudo?.toolUseId === event.payload.toolUseId) {
+            store.setPendingSudoPassword(null);
+          }
+          break;
+        }
+
+        case "config.status": {
+          console.log(
+            "[useIPC] config.status received:",
+            event.payload.isConfigured,
+          );
+          applyConfigSnapshot(
+            event.payload.config,
+            event.payload.isConfigured,
+          );
+          break;
+        }
+
+        case "sandbox.progress":
+          console.log(
+            "[useIPC] sandbox.progress received:",
+            event.payload.phase,
+            event.payload.message,
+          );
+          store.setSandboxSetupProgress(event.payload);
+          break;
+
+        case "sandbox.sync":
+          console.log(
+            "[useIPC] sandbox.sync received:",
+            event.payload.phase,
+            event.payload.message,
+          );
+          store.setSandboxSyncStatus(event.payload);
+          break;
+
+        case "workdir.changed":
+          console.log("[useIPC] workdir.changed received:", event.payload.path);
+          store.setWorkingDir(event.payload.path || null);
+          break;
+
+        case "session.contextInfo":
+          store.setSessionContextWindow(
+            event.payload.sessionId,
+            event.payload.contextWindow,
+          );
+          break;
+
+        case "error":
+          console.error("[useIPC] Server error:", event.payload.message);
+          store.setLoading(false);
+          if (event.payload.code === "CONFIG_REQUIRED_ACTIVE_SET") {
+            store.setGlobalNotice({
+              id: `notice-config-required-${Date.now()}`,
+              type: "warning",
+              message: i18n.t("api.configRequiredActiveSet"),
+              messageKey: "api.configRequiredActiveSet",
+              action:
+                event.payload.action === "open_api_settings"
+                  ? "open_api_settings"
+                  : undefined,
+            });
+          } else {
+            store.setGlobalNotice({
+              id: `notice-error-${Date.now()}`,
+              type: "error",
+              message: event.payload.message,
+            });
+          }
+          break;
+
+        case "native-theme.changed":
+          store.setSystemDarkMode(event.payload.shouldUseDarkColors);
+          break;
+
+        case "new-session":
+          store.setWorkingDir(null);
+          store.setActiveSession(null);
+          store.setShowSettings(false);
+          store.setShowSchedule(false);
+          store.setShowMarketplace(false);
+          break;
+
+        case "navigate":
+          if (event.payload === "settings") {
+            store.setShowSettings(true);
+          }
+          break;
+
+        default:
+          console.log("[useIPC] Unknown server event:", event);
+      }
+    } catch (err) {
+      console.error("[useIPC] Error handling server event:", event.type, err);
+    }
+  });
+
+  let disposed = false;
+  void (async () => {
+    try {
+      const [config, isConfiguredNow, systemTheme] = await Promise.all([
+        window.electronAPI.config.get(),
+        window.electronAPI.config.isConfigured(),
+        window.electronAPI.getSystemTheme(),
+      ]);
+      if (disposed) {
+        return;
+      }
+      const store = useAppStore.getState();
+      store.setSystemDarkMode(Boolean(systemTheme?.shouldUseDarkColors));
+      applyConfigSnapshot(config, Boolean(isConfiguredNow));
+    } catch (error) {
+      console.error("[useIPC] Failed to bootstrap config/theme state:", error);
+    }
+  })();
+
+}
+
 export function useIPC() {
   // Handle incoming server events - only setup once
   useEffect(() => {
@@ -27,482 +471,9 @@ export function useIPC() {
       return;
     }
 
-    console.log("[useIPC] Setting up IPC listener (once)");
-
-    // --- RAF batching for high-frequency events ---
-    const pendingPartials: Record<string, Record<string, string[]>> = {};
-    let partialRafId: number | null = null;
-
-    const pendingThinking: Record<string, Record<string, string[]>> = {};
-    let thinkingRafId: number | null = null;
-
-    const flushPartials = () => {
-      partialRafId = null;
-      const store = useAppStore.getState();
-      for (const sessionId in pendingPartials) {
-        for (const turnId in pendingPartials[sessionId]) {
-          const chunks = pendingPartials[sessionId][turnId];
-          if (chunks.length > 0) {
-            store.setPartialMessage(
-              sessionId,
-              chunks.join(""),
-              turnId === "__default__" ? undefined : turnId,
-            );
-            pendingPartials[sessionId][turnId] = [];
-          }
-        }
-      }
-    };
-
-    const bufferPartial = (
-      sessionId: string,
-      delta: string,
-      turnId?: string,
-    ) => {
-      const key = turnId || "__default__";
-      if (!pendingPartials[sessionId]) pendingPartials[sessionId] = {};
-      if (!pendingPartials[sessionId][key])
-        pendingPartials[sessionId][key] = [];
-      pendingPartials[sessionId][key].push(delta);
-      if (partialRafId === null) {
-        partialRafId = requestAnimationFrame(flushPartials);
-      }
-    };
-
-    const flushThinking = () => {
-      thinkingRafId = null;
-      const store = useAppStore.getState();
-      for (const sessionId in pendingThinking) {
-        for (const turnId in pendingThinking[sessionId]) {
-          const chunks = pendingThinking[sessionId][turnId];
-          if (chunks.length > 0) {
-            store.setPartialThinking(
-              sessionId,
-              chunks.join(""),
-              turnId === "__default__" ? undefined : turnId,
-            );
-            pendingThinking[sessionId][turnId] = [];
-          }
-        }
-      }
-    };
-
-    const bufferThinking = (
-      sessionId: string,
-      delta: string,
-      turnId?: string,
-    ) => {
-      const key = turnId || "__default__";
-      if (!pendingThinking[sessionId]) pendingThinking[sessionId] = {};
-      if (!pendingThinking[sessionId][key])
-        pendingThinking[sessionId][key] = [];
-      pendingThinking[sessionId][key].push(delta);
-      if (thinkingRafId === null) {
-        thinkingRafId = requestAnimationFrame(flushThinking);
-      }
-    };
-
-    type TraceAction =
-      | { kind: "add"; sessionId: string; step: TraceStep }
-      | {
-          kind: "update";
-          sessionId: string;
-          stepId: string;
-          updates: Partial<TraceStep>;
-        };
-    let pendingTraces: TraceAction[] = [];
-    let traceRafId: number | null = null;
-
-    const flushTraces = () => {
-      traceRafId = null;
-      const store = useAppStore.getState();
-      for (const action of pendingTraces) {
-        if (action.kind === "add") {
-          store.addTraceStep(action.sessionId, action.step);
-        } else {
-          store.updateTraceStep(
-            action.sessionId,
-            action.stepId,
-            action.updates,
-          );
-        }
-      }
-      pendingTraces = [];
-    };
-
-    const bufferTrace = (action: TraceAction) => {
-      pendingTraces.push(action);
-      if (traceRafId === null) {
-        traceRafId = requestAnimationFrame(flushTraces);
-      }
-    };
-
-    const applyConfigSnapshot = (config: AppConfig, isConfigured: boolean) => {
-      const store = useAppStore.getState();
-      const isInitialConfigStatus = !store.hasSeenInitialConfigStatus;
-      store.setIsConfigured(isConfigured);
-      store.setAppConfig(config);
-      store.setSettings({ theme: config.theme || "light" });
-      if (config.themePreset) {
-        store.setSettings({ themePreset: config.themePreset });
-      }
-      store.setSettings({
-        autoSkillLearning: config.autoSkillLearning ?? false,
-      });
-      if (isInitialConfigStatus) {
-        store.markInitialConfigStatusSeen();
-      }
-    };
-
-    const cleanup = window.electronAPI.on((event: ServerEvent) => {
-      const store = useAppStore.getState();
-
-      try {
-        switch (event.type) {
-          case "session.list":
-            store.setSessions(event.payload.sessions);
-            // Auto-restore last session with messages loaded (avoid white screen on restart)
-            (async () => {
-              try {
-                // Restore contextWindows from model configs
-                if (event.payload.contextWindows) {
-                  for (const [sessionId, cw] of Object.entries(
-                    event.payload.contextWindows,
-                  )) {
-                    if (typeof cw === "number")
-                      store.setSessionContextWindow(sessionId, cw);
-                  }
-                }
-                const lastId = localStorage.getItem("deskwand.lastSessionId");
-                if (
-                  lastId &&
-                  event.payload.sessions.some((s) => s.id === lastId)
-                ) {
-                  if (store.activeSessionId !== lastId) {
-                    const [messages, steps] = await Promise.all([
-                      invoke<Message[]>({
-                        type: "session.getMessages",
-                        payload: { sessionId: lastId },
-                      }),
-                      invoke<TraceStep[]>({
-                        type: "session.getTraceSteps",
-                        payload: { sessionId: lastId },
-                      }),
-                    ]);
-                    if (messages) store.setMessages(lastId, messages);
-                    if (steps) store.setTraceSteps(lastId, steps);
-                    store.setActiveSession(lastId);
-                  }
-                } else if (
-                  store.activeSessionId &&
-                  !event.payload.sessions.some(
-                    (s) => s.id === store.activeSessionId,
-                  )
-                ) {
-                  store.setActiveSession(null);
-                }
-              } catch {
-                /* silent fallback */
-              }
-            })();
-            break;
-
-          case "session.status":
-            console.log("[useIPC] session.status received:", event.payload);
-            store.updateSession(event.payload.sessionId, {
-              status: event.payload.status,
-            });
-            if (event.payload.status !== "running") {
-              store.finishExecutionClock(event.payload.sessionId);
-              store.setLoading(false);
-              store.clearActiveTurn(event.payload.sessionId);
-              store.clearPendingTurns(event.payload.sessionId);
-              store.clearQueuedMessages(event.payload.sessionId);
-              console.log(
-                "[useIPC] session.status non-running cleanup done:",
-                event.payload,
-              );
-            }
-            break;
-
-          case "session.update":
-            store.updateSession(event.payload.sessionId, event.payload.updates);
-            break;
-
-          case "stream.message":
-            // Clear only this turn's pending buffers to avoid wiping queued turns
-            const completedTurnId =
-              event.payload.message.turnId || event.payload.turnId;
-            if (completedTurnId) {
-              delete pendingPartials[event.payload.sessionId]?.[
-                completedTurnId
-              ];
-              delete pendingThinking[event.payload.sessionId]?.[
-                completedTurnId
-              ];
-            } else {
-              delete pendingPartials[event.payload.sessionId];
-              delete pendingThinking[event.payload.sessionId];
-            }
-            // Per-turn auto-expand removed; global Eye button replaces it.
-            store.addMessage(event.payload.sessionId, event.payload.message);
-            break;
-
-          case "stream.partial":
-            bufferPartial(
-              event.payload.sessionId,
-              event.payload.delta,
-              event.payload.turnId,
-            );
-            break;
-
-          case "stream.thinking":
-            bufferThinking(
-              event.payload.sessionId,
-              event.payload.delta,
-              event.payload.turnId,
-            );
-            break;
-
-          case "trace.step": {
-            if (
-              event.payload.step.type === "thinking" &&
-              event.payload.step.status === "running"
-            ) {
-              const currentState = useAppStore.getState();
-              const ss = currentState.sessionStates[event.payload.sessionId];
-              const pending = ss?.pendingTurns || [];
-              const activeTurn = ss?.activeTurn;
-              if (pending.length > 0) {
-                store.activateNextTurn(
-                  event.payload.sessionId,
-                  event.payload.step.id,
-                );
-              } else if (activeTurn) {
-                // 绑定真实 stepId，避免 mock stepId 导致无法清理
-                store.updateActiveTurnStep(
-                  event.payload.sessionId,
-                  event.payload.step.id,
-                );
-              }
-            }
-            bufferTrace({
-              kind: "add",
-              sessionId: event.payload.sessionId,
-              step: event.payload.step,
-            });
-            break;
-          }
-
-          case "trace.update":
-            bufferTrace({
-              kind: "update",
-              sessionId: event.payload.sessionId,
-              stepId: event.payload.stepId,
-              updates: event.payload.updates,
-            });
-            break;
-
-          case "goal.status":
-            store.setGoalStatus(event.payload.sessionId, {
-              status: event.payload.status,
-              objective: event.payload.objective,
-              iteration: event.payload.iteration,
-              tokensUsed: event.payload.tokensUsed,
-              tokenBudget: event.payload.tokenBudget,
-              timeUsedSeconds: event.payload.timeUsedSeconds,
-              timeBudgetSeconds: event.payload.timeBudgetSeconds,
-            });
-            break;
-
-          case "permission.request":
-            store.setPendingPermission(event.payload);
-            break;
-
-          case "permission.dismiss": {
-            const currentPermission = useAppStore.getState().pendingPermission;
-            if (currentPermission?.toolUseId === event.payload.toolUseId) {
-              store.setPendingPermission(null);
-            }
-            break;
-          }
-
-          case "stream.executionTime":
-            store.updateMessage(
-              event.payload.sessionId,
-              event.payload.messageId,
-              {
-                executionTimeMs: event.payload.executionTimeMs,
-              },
-            );
-            break;
-
-          // Empty content is the clear signal sent from tool_execution_end.
-          // Normal partial updates always have non-empty content from onUpdate.
-          case "stream.toolResultPartial": {
-            const { sessionId, toolCallId, content, isError, images, diff } =
-              event.payload;
-            if (!content) {
-              store.setPartialToolResult(sessionId, toolCallId, null);
-            } else {
-              store.setPartialToolResult(sessionId, toolCallId, {
-                content,
-                isError,
-                images,
-                diff,
-              });
-            }
-            break;
-          }
-
-          case "sudo.password.request":
-            store.setPendingSudoPassword(event.payload);
-            break;
-
-          case "sudo.password.dismiss": {
-            const currentSudo = useAppStore.getState().pendingSudoPassword;
-            if (currentSudo?.toolUseId === event.payload.toolUseId) {
-              store.setPendingSudoPassword(null);
-            }
-            break;
-          }
-
-          case "config.status": {
-            console.log(
-              "[useIPC] config.status received:",
-              event.payload.isConfigured,
-            );
-            applyConfigSnapshot(
-              event.payload.config,
-              event.payload.isConfigured,
-            );
-            break;
-          }
-
-          case "sandbox.progress":
-            console.log(
-              "[useIPC] sandbox.progress received:",
-              event.payload.phase,
-              event.payload.message,
-            );
-            store.setSandboxSetupProgress(event.payload);
-            break;
-
-          case "sandbox.sync":
-            console.log(
-              "[useIPC] sandbox.sync received:",
-              event.payload.phase,
-              event.payload.message,
-            );
-            store.setSandboxSyncStatus(event.payload);
-            break;
-
-          case "workdir.changed":
-            console.log(
-              "[useIPC] workdir.changed received:",
-              event.payload.path,
-            );
-            store.setWorkingDir(event.payload.path || null);
-            break;
-
-          case "session.contextInfo":
-            store.setSessionContextWindow(
-              event.payload.sessionId,
-              event.payload.contextWindow,
-            );
-            break;
-
-          case "error":
-            console.error("[useIPC] Server error:", event.payload.message);
-            store.setLoading(false);
-            if (event.payload.code === "CONFIG_REQUIRED_ACTIVE_SET") {
-              store.setGlobalNotice({
-                id: `notice-config-required-${Date.now()}`,
-                type: "warning",
-                message: i18n.t("api.configRequiredActiveSet"),
-                messageKey: "api.configRequiredActiveSet",
-                action:
-                  event.payload.action === "open_api_settings"
-                    ? "open_api_settings"
-                    : undefined,
-              });
-            } else {
-              store.setGlobalNotice({
-                id: `notice-error-${Date.now()}`,
-                type: "error",
-                message: event.payload.message,
-              });
-            }
-            break;
-
-          case "native-theme.changed":
-            store.setSystemDarkMode(event.payload.shouldUseDarkColors);
-            break;
-
-          case "new-session":
-            store.setWorkingDir(null);
-            store.setActiveSession(null);
-            store.setShowSettings(false);
-            store.setShowSchedule(false);
-            store.setShowMarketplace(false);
-            break;
-
-          case "navigate":
-            if (event.payload === "settings") {
-              store.setShowSettings(true);
-            }
-            break;
-
-          default:
-            console.log("[useIPC] Unknown server event:", event);
-        }
-      } catch (err) {
-        console.error("[useIPC] Error handling server event:", event.type, err);
-      }
-    });
-
-    let disposed = false;
-    void (async () => {
-      try {
-        const [config, isConfigured, systemTheme] = await Promise.all([
-          window.electronAPI.config.get(),
-          window.electronAPI.config.isConfigured(),
-          window.electronAPI.getSystemTheme(),
-        ]);
-        if (disposed) {
-          return;
-        }
-        const store = useAppStore.getState();
-        store.setSystemDarkMode(Boolean(systemTheme?.shouldUseDarkColors));
-        applyConfigSnapshot(config, Boolean(isConfigured));
-      } catch (error) {
-        console.error(
-          "[useIPC] Failed to bootstrap config/theme state:",
-          error,
-        );
-      }
-    })();
-
-    // Cleanup on unmount only
-    return () => {
-      disposed = true;
-      console.log("[useIPC] Cleaning up IPC listener");
-      // Flush any pending RAF batches before cancelling to avoid lost updates
-      if (partialRafId !== null) {
-        cancelAnimationFrame(partialRafId);
-        flushPartials();
-      }
-      if (thinkingRafId !== null) {
-        cancelAnimationFrame(thinkingRafId);
-        flushThinking();
-      }
-      if (traceRafId !== null) {
-        cancelAnimationFrame(traceRafId);
-        flushTraces();
-      }
-      cleanup?.();
-    };
-  }, []); // Empty deps - setup listener only once!
+    console.log("[useIPC] Ensuring shared IPC listener");
+    installSharedIpcBridge();
+  }, []);
 
   // Get actions for the rest of the hook
   const addSession = useAppStore((s) => s.addSession);

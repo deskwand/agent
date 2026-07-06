@@ -36,8 +36,8 @@ import type {
   RemoteSessionMapping,
 } from "../shared/ipc-types";
 
-// Track registered callbacks to prevent duplicate listeners
-let registeredCallback: ((event: ServerEvent) => void) | null = null;
+// Fan out one IPC listener to all active renderer subscribers.
+const registeredCallbacks = new Set<(event: ServerEvent) => void>();
 let ipcListener:
   | ((event: Electron.IpcRendererEvent, data: ServerEvent) => void)
   | null = null;
@@ -82,28 +82,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.send("client-event", event);
   },
 
-  // Receive events from main process - ensures only ONE listener
+  // Receive events from main process
   on: (callback: (event: ServerEvent) => void) => {
-    // Remove previous listener if exists
-    if (ipcListener) {
-      ipcRenderer.removeListener("server-event", ipcListener);
+    registeredCallbacks.add(callback);
+
+    if (!ipcListener) {
+      ipcListener = (_: Electron.IpcRendererEvent, data: ServerEvent) => {
+        for (const registeredCallback of registeredCallbacks) {
+          registeredCallback(data);
+        }
+      };
+      ipcRenderer.on("server-event", ipcListener);
     }
-
-    registeredCallback = callback;
-    ipcListener = (_: Electron.IpcRendererEvent, data: ServerEvent) => {
-      if (registeredCallback) {
-        registeredCallback(data);
-      }
-    };
-
-    ipcRenderer.on("server-event", ipcListener);
 
     // Return cleanup function
     return () => {
-      if (ipcListener) {
+      registeredCallbacks.delete(callback);
+      if (ipcListener && registeredCallbacks.size === 0) {
         ipcRenderer.removeListener("server-event", ipcListener);
         ipcListener = null;
-        registeredCallback = null;
       }
     };
   },
