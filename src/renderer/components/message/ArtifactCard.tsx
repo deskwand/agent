@@ -1,11 +1,12 @@
 import { memo, useState, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Copy, Check, Undo2 } from "lucide-react";
+import { Copy, Check, Undo2, File, FileCode, Image } from "lucide-react";
 import { useAppStore } from "../../store";
 import { useIPC } from "../../hooks/useIPC";
 import type { Session } from "../../types";
 import type { ResultFileEntry } from "../../utils/tool-display-blocks";
 import { shortenPath } from "./toolHelpers";
+import { IMAGE_EXTS, CODE_LIKE_EXTS } from "../../utils/file-types";
 import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import { FilePreviewModal } from "../FilePreviewModal";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -21,6 +22,15 @@ function isEdited(f: ResultFileEntry): boolean {
 
 function isNew(f: ResultFileEntry): boolean {
   return f.writes > 0 && f.edits === 0;
+}
+
+function getFileIcon(filePath: string) {
+  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
+  if (IMAGE_EXTS.has(ext))
+    return <Image className="w-4 h-4 shrink-0 text-sky-400" />;
+  if (CODE_LIKE_EXTS.has(ext))
+    return <FileCode className="w-4 h-4 shrink-0 text-accent" />;
+  return <File className="w-4 h-4 shrink-0 text-text-muted" />;
 }
 
 export const ArtifactCard = memo(function ArtifactCard({
@@ -213,7 +223,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                 return (
                   <div
                     key={file.path}
-                    className={`group flex items-center justify-between rounded-md px-2 py-1.5 font-mono text-[11px] leading-tight transition-colors outline-none ${
+                    className={`group flex items-center justify-between rounded-md py-1.5 pl-2 pr-2 text-sm transition-colors outline-none ${
                       reverted
                         ? "cursor-default text-text-muted line-through"
                         : "cursor-pointer hover:bg-surface-hover active:bg-surface-active text-text-secondary focus-visible:ring-2 focus-visible:ring-accent"
@@ -235,7 +245,8 @@ export const ArtifactCard = memo(function ArtifactCard({
                           : t("artifactCard.editedFiles")
                     }
                   >
-                    <span className="min-w-0 flex-1 truncate">
+                    <span className="min-w-0 flex-1 truncate flex items-center gap-1.5">
+                      {getFileIcon(file.path)}
                       {shortenPath(file.path)}
                     </span>
                     <span
@@ -286,7 +297,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                 return (
                   <div
                     key={file.path}
-                    className={`group flex items-center justify-between rounded-md px-2 py-1.5 font-mono text-[11px] leading-tight transition-colors outline-none ${
+                    className={`group flex items-center justify-between rounded-md py-1.5 pl-2 pr-2 text-sm transition-colors outline-none ${
                       reverted
                         ? "cursor-default text-text-muted line-through"
                         : "cursor-pointer hover:bg-success/10 active:bg-success/15 text-success focus-visible:ring-2 focus-visible:ring-accent"
@@ -308,7 +319,8 @@ export const ArtifactCard = memo(function ArtifactCard({
                           : t("artifactCard.newFiles")
                     }
                   >
-                    <span className="min-w-0 flex-1 truncate">
+                    <span className="min-w-0 flex-1 truncate flex items-center gap-1.5">
+                      {getFileIcon(file.path)}
                       {shortenPath(file.path)}
                     </span>
                     <span
