@@ -783,25 +783,13 @@
     border: none;
   }
 
-  /* Sidebar scrollbar auto-hide — thumb transparent by default, visible on group hover */
+  /* Sidebar scrollbar auto-hide — uses modern scrollbar-color (Chromium 121+ / Firefox) */
   .sidebar-scroll {
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
   }
-  .sidebar-scroll::-webkit-scrollbar {
-    width: 4px;
-  }
-  .sidebar-scroll::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .sidebar-scroll::-webkit-scrollbar-thumb {
-    background: transparent;
-    border-radius: 9999px;
-  }
-  .sidebar-scroll::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-muted);
-  }
-  .group:hover .sidebar-scroll::-webkit-scrollbar-thumb {
-    background: var(--color-border);
+  .group:hover .sidebar-scroll {
+    scrollbar-color: var(--color-border) transparent;
   }
 }
 
