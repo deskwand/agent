@@ -11,13 +11,13 @@ import {
 import { useAppStore } from "../../store";
 import {
   formatCollapsedToolSummary,
+  findToolResult,
   getCollapsedToolSummary,
   shouldPreferToolResultImages,
   shouldRenderToolResultText,
 } from "../../utils/tool-result-summary";
 import type {
   ToolUseContent,
-  ToolResultContent,
   ContentBlock,
   Message,
 } from "../../types";
@@ -120,26 +120,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   }
 
   // Find matching tool_result: first in same message, then across all session messages
-  let toolResult = allBlocks?.find(
-    (b) =>
-      b.type === "tool_result" &&
-      (b as ToolResultContent).toolUseId === block.id,
-  ) as ToolResultContent | undefined;
-
-  if (!toolResult && message?.sessionId) {
-    for (const msg of allMessages) {
-      if (!Array.isArray(msg.content)) continue;
-      const found = (msg.content as ContentBlock[]).find(
-        (b) =>
-          b.type === "tool_result" &&
-          (b as ToolResultContent).toolUseId === block.id,
-      );
-      if (found) {
-        toolResult = found as ToolResultContent;
-        break;
-      }
-    }
-  }
+  const toolResult = findToolResult(block.id, allBlocks, allMessages);
 
   // Determine state: running / success / error
   // Only show spinner if session still has an active turn; otherwise treat as done

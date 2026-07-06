@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import type { ContentBlock, Message, ToolResultContent } from "../types";
 
 const screenshotSuccessPattern =
   /\b(?:screenshot\s+(?:saved|captured)|saved\s+screenshot|captured\s+screenshot)\b/i;
@@ -27,6 +28,50 @@ function isFileReadTool(name: string): boolean {
 function isBashTool(name: string): boolean {
   const lower = name.toLowerCase();
   return lower === "bash" || lower === "execute_command";
+}
+
+/** Count added/removed lines from a unified diff string */
+export function countDiffLines(diff: string): {
+  added: number;
+  removed: number;
+} {
+  let added = 0;
+  let removed = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++ ")) {
+      added++;
+    } else if (line.startsWith("-") && !line.startsWith("--- ")) {
+      removed++;
+    }
+  }
+  return { added, removed };
+}
+
+/** Find a tool_result block matching a tool_use id across blocks and messages */
+export function findToolResult(
+  toolUseId: string,
+  allBlocks: ContentBlock[] | undefined,
+  allMessages: Message[],
+): ToolResultContent | undefined {
+  const result = allBlocks?.find(
+    (b) =>
+      b.type === "tool_result" &&
+      (b as ToolResultContent).toolUseId === toolUseId,
+  ) as ToolResultContent | undefined;
+
+  if (result) return result;
+
+  for (const msg of allMessages) {
+    if (!Array.isArray(msg.content)) continue;
+    const found = (msg.content as ContentBlock[]).find(
+      (b) =>
+        b.type === "tool_result" &&
+        (b as ToolResultContent).toolUseId === toolUseId,
+    );
+    if (found) return found as ToolResultContent;
+  }
+
+  return undefined;
 }
 
 function isModifyTool(name: string): boolean {
@@ -150,15 +195,7 @@ export function getCollapsedToolSummary(
   // Write / Edit — show diff line counts when available, otherwise "modified"
   if (isModifyTool(toolNameLower)) {
     if (diff) {
-      let added = 0;
-      let removed = 0;
-      for (const line of diff.split("\n")) {
-        if (line.startsWith("+") && !line.startsWith("+++ ")) {
-          added++;
-        } else if (line.startsWith("-") && !line.startsWith("--- ")) {
-          removed++;
-        }
-      }
+      const { added, removed } = countDiffLines(diff);
       return { kind: "diff", added, removed };
     }
     return { kind: "modified" };
