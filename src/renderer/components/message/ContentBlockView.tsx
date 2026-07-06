@@ -410,7 +410,7 @@ export const ContentBlockView = memo(function ContentBlockView({
           <p className="message-user-text text-text-primary whitespace-pre-wrap break-words text-left">
             {text}
             {isStreaming && (
-              <span className="inline-block w-2 h-4 bg-accent ml-1 animate-pulse" />
+              <span className="eff-cursor" />
             )}
           </p>
         );

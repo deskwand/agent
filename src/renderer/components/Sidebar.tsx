@@ -371,7 +371,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         <div className="flex items-center gap-2">
           {session.status === "running" && (
             <span
-              className="w-2 h-2 rounded-full bg-accent animate-pulse flex-shrink-0"
+              className="w-2.5 h-2.5 rounded-full bg-accent eff-thinking eff-thinking--active flex-shrink-0"
               role="status"
               aria-label={t("sidebar.running")}
             />
@@ -468,15 +468,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     );
   };
 
-  if (sidebarCollapsed) {
-    return <aside className="w-0 overflow-hidden flex-shrink-0" />;
-  }
-
   return (
     <aside
-      className="group bg-surface/96 flex flex-col overflow-hidden"
-      style={{ width: `${width}px` }}
+      className={`group bg-surface/96 flex flex-col overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${sidebarCollapsed ? 'w-0' : ''}`}
+      style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
     >
+      {!sidebarCollapsed && (<>
       <div className="px-4 pt-3 pb-2">
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
@@ -1058,6 +1055,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           </div>
         </div>
       )}
+      </>)}
     </aside>
   );
 }

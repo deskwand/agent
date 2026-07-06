@@ -146,7 +146,7 @@ export const MessageCard = memo(function MessageCard({
   }
 
   return (
-    <div className="animate-fade-in">
+    <div className="eff-message-enter">
       {isUser ? (
         // User message - compact styling with smaller padding and radius
         <div className="flex items-start gap-2 justify-end group">

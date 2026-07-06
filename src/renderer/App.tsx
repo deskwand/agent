@@ -332,56 +332,61 @@ function App() {
         </main>
 
         {/* Right Panel: File Browser or Browser */}
-        {!isFullScreenView && rightPanelMode !== null && (
-          <>
-            <ResizeHandle
-              onResize={(delta) =>
-                setContextPanelWidth(
-                  Math.max(
-                    rightPanelMode === "browser" ? 350 : 280,
-                    rightPanelMode === "browser"
-                      ? contextPanelWidth - delta
-                      : Math.min(480, contextPanelWidth - delta),
-                  ),
-                )
-              }
-              onDoubleClick={() => setContextPanelWidth(340)}
-              position="left"
-              className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
-            />
-            {rightPanelMode === "browser" ? (
-              <PanelErrorBoundary
-                name="BrowserPanel"
-                fallback={
-                  <div className="w-[340px] shrink-0 border-l border-border-subtle bg-background/60" />
+        <div
+          className={`overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${!isFullScreenView && rightPanelMode !== null ? '' : 'w-0'}`}
+          style={{ width: !isFullScreenView && rightPanelMode !== null ? `${contextPanelWidth}px` : 0 }}
+        >
+          {!isFullScreenView && rightPanelMode !== null && (
+            <>
+              <ResizeHandle
+                onResize={(delta) =>
+                  setContextPanelWidth(
+                    Math.max(
+                      rightPanelMode === "browser" ? 350 : 280,
+                      rightPanelMode === "browser"
+                        ? contextPanelWidth - delta
+                        : Math.min(480, contextPanelWidth - delta),
+                    ),
+                  )
                 }
-              >
-                <Suspense
+                onDoubleClick={() => setContextPanelWidth(340)}
+                position="left"
+                className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
+              />
+              {rightPanelMode === "browser" ? (
+                <PanelErrorBoundary
+                  name="BrowserPanel"
                   fallback={
-                    <div className="w-[340px] shrink-0 border-l border-border-subtle bg-background/60" />
+                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
                   }
                 >
-                  <BrowserPanel width={contextPanelWidth} />
-                </Suspense>
-              </PanelErrorBoundary>
-            ) : (
-              <PanelErrorBoundary
-                name="FileBrowser"
-                fallback={
-                  <div className="w-[340px] shrink-0 border-l border-border-subtle bg-background/60" />
-                }
-              >
-                <Suspense
+                  <Suspense
+                    fallback={
+                      <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                    }
+                  >
+                    <BrowserPanel width={contextPanelWidth} />
+                  </Suspense>
+                </PanelErrorBoundary>
+              ) : (
+                <PanelErrorBoundary
+                  name="FileBrowser"
                   fallback={
-                    <div className="w-[340px] shrink-0 border-l border-border-subtle bg-background/60" />
+                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
                   }
                 >
-                  <FileBrowser width={contextPanelWidth} />
-                </Suspense>
-              </PanelErrorBoundary>
-            )}
-          </>
-        )}
+                  <Suspense
+                    fallback={
+                      <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                    }
+                  >
+                    <FileBrowser width={contextPanelWidth} />
+                  </Suspense>
+                </PanelErrorBoundary>
+              )}
+            </>
+          )}
+        </div>
       </div>
       )}
 
