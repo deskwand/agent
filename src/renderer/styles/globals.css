@@ -786,7 +786,6 @@
   /* Sidebar scrollbar auto-hide — thumb transparent by default, visible on group hover */
   .sidebar-scroll {
     scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
   }
   .sidebar-scroll::-webkit-scrollbar {
     width: 4px;
