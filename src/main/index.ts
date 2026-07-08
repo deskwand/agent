@@ -1241,6 +1241,9 @@ app
 
 // Flag to prevent double cleanup
 let isCleaningUp = false;
+// Flag to skip async cleanup when quitting for auto-update
+// Squirrel.Mac's ShipIt process needs a clean, fast quit to replace the app bundle
+let isQuittingForUpdate = false;
 
 function withTimeout<T>(
   operation: Promise<T>,
@@ -1362,6 +1365,20 @@ for (const sig of ["SIGTERM", "SIGINT"] as const) {
 // Handle app quit - before-quit (for macOS Cmd+Q and other quit methods)
 app.on("before-quit", async (event) => {
   if (!isCleaningUp) {
+    // Quitting for auto-update: let quit flow naturally, Squirrel.Mac needs it fast
+    if (isQuittingForUpdate) {
+      stopNavServer();
+      scheduledTaskManager?.stop();
+      tray?.destroy();
+      tray = null;
+      try {
+        closeDatabase();
+      } catch {
+        /* best-effort */
+      }
+      closeLogFile();
+      return;
+    }
     // In dev mode, exit quickly — no need for async sandbox cleanup
     if (process.env.VITE_DEV_SERVER_URL) {
       stopNavServer();
@@ -3858,6 +3875,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       return null;
 
     case "update.install":
+      isQuittingForUpdate = true;
       autoUpdater.quitAndInstall();
       return null;
 
