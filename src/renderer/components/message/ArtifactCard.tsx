@@ -1,4 +1,5 @@
 import { memo, useState, useCallback, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Copy, Check, Undo2, File, FileCode, Image } from "lucide-react";
 import { useAppStore } from "../../store";
@@ -408,17 +409,19 @@ export const ArtifactCard = memo(function ArtifactCard({
         onCancel={() => setRevertConfirm(null)}
       />
 
-      {/* File preview modal */}
-      {previewFile ? (
-        <FilePreviewModal
-          isOpen
-          filePath={previewFile.path}
-          fileName={
-            previewFile.path.split("/").pop() || previewFile.path
-          }
-          onClose={() => setPreviewFile(null)}
-        />
-      ) : null}
+      {/* File preview modal — portal to body for proper z-index */}
+      {previewFile &&
+        createPortal(
+          <FilePreviewModal
+            isOpen
+            filePath={previewFile.path}
+            fileName={
+              previewFile.path.split("/").pop() || previewFile.path
+            }
+            onClose={() => setPreviewFile(null)}
+          />,
+          document.body,
+        )}
     </>
   );
 });
