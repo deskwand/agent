@@ -332,28 +332,29 @@ function App() {
         </main>
 
         {/* Right Panel: File Browser or Browser */}
+        {!isFullScreenView && rightPanelMode !== null && (
+          <ResizeHandle
+            onResize={(delta) =>
+              setContextPanelWidth(
+                Math.max(
+                  rightPanelMode === "browser" ? 350 : 280,
+                  rightPanelMode === "browser"
+                    ? contextPanelWidth - delta
+                    : Math.min(480, contextPanelWidth - delta),
+                ),
+              )
+            }
+            onDoubleClick={() => setContextPanelWidth(340)}
+            position="left"
+            className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
+          />
+        )}
         <div
-          className={`overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${!isFullScreenView && rightPanelMode !== null ? '' : 'w-0'}`}
+          className={`overflow-hidden flex-shrink-0 flex transition-[width] duration-300 ease-in-out ${!isFullScreenView && rightPanelMode !== null ? '' : 'w-0'}`}
           style={{ width: !isFullScreenView && rightPanelMode !== null ? `${contextPanelWidth}px` : 0 }}
         >
-          {!isFullScreenView && rightPanelMode !== null && (
-            <>
-              <ResizeHandle
-                onResize={(delta) =>
-                  setContextPanelWidth(
-                    Math.max(
-                      rightPanelMode === "browser" ? 350 : 280,
-                      rightPanelMode === "browser"
-                        ? contextPanelWidth - delta
-                        : Math.min(480, contextPanelWidth - delta),
-                    ),
-                  )
-                }
-                onDoubleClick={() => setContextPanelWidth(340)}
-                position="left"
-                className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
-              />
-              {rightPanelMode === "browser" ? (
+          {!isFullScreenView && rightPanelMode !== null &&
+            (rightPanelMode === "browser" ? (
                 <PanelErrorBoundary
                   name="BrowserPanel"
                   fallback={
@@ -383,9 +384,8 @@ function App() {
                     <FileBrowser width={contextPanelWidth} />
                   </Suspense>
                 </PanelErrorBoundary>
-              )}
-            </>
-          )}
+              )
+            )}
         </div>
       </div>
       )}
