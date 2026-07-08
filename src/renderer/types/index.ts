@@ -913,3 +913,27 @@ export interface MCPToolInfo {
   serverId: string;
   serverName: string;
 }
+
+export interface CloudConfig {
+  serverUrl: string;
+  token: string;
+  isLoggedIn: boolean;
+  email: string;
+  level: string;
+  creditsBalance: number;
+  modes: Array<{ id: string; name: string; model: string }>;
+}
+
+export interface CloudSkill {
+  id: string;
+  name: string;
+  description: string;
+  category_name: string;
+  current_version: number;
+  owner_user_id?: string;
+  owner_email?: string;
+  created_at?: string;
+  updated_at?: string;
+  shared_teams?: Array<{ team_id: string; team_name: string }>;
+  skill_md?: string;
+}

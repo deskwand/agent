@@ -25,6 +25,10 @@ import {
 } from "electron";
 import { join, resolve, dirname, isAbsolute, basename, extname } from "path";
 import * as fs from "fs";
+import { writeFile, mkdir, readFile, unlink, rm } from "fs/promises";
+import { tmpdir } from "os";
+import JSZip from "jszip";
+import { createHash } from "crypto";
 import { execFileSync } from "child_process";
 import { config } from "dotenv";
 import { initDatabase, closeDatabase } from "./db/database";
@@ -110,6 +114,8 @@ import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
 import { initOAuthService } from "./auth/oauth-service";
+// TODO: 恢复 Google 登录时取消注释
+// import { startGoogleAuth } from "./oauth/google-auth-handler";
 import { openRouterPkceService } from "./auth/openrouter-pkce-service";
 import { fetchOpenRouterModels } from "./config/openrouter-models";
 import {
@@ -1408,6 +1414,10 @@ ipcMain.handle("openrouterAuth.logout", async () => {
 ipcMain.handle("openrouterAuth.status", async () => {
   return openRouterPkceService.status();
 });
+// TODO: 恢复 Google 登录时取消注释
+// ipcMain.handle("cloudAuth.googleLogin", async () => {
+//   return startGoogleAuth();
+// });
 
 ipcMain.handle("client-invoke", async (_event, data: ClientEvent) => {
   return handleClientEvent(data);
@@ -2335,6 +2345,125 @@ ipcMain.handle("skills.getAll", async () => {
   }
 });
 
+/** Recursively add a directory to a JSZip instance. */
+async function addDirToZip(zip: JSZip, dirPath: string, basePath: string): Promise<void> {
+  const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = join(dirPath, entry.name);
+    const zipPath = basePath ? `${basePath}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      await addDirToZip(zip, fullPath, zipPath);
+    } else if (entry.isFile()) {
+      const buf = await readFile(fullPath);
+      zip.file(zipPath, buf);
+    }
+  }
+}
+
+ipcMain.handle("skills.getGlobalSkillsPath", async () => {
+  if (!skillsManager) {
+    throw new Error("SkillsManager not initialized");
+  }
+  return skillsManager.getGlobalSkillsPath();
+});
+
+ipcMain.handle("skills.packageToZip", async (_event, skillName: string) => {
+  if (!skillsManager) {
+    throw new Error("SkillsManager not initialized");
+  }
+  const skillsPath = skillsManager.getGlobalSkillsPath();
+  const skillDir = join(skillsPath, skillName);
+  if (!fs.existsSync(skillDir)) {
+    throw new Error(`Skill folder not found: ${skillDir}`);
+  }
+  const zip = new JSZip();
+  await addDirToZip(zip, skillDir, "");
+  const zipBuffer = await zip.generateAsync({ type: "arraybuffer" });
+  return zipBuffer;
+});
+
+ipcMain.handle("skills.computeContentFingerprint", async (_event, skillName: string) => {
+  if (!skillsManager) {
+    throw new Error("SkillsManager not initialized");
+  }
+  const skillsPath = skillsManager.getGlobalSkillsPath();
+  const skillDir = join(skillsPath, skillName);
+  if (!fs.existsSync(skillDir)) {
+    throw new Error(`Skill folder not found: ${skillDir}`);
+  }
+
+  const entries: Array<{ path: string; hash: string }> = [];
+  const excludeDirs = new Set(["node_modules", ".git", "__pycache__"]);
+
+  async function walk(dir: string, base: string): Promise<void> {
+    const items = await fs.promises.readdir(dir, { withFileTypes: true });
+    for (const item of items) {
+      const full = join(dir, item.name);
+      const rel = base ? `${base}/${item.name}` : item.name;
+      if (item.isDirectory() && !excludeDirs.has(item.name)) {
+        await walk(full, rel);
+      } else if (item.isFile() && !item.name.startsWith(".")) {
+        const buf = await readFile(full);
+        const hash = createHash("sha256").update(buf).digest("hex");
+        entries.push({ path: rel, hash });
+      }
+    }
+  }
+
+  await walk(skillDir, "");
+  entries.sort((a, b) => a.path.localeCompare(b.path));
+  const payload = entries.map(e => `${e.path}\n${e.hash}`).join("\n");
+  return createHash("sha256").update(payload).digest("hex");
+});
+
+ipcMain.handle("skills.writeFingerprint", async (_event, skillName: string, fingerprint: string) => {
+  if (!skillsManager) throw new Error("SkillsManager not initialized");
+  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-fingerprint");
+  await writeFile(p, fingerprint, "utf-8");
+});
+
+ipcMain.handle("skills.readSkillMd", async (_event, skillName: string) => {
+  if (!skillsManager) throw new Error("SkillsManager not initialized");
+  const p = join(skillsManager.getGlobalSkillsPath(), skillName, "SKILL.md");
+  try {
+    return await readFile(p, "utf-8");
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle("skills.writeInstalledMeta", async (_event, skillName: string, meta: { skillId: string; version: number }) => {
+  if (!skillsManager) throw new Error("SkillsManager not initialized");
+  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-installed.json");
+  await writeFile(p, JSON.stringify(meta), "utf-8");
+});
+
+ipcMain.handle("skills.readInstalledMeta", async (_event, skillName: string) => {
+  if (!skillsManager) throw new Error("SkillsManager not initialized");
+  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-installed.json");
+  try {
+    return JSON.parse(await readFile(p, "utf-8"));
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle("skills.deleteFingerprint", async (_event, skillName: string) => {
+  if (!skillsManager) throw new Error("SkillsManager not initialized");
+  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-fingerprint");
+  try { await unlink(p); } catch { /* already gone */ }
+});
+
+ipcMain.handle("skills.readFingerprint", async (_event, skillName: string) => {
+  if (!skillsManager) throw new Error("SkillsManager not initialized");
+  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-fingerprint");
+  try {
+    return await readFile(p, "utf-8");
+  } catch {
+    return null;
+  }
+});
+
 ipcMain.handle("skills.install", async (_event, skillPath: string) => {
   try {
     if (!skillsManager) {
@@ -2348,6 +2477,66 @@ ipcMain.handle("skills.install", async (_event, skillPath: string) => {
     throw error;
   }
 });
+
+ipcMain.handle(
+  "file.saveToTemp",
+  async (_event, buffer: ArrayBuffer, filename: string) => {
+    try {
+      const tmpPath = join(tmpdir(), `deskwand-skill-${Date.now()}-${filename}`);
+      await writeFile(tmpPath, Buffer.from(buffer));
+      return tmpPath;
+    } catch (error) {
+      logError("[File] Error saving temp:", error);
+      throw error;
+    }
+  },
+);
+
+ipcMain.handle(
+  "file.extractArchive",
+  async (_event, archivePath: string) => {
+    try {
+      const extractDir = join(tmpdir(), `deskwand-extract-${Date.now()}`);
+      await mkdir(extractDir, { recursive: true });
+
+      const zipData = await readFile(archivePath);
+      const zip = await JSZip.loadAsync(zipData);
+
+      // Extract all files preserving directory structure
+      const entries = Object.entries(zip.files);
+      for (const [relativePath, file] of entries) {
+        if (file.dir) {
+          await mkdir(join(extractDir, relativePath), { recursive: true });
+        } else {
+          const content = await file.async("nodebuffer");
+          const targetPath = join(extractDir, relativePath);
+          const targetDir = dirname(targetPath);
+          await mkdir(targetDir, { recursive: true });
+          await writeFile(targetPath, content);
+        }
+      }
+
+      return extractDir;
+    } catch (error) {
+      logError("[File] Error extracting archive:", error);
+      throw error;
+    } finally {
+      // Clean up the temp archive after extraction
+      try { await unlink(archivePath); } catch { /* best effort */ }
+    }
+  },
+);
+
+ipcMain.handle(
+  "file.removeTemp",
+  async (_event, tempPath: string) => {
+    try {
+      await rm(tempPath, { recursive: true, force: true });
+    } catch (error) {
+      // best effort — path may already be gone
+    }
+  },
+);
 
 ipcMain.handle("skills.delete", async (_event, skillId: string) => {
   try {

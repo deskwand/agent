@@ -196,3 +196,17 @@ export interface OpenRouterModelsResult {
   usedFallback: boolean;
   error?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Cloud Auth (Google OAuth)
+// ---------------------------------------------------------------------------
+
+/** Google OAuth 登录成功返回 */
+export interface CloudAuthLoginResult {
+  token: string;
+  user: {
+    email: string;
+    level: string;
+    credits_balance: number;
+  };
+}

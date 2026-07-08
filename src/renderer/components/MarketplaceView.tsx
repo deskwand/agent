@@ -1,32 +1,89 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ArrowLeft, Plug, Package } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { SettingsConnectors } from "./settings/SettingsConnectors";
 import { SettingsSkills } from "./settings/SettingsSkills";
+import { CloudApiClient } from "../services/cloud-api";
 
-type TabId = "connectors" | "skills";
+type TabId = string;
 
 export function MarketplaceView() {
   const { t } = useTranslation();
   const storeTab = useAppStore((s) => s.marketplaceTab);
   const setMarketplaceTab = useAppStore((s) => s.setMarketplaceTab);
   const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
+  const cloudConfig = useAppStore((s) => s.cloudConfig);
+  const setActiveTeamId = useAppStore((s) => s.setActiveTeamId);
+  const setActiveTeamName = useAppStore((s) => s.setActiveTeamName);
+  const prevTokenRef = useRef<string | undefined>();
+
+  // Fetch team on login
+  useEffect(() => {
+    const token = cloudConfig?.token;
+    if (!token) {
+      setActiveTeamId(null);
+      setActiveTeamName("");
+      prevTokenRef.current = undefined;
+      return;
+    }
+    if (token === prevTokenRef.current) return;
+    prevTokenRef.current = token;
+    const client = new CloudApiClient(token);
+    client
+      .getTeams()
+      .then((teams) => {
+        if (teams.length > 0) {
+          setActiveTeamId(teams[0].id);
+          setActiveTeamName(teams[0].name);
+        } else {
+          setActiveTeamId(null);
+          setActiveTeamName("");
+        }
+      })
+      .catch((err: unknown) => {
+        const e = err as Error & { status?: number };
+        if (e?.status === 401) useAppStore.getState().setCloudConfig(null);
+      });
+  }, [cloudConfig?.token, setActiveTeamId]);
+
+  // Build dynamic tabs
+  const tabs: Array<{ id: TabId; label: string; icon: typeof Package }> = [];
+
+  // My Skills tab (always visible)
+  tabs.push({
+    id: "my-skills",
+    label: t("skillMarket.tabMySkills"),
+    icon: Package,
+  });
+  // MCP tab (always visible)
+  tabs.push({
+    id: "connectors",
+    label: t("marketplace.tabMCP"),
+    icon: Plug,
+  });
+
+  // Active tab — start with my-skills
+  const defaultTab = "my-skills";
 
   const [activeTab, setActiveTab] = useState<TabId>(
-    storeTab === "connectors" ? "connectors" : "skills",
+    (() => {
+      if (storeTab === "connectors") return "connectors";
+      if (storeTab === "skills") return "my-skills";
+      return defaultTab;
+    })()
   );
   const [viewedTabs, setViewedTabs] = useState<Set<TabId>>(
-    new Set([storeTab === "connectors" ? "connectors" : "skills"] as TabId[]),
+    new Set([activeTab])
   );
 
-  // Consume store signal for external navigation
+  // External navigation
   useEffect(() => {
-    if (
-      storeTab === "skills" ||
-      storeTab === "connectors"
-    ) {
-      setActiveTab(storeTab);
+    if (storeTab === "skills") {
+      setActiveTab("my-skills");
+      setMarketplaceTab(null);
+    } else if (storeTab === "connectors") {
+      setActiveTab("connectors");
       setMarketplaceTab(null);
     }
   }, [storeTab, setMarketplaceTab]);
@@ -37,19 +94,6 @@ export function MarketplaceView() {
       setViewedTabs((prev) => new Set([...prev, activeTab]));
     }
   }, [activeTab]);
-
-  const tabs = [
-    {
-      id: "skills" as TabId,
-      label: t("marketplace.tabSkills"),
-      icon: Package,
-    },
-    {
-      id: "connectors" as TabId,
-      label: t("marketplace.tabMCP"),
-      icon: Plug,
-    },
-  ];
 
   const handleTabKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -65,7 +109,7 @@ export function MarketplaceView() {
         setActiveTab(tabs[nextIndex].id);
       }
     },
-    [activeTab],
+    [activeTab, tabs]
   );
 
   return (
@@ -110,11 +154,11 @@ export function MarketplaceView() {
       </nav>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 lg:px-8">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 lg:px-8" style={{ scrollbarGutter: "stable" }}>
         <div className="max-w-[920px] w-full min-w-0 mx-auto">
-          <div className={activeTab === "skills" ? "" : "hidden"}>
-            {viewedTabs.has("skills") && (
-              <SettingsSkills isActive={activeTab === "skills"} />
+          <div className={activeTab === "my-skills" ? "" : "hidden"}>
+            {viewedTabs.has("my-skills") && (
+              <SettingsSkills isActive={activeTab === "my-skills"} />
             )}
           </div>
           <div className={activeTab === "connectors" ? "" : "hidden"}>

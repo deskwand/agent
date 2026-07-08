@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-success-foreground: #ffffff;
+  --color-warning-foreground: #ffffff;
+}
+
 @layer base {
   /* ================================================================
      Theme Presets — dark (default) + light (.light) × 3 presets

@@ -39,7 +39,9 @@ module.exports = {
           muted: 'var(--color-text-muted)',
         },
         success: 'var(--color-success)',
+        'success-foreground': 'var(--color-success-foreground)',
         warning: 'var(--color-warning)',
+        'warning-foreground': 'var(--color-warning-foreground)',
         error: 'var(--color-error)',
       },
       fontFamily: {

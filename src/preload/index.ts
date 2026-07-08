@@ -246,8 +246,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
       baseUrl?: string;
     }): Promise<ProviderModelInfo[]> =>
       ipcRenderer.invoke("config.listModels", payload),
-    fetchOpenRouterModels: (): Promise<import("../shared/ipc-types").OpenRouterModelsResult> =>
-      ipcRenderer.invoke("config.fetchOpenRouterModels"),
+    fetchOpenRouterModels: (): Promise<
+      import("../shared/ipc-types").OpenRouterModelsResult
+    > => ipcRenderer.invoke("config.fetchOpenRouterModels"),
     diagnose: (input: DiagnosticInput): Promise<DiagnosticResult> =>
       ipcRenderer.invoke("config.diagnose", input),
     discoverLocal: (payload?: {
@@ -307,6 +308,38 @@ contextBridge.exposeInMainWorld("electronAPI", {
       skillPath: string,
     ): Promise<{ valid: boolean; errors: string[] }> =>
       ipcRenderer.invoke("skills.validate", skillPath),
+    getGlobalSkillsPath: (): Promise<string> =>
+      ipcRenderer.invoke("skills.getGlobalSkillsPath"),
+    packageToZip: (skillName: string): Promise<ArrayBuffer> =>
+      ipcRenderer.invoke("skills.packageToZip", skillName),
+    computeContentFingerprint: (skillName: string): Promise<string> =>
+      ipcRenderer.invoke("skills.computeContentFingerprint", skillName),
+    writeFingerprint: (skillName: string, fingerprint: string): Promise<void> =>
+      ipcRenderer.invoke("skills.writeFingerprint", skillName, fingerprint),
+    readFingerprint: (skillName: string): Promise<string | null> =>
+      ipcRenderer.invoke("skills.readFingerprint", skillName),
+    deleteFingerprint: (skillName: string): Promise<void> =>
+      ipcRenderer.invoke("skills.deleteFingerprint", skillName),
+    readSkillMd: (skillName: string): Promise<string | null> =>
+      ipcRenderer.invoke("skills.readSkillMd", skillName),
+    writeInstalledMeta: (
+      skillName: string,
+      meta: { skillId: string; version: number },
+    ): Promise<void> =>
+      ipcRenderer.invoke("skills.writeInstalledMeta", skillName, meta),
+    readInstalledMeta: (
+      skillName: string,
+    ): Promise<{ skillId: string; version: number } | null> =>
+      ipcRenderer.invoke("skills.readInstalledMeta", skillName),
+  },
+  // File methods
+  file: {
+    saveToTemp: (buffer: ArrayBuffer, filename: string): Promise<string> =>
+      ipcRenderer.invoke("file.saveToTemp", buffer, filename),
+    extractArchive: (archivePath: string): Promise<string> =>
+      ipcRenderer.invoke("file.extractArchive", archivePath),
+    removeTemp: (tempPath: string): Promise<void> =>
+      ipcRenderer.invoke("file.removeTemp", tempPath),
   },
 
   // Sandbox methods
@@ -549,7 +582,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("auth.login", providerId, force),
     logout: (providerId: string): Promise<void> =>
       ipcRenderer.invoke("auth.logout", providerId),
-    status: (providerId: string): Promise<import("../shared/ipc-types").OAuthStatusResult> =>
+    status: (
+      providerId: string,
+    ): Promise<import("../shared/ipc-types").OAuthStatusResult> =>
       ipcRenderer.invoke("auth.status", providerId),
   },
 
@@ -557,9 +592,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
     login: (): Promise<import("../shared/ipc-types").OpenRouterLoginResult> =>
       ipcRenderer.invoke("openrouterAuth.login"),
     logout: (): Promise<void> => ipcRenderer.invoke("openrouterAuth.logout"),
-    status: (): Promise<import("../shared/ipc-types").OpenRouterAuthStatusResult> =>
-      ipcRenderer.invoke("openrouterAuth.status"),
+    status: (): Promise<
+      import("../shared/ipc-types").OpenRouterAuthStatusResult
+    > => ipcRenderer.invoke("openrouterAuth.status"),
   },
+
+  // TODO: 恢复 Google 登录时取消注释
+  // Cloud Auth (Google OAuth login for DeskWand cloud)
+  // cloudAuth: {
+  //   googleLogin: (): Promise<
+  //     import("../shared/ipc-types").CloudAuthLoginResult
+  //   > => ipcRenderer.invoke("cloudAuth.googleLogin"),
+  // },
 
   // Browser panel methods
   browser: {
@@ -684,7 +728,9 @@ declare global {
           apiKey: string;
           baseUrl?: string;
         }) => Promise<ProviderModelInfo[]>;
-        fetchOpenRouterModels: () => Promise<import("../shared/ipc-types").OpenRouterModelsResult>;
+        fetchOpenRouterModels: () => Promise<
+          import("../shared/ipc-types").OpenRouterModelsResult
+        >;
         diagnose: (input: DiagnosticInput) => Promise<DiagnosticResult>;
         discoverLocal: (payload?: {
           baseUrl?: string;
@@ -722,6 +768,23 @@ declare global {
         validate: (
           skillPath: string,
         ) => Promise<{ valid: boolean; errors: string[] }>;
+        getGlobalSkillsPath: () => Promise<string>;
+        packageToZip: (skillName: string) => Promise<ArrayBuffer>;
+        computeContentFingerprint: (skillName: string) => Promise<string>;
+        writeFingerprint: (
+          skillName: string,
+          fingerprint: string,
+        ) => Promise<void>;
+        readFingerprint: (skillName: string) => Promise<string | null>;
+        deleteFingerprint: (skillName: string) => Promise<void>;
+        readSkillMd: (skillName: string) => Promise<string | null>;
+        writeInstalledMeta: (
+          skillName: string,
+          meta: { skillId: string; version: number },
+        ) => Promise<void>;
+        readInstalledMeta: (
+          skillName: string,
+        ) => Promise<{ skillId: string; version: number } | null>;
         getStoragePath: () => Promise<string>;
         setStoragePath: (
           targetPath: string,
@@ -738,6 +801,11 @@ declare global {
           path: string;
           error?: string;
         }>;
+      };
+      file: {
+        saveToTemp: (buffer: ArrayBuffer, filename: string) => Promise<string>;
+        extractArchive: (archivePath: string) => Promise<string>;
+        removeTemp: (tempPath: string) => Promise<void>;
       };
       sandbox: {
         getStatus: () => Promise<{
@@ -930,13 +998,25 @@ declare global {
       auth: {
         login: (providerId: string, force?: boolean) => Promise<void>;
         logout: (providerId: string) => Promise<void>;
-        status: (providerId: string) => Promise<import("../shared/ipc-types").OAuthStatusResult>;
+        status: (
+          providerId: string,
+        ) => Promise<import("../shared/ipc-types").OAuthStatusResult>;
       };
       openrouterAuth: {
-        login: () => Promise<import("../shared/ipc-types").OpenRouterLoginResult>;
+        login: () => Promise<
+          import("../shared/ipc-types").OpenRouterLoginResult
+        >;
         logout: () => Promise<void>;
-        status: () => Promise<import("../shared/ipc-types").OpenRouterAuthStatusResult>;
+        status: () => Promise<
+          import("../shared/ipc-types").OpenRouterAuthStatusResult
+        >;
       };
+      // TODO: 恢复 Google 登录时取消注释
+      // cloudAuth: {
+      //   googleLogin: () => Promise<
+      //     import("../shared/ipc-types").CloudAuthLoginResult
+      //   >;
+      // };
       browser: {
         toggle: () => Promise<{
           visible: boolean;

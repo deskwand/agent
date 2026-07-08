@@ -3,10 +3,9 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import {
+  Cloud,
   Trash2,
   Settings,
-  Store,
-  Clock3,
   Search as SearchIcon,
   Check,
   Folder,
@@ -14,6 +13,10 @@ import {
   ChevronDown,
   SquarePen,
 } from "lucide-react";
+import { AccountMenu } from "./AccountMenu";
+import { LoginModal } from "./LoginModal";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { CloudApiClient } from "../services/cloud-api";
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 
@@ -30,7 +33,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
+  const showMarketplace = useAppStore((s) => s.showMarketplace);
   const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
+  const cloudConfig = useAppStore((s) => s.cloudConfig);
+  const showLoginModal = useAppStore((s) => s.showLoginModal);
+  const setShowLoginModal = useAppStore((s) => s.setShowLoginModal);
+  const setCloudConfig = useAppStore((s) => s.setCloudConfig);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const taskSlots = useAppStore((s) => s.taskSlots);
   const removeTaskSlot = useAppStore((s) => s.removeTaskSlot);
@@ -53,8 +61,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     Record<string, boolean>
   >({});
   const [showProjectActions, setShowProjectActions] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
+  const [cloudRestoring, setCloudRestoring] = useState(false);
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   useEffect(() => {
     if (!showProjectActions) return;
@@ -62,6 +72,44 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, [showProjectActions]);
+
+  // 启动时恢复云端登录状态
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("deskwand.cloud");
+      if (!raw) return;
+      const c = JSON.parse(raw);
+      if (!c?.token) return;
+      setCloudRestoring(true);
+      (async () => {
+        try {
+          const me = await new CloudApiClient(c.token).getMe();
+          let modes: Array<{ id: string; name: string; model: string }> = [];
+          try {
+            const res = await new CloudApiClient(c.token).getModes();
+            modes = res;
+          } catch { /* modes optional, keep empty */ }
+          setCloudConfig({
+            serverUrl: "http://localhost:8787",
+            token: c.token,
+            isLoggedIn: true,
+            email: me.email,
+            level: me.level,
+            creditsBalance: me.credits_balance,
+            modes,
+          });
+        } catch (e: any) {
+          if (e?.status === 401) {
+            localStorage.removeItem("deskwand.cloud");
+          }
+          // 网络错误时保留 localStorage，下次启动再试
+        } finally {
+          setCloudRestoring(false);
+        }
+      })();
+    } catch { /* ignore */ }
+  }, []);
+
   const [hoveredTimeSessionId, setHoveredTimeSessionId] = useState<
     string | null
   >(null);
@@ -95,12 +143,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([name, cwd]) => ({ name, cwd }));
   }, [activeSessions]);
-
-  useEffect(() => {
-    if (sidebarCollapsed) {
-      setShowSettingsMenu(false);
-    }
-  }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!normalizedQuery) {
@@ -356,7 +398,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     session: Session,
     showRelativeTime: boolean,
   ) => {
-    const isActive = activeSessionId === session.id;
+    const isActive = activeSessionId === session.id && !showMarketplace;
 
     return (
       <div
@@ -469,11 +511,31 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   };
 
   return (
+    <>
     <aside
       className={`group bg-surface/96 flex flex-col overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${sidebarCollapsed ? 'w-0' : ''}`}
       style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
     >
       {!sidebarCollapsed && (<>
+      {/* Cloud nav bar */}
+      <div className="px-3 pt-3 pb-1">
+        <button
+          onClick={() => {
+            setShowSettings(false);
+            setShowSchedule(false);
+            setShowMarketplace(true);
+          }}
+          className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
+            showMarketplace
+              ? "bg-surface-active text-text-primary"
+              : "text-text-secondary hover:bg-surface-hover/60 hover:text-text-primary"
+          }`}
+        >
+          <Cloud className="w-4 h-4 flex-shrink-0" />
+          <span className="font-medium">{t("sidebar.skillsCloud")}</span>
+        </button>
+      </div>
+
       <div className="px-4 pt-3 pb-2">
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
@@ -609,14 +671,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   key={slot.sessionId}
                   onClick={() => void handleSessionClick(slot.sessionId)}
                   className={`group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors border-l-[3px] border-l-transparent ${
-                    activeSessionId === slot.sessionId
+                    activeSessionId === slot.sessionId && !showMarketplace
                       ? "bg-surface-active border-l-accent"
                       : ""
                   }`}
                 >
                   <div className="flex items-center gap-2">
                     <span
-                      className={`text-sm font-medium leading-5 truncate flex-1 ${activeSessionId === slot.sessionId || !slot.completed ? 'text-text-primary' : 'text-text-secondary'}`}
+                      className={`text-sm font-medium leading-5 truncate flex-1 ${(activeSessionId === slot.sessionId && !showMarketplace) || !slot.completed ? 'text-text-primary' : 'text-text-secondary'}`}
                     >
                       {session.title}
                     </span>
@@ -894,11 +956,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       <div className="px-3 py-3 relative">
         <div className="flex items-center gap-2 rounded-2xl bg-background/50 px-3 py-2.5">
           <button
-            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-            onKeyDown={(e) => { if (e.key === 'Escape') setShowSettingsMenu(false); }}
+            onClick={() => setAccountMenuOpen((v) => !v)}
             className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
-            aria-expanded={showSettingsMenu}
-            aria-haspopup="menu"
           >
             <Settings className="w-4 h-4 flex-shrink-0" />
             <div className="min-w-0 flex-1">
@@ -908,66 +967,32 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             </div>
             <ChevronDown
               className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
-                showSettingsMenu ? "rotate-180" : ""
+                accountMenuOpen ? "rotate-180" : ""
               }`}
             />
           </button>
         </div>
-
-        {showSettingsMenu && (
-          <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setShowSettingsMenu(false)}
-            />
-            <div
-              className="absolute bottom-full left-3 right-3 mb-1 z-50 rounded-xl border border-border-muted bg-background shadow-lg p-1"
-              role="menu"
-              onKeyDown={(e) => { if (e.key === 'Escape') setShowSettingsMenu(false); }}
-            >
-              <button
-                onClick={() => {
-                  setShowSettingsMenu(false);
-                  setShowSettings(false);
-                  setShowSchedule(false);
-                  setShowMarketplace(true);
-                }}
-                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
-                role="menuitem"
-              >
-                <Store className="w-4 h-4 flex-shrink-0" />
-                {t("sidebar.marketplace")}
-              </button>
-              <button
-                onClick={() => {
-                  setShowSettingsMenu(false);
-                  setShowSettings(false);
-                  setShowMarketplace(false);
-                  setShowSchedule(true);
-                }}
-                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
-                role="menuitem"
-              >
-                <Clock3 className="w-4 h-4 flex-shrink-0" />
-                {t("sidebar.automation")}
-              </button>
-              <div className="mx-1 my-0.5 border-t border-border-muted" />
-              <button
-                onClick={() => {
-                  setShowSettingsMenu(false);
-                  setShowMarketplace(false);
-                  setShowSchedule(false);
-                  setShowSettings(true);
-                }}
-                className="w-full flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors text-left"
-                role="menuitem"
-              >
-                <Settings className="w-4 h-4 flex-shrink-0" />
-                {t("sidebar.settings")}
-              </button>
-            </div>
-          </>
-        )}
+        <AccountMenu
+          isOpen={accountMenuOpen}
+          cloudConfig={cloudConfig}
+          cloudRestoring={cloudRestoring}
+          onOpenLogin={() => setShowLoginModal(true)}
+          onOpenSettings={() => {
+            setShowMarketplace(false);
+            setShowSchedule(false);
+            setShowSettings(true);
+          }}
+          onOpenAutomation={() => {
+            setShowSettings(false);
+            setShowMarketplace(false);
+            setShowSchedule(true);
+          }}
+          onLogout={() => {
+            setAccountMenuOpen(false);
+            setConfirmLogoutOpen(true);
+          }}
+          onClose={() => setAccountMenuOpen(false)}
+        />
       </div>
 
       {deleteConfirm && (
@@ -1057,6 +1082,27 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       )}
       </>)}
     </aside>
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={(config) => setCloudConfig(config)}
+      />
+      <ConfirmDialog
+        isOpen={confirmLogoutOpen}
+        title={t("auth.logoutConfirm")}
+        confirmLabel={t("auth.logoutConfirmBtn")}
+        onConfirm={async () => {
+          setConfirmLogoutOpen(false);
+          if (cloudConfig?.token) {
+            try { await new CloudApiClient(cloudConfig.token).logout(); } catch { /* ignore */ }
+            setCloudConfig(null);
+          } else {
+            setCloudConfig(null);
+          }
+        }}
+        onCancel={() => setConfirmLogoutOpen(false)}
+      />
+    </>
   );
 }
 

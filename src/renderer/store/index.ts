@@ -8,6 +8,7 @@ import type {
   SudoPasswordRequest,
   Settings,
   AppConfig,
+  CloudConfig,
   SandboxSetupProgress,
   SandboxSyncStatus,
   PartialToolResult,
@@ -132,6 +133,20 @@ interface AppState {
   appConfig: AppConfig | null;
   isConfigured: boolean;
   showConfigModal: boolean;
+  setShowLoginModal: (show: boolean) => void;
+  showLoginModal: boolean;
+
+  // Cloud auth
+  cloudConfig: CloudConfig | null;
+  setCloudConfig: (config: CloudConfig | null) => void;
+  // Cloud — active team
+  activeTeamId: string | null;
+  setActiveTeamId: (id: string | null) => void;
+  activeTeamName: string;
+  setActiveTeamName: (name: string) => void;
+  // Incremented when skills change (share/delete/publish), triggers tab refresh
+  skillRefreshKey: number;
+  incrementSkillRefreshKey: () => void;
   hasSeenInitialConfigStatus: boolean;
   globalNotice: GlobalNotice | null;
 
@@ -374,6 +389,11 @@ export const useAppStore = create<AppState>((set) => ({
   settings: defaultSettings,
   appConfig: null,
   isConfigured: false,
+  cloudConfig: null,
+  activeTeamId: null,
+  activeTeamName: "",
+  skillRefreshKey: 0,
+  showLoginModal: false,
   showConfigModal: false,
   hasSeenInitialConfigStatus: false,
   globalNotice: null,
@@ -840,6 +860,22 @@ export const useAppStore = create<AppState>((set) => ({
   // Config actions
   setAppConfig: (config) => set({ appConfig: config }),
   setIsConfigured: (configured) => set({ isConfigured: configured }),
+  setActiveTeamId: (id) => set({ activeTeamId: id }),
+  setActiveTeamName: (name) => set({ activeTeamName: name }),
+  incrementSkillRefreshKey: () =>
+    set((s) => ({ skillRefreshKey: s.skillRefreshKey + 1 })),
+
+  setCloudConfig: (config) => {
+    set({ cloudConfig: config });
+    try {
+      if (config) {
+        localStorage.setItem("deskwand.cloud", JSON.stringify(config));
+      } else {
+        localStorage.removeItem("deskwand.cloud");
+      }
+    } catch { /* localStorage unavailable */ }
+  },
+  setShowLoginModal: (show) => set({ showLoginModal: show }),
   setShowConfigModal: (show) => set({ showConfigModal: show }),
   markInitialConfigStatusSeen: () => set({ hasSeenInitialConfigStatus: true }),
   setGlobalNotice: (notice) => set({ globalNotice: notice }),
