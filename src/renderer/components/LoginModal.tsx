@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { CloudApiClient } from "../services/cloud-api";
+import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import type { CloudConfig } from "../types";
 
 interface LoginModalProps {
@@ -91,7 +92,7 @@ export function LoginModal({
       );
       const cloudApi = new CloudApiClient(result.token);
       const config: CloudConfig = {
-        serverUrl: "http://localhost:8787",
+        serverUrl: DESKWAND_API_URL,
         token: result.token,
         isLoggedIn: true,
         email: result.user.email,

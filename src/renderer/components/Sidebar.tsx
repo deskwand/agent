@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import { useIPC } from "../hooks/useIPC";
 import {
   Cloud,
@@ -90,7 +91,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             modes = res;
           } catch { /* modes optional, keep empty */ }
           setCloudConfig({
-            serverUrl: "http://localhost:8787",
+            serverUrl: DESKWAND_API_URL,
             token: c.token,
             isLoggedIn: true,
             email: me.email,
