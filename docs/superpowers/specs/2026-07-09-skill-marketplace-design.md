@@ -1,0 +1,276 @@
+# 技能市场（Skill Marketplace）设计文档
+
+> 日期：2026-07-09 | 状态：设计审核中
+
+## 1. 概述
+
+为 DeskWand 添加技能市场（Marketplace）功能，允许用户浏览、搜索、安装公开技能。市场技能融入现有的「我的技能」视图，不新建独立页面。
+
+API 接口参考 `server/docs/api.md` 第 7 节「技能市场（Marketplace）」。
+
+---
+
+## 2. 架构
+
+### 2.1 不改动范围
+
+- 不新建路由或页面
+- 不修改后端 API（接口已就绪）
+- 不修改技能安装引擎（复用 `SkillsManager.installSkill`）
+
+### 2.2 改动文件清单
+
+| 操作 | 文件 | 说明 |
+|------|------|------|
+| 改 | `src/renderer/components/settings/SettingsSkills.tsx` | 市场数据加载、筛选 Chip、左侧分类栏、安装流程、去重逻辑 |
+| 改 | `src/renderer/components/settings/SkillCard.tsx` | 市场技能 source 标记 |
+| 新 | `src/renderer/components/settings/MarketplaceSkillCard.tsx` | 市场专用卡片组件（完整字段 + 安装/详情按钮） |
+| 新 | `src/renderer/components/settings/MarketplaceCategorySidebar.tsx` | 左侧分类栏（仅「全部」「市场」显示） |
+| 改 | `src/renderer/services/cloud-api.ts` | 新增 3 个 marketplace API 方法 |
+| 改 | `src/renderer/types/index.ts` | 新增 `MarketplaceSkill` 类型 |
+| 改 | `src/renderer/i18n/locales/zh.json` | 新增 marketplace 翻译 |
+| 改 | `src/renderer/i18n/locales/en.json` | 新增 marketplace 翻译 |
+| 改 | `src/renderer/store/index.ts` | 新增 marketplace 相关 state |
+
+---
+
+## 3. 数据模型
+
+### 3.1 MarketplaceSkill 类型（新增）
+
+```typescript
+export interface MarketplaceSkill {
+  slug: string;
+  name: string;
+  description: string;
+  description_zh: string;
+  category: string;                     // "ai-agent" | "dev-programming" | ...
+  category_name: string;                 // "AI Agent" | "开发编程"
+  sub_categories: Array<{ key: string; name: string }>;
+  source: string;
+  downloads: number;
+  installs: number;
+  stars: number;
+  version: string;
+  verified: boolean;
+  homepage: string;
+  skill_md?: string;                     // 仅详情接口返回
+}
+```
+
+### 3.2 安装元数据
+
+复用「我的云端」已有的 `.deskwand-installed.json` 文件（存储在技能目录下），扩展字段：
+
+```json
+{
+  "skillId": "abc-123",
+  "version": 1,
+  "source": "marketplace",
+  "slug": "prompt-optimizer-en"
+}
+```
+
+`source` 字段区分来源（`"cloud"` / `"marketplace"`），用于去重和筛选逻辑。
+
+### 3.3 CloudApiClient 新增方法
+
+```typescript
+// GET /api/marketplace?q=&category=&page=1&limit=20
+getMarketplace(params: {
+  q?: string;
+  category?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  skills: MarketplaceSkill[];
+  total: number;
+  page: number;
+  limit: number;
+}>;
+
+// POST /api/marketplace/:slug/install
+installMarketplaceSkill(slug: string): Promise<{
+  skill: { id: string; name: string; current_version: number };
+}>;
+
+// GET /api/marketplace/:slug
+getMarketplaceSkillDetail(slug: string): Promise<MarketplaceSkill>;
+```
+
+---
+
+## 4. 筛选逻辑矩阵
+
+| 筛选 Chip | 数据来源 | 左侧分类栏 | 说明 |
+|-----------|---------|-----------|------|
+| **全部** | 本地 + 云端 + 团队 + 市场 | ✅ 显示 | 市场技能去重后混入 |
+| **我的云端** | 云端个人技能 | ❌ | 现有逻辑不变 |
+| **团队** | 团队共享技能 | ❌ | 现有逻辑不变 |
+| **AI 生成** | 本地 agent 类型 | ❌ | 现有逻辑不变 |
+| **内置** | 本地 builtin 类型 | ❌ | 现有逻辑不变 |
+| **市场** 🆕 | API 全量市场列表 | ✅ 显示 | 已装/未装都显示，标记安装状态 |
+| **已安装** 🆕 | 本地所有已装 | ❌ | 不含未装市场技能 |
+
+### 4.1 去重策略
+
+「全部」视图下，市场技能与本地已装技能的去重：
+
+1. 市场技能名 vs 本地技能名（不区分大小写）
+2. 市场 slug → 检查 `.deskwand-installed.json` 中是否有 `source: "marketplace"` 且 `slug` 匹配
+3. 任一匹配 → 视为已安装，不在「全部」中重复出现
+
+### 4.2 「市场」筛选行为
+
+- 显示所有市场技能（含已装和未装）
+- 已安装的标记「已安装」+ 版本对比
+- 未安装的显示「安装」按钮
+- 未登录时显示登录引导卡片，不调 API
+
+### 4.3 数据加载策略
+
+- 进入 `SettingsSkills` 组件时预加载市场第一页
+- 用户切到「市场」筛选时无需额外等待
+- 分页使用「加载更多」按钮，非无限滚动
+
+---
+
+## 5. 组件设计
+
+### 5.1 MarketplaceSkillCard（新增）
+
+市场专用卡片，展示完整字段：
+
+- 图标 + 名称 + 认证标识（verified）
+- 分类标签（category_name + sub_categories）
+- 描述（根据语言显示 description 或 description_zh）
+- 统计行：下载量 / 安装量 / 星标 / 版本号
+- 操作按钮：
+  - 未安装：「查看详情」+「安装」
+  - 安装中：Loading 动画
+  - 已安装（最新版）「已安装 ✓」+「查看详情」
+  - 已安装（有更新）「更新」+「查看详情」
+
+支持卡片视图和列表视图（与现有 SkillCard 一致的 viewMode）。
+
+### 5.2 MarketplaceCategorySidebar（新增）
+
+- 仅在「全部」或「市场」筛选下显示
+- 左侧垂直列表，默认选中「全部」
+- 点击大类 → 重新请求 API（category 参数）
+- 选中大类后，下方显示 sub_categories Chip 用于叠加过滤
+
+### 5.3 SettingsSkills 改动
+
+- 新增 `FilterKey`：「marketplace」和「installed」
+- 新增状态：`marketplaceSkills`、`marketplaceTotal`、`marketplacePage`、`marketplaceCategory`
+- 新增加载函数：`loadMarketplace()`、`loadMoreMarketplace()`
+- 新增安装函数：`doMarketplaceInstall(slug)`
+- 筛选 Chip 新增「市场」「已安装」
+
+### 5.4 SkillCard 改动
+
+- 安装后的市场技能使用普通 `SkillCard` 渲染，source 标记为 `"marketplace"`
+- 行为和自定义技能一致：可启用/禁用、删除、发布到云端
+
+---
+
+## 6. 安装流程
+
+```
+用户点击「安装」
+  ↓
+SettingsSkills 设置 installingId，按钮显示 Loading
+  ↓
+POST /api/marketplace/:slug/install
+  ↓ 拿到 { skill: { id, name, version } }
+  ↓
+GET /api/skills/:id/versions/:version/download（复用现有 downloadSkill）
+  ↓
+解压 zip → electronAPI.skills.install()
+  ↓
+writeInstalledMeta({ skillId, version, source: "marketplace", slug })
+  ↓
+刷新列表 → 技能卡片状态切换为「已安装」
+```
+
+---
+
+## 7. 错误处理
+
+| 场景 | 处理方式 |
+|------|----------|
+| API 请求失败（网络/超时） | Toast 提示，保留上次成功数据 |
+| 401 未登录（市场筛选） | 显示登录引导卡片 |
+| 401 未登录（安装操作） | 弹出登录弹窗 |
+| 404 slug 不存在 | Toast "技能已下架" |
+| 安装失败（下载/解压/重复） | Toast 具体错误信息，按钮恢复 |
+| 分类为空 | 显示空状态 "该分类暂无技能" |
+| 搜索无结果 | 显示 "未找到匹配技能" |
+| 已安装技能从市场下架 | 不影响本地使用 |
+| 多次快速点击安装 | 按钮内置 loading 状态防抖 |
+| 同名技能冲突 | install API 做深拷贝生成新 id |
+
+---
+
+## 8. i18n 翻译项（新增）
+
+### zh.json
+
+```json
+"skillMarket": {
+  "filterMarketplace": "市场",
+  "filterInstalled": "已安装",
+  "allCategories": "全部",
+  "downloads": "下载",
+  "installs": "安装",
+  "stars": "星标",
+  "verified": "已认证",
+  "viewDetail": "查看详情",
+  "installedTip": "已安装",
+  "updateAvailable": "有更新",
+  "noMarketplaceSkills": "暂无市场技能",
+  "noCategorySkills": "该分类暂无技能",
+  "loadMore": "加载更多",
+  "installFailed": "安装失败",
+  "skillRemoved": "技能已下架"
+}
+```
+
+### en.json
+
+```json
+"skillMarket": {
+  "filterMarketplace": "Marketplace",
+  "filterInstalled": "Installed",
+  "allCategories": "All",
+  "downloads": "Downloads",
+  "installs": "Installs",
+  "stars": "Stars",
+  "verified": "Verified",
+  "viewDetail": "View Details",
+  "installedTip": "Installed",
+  "updateAvailable": "Update",
+  "noMarketplaceSkills": "No marketplace skills",
+  "noCategorySkills": "No skills in this category",
+  "loadMore": "Load More",
+  "installFailed": "Install failed",
+  "skillRemoved": "Skill no longer available"
+}
+```
+
+---
+
+## 9. 测试要点
+
+- 市场列表正常加载和分页
+- 搜索过滤正常工作
+- 分类筛选 + 子分类叠加
+- 安装流程端到端（API → 下载 → 本地安装）
+- 已安装去重（「全部」不重复）
+- 「市场」筛选下已安装状态标记正确
+- 版本更新检测和更新按钮
+- 登录引导卡片（未登录时）
+- 安装按钮防抖（快速双击不会重复安装）
+- 错误场景覆盖（网络/401/404/超时）
+- 语言切换（zh/en 描述字段切换）
