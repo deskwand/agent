@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://deskwand.com">官网</a> ·
-  <a href="https://deskwand.com/download">下载</a> ·
+  <a href="https://deskwand.com/#download">下载</a> ·
   <a href="https://github.com/deskwand/agent/releases">版本发布</a>
 </p>
 
@@ -30,7 +30,7 @@
 | Windows | [`.exe`](https://github.com/deskwand/agent/releases) |
 | Linux | [`.AppImage`](https://github.com/deskwand/agent/releases) · [`.deb`](https://github.com/deskwand/agent/releases) · [`.rpm`](https://github.com/deskwand/agent/releases) |
 
-👉 [deskwand.com/download](https://deskwand.com/download)
+👉 [deskwand.com/#download](https://deskwand.com/#download)
 
 ### 快速开始
 
