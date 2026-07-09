@@ -16,6 +16,10 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="License" />
 </p>
 
+<p align="center">
+  <a href="./README.md">English</a>
+</p>
+
 ---
 
 ### 安装
@@ -39,13 +43,6 @@
 
 配置、模型、技能、MCP 等更多信息，请查看 [源码](https://github.com/deskwand/agent)。
 
-### 参与贡献
-
-欢迎贡献，提交 PR 前请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md)。
-
----
-
 <p align="center">
-  <a href="https://deskwand.com">deskwand.com</a> ·
-  <a href="./README.md">English</a>
+  <a href="https://deskwand.com">deskwand.com</a>
 </p>
