@@ -28,7 +28,7 @@ function buildGoogleAuthUrl(port: number): string {
     response_type: "code",
     scope: GOOGLE_OAUTH_SCOPES,
   });
-  return `https://accounts.google.com/o/oauth/v2/auth?${params.toString()}`;
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
 async function exchangeCodeForToken(
