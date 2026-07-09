@@ -26,6 +26,7 @@
   },
   "welcome": {
     "title": "今天我能为您做些什么？",
+    "titleWithProject": "在项目「{{projectName}}」中，今天我能为您做些什么？",
     "placeholder": "描述你想做的事情，按 / 使用快捷命令...",
     "createFile": "创建文件",
     "crunchData": "处理数据",

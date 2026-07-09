@@ -26,6 +26,7 @@
   },
   "welcome": {
     "title": "How can I help you today?",
+    "titleWithProject": "How can I help you today in project \"{{projectName}}\"?",
     "placeholder": "Describe what you'd like to do, press / for shortcuts...",
     "createFile": "Create a file",
     "crunchData": "Crunch data",

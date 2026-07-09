@@ -11,6 +11,7 @@ import type {
   ApiProviderConfig,
 } from "../types";
 import { getInitialSessionTitle } from "../../shared/session-title";
+import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import { ArrowRight } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
@@ -43,6 +44,11 @@ export function WelcomeView() {
   const setShowSettings = useAppStore((state) => state.setShowSettings);
   const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const appConfig = useAppConfig();
+  const projectName = (() => {
+    if (!workingDir) return '';
+    return workingDir.split(/[\\/]/).filter(Boolean).pop() || '';
+  })();
+  const showProjectTitle = !!projectName && projectName !== DEFAULT_WORKDIR_DIRNAME;
   const chatInputRef = useRef<ChatInputHandle>(null);
 
   // Model & thinking level — initialised from first available model, same source as ChatView
@@ -226,7 +232,9 @@ export function WelcomeView() {
       <div className="max-w-[840px] w-full space-y-7 animate-fade-in">
         <div className="space-y-4 text-center">
           <p className="text-base font-medium tracking-[-0.02em] text-text-secondary text-center eff-float">
-            {t("welcome.title")}
+            {showProjectTitle
+              ? t("welcome.titleWithProject", { projectName })
+              : t("welcome.title")}
           </p>
         </div>
 
