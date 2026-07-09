@@ -937,3 +937,22 @@ export interface CloudSkill {
   shared_teams?: Array<{ team_id: string; team_name: string }>;
   skill_md?: string;
 }
+
+// Marketplace skill from /api/marketplace
+export interface MarketplaceSkill {
+  slug: string;
+  name: string;
+  description: string;
+  description_zh: string;
+  category: string;
+  category_name: string;
+  sub_categories: Array<{ key: string; name: string }>;
+  source: string;
+  installs: number;
+  version: string;
+  verified: boolean;
+  homepage: string;
+  skill_md?: string;
+  created_at?: string;
+  updated_at?: string;
+}

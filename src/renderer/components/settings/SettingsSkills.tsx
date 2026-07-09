@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
+  CheckCircle2,
+  Loader2,
   Package,
   Trash2,
   Search,
@@ -10,7 +12,7 @@ import {
   LayoutGrid,
   List,
 } from "lucide-react";
-import type { Skill, CloudSkill } from "../../types";
+import type { Skill, CloudSkill, MarketplaceSkill } from "../../types";
 import type { LocalizedBanner } from "./shared";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SkillMdModal } from "../SkillMdModal";
@@ -18,6 +20,9 @@ import { useAppStore } from "../../store";
 import { CloudApiClient } from "../../services/cloud-api";
 import { SkillCard, CloudOnlySkillCard } from "./SkillCard";
 import type { DisplaySkill } from "./SkillCard";
+import { MarketplaceSkillCard } from "./MarketplaceSkillCard";
+import type { MarketplaceInstallState } from "./MarketplaceSkillCard";
+import { MarketplaceCategorySidebar } from "./MarketplaceCategorySidebar";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -35,6 +40,20 @@ function formatTimeAgo(
   return t("skills.daysAgo", { n: Math.floor(seconds / 86400) });
 }
 
+function extractCategories(
+  skills: MarketplaceSkill[],
+): Array<{ key: string; name: string }> {
+  const seen = new Set<string>();
+  const result: Array<{ key: string; name: string }> = [];
+  for (const s of skills) {
+    if (!seen.has(s.category)) {
+      seen.add(s.category);
+      result.push({ key: s.category, name: s.category_name });
+    }
+  }
+  return result;
+}
+
 /* ─── main component ─── */
 
 export function SettingsSkills({ isActive }: { isActive: boolean }) {
@@ -49,11 +68,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const activeTeamId = useAppStore((s) => s.activeTeamId);
   const activeTeamName = useAppStore((s) => s.activeTeamName);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishStatus, setPublishStatus] = useState<
     Map<string, "unpublished" | "published" | "outdated" | "has_update">
   >(new Map());
   const [mdModal, setMdModal] = useState<{ name: string; content: string | null } | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [cloudSkills, setCloudSkills] = useState<CloudSkill[]>([]);
   const [teamCloudSkills, setTeamCloudSkills] = useState<CloudSkill[]>([]);
   const [unshareTarget, setUnshareTarget] = useState<CloudSkill | null>(null);
@@ -69,15 +90,32 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     }
   });
 
+  // Marketplace state
+  const [marketplaceSkills, setMarketplaceSkills] = useState<MarketplaceSkill[]>([]);
+  const [marketplaceTotal, setMarketplaceTotal] = useState(0);
+  const [marketplacePage, setMarketplacePage] = useState(0);
+  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
+  const [marketplaceCategory, setMarketplaceCategory] = useState<string | null>(null);
+  const [installingMarketplaceSlug, setInstallingMarketplaceSlug] = useState<string | null>(null);
+  const [allCategories, setAllCategories] = useState<Array<{ key: string; name: string }>>([]);
+
   function toggleViewMode(mode: "cards" | "list") {
     setViewMode(mode);
     try { localStorage.setItem("skillViewMode", mode); } catch { /* noop */ }
   }
 
   // ─── filter + search state ───
-  type FilterKey = "all" | "ai" | "mycloud" | "team" | "builtin";
-  const [filterKey, setFilterKey] = useState<FilterKey>("all");
+  type FilterKey = "ai" | "mycloud" | "team" | "builtin" | "marketplace" | "installed";
+  const [filterKey, setFilterKey] = useState<FilterKey>("marketplace");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const detailCache = useRef<Map<string, string | null>>(new Map());
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // ─── load local skills ───
   const loadSkills = useCallback(
@@ -285,10 +323,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   // ─── filtered + searched list ───
   const filteredSkills = useMemo(() => {
     let list = displaySkills;
-    if (filterKey === "ai") list = list.filter((s) => s.source === "ai");
+    if (filterKey === "installed") {
+      list = list.filter((s) => s.source !== "builtin" && !s.isCloudOnly);
+    } else if (filterKey === "ai") list = list.filter((s) => s.source === "ai");
     else if (filterKey === "mycloud") list = list.filter((s) => myCloudSkillNames.has(s.name.toLowerCase()));
     else if (filterKey === "team") list = list.filter((s) => teamCloudSkillNames.has(s.name.toLowerCase()));
     else if (filterKey === "builtin") list = list.filter((s) => s.source === "builtin");
+    else if (filterKey === "marketplace") list = [];
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(
@@ -461,6 +502,123 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     }
   }
 
+  // ─── marketplace install ───
+  const loadMarketplace = useCallback(
+    async (page = 1, append = false) => {
+      if (!cloudConfig?.token) return;
+      setMarketplaceLoading(true);
+      try {
+        const client = new CloudApiClient(cloudConfig.token);
+        const res = await client.getMarketplace({
+          q: debouncedSearch || undefined,
+          category: marketplaceCategory ?? undefined,
+          page,
+          limit: 20,
+        });
+        setMarketplaceSkills((prev) =>
+          append ? [...prev, ...res.skills] : res.skills,
+        );
+        setMarketplaceTotal(res.total);
+        setMarketplacePage(res.page);
+        // Cache full category list on unfiltered first-page loads (for sidebar persistence)
+        if (!append && !marketplaceCategory) {
+          setAllCategories(extractCategories(res.skills));
+        }
+      } catch (err: unknown) {
+        const e = err as Error & { status?: number };
+        if (e?.status === 401) {
+          useAppStore.getState().setCloudConfig(null);
+        }
+      } finally {
+        setMarketplaceLoading(false);
+      }
+    },
+    [cloudConfig?.token, debouncedSearch, marketplaceCategory],
+  );
+
+  const loadMoreMarketplace = useCallback(() => {
+    if (marketplaceLoading) return;
+    const nextPage = marketplacePage + 1;
+    if (marketplaceSkills.length >= marketplaceTotal) return;
+    void loadMarketplace(nextPage, true);
+  }, [marketplaceLoading, marketplacePage, marketplaceSkills.length, marketplaceTotal, loadMarketplace]);
+
+  async function doMarketplaceInstall(skill: MarketplaceSkill) {
+    if (!cloudConfig?.token || !isElectron) return;
+    setInstallingMarketplaceSlug(skill.slug);
+    try {
+      const client = new CloudApiClient(cloudConfig.token);
+      const installRes = await client.installMarketplaceSkill(skill.slug);
+      const dlPath = client.getSkillDownloadUrl(installRes.skill.id, installRes.skill.current_version);
+      const { blob, filename } = await client.downloadSkill(dlPath);
+      const buffer = await blob.arrayBuffer();
+      const tmpPath = await window.electronAPI.file.saveToTemp(buffer, filename);
+      const extractDir = await window.electronAPI.file.extractArchive(tmpPath);
+      let installedName: string | undefined;
+      try {
+        const result = await window.electronAPI.skills.install(extractDir);
+        if (result?.skill?.name) {
+          installedName = result.skill.name;
+          await window.electronAPI.skills.writeInstalledMeta(result.skill.name, {
+            skillId: installRes.skill.id,
+            version: installRes.skill.current_version,
+          });
+        }
+      } finally {
+        await window.electronAPI.file.removeTemp(extractDir).catch(() => {});
+      }
+      incrementSkillRefreshKey();
+      await loadSkills(true);
+      if (installedName) {
+        setSuccessMessage(`「${installedName}」${t("skillMarket.installSuccess")}`);
+        setTimeout(() => setSuccessMessage(null), 3000);
+      }
+    } catch (err: unknown) {
+      const e = err as Error & { status?: number };
+      if (e?.status === 401) useAppStore.getState().setCloudConfig(null);
+      else if (e?.status === 404) setPublishError(t("skillMarket.skillRemoved"));
+      else setPublishError(e?.message || t("skillMarket.installFailed"));
+    } finally {
+      setInstallingMarketplaceSlug(null);
+    }
+  }
+
+  // ─── marketplace install states ───
+  const marketplaceInstallStates = useMemo(() => {
+    const map = new Map<string, MarketplaceInstallState>();
+    for (const ms of marketplaceSkills) {
+      if (installingMarketplaceSlug === ms.slug) {
+        map.set(ms.slug, "installing");
+      } else if (localSkillNames.has(ms.name.toLowerCase())) {
+        map.set(ms.slug, "installed");
+      } else {
+        map.set(ms.slug, "available");
+      }
+    }
+    return map;
+  }, [marketplaceSkills, localSkillNames, installingMarketplaceSlug]);
+
+  // ─── marketplace effects ───
+  useEffect(() => {
+    if (!isActive) return;
+    if (!cloudConfig?.token) {
+      setMarketplaceSkills([]);
+      setMarketplaceTotal(0);
+      return;
+    }
+    setMarketplacePage(0);
+    void loadMarketplace(1);
+  }, [isActive, cloudConfig?.token, loadMarketplace]);
+
+  useEffect(() => {
+    if (!isActive || filterKey !== "marketplace") return;
+    if (!cloudConfig?.token) return;
+    void loadMarketplace(1);
+    // isActive / token / filterKey guards are in the effect above;
+    // this effect only triggers on marketplace-relevant changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketplaceCategory, debouncedSearch]);
+
   // ─── cloud operations ───
   function handleUnshare(skillName: string) {
     const cloudSkill = cloudSkills.find(
@@ -511,7 +669,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   // ─── filter chip definitions ───
   const filterChips = useMemo(() => {
     const chips: Array<{ key: FilterKey; label: string }> = [
-      { key: "all", label: t("skillMarket.filterAll") },
+      { key: "marketplace", label: t("skillMarket.filterMarketplace") },
       { key: "mycloud", label: t("skillMarket.filterMyCloud") },
     ];
     if (activeTeamId) {
@@ -519,6 +677,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     }
     chips.push({ key: "ai", label: t("skillMarket.filterAI") });
     chips.push({ key: "builtin", label: t("skillMarket.filterBuiltin") });
+    chips.push({ key: "installed", label: t("skillMarket.filterInstalled") });
     return chips;
   }, [t, activeTeamId]);
 
@@ -531,6 +690,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       case "mycloud": label = t("skillMarket.sourceMyCloud"); break;
       case "team": label = `${t("skillMarket.sourceTeam")}·${ds.sourceTeam || ""}`; break;
       case "builtin": label = t("skillMarket.sourceBuiltin"); break;
+      case "marketplace": label = t("skillMarket.sourceMarketplace"); break;
     }
     // Append cloud membership for installed (non-cloud-only) skills
     if (!ds.isCloudOnly && ds.cloudMembership === "mycloud") {
@@ -545,6 +705,12 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
 
   return (
     <div className="space-y-4">
+      {successMessage && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-success/10 text-success text-sm">
+          <CheckCircle2 className="w-4 h-4" />
+          {successMessage}
+        </div>
+      )}
       {publishError && (
         <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
           <AlertCircle className="w-4 h-4" />
@@ -577,7 +743,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-text-muted whitespace-nowrap">
-            {filteredSkills.length} {t("skillMarket.skillCount")}
+            {filterKey === "marketplace" ? marketplaceTotal : filteredSkills.length} {t("skillMarket.skillCount")}
           </span>
           <div className="flex items-center rounded-lg border border-border overflow-hidden">
             <button
@@ -618,30 +784,112 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         />
       </div>
 
-      {/* Unified skill list */}
+      {/* Marketplace section — shown for "marketplace" filter */}
+      {filterKey === "marketplace" && cloudConfig?.token && (
+        <div className="mb-6">
+          <div className="flex gap-0">
+            <MarketplaceCategorySidebar
+              categories={allCategories}
+              selectedCategory={marketplaceCategory}
+              onSelect={(key) => {
+                setMarketplaceCategory(key);
+                setMarketplacePage(0);
+              }}
+            />
+            <div className="flex-1 min-w-0 pl-4 relative">
+              {marketplaceSkills.length === 0 && !marketplaceLoading && (
+                <div className="text-center py-8 text-text-muted">
+                  <Package className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                  <p className="text-sm">
+                    {marketplaceCategory
+                      ? t("skillMarket.noCategorySkills")
+                      : searchQuery.trim()
+                        ? t("skillMarket.noMatch")
+                        : t("skillMarket.noMarketplaceSkills")}
+                  </p>
+                </div>
+              )}
+              {marketplaceLoading && marketplaceSkills.length > 0 && (
+                <div className="absolute inset-0 bg-surface/60 flex items-center justify-center rounded-lg z-10">
+                  <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                </div>
+              )}
+              <div className={viewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "space-y-2"}>
+                {marketplaceSkills.map((ms) => (
+                  <MarketplaceSkillCard
+                    key={ms.slug}
+                    skill={ms}
+                    installState={
+                      marketplaceInstallStates.get(ms.slug) ?? "available"
+                    }
+                    onInstall={() => doMarketplaceInstall(ms)}
+                    onViewDetail={() => {
+                      if (!cloudConfig?.token) return;
+                      if (detailCache.current.has(ms.slug)) {
+                        setMdModal({ name: ms.name, content: detailCache.current.get(ms.slug)! });
+                        return;
+                      }
+                      setDetailLoading(true);
+                      setMdModal({ name: ms.name, content: null });
+                      const client = new CloudApiClient(cloudConfig.token);
+                      client
+                        .getMarketplaceSkillDetail(ms.slug)
+                        .then((detail) => {
+                          const content = detail.skill_md ?? null;
+                          detailCache.current.set(ms.slug, content);
+                          setMdModal({ name: ms.name, content });
+                        })
+                        .catch(() => {
+                          detailCache.current.set(ms.slug, null);
+                          setMdModal({ name: ms.name, content: null });
+                        })
+                        .finally(() => setDetailLoading(false));
+                    }}
+                    viewMode={viewMode}
+                  />
+                ))}
+              </div>
+              {marketplaceSkills.length < marketplaceTotal && (
+                  <div className="text-center mt-4">
+                    <button
+                      onClick={loadMoreMarketplace}
+                      disabled={marketplaceLoading}
+                      className="px-4 py-2 rounded-lg bg-surface-muted text-sm text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
+                    >
+                      {marketplaceLoading ? "..." : t("skillMarket.loadMore")}
+                    </button>
+                  </div>
+                )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Login prompt for cloud tabs when not logged in */}
+      {!cloudConfig?.token && (filterKey === "marketplace" || filterKey === "mycloud" || filterKey === "team") && (
+        <div className="rounded-lg border border-border p-6 text-center max-w-sm mx-auto">
+          <Cloud className="w-8 h-8 mx-auto mb-3 text-text-muted" />
+          <p className="text-sm text-text-secondary mb-4">{t("skillMarket.loginPrompt")}</p>
+          <button
+            onClick={() => useAppStore.getState().setShowLoginModal(true)}
+            className="px-5 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-hover transition-colors"
+          >
+            {t("auth.login")}
+          </button>
+        </div>
+      )}
+
+      {/* Unified skill list — hidden for marketplace or when login prompt shown */}
+      {filterKey !== "marketplace" && !(!cloudConfig?.token && (filterKey === "mycloud" || filterKey === "team")) && (
+      <>
       {filteredSkills.length === 0 ? (
         <div className="text-center py-8 text-text-muted">
-          {!cloudConfig?.token && (filterKey === "mycloud" || filterKey === "team") ? (
-            <div className="rounded-lg border border-border p-6 text-center max-w-sm mx-auto">
-              <Cloud className="w-8 h-8 mx-auto mb-3 text-text-muted" />
-              <p className="text-sm text-text-secondary mb-4">{t("skillMarket.loginPrompt")}</p>
-              <button
-                onClick={() => useAppStore.getState().setShowLoginModal(true)}
-                className="px-5 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-hover transition-colors"
-              >
-                {t("auth.login")}
-              </button>
-            </div>
-          ) : (
-            <>
-              <Package className="w-6 h-6 mx-auto mb-2 opacity-40" />
+            <Package className="w-6 h-6 mx-auto mb-2 opacity-40" />
               <p className="text-sm">
                 {searchQuery.trim()
                   ? t("skillMarket.noMatch")
                   : t("skillMarket.noSkills")}
               </p>
-            </>
-          )}
         </div>
       ) : (
         <div className={viewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "space-y-2"} style={{ scrollbarGutter: "stable" }}>
@@ -738,6 +986,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
           })}
         </div>
       )}
+      </>
+      )}
 
       <ConfirmDialog
         isOpen={pendingDelete !== null}
@@ -788,6 +1038,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         isOpen={mdModal !== null}
         title={mdModal?.name ?? ""}
         content={mdModal?.content ?? null}
+        loading={detailLoading}
         onClose={() => setMdModal(null)}
       />
     </div>

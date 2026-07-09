@@ -197,4 +197,45 @@ export class CloudApiClient {
       (match?.[2] || match?.[3])?.trim() || url.split("/").pop() || "skill.zip";
     return { blob, filename };
   }
+
+  // ── Marketplace ──
+
+  async getMarketplace(params: {
+    q?: string;
+    category?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{
+    skills: import("../types").MarketplaceSkill[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const sp = new URLSearchParams();
+    if (params.q) sp.set("q", params.q);
+    if (params.category) sp.set("category", params.category);
+    sp.set("page", String(params.page ?? 1));
+    sp.set("limit", String(params.limit ?? 20));
+    return this.request(`/api/marketplace?${sp.toString()}`);
+  }
+
+  async getMarketplaceSkillDetail(
+    slug: string,
+  ): Promise<import("../types").MarketplaceSkill> {
+    return this.request(`/api/marketplace/${slug}`);
+  }
+
+  async installMarketplaceSkill(
+    slug: string,
+  ): Promise<{
+    skill: { id: string; name: string; current_version: number };
+  }> {
+    return this.request(`/api/marketplace/${slug}/install`, {
+      method: "POST",
+    });
+  }
+
+  getSkillDownloadUrl(skillId: string, version: number): string {
+    return `/api/skills/${skillId}/versions/${version}/download`;
+  }
 }

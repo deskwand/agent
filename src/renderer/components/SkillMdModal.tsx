@@ -1,16 +1,17 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { MessageMarkdown } from "./MessageMarkdown";
 
 interface SkillMdModalProps {
   isOpen: boolean;
   title: string;
   content: string | null;
+  loading?: boolean;
   onClose: () => void;
 }
 
-export function SkillMdModal({ isOpen, title, content, onClose }: SkillMdModalProps) {
+export function SkillMdModal({ isOpen, title, content, loading, onClose }: SkillMdModalProps) {
   const { t } = useTranslation();
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -46,6 +47,10 @@ export function SkillMdModal({ isOpen, title, content, onClose }: SkillMdModalPr
         <div className="p-5 max-h-[60vh] overflow-y-auto">
           {content ? (
             <MessageMarkdown normalizedText={content} />
+          ) : loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 text-accent animate-spin" />
+            </div>
           ) : (
             <p className="text-sm text-text-muted text-center py-8">
               {t("skillMarket.noContent")}

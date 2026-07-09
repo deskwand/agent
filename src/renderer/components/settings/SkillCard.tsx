@@ -51,7 +51,7 @@ function ToggleButton({
 
 /* ─── icon mapping ─── */
 
-export type SkillSource = "ai" | "custom" | "mycloud" | "team" | "builtin";
+export type SkillSource = "ai" | "custom" | "mycloud" | "team" | "builtin" | "marketplace";
 
 const SKILL_ICON_MAP: Record<
   SkillSource,
@@ -62,6 +62,7 @@ const SKILL_ICON_MAP: Record<
   team: { icon: Users, bgClass: "bg-warning", iconClass: "text-warning-foreground", strokeWidth: 2 },
   custom: { icon: FileCode, bgClass: "bg-success", iconClass: "text-success-foreground", strokeWidth: 2 },
   builtin: { icon: Package, bgClass: "bg-surface-muted", iconClass: "text-text-muted", strokeWidth: 2 },
+  marketplace: { icon: Package, bgClass: "bg-accent", iconClass: "text-accent-foreground", strokeWidth: 2 },
 };
 
 function getSkillIcon(source: SkillSource) {
