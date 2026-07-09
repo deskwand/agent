@@ -114,8 +114,7 @@ import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
 import { initOAuthService } from "./auth/oauth-service";
-// TODO: 恢复 Google 登录时取消注释
-// import { startGoogleAuth } from "./oauth/google-auth-handler";
+import { startGoogleAuth } from "./oauth/google-auth-handler";
 import { openRouterPkceService } from "./auth/openrouter-pkce-service";
 import { fetchOpenRouterModels } from "./config/openrouter-models";
 import {
@@ -1431,10 +1430,9 @@ ipcMain.handle("openrouterAuth.logout", async () => {
 ipcMain.handle("openrouterAuth.status", async () => {
   return openRouterPkceService.status();
 });
-// TODO: 恢复 Google 登录时取消注释
-// ipcMain.handle("cloudAuth.googleLogin", async () => {
-//   return startGoogleAuth();
-// });
+ipcMain.handle("cloudAuth.googleLogin", async () => {
+  return startGoogleAuth();
+});
 
 ipcMain.handle("client-invoke", async (_event, data: ClientEvent) => {
   return handleClientEvent(data);

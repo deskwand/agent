@@ -597,13 +597,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     > => ipcRenderer.invoke("openrouterAuth.status"),
   },
 
-  // TODO: 恢复 Google 登录时取消注释
   // Cloud Auth (Google OAuth login for DeskWand cloud)
-  // cloudAuth: {
-  //   googleLogin: (): Promise<
-  //     import("../shared/ipc-types").CloudAuthLoginResult
-  //   > => ipcRenderer.invoke("cloudAuth.googleLogin"),
-  // },
+  cloudAuth: {
+    googleLogin: (): Promise<
+      import("../shared/ipc-types").CloudAuthLoginResult
+    > => ipcRenderer.invoke("cloudAuth.googleLogin"),
+  },
 
   // Browser panel methods
   browser: {
@@ -1011,12 +1010,11 @@ declare global {
           import("../shared/ipc-types").OpenRouterAuthStatusResult
         >;
       };
-      // TODO: 恢复 Google 登录时取消注释
-      // cloudAuth: {
-      //   googleLogin: () => Promise<
-      //     import("../shared/ipc-types").CloudAuthLoginResult
-      //   >;
-      // };
+      cloudAuth: {
+        googleLogin: () => Promise<
+          import("../shared/ipc-types").CloudAuthLoginResult
+        >;
+      };
       browser: {
         toggle: () => Promise<{
           visible: boolean;
