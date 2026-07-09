@@ -102,15 +102,21 @@ getMarketplaceSkillDetail(slug: string): Promise<MarketplaceSkill>;
 
 ## 4. 筛选逻辑矩阵
 
+### Chip 排序
+
+从左到右：`全部 / 已安装 🆕 / 市场 🆕 / 我的云端 / 团队 / AI 生成 / 内置`
+
+理由：「已安装」紧挨「全部」方便快速查看已拥有的；「市场」作为发现入口放在云端之前。
+
 | 筛选 Chip | 数据来源 | 左侧分类栏 | 说明 |
 |-----------|---------|-----------|------|
 | **全部** | 本地 + 云端 + 团队 + 市场 | ✅ 显示 | 市场技能去重后混入 |
+| **已安装** 🆕 | 本地所有已装 | ❌ | 不含未装市场技能 |
+| **市场** 🆕 | API 全量市场列表 | ✅ 显示 | 已装/未装都显示，标记安装状态 |
 | **我的云端** | 云端个人技能 | ❌ | 现有逻辑不变 |
 | **团队** | 团队共享技能 | ❌ | 现有逻辑不变 |
 | **AI 生成** | 本地 agent 类型 | ❌ | 现有逻辑不变 |
 | **内置** | 本地 builtin 类型 | ❌ | 现有逻辑不变 |
-| **市场** 🆕 | API 全量市场列表 | ✅ 显示 | 已装/未装都显示，标记安装状态 |
-| **已安装** 🆕 | 本地所有已装 | ❌ | 不含未装市场技能 |
 
 ### 4.1 去重策略
 
@@ -129,9 +135,11 @@ getMarketplaceSkillDetail(slug: string): Promise<MarketplaceSkill>;
 
 ### 4.3 数据加载策略
 
-- 进入 `SettingsSkills` 组件时预加载市场第一页
-- 用户切到「市场」筛选时无需额外等待
+- **触发时机**：`isActive` 从 false 变 true 且 `cloudConfig.token` 存在时，预加载市场第一页
+- token 变化（登录/登出）时重新加载；同一 token 下多次进入页面使用内存缓存，不重复请求
+- 用户切到「市场」筛选时，若数据已预加载则直接渲染，否则触发首次加载
 - 分页使用「加载更多」按钮，非无限滚动
+- 切换筛选条件（分类/搜索）时重置为 page=1
 
 ---
 
@@ -151,7 +159,7 @@ getMarketplaceSkillDetail(slug: string): Promise<MarketplaceSkill>;
   - 已安装（最新版）「已安装 ✓」+「查看详情」
   - 已安装（有更新）「更新」+「查看详情」
 
-支持卡片视图和列表视图（与现有 SkillCard 一致的 viewMode）。
+支持卡片视图和列表视图，复用现有 `SettingsSkills` 中 `localStorage('skillViewMode')` 控制的 `viewMode` 状态，不引入独立的视图切换逻辑。
 
 ### 5.2 MarketplaceCategorySidebar（新增）
 
@@ -177,21 +185,23 @@ getMarketplaceSkillDetail(slug: string): Promise<MarketplaceSkill>;
 
 ## 6. 安装流程
 
+`POST /api/marketplace/:slug/install` 将市场技能深拷贝为个人技能，返回的 `skill.id` 即为个人技能库中的 id，后续直接用此 id 下载，无需额外查详情。
+
 ```
 用户点击「安装」
   ↓
 SettingsSkills 设置 installingId，按钮显示 Loading
   ↓
-POST /api/marketplace/:slug/install
-  ↓ 拿到 { skill: { id, name, version } }
+POST /api/marketplace/:slug/install  → 返回 { skill: { id, name, version } }
+  ↓  （id 即个人技能库中的 skillId，可直接用于下载）
   ↓
 GET /api/skills/:id/versions/:version/download（复用现有 downloadSkill）
   ↓
 解压 zip → electronAPI.skills.install()
   ↓
-writeInstalledMeta({ skillId, version, source: "marketplace", slug })
+writeInstalledMeta({ skillId: id, version, source: "marketplace", slug })
   ↓
-刷新列表 → 技能卡片状态切换为「已安装」
+Toast "安装成功" → 刷新列表 → 技能卡片状态切换为「已安装」
 ```
 
 ---
@@ -215,12 +225,14 @@ writeInstalledMeta({ skillId, version, source: "marketplace", slug })
 
 ## 8. i18n 翻译项（新增）
 
+新增 key 合并到现有 `skillMarket` 对象中，与已有 key（如 `tabMySkills`、`publish`、`search` 等）同级，顺序上新增 key 追加在末尾。
+
 ### zh.json
 
 ```json
-"skillMarket": {
-  "filterMarketplace": "市场",
-  "filterInstalled": "已安装",
+// 在现有 skillMarket 对象末尾追加以下 key：
+"filterMarketplace": "市场",
+"filterInstalled": "已安装",
   "allCategories": "全部",
   "downloads": "下载",
   "installs": "安装",
@@ -240,9 +252,9 @@ writeInstalledMeta({ skillId, version, source: "marketplace", slug })
 ### en.json
 
 ```json
-"skillMarket": {
-  "filterMarketplace": "Marketplace",
-  "filterInstalled": "Installed",
+// Append to existing skillMarket object:
+"filterMarketplace": "Marketplace",
+"filterInstalled": "Installed",
   "allCategories": "All",
   "downloads": "Downloads",
   "installs": "Installs",
