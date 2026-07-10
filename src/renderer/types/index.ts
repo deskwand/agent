@@ -941,6 +941,7 @@ export interface CloudSkill {
 export interface MarketplaceCategory {
   category: string;
   category_name: string;
+  category_name_en: string;
   count: number;
 }
 
@@ -952,7 +953,8 @@ export interface MarketplaceSkill {
   description_zh: string;
   category: string;
   category_name: string;
-  sub_categories: Array<{ key: string; name: string }>;
+  category_name_en: string;
+  sub_categories: Array<{ key: string; name: string; name_en?: string }>;
   source: string;
   installs: number;
   version: string;

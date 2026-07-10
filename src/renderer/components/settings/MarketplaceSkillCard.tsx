@@ -52,7 +52,9 @@ function MarketplaceCardView({
               </span>
             ) : null}
             <span className="text-xs px-1.5 py-0.5 rounded bg-surface-muted text-text-muted shrink-0">
-              {skill.category_name}
+              {i18n.language === "en" && skill.category_name_en
+                ? skill.category_name_en
+                : skill.category_name}
             </span>
           </div>
           {skill.sub_categories.length > 0 ? (
@@ -62,7 +64,9 @@ function MarketplaceCardView({
                   key={sc.key}
                   className="text-[10px] px-1.5 py-0.5 rounded bg-surface-muted text-text-muted"
                 >
-                  {sc.name}
+                  {i18n.language === "en" && sc.name_en
+                    ? sc.name_en
+                    : sc.name}
                 </span>
               ))}
             </div>

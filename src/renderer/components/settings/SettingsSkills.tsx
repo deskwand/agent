@@ -57,7 +57,7 @@ type MarketCacheEntry = {
 /* ─── main component ─── */
 
 export function SettingsSkills({ isActive }: { isActive: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [skills, setSkills] = useState<Skill[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<LocalizedBanner | null>(null);
@@ -538,8 +538,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     try {
       const client = new CloudApiClient(cloudConfig.token);
       const cats = await client.getMarketplaceCategories();
+      const isEn = i18n.language === "en";
       const mapped: Array<{ key: string; name: string }> = cats.map(
-        (c) => ({ key: c.category, name: c.category_name }),
+        (c) => ({ key: c.category, name: isEn ? c.category_name_en || c.category_name : c.category_name }),
       );
       categoriesCache.current = { timestamp: now, categories: mapped };
       setAllCategories(mapped);
