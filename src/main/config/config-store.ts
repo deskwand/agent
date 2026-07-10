@@ -690,7 +690,8 @@ let cachedDynamicPresets: typeof PROVIDER_PRESETS | null = null;
 export async function getPiAiModelPresets(): Promise<typeof PROVIDER_PRESETS> {
   if (cachedDynamicPresets) return cachedDynamicPresets;
   try {
-    const { getModels } = (await import("@earendil-works/pi-ai")) as {
+    // TODO: migrate from compat to createModels() when compat is removed
+    const { getModels } = (await import("@earendil-works/pi-ai/compat")) as {
       getModels: (
         provider: string,
       ) => Array<{ id: string; name: string }> | undefined;

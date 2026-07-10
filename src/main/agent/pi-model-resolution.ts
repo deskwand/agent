@@ -1,4 +1,7 @@
-import { getModel, getModels, getProviders, type Api, type Model } from "@earendil-works/pi-ai";
+// TODO: migrate from compat to createModels() when compat is removed
+// (v0.80.0 changelog: "will be removed in a future release with a migration guide")
+import { getModel, getModels, getProviders } from "@earendil-works/pi-ai/compat";
+import type { Api, Model } from "@earendil-works/pi-ai";
 import { isOfficialOpenAIBaseUrl } from "../config/auth-utils";
 
 const COMMON_FALLBACK_PROVIDERS = ["openai", "anthropic", "google"] as const;

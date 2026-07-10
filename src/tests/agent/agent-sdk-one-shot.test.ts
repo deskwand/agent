@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const completeSimpleMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@earendil-works/pi-ai", () => ({
+vi.mock("@earendil-works/pi-ai/compat", () => ({
   completeSimple: completeSimpleMock,
+  getProviders: vi.fn(() => []),
+  getModels: vi.fn(() => []),
   getModel: vi.fn(() => undefined),
 }));
 

@@ -1,7 +1,6 @@
-import {
-  completeSimple,
-  type UserMessage as PiUserMessage,
-} from "@earendil-works/pi-ai";
+// TODO: migrate from compat to createModels() when compat is removed
+import { completeSimple } from "@earendil-works/pi-ai/compat";
+import { type UserMessage as PiUserMessage } from "@earendil-works/pi-ai";
 import type { ApiTestInput, ApiTestResult } from "../../renderer/types";
 import {
   PROVIDER_PRESETS,
