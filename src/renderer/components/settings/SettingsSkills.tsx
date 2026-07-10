@@ -23,6 +23,7 @@ import type { DisplaySkill } from "./SkillCard";
 import { MarketplaceSkillCard } from "./MarketplaceSkillCard";
 import type { MarketplaceInstallState } from "./MarketplaceSkillCard";
 import { MarketplaceCategorySidebar } from "./MarketplaceCategorySidebar";
+import { MarketplaceSkeleton } from "./MarketplaceSkeleton";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -40,19 +41,18 @@ function formatTimeAgo(
   return t("skills.daysAgo", { n: Math.floor(seconds / 86400) });
 }
 
-function extractCategories(
-  skills: MarketplaceSkill[],
-): Array<{ key: string; name: string }> {
-  const seen = new Set<string>();
-  const result: Array<{ key: string; name: string }> = [];
-  for (const s of skills) {
-    if (!seen.has(s.category)) {
-      seen.add(s.category);
-      result.push({ key: s.category, name: s.category_name });
-    }
-  }
-  return result;
-}
+/* ─── cache TTL ─── */
+const MARKET_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
+const CATEGORY_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
+
+type MarketCacheEntry = {
+  timestamp: number;
+  skills: MarketplaceSkill[];
+  total: number;
+  page: number;
+  category: string | null;
+  query: string;
+};
 
 /* ─── main component ─── */
 
@@ -97,7 +97,18 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceCategory, setMarketplaceCategory] = useState<string | null>(null);
   const [installingMarketplaceSlug, setInstallingMarketplaceSlug] = useState<string | null>(null);
-  const [allCategories, setAllCategories] = useState<Array<{ key: string; name: string }>>([]);
+  const [allCategories, setAllCategories] = useState<
+    Array<{ key: string; name: string }>
+  >([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+
+  // Cache refs
+  const marketCache = useRef<MarketCacheEntry | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const categoriesCache = useRef<{
+    timestamp: number;
+    categories: Array<{ key: string; name: string }>;
+  } | null>(null);
 
   function toggleViewMode(mode: "cards" | "list") {
     setViewMode(mode);
@@ -174,41 +185,50 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     const checkStatus = async () => {
       const newStatus = new Map<string, "unpublished" | "published" | "outdated" | "has_update">();
       const all = skills.filter((s) => s.type !== "builtin");
-      for (const skill of all) {
-        try {
-          const localFp = await window.electronAPI.skills.computeContentFingerprint(skill.name);
-          const storedFp = await window.electronAPI.skills.readFingerprint(skill.name);
-          const installedMeta = await window.electronAPI.skills.readInstalledMeta(skill.name);
-          const cloudSkill = cloudSkills.find(
-            (cs) => cs.name.toLowerCase() === skill.name.toLowerCase()
-          ) || teamCloudSkills.find(
-            (cs) => cs.name.toLowerCase() === skill.name.toLowerCase()
-          );
-          if (!cloudSkill) {
-            newStatus.set(skill.name, "unpublished");
-          } else if (storedFp) {
-            if (storedFp === localFp) {
-              if (installedMeta && installedMeta.version < cloudSkill.current_version) {
+      if (all.length === 0) {
+        setPublishStatus(newStatus);
+        return;
+      }
+      // Run all IPC calls in parallel per skill (3 calls per skill)
+      await Promise.all(
+        all.map(async (skill) => {
+          try {
+            const [localFp, storedFp, installedMeta] = await Promise.all([
+              window.electronAPI.skills.computeContentFingerprint(skill.name),
+              window.electronAPI.skills.readFingerprint(skill.name),
+              window.electronAPI.skills.readInstalledMeta(skill.name),
+            ]);
+            const cloudSkill = cloudSkills.find(
+              (cs) => cs.name.toLowerCase() === skill.name.toLowerCase()
+            ) || teamCloudSkills.find(
+              (cs) => cs.name.toLowerCase() === skill.name.toLowerCase()
+            );
+            if (!cloudSkill) {
+              newStatus.set(skill.name, "unpublished");
+            } else if (storedFp) {
+              if (storedFp === localFp) {
+                if (installedMeta && installedMeta.version < cloudSkill.current_version) {
+                  newStatus.set(skill.name, "has_update");
+                } else {
+                  newStatus.set(skill.name, "published");
+                }
+              } else {
+                newStatus.set(skill.name, "outdated");
+              }
+            } else if (installedMeta) {
+              if (installedMeta.version < cloudSkill.current_version) {
                 newStatus.set(skill.name, "has_update");
               } else {
                 newStatus.set(skill.name, "published");
               }
             } else {
-              newStatus.set(skill.name, "outdated");
+              newStatus.set(skill.name, "unpublished");
             }
-          } else if (installedMeta) {
-            if (installedMeta.version < cloudSkill.current_version) {
-              newStatus.set(skill.name, "has_update");
-            } else {
-              newStatus.set(skill.name, "published");
-            }
-          } else {
+          } catch {
             newStatus.set(skill.name, "unpublished");
           }
-        } catch {
-          newStatus.set(skill.name, "unpublished");
-        }
-      }
+        }),
+      );
       setPublishStatus(newStatus);
     };
     checkStatus();
@@ -503,9 +523,64 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   }
 
   // ─── marketplace install ───
+  // ─── load categories from API ───
+  const loadCategories = useCallback(async () => {
+    if (!cloudConfig?.token) return;
+    const now = Date.now();
+    if (
+      categoriesCache.current &&
+      now - categoriesCache.current.timestamp < CATEGORY_CACHE_TTL_MS
+    ) {
+      setAllCategories(categoriesCache.current.categories);
+      return;
+    }
+    setCategoriesLoading(true);
+    try {
+      const client = new CloudApiClient(cloudConfig.token);
+      const cats = await client.getMarketplaceCategories();
+      const mapped: Array<{ key: string; name: string }> = cats.map(
+        (c) => ({ key: c.category, name: c.category_name }),
+      );
+      categoriesCache.current = { timestamp: now, categories: mapped };
+      setAllCategories(mapped);
+    } catch {
+      // silent
+    } finally {
+      setCategoriesLoading(false);
+    }
+  }, [cloudConfig?.token]);
+
   const loadMarketplace = useCallback(
     async (page = 1, append = false) => {
       if (!cloudConfig?.token) return;
+
+      // Check memory cache for non-append loads
+      if (!append) {
+        const now = Date.now();
+        const cached = marketCache.current;
+        if (
+          cached &&
+          now - cached.timestamp < MARKET_CACHE_TTL_MS &&
+          cached.page === page &&
+          cached.category === marketplaceCategory &&
+          cached.query === debouncedSearch
+        ) {
+          setMarketplaceSkills(cached.skills);
+          setMarketplaceTotal(cached.total);
+          setMarketplacePage(cached.page);
+          return;
+        }
+      }
+
+      // Abort previous in-flight request
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      let aborted = false;
+      controller.signal.addEventListener("abort", () => {
+        aborted = true;
+      });
+
       setMarketplaceLoading(true);
       try {
         const client = new CloudApiClient(cloudConfig.token);
@@ -515,22 +590,37 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
           page,
           limit: 20,
         });
+
+        if (controller.signal.aborted) return;
+
         setMarketplaceSkills((prev) =>
           append ? [...prev, ...res.skills] : res.skills,
         );
         setMarketplaceTotal(res.total);
         setMarketplacePage(res.page);
-        // Cache full category list on unfiltered first-page loads (for sidebar persistence)
-        if (!append && !marketplaceCategory) {
-          setAllCategories(extractCategories(res.skills));
+
+        // Update cache on fresh (non-append) loads
+        if (!append) {
+          marketCache.current = {
+            timestamp: Date.now(),
+            skills: res.skills,
+            total: res.total,
+            page: res.page,
+            category: marketplaceCategory,
+            query: debouncedSearch,
+          };
         }
       } catch (err: unknown) {
         const e = err as Error & { status?: number };
         if (e?.status === 401) {
           useAppStore.getState().setCloudConfig(null);
         }
+        // Don't show error for aborted requests
+        if (aborted) return;
       } finally {
-        setMarketplaceLoading(false);
+        if (!controller.signal.aborted) {
+          setMarketplaceLoading(false);
+        }
       }
     },
     [cloudConfig?.token, debouncedSearch, marketplaceCategory],
@@ -599,25 +689,39 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   }, [marketplaceSkills, localSkillNames, installingMarketplaceSlug]);
 
   // ─── marketplace effects ───
+
+  // Load categories once when token is available
   useEffect(() => {
     if (!isActive) return;
     if (!cloudConfig?.token) {
-      setMarketplaceSkills([]);
-      setMarketplaceTotal(0);
+      setAllCategories([]);
+      categoriesCache.current = null;
       return;
     }
-    setMarketplacePage(0);
+    void loadCategories();
+  }, [isActive, cloudConfig?.token, loadCategories]);
+
+  useEffect(() => {
+    if (!isActive) return;
+    if (!cloudConfig?.token || filterKey !== "marketplace") {
+      setMarketplaceSkills([]);
+      setMarketplaceTotal(0);
+      marketCache.current = null;
+      return;
+    }
     void loadMarketplace(1);
-  }, [isActive, cloudConfig?.token, loadMarketplace]);
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, [isActive, cloudConfig?.token, filterKey, loadMarketplace]);
 
   useEffect(() => {
     if (!isActive || filterKey !== "marketplace") return;
     if (!cloudConfig?.token) return;
+    // Invalidate cache when filters change
+    marketCache.current = null;
     void loadMarketplace(1);
-    // isActive / token / filterKey guards are in the effect above;
-    // this effect only triggers on marketplace-relevant changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [marketplaceCategory, debouncedSearch]);
+  }, [marketplaceCategory, debouncedSearch, filterKey]);
 
   // ─── cloud operations ───
   function handleUnshare(skillName: string) {
@@ -791,12 +895,24 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             <MarketplaceCategorySidebar
               categories={allCategories}
               selectedCategory={marketplaceCategory}
+              loading={categoriesLoading}
               onSelect={(key) => {
                 setMarketplaceCategory(key);
                 setMarketplacePage(0);
               }}
             />
             <div className="flex-1 min-w-0 pl-4 relative">
+              {/* Initial loading skeleton */}
+              {marketplaceLoading && marketplaceSkills.length === 0 && (
+                <MarketplaceSkeleton viewMode={viewMode} />
+              )}
+              {/* Pagination loading overlay */}
+              {marketplaceLoading && marketplaceSkills.length > 0 && (
+                <div className="absolute inset-0 bg-surface/60 flex items-center justify-center rounded-lg z-10">
+                  <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                </div>
+              )}
+              {/* Empty state */}
               {marketplaceSkills.length === 0 && !marketplaceLoading && (
                 <div className="text-center py-8 text-text-muted">
                   <Package className="w-6 h-6 mx-auto mb-2 opacity-40" />
@@ -809,57 +925,57 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                   </p>
                 </div>
               )}
-              {marketplaceLoading && marketplaceSkills.length > 0 && (
-                <div className="absolute inset-0 bg-surface/60 flex items-center justify-center rounded-lg z-10">
-                  <Loader2 className="w-5 h-5 text-accent animate-spin" />
-                </div>
-              )}
-              <div className={viewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "space-y-2"}>
-                {marketplaceSkills.map((ms) => (
-                  <MarketplaceSkillCard
-                    key={ms.slug}
-                    skill={ms}
-                    installState={
-                      marketplaceInstallStates.get(ms.slug) ?? "available"
-                    }
-                    onInstall={() => doMarketplaceInstall(ms)}
-                    onViewDetail={() => {
-                      if (!cloudConfig?.token) return;
-                      if (detailCache.current.has(ms.slug)) {
-                        setMdModal({ name: ms.name, content: detailCache.current.get(ms.slug)! });
-                        return;
-                      }
-                      setDetailLoading(true);
-                      setMdModal({ name: ms.name, content: null });
-                      const client = new CloudApiClient(cloudConfig.token);
-                      client
-                        .getMarketplaceSkillDetail(ms.slug)
-                        .then((detail) => {
-                          const content = detail.skill_md ?? null;
-                          detailCache.current.set(ms.slug, content);
-                          setMdModal({ name: ms.name, content });
-                        })
-                        .catch(() => {
-                          detailCache.current.set(ms.slug, null);
+              {/* Skill cards */}
+              {marketplaceSkills.length > 0 && (
+                <>
+                  <div className={viewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "space-y-2"}>
+                    {marketplaceSkills.map((ms) => (
+                      <MarketplaceSkillCard
+                        key={ms.slug}
+                        skill={ms}
+                        installState={
+                          marketplaceInstallStates.get(ms.slug) ?? "available"
+                        }
+                        onInstall={() => doMarketplaceInstall(ms)}
+                        onViewDetail={() => {
+                          if (!cloudConfig?.token) return;
+                          if (detailCache.current.has(ms.slug)) {
+                            setMdModal({ name: ms.name, content: detailCache.current.get(ms.slug)! });
+                            return;
+                          }
+                          setDetailLoading(true);
                           setMdModal({ name: ms.name, content: null });
-                        })
-                        .finally(() => setDetailLoading(false));
-                    }}
-                    viewMode={viewMode}
-                  />
-                ))}
-              </div>
-              {marketplaceSkills.length < marketplaceTotal && (
-                  <div className="text-center mt-4">
-                    <button
-                      onClick={loadMoreMarketplace}
-                      disabled={marketplaceLoading}
-                      className="px-4 py-2 rounded-lg bg-surface-muted text-sm text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
-                    >
-                      {marketplaceLoading ? "..." : t("skillMarket.loadMore")}
-                    </button>
+                          const client = new CloudApiClient(cloudConfig.token);
+                          client
+                            .getMarketplaceSkillDetail(ms.slug)
+                            .then((detail) => {
+                              const content = detail.skill_md ?? null;
+                              detailCache.current.set(ms.slug, content);
+                              setMdModal({ name: ms.name, content });
+                            })
+                            .catch(() => {
+                              detailCache.current.set(ms.slug, null);
+                              setMdModal({ name: ms.name, content: null });
+                            })
+                            .finally(() => setDetailLoading(false));
+                        }}
+                        viewMode={viewMode}
+                      />
+                    ))}
                   </div>
-                )}
+                  {marketplaceSkills.length < marketplaceTotal && (
+                    <div className="text-center mt-4">
+                      <button
+                        onClick={loadMoreMarketplace}
+                        disabled={marketplaceLoading}
+                        className="px-4 py-2 rounded-lg bg-surface-muted text-sm text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
+                      >
+                        {marketplaceLoading ? "..." : t("skillMarket.loadMore")}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

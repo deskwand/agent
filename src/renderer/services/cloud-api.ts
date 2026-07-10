@@ -200,6 +200,15 @@ export class CloudApiClient {
 
   // ── Marketplace ──
 
+  async getMarketplaceCategories(): Promise<
+    import("../types").MarketplaceCategory[]
+  > {
+    const res = await this.request<{
+      categories: import("../types").MarketplaceCategory[];
+    }>("/api/marketplace/categories");
+    return res.categories;
+  }
+
   async getMarketplace(params: {
     q?: string;
     category?: string;

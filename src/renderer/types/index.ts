@@ -938,6 +938,12 @@ export interface CloudSkill {
   skill_md?: string;
 }
 
+export interface MarketplaceCategory {
+  category: string;
+  category_name: string;
+  count: number;
+}
+
 // Marketplace skill from /api/marketplace
 export interface MarketplaceSkill {
   slug: string;
