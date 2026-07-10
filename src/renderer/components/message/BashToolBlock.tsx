@@ -184,20 +184,16 @@ export const BashToolBlock = memo(function BashToolBlock({
         </div>
         ) : null}
 
-        {/* Label: $ command · exit N — hidden when expanded (terminal panel shows it) */}
+        {/* Label: $ command · exit N */}
         <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
-          {!expanded && (
-            <>
-              <span className="min-w-0 max-w-full truncate text-xs font-mono text-text-secondary">
-                $ {truncateCmd(cmd)}
-              </span>
-              {isRunning ? (
-                <span className="whitespace-nowrap text-xs text-text-muted">
-                  · {t("tool.bashRunning")}
-                </span>
-              ) : null}
-            </>
-          )}
+          <span className="min-w-0 max-w-full truncate text-xs font-mono text-text-secondary">
+            $ {truncateCmd(cmd)}
+          </span>
+          {isRunning ? (
+            <span className="whitespace-nowrap text-xs text-text-muted">
+              · {t("tool.bashRunning")}
+            </span>
+          ) : null}
           <span
             className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-text-muted transition-opacity ${
               expanded
