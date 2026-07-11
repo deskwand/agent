@@ -66,6 +66,7 @@ import { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extens
 import { configStore } from "../config/config-store";
 import crypto from "node:crypto";
 import { createVisionDescribeTool } from "./tools/vision-describe";
+import { createOfficeTools } from "./tools/office/office-tools";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
 import {
   BrowserViewManager,
@@ -2895,11 +2896,19 @@ Tool routing:\n
         }
       }
 
+      // Register built-in office document read tools (zero-dependency, pure JS)
+      const officeTools = createOfficeTools(effectiveCwd);
+      log(
+        `[AgentRunner] Registered ${officeTools.length} office read tools: ${officeTools.map((t) => t.name).join(", ")}`,
+      );
+
       const allCustomTools = [
         ...customTools,
         ...this._customTools, // background review tools
         ...(wrappedBashTool ? [wrappedBashTool] : []),
         ...(visionTool ? [visionTool] : []),
+        // Add office tools (always registered, no config required)
+        ...officeTools,
       ];
 
       // Diagnostic: log tools being passed to SDK (helps debug Ollama tool use)

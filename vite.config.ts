@@ -58,6 +58,13 @@ export default defineConfig({
                 // node:sqlite was added in Node 22 and is not listed in
                 // module.builtinModules — must be externalized explicitly.
                 'node:sqlite',
+                // pdfjs-dist's internal dynamic import of pdf.worker.mjs gets
+                // resolved by Rollup to the dist output dir. Keep it external.
+                'pdfjs-dist/legacy/build/pdf.worker.mjs',
+                // @napi-rs/canvas is a native addon used by pdfjs-dist's
+                // NodeCanvasFactory for page rendering (image-only PDF pages).
+                // Native addons must not be bundled.
+                '@napi-rs/canvas',
               ],
               output: {
                 // Ensure consistent interop for CJS/ESM
