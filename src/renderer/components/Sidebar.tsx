@@ -644,7 +644,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               </span>
             </div>
             <div className="space-y-0.5 max-h-40 overflow-y-auto sidebar-scroll">
-            {taskSlots.map((slot) => {
+            {[...taskSlots]
+              .sort((a, b) => {
+                const sessionA = sessions.find((s) => s.id === a.sessionId);
+                const sessionB = sessions.find((s) => s.id === b.sessionId);
+                if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                return (sessionB?.updatedAt || 0) - (sessionA?.updatedAt || 0);
+              })
+              .map((slot) => {
               const session = sessions.find((s) => s.id === slot.sessionId);
               if (!session) return null;
               return (

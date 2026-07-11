@@ -53,6 +53,63 @@ describe("Sidebar current tasks", () => {
     });
   });
 
+  it("sorts running tasks before completed tasks and by updatedAt desc", async () => {
+    const base = Date.now();
+    useAppStore.setState({
+      sessions: [
+        { ...makeSession("s_old_run", "Old running"), id: "s_old_run", updatedAt: base - 2000 },
+        { ...makeSession("s_new_run", "New running"), id: "s_new_run", updatedAt: base },
+        { ...makeSession("s_old_done", "Old done"), id: "s_old_done", updatedAt: base - 4000 },
+        { ...makeSession("s_new_done", "New done"), id: "s_new_done", updatedAt: base - 1000 },
+      ],
+      taskSlots: [
+        { sessionId: "s_old_done", completed: true },
+        { sessionId: "s_new_done", completed: true },
+        { sessionId: "s_new_run", completed: false },
+        { sessionId: "s_old_run", completed: false },
+      ],
+    });
+
+    await act(async () => {
+      root.render(React.createElement(Sidebar, { width: 280 }));
+    });
+    await flush();
+
+    const taskSection = container.querySelector(".max-h-40");
+    expect(taskSection).toBeTruthy();
+    const children = taskSection!.children;
+    const titles = Array.from(children).map((c) => c.textContent?.trim() ?? "");
+
+    // running first: newest → oldest, then completed: newest → oldest
+    expect(titles).toEqual(["New running", "Old running", "New done", "Old done"]);
+  });
+
+  it("pushes slots with missing sessions to the end", async () => {
+    const base = Date.now();
+    useAppStore.setState({
+      sessions: [
+        { ...makeSession("s_real", "Real session"), id: "s_real", updatedAt: base },
+      ],
+      taskSlots: [
+        { sessionId: "s_orphan", completed: false },
+        { sessionId: "s_real", completed: false },
+      ],
+    });
+
+    await act(async () => {
+      root.render(React.createElement(Sidebar, { width: 280 }));
+    });
+    await flush();
+
+    const taskSection = container.querySelector(".max-h-40");
+    expect(taskSection).toBeTruthy();
+    const children = taskSection!.children;
+    const titles = Array.from(children).map((c) => c.textContent?.trim() ?? "");
+
+    // orphan slot with missing session should be hidden (returns null), so only Real session renders
+    expect(titles).toEqual(["Real session"]);
+  });
+
   it("reserves the left selection gutter for inactive current tasks", async () => {
     await act(async () => {
       root.render(React.createElement(Sidebar, { width: 280 }));
