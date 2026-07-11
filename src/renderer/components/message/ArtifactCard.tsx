@@ -185,17 +185,65 @@ export const ArtifactCard = memo(function ArtifactCard({
     activeSessionCwd ? resolvePathAgainstWorkspace(p, activeSessionCwd) : p;
 
   const handleClickFile = useCallback(
-    (file: ResultFileEntry) => {
+    async (file: ResultFileEntry) => {
       if (revertedFiles.has(file.path)) return;
       const resolvedPath = resolvePath(file.path);
-      if (isNew(file) || !isGitRepo) {
+      const openPreview = () => {
         setPreviewFile({ ...file, path: resolvedPath });
-      } else {
-        setReviewTargetFile(resolvedPath);
+      };
+
+      if (isNew(file) || !isGitRepo || !activeSessionCwd) {
+        openPreview();
+        return;
+      }
+
+      const getDiffFiles = window.electronAPI?.review?.getDiffFiles;
+      if (!getDiffFiles) {
+        openPreview();
+        return;
+      }
+
+      try {
+        const diffFiles = await getDiffFiles(activeSessionCwd);
+        const normalizedResolvedPath = resolvedPath.replace(/\\/g, "/");
+        const normalizedWorkingDir = activeSessionCwd
+          .replace(/\\/g, "/")
+          .replace(/\/+$/, "");
+        const normalizedFilePath = file.path
+          .replace(/\\/g, "/")
+          .replace(/^\.\/+/, "");
+        const workspaceRelativePath = normalizedResolvedPath.startsWith(
+          `${normalizedWorkingDir}/`,
+        )
+          ? normalizedResolvedPath.slice(normalizedWorkingDir.length + 1)
+          : normalizedFilePath;
+        const matchingDiffFile = diffFiles.find(({ path }) => {
+          const normalizedDiffPath = path.replace(/\\/g, "/");
+          return (
+            normalizedDiffPath === workspaceRelativePath ||
+            normalizedDiffPath.endsWith(`/${workspaceRelativePath}`)
+          );
+        });
+
+        if (!matchingDiffFile) {
+          openPreview();
+          return;
+        }
+
+        setReviewTargetFile(matchingDiffFile.path);
         setReviewOpen(true);
+      } catch {
+        openPreview();
       }
     },
-    [revertedFiles, isGitRepo, resolvePath, setReviewTargetFile, setReviewOpen],
+    [
+      activeSessionCwd,
+      isGitRepo,
+      resolvePath,
+      revertedFiles,
+      setReviewTargetFile,
+      setReviewOpen,
+    ],
   );
 
   const handleReviewAll = useCallback(() => {
