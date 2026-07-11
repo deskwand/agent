@@ -76,7 +76,8 @@
     "archivedSessions": "已归档",
     "archivedSessionsDesc": "浏览、恢复或彻底删除已归档会话",
     "about": "关于",
-    "aboutDesc": "版本与更新"
+    "aboutDesc": "版本与更新",
+    "connectorsDesc": "管理 MCP 连接器"
   },
   "marketplace": {
     "title": "技能云",

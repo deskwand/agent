@@ -112,7 +112,7 @@ interface AppState {
   showSchedule: boolean;
   showMarketplace: boolean;
   settingsTab: string | null;
-  marketplaceTab: string | null;
+
   rightPanelMode: "files" | "browser" | null;
   isReviewOpen: boolean;
   reviewTargetFile: string | null;
@@ -241,7 +241,7 @@ interface AppState {
   setShowSchedule: (show: boolean) => void;
   setShowMarketplace: (show: boolean) => void;
   setSettingsTab: (tab: string | null) => void;
-  setMarketplaceTab: (tab: string | null) => void;
+
   setRightPanelMode: (mode: "files" | "browser" | null) => void;
   setReviewOpen: (open: boolean) => void;
   setReviewTargetFile: (path: string | null) => void;
@@ -377,7 +377,6 @@ export const useAppStore = create<AppState>((set) => ({
   showSchedule: false,
   showMarketplace: false,
   settingsTab: null,
-  marketplaceTab: null,
   rightPanelMode: null as "files" | "browser" | null,
   isReviewOpen: false,
   reviewTargetFile: null,
@@ -809,7 +808,6 @@ export const useAppStore = create<AppState>((set) => ({
   setShowSchedule: (show) => set({ showSchedule: show }),
   setShowMarketplace: (show) => set({ showMarketplace: show }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
-  setMarketplaceTab: (tab) => set({ marketplaceTab: tab }),
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
   setReviewOpen: (open) => set({ isReviewOpen: open }),
   setReviewTargetFile: (path) => set({ reviewTargetFile: path }),

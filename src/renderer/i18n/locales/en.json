@@ -76,7 +76,8 @@
     "archivedSessions": "Archived",
     "archivedSessionsDesc": "Browse, restore or permanently delete archived sessions",
     "about": "About",
-    "aboutDesc": "Version & updates"
+    "aboutDesc": "Version & updates",
+    "connectorsDesc": "Manage MCP connectors"
   },
   "marketplace": {
     "title": "Skills Cloud",

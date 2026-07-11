@@ -238,15 +238,13 @@ export function useScheduleViewState(): boolean {
   return useAppStore((s) => s.showSchedule);
 }
 
-/** Returns whether the marketplace view is active, plus the active tab. */
+/** Returns whether the marketplace view is active. */
 export function useMarketplaceViewState(): {
   showMarketplace: boolean;
-  marketplaceTab: string | null;
 } {
   return useAppStore(
     useShallow((s) => ({
       showMarketplace: s.showMarketplace,
-      marketplaceTab: s.marketplaceTab,
     })),
   );
 }
