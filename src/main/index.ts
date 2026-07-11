@@ -52,6 +52,7 @@ import {
   type ThemePreset,
   type SaveProviderPayload,
   type ProviderProfileKey,
+  enrichOAuthProviderModels,
 } from "./config/config-store";
 import { runConfigApiTest } from "./config/config-test-routing";
 import { listOllamaModels } from "./config/ollama-api";
@@ -2143,7 +2144,9 @@ ipcMain.handle(
   async (_event, payload: SaveProviderPayload) => {
     log("[Config] Saving provider:", payload.profileKey);
     const previousConfig = configStore.getAll();
-    configStore.saveProvider(payload);
+    // Enrich OAuth models from pi-ai built-in registry (authoritative source)
+    const enriched = await enrichOAuthProviderModels(payload);
+    configStore.saveProvider(enriched);
     const updatedConfig = await syncConfigAfterMutation(previousConfig);
     return { success: true, config: updatedConfig };
   },

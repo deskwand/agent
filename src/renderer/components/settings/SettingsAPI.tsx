@@ -59,6 +59,9 @@ const PROVIDER_ORDER: ProviderChoice[] = [
 
 const OAUTH_PROVIDER_MODELS: Record<string, Array<{ id: string; name: string }>> = {
   "openai-codex": [
+    { id: "gpt-5.6-sol", name: "gpt-5.6-sol" },
+    { id: "gpt-5.6-terra", name: "gpt-5.6-terra" },
+    { id: "gpt-5.6-luna", name: "gpt-5.6-luna" },
     { id: "gpt-5.5", name: "gpt-5.5" },
     { id: "gpt-5.4", name: "gpt-5.4" },
     { id: "gpt-5.4-mini", name: "gpt-5.4-mini" },

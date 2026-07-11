@@ -12,7 +12,7 @@ import {
   shouldUseAnthropicAuthToken,
 } from "./auth-utils";
 import { resolveModelContextWindow } from "../agent/pi-model-resolution";
-import { isOAuthProfileKey } from "../../shared/oauth-utils";
+import { extractOAuthProviderId, isOAuthProfileKey } from "../../shared/oauth-utils";
 
 export type ProviderType =
   | "openrouter"
@@ -543,6 +543,47 @@ function clearProviderConfig(
     baseUrl: cleared.baseUrl,
     updatedAt: nowISO(),
   };
+}
+
+/**
+ * Attempt to enrich an OAuth provider payload with models from the
+ * pi-ai built-in registry (which is the authoritative source for
+ * OAuth provider models). Falls back to the renderer-provided models
+ * if pi-ai is unavailable or does not know the provider.
+ */
+export async function enrichOAuthProviderModels(
+  payload: SaveProviderPayload,
+): Promise<SaveProviderPayload> {
+  if (payload.config.provider !== "oauth") return payload;
+  try {
+    const providerId = extractOAuthProviderId(payload.profileKey);
+    if (!providerId) return payload;
+    const { getModels } = await import("@earendil-works/pi-ai/compat");
+    const piModels = getModels(providerId as Parameters<typeof getModels>[0]);
+    if (!piModels?.length) return payload;
+    const models: ApiProviderModel[] = piModels.map((m) => ({
+      id: m.id,
+      label: m.name,
+      source: "preset" as const,
+      contextWindow: m.contextWindow,
+      maxTokens: m.maxTokens,
+      input: m.input,
+    }));
+    return {
+      ...payload,
+      config: {
+        ...payload.config,
+        models,
+        defaultModel: models[0]?.id || payload.config.defaultModel,
+      },
+    };
+  } catch (error) {
+    logWarn(
+      "[Config] Failed to enrich OAuth models from pi-ai, using renderer fallback:",
+      error,
+    );
+    return payload;
+  }
 }
 
 function sanitizeSaveProviderPayload(
