@@ -11,6 +11,7 @@ import {
   Cloud,
   LayoutGrid,
   List,
+  RefreshCw,
 } from "lucide-react";
 import type { Skill, CloudSkill, MarketplaceSkill } from "../../types";
 import type { LocalizedBanner } from "./shared";
@@ -42,8 +43,8 @@ function formatTimeAgo(
 }
 
 /* ─── cache TTL ─── */
-const MARKET_CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
-const CATEGORY_CACHE_TTL_MS = 10 * 60 * 1000; // 10 min
+const MARKET_CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
+const CATEGORY_CACHE_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 type MarketCacheEntry = {
   timestamp: number;
@@ -53,6 +54,75 @@ type MarketCacheEntry = {
   category: string | null;
   query: string;
 };
+
+type CategoriesCacheEntry = {
+  timestamp: number;
+  language: string;
+  categories: Array<{ key: string; name: string }>;
+};
+
+const MARKET_CACHE_KEY = "marketplaceCache";
+const CATEGORIES_CACHE_KEY = "categoriesCache";
+const DETAIL_CACHE_KEY = "marketplaceDetailCache";
+
+/* ─── localStorage cache helpers ─── */
+
+function loadMarketCache(): MarketCacheEntry | null {
+  try {
+    const raw = localStorage.getItem(MARKET_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as MarketCacheEntry) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveMarketCache(data: MarketCacheEntry): void {
+  try {
+    localStorage.setItem(MARKET_CACHE_KEY, JSON.stringify(data));
+  } catch { /* quota exceeded, ignore */ }
+}
+
+function loadCategoriesCache(): CategoriesCacheEntry | null {
+  try {
+    const raw = localStorage.getItem(CATEGORIES_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as CategoriesCacheEntry) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveCategoriesCache(data: CategoriesCacheEntry): void {
+  try {
+    localStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data));
+  } catch { /* quota exceeded, ignore */ }
+}
+
+function loadDetailCache(): Map<string, string | null> {
+  try {
+    const raw = localStorage.getItem(DETAIL_CACHE_KEY);
+    if (raw) {
+      return new Map(JSON.parse(raw) as [string, string | null][]);
+    }
+  } catch { /* ignore corrupt data */ }
+  return new Map();
+}
+
+function saveDetailCache(cache: Map<string, string | null>): void {
+  try {
+    localStorage.setItem(
+      DETAIL_CACHE_KEY,
+      JSON.stringify([...cache.entries()]),
+    );
+  } catch { /* quota exceeded, ignore */ }
+}
+
+function clearAllMarketplaceCaches(): void {
+  try {
+    localStorage.removeItem(MARKET_CACHE_KEY);
+    localStorage.removeItem(CATEGORIES_CACHE_KEY);
+    localStorage.removeItem(DETAIL_CACHE_KEY);
+  } catch { /* noop */ }
+}
 
 /* ─── main component ─── */
 
@@ -102,13 +172,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   >([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
 
-  // Cache refs
-  const marketCache = useRef<MarketCacheEntry | null>(null);
+  // Cache refs (initialized from localStorage)
+  const marketCache = useRef<MarketCacheEntry | null>(loadMarketCache());
   const abortRef = useRef<AbortController | null>(null);
-  const categoriesCache = useRef<{
-    timestamp: number;
-    categories: Array<{ key: string; name: string }>;
-  } | null>(null);
+  const categoriesCache = useRef<CategoriesCacheEntry | null>(loadCategoriesCache());
 
   function toggleViewMode(mode: "cards" | "list") {
     setViewMode(mode);
@@ -120,7 +187,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const [filterKey, setFilterKey] = useState<FilterKey>("marketplace");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const detailCache = useRef<Map<string, string | null>>(new Map());
+  const detailCache = useRef<Map<string, string | null>>(loadDetailCache());
 
   // Debounce search
   useEffect(() => {
@@ -529,6 +596,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     const now = Date.now();
     if (
       categoriesCache.current &&
+      categoriesCache.current.language === i18n.language &&
       now - categoriesCache.current.timestamp < CATEGORY_CACHE_TTL_MS
     ) {
       setAllCategories(categoriesCache.current.categories);
@@ -542,14 +610,15 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       const mapped: Array<{ key: string; name: string }> = cats.map(
         (c) => ({ key: c.category, name: isEn ? c.category_name_en || c.category_name : c.category_name }),
       );
-      categoriesCache.current = { timestamp: now, categories: mapped };
+      categoriesCache.current = { timestamp: now, language: i18n.language, categories: mapped };
+      saveCategoriesCache(categoriesCache.current);
       setAllCategories(mapped);
     } catch {
       // silent
     } finally {
       setCategoriesLoading(false);
     }
-  }, [cloudConfig?.token]);
+  }, [cloudConfig?.token, i18n.language]);
 
   const loadMarketplace = useCallback(
     async (page = 1, append = false) => {
@@ -610,6 +679,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             category: marketplaceCategory,
             query: debouncedSearch,
           };
+          saveMarketCache(marketCache.current);
         }
       } catch (err: unknown) {
         const e = err as Error & { status?: number };
@@ -626,6 +696,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     },
     [cloudConfig?.token, debouncedSearch, marketplaceCategory],
   );
+
+  function handleRefreshMarketplace() {
+    marketCache.current = null;
+    try { localStorage.removeItem(MARKET_CACHE_KEY); } catch { /* noop */ }
+    abortRef.current?.abort();
+    void loadMarketplace(1);
+  }
 
   const loadMoreMarketplace = useCallback(() => {
     if (marketplaceLoading) return;
@@ -697,6 +774,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     if (!cloudConfig?.token) {
       setAllCategories([]);
       categoriesCache.current = null;
+      clearAllMarketplaceCaches();
       return;
     }
     void loadCategories();
@@ -708,6 +786,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       setMarketplaceSkills([]);
       setMarketplaceTotal(0);
       marketCache.current = null;
+      if (!cloudConfig?.token) {
+        clearAllMarketplaceCaches();
+      }
       return;
     }
     void loadMarketplace(1);
@@ -719,8 +800,6 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (!isActive || filterKey !== "marketplace") return;
     if (!cloudConfig?.token) return;
-    // Invalidate cache when filters change
-    marketCache.current = null;
     void loadMarketplace(1);
   }, [marketplaceCategory, debouncedSearch, filterKey]);
 
@@ -903,6 +982,17 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
               }}
             />
             <div className="flex-1 min-w-0 pl-4 relative">
+              {/* Refresh button */}
+              <div className="flex items-center justify-end mb-2">
+                <button
+                  onClick={handleRefreshMarketplace}
+                  disabled={marketplaceLoading}
+                  className="p-1 rounded-md hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+                  title={t("skillMarket.refresh")}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${marketplaceLoading ? "animate-spin" : ""}`} />
+                </button>
+              </div>
               {/* Initial loading skeleton */}
               {marketplaceLoading && marketplaceSkills.length === 0 && (
                 <MarketplaceSkeleton viewMode={viewMode} />
@@ -952,6 +1042,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                             .then((detail) => {
                               const content = detail.skill_md ?? null;
                               detailCache.current.set(ms.slug, content);
+                              saveDetailCache(detailCache.current);
                               setMdModal({ name: ms.name, content });
                             })
                             .catch(() => {

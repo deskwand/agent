@@ -138,7 +138,8 @@
     "skillRemoved": "技能已下架",
     "installSuccess": "安装成功",
     "sourceMarketplace": "市场",
-    "categories": "分类"
+    "categories": "分类",
+    "refresh": "刷新"
   },
   "general": {
     "appearance": "外观",

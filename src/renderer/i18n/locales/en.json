@@ -139,7 +139,8 @@
     "skillRemoved": "Skill no longer available",
     "installSuccess": "Installed successfully",
     "sourceMarketplace": "Marketplace",
-    "categories": "Categories"
+    "categories": "Categories",
+    "refresh": "Refresh"
   },
   "general": {
     "appearance": "Appearance",
