@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { LogIn, User, Settings, LogOut, Clock3 } from "lucide-react";
+import { LogIn, User, Settings, LogOut, Clock3, Cloud } from "lucide-react";
 import type { CloudConfig } from "../types";
 
 interface AccountMenuProps {
@@ -9,6 +9,7 @@ interface AccountMenuProps {
   onOpenLogin: () => void;
   onOpenSettings: () => void;
   onOpenAutomation: () => void;
+  onOpenMarketplace: () => void;
   onLogout: () => void;
   onClose: () => void;
 }
@@ -20,6 +21,7 @@ export function AccountMenu({
   onOpenLogin,
   onOpenSettings,
   onOpenAutomation,
+  onOpenMarketplace,
   onLogout,
   onClose,
 }: AccountMenuProps) {
@@ -32,6 +34,7 @@ export function AccountMenu({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-border bg-background shadow-soft p-1.5 z-50">
+        <MenuItem icon={<Cloud className="w-4 h-4" />} label={t("sidebar.skillsCloud")} onClick={() => { onOpenMarketplace(); onClose(); }} />
         <MenuItem icon={<Clock3 className="w-4 h-4" />} label={t("sidebar.automation")} onClick={() => { onOpenAutomation(); onClose(); }} />
         <MenuItem icon={<Settings className="w-4 h-4" />} label={t("sidebar.settings")} onClick={() => { onOpenSettings(); onClose(); }} />
 

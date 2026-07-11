@@ -4,7 +4,6 @@ import { useAppStore } from "../store";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import { useIPC } from "../hooks/useIPC";
 import {
-  Cloud,
   Trash2,
   Settings,
   Search as SearchIcon,
@@ -518,25 +517,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
     >
       {!sidebarCollapsed && (<>
-      {/* Cloud nav bar */}
-      <div className="px-3 pt-3 pb-1">
-        <button
-          onClick={() => {
-            setShowSettings(false);
-            setShowSchedule(false);
-            setShowMarketplace(true);
-          }}
-          className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition-colors ${
-            showMarketplace
-              ? "bg-surface-active text-text-primary"
-              : "text-text-secondary hover:bg-surface-hover/60 hover:text-text-primary"
-          }`}
-        >
-          <Cloud className="w-4 h-4 flex-shrink-0" />
-          <span className="font-medium">{t("sidebar.skillsCloud")}</span>
-        </button>
-      </div>
-
       <div className="px-4 pt-3 pb-2">
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-0">
@@ -982,6 +962,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             setShowMarketplace(false);
             setShowSchedule(false);
             setShowSettings(true);
+          }}
+          onOpenMarketplace={() => {
+            setShowSettings(false);
+            setShowSchedule(false);
+            setShowMarketplace(true);
           }}
           onOpenAutomation={() => {
             setShowSettings(false);
