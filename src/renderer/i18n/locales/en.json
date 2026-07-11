@@ -1277,9 +1277,9 @@
     "loading": "...",
     "googleLogin": "Sign in with Google",
     "redirecting": "Redirecting to browser...",
-    "emailFallback": "Sign in with email",
-    "orSeparator": "—— or ——",
-    "backToSelect": "Back",
+    "emailFallback": "or sign in with email →",
+    "emailLoginTitle": "Email Verification",
+    "backToSelect": "← Back",
     "errorCodes": {
       "BAD_REQUEST": "Invalid request",
       "UNAUTHORIZED": "Session expired",

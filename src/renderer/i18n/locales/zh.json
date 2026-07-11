@@ -1273,9 +1273,9 @@
     "loading": "...",
     "googleLogin": "使用 Google 账号登录",
     "redirecting": "正在跳转浏览器...",
-    "emailFallback": "使用邮箱验证码登录",
-    "orSeparator": "—— 或 ——",
-    "backToSelect": "返回",
+    "emailFallback": "或使用邮箱验证码登录 →",
+    "emailLoginTitle": "邮箱验证码登录",
+    "backToSelect": "← 返回",
     "errorCodes": {
       "BAD_REQUEST": "请求参数错误",
       "UNAUTHORIZED": "登录已过期",
