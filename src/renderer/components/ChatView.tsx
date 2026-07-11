@@ -225,6 +225,7 @@ export function shouldShowHydratingHistoryState(
 
 const INITIAL_VISIBLE_TURNS = 8;
 const PREPEND_TURNS = 6;
+const BOTTOM_EPSILON_PX = 1;
 // Fire a little before the user hits absolute top to hide prepend latency.
 const LOAD_OLDER_THRESHOLD_PX = 160;
 
@@ -328,6 +329,8 @@ export function ChatView() {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const isUserAtBottomRef = useRef(true);
   const autoFollowRef = useRef(true);
+  const previousScrollTopRef = useRef(0);
+  const upwardScrollIntentRef = useRef(false);
   const prevMessageCountRef = useRef(0);
   const prevPartialLengthRef = useRef(0);
   const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -832,8 +835,27 @@ export function ChatView() {
   const syncAutoFollowState = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    const isAtBottom = updateScrollToBottomVisibility();
-    autoFollowRef.current = isAtBottom;
+
+    const isNearBottom = updateScrollToBottomVisibility();
+    const distanceToBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const scrolledAwayFromBottom =
+      container.scrollTop < previousScrollTopRef.current &&
+      distanceToBottom > BOTTOM_EPSILON_PX;
+    previousScrollTopRef.current = container.scrollTop;
+
+    if (upwardScrollIntentRef.current || scrolledAwayFromBottom) {
+      autoFollowRef.current = false;
+    } else if (
+      !autoFollowRef.current &&
+      distanceToBottom <= BOTTOM_EPSILON_PX
+    ) {
+      autoFollowRef.current = true;
+    } else if (autoFollowRef.current && !isNearBottom) {
+      autoFollowRef.current = false;
+    }
+    if (scrolledAwayFromBottom) upwardScrollIntentRef.current = false;
+
     setShowScrollToBottom(!autoFollowRef.current);
   }, [updateScrollToBottomVisibility]);
 
@@ -889,10 +911,17 @@ export function ChatView() {
       }
     };
     container.addEventListener("scroll", onScroll, { passive: true });
-    // ponytail: wheel fires before any pixel moves — beats the 80px isAtBottom
-    // threshold race with incoming stream tokens during high-speed scrolling.
+    // Wheel fires before the first scroll event, so an incoming token cannot
+    // pull the viewport back down while the upward gesture is starting.
     const onWheel = (e: WheelEvent) => {
-      if (e.deltaY < 0) autoFollowRef.current = false;
+      if (e.deltaY < 0) {
+        previousScrollTopRef.current = container.scrollTop;
+        upwardScrollIntentRef.current = true;
+        autoFollowRef.current = false;
+        setShowScrollToBottom(true);
+      } else if (e.deltaY > 0) {
+        upwardScrollIntentRef.current = false;
+      }
     };
     container.addEventListener("wheel", onWheel, { passive: true });
     return () => {
@@ -958,9 +987,8 @@ export function ChatView() {
     const isStreamingTick =
       partialLength !== prevPartialLengthRef.current && !hasNewMessage;
 
-    // Streaming tick: keep following unless the user explicitly scrolled away.
-    // Mark as programmatic so the resulting scroll event does NOT reset
-    // autoFollowRef back to true (race with user's scroll-up event).
+    // Streaming tick: keep following unless upward user input latched
+    // auto-follow off. It is restored only at the actual bottom or by button.
     if (isStreamingTick && autoFollowRef.current) {
       const container = scrollContainerRef.current;
       if (container) {
@@ -975,6 +1003,7 @@ export function ChatView() {
       hasNewMessage && messages[messages.length - 1]?.role === "user";
     if (isOwnNewMessage) {
       autoFollowRef.current = true;
+      upwardScrollIntentRef.current = false;
       const container = scrollContainerRef.current;
       if (container) {
         container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
@@ -1037,6 +1066,8 @@ export function ChatView() {
     chatInputRef.current?.focus();
     // 重置跟随状态，覆盖旧会话中用户手动上滚的残留
     autoFollowRef.current = true;
+    previousScrollTopRef.current = 0;
+    upwardScrollIntentRef.current = false;
     setIsInputExpanded(false);
     const rafId = requestAnimationFrame(() => {
       scrollToBottom("auto", true);
@@ -1256,6 +1287,7 @@ export function ChatView() {
   const scrollToBottomByButton = () => {
     if (isScrollingRef.current) return;
     autoFollowRef.current = true;
+    upwardScrollIntentRef.current = false;
     isUserAtBottomRef.current = true;
     setShowScrollToBottom(false);
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
