@@ -1034,11 +1034,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       {t("sidebar.settings")}
                     </div>
                   </div>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
-                      accountMenuOpen ? "rotate-180" : ""
-                    }`}
-                  />
                 </button>
                 {updateReady && updateVersion && (
                   <button
