@@ -28,7 +28,10 @@ export interface TickStyle {
 
 // ── 工具函数 ──
 
-export function getTurnPreviewText(message: Message, maxLen = 100): PreviewResult {
+export function getTurnPreviewText(
+  message: Message,
+  maxLen = 100,
+): PreviewResult {
   if (!Array.isArray(message.content)) return { kind: "empty" };
 
   const blocks = message.content;
@@ -41,7 +44,11 @@ export function getTurnPreviewText(message: Message, maxLen = 100): PreviewResul
   );
   if (textBlocks.length > 0) {
     const t = textBlocks[textBlocks.length - 1].text.trim();
-    if (t) return { kind: "text", value: t.length > maxLen ? t.slice(0, maxLen) + "…" : t };
+    if (t)
+      return {
+        kind: "text",
+        value: t.length > maxLen ? t.slice(0, maxLen) + "…" : t,
+      };
   }
 
   // 2) 最后的 thinking 块
@@ -51,7 +58,11 @@ export function getTurnPreviewText(message: Message, maxLen = 100): PreviewResul
   );
   if (thinkBlocks.length > 0) {
     const t = thinkBlocks[thinkBlocks.length - 1].thinking.trim();
-    if (t) return { kind: "thinking", value: t.length > maxLen ? t.slice(0, maxLen) + "…" : t };
+    if (t)
+      return {
+        kind: "thinking",
+        value: t.length > maxLen ? t.slice(0, maxLen) + "…" : t,
+      };
   }
 
   // 3) 最后的 tool_use 块
@@ -59,7 +70,8 @@ export function getTurnPreviewText(message: Message, maxLen = 100): PreviewResul
     (b): b is ContentBlock & { type: "tool_use"; name: string } =>
       b.type === "tool_use" && isString((b as { name?: unknown }).name),
   );
-  if (toolBlocks.length > 0) return { kind: "tool", value: toolBlocks[toolBlocks.length - 1].name };
+  if (toolBlocks.length > 0)
+    return { kind: "tool", value: toolBlocks[toolBlocks.length - 1].name };
 
   return { kind: "empty" };
 }
@@ -69,7 +81,11 @@ export function getTurnPreviewText(message: Message, maxLen = 100): PreviewResul
  * n 个 tick 以 gap 间距紧凑排列，整体垂直居中。
  * 当 rail 高度不足以放下全部 tick 时，压缩间距至最小 4px。
  */
-export function getTickOffsets(railHeight: number, n: number, gap = 10): number[] {
+export function getTickOffsets(
+  railHeight: number,
+  n: number,
+  gap = 10,
+): number[] {
   if (n === 0 || railHeight === 0) return [];
   if (n === 1) return [railHeight / 2];
   const needed = (n - 1) * gap;
@@ -122,6 +138,7 @@ export function getTickStyles(
 
 const TICK_GAP = 10;
 const HOT_ZONE_WIDTH = 64;
+const HALF_ZONE = HOT_ZONE_WIDTH / 2;
 const MAX_DIST = 96;
 const MIN_W = 8;
 const MAX_W = 28;
@@ -163,7 +180,7 @@ const TickMark = memo(function TickMark({
       {isPrimary && userPreview && (
         <div
           className="absolute z-30 bg-surface/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-elevated text-xs w-[280px] max-h-[7.5rem] overflow-hidden pointer-events-none"
-          style={{ left: 26, top: cardTop }}
+          style={{ left: HALF_ZONE + 26, top: cardTop }}
         >
           <div className="text-text-secondary whitespace-normal leading-relaxed">
             {userPreview}
@@ -183,8 +200,9 @@ const TickMark = memo(function TickMark({
           e.stopPropagation();
           onClick();
         }}
-        className="absolute left-0 cursor-pointer rounded-full z-20"
+        className="absolute cursor-pointer rounded-full z-20"
         style={{
+          left: HALF_ZONE,
           top: y,
           width,
           height: 3,
@@ -237,7 +255,16 @@ export const MessageNavRail = memo(function MessageNavRail({
   );
 
   const tickStyles = useMemo(
-    () => getTickStyles(mouseY, tickOffsets, MAX_DIST, MIN_W, MAX_W, MIN_OP, MAX_OP),
+    () =>
+      getTickStyles(
+        mouseY,
+        tickOffsets,
+        MAX_DIST,
+        MIN_W,
+        MAX_W,
+        MIN_OP,
+        MAX_OP,
+      ),
     [mouseY, tickOffsets],
   );
 
@@ -288,25 +315,21 @@ export const MessageNavRail = memo(function MessageNavRail({
   return (
     <div
       ref={railRef}
-      className="absolute left-0 top-0 bottom-0 z-10"
+      className="absolute top-0 bottom-0 z-10"
+      style={{ left: -HALF_ZONE, width: HOT_ZONE_WIDTH }}
       aria-hidden="true"
+      onMouseMove={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setMouseY(e.clientY - rect.top);
+      }}
+      onMouseLeave={() => {
+        setMouseY(null);
+      }}
+      onClick={() => {
+        if (primaryIdx !== null) handleSelect(primaryIdx);
+      }}
     >
-      <div
-        className="absolute top-0 bottom-0 pointer-events-auto"
-        style={{ left: -HOT_ZONE_WIDTH / 2, width: HOT_ZONE_WIDTH }}
-        onMouseMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect();
-          setMouseY(e.clientY - rect.top);
-        }}
-        onMouseLeave={() => {
-          setMouseY(null);
-        }}
-        onClick={() => {
-          if (primaryIdx !== null) handleSelect(primaryIdx);
-        }}
-      />
-
-      <div className="absolute left-0 top-0 bottom-0 pointer-events-auto">
+      <div className="relative h-full">
         {ticks.map((tick, i) => (
           <TickMark
             key={tick.messageId}
