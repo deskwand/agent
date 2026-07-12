@@ -542,7 +542,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   return (
     <>
       <aside
-        className={`group bg-surface/85 flex flex-col overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${sidebarCollapsed ? "w-0" : ""}`}
+        className={`group bg-background-secondary shadow-[inset_-6px_0_8px_-6px_var(--shadow-sidebar-sep)] flex flex-col overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${sidebarCollapsed ? "w-0" : ""}`}
         style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
       >
         {!sidebarCollapsed && (
