@@ -490,18 +490,34 @@ export function ChatView() {
   }, [appConfig?.providers]);
   const activeModel = activeSession?.model || appConfig?.model || "";
 
+  // Strip thinking blocks from all assistant messages — thinking happens
+  // server-side but should never appear in the chat UI.
+  const messagesWithoutThinking = useMemo(
+    () =>
+      messages.map((msg) => {
+        if (msg.role !== "assistant" || !Array.isArray(msg.content)) return msg;
+        return {
+          ...msg,
+          content: (msg.content as ContentBlock[]).filter(
+            (b) => b.type !== "thinking",
+          ),
+        };
+      }),
+    [messages],
+  );
+
   const displayedMessages = useMemo(() => {
     if (!activeSessionId || !activeTurn?.userMessageId || !activeTurn.turnId)
-      return messages;
+      return messagesWithoutThinking;
 
-    const anchorIndex = messages.findIndex(
+    const anchorIndex = messagesWithoutThinking.findIndex(
       (message) => message.id === activeTurn.userMessageId,
     );
-    if (anchorIndex === -1) return messages;
+    if (anchorIndex === -1) return messagesWithoutThinking;
 
     let rangeEnd = anchorIndex + 1;
-    while (rangeEnd < messages.length) {
-      if (messages[rangeEnd].role === "user") break;
+    while (rangeEnd < messagesWithoutThinking.length) {
+      if (messagesWithoutThinking[rangeEnd].role === "user") break;
       rangeEnd += 1;
     }
 
@@ -510,7 +526,7 @@ export function ChatView() {
     let executionTimeMs: number | undefined;
 
     for (let i = anchorIndex + 1; i < rangeEnd; i += 1) {
-      const message = messages[i];
+      const message = messagesWithoutThinking[i];
       if (
         message.role !== "assistant" ||
         message.turnId !== activeTurn.turnId ||
@@ -520,7 +536,6 @@ export function ChatView() {
       }
       hasActiveTurnAssistantMessage = true;
       for (const block of message.content) {
-        if (block.type === "thinking") continue;
         appendMergedLiveBlock(aggregatedBlocks, block);
       }
       if (
@@ -542,7 +557,7 @@ export function ChatView() {
     }
 
     const hasStreamingContent = Boolean(partialMessage);
-    if (!hasActiveTurnAssistantMessage && !hasStreamingContent) return messages;
+    if (!hasActiveTurnAssistantMessage && !hasStreamingContent) return messagesWithoutThinking;
 
     const streamingMessage: Message = {
       id: `partial-${activeSessionId}-${activeTurn.turnId}`,
@@ -554,15 +569,15 @@ export function ChatView() {
       executionTimeMs,
     };
 
-    const before = messages.slice(0, anchorIndex + 1);
-    const after = messages.slice(rangeEnd);
+    const before = messagesWithoutThinking.slice(0, anchorIndex + 1);
+    const after = messagesWithoutThinking.slice(rangeEnd);
 
     return [...before, streamingMessage, ...after];
   }, [
     activeSessionId,
     activeTurn?.turnId,
     activeTurn?.userMessageId,
-    messages,
+    messagesWithoutThinking,
     partialMessage,
   ]);
 
