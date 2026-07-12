@@ -841,8 +841,6 @@
     "alreadyCompacted": "Session already compacted",
     "expandInput": "Expand input",
     "collapseInput": "Collapse input",
-    "expandTrace": "Process",
-    "collapseTrace": "Process",
     "openCodeReview": "Code Review · {{count}} changed files"
   },
   "steer": {

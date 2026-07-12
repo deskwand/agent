@@ -54,14 +54,6 @@ function hasUsableProviderConfig(
   return Boolean(config.apiKey.trim());
 }
 
-function isTraceBlock(block: ContentBlock): boolean {
-  return (
-    block.type === "thinking" ||
-    block.type === "tool_use" ||
-    block.type === "tool_result"
-  );
-}
-
 function appendMergedLiveBlock(
   target: ContentBlock[],
   block: ContentBlock,
@@ -274,9 +266,6 @@ export function ChatView() {
   const sessionState = useAppStore((s) =>
     activeSessionId ? s.sessionStates[activeSessionId] : undefined,
   );
-  const setTraceExpandedOverride = useAppStore(
-    (s) => s.setTraceExpandedOverride,
-  );
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const updateSession = useAppStore((s) => s.updateSession);
   const clearActiveTurn = useAppStore((s) => s.clearActiveTurn);
@@ -355,24 +344,6 @@ export function ChatView() {
 
   const hasActiveTurn = Boolean(activeTurn);
 
-  // Trace expand/collapse: default from project mode, user override wins
-  const defaultTraceExpanded = activeSession?.isProjectMode ?? false;
-  const effectiveTraceExpanded =
-    sessionState?.traceExpandedOverride ?? defaultTraceExpanded;
-
-  const hasTraceContent = useMemo(() => {
-    return messages.some(
-      (m) =>
-        m.role === "assistant" &&
-        Array.isArray(m.content) &&
-        m.content.some((b) => isTraceBlock(b)),
-    );
-  }, [messages]);
-
-  const handleToggleTraceExpanded = useCallback(() => {
-    if (!activeSessionId) return;
-    setTraceExpandedOverride(activeSessionId, !effectiveTraceExpanded);
-  }, [activeSessionId, effectiveTraceExpanded, setTraceExpandedOverride]);
   const goalStatus = useAppStore((s) =>
     activeSessionId ? s.sessionStates[activeSessionId]?.goalStatus : undefined,
   );
@@ -754,13 +725,9 @@ export function ChatView() {
         // keep their natural order instead of being pushed to the end.
         isLatestRound:
           msgId.startsWith("partial-") || msgId === latestAssistantId,
-        hideTraceBlocks:
-          message.role === "assistant" &&
-          Boolean(turnId) &&
-          !effectiveTraceExpanded,
         artifactFiles: turnArtifactFiles.get(msgId) ?? [],
         turnProcessSummary:
-          message.role === "assistant" && effectiveTraceExpanded
+          message.role === "assistant"
             ? turnProcessSummaries.get(msgId)
             : undefined,
         suppressProcessSummaries:
@@ -769,7 +736,7 @@ export function ChatView() {
           turnsWithProcessSummary.has(turnId),
       };
     });
-  }, [mergedMessages, effectiveTraceExpanded, hoistedProcessSummaryTurnIds]);
+  }, [mergedMessages, hoistedProcessSummaryTurnIds]);
 
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,
@@ -1371,7 +1338,6 @@ export function ChatView() {
                 ({
                   message,
                   isStreaming,
-                  hideTraceBlocks,
                   isLatestRound,
                   artifactFiles,
                   turnProcessSummary,
@@ -1387,7 +1353,6 @@ export function ChatView() {
                     <MessageCard
                       message={message}
                       isStreaming={isStreaming}
-                      hideTraceBlocks={hideTraceBlocks}
                       isLatestRound={isLatestRound}
                       artifactFiles={artifactFiles}
                       suppressProcessSummaries={suppressProcessSummaries}
@@ -1506,12 +1471,6 @@ export function ChatView() {
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 onSteer={handleSteer}
                 hasInput={hasInput}
-                traceExpanded={effectiveTraceExpanded}
-                onToggleTrace={
-                  hasTraceContent || hasActiveTurn
-                    ? handleToggleTraceExpanded
-                    : undefined
-                }
               />
             }
           />

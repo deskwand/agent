@@ -15,7 +15,6 @@ import type {
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
 
-
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
 
@@ -43,13 +42,18 @@ export interface SessionState {
   partialThinking: string;
   pendingTurns: TurnState[];
   activeTurn: TurnState | null;
-  traceExpandedOverride?: boolean;
   executionClock: SessionExecutionClock;
   traceSteps: TraceStep[];
   contextWindow: number;
   partialToolResults: Record<string, PartialToolResult>;
   goalStatus?: {
-    status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
+    status:
+      | "active"
+      | "paused"
+      | "complete"
+      | "cleared"
+      | "blocked"
+      | "budget_limited";
     objective?: string;
     iteration?: number;
     tokensUsed?: number;
@@ -67,7 +71,6 @@ const DEFAULT_SESSION_STATE: SessionState = {
   partialThinking: "",
   pendingTurns: [],
   activeTurn: null,
-  traceExpandedOverride: undefined,
   executionClock: { startAt: null, endAt: null },
   traceSteps: [],
   contextWindow: 0,
@@ -219,11 +222,6 @@ interface AppState {
   clearPendingTurns: (sessionId: string) => void;
   clearQueuedMessages: (sessionId: string) => void;
   cancelQueuedMessages: (sessionId: string) => void;
-  setTraceExpandedOverride: (
-    sessionId: string,
-    override: boolean,
-  ) => void;
-
   addTraceStep: (sessionId: string, step: TraceStep) => void;
   updateTraceStep: (
     sessionId: string,
@@ -760,13 +758,6 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 
-  setTraceExpandedOverride: (sessionId, override) =>
-    set((state) => ({
-      sessionStates: patchSession(state.sessionStates, sessionId, {
-        traceExpandedOverride: override,
-      }),
-    })),
-
   addTraceStep: (sessionId, step) =>
     set((state) => {
       const ss = getSession(state.sessionStates, sessionId);
@@ -871,7 +862,9 @@ export const useAppStore = create<AppState>((set) => ({
       } else {
         localStorage.removeItem("deskwand.cloud");
       }
-    } catch { /* localStorage unavailable */ }
+    } catch {
+      /* localStorage unavailable */
+    }
   },
   setShowLoginModal: (show) => set({ showLoginModal: show }),
   setShowConfigModal: (show) => set({ showConfigModal: show }),
@@ -987,7 +980,10 @@ if (typeof window !== "undefined") {
       store.setShowSettings(false);
       const hasHydratedState =
         store.sessionStates[sessionId]?.historyHydrated === true;
-      if (!hasHydratedState && typeof window.electronAPI?.invoke === "function") {
+      if (
+        !hasHydratedState &&
+        typeof window.electronAPI?.invoke === "function"
+      ) {
         try {
           const [messages, traceSteps] = await Promise.all([
             window.electronAPI.invoke({

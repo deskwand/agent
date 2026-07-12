@@ -36,11 +36,13 @@ vi.mock("../../renderer/components/ChatInput", async () => {
 });
 
 vi.mock("../../renderer/components/ChatInputBottomBar", () => ({
-  ChatInputBottomBar: () => React.createElement("div", { "data-testid": "chat-input-bottom-bar" }),
+  ChatInputBottomBar: () =>
+    React.createElement("div", { "data-testid": "chat-input-bottom-bar" }),
 }));
 
 vi.mock("../../renderer/components/ChatInputStatusBar", () => ({
-  ChatInputStatusBar: () => React.createElement("div", { "data-testid": "chat-input-status-bar" }),
+  ChatInputStatusBar: () =>
+    React.createElement("div", { "data-testid": "chat-input-status-bar" }),
   resolveInputStatus: () => null,
 }));
 
@@ -100,7 +102,9 @@ async function flush(): Promise<void> {
   });
 }
 
-function getBrowseSummaryButtons(container: HTMLDivElement): HTMLButtonElement[] {
+function getBrowseSummaryButtons(
+  container: HTMLDivElement,
+): HTMLButtonElement[] {
   return Array.from(container.querySelectorAll("button")).filter((element) =>
     element.textContent?.includes("Browsed the web"),
   ) as HTMLButtonElement[];
@@ -108,7 +112,6 @@ function getBrowseSummaryButtons(container: HTMLDivElement): HTMLButtonElement[]
 
 function setSessionMessages(
   messages: Message[],
-  options?: { traceExpandedOverride?: boolean },
 ): void {
   useAppStore.setState({
     sessions: [makeSession("s1")],
@@ -122,7 +125,6 @@ function setSessionMessages(
         partialThinking: "",
         pendingTurns: [],
         activeTurn: null,
-        traceExpandedOverride: options?.traceExpandedOverride ?? true,
         executionClock: { startAt: null, endAt: null },
         traceSteps: [],
         contextWindow: 0,
@@ -137,7 +139,9 @@ describe("ChatView trace summary merging", () => {
   let root: Root | null;
 
   beforeEach(async () => {
-    (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    (
+      globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true;
     useAppStore.setState(useAppStore.getInitialState());
     const storage = new Map<string, string>();
     const localStorageMock = {
@@ -178,7 +182,8 @@ describe("ChatView trace summary merging", () => {
     if (!("requestAnimationFrame" in window)) {
       Object.defineProperty(window, "requestAnimationFrame", {
         writable: true,
-        value: (callback: FrameRequestCallback) => window.setTimeout(() => callback(0), 0),
+        value: (callback: FrameRequestCallback) =>
+          window.setTimeout(() => callback(0), 0),
       });
       Object.defineProperty(window, "cancelAnimationFrame", {
         writable: true,
@@ -303,32 +308,5 @@ describe("ChatView trace summary merging", () => {
     await flush();
 
     expect(getBrowseSummaryButtons(container)).toHaveLength(2);
-  });
-
-  it("hides turn-level browser summaries when trace blocks are collapsed", async () => {
-    const turnId = "turn-5";
-    setSessionMessages(
-      [
-        userMessage(turnId),
-        assistantMessage(
-          "a5",
-          turnId,
-          [
-            { type: "text", text: "Fetch and inspect." },
-            toolUse("wf5", "web_fetch", { url: "https://example.com" }),
-            toolResult("wf5", "fetched"),
-          ],
-          6,
-        ),
-      ],
-      { traceExpandedOverride: false },
-    );
-
-    await act(async () => {
-      root!.render(React.createElement(ChatView));
-    });
-    await flush();
-
-    expect(getBrowseSummaryButtons(container)).toHaveLength(0);
   });
 });

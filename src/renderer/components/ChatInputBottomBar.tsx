@@ -1,7 +1,15 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel, ProviderProfileKey } from "../types";
-import { Plus, ChevronDown, ArrowUp, Square, Maximize2, Minimize2, Target, Eye, EyeOff } from "lucide-react";
+import {
+  Plus,
+  ChevronDown,
+  ArrowUp,
+  Square,
+  Maximize2,
+  Minimize2,
+  Target,
+} from "lucide-react";
 
 export interface ModelOptionGroup {
   profileKey: ProviderProfileKey;
@@ -30,8 +38,6 @@ export interface ChatInputBottomBarProps {
   onToggleExpand?: () => void;
   onSteer?: () => void;
   hasInput?: boolean;
-  traceExpanded?: boolean;
-  onToggleTrace?: () => void;
 }
 
 export function ChatInputBottomBar({
@@ -55,8 +61,6 @@ export function ChatInputBottomBar({
   onToggleExpand,
   onSteer,
   hasInput = false,
-  traceExpanded = false,
-  onToggleTrace,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
   const [modelMenuOpen, setModelMenuOpen] = useState(false);
@@ -72,7 +76,7 @@ export function ChatInputBottomBar({
         items: group.items.filter(
           (item) =>
             item.name.toLowerCase().includes(q) ||
-            item.id.toLowerCase().includes(q)
+            item.id.toLowerCase().includes(q),
         ),
       }))
       .filter((group) => group.items.length > 0);
@@ -112,20 +116,6 @@ export function ChatInputBottomBar({
         >
           <Plus className="w-4 h-4" />
         </button>
-        {onToggleTrace && (
-          <button
-            type="button"
-            onClick={onToggleTrace}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-            title={traceExpanded ? t("chat.collapseTrace") : t("chat.expandTrace")}
-          >
-            {traceExpanded ? (
-              <EyeOff className="w-4 h-4" />
-            ) : (
-              <Eye className="w-4 h-4" />
-            )}
-          </button>
-        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">

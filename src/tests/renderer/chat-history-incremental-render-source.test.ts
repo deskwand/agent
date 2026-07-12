@@ -15,7 +15,7 @@ describe("ChatView incremental history wiring", () => {
     expect(source).toContain("const INITIAL_VISIBLE_TURNS = 8;");
     expect(source).toContain("const PREPEND_TURNS = 6;");
     expect(source).toContain(
-      'const [visibleTurnStartIndex, setVisibleTurnStartIndex] = useState(0);',
+      "const [visibleTurnStartIndex, setVisibleTurnStartIndex] = useState(0);",
     );
     expect(source).toContain(
       "const turnRanges = useMemo(() => buildTurnRanges(displayedMessages)",
@@ -25,7 +25,7 @@ describe("ChatView incremental history wiring", () => {
       "displayedMessages.slice(visibleMessageStartIndex)",
     );
     expect(source).toContain(
-      "visibleTurnEntries.map(({ message, isStreaming, hideTraceBlocks, isLatestRound, artifactFiles }) => (",
+      "visibleTurnEntries.map(({ message, isStreaming, isLatestRound, artifactFiles }) => (",
     );
   });
 

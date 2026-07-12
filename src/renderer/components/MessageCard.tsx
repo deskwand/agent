@@ -11,7 +11,6 @@ import type {
 } from "../types";
 import {
   buildToolDisplayBlocks,
-  filterAssistantVisibleBlocks,
   orderAssistantDisplayBlocks,
 } from "../utils/tool-display-blocks";
 import type { ResultFileEntry } from "../utils/tool-display-blocks";
@@ -23,17 +22,12 @@ import { ArtifactCard } from "./message/ArtifactCard";
 interface MessageCardProps {
   message: Message;
   isStreaming?: boolean;
-  hideTraceBlocks?: boolean;
   /** Whether this turn is the latest (actively streaming or just completed) */
   isLatestRound?: boolean;
   /** Files changed in this turn (aggregated by ChatView) */
   artifactFiles?: ResultFileEntry[];
   /** Hide process summaries when ChatView renders a turn-level summary. */
   suppressProcessSummaries?: boolean;
-}
-
-function isTraceBlock(block: ContentBlock): boolean {
-  return block.type === "tool_use" || block.type === "tool_result";
 }
 
 function formatRelativeTime(timestamp: number, locale: string): string {
@@ -66,7 +60,6 @@ function formatRelativeTime(timestamp: number, locale: string): string {
 export const MessageCard = memo(function MessageCard({
   message,
   isStreaming,
-  hideTraceBlocks = false,
   isLatestRound = false,
   artifactFiles = [],
   suppressProcessSummaries = false,
@@ -79,11 +72,7 @@ export const MessageCard = memo(function MessageCard({
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
     : [{ type: "text", text: String(rawContent ?? "") } as ContentBlock];
-  const visibleBlocks = isUser
-    ? hideTraceBlocks
-      ? contentBlocks.filter((block) => !isTraceBlock(block))
-      : contentBlocks
-    : filterAssistantVisibleBlocks(contentBlocks, hideTraceBlocks);
+  const visibleBlocks = contentBlocks;
   const lastTextBlockIndex = useMemo(() => {
     let idx = -1;
     visibleBlocks.forEach((b, i) => {
