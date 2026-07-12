@@ -440,6 +440,7 @@
       -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "PingFang SC",
       "Microsoft YaHei", sans-serif;
     font-size: var(--font-size-body);
+    font-weight: 500;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
