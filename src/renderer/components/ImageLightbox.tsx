@@ -53,6 +53,7 @@ export function ImageLightbox({
   error = null,
 }: ImageLightboxProps) {
   const { t } = useTranslation();
+
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -160,7 +161,6 @@ export function ImageLightbox({
   const handleCopy = useCallback(async () => {
     if (!currentImage) return;
     try {
-      // Try canvas approach
       const img = new Image();
       if (!currentImage.src.startsWith("data:")) {
         img.crossOrigin = "anonymous";
@@ -192,7 +192,6 @@ export function ImageLightbox({
       setCopyFeedback(true);
       setTimeout(() => setCopyFeedback(false), 2000);
     } catch {
-      // Fallback: try copying URL if nothing else works
       try {
         await navigator.clipboard.writeText(currentImage.src);
         setCopyFeedback(true);
@@ -208,7 +207,6 @@ export function ImageLightbox({
     try {
       await window.electronAPI?.openPath?.(currentImage.filePath);
     } catch {
-      // fallback: try openExternal
       if (window.electronAPI?.openExternal) {
         await window.electronAPI.openExternal(
           `file://${currentImage.filePath}`,
@@ -221,7 +219,6 @@ export function ImageLightbox({
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => {
-      // Don't capture when composing
       if (e.isComposing) return;
       switch (e.key) {
         case "Escape":
@@ -286,17 +283,17 @@ export function ImageLightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[100] bg-black/80 flex flex-col"
+      className="fixed inset-0 z-[100] bg-black/50 dark:bg-black/80 flex flex-col"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       {/* ── Top bar ── */}
-      <div className="flex items-center justify-between px-4 py-2 bg-black/60 text-white select-none shrink-0">
+      <div className="flex items-center justify-between px-4 py-2 bg-black/60 dark:bg-black/70 backdrop-blur-md text-white select-none shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-sm font-medium truncate">{imageName}</span>
           {!isSingle && (
-            <span className="text-xs text-white/60">
+            <span className="text-xs text-white/60 dark:text-white/50">
               {t("imageLightbox.imageCount", {
                 current: currentIndex + 1,
                 total: images.length,
@@ -310,7 +307,7 @@ export function ImageLightbox({
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
+          className="p-1.5 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors"
           aria-label={t("imageLightbox.close")}
         >
           <X className="w-5 h-5" />
@@ -332,15 +329,15 @@ export function ImageLightbox({
         )}
 
         {/* Error */}
-        {error && !loading && (
+        {!loading && (error || images.every((img) => !img.src)) && (
           <div className="flex flex-col items-center gap-3 text-white/70">
             <AlertCircle className="w-8 h-8 text-error" />
-            <span className="text-sm">{error}</span>
+            <span className="text-sm">{error || t("imageLightbox.loadFailed")}</span>
           </div>
         )}
 
         {/* Image */}
-        {!loading && !error && (
+        {!loading && imageSrc && (
           <div
             className="relative select-none"
             style={{
@@ -375,18 +372,12 @@ export function ImageLightbox({
                   ? "none"
                   : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
               }}
-              onLoad={() => {
-                // Image dimensions could be displayed in top bar if needed
-              }}
-              onError={() => {
-                // handled by showing fallback in image area
-              }}
             />
           </div>
         )}
 
         {/* Prev / Next arrows */}
-        {!isSingle && !loading && !error && (
+        {!isSingle && !loading && (
           <>
             {currentIndex > 0 && (
               <button
@@ -395,7 +386,7 @@ export function ImageLightbox({
                   e.stopPropagation();
                   goPrev();
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors"
                 aria-label={t("imageLightbox.prev")}
               >
                 <ChevronLeft className="w-6 h-6" />
@@ -408,7 +399,7 @@ export function ImageLightbox({
                   e.stopPropagation();
                   goNext();
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors"
                 aria-label={t("imageLightbox.next")}
               >
                 <ChevronRight className="w-6 h-6" />
@@ -428,12 +419,12 @@ export function ImageLightbox({
       </div>
 
       {/* ── Bottom bar ── */}
-      {!loading && !error && (
-        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-black/60 text-white select-none shrink-0">
+      {!loading && imageSrc && (
+        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-black/60 dark:bg-black/70 backdrop-blur-md text-white select-none shrink-0">
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-white/10 transition-colors text-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
             aria-label={t("imageLightbox.copy")}
           >
             <Copy className="w-4 h-4" />
@@ -447,7 +438,7 @@ export function ImageLightbox({
             <button
               type="button"
               onClick={handleOpenExternal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-white/10 transition-colors text-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
               aria-label={t("imageLightbox.openExternal")}
             >
               <ExternalLink className="w-4 h-4" />

@@ -14,6 +14,7 @@ import type {
   PartialToolResult,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
+import type { ImageSource } from "../components/ImageLightbox";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
@@ -172,6 +173,14 @@ interface AppState {
   // Update
   updateReady: boolean;
   updateVersion: string;
+
+  // Image lightbox
+  lightboxImages: ImageSource[];
+  lightboxIndex: number;
+  lightboxLoading: boolean;
+  lightboxSource: 'pasted' | 'attached' | 'message' | null;
+  openLightbox: (images: ImageSource[], index?: number, loading?: boolean, source?: 'pasted' | 'attached' | 'message') => void;
+  closeLightbox: () => void;
 
   // Browser fullscreen
   isBrowserFullscreen: boolean;
@@ -409,6 +418,10 @@ export const useAppStore = create<AppState>((set) => ({
   systemDarkMode: false,
   updateReady: false,
   updateVersion: '',
+  lightboxImages: [] as ImageSource[],
+  lightboxIndex: 0,
+  lightboxLoading: false,
+  lightboxSource: null as 'pasted' | 'attached' | 'message' | null,
   isBrowserFullscreen: false,
   browserFullscreenSnapshot: null as {
     rightPanelMode: "files" | "browser" | null;
@@ -941,6 +954,17 @@ export const useAppStore = create<AppState>((set) => ({
       updateReady: version !== null,
       updateVersion: version || '',
     }),
+
+  // Image lightbox actions
+  openLightbox: (images, index = 0, loading = false, source) =>
+    set({
+      lightboxImages: images,
+      lightboxIndex: index,
+      lightboxLoading: loading,
+      lightboxSource: source ?? null,
+    }),
+  closeLightbox: () =>
+    set({ lightboxImages: [], lightboxIndex: 0, lightboxLoading: false, lightboxSource: null }),
 
   // Browser fullscreen actions
   enterBrowserFullscreen: () =>

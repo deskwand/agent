@@ -24,6 +24,7 @@ import type {
   AppConfig,
   TurnState,
 } from "../types";
+import type { ImageSource } from "../components/ImageLightbox";
 import type { GlobalNotice, SessionExecutionClock } from "./index";
 
 // ---------------------------------------------------------------------------
@@ -339,6 +340,29 @@ export function usePendingDialogs() {
     useShallow((s) => ({
       pendingPermission: s.pendingPermission,
       pendingSudoPassword: s.pendingSudoPassword,
+    })),
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Image lightbox domain
+// ---------------------------------------------------------------------------
+
+/** Returns the image lightbox state and actions for rendering at the App level. */
+export function useImageLightboxState(): {
+  isOpen: boolean;
+  images: ImageSource[];
+  startIndex: number;
+  loading: boolean;
+  onClose: () => void;
+} {
+  return useAppStore(
+    useShallow((s) => ({
+      isOpen: s.lightboxImages.length > 0,
+      images: s.lightboxImages,
+      startIndex: s.lightboxIndex,
+      loading: s.lightboxLoading,
+      onClose: s.closeLightbox,
     })),
   );
 }

@@ -33,6 +33,8 @@ import { Titlebar } from "./components/Titlebar";
 import { SandboxSetupDialog } from "./components/SandboxSetupDialog";
 import { SandboxSyncToast } from "./components/SandboxSyncToast";
 import { GlobalNoticeToast } from "./components/GlobalNoticeToast";
+import { ImageLightbox } from "./components/ImageLightbox";
+import { useImageLightboxState } from "./store/selectors";
 import { PanelErrorBoundary } from "./components/PanelErrorBoundary";
 import type { AppConfig } from "./types";
 import type { GlobalNoticeAction } from "./store";
@@ -90,6 +92,7 @@ function App() {
   const showSchedule = useScheduleViewState();
   const { showMarketplace } = useMarketplaceViewState();
   const { showConfigModal, isConfigured, appConfig } = useConfigModalState();
+  const lightboxState = useImageLightboxState();
   const globalNotice = useGlobalNotice();
   const { progress: sandboxSetupProgress, isComplete: isSandboxSetupComplete } =
     useSandboxSetupState();
@@ -434,6 +437,9 @@ function App() {
         onDismiss={clearGlobalNotice}
         onAction={handleGlobalNoticeAction}
       />
+
+      {/* Image Lightbox */}
+      <ImageLightbox {...lightboxState} />
     </div>
   );
 }

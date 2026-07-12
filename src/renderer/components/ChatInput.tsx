@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { X, Image as ImageIcon } from "lucide-react";
-import { ImageLightbox, type ImageSource } from "./ImageLightbox";
+import type { ImageSource } from "./ImageLightbox";
 import type { Skill } from "../types";
 import {
   getBuiltinCommands,
@@ -93,11 +93,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       [],
     );
     const [isDragging, setIsDragging] = useState(false);
-    const [previewIndex, setPreviewIndex] = useState(-1);
-    const [attachPreview, setAttachPreview] = useState<{
-      images: ImageSource[];
-      startIndex: number;
-    } | null>(null);
+    const openLightbox = useAppStore((s) => s.openLightbox);
+    const closeLightbox = useAppStore((s) => s.closeLightbox);
+    const lightboxSource = useAppStore((s) => s.lightboxSource);
 
     const SLASH_TABS: readonly SlashTab[] = ["all", "commands", "skills"];
 
@@ -274,42 +272,22 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         updated.splice(index, 1);
         return updated;
       });
-      // Close lightbox if removing the currently previewed image
-      setPreviewIndex((prev) => {
-        if (prev === index) return -1;
-        if (prev > index) return prev - 1;
-        return prev;
-      });
+      // Close lightbox only if currently showing pasted images
+      if (lightboxSource === 'pasted') closeLightbox();
     };
 
     const removeFile = (index: number) => {
+      const removed = attachedFiles[index];
+      const isImage =
+        removed?.type?.startsWith("image/") ||
+        /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(removed?.name || "");
       setAttachedFiles((prev) => {
         const updated = [...prev];
         updated.splice(index, 1);
         return updated;
       });
-      // Close attach lightbox if the removed file is the only image being previewed
-      setAttachPreview((prev) => {
-        if (!prev) return null;
-        // Recompute remaining image indices after removal
-        const surviving = attachedFiles
-          .map((f, i) => ({ f, i }))
-          .filter(({ f, i }) => {
-            if (i === index) return false;
-            return (
-              f.type.startsWith("image/") ||
-              /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(f.name || "")
-            );
-          });
-        if (surviving.length === 0) return null;
-        const newImages = surviving.map(({ f }) => ({
-          src: "",
-          name: f.name,
-          filePath: f.path || undefined,
-        }));
-        const newStart = Math.min(prev.startIndex, newImages.length - 1);
-        return { images: newImages, startIndex: newStart };
-      });
+      // Close lightbox only if removing an image file while showing attached images
+      if (lightboxSource === 'attached' && isImage) closeLightbox();
     };
 
     // --- File selection ---
@@ -639,7 +617,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     src={img.url}
                     alt={t("common.pastedImageAlt", { index: index + 1 })}
                     className="w-full aspect-square object-cover rounded-lg border border-border block cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => setPreviewIndex(index)}
+                    onClick={() => openLightbox(pastedImages.map((img) => ({ src: img.url })), index, false, 'pasted')}
                   />
                   <button
                     type="button"
@@ -685,10 +663,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     name: f.file.name,
                     filePath: f.file.path || undefined,
                   }));
-                  setAttachPreview({
-                    images: initialImages,
-                    startIndex: startIdx >= 0 ? startIdx : 0,
-                  });
+                  openLightbox(initialImages, startIdx >= 0 ? startIdx : 0, true, 'attached');
 
                   const loadedImages = await Promise.all(
                     imageFiles.map(async (f) => {
@@ -740,10 +715,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
                   // Discard results if a newer click started loading
                   if (token !== attachLoadTokenRef.current) return;
-                  setAttachPreview({
-                    images: loadedImages,
-                    startIndex: startIdx >= 0 ? startIdx : 0,
-                  });
+                  openLightbox(loadedImages, startIdx >= 0 ? startIdx : 0, false, 'attached');
                 };
 
                 return (
@@ -965,24 +937,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             </div>
           </div>
         </form>
-        <ImageLightbox
-          isOpen={previewIndex >= 0 && previewIndex < pastedImages.length}
-          images={pastedImages.map((img) => ({ src: img.url }))}
-          startIndex={previewIndex}
-          onClose={() => setPreviewIndex(-1)}
-        />
-        {attachPreview && (
-          <ImageLightbox
-            isOpen={true}
-            images={attachPreview.images}
-            startIndex={attachPreview.startIndex}
-            onClose={() => setAttachPreview(null)}
-            loading={
-              attachPreview.images.length > 0 &&
-              attachPreview.images.every((img) => !img.src)
-            }
-          />
-        )}
       </>
     );
   },

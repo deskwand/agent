@@ -35,7 +35,7 @@ import { ThinkingBlock } from "./ThinkingBlock";
 import { ToolUseBlock } from "./ToolUseBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
 import { FilePreviewModal } from "../FilePreviewModal";
-import { ImageLightbox, type ImageSource } from "../ImageLightbox";
+import type { ImageSource } from "../ImageLightbox";
 import { isPreviewableExt } from "../../utils/file-preview";
 import type { ContentBlockViewProps } from "./types";
 
@@ -81,12 +81,12 @@ export const ContentBlockView = memo(function ContentBlockView({
     : null;
   const currentWorkingDir = activeSession?.cwd || workingDir;
 
+  const openLightbox = useAppStore((s) => s.openLightbox);
+
   const [previewFile, setPreviewFile] = useState<{
     path: string;
     name: string;
   } | null>(null);
-  const [lightboxImages, setLightboxImages] = useState<ImageSource[]>([]);
-  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const resolveFilePath = (value: string) =>
     resolvePathAgainstWorkspace(value, currentWorkingDir);
@@ -478,8 +478,7 @@ export const ContentBlockView = memo(function ContentBlockView({
         const clickedIdx = allImages.findIndex(
           (img) => img.src === imageSrc,
         );
-        setLightboxImages(allImages);
-        setLightboxIndex(clickedIdx >= 0 ? clickedIdx : 0);
+        openLightbox(allImages, clickedIdx >= 0 ? clickedIdx : 0, false, 'message');
       };
 
       return (
@@ -569,12 +568,6 @@ export const ContentBlockView = memo(function ContentBlockView({
           onClose={() => setPreviewFile(null)}
         />
       )}
-      <ImageLightbox
-        isOpen={lightboxImages.length > 0}
-        images={lightboxImages}
-        startIndex={lightboxIndex}
-        onClose={() => setLightboxImages([])}
-      />
     </>
   );
 });
