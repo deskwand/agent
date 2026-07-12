@@ -906,12 +906,13 @@ export function ChatView() {
       }
 
       const performScroll = () => {
-        if (!autoFollowRef.current) return;
+        const container = scrollContainerRef.current;
+        if (!container || !autoFollowRef.current) return;
 
         // Mark as scrolling to prevent concurrent scrolls
         isScrollingRef.current = true;
 
-        messagesEndRef.current?.scrollIntoView({ behavior });
+        container.scrollTo({ top: container.scrollHeight, behavior });
 
         // Reset scrolling flag after a short delay
         setTimeout(
@@ -1323,7 +1324,8 @@ export function ChatView() {
     upwardScrollIntentRef.current = false;
     isUserAtBottomRef.current = true;
     setShowScrollToBottom(false);
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const c = scrollContainerRef.current;
+    c?.scrollTo({ top: c.scrollHeight, behavior: "smooth" });
   };
 
   if (!activeSession) {
