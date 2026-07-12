@@ -1526,7 +1526,7 @@ export function ChatView() {
       </div>
       <MessageNavRail
         ticks={railTicks}
-        scrollContainerRef={scrollContainerRef as React.RefObject<HTMLElement | null>}
+        scrollContainerRef={scrollContainerRef}
       />
     </div>
   );

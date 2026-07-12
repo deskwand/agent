@@ -20,6 +20,12 @@ export interface RailTickEntry {
   assistantPreview: string | null;
 }
 
+export interface TickStyle {
+  w: number;
+  op: number;
+  primary: boolean;
+}
+
 // ── 工具函数 ──
 
 export function getTurnPreviewText(message: Message, maxLen = 100): PreviewResult {
@@ -58,15 +64,69 @@ export function getTurnPreviewText(message: Message, maxLen = 100): PreviewResul
   return { kind: "empty" };
 }
 
+/**
+ * 计算 tick 的固定 Y 偏移数组。
+ * n 个 tick 以 gap 间距紧凑排列，整体垂直居中。
+ * 当 rail 高度不足以放下全部 tick 时，压缩间距至最小 4px。
+ */
+export function getTickOffsets(railHeight: number, n: number, gap = 10): number[] {
+  if (n === 0 || railHeight === 0) return [];
+  if (n === 1) return [railHeight / 2];
+  const needed = (n - 1) * gap;
+  if (needed + 8 <= railHeight) {
+    const top = (railHeight - needed) / 2;
+    return Array.from({ length: n }, (_, i) => top + i * gap);
+  }
+  const compressed = Math.max(4, (railHeight - 8) / (n - 1));
+  return Array.from({ length: n }, (_, i) => 4 + i * compressed);
+}
+
+/**
+ * 根据鼠标 Y 坐标为每个 tick 计算 Dock 风格的宽度/透明度。
+ * 距离越近越大越亮，maxDist 之外的 tick 保持最小值。
+ */
+export function getTickStyles(
+  mouseY: number | null,
+  offsets: number[],
+  maxDist = 96,
+  minW = 8,
+  maxW = 28,
+  minOp = 0.6,
+  maxOp = 0.95,
+): TickStyle[] {
+  if (mouseY === null || offsets.length === 0) {
+    return offsets.map(() => ({ w: minW, op: minOp, primary: false }));
+  }
+  let closestIdx = 0;
+  let closestDist = Infinity;
+  const styles: TickStyle[] = offsets.map((ty, i) => {
+    const dist = Math.abs(mouseY - ty);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closestIdx = i;
+    }
+    const t = Math.max(0, 1 - dist / maxDist);
+    return {
+      w: minW + (maxW - minW) * t,
+      op: minOp + (maxOp - minOp) * t,
+      primary: false,
+    };
+  });
+  if (styles[closestIdx]) {
+    styles[closestIdx] = { ...styles[closestIdx], primary: true };
+  }
+  return styles;
+}
+
 // ── 常量 ──
 
 const TICK_GAP = 10;
-const HOT_ZONE_WIDTH = 48;
-const MAX_DIST = 72;
-const MIN_W = 6;
-const MAX_W = 20;
-const MIN_OP = 0.5;
-const MAX_OP = 0.9;
+const HOT_ZONE_WIDTH = 64;
+const MAX_DIST = 96;
+const MIN_W = 8;
+const MAX_W = 28;
+const MIN_OP = 0.6;
+const MAX_OP = 0.95;
 
 // ── TickMark ──
 
@@ -96,7 +156,7 @@ const TickMark = memo(function TickMark({
       ? "var(--color-text-primary)"
       : "var(--color-text-secondary)";
 
-  const cardTop = y - (assistantPreview ? 20 : 10);
+  const cardTop = y - (assistantPreview ? 28 : 14);
 
   return (
     <>
@@ -105,9 +165,13 @@ const TickMark = memo(function TickMark({
           className="absolute z-30 bg-surface/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-elevated text-xs w-[280px] max-h-[7.5rem] overflow-hidden pointer-events-none"
           style={{ left: 26, top: cardTop }}
         >
-          <div className="text-text-secondary truncate">{userPreview}</div>
+          <div className="text-text-secondary whitespace-normal leading-relaxed">
+            {userPreview}
+          </div>
           {assistantPreview && (
-            <div className="text-text-primary truncate">{assistantPreview}</div>
+            <div className="text-text-primary whitespace-normal leading-relaxed">
+              {assistantPreview}
+            </div>
           )}
         </div>
       )}
@@ -123,7 +187,7 @@ const TickMark = memo(function TickMark({
         style={{
           top: y,
           width,
-          height: 2,
+          height: 3,
           backgroundColor: bg,
           opacity,
           transition:
@@ -138,7 +202,7 @@ const TickMark = memo(function TickMark({
 
 interface MessageNavRailProps {
   ticks: RailTickEntry[];
-  scrollContainerRef: React.RefObject<HTMLElement | null>;
+  scrollContainerRef: React.RefObject<HTMLElement>;
 }
 
 export const MessageNavRail = memo(function MessageNavRail({
@@ -167,52 +231,28 @@ export const MessageNavRail = memo(function MessageNavRail({
 
   const n = ticks.length;
 
-  const tickOffsets = useMemo(() => {
-    if (n === 0 || railHeight === 0) return [] as number[];
-    if (n === 1) return [railHeight / 2];
-    const needed = (n - 1) * TICK_GAP;
-    if (needed + 8 <= railHeight) {
-      const top = (railHeight - needed) / 2;
-      return Array.from({ length: n }, (_, i) => top + i * TICK_GAP);
-    }
-    const compressed = Math.max(4, (railHeight - 8) / (n - 1));
-    return Array.from({ length: n }, (_, i) => 4 + i * compressed);
-  }, [n, railHeight]);
+  const tickOffsets = useMemo(
+    () => getTickOffsets(railHeight, n, TICK_GAP),
+    [n, railHeight],
+  );
 
-  const tickStyles = useMemo(() => {
-    if (mouseY === null || tickOffsets.length === 0) {
-      return tickOffsets.map(() => ({ w: MIN_W, op: MIN_OP, primary: false }));
-    }
-    let closestIdx = 0;
-    let closestDist = Infinity;
-    const styles = tickOffsets.map((ty, i) => {
-      const dist = Math.abs(mouseY - ty);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closestIdx = i;
-      }
-      const t = Math.max(0, 1 - dist / MAX_DIST);
-      return {
-        w: MIN_W + (MAX_W - MIN_W) * t,
-        op: MIN_OP + (MAX_OP - MIN_OP) * t,
-        primary: false,
-      };
-    });
-    if (styles[closestIdx]) {
-      styles[closestIdx] = { ...styles[closestIdx], primary: true };
-    }
-    return styles;
-  }, [mouseY, tickOffsets]);
+  const tickStyles = useMemo(
+    () => getTickStyles(mouseY, tickOffsets, MAX_DIST, MIN_W, MAX_W, MIN_OP, MAX_OP),
+    [mouseY, tickOffsets],
+  );
 
   const primaryIdx = tickStyles.findIndex((s) => s.primary);
 
+  const nRef = useRef(n);
+  nRef.current = n;
+
   const updateActive = useCallback(() => {
     const container = scrollContainerRef.current;
-    if (!container || n === 0) return;
+    if (!container || nRef.current === 0) return;
     const maxScroll = container.scrollHeight - container.clientHeight;
     const ratio = maxScroll > 0 ? container.scrollTop / maxScroll : 0;
-    setActiveIndex(Math.round(ratio * (n - 1)));
-  }, [scrollContainerRef, n]);
+    setActiveIndex(Math.round(ratio * (nRef.current - 1)));
+  }, [scrollContainerRef]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
