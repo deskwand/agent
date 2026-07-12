@@ -231,7 +231,7 @@ export function ChatView() {
   const activeSessionId = useActiveSessionId();
   const activeSession = useCurrentSession();
   const messages = useActiveSessionMessages();
-  const { partialMessage, partialThinking } = useActivePartialContent();
+  const { partialMessage } = useActivePartialContent();
   const activeTurn = useActiveTurn();
   const pendingTurns = usePendingTurns();
   const [steeringEvent, setSteeringEvent] = useState<{
@@ -520,6 +520,7 @@ export function ChatView() {
       }
       hasActiveTurnAssistantMessage = true;
       for (const block of message.content) {
+        if (block.type === "thinking") continue;
         appendMergedLiveBlock(aggregatedBlocks, block);
       }
       if (
@@ -533,12 +534,6 @@ export function ChatView() {
       }
     }
 
-    if (partialThinking) {
-      appendMergedLiveBlock(aggregatedBlocks, {
-        type: "thinking",
-        thinking: partialThinking,
-      });
-    }
     if (partialMessage) {
       appendMergedLiveBlock(aggregatedBlocks, {
         type: "text",
@@ -546,7 +541,7 @@ export function ChatView() {
       });
     }
 
-    const hasStreamingContent = Boolean(partialThinking || partialMessage);
+    const hasStreamingContent = Boolean(partialMessage);
     if (!hasActiveTurnAssistantMessage && !hasStreamingContent) return messages;
 
     const streamingMessage: Message = {
@@ -569,7 +564,6 @@ export function ChatView() {
     activeTurn?.userMessageId,
     messages,
     partialMessage,
-    partialThinking,
   ]);
 
   const turnRanges = useMemo(
