@@ -71,7 +71,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [cloudRestoring, setCloudRestoring] = useState(false);
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
-  const [currentAppVersion, setCurrentAppVersion] = useState('');
+  const [currentAppVersion, setCurrentAppVersion] = useState("");
 
   useEffect(() => {
     if (!showProjectActions) return;
@@ -86,7 +86,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     try {
       const v = window.electronAPI.getVersion?.();
       if (v instanceof Promise) {
-        v.then((ver) => { if (ver) setCurrentAppVersion(ver); });
+        v.then((ver) => {
+          if (ver) setCurrentAppVersion(ver);
+        });
       } else if (v) {
         setCurrentAppVersion(v);
       }
@@ -565,7 +567,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       setWorkingDir(null);
                       handleNewSession();
                     }}
-                    className="h-8 w-8 rounded-l-xl bg-surface-muted text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                    className="h-8 w-8 rounded-l-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
                     title={t("sidebar.newChat")}
                   >
                     <SquarePen className="w-4 h-4" />
@@ -575,7 +577,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       e.stopPropagation();
                       setShowProjectActions((prev) => !prev);
                     }}
-                    className="w-5 h-8 rounded-r-xl bg-surface-muted text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors border-l border-surface-hover flex items-center justify-center"
+                    className="w-5 h-8 rounded-r-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors border-l border-surface-hover flex items-center justify-center"
                   >
                     <ChevronDown className="w-3 h-3" />
                   </button>
