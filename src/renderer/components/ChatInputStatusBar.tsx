@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next";
-import { AlertCircle, Check, Loader2, Target } from "lucide-react";
 
 export type ChatInputStatus =
   | { type: "sending" }
@@ -36,82 +35,98 @@ interface ChatInputStatusBarProps {
   status: ChatInputStatus;
 }
 
+// Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
+const gradientStyles = `
+@keyframes gradient-flow {
+  0%   { background-position: 200% 50%; }
+  100% { background-position: -200% 50%; }
+}
+.gradient-text {
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-flow 3s linear infinite;
+}
+`;
+
 export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
 
   // Always render a fixed-height container to prevent layout jump
-  let icon: React.ReactNode = null;
   let text = "";
   let toneClass = "text-text-muted";
+  let isRunning = false;
 
   if (status) {
     switch (status.type) {
     case "sending":
-      icon = <Loader2 className="w-3 h-3 animate-spin" />;
       text = t("chat.sending");
-      toneClass = "text-accent";
+      toneClass = "text-text-primary";
+      isRunning = true;
       break;
     case "thinking":
-      icon = <Loader2 className="w-3 h-3 animate-spin" />;
       text = t("chat.processing");
-      toneClass = "text-accent";
+      toneClass = "text-text-primary";
+      isRunning = true;
       break;
     case "responding":
-      icon = <Loader2 className="w-3 h-3 animate-spin" />;
       text = t("chat.responding");
-      toneClass = "text-accent";
+      toneClass = "text-text-primary";
+      isRunning = true;
       break;
     case "compacting":
-      icon = <Loader2 className="w-3 h-3 animate-spin" />;
       text = t("chat.compacting");
-      toneClass = "text-accent";
+      toneClass = "text-text-primary";
+      isRunning = true;
       break;
     case "compaction-success":
-      icon = <Check className="w-3 h-3" />;
       text = t("chat.compacted");
-      toneClass = "text-success";
+      toneClass = "text-text-muted";
       break;
     case "compaction-failed":
-      icon = <AlertCircle className="w-3 h-3" />;
       text = t("chat.compactFailed");
-      toneClass = "text-error";
+      toneClass = "text-text-muted";
       break;
     case "steering":
-      icon = <Target className="w-3 h-3" />;
       text = `${t("steer.eventLabel")}: ${status.text}`;
-      toneClass = "text-text-secondary";
+      toneClass = "text-text-primary";
+      isRunning = true;
       break;
     case "goal-active":
-      icon = <Target className="w-3 h-3 animate-pulse" />;
       text = `${t("goal.active")}: ${status.objective} (${t("goal.turn", { n: status.iteration })})`;
+      toneClass = "text-text-primary";
+      isRunning = true;
       break;
     case "goal-paused":
-      icon = <Target className="w-3 h-3" />;
       text = `${t("goal.paused")}: ${status.objective}`;
+      toneClass = "text-text-primary";
+      isRunning = true;
       break;
     case "goal-complete":
-      icon = <Check className="w-3 h-3" />;
       text = `${t("goal.complete")}: ${status.objective}`;
-      toneClass = "text-success";
+      toneClass = "text-text-muted";
       break;
     case "goal-blocked":
-      icon = <AlertCircle className="w-3 h-3" />;
       text = `${t("goal.blocked")}: ${status.objective}`;
-      toneClass = "text-error";
+      toneClass = "text-text-muted";
       break;
     case "goal-budget-limited":
-      icon = <AlertCircle className="w-3 h-3" />;
       text = `${t("goal.budgetLimited")}: ${status.objective} (${t("goal.turn", { n: status.iteration })})`;
-      toneClass = "text-warning";
+      toneClass = "text-text-primary";
+      isRunning = true;
       break;
     }
   }
 
   return (
     <div className="min-h-5 px-1 pb-1">
+      <style>{gradientStyles}</style>
       <div className={`flex items-center gap-1.5 text-xs ${toneClass}`}>
-        <span className="shrink-0 opacity-70">{icon}</span>
-        <span className="min-w-0 truncate">{text}</span>
+        <span className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}>
+          {text}
+        </span>
       </div>
     </div>
   );
