@@ -19,6 +19,7 @@ import {
   type SlashItem,
 } from "../slash-commands";
 import { SlashMenu, type SlashTab } from "./SlashMenu";
+import { compressImageForLLM } from "../utils/image-compress";
 
 export interface ChatInputAttachedFile {
   name: string;
@@ -231,69 +232,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       });
     };
 
-    const resizeImageIfNeeded = async (blob: Blob): Promise<Blob> => {
-      const MAX_BLOB_SIZE = 3.75 * 1024 * 1024;
-      if (blob.size <= MAX_BLOB_SIZE) return blob;
-
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        const url = URL.createObjectURL(blob);
-        img.onload = () => {
-          URL.revokeObjectURL(url);
-          const canvas = document.createElement("canvas");
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            reject(new Error("Failed to get canvas context"));
-            return;
-          }
-
-          const scale = Math.sqrt(MAX_BLOB_SIZE / blob.size);
-          const quality = 0.9;
-
-          const attemptCompress = (
-            currentScale: number,
-            currentQuality: number,
-          ): Promise<Blob> => {
-            canvas.width = Math.floor(img.width * currentScale);
-            canvas.height = Math.floor(img.height * currentScale);
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-            return new Promise((resolveBlob) => {
-              canvas.toBlob(
-                (compressedBlob) => {
-                  if (!compressedBlob) {
-                    reject(new Error("Failed to compress image"));
-                    return;
-                  }
-                  if (
-                    compressedBlob.size > MAX_BLOB_SIZE &&
-                    (currentQuality > 0.5 || currentScale > 0.3)
-                  ) {
-                    const newQuality = Math.max(0.5, currentQuality - 0.1);
-                    const newScale =
-                      currentQuality <= 0.5 ? currentScale * 0.9 : currentScale;
-                    attemptCompress(newScale, newQuality).then(resolveBlob);
-                  } else {
-                    resolveBlob(compressedBlob);
-                  }
-                },
-                blob.type || "image/jpeg",
-                currentQuality,
-              );
-            });
-          };
-
-          attemptCompress(scale, quality).then(resolve).catch(reject);
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(url);
-          reject(new Error("Failed to load image"));
-        };
-        img.src = url;
-      });
-    };
-
     // --- Paste handler ---
     const handlePaste = async (e: React.ClipboardEvent) => {
       const items = e.clipboardData?.items;
@@ -313,7 +251,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const blob = item.getAsFile();
         if (!blob) continue;
         try {
-          const resizedBlob = await resizeImageIfNeeded(blob);
+          const resizedBlob = await compressImageForLLM(blob);
           const base64 = await blobToBase64(resizedBlob);
           const url = URL.createObjectURL(resizedBlob);
           newImages.push({ url, base64, mediaType: resizedBlob.type });
@@ -593,7 +531,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         }> = [];
         for (const file of imageFiles) {
           try {
-            const resizedBlob = await resizeImageIfNeeded(file);
+            const resizedBlob = await compressImageForLLM(file);
             const base64 = await blobToBase64(resizedBlob);
             const url = URL.createObjectURL(resizedBlob);
             newImages.push({ url, base64, mediaType: resizedBlob.type });
