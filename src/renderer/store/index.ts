@@ -110,8 +110,10 @@ interface AppState {
   // UI state
   isLoading: boolean;
   sidebarCollapsed: boolean;
+  sidebarCollapsedBeforeBrowser: boolean;
   sidebarWidth: number;
   contextPanelWidth: number;
+  browserWidthManual: boolean;
   showSettings: boolean;
   showSchedule: boolean;
   showMarketplace: boolean;
@@ -261,6 +263,7 @@ interface AppState {
   toggleFileBrowser: () => void;
   toggleReviewPanel: () => void;
   toggleBrowserPanel: () => void;
+  setBrowserWidthManual: (manual: boolean) => void;
   setGitChangeCount: (count: number) => void;
 
   setPendingPermission: (permission: PermissionRequest | null) => void;
@@ -385,8 +388,10 @@ export const useAppStore = create<AppState>((set) => ({
   sessionStates: {},
   isLoading: false,
   sidebarCollapsed: false,
+  sidebarCollapsedBeforeBrowser: false,
   sidebarWidth: 280,
   contextPanelWidth: 288,
+  browserWidthManual: false,
   showSettings: false,
   showSchedule: false,
   showMarketplace: false,
@@ -839,10 +844,19 @@ export const useAppStore = create<AppState>((set) => ({
   toggleBrowserPanel: () =>
     set((state) => {
       if (state.rightPanelMode === "browser") {
-        return { rightPanelMode: null };
+        return {
+          rightPanelMode: null,
+          sidebarCollapsed: state.sidebarCollapsedBeforeBrowser,
+        };
       }
-      return { rightPanelMode: "browser" };
+      return {
+        rightPanelMode: "browser",
+        sidebarCollapsedBeforeBrowser: state.sidebarCollapsed,
+        sidebarCollapsed: true,
+        browserWidthManual: false,
+      };
     }),
+  setBrowserWidthManual: (manual) => set({ browserWidthManual: manual }),
   setGitChangeCount: (count) => set({ gitChangeCount: count }),
 
   // Permission actions

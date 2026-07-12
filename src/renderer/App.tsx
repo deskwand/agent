@@ -114,9 +114,11 @@ function App() {
   const contextPanelWidth = useAppStore((s) => s.contextPanelWidth);
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const setContextPanelWidth = useAppStore((s) => s.setContextPanelWidth);
-  const setRightPanelMode = useAppStore((s) => s.setRightPanelMode);
   const isBrowserFullscreen = useAppStore((s) => s.isBrowserFullscreen);
   const exitBrowserFullscreen = useAppStore((s) => s.exitBrowserFullscreen);
+  const browserWidthManual = useAppStore((s) => s.browserWidthManual);
+  const setBrowserWidthManual = useAppStore((s) => s.setBrowserWidthManual);
+  const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
 
   const { listSessions, isElectron } = useIPC();
   useWindowSize();
@@ -230,11 +232,46 @@ function App() {
         rightPanelMode !== "browser" &&
         !browserDismissedRef.current
       ) {
-        setRightPanelMode("browser");
+        toggleBrowserPanel();
       }
     });
     return unsub;
-  }, [rightPanelMode, setRightPanelMode]);
+  }, [rightPanelMode, toggleBrowserPanel]);
+
+  // Stable 50%-width calculator for browser panel
+  const calcHalfWidth = useCallback(() => {
+    const available = sidebarCollapsed
+      ? window.innerWidth
+      : window.innerWidth - sidebarWidth;
+    return Math.round(available / 2);
+  }, [sidebarCollapsed, sidebarWidth]);
+
+  // Auto-set browser panel to 50% width when opened in auto mode
+  useEffect(() => {
+    if (rightPanelMode === "browser" && !browserWidthManual) {
+      setContextPanelWidth(calcHalfWidth());
+    }
+  }, [rightPanelMode, browserWidthManual, calcHalfWidth, setContextPanelWidth]);
+
+  // Keep browser at 50% on window resize when in auto mode.
+  // Uses refs to avoid re-binding the listener on every sidebar change.
+  const resizeGuardRef = useRef<{
+    rightPanelMode: "files" | "browser" | null;
+    browserWidthManual: boolean;
+    calcHalfWidth: typeof calcHalfWidth;
+  }>(null!);
+  resizeGuardRef.current = { rightPanelMode, browserWidthManual, calcHalfWidth };
+
+  useEffect(() => {
+    const handleResize = () => {
+      const { rightPanelMode: mode, browserWidthManual: manual, calcHalfWidth: calc } =
+        resizeGuardRef.current;
+      if (mode !== "browser" || manual) return;
+      setContextPanelWidth(calc());
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [setContextPanelWidth]);
 
   // When user manually closes the browser panel (any mode transition away from browser),
   // mark it as dismissed so MCP navigations won't force-reopen it.
@@ -337,7 +374,8 @@ function App() {
         {/* Right Panel: File Browser or Browser */}
         {!isFullScreenView && rightPanelMode !== null && (
           <ResizeHandle
-            onResize={(delta) =>
+            onResize={(delta) => {
+              setBrowserWidthManual(true);
               setContextPanelWidth(
                 Math.max(
                   rightPanelMode === "browser" ? 350 : 280,
@@ -345,9 +383,12 @@ function App() {
                     ? contextPanelWidth - delta
                     : Math.min(480, contextPanelWidth - delta),
                 ),
-              )
-            }
-            onDoubleClick={() => setContextPanelWidth(340)}
+              );
+            }}
+            onDoubleClick={() => {
+              setBrowserWidthManual(false);
+              setContextPanelWidth(calcHalfWidth());
+            }}
             position="left"
             className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
           />
