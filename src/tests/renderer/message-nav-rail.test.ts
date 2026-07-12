@@ -9,6 +9,7 @@ function msg(blocks: Message["content"]): Message {
     content: blocks,
     sessionId: "s1",
     createdAt: 0,
+    timestamp: 0,
   } as Message;
 }
 
@@ -75,6 +76,7 @@ describe("getTurnPreviewText", () => {
       content: "string content" as never,
       sessionId: "s1",
       createdAt: 0,
+      timestamp: 0,
     } as Message);
     expect(result).toEqual({ kind: "empty" });
   });

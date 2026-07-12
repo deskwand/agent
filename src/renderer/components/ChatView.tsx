@@ -40,6 +40,11 @@ import {
 } from "./ChatInput";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { ChatInputStatusBar, resolveInputStatus } from "./ChatInputStatusBar";
+import {
+  MessageNavRail,
+  getTurnPreviewText,
+  type RailTickEntry,
+} from "./MessageNavRail";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -747,6 +752,40 @@ export function ChatView() {
     });
   }, [mergedMessages, hoistedProcessSummaryTurnIds]);
 
+  const railTicks = useMemo<RailTickEntry[]>(() => {
+    const entries: RailTickEntry[] = [];
+    const ve = visibleTurnEntries;
+    for (let i = 0; i < ve.length; i++) {
+      const msg = ve[i].message;
+      if (msg.role !== "user") continue;
+      let assistantText: string | null = null;
+      for (let j = i + 1; j < ve.length; j++) {
+        const next = ve[j].message;
+        if (next.role === "user") {
+          if (Array.isArray(next.content) && next.content.some((b) => b.type === "tool_result")) {
+            continue;
+          }
+          break;
+        }
+        if (next.role === "assistant") {
+          const result = getTurnPreviewText(next, 100);
+          if (result.kind === "text") {
+            assistantText = result.value;
+          } else if (!assistantText && result.kind !== "empty") {
+            assistantText = result.value;
+          }
+        }
+      }
+      const userResult = getTurnPreviewText(msg, 100);
+      entries.push({
+        messageId: String(msg.id),
+        userPreview: userResult.kind !== "empty" ? userResult.value : "",
+        assistantPreview: assistantText,
+      });
+    }
+    return entries;
+  }, [visibleTurnEntries]);
+
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,
     Boolean(activeSession),
@@ -1296,7 +1335,7 @@ export function ChatView() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+    <div className="relative flex-1 flex flex-col overflow-hidden bg-background">
       <div ref={headerRef} className="hidden" />
       <h2 ref={titleRef} className="sr-only">
         {activeSession.title}
@@ -1485,6 +1524,10 @@ export function ChatView() {
           />
         </div>
       </div>
+      <MessageNavRail
+        ticks={railTicks}
+        scrollContainerRef={scrollContainerRef as React.RefObject<HTMLElement | null>}
+      />
     </div>
   );
 }
