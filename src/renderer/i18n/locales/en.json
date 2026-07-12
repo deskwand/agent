@@ -1299,6 +1299,12 @@
       "TIMEOUT": "Authorization timed out, please try again"
     }
   },
+  "update": {
+    "title": "New Version Available",
+    "description": "DeskWand v{{version}} has been downloaded. Restart to complete the update.",
+    "later": "Later",
+    "restart": "Restart Now"
+  },
   "artifactCard": {
     "title": "Round Artifacts",
     "editedFiles": "Edited Files",

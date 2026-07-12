@@ -12,10 +12,12 @@ import {
   Archive,
   ChevronDown,
   SquarePen,
+  Download,
 } from "lucide-react";
 import { AccountMenu } from "./AccountMenu";
 import { LoginModal } from "./LoginModal";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { UpdateConfirmDialog } from "./UpdateConfirmDialog";
 import { CloudApiClient } from "../services/cloud-api";
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
@@ -44,6 +46,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const removeTaskSlot = useAppStore((s) => s.removeTaskSlot);
   const setTaskSlots = useAppStore((s) => s.setTaskSlots);
 
+  const updateReady = useAppStore((s) => s.updateReady);
+  const updateVersion = useAppStore((s) => s.updateVersion);
+
   const {
     invoke,
     deleteSession,
@@ -65,6 +70,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   const [cloudRestoring, setCloudRestoring] = useState(false);
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const [currentAppVersion, setCurrentAppVersion] = useState('');
 
   useEffect(() => {
     if (!showProjectActions) return;
@@ -72,6 +79,21 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, [showProjectActions]);
+
+  // Get current app version for update dialog
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    try {
+      const v = window.electronAPI.getVersion?.();
+      if (v instanceof Promise) {
+        v.then((ver) => { if (ver) setCurrentAppVersion(ver); });
+      } else if (v) {
+        setCurrentAppVersion(v);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // 启动时恢复云端登录状态
   useEffect(() => {
@@ -1018,6 +1040,15 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                     }`}
                   />
                 </button>
+                {updateReady && updateVersion && (
+                  <button
+                    onClick={() => setShowUpdateDialog(true)}
+                    className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent text-xs font-semibold transition-colors"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>v{updateVersion}</span>
+                  </button>
+                )}
               </div>
               <AccountMenu
                 isOpen={accountMenuOpen}
@@ -1158,6 +1189,22 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           }
         }}
         onCancel={() => setConfirmLogoutOpen(false)}
+      />
+      <UpdateConfirmDialog
+        isOpen={showUpdateDialog}
+        currentVersion={currentAppVersion}
+        newVersion={updateVersion}
+        onConfirm={() => {
+          setShowUpdateDialog(false);
+          // Send IPC to install the update (quitAndInstall)
+          if (window.electronAPI) {
+            window.electronAPI.send({
+              type: "update.install",
+              payload: {},
+            });
+          }
+        }}
+        onCancel={() => setShowUpdateDialog(false)}
       />
     </>
   );

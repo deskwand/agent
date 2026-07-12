@@ -387,6 +387,14 @@ function installSharedIpcBridge(): void {
           store.setWorkingDir(event.payload.path || null);
           break;
 
+        case "update.downloaded":
+          store.setUpdateReady(event.payload.version || null);
+          break;
+
+        case "update.not-available":
+          store.setUpdateReady(null);
+          break;
+
         case "session.contextInfo":
           store.setSessionContextWindow(
             event.payload.sessionId,

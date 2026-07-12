@@ -1295,6 +1295,12 @@
       "TIMEOUT": "授权超时，请重试"
     }
   },
+  "update": {
+    "title": "发现新版本",
+    "description": "DeskWand v{{version}} 已下载完毕，重启应用即可完成更新",
+    "later": "稍后再说",
+    "restart": "立即重启"
+  },
   "artifactCard": {
     "title": "本轮产物",
     "editedFiles": "编辑的文件",

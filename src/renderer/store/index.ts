@@ -169,6 +169,10 @@ interface AppState {
   // System theme (from OS native theme)
   systemDarkMode: boolean;
 
+  // Update
+  updateReady: boolean;
+  updateVersion: string;
+
   // Browser fullscreen
   isBrowserFullscreen: boolean;
   browserFullscreenSnapshot: {
@@ -290,6 +294,9 @@ interface AppState {
 
   // System theme actions
   setSystemDarkMode: (dark: boolean) => void;
+
+  // Update actions
+  setUpdateReady: (version: string | null) => void;
 }
 
 const defaultSettings: Settings = {
@@ -400,6 +407,8 @@ export const useAppStore = create<AppState>((set) => ({
   sandboxSyncStatus: null,
   taskSlots: loadTaskSlots(),
   systemDarkMode: false,
+  updateReady: false,
+  updateVersion: '',
   isBrowserFullscreen: false,
   browserFullscreenSnapshot: null as {
     rightPanelMode: "files" | "browser" | null;
@@ -925,6 +934,13 @@ export const useAppStore = create<AppState>((set) => ({
 
   // System theme actions
   setSystemDarkMode: (dark) => set({ systemDarkMode: dark }),
+
+  // Update actions
+  setUpdateReady: (version) =>
+    set({
+      updateReady: version !== null,
+      updateVersion: version || '',
+    }),
 
   // Browser fullscreen actions
   enterBrowserFullscreen: () =>
