@@ -3,7 +3,11 @@
  * Provides persistent storage for sessions, messages, and other data
  */
 
-import { DatabaseSync, type StatementSync, type SQLInputValue } from "node:sqlite";
+import {
+  DatabaseSync,
+  type StatementSync,
+  type SQLInputValue,
+} from "node:sqlite";
 import { app } from "electron";
 import { join } from "path";
 import {
@@ -79,6 +83,7 @@ export interface SessionRow {
   thinking_level: string;
   archived: number;
   archived_at: number | null;
+  pi_session_file: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -274,7 +279,9 @@ function initializeSchema(database: DatabaseSync): void {
       database.exec(
         "ALTER TABLE sessions RENAME COLUMN claude_session_id TO deskwand_session_id",
       );
-      log("[Database] Migrated sessions.claude_session_id → deskwand_session_id");
+      log(
+        "[Database] Migrated sessions.claude_session_id → deskwand_session_id",
+      );
     }
 
     ensureColumn(
@@ -308,6 +315,12 @@ function initializeSchema(database: DatabaseSync): void {
       "sessions",
       "is_project_mode",
       "is_project_mode INTEGER NOT NULL DEFAULT 0",
+    );
+    ensureColumn(
+      database,
+      "sessions",
+      "pi_session_file",
+      "pi_session_file TEXT",
     );
 
     // Create messages table
@@ -641,7 +654,9 @@ export function initDatabase(): DatabaseInstance {
         values.push(id);
 
         const sql = `UPDATE sessions SET ${setClauses.join(", ")} WHERE id = ?`;
-        rawDb.prepare(sql).run(...(values as [SQLInputValue, ...SQLInputValue[]]));
+        rawDb
+          .prepare(sql)
+          .run(...(values as [SQLInputValue, ...SQLInputValue[]]));
       },
 
       get: (id: string): SessionRow | undefined => {
@@ -682,7 +697,9 @@ export function initDatabase(): DatabaseInstance {
       },
 
       getBySessionId: (sessionId: string): MessageRow[] => {
-        return getMessagesBySessionStmt.all(sessionId) as unknown as MessageRow[];
+        return getMessagesBySessionStmt.all(
+          sessionId,
+        ) as unknown as MessageRow[];
       },
 
       delete: (id: string) => {
@@ -728,11 +745,15 @@ export function initDatabase(): DatabaseInstance {
 
         values.push(id);
         const sql = `UPDATE trace_steps SET ${setClauses.join(", ")} WHERE id = ?`;
-        rawDb.prepare(sql).run(...(values as [SQLInputValue, ...SQLInputValue[]]));
+        rawDb
+          .prepare(sql)
+          .run(...(values as [SQLInputValue, ...SQLInputValue[]]));
       },
 
       getBySessionId: (sessionId: string): TraceStepRow[] => {
-        return getTraceStepsBySessionStmt.all(sessionId) as unknown as TraceStepRow[];
+        return getTraceStepsBySessionStmt.all(
+          sessionId,
+        ) as unknown as TraceStepRow[];
       },
 
       deleteBySessionId: (sessionId: string) => {
@@ -780,7 +801,9 @@ export function initDatabase(): DatabaseInstance {
         values.push(id);
 
         const sql = `UPDATE scheduled_tasks SET ${setClauses.join(", ")} WHERE id = ?`;
-        rawDb.prepare(sql).run(...(values as [SQLInputValue, ...SQLInputValue[]]));
+        rawDb
+          .prepare(sql)
+          .run(...(values as [SQLInputValue, ...SQLInputValue[]]));
       },
 
       get: (id: string): ScheduledTaskRow | undefined => {

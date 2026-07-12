@@ -17,6 +17,7 @@ export interface Session {
   isProjectMode: boolean;
   archived?: boolean;
   archivedAt?: number;
+  piSessionFile?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -626,7 +627,13 @@ export type ServerEvent =
       type: "goal.status";
       payload: {
         sessionId: string;
-        status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
+        status:
+          | "active"
+          | "paused"
+          | "complete"
+          | "cleared"
+          | "blocked"
+          | "budget_limited";
         objective?: string;
         iteration?: number;
         tokensUsed?: number;

@@ -32,7 +32,9 @@ describe("AgentRunner contextualPrompt injection ordering", () => {
     const fnDefIdx = src.indexOf("const injectHistoryPreamble = (");
     const firstCallIdx = src.indexOf("injectHistoryPreamble(prompt,");
 
-    expect(fnDefIdx, "injectHistoryPreamble must be defined").toBeGreaterThan(-1);
+    expect(fnDefIdx, "injectHistoryPreamble must be defined").toBeGreaterThan(
+      -1,
+    );
     expect(firstCallIdx, "first call must exist").toBeGreaterThan(-1);
     expect(fnDefIdx).toBeLessThan(firstCallIdx);
   });
@@ -55,7 +57,7 @@ describe("AgentRunner contextualPrompt injection ordering", () => {
     );
     // The re-injection call uses contextualPrompt (not prompt) as first arg
     const reInjectCallIdx = src.indexOf(
-      "injectHistoryPreamble(\n          contextualPrompt,",
+      'injectHistoryPreamble(contextualPrompt, "Tools change cold-start")',
     );
 
     expect(toolsSigIdx, "toolsSignature check must exist").toBeGreaterThan(-1);
@@ -67,10 +69,10 @@ describe("AgentRunner contextualPrompt injection ordering", () => {
     const src = readSource();
 
     const guardIdx = src.indexOf(
-      "if (!cachedSession && !historyWasInjected)",
+      "if (!cachedSession && !historyWasInjected && !piSessionFile)",
     );
     const reInjectCallIdx = src.indexOf(
-      "injectHistoryPreamble(\n          contextualPrompt,",
+      'injectHistoryPreamble(contextualPrompt, "Tools change cold-start")',
     );
 
     expect(guardIdx, "double-injection guard must exist").toBeGreaterThan(-1);
@@ -81,11 +83,13 @@ describe("AgentRunner contextualPrompt injection ordering", () => {
     const src = readSource();
 
     const reInjectCallIdx = src.indexOf(
-      "injectHistoryPreamble(\n          contextualPrompt,",
+      'injectHistoryPreamble(contextualPrompt, "Tools change cold-start")',
     );
     const piSessionIdx = src.indexOf("let piSession: PiAgentSession;");
 
-    expect(piSessionIdx, "piSession declaration must exist").toBeGreaterThan(-1);
+    expect(piSessionIdx, "piSession declaration must exist").toBeGreaterThan(
+      -1,
+    );
     expect(reInjectCallIdx).toBeLessThan(piSessionIdx);
   });
 });

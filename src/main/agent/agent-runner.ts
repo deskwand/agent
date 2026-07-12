@@ -537,6 +537,8 @@ interface CachedPiSession {
   ollamaNumCtx?: { value: number };
   /** Extension commands registered via pi.registerCommand (e.g. /subagents-doctor) */
   extensionCommands?: { name: string; description: string }[];
+  /** JSONL session file path for persistence across restarts */
+  piSessionFile?: string;
 }
 
 /**
@@ -562,10 +564,14 @@ export class AgentRunner {
   private _browserViewManager: BrowserViewManager | null = null;
   private _browser: Browser | null = null;
   private _browserPage: Page | null = null;
-  private _snapshotRefMap: Map<string, { role: string; name?: string; placeholder?: string; value?: string }> | null = null;
+  private _snapshotRefMap: Map<
+    string,
+    { role: string; name?: string; placeholder?: string; value?: string }
+  > | null = null;
   private activeControllers: Map<string, AbortController> = new Map();
   private piSessions: Map<string, CachedPiSession> = new Map();
   private _turnFinalizer: TurnFinalizer | null = null;
+  onSessionFileCreated?: (sessionId: string, path: string) => void;
   private _customTools: ToolDefinition[] = [];
   private static readonly MAX_CACHED_SESSIONS = 50;
 
@@ -991,17 +997,26 @@ ${hints.join("\n")}
         const { role, name, placeholder } = info;
         if (role === "textbox" || role === "searchbox") {
           if (placeholder) return page.getByPlaceholder(placeholder);
-          if (name) return page.getByRole(role as "textbox" | "searchbox", { name });
+          if (name)
+            return page.getByRole(role as "textbox" | "searchbox", { name });
         }
-        if (role === "button") return page.getByRole("button", { name: name || "" });
-        if (role === "link") return page.getByRole("link", { name: name || "" });
-        if (role === "checkbox") return page.getByRole("checkbox", { name: name || "" });
-        if (role === "radio") return page.getByRole("radio", { name: name || "" });
+        if (role === "button")
+          return page.getByRole("button", { name: name || "" });
+        if (role === "link")
+          return page.getByRole("link", { name: name || "" });
+        if (role === "checkbox")
+          return page.getByRole("checkbox", { name: name || "" });
+        if (role === "radio")
+          return page.getByRole("radio", { name: name || "" });
         if (role === "combobox" || role === "listbox")
-          return page.getByRole(role as "combobox" | "listbox", { name: name || "" });
+          return page.getByRole(role as "combobox" | "listbox", {
+            name: name || "",
+          });
         if (name) return page.getByRole(role as "button", { name });
       }
-      throw new Error(`Snapshot ref "${selector}" not found in current snapshot. Run internal_browser_snapshot first.`);
+      throw new Error(
+        `Snapshot ref "${selector}" not found in current snapshot. Run internal_browser_snapshot first.`,
+      );
     }
     return page.locator(selector);
   }
@@ -1021,7 +1036,7 @@ ${hints.join("\n")}
 
     const self = this;
 
-    const withPage = <T,>(
+    const withPage = <T>(
       operation: string,
       action: (page: Page) => Promise<T>,
     ) => self._withBrowserPage(operation, action);
@@ -1032,22 +1047,41 @@ ${hints.join("\n")}
     // writing CSS selectors, inspect the real DOM or use @eN refs for targeting.
     function flattenA11y(axNodes: Record<string, any>[]): string[] {
       const lines: string[] = [];
-      const refMap = new Map<string, { role: string; name?: string; placeholder?: string; value?: string }>();
+      const refMap = new Map<
+        string,
+        { role: string; name?: string; placeholder?: string; value?: string }
+      >();
       let refIndex = 0;
       const interactiveRoles = new Set([
-        "button", "link", "textbox", "searchbox", "combobox", "listbox",
-        "checkbox", "radio", "switch", "tab", "menuitem", "option",
-        "slider", "spinbutton", "heading", "listitem",
+        "button",
+        "link",
+        "textbox",
+        "searchbox",
+        "combobox",
+        "listbox",
+        "checkbox",
+        "radio",
+        "switch",
+        "tab",
+        "menuitem",
+        "option",
+        "slider",
+        "spinbutton",
+        "heading",
+        "listitem",
       ]);
-      const nodeMap = new Map<string, typeof axNodes[0]>();
+      const nodeMap = new Map<string, (typeof axNodes)[0]>();
       for (const n of axNodes) {
         nodeMap.set(n.nodeId, n);
       }
       // Find root nodes: nodes whose nodeId is not referenced as childId by any other node
       const childIdSet = new Set(axNodes.flatMap((n) => n.childIds ?? []));
-      const rootNodes = axNodes.filter((n) => !n.ignored && !childIdSet.has(n.nodeId));
-      const starts = rootNodes.length > 0 ? rootNodes : axNodes.filter((n) => !n.ignored);
-      function walk(node: typeof axNodes[0], depth: number) {
+      const rootNodes = axNodes.filter(
+        (n) => !n.ignored && !childIdSet.has(n.nodeId),
+      );
+      const starts =
+        rootNodes.length > 0 ? rootNodes : axNodes.filter((n) => !n.ignored);
+      function walk(node: (typeof axNodes)[0], depth: number) {
         if (node.ignored) {
           // Still walk children — ignored wrapper may contain interactive nodes
           for (const cid of node.childIds ?? []) {
@@ -1065,7 +1099,11 @@ ${hints.join("\n")}
           const name = node.name?.value;
           if (name) parts.push(`name="${name}"`);
           const props = node.properties ?? [];
-          const getProp = (pn: string) => props.find((p: { name: string; value?: { value?: unknown } }) => p.name === pn)?.value?.value;
+          const getProp = (pn: string) =>
+            props.find(
+              (p: { name: string; value?: { value?: unknown } }) =>
+                p.name === pn,
+            )?.value?.value;
           const val = getProp("valuetext") ?? getProp("value");
           if (val !== undefined && val !== "") parts.push(`value="${val}"`);
           const checked = getProp("checked");
@@ -1100,17 +1138,32 @@ ${hints.join("\n")}
       parameters: Type.Object({
         url: Type.String({ description: "URL to navigate to" }),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { url } = params as { url: string };
         self._invalidateSnapshotRefs();
         // file:// must go through main-process loadURL to bypass renderer sandbox
         if (url.startsWith("file://")) {
           bvm.navigate(url);
-          return { content: [{ type: "text" as const, text: `Navigated to ${url}` }] };
+          return {
+            content: [{ type: "text" as const, text: `Navigated to ${url}` }],
+          };
         }
         return withPage("internal_browser_navigate", async (page) => {
-          await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-          return { content: [{ type: "text" as const, text: `Navigated to ${page.url()}` }] };
+          await page.goto(url, {
+            waitUntil: "domcontentloaded",
+            timeout: 30000,
+          });
+          return {
+            content: [
+              { type: "text" as const, text: `Navigated to ${page.url()}` },
+            ],
+          };
         });
       },
     };
@@ -1120,12 +1173,23 @@ ${hints.join("\n")}
       label: "Take screenshot",
       description: "Take a screenshot of the current internal browser page.",
       parameters: Type.Object({
-        fullPage: Type.Optional(Type.Boolean({ description: "Capture full scrollable page" })),
+        fullPage: Type.Optional(
+          Type.Boolean({ description: "Capture full scrollable page" }),
+        ),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { fullPage } = params as { fullPage?: boolean };
         return withPage("internal_browser_screenshot", async (page) => {
-          const buf = (await page.screenshot({ fullPage: fullPage ?? false, type: "png" })) as Buffer;
+          const buf = (await page.screenshot({
+            fullPage: fullPage ?? false,
+            type: "png",
+          })) as Buffer;
           const base64 = buf.toString("base64");
           // Save to disk so vision_describe can read it in the same turn
           const filename = `browser_screenshot_${Date.now()}.png`;
@@ -1135,8 +1199,12 @@ ${hints.join("\n")}
           fs.writeFileSync(absPath, buf);
           // Prune old browser screenshots, keep last 20
           try {
-            const existing = fs.readdirSync(visionDir)
-              .filter((f) => f.startsWith("browser_screenshot_") && f.endsWith(".png"))
+            const existing = fs
+              .readdirSync(visionDir)
+              .filter(
+                (f) =>
+                  f.startsWith("browser_screenshot_") && f.endsWith(".png"),
+              )
               .map((f) => ({
                 name: f,
                 mtime: fs.statSync(path.join(visionDir, f)).mtimeMs,
@@ -1149,8 +1217,15 @@ ${hints.join("\n")}
             // Non-critical, ignore cleanup errors
           }
           return {
-            content: [{ type: "text" as const, text: `Screenshot saved (${(buf.length / 1024).toFixed(1)} KB). Use vision_describe(path="${absPath}") to examine it.` }],
-            details: { openCoworkImages: [{ data: base64, mimeType: "image/png" }] },
+            content: [
+              {
+                type: "text" as const,
+                text: `Screenshot saved (${(buf.length / 1024).toFixed(1)} KB). Use vision_describe(path="${absPath}") to examine it.`,
+              },
+            ],
+            details: {
+              openCoworkImages: [{ data: base64, mimeType: "image/png" }],
+            },
           };
         });
       },
@@ -1159,15 +1234,27 @@ ${hints.join("\n")}
     const clickTool = {
       name: "internal_browser_click",
       label: "Click element",
-      description: "Click an element on the page by CSS selector, @eN snapshot ref, or text content.",
+      description:
+        "Click an element on the page by CSS selector, @eN snapshot ref, or text content.",
       parameters: Type.Object({
-        selector: Type.String({ description: "CSS selector, @eN snapshot ref, or visible text to click" }),
+        selector: Type.String({
+          description:
+            "CSS selector, @eN snapshot ref, or visible text to click",
+        }),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { selector } = params as { selector: string };
         return withPage("internal_browser_click", async (page) => {
           await self._resolveLocator(page, selector).click({ timeout: 5000 });
-          return { content: [{ type: "text" as const, text: `Clicked "${selector}"` }] };
+          return {
+            content: [{ type: "text" as const, text: `Clicked "${selector}"` }],
+          };
         });
       },
     };
@@ -1175,12 +1262,21 @@ ${hints.join("\n")}
     const fillTool = {
       name: "internal_browser_fill",
       label: "Fill input",
-      description: "Fill a form field. Clears any existing content then types the text. Works with <input>, <textarea>, <select>, and contenteditable elements.",
+      description:
+        "Fill a form field. Clears any existing content then types the text. Works with <input>, <textarea>, <select>, and contenteditable elements.",
       parameters: Type.Object({
-        selector: Type.String({ description: "CSS selector or @eN ref of the input element" }),
+        selector: Type.String({
+          description: "CSS selector or @eN ref of the input element",
+        }),
         text: Type.String({ description: "Text to fill" }),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { selector, text } = params as { selector: string; text: string };
         return withPage("internal_browser_fill", async (page) => {
           // Use force:true to skip Playwright's actionability checks.
@@ -1189,38 +1285,65 @@ ${hints.join("\n")}
           // is perfectly functional. force:true types directly into the element
           // while still dispatching all necessary DOM events (focus, input, change).
           try {
-            await self._resolveLocator(page, selector).fill(text, { timeout: 5000, force: true });
+            await self
+              ._resolveLocator(page, selector)
+              .fill(text, { timeout: 5000, force: true });
           } catch (forceErr) {
             if (self._isRetryableBrowserPageError(forceErr)) {
               throw forceErr; // Stale page — let _withBrowserPage retry
             }
             // force:true also failed — fall back to raw DOM manipulation
-            logWarn(`[AgentRunner] fill force:true failed, trying DOM fallback: ${toErrorText(forceErr)}`);
+            logWarn(
+              `[AgentRunner] fill force:true failed, trying DOM fallback: ${toErrorText(forceErr)}`,
+            );
             try {
-              await page.evaluate(({ sel, txt }: { sel: string; txt: string }) => {
-                let el = document.querySelector(sel) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
-                if (!el) {
-                  // Fuzzy fallback: try to extract name= from a CSS attribute selector
-                  const m = sel.match(/\[name=["']([^"']*)["']\]/);
-                  if (m) {
-                    const all = document.querySelectorAll('input, textarea, select');
-                    el = (Array.from(all).find(
-                      (e) => e.getAttribute('name') === m[1],
-                    ) ?? null) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+              await page.evaluate(
+                ({ sel, txt }: { sel: string; txt: string }) => {
+                  let el = document.querySelector(sel) as
+                    | HTMLInputElement
+                    | HTMLTextAreaElement
+                    | HTMLSelectElement
+                    | null;
+                  if (!el) {
+                    // Fuzzy fallback: try to extract name= from a CSS attribute selector
+                    const m = sel.match(/\[name=["']([^"']*)["']\]/);
+                    if (m) {
+                      const all = document.querySelectorAll(
+                        "input, textarea, select",
+                      );
+                      el = (Array.from(all).find(
+                        (e) => e.getAttribute("name") === m[1],
+                      ) ?? null) as
+                        | HTMLInputElement
+                        | HTMLTextAreaElement
+                        | HTMLSelectElement
+                        | null;
+                    }
                   }
-                }
-                if (!el || !("value" in el)) throw new Error(`Cannot fill: ${sel}`);
-                el.focus();
-                el.value = txt;
-                el.dispatchEvent(new Event("input", { bubbles: true }));
-                el.dispatchEvent(new Event("change", { bubbles: true }));
-              }, { sel: selector, txt: text });
+                  if (!el || !("value" in el))
+                    throw new Error(`Cannot fill: ${sel}`);
+                  el.focus();
+                  el.value = txt;
+                  el.dispatchEvent(new Event("input", { bubbles: true }));
+                  el.dispatchEvent(new Event("change", { bubbles: true }));
+                },
+                { sel: selector, txt: text },
+              );
             } catch (domErr) {
-              logWarn(`[AgentRunner] fill DOM fallback also failed: ${toErrorText(domErr)}`);
+              logWarn(
+                `[AgentRunner] fill DOM fallback also failed: ${toErrorText(domErr)}`,
+              );
               throw forceErr; // Re-throw the force:true error
             }
           }
-          return { content: [{ type: "text" as const, text: `Filled "${text}" into "${selector}"` }] };
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Filled "${text}" into "${selector}"`,
+              },
+            ],
+          };
         });
       },
     };
@@ -1228,16 +1351,37 @@ ${hints.join("\n")}
     const scrollTool = {
       name: "internal_browser_scroll",
       label: "Scroll page",
-      description: "Scroll the page by pixel deltas. Positive dy scrolls down, positive dx scrolls right.",
+      description:
+        "Scroll the page by pixel deltas. Positive dy scrolls down, positive dx scrolls right.",
       parameters: Type.Object({
-        dx: Type.Optional(Type.Number({ description: "Horizontal delta (default 0)" })),
-        dy: Type.Optional(Type.Number({ description: "Vertical delta (default 0)" })),
+        dx: Type.Optional(
+          Type.Number({ description: "Horizontal delta (default 0)" }),
+        ),
+        dy: Type.Optional(
+          Type.Number({ description: "Vertical delta (default 0)" }),
+        ),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { dx, dy } = params as { dx?: number; dy?: number };
         return withPage("internal_browser_scroll", async (page) => {
-          await page.evaluate(({ x, y }) => window.scrollBy(x ?? 0, y ?? 0), { x: dx ?? 0, y: dy ?? 0 });
-          return { content: [{ type: "text" as const, text: `Scrolled by (${dx ?? 0}, ${dy ?? 0})` }] };
+          await page.evaluate(({ x, y }) => window.scrollBy(x ?? 0, y ?? 0), {
+            x: dx ?? 0,
+            y: dy ?? 0,
+          });
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Scrolled by (${dx ?? 0}, ${dy ?? 0})`,
+              },
+            ],
+          };
         });
       },
     };
@@ -1247,13 +1391,23 @@ ${hints.join("\n")}
       label: "Hover element",
       description: "Hover the mouse over an element.",
       parameters: Type.Object({
-        selector: Type.String({ description: "CSS selector or @eN ref of the element to hover" }),
+        selector: Type.String({
+          description: "CSS selector or @eN ref of the element to hover",
+        }),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { selector } = params as { selector: string };
         return withPage("internal_browser_hover", async (page) => {
           await self._resolveLocator(page, selector).hover({ timeout: 5000 });
-          return { content: [{ type: "text" as const, text: `Hovered "${selector}"` }] };
+          return {
+            content: [{ type: "text" as const, text: `Hovered "${selector}"` }],
+          };
         });
       },
     };
@@ -1261,48 +1415,84 @@ ${hints.join("\n")}
     const selectTool = {
       name: "internal_browser_select",
       label: "Select option",
-      description: "Select an option from a <select> dropdown by value or label.",
+      description:
+        "Select an option from a <select> dropdown by value or label.",
       parameters: Type.Object({
-        selector: Type.String({ description: "CSS selector or @eN ref of the <select> element" }),
+        selector: Type.String({
+          description: "CSS selector or @eN ref of the <select> element",
+        }),
         value: Type.String({ description: "Option value or label to select" }),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
-        const { selector, value } = params as { selector: string; value: string };
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
+        const { selector, value } = params as {
+          selector: string;
+          value: string;
+        };
         return withPage("internal_browser_select", async (page) => {
           try {
-            await self._resolveLocator(page, selector).selectOption(value, { timeout: 5000 });
+            await self
+              ._resolveLocator(page, selector)
+              .selectOption(value, { timeout: 5000 });
           } catch (err) {
             if (!self._isRetryableBrowserPageError(err)) {
               // DOM fallback for custom select widgets (Bootstrap, React, etc.)
               // that don't respond to native selectOption()
-              logWarn(`[AgentRunner] select locator failed, trying DOM fallback: ${toErrorText(err)}`);
+              logWarn(
+                `[AgentRunner] select locator failed, trying DOM fallback: ${toErrorText(err)}`,
+              );
               try {
-                await page.evaluate(({ sel, val }: { sel: string; val: string }) => {
-                  const el = document.querySelector(sel) as HTMLSelectElement | null;
-                  if (!el || el.tagName !== "SELECT") throw new Error(`Not a <select>: ${sel}`);
-                  // Match by option value first, then by label text (exact, trimmed).
-                  // Playwright's selectOption(label) can match imprecisely when
-                  // multiple options share substrings.
-                  const options = Array.from(el.options);
-                  let target = options.find((o) => o.value === val);
-                  if (!target) target = options.find((o) => o.text.trim() === val.trim());
-                  if (target) {
-                    el.value = target.value;
-                    el.dispatchEvent(new Event("input", { bubbles: true }));
-                    el.dispatchEvent(new Event("change", { bubbles: true }));
-                  } else {
-                    throw new Error(`Option "${val}" not found in <select> ${sel} (checked by value and label)`);
-                  }
-                }, { sel: selector, val: value });
+                await page.evaluate(
+                  ({ sel, val }: { sel: string; val: string }) => {
+                    const el = document.querySelector(
+                      sel,
+                    ) as HTMLSelectElement | null;
+                    if (!el || el.tagName !== "SELECT")
+                      throw new Error(`Not a <select>: ${sel}`);
+                    // Match by option value first, then by label text (exact, trimmed).
+                    // Playwright's selectOption(label) can match imprecisely when
+                    // multiple options share substrings.
+                    const options = Array.from(el.options);
+                    let target = options.find((o) => o.value === val);
+                    if (!target)
+                      target = options.find(
+                        (o) => o.text.trim() === val.trim(),
+                      );
+                    if (target) {
+                      el.value = target.value;
+                      el.dispatchEvent(new Event("input", { bubbles: true }));
+                      el.dispatchEvent(new Event("change", { bubbles: true }));
+                    } else {
+                      throw new Error(
+                        `Option "${val}" not found in <select> ${sel} (checked by value and label)`,
+                      );
+                    }
+                  },
+                  { sel: selector, val: value },
+                );
               } catch (domErr) {
-                logWarn(`[AgentRunner] select DOM fallback also failed: ${toErrorText(domErr)}`);
+                logWarn(
+                  `[AgentRunner] select DOM fallback also failed: ${toErrorText(domErr)}`,
+                );
                 throw err;
               }
             } else {
               throw err;
             }
           }
-          return { content: [{ type: "text" as const, text: `Selected "${value}" in "${selector}"` }] };
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Selected "${value}" in "${selector}"`,
+              },
+            ],
+          };
         });
       },
     };
@@ -1310,15 +1500,29 @@ ${hints.join("\n")}
     const pressTool = {
       name: "internal_browser_press",
       label: "Press key",
-      description: "Press a keyboard key. Use for Enter, Escape, Tab, Backspace, arrow keys, or combos like Control+A.",
+      description:
+        "Press a keyboard key. Use for Enter, Escape, Tab, Backspace, arrow keys, or combos like Control+A.",
       parameters: Type.Object({
-        key: Type.String({ description: "Key to press (e.g. Enter, Escape, Tab, ArrowDown, Control+A)" }),
+        key: Type.String({
+          description:
+            "Key to press (e.g. Enter, Escape, Tab, ArrowDown, Control+A)",
+        }),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { key } = params as { key: string };
         return withPage("internal_browser_press", async (page) => {
-          await page.keyboard.press(key as Parameters<typeof page.keyboard.press>[0]);
-          return { content: [{ type: "text" as const, text: `Pressed "${key}"` }] };
+          await page.keyboard.press(
+            key as Parameters<typeof page.keyboard.press>[0],
+          );
+          return {
+            content: [{ type: "text" as const, text: `Pressed "${key}"` }],
+          };
         });
       },
     };
@@ -1326,16 +1530,26 @@ ${hints.join("\n")}
     const snapshotTool = {
       name: "internal_browser_snapshot",
       label: "Take text snapshot",
-      description: "Capture an accessibility text snapshot of the current page. Returns interactive elements as @eN [role] references. @eN refs can be used in subsequent click, fill, hover, and select calls within the same page. Note: the 'name' shown is the accessible name (derived from label/aria-label/text), not the HTML name attribute.",
+      description:
+        "Capture an accessibility text snapshot of the current page. Returns interactive elements as @eN [role] references. @eN refs can be used in subsequent click, fill, hover, and select calls within the same page. Note: the 'name' shown is the accessible name (derived from label/aria-label/text), not the HTML name attribute.",
       parameters: Type.Object({}),
-      async execute(_tcId: any, _params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        _params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         return withPage("internal_browser_snapshot", async (page) => {
           const cdp = await page.context().newCDPSession(page);
           try {
             await cdp.send("Accessibility.enable");
             const { nodes } = await cdp.send("Accessibility.getFullAXTree");
             const lines = flattenA11y(nodes);
-            const text = lines.length > 0 ? lines.join("\n").substring(0, 15000) : "(no interactive elements found)";
+            const text =
+              lines.length > 0
+                ? lines.join("\n").substring(0, 15000)
+                : "(no interactive elements found)";
             return { content: [{ type: "text" as const, text }] };
           } finally {
             await cdp.detach().catch(() => {});
@@ -1351,11 +1565,25 @@ ${hints.join("\n")}
       parameters: Type.Object({
         script: Type.String({ description: "JavaScript code to execute" }),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { script } = params as { script: string };
         return withPage("internal_browser_evaluate", async (page) => {
           const result = await page.evaluate(script);
-          return { content: [{ type: "text" as const, text: typeof result === "string" ? result : JSON.stringify(result) }] };
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text:
+                  typeof result === "string" ? result : JSON.stringify(result),
+              },
+            ],
+          };
         });
       },
     };
@@ -1363,17 +1591,39 @@ ${hints.join("\n")}
     const waitForTool = {
       name: "internal_browser_wait_for",
       label: "Wait for element",
-      description: "Wait for text, a CSS selector, network idle, or a URL pattern.",
+      description:
+        "Wait for text, a CSS selector, network idle, or a URL pattern.",
       parameters: Type.Object({
         text: Type.Optional(Type.String({ description: "Text to wait for" })),
-        selector: Type.Optional(Type.String({ description: "CSS selector to wait for" })),
-        timeout: Type.Optional(Type.Integer({ description: "Max wait time in ms (default 10000)" })),
-        state: Type.Optional(Type.String({ description: "Wait state: 'networkidle' or 'load'" })),
-        url: Type.Optional(Type.String({ description: "URL glob pattern to wait for (e.g. **/dashboard). Note: triggers only on navigation; the current URL is checked first — if it already matches the wait returns immediately." })),
+        selector: Type.Optional(
+          Type.String({ description: "CSS selector to wait for" }),
+        ),
+        timeout: Type.Optional(
+          Type.Integer({ description: "Max wait time in ms (default 10000)" }),
+        ),
+        state: Type.Optional(
+          Type.String({ description: "Wait state: 'networkidle' or 'load'" }),
+        ),
+        url: Type.Optional(
+          Type.String({
+            description:
+              "URL glob pattern to wait for (e.g. **/dashboard). Note: triggers only on navigation; the current URL is checked first — if it already matches the wait returns immediately.",
+          }),
+        ),
       }),
-      async execute(_tcId: any, params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         const { text, selector, timeout, state, url } = params as {
-          text?: string; selector?: string; timeout?: number; state?: string; url?: string;
+          text?: string;
+          selector?: string;
+          timeout?: number;
+          state?: string;
+          url?: string;
         };
         return withPage("internal_browser_wait_for", async (page) => {
           const ms = timeout ?? 10000;
@@ -1382,17 +1632,36 @@ ${hints.join("\n")}
           } else if (state === "load") {
             await page.waitForLoadState("load", { timeout: ms });
           } else if (url) {
-            const urlRe = new RegExp("^" + url.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*") + "$");
+            const urlRe = new RegExp(
+              "^" +
+                url
+                  .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+                  .replace(/\*\*/g, ".*")
+                  .replace(/\*/g, "[^/]*") +
+                "$",
+            );
             if (!urlRe.test(page.url())) {
-              await page.waitForURL((u) => urlRe.test(u.toString()), { timeout: ms });
+              await page.waitForURL((u) => urlRe.test(u.toString()), {
+                timeout: ms,
+              });
             }
           } else if (selector) {
             await page.locator(selector).waitFor({ timeout: ms });
           } else if (text) {
             await page.getByText(text).first().waitFor({ timeout: ms });
           }
-          const what = url ? `URL pattern "${url}"` : state ? `state "${state}"` : (selector ? `selector "${selector}"` : `text "${text}"`);
-          return { content: [{ type: "text" as const, text: `Wait satisfied for ${what}` }] };
+          const what = url
+            ? `URL pattern "${url}"`
+            : state
+              ? `state "${state}"`
+              : selector
+                ? `selector "${selector}"`
+                : `text "${text}"`;
+          return {
+            content: [
+              { type: "text" as const, text: `Wait satisfied for ${what}` },
+            ],
+          };
         });
       },
     };
@@ -1402,10 +1671,20 @@ ${hints.join("\n")}
       label: "Get page state",
       description: "Get the current page URL and title.",
       parameters: Type.Object({}),
-      async execute(_tcId: any, _params: any, _signal: any, _onUpd: any, _ctx: any) {
+      async execute(
+        _tcId: any,
+        _params: any,
+        _signal: any,
+        _onUpd: any,
+        _ctx: any,
+      ) {
         return withPage("internal_browser_get_state", async (page) => {
           const [url, title] = await Promise.all([page.url(), page.title()]);
-          return { content: [{ type: "text" as const, text: JSON.stringify({ url, title }) }] };
+          return {
+            content: [
+              { type: "text" as const, text: JSON.stringify({ url, title }) },
+            ],
+          };
         });
       },
     };
@@ -1489,9 +1768,7 @@ ${hints.join("\n")}
         }
 
         if (!response.ok) {
-          throw new Error(
-            `HTTP ${response.status}: ${response.statusText}`,
-          );
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
 
         const contentType = response.headers.get("content-type") || "";
@@ -1530,9 +1807,7 @@ ${hints.join("\n")}
         const article = reader.parse();
 
         if (!article || !article.content) {
-          throw new Error(
-            "Could not extract readable content from the page",
-          );
+          throw new Error("Could not extract readable content from the page");
         }
 
         const turndown = new TurndownService({
@@ -1581,7 +1856,9 @@ ${hints.join("\n")}
       return true;
     }
     // IPv4 private ranges: 10.x, 172.16-31.x, 192.168.x, 169.254.x
-    if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(hostname)) {
+    if (
+      /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(hostname)
+    ) {
       return true;
     }
     // Cloud metadata endpoints
@@ -1756,6 +2033,7 @@ ${hints.join("\n")}
     prompt: string,
     existingMessages: Message[],
     turnId?: string,
+    piSessionFile?: string | null,
   ): Promise<void> {
     const runStartTime = Date.now();
     logCtx("[AgentRunner] run() started");
@@ -2304,103 +2582,106 @@ ${hints.join("\n")}
       if (!this._skillsSetupDone && !this._skillsSetupInProgress) {
         this._skillsSetupInProgress = true;
         try {
-        // Ensure app DeskWand config directory exists
-        if (!fs.existsSync(userDeskWandDir)) {
-          fs.mkdirSync(userDeskWandDir, { recursive: true });
-        }
+          // Ensure app DeskWand config directory exists
+          if (!fs.existsSync(userDeskWandDir)) {
+            fs.mkdirSync(userDeskWandDir, { recursive: true });
+          }
 
-        // Ensure app DeskWand skills directory exists
-        const appSkillsDir = this.getRuntimeSkillsDir();
-        if (!fs.existsSync(appSkillsDir)) {
-          fs.mkdirSync(appSkillsDir, { recursive: true });
-        }
+          // Ensure app DeskWand skills directory exists
+          const appSkillsDir = this.getRuntimeSkillsDir();
+          if (!fs.existsSync(appSkillsDir)) {
+            fs.mkdirSync(appSkillsDir, { recursive: true });
+          }
 
-        // Copy built-in skills to app DeskWand skills directory if they don't exist
-        const builtinSkillsPath = this.getBuiltinSkillsPath();
-        if (builtinSkillsPath && fs.existsSync(builtinSkillsPath)) {
-          // Symlinks into .asar archives don't work at the OS level (ENOTDIR),
-          // so always copy when the source is inside an asar archive.
-          // Use regex to match .asar/ but NOT .asar.unpacked/ (which is a real directory).
-          const sourceInsideAsar = /\.asar[/\\]/.test(builtinSkillsPath);
-          const builtinSkills = fs.readdirSync(builtinSkillsPath);
-          for (const skillName of builtinSkills) {
-            const builtinSkillPath = path.join(builtinSkillsPath, skillName);
-            const userSkillPath = path.join(appSkillsDir, skillName);
+          // Copy built-in skills to app DeskWand skills directory if they don't exist
+          const builtinSkillsPath = this.getBuiltinSkillsPath();
+          if (builtinSkillsPath && fs.existsSync(builtinSkillsPath)) {
+            // Symlinks into .asar archives don't work at the OS level (ENOTDIR),
+            // so always copy when the source is inside an asar archive.
+            // Use regex to match .asar/ but NOT .asar.unpacked/ (which is a real directory).
+            const sourceInsideAsar = /\.asar[/\\]/.test(builtinSkillsPath);
+            const builtinSkills = fs.readdirSync(builtinSkillsPath);
+            for (const skillName of builtinSkills) {
+              const builtinSkillPath = path.join(builtinSkillsPath, skillName);
+              const userSkillPath = path.join(appSkillsDir, skillName);
 
-            // Clean up broken symlinks pointing into .asar from previous versions
-            try {
-              const lstat = fs.lstatSync(userSkillPath);
-              if (lstat.isSymbolicLink()) {
-                const linkTarget = fs.readlinkSync(userSkillPath);
-                if (/\.asar[/\\]/.test(linkTarget)) {
-                  fs.unlinkSync(userSkillPath);
-                  log(
-                    `[AgentRunner] Removed broken asar symlink: ${userSkillPath}`,
-                  );
-                }
-              }
-            } catch {
-              // Path doesn't exist — fine, we'll create it below
-            }
-
-            // Only set up if it's a directory and doesn't exist in app directory
-            if (
-              fs.statSync(builtinSkillPath).isDirectory() &&
-              !fs.existsSync(userSkillPath)
-            ) {
+              // Clean up broken symlinks pointing into .asar from previous versions
               try {
-                if (sourceInsideAsar) {
-                  // Source is inside .asar — must copy (symlinks to asar paths fail at OS level)
-                  this.copyDirectorySync(builtinSkillPath, userSkillPath);
-                  log(
-                    `[AgentRunner] Copied built-in skill from asar: ${skillName}`,
-                  );
-                } else {
-                  // Source is a real directory — symlink for space efficiency
-                  try {
-                    fs.symlinkSync(builtinSkillPath, userSkillPath, "dir");
-                    log(`[AgentRunner] Linked built-in skill: ${skillName}`);
-                  } catch (symErr) {
-                    logWarn(
-                      `[AgentRunner] Failed to symlink ${skillName}, copying instead:`,
-                      (symErr as NodeJS.ErrnoException).code,
+                const lstat = fs.lstatSync(userSkillPath);
+                if (lstat.isSymbolicLink()) {
+                  const linkTarget = fs.readlinkSync(userSkillPath);
+                  if (/\.asar[/\\]/.test(linkTarget)) {
+                    fs.unlinkSync(userSkillPath);
+                    log(
+                      `[AgentRunner] Removed broken asar symlink: ${userSkillPath}`,
                     );
-                    // Ensure the target path is clear before copying
-                    try {
-                      const lst = fs.lstatSync(userSkillPath);
-                      if (lst.isDirectory()) {
-                        fs.rmSync(userSkillPath, { recursive: true, force: true });
-                      } else {
-                        fs.unlinkSync(userSkillPath);
-                      }
-                    } catch {
-                      // Target did not exist or was already gone
-                    }
-                    this.copyDirectorySync(builtinSkillPath, userSkillPath);
                   }
                 }
-              } catch (skillErr) {
-                logWarn(
-                  `[AgentRunner] Failed to set up built-in skill ${skillName}:`,
-                  (skillErr as NodeJS.ErrnoException).code,
-                );
-                // Clean up partial target to allow retry on next start
+              } catch {
+                // Path doesn't exist — fine, we'll create it below
+              }
+
+              // Only set up if it's a directory and doesn't exist in app directory
+              if (
+                fs.statSync(builtinSkillPath).isDirectory() &&
+                !fs.existsSync(userSkillPath)
+              ) {
                 try {
-                  fs.rmSync(userSkillPath, { recursive: true, force: true });
-                } catch {
-                  // best-effort cleanup
+                  if (sourceInsideAsar) {
+                    // Source is inside .asar — must copy (symlinks to asar paths fail at OS level)
+                    this.copyDirectorySync(builtinSkillPath, userSkillPath);
+                    log(
+                      `[AgentRunner] Copied built-in skill from asar: ${skillName}`,
+                    );
+                  } else {
+                    // Source is a real directory — symlink for space efficiency
+                    try {
+                      fs.symlinkSync(builtinSkillPath, userSkillPath, "dir");
+                      log(`[AgentRunner] Linked built-in skill: ${skillName}`);
+                    } catch (symErr) {
+                      logWarn(
+                        `[AgentRunner] Failed to symlink ${skillName}, copying instead:`,
+                        (symErr as NodeJS.ErrnoException).code,
+                      );
+                      // Ensure the target path is clear before copying
+                      try {
+                        const lst = fs.lstatSync(userSkillPath);
+                        if (lst.isDirectory()) {
+                          fs.rmSync(userSkillPath, {
+                            recursive: true,
+                            force: true,
+                          });
+                        } else {
+                          fs.unlinkSync(userSkillPath);
+                        }
+                      } catch {
+                        // Target did not exist or was already gone
+                      }
+                      this.copyDirectorySync(builtinSkillPath, userSkillPath);
+                    }
+                  }
+                } catch (skillErr) {
+                  logWarn(
+                    `[AgentRunner] Failed to set up built-in skill ${skillName}:`,
+                    (skillErr as NodeJS.ErrnoException).code,
+                  );
+                  // Clean up partial target to allow retry on next start
+                  try {
+                    fs.rmSync(userSkillPath, { recursive: true, force: true });
+                  } catch {
+                    // best-effort cleanup
+                  }
                 }
               }
             }
           }
-        }
 
-        this.syncUserSkillsToAppDir(appSkillsDir);
+          this.syncUserSkillsToAppDir(appSkillsDir);
 
-        // Only mark setup done after successful completion — if we failed,
-        // the next query will retry.
-        this._skillsSetupDone = true;
-        log("[AgentRunner] Skills setup complete");
+          // Only mark setup done after successful completion — if we failed,
+          // the next query will retry.
+          this._skillsSetupDone = true;
+          log("[AgentRunner] Skills setup complete");
         } finally {
           this._skillsSetupInProgress = false;
         }
@@ -2445,13 +2726,18 @@ ${hints.join("\n")}
       });
       const { skillPaths } = await this.resolveSkillPaths();
       const skillsSignature = JSON.stringify(
-        skillPaths.map(p => {
+        skillPaths.map((p) => {
           try {
-            return `${p}:[${fs.readdirSync(p, { withFileTypes: true })
-              .filter(d => d.isDirectory())
-              .map(d => d.name).sort().join(',')}]`;
-          } catch { return p; }
-        })
+            return `${p}:[${fs
+              .readdirSync(p, { withFileTypes: true })
+              .filter((d) => d.isDirectory())
+              .map((d) => d.name)
+              .sort()
+              .join(",")}]`;
+          } catch {
+            return p;
+          }
+        }),
       );
       log("[AgentRunner] Skill paths for pi ResourceLoader:", skillPaths);
 
@@ -2568,9 +2854,7 @@ ${hints.join("\n")}
 
         const trimmedCount = historyMessages.length - historyItems.length;
         const historyNote =
-          trimmedCount > 0
-            ? `[${trimmedCount} older messages omitted]\n`
-            : "";
+          trimmedCount > 0 ? `[${trimmedCount} older messages omitted]\n` : "";
         const preamble = `<conversation_history>\n${historyNote}${historyItems.join("\n")}\n</conversation_history>`;
         contextualPrompt = `${preamble}\n\n${basePrompt}`;
         log(
@@ -2590,7 +2874,16 @@ ${hints.join("\n")}
       };
 
       if (!cachedSession) {
-        historyWasInjected = injectHistoryPreamble(prompt, "Cold start");
+        if (piSessionFile) {
+          // pi session file provides structured history via buildSessionContext(),
+          // no text preamble needed.
+          logCtx(
+            "[AgentRunner] Cold start with pi session file:",
+            piSessionFile,
+          );
+        } else {
+          historyWasInjected = injectHistoryPreamble(prompt, "Cold start");
+        }
       } else {
         // Reusing session — SDK already has the full conversation context
         logCtx("[AgentRunner] Reusing existing SDK session for:", session.id);
@@ -2881,16 +3174,21 @@ Tool routing:\n
       // Register vision_describe tool if a vision model is configured and enabled.
       // Config is read once at session initialization to keep the tool list stable
       // (tool list changes would invalidate the prompt cache).
-      const visionModelConfig: VisionModelConfig | undefined =
-        configStore.get("visionModel") as VisionModelConfig | undefined;
+      const visionModelConfig: VisionModelConfig | undefined = configStore.get(
+        "visionModel",
+      ) as VisionModelConfig | undefined;
       let visionTool: ToolDefinition | undefined;
-      if (
-        visionModelConfig?.enabled &&
-        visionModelConfig.model?.trim()
-      ) {
+      if (visionModelConfig?.enabled && visionModelConfig.model?.trim()) {
         try {
-          visionTool = createVisionDescribeTool(visionModelConfig, effectiveCwd);
-          log("[AgentRunner] Vision model configured:", visionModelConfig.provider, visionModelConfig.model);
+          visionTool = createVisionDescribeTool(
+            visionModelConfig,
+            effectiveCwd,
+          );
+          log(
+            "[AgentRunner] Vision model configured:",
+            visionModelConfig.provider,
+            visionModelConfig.model,
+          );
         } catch (err) {
           logWarn("[AgentRunner] Failed to create vision tool:", err);
         }
@@ -2944,11 +3242,8 @@ Tool routing:\n
 
       // If toolsSignature just invalidated the cached session, re-inject
       // conversation history that was skipped above.
-      if (!cachedSession && !historyWasInjected) {
-        injectHistoryPreamble(
-          contextualPrompt,
-          "Tools change cold-start",
-        );
+      if (!cachedSession && !historyWasInjected && !piSessionFile) {
+        injectHistoryPreamble(contextualPrompt, "Tools change cold-start");
       }
 
       let piSession: PiAgentSession;
@@ -3033,6 +3328,13 @@ Tool routing:\n
           compactionSettings = { enabled: true };
         }
 
+        const sessionDir = piSessionFile
+          ? undefined
+          : path.join(userDeskWandDir, "pi-sessions", session.id);
+        const piSessionManager = piSessionFile
+          ? PiSessionManager.open(piSessionFile)
+          : PiSessionManager.create(effectiveCwd, sessionDir);
+
         const { session: newPiSession, extensionsResult } =
           await createAgentSession({
             model: piModel,
@@ -3042,7 +3344,7 @@ Tool routing:\n
             // tools intentionally left as default — customTools (including MCP)
             // provide their own activation through includeAllExtensionTools.
             customTools: allCustomTools,
-            sessionManager: PiSessionManager.inMemory(),
+            sessionManager: piSessionManager,
             settingsManager: PiSettingsManager.inMemory({
               compaction: compactionSettings,
               retry: { enabled: true, maxRetries: 2 },
@@ -3051,6 +3353,13 @@ Tool routing:\n
             cwd: effectiveCwd,
           });
         piSession = newPiSession;
+
+        // Persist the pi session file path so cold restarts can recover
+        // the full structured conversation history from JSONL.
+        const newPiSessionFile = piSession.sessionFile;
+        if (newPiSessionFile && !piSessionFile) {
+          this.onSessionFileCreated?.(session.id, newPiSessionFile);
+        }
 
         // Extract extension commands (registered via pi.registerCommand during load)
         const extCmds: { name: string; description: string }[] = [];
@@ -3096,6 +3405,7 @@ Tool routing:\n
           skillsSignature,
           toolsSignature,
           extensionCommands: extCmds,
+          piSessionFile: newPiSessionFile || undefined,
         });
 
         // Ollama: wrap _onPayload to inject num_ctx into every request
@@ -3190,8 +3500,6 @@ Tool routing:\n
           );
         }
       };
-
-
 
       const recordStreamEvent = (eventType: string) => {
         streamEventCounts.set(
@@ -3489,17 +3797,25 @@ Tool routing:\n
 
             case "tool_execution_update": {
               if (controller.signal.aborted) break;
-              const partialResult = event.partialResult as {
-                content?: Array<{ type: string; text?: string }>;
-                details?: {
-                  diff?: string;
-                  openCoworkImages?: Array<{ mimeType: string; data: string }>;
-                };
-              } | undefined;
+              const partialResult = event.partialResult as
+                | {
+                    content?: Array<{ type: string; text?: string }>;
+                    details?: {
+                      diff?: string;
+                      openCoworkImages?: Array<{
+                        mimeType: string;
+                        data: string;
+                      }>;
+                    };
+                  }
+                | undefined;
               if (!partialResult) break;
 
               const textContent = Array.isArray(partialResult.content)
-                ? partialResult.content.find((c): c is { type: "text"; text: string } => c.type === "text")
+                ? partialResult.content.find(
+                    (c): c is { type: "text"; text: string } =>
+                      c.type === "text",
+                  )
                 : null;
               const outputText = textContent?.text || "";
 
@@ -3558,8 +3874,13 @@ Tool routing:\n
                     toolUseId: toolCallId,
                     content: sanitizeOutputPaths(outputText),
                     isError,
-                    ...(typeof (event.result as { details?: Record<string, unknown> })?.details?.diff === "string"
-                      ? { diff: (event.result as { details: { diff: string } }).details.diff }
+                    ...(typeof (
+                      event.result as { details?: Record<string, unknown> }
+                    )?.details?.diff === "string"
+                      ? {
+                          diff: (event.result as { details: { diff: string } })
+                            .details.diff,
+                        }
                       : {}),
                     ...(normalizedToolResult.images.length > 0
                       ? { images: normalizedToolResult.images }
@@ -3703,14 +4024,8 @@ Tool routing:\n
         // save them to disk under the session working directory so the
         // vision_describe tool can access them. Files persist across rounds.
         let imageGuidancePrefix = "";
-        if (
-          !modelSupportsImages &&
-          hasImages &&
-          lastUserMsg?.role === "user"
-        ) {
-          const userImages = (
-            lastUserMsg.content as ContentBlock[]
-          ).filter(
+        if (!modelSupportsImages && hasImages && lastUserMsg?.role === "user") {
+          const userImages = (lastUserMsg.content as ContentBlock[]).filter(
             (c) => c.type === "image",
           ) as Array<{
             type: "image";
@@ -3729,8 +4044,7 @@ Tool routing:\n
                 const paths: string[] = [];
 
                 for (let i = 0; i < userImages.length; i++) {
-                  const mimeParts =
-                    userImages[i].source.media_type.split("/");
+                  const mimeParts = userImages[i].source.media_type.split("/");
                   const ext =
                     mimeParts[1] === "jpeg" ? "jpg" : mimeParts[1] || "jpg";
                   const hash = crypto
@@ -4005,7 +4319,8 @@ Tool routing:\n
       logWarn("[AgentRunner] steer: no active piSession for", sessionId);
       return;
     }
-    cached.session.steer(text)
+    cached.session
+      .steer(text)
       .then(() => log("[AgentRunner] steer delivered:", text.substring(0, 80)))
       .catch((e) => logError("[AgentRunner] steer failed:", e));
   }
