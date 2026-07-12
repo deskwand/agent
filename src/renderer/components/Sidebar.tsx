@@ -647,7 +647,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               {taskSlots.length > 0 && (
                 <div className="mb-4">
                   <div className="px-3 pb-1.5">
-                    <span className="text-sm font-medium leading-5 text-text-secondary">
+                    <span className="text-sm font-medium leading-5 text-accent">
                       {t("sidebar.currentTasks")}
                     </span>
                   </div>
@@ -733,7 +733,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               <div className="space-y-0.5">
                 {/* Session list header */}
                 <div className="px-3 pb-1.5 flex items-center justify-between">
-                  <span className="text-sm font-medium leading-5 text-text-secondary">
+                  <span className="text-sm font-medium leading-5 text-text-muted">
                     {t("sidebar.allSessions")}
                   </span>
                 </div>
