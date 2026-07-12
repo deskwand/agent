@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { X, ChevronLeft, ChevronRight, Copy, ExternalLink, AlertCircle, Loader2 } from "lucide-react";
+import {
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 
 export interface ImageSource {
   src: string;
@@ -91,7 +99,11 @@ export function ImageLightbox({
     (delta: number, clientX?: number, clientY?: number) => {
       setZoom((prev) => {
         const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, prev + delta));
-        if (clientX !== undefined && clientY !== undefined && containerRef.current) {
+        if (
+          clientX !== undefined &&
+          clientY !== undefined &&
+          containerRef.current
+        ) {
           const rect = containerRef.current.getBoundingClientRect();
           const cx = clientX - rect.left - rect.width / 2;
           const cy = clientY - rect.top - rect.height / 2;
@@ -282,9 +294,7 @@ export function ImageLightbox({
       {/* ── Top bar ── */}
       <div className="flex items-center justify-between px-4 py-2 bg-black/60 text-white select-none shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-sm font-medium truncate">
-            {imageName}
-          </span>
+          <span className="text-sm font-medium truncate">{imageName}</span>
           {!isSingle && (
             <span className="text-xs text-white/60">
               {t("imageLightbox.imageCount", {
@@ -352,13 +362,18 @@ export function ImageLightbox({
             <img
               ref={imageRef}
               src={imageSrc}
-              alt={imageName || t("common.pastedImageAlt", { index: currentIndex + 1 })}
+              alt={
+                imageName ||
+                t("common.pastedImageAlt", { index: currentIndex + 1 })
+              }
               className="max-w-[90vw] max-h-[80vh] object-contain"
               draggable={false}
               style={{
                 transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
                 transformOrigin: "center center",
-                transition: isDragging ? "none" : "transform 0.15s ease-out",
+                transition: isDragging
+                  ? "none"
+                  : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
               }}
               onLoad={() => {
                 // Image dimensions could be displayed in top bar if needed

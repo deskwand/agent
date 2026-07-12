@@ -34,7 +34,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
   ].includes(permission.toolName);
 
   return (
-    <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 animate-fade-in">
+    <div className="fixed inset-0 flex items-center justify-center z-50 animate-fade-in modal-overlay-subtle">
       <div className="card w-full max-w-md p-6 m-4 shadow-elevated animate-slide-up">
         {/* Header */}
         <div className="flex items-start gap-4">

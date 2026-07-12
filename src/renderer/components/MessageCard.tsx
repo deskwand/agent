@@ -111,8 +111,7 @@ export const MessageCard = memo(function MessageCard({
   }, [visibleBlocks]);
   const groupedDisplayBlocks = useMemo(() => {
     const blocks = buildToolDisplayBlocks(visibleBlocks).filter(
-      (block) =>
-        !suppressProcessSummaries || block.type !== "process-summary",
+      (block) => !suppressProcessSummaries || block.type !== "process-summary",
     );
     // Keep natural block order for the latest round so process summaries appear
     // in context. Reorder historical (completed) messages to group content first,
@@ -154,7 +153,10 @@ export const MessageCard = memo(function MessageCard({
   // text blocks include markdown code fences — no separate code block type exists.
   const getCopyContent = (): string =>
     visibleBlocks
-      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .filter(
+        (block): block is { type: "text"; text: string } =>
+          block.type === "text",
+      )
       .map((block) => block.text)
       .join("\n");
 
@@ -175,7 +177,7 @@ export const MessageCard = memo(function MessageCard({
 
   const renderActionBar = (extraClass?: string) => (
     <div
-      className={`flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity${extraClass ? ` ${extraClass}` : ""}`}
+      className={`flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-200 scale-90 group-hover:scale-100${extraClass ? ` ${extraClass}` : ""}`}
     >
       <span className="text-xs text-text-muted select-none">
         {timestampLabel}
@@ -310,10 +312,7 @@ export const MessageCard = memo(function MessageCard({
             );
           })}
           {artifactFiles.length > 0 ? (
-            <ArtifactCard
-              files={artifactFiles}
-              isLatestRound={isLatestRound}
-            />
+            <ArtifactCard files={artifactFiles} isLatestRound={isLatestRound} />
           ) : null}
           {showActions && renderActionBar()}
         </div>

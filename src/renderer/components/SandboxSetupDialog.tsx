@@ -94,7 +94,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/60 transition-opacity duration-500 ${fadeOut ? "opacity-0" : "opacity-100"}`}
+      className={`fixed inset-0 z-50 flex items-center justify-center modal-overlay-heavy transition-opacity duration-500 ${fadeOut ? "opacity-0" : "opacity-100"}`}
     >
       <div className="bg-background border border-border-subtle rounded-6xl shadow-elevated max-w-md w-full mx-4 overflow-hidden">
         {/* Header */}

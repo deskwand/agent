@@ -88,7 +88,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           try {
             const res = await new CloudApiClient(c.token).getModes();
             modes = res;
-          } catch { /* modes optional, keep empty */ }
+          } catch {
+            /* modes optional, keep empty */
+          }
           setCloudConfig({
             serverUrl: DESKWAND_API_URL,
             token: c.token,
@@ -107,7 +109,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           setCloudRestoring(false);
         }
       })();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const [hoveredTimeSessionId, setHoveredTimeSessionId] = useState<
@@ -161,8 +165,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     const runningIds = new Set(
       sessions.filter((s) => s.status === "running").map((s) => s.id),
     );
-    const allIds = new Set(sessions.filter((s) => !s.archived).map((s) => s.id));
-    const currentSlotMap = new Map(taskSlots.map((s) => [s.sessionId, s.completed]));
+    const allIds = new Set(
+      sessions.filter((s) => !s.archived).map((s) => s.id),
+    );
+    const currentSlotMap = new Map(
+      taskSlots.map((s) => [s.sessionId, s.completed]),
+    );
 
     let slots = [...taskSlots];
     let changed = false;
@@ -394,10 +402,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     [handleNewSession, invoke, isElectron],
   );
 
-  const renderSessionItem = (
-    session: Session,
-    showRelativeTime: boolean,
-  ) => {
+  const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive = activeSessionId === session.id && !showMarketplace;
 
     return (
@@ -420,7 +425,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           )}
 
           <div className="min-w-0 flex-1 flex items-center gap-2">
-            <div className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? 'text-text-primary' : 'text-text-secondary'}`}>
+            <div
+              className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? "text-text-primary" : "text-text-secondary"}`}
+            >
               {session.title}
             </div>
             {session.isProjectMode &&
@@ -512,569 +519,622 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   return (
     <>
-    <aside
-      className={`group bg-surface/96 flex flex-col overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${sidebarCollapsed ? 'w-0' : ''}`}
-      style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
-    >
-      {!sidebarCollapsed && (<>
-      <div className="px-4 pt-3 pb-2">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 min-w-0">
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={t("sidebar.searchPlaceholder")}
-              className="w-full rounded-xl border border-transparent bg-surface-muted pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border focus:bg-background transition-colors"
-            />
-          </div>
-          <div className="relative flex flex-shrink-0">
-            <button
-              onClick={() => {
-                setWorkingDir(null);
-                handleNewSession();
-              }}
-              className="h-8 w-8 rounded-l-xl bg-surface-muted text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
-              title={t("sidebar.newChat")}
-            >
-              <SquarePen className="w-4 h-4" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowProjectActions((prev) => !prev);
-              }}
-              className="w-5 h-8 rounded-r-xl bg-surface-muted text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors border-l border-surface-hover flex items-center justify-center"
-            >
-              <ChevronDown className="w-3 h-3" />
-            </button>
-            {showProjectActions && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border-muted bg-background shadow-lg p-1"
-              >
-                {projectEntries.length > 0 && (
-                  <>
-                    <div className="px-2.5 py-1.5 text-[10px] text-text-muted uppercase tracking-wide">
-                      {t("sidebar.newSessionInProject")}
-                    </div>
-                    {projectEntries.map(({ name, cwd }) => (
-                      <button
-                        key={cwd}
-                        onClick={() => {
-                          setShowProjectActions(false);
-                          void handleNewSessionInProject(cwd);
-                        }}
-                        className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors flex items-center gap-2"
-                      >
-                        <Folder className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
-                        <span className="truncate">{name}</span>
-                      </button>
-                    ))}
-                    <div className="mx-1 my-1 border-t border-border-muted" />
-                  </>
-                )}
-                <button
-                  onClick={() => void handleNewProject()}
-                  className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
-                >
-                  {t("sidebar.newProject")}
-                </button>
-                <button
-                  onClick={() => void handleOpenProject()}
-                  className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
-                >
-                  {t("sidebar.openProject")}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Search-driven Chip filter */}
-      {normalizedQuery &&
-        (() => {
-          const matchedProjects = getMatchedProjectNames(
-            activeSessions,
-            normalizedQuery,
-          );
-          if (matchedProjects.size === 0) return null;
-          return (
-            <div className="px-4 pt-2">
-              <div className="text-[10px] text-text-muted mb-1 ml-0.5">
-                {t("sidebar.filterByProject")}
-              </div>
-              <div className="flex gap-1.5 flex-wrap">
-                {Array.from(matchedProjects).map((name) => {
-                  const isActive = projectFilter === name;
-                  return (
-                    <button
-                      key={name}
-                      onClick={() =>
-                        setProjectFilter(isActive ? null : name)
-                      }
-                      className={`px-2 py-0.5 rounded-full text-[10px] transition-colors ${
-                        isActive
-                          ? "bg-accent text-accent-foreground"
-                          : "bg-surface-muted text-text-secondary hover:bg-accent hover:text-accent-foreground"
-                      }`}
-                    >
-                      <Folder className="w-3 h-3 inline mr-0.5 -mt-px" />
-                      {name}
-                      {isActive && (
-                        <span className="ml-0.5 opacity-70">✕</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-
-      <div className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll">
-        {/* Task slot area */}
-        {taskSlots.length > 0 && (
-          <div className="mb-4">
-            <div className="px-3 pb-1.5">
-              <span className="text-sm font-medium leading-5 text-text-secondary">
-                {t("sidebar.currentTasks")}
-              </span>
-            </div>
-            <div className="space-y-0.5 max-h-40 overflow-y-auto sidebar-scroll">
-            {[...taskSlots]
-              .sort((a, b) => {
-                const sessionA = sessions.find((s) => s.id === a.sessionId);
-                const sessionB = sessions.find((s) => s.id === b.sessionId);
-                if (a.completed !== b.completed) return a.completed ? 1 : -1;
-                return (sessionB?.updatedAt || 0) - (sessionA?.updatedAt || 0);
-              })
-              .map((slot) => {
-              const session = sessions.find((s) => s.id === slot.sessionId);
-              if (!session) return null;
-              return (
-                <div
-                  key={slot.sessionId}
-                  onClick={() => void handleSessionClick(slot.sessionId)}
-                  className={`group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors border-l-[3px] border-l-transparent ${
-                    activeSessionId === slot.sessionId && !showMarketplace
-                      ? "bg-surface-active border-l-accent"
-                      : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-sm font-medium leading-5 truncate flex-1 ${(activeSessionId === slot.sessionId && !showMarketplace) || !slot.completed ? 'text-text-primary' : 'text-text-secondary'}`}
-                    >
-                      {session.title}
-                    </span>
-                    {session.isProjectMode &&
-                      session.cwd &&
-                      !isDefaultWorkspacePath(session.cwd) && (
-                        <span className="text-[10px] bg-surface-muted text-text-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                          {getWorkspaceName(session.cwd)}
-                        </span>
-                      )}
-                    <div className="relative w-5 h-5 flex-shrink-0">
-                      <span
-                        className={`absolute inset-0 m-auto w-2 h-2 rounded-full bg-accent transition-all duration-300 ${slot.completed ? 'opacity-0 scale-0' : 'opacity-100 scale-100 animate-pulse'}`}
-                        role="status"
-                        aria-label={t("sidebar.running")}
-                      />
-                      <Check
-                        className={`absolute inset-0 m-auto w-3.5 h-3.5 text-accent/50 hover:text-accent transition-all duration-300 ${slot.completed ? 'opacity-100 scale-100 cursor-pointer' : 'opacity-0 scale-0 pointer-events-none'}`}
-                        role="button"
-                        tabIndex={slot.completed ? 0 : -1}
-                        aria-label={t("sidebar.taskCompleted")}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeTaskSlot(slot.sessionId);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            removeTaskSlot(slot.sessionId);
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
+      <aside
+        className={`group bg-surface/85 flex flex-col overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${sidebarCollapsed ? "w-0" : ""}`}
+        style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
+      >
+        {!sidebarCollapsed && (
+          <>
+            <div className="px-4 pt-3 pb-2">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 min-w-0">
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t("sidebar.searchPlaceholder")}
+                    className="w-full rounded-xl border border-transparent bg-surface-muted pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border focus:bg-background transition-colors"
+                  />
                 </div>
-              );
-            })}
-          </div>
-          </div>
-        )}
-
-        <div className="space-y-0.5">
-          {/* Session list header */}
-          <div className="px-3 pb-1.5 flex items-center justify-between">
-            <span className="text-sm font-medium leading-5 text-text-secondary">
-              {t("sidebar.allSessions")}
-            </span>
-          </div>
-
-          {/* Session list */}
-          {(() => {
-            const taskSlotIds = new Set(taskSlots.map((s) => s.sessionId));
-            const sorted = sortFlattenedSessions(
-              activeSessions,
-              taskSlotIds,
-            );
-            const filtered = (() => {
-              if (!normalizedQuery && !projectFilter) return sorted;
-              return sorted.filter((s) => {
-                if (projectFilter && !sessionMatchesProject(s, projectFilter))
-                  return false;
-                if (normalizedQuery && !sessionMatchesQuery(s, normalizedQuery))
-                  return false;
-                return true;
-              });
-            })();
-
-            if (filtered.length === 0) {
-              return (
-                <div className="px-3 py-6 text-center">
-                  <p className="text-sm text-text-muted">
-                    {t("sidebar.emptyTitle")}
-                  </p>
-                  {activeSessions.length === 0 && (
-                    <p className="text-xs text-text-muted mt-1">
-                      {t("sidebar.emptyHint")}
-                    </p>
+                <div className="relative flex flex-shrink-0">
+                  <button
+                    onClick={() => {
+                      setWorkingDir(null);
+                      handleNewSession();
+                    }}
+                    className="h-8 w-8 rounded-l-xl bg-surface-muted text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                    title={t("sidebar.newChat")}
+                  >
+                    <SquarePen className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowProjectActions((prev) => !prev);
+                    }}
+                    className="w-5 h-8 rounded-r-xl bg-surface-muted text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors border-l border-surface-hover flex items-center justify-center"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {showProjectActions && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border-muted bg-background shadow-lg p-1"
+                    >
+                      {projectEntries.length > 0 && (
+                        <>
+                          <div className="px-2.5 py-1.5 text-[10px] text-text-muted uppercase tracking-wide">
+                            {t("sidebar.newSessionInProject")}
+                          </div>
+                          {projectEntries.map(({ name, cwd }) => (
+                            <button
+                              key={cwd}
+                              onClick={() => {
+                                setShowProjectActions(false);
+                                void handleNewSessionInProject(cwd);
+                              }}
+                              className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors flex items-center gap-2"
+                            >
+                              <Folder className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                              <span className="truncate">{name}</span>
+                            </button>
+                          ))}
+                          <div className="mx-1 my-1 border-t border-border-muted" />
+                        </>
+                      )}
+                      <button
+                        onClick={() => void handleNewProject()}
+                        className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
+                      >
+                        {t("sidebar.newProject")}
+                      </button>
+                      <button
+                        onClick={() => void handleOpenProject()}
+                        className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
+                      >
+                        {t("sidebar.openProject")}
+                      </button>
+                    </div>
                   )}
                 </div>
-              );
-            }
+              </div>
+            </div>
 
-            // Build groups: project sessions grouped by cwd, chat sessions as one group
-            const MAX_PROJECT_VISIBLE = 5;
-            const isSearching = !!(normalizedQuery || projectFilter);
+            {/* Search-driven Chip filter */}
+            {normalizedQuery &&
+              (() => {
+                const matchedProjects = getMatchedProjectNames(
+                  activeSessions,
+                  normalizedQuery,
+                );
+                if (matchedProjects.size === 0) return null;
+                return (
+                  <div className="px-4 pt-2">
+                    <div className="text-[10px] text-text-muted mb-1 ml-0.5">
+                      {t("sidebar.filterByProject")}
+                    </div>
+                    <div className="flex gap-1.5 flex-wrap">
+                      {Array.from(matchedProjects).map((name) => {
+                        const isActive = projectFilter === name;
+                        return (
+                          <button
+                            key={name}
+                            onClick={() =>
+                              setProjectFilter(isActive ? null : name)
+                            }
+                            className={`px-2 py-0.5 rounded-full text-[10px] transition-colors ${
+                              isActive
+                                ? "bg-accent text-accent-foreground"
+                                : "bg-surface-muted text-text-secondary hover:bg-accent hover:text-accent-foreground"
+                            }`}
+                          >
+                            <Folder className="w-3 h-3 inline mr-0.5 -mt-px" />
+                            {name}
+                            {isActive && (
+                              <span className="ml-0.5 opacity-70">✕</span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
-            const items: RenderItem[] = [];
-            let lastProject = "";
-            let hasRenderedGroup = false;
-            let projectSeen = 0; // count of sessions seen for current project
-            let projectTotal = 0; // total sessions in current project
-            let sawExpandedProject = false;
-            let chatSeen = 0;
-            const CHAT_EXPAND_KEY = "__chats__";
-            const chatsExpanded = projectExpandedMap[CHAT_EXPAND_KEY];
-
-            // Total chat sessions for expand/collapse counting
-            const chatTotal = filtered.filter(
-              (s) => !s.isProjectMode || !s.cwd || isDefaultWorkspacePath(s.cwd),
-            ).length;
-
-            for (const session of filtered) {
-              const pName =
-                session.isProjectMode &&
-                session.cwd &&
-                !isDefaultWorkspacePath(session.cwd)
-                  ? getWorkspaceName(session.cwd)
-                  : "";
-
-              if (pName && pName !== lastProject) {
-                // Transition to a new project
-                // Insert collapse button for previous expanded project if needed
-                if (sawExpandedProject && projectSeen > MAX_PROJECT_VISIBLE) {
-                  items.push({
-                    type: "collapse",
-                    key: `collapse-${lastProject}`,
-                    projectName: lastProject,
-                  });
-                }
-                sawExpandedProject = false;
-                // If transitioning from chat to first project, insert chat collapse
-                if (lastProject === "" && chatsExpanded && chatSeen > MAX_PROJECT_VISIBLE) {
-                  items.push({
-                    type: "collapse",
-                    key: `collapse-${CHAT_EXPAND_KEY}`,
-                    projectName: CHAT_EXPAND_KEY,
-                  });
-                }
-                // Insert divider
-                if (hasRenderedGroup) {
-                  items.push({ type: "divider", key: `div-${pName}` });
-                }
-                projectSeen = 0;
-                projectTotal = 0;
-                lastProject = pName;
-                // Count total sessions in this project
-                projectTotal = filtered.filter((s) => {
-                  if (!s.isProjectMode || !s.cwd || isDefaultWorkspacePath(s.cwd)) return false;
-                  return getWorkspaceName(s.cwd) === pName;
-                }).length;
-              } else if (!pName && lastProject) {
-                // Transition from project to chat sessions
-                if (sawExpandedProject && projectSeen > MAX_PROJECT_VISIBLE) {
-                  items.push({
-                    type: "collapse",
-                    key: `collapse-${lastProject}`,
-                    projectName: lastProject,
-                  });
-                }
-                sawExpandedProject = false;
-                items.push({ type: "divider", key: `div-chat` });
-                chatSeen = 0;
-                lastProject = "";
-              }
-
-              // Truncation: for project sessions, only show first N unless expanded or searching
-              let shouldSkip = false;
-              let shouldExpand: number | null = null;
-              if (pName && !isSearching) {
-                projectSeen++;
-                if (!projectExpandedMap[pName]) {
-                  if (projectSeen > MAX_PROJECT_VISIBLE) shouldSkip = true;
-                  else if (projectSeen === MAX_PROJECT_VISIBLE && projectTotal > MAX_PROJECT_VISIBLE) {
-                    shouldExpand = projectTotal - MAX_PROJECT_VISIBLE;
-                  }
-                } else {
-                  sawExpandedProject = true;
-                }
-              }
-
-              // Truncation: for chat sessions, same rule
-              if (!pName && !isSearching) {
-                chatSeen++;
-                if (!chatsExpanded) {
-                  if (chatSeen > MAX_PROJECT_VISIBLE) shouldSkip = true;
-                  else if (chatSeen === MAX_PROJECT_VISIBLE && chatTotal > MAX_PROJECT_VISIBLE) {
-                    shouldExpand = chatTotal - MAX_PROJECT_VISIBLE;
-                  }
-                }
-              }
-
-              if (shouldSkip) continue;
-
-              items.push({ type: "session", key: session.id, session });
-              hasRenderedGroup = true;
-
-              // Insert expand button AFTER the N-th session
-              if (shouldExpand !== null) {
-                const expandKey = pName || CHAT_EXPAND_KEY;
-                items.push({
-                  type: "expand",
-                  key: `expand-${expandKey}`,
-                  projectName: expandKey,
-                  count: shouldExpand,
-                });
-              }
-            }
-
-            // Handle collapse for the last project group
-            if (sawExpandedProject && projectSeen > MAX_PROJECT_VISIBLE) {
-              items.push({
-                type: "collapse",
-                key: `collapse-${lastProject}`,
-                projectName: lastProject,
-              });
-            }
-
-            // Handle collapse for chat section (only if no projects followed chat)
-            if (lastProject === "" && chatsExpanded && chatSeen > MAX_PROJECT_VISIBLE) {
-              items.push({
-                type: "collapse",
-                key: `collapse-${CHAT_EXPAND_KEY}`,
-                projectName: CHAT_EXPAND_KEY,
-              });
-            }
-
-            return (
-              <>
-                {items.map((item) => {
-                    switch (item.type) {
-                      case "divider":
+            <div className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll">
+              {/* Task slot area */}
+              {taskSlots.length > 0 && (
+                <div className="mb-4">
+                  <div className="px-3 pb-1.5">
+                    <span className="text-sm font-medium leading-5 text-text-secondary">
+                      {t("sidebar.currentTasks")}
+                    </span>
+                  </div>
+                  <div className="space-y-0.5 max-h-40 overflow-y-auto sidebar-scroll">
+                    {[...taskSlots]
+                      .sort((a, b) => {
+                        const sessionA = sessions.find(
+                          (s) => s.id === a.sessionId,
+                        );
+                        const sessionB = sessions.find(
+                          (s) => s.id === b.sessionId,
+                        );
+                        if (a.completed !== b.completed)
+                          return a.completed ? 1 : -1;
+                        return (
+                          (sessionB?.updatedAt || 0) -
+                          (sessionA?.updatedAt || 0)
+                        );
+                      })
+                      .map((slot) => {
+                        const session = sessions.find(
+                          (s) => s.id === slot.sessionId,
+                        );
+                        if (!session) return null;
                         return (
                           <div
-                            key={item.key}
-                            className="mx-3 my-0.5 border-t border-dashed border-border-muted"
-                          />
-                        );
-                      case "expand":
-                        return (
-                          <button
-                            key={item.key}
+                            key={slot.sessionId}
                             onClick={() =>
-                              setProjectExpandedMap((prev) => ({
-                                ...prev,
-                                [item.projectName!]: true,
-                              }))
+                              void handleSessionClick(slot.sessionId)
                             }
-                            className="w-full text-center text-xs text-text-muted hover:text-text-secondary py-1 transition-colors"
+                            className={`group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors border-l-[3px] border-l-transparent ${
+                              activeSessionId === slot.sessionId &&
+                              !showMarketplace
+                                ? "bg-surface-active border-l-accent"
+                                : ""
+                            }`}
                           >
-                            {t("sidebar.expandProject", { count: item.count })}
-                          </button>
-                        );
-                      case "collapse":
-                        return (
-                          <button
-                            key={item.key}
-                            onClick={() =>
-                              setProjectExpandedMap((prev) => {
-                                const next = { ...prev };
-                                delete next[item.projectName!];
-                                return next;
-                              })
-                            }
-                            className="w-full text-center text-xs text-text-muted hover:text-text-secondary py-1 transition-colors"
-                          >
-                            {t("sidebar.collapseProject")}
-                          </button>
-                        );
-                      case "session":
-                        return (
-                          <div key={item.key}>
-                            {renderSessionItem(item.session!, true)}
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`text-sm font-medium leading-5 truncate flex-1 ${(activeSessionId === slot.sessionId && !showMarketplace) || !slot.completed ? "text-text-primary" : "text-text-secondary"}`}
+                              >
+                                {session.title}
+                              </span>
+                              {session.isProjectMode &&
+                                session.cwd &&
+                                !isDefaultWorkspacePath(session.cwd) && (
+                                  <span className="text-[10px] bg-surface-muted text-text-muted px-1.5 py-0.5 rounded flex-shrink-0">
+                                    {getWorkspaceName(session.cwd)}
+                                  </span>
+                                )}
+                              <div className="relative w-5 h-5 flex-shrink-0">
+                                <span
+                                  className={`absolute inset-0 m-auto w-2 h-2 rounded-full bg-accent transition-all duration-300 ${slot.completed ? "opacity-0 scale-0" : "opacity-100 scale-100 animate-pulse"}`}
+                                  role="status"
+                                  aria-label={t("sidebar.running")}
+                                />
+                                <Check
+                                  className={`absolute inset-0 m-auto w-3.5 h-3.5 text-accent/50 hover:text-accent transition-all duration-300 ${slot.completed ? "opacity-100 scale-100 cursor-pointer" : "opacity-0 scale-0 pointer-events-none"}`}
+                                  role="button"
+                                  tabIndex={slot.completed ? 0 : -1}
+                                  aria-label={t("sidebar.taskCompleted")}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeTaskSlot(slot.sessionId);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      removeTaskSlot(slot.sessionId);
+                                    }
+                                  }}
+                                />
+                              </div>
+                            </div>
                           </div>
                         );
-                    }
-                  })
-                }
-              </>
-            );
-          })()}
-        </div>
-      </div>
+                      })}
+                  </div>
+                </div>
+              )}
 
-      <div className="px-3 py-3 relative">
-        <div className="flex items-center gap-2 rounded-2xl bg-background/50 px-3 py-2.5">
-          <button
-            onClick={() => setAccountMenuOpen((v) => !v)}
-            className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <Settings className="w-4 h-4 flex-shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-text-primary">
-                {t("sidebar.settings")}
-              </div>
-            </div>
-            <ChevronDown
-              className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
-                accountMenuOpen ? "rotate-180" : ""
-              }`}
-            />
-          </button>
-        </div>
-        <AccountMenu
-          isOpen={accountMenuOpen}
-          cloudConfig={cloudConfig}
-          cloudRestoring={cloudRestoring}
-          onOpenLogin={() => setShowLoginModal(true)}
-          onOpenSettings={() => {
-            setShowMarketplace(false);
-            setShowSchedule(false);
-            setShowSettings(true);
-          }}
-          onOpenMarketplace={() => {
-            setShowSettings(false);
-            setShowSchedule(false);
-            setShowMarketplace(true);
-          }}
-          onOpenAutomation={() => {
-            setShowSettings(false);
-            setShowMarketplace(false);
-            setShowSchedule(true);
-          }}
-          onLogout={() => {
-            setAccountMenuOpen(false);
-            setConfirmLogoutOpen(true);
-          }}
-          onClose={() => setAccountMenuOpen(false)}
-        />
-      </div>
+              <div className="space-y-0.5">
+                {/* Session list header */}
+                <div className="px-3 pb-1.5 flex items-center justify-between">
+                  <span className="text-sm font-medium leading-5 text-text-secondary">
+                    {t("sidebar.allSessions")}
+                  </span>
+                </div>
 
-      {deleteConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => setDeleteConfirm(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl border border-border-muted bg-background shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4">
-              <p className="text-sm leading-6 text-text-primary">
-                {deleteConfirm.message}
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-2 border-t border-border-muted px-4 py-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors"
-              >
-                {t("sidebar.cancel")}
-              </button>
-              <button
-                onClick={deleteConfirm.onConfirm}
-                className="rounded-xl bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 transition-colors"
-              >
-                {t("sidebar.confirmDelete")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                {/* Session list */}
+                {(() => {
+                  const taskSlotIds = new Set(
+                    taskSlots.map((s) => s.sessionId),
+                  );
+                  const sorted = sortFlattenedSessions(
+                    activeSessions,
+                    taskSlotIds,
+                  );
+                  const filtered = (() => {
+                    if (!normalizedQuery && !projectFilter) return sorted;
+                    return sorted.filter((s) => {
+                      if (
+                        projectFilter &&
+                        !sessionMatchesProject(s, projectFilter)
+                      )
+                        return false;
+                      if (
+                        normalizedQuery &&
+                        !sessionMatchesQuery(s, normalizedQuery)
+                      )
+                        return false;
+                      return true;
+                    });
+                  })();
 
-      {createProjectModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => {
-            if (isCreatingProject) return;
-            setCreateProjectModalOpen(false);
-          }}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl border border-border-muted bg-background shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-4 space-y-3">
-              <div>
-                <h3 className="text-sm font-medium text-text-primary">
-                  {t("sidebar.createProjectTitle")}
-                </h3>
-              </div>
-              <input
-                autoFocus
-                type="text"
-                value={projectName}
-                onChange={(e) => setProjectName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !isCreatingProject) {
-                    void handleCreateProject();
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="px-3 py-6 text-center">
+                        <p className="text-sm text-text-muted">
+                          {t("sidebar.emptyTitle")}
+                        </p>
+                        {activeSessions.length === 0 && (
+                          <p className="text-xs text-text-muted mt-1">
+                            {t("sidebar.emptyHint")}
+                          </p>
+                        )}
+                      </div>
+                    );
                   }
+
+                  // Build groups: project sessions grouped by cwd, chat sessions as one group
+                  const MAX_PROJECT_VISIBLE = 5;
+                  const isSearching = !!(normalizedQuery || projectFilter);
+
+                  const items: RenderItem[] = [];
+                  let lastProject = "";
+                  let hasRenderedGroup = false;
+                  let projectSeen = 0; // count of sessions seen for current project
+                  let projectTotal = 0; // total sessions in current project
+                  let sawExpandedProject = false;
+                  let chatSeen = 0;
+                  const CHAT_EXPAND_KEY = "__chats__";
+                  const chatsExpanded = projectExpandedMap[CHAT_EXPAND_KEY];
+
+                  // Total chat sessions for expand/collapse counting
+                  const chatTotal = filtered.filter(
+                    (s) =>
+                      !s.isProjectMode ||
+                      !s.cwd ||
+                      isDefaultWorkspacePath(s.cwd),
+                  ).length;
+
+                  for (const session of filtered) {
+                    const pName =
+                      session.isProjectMode &&
+                      session.cwd &&
+                      !isDefaultWorkspacePath(session.cwd)
+                        ? getWorkspaceName(session.cwd)
+                        : "";
+
+                    if (pName && pName !== lastProject) {
+                      // Transition to a new project
+                      // Insert collapse button for previous expanded project if needed
+                      if (
+                        sawExpandedProject &&
+                        projectSeen > MAX_PROJECT_VISIBLE
+                      ) {
+                        items.push({
+                          type: "collapse",
+                          key: `collapse-${lastProject}`,
+                          projectName: lastProject,
+                        });
+                      }
+                      sawExpandedProject = false;
+                      // If transitioning from chat to first project, insert chat collapse
+                      if (
+                        lastProject === "" &&
+                        chatsExpanded &&
+                        chatSeen > MAX_PROJECT_VISIBLE
+                      ) {
+                        items.push({
+                          type: "collapse",
+                          key: `collapse-${CHAT_EXPAND_KEY}`,
+                          projectName: CHAT_EXPAND_KEY,
+                        });
+                      }
+                      // Insert divider
+                      if (hasRenderedGroup) {
+                        items.push({ type: "divider", key: `div-${pName}` });
+                      }
+                      projectSeen = 0;
+                      projectTotal = 0;
+                      lastProject = pName;
+                      // Count total sessions in this project
+                      projectTotal = filtered.filter((s) => {
+                        if (
+                          !s.isProjectMode ||
+                          !s.cwd ||
+                          isDefaultWorkspacePath(s.cwd)
+                        )
+                          return false;
+                        return getWorkspaceName(s.cwd) === pName;
+                      }).length;
+                    } else if (!pName && lastProject) {
+                      // Transition from project to chat sessions
+                      if (
+                        sawExpandedProject &&
+                        projectSeen > MAX_PROJECT_VISIBLE
+                      ) {
+                        items.push({
+                          type: "collapse",
+                          key: `collapse-${lastProject}`,
+                          projectName: lastProject,
+                        });
+                      }
+                      sawExpandedProject = false;
+                      items.push({ type: "divider", key: `div-chat` });
+                      chatSeen = 0;
+                      lastProject = "";
+                    }
+
+                    // Truncation: for project sessions, only show first N unless expanded or searching
+                    let shouldSkip = false;
+                    let shouldExpand: number | null = null;
+                    if (pName && !isSearching) {
+                      projectSeen++;
+                      if (!projectExpandedMap[pName]) {
+                        if (projectSeen > MAX_PROJECT_VISIBLE)
+                          shouldSkip = true;
+                        else if (
+                          projectSeen === MAX_PROJECT_VISIBLE &&
+                          projectTotal > MAX_PROJECT_VISIBLE
+                        ) {
+                          shouldExpand = projectTotal - MAX_PROJECT_VISIBLE;
+                        }
+                      } else {
+                        sawExpandedProject = true;
+                      }
+                    }
+
+                    // Truncation: for chat sessions, same rule
+                    if (!pName && !isSearching) {
+                      chatSeen++;
+                      if (!chatsExpanded) {
+                        if (chatSeen > MAX_PROJECT_VISIBLE) shouldSkip = true;
+                        else if (
+                          chatSeen === MAX_PROJECT_VISIBLE &&
+                          chatTotal > MAX_PROJECT_VISIBLE
+                        ) {
+                          shouldExpand = chatTotal - MAX_PROJECT_VISIBLE;
+                        }
+                      }
+                    }
+
+                    if (shouldSkip) continue;
+
+                    items.push({ type: "session", key: session.id, session });
+                    hasRenderedGroup = true;
+
+                    // Insert expand button AFTER the N-th session
+                    if (shouldExpand !== null) {
+                      const expandKey = pName || CHAT_EXPAND_KEY;
+                      items.push({
+                        type: "expand",
+                        key: `expand-${expandKey}`,
+                        projectName: expandKey,
+                        count: shouldExpand,
+                      });
+                    }
+                  }
+
+                  // Handle collapse for the last project group
+                  if (sawExpandedProject && projectSeen > MAX_PROJECT_VISIBLE) {
+                    items.push({
+                      type: "collapse",
+                      key: `collapse-${lastProject}`,
+                      projectName: lastProject,
+                    });
+                  }
+
+                  // Handle collapse for chat section (only if no projects followed chat)
+                  if (
+                    lastProject === "" &&
+                    chatsExpanded &&
+                    chatSeen > MAX_PROJECT_VISIBLE
+                  ) {
+                    items.push({
+                      type: "collapse",
+                      key: `collapse-${CHAT_EXPAND_KEY}`,
+                      projectName: CHAT_EXPAND_KEY,
+                    });
+                  }
+
+                  return (
+                    <>
+                      {items.map((item) => {
+                        switch (item.type) {
+                          case "divider":
+                            return (
+                              <div
+                                key={item.key}
+                                className="mx-3 my-0.5 border-t border-dashed border-border-muted"
+                              />
+                            );
+                          case "expand":
+                            return (
+                              <button
+                                key={item.key}
+                                onClick={() =>
+                                  setProjectExpandedMap((prev) => ({
+                                    ...prev,
+                                    [item.projectName!]: true,
+                                  }))
+                                }
+                                className="w-full text-center text-xs text-text-muted hover:text-text-secondary py-1 transition-colors"
+                              >
+                                {t("sidebar.expandProject", {
+                                  count: item.count,
+                                })}
+                              </button>
+                            );
+                          case "collapse":
+                            return (
+                              <button
+                                key={item.key}
+                                onClick={() =>
+                                  setProjectExpandedMap((prev) => {
+                                    const next = { ...prev };
+                                    delete next[item.projectName!];
+                                    return next;
+                                  })
+                                }
+                                className="w-full text-center text-xs text-text-muted hover:text-text-secondary py-1 transition-colors"
+                              >
+                                {t("sidebar.collapseProject")}
+                              </button>
+                            );
+                          case "session":
+                            return (
+                              <div key={item.key}>
+                                {renderSessionItem(item.session!, true)}
+                              </div>
+                            );
+                        }
+                      })}
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+
+            <div className="px-3 py-3 relative">
+              <div className="flex items-center gap-2 rounded-2xl bg-background/50 px-3 py-2.5">
+                <button
+                  onClick={() => setAccountMenuOpen((v) => !v)}
+                  className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <Settings className="w-4 h-4 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-text-primary">
+                      {t("sidebar.settings")}
+                    </div>
+                  </div>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${
+                      accountMenuOpen ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+              <AccountMenu
+                isOpen={accountMenuOpen}
+                cloudConfig={cloudConfig}
+                cloudRestoring={cloudRestoring}
+                onOpenLogin={() => setShowLoginModal(true)}
+                onOpenSettings={() => {
+                  setShowMarketplace(false);
+                  setShowSchedule(false);
+                  setShowSettings(true);
                 }}
-                placeholder={t("sidebar.projectNamePlaceholder")}
-                className="w-full rounded-xl border border-border-muted bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border"
+                onOpenMarketplace={() => {
+                  setShowSettings(false);
+                  setShowSchedule(false);
+                  setShowMarketplace(true);
+                }}
+                onOpenAutomation={() => {
+                  setShowSettings(false);
+                  setShowMarketplace(false);
+                  setShowSchedule(true);
+                }}
+                onLogout={() => {
+                  setAccountMenuOpen(false);
+                  setConfirmLogoutOpen(true);
+                }}
+                onClose={() => setAccountMenuOpen(false)}
               />
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-border-muted px-4 py-3">
-              <button
-                onClick={() => setCreateProjectModalOpen(false)}
-                disabled={isCreatingProject}
-                className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+
+            {deleteConfirm && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center modal-overlay px-4"
+                onClick={() => setDeleteConfirm(null)}
               >
-                {t("sidebar.cancel")}
-              </button>
-              <button
-                onClick={() => void handleCreateProject()}
-                disabled={isCreatingProject}
-                className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                <div
+                  className="w-full max-w-sm rounded-2xl border border-border-muted bg-background shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-5 py-4">
+                    <p className="text-sm leading-6 text-text-primary">
+                      {deleteConfirm.message}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 border-t border-border-muted px-4 py-3">
+                    <button
+                      onClick={() => setDeleteConfirm(null)}
+                      className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors"
+                    >
+                      {t("sidebar.cancel")}
+                    </button>
+                    <button
+                      onClick={deleteConfirm.onConfirm}
+                      className="rounded-xl bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 transition-colors"
+                    >
+                      {t("sidebar.confirmDelete")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {createProjectModalOpen && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center modal-overlay px-4"
+                onClick={() => {
+                  if (isCreatingProject) return;
+                  setCreateProjectModalOpen(false);
+                }}
               >
-                {isCreatingProject
-                  ? t("common.loading")
-                  : t("sidebar.newProject")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      </>)}
-    </aside>
+                <div
+                  className="w-full max-w-sm rounded-2xl border border-border-muted bg-background shadow-xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-5 py-4 space-y-3">
+                    <div>
+                      <h3 className="text-sm font-medium text-text-primary">
+                        {t("sidebar.createProjectTitle")}
+                      </h3>
+                    </div>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={projectName}
+                      onChange={(e) => setProjectName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !isCreatingProject) {
+                          void handleCreateProject();
+                        }
+                      }}
+                      placeholder={t("sidebar.projectNamePlaceholder")}
+                      className="w-full rounded-xl border border-border-muted bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 border-t border-border-muted px-4 py-3">
+                    <button
+                      onClick={() => setCreateProjectModalOpen(false)}
+                      disabled={isCreatingProject}
+                      className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {t("sidebar.cancel")}
+                    </button>
+                    <button
+                      onClick={() => void handleCreateProject()}
+                      disabled={isCreatingProject}
+                      className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {isCreatingProject
+                        ? t("common.loading")
+                        : t("sidebar.newProject")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </aside>
       <LoginModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
@@ -1087,7 +1147,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         onConfirm={async () => {
           setConfirmLogoutOpen(false);
           if (cloudConfig?.token) {
-            try { await new CloudApiClient(cloudConfig.token).logout(); } catch { /* ignore */ }
+            try {
+              await new CloudApiClient(cloudConfig.token).logout();
+            } catch {
+              /* ignore */
+            }
             setCloudConfig(null);
           } else {
             setCloudConfig(null);

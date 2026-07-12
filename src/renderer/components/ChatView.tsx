@@ -176,7 +176,11 @@ export function shouldInitializeVisibleTurns(
   initializedSessionId: string | null,
   turnCount: number,
 ): boolean {
-  return Boolean(activeSessionId) && activeSessionId !== initializedSessionId && turnCount > 0;
+  return (
+    Boolean(activeSessionId) &&
+    activeSessionId !== initializedSessionId &&
+    turnCount > 0
+  );
 }
 
 export function canLoadOlderTurns(
@@ -217,9 +221,9 @@ export function shouldShowHydratingHistoryState(
 ): boolean {
   return Boolean(
     activeSessionId &&
-      hasActiveSession &&
-      !hasHistoryHydrated &&
-      displayedMessageCount === 0,
+    hasActiveSession &&
+    !hasHistoryHydrated &&
+    displayedMessageCount === 0,
   );
 }
 
@@ -238,7 +242,10 @@ export function ChatView() {
   const { partialMessage, partialThinking } = useActivePartialContent();
   const activeTurn = useActiveTurn();
   const pendingTurns = usePendingTurns();
-  const [steeringEvent, setSteeringEvent] = useState<{ turnId: string; text: string } | null>(null);
+  const [steeringEvent, setSteeringEvent] = useState<{
+    turnId: string;
+    text: string;
+  } | null>(null);
   const [compactionResult, setCompactionResult] = useState<
     "success" | "failed" | null
   >(null);
@@ -367,9 +374,7 @@ export function ChatView() {
     setTraceExpandedOverride(activeSessionId, !effectiveTraceExpanded);
   }, [activeSessionId, effectiveTraceExpanded, setTraceExpandedOverride]);
   const goalStatus = useAppStore((s) =>
-    activeSessionId
-      ? s.sessionStates[activeSessionId]?.goalStatus
-      : undefined,
+    activeSessionId ? s.sessionStates[activeSessionId]?.goalStatus : undefined,
   );
 
   const pendingCount = pendingTurns.length;
@@ -392,7 +397,8 @@ export function ChatView() {
       steeringText,
       // Guard with hasActiveTurn: once the turn ends we don't show
       // "thinking" during the brief idle-window before session settles.
-      shouldShowThinkingIndicator: canStop && hasActiveTurn && !hasStreamingText,
+      shouldShowThinkingIndicator:
+        canStop && hasActiveTurn && !hasStreamingText,
       isResponding: canStop && hasStreamingText,
       goalStatus,
     });
@@ -595,7 +601,10 @@ export function ChatView() {
     partialThinking,
   ]);
 
-  const turnRanges = useMemo(() => buildTurnRanges(displayedMessages), [displayedMessages]);
+  const turnRanges = useMemo(
+    () => buildTurnRanges(displayedMessages),
+    [displayedMessages],
+  );
   turnCountRef.current = turnRanges.length;
 
   const effectiveVisibleTurnStartIndex = useMemo(
@@ -611,12 +620,13 @@ export function ChatView() {
   );
 
   const visibleMessageStartIndex = useMemo(
-    () => getVisibleMessageStartIndex(turnRanges, effectiveVisibleTurnStartIndex),
+    () =>
+      getVisibleMessageStartIndex(turnRanges, effectiveVisibleTurnStartIndex),
     [turnRanges, effectiveVisibleTurnStartIndex],
   );
 
-  const visibleMessages = useMemo(() =>
-    displayedMessages.slice(visibleMessageStartIndex),
+  const visibleMessages = useMemo(
+    () => displayedMessages.slice(visibleMessageStartIndex),
     [displayedMessages, visibleMessageStartIndex],
   );
   // TODO: add bottom-side reclamation if very long sessions still degrade
@@ -624,49 +634,54 @@ export function ChatView() {
 
   // Merge pure-tool messages (no text blocks) into the preceding assistant
   // message so buildToolDisplayBlocks can group all tool_use/tool_result together.
-  const { messages: mergedMessages, hoistedProcessSummaryTurnIds } = useMemo(() => {
-    const result: Message[] = [];
-    const hoistedTurnIds = new Set<string>();
+  const { messages: mergedMessages, hoistedProcessSummaryTurnIds } =
+    useMemo(() => {
+      const result: Message[] = [];
+      const hoistedTurnIds = new Set<string>();
 
-    for (const msg of visibleMessages) {
-      if (msg.role === "assistant") {
-        const blocks = Array.isArray(msg.content)
-          ? (msg.content as unknown as ContentBlock[])
-          : [];
-        const hasText = blocks.some((b) => b.type === "text");
-        
-        if (!hasText && blocks.length > 0) {
-          // Pure-tool message — merge into the preceding assistant message
-          let merged = false;
-          for (let j = result.length - 1; j >= 0; j--) {
-            const prev = result[j];
-            if (prev && prev.role === "assistant" && prev.turnId === msg.turnId) {
-              const prevBlocks = Array.isArray(prev.content)
-                ? (prev.content as unknown as ContentBlock[])
-                : [];
-              result[j] = {
-                ...prev,
-                content: [...prevBlocks, ...blocks],
-              };
-              if (typeof msg.turnId === "string") {
-                hoistedTurnIds.add(msg.turnId);
+      for (const msg of visibleMessages) {
+        if (msg.role === "assistant") {
+          const blocks = Array.isArray(msg.content)
+            ? (msg.content as unknown as ContentBlock[])
+            : [];
+          const hasText = blocks.some((b) => b.type === "text");
+
+          if (!hasText && blocks.length > 0) {
+            // Pure-tool message — merge into the preceding assistant message
+            let merged = false;
+            for (let j = result.length - 1; j >= 0; j--) {
+              const prev = result[j];
+              if (
+                prev &&
+                prev.role === "assistant" &&
+                prev.turnId === msg.turnId
+              ) {
+                const prevBlocks = Array.isArray(prev.content)
+                  ? (prev.content as unknown as ContentBlock[])
+                  : [];
+                result[j] = {
+                  ...prev,
+                  content: [...prevBlocks, ...blocks],
+                };
+                if (typeof msg.turnId === "string") {
+                  hoistedTurnIds.add(msg.turnId);
+                }
+                merged = true;
+                break;
               }
-              merged = true;
-              break;
             }
+            if (merged) continue;
+            // No preceding assistant (e.g. first message in turn is a tool) — keep as-is
           }
-          if (merged) continue;
-          // No preceding assistant (e.g. first message in turn is a tool) — keep as-is
         }
+        result.push(msg);
       }
-      result.push(msg);
-    }
 
-    return {
-      messages: result,
-      hoistedProcessSummaryTurnIds: hoistedTurnIds,
-    };
-  }, [visibleMessages]);
+      return {
+        messages: result,
+        hoistedProcessSummaryTurnIds: hoistedTurnIds,
+      };
+    }, [visibleMessages]);
 
   const visibleTurnEntries = useMemo(() => {
     // Single pass: detect turn-end indices, latest non-partial assistant,
@@ -693,9 +708,7 @@ export function ChatView() {
           (b): b is ToolUseContent => b.type === "tool_use",
         );
         currentTurnToolUses.push(...toolUses);
-        currentTurnProcessToolUses.push(
-          ...toolUses.filter(isProcessToolUse),
-        );
+        currentTurnProcessToolUses.push(...toolUses.filter(isProcessToolUse));
 
         const msgId = String(msg.id);
         const isPartial = msgId.startsWith("partial-");
@@ -742,7 +755,9 @@ export function ChatView() {
         isLatestRound:
           msgId.startsWith("partial-") || msgId === latestAssistantId,
         hideTraceBlocks:
-          message.role === "assistant" && Boolean(turnId) && !effectiveTraceExpanded,
+          message.role === "assistant" &&
+          Boolean(turnId) &&
+          !effectiveTraceExpanded,
         artifactFiles: turnArtifactFiles.get(msgId) ?? [],
         turnProcessSummary:
           message.role === "assistant" && effectiveTraceExpanded
@@ -765,7 +780,10 @@ export function ChatView() {
 
   useEffect(() => {
     if (
-      !didSessionHistoryScopeChange(previousSessionIdRef.current, activeSessionId)
+      !didSessionHistoryScopeChange(
+        previousSessionIdRef.current,
+        activeSessionId,
+      )
     ) {
       return;
     }
@@ -1349,48 +1367,52 @@ export function ChatView() {
                 </p>
               </div>
             ) : (
-              visibleTurnEntries.map(({
-                message,
-                isStreaming,
-                hideTraceBlocks,
-                isLatestRound,
-                artifactFiles,
-                turnProcessSummary,
-                suppressProcessSummaries,
-              }) => (
-                <div key={message.id} className="space-y-1.5">
-                  {turnProcessSummary ? (
-                    <ProcessSummaryBlock
-                      block={turnProcessSummary}
+              visibleTurnEntries.map(
+                ({
+                  message,
+                  isStreaming,
+                  hideTraceBlocks,
+                  isLatestRound,
+                  artifactFiles,
+                  turnProcessSummary,
+                  suppressProcessSummaries,
+                }) => (
+                  <div key={message.id} className="space-y-1.5">
+                    {turnProcessSummary ? (
+                      <ProcessSummaryBlock
+                        block={turnProcessSummary}
+                        message={message}
+                      />
+                    ) : null}
+                    <MessageCard
                       message={message}
+                      isStreaming={isStreaming}
+                      hideTraceBlocks={hideTraceBlocks}
+                      isLatestRound={isLatestRound}
+                      artifactFiles={artifactFiles}
+                      suppressProcessSummaries={suppressProcessSummaries}
                     />
-                  ) : null}
-                  <MessageCard
-                    message={message}
-                    isStreaming={isStreaming}
-                    hideTraceBlocks={hideTraceBlocks}
-                    isLatestRound={isLatestRound}
-                    artifactFiles={artifactFiles}
-                    suppressProcessSummaries={suppressProcessSummaries}
-                  />
-                </div>
-              ))
+                  </div>
+                ),
+              )
             )}
 
             <div ref={messagesEndRef} />
           </div>
         </div>
 
-        {showScrollToBottom && (
-          <button
-            type="button"
-            onClick={scrollToBottomByButton}
-            aria-label="Scroll to bottom"
-            className="absolute right-5 lg:right-8 bottom-6 z-20 w-10 h-10 rounded-full bg-surface text-text-secondary hover:bg-surface-hover hover:text-text-primary shadow-elevated transition-colors flex items-center justify-center"
-          >
-            <ChevronsDown className="w-5 h-5" />
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={scrollToBottomByButton}
+          aria-label="Scroll to bottom"
+          className={`absolute right-5 lg:right-8 bottom-6 z-20 w-10 h-10 rounded-full bg-surface text-text-secondary hover:bg-surface-hover hover:text-text-primary shadow-elevated transition-all duration-200 flex items-center justify-center ${
+            showScrollToBottom
+              ? "opacity-100 scale-100 pointer-events-auto"
+              : "opacity-0 scale-75 pointer-events-none"
+          }`}
+        >
+          <ChevronsDown className="w-5 h-5" />
+        </button>
       </div>
 
       {/* Input */}
@@ -1409,7 +1431,7 @@ export function ChatView() {
             isExpanded={isInputExpanded}
             onToggleExpand={() => setIsInputExpanded((v) => !v)}
             placeholder={t("chat.typeMessage")}
-            cardClassName="p-3.5 rounded-6xl bg-background/60 shadow-elevated"
+            cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
             textareaClassName="w-full resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
             bottomSlot={
               <ChatInputBottomBar
@@ -1421,8 +1443,10 @@ export function ChatView() {
                 onSelectModel={(profileKey, modelId) => {
                   if (!activeSession) return;
                   // Validate modelId exists in modelOptions before applying
-                  const group = modelOptions.find(g => g.profileKey === profileKey);
-                  if (!group?.items.some(i => i.id === modelId)) return;
+                  const group = modelOptions.find(
+                    (g) => g.profileKey === profileKey,
+                  );
+                  if (!group?.items.some((i) => i.id === modelId)) return;
                   setSessionProviderModel(
                     activeSession.id,
                     profileKey,
@@ -1433,7 +1457,11 @@ export function ChatView() {
                     try {
                       localStorage.setItem(
                         "deskwand.pm." + encodeURIComponent(activeSessionCwd),
-                        JSON.stringify({ p: profileKey, m: modelId, t: thinkingLevel }),
+                        JSON.stringify({
+                          p: profileKey,
+                          m: modelId,
+                          t: thinkingLevel,
+                        }),
                       );
                     } catch {
                       /* ignore */
@@ -1455,7 +1483,11 @@ export function ChatView() {
                     try {
                       localStorage.setItem(
                         "deskwand.pm." + encodeURIComponent(activeSessionCwd),
-                        JSON.stringify({ p: activeProviderProfileKey, m: activeModel, t: level }),
+                        JSON.stringify({
+                          p: activeProviderProfileKey,
+                          m: activeModel,
+                          t: level,
+                        }),
                       );
                     } catch {
                       /* ignore */

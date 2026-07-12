@@ -414,9 +414,9 @@
 
   /* ----- Magic effect tokens — theme-aware via accent color ----- */
   :root {
-    --color-magic: color-mix(in srgb, var(--color-accent) 70%, #A78BFA);
-    --color-magic-glow: color-mix(in srgb, var(--color-accent) 60%, #C4B5FD);
-    --color-magic-spark: color-mix(in srgb, var(--color-accent) 30%, #EDE9FE);
+    --color-magic: color-mix(in srgb, var(--color-accent) 70%, #a78bfa);
+    --color-magic-glow: color-mix(in srgb, var(--color-accent) 60%, #c4b5fd);
+    --color-magic-spark: color-mix(in srgb, var(--color-accent) 30%, #ede9fe);
   }
 
   * {
@@ -784,7 +784,6 @@
     background: var(--color-surface-muted);
   }
 
-
   /* Code block */
   .code-block {
     @apply bg-surface-muted rounded-xl p-4 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-w-full;
@@ -818,12 +817,41 @@
 }
 
 /* Settings panel overlay animations */
+
+/* Modal / panel backdrop — translucent material that pushes background back */
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.modal-overlay-subtle {
+  background: rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.modal-overlay-heavy {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -836,12 +864,29 @@
   }
 }
 
+@keyframes slide-out-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
 .animate-fade-in {
   animation: fade-in 200ms ease-out;
 }
 
+.animate-fade-out {
+  animation: fade-out 150ms ease-in forwards;
+}
+
 .animate-slide-in-right {
-  animation: slide-in-right 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  animation: slide-in-right 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.animate-slide-out-right {
+  animation: slide-out-right 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 /* ================================================================
@@ -850,38 +895,79 @@
 
 /* -- Keyframes -- */
 @keyframes eff-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--color-magic-glow); }
-  50%      { box-shadow: 0 0 16px 4px var(--color-magic-glow); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--color-magic-glow);
+  }
+  50% {
+    box-shadow: 0 0 16px 4px var(--color-magic-glow);
+  }
 }
 
 @keyframes eff-particle-1 {
-  0%   { transform: translate(0, 0) scale(1);   opacity: 0.8; }
-  100% { transform: translate(-8px, -22px) scale(0); opacity: 0; }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-8px, -22px) scale(0);
+    opacity: 0;
+  }
 }
 
 @keyframes eff-particle-2 {
-  0%   { transform: translate(0, 0) scale(1);   opacity: 0.6; }
-  100% { transform: translate(10px, -18px) scale(0); opacity: 0; }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translate(10px, -18px) scale(0);
+    opacity: 0;
+  }
 }
 
 @keyframes eff-particle-3 {
-  0%   { transform: translate(0, 0) scale(1);   opacity: 0.7; }
-  100% { transform: translate(3px, -26px) scale(0);  opacity: 0; }
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(3px, -26px) scale(0);
+    opacity: 0;
+  }
 }
 
 @keyframes eff-message-in {
-  0%   { transform: translateY(20px); opacity: 0; filter: blur(4px); }
-  100% { transform: translateY(0);    opacity: 1; filter: blur(0); }
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+    filter: blur(4px);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
 }
 
 @keyframes eff-float {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-6px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
 }
 
 @keyframes eff-cursor-blink {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.15; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
 }
 
 @layer utilities {
@@ -894,20 +980,32 @@
     border-radius: inherit;
   }
   .eff-thinking--active::after {
-    content: '';
+    content: "";
     position: absolute;
     inset: -6px;
     border-radius: inherit;
     pointer-events: none;
     z-index: -1;
     background:
-      radial-gradient(1.5px circle at 40% 20%, var(--color-magic-spark) 80%, transparent),
-      radial-gradient(1px   circle at 65% 15%, var(--color-magic-spark) 80%, transparent),
-      radial-gradient(1.5px circle at 50% 10%, var(--color-magic-spark) 80%, transparent);
+      radial-gradient(
+        1.5px circle at 40% 20%,
+        var(--color-magic-spark) 80%,
+        transparent
+      ),
+      radial-gradient(
+        1px circle at 65% 15%,
+        var(--color-magic-spark) 80%,
+        transparent
+      ),
+      radial-gradient(
+        1.5px circle at 50% 10%,
+        var(--color-magic-spark) 80%,
+        transparent
+      );
     animation:
       eff-particle-1 2.2s ease-out 0s infinite,
       eff-particle-2 1.8s ease-out 0.6s infinite,
-      eff-particle-3 2.0s ease-out 1.1s infinite;
+      eff-particle-3 2s ease-out 1.1s infinite;
   }
 
   /* ── Message entrance ── */
@@ -922,10 +1020,20 @@
 
   /* ── Scroll fade mask ── */
   .eff-scroll-fade {
-    -webkit-mask-image:
-      linear-gradient(to bottom, transparent 0%, black 4%, black 96%, transparent 100%);
-    mask-image:
-      linear-gradient(to bottom, transparent 0%, black 4%, black 96%, transparent 100%);
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      black 4%,
+      black 96%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      black 4%,
+      black 96%,
+      transparent 100%
+    );
   }
 
   /* ── Empty state float ── */
@@ -955,5 +1063,17 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  /* Replace slide animations with cross-fade */
+  .animate-slide-in-right,
+  .animate-slide-out-right {
+    animation-name: fade-in !important;
+    animation-duration: 150ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: opacity !important;
+    transition-duration: 150ms !important;
+  }
+  .animate-slide-out-right {
+    animation-name: fade-out !important;
   }
 }

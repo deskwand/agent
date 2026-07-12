@@ -695,7 +695,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               {pastedImages.map((img, index) => (
                 <div
                   key={img.url || `pasted-image-${index}`}
-                  className="relative group"
+                  className="relative group eff-message-enter"
                 >
                   <img
                     src={img.url}

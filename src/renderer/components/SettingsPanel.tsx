@@ -177,7 +177,7 @@ export function SettingsPanel({
     <div className="flex h-full w-full overflow-hidden bg-background">
       {/* Sidebar */}
       <div
-        className={`${compactSidebar ? "w-14" : "w-52 lg:w-60"} bg-background-secondary/88 flex flex-col flex-shrink-0`}
+        className={`${compactSidebar ? "w-14" : "w-52 lg:w-60"} bg-background-secondary/80 flex flex-col flex-shrink-0`}
       >
         {/* Back button — settings top-left */}
         <div
