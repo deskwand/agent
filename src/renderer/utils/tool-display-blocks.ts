@@ -53,6 +53,10 @@ const PROCESS_TOOLS = new Set([
   "websearch",
   "web_fetch",
   "vision_describe",
+  "office_read_xlsx",
+  "office_read_docx",
+  "office_read_pptx",
+  "office_read_pdf",
   "internal_browser_navigate",
   "internal_browser_screenshot",
   "internal_browser_click",
@@ -130,10 +134,14 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   for (const item of items) {
     const lower = item.name.toLowerCase();
     let countedAsSpecific = false;
+    // read / read_file / vision_describe / office_read_* all count as "read files"
+    // in the process summary. Using startsWith for office_read_ means future
+    // formats (csv, md, etc.) are automatically covered.
     if (
       lower === "read" ||
       lower === "read_file" ||
-      lower === "vision_describe"
+      lower === "vision_describe" ||
+      lower.startsWith("office_read_")
     ) {
       const path = extractFilePathFromToolInput(item.input);
       if (path) {

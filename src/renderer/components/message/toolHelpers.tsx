@@ -9,6 +9,9 @@ import {
   Globe,
   FolderSearch,
   Eye,
+  Table,
+  Presentation,
+  FileScan,
 } from "lucide-react";
 
 /** Map a tool name to a small icon element */
@@ -27,6 +30,10 @@ export function getToolIcon(name: string) {
   if (n === "websearch") return <Globe className="w-3.5 h-3.5" />;
   if (n === "webfetch") return <Globe className="w-3.5 h-3.5" />;
   if (n === "vision_describe") return <Eye className="w-3.5 h-3.5" />;
+  if (n === "office_read_xlsx") return <Table className="w-3.5 h-3.5" />;
+  if (n === "office_read_docx") return <FileText className="w-3.5 h-3.5" />;
+  if (n === "office_read_pptx") return <Presentation className="w-3.5 h-3.5" />;
+  if (n === "office_read_pdf") return <FileScan className="w-3.5 h-3.5" />;
   if (n.startsWith("internal_browser"))
     return <Globe className="w-3.5 h-3.5" />;
   return <Terminal className="w-3.5 h-3.5" />;
@@ -156,12 +163,37 @@ export function getToolLabel(
     const text = String(inp.text || "");
     const selector = String(inp.selector || "");
     if (text) return t("tool.labelBrowserWaitText", { text });
-    if (selector)
-      return t("tool.labelBrowserWaitSelector", { selector });
+    if (selector) return t("tool.labelBrowserWaitSelector", { selector });
     return t("tool.actionBrowserWait");
   }
   if (nameLower === "internal_browser_get_state")
     return t("tool.actionBrowserGetState");
+
+  // --- Office document read tools ---
+  if (nameLower === "office_read_xlsx") {
+    const p = String(inp.path || "");
+    return p
+      ? t("tool.labelReadXlsx", { path: shortenPath(p) })
+      : t("tool.actionReadXlsx");
+  }
+  if (nameLower === "office_read_docx") {
+    const p = String(inp.path || "");
+    return p
+      ? t("tool.labelReadDocx", { path: shortenPath(p) })
+      : t("tool.actionReadDocx");
+  }
+  if (nameLower === "office_read_pptx") {
+    const p = String(inp.path || "");
+    return p
+      ? t("tool.labelReadPptx", { path: shortenPath(p) })
+      : t("tool.actionReadPptx");
+  }
+  if (nameLower === "office_read_pdf") {
+    const p = String(inp.path || "");
+    return p
+      ? t("tool.labelReadPdf", { path: shortenPath(p) })
+      : t("tool.actionReadPdf");
+  }
 
   // --- Vision tools ---
   if (nameLower === "vision_describe") {

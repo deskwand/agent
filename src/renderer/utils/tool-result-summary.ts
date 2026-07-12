@@ -22,7 +22,7 @@ export type CollapsedToolSummary =
 
 function isFileReadTool(name: string): boolean {
   const lower = name.toLowerCase();
-  return lower === "read" || lower === "read_file";
+  return lower === "read" || lower === "read_file" || lower.startsWith("office_read_");
 }
 
 function isBashTool(name: string): boolean {
