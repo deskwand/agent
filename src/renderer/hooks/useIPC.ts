@@ -202,6 +202,7 @@ function installSharedIpcBridge(): void {
           console.log("[useIPC] session.status received:", event.payload);
           store.updateSession(event.payload.sessionId, {
             status: event.payload.status,
+            updatedAt: Date.now(),
           });
           if (event.payload.status !== "running") {
             store.finishExecutionClock(event.payload.sessionId);
