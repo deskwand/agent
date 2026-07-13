@@ -142,9 +142,9 @@ export const ToolResultBlock = memo(function ToolResultBlock({
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
       >
         {block.isError ? (
-          <XCircle className="w-3.5 h-3.5 pt-0.5 text-error flex-shrink-0" />
+          <XCircle className="w-3.5 h-3.5 pt-0.5 text-text-muted flex-shrink-0" />
         ) : (
-          <CheckCircle2 className="w-3.5 h-3.5 pt-0.5 text-success flex-shrink-0" />
+          <CheckCircle2 className="w-3.5 h-3.5 pt-0.5 text-text-muted flex-shrink-0" />
         )}
         <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
           <span

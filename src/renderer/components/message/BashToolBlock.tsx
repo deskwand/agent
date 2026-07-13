@@ -160,20 +160,13 @@ export const BashToolBlock = memo(function BashToolBlock({
       >
         {/* Status icon */}
         <div
-          className={`flex-shrink-0 pt-0.5 ${
-            isError
-              ? "text-error"
-              : isRunning
-                ? "text-accent"
-                : "text-text-muted"
-          }`}
-        >
+          className="flex-shrink-0 pt-0.5 text-text-muted">
           {isRunning ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : isError ? (
             <XCircle className="w-3.5 h-3.5" />
           ) : (
-            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+            <CheckCircle2 className="w-3.5 h-3.5" />
           )}
         </div>
 

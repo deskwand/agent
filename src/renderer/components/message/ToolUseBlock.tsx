@@ -212,21 +212,13 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
       >
         {/* Status icon */}
-        <div
-          className={`flex-shrink-0 pt-0.5 ${
-            isError
-              ? "text-error"
-              : isRunning
-                ? "text-accent"
-                : "text-text-muted"
-          }`}
-        >
+        <div className="flex-shrink-0 pt-0.5 text-text-muted">
           {isRunning ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : isError ? (
             <XCircle className="w-3.5 h-3.5" />
           ) : (
-            <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+            <CheckCircle2 className="w-3.5 h-3.5" />
           )}
         </div>
 
