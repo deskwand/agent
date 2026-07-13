@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import type { TaskSlot } from "../store";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import { useIPC } from "../hooks/useIPC";
 import {
@@ -62,9 +63,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
-  const [projectExpandedMap, setProjectExpandedMap] = useState<
-    Record<string, boolean>
-  >({});
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
@@ -426,6 +424,24 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     [handleNewSession, invoke, isElectron],
   );
 
+  const highlightTitle = useCallback(
+    (title: string, query: string) => {
+      if (!query) return title;
+      const idx = title.toLowerCase().indexOf(query.toLowerCase());
+      if (idx === -1) return title;
+      return (
+        <>
+          {title.slice(0, idx)}
+          <mark className="bg-accent/20 text-text-primary rounded-sm px-0.5">
+            {title.slice(idx, idx + query.length)}
+          </mark>
+          {title.slice(idx + query.length)}
+        </>
+      );
+    },
+    [],
+  );
+
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive = activeSessionId === session.id && !showMarketplace;
 
@@ -440,19 +456,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         }`}
       >
         <div className="flex items-center gap-2">
-          {session.status === "running" && (
-            <span
-              className="w-2.5 h-2.5 rounded-full bg-accent eff-thinking eff-thinking--active flex-shrink-0"
-              role="status"
-              aria-label={t("sidebar.running")}
-            />
-          )}
-
           <div className="min-w-0 flex-1 flex items-center gap-2">
             <div
               className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? "text-text-primary" : "text-text-secondary"}`}
             >
-              {session.title}
+              {highlightTitle(session.title, normalizedQuery)}
             </div>
             {session.isProjectMode &&
               session.cwd &&
@@ -464,6 +472,51 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   {getWorkspaceName(session.cwd)}
                 </span>
               )}
+
+            {/* Status indicator: ● running / ✓ buffered completed */}
+            {(() => {
+              const slot = taskSlots.find((s) => s.sessionId === session.id);
+              if (slot && !slot.completed) {
+                return (
+                  <span
+                    className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse flex-shrink-0"
+                    role="status"
+                    aria-label={t("sidebar.running")}
+                  />
+                );
+              }
+              if (slot && slot.completed && session.status === "completed") {
+                return (
+                  <Check
+                    className="w-4 h-4 text-accent/60 hover:text-accent cursor-pointer flex-shrink-0 transition-colors"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("sidebar.archive")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeTaskSlot(session.id);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        removeTaskSlot(session.id);
+                      }
+                    }}
+                  />
+                );
+              }
+              if (!slot && session.status === "running") {
+                return (
+                  <span
+                    className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse flex-shrink-0"
+                    role="status"
+                    aria-label={t("sidebar.running")}
+                  />
+                );
+              }
+              return null;
+            })()}
 
             {showRelativeTime && (
               <div
@@ -667,93 +720,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               })()}
 
             <div className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll">
-              {/* Task slot area */}
-              {taskSlots.length > 0 && (
-                <div className="mb-4">
-                  <div className="px-3 pb-1.5">
-                    <span className="text-sm font-medium leading-5 text-accent">
-                      {t("sidebar.currentTasks")}
-                    </span>
-                  </div>
-                  <div className="space-y-0.5 max-h-40 overflow-y-auto sidebar-scroll">
-                    {[...taskSlots]
-                      .sort((a, b) => {
-                        const sessionA = sessions.find(
-                          (s) => s.id === a.sessionId,
-                        );
-                        const sessionB = sessions.find(
-                          (s) => s.id === b.sessionId,
-                        );
-                        if (a.completed !== b.completed)
-                          return a.completed ? 1 : -1;
-                        return (
-                          (sessionB?.updatedAt || 0) -
-                          (sessionA?.updatedAt || 0)
-                        );
-                      })
-                      .map((slot) => {
-                        const session = sessions.find(
-                          (s) => s.id === slot.sessionId,
-                        );
-                        if (!session) return null;
-                        return (
-                          <div
-                            key={slot.sessionId}
-                            onClick={() =>
-                              void handleSessionClick(slot.sessionId)
-                            }
-                            className={`group cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors border-l-[3px] border-l-transparent ${
-                              activeSessionId === slot.sessionId &&
-                              !showMarketplace
-                                ? "bg-surface-active border-l-accent"
-                                : ""
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`text-sm font-medium leading-5 truncate flex-1 ${(activeSessionId === slot.sessionId && !showMarketplace) || !slot.completed ? "text-text-primary" : "text-text-secondary"}`}
-                              >
-                                {session.title}
-                              </span>
-                              {session.isProjectMode &&
-                                session.cwd &&
-                                !isDefaultWorkspacePath(session.cwd) && (
-                                  <span className="text-[10px] bg-surface-muted text-text-muted px-1.5 py-0.5 rounded flex-shrink-0">
-                                    {getWorkspaceName(session.cwd)}
-                                  </span>
-                                )}
-                              <div className="relative w-5 h-5 flex-shrink-0">
-                                <span
-                                  className={`absolute inset-0 m-auto w-2 h-2 rounded-full bg-accent transition-all duration-300 ${slot.completed ? "opacity-0 scale-0" : "opacity-100 scale-100 animate-pulse"}`}
-                                  role="status"
-                                  aria-label={t("sidebar.running")}
-                                />
-                                <Check
-                                  className={`absolute inset-0 m-auto w-3.5 h-3.5 text-accent/50 hover:text-accent transition-all duration-300 ${slot.completed ? "opacity-100 scale-100 cursor-pointer" : "opacity-0 scale-0 pointer-events-none"}`}
-                                  role="button"
-                                  tabIndex={slot.completed ? 0 : -1}
-                                  aria-label={t("sidebar.taskCompleted")}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    removeTaskSlot(slot.sessionId);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      removeTaskSlot(slot.sessionId);
-                                    }
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-              )}
-
               <div className="space-y-0.5">
                 {/* Session list header */}
                 <div className="px-3 pb-1.5 flex items-center justify-between">
@@ -764,25 +730,13 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
                 {/* Session list */}
                 {(() => {
-                  const taskSlotIds = new Set(
-                    taskSlots.map((s) => s.sessionId),
-                  );
-                  const sorted = sortFlattenedSessions(
-                    activeSessions,
-                    taskSlotIds,
-                  );
+                  const sorted = sortFlattenedSessions(activeSessions, taskSlots);
                   const filtered = (() => {
                     if (!normalizedQuery && !projectFilter) return sorted;
                     return sorted.filter((s) => {
-                      if (
-                        projectFilter &&
-                        !sessionMatchesProject(s, projectFilter)
-                      )
+                      if (projectFilter && !sessionMatchesProject(s, projectFilter))
                         return false;
-                      if (
-                        normalizedQuery &&
-                        !sessionMatchesQuery(s, normalizedQuery)
-                      )
+                      if (normalizedQuery && !sessionMatchesQuery(s, normalizedQuery))
                         return false;
                       return true;
                     });
@@ -803,223 +757,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                     );
                   }
 
-                  // Build groups: project sessions grouped by cwd, chat sessions as one group
-                  const MAX_PROJECT_VISIBLE = 5;
-                  const isSearching = !!(normalizedQuery || projectFilter);
-
-                  const items: RenderItem[] = [];
-                  let lastProject = "";
-                  let hasRenderedGroup = false;
-                  let projectSeen = 0; // count of sessions seen for current project
-                  let projectTotal = 0; // total sessions in current project
-                  let sawExpandedProject = false;
-                  let chatSeen = 0;
-                  const CHAT_EXPAND_KEY = "__chats__";
-                  const chatsExpanded = projectExpandedMap[CHAT_EXPAND_KEY];
-
-                  // Total chat sessions for expand/collapse counting
-                  const chatTotal = filtered.filter(
-                    (s) =>
-                      !s.isProjectMode ||
-                      !s.cwd ||
-                      isDefaultWorkspacePath(s.cwd),
-                  ).length;
-
-                  for (const session of filtered) {
-                    const pName =
-                      session.isProjectMode &&
-                      session.cwd &&
-                      !isDefaultWorkspacePath(session.cwd)
-                        ? getWorkspaceName(session.cwd)
-                        : "";
-
-                    if (pName && pName !== lastProject) {
-                      // Transition to a new project
-                      // Insert collapse button for previous expanded project if needed
-                      if (
-                        sawExpandedProject &&
-                        projectSeen > MAX_PROJECT_VISIBLE
-                      ) {
-                        items.push({
-                          type: "collapse",
-                          key: `collapse-${lastProject}`,
-                          projectName: lastProject,
-                        });
-                      }
-                      sawExpandedProject = false;
-                      // If transitioning from chat to first project, insert chat collapse
-                      if (
-                        lastProject === "" &&
-                        chatsExpanded &&
-                        chatSeen > MAX_PROJECT_VISIBLE
-                      ) {
-                        items.push({
-                          type: "collapse",
-                          key: `collapse-${CHAT_EXPAND_KEY}`,
-                          projectName: CHAT_EXPAND_KEY,
-                        });
-                      }
-                      // Insert divider
-                      if (hasRenderedGroup) {
-                        items.push({ type: "divider", key: `div-${pName}` });
-                      }
-                      projectSeen = 0;
-                      projectTotal = 0;
-                      lastProject = pName;
-                      // Count total sessions in this project
-                      projectTotal = filtered.filter((s) => {
-                        if (
-                          !s.isProjectMode ||
-                          !s.cwd ||
-                          isDefaultWorkspacePath(s.cwd)
-                        )
-                          return false;
-                        return getWorkspaceName(s.cwd) === pName;
-                      }).length;
-                    } else if (!pName && lastProject) {
-                      // Transition from project to chat sessions
-                      if (
-                        sawExpandedProject &&
-                        projectSeen > MAX_PROJECT_VISIBLE
-                      ) {
-                        items.push({
-                          type: "collapse",
-                          key: `collapse-${lastProject}`,
-                          projectName: lastProject,
-                        });
-                      }
-                      sawExpandedProject = false;
-                      items.push({ type: "divider", key: `div-chat` });
-                      chatSeen = 0;
-                      lastProject = "";
-                    }
-
-                    // Truncation: for project sessions, only show first N unless expanded or searching
-                    let shouldSkip = false;
-                    let shouldExpand: number | null = null;
-                    if (pName && !isSearching) {
-                      projectSeen++;
-                      if (!projectExpandedMap[pName]) {
-                        if (projectSeen > MAX_PROJECT_VISIBLE)
-                          shouldSkip = true;
-                        else if (
-                          projectSeen === MAX_PROJECT_VISIBLE &&
-                          projectTotal > MAX_PROJECT_VISIBLE
-                        ) {
-                          shouldExpand = projectTotal - MAX_PROJECT_VISIBLE;
-                        }
-                      } else {
-                        sawExpandedProject = true;
-                      }
-                    }
-
-                    // Truncation: for chat sessions, same rule
-                    if (!pName && !isSearching) {
-                      chatSeen++;
-                      if (!chatsExpanded) {
-                        if (chatSeen > MAX_PROJECT_VISIBLE) shouldSkip = true;
-                        else if (
-                          chatSeen === MAX_PROJECT_VISIBLE &&
-                          chatTotal > MAX_PROJECT_VISIBLE
-                        ) {
-                          shouldExpand = chatTotal - MAX_PROJECT_VISIBLE;
-                        }
-                      }
-                    }
-
-                    if (shouldSkip) continue;
-
-                    items.push({ type: "session", key: session.id, session });
-                    hasRenderedGroup = true;
-
-                    // Insert expand button AFTER the N-th session
-                    if (shouldExpand !== null) {
-                      const expandKey = pName || CHAT_EXPAND_KEY;
-                      items.push({
-                        type: "expand",
-                        key: `expand-${expandKey}`,
-                        projectName: expandKey,
-                        count: shouldExpand,
-                      });
-                    }
-                  }
-
-                  // Handle collapse for the last project group
-                  if (sawExpandedProject && projectSeen > MAX_PROJECT_VISIBLE) {
-                    items.push({
-                      type: "collapse",
-                      key: `collapse-${lastProject}`,
-                      projectName: lastProject,
-                    });
-                  }
-
-                  // Handle collapse for chat section (only if no projects followed chat)
-                  if (
-                    lastProject === "" &&
-                    chatsExpanded &&
-                    chatSeen > MAX_PROJECT_VISIBLE
-                  ) {
-                    items.push({
-                      type: "collapse",
-                      key: `collapse-${CHAT_EXPAND_KEY}`,
-                      projectName: CHAT_EXPAND_KEY,
-                    });
-                  }
-
-                  return (
-                    <>
-                      {items.map((item) => {
-                        switch (item.type) {
-                          case "divider":
-                            return (
-                              <div
-                                key={item.key}
-                                className="mx-3 my-0.5 border-t border-dashed border-border-muted"
-                              />
-                            );
-                          case "expand":
-                            return (
-                              <button
-                                key={item.key}
-                                onClick={() =>
-                                  setProjectExpandedMap((prev) => ({
-                                    ...prev,
-                                    [item.projectName!]: true,
-                                  }))
-                                }
-                                className="w-full text-center text-xs text-text-muted hover:text-text-secondary py-1 transition-colors"
-                              >
-                                {t("sidebar.expandProject", {
-                                  count: item.count,
-                                })}
-                              </button>
-                            );
-                          case "collapse":
-                            return (
-                              <button
-                                key={item.key}
-                                onClick={() =>
-                                  setProjectExpandedMap((prev) => {
-                                    const next = { ...prev };
-                                    delete next[item.projectName!];
-                                    return next;
-                                  })
-                                }
-                                className="w-full text-center text-xs text-text-muted hover:text-text-secondary py-1 transition-colors"
-                              >
-                                {t("sidebar.collapseProject")}
-                              </button>
-                            );
-                          case "session":
-                            return (
-                              <div key={item.key}>
-                                {renderSessionItem(item.session!, true)}
-                              </div>
-                            );
-                        }
-                      })}
-                    </>
-                  );
+                  return filtered.map((session) => (
+                    <div key={session.id}>
+                      {renderSessionItem(session, true)}
+                    </div>
+                  ));
                 })()}
               </div>
             </div>
@@ -1207,67 +949,59 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   );
 }
 
-interface RenderItem {
-  type: "divider" | "session" | "expand" | "collapse";
-  key: string;
-  session?: Session;
-  projectName?: string;
-  count?: number;
-}
-
 function sortFlattenedSessions(
   sessions: Session[],
-  taskSlotIds: Set<string>,
+  taskSlots: TaskSlot[],
 ): Session[] {
-  const available = sessions.filter((s) => !taskSlotIds.has(s.id));
+  const BUFFER_DURATION_MS = 5 * 60 * 1000;
+  const now = Date.now();
 
-  const projectSessions: Session[] = [];
-  const chatSessions: Session[] = [];
+  const runningIds = new Set(
+    taskSlots.filter((s) => !s.completed).map((s) => s.sessionId),
+  );
+  const bufferedIds = new Set(
+    taskSlots
+      .filter((s) => {
+        if (!s.completed) return false;
+        const session = sessions.find((ss) => ss.id === s.sessionId);
+        if (!session || session.status !== "completed") return false;
+        return now - session.updatedAt < BUFFER_DURATION_MS;
+      })
+      .map((s) => s.sessionId),
+  );
 
-  for (const s of available) {
-    if (s.isProjectMode && s.cwd && !isDefaultWorkspacePath(s.cwd)) {
-      projectSessions.push(s);
+  const running: Session[] = [];
+  const buffered: Session[] = [];
+  const normal: Session[] = [];
+
+  for (const s of sessions) {
+    if (s.archived) continue;
+    if (runningIds.has(s.id)) {
+      running.push(s);
+    } else if (bufferedIds.has(s.id)) {
+      buffered.push(s);
     } else {
-      chatSessions.push(s);
+      normal.push(s);
     }
   }
 
-  // Group project sessions by cwd, sort groups by latest session time
-  const grouped = new Map<string, Session[]>();
-  for (const s of projectSessions) {
-    const cwd = normalizeWorkspacePath(s.cwd);
-    if (!cwd) continue;
-    const arr = grouped.get(cwd) || [];
-    arr.push(s);
-    grouped.set(cwd, arr);
-  }
-
-  // Sort each group internally by updatedAt desc
-  for (const arr of grouped.values()) {
-    arr.sort(
-      (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
-    );
-  }
-
-  // Sort groups by their most recent session
-  const sortedGroups = Array.from(grouped.entries()).sort(([, a], [, b]) => {
-    const aLatest = a[0]?.updatedAt || a[0]?.createdAt || 0;
-    const bLatest = b[0]?.updatedAt || b[0]?.createdAt || 0;
-    return bLatest - aLatest;
-  });
-
-  // Chat sessions first, sorted by time
-  chatSessions.sort(
+  // Running: most recent first
+  running.sort(
     (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
   );
-  const result: Session[] = [...chatSessions];
+  // Buffered: most recently completed first
+  buffered.sort(
+    (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
+  );
+  // Normal: group by cwd, then sort by updatedAt
+  normal.sort((a, b) => {
+    const aCwd = normalizeWorkspacePath(a.cwd);
+    const bCwd = normalizeWorkspacePath(b.cwd);
+    if (aCwd !== bCwd) return aCwd.localeCompare(bCwd);
+    return (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
+  });
 
-  // Project sessions after, grouped by workspace
-  for (let i = 0; i < sortedGroups.length; i++) {
-    result.push(...sortedGroups[i][1]);
-  }
-
-  return result;
+  return [...running, ...buffered, ...normal];
 }
 
 /** Returns Set of project names that match the search query (for Chip display). */
