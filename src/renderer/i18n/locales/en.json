@@ -754,6 +754,7 @@
     "emptyTitle": "No sessions yet",
     "emptyHint": "Click \"New\" to start",
     "filterByProject": "Filter by project:",
+    "dismiss": "Dismiss",
     "newSessionInProject": "New session in project",
     "automation": "Automation",
     "browser": "Browser",

@@ -753,6 +753,7 @@
     "emptyTitle": "还没有会话",
     "emptyHint": "点击「新建」开始",
     "filterByProject": "筛选项目：",
+    "dismiss": "消除",
     "newSessionInProject": "在项目下新建会话",
     "automation": "自动化",
     "browser": "浏览器",
