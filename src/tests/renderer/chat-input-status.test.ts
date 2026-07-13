@@ -5,7 +5,7 @@ describe("resolveInputStatus", () => {
   const base = {
     isSending: false,
     isCompacting: false,
-    compactionResult: null as "success" | "failed" | null,
+    compactionResult: null as "success" | "failed" | "aborted" | null,
     steeringText: "",
     shouldShowThinkingIndicator: false,
     isResponding: false,
@@ -44,6 +44,12 @@ describe("resolveInputStatus", () => {
     expect(
       resolveInputStatus({ ...base, compactionResult: "failed" }),
     ).toEqual({ type: "compaction-failed" });
+  });
+
+  it("returns compaction-aborted for a cancelled compaction", () => {
+    expect(
+      resolveInputStatus({ ...base, compactionResult: "aborted" }),
+    ).toEqual({ type: "compaction-aborted" });
   });
 
   it("compaction-failed wins over steering", () => {

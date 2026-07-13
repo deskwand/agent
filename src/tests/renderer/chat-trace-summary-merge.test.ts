@@ -128,6 +128,7 @@ function setSessionMessages(
         executionClock: { startAt: null, endAt: null },
         traceSteps: [],
         contextWindow: 0,
+        compaction: { status: "idle" },
         partialToolResults: {},
       },
     },

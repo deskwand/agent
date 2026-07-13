@@ -460,6 +460,63 @@ describe("SessionState unified store", () => {
     });
   });
 
+  describe("compaction state", () => {
+    it("keeps compaction state isolated by session", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().addSession(makeSession("s2"));
+
+      useAppStore.getState().setSessionCompaction("s1", "running");
+
+      expect(useAppStore.getState().sessionStates.s1.compaction.status).toBe(
+        "running",
+      );
+      expect(useAppStore.getState().sessionStates.s2.compaction.status).toBe(
+        "idle",
+      );
+    });
+
+    it("preserves a successful estimate when status is dismissed", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().setSessionCompaction("s1", "success", 39400);
+      useAppStore.getState().dismissSessionCompaction("s1");
+
+      expect(useAppStore.getState().sessionStates.s1.compaction).toEqual({
+        status: "idle",
+        estimatedTokens: 39400,
+      });
+    });
+
+    it("marks successful compaction without an estimate as unknown", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().setSessionCompaction("s1", "success");
+
+      expect(
+        useAppStore.getState().sessionStates.s1.compaction.estimatedTokens,
+      ).toBeNull();
+    });
+
+    it("clears the estimate when exact assistant usage arrives", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().setSessionCompaction("s1", "success", 39400);
+      useAppStore.getState().addMessage("s1", {
+        id: "a1",
+        sessionId: "s1",
+        role: "assistant",
+        content: [{ type: "text", text: "done" }],
+        timestamp: 1,
+        tokenUsage: {
+          input: 100,
+          output: 10,
+          totalPromptInput: 40100,
+        },
+      });
+
+      expect(useAppStore.getState().sessionStates.s1.compaction).toEqual({
+        status: "idle",
+      });
+    });
+  });
+
   describe("cross-session isolation", () => {
     it("should not affect other sessions when updating one", () => {
       useAppStore.getState().addSession(makeSession("s1"));

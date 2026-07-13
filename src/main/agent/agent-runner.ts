@@ -3899,6 +3899,10 @@ Tool routing:\n
             }
 
             case "compaction_start": {
+              this.sendToRenderer({
+                type: "session.compaction",
+                payload: resolveCompactionLifecyclePayload(session.id, event),
+              });
               log(
                 "[AgentRunner] Auto-compaction started, reason:",
                 event.reason,
@@ -3915,6 +3919,10 @@ Tool routing:\n
             }
 
             case "compaction_end": {
+              this.sendToRenderer({
+                type: "session.compaction",
+                payload: resolveCompactionLifecyclePayload(session.id, event),
+              });
               const status = event.aborted
                 ? "error"
                 : event.errorMessage
@@ -4337,25 +4345,54 @@ Tool routing:\n
       logWarn("[AgentRunner] No active pi session to compact for:", sessionId);
       return "skipped";
     }
+    this.sendToRenderer({
+      type: "session.compaction",
+      payload: { sessionId, status: "running" },
+    });
     try {
-      await cached.session.compact(instructions);
+      const result = await cached.session.compact(instructions);
+      this.sendToRenderer({
+        type: "session.compaction",
+        payload: {
+          sessionId,
+          status: "success",
+          ...(typeof result.estimatedTokensAfter === "number"
+            ? { estimatedTokens: result.estimatedTokensAfter }
+            : {}),
+        },
+      });
       log("[AgentRunner] Compaction completed for session:", sessionId);
       return "compacted";
-    } catch (e: any) {
-      if (e?.message?.includes?.("Already compacted")) {
+    } catch (error: unknown) {
+      const errorName =
+        error instanceof Error ? error.name : "UnknownCompactionError";
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes("Already compacted")) {
+        this.sendToRenderer({
+          type: "session.compaction",
+          payload: { sessionId, status: "success" },
+        });
         log("[AgentRunner] Session already compacted:", sessionId);
         return "already-compacted";
       }
       // Treat intentional abort as a normal completion
       if (
-        e?.message?.includes?.("abort") ||
-        e?.message?.includes?.("aborted") ||
-        e?.name === "AbortError"
+        errorMessage.toLowerCase().includes("abort") ||
+        errorName === "AbortError"
       ) {
+        this.sendToRenderer({
+          type: "session.compaction",
+          payload: { sessionId, status: "aborted" },
+        });
         log("[AgentRunner] Compaction aborted for session:", sessionId);
         return "compacted";
       }
-      throw e;
+      this.sendToRenderer({
+        type: "session.compaction",
+        payload: { sessionId, status: "failed" },
+      });
+      throw error;
     }
   }
 
@@ -4401,4 +4438,41 @@ Tool routing:\n
       payload: { sessionId, delta, turnId },
     });
   }
+}
+
+type CompactionLifecycleEvent =
+  | { type: "compaction_start" }
+  | {
+      type: "compaction_end";
+      aborted: boolean;
+      errorMessage?: string;
+      result?: { estimatedTokensAfter?: number };
+    };
+
+type CompactionLifecyclePayload = Extract<
+  ServerEvent,
+  { type: "session.compaction" }
+>["payload"];
+
+export function resolveCompactionLifecyclePayload(
+  sessionId: string,
+  event: CompactionLifecycleEvent,
+): CompactionLifecyclePayload {
+  if (event.type === "compaction_start") {
+    return { sessionId, status: "running" };
+  }
+
+  const status = event.aborted
+    ? "aborted"
+    : event.errorMessage
+      ? "failed"
+      : "success";
+  return {
+    sessionId,
+    status,
+    ...(status === "success" &&
+    typeof event.result?.estimatedTokensAfter === "number"
+      ? { estimatedTokens: event.result.estimatedTokensAfter }
+      : {}),
+  };
 }

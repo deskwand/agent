@@ -123,6 +123,19 @@ export interface TokenUsage {
   totalPromptInput: number;
 }
 
+export type CompactionStatus =
+  | "idle"
+  | "running"
+  | "success"
+  | "failed"
+  | "aborted";
+
+export interface CompactionState {
+  status: CompactionStatus;
+  /** undefined = no override, null = post-compaction usage unknown */
+  estimatedTokens?: number | null;
+}
+
 // Trace types for visualization
 export interface TraceStep {
   id: string;
@@ -597,6 +610,14 @@ export type ServerEvent =
   | {
       type: "session.contextInfo";
       payload: { sessionId: string; contextWindow: number };
+    }
+  | {
+      type: "session.compaction";
+      payload: {
+        sessionId: string;
+        status: Exclude<CompactionStatus, "idle">;
+        estimatedTokens?: number;
+      };
     }
   | {
       type: "navigate.to";

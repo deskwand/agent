@@ -402,6 +402,14 @@ function installSharedIpcBridge(): void {
           );
           break;
 
+        case "session.compaction":
+          store.setSessionCompaction(
+            event.payload.sessionId,
+            event.payload.status,
+            event.payload.estimatedTokens,
+          );
+          break;
+
         case "error":
           console.error("[useIPC] Server error:", event.payload.message);
           store.setLoading(false);

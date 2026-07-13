@@ -34,6 +34,7 @@ export interface ChatInputBottomBarProps {
   canStop: boolean;
   onStop: () => void;
   isSubmitting: boolean;
+  submitDisabled?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   onSteer?: () => void;
@@ -57,6 +58,7 @@ export function ChatInputBottomBar({
   canStop,
   onStop,
   isSubmitting,
+  submitDisabled = false,
   isExpanded = false,
   onToggleExpand,
   onSteer,
@@ -329,7 +331,7 @@ export function ChatInputBottomBar({
         <button
           type={canStop ? "button" : "submit"}
           onClick={canStop ? onStop : undefined}
-          disabled={!canStop && isSubmitting}
+          disabled={!canStop && (isSubmitting || submitDisabled)}
           className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-all duration-150 ${
             canStop
               ? "bg-accent text-background hover:bg-accent-hover animate-pulse"

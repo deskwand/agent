@@ -50,6 +50,7 @@ interface ChatInputProps {
   onCommand?: (action: string) => void;
   onInputChange?: (hasText: boolean) => void;
   disabled?: boolean;
+  submitDisabled?: boolean;
   placeholder: string;
   cardClassName: string;
   textareaClassName: string;
@@ -71,6 +72,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onCommand,
       onInputChange,
       disabled = false,
+      submitDisabled = false,
       placeholder,
       cardClassName,
       textareaClassName,
@@ -554,7 +556,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         attachedFiles.length === 0
       )
         return;
-      if (disabled) return;
+      if (disabled || submitDisabled) return;
 
       // --- /compact command interception ---
       if (currentPrompt.startsWith("/compact")) {
@@ -585,6 +587,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       pastedImages,
       attachedFiles,
       disabled,
+      submitDisabled,
       onSubmit,
       onCompact,
       isExpanded,

@@ -12,6 +12,10 @@ import {
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
+import {
+  formatContextPercentage,
+  resolveDisplayedContextUsage,
+} from "../utils/context-usage";
 import { MessageCard } from "./MessageCard";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import type {
@@ -243,24 +247,12 @@ export function ChatView() {
     turnId: string;
     text: string;
   } | null>(null);
-  const [compactionResult, setCompactionResult] = useState<
-    "success" | "failed" | null
-  >(null);
-
   // Clear steering event when active turn changes
   useEffect(() => {
     setSteeringEvent((prev) =>
       prev && activeTurn && prev.turnId === activeTurn.turnId ? prev : null,
     );
   }, [activeTurn?.turnId]);
-
-  // Auto-dismiss compaction result after timeout
-  useEffect(() => {
-    if (!compactionResult) return;
-    const timeoutMs = compactionResult === "success" ? 3000 : 5000;
-    const id = setTimeout(() => setCompactionResult(null), timeoutMs);
-    return () => clearTimeout(id);
-  }, [compactionResult]);
 
   const appConfig = useAppConfig();
   const contextWindow = useAppStore((s) =>
@@ -270,6 +262,18 @@ export function ChatView() {
   );
   const sessionState = useAppStore((s) =>
     activeSessionId ? s.sessionStates[activeSessionId] : undefined,
+  );
+  const compaction = sessionState?.compaction ?? { status: "idle" as const };
+  const isCompacting = compaction.status === "running";
+  const compactionResult =
+    compaction.status === "success" ||
+    compaction.status === "failed" ||
+    compaction.status === "aborted"
+      ? compaction.status
+      : null;
+  const setSessionCompaction = useAppStore((s) => s.setSessionCompaction);
+  const dismissSessionCompaction = useAppStore(
+    (s) => s.dismissSessionCompaction,
   );
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const updateSession = useAppStore((s) => s.updateSession);
@@ -285,8 +289,17 @@ export function ChatView() {
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInput, setHasInput] = useState(false);
   const isSteerRef = useRef(false);
-  const [isCompacting, setIsCompacting] = useState(false);
   const setGitChangeCount = useAppStore((s) => s.setGitChangeCount);
+
+  useEffect(() => {
+    if (!activeSessionId || !compactionResult) return;
+    const timeoutMs = compactionResult === "success" ? 3000 : 5000;
+    const id = setTimeout(
+      () => dismissSessionCompaction(activeSessionId),
+      timeoutMs,
+    );
+    return () => clearTimeout(id);
+  }, [activeSessionId, compactionResult, dismissSessionCompaction]);
 
   // Active session cwd for git diff detection
   const activeSessionCwd = useAppStore((s) => {
@@ -405,9 +418,14 @@ export function ChatView() {
     }
     return undefined;
   }, [messages]);
+  const displayedContextUsage = resolveDisplayedContextUsage(
+    lastInputTokens,
+    compaction.estimatedTokens,
+  );
+  const displayedContextTokens = displayedContextUsage.tokens;
   const contextUsagePercentage =
-    contextWindow && contextWindow > 0
-      ? Math.min((lastInputTokens / contextWindow) * 100, 100)
+    displayedContextTokens !== null && contextWindow && contextWindow > 0
+      ? Math.min((displayedContextTokens / contextWindow) * 100, 100)
       : 0;
   const contextRingColorClass =
     contextUsagePercentage > 95
@@ -415,30 +433,45 @@ export function ChatView() {
       : contextUsagePercentage > 80
         ? "text-warning"
         : "text-accent";
+  const showExactUsageDetails = !displayedContextUsage.isEstimated;
   const cacheHitRate =
+    showExactUsageDetails &&
     typeof latestAssistantUsage?.cacheRead === "number" &&
     typeof latestAssistantUsage?.totalPromptInput === "number" &&
     latestAssistantUsage.totalPromptInput > 0
       ? `${((latestAssistantUsage.cacheRead / latestAssistantUsage.totalPromptInput) * 100).toFixed(1)}%`
       : "--";
+  const formattedUsed =
+    displayedContextTokens === null
+      ? "--"
+      : formatTokenCount(displayedContextTokens);
   const contextUsageTooltip = t("chat.contextUsageTooltip", {
-    percentage: Math.round(contextUsagePercentage),
-    used: formatTokenCount(lastInputTokens),
+    percentage: formatContextPercentage(
+      displayedContextTokens === null
+        ? null
+        : displayedContextUsage.isEstimated
+          ? t("chat.approximateValue", {
+              value: Math.round(contextUsagePercentage),
+            })
+          : Math.round(contextUsagePercentage),
+    ),
+    used:
+      displayedContextUsage.isEstimated && displayedContextTokens !== null
+        ? t("chat.approximateValue", { value: formattedUsed })
+        : formattedUsed,
     total: formatTokenCount(contextWindow || 0),
-    input:
-      typeof latestAssistantUsage?.totalPromptInput === "number"
-        ? formatTokenCount(latestAssistantUsage.totalPromptInput)
-        : "--",
     output:
+      showExactUsageDetails &&
       typeof latestAssistantUsage?.output === "number"
         ? formatTokenCount(latestAssistantUsage.output)
         : "--",
     cacheRead:
+      showExactUsageDetails &&
       typeof latestAssistantUsage?.cacheRead === "number"
         ? formatTokenCount(latestAssistantUsage.cacheRead)
         : "--",
     promptNonCache:
-      typeof latestAssistantUsage?.input === "number"
+      showExactUsageDetails && typeof latestAssistantUsage?.input === "number"
         ? formatTokenCount(latestAssistantUsage.input)
         : "--",
     cacheHitRate,
@@ -1176,7 +1209,7 @@ export function ChatView() {
   }, [activeSession?.title, activeConnectors.length]);
 
   const handleSubmit = async (data: ChatInputSubmitData) => {
-    if (!activeSessionId || isSubmitting) return;
+    if (!activeSessionId || isSubmitting || isCompacting) return;
 
     const rawText = data.text.trim();
     if (!rawText && data.images.length === 0 && data.files.length === 0) return;
@@ -1256,9 +1289,6 @@ export function ChatView() {
       return;
     }
 
-    setCompactionResult(null);
-    setIsCompacting(true);
-
     try {
       const res = await window.electronAPI!.invoke<{
         success: boolean;
@@ -1268,7 +1298,7 @@ export function ChatView() {
         payload: { sessionId: activeSessionId, instructions },
       });
       if (!res?.success) {
-        setCompactionResult("failed");
+        setSessionCompaction(activeSessionId, "failed");
         setGlobalNotice({
           id: `compact-err-${Date.now()}`,
           type: "error",
@@ -1276,25 +1306,20 @@ export function ChatView() {
         });
         return;
       }
-      if (res?.status === "already-compacted") {
-        setCompactionResult("success");
-        return;
-      }
-      if (res?.status === "skipped") {
-        return;
+      if (res.status === "already-compacted") {
+        setSessionCompaction(activeSessionId, "success");
+      } else if (res.status === "skipped") {
+        dismissSessionCompaction(activeSessionId);
       }
     } catch {
-      setCompactionResult("failed");
+      setSessionCompaction(activeSessionId, "failed");
       setGlobalNotice({
         id: `compact-err-${Date.now()}`,
         type: "error",
         message: t("chat.compactFailed"),
       });
       return;
-    } finally {
-      setIsCompacting(false);
     }
-    setCompactionResult("success");
   };
 
   const handleCommand = (action: string) => {
@@ -1442,7 +1467,8 @@ export function ChatView() {
             onCompact={handleCompact}
             onCommand={handleCommand}
             onInputChange={setHasInput}
-            disabled={isSubmitting || isCompacting}
+            disabled={isSubmitting}
+            submitDisabled={isCompacting}
             isExpanded={isInputExpanded}
             onToggleExpand={() => setIsInputExpanded((v) => !v)}
             placeholder={t("chat.typeMessage")}
@@ -1517,6 +1543,7 @@ export function ChatView() {
                 canStop={canStop}
                 onStop={handleStop}
                 isSubmitting={isSubmitting}
+                submitDisabled={isCompacting}
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 onSteer={handleSteer}

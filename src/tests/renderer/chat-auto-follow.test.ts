@@ -83,6 +83,7 @@ function setInitialState(): void {
         executionClock: { startAt: null, endAt: null },
         traceSteps: [],
         contextWindow: 0,
+        compaction: { status: "idle" },
         partialToolResults: {},
       },
     },

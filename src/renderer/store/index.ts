@@ -12,6 +12,8 @@ import type {
   SandboxSetupProgress,
   SandboxSyncStatus,
   PartialToolResult,
+  CompactionState,
+  CompactionStatus,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
 import type { ImageSource } from "../components/ImageLightbox";
@@ -46,6 +48,7 @@ export interface SessionState {
   executionClock: SessionExecutionClock;
   traceSteps: TraceStep[];
   contextWindow: number;
+  compaction: CompactionState;
   partialToolResults: Record<string, PartialToolResult>;
   goalStatus?: {
     status:
@@ -75,6 +78,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   executionClock: { startAt: null, endAt: null },
   traceSteps: [],
   contextWindow: 0,
+  compaction: { status: "idle" },
   partialToolResults: {},
 };
 
@@ -293,6 +297,12 @@ interface AppState {
 
   // Context window actions
   setSessionContextWindow: (sessionId: string, contextWindow: number) => void;
+  setSessionCompaction: (
+    sessionId: string,
+    status: CompactionStatus,
+    estimatedTokens?: number,
+  ) => void;
+  dismissSessionCompaction: (sessionId: string) => void;
 
   setPartialToolResult: (
     sessionId: string,
@@ -548,6 +558,9 @@ export const useAppStore = create<AppState>((set) => ({
                   : ss.partialByTurn,
                 partialMessage: "",
                 partialThinking: "",
+                ...(message.tokenUsage
+                  ? { compaction: { status: "idle" } }
+                  : {}),
               }
             : {}),
         }),
@@ -939,6 +952,33 @@ export const useAppStore = create<AppState>((set) => ({
         contextWindow,
       }),
     })),
+
+  setSessionCompaction: (sessionId, status, estimatedTokens) =>
+    set((state) => {
+      const current = getSession(state.sessionStates, sessionId).compaction;
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          compaction: {
+            status,
+            ...(status === "success"
+              ? { estimatedTokens: estimatedTokens ?? null }
+              : current.estimatedTokens !== undefined
+                ? { estimatedTokens: current.estimatedTokens }
+                : {}),
+          },
+        }),
+      };
+    }),
+
+  dismissSessionCompaction: (sessionId) =>
+    set((state) => {
+      const current = getSession(state.sessionStates, sessionId).compaction;
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          compaction: { ...current, status: "idle" },
+        }),
+      };
+    }),
 
   setPartialToolResult: (sessionId, toolCallId, result) =>
     set((state) => {

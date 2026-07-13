@@ -7,6 +7,7 @@ export type ChatInputStatus =
   | { type: "compacting" }
   | { type: "compaction-success" }
   | { type: "compaction-failed" }
+  | { type: "compaction-aborted" }
   | { type: "steering"; text: string }
   | {
       type: "goal-active";
@@ -89,6 +90,10 @@ export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
       text = t("chat.compactFailed");
       toneClass = "text-text-muted";
       break;
+    case "compaction-aborted":
+      text = t("chat.compactAborted");
+      toneClass = "text-text-muted";
+      break;
     case "steering":
       text = `${t("steer.eventLabel")}: ${status.text}`;
       toneClass = "text-text-primary";
@@ -137,7 +142,7 @@ export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
 export function resolveInputStatus(params: {
   isSending: boolean;
   isCompacting: boolean;
-  compactionResult: "success" | "failed" | null;
+  compactionResult: "success" | "failed" | "aborted" | null;
   steeringText: string;
   shouldShowThinkingIndicator: boolean;
   isResponding: boolean;
@@ -155,6 +160,9 @@ export function resolveInputStatus(params: {
   if (params.isSending) return { type: "sending" };
   if (params.compactionResult === "failed") {
     return { type: "compaction-failed" };
+  }
+  if (params.compactionResult === "aborted") {
+    return { type: "compaction-aborted" };
   }
   if (params.steeringText) {
     return { type: "steering", text: params.steeringText };
