@@ -1239,8 +1239,9 @@ app
     app.quit();
   });
 
-// Flag to prevent double cleanup
+// Flags coordinating asynchronous cleanup with Electron's synchronous quit event
 let isCleaningUp = false;
+let isCleanupComplete = false;
 // Flag to skip async cleanup when quitting for auto-update
 // Squirrel.Mac's ShipIt process needs a clean, fast quit to replace the app bundle
 let isQuittingForUpdate = false;
@@ -1341,6 +1342,7 @@ async function cleanupSandboxResources(): Promise<void> {
   }
 
   closeLogFile();
+  isCleanupComplete = true;
 
   // pi-ai doesn't need proxy shutdown
 }
@@ -1364,6 +1366,13 @@ for (const sig of ["SIGTERM", "SIGINT"] as const) {
 
 // Handle app quit - before-quit (for macOS Cmd+Q and other quit methods)
 app.on("before-quit", async (event) => {
+  if (isCleaningUp) {
+    if (!isCleanupComplete && !isQuittingForUpdate) {
+      event.preventDefault();
+    }
+    return;
+  }
+
   if (!isCleaningUp) {
     // Quitting for auto-update: let quit flow naturally, Squirrel.Mac needs it fast
     if (isQuittingForUpdate) {
@@ -1392,8 +1401,6 @@ app.on("before-quit", async (event) => {
       tray = null;
       return;
     }
-    // Set the flag immediately before any await to prevent re-entrant cleanup
-    isCleaningUp = true;
     event.preventDefault();
     try {
       await cleanupSandboxResources();
@@ -1401,6 +1408,7 @@ app.on("before-quit", async (event) => {
     } catch (error) {
       logError("[App] before-quit cleanup failed, forcing quit:", error);
     }
+    isCleanupComplete = true;
     app.quit();
   }
 });
