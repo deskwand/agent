@@ -166,18 +166,8 @@ export const FileToolBlock = memo(function FileToolBlock({
       ? stripLineNumbers(toolResult.content) // read: from result, strip prefixes
       : "";
 
-  // Stats (for collapsed header)
+  // Stats (for expanded view)
   const lang = languageFromPath(path);
-  const lines = isWrite
-    ? inputContent
-      ? inputContent.split("\n").length
-      : 0
-    : toolResult
-      ? displayContent
-        ? displayContent.split("\n").length
-        : 0
-      : 0;
-  const sizeText = formatSize(displayContent.length);
 
   // Duration from trace steps
   let duration: number | undefined;
