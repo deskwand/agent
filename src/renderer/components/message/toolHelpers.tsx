@@ -87,8 +87,7 @@ export function getToolLabel(
   if (nameLower === "bash" || nameLower === "execute_command") {
     const cmd = String(inp.command || inp.cmd || "");
     if (cmd) {
-      const short = cmd.length > 60 ? cmd.substring(0, 57) + "..." : cmd;
-      return t("tool.labelBash", { command: short });
+      return t("tool.labelBash", { command: cmd });
     }
     return t("tool.actionBash");
   }

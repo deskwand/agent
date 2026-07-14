@@ -230,8 +230,8 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         ) : null}
 
         {/* Content cluster */}
-        <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
-          <span className="min-w-0 max-w-full truncate text-xs font-mono text-text-secondary">
+        <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
+          <span className="min-w-0 flex-1 truncate text-xs font-mono text-text-secondary">
             {label}
           </span>
           {!isRunning && collapsedSummary.kind === "diff" && (
