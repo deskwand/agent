@@ -7,6 +7,7 @@ export interface ProcessSummary {
   hasSearch: boolean;
   hasBrowse: boolean;
   commandCount: number;
+  hasGoal: boolean;
   usedToolCount: number;
 }
 
@@ -124,11 +125,18 @@ export function isProcessToolUse(item: ToolUseContent): boolean {
   return getToolKind(item.name) === "process";
 }
 
+const GOAL_TOOLS = new Set([
+  "get_goal",
+  "update_goal",
+  "goal_complete",
+]);
+
 function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   const readPaths = new Set<string>();
   let hasSearch = false;
   let hasBrowse = false;
   let commandCount = 0;
+  let hasGoal = false;
   let usedToolCount = 0;
 
   for (const item of items) {
@@ -161,6 +169,10 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
       commandCount += 1;
       countedAsSpecific = true;
     }
+    if (GOAL_TOOLS.has(lower)) {
+      hasGoal = true;
+      countedAsSpecific = true;
+    }
     if (!countedAsSpecific) {
       usedToolCount += 1;
     }
@@ -171,6 +183,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     hasSearch,
     hasBrowse,
     commandCount,
+    hasGoal,
     usedToolCount,
   };
 }
@@ -388,7 +401,7 @@ export function formatProcessSummaryLabel(
 
 export type ProcessSummaryFragment = {
   text: string;
-  iconType: "read" | "search" | "browse" | "command" | "tool";
+  iconType: "read" | "search" | "browse" | "command" | "goal" | "tool";
 };
 
 export function getProcessSummaryFragments(
@@ -426,6 +439,12 @@ export function getProcessSummaryFragments(
         },
       ),
       iconType: "command",
+    });
+  }
+  if (summary.hasGoal) {
+    fragments.push({
+      text: t("tool.grouped.managedGoal"),
+      iconType: "goal",
     });
   }
   if (summary.usedToolCount > 0) {

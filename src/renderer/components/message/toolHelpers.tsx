@@ -1,8 +1,9 @@
 // Utility functions for tool use/result display
 import type { TFunction } from "i18next";
 import {
-  Terminal,
-  FileCode,
+  MonitorPlay,
+  Target,
+  BookOpen,
   FileText,
   Pencil,
   Search,
@@ -18,9 +19,9 @@ import {
 export function getToolIcon(name: string) {
   const n = name.toLowerCase();
   if (n === "bash" || n === "execute_command")
-    return <Terminal className="w-3.5 h-3.5" />;
+    return <MonitorPlay className="w-3.5 h-3.5" />;
   if (n === "read" || n === "read_file")
-    return <FileCode className="w-3.5 h-3.5" />;
+    return <BookOpen className="w-3.5 h-3.5" />;
   if (n === "write" || n === "write_file")
     return <FileText className="w-3.5 h-3.5" />;
   if (n === "edit" || n === "edit_file")
@@ -34,9 +35,11 @@ export function getToolIcon(name: string) {
   if (n === "office_read_docx") return <FileText className="w-3.5 h-3.5" />;
   if (n === "office_read_pptx") return <Presentation className="w-3.5 h-3.5" />;
   if (n === "office_read_pdf") return <FileScan className="w-3.5 h-3.5" />;
+  if (n === "get_goal" || n === "update_goal" || n === "goal_complete")
+    return <Target className="w-3.5 h-3.5" />;
   if (n.startsWith("internal_browser"))
     return <Globe className="w-3.5 h-3.5" />;
-  return <Terminal className="w-3.5 h-3.5" />;
+  return <MonitorPlay className="w-3.5 h-3.5" />;
 }
 
 /** Shorten a file path to just filename or last 2 segments */
@@ -208,6 +211,16 @@ export function getToolLabel(
     return p
       ? t("tool.labelVisionDescribe", { path: shortenPath(p) })
       : t("tool.actionVisionDescribe");
+  }
+
+  if (nameLower === "get_goal") {
+    return t("tool.actionGetGoal");
+  }
+  if (nameLower === "update_goal") {
+    return t("tool.actionUpdateGoal");
+  }
+  if (nameLower === "goal_complete") {
+    return t("tool.actionGoalComplete");
   }
 
   return name;

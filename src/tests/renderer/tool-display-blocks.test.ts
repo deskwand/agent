@@ -85,6 +85,7 @@ describe("orderAssistantDisplayBlocks", () => {
           hasSearch: false,
           hasBrowse: false,
           commandCount: 0,
+          hasGoal: false,                                                                      
           usedToolCount: 0,
         },
       },
@@ -127,6 +128,7 @@ describe("buildToolDisplayBlocks", () => {
         hasSearch: true,
         hasBrowse: false,
         commandCount: 1,
+          hasGoal: false,                                                                      
         usedToolCount: 0,
       },
     });
@@ -195,6 +197,7 @@ describe("buildToolDisplayBlocks", () => {
         hasSearch: false,
         hasBrowse: false,
         commandCount: 0,
+          hasGoal: false,                                                                      
         usedToolCount: 0,
       },
     });
@@ -217,6 +220,7 @@ describe("buildToolDisplayBlocks", () => {
         hasSearch: false,
         hasBrowse: false,
         commandCount: 0,
+          hasGoal: false,                                                                      
         usedToolCount: 0,
       },
     });
@@ -248,6 +252,7 @@ describe("formatProcessSummaryLabel", () => {
           hasSearch: true,
           hasBrowse: false,
           commandCount: 1,
+          hasGoal: false,                                                                      
           usedToolCount: 0,
         },
         t,
@@ -263,6 +268,7 @@ describe("formatProcessSummaryLabel", () => {
           hasSearch: true,
           hasBrowse: false,
           commandCount: 0,
+          hasGoal: false,                                                                      
           usedToolCount: 0,
         },
         t,
@@ -282,6 +288,7 @@ describe("formatProcessSummaryLabel", () => {
         hasSearch: false,
         hasBrowse: true,
         commandCount: 0,
+          hasGoal: false,                                                                      
         usedToolCount: 0,
       },
     });
@@ -302,6 +309,7 @@ describe("formatProcessSummaryLabel", () => {
     expect(blocks[0]).toMatchObject({
       type: "process-summary",
       summary: {
+          hasGoal: false,                                                                      
         usedToolCount: 1,
       },
     });

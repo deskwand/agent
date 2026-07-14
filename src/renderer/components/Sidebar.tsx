@@ -497,8 +497,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                     <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
                   </span>
                 ) : slot && slot.completed && session.status !== "running" ? (
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center opacity-30 hover:opacity-70 focus-visible:opacity-70 cursor-pointer transition-opacity">
                   <Check
-                    className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 text-accent/60 hover:text-accent cursor-pointer transition-colors"
+                    className="w-3.5 h-3.5 text-accent"
                     role="button"
                     tabIndex={0}
                     aria-label={t("sidebar.dismiss")}
@@ -514,6 +515,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       }
                     }}
                   />
+                  </span>
                 ) : !slot && session.status === "running" ? (
                   <span
                     className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center"
@@ -623,7 +625,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       e.stopPropagation();
                       setShowProjectActions((prev) => !prev);
                     }}
-                    className="w-5 h-8 rounded-r-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors border-l border-surface-hover flex items-center justify-center"
+                    className="w-5 h-8 rounded-r-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
                   >
                     <ChevronDown className="w-3 h-3" />
                   </button>

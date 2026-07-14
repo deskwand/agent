@@ -3,12 +3,12 @@ import {
   Square,
   X,
   Copy,
-  SidebarOpen,
-  SidebarClose,
+  PanelLeft,
+  Columns2,
   FolderOpen,
-  GitCompare,
+  Diff,
   Globe,
-  Layers,
+  Package,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
@@ -69,7 +69,7 @@ export function Titlebar() {
         className="relative w-7 h-7 rounded-md flex items-center justify-center hover:bg-surface-hover transition-colors"
         title={t("artifactPanel.toggle", "产物面板")}
       >
-        <Layers
+        <Package
           className={`w-3.5 h-3.5 ${
             isArtifactPanelOpen ? "text-accent" : "text-text-muted"
           }`}
@@ -120,16 +120,11 @@ export function Titlebar() {
         className="relative w-7 h-7 rounded-md flex items-center justify-center hover:bg-surface-hover transition-colors"
         title={isReviewOpen ? "关闭代码审查" : "代码审查"}
       >
-        <GitCompare
+        <Diff
           className={`w-3.5 h-3.5 ${
             isReviewOpen ? "text-accent" : "text-text-muted"
           }`}
         />
-        {gitChangeCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] rounded-full bg-accent text-[0.625rem] font-bold text-background px-1 leading-none">
-            {gitChangeCount}
-          </span>
-        )}
       </button>
     </div>
   );
@@ -154,9 +149,9 @@ export function Titlebar() {
                 }
               >
                 {sidebarCollapsed ? (
-                  <SidebarOpen className="w-3.5 h-3.5" />
+                  <PanelLeft className="w-3.5 h-3.5" />
                 ) : (
-                  <SidebarClose className="w-3.5 h-3.5" />
+                  <Columns2 className="w-3.5 h-3.5" />
                 )}
               </button>
             </div>

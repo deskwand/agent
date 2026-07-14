@@ -3,10 +3,11 @@ import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronRight,
-  FileCode,
+  BookOpen,
   Search,
   Globe,
-  Terminal,
+  MonitorPlay,
+  Target,
   Wrench,
 } from "lucide-react";
 import type { Message, ContentBlock } from "../../types";
@@ -21,11 +22,12 @@ const PROCESS_ICON_MAP: Record<
   ProcessSummaryFragment["iconType"],
   React.ReactNode
 > = {
-  read: <FileCode className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
+  read: <BookOpen className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   search: <Search className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   browse: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  command: <Terminal className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
+  command: <MonitorPlay className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   tool: <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
+  goal: <Target className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
 };
 
 interface ProcessSummaryBlockProps {
