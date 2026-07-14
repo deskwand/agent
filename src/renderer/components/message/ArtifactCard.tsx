@@ -1,13 +1,12 @@
 import { memo, useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Copy, Check, Undo2, File, FileCode, Image } from "lucide-react";
+import { Copy, Check, Undo2, File, Paperclip } from "lucide-react";
 import { useAppStore } from "../../store";
 import { useIPC } from "../../hooks/useIPC";
 import type { Session } from "../../types";
 import type { ResultFileEntry } from "../../utils/tool-display-blocks";
 import { shortenPath } from "./toolHelpers";
-import { IMAGE_EXTS, CODE_LIKE_EXTS } from "../../utils/file-types";
 import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import { FilePreviewModal } from "../FilePreviewModal";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -25,13 +24,8 @@ function isNew(f: ResultFileEntry): boolean {
   return f.writes > 0 && f.edits === 0;
 }
 
-function getFileIcon(filePath: string) {
-  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
-  if (IMAGE_EXTS.has(ext))
-    return <Image className="w-4 h-4 shrink-0 text-sky-400" />;
-  if (CODE_LIKE_EXTS.has(ext))
-    return <FileCode className="w-4 h-4 shrink-0 text-accent" />;
-  return <File className="w-4 h-4 shrink-0 text-text-muted" />;
+function getFileIcon() {
+  return <File className="h-4 w-4 shrink-0 text-text-muted" />;
 }
 
 export const ArtifactCard = memo(function ArtifactCard({
@@ -87,6 +81,8 @@ export const ArtifactCard = memo(function ArtifactCard({
 
   const editedFiles = files.filter(isEdited);
   const newFiles = files.filter(isNew);
+  const artifactFileCount = editedFiles.length + newFiles.length;
+  const isContained = artifactFileCount >= 3;
 
   if (editedFiles.length === 0 && newFiles.length === 0) {
     return null;
@@ -253,16 +249,22 @@ export const ArtifactCard = memo(function ArtifactCard({
 
   return (
     <>
-      <div className="rounded-xl border border-border bg-surface px-4 py-3.5 shadow-soft">
+      <div
+        className={
+          isContained
+            ? "rounded-xl border border-border-subtle px-4 py-3.5"
+            : "border-t border-border-subtle pt-3"
+        }
+      >
         {/* Title */}
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-accent">
-          <span aria-hidden="true">✨</span>
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-secondary">
+          <Paperclip aria-hidden="true" className="h-4 w-4 text-text-muted" />
           {t("artifactCard.title")}
         </div>
 
         {/* Edited files group */}
         {editedFiles.length > 0 ? (
-          <div className="mb-2 rounded-lg bg-surface-muted px-3 py-2">
+          <div className="mb-2">
             <div className="mb-2 text-[11px] font-medium text-text-muted">
               {t("artifactCard.editedFiles")}
             </div>
@@ -295,7 +297,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                     }
                   >
                     <span className="min-w-0 flex-1 truncate flex items-center gap-1.5">
-                      {getFileIcon(file.path)}
+                      {getFileIcon()}
                       {shortenPath(file.path)}
                     </span>
                     <span
@@ -321,7 +323,11 @@ export const ArtifactCard = memo(function ArtifactCard({
                           e.stopPropagation();
                           handleRevertFile(file);
                         }}
-                        title={isUndoDisabled ? t("artifactCard.desktopOnly") : t("artifactCard.revertFile")}
+                        title={
+                          isUndoDisabled
+                            ? t("artifactCard.desktopOnly")
+                            : t("artifactCard.revertFile")
+                        }
                         disabled={isUndoDisabled}
                       >
                         <Undo2 className="h-3 w-3" />
@@ -336,7 +342,7 @@ export const ArtifactCard = memo(function ArtifactCard({
 
         {/* New files group */}
         {newFiles.length > 0 ? (
-          <div className="mb-2 rounded-lg bg-success/5 px-3 py-2">
+          <div className="mb-2">
             <div className="mb-2 text-[11px] font-medium text-text-muted">
               {t("artifactCard.newFiles")}
             </div>
@@ -349,7 +355,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                     className={`group flex items-center justify-between rounded-md py-1.5 pl-2 pr-2 text-sm transition-colors outline-none ${
                       reverted
                         ? "cursor-default text-text-muted line-through"
-                        : "cursor-pointer hover:bg-success/10 active:bg-success/15 text-success focus-visible:ring-2 focus-visible:ring-accent"
+                        : "cursor-pointer hover:bg-surface-hover active:bg-surface-active text-text-secondary focus-visible:ring-2 focus-visible:ring-accent"
                     }`}
                     onClick={() => handleClickFile(file)}
                     onKeyDown={(e) => {
@@ -369,7 +375,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                     }
                   >
                     <span className="min-w-0 flex-1 truncate flex items-center gap-1.5">
-                      {getFileIcon(file.path)}
+                      {getFileIcon()}
                       {shortenPath(file.path)}
                     </span>
                     <span
@@ -395,7 +401,11 @@ export const ArtifactCard = memo(function ArtifactCard({
                           e.stopPropagation();
                           handleRevertFile(file);
                         }}
-                        title={isUndoDisabled ? t("artifactCard.desktopOnly") : t("artifactCard.revertFile")}
+                        title={
+                          isUndoDisabled
+                            ? t("artifactCard.desktopOnly")
+                            : t("artifactCard.revertFile")
+                        }
                         disabled={isUndoDisabled}
                       >
                         <Undo2 className="h-3 w-3" />
@@ -413,7 +423,7 @@ export const ArtifactCard = memo(function ArtifactCard({
           {isLatestRound && isGitRepo ? (
             <button
               type="button"
-              className="font-medium text-error transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+              className="font-medium text-text-muted transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
               onClick={handleRevertRound}
               disabled={isUndoDisabled || revertedFiles.size === files.length}
               title={isUndoDisabled ? t("artifactCard.desktopOnly") : undefined}
