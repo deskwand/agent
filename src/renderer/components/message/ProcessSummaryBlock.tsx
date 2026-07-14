@@ -82,7 +82,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
       </button>
 
       {expanded ? (
-        <div className="mt-1 max-h-[400px] overflow-y-auto">
+        <div className="mt-1 max-h-[400px] overflow-y-auto pl-5 space-y-1">
           {block.items.map((item) => (
             <ToolUseBlock
               key={item.id}
