@@ -237,11 +237,7 @@ export const FileToolBlock = memo(function FileToolBlock({
             <span className="whitespace-nowrap text-xs text-text-muted">
               · {isWrite ? t("tool.writeWriting") : t("tool.readReading")}
             </span>
-          ) : (
-            <span className="whitespace-nowrap text-xs text-text-muted">
-              · {t("tool.writeLinesBytes", { lines, size: sizeText })}
-            </span>
-          )}
+          ) : null}
           <span
             className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-text-muted transition-opacity ${
               expanded
