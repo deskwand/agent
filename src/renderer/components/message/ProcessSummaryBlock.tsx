@@ -16,7 +16,7 @@ import {
   type DisplayBlock,
   type ProcessSummaryFragment,
 } from "../../utils/tool-display-blocks";
-import { ToolUseBlock } from "./ToolUseBlock";
+import { CompactToolRow } from "./CompactToolRow";
 
 const PROCESS_ICON_MAP: Record<
   ProcessSummaryFragment["iconType"],
@@ -82,14 +82,13 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
       </button>
 
       {expanded ? (
-        <div className="mt-0.5 space-y-1 pl-5">
+        <div className="mt-1 max-h-[400px] overflow-y-auto">
           {block.items.map((item) => (
-            <ToolUseBlock
+            <CompactToolRow
               key={item.id}
               block={item}
               allBlocks={allBlocks}
               message={message}
-              showIcon={false}
             />
           ))}
         </div>
