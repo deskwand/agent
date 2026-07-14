@@ -6,6 +6,13 @@ import { ChatView } from "../../renderer/components/ChatView";
 import { useAppStore } from "../../renderer/store";
 import type { Message, MountedPath, Session } from "../../renderer/types";
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: "en" },
+  }),
+}));
+
 vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => ({
     continueSession: vi.fn(),
@@ -90,10 +97,11 @@ function setInitialState(): void {
   });
 }
 
-describe("ChatView streaming auto-follow", () => {
+describe("ChatView auto-follow", () => {
   let container: HTMLDivElement;
   let root: Root;
-  let scrollIntoViewDescriptor: PropertyDescriptor | undefined;
+  let resizeCallbacks: Map<Element, ResizeObserverCallback>;
+  let scrollToDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
     (
@@ -102,10 +110,32 @@ describe("ChatView streaming auto-follow", () => {
     useAppStore.setState(useAppStore.getInitialState());
     setInitialState();
 
+    resizeCallbacks = new Map();
     class ResizeObserverMock {
-      observe() {}
-      disconnect() {}
-      unobserve() {}
+      private readonly targets = new Set<Element>();
+
+      constructor(private readonly callback: ResizeObserverCallback) {}
+
+      observe(target: Element) {
+        this.targets.add(target);
+        resizeCallbacks.set(target, this.callback);
+      }
+
+      disconnect() {
+        for (const target of this.targets) {
+          if (resizeCallbacks.get(target) === this.callback) {
+            resizeCallbacks.delete(target);
+          }
+        }
+        this.targets.clear();
+      }
+
+      unobserve(target: Element) {
+        this.targets.delete(target);
+        if (resizeCallbacks.get(target) === this.callback) {
+          resizeCallbacks.delete(target);
+        }
+      }
     }
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -113,14 +143,23 @@ describe("ChatView streaming auto-follow", () => {
       return 1;
     });
     vi.stubGlobal("cancelAnimationFrame", () => {});
-    scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+    scrollToDescriptor = Object.getOwnPropertyDescriptor(
       HTMLElement.prototype,
-      "scrollIntoView",
+      "scrollTo",
     );
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
+    Object.defineProperty(HTMLElement.prototype, "scrollTo", {
       configurable: true,
       writable: true,
-      value: () => {},
+      value: function scrollTo(
+        this: HTMLElement,
+        optionsOrX?: ScrollToOptions | number,
+        y?: number,
+      ) {
+        const requestedTop =
+          typeof optionsOrX === "number" ? (y ?? 0) : (optionsOrX?.top ?? 0);
+        const maxScrollTop = Math.max(0, this.scrollHeight - this.clientHeight);
+        this.scrollTop = Math.min(Math.max(0, requestedTop), maxScrollTop);
+      },
     });
 
     container = document.createElement("div");
@@ -132,19 +171,90 @@ describe("ChatView streaming auto-follow", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.unstubAllGlobals();
-    if (scrollIntoViewDescriptor) {
+    vi.useRealTimers();
+    if (scrollToDescriptor) {
       Object.defineProperty(
         HTMLElement.prototype,
-        "scrollIntoView",
-        scrollIntoViewDescriptor,
+        "scrollTo",
+        scrollToDescriptor,
       );
     } else {
       delete (
         HTMLElement.prototype as unknown as {
-          scrollIntoView?: HTMLElement["scrollIntoView"];
+          scrollTo?: HTMLElement["scrollTo"];
         }
-      ).scrollIntoView;
+      ).scrollTo;
     }
+  });
+
+  it("keeps an idle conversation pinned after content grows during programmatic scrolling", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+
+    const messagesContainer = scrollContainer!.firstElementChild;
+    expect(messagesContainer).not.toBeNull();
+    expect(resizeCallbacks.has(messagesContainer!)).toBe(true);
+
+    scrollHeight = 1120;
+    await act(async () => {
+      resizeCallbacks.get(messagesContainer!)?.([], {} as ResizeObserver);
+      await vi.advanceTimersByTimeAsync(16);
+    });
+
+    const distanceToBottom =
+      scrollHeight - scrollContainer!.scrollTop - scrollContainer!.clientHeight;
+    expect(distanceToBottom).toBeLessThanOrEqual(1);
+  });
+
+  it("does not pull an idle conversation back down after the user scrolls upward", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -20 }),
+      );
+    });
+
+    const messagesContainer = scrollContainer!.firstElementChild;
+    expect(messagesContainer).not.toBeNull();
+    scrollHeight = 1120;
+    await act(async () => {
+      resizeCallbacks.get(messagesContainer!)?.([], {} as ResizeObserver);
+      await vi.advanceTimersByTimeAsync(16);
+    });
+
+    expect(scrollContainer!.scrollTop).toBe(500);
   });
 
   it("stops following streaming output as soon as the user scrolls upward", async () => {

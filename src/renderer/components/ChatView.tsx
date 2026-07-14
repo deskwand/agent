@@ -1103,9 +1103,9 @@ export function ChatView() {
     if (!container || !messagesContainer) return;
 
     const resizeObserver = new ResizeObserver(() => {
-      // Don't interfere with ongoing scrolls
-      if (!isScrollingRef.current && autoFollowRef.current) {
-        // Scroll to bottom when content height changes while auto-follow is active
+      // Keep correcting layout growth while auto-follow is active, even if a
+      // previous programmatic scroll is still settling.
+      if (autoFollowRef.current) {
         scrollToBottom("auto", false);
       }
     });
