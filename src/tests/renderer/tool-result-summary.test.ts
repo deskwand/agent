@@ -172,38 +172,37 @@ describe("getCollapsedToolSummary", () => {
   });
 
   // --- webfetch ---
-  it("counts chars for webfetch", () => {
+  it("returns none for webfetch", () => {
     expect(getCollapsedToolSummary("webfetch", "hello world", false)).toEqual({
-      kind: "chars",
-      count: 11,
+      kind: "none",
     });
   });
 
   // --- vision_describe ---
-  it("shows line count for vision_describe description", () => {
+  it("returns none for vision_describe", () => {
     expect(
       getCollapsedToolSummary(
         "vision_describe",
         "[Image description of screenshot.png]\n\nA dark-themed code editor with syntax highlighting visible.",
         false,
       ),
-    ).toEqual({ kind: "lines", count: 1 });
+    ).toEqual({ kind: "none" });
   });
 
-  it("counts multiple lines for vision_describe output", () => {
+  it("returns none for multi-line vision_describe output", () => {
     expect(
       getCollapsedToolSummary(
         "vision_describe",
         "[Image description of test.png]\n\nLine one.\nLine two.\nLine three.",
         false,
       ),
-    ).toEqual({ kind: "lines", count: 3 });
+    ).toEqual({ kind: "none" });
   });
 
-  it("counts lines without prefix for vision_describe fallback", () => {
+  it("returns none for vision_describe without prefix", () => {
     expect(
       getCollapsedToolSummary("vision_describe", "Line one.\nLine two.", false),
-    ).toEqual({ kind: "lines", count: 2 });
+    ).toEqual({ kind: "none" });
   });
 
   it("returns none for empty vision_describe output", () => {

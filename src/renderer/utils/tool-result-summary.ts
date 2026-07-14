@@ -98,12 +98,6 @@ function isVisionDescribeTool(name: string): boolean {
   return name.toLowerCase() === "vision_describe";
 }
 
-/** Strip the [Image description of xxx]\n\n prefix from vision_describe output */
-function stripVisionDescribePrefix(text: string): string {
-  const match = text.match(/^\[Image description of .+?\]\n\n/);
-  return match ? text.slice(match[0].length) : text;
-}
-
 function getFirstContentLine(text: string, maxLen = 80): string {
   const firstLine = text.split(/\r?\n/)[0] ?? "";
   if (firstLine.length > maxLen) {
@@ -182,6 +176,11 @@ export function getCollapsedToolSummary(
 
   const toolNameLower = (toolName || "").toLowerCase();
 
+  // Office document reads — no summary needed
+  if (toolNameLower.startsWith("office_read_")) {
+    return { kind: "none" };
+  }
+
   // File read — show first line of content
   if (isFileReadTool(toolNameLower)) {
     return { kind: "text", text: getFirstContentLine(normalized) };
@@ -207,16 +206,14 @@ export function getCollapsedToolSummary(
     return { kind: "matches", count: matches };
   }
 
-  // Webfetch — character count
+  // Webfetch — no summary needed
   if (isFetchTool(toolNameLower)) {
-    return { kind: "chars", count: normalized.length };
+    return { kind: "none" };
   }
 
-  // Vision describe — show line count (avoid duplicating label text in summary)
+  // Vision describe — no summary needed
   if (isVisionDescribeTool(toolNameLower)) {
-    const description = stripVisionDescribePrefix(normalized);
-    const lineCount = description.split(/\r?\n/).filter((l) => l.trim()).length;
-    return { kind: "lines", count: lineCount || 1 };
+    return { kind: "none" };
   }
 
   // Default — first line preview for short output, line count for long
