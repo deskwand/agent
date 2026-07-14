@@ -146,9 +146,9 @@ export const ToolResultBlock = memo(function ToolResultBlock({
         ) : (
           <CheckCircle2 className="w-3.5 h-3.5 pt-0.5 text-text-muted flex-shrink-0" />
         )}
-        <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
+        <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
           <span
-            className={`min-w-0 max-w-full truncate text-xs font-mono ${
+            className={`min-w-0 flex-1 truncate text-xs font-mono ${
               block.isError ? "text-error" : "text-text-secondary"
             }`}
           >

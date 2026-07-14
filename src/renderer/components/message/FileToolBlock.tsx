@@ -226,11 +226,11 @@ export const FileToolBlock = memo(function FileToolBlock({
         ) : null}
 
         {/* Label: action + path + stats */}
-        <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
+        <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
           <span className="whitespace-nowrap text-xs text-text-muted">
             {t(isWrite ? "tool.actionWrite" : "tool.actionRead")}
           </span>
-          <span className="min-w-0 max-w-full truncate text-xs font-mono text-text-secondary">
+          <span className="min-w-0 flex-1 truncate text-xs font-mono text-text-secondary">
             · {shortenPath(path)}
           </span>
           {isRunning ? (
