@@ -4,6 +4,7 @@ import { useAppStore } from "../store";
 import type { TaskSlot } from "../store";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import { useIPC } from "../hooks/useIPC";
+import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 import {
   Trash2,
   Settings,
@@ -144,6 +145,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     onConfirm: () => void;
   } | null>(null);
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
+  useBrowserOcclusion(Boolean(deleteConfirm) || createProjectModalOpen);
   const [projectName, setProjectName] = useState("");
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const sessionLoadSeqRef = useRef(0);

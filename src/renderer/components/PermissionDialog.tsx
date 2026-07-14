@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useIPC } from "../hooks/useIPC";
 import type { PermissionRequest } from "../types";
 import { Shield, X, Check, AlertTriangle } from "lucide-react";
+import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 
 interface PermissionDialogProps {
   permission: PermissionRequest;
@@ -11,6 +12,7 @@ interface PermissionDialogProps {
 export function PermissionDialog({ permission }: PermissionDialogProps) {
   const { t } = useTranslation();
   const { respondToPermission } = useIPC();
+  useBrowserOcclusion(true);
   const [pendingAlwaysAllow, setPendingAlwaysAllow] = useState(false);
 
   const getToolDescription = (toolName: string): string => {

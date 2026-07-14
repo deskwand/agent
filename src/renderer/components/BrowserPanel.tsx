@@ -70,6 +70,11 @@ export function BrowserPanel({ width }: { width: number }) {
     syncBounds();
   }, [width, syncBounds]);
 
+  // show() reattaches WebContentsView as invisible until bounds are applied.
+  useEffect(() => {
+    if (status.visible) syncBounds();
+  }, [status.visible, syncBounds]);
+
   // Listen for state changes from main process
   useEffect(() => {
     const unsub = window.electronAPI?.browser.onStateChanged((s) => {

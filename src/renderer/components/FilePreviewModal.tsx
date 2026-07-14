@@ -10,6 +10,7 @@ import hljs from "highlight.js";
 import { List } from "react-window";
 import type { ReadFileResult } from "../utils/file-preview";
 import { getLangFromExt } from "../utils/file-preview";
+import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 
 // Re-export for external consumers
 export type { ReadFileResult };
@@ -170,6 +171,7 @@ export function FilePreviewModal({
   onClose,
 }: FilePreviewModalProps) {
   const { t } = useTranslation();
+  useBrowserOcclusion(isOpen);
   const [result, setResult] = useState<ReadFileResult | null>(null);
   const [loading, setLoading] = useState(false);
 

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SandboxSetupProgress, SandboxSetupPhase } from "../types";
 import { getSandboxSetupDisplayText } from "../utils/sandbox-i18n";
+import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 
 interface Props {
   progress: SandboxSetupProgress | null;
@@ -30,6 +31,7 @@ const phaseConfig: Record<SandboxSetupPhase, { icon: string }> = {
 export function SandboxSetupDialog({ progress, onComplete }: Props) {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(true);
+  useBrowserOcclusion(Boolean(progress) && isVisible);
   const [fadeOut, setFadeOut] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 

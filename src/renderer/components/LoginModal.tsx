@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { CloudApiClient } from "../services/cloud-api";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import type { CloudConfig } from "../types";
+import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -66,6 +67,7 @@ export function LoginModal({
   onLoginSuccess,
 }: LoginModalProps) {
   const { t } = useTranslation();
+  useBrowserOcclusion(isOpen);
   const [step, setStep] = useState<LoginStep>("social");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");

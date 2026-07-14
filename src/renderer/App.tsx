@@ -38,6 +38,10 @@ import { useImageLightboxState } from "./store/selectors";
 import { PanelErrorBoundary } from "./components/PanelErrorBoundary";
 import type { AppConfig } from "./types";
 import type { GlobalNoticeAction } from "./store";
+import {
+  shouldShowBrowserView,
+  shouldSuppressVisibleBrowser,
+} from "./utils/browser-visibility";
 
 const ChatView = lazy(() =>
   import("./components/ChatView").then((module) => ({
@@ -108,6 +112,9 @@ function App() {
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
+  const hasBrowserOcclusion = useAppStore(
+    (state) => state.browserOcclusionIds.size > 0,
+  );
   const isReviewOpen = useAppStore((s) => s.isReviewOpen);
   const isArtifactPanelOpen = useAppStore((s) => s.isArtifactPanelOpen);
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
@@ -212,31 +219,40 @@ function App() {
     isReviewOpen ||
     showConfigModal;
 
-  useEffect(() => {
-    if (isFullScreenView) {
-      window.electronAPI?.browser.hide();
-    } else if (rightPanelMode === "browser") {
-      browserDismissedRef.current = false; // reset on explicit open
+  useLayoutEffect(() => {
+    if (
+      shouldShowBrowserView(
+        rightPanelMode,
+        isFullScreenView,
+        hasBrowserOcclusion,
+      )
+    ) {
+      browserDismissedRef.current = false;
       window.electronAPI?.browser.show();
     } else {
       window.electronAPI?.browser.hide();
     }
-  }, [rightPanelMode, isFullScreenView]);
+  }, [rightPanelMode, isFullScreenView, hasBrowserOcclusion]);
 
   // Auto-open browser panel when MCP triggers navigation (browser becomes visible),
   // but only if the user hasn't manually dismissed it.
   useEffect(() => {
     const unsub = window.electronAPI?.browser.onStateChanged((status) => {
-      if (
-        status.visible &&
-        rightPanelMode !== "browser" &&
-        !browserDismissedRef.current
-      ) {
+      if (!status.visible) return;
+      if (rightPanelMode !== "browser" && !browserDismissedRef.current) {
         toggleBrowserPanel();
+      }
+      if (shouldSuppressVisibleBrowser(isFullScreenView, hasBrowserOcclusion)) {
+        window.electronAPI?.browser.hide();
       }
     });
     return unsub;
-  }, [rightPanelMode, toggleBrowserPanel]);
+  }, [
+    rightPanelMode,
+    isFullScreenView,
+    hasBrowserOcclusion,
+    toggleBrowserPanel,
+  ]);
 
   // Stable 50%-width calculator for browser panel
   const calcHalfWidth = useCallback(() => {

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
+import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 
 interface UpdateConfirmDialogProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export function UpdateConfirmDialog({
   onCancel,
 }: UpdateConfirmDialogProps) {
   const { t } = useTranslation();
+  useBrowserOcclusion(isOpen);
 
   if (!isOpen) return null;
 

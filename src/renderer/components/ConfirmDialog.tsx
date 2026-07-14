@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   const { t } = useTranslation();
+  useBrowserOcclusion(isOpen);
 
   if (!isOpen) return null;
 

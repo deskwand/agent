@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useIPC } from "../hooks/useIPC";
 import type { SudoPasswordRequest } from "../types";
 import { Shield, X, Play } from "lucide-react";
+import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 
 interface SudoPasswordDialogProps {
   request: SudoPasswordRequest;
@@ -11,6 +12,7 @@ interface SudoPasswordDialogProps {
 export function SudoPasswordDialog({ request }: SudoPasswordDialogProps) {
   const { t } = useTranslation();
   const { respondToSudoPassword } = useIPC();
+  useBrowserOcclusion(true);
   // Use ref so the password never lives in React state / re-render cycle
   const passwordRef = useRef<string>("");
   const inputRef = useRef<HTMLInputElement>(null);

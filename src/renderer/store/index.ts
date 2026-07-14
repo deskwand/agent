@@ -188,6 +188,11 @@ interface AppState {
   openLightbox: (images: ImageSource[], index?: number, loading?: boolean, source?: 'pasted' | 'attached' | 'message') => void;
   closeLightbox: () => void;
 
+  // Blocking renderer modals that must cover the native browser view
+  browserOcclusionIds: ReadonlySet<string>;
+  acquireBrowserOcclusion: (id: string) => void;
+  releaseBrowserOcclusion: (id: string) => void;
+
   // Browser fullscreen
   isBrowserFullscreen: boolean;
   browserFullscreenSnapshot: {
@@ -437,6 +442,7 @@ export const useAppStore = create<AppState>((set) => ({
   lightboxIndex: 0,
   lightboxLoading: false,
   lightboxSource: null as 'pasted' | 'attached' | 'message' | null,
+  browserOcclusionIds: new Set<string>(),
   isBrowserFullscreen: false,
   browserFullscreenSnapshot: null as {
     rightPanelMode: "files" | "browser" | null;
@@ -1019,6 +1025,22 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   closeLightbox: () =>
     set({ lightboxImages: [], lightboxIndex: 0, lightboxLoading: false, lightboxSource: null }),
+
+  acquireBrowserOcclusion: (id) =>
+    set((state) => {
+      if (state.browserOcclusionIds.has(id)) return state;
+      const browserOcclusionIds = new Set(state.browserOcclusionIds);
+      browserOcclusionIds.add(id);
+      return { browserOcclusionIds };
+    }),
+
+  releaseBrowserOcclusion: (id) =>
+    set((state) => {
+      if (!state.browserOcclusionIds.has(id)) return state;
+      const browserOcclusionIds = new Set(state.browserOcclusionIds);
+      browserOcclusionIds.delete(id);
+      return { browserOcclusionIds };
+    }),
 
   // Browser fullscreen actions
   enterBrowserFullscreen: () =>
