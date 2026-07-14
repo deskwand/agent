@@ -35,13 +35,7 @@ function makeAnsiConverter() {
   });
 }
 
-/** Truncate a command string for the collapsed header */
-function truncateCmd(cmd: string, maxLen = 40): string {
-  return cmd.length > maxLen ? cmd.substring(0, maxLen - 1) + "..." : cmd;
-}
-
-/**
- * Check whether a bash tool input can be rendered by BashToolBlock.
+/** Check whether a bash tool input can be rendered by BashToolBlock.
  * Exported so ToolUseBlock can decide whether to delegate.
  */
 export function canHandleBashInput(
@@ -178,9 +172,9 @@ export const BashToolBlock = memo(function BashToolBlock({
         ) : null}
 
         {/* Label: $ command · exit N */}
-        <div className="min-w-0 flex flex-1 flex-wrap items-baseline gap-x-1 gap-y-0.5">
-          <span className="min-w-0 max-w-full truncate text-xs font-mono text-text-secondary">
-            $ {truncateCmd(cmd)}
+        <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
+          <span className="min-w-0 flex-1 truncate text-xs font-mono text-text-secondary">
+            $ {cmd}
           </span>
           {isRunning ? (
             <span className="whitespace-nowrap text-xs text-text-muted">
