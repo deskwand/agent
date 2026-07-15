@@ -1,10 +1,19 @@
+// @vitest-environment jsdom
+
+import React, { act } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, it, expect } from "vitest";
 import {
   getTurnPreviewText,
   getTickOffsets,
   getTickStyles,
+  MessageNavRail,
 } from "../../renderer/components/MessageNavRail";
 import type { Message } from "../../renderer/types";
+
+(
+  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
+).IS_REACT_ACT_ENVIRONMENT = true;
 
 function msg(blocks: Message["content"]): Message {
   return {
@@ -119,6 +128,81 @@ describe("getTickOffsets", () => {
     const result = getTickOffsets(300, 2);
     // needed=10, top=(300-10)/2=145, offsets=[145,155]
     expect(result).toEqual([145, 155]);
+  });
+});
+
+describe("MessageNavRail", () => {
+  it("uses an opaque surface for the hover preview", async () => {
+    const originalClientHeight = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "clientHeight",
+    );
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", {
+      configurable: true,
+      value: 200,
+    });
+
+    const originalResizeObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    } as unknown as typeof ResizeObserver;
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    try {
+      await act(async () => {
+        root.render(
+          React.createElement(MessageNavRail, {
+            ticks: [
+              {
+                messageId: "message-1",
+                userPreview: "User preview",
+                assistantPreview: "Assistant preview",
+              },
+            ],
+            scrollContainerRef: { current: null },
+          }),
+        );
+      });
+
+      const rail = container.querySelector<HTMLElement>('[aria-hidden="true"]');
+      expect(rail).not.toBeNull();
+
+      await act(async () => {
+        rail?.dispatchEvent(
+          new MouseEvent("mousemove", { bubbles: true, clientY: 100 }),
+        );
+      });
+
+      const preview = container.querySelector<HTMLElement>(".shadow-elevated");
+      expect(preview).not.toBeNull();
+      expect(preview?.classList.contains("bg-surface")).toBe(true);
+      expect(preview?.classList.contains("bg-surface/90")).toBe(false);
+      expect(preview?.classList.contains("backdrop-blur-sm")).toBe(false);
+    } finally {
+      await act(async () => root.unmount());
+      container.remove();
+      if (originalClientHeight) {
+        Object.defineProperty(
+          HTMLElement.prototype,
+          "clientHeight",
+          originalClientHeight,
+        );
+      } else {
+        delete (HTMLElement.prototype as { clientHeight?: number })
+          .clientHeight;
+      }
+      if (originalResizeObserver) {
+        globalThis.ResizeObserver = originalResizeObserver;
+      } else {
+        delete (globalThis as { ResizeObserver?: typeof ResizeObserver })
+          .ResizeObserver;
+      }
+    }
   });
 });
 

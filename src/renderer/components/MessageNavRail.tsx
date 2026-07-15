@@ -179,7 +179,7 @@ const TickMark = memo(function TickMark({
     <>
       {isPrimary && userPreview && (
         <div
-          className="absolute z-30 bg-surface/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-elevated text-xs w-[280px] max-h-[7.5rem] overflow-hidden pointer-events-none"
+          className="absolute z-30 bg-surface rounded-lg px-2.5 py-1.5 shadow-elevated text-xs w-[280px] max-h-[7.5rem] overflow-hidden pointer-events-none"
           style={{ left: HALF_ZONE + 26, top: cardTop }}
         >
           <div className="text-text-secondary whitespace-normal leading-relaxed">
