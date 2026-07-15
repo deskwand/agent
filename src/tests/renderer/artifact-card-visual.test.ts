@@ -98,6 +98,7 @@ describe("ArtifactCard visual hierarchy", () => {
       root.render(
         React.createElement(ArtifactCard, {
           files,
+          videoReferences: [],
           isLatestRound: true,
         }),
       );

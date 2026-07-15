@@ -119,4 +119,38 @@ describe('splitTextByFileMentions', () => {
       { type: 'text', value: ' - 描述' },
     ]);
   });
+
+  it('detects an explicit relative path', () => {
+    expect(splitTextByFileMentions('open ./output/clip.mp4')).toContainEqual({
+      type: 'file',
+      value: './output/clip.mp4',
+    });
+  });
+
+  it('detects a workspace-relative path', () => {
+    expect(splitTextByFileMentions('open output/clips/clip.webm')).toContainEqual({
+      type: 'file',
+      value: 'output/clips/clip.webm',
+    });
+  });
+
+  it('detects a quoted absolute path', () => {
+    expect(
+      splitTextByFileMentions('open "/Users/demo/My Video/clip.mp4"'),
+    ).toContainEqual({
+      type: 'file',
+      value: '/Users/demo/My Video/clip.mp4',
+    });
+  });
+
+  it('detects a path containing a hidden directory', () => {
+    expect(
+      splitTextByFileMentions(
+        'open /Users/demo/.deskwand/default_working_dir/clip.mp4',
+      ),
+    ).toContainEqual({
+      type: 'file',
+      value: '/Users/demo/.deskwand/default_working_dir/clip.mp4',
+    });
+  });
 });

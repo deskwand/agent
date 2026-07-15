@@ -4,15 +4,18 @@ import type { ServerEvent } from "../src/renderer/types";
 type IpcEventHandler = (event: unknown, data: ServerEvent) => void;
 type ExposedElectronApi = {
   on: (callback: (event: ServerEvent) => void) => () => void;
+  getVideoSourceUrl: (filePath: string) => Promise<string>;
 };
 
 describe("preload electronAPI.on", () => {
   let serverEventHandler: IpcEventHandler | null = null;
   let exposedApi: ExposedElectronApi | undefined;
+  let ipcInvoke: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
     serverEventHandler = null;
     exposedApi = undefined;
+    ipcInvoke = vi.fn(async () => "deskwand-media://local/signed");
     vi.resetModules();
 
     vi.doMock("electron", () => {
@@ -25,7 +28,7 @@ describe("preload electronAPI.on", () => {
         once: vi.fn(),
         send: vi.fn(),
         sendSync: vi.fn(() => null),
-        invoke: vi.fn(async () => null),
+        invoke: ipcInvoke,
         removeAllListeners: vi.fn(),
         removeListener: vi.fn(
           (channel: string, handler: IpcEventHandler | null) => {
@@ -49,6 +52,16 @@ describe("preload electronAPI.on", () => {
     });
 
     await import("../src/preload/index");
+  });
+
+  it("requests a signed video source from the main process", async () => {
+    await expect(exposedApi?.getVideoSourceUrl("/tmp/clip.mp4")).resolves.toBe(
+      "deskwand-media://local/signed",
+    );
+    expect(ipcInvoke).toHaveBeenCalledWith(
+      "video.getSourceUrl",
+      "/tmp/clip.mp4",
+    );
   });
 
   it("keeps remaining subscribers active after another subscriber unsubscribes", () => {

@@ -7,6 +7,7 @@ import {
 } from "../../shared/local-file-path";
 
 const markdownInlineLinkPattern = /(?<!!)\[([^\]]+)\]\(\s*([\s\S]*?)\s*\)/g;
+const markdownInlineImagePattern = /!\[[^\]]*\]\(\s*[\s\S]*?\s*\)/g;
 const unixAbsolutePathPattern = /^\//;
 const webLikeUrlPattern = /^(?:https?:\/\/|mailto:|file:\/\/|#)/i;
 const httpLikeUrlPattern = /^(?:https?:\/\/|mailto:|#)/i;
@@ -53,6 +54,19 @@ function toFileUrl(pathValue: string): string | null {
 const escapeMarkdown = (text: string): string => {
   return text.replace(/([\\`*_{}[\]()#+\-!|])/g, "\\$1");
 };
+
+export function extractMarkdownLocalFileHrefs(markdown: string): string[] {
+  if (!markdown) return [];
+  return Array.from(markdown.matchAll(markdownInlineLinkPattern), (match) =>
+    match[2]?.trim(),
+  ).filter((href): href is string => Boolean(href));
+}
+
+export function stripMarkdownInlineLinks(markdown: string): string {
+  return markdown
+    .replace(markdownInlineImagePattern, "")
+    .replace(markdownInlineLinkPattern, "");
+}
 
 export function normalizeLocalFileMarkdownLinks(markdown: string): string {
   if (!markdown) {

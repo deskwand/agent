@@ -123,6 +123,13 @@ import {
   partitionArtifactPaths,
   toRepoRelativePath,
 } from "./git-artifact-utils";
+import {
+  createVideoSourceUrl,
+  installVideoProtocol,
+  registerVideoProtocolScheme,
+} from "./video-protocol";
+
+registerVideoProtocolScheme();
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -972,6 +979,8 @@ function sendToRenderer(event: ServerEvent) {
 app
   .whenReady()
   .then(async () => {
+    await installVideoProtocol();
+
     // Smoke test mode: verify the app can start, then exit cleanly
     if (process.argv.includes("--smoke-test")) {
       log("[SmokeTest] App launched successfully in smoke test mode");
@@ -1941,6 +1950,17 @@ ipcMain.handle(
     return listRecentWorkspaceFiles(cwd, sinceMs, limit);
   },
 );
+
+ipcMain.handle("video.getSourceUrl", (event, filePath: string) => {
+  if (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender.id !== mainWindow.webContents.id
+  ) {
+    throw new Error("Unauthorized video source request");
+  }
+  return createVideoSourceUrl(filePath);
+});
 
 ipcMain.handle("dialog.selectFiles", async () => {
   const result = await dialog.showOpenDialog({

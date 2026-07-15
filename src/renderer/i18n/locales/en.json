@@ -1157,6 +1157,13 @@
     "fileTooLarge": "File too large (max 10MB)",
     "unsupportedType": "Cannot preview this file type"
   },
+  "videoPlayer": {
+    "loading": "Loading video…",
+    "externalOnly": "Open this video with the system player",
+    "playbackFailed": "This video cannot be played here. The file may be missing or use an unsupported codec.",
+    "openExternal": "Open in system player",
+    "previewLabel": "Video preview: {{name}}"
+  },
   "about": {
     "title": "About DeskWand",
     "checkUpdate": "Check for Updates",
@@ -1310,6 +1317,7 @@
   },
   "artifactCard": {
     "title": "Round Artifacts",
+    "videos": "Videos",
     "editedFiles": "Edited Files",
     "newFiles": "New Files",
     "reviewChanges": "Review Changes",

@@ -1,5 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
-import { X, ExternalLink, FileCode, Image, Loader2 } from "lucide-react";
+import {
+  X,
+  ExternalLink,
+  FileCode,
+  Image,
+  Loader2,
+  Video,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -11,6 +18,8 @@ import { List } from "react-window";
 import type { ReadFileResult } from "../utils/file-preview";
 import { getLangFromExt } from "../utils/file-preview";
 import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
+import { getVideoPlaybackKind } from "../../shared/video-file";
+import { VideoPlayer } from "./VideoPlayer";
 
 // Re-export for external consumers
 export type { ReadFileResult };
@@ -36,6 +45,7 @@ interface FilePreviewModalProps {
   isOpen: boolean;
   filePath: string;
   fileName: string;
+  autoPlay?: boolean;
   onClose: () => void;
 }
 
@@ -168,15 +178,23 @@ export function FilePreviewModal({
   isOpen,
   filePath,
   fileName,
+  autoPlay = false,
   onClose,
 }: FilePreviewModalProps) {
   const { t } = useTranslation();
   useBrowserOcclusion(isOpen);
   const [result, setResult] = useState<ReadFileResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const videoKind = getVideoPlaybackKind(fileName);
+  const isVideo = videoKind !== "none";
 
   useEffect(() => {
     if (!isOpen) return;
+    if (isVideo) {
+      setLoading(false);
+      setResult(null);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setResult(null);
@@ -198,7 +216,7 @@ export function FilePreviewModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, filePath, t]);
+  }, [isOpen, isVideo, filePath, t]);
 
   const handleOpenExternal = useCallback(async () => {
     if (window.electronAPI?.openPath) {
@@ -219,7 +237,9 @@ export function FilePreviewModal({
         <div className="flex items-center justify-between border-b border-border-muted bg-background/88 px-6 py-4 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border-subtle bg-background-secondary/88 text-accent shrink-0">
-              {result?.type === "image" ? (
+              {isVideo ? (
+                <Video className="h-5 w-5" />
+              ) : result?.type === "image" ? (
                 <Image className="h-5 w-5" />
               ) : (
                 <FileCode className="h-5 w-5" />
@@ -243,7 +263,14 @@ export function FilePreviewModal({
 
         {/* Body */}
         <div className="flex-1 flex flex-col overflow-hidden bg-background/70 p-6">
-          {loading ? (
+          {isVideo ? (
+            <VideoPlayer
+              filePath={filePath}
+              fileName={fileName}
+              showOpenExternal={false}
+              autoPlay={autoPlay}
+            />
+          ) : loading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="w-6 h-6 animate-spin text-text-muted mr-2" />
               <span className="text-sm text-text-muted">

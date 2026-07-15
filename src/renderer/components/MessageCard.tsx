@@ -14,6 +14,7 @@ import {
   orderAssistantDisplayBlocks,
 } from "../utils/tool-display-blocks";
 import type { ResultFileEntry } from "../utils/tool-display-blocks";
+import type { VideoReference } from "../utils/video-reference";
 import { ContentBlockView } from "./message/ContentBlockView";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
@@ -26,6 +27,8 @@ interface MessageCardProps {
   isLatestRound?: boolean;
   /** Files changed in this turn (aggregated by ChatView) */
   artifactFiles?: ResultFileEntry[];
+  /** Local videos referenced by assistant text in this turn. */
+  videoReferences?: VideoReference[];
   /** Hide process summaries when ChatView renders a turn-level summary. */
   suppressProcessSummaries?: boolean;
 }
@@ -62,6 +65,7 @@ export const MessageCard = memo(function MessageCard({
   isStreaming,
   isLatestRound = false,
   artifactFiles = [],
+  videoReferences = [],
   suppressProcessSummaries = false,
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
@@ -300,8 +304,12 @@ export const MessageCard = memo(function MessageCard({
               />
             );
           })}
-          {artifactFiles.length > 0 ? (
-            <ArtifactCard files={artifactFiles} isLatestRound={isLatestRound} />
+          {artifactFiles.length > 0 || videoReferences.length > 0 ? (
+            <ArtifactCard
+              files={artifactFiles}
+              videoReferences={videoReferences}
+              isLatestRound={isLatestRound}
+            />
           ) : null}
           {showActions && renderActionBar()}
         </div>

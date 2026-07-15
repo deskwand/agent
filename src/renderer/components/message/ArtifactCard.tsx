@@ -6,13 +6,19 @@ import { useAppStore } from "../../store";
 import { useIPC } from "../../hooks/useIPC";
 import type { Session } from "../../types";
 import type { ResultFileEntry } from "../../utils/tool-display-blocks";
+import {
+  normalizeVideoReferencePath,
+  type VideoReference,
+} from "../../utils/video-reference";
 import { shortenPath } from "./toolHelpers";
 import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import { FilePreviewModal } from "../FilePreviewModal";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { VideoArtifactThumbnail } from "./VideoArtifactThumbnail";
 
 interface ArtifactCardProps {
   files: ResultFileEntry[];
+  videoReferences: VideoReference[];
   isLatestRound: boolean;
 }
 
@@ -30,6 +36,7 @@ function getFileIcon() {
 
 export const ArtifactCard = memo(function ArtifactCard({
   files,
+  videoReferences = [],
   isLatestRound,
 }: ArtifactCardProps) {
   const { t } = useTranslation();
@@ -47,7 +54,10 @@ export const ArtifactCard = memo(function ArtifactCard({
   const setReviewOpen = useAppStore((s) => s.setReviewOpen);
   const setReviewTargetFile = useAppStore((s) => s.setReviewTargetFile);
 
-  const [previewFile, setPreviewFile] = useState<ResultFileEntry | null>(null);
+  const [previewFile, setPreviewFile] = useState<{
+    path: string;
+    autoPlay?: boolean;
+  } | null>(null);
   const [revertedFiles, setRevertedFiles] = useState<Set<string>>(new Set());
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [revertConfirm, setRevertConfirm] = useState<
@@ -79,12 +89,28 @@ export const ArtifactCard = memo(function ArtifactCard({
       });
   }, [activeSessionCwd, isElectron]);
 
-  const editedFiles = files.filter(isEdited);
-  const newFiles = files.filter(isNew);
-  const artifactFileCount = editedFiles.length + newFiles.length;
+  const resolvePath = (filePath: string) =>
+    activeSessionCwd
+      ? resolvePathAgainstWorkspace(filePath, activeSessionCwd)
+      : filePath;
+  const videoPathKeys = new Set(
+    videoReferences.map((reference) =>
+      normalizeVideoReferencePath(reference.path),
+    ),
+  );
+  const isDuplicateVideoRow = (file: ResultFileEntry) =>
+    videoPathKeys.has(normalizeVideoReferencePath(resolvePath(file.path)));
+  const editedFiles = files
+    .filter(isEdited)
+    .filter((file) => !isDuplicateVideoRow(file));
+  const newFiles = files
+    .filter(isNew)
+    .filter((file) => !isDuplicateVideoRow(file));
+  const artifactFileCount =
+    editedFiles.length + newFiles.length + videoReferences.length;
   const isContained = artifactFileCount >= 3;
 
-  if (editedFiles.length === 0 && newFiles.length === 0) {
+  if (artifactFileCount === 0) {
     return null;
   }
 
@@ -177,9 +203,6 @@ export const ArtifactCard = memo(function ArtifactCard({
     setRevertConfirm(null);
   }, [revertConfirm, doRevert, files]);
 
-  const resolvePath = (p: string) =>
-    activeSessionCwd ? resolvePathAgainstWorkspace(p, activeSessionCwd) : p;
-
   const handleClickFile = useCallback(
     async (file: ResultFileEntry) => {
       if (revertedFiles.has(file.path)) return;
@@ -261,6 +284,26 @@ export const ArtifactCard = memo(function ArtifactCard({
           <Paperclip aria-hidden="true" className="h-4 w-4 text-text-muted" />
           {t("artifactCard.title")}
         </div>
+
+        {/* Video references group */}
+        {videoReferences.length > 0 ? (
+          <div className="mb-3">
+            <div className="mb-2 text-[11px] font-medium text-text-muted">
+              {t("artifactCard.videos")}
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {videoReferences.map((reference) => (
+                <VideoArtifactThumbnail
+                  key={normalizeVideoReferencePath(reference.path)}
+                  reference={reference}
+                  onOpen={() =>
+                    setPreviewFile({ path: reference.path, autoPlay: true })
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         {/* Edited files group */}
         {editedFiles.length > 0 ? (
@@ -420,7 +463,7 @@ export const ArtifactCard = memo(function ArtifactCard({
 
         {/* Bottom actions */}
         <div className="flex items-center justify-between text-[11px]">
-          {isLatestRound && isGitRepo ? (
+          {files.length > 0 && isLatestRound && isGitRepo ? (
             <button
               type="button"
               className="font-medium text-text-muted transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
@@ -433,7 +476,7 @@ export const ArtifactCard = memo(function ArtifactCard({
           ) : (
             <span />
           )}
-          {isGitRepo && hasGitChanges ? (
+          {files.length > 0 && isGitRepo && hasGitChanges ? (
             <button
               type="button"
               className="font-medium text-accent transition-colors hover:text-accent-hover"
@@ -473,9 +516,8 @@ export const ArtifactCard = memo(function ArtifactCard({
           <FilePreviewModal
             isOpen
             filePath={previewFile.path}
-            fileName={
-              previewFile.path.split("/").pop() || previewFile.path
-            }
+            fileName={previewFile.path.split(/[/\\]/).pop() || previewFile.path}
+            autoPlay={previewFile.autoPlay}
             onClose={() => setPreviewFile(null)}
           />,
           document.body,

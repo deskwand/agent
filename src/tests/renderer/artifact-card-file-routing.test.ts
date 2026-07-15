@@ -95,6 +95,7 @@ describe("ArtifactCard edited-file routing", () => {
       root.render(
         React.createElement(ArtifactCard, {
           files: [editedFile],
+          videoReferences: [],
           isLatestRound: false,
         }),
       );

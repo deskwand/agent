@@ -146,6 +146,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Select files using native dialog
   selectFiles: (): Promise<string[]> =>
     ipcRenderer.invoke("dialog.selectFiles"),
+  getVideoSourceUrl: (filePath: string): Promise<string> =>
+    ipcRenderer.invoke("video.getSourceUrl", filePath),
 
   // List directory contents for file browser
   listDirectory: (
@@ -659,6 +661,7 @@ declare global {
       openExternal: (url: string) => Promise<boolean>;
       showItemInFolder: (filePath: string, cwd?: string) => Promise<boolean>;
       selectFiles: () => Promise<string[]>;
+      getVideoSourceUrl: (filePath: string) => Promise<string>;
       listDirectory: (
         dirPath: string,
       ) => Promise<

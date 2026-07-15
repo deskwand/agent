@@ -35,6 +35,10 @@ import type {
   ProcessSummaryDisplayBlock,
   ResultFileEntry,
 } from "../utils/tool-display-blocks";
+import {
+  extractVideoReferences,
+  type VideoReference,
+} from "../utils/video-reference";
 import { Plug, ChevronsDown, Loader2 } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
@@ -706,11 +710,13 @@ export function ChatView() {
     // collect artifact files, and build one turn-level process summary anchor.
     const turnEndIds = new Set<string>();
     const turnArtifactFiles = new Map<string, ResultFileEntry[]>();
+    const turnVideoReferences = new Map<string, VideoReference[]>();
     const turnProcessSummaries = new Map<string, ProcessSummaryDisplayBlock>();
     const turnsWithProcessSummary = new Set<string>();
     let latestAssistantId: string | null = null;
     let currentTurnToolUses: ToolUseContent[] = [];
     let currentTurnProcessToolUses: ToolUseContent[] = [];
+    let currentTurnAssistantText: string[] = [];
 
     for (let i = 0; i < mergedMessages.length; i++) {
       const msg = mergedMessages[i];
@@ -724,6 +730,9 @@ export function ChatView() {
           : [];
         const toolUses = blocks.filter(
           (b): b is ToolUseContent => b.type === "tool_use",
+        );
+        currentTurnAssistantText.push(
+          ...blocks.filter((b) => b.type === "text").map((b) => b.text),
         );
         currentTurnToolUses.push(...toolUses);
         currentTurnProcessToolUses.push(...toolUses.filter(isProcessToolUse));
@@ -741,6 +750,13 @@ export function ChatView() {
               collectResultFiles(currentTurnToolUses),
             );
           }
+          const videoReferences = extractVideoReferences(
+            currentTurnAssistantText.join("\n"),
+            activeSessionCwd,
+          );
+          if (videoReferences.length > 0) {
+            turnVideoReferences.set(msgId, videoReferences);
+          }
           if (
             currentTurnProcessToolUses.length > 0 &&
             typeof msg.turnId === "string" &&
@@ -754,6 +770,7 @@ export function ChatView() {
           }
           currentTurnToolUses = [];
           currentTurnProcessToolUses = [];
+          currentTurnAssistantText = [];
         }
       }
     }
@@ -773,6 +790,7 @@ export function ChatView() {
         isLatestRound:
           msgId.startsWith("partial-") || msgId === latestAssistantId,
         artifactFiles: turnArtifactFiles.get(msgId) ?? [],
+        videoReferences: turnVideoReferences.get(msgId) ?? [],
         turnProcessSummary:
           message.role === "assistant"
             ? turnProcessSummaries.get(msgId)
@@ -783,7 +801,7 @@ export function ChatView() {
           turnsWithProcessSummary.has(turnId),
       };
     });
-  }, [mergedMessages, hoistedProcessSummaryTurnIds]);
+  }, [mergedMessages, hoistedProcessSummaryTurnIds, activeSessionCwd]);
 
   const railTicks = useMemo<RailTickEntry[]>(() => {
     const entries: RailTickEntry[] = [];
@@ -1415,6 +1433,7 @@ export function ChatView() {
                   isStreaming,
                   isLatestRound,
                   artifactFiles,
+                  videoReferences,
                   turnProcessSummary,
                   suppressProcessSummaries,
                 }) => (
@@ -1430,6 +1449,7 @@ export function ChatView() {
                       isStreaming={isStreaming}
                       isLatestRound={isLatestRound}
                       artifactFiles={artifactFiles}
+                      videoReferences={videoReferences}
                       suppressProcessSummaries={suppressProcessSummaries}
                     />
                   </div>

@@ -125,6 +125,11 @@ export const contextBridge = {
   exposeInMainWorld: noop,
 };
 
+export const protocol = {
+  registerSchemesAsPrivileged: noop,
+  handle: noopAsync,
+};
+
 const electron = {
   app,
   ipcMain,
@@ -136,6 +141,7 @@ const electron = {
   BrowserWindow,
   Tray,
   contextBridge,
+  protocol,
 };
 
 export default electron;

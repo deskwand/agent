@@ -1155,6 +1155,13 @@
     "fileTooLarge": "文件过大（最大 10MB）",
     "unsupportedType": "不支持预览此文件类型"
   },
+  "videoPlayer": {
+    "loading": "正在加载视频…",
+    "externalOnly": "使用系统播放器打开此视频",
+    "playbackFailed": "无法播放此视频，文件可能不存在或使用了不支持的编码",
+    "openExternal": "使用系统播放器打开",
+    "previewLabel": "视频预览：{{name}}"
+  },
   "about": {
     "title": "关于 DeskWand",
     "checkUpdate": "检查更新",
@@ -1306,6 +1313,7 @@
   },
   "artifactCard": {
     "title": "本轮产物",
+    "videos": "视频",
     "editedFiles": "编辑的文件",
     "newFiles": "新建的文件",
     "reviewChanges": "审核变更",
