@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Zap, Sparkles, List } from "lucide-react";
+import { Bot, List, Package, Pencil, Plug, Sparkles, Zap } from "lucide-react";
 import type { Skill } from "../types";
 import type { SlashCommand, SlashItem } from "../slash-commands";
 
@@ -22,19 +22,32 @@ const TAB_LIST: { key: SlashTab; i18n: string }[] = [
   { key: "skills", i18n: "slashTabSkills" },
 ];
 
-const SKILL_TYPE_COLORS: Record<string, string> = {
-  builtin: "text-accent bg-accent/10",
-  mcp: "text-mcp bg-mcp/10",
-  custom: "text-success bg-success/10",
-  agent: "text-warning bg-warning/10",
+const SKILL_TYPE_BACKGROUNDS: Record<Skill["type"], string> = {
+  builtin: "bg-accent/10",
+  mcp: "bg-mcp/10",
+  custom: "bg-success/10",
+  agent: "bg-warning/10",
 };
 
-const SKILL_TYPE_ICONS: Record<string, string> = {
-  builtin: "📦",
-  mcp: "🔌",
-  custom: "✏️",
-  agent: "🤖",
+const SKILL_TYPE_ICONS: Record<Skill["type"], typeof Package> = {
+  builtin: Package,
+  mcp: Plug,
+  custom: Pencil,
+  agent: Bot,
 };
+
+function SkillTypeBadge({ type }: { type: Skill["type"] }) {
+  const SkillTypeIcon = SKILL_TYPE_ICONS[type];
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] text-text-muted px-1.5 py-0.5 rounded ${SKILL_TYPE_BACKGROUNDS[type] ?? "bg-surface-muted"}`}
+    >
+      {SkillTypeIcon && <SkillTypeIcon className="w-3 h-3 text-text-muted" />}
+      {type}
+    </span>
+  );
+}
 
 export const SLASH_MENU_CONTAINER_CLASS =
   "absolute left-0 right-0 z-30 rounded-xl border border-border bg-background shadow-soft flex flex-col h-[28rem] max-h-[60vh]";
@@ -211,13 +224,7 @@ export function SlashMenu({
                       icon={
                         <Sparkles className="w-4 h-4 text-text-muted flex-shrink-0" />
                       }
-                      badge={
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded ${SKILL_TYPE_COLORS[type] ?? "text-text-muted bg-surface-muted"}`}
-                        >
-                          {SKILL_TYPE_ICONS[type] ?? ""} {type}
-                        </span>
-                      }
+                      badge={<SkillTypeBadge type={type} />}
                     />
                   );
                 })}
@@ -253,13 +260,7 @@ export function SlashMenu({
                 icon={
                   <Sparkles className="w-4 h-4 text-text-muted flex-shrink-0" />
                 }
-                badge={
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded ${SKILL_TYPE_COLORS[type] ?? "text-text-muted bg-surface-muted"}`}
-                  >
-                    {SKILL_TYPE_ICONS[type] ?? ""} {type}
-                  </span>
-                }
+                badge={<SkillTypeBadge type={type} />}
               />
             );
           })
