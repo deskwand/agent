@@ -119,6 +119,12 @@ describe("Sidebar project groups", () => {
     return button as HTMLButtonElement;
   }
 
+  function findButton(text: string): HTMLButtonElement | undefined {
+    return Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === text,
+    );
+  }
+
   function makeProjectSessions(
     projectName: string,
     count: number,
@@ -304,9 +310,9 @@ describe("Sidebar project groups", () => {
     expect("removeTaskSlot" in state).toBe(false);
   });
 
-  it("shows five ordinary sessions and expands or contracts the overflow", async () => {
+  it("expands ordinary sessions in batches of five and contracts to five", async () => {
     await render(
-      Array.from({ length: 7 }, (_, index) =>
+      Array.from({ length: 12 }, (_, index) =>
         session(`ordinary-${index + 1}`, {
           title: `Ordinary ${index + 1}`,
           updatedAt: 100 - index,
@@ -317,10 +323,7 @@ describe("Sidebar project groups", () => {
     expect(container.textContent).toContain("Ordinary 5");
     expect(container.textContent).not.toContain("Ordinary 6");
 
-    const showMore = Array.from(container.querySelectorAll("button")).find(
-      (button) =>
-        button.textContent === i18n.t("sidebar.showMoreSessions", { count: 2 }),
-    );
+    let showMore = findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }));
     expect(showMore).toBeTruthy();
     expect(showMore?.className).toContain("text-text-muted");
     expect(showMore?.className).toContain("hover:text-text-secondary");
@@ -331,13 +334,24 @@ describe("Sidebar project groups", () => {
     expect(showMore?.className).not.toContain("text-accent");
     expect(showMore?.className).not.toContain("hover:bg-accent");
     expect(showMore?.className).not.toContain("focus-visible:outline-none");
-    await act(async () => showMore?.click());
-    expect(container.textContent).toContain("Ordinary 7");
 
-    const showLess = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === i18n.t("sidebar.showLessSessions"),
+    await act(async () => showMore?.click());
+    expect(container.textContent).toContain("Ordinary 10");
+    expect(container.textContent).not.toContain("Ordinary 11");
+    expect(findButton(i18n.t("sidebar.showLessSessions"))).toBeTruthy();
+
+    showMore = findButton(i18n.t("sidebar.showMoreSessions", { count: 2 }));
+    expect(showMore).toBeTruthy();
+    await act(async () => showMore?.click());
+    expect(container.textContent).toContain("Ordinary 12");
+    expect(findButton(i18n.t("sidebar.showLessSessions"))).toBeTruthy();
+    expect(
+      findButton(i18n.t("sidebar.showMoreSessions", { count: 1 })),
+    ).toBeUndefined();
+
+    await act(async () =>
+      findButton(i18n.t("sidebar.showLessSessions"))?.click(),
     );
-    await act(async () => showLess?.click());
     expect(container.textContent).not.toContain("Ordinary 6");
   });
 
@@ -400,7 +414,7 @@ describe("Sidebar project groups", () => {
     );
   });
 
-  it("reveals an older active session but allows explicit contraction", async () => {
+  it("keeps an older active project open but limits its sessions to five", async () => {
     useAppStore.setState({ activeSessionId: "project-4-7" });
     await render([
       ...makeProjectSessions("project-1", 1, 500),
@@ -412,66 +426,92 @@ describe("Sidebar project groups", () => {
     expect(projectToggle("/work/project-4").getAttribute("aria-expanded")).toBe(
       "true",
     );
-    expect(projectSection("/work/project-4").textContent).toContain(
-      "project-4 chat 7",
-    );
-
-    const showLess = Array.from(
-      projectSection("/work/project-4").querySelectorAll("button"),
-    ).find(
-      (button) => button.textContent === i18n.t("sidebar.showLessSessions"),
-    );
-    await act(async () => showLess?.click());
     expect(projectSection("/work/project-4").textContent).not.toContain(
       "project-4 chat 7",
     );
 
-    await act(async () => projectToggle("/work/project-4").click());
-    expect(projectToggle("/work/project-4").getAttribute("aria-expanded")).toBe(
-      "false",
+    await act(async () =>
+      findButton(i18n.t("sidebar.showMoreSessions", { count: 2 }))?.click(),
+    );
+    expect(projectSection("/work/project-4").textContent).toContain(
+      "project-4 chat 7",
+    );
+
+    await act(async () =>
+      findButton(i18n.t("sidebar.showLessSessions"))?.click(),
+    );
+    expect(projectSection("/work/project-4").textContent).not.toContain(
+      "project-4 chat 7",
     );
   });
 
-  it("temporarily expands search results and restores manual state", async () => {
+  it("resets a project list to five when its Header collapses", async () => {
+    await render(makeProjectSessions("deskwand", 7, 500));
+
+    await act(async () =>
+      findButton(i18n.t("sidebar.showMoreSessions", { count: 2 }))?.click(),
+    );
+    expect(projectSection("/work/deskwand").textContent).toContain(
+      "deskwand chat 7",
+    );
+
+    await act(async () => projectToggle("/work/deskwand").click());
+    await act(async () => projectToggle("/work/deskwand").click());
+
+    expect(projectSection("/work/deskwand").textContent).not.toContain(
+      "deskwand chat 6",
+    );
+    expect(projectSection("/work/deskwand").textContent).toContain(
+      i18n.t("sidebar.showMoreSessions", { count: 2 }),
+    );
+  });
+
+  it("temporarily expands search results and restores the visible count", async () => {
     await render([
-      ...makeProjectSessions("deskwand", 7, 500),
+      ...makeProjectSessions("deskwand", 12, 500),
       ...makeProjectSessions("project-2", 1, 400),
       ...makeProjectSessions("project-3", 1, 300),
     ]);
 
-    const showMore = Array.from(
-      projectSection("/work/deskwand").querySelectorAll("button"),
-    ).find(
-      (button) =>
-        button.textContent === i18n.t("sidebar.showMoreSessions", { count: 2 }),
+    await act(async () =>
+      findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }))?.click(),
     );
-    await act(async () => showMore?.click());
     expect(projectSection("/work/deskwand").textContent).toContain(
-      "deskwand chat 7",
+      "deskwand chat 10",
     );
-
-    await act(async () => projectToggle("/work/deskwand").click());
-    expect(projectToggle("/work/deskwand").getAttribute("aria-expanded")).toBe(
-      "false",
+    expect(projectSection("/work/deskwand").textContent).not.toContain(
+      "deskwand chat 11",
     );
 
     await search("deskwand");
-    expect(projectToggle("/work/deskwand").getAttribute("aria-expanded")).toBe(
-      "true",
-    );
     expect(projectSection("/work/deskwand").textContent).toContain(
-      "deskwand chat 7",
+      "deskwand chat 12",
     );
 
     await search("");
-    expect(projectToggle("/work/deskwand").getAttribute("aria-expanded")).toBe(
-      "false",
+    expect(projectSection("/work/deskwand").textContent).toContain(
+      "deskwand chat 10",
+    );
+    expect(projectSection("/work/deskwand").textContent).not.toContain(
+      "deskwand chat 11",
+    );
+  });
+
+  it("clamps a stale visible count after sessions are removed", async () => {
+    const ordinary = Array.from({ length: 12 }, (_, index) =>
+      session(`ordinary-${index + 1}`, {
+        title: `Ordinary ${index + 1}`,
+        updatedAt: 100 - index,
+      }),
+    );
+    await render(ordinary);
+    await act(async () =>
+      findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }))?.click(),
     );
 
-    await act(async () => projectToggle("/work/deskwand").click());
-    expect(projectSection("/work/deskwand").textContent).toContain(
-      "deskwand chat 7",
-    );
+    await render(ordinary.slice(0, 7));
+    expect(container.textContent).toContain("Ordinary 7");
+    expect(findButton(i18n.t("sidebar.showLessSessions"))).toBeTruthy();
   });
 
   it("keeps manual project choices across the default expansion threshold", async () => {

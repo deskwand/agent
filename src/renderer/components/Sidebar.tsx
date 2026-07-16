@@ -27,6 +27,8 @@ import { buildSidebarSessionGroups } from "../utils/sidebar-session-groups";
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
 const ORDINARY_SESSION_GROUP_KEY = "__ordinary_sessions__";
+const SESSION_OVERFLOW_BUTTON_CLASS =
+  "rounded-lg bg-transparent px-3 py-1.5 text-xs text-text-muted hover:bg-transparent hover:text-text-secondary focus-visible:bg-transparent focus-visible:text-text-secondary transition-colors";
 
 export function Sidebar({ width = 280 }: { width?: number }) {
   const { t, i18n } = useTranslation();
@@ -67,9 +69,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [projectExpansionOverrides, setProjectExpansionOverrides] = useState(
     () => new Map<string, boolean>(),
   );
-  const [sessionExpansionOverrides, setSessionExpansionOverrides] = useState(
-    () => new Map<string, boolean>(),
-  );
+  const [sessionVisibleCountOverrides, setSessionVisibleCountOverrides] =
+    useState(() => new Map<string, number>());
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
@@ -184,16 +185,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     );
   };
 
-  const resolveSessionListExpanded = (
+  const resolveSessionVisibleCount = (
     groupKey: string,
-    groupSessions: Session[],
-  ): boolean => {
-    if (normalizedQuery) return true;
-    const override = sessionExpansionOverrides.get(groupKey);
-    if (override !== undefined) return override;
-    return (
-      groupSessions.findIndex((session) => session.id === activeSessionId) >=
-      DEFAULT_VISIBLE_SESSIONS
+    sessionCount: number,
+  ): number => {
+    if (normalizedQuery) return sessionCount;
+    return Math.min(
+      sessionVisibleCountOverrides.get(groupKey) ?? DEFAULT_VISIBLE_SESSIONS,
+      sessionCount,
     );
   };
 
@@ -205,10 +204,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     });
   };
 
-  const setSessionListExpanded = (groupKey: string, expanded: boolean) => {
-    setSessionExpansionOverrides((current) => {
+  const setSessionVisibleCount = (groupKey: string, visibleCount: number) => {
+    setSessionVisibleCountOverrides((current) => {
       const next = new Map(current);
-      next.set(groupKey, expanded);
+      next.set(groupKey, visibleCount);
       return next;
     });
   };
@@ -560,25 +559,48 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   };
 
   const renderSessionList = (groupKey: string, groupSessions: Session[]) => {
-    const isExpanded = resolveSessionListExpanded(groupKey, groupSessions);
-    const visibleSessions = isExpanded
+    const visibleCount = resolveSessionVisibleCount(
+      groupKey,
+      groupSessions.length,
+    );
+    const visibleSessions = normalizedQuery
       ? groupSessions
-      : groupSessions.slice(0, DEFAULT_VISIBLE_SESSIONS);
-    const hiddenCount = groupSessions.length - DEFAULT_VISIBLE_SESSIONS;
+      : groupSessions.slice(0, visibleCount);
+    const hiddenCount = Math.max(0, groupSessions.length - visibleCount);
+    const nextBatchCount = Math.min(DEFAULT_VISIBLE_SESSIONS, hiddenCount);
+    const canShowLess = visibleCount > DEFAULT_VISIBLE_SESSIONS;
 
     return (
       <>
         {visibleSessions.map((session) => renderSessionItem(session, true))}
-        {!normalizedQuery && hiddenCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setSessionListExpanded(groupKey, !isExpanded)}
-            className="w-full rounded-lg bg-transparent px-3 py-1.5 text-left text-xs text-text-muted hover:bg-transparent hover:text-text-secondary focus-visible:bg-transparent focus-visible:text-text-secondary transition-colors"
-          >
-            {isExpanded
-              ? t("sidebar.showLessSessions")
-              : t("sidebar.showMoreSessions", { count: hiddenCount })}
-          </button>
+        {!normalizedQuery && (hiddenCount > 0 || canShowLess) && (
+          <div className="flex items-center">
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setSessionVisibleCount(
+                    groupKey,
+                    visibleCount + nextBatchCount,
+                  )
+                }
+                className={`${SESSION_OVERFLOW_BUTTON_CLASS} flex-1 text-left`}
+              >
+                {t("sidebar.showMoreSessions", { count: nextBatchCount })}
+              </button>
+            )}
+            {canShowLess && (
+              <button
+                type="button"
+                onClick={() =>
+                  setSessionVisibleCount(groupKey, DEFAULT_VISIBLE_SESSIONS)
+                }
+                className={`${SESSION_OVERFLOW_BUTTON_CLASS} ml-auto flex-shrink-0 text-right`}
+              >
+                {t("sidebar.showLessSessions")}
+              </button>
+            )}
+          </div>
         )}
       </>
     );
@@ -704,9 +726,16 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                             { projectName: group.name },
                           )}
                           disabled={Boolean(normalizedQuery)}
-                          onClick={() =>
-                            setProjectExpanded(group.key, !isProjectExpanded)
-                          }
+                          onClick={() => {
+                            const nextExpanded = !isProjectExpanded;
+                            setProjectExpanded(group.key, nextExpanded);
+                            if (!nextExpanded) {
+                              setSessionVisibleCount(
+                                group.key,
+                                DEFAULT_VISIBLE_SESSIONS,
+                              );
+                            }
+                          }}
                           className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-sm font-medium leading-5 text-text-muted hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
                         >
                           <ChevronDown
