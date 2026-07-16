@@ -1,7 +1,7 @@
 import { memo, useState, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Copy, Check, Undo2, File, Paperclip } from "lucide-react";
+import { Check, Copy, CirclePlay, Video } from "lucide-react";
 import { useAppStore } from "../../store";
 import { useIPC } from "../../hooks/useIPC";
 import type { Session } from "../../types";
@@ -14,7 +14,6 @@ import { shortenPath } from "./toolHelpers";
 import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import { FilePreviewModal } from "../FilePreviewModal";
 import { ConfirmDialog } from "../ConfirmDialog";
-import { VideoArtifactThumbnail } from "./VideoArtifactThumbnail";
 
 interface ArtifactCardProps {
   files: ResultFileEntry[];
@@ -30,8 +29,68 @@ function isNew(f: ResultFileEntry): boolean {
   return f.writes > 0 && f.edits === 0;
 }
 
-function getFileIcon() {
-  return <File className="h-4 w-4 shrink-0 text-text-muted" />;
+function getFileExt(filePath: string): string {
+  const name = filePath.split(/[/\\]/).pop() || filePath;
+  // dotfiles: show the full name (e.g. ".gitignore" → ".git")
+  if (name.startsWith(".") && name.lastIndexOf(".") === 0) {
+    return name.slice(0, 4).toUpperCase();
+  }
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return name.slice(0, 4).toUpperCase();
+  return name.slice(dot + 1).slice(0, 4).toUpperCase();
+}
+
+function VideoThumb({ reference }: { reference: VideoReference }) {
+  const [src, setSrc] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setSrc("");
+    setFailed(false);
+    if (reference.playbackKind !== "inline") {
+      setFailed(true);
+      return;
+    }
+    const getSourceUrl = window.electronAPI?.getVideoSourceUrl;
+    if (!getSourceUrl) {
+      setFailed(true);
+      return;
+    }
+    getSourceUrl(reference.path)
+      .then((url) => {
+        if (!cancelled) setSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reference.path, reference.playbackKind]);
+
+  const showVideo =
+    reference.playbackKind === "inline" && Boolean(src) && !failed;
+
+  return (
+    <div className="relative flex h-9 w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-muted">
+      {showVideo ? (
+        <video
+          src={src}
+          muted
+          preload="metadata"
+          playsInline
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <Video className="h-4 w-4 text-text-muted" />
+      )}
+      {showVideo ? (
+        <CirclePlay className="absolute h-5 w-5 text-white drop-shadow" />
+      ) : null}
+    </div>
+  );
 }
 
 export const ArtifactCard = memo(function ArtifactCard({
@@ -45,12 +104,9 @@ export const ArtifactCard = memo(function ArtifactCard({
   const activeSessionCwd = useAppStore((s) => {
     const sid = s.activeSessionId;
     if (!sid) return undefined;
-    const session = (s.sessions as Session[]).find(
-      (ses) => ses.id === sid,
-    );
+    const session = (s.sessions as Session[]).find((ses) => ses.id === sid);
     return session?.cwd || undefined;
   });
-  const toggleReviewPanel = useAppStore((s) => s.toggleReviewPanel);
   const setReviewOpen = useAppStore((s) => s.setReviewOpen);
   const setReviewTargetFile = useAppStore((s) => s.setReviewTargetFile);
 
@@ -60,59 +116,64 @@ export const ArtifactCard = memo(function ArtifactCard({
   } | null>(null);
   const [revertedFiles, setRevertedFiles] = useState<Set<string>>(new Set());
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
-  const [revertConfirm, setRevertConfirm] = useState<
-    | { type: "file"; file: ResultFileEntry }
-    | { type: "round" }
-    | null
-  >(null);
+  const [revertConfirm, setRevertConfirm] = useState<ResultFileEntry | null>(
+    null,
+  );
   const [revertError, setRevertError] = useState<string | null>(null);
   const [isGitRepo, setIsGitRepo] = useState(true);
-  const [hasGitChanges, setHasGitChanges] = useState(true);
 
-  // Detect whether the working directory is a git repo and has uncommitted changes
   useEffect(() => {
     if (!isElectron || !activeSessionCwd) return;
     const gitApi = window.electronAPI?.git;
     if (!gitApi?.hasChanges) {
       setIsGitRepo(false);
-      setHasGitChanges(false);
       return;
     }
-    (gitApi.hasChanges as (cwd: string) => Promise<{ isRepo: boolean; changeCount: number }>)(activeSessionCwd)
-      .then((r) => {
-        setIsGitRepo(r.isRepo);
-        setHasGitChanges(r.isRepo && r.changeCount > 0);
-      })
-      .catch(() => {
-        setIsGitRepo(false);
-        setHasGitChanges(false);
-      });
+    (
+      gitApi.hasChanges as (
+        cwd: string,
+      ) => Promise<{ isRepo: boolean; changeCount: number }>
+    )(activeSessionCwd)
+      .then((r) => setIsGitRepo(r.isRepo))
+      .catch(() => setIsGitRepo(false));
   }, [activeSessionCwd, isElectron]);
 
   const resolvePath = (filePath: string) =>
     activeSessionCwd
       ? resolvePathAgainstWorkspace(filePath, activeSessionCwd)
       : filePath;
+
   const videoPathKeys = new Set(
-    videoReferences.map((reference) =>
-      normalizeVideoReferencePath(reference.path),
-    ),
+    videoReferences.map((ref) => normalizeVideoReferencePath(ref.path)),
   );
   const isDuplicateVideoRow = (file: ResultFileEntry) =>
     videoPathKeys.has(normalizeVideoReferencePath(resolvePath(file.path)));
+
   const editedFiles = files
     .filter(isEdited)
     .filter((file) => !isDuplicateVideoRow(file));
   const newFiles = files
     .filter(isNew)
     .filter((file) => !isDuplicateVideoRow(file));
-  const artifactFileCount =
-    editedFiles.length + newFiles.length + videoReferences.length;
-  const isContained = artifactFileCount >= 3;
 
-  if (artifactFileCount === 0) {
-    return null;
-  }
+  const allItems: Array<
+    | { kind: "video"; reference: VideoReference }
+    | { kind: "file"; file: ResultFileEntry; status: "edited" | "new" }
+  > = [
+    ...videoReferences.map(
+      (ref) => ({ kind: "video" as const, reference: ref }),
+    ),
+    ...editedFiles.map(
+      (file) =>
+        ({ kind: "file" as const, file, status: "edited" as const }),
+    ),
+    ...newFiles.map(
+      (file) =>
+        ({ kind: "file" as const, file, status: "new" as const }),
+    ),
+  ];
+
+  if (allItems.length === 0) return null;
 
   const handleCopyPath = useCallback(async (path: string) => {
     try {
@@ -123,7 +184,6 @@ export const ArtifactCard = memo(function ArtifactCard({
     }
   }, []);
 
-  // Clean up copiedPath indicator after 2s
   useEffect(() => {
     if (!copiedPath) return;
     const id = setTimeout(() => setCopiedPath(null), 2000);
@@ -131,13 +191,16 @@ export const ArtifactCard = memo(function ArtifactCard({
   }, [copiedPath]);
 
   const doRevert = useCallback(
-    async (entries: ResultFileEntry[]) => {
+    async (entry: ResultFileEntry) => {
       if (!isElectron || !activeSessionCwd) return;
       setRevertError(null);
 
       const gitApi = window.electronAPI?.git as
         | {
-            revertFiles?: (cwd: string, paths: string[]) => Promise<{ success: boolean; error?: string }>;
+            revertFiles?: (
+              cwd: string,
+              paths: string[],
+            ) => Promise<{ success: boolean; error?: string }>;
           }
         | undefined;
       if (!gitApi?.revertFiles) {
@@ -145,31 +208,18 @@ export const ArtifactCard = memo(function ArtifactCard({
         return;
       }
 
-      const reverted: string[] = [];
-
       try {
-        const paths = entries.map((entry) => entry.path);
-        const result = await gitApi.revertFiles(activeSessionCwd, paths);
+        const result = await gitApi.revertFiles(activeSessionCwd, [
+          entry.path,
+        ]);
         if (result?.success) {
-          reverted.push(...paths);
-        } else {
-          setRevertError(result?.error || t("artifactCard.revertFailed"));
-          return;
-        }
-
-        if (reverted.length > 0) {
           setRevertedFiles((prev) => {
             const next = new Set(prev);
-            reverted.forEach((p) => next.add(p));
+            next.add(entry.path);
             return next;
           });
-          // Re-check git status to potentially hide review button
-          const gitHasChanges = window.electronAPI?.git?.hasChanges;
-          if (gitHasChanges) {
-            (gitHasChanges as (cwd: string) => Promise<{ isRepo: boolean; changeCount: number }>)(activeSessionCwd)
-              .then((r) => setHasGitChanges(r.changeCount > 0))
-              .catch(() => {});
-          }
+        } else {
+          setRevertError(result?.error || t("artifactCard.revertFailed"));
         }
       } catch {
         setRevertError(t("artifactCard.revertFailed"));
@@ -181,27 +231,18 @@ export const ArtifactCard = memo(function ArtifactCard({
   const handleRevertFile = useCallback(
     (file: ResultFileEntry) => {
       if (!isElectron || !isGitRepo) return;
-      setRevertConfirm({ type: "file", file });
+      setRevertConfirm(file);
     },
     [isElectron, isGitRepo],
   );
-
-  const handleRevertRound = useCallback(() => {
-    if (!isElectron || !isGitRepo) return;
-    setRevertConfirm({ type: "round" });
-  }, [isElectron, isGitRepo]);
 
   const isUndoDisabled = !isElectron || !isGitRepo;
 
   const confirmRevert = useCallback(async () => {
     if (!revertConfirm) return;
-    if (revertConfirm.type === "file") {
-      await doRevert([revertConfirm.file]);
-    } else {
-      await doRevert(files);
-    }
+    await doRevert(revertConfirm);
     setRevertConfirm(null);
-  }, [revertConfirm, doRevert, files]);
+  }, [revertConfirm, doRevert]);
 
   const handleClickFile = useCallback(
     async (file: ResultFileEntry) => {
@@ -236,8 +277,8 @@ export const ArtifactCard = memo(function ArtifactCard({
         )
           ? normalizedResolvedPath.slice(normalizedWorkingDir.length + 1)
           : normalizedFilePath;
-        const matchingDiffFile = diffFiles.find(({ path }) => {
-          const normalizedDiffPath = path.replace(/\\/g, "/");
+        const matchingDiffFile = diffFiles.find(({ path: dp }) => {
+          const normalizedDiffPath = dp.replace(/\\/g, "/");
           return (
             normalizedDiffPath === workspaceRelativePath ||
             normalizedDiffPath.endsWith(`/${workspaceRelativePath}`)
@@ -265,258 +306,200 @@ export const ArtifactCard = memo(function ArtifactCard({
     ],
   );
 
-  const handleReviewAll = useCallback(() => {
-    if (!isGitRepo || !hasGitChanges) return;
-    toggleReviewPanel();
-  }, [isGitRepo, hasGitChanges, toggleReviewPanel]);
+  const handleClickVideo = useCallback(
+    (reference: VideoReference) => {
+      setPreviewFile({ path: reference.path, autoPlay: true });
+    },
+    [],
+  );
 
   return (
     <>
-      <div
-        className={
-          isContained
-            ? "rounded-xl border border-border-subtle px-4 py-3.5"
-            : "border-t border-border-subtle pt-3"
-        }
-      >
-        {/* Title */}
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-text-secondary">
-          <Paperclip aria-hidden="true" className="h-4 w-4 text-text-muted" />
-          {t("artifactCard.title")}
-        </div>
-
-        {/* Video references group */}
-        {videoReferences.length > 0 ? (
-          <div className="mb-3">
-            <div className="mb-2 text-[11px] font-medium text-text-muted">
-              {t("artifactCard.videos")}
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {videoReferences.map((reference) => (
-                <VideoArtifactThumbnail
-                  key={normalizeVideoReferencePath(reference.path)}
-                  reference={reference}
-                  onOpen={() =>
-                    setPreviewFile({ path: reference.path, autoPlay: true })
+      <div className="flex flex-col gap-2">
+        {allItems.map((item) => {
+          if (item.kind === "video") {
+            const ref = item.reference;
+            const key = normalizeVideoReferencePath(ref.path);
+            return (
+              <div
+                key={key}
+                className="flex cursor-pointer items-center justify-between rounded-xl border border-border-subtle px-4 py-3.5 transition-colors hover:bg-surface-hover/50"
+                onClick={() => handleClickVideo(ref)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleClickVideo(ref);
                   }
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {/* Edited files group */}
-        {editedFiles.length > 0 ? (
-          <div className="mb-2">
-            <div className="mb-2 text-[11px] font-medium text-text-muted">
-              {t("artifactCard.editedFiles")}
-            </div>
-            <div className="flex flex-col gap-0.5">
-              {editedFiles.map((file) => {
-                const reverted = revertedFiles.has(file.path);
-                return (
-                  <div
-                    key={file.path}
-                    className={`group flex items-center justify-between rounded-md py-1.5 pl-2 pr-2 text-sm transition-colors outline-none ${
-                      reverted
-                        ? "cursor-default text-text-muted line-through"
-                        : "cursor-pointer hover:bg-surface-hover active:bg-surface-active text-text-secondary focus-visible:ring-2 focus-visible:ring-accent"
-                    }`}
-                    onClick={() => handleClickFile(file)}
-                    onKeyDown={(e) => {
-                      if ((e.key === "Enter" || e.key === " ") && !reverted) {
-                        e.preventDefault();
-                        handleClickFile(file);
-                      }
+                }}
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <VideoThumb reference={ref} />
+                  <div className="min-w-0">
+                    <div className="truncate text-base font-semibold text-text-primary">
+                      {ref.name}
+                    </div>
+                  </div>
+                </div>
+                <div className="ml-3 flex shrink-0 items-center gap-1.5">
+                  <button
+                    type="button"
+                    className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-accent hover:bg-accent/5"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleClickVideo(ref);
                     }}
-                    role={reverted ? undefined : "button"}
-                    tabIndex={reverted ? -1 : 0}
+                  >
+                    {t("artifactCard.play")}
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          // file card
+          const { file, status } = item;
+          const reverted = revertedFiles.has(file.path);
+          const ext = getFileExt(file.path);
+          const canRevert = isLatestRound && !reverted && isGitRepo;
+
+          return (
+            <div
+              key={file.path}
+              className={`flex items-center justify-between rounded-xl border border-border-subtle px-4 py-3.5 transition-colors outline-none ${
+                reverted
+                  ? "cursor-default opacity-50"
+                  : "cursor-pointer hover:bg-surface-hover/50"
+              }`}
+              onClick={() => handleClickFile(file)}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === " ") && !reverted) {
+                  e.preventDefault();
+                  handleClickFile(file);
+                }
+              }}
+              role={reverted ? undefined : "button"}
+              tabIndex={reverted ? -1 : 0}
+              title={reverted ? t("artifactCard.reverted") : undefined}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-xs font-semibold text-text-muted ${
+                    reverted ? "line-through" : ""
+                  }`}
+                >
+                  {ext}
+                </div>
+                <div className="min-w-0">
+                  <div
+                    className={`truncate text-base font-semibold text-text-primary ${
+                      reverted ? "line-through text-text-muted" : ""
+                    }`}
+                  >
+                    {shortenPath(file.path)}
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-text-muted">
+                    {status === "edited" ? (
+                      <>
+                        {file.edits > 0 ? (
+                          <span className="text-success">+{file.edits}</span>
+                        ) : null}
+                        {file.edits > 0 && file.writes > 0 ? (
+                          <span className="text-error">-{file.writes}</span>
+                        ) : null}
+                        <span>·</span>
+                        <span>{t("artifactCard.statusEdited")}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-success">+{file.writes}</span>
+                        <span className="text-error">-0</span>
+                        <span>·</span>
+                        <span>{t("artifactCard.statusNew")}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="ml-3 flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  className="rounded-md p-1 text-text-muted hover:bg-surface-hover hover:text-text-secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!reverted) handleCopyPath(resolvePath(file.path));
+                  }}
+                  title={t("artifactCard.copyPath")}
+                >
+                  {copiedPath === resolvePath(file.path) ? (
+                    <Check className="h-3.5 w-3.5 text-success" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                </button>
+                {canRevert ? (
+                  <button
+                    type="button"
+                    className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-text-muted hover:border-error/20 hover:bg-error/5 hover:text-error"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRevertFile(file);
+                    }}
                     title={
                       isUndoDisabled
                         ? t("artifactCard.desktopOnly")
-                        : reverted
-                          ? t("artifactCard.reverted")
-                          : t("artifactCard.editedFiles")
+                        : t("artifactCard.revertFile")
                     }
+                    disabled={isUndoDisabled}
                   >
-                    <span className="min-w-0 flex-1 truncate flex items-center gap-1.5">
-                      {getFileIcon()}
-                      {shortenPath(file.path)}
-                    </span>
-                    <span
-                      className="ml-2 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!reverted) handleCopyPath(resolvePath(file.path));
-                      }}
-                      role="button"
-                      tabIndex={-1}
-                    >
-                      {copiedPath === file.path ? (
-                        <Check className="h-3 w-3 text-success" />
-                      ) : (
-                        <Copy className="h-3 w-3 text-text-muted hover:text-text-secondary" />
-                      )}
-                    </span>
-                    {isLatestRound && !reverted && isGitRepo ? (
-                      <button
-                        type="button"
-                        className="ml-1 shrink-0 rounded p-0.5 text-text-muted opacity-0 transition-opacity hover:bg-error/10 hover:text-error group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRevertFile(file);
-                        }}
-                        title={
-                          isUndoDisabled
-                            ? t("artifactCard.desktopOnly")
-                            : t("artifactCard.revertFile")
-                        }
-                        disabled={isUndoDisabled}
-                      >
-                        <Undo2 className="h-3 w-3" />
-                      </button>
-                    ) : null}
-                  </div>
-                );
-              })}
+                    {t("artifactCard.revert")}
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-accent hover:bg-accent/5"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClickFile(file);
+                  }}
+                >
+                  {status === "edited"
+                    ? t("artifactCard.review")
+                    : t("artifactCard.preview")}
+                </button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          );
+        })}
 
-        {/* New files group */}
-        {newFiles.length > 0 ? (
-          <div className="mb-2">
-            <div className="mb-2 text-[11px] font-medium text-text-muted">
-              {t("artifactCard.newFiles")}
-            </div>
-            <div className="flex flex-col gap-0.5">
-              {newFiles.map((file) => {
-                const reverted = revertedFiles.has(file.path);
-                return (
-                  <div
-                    key={file.path}
-                    className={`group flex items-center justify-between rounded-md py-1.5 pl-2 pr-2 text-sm transition-colors outline-none ${
-                      reverted
-                        ? "cursor-default text-text-muted line-through"
-                        : "cursor-pointer hover:bg-surface-hover active:bg-surface-active text-text-secondary focus-visible:ring-2 focus-visible:ring-accent"
-                    }`}
-                    onClick={() => handleClickFile(file)}
-                    onKeyDown={(e) => {
-                      if ((e.key === "Enter" || e.key === " ") && !reverted) {
-                        e.preventDefault();
-                        handleClickFile(file);
-                      }
-                    }}
-                    role={reverted ? undefined : "button"}
-                    tabIndex={reverted ? -1 : 0}
-                    title={
-                      isUndoDisabled
-                        ? t("artifactCard.desktopOnly")
-                        : reverted
-                          ? t("artifactCard.reverted")
-                          : t("artifactCard.newFiles")
-                    }
-                  >
-                    <span className="min-w-0 flex-1 truncate flex items-center gap-1.5">
-                      {getFileIcon()}
-                      {shortenPath(file.path)}
-                    </span>
-                    <span
-                      className="ml-2 flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!reverted) handleCopyPath(resolvePath(file.path));
-                      }}
-                      role="button"
-                      tabIndex={-1}
-                    >
-                      {copiedPath === file.path ? (
-                        <Check className="h-3 w-3 text-success" />
-                      ) : (
-                        <Copy className="h-3 w-3 text-text-muted hover:text-text-secondary" />
-                      )}
-                    </span>
-                    {isLatestRound && !reverted && isGitRepo ? (
-                      <button
-                        type="button"
-                        className="ml-1 shrink-0 rounded p-0.5 text-text-muted opacity-0 transition-opacity hover:bg-error/10 hover:text-error group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRevertFile(file);
-                        }}
-                        title={
-                          isUndoDisabled
-                            ? t("artifactCard.desktopOnly")
-                            : t("artifactCard.revertFile")
-                        }
-                        disabled={isUndoDisabled}
-                      >
-                        <Undo2 className="h-3 w-3" />
-                      </button>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
-
-        {/* Bottom actions */}
-        <div className="flex items-center justify-between text-[11px]">
-          {files.length > 0 && isLatestRound && isGitRepo ? (
-            <button
-              type="button"
-              className="font-medium text-text-muted transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={handleRevertRound}
-              disabled={isUndoDisabled || revertedFiles.size === files.length}
-              title={isUndoDisabled ? t("artifactCard.desktopOnly") : undefined}
-            >
-              ↩ {t("artifactCard.revertRound")}
-            </button>
-          ) : (
-            <span />
-          )}
-          {files.length > 0 && isGitRepo && hasGitChanges ? (
-            <button
-              type="button"
-              className="font-medium text-accent transition-colors hover:text-accent-hover"
-              onClick={handleReviewAll}
-            >
-              {t("artifactCard.reviewChanges")} →
-            </button>
-          ) : (
-            <span />
-          )}
-        </div>
-
-        {/* Revert error */}
         {revertError ? (
-          <div className="mt-2 text-[11px] text-error">{revertError}</div>
+          <div className="text-xs text-error">{revertError}</div>
         ) : null}
       </div>
 
-      {/* Confirm dialog */}
       <ConfirmDialog
         isOpen={revertConfirm !== null}
         title={
-          revertConfirm?.type === "file"
+          revertConfirm
             ? t("artifactCard.confirmRevertFile", {
-                path: resolvePath(revertConfirm.file.path),
+                path: resolvePath(revertConfirm.path),
               })
-            : t("artifactCard.confirmRevertRound")
+            : ""
         }
-        confirmLabel={t("artifactCard.revertRound")}
+        confirmLabel={t("artifactCard.revert")}
         onConfirm={confirmRevert}
         onCancel={() => setRevertConfirm(null)}
       />
 
-      {/* File preview modal — portal to body for proper z-index */}
       {previewFile &&
         createPortal(
           <FilePreviewModal
             isOpen
             filePath={previewFile.path}
-            fileName={previewFile.path.split(/[/\\]/).pop() || previewFile.path}
+            fileName={
+              previewFile.path.split(/[/\\]/).pop() || previewFile.path
+            }
             autoPlay={previewFile.autoPlay}
             onClose={() => setPreviewFile(null)}
           />,

@@ -1320,19 +1320,17 @@
     "restart": "Restart Now"
   },
   "artifactCard": {
-    "title": "Round Artifacts",
-    "videos": "Videos",
-    "editedFiles": "Edited Files",
-    "newFiles": "New Files",
-    "reviewChanges": "Review Changes",
-    "revertRound": "Revert Round Changes",
+    "revert": "Revert",
+    "review": "Review",
+    "preview": "Preview",
+    "play": "Play",
+    "statusEdited": "Edited",
+    "statusNew": "New",
     "revertFile": "Revert File",
     "copyPath": "Copy Path",
     "copyPathSuccess": "Copied",
-    "confirmRevertRound": "Revert all file changes from this round? This cannot be undone.",
     "confirmRevertFile": "Revert changes to {{path}}?",
     "reverted": "Reverted",
-    "noChanges": "No file changes this round",
     "revertFailed": "Revert failed",
     "desktopOnly": "Desktop only"
   }

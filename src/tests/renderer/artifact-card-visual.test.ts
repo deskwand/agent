@@ -46,24 +46,10 @@ function makeSession(): Session {
   };
 }
 
-function artifactRoot(container: HTMLElement): HTMLElement {
-  const element = container.firstElementChild;
-  if (!(element instanceof HTMLElement)) {
-    throw new Error("Artifact card root not found");
-  }
-  return element;
-}
-
-function findRoundRevertButton(container: HTMLElement): HTMLButtonElement {
-  const button = Array.from(container.querySelectorAll("button")).find(
-    (element) =>
-      element.textContent?.includes("撤销本轮变更") ||
-      element.textContent?.includes("Revert Round Changes"),
-  );
-  if (!(button instanceof HTMLButtonElement)) {
-    throw new Error("Round revert button not found");
-  }
-  return button;
+function findFileCards(container: HTMLElement): HTMLElement[] {
+  return Array.from(
+    container.querySelectorAll('[role="button"]'),
+  ) as HTMLElement[];
 }
 
 describe("ArtifactCard visual hierarchy", () => {
@@ -106,71 +92,93 @@ describe("ArtifactCard visual hierarchy", () => {
     });
   }
 
-  it.each([
-    ["one", [editedFile]],
-    ["two", [editedFile, newFile]],
-  ])(
-    "renders %s effective files as an inline section",
-    async (_label, files) => {
-      await render(files);
-
-      const card = artifactRoot(container);
-      expect(card.classList.contains("border-t")).toBe(true);
-      expect(card.classList.contains("rounded-xl")).toBe(false);
-      expect(card.classList.contains("shadow-soft")).toBe(false);
-    },
-  );
-
-  it("renders three effective files in a weak container", async () => {
+  it("renders each file as a separate card", async () => {
     await render([editedFile, newFile, imageFile]);
 
-    const card = artifactRoot(container);
-    expect(card.classList.contains("rounded-xl")).toBe(true);
-    expect(card.classList.contains("border-border-subtle")).toBe(true);
-    expect(card.classList.contains("bg-surface/40")).toBe(false);
-    expect(card.classList.contains("bg-surface")).toBe(false);
-    expect(card.classList.contains("shadow-soft")).toBe(false);
+    const cards = findFileCards(container);
+    expect(cards).toHaveLength(3);
+    expect(cards[0].textContent).toContain("src/example.ts");
+    expect(cards[1].textContent).toContain("src/new-file.ts");
+    expect(cards[2].textContent).toContain("assets/preview.png");
   });
 
-  it("uses neutral paperclip and file icons", async () => {
-    await render([editedFile, imageFile]);
-
-    expect(container.textContent).not.toContain("✨");
-    expect(container.querySelector(".lucide-paperclip")).not.toBeNull();
-    expect(container.querySelectorAll(".lucide-file")).toHaveLength(2);
-    expect(container.querySelector(".lucide-file-code")).toBeNull();
-    expect(container.querySelector(".lucide-image")).toBeNull();
-    expect(container.querySelector("svg.text-sky-400")).toBeNull();
-    expect(container.querySelector("svg.text-accent")).toBeNull();
-  });
-
-  it("uses neutral row colors for new files", async () => {
-    await render([newFile]);
-
-    const row = Array.from(
-      container.querySelectorAll<HTMLElement>('[role="button"]'),
-    ).find((element) => element.textContent?.includes("src/new-file.ts"));
-    expect(row).toBeDefined();
-    expect(row?.classList.contains("text-text-secondary")).toBe(true);
-    expect(row?.classList.contains("text-success")).toBe(false);
-    expect(row?.classList.contains("hover:bg-surface-hover")).toBe(true);
-    expect(row?.classList.contains("hover:bg-success/10")).toBe(false);
-    expect(row?.classList.contains("active:bg-success/15")).toBe(false);
-  });
-
-  it("keeps round revert neutral until hover", async () => {
+  it("renders cards with rounded-xl border style", async () => {
     await render([editedFile]);
 
-    const button = findRoundRevertButton(container);
-    expect(button.classList.contains("text-text-muted")).toBe(true);
-    expect(button.classList.contains("text-error")).toBe(false);
-    expect(button.classList.contains("hover:text-error")).toBe(true);
+    const cards = findFileCards(container);
+    expect(cards).toHaveLength(1);
+    const cardEl = cards[0].closest(".rounded-xl");
+    expect(cardEl).not.toBeNull();
+    expect(cardEl?.classList.contains("border-border-subtle")).toBe(true);
   });
 
-  it("does not render dark backgrounds on file groups", async () => {
+  it("shows file extension badges instead of paperclip/file icons", async () => {
+    await render([editedFile, imageFile]);
+
+    // No more Paperclip icon (used for old title)
+    expect(container.querySelector(".lucide-paperclip")).toBeNull();
+    // No more generic File icon
+    expect(container.querySelector(".lucide-file")).toBeNull();
+    // Has file extension text labels
+    expect(container.textContent).toContain("TS");
+    expect(container.textContent).toContain("PNG");
+  });
+
+  it("shows revert button always visible for latest round", async () => {
+    await render([editedFile]);
+
+    const revertBtn = Array.from(container.querySelectorAll("button")).find(
+      (el) => {
+        const text = el.textContent || "";
+        return text.includes("撤销") || text === "Revert";
+      },
+    );
+    expect(revertBtn).toBeDefined();
+    // Should be visible, not opacity-0
+    expect(revertBtn?.classList.contains("opacity-0")).toBe(false);
+  });
+
+  it("shows edit status and change count", async () => {
+    await render([editedFile]);
+
+    expect(container.textContent).toMatch(/编辑|Edited/);
+    expect(container.textContent).toContain("+1");
+  });
+
+  it("shows new status and change count for new files", async () => {
+    await render([newFile]);
+
+    expect(container.textContent).toMatch(/新建|New/);
+    expect(container.textContent).toContain("+1");
+    expect(container.textContent).toContain("-0");
+  });
+
+  it("renders in a flex column layout", async () => {
     await render([editedFile, newFile]);
 
-    expect(container.querySelector(".bg-surface-muted")).toBeNull();
-    expect(container.querySelector(".bg-success\\/5")).toBeNull();
+    // The wrapper should be a flex column for card stacking
+    const wrapper = container.firstElementChild;
+    expect(wrapper?.classList.contains("flex-col")).toBe(true);
+  });
+
+  it("does not show group labels or round title", async () => {
+    await render([editedFile, newFile]);
+
+    expect(container.textContent).not.toMatch(/本轮产物|Round Artifacts/);
+    expect(container.textContent).not.toMatch(/编辑的文件|Edited Files/);
+    expect(container.textContent).not.toMatch(/新建的文件|New Files/);
+    expect(container.textContent).not.toMatch(/Videos|视频/);
+  });
+
+  it("does not show round revert button at bottom", async () => {
+    await render([editedFile]);
+
+    const buttons = Array.from(container.querySelectorAll("button"));
+    const roundRevert = buttons.find(
+      (el) =>
+        el.textContent?.includes("撤销本轮") ||
+        el.textContent?.includes("Revert Round"),
+    );
+    expect(roundRevert).toBeUndefined();
   });
 });

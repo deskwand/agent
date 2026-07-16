@@ -12,20 +12,6 @@ import type { VideoReference } from "../../renderer/utils/video-reference";
 vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => ({ isElectron: true }),
 }));
-vi.mock("../../renderer/components/message/VideoArtifactThumbnail", () => ({
-  VideoArtifactThumbnail: ({
-    reference,
-    onOpen,
-  }: {
-    reference: VideoReference;
-    onOpen: () => void;
-  }) =>
-    React.createElement(
-      "button",
-      { type: "button", onClick: onOpen },
-      reference.name,
-    ),
-}));
 vi.mock("../../renderer/components/FilePreviewModal", () => ({
   FilePreviewModal: ({
     fileName,
@@ -106,7 +92,9 @@ async function renderCard(
 
 function findVideoButton(rootElement: HTMLElement): HTMLButtonElement {
   const button = Array.from(rootElement.querySelectorAll("button")).find(
-    (element) => element.textContent?.includes("clip.mp4"),
+    (element) =>
+      element.textContent?.includes("播放") ||
+      element.textContent?.includes("Play"),
   );
   if (!(button instanceof HTMLButtonElement)) {
     throw new Error("video button missing");
@@ -118,7 +106,8 @@ describe("ArtifactCard video references", () => {
   it("renders for a video-only result", async () => {
     await renderCard([], [videoReference]);
     expect(container.textContent).toContain("clip.mp4");
-    expect(container.textContent).toMatch(/Videos|视频/);
+    const playBtn = findVideoButton(container);
+    expect(playBtn).toBeDefined();
   });
 
   it("suppresses a duplicate regular row without changing the files input", async () => {

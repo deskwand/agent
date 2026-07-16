@@ -1316,19 +1316,17 @@
     "restart": "立即重启"
   },
   "artifactCard": {
-    "title": "本轮产物",
-    "videos": "视频",
-    "editedFiles": "编辑的文件",
-    "newFiles": "新建的文件",
-    "reviewChanges": "审核变更",
-    "revertRound": "撤销本轮变更",
+    "revert": "撤销",
+    "review": "审核",
+    "preview": "预览",
+    "play": "播放",
+    "statusEdited": "编辑",
+    "statusNew": "新建",
     "revertFile": "撤销此文件",
     "copyPath": "复制路径",
     "copyPathSuccess": "已复制",
-    "confirmRevertRound": "确定撤销本轮所有文件变更？此操作不可撤销。",
     "confirmRevertFile": "确定撤销 {{path}} 的变更？",
     "reverted": "已撤销",
-    "noChanges": "本轮无文件变更",
     "revertFailed": "撤销失败",
     "desktopOnly": "仅桌面端可用"
   }
