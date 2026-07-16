@@ -156,6 +156,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [projectName, setProjectName] = useState("");
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const sessionLoadSeqRef = useRef(0);
+  const scrollListRef = useRef<HTMLDivElement>(null);
 
   const normalizedQuery = useMemo(
     () => searchQuery.trim().toLowerCase(),
@@ -171,29 +172,47 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     [sessions, normalizedQuery],
   );
 
+  useEffect(() => {
+    if (!activeSessionId || normalizedQuery) return;
+    const raf = requestAnimationFrame(() => {
+      scrollListRef.current
+        ?.querySelector(`[data-session-id="${activeSessionId}"]`)
+        ?.scrollIntoView({ block: "nearest" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [activeSessionId, normalizedQuery]);
+
   const resolveProjectExpanded = (
     groupKey: string,
     projectIndex: number,
     projectSessions: Session[],
   ): boolean => {
     if (normalizedQuery) return true;
+    if (activeSessionId && projectSessions.some((s) => s.id === activeSessionId)) return true;
     const override = projectExpansionOverrides.get(groupKey);
     if (override !== undefined) return override;
-    return (
-      projectIndex < DEFAULT_EXPANDED_PROJECTS ||
-      projectSessions.some((session) => session.id === activeSessionId)
-    );
+    return projectIndex < DEFAULT_EXPANDED_PROJECTS;
   };
 
   const resolveSessionVisibleCount = (
     groupKey: string,
-    sessionCount: number,
+    groupSessions: Session[],
   ): number => {
-    if (normalizedQuery) return sessionCount;
-    return Math.min(
-      sessionVisibleCountOverrides.get(groupKey) ?? DEFAULT_VISIBLE_SESSIONS,
-      sessionCount,
+    if (normalizedQuery) return groupSessions.length;
+    const override = sessionVisibleCountOverrides.get(groupKey);
+    let visibleCount = Math.min(
+      override ?? DEFAULT_VISIBLE_SESSIONS,
+      groupSessions.length,
     );
+    if (activeSessionId) {
+      const activeIndex = groupSessions.findIndex(
+        (s) => s.id === activeSessionId,
+      );
+      if (activeIndex >= 0 && activeIndex >= visibleCount) {
+        visibleCount = activeIndex + 1;
+      }
+    }
+    return visibleCount;
   };
 
   const setProjectExpanded = (groupKey: string, expanded: boolean) => {
@@ -456,6 +475,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     return (
       <div
         key={session.id}
+        data-session-id={session.id}
         onClick={() => void handleSessionClick(session.id)}
         className={`group relative cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors border-l-[3px] border-l-transparent ${
           isActive
@@ -561,7 +581,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const renderSessionList = (groupKey: string, groupSessions: Session[]) => {
     const visibleCount = resolveSessionVisibleCount(
       groupKey,
-      groupSessions.length,
+      groupSessions,
     );
     const visibleSessions = normalizedQuery
       ? groupSessions
@@ -690,7 +710,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll">
+            <div ref={scrollListRef} className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll">
               <div className="space-y-0.5">
                 <div className="px-3 pb-1.5 flex items-center justify-between">
                   <span className="text-sm font-medium leading-5 text-text-muted">
