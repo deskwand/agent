@@ -170,9 +170,6 @@ interface AppState {
   // Sandbox sync (per-session)
   sandboxSyncStatus: SandboxSyncStatus | null;
 
-  // Task slots — running/completed sessions pinned above the sidebar list
-  taskSlots: TaskSlot[];
-
   // System theme (from OS native theme)
   systemDarkMode: boolean;
 
@@ -315,10 +312,6 @@ interface AppState {
     result: PartialToolResult | null,
   ) => void;
 
-  // Task slot actions
-  setTaskSlots: (slots: TaskSlot[]) => void;
-  removeTaskSlot: (sessionId: string) => void;
-
   // System theme actions
   setSystemDarkMode: (dark: boolean) => void;
 
@@ -355,47 +348,6 @@ const defaultSettings: Settings = {
   autoSkillLearning: true,
 };
 
-export interface TaskSlot {
-  sessionId: string;
-  completed: boolean;
-}
-
-const TASK_SLOTS_KEY = "deskwand.taskSlots";
-
-function isTaskSlot(s: unknown): s is TaskSlot {
-  return (
-    s !== null &&
-    typeof s === "object" &&
-    typeof (s as Record<string, unknown>).sessionId === "string" &&
-    typeof (s as Record<string, unknown>).completed === "boolean"
-  );
-}
-
-function loadTaskSlots(): TaskSlot[] {
-  try {
-    const raw = localStorage.getItem(TASK_SLOTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isTaskSlot);
-  } catch {
-    return [];
-  }
-}
-
-function persistTaskSlots(slots: TaskSlot[]): void {
-  try {
-    const next = JSON.stringify(slots);
-    if (localStorage.getItem(TASK_SLOTS_KEY) === next) return;
-    localStorage.setItem(TASK_SLOTS_KEY, next);
-  } catch {
-    /* ignore */
-  }
-}
-
-// NOTE: TaskSlot helpers above MUST stay before create(). loadTaskSlots() is
-// called synchronously during store init — if TASK_SLOTS_KEY were below it
-// would be in the Temporal Dead Zone and always return [].
 export const useAppStore = create<AppState>((set) => ({
   // Initial state
   sessions: [],
@@ -434,7 +386,6 @@ export const useAppStore = create<AppState>((set) => ({
   sandboxSetupProgress: null,
   isSandboxSetupComplete: false,
   sandboxSyncStatus: null,
-  taskSlots: loadTaskSlots(),
   systemDarkMode: false,
   updateReady: false,
   updateVersion: '',
@@ -938,18 +889,6 @@ export const useAppStore = create<AppState>((set) => ({
 
   // Sandbox sync actions
   setSandboxSyncStatus: (status) => set({ sandboxSyncStatus: status }),
-
-  // Task slot actions
-  setTaskSlots: (slots) => {
-    persistTaskSlots(slots);
-    set({ taskSlots: slots });
-  },
-  removeTaskSlot: (sessionId) =>
-    set((state) => {
-      const next = state.taskSlots.filter((s) => s.sessionId !== sessionId);
-      persistTaskSlots(next);
-      return { taskSlots: next };
-    }),
 
   // Context window actions
   setSessionContextWindow: (sessionId, contextWindow) =>

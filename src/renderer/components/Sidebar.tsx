@@ -1,7 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
-import type { TaskSlot } from "../store";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import { useIPC } from "../hooks/useIPC";
 import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
@@ -23,6 +22,7 @@ import { UpdateConfirmDialog } from "./UpdateConfirmDialog";
 import { CloudApiClient } from "../services/cloud-api";
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
+import { buildSidebarSessionGroups } from "../utils/sidebar-session-groups";
 
 export function Sidebar({ width = 280 }: { width?: number }) {
   const { t, i18n } = useTranslation();
@@ -44,9 +44,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const setShowLoginModal = useAppStore((s) => s.setShowLoginModal);
   const setCloudConfig = useAppStore((s) => s.setCloudConfig);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
-  const taskSlots = useAppStore((s) => s.taskSlots);
-  const removeTaskSlot = useAppStore((s) => s.removeTaskSlot);
-  const setTaskSlots = useAppStore((s) => s.setTaskSlots);
 
   const updateReady = useAppStore((s) => s.updateReady);
   const updateVersion = useAppStore((s) => s.updateVersion);
@@ -63,7 +60,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   } = useIPC();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
@@ -159,6 +155,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     () => sessions.filter((s) => !s.archived),
     [sessions],
   );
+  const sessionGroups = useMemo(
+    () => buildSidebarSessionGroups(sessions, normalizedQuery),
+    [sessions, normalizedQuery],
+  );
   // Unique project names with their cwds for the ▾ menu
   const projectEntries = useMemo(() => {
     const map = new Map<string, string>();
@@ -171,74 +171,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([name, cwd]) => ({ name, cwd }));
   }, [activeSessions]);
-
-  useEffect(() => {
-    if (!normalizedQuery) {
-      setProjectFilter(null);
-    }
-  }, [normalizedQuery]);
-
-  // Sync taskSlots with session running/completed status.
-  // Guard: only trigger on sessions change; taskSlots updates from this effect
-  // should not cause re-entry that clears slots before runningIds are checked.
-  const prevSessionsRef = useRef(sessions);
-  useEffect(() => {
-    const sessionsChanged = prevSessionsRef.current !== sessions;
-    prevSessionsRef.current = sessions;
-
-    const runningIds = new Set(
-      sessions.filter((s) => s.status === "running").map((s) => s.id),
-    );
-    const allIds = new Set(
-      sessions.filter((s) => !s.archived).map((s) => s.id),
-    );
-    const currentSlotMap = new Map(
-      taskSlots.map((s) => [s.sessionId, s.completed]),
-    );
-
-    let slots = [...taskSlots];
-    let changed = false;
-
-    // Remove slots for archived/deleted sessions (only when sessions actually changed
-    // and sessions are loaded — guard against empty sessions on initial mount)
-    if (sessionsChanged && allIds.size > 0) {
-      const filtered = slots.filter((s) => allIds.has(s.sessionId));
-      if (filtered.length !== slots.length) {
-        slots = filtered;
-        changed = true;
-      }
-    }
-
-    // Add newly running sessions (only when sessions changed and there are runners)
-    if (sessionsChanged && runningIds.size > 0) {
-      for (const id of runningIds) {
-        if (!currentSlotMap.has(id)) {
-          slots = [{ sessionId: id, completed: false }, ...slots];
-          changed = true;
-        }
-      }
-    }
-
-    // Transition completed ↔ running (only when sessions changed)
-    if (sessionsChanged) {
-      slots = slots.map((slot) => {
-        const running = runningIds.has(slot.sessionId);
-        if (running && slot.completed) {
-          changed = true;
-          return { ...slot, completed: false };
-        }
-        if (!running && !slot.completed) {
-          changed = true;
-          return { ...slot, completed: true };
-        }
-        return slot;
-      });
-    }
-
-    if (changed) {
-      setTaskSlots(slots);
-    }
-  }, [sessions, taskSlots, setTaskSlots]);
 
   const handleSessionClick = useCallback(
     async (sessionId: string) => {
@@ -415,36 +347,58 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const handleNewSessionInProject = useCallback(
     async (cwd: string) => {
-      if (isElectron) {
-        await invoke<{ success: boolean; path: string; error?: string }>({
-          type: "workdir.set",
-          payload: { path: cwd },
+      const showFailureNotice = () => {
+        setGlobalNotice({
+          id: `notice-project-session-create-failed-${Date.now()}`,
+          type: "error",
+          message: t("sidebar.newSessionForProjectFailed"),
         });
+      };
+
+      try {
+        let nextPath = cwd;
+        if (isElectron) {
+          const result = await invoke<{
+            success: boolean;
+            path: string;
+            error?: string;
+          }>({
+            type: "workdir.set",
+            payload: { path: cwd },
+          });
+          if (!result.success) {
+            showFailureNotice();
+            return;
+          }
+          nextPath = result.path;
+        }
+        setWorkingDir(nextPath);
+        handleNewSession();
+      } catch {
+        showFailureNotice();
       }
-      handleNewSession();
     },
-    [handleNewSession, invoke, isElectron],
+    [handleNewSession, invoke, isElectron, setGlobalNotice, setWorkingDir, t],
   );
 
   const highlightTitle = (title: string, query: string) => {
-      if (!query) return title;
-      const idx = title.toLowerCase().indexOf(query.toLowerCase());
-      if (idx === -1) return title;
-      return (
-        <>
-          {title.slice(0, idx)}
-          <mark className="bg-accent/40 text-accent-foreground rounded-sm px-0.5">
-            {title.slice(idx, idx + query.length)}
-          </mark>
-          {title.slice(idx + query.length)}
-        </>
-      );
-    };
+    if (!query) return title;
+    const idx = title.toLowerCase().indexOf(query.toLowerCase());
+    if (idx === -1) return title;
+    return (
+      <>
+        {title.slice(0, idx)}
+        <mark className="bg-accent/40 text-accent-foreground rounded-sm px-0.5">
+          {title.slice(idx, idx + query.length)}
+        </mark>
+        {title.slice(idx + query.length)}
+      </>
+    );
+  };
 
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive = activeSessionId === session.id && !showMarketplace;
-    const slot = taskSlots.find((s) => s.sessionId === session.id);
-    const hasStatusIndicator = (slot && !slot.completed) || (slot && slot.completed && session.status !== "running") || (!slot && session.status === "running");
+    const hasStatusIndicator = session.status === "running";
 
     return (
       <div
@@ -463,17 +417,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             >
               {highlightTitle(session.title, normalizedQuery)}
             </div>
-            {session.isProjectMode &&
-              session.cwd &&
-              !isDefaultWorkspacePath(session.cwd) && (
-                <span
-                  className="text-[10px] bg-surface-muted text-text-muted px-1.5 py-0.5 rounded flex-shrink-0 truncate max-w-[80px]"
-                  title={getWorkspaceName(session.cwd)}
-                >
-                  {getWorkspaceName(session.cwd)}
-                </span>
-              )}
-
             {showRelativeTime && (
               <div
                 className="ml-auto min-w-[3.5rem] h-6 flex-shrink-0 relative"
@@ -487,8 +430,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   );
                 }}
               >
-                {/* Status indicator: ● running / ✓ completed */}
-                {slot && !slot.completed ? (
+                {hasStatusIndicator && (
                   <span
                     className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center"
                     role="status"
@@ -496,35 +438,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   >
                     <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
                   </span>
-                ) : slot && slot.completed && session.status !== "running" ? (
-                  <span className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center opacity-30 hover:opacity-70 focus-visible:opacity-70 cursor-pointer transition-opacity">
-                  <Check
-                    className="w-3.5 h-3.5 text-accent"
-                    role="button"
-                    tabIndex={0}
-                    aria-label={t("sidebar.dismiss")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeTaskSlot(session.id);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        removeTaskSlot(session.id);
-                      }
-                    }}
-                  />
-                  </span>
-                ) : !slot && session.status === "running" ? (
-                  <span
-                    className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center"
-                    role="status"
-                    aria-label={t("sidebar.running")}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
-                  </span>
-                ) : null}
+                )}
 
                 <span
                   className={`absolute inset-0 flex items-center justify-end text-sm leading-5 text-text-muted text-right whitespace-nowrap transition-opacity ${
@@ -554,7 +468,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       ? "text-accent bg-accent-muted/20 border border-accent/30"
                       : "text-text-muted hover:text-accent hover:bg-surface-active"
                   } ${
-                    (pendingArchiveId === session.id || hoveredTimeSessionId === session.id) && !hasStatusIndicator
+                    (pendingArchiveId === session.id ||
+                      hoveredTimeSessionId === session.id) &&
+                    !hasStatusIndicator
                       ? "opacity-100 pointer-events-auto"
                       : "opacity-0 pointer-events-none"
                   }`}
@@ -673,91 +589,61 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               </div>
             </div>
 
-            {/* Search-driven Chip filter */}
-            {normalizedQuery &&
-              (() => {
-                const matchedProjects = getMatchedProjectNames(
-                  activeSessions,
-                  normalizedQuery,
-                );
-                if (matchedProjects.size === 0) return null;
-                return (
-                  <div className="px-4 pt-2">
-                    <div className="text-[10px] text-text-muted mb-1 ml-0.5">
-                      {t("sidebar.filterByProject")}
-                    </div>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {Array.from(matchedProjects).map((name) => {
-                        const isActive = projectFilter === name;
-                        return (
-                          <button
-                            key={name}
-                            onClick={() =>
-                              setProjectFilter(isActive ? null : name)
-                            }
-                            className={`px-2 py-0.5 rounded-full text-[10px] transition-colors ${
-                              isActive
-                                ? "bg-accent text-accent-foreground"
-                                : "bg-surface-muted text-text-secondary hover:bg-accent hover:text-accent-foreground"
-                            }`}
-                          >
-                            <Folder className="w-3 h-3 inline mr-0.5 -mt-px" />
-                            {name}
-                            {isActive && (
-                              <span className="ml-0.5 opacity-70">✕</span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
             <div className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll">
               <div className="space-y-0.5">
-                {/* Session list header */}
                 <div className="px-3 pb-1.5 flex items-center justify-between">
                   <span className="text-sm font-medium leading-5 text-text-muted">
                     {t("sidebar.allSessions")}
                   </span>
                 </div>
 
-                {/* Session list */}
-                {(() => {
-                  const sorted = sortFlattenedSessions(activeSessions, taskSlots);
-                  const filtered = (() => {
-                    if (!normalizedQuery && !projectFilter) return sorted;
-                    return sorted.filter((s) => {
-                      if (projectFilter && !sessionMatchesProject(s, projectFilter))
-                        return false;
-                      if (normalizedQuery && !sessionMatchesQuery(s, normalizedQuery))
-                        return false;
-                      return true;
-                    });
-                  })();
+                {sessionGroups.unscopedSessions.map((session) =>
+                  renderSessionItem(session, true),
+                )}
 
-                  if (filtered.length === 0) {
-                    return (
-                      <div className="px-3 py-6 text-center">
-                        <p className="text-sm text-text-muted">
-                          {t("sidebar.emptyTitle")}
-                        </p>
-                        {activeSessions.length === 0 && (
-                          <p className="text-xs text-text-muted mt-1">
-                            {t("sidebar.emptyHint")}
-                          </p>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  return filtered.map((session) => (
-                    <div key={session.id}>
-                      {renderSessionItem(session, true)}
+                {sessionGroups.projectGroups.map((group) => (
+                  <section key={group.cwd} className="pt-3">
+                    <div
+                      className="px-3 pb-1.5 flex items-center justify-between"
+                      title={group.cwd}
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium leading-5 text-text-muted">
+                        {group.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleNewSessionInProject(group.cwd);
+                        }}
+                        className="h-6 w-6 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                        title={t("sidebar.newSessionForProject")}
+                        aria-label={t("sidebar.newSessionForProject")}
+                      >
+                        <SquarePen className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                  ));
-                })()}
+                    <div className="space-y-0.5">
+                      {group.sessions.map((session) =>
+                        renderSessionItem(session, true),
+                      )}
+                    </div>
+                  </section>
+                ))}
+
+                {sessionGroups.unscopedSessions.length === 0 &&
+                  sessionGroups.projectGroups.length === 0 && (
+                    <div className="px-3 py-6 text-center">
+                      <p className="text-sm text-text-muted">
+                        {t("sidebar.emptyTitle")}
+                      </p>
+                      {activeSessions.length === 0 && (
+                        <p className="text-xs text-text-muted mt-1">
+                          {t("sidebar.emptyHint")}
+                        </p>
+                      )}
+                    </div>
+                  )}
               </div>
             </div>
 
@@ -942,90 +828,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       />
     </>
   );
-}
-
-function sortFlattenedSessions(
-  sessions: Session[],
-  taskSlots: TaskSlot[],
-): Session[] {
-  const runningIds = new Set(
-    taskSlots.filter((s) => !s.completed).map((s) => s.sessionId),
-  );
-  const bufferedIds = new Set(
-    taskSlots
-      .filter((s) => {
-        if (!s.completed) return false;
-        const session = sessions.find((ss) => ss.id === s.sessionId);
-        if (!session || session.status === "running") return false;
-        return true;
-      })
-      .map((s) => s.sessionId),
-  );
-
-  const running: Session[] = [];
-  const buffered: Session[] = [];
-  const normal: Session[] = [];
-
-  for (const s of sessions) {
-    if (runningIds.has(s.id)) {
-      running.push(s);
-    } else if (bufferedIds.has(s.id)) {
-      buffered.push(s);
-    } else {
-      normal.push(s);
-    }
-  }
-
-  // Running: most recent first
-  running.sort(
-    (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
-  );
-  // Buffered: most recently completed first
-  buffered.sort(
-    (a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt),
-  );
-  // Normal: group by cwd, then sort by updatedAt
-  normal.sort((a, b) => {
-    const aCwd = normalizeWorkspacePath(a.cwd);
-    const bCwd = normalizeWorkspacePath(b.cwd);
-    if (aCwd !== bCwd) return aCwd.localeCompare(bCwd);
-    return (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt);
-  });
-
-  return [...running, ...buffered, ...normal];
-}
-
-/** Returns Set of project names that match the search query (for Chip display). */
-function getMatchedProjectNames(
-  sessions: Session[],
-  query: string,
-): Set<string> {
-  const names = new Set<string>();
-  if (!query) return names;
-  for (const s of sessions) {
-    if (!s.isProjectMode || !s.cwd || isDefaultWorkspacePath(s.cwd)) continue;
-    const name = getWorkspaceName(s.cwd).toLowerCase();
-    if (name.includes(query)) {
-      names.add(getWorkspaceName(s.cwd));
-    }
-  }
-  return names;
-}
-
-/** Check if a session matches the search query (title OR project name). */
-function sessionMatchesQuery(session: Session, query: string): boolean {
-  const q = query.toLowerCase();
-  if (session.title.toLowerCase().includes(q)) return true;
-  if (session.cwd && !isDefaultWorkspacePath(session.cwd)) {
-    if (getWorkspaceName(session.cwd).toLowerCase().includes(q)) return true;
-  }
-  return false;
-}
-
-/** Check if a session belongs to a given project (by workspace folder name). */
-function sessionMatchesProject(session: Session, projectName: string): boolean {
-  if (!session.cwd || isDefaultWorkspacePath(session.cwd)) return false;
-  return getWorkspaceName(session.cwd) === projectName;
 }
 
 function getWorkspaceName(cwd: string): string {
