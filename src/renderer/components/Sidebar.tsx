@@ -24,6 +24,10 @@ import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import { buildSidebarSessionGroups } from "../utils/sidebar-session-groups";
 
+const DEFAULT_VISIBLE_SESSIONS = 5;
+const DEFAULT_EXPANDED_PROJECTS = 3;
+const ORDINARY_SESSION_GROUP_KEY = "__ordinary_sessions__";
+
 export function Sidebar({ width = 280 }: { width?: number }) {
   const { t, i18n } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
@@ -60,6 +64,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   } = useIPC();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [projectExpansionOverrides, setProjectExpansionOverrides] = useState(
+    () => new Map<string, boolean>(),
+  );
+  const [sessionExpansionOverrides, setSessionExpansionOverrides] = useState(
+    () => new Map<string, boolean>(),
+  );
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
@@ -159,6 +169,50 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     () => buildSidebarSessionGroups(sessions, normalizedQuery),
     [sessions, normalizedQuery],
   );
+
+  const resolveProjectExpanded = (
+    groupKey: string,
+    projectIndex: number,
+    projectSessions: Session[],
+  ): boolean => {
+    if (normalizedQuery) return true;
+    const override = projectExpansionOverrides.get(groupKey);
+    if (override !== undefined) return override;
+    return (
+      projectIndex < DEFAULT_EXPANDED_PROJECTS ||
+      projectSessions.some((session) => session.id === activeSessionId)
+    );
+  };
+
+  const resolveSessionListExpanded = (
+    groupKey: string,
+    groupSessions: Session[],
+  ): boolean => {
+    if (normalizedQuery) return true;
+    const override = sessionExpansionOverrides.get(groupKey);
+    if (override !== undefined) return override;
+    return (
+      groupSessions.findIndex((session) => session.id === activeSessionId) >=
+      DEFAULT_VISIBLE_SESSIONS
+    );
+  };
+
+  const setProjectExpanded = (groupKey: string, expanded: boolean) => {
+    setProjectExpansionOverrides((current) => {
+      const next = new Map(current);
+      next.set(groupKey, expanded);
+      return next;
+    });
+  };
+
+  const setSessionListExpanded = (groupKey: string, expanded: boolean) => {
+    setSessionExpansionOverrides((current) => {
+      const next = new Map(current);
+      next.set(groupKey, expanded);
+      return next;
+    });
+  };
+
   // Unique project names with their cwds for the ▾ menu
   const projectEntries = useMemo(() => {
     const map = new Map<string, string>();
@@ -505,6 +559,31 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     );
   };
 
+  const renderSessionList = (groupKey: string, groupSessions: Session[]) => {
+    const isExpanded = resolveSessionListExpanded(groupKey, groupSessions);
+    const visibleSessions = isExpanded
+      ? groupSessions
+      : groupSessions.slice(0, DEFAULT_VISIBLE_SESSIONS);
+    const hiddenCount = groupSessions.length - DEFAULT_VISIBLE_SESSIONS;
+
+    return (
+      <>
+        {visibleSessions.map((session) => renderSessionItem(session, true))}
+        {!normalizedQuery && hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setSessionListExpanded(groupKey, !isExpanded)}
+            className="w-full rounded-lg px-3 py-1.5 text-left text-xs text-accent hover:bg-accent/10 transition-colors"
+          >
+            {isExpanded
+              ? t("sidebar.showLessSessions")
+              : t("sidebar.showMoreSessions", { count: hiddenCount })}
+          </button>
+        )}
+      </>
+    );
+  };
+
   return (
     <>
       <aside
@@ -597,39 +676,70 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   </span>
                 </div>
 
-                {sessionGroups.unscopedSessions.map((session) =>
-                  renderSessionItem(session, true),
+                {renderSessionList(
+                  ORDINARY_SESSION_GROUP_KEY,
+                  sessionGroups.unscopedSessions,
                 )}
 
-                {sessionGroups.projectGroups.map((group) => (
-                  <section key={group.cwd} className="pt-3">
-                    <div
-                      className="px-3 pb-1.5 flex items-center justify-between"
-                      title={group.cwd}
-                    >
-                      <span className="min-w-0 truncate text-sm font-medium leading-5 text-text-muted">
-                        {group.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleNewSessionInProject(group.cwd);
-                        }}
-                        className="h-6 w-6 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
-                        title={t("sidebar.newSessionForProject")}
-                        aria-label={t("sidebar.newSessionForProject")}
+                {sessionGroups.projectGroups.map((group, projectIndex) => {
+                  const isProjectExpanded = resolveProjectExpanded(
+                    group.key,
+                    projectIndex,
+                    group.sessions,
+                  );
+
+                  return (
+                    <section key={group.key} className="pt-3">
+                      <div
+                        className="flex items-center justify-between"
+                        title={group.cwd}
                       >
-                        <SquarePen className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                    <div className="space-y-0.5">
-                      {group.sessions.map((session) =>
-                        renderSessionItem(session, true),
+                        <button
+                          type="button"
+                          aria-expanded={isProjectExpanded}
+                          aria-label={t(
+                            isProjectExpanded
+                              ? "sidebar.collapseProject"
+                              : "sidebar.expandProject",
+                            { projectName: group.name },
+                          )}
+                          disabled={Boolean(normalizedQuery)}
+                          onClick={() =>
+                            setProjectExpanded(group.key, !isProjectExpanded)
+                          }
+                          className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-sm font-medium leading-5 text-text-muted hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                        >
+                          <ChevronDown
+                            className={`h-3.5 w-3.5 flex-shrink-0 transition-transform ${
+                              isProjectExpanded ? "rotate-0" : "-rotate-90"
+                            }`}
+                          />
+                          <span className="truncate">{group.name}</span>
+                          <span className="ml-auto text-xs font-normal text-text-muted">
+                            {group.sessions.length}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleNewSessionInProject(group.cwd);
+                          }}
+                          className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                          title={t("sidebar.newSessionForProject")}
+                          aria-label={t("sidebar.newSessionForProject")}
+                        >
+                          <SquarePen className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {isProjectExpanded && (
+                        <div className="space-y-0.5">
+                          {renderSessionList(group.key, group.sessions)}
+                        </div>
                       )}
-                    </div>
-                  </section>
-                ))}
+                    </section>
+                  );
+                })}
 
                 {sessionGroups.unscopedSessions.length === 0 &&
                   sessionGroups.projectGroups.length === 0 && (

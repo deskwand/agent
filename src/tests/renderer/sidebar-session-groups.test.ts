@@ -63,6 +63,7 @@ describe("buildSidebarSessionGroups", () => {
     );
 
     expect(result.projectGroups).toHaveLength(1);
+    expect(result.projectGroups[0].key).toBe("c:/work/app");
     expect(result.projectGroups[0].sessions.map(({ id }) => id)).toEqual([
       "backslash",
       "forward-slash",

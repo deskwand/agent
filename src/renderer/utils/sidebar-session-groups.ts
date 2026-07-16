@@ -2,6 +2,7 @@ import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import type { Session } from "../types";
 
 export interface SidebarProjectGroup {
+  key: string;
   cwd: string;
   name: string;
   sessions: Session[];
@@ -77,8 +78,8 @@ export function buildSidebarSessionGroups(
   }
 
   const projectGroups = Array.from(
-    projects.values(),
-    ({ cwd, sessions: projectSessions }) => {
+    projects.entries(),
+    ([key, { cwd, sessions: projectSessions }]) => {
       const name = workspaceName(cwd);
       const projectMatches = name.toLowerCase().includes(normalizedQuery);
       const visibleSessions = projectMatches
@@ -89,6 +90,7 @@ export function buildSidebarSessionGroups(
               session.title.toLowerCase().includes(normalizedQuery),
           );
       return {
+        key,
         cwd,
         name,
         sessions: sortByActivity(visibleSessions),
