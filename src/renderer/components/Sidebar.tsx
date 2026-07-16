@@ -573,7 +573,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           <button
             type="button"
             onClick={() => setSessionListExpanded(groupKey, !isExpanded)}
-            className="w-full rounded-lg px-3 py-1.5 text-left text-xs text-accent hover:bg-accent/10 transition-colors"
+            className="w-full rounded-lg bg-transparent px-3 py-1.5 text-left text-xs text-text-muted hover:bg-transparent hover:text-text-secondary focus-visible:bg-transparent focus-visible:text-text-secondary transition-colors"
           >
             {isExpanded
               ? t("sidebar.showLessSessions")

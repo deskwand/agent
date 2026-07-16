@@ -322,6 +322,15 @@ describe("Sidebar project groups", () => {
         button.textContent === i18n.t("sidebar.showMoreSessions", { count: 2 }),
     );
     expect(showMore).toBeTruthy();
+    expect(showMore?.className).toContain("text-text-muted");
+    expect(showMore?.className).toContain("hover:text-text-secondary");
+    expect(showMore?.className).toContain("focus-visible:text-text-secondary");
+    expect(showMore?.className).toContain("bg-transparent");
+    expect(showMore?.className).toContain("hover:bg-transparent");
+    expect(showMore?.className).toContain("focus-visible:bg-transparent");
+    expect(showMore?.className).not.toContain("text-accent");
+    expect(showMore?.className).not.toContain("hover:bg-accent");
+    expect(showMore?.className).not.toContain("focus-visible:outline-none");
     await act(async () => showMore?.click());
     expect(container.textContent).toContain("Ordinary 7");
 
