@@ -19,6 +19,7 @@ import {
   createCodingTools,
   type AgentSession as PiAgentSession,
   type ToolDefinition,
+  type BashToolOptions,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
 import {
@@ -3157,7 +3158,51 @@ Tool routing:\n
       // executed via Pi SDK's Bash tool can find bundled and user-installed executables.
       await enrichProcessPathForBuild();
 
-      const codingTools = createCodingTools(effectiveCwd);
+      // Resolve shell for bash tool on Windows (Git Bash / busybox / cmd)
+      let bashOptions: BashToolOptions | undefined;
+      if (process.platform === "win32") {
+        const shell = getDefaultShell();
+        if (shell.toLowerCase().includes("bash")) {
+          // Git Bash — SDK handles it natively with -c
+          bashOptions = { shellPath: shell };
+        } else {
+          // busybox — SDK uses -c but busybox needs "ash -c"
+          const busyboxShell = shell;
+          bashOptions = {
+            operations: {
+              exec: (command, cwd, { onData, signal, env }) =>
+                new Promise((resolve, reject) => {
+                  const child = spawn(busyboxShell, ["ash", "-c", command], {
+                    cwd,
+                    env: env ?? process.env,
+                    stdio: ["ignore", "pipe", "pipe"],
+                    windowsHide: true,
+                  });
+                  let killed = false;
+                  const onAbort = (): void => {
+                    killed = true;
+                    child.kill();
+                  };
+                  signal?.addEventListener("abort", onAbort, { once: true });
+                  child.stdout?.on("data", onData);
+                  child.stderr?.on("data", onData);
+                  child.on("close", (code) => {
+                    signal?.removeEventListener("abort", onAbort);
+                    resolve({ exitCode: killed ? null : code });
+                  });
+                  child.on("error", (err) => {
+                    signal?.removeEventListener("abort", onAbort);
+                    reject(err);
+                  });
+                }),
+            },
+          };
+        }
+      }
+
+      const codingTools = createCodingTools(effectiveCwd, {
+        bash: bashOptions,
+      });
 
       // Inject a default 120s timeout for bash commands when the model omits one
       const withTimeout = AgentRunner.wrapBashToolWithDefaultTimeout(
