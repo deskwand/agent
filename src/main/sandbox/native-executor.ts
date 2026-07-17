@@ -6,11 +6,11 @@
  */
 
 import * as fs from "fs";
-import * as os from "os";
 import * as path from "path";
 import { spawn } from "child_process";
 import { log } from "../utils/logger";
 import { isPathWithinRoot } from "../tools/path-containment";
+import { getShellArgs } from "../utils/shell-resolver";
 import type {
   SandboxConfig,
   SandboxExecutor,
@@ -135,36 +135,9 @@ export class NativeExecutor implements SandboxExecutor {
     const workDir = cwd ? this.validatePath(cwd) : this.workspacePath;
     this.validateCommand(command, workDir);
 
+    const [shell, args] = getShellArgs(command);
+
     return new Promise((resolve) => {
-      const isWindows = process.platform === "win32";
-      const shell = isWindows ? "powershell.exe" : "/bin/bash";
-      let scriptPath: string | null = null;
-      const args = isWindows
-        ? (() => {
-            scriptPath = path.join(os.tmpdir(), `oc-cmd-${Date.now()}.ps1`);
-            fs.writeFileSync(scriptPath, command, "utf-8");
-            return [
-              "-NoProfile",
-              "-NonInteractive",
-              "-ExecutionPolicy",
-              "Bypass",
-              "-File",
-              scriptPath,
-            ];
-          })()
-        : ["-c", command];
-
-      const cleanupScript = (): void => {
-        if (scriptPath) {
-          try {
-            fs.unlinkSync(scriptPath);
-          } catch (_e) {
-            /* ignore cleanup failure */
-          }
-          scriptPath = null;
-        }
-      };
-
       const proc = spawn(shell, args, {
         cwd: workDir,
         env: {
@@ -187,7 +160,6 @@ export class NativeExecutor implements SandboxExecutor {
       });
 
       proc.on("error", (error: Error) => {
-        cleanupScript();
         resolve({
           success: false,
           stdout: "",
@@ -197,7 +169,6 @@ export class NativeExecutor implements SandboxExecutor {
       });
 
       proc.on("close", (code: number | null) => {
-        cleanupScript();
         resolve({
           success: code === 0,
           stdout,
