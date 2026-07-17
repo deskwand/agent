@@ -73,6 +73,8 @@ win:
       to: node
     - from: dist-wsl-agent
       to: wsl-agent
+    - from: resources/msys2/win32-x64
+      to: msys2
     - from: .deskwand/skills
       to: skills
 mac:

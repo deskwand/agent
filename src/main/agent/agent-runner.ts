@@ -19,6 +19,7 @@ import {
   createCodingTools,
   type AgentSession as PiAgentSession,
   type ToolDefinition,
+  type BashToolOptions,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
 import {
@@ -3157,7 +3158,14 @@ Tool routing:\n
       // executed via Pi SDK's Bash tool can find bundled and user-installed executables.
       await enrichProcessPathForBuild();
 
-      const codingTools = createCodingTools(effectiveCwd);
+      let bashOptions: BashToolOptions | undefined;
+      if (process.platform === "win32") {
+        bashOptions = { shellPath: getDefaultShell() };
+      }
+
+      const codingTools = createCodingTools(effectiveCwd, {
+        bash: bashOptions,
+      });
 
       // Inject a default 120s timeout for bash commands when the model omits one
       const withTimeout = AgentRunner.wrapBashToolWithDefaultTimeout(
