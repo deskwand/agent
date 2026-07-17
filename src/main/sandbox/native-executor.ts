@@ -10,7 +10,7 @@ import * as path from "path";
 import { spawn } from "child_process";
 import { log } from "../utils/logger";
 import { isPathWithinRoot } from "../tools/path-containment";
-import { getShellArgs } from "../utils/shell-resolver";
+import { getShellArgs, getDefaultShell } from "../utils/shell-resolver";
 import type {
   SandboxConfig,
   SandboxExecutor,
@@ -39,7 +39,7 @@ export class NativeExecutor implements SandboxExecutor {
     }
 
     this.isInitialized = true;
-    log("[NativeExecutor] Initialized with workspace:", this.workspacePath);
+    log("[NativeExecutor] Initialized shell:", getDefaultShell(), "workspace:", this.workspacePath);
   }
 
   /**
