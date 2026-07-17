@@ -65,6 +65,8 @@ win:
   artifactName: ${productName}-${version}-win-${arch}.${ext}
   signAndEditExecutable: false
   extraResources:
+    - from: resources/icon.ico
+      to: icon.ico
     - from: .bundle-resources/mcp
       to: mcp
     - from: resources/node/win32-x64
