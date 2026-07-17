@@ -5,39 +5,15 @@
  * - Text pages: extracts text content with CMap support for Chinese/CJK.
  * - Image-only pages: renders to PNG, saves to temp files, returns file paths
  *   so the LLM can delegate to vision_describe or image-ocr as needed.
+ *
+ * pdfjs-dist is loaded lazily (dynamic import inside readPdf) to avoid a
+ * startup crash on Windows when @napi-rs/canvas native binary is missing
+ * and DOMMatrix cannot be polyfilled at module-init time.
  */
-// pdfjs-dist v6+ is ESM + DOM-only; Node.js must use the legacy build.
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import * as path from "path";
 import * as fs from "fs";
 import { pathToFileURL } from "url";
 import { logError } from "../../../utils/logger";
-
-// ── Worker setup ──────────────────────────────────────────────────
-
-(() => {
-  try {
-    const workerPath = require.resolve(
-      "pdfjs-dist/legacy/build/pdf.worker.mjs",
-    );
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
-  } catch {
-    // worker file not found — pdfjs-dist will fall back to its default
-  }
-})();
-
-// ── CMap setup (Chinese/CJK font support) ─────────────────────────
-
-const CMAP_URL: string | undefined = (() => {
-  try {
-    const pdfjsPath = require.resolve("pdfjs-dist/legacy/build/pdf.mjs");
-    const cmapDir = path.join(path.dirname(pdfjsPath), "..", "..", "cmaps");
-    const url = pathToFileURL(cmapDir + path.sep);
-    return url.href;
-  } catch {
-    return undefined;
-  }
-})();
 
 // ── Content block types ───────────────────────────────────────────
 
@@ -73,7 +49,8 @@ function extractPageText(textContent: { items: TextItem[] }): string {
 }
 
 async function renderPageToPng(
-  page: pdfjsLib.PDFPageProxy,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  page: any,
   scale: number,
   outputPath: string,
 ): Promise<void> {
@@ -124,6 +101,28 @@ export async function readPdf(
   startPage?: number,
   endPage?: number,
 ): Promise<PdfContentBlock[]> {
+  // Dynamic import avoids a startup crash on Windows where @napi-rs/canvas
+  // native binary is missing → pdfjs-dist top-level `new DOMMatrix()` throws.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfjsLib: any = await import("pdfjs-dist/legacy/build/pdf.mjs");
+
+  // Worker & CMap setup (previously at module top-level, now inline)
+  try {
+    const wp = require.resolve("pdfjs-dist/legacy/build/pdf.worker.mjs");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(wp).href;
+  } catch {
+    // worker file not found — pdfjs-dist will fall back to its default
+  }
+  let cmapUrl: string | undefined;
+  try {
+    const p = require.resolve("pdfjs-dist/legacy/build/pdf.mjs");
+    cmapUrl = pathToFileURL(
+      path.join(path.dirname(p), "..", "..", "cmaps") + path.sep,
+    ).href;
+  } catch {
+    // cmaps not found — CJK text may render poorly
+  }
+
   // pdfjs-dist v6 requires Uint8Array; from fs.readFileSync, byteOffset is 0.
   const data = new Uint8Array(
     buffer.buffer,
@@ -133,7 +132,7 @@ export async function readPdf(
 
   const loadingTask = pdfjsLib.getDocument({
     data,
-    ...(CMAP_URL ? { cMapUrl: CMAP_URL, cMapPacked: true } : {}),
+    ...(cmapUrl ? { cMapUrl: cmapUrl, cMapPacked: true } : {}),
   });
 
   const doc = await loadingTask.promise;
