@@ -106,6 +106,9 @@ linux:
     - target: AppImage
       arch:
         - x64
+    - target: deb
+      arch:
+        - x64
   artifactName: ${productName}-${version}-linux-${arch}.${ext}
   extraResources:
     - from: .bundle-resources/mcp
