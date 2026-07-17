@@ -1575,12 +1575,17 @@ ${hints.join("\n")}
         const { script } = params as { script: string };
         return withPage("internal_browser_evaluate", async (page) => {
           const result = await page.evaluate(script);
+          const text =
+            typeof result === "string"
+              ? result
+              : result === undefined
+                ? "(no return value)"
+                : JSON.stringify(result);
           return {
             content: [
               {
                 type: "text" as const,
-                text:
-                  typeof result === "string" ? result : JSON.stringify(result),
+                text,
               },
             ],
           };
