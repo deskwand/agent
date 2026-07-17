@@ -73,6 +73,8 @@ win:
       to: node
     - from: dist-wsl-agent
       to: wsl-agent
+    - from: resources/busybox/win32-x64/busybox.exe
+      to: busybox/busybox.exe
     - from: .deskwand/skills
       to: skills
 mac:
