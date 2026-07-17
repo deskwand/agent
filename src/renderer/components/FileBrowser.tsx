@@ -11,6 +11,7 @@ import {
   Home,
   Loader2,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { IMAGE_EXTS, CODE_LIKE_EXTS } from "../utils/file-types";
 import { isPreviewableExt } from "../utils/file-preview";
@@ -318,14 +319,16 @@ export function FileBrowser({ width }: { width: number }) {
         )}
       </div>
 
-      {previewFile && (
-        <FilePreviewModal
-          isOpen={true}
-          filePath={previewFile.path}
-          fileName={previewFile.name}
-          onClose={() => setPreviewFile(null)}
-        />
-      )}
+      {previewFile &&
+        createPortal(
+          <FilePreviewModal
+            isOpen={true}
+            filePath={previewFile.path}
+            fileName={previewFile.name}
+            onClose={() => setPreviewFile(null)}
+          />,
+          document.body,
+        )}
     </div>
   );
 }

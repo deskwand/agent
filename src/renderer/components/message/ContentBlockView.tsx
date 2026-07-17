@@ -9,6 +9,7 @@ import {
   useState,
   useCallback,
 } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import { PanelErrorBoundary } from "../PanelErrorBoundary";
@@ -560,14 +561,16 @@ export const ContentBlockView = memo(function ContentBlockView({
   return (
     <>
       {content}
-      {previewFile && (
-        <FilePreviewModal
-          isOpen={true}
-          filePath={previewFile.path}
-          fileName={previewFile.name}
-          onClose={() => setPreviewFile(null)}
-        />
-      )}
+      {previewFile &&
+        createPortal(
+          <FilePreviewModal
+            isOpen={true}
+            filePath={previewFile.path}
+            fileName={previewFile.name}
+            onClose={() => setPreviewFile(null)}
+          />,
+          document.body,
+        )}
     </>
   );
 });
