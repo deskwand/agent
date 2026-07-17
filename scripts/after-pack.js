@@ -227,5 +227,55 @@ module.exports = async function afterPack(context) {
     console.log(`  ✓ app-update.yml written to ${updaterYmlPath}`);
   }
 
+  // --- 6. Windows: set .exe icon using resedit (cross-platform, no wine/rcedit needed) ---
+  if (platform === 'win32') {
+    try {
+      const ResEdit = require('resedit');
+
+      const exeName = `${context.packager.appInfo.productFilename}.exe`;
+      const exePath = path.join(appOutDir, exeName);
+
+      if (!fs.existsSync(exePath)) {
+        console.warn(`  ⚠ icon: .exe not found at ${exePath}, skipping`);
+      } else {
+        // icon.ico comes from extraResources, already in resourcesDir
+        const iconPath = path.join(resourcesDir, 'icon.ico');
+
+        if (!fs.existsSync(iconPath)) {
+          console.warn(`  ⚠ icon: ${iconPath} not found, skipping`);
+        } else {
+          const exeData = fs.readFileSync(exePath);
+          const iconData = fs.readFileSync(iconPath);
+
+          const exe = ResEdit.NtExecutable.from(exeData);
+          const res = ResEdit.NtExecutableResource.from(exe);
+          const iconFile = ResEdit.Data.IconFile.from(iconData);
+          const iconItems = iconFile.icons.map((item) => item.data);
+
+          // Find existing icon groups and replace them all
+          const iconGroups = ResEdit.Resource.IconGroupEntry.fromEntries(res.entries);
+          if (iconGroups.length > 0) {
+            for (const group of iconGroups) {
+              ResEdit.Resource.IconGroupEntry.replaceIconsForResource(
+                res.entries, group.id, group.lang, iconItems
+              );
+            }
+          } else {
+            // No icon group yet, create one (ID=1, lang=0 for neutral)
+            ResEdit.Resource.IconGroupEntry.replaceIconsForResource(
+              res.entries, 1, 0, iconItems
+            );
+          }
+
+          res.outputResource(exe);
+          fs.writeFileSync(exePath, Buffer.from(exe.generate()));
+          console.log(`  ✓ icon: .exe icon replaced (${iconGroups.length || 1} group(s))`);
+        }
+      }
+    } catch (err) {
+      console.error(`  ⚠ icon: failed to set .exe icon:`, err.message);
+    }
+  }
+
   console.log(`✅ after-pack cleanup complete for ${platform}-${archName}\n`);
 };
