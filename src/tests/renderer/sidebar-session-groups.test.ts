@@ -70,35 +70,43 @@ describe("buildSidebarSessionGroups", () => {
     ]);
   });
 
-  it("sorts project groups and their sessions by latest activity", () => {
+  it("sorts project groups by earliest createdAt (stable) and sessions by latest activity", () => {
     const result = buildSidebarSessionGroups(
       [
-        session("older-in-new-project", {
-          isProjectMode: true,
-          cwd: "/work/new",
-          updatedAt: 20,
-        }),
-        session("newer-in-new-project", {
-          isProjectMode: true,
-          cwd: "/work/new",
-          updatedAt: 50,
-        }),
-        session("old-project", {
+        session("old-project-first-session", {
           isProjectMode: true,
           cwd: "/work/old",
-          updatedAt: 40,
+          createdAt: 1,
+          updatedAt: 100,
+        }),
+        session("new-project-session", {
+          isProjectMode: true,
+          cwd: "/work/new",
+          createdAt: 50,
+          updatedAt: 20,
+        }),
+        session("new-project-later-session", {
+          isProjectMode: true,
+          cwd: "/work/new",
+          createdAt: 30,
+          updatedAt: 10,
         }),
       ],
       "",
     );
 
+    // 项目组按 earliestCreatedAt 排序：new(min=30) > old(1)，新项目在上
     expect(result.projectGroups.map(({ name }) => name)).toEqual([
       "new",
       "old",
     ]);
+    // 组内会话仍按活跃时间排序
     expect(result.projectGroups[0].sessions.map(({ id }) => id)).toEqual([
-      "newer-in-new-project",
-      "older-in-new-project",
+      "new-project-session",
+      "new-project-later-session",
+    ]);
+    expect(result.projectGroups[1].sessions.map(({ id }) => id)).toEqual([
+      "old-project-first-session",
     ]);
   });
 

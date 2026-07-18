@@ -188,9 +188,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     projectSessions: Session[],
   ): boolean => {
     if (normalizedQuery) return true;
-    if (activeSessionId && projectSessions.some((s) => s.id === activeSessionId)) return true;
     const override = projectExpansionOverrides.get(groupKey);
     if (override !== undefined) return override;
+    if (activeSessionId && projectSessions.some((s) => s.id === activeSessionId)) return true;
     return projectIndex < DEFAULT_EXPANDED_PROJECTS;
   };
 

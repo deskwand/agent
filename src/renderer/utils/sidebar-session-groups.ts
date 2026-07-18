@@ -6,7 +6,7 @@ export interface SidebarProjectGroup {
   cwd: string;
   name: string;
   sessions: Session[];
-  latestAt: number;
+  earliestCreatedAt: number;
 }
 
 export interface SidebarSessionGroups {
@@ -94,12 +94,12 @@ export function buildSidebarSessionGroups(
         cwd,
         name,
         sessions: sortByActivity(visibleSessions),
-        latestAt: Math.max(...projectSessions.map(sessionTime)),
+        earliestCreatedAt: Math.min(...projectSessions.map((s) => s.createdAt)),
       };
     },
   )
     .filter(({ sessions }) => sessions.length > 0)
-    .sort((a, b) => b.latestAt - a.latestAt);
+    .sort((a, b) => b.earliestCreatedAt - a.earliestCreatedAt);
 
   return {
     unscopedSessions: sortByActivity(unscoped),
