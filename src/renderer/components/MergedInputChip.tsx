@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ThinkingLevel, ProviderProfileKey } from "../types";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
+import type { ProviderProfileKey, ThinkingLevel } from "../types";
 import type { ModelOptionGroup } from "./ChatInputBottomBar";
-import { ChevronDown } from "lucide-react";
 
 export interface MergedInputChipProps {
   model: string;
@@ -15,6 +15,16 @@ export interface MergedInputChipProps {
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
 }
 
+type ActiveSubmenu = "model" | "thinking" | null;
+
+const MENU_ROW_HEIGHT_PX = 36;
+const MODEL_MENU_MAX_VISIBLE_ROWS = 16;
+const MODEL_MENU_MAX_HEIGHT_PX =
+  MENU_ROW_HEIGHT_PX * MODEL_MENU_MAX_VISIBLE_ROWS;
+const TITLEBAR_HEIGHT_PX = 40;
+const MENU_TOP_MARGIN_PX = 16;
+const VIEWPORT_TOP_SAFE_AREA_PX = TITLEBAR_HEIGHT_PX + MENU_TOP_MARGIN_PX;
+
 export function MergedInputChip({
   model,
   modelOptions,
@@ -26,240 +36,270 @@ export function MergedInputChip({
   onSelectThinkingLevel,
 }: MergedInputChipProps) {
   const { t } = useTranslation();
-  const [panelOpen, setPanelOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeSubmenu, setActiveSubmenu] = useState<ActiveSubmenu>(null);
   const [modelSearch, setModelSearch] = useState("");
-  const [showLeft, setShowLeft] = useState(false);
-  const [showRight, setShowRight] = useState(false);
+  const [modelMenuMaxHeight, setModelMenuMaxHeight] = useState(
+    MODEL_MENU_MAX_HEIGHT_PX,
+  );
   const containerRef = useRef<HTMLDivElement>(null);
+  const primaryMenuRef = useRef<HTMLDivElement>(null);
 
   const filteredModelOptions = useMemo(() => {
-    if (!modelSearch.trim()) return modelOptions;
-    const q = modelSearch.toLowerCase();
+    const query = modelSearch.trim().toLowerCase();
+    if (!query) return modelOptions;
+
     return modelOptions
       .map((group) => ({
         ...group,
         items: group.items.filter(
           (item) =>
-            item.name.toLowerCase().includes(q) ||
-            item.id.toLowerCase().includes(q),
+            item.name.toLowerCase().includes(query) ||
+            item.id.toLowerCase().includes(query),
         ),
       }))
       .filter((group) => group.items.length > 0);
   }, [modelOptions, modelSearch]);
 
-  const closeAll = useCallback(() => {
-    setPanelOpen(false);
+  const closeMenu = useCallback(() => {
+    setMenuOpen(false);
+    setActiveSubmenu(null);
     setModelSearch("");
-    setShowLeft(false);
-    setShowRight(false);
   }, []);
 
+  const updateModelMenuMaxHeight = useCallback(() => {
+    const menu = primaryMenuRef.current;
+    if (!menu) return;
+
+    const availableHeight = Math.max(
+      0,
+      Math.floor(
+        menu.getBoundingClientRect().bottom - VIEWPORT_TOP_SAFE_AREA_PX,
+      ),
+    );
+    setModelMenuMaxHeight(Math.min(MODEL_MENU_MAX_HEIGHT_PX, availableHeight));
+  }, []);
+
+  const openSubmenu = useCallback(
+    (submenu: Exclude<ActiveSubmenu, null>) => {
+      if (submenu === "model") updateModelMenuMaxHeight();
+      setActiveSubmenu(submenu);
+    },
+    [updateModelMenuMaxHeight],
+  );
+
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function handleOutsideClick(event: MouseEvent) {
       if (
         containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
+        !containerRef.current.contains(event.target as Node)
       ) {
-        closeAll();
+        closeMenu();
       }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [closeAll]);
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [closeMenu]);
 
   useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape" && panelOpen) {
-        closeAll();
-      }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && menuOpen) closeMenu();
     }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [panelOpen, closeAll]);
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [closeMenu, menuOpen]);
+
+  useEffect(() => {
+    if (!menuOpen || activeSubmenu !== "model") return;
+
+    updateModelMenuMaxHeight();
+    window.addEventListener("resize", updateModelMenuMaxHeight);
+    return () => window.removeEventListener("resize", updateModelMenuMaxHeight);
+  }, [activeSubmenu, menuOpen, updateModelMenuMaxHeight]);
 
   const disabled = modelMenuDisabled || modelOptions.length === 0;
+  const combinedLabel = `${t("chat.model")}, ${t("chat.thinkingLevel")}`;
 
   return (
     <div ref={containerRef} className="relative inline-flex">
-      {/* Popup panel + chip as one visual unit */}
-      <div
-        className={`absolute right-0 bottom-0 z-30 flex flex-col items-start transition duration-150 ease-out ${
-          panelOpen
-            ? "opacity-100 translate-y-0 visible"
-            : "opacity-0 translate-y-2 invisible pointer-events-none"
-        }`}
-      >
-        {/* Panel body: center column + absolute wings */}
-        <div className="flex">
-          {/* Left wing: model list (absolute, to the left of center) */}
-          <div
-            onMouseEnter={() => setShowLeft(true)}
-            onMouseLeave={() => setShowLeft(false)}
-            className={`absolute right-full top-0 w-[200px] max-h-[320px] overflow-y-auto rounded-tl-xl border border-border border-r-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
-              showLeft
-                ? "opacity-100 translate-x-0"
-                : "opacity-0 translate-x-2 pointer-events-none"
-            }`}
-          >
-            <input
-              type="text"
-              value={modelSearch}
-              onChange={(e) => setModelSearch(e.target.value)}
-              placeholder={t("chat.searchModel")}
-              className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <div className="mt-1.5">
-              {filteredModelOptions.length === 0 ? (
-                <div className="px-2.5 py-3 text-xs text-text-muted text-center">
-                  {t("chat.noModelMatch")}
-                </div>
-              ) : (
-                filteredModelOptions.map((group) => (
-                  <div key={group.profileKey} className="mb-1 last:mb-0">
-                    <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
-                      {group.groupLabel}
-                    </div>
-                    {group.items.map((item) => (
-                      <button
-                        key={`${group.profileKey}:${item.id}`}
-                        type="button"
-                        onClick={() => {
-                          onSelectModel(group.profileKey, item.id);
-                        }}
-                        className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
-                          group.profileKey === activeProviderProfileKey &&
-                          item.id === model
-                            ? "bg-accent text-background"
-                            : "text-text-primary hover:bg-surface-hover"
-                        }`}
-                        role="option"
-                        aria-selected={
-                          group.profileKey === activeProviderProfileKey &&
-                          item.id === model
-                        }
-                        title={item.name}
-                      >
-                        {item.name}
-                      </button>
-                    ))}
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Center column: vertical "模型" / "思考" */}
-          <div className="w-[130px] border border-border border-b-0 bg-background rounded-t-xl p-2 flex flex-col gap-0.5">
-            <div
-              className={`px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
-                showLeft
-                  ? "bg-accent/10 text-text-primary"
-                  : "text-text-secondary hover:bg-surface-hover"
-              }`}
-              onMouseEnter={() => {
-                setShowLeft(true);
-                setShowRight(false);
-              }}
-            >
-              {t("chat.switchModel")}
-            </div>
-            <div
-              className={`px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
-                showRight
-                  ? "bg-accent/10 text-text-primary"
-                  : "text-text-secondary hover:bg-surface-hover"
-              }`}
-              onMouseEnter={() => {
-                setShowRight(true);
-                setShowLeft(false);
-              }}
-            >
-              {t("chat.thinkingLevel")}
-            </div>
-          </div>
-
-          {/* Right wing: thinking-level options (absolute, to the right of center) */}
-          <div
-            onMouseEnter={() => setShowRight(true)}
-            onMouseLeave={() => setShowRight(false)}
-            className={`absolute left-full top-0 w-[140px] max-h-[320px] overflow-y-auto rounded-tr-xl border border-border border-l-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
-              showRight
-                ? "opacity-100 translate-x-0"
-                : "opacity-0 -translate-x-2 pointer-events-none"
-            }`}
-          >
-            <div className="px-1 text-xs uppercase tracking-[0.08em] text-text-muted mb-1">
-              {t("chat.thinkingLevel")}
-            </div>
-            {thinkingLevelOptions.map((level) => (
-              <button
-                key={level}
-                type="button"
-                onClick={() => {
-                  onSelectThinkingLevel(level);
-                }}
-                className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
-                  level === thinkingLevel
-                    ? "bg-accent text-background"
-                    : "text-text-primary hover:bg-surface-hover"
-                }`}
-                role="option"
-                aria-selected={level === thinkingLevel}
-              >
-                {t(`chat.thinkingLevel.${level}`)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Chip: bottom of the connected visual unit */}
-        <button
-          type="button"
-          className="inline-flex h-9 items-center gap-1.5 px-2 bg-background border border-border rounded-b-full text-xs text-text-primary"
-          onClick={() => {
-            if (disabled) return;
-            closeAll();
-          }}
-        >
-          <span className="truncate max-w-[10rem]">
-            {model || t("chat.noModel")}
-          </span>
-          <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
-          <ChevronDown
-            className={`w-3 h-3 text-text-muted transition-transform ${panelOpen ? "rotate-180" : ""}`}
-          />
-        </button>
-      </div>
-
-      {/* Collapsed chip (shown when panel is closed) */}
       <button
         type="button"
         onClick={() => {
           if (disabled) return;
-          setPanelOpen((v) => !v);
-          setShowLeft(false);
-          setShowRight(false);
+          setMenuOpen((open) => !open);
+          setActiveSubmenu(null);
           setModelSearch("");
         }}
         disabled={disabled}
-        className={`inline-flex h-9 items-center gap-1.5 px-2 rounded-full border text-xs transition-colors ${
-          panelOpen
-            ? "invisible pointer-events-none"
-            : "border-border-subtle bg-background/60"
-        } disabled:opacity-50`}
-        aria-haspopup="dialog"
-        aria-expanded={panelOpen}
-        title={t("chat.switchModel")}
+        className={`inline-flex h-9 items-center gap-1.5 rounded-full border border-border-subtle bg-background/60 px-2 text-xs text-text-primary transition-[width,background-color] duration-150 hover:bg-surface-hover disabled:opacity-50 ${
+          menuOpen ? "w-[15rem] justify-center" : "max-w-[18rem]"
+        }`}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-label={combinedLabel}
+        title={combinedLabel}
       >
-        <span className="truncate max-w-[10rem] text-text-primary">
+        <span className="max-w-[11rem] truncate">
           {model || t("chat.noModel")}
         </span>
-        <span className="text-text-primary">
-          {t(`chat.thinkingLevel.${thinkingLevel}`)}
-        </span>
-        <ChevronDown className="w-3 h-3 text-text-muted" />
+        <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
+        <ChevronDown
+          className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${menuOpen ? "rotate-180" : ""}`}
+        />
       </button>
+
+      <div
+        ref={primaryMenuRef}
+        role="menu"
+        aria-label={combinedLabel}
+        aria-hidden={!menuOpen}
+        className={`absolute right-0 bottom-[calc(100%+8px)] z-30 flex w-[15rem] flex-col rounded-xl border border-border bg-background p-1 shadow-soft transition duration-150 ease-out ${
+          menuOpen
+            ? "visible translate-y-0 opacity-100"
+            : "pointer-events-none invisible translate-y-2 opacity-0"
+        }`}
+      >
+        <button
+          type="button"
+          onMouseEnter={() => openSubmenu("model")}
+          onClick={() => openSubmenu("model")}
+          className={`flex h-9 items-center justify-between gap-3 rounded-lg px-3 text-sm transition-colors ${
+            activeSubmenu === "model"
+              ? "bg-surface-hover text-text-primary"
+              : "text-text-primary hover:bg-surface-hover"
+          }`}
+          aria-haspopup="listbox"
+          aria-expanded={activeSubmenu === "model"}
+          aria-label={t("chat.model")}
+        >
+          <span className="font-medium">{t("chat.model")}</span>
+          <span className="flex min-w-0 items-center gap-2 text-text-muted">
+            <span className="max-w-[9rem] truncate">
+              {model || t("chat.noModel")}
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onMouseEnter={() => openSubmenu("thinking")}
+          onClick={() => openSubmenu("thinking")}
+          className={`flex h-9 items-center justify-between gap-3 rounded-lg px-3 text-sm transition-colors ${
+            activeSubmenu === "thinking"
+              ? "bg-surface-hover text-text-primary"
+              : "text-text-primary hover:bg-surface-hover"
+          }`}
+          aria-haspopup="listbox"
+          aria-expanded={activeSubmenu === "thinking"}
+          aria-label={t("chat.thinkingLevel")}
+        >
+          <span className="font-medium">{t("chat.thinkingLevel")}</span>
+          <span className="flex items-center gap-2 text-text-muted">
+            <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          </span>
+        </button>
+
+        <div
+          role="listbox"
+          aria-label={t("chat.model")}
+          aria-hidden={activeSubmenu !== "model"}
+          onMouseEnter={() => openSubmenu("model")}
+          style={{ maxHeight: `${modelMenuMaxHeight}px` }}
+          className={`absolute right-[calc(100%+4px)] bottom-0 w-[20rem] overflow-y-auto rounded-xl border border-border bg-background p-2 shadow-soft transition duration-150 ease-out ${
+            activeSubmenu === "model"
+              ? "visible translate-x-0 opacity-100"
+              : "pointer-events-none invisible translate-x-2 opacity-0"
+          }`}
+        >
+          <input
+            type="text"
+            value={modelSearch}
+            onChange={(event) => setModelSearch(event.target.value)}
+            onClick={(event) => event.stopPropagation()}
+            placeholder={t("chat.searchModel")}
+            className="sticky top-0 z-10 mb-1.5 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+          />
+
+          {filteredModelOptions.length === 0 ? (
+            <div className="px-2.5 py-3 text-center text-xs text-text-muted">
+              {t("chat.noModelMatch")}
+            </div>
+          ) : (
+            filteredModelOptions.map((group) => (
+              <div key={group.profileKey} className="mb-1 last:mb-0">
+                <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
+                  {group.groupLabel}
+                </div>
+                {group.items.map((item) => {
+                  const selected =
+                    group.profileKey === activeProviderProfileKey &&
+                    item.id === model;
+
+                  return (
+                    <button
+                      key={`${group.profileKey}:${item.id}`}
+                      type="button"
+                      onClick={() => onSelectModel(group.profileKey, item.id)}
+                      className={`flex h-9 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-left text-sm transition-colors ${
+                        selected
+                          ? "bg-surface-hover text-text-primary"
+                          : "text-text-primary hover:bg-surface-hover"
+                      }`}
+                      role="option"
+                      aria-selected={selected}
+                      title={item.name}
+                    >
+                      <span className="truncate">{item.name}</span>
+                      {selected && <Check className="h-4 w-4 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            ))
+          )}
+        </div>
+
+        <div
+          role="listbox"
+          aria-label={t("chat.thinkingLevel")}
+          aria-hidden={activeSubmenu !== "thinking"}
+          onMouseEnter={() => openSubmenu("thinking")}
+          className={`absolute left-[calc(100%+4px)] bottom-0 w-[12rem] rounded-xl border border-border bg-background p-2 shadow-soft transition duration-150 ease-out ${
+            activeSubmenu === "thinking"
+              ? "visible translate-x-0 opacity-100"
+              : "pointer-events-none invisible -translate-x-2 opacity-0"
+          }`}
+        >
+          <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
+            {t("chat.thinkingLevel")}
+          </div>
+          {thinkingLevelOptions.map((level) => {
+            const selected = level === thinkingLevel;
+
+            return (
+              <button
+                key={level}
+                type="button"
+                onClick={() => onSelectThinkingLevel(level)}
+                className={`flex h-9 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-left text-sm transition-colors ${
+                  selected
+                    ? "bg-surface-hover text-text-primary"
+                    : "text-text-primary hover:bg-surface-hover"
+                }`}
+                role="option"
+                aria-selected={selected}
+              >
+                <span>{t(`chat.thinkingLevel.${level}`)}</span>
+                {selected && <Check className="h-4 w-4 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }

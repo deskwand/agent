@@ -10,7 +10,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-const makeModelOptions = (): ModelOptionGroup[] => [
+const modelOptions: ModelOptionGroup[] = [
   {
     profileKey: "profile-a" as never,
     groupLabel: "Provider A",
@@ -26,22 +26,23 @@ const makeModelOptions = (): ModelOptionGroup[] => [
   },
 ];
 
-const baseThinkingOptions = [
+const thinkingLevelOptions = [
   "off",
+  "minimal",
   "low",
   "medium",
   "high",
-  "extreme",
+  "xhigh",
 ] as never[];
 
 const baseProps = {
   model: "model-1",
-  modelOptions: makeModelOptions(),
+  modelOptions,
   activeProviderProfileKey: "profile-a" as never,
   onSelectModel: vi.fn(),
   modelMenuDisabled: false,
   thinkingLevel: "medium" as never,
-  thinkingLevelOptions: baseThinkingOptions,
+  thinkingLevelOptions,
   onSelectThinkingLevel: vi.fn(),
 };
 
@@ -63,187 +64,193 @@ describe("MergedInputChip", () => {
   });
 
   function render(props = {}) {
-    const merged = { ...baseProps, ...props };
     act(() => {
-      root.render(React.createElement(MergedInputChip, merged));
-    });
-  }
-
-  function panelIsOpen(): boolean {
-    // The panel wrapper div has "invisible" class when closed
-    const wrappers = container.querySelectorAll(
-      'div.absolute.right-0.bottom-0.z-30',
-    );
-    for (const el of wrappers) {
-      if (el.classList.contains("invisible")) return false;
-      return true;
-    }
-    return false;
-  }
-
-  function collapsedChip(): HTMLButtonElement | null {
-    // The collapsed chip has rounded-full; the panel chip has rounded-b-full
-    return container.querySelector("button.rounded-full");
-  }
-
-  function getCenterModelEntry(): HTMLElement | null {
-    // Center column: "chat.switchModel" text among the panel's direct children
-    return Array.from(container.querySelectorAll(".px-3.py-2.rounded-lg")).find(
-      (el) => el.textContent?.includes("chat.switchModel"),
-    ) as HTMLElement | null;
-  }
-
-  function getCenterThinkingEntry(): HTMLElement | null {
-    return Array.from(container.querySelectorAll(".px-3.py-2.rounded-lg")).find(
-      (el) => el.textContent?.includes("chat.thinkingLevel"),
-    ) as HTMLElement | null;
-  }
-
-  it("renders model id and thinking level in collapsed chip", () => {
-    render();
-    const chip = collapsedChip();
-    expect(chip).toBeTruthy();
-    expect(chip?.textContent).toContain("model-1");
-    expect(chip?.textContent).toContain("chat.thinkingLevel.medium");
-    expect(panelIsOpen()).toBe(false);
-  });
-
-  it("renders fallback when model is empty and modelOptions is empty", () => {
-    render({ model: "", modelOptions: [] });
-    const chip = collapsedChip();
-    expect(chip).toBeTruthy();
-    expect(chip?.textContent).toContain("chat.noModel");
-  });
-
-  it("opens panel on chip click", () => {
-    render();
-    const chip = collapsedChip();
-    act(() => chip?.click());
-    expect(panelIsOpen()).toBe(true);
-  });
-
-  it("shows center column with model and thinking anchors when panel opens", () => {
-    render();
-    act(() => collapsedChip()?.click());
-    expect(getCenterModelEntry()).toBeTruthy();
-    expect(getCenterThinkingEntry()).toBeTruthy();
-  });
-
-  it("reveals left column on hover of model anchor in center", () => {
-    render();
-    act(() => collapsedChip()?.click());
-    // Hover center "chat.switchModel" entry
-    const modelEntry = getCenterModelEntry();
-    act(() => {
-      modelEntry?.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-    });
-    // Search input should now be visible (left column is shown)
-    expect(
-      container.querySelector('[placeholder="chat.searchModel"]'),
-    ).toBeTruthy();
-  });
-
-  it("reveals right column on hover of thinking anchor in center", () => {
-    render();
-    act(() => collapsedChip()?.click());
-    const thinkingEntry = getCenterThinkingEntry();
-    act(() => {
-      thinkingEntry?.dispatchEvent(
-        new MouseEvent("mouseenter", { bubbles: true }),
+      root.render(
+        React.createElement(MergedInputChip, { ...baseProps, ...props }),
       );
     });
-    // Thinking options should be visible
-    expect(container.textContent).toContain("chat.thinkingLevel.off");
-    expect(container.textContent).toContain("chat.thinkingLevel.extreme");
+  }
+
+  function trigger(): HTMLButtonElement {
+    return container.querySelector('button[aria-haspopup="menu"]')!;
+  }
+
+  function primaryMenu(): HTMLElement {
+    return container.querySelector('[role="menu"]')!;
+  }
+
+  function modelRow(): HTMLButtonElement {
+    return container.querySelector(
+      'button[aria-haspopup="listbox"][aria-label="chat.model"]',
+    )!;
+  }
+
+  function thinkingRow(): HTMLButtonElement {
+    return container.querySelector(
+      'button[aria-haspopup="listbox"][aria-label="chat.thinkingLevel"]',
+    )!;
+  }
+
+  function modelList(): HTMLElement {
+    return container.querySelector(
+      '[role="listbox"][aria-label="chat.model"]',
+    )!;
+  }
+
+  function thinkingList(): HTMLElement {
+    return container.querySelector(
+      '[role="listbox"][aria-label="chat.thinkingLevel"]',
+    )!;
+  }
+
+  function hover(element: Element) {
+    act(() => {
+      element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+  }
+
+  it("renders one trigger chip with model and thinking level", () => {
+    render();
+    expect(
+      container.querySelectorAll('button[aria-haspopup="menu"]'),
+    ).toHaveLength(1);
+    expect(trigger().textContent).toContain("model-1");
+    expect(trigger().textContent).toContain("chat.thinkingLevel.medium");
   });
 
-  it("calls onSelectModel when a model is clicked in left column", () => {
+  it("opens a compact fixed menu and expands the trigger to the same width", () => {
+    render();
+    expect(trigger().className).not.toContain("w-[15rem]");
+
+    act(() => trigger().click());
+
+    const menu = primaryMenu();
+    expect(menu.getAttribute("aria-hidden")).toBe("false");
+    expect(menu.className).toContain("right-0");
+    expect(menu.className).toContain("bottom-[calc(100%+8px)]");
+    expect(menu.className).toContain("w-[15rem]");
+    expect(menu.className).not.toContain("w-[17rem]");
+    expect(menu.className).toContain("flex-col");
+    expect(menu.className).toContain("p-1");
+    expect(menu.className).not.toContain("p-1.5");
+    expect(trigger().className).toContain("w-[15rem]");
+    expect(modelRow().className).toContain("h-9");
+    expect(modelRow().className).not.toContain("h-11");
+    expect(thinkingRow().className).toContain("h-9");
+    expect(thinkingRow().className).not.toContain("h-11");
+  });
+
+  it("shows current values and chevrons in the two primary rows", () => {
+    render();
+    act(() => trigger().click());
+
+    expect(modelRow().textContent).toContain("model-1");
+    expect(thinkingRow().textContent).toContain("chat.thinkingLevel.medium");
+    expect(modelRow().querySelector("svg")).toBeTruthy();
+    expect(thinkingRow().querySelector("svg")).toBeTruthy();
+  });
+
+  it("opens the complete model submenu to the left on hover", () => {
+    render();
+    act(() => trigger().click());
+    vi.spyOn(primaryMenu(), "getBoundingClientRect").mockReturnValue({
+      bottom: 420,
+    } as DOMRect);
+    hover(modelRow());
+
+    const list = modelList();
+    expect(list.getAttribute("aria-hidden")).toBe("false");
+    expect(list.className).toContain("absolute");
+    expect(list.className).toContain("right-[calc(100%+4px)]");
+    expect(list.className).toContain("bottom-0");
+    expect(list.className).not.toContain("top-0");
+    expect(list.className).not.toContain("max-h-[80vh]");
+    // Reserve the 40px titlebar plus a 16px visual margin.
+    expect(list.style.maxHeight).toBe("364px");
+    expect(list.className).toContain("overflow-y-auto");
+    expect(list.querySelector("input")?.className).toContain("sticky");
+    expect(list.textContent).toContain("Provider A");
+    expect(list.textContent).toContain("Provider B");
+    expect(list.textContent).toContain("Model One");
+    expect(list.textContent).toContain("Model Two");
+    expect(list.textContent).toContain("Model Three");
+    for (const option of list.querySelectorAll('[role="option"]')) {
+      expect(option.className).toContain("h-9");
+    }
+  });
+
+  it("opens every thinking option to the right on hover", () => {
+    render();
+    act(() => trigger().click());
+    hover(thinkingRow());
+
+    const list = thinkingList();
+    expect(list.getAttribute("aria-hidden")).toBe("false");
+    expect(list.className).toContain("absolute");
+    expect(list.className).toContain("left-[calc(100%+4px)]");
+    expect(list.className).toContain("bottom-0");
+    expect(list.className).not.toContain("top-0");
+    expect(list.className).not.toContain("max-h-");
+    expect(list.className).not.toContain("overflow-y-auto");
+    for (const level of ["off", "minimal", "low", "medium", "high", "xhigh"]) {
+      expect(list.textContent).toContain(`chat.thinkingLevel.${level}`);
+    }
+    for (const option of list.querySelectorAll('[role="option"]')) {
+      expect(option.className).toContain("h-9");
+    }
+  });
+
+  it("switches from the model submenu to the thinking submenu", () => {
+    render();
+    act(() => trigger().click());
+    hover(modelRow());
+    expect(modelList().getAttribute("aria-hidden")).toBe("false");
+
+    hover(thinkingRow());
+    expect(modelList().getAttribute("aria-hidden")).toBe("true");
+    expect(thinkingList().getAttribute("aria-hidden")).toBe("false");
+  });
+
+  it("keeps the primary menu open after model selection", () => {
     const onSelectModel = vi.fn();
     render({ onSelectModel });
-    act(() => collapsedChip()?.click());
-    // Hover model anchor to reveal left
-    act(() => {
-      getCenterModelEntry()?.dispatchEvent(
-        new MouseEvent("mouseenter", { bubbles: true }),
-      );
-    });
-    // Click "Model Two"
-    const modelTwoBtn = Array.from(
-      container.querySelectorAll('[role="option"]'),
-    ).find((el) => el.textContent?.includes("Model Two")) as HTMLElement;
-    act(() => modelTwoBtn?.click());
+    act(() => trigger().click());
+    hover(modelRow());
+
+    const modelTwo = Array.from(
+      modelList().querySelectorAll('[role="option"]'),
+    ).find((element) =>
+      element.textContent?.includes("Model Two"),
+    ) as HTMLElement;
+    act(() => modelTwo.click());
+
     expect(onSelectModel).toHaveBeenCalledWith("profile-a", "model-2");
+    expect(primaryMenu().getAttribute("aria-hidden")).toBe("false");
   });
 
-  it("calls onSelectThinkingLevel when option clicked in right column", () => {
+  it("keeps the primary menu open after thinking selection", () => {
     const onSelectThinkingLevel = vi.fn();
     render({ onSelectThinkingLevel });
-    act(() => collapsedChip()?.click());
-    // Hover thinking anchor to reveal right
-    act(() => {
-      getCenterThinkingEntry()?.dispatchEvent(
-        new MouseEvent("mouseenter", { bubbles: true }),
-      );
-    });
-    // Click "extreme"
-    const extremeBtn = Array.from(
-      container.querySelectorAll('[role="option"]'),
-    ).find((el) =>
-      el.textContent?.includes("chat.thinkingLevel.extreme"),
+    act(() => trigger().click());
+    hover(thinkingRow());
+
+    const extreme = Array.from(
+      thinkingList().querySelectorAll('[role="option"]'),
+    ).find((element) =>
+      element.textContent?.includes("chat.thinkingLevel.xhigh"),
     ) as HTMLElement;
-    act(() => extremeBtn?.click());
-    expect(onSelectThinkingLevel).toHaveBeenCalledWith("extreme");
+    act(() => extreme.click());
+
+    expect(onSelectThinkingLevel).toHaveBeenCalledWith("xhigh");
+    expect(primaryMenu().getAttribute("aria-hidden")).toBe("false");
   });
 
-  it("closes panel when a model is selected (now: stays open)", () => {
+  it("filters the model submenu without closing it", () => {
     render();
-    act(() => collapsedChip()?.click());
-    act(() => {
-      getCenterModelEntry()?.dispatchEvent(
-        new MouseEvent("mouseenter", { bubbles: true }),
-      );
-    });
-    const modelTwoBtn = Array.from(
-      container.querySelectorAll('[role="option"]'),
-    ).find((el) => el.textContent?.includes("Model Two")) as HTMLElement;
-    act(() => modelTwoBtn?.click());
-    // Panel stays open after selection
-    expect(panelIsOpen()).toBe(true);
-  });
+    act(() => trigger().click());
+    hover(modelRow());
 
-  it("closes panel on Escape key", () => {
-    render();
-    act(() => collapsedChip()?.click());
-    expect(panelIsOpen()).toBe(true);
-    act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    });
-    expect(panelIsOpen()).toBe(false);
-  });
-
-  it("does not open panel when disabled", () => {
-    render({ modelMenuDisabled: true });
-    act(() => collapsedChip()?.click());
-    expect(panelIsOpen()).toBe(false);
-  });
-
-  it("does not open panel when modelOptions is empty", () => {
-    render({ model: "", modelOptions: [] });
-    act(() => collapsedChip()?.click());
-    expect(panelIsOpen()).toBe(false);
-  });
-
-  it("filters model list on search in left column", () => {
-    render();
-    act(() => collapsedChip()?.click());
-    act(() => {
-      getCenterModelEntry()?.dispatchEvent(
-        new MouseEvent("mouseenter", { bubbles: true }),
-      );
-    });
-    const input = container.querySelector(
-      'input[placeholder="chat.searchModel"]',
-    ) as HTMLInputElement;
+    const input = modelList().querySelector("input")!;
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
@@ -252,37 +259,49 @@ describe("MergedInputChip", () => {
       setter?.call(input, "Two");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    expect(container.textContent).toContain("Model Two");
-    expect(container.textContent).not.toContain("Model One");
+
+    expect(modelList().textContent).toContain("Model Two");
+    expect(modelList().textContent).not.toContain("Model One");
+    expect(primaryMenu().getAttribute("aria-hidden")).toBe("false");
   });
 
-  it("shows Provider A and Provider B groups in left column", () => {
+  it("closes on outside click", () => {
     render();
-    act(() => collapsedChip()?.click());
+    act(() => trigger().click());
+    expect(primaryMenu().getAttribute("aria-hidden")).toBe("false");
+
     act(() => {
-      getCenterModelEntry()?.dispatchEvent(
-        new MouseEvent("mouseenter", { bubbles: true }),
+      document.body.dispatchEvent(
+        new MouseEvent("mousedown", { bubbles: true }),
       );
     });
-    expect(container.textContent).toContain("Provider A");
-    expect(container.textContent).toContain("Provider B");
+    expect(primaryMenu().getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("highlights selected model in left column", () => {
+  it("closes on Escape", () => {
     render();
-    act(() => collapsedChip()?.click());
+    act(() => trigger().click());
     act(() => {
-      getCenterModelEntry()?.dispatchEvent(
-        new MouseEvent("mouseenter", { bubbles: true }),
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(primaryMenu().getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("does not open while disabled or without models", () => {
+    render({ modelMenuDisabled: true });
+    act(() => trigger().click());
+    expect(primaryMenu().getAttribute("aria-hidden")).toBe("true");
+
+    act(() => {
+      root.render(
+        React.createElement(MergedInputChip, {
+          ...baseProps,
+          model: "",
+          modelOptions: [],
+        }),
       );
     });
-    const selected = Array.from(
-      container.querySelectorAll('[role="option"]'),
-    ).find(
-      (el) =>
-        el.getAttribute("aria-selected") === "true" &&
-        el.textContent?.includes("Model One"),
-    );
-    expect(selected).toBeTruthy();
+    act(() => trigger().click());
+    expect(primaryMenu().getAttribute("aria-hidden")).toBe("true");
   });
 });

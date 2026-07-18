@@ -865,6 +865,7 @@
     "startConversation": "Start chat",
     "startFailed": "Failed to start session. Please try again.",
     "noModel": "No model",
+    "model": "Model",
     "switchModel": "Switch model",
     "searchModel": "Search models...",
     "noModelMatch": "No matching models",

@@ -864,6 +864,7 @@
     "startConversation": "开始聊天",
     "startFailed": "启动会话失败，请稍后重试。",
     "noModel": "无模型",
+    "model": "模型",
     "switchModel": "切换模型",
     "searchModel": "搜索模型...",
     "noModelMatch": "无匹配模型",
