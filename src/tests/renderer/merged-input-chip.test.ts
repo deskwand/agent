@@ -195,7 +195,7 @@ describe("MergedInputChip", () => {
     expect(onSelectThinkingLevel).toHaveBeenCalledWith("extreme");
   });
 
-  it("closes panel when a model is selected", () => {
+  it("closes panel when a model is selected (now: stays open)", () => {
     render();
     act(() => collapsedChip()?.click());
     act(() => {
@@ -207,7 +207,8 @@ describe("MergedInputChip", () => {
       container.querySelectorAll('[role="option"]'),
     ).find((el) => el.textContent?.includes("Model Two")) as HTMLElement;
     act(() => modelTwoBtn?.click());
-    expect(panelIsOpen()).toBe(false);
+    // Panel stays open after selection
+    expect(panelIsOpen()).toBe(true);
   });
 
   it("closes panel on Escape key", () => {

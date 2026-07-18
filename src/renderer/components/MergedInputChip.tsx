@@ -126,7 +126,6 @@ export function MergedInputChip({
                         type="button"
                         onClick={() => {
                           onSelectModel(group.profileKey, item.id);
-                          closeAll();
                         }}
                         className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
                           group.profileKey === activeProviderProfileKey &&
@@ -204,7 +203,6 @@ export function MergedInputChip({
                   type="button"
                   onClick={() => {
                     onSelectThinkingLevel(level);
-                    closeAll();
                   }}
                   className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
                     level === thinkingLevel
