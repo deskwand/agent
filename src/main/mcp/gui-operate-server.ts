@@ -20,6 +20,16 @@
 
 // Bootstrap logging - log as early as possible
 import { writeMCPLog } from "./mcp-logger.js";
+import {
+  GUI_FIND_ELEMENT_TOOL,
+  MAC_ACCESSIBILITY_SCAN_SCRIPT,
+  WINDOWS_ACCESSIBILITY_SCAN_SCRIPT,
+  buildAccessibilityQueryResult,
+  formatAccessibilityQueryError,
+  parseRawAccessibilityScan,
+  type AccessibilityQueryResult,
+  type AccessibilitySource,
+} from "./gui-accessibility-query.js";
 writeMCPLog("=== Module Loading Started ===", "Bootstrap");
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -1829,6 +1839,16 @@ async function executeCommandSafe(
       stderr: typeof result.stderr === "string" ? result.stderr : "",
     };
   } catch (error: unknown) {
+    const commandError =
+      typeof error === "object" && error !== null
+        ? (error as { code?: unknown; killed?: unknown })
+        : null;
+    if (
+      options?.timeout &&
+      (commandError?.killed === true || commandError?.code === "ETIMEDOUT")
+    ) {
+      throw new Error(`Command timed out after ${options.timeout}ms`);
+    }
     throw new Error(
       `Command execution failed: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -5985,6 +6005,63 @@ async function locateGUIElement(
   return coords;
 }
 
+async function findGUIElementsByAccessibility(
+  text: unknown,
+  role?: unknown,
+): Promise<AccessibilityQueryResult> {
+  if (typeof text !== "string" || !text.trim()) {
+    throw new Error("gui_find_element text must not be empty.");
+  }
+  if (role !== undefined && typeof role !== "string") {
+    throw new Error("gui_find_element role must be a string when provided.");
+  }
+  const normalizedText = text.trim();
+  const normalizedRole = role?.trim() || undefined;
+
+  const startedAt = Date.now();
+  let stdout: string;
+  let source: AccessibilitySource;
+  try {
+    if (PLATFORM === "darwin") {
+      const result = await executeJXAScript(
+        MAC_ACCESSIBILITY_SCAN_SCRIPT,
+        5000,
+      );
+      stdout = result.stdout;
+      source = "macos-accessibility";
+    } else if (PLATFORM === "win32") {
+      const result = await executePowerShell(
+        WINDOWS_ACCESSIBILITY_SCAN_SCRIPT,
+        5000,
+      );
+      stdout = result.stdout;
+      source = "windows-uia";
+    } else {
+      throw new Error(
+        `Accessibility element queries are not supported on platform: ${PLATFORM}`,
+      );
+    }
+  } catch (error: unknown) {
+    throw new Error(formatAccessibilityQueryError(PLATFORM, error));
+  }
+
+  const scan = parseRawAccessibilityScan(stdout);
+  const displayConfiguration = await getDisplayConfiguration();
+  const result = buildAccessibilityQueryResult(
+    scan,
+    { text: normalizedText, role: normalizedRole },
+    displayConfiguration.displays,
+    source,
+    Date.now() - startedAt,
+  );
+
+  writeMCPLog(
+    `[gui_find_element] source=${source}, scanned=${result.scannedNodes}, matches=${result.matches.length}, truncated=${result.truncated}, elapsedMs=${result.elapsedMs}`,
+    "Accessibility Query",
+  );
+  return result;
+}
+
 /**
  * Execute a single GUI action step
  */
@@ -6916,6 +6993,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["duration"],
         },
       },
+      GUI_FIND_ELEMENT_TOOL,
       {
         name: "gui_locate_element",
         description:
@@ -7023,10 +7101,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
-    writeMCPLog(
-      `[CallTool] name=${name}, args=${JSON.stringify(args ?? {})}`,
-      "Tool Call",
-    );
+    const loggedArgs =
+      name === "gui_find_element" ? "[redacted]" : JSON.stringify(args ?? {});
+    writeMCPLog(`[CallTool] name=${name}, args=${loggedArgs}`, "Tool Call");
 
     let result: string;
 
@@ -7259,6 +7336,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
         const plan = await planGUIActions(task_description, display_index);
         result = JSON.stringify(plan, null, 2);
+        break;
+      }
+
+      case "gui_find_element": {
+        const { text, role } = args as {
+          text?: unknown;
+          role?: unknown;
+        };
+        const matches = await findGUIElementsByAccessibility(text, role);
+        result = JSON.stringify(matches, null, 2);
         break;
       }
 
