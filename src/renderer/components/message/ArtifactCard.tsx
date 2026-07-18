@@ -315,7 +315,7 @@ export const ArtifactCard = memo(function ArtifactCard({
 
   return (
     <>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 max-h-[320px] overflow-y-auto">
         {allItems.map((item) => {
           if (item.kind === "video") {
             const ref = item.reference;
