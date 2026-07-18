@@ -39,7 +39,6 @@ export function Titlebar() {
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
   const toggleArtifactPanel = useAppStore((s) => s.toggleArtifactPanel);
   const isArtifactPanelOpen = useAppStore((s) => s.isArtifactPanelOpen);
-  const gitChangeCount = useAppStore((s) => s.gitChangeCount);
   const showSettings = useAppStore((s) => s.showSettings);
 
   const activeSessionTitle = activeSessionId
@@ -74,11 +73,6 @@ export function Titlebar() {
             isArtifactPanelOpen ? "text-accent" : "text-text-muted"
           }`}
         />
-        {!isArtifactPanelOpen && gitChangeCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[1.125rem] h-[1.125rem] rounded-full bg-accent text-[0.625rem] font-bold text-background px-1 leading-none">
-            {gitChangeCount}
-          </span>
-        )}
       </button>
       {/* File browser toggle */}
       <button

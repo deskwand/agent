@@ -206,6 +206,6 @@ export function getArtifactSteps(steps: TraceStep[]): ArtifactStepResult {
   return {
     artifactSteps,
     fileSteps,
-    displayArtifactSteps: fileSteps,
+    displayArtifactSteps: [...artifactSteps, ...fileSteps],
   };
 }

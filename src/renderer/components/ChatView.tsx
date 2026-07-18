@@ -293,8 +293,6 @@ export function ChatView() {
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInput, setHasInput] = useState(false);
   const isSteerRef = useRef(false);
-  const setGitChangeCount = useAppStore((s) => s.setGitChangeCount);
-
   useEffect(() => {
     if (!activeSessionId || !compactionResult) return;
     const timeoutMs = compactionResult === "success" ? 3000 : 5000;
@@ -305,7 +303,6 @@ export function ChatView() {
     return () => clearTimeout(id);
   }, [activeSessionId, compactionResult, dismissSessionCompaction]);
 
-  // Active session cwd for git diff detection
   const activeSessionCwd = useAppStore((s) => {
     if (!activeSessionId) return undefined;
     const session = (s.sessions as { id: string; cwd?: string | null }[]).find(
@@ -313,23 +310,6 @@ export function ChatView() {
     );
     return session?.cwd || undefined;
   });
-
-  // Check git changes for code review button (refresh on session switch + window focus)
-  const checkGitChanges = useCallback(() => {
-    if (isElectron && activeSessionCwd && window.electronAPI?.git) {
-      window.electronAPI.git.hasChanges(activeSessionCwd).then((info) => {
-        setGitChangeCount(info.isRepo ? info.changeCount : 0);
-      });
-    } else {
-      setGitChangeCount(0);
-    }
-  }, [activeSessionCwd, isElectron]);
-
-  useEffect(() => {
-    checkGitChanges();
-    window.addEventListener("focus", checkGitChanges);
-    return () => window.removeEventListener("focus", checkGitChanges);
-  }, [checkGitChanges]);
 
   const [activeConnectors, setActiveConnectors] = useState<
     { id: string; name: string; connected: boolean; toolCount: number }[]

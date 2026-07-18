@@ -128,7 +128,6 @@ interface AppState {
   reviewTargetFile: string | null;
   isArtifactPanelOpen: boolean;
   fileBrowserRoot: string | null;
-  gitChangeCount: number;
 
   // Permission
   pendingPermission: PermissionRequest | null;
@@ -270,7 +269,6 @@ interface AppState {
   toggleReviewPanel: () => void;
   toggleBrowserPanel: () => void;
   setBrowserWidthManual: (manual: boolean) => void;
-  setGitChangeCount: (count: number) => void;
 
   setPendingPermission: (permission: PermissionRequest | null) => void;
 
@@ -368,7 +366,6 @@ export const useAppStore = create<AppState>((set) => ({
   reviewTargetFile: null,
   isArtifactPanelOpen: false,
   fileBrowserRoot: null,
-  gitChangeCount: 0,
   pendingPermission: null,
   pendingSudoPassword: null,
   settings: defaultSettings,
@@ -827,7 +824,6 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
   setBrowserWidthManual: (manual) => set({ browserWidthManual: manual }),
-  setGitChangeCount: (count) => set({ gitChangeCount: count }),
 
   // Permission actions
   setPendingPermission: (permission) => set({ pendingPermission: permission }),

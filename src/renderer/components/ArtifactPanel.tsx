@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
@@ -31,10 +31,6 @@ export function ArtifactPanel() {
   const sessionStates = useAppStore((s) => s.sessionStates);
   const workingDir = useAppStore((s) => s.workingDir);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
-
-  const [recentWorkspaceFiles, setRecentWorkspaceFiles] = useState<
-    Array<{ path: string; modifiedAt: number; size: number }>
-  >([]);
 
   const [previewFile, setPreviewFile] = useState<{
     path: string;
@@ -71,54 +67,6 @@ export function ArtifactPanel() {
     [canOpenPath, setGlobalNotice, t],
   );
 
-  const completedStepCount = useMemo(
-    () => steps.reduce((n, s) => n + (s.status === "completed" ? 1 : 0), 0),
-    [steps],
-  );
-
-  // Fetch recent workspace files
-  useEffect(() => {
-    if (
-      typeof window === "undefined" ||
-      !window.electronAPI?.artifacts?.listRecentFiles ||
-      !currentWorkingDir ||
-      !activeSession?.createdAt
-    ) {
-      setRecentWorkspaceFiles([]);
-      return;
-    }
-
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const files = await window.electronAPI.artifacts.listRecentFiles(
-          currentWorkingDir,
-          activeSession.createdAt,
-          50,
-        );
-        if (!cancelled) {
-          setRecentWorkspaceFiles(files || []);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error("Failed to load recent workspace files:", error);
-          setRecentWorkspaceFiles([]);
-        }
-      }
-    }, 500);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [
-    activeSession?.createdAt,
-    activeSessionId,
-    steps.length,
-    completedStepCount,
-    currentWorkingDir,
-  ]);
-
   const displayArtifacts = useMemo(() => {
     const seenPaths = new Set<string>();
     const items: Array<{ label: string; path: string }> = [];
@@ -137,17 +85,8 @@ export function ArtifactPanel() {
       items.push({ label: getArtifactLabel(fallbackPath), path: resolvedPath });
     }
 
-    for (const file of recentWorkspaceFiles) {
-      const resolvedPath = resolveArtifactPath(file.path, currentWorkingDir);
-      const key = resolvedPath.trim();
-      if (!key || seenPaths.has(key)) continue;
-
-      seenPaths.add(key);
-      items.push({ label: getArtifactLabel(file.path), path: resolvedPath });
-    }
-
     return items;
-  }, [currentWorkingDir, displayArtifactSteps, recentWorkspaceFiles]);
+  }, [currentWorkingDir, displayArtifactSteps]);
 
   return (
     <>
@@ -168,11 +107,6 @@ export function ArtifactPanel() {
             <span className="text-sm font-medium text-text-primary">
               {t("artifactPanel.title", "产物")}
             </span>
-            {displayArtifacts.length > 0 && (
-              <span className="text-xs text-text-muted bg-surface-muted px-1.5 py-0.5 rounded-full">
-                {displayArtifacts.length}
-              </span>
-            )}
           </div>
         </div>
 
