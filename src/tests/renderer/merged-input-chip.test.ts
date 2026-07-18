@@ -26,6 +26,14 @@ const makeModelOptions = (): ModelOptionGroup[] => [
   },
 ];
 
+const baseThinkingOptions = [
+  "off",
+  "low",
+  "medium",
+  "high",
+  "extreme",
+] as never[];
+
 const baseProps = {
   model: "model-1",
   modelOptions: makeModelOptions(),
@@ -33,16 +41,8 @@ const baseProps = {
   onSelectModel: vi.fn(),
   modelMenuDisabled: false,
   thinkingLevel: "medium" as never,
-  thinkingLevelOptions: [
-    "off",
-    "low",
-    "medium",
-    "high",
-    "extreme",
-  ] as never[],
+  thinkingLevelOptions: baseThinkingOptions,
   onSelectThinkingLevel: vi.fn(),
-  contextUsagePercentage: 56,
-  contextUsageTooltip: "Context: 45K / 80K  (56%)",
 };
 
 describe("MergedInputChip", () => {
@@ -69,47 +69,105 @@ describe("MergedInputChip", () => {
     });
   }
 
-  function getChipButton(): HTMLButtonElement | null {
-    return container.querySelector("button");
+  function panelIsOpen(): boolean {
+    // The panel wrapper div has "invisible" class when closed
+    const wrappers = container.querySelectorAll(
+      'div.absolute.right-0.bottom-0.z-30',
+    );
+    for (const el of wrappers) {
+      if (el.classList.contains("invisible")) return false;
+      return true;
+    }
+    return false;
   }
 
-  function panelIsOpen(): boolean {
-    // The panel div always exists in DOM; check for "invisible" class.
-    // jsdom doesn't load Tailwind CSS, so check classList directly.
-    const panel = container.querySelector(
-      'div[class*="z-30"][class*="rounded-xl"]',
+  function collapsedChip(): HTMLButtonElement | null {
+    // The collapsed chip has rounded-full; the panel chip has rounded-b-full
+    return container.querySelector("button.rounded-full");
+  }
+
+  function getCenterModelEntry(): HTMLElement | null {
+    // Center column: "chat.switchModel" text among the panel's direct children
+    return Array.from(container.querySelectorAll(".px-3.py-2.rounded-lg")).find(
+      (el) => el.textContent?.includes("chat.switchModel"),
     ) as HTMLElement | null;
-    if (!panel) return false;
-    return !panel.classList.contains("invisible");
+  }
+
+  function getCenterThinkingEntry(): HTMLElement | null {
+    return Array.from(container.querySelectorAll(".px-3.py-2.rounded-lg")).find(
+      (el) => el.textContent?.includes("chat.thinkingLevel"),
+    ) as HTMLElement | null;
   }
 
   it("renders model id and thinking level in collapsed chip", () => {
     render();
-    const btn = getChipButton();
-    expect(btn?.textContent).toContain("model-1");
-    expect(btn?.textContent).toContain("chat.thinkingLevel.medium");
+    const chip = collapsedChip();
+    expect(chip).toBeTruthy();
+    expect(chip?.textContent).toContain("model-1");
+    expect(chip?.textContent).toContain("chat.thinkingLevel.medium");
     expect(panelIsOpen()).toBe(false);
   });
 
   it("renders fallback when model is empty and modelOptions is empty", () => {
     render({ model: "", modelOptions: [] });
-    const btn = getChipButton();
-    expect(btn?.textContent).toContain("chat.noModel");
+    const chip = collapsedChip();
+    expect(chip).toBeTruthy();
+    expect(chip?.textContent).toContain("chat.noModel");
   });
 
   it("opens panel on chip click", () => {
     render();
-    const btn = getChipButton();
-    act(() => btn?.click());
+    const chip = collapsedChip();
+    act(() => chip?.click());
     expect(panelIsOpen()).toBe(true);
   });
 
-  it("calls onSelectModel when a model is clicked in panel", () => {
+  it("shows center column with model and thinking anchors when panel opens", () => {
+    render();
+    act(() => collapsedChip()?.click());
+    expect(getCenterModelEntry()).toBeTruthy();
+    expect(getCenterThinkingEntry()).toBeTruthy();
+  });
+
+  it("reveals left column on hover of model anchor in center", () => {
+    render();
+    act(() => collapsedChip()?.click());
+    // Hover center "chat.switchModel" entry
+    const modelEntry = getCenterModelEntry();
+    act(() => {
+      modelEntry?.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    });
+    // Search input should now be visible (left column is shown)
+    expect(
+      container.querySelector('[placeholder="chat.searchModel"]'),
+    ).toBeTruthy();
+  });
+
+  it("reveals right column on hover of thinking anchor in center", () => {
+    render();
+    act(() => collapsedChip()?.click());
+    const thinkingEntry = getCenterThinkingEntry();
+    act(() => {
+      thinkingEntry?.dispatchEvent(
+        new MouseEvent("mouseenter", { bubbles: true }),
+      );
+    });
+    // Thinking options should be visible
+    expect(container.textContent).toContain("chat.thinkingLevel.off");
+    expect(container.textContent).toContain("chat.thinkingLevel.extreme");
+  });
+
+  it("calls onSelectModel when a model is clicked in left column", () => {
     const onSelectModel = vi.fn();
     render({ onSelectModel });
-    // Open panel
-    act(() => getChipButton()?.click());
-    // Click "Model Two" in the list
+    act(() => collapsedChip()?.click());
+    // Hover model anchor to reveal left
+    act(() => {
+      getCenterModelEntry()?.dispatchEvent(
+        new MouseEvent("mouseenter", { bubbles: true }),
+      );
+    });
+    // Click "Model Two"
     const modelTwoBtn = Array.from(
       container.querySelectorAll('[role="option"]'),
     ).find((el) => el.textContent?.includes("Model Two")) as HTMLElement;
@@ -117,67 +175,17 @@ describe("MergedInputChip", () => {
     expect(onSelectModel).toHaveBeenCalledWith("profile-a", "model-2");
   });
 
-  it("closes panel when a model is selected", () => {
-    render();
-    act(() => getChipButton()?.click());
-    expect(panelIsOpen()).toBe(true);
-    // Click a model
-    const modelTwoBtn = Array.from(
-      container.querySelectorAll('[role="option"]'),
-    ).find((el) => el.textContent?.includes("Model Two")) as HTMLElement;
-    act(() => modelTwoBtn?.click());
-    expect(panelIsOpen()).toBe(false);
-  });
-
-  it("filters model list on search", () => {
-    render();
-    act(() => getChipButton()?.click());
-    const input = container.querySelector(
-      'input[placeholder="chat.searchModel"]',
-    ) as HTMLInputElement;
-    act(() => {
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      nativeInputValueSetter?.call(input, "Two");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("Model Two");
-    expect(container.textContent).not.toContain("Model One");
-  });
-
-  it("shows no match message when search filters all models", () => {
-    render();
-    act(() => getChipButton()?.click());
-    const input = container.querySelector(
-      'input[placeholder="chat.searchModel"]',
-    ) as HTMLInputElement;
-    act(() => {
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      nativeInputValueSetter?.call(input, "zzz_nonexistent");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(container.textContent).toContain("chat.noModelMatch");
-  });
-
-  it("calls onSelectThinkingLevel when option clicked", () => {
+  it("calls onSelectThinkingLevel when option clicked in right column", () => {
     const onSelectThinkingLevel = vi.fn();
     render({ onSelectThinkingLevel });
-    act(() => getChipButton()?.click());
-    // Click the thinking-level dropdown trigger inside the panel
-    // It's the button that contains "chat.thinkingLevel.medium" inside the panel
-    const thinkingTriggers = Array.from(
-      container.querySelectorAll("button"),
-    ).filter((el) =>
-      el.textContent?.includes("chat.thinkingLevel.medium"),
-    );
-    // The second match is the thinking-level dropdown trigger in the right column
-    act(() => thinkingTriggers[1]?.click());
-    // Now click an option in the nested dropdown
+    act(() => collapsedChip()?.click());
+    // Hover thinking anchor to reveal right
+    act(() => {
+      getCenterThinkingEntry()?.dispatchEvent(
+        new MouseEvent("mouseenter", { bubbles: true }),
+      );
+    });
+    // Click "extreme"
     const extremeBtn = Array.from(
       container.querySelectorAll('[role="option"]'),
     ).find((el) =>
@@ -187,15 +195,24 @@ describe("MergedInputChip", () => {
     expect(onSelectThinkingLevel).toHaveBeenCalledWith("extreme");
   });
 
-  it("displays context info in the panel", () => {
+  it("closes panel when a model is selected", () => {
     render();
-    act(() => getChipButton()?.click());
-    expect(container.textContent).toContain("Context: 45K / 80K  (56%)");
+    act(() => collapsedChip()?.click());
+    act(() => {
+      getCenterModelEntry()?.dispatchEvent(
+        new MouseEvent("mouseenter", { bubbles: true }),
+      );
+    });
+    const modelTwoBtn = Array.from(
+      container.querySelectorAll('[role="option"]'),
+    ).find((el) => el.textContent?.includes("Model Two")) as HTMLElement;
+    act(() => modelTwoBtn?.click());
+    expect(panelIsOpen()).toBe(false);
   });
 
   it("closes panel on Escape key", () => {
     render();
-    act(() => getChipButton()?.click());
+    act(() => collapsedChip()?.click());
     expect(panelIsOpen()).toBe(true);
     act(() => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
@@ -205,33 +222,66 @@ describe("MergedInputChip", () => {
 
   it("does not open panel when disabled", () => {
     render({ modelMenuDisabled: true });
-    act(() => getChipButton()?.click());
+    act(() => collapsedChip()?.click());
     expect(panelIsOpen()).toBe(false);
   });
 
   it("does not open panel when modelOptions is empty", () => {
     render({ model: "", modelOptions: [] });
-    act(() => getChipButton()?.click());
+    act(() => collapsedChip()?.click());
     expect(panelIsOpen()).toBe(false);
   });
 
-  it("shows Provider A and Provider B groups", () => {
+  it("filters model list on search in left column", () => {
     render();
-    act(() => getChipButton()?.click());
+    act(() => collapsedChip()?.click());
+    act(() => {
+      getCenterModelEntry()?.dispatchEvent(
+        new MouseEvent("mouseenter", { bubbles: true }),
+      );
+    });
+    const input = container.querySelector(
+      'input[placeholder="chat.searchModel"]',
+    ) as HTMLInputElement;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "Two");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(container.textContent).toContain("Model Two");
+    expect(container.textContent).not.toContain("Model One");
+  });
+
+  it("shows Provider A and Provider B groups in left column", () => {
+    render();
+    act(() => collapsedChip()?.click());
+    act(() => {
+      getCenterModelEntry()?.dispatchEvent(
+        new MouseEvent("mouseenter", { bubbles: true }),
+      );
+    });
     expect(container.textContent).toContain("Provider A");
     expect(container.textContent).toContain("Provider B");
   });
 
-  it("highlights selected model with aria-selected", () => {
+  it("highlights selected model in left column", () => {
     render();
-    act(() => getChipButton()?.click());
-    const selectedOption = Array.from(
+    act(() => collapsedChip()?.click());
+    act(() => {
+      getCenterModelEntry()?.dispatchEvent(
+        new MouseEvent("mouseenter", { bubbles: true }),
+      );
+    });
+    const selected = Array.from(
       container.querySelectorAll('[role="option"]'),
     ).find(
       (el) =>
         el.getAttribute("aria-selected") === "true" &&
         el.textContent?.includes("Model One"),
     );
-    expect(selectedOption).toBeTruthy();
+    expect(selected).toBeTruthy();
   });
 });

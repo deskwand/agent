@@ -89,8 +89,6 @@ export function ChatInputBottomBar({
           thinkingLevel={thinkingLevel}
           thinkingLevelOptions={thinkingLevelOptions}
           onSelectThinkingLevel={onSelectThinkingLevel}
-          contextUsagePercentage={contextUsagePercentage}
-          contextUsageTooltip={contextUsageTooltip}
         />
 
         {/* Context ring */}
