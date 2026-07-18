@@ -223,6 +223,11 @@ export function getCollapsedToolSummary(
     return { kind: "none" };
   }
 
+  // Goal tools — objective is shown inline in the tool label
+  if (toolNameLower === "get_goal" || toolNameLower === "update_goal" || toolNameLower === "goal_complete") {
+    return { kind: "none" };
+  }
+
   // Default — first line preview for short output, line count for long
   const lineCount = normalized.split(/\r?\n/).length;
   if (lineCount <= 5 && normalized.length <= 120) {

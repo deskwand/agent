@@ -140,7 +140,23 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const isRunning = !toolResult && hasActiveTurn;
   const isError = toolResult?.isError === true;
 
+  const isGoalTool =
+    block.name === "get_goal" ||
+    block.name === "update_goal" ||
+    block.name === "goal_complete";
+
   const label = getToolLabel(block.name, block.input, t);
+
+  // Inline get_goal objective into the label when result is available
+  let displayLabel = label;
+  if (toolResult && isGoalTool) {
+    const resultText =
+      typeof toolResult.content === "string" ? toolResult.content : "";
+    const match = resultText.match(/^Objective:\s*(.+)/m);
+    if (match) {
+      displayLabel = `${label} · ${match[1]}`;
+    }
+  }
   const isMCPTool = block.name.startsWith("mcp__");
   const mcpServerName = isMCPTool
     ? block.name.match(/^mcp__(.+?)__/)?.[1]
@@ -231,20 +247,22 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         aria-expanded={expanded}
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
       >
-        {/* Status icon */}
-        <div className="flex-shrink-0 pt-0.5 text-text-muted">
-          {isRunning ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : isError ? (
-            <XCircle className="w-3.5 h-3.5" />
-          ) : (
-            <CheckCircle2 className="w-3.5 h-3.5" />
-          )}
-        </div>
+        {/* Status icon — goal tools are status queries, no execution indicator needed */}
+        {!isGoalTool && (
+          <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-text-muted">
+            {isRunning ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : isError ? (
+              <XCircle className="w-3.5 h-3.5" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            )}
+          </div>
+        )}
 
         {/* Tool icon */}
         {showIcon ? (
-          <div className="flex-shrink-0 pt-0.5 text-text-muted">
+          <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-text-muted">
             {getToolIcon(block.name)}
           </div>
         ) : null}
@@ -252,7 +270,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         {/* Content cluster */}
         <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
           <span className="min-w-0 flex-1 truncate text-xs font-mono text-text-secondary">
-            {label}
+            {displayLabel}
           </span>
           {!isRunning && collapsedSummary.kind === "diff" && (
             <span className="whitespace-nowrap text-xs text-text-muted inline-flex items-center gap-1">
