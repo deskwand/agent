@@ -83,19 +83,19 @@ export function MergedInputChip({
     <div ref={containerRef} className="relative inline-flex">
       {/* Popup panel + chip as one visual unit */}
       <div
-        className={`absolute right-0 bottom-0 z-30 flex flex-col items-end transition duration-150 ease-out ${
+        className={`absolute right-0 bottom-0 z-30 flex flex-col items-start transition duration-150 ease-out ${
           panelOpen
             ? "opacity-100 translate-y-0 visible"
             : "opacity-0 translate-y-2 invisible pointer-events-none"
         }`}
       >
-        {/* Center column: anchors at the bottom, above chip */}
-        <div className="flex items-end">
-          {/* Left sub-panel: model list (absolute, slides left from center) */}
+        {/* Panel body: center column + absolute wings */}
+        <div className="flex">
+          {/* Left wing: model list (absolute, to the left of center) */}
           <div
             onMouseEnter={() => setShowLeft(true)}
             onMouseLeave={() => setShowLeft(false)}
-            className={`absolute right-full mr-0 top-0 w-[200px] rounded-tl-xl border border-border border-r-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
+            className={`absolute right-full top-0 w-[200px] max-h-[320px] overflow-y-auto rounded-tl-xl border border-border border-r-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
               showLeft
                 ? "opacity-100 translate-x-0"
                 : "opacity-0 translate-x-2 pointer-events-none"
@@ -109,7 +109,7 @@ export function MergedInputChip({
               className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
               onClick={(e) => e.stopPropagation()}
             />
-            <div className="mt-1.5 max-h-[260px] overflow-y-auto">
+            <div className="mt-1.5">
               {filteredModelOptions.length === 0 ? (
                 <div className="px-2.5 py-3 text-xs text-text-muted text-center">
                   {t("chat.noModelMatch")}
@@ -149,10 +149,10 @@ export function MergedInputChip({
             </div>
           </div>
 
-          {/* Center column: "模型" / "思考" at the bottom */}
-          <div className="w-fit border border-border border-b-0 bg-background rounded-t-xl p-2 flex gap-0.5">
+          {/* Center column: vertical "模型" / "思考" */}
+          <div className="w-[130px] border border-border border-b-0 bg-background rounded-t-xl p-2 flex flex-col gap-0.5">
             <div
-              className={`px-3 py-2 rounded-lg text-xs cursor-pointer whitespace-nowrap transition-colors ${
+              className={`px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
                 showLeft
                   ? "bg-accent/10 text-text-primary"
                   : "text-text-secondary hover:bg-surface-hover"
@@ -161,12 +161,11 @@ export function MergedInputChip({
                 setShowLeft(true);
                 setShowRight(false);
               }}
-              onMouseLeave={() => setShowLeft(false)}
             >
               {t("chat.switchModel")}
             </div>
             <div
-              className={`px-3 py-2 rounded-lg text-xs cursor-pointer whitespace-nowrap transition-colors ${
+              className={`px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
                 showRight
                   ? "bg-accent/10 text-text-primary"
                   : "text-text-secondary hover:bg-surface-hover"
@@ -175,17 +174,16 @@ export function MergedInputChip({
                 setShowRight(true);
                 setShowLeft(false);
               }}
-              onMouseLeave={() => setShowRight(false)}
             >
               {t("chat.thinkingLevel")}
             </div>
           </div>
 
-          {/* Right sub-panel: thinking-level options (absolute, slides right from center) */}
+          {/* Right wing: thinking-level options (absolute, to the right of center) */}
           <div
             onMouseEnter={() => setShowRight(true)}
             onMouseLeave={() => setShowRight(false)}
-            className={`absolute left-full ml-0 top-0 w-[140px] rounded-tr-xl border border-border border-l-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
+            className={`absolute left-full top-0 w-[140px] max-h-[320px] overflow-y-auto rounded-tr-xl border border-border border-l-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
               showRight
                 ? "opacity-100 translate-x-0"
                 : "opacity-0 -translate-x-2 pointer-events-none"
@@ -194,26 +192,24 @@ export function MergedInputChip({
             <div className="px-1 text-xs uppercase tracking-[0.08em] text-text-muted mb-1">
               {t("chat.thinkingLevel")}
             </div>
-            <div className="max-h-[260px] overflow-y-auto">
-              {thinkingLevelOptions.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => {
-                    onSelectThinkingLevel(level);
-                  }}
-                  className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
-                    level === thinkingLevel
-                      ? "bg-accent text-background"
-                      : "text-text-primary hover:bg-surface-hover"
-                  }`}
-                  role="option"
-                  aria-selected={level === thinkingLevel}
-                >
-                  {t(`chat.thinkingLevel.${level}`)}
-                </button>
-              ))}
-            </div>
+            {thinkingLevelOptions.map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => {
+                  onSelectThinkingLevel(level);
+                }}
+                className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
+                  level === thinkingLevel
+                    ? "bg-accent text-background"
+                    : "text-text-primary hover:bg-surface-hover"
+                }`}
+                role="option"
+                aria-selected={level === thinkingLevel}
+              >
+                {t(`chat.thinkingLevel.${level}`)}
+              </button>
+            ))}
           </div>
         </div>
 
