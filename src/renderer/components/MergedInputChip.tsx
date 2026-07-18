@@ -54,7 +54,6 @@ export function MergedInputChip({
     setShowRight(false);
   }, []);
 
-  // Click-outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (
@@ -68,7 +67,6 @@ export function MergedInputChip({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [closeAll]);
 
-  // Escape
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === "Escape" && panelOpen) {
@@ -85,20 +83,22 @@ export function MergedInputChip({
     <div ref={containerRef} className="relative inline-flex">
       {/* Popup panel + chip as one visual unit */}
       <div
-        className={`absolute right-0 bottom-0 z-30 flex flex-col transition duration-150 ease-out ${
+        className={`absolute right-0 bottom-0 z-30 flex flex-col items-end transition duration-150 ease-out ${
           panelOpen
             ? "opacity-100 translate-y-0 visible"
             : "opacity-0 translate-y-2 invisible pointer-events-none"
         }`}
       >
-        {/* Three-column panel */}
-        <div className="flex items-stretch">
-          {/* Left column: model list (hover-triggered) */}
+        {/* Center column: anchors at the bottom, above chip */}
+        <div className="flex items-end">
+          {/* Left sub-panel: model list (absolute, slides left from center) */}
           <div
-            className={`shrink-0 w-[200px] rounded-tl-xl border border-border border-r-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
+            onMouseEnter={() => setShowLeft(true)}
+            onMouseLeave={() => setShowLeft(false)}
+            className={`absolute right-full mr-0 top-0 w-[200px] rounded-tl-xl border border-border border-r-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
               showLeft
                 ? "opacity-100 translate-x-0"
-                : "opacity-0 -translate-x-2 pointer-events-none"
+                : "opacity-0 translate-x-2 pointer-events-none"
             }`}
           >
             <input
@@ -149,16 +149,10 @@ export function MergedInputChip({
             </div>
           </div>
 
-          {/* Center column: anchors (always visible) */}
-          <div
-            className="shrink-0 w-[140px] border border-border border-b-0 bg-background p-2 flex flex-col gap-0.5"
-            onMouseEnter={() => {
-              setShowLeft(false);
-              setShowRight(false);
-            }}
-          >
+          {/* Center column: "模型" / "思考" at the bottom */}
+          <div className="w-fit border border-border border-b-0 bg-background rounded-t-xl p-2 flex gap-0.5">
             <div
-              className={`px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
+              className={`px-3 py-2 rounded-lg text-xs cursor-pointer whitespace-nowrap transition-colors ${
                 showLeft
                   ? "bg-accent/10 text-text-primary"
                   : "text-text-secondary hover:bg-surface-hover"
@@ -167,11 +161,12 @@ export function MergedInputChip({
                 setShowLeft(true);
                 setShowRight(false);
               }}
+              onMouseLeave={() => setShowLeft(false)}
             >
               {t("chat.switchModel")}
             </div>
             <div
-              className={`px-3 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
+              className={`px-3 py-2 rounded-lg text-xs cursor-pointer whitespace-nowrap transition-colors ${
                 showRight
                   ? "bg-accent/10 text-text-primary"
                   : "text-text-secondary hover:bg-surface-hover"
@@ -180,17 +175,20 @@ export function MergedInputChip({
                 setShowRight(true);
                 setShowLeft(false);
               }}
+              onMouseLeave={() => setShowRight(false)}
             >
               {t("chat.thinkingLevel")}
             </div>
           </div>
 
-          {/* Right column: thinking-level options (hover-triggered) */}
+          {/* Right sub-panel: thinking-level options (absolute, slides right from center) */}
           <div
-            className={`shrink-0 w-[140px] rounded-tr-xl border border-border border-l-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
+            onMouseEnter={() => setShowRight(true)}
+            onMouseLeave={() => setShowRight(false)}
+            className={`absolute left-full ml-0 top-0 w-[140px] rounded-tr-xl border border-border border-l-0 border-b-0 bg-background p-2 transition-all duration-200 ease-out ${
               showRight
                 ? "opacity-100 translate-x-0"
-                : "opacity-0 translate-x-2 pointer-events-none"
+                : "opacity-0 -translate-x-2 pointer-events-none"
             }`}
           >
             <div className="px-1 text-xs uppercase tracking-[0.08em] text-text-muted mb-1">
