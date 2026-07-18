@@ -1,15 +1,14 @@
-import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel, ProviderProfileKey } from "../types";
 import {
   Plus,
-  ChevronDown,
   ArrowUp,
   Square,
   Maximize2,
   Minimize2,
   Target,
 } from "lucide-react";
+import { MergedInputChip } from "./MergedInputChip";
 
 export interface ModelOptionGroup {
   profileKey: ProviderProfileKey;
@@ -65,47 +64,6 @@ export function ChatInputBottomBar({
   hasInput = false,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
-  const [modelSearch, setModelSearch] = useState("");
-  const [thinkingMenuOpen, setThinkingMenuOpen] = useState(false);
-
-  const filteredModelOptions = useMemo(() => {
-    if (!modelSearch.trim()) return modelOptions;
-    const q = modelSearch.toLowerCase();
-    return modelOptions
-      .map((group) => ({
-        ...group,
-        items: group.items.filter(
-          (item) =>
-            item.name.toLowerCase().includes(q) ||
-            item.id.toLowerCase().includes(q),
-        ),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [modelOptions, modelSearch]);
-  const modelMenuRef = useRef<HTMLDivElement>(null);
-  const thinkingMenuRef = useRef<HTMLDivElement>(null);
-
-  // Click-outside to close menus
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (
-        modelMenuRef.current &&
-        !modelMenuRef.current.contains(e.target as Node)
-      ) {
-        setModelMenuOpen(false);
-        setModelSearch("");
-      }
-      if (
-        thinkingMenuRef.current &&
-        !thinkingMenuRef.current.contains(e.target as Node)
-      ) {
-        setThinkingMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
 
   return (
     <div className="mt-3 flex items-center justify-between gap-2">
@@ -121,13 +79,27 @@ export function ChatInputBottomBar({
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <span className="hidden sm:inline-flex relative items-center justify-center group">
+        {/* Merged model + thinking chip */}
+        <MergedInputChip
+          model={model}
+          modelOptions={modelOptions}
+          activeProviderProfileKey={activeProviderProfileKey}
+          onSelectModel={onSelectModel}
+          modelMenuDisabled={modelMenuDisabled}
+          thinkingLevel={thinkingLevel}
+          thinkingLevelOptions={thinkingLevelOptions}
+          onSelectThinkingLevel={onSelectThinkingLevel}
+          contextUsagePercentage={contextUsagePercentage}
+          contextUsageTooltip={contextUsageTooltip}
+        />
+
+        {/* Context ring */}
+        <span className="relative inline-flex items-center justify-center group">
           <svg
             className="w-6 h-6 -rotate-90 text-text-muted"
             viewBox="0 0 24 24"
             aria-hidden="true"
           >
-            {/* Thin base ring connecting the ticks */}
             <circle
               cx="12"
               cy="12"
@@ -137,7 +109,6 @@ export function ChatInputBottomBar({
               strokeWidth="1"
               className="opacity-20"
             />
-            {/* 8 tick marks: (2π·9)/8 ≈ 7.07, gap = 7.07 - 1.5 ≈ 5.57 */}
             <circle
               cx="12"
               cy="12"
@@ -148,7 +119,6 @@ export function ChatInputBottomBar({
               strokeDasharray="1.5 5.5686"
               className="opacity-25"
             />
-            {/* Usage arc with round caps */}
             <circle
               cx="12"
               cy="12"
@@ -166,146 +136,14 @@ export function ChatInputBottomBar({
           </span>
         </span>
 
-        {/* Model + Thinking level */}
-        <div className="flex items-center gap-2 max-w-full">
-          <div
-            ref={modelMenuRef}
-            className="relative inline-flex h-9 items-center max-w-[16rem] px-2 rounded-full border border-border-subtle bg-background/60 text-xs text-text-muted"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                if (modelMenuDisabled || modelOptions.length === 0) return;
-                setModelMenuOpen((v) => {
-                  if (v) setModelSearch("");
-                  return !v;
-                });
-              }}
-              disabled={modelMenuDisabled || modelOptions.length === 0}
-              className="inline-flex h-full items-center gap-1 text-text-primary max-w-[14rem] disabled:opacity-50"
-              aria-haspopup="listbox"
-              aria-expanded={modelMenuOpen}
-              aria-label={t("chat.switchModel")}
-              title={t("chat.switchModel")}
-            >
-              <span className="truncate">{model || t("chat.noModel")}</span>
-              <ChevronDown className="w-3 h-3 text-text-muted" />
-            </button>
-            <div
-              className={`absolute right-0 bottom-[calc(100%+8px)] z-30 min-w-[12rem] max-w-[16rem] rounded-xl border border-border bg-background shadow-soft transition duration-150 ease-out ${
-                modelMenuOpen
-                  ? "opacity-100 translate-y-0 visible"
-                  : "opacity-0 translate-y-2 invisible pointer-events-none"
-              }`}
-            >
-              <div className="p-1.5 pb-0">
-                <input
-                  type="text"
-                  value={modelSearch}
-                  onChange={(e) => setModelSearch(e.target.value)}
-                  placeholder={t("chat.searchModel")}
-                  className="w-full rounded-lg border border-border bg-background px-2 py-1 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-              <div className="max-h-[280px] overflow-y-auto p-1">
-                {filteredModelOptions.length === 0 ? (
-                  <div className="px-2.5 py-3 text-xs text-text-muted text-center">
-                    {t("chat.noModelMatch")}
-                  </div>
-                ) : (
-                  filteredModelOptions.map((group) => (
-                    <div key={group.profileKey} className="mb-1 last:mb-0">
-                      <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
-                        {group.groupLabel}
-                      </div>
-                      {group.items.map((item) => (
-                        <button
-                          key={`${group.profileKey}:${item.id}`}
-                          type="button"
-                          onClick={() => {
-                            onSelectModel(group.profileKey, item.id);
-                            setModelMenuOpen(false);
-                            setModelSearch("");
-                          }}
-                          className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors ${
-                            group.profileKey === activeProviderProfileKey &&
-                            item.id === model
-                              ? "bg-accent text-background"
-                              : "text-text-primary hover:bg-surface-hover"
-                          }`}
-                          role="option"
-                          aria-selected={
-                            group.profileKey === activeProviderProfileKey &&
-                            item.id === model
-                          }
-                          title={item.name}
-                        >
-                          {item.name}
-                        </button>
-                      ))}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-          <div
-            ref={thinkingMenuRef}
-            onClick={() => setThinkingMenuOpen((v) => !v)}
-            className="relative inline-flex h-9 items-center gap-1.5 px-2 rounded-full border border-border-subtle bg-background/60 text-xs text-text-muted cursor-pointer"
-            role="button"
-            tabIndex={0}
-          >
-            <span>{t("chat.thinkingLevel")}</span>
-            <button
-              type="button"
-              tabIndex={-1}
-              className="inline-flex h-full items-center gap-1 text-text-primary"
-              aria-haspopup="listbox"
-              aria-expanded={thinkingMenuOpen}
-              aria-label={t("chat.thinkingLevel")}
-            >
-              <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
-              <ChevronDown className="w-3 h-3" />
-            </button>
-            <div
-              className={`absolute right-0 bottom-[calc(100%+8px)] z-30 min-w-[7.25rem] rounded-xl border border-border bg-background shadow-soft p-1 transition duration-150 ease-out ${
-                thinkingMenuOpen
-                  ? "opacity-100 translate-y-0 visible"
-                  : "opacity-0 translate-y-2 invisible pointer-events-none"
-              }`}
-            >
-              {thinkingLevelOptions.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectThinkingLevel(level);
-                    setThinkingMenuOpen(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition-colors ${
-                    level === thinkingLevel
-                      ? "bg-accent text-background"
-                      : "text-text-primary hover:bg-surface-hover"
-                  }`}
-                  role="option"
-                  aria-selected={level === thinkingLevel}
-                >
-                  {t(`chat.thinkingLevel.${level}`)}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
         {onToggleExpand && (
           <button
             type="button"
             onClick={onToggleExpand}
             className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-            title={isExpanded ? t("chat.collapseInput") : t("chat.expandInput")}
+            title={
+              isExpanded ? t("chat.collapseInput") : t("chat.expandInput")
+            }
           >
             {isExpanded ? (
               <Minimize2 className="w-4 h-4" />
