@@ -49,6 +49,7 @@ function appConfigWithProviders(providers: AppConfig["providers"]): AppConfig {
     enableThinking: false,
     thinkingLevel: "medium",
     autoSkillLearning: true,
+    telemetryEnabled: true,
     isConfigured: true,
     webAccess: normalizeWebAccessConfig(undefined),
   };

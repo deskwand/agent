@@ -691,6 +691,7 @@ export interface Settings {
   memoryStrategy: "auto" | "manual" | "rolling";
   maxContextTokens: number;
   autoSkillLearning: boolean;
+  telemetryEnabled: boolean;
 }
 
 // Tool types

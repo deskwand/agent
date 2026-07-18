@@ -214,7 +214,9 @@
     "language": "语言",
     "autoSkillLearning": "自动技能学习",
     "autoSkillLearningDesc": "开启后，AI 助手可在对话中自动发现并学习新技能，定期整理已有技能。关闭后停止所有自动学习与整理行为。",
-    "autoSkillLearningProjectNote": "项目模式下不支持自动学习。"
+    "autoSkillLearningProjectNote": "项目模式下不支持自动学习。",
+    "telemetry": "匿名使用统计",
+    "telemetryDesc": "帮助改进 DeskWand，仅上报随机设备标识与应用版本信息，不包含任何个人数据"
   },
   "memory": {
     "title": "Memory 机制",

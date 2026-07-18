@@ -163,6 +163,7 @@ function buildAppConfig(): AppConfig {
     themePreset: "graphite",
     thinkingLevel: "medium",
     autoSkillLearning: false,
+    telemetryEnabled: true,
     isConfigured: true,
     webAccess: normalizeWebAccessConfig(undefined),
   };

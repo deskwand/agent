@@ -70,6 +70,7 @@ function makeConfig(timeoutMs: number): AppConfig {
     themePreset: "graphite",
     thinkingLevel: "medium",
     autoSkillLearning: false,
+    telemetryEnabled: true,
     isConfigured: true,
     webAccess: normalizeWebAccessConfig(undefined),
   };

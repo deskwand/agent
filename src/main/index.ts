@@ -104,6 +104,7 @@ import {
 import { eventRequiresSessionManager } from "./client-event-utils";
 import { getUnsupportedWorkspacePathReason } from "./workspace-path-constraints";
 import { getDefaultWorkingDirPath } from "../shared/workspace-path";
+import { DESKWAND_API_URL } from "../shared/oauth-config";
 import {
   log,
   logWarn,
@@ -1041,6 +1042,31 @@ app
     log("  OPENAI_API_MODE:", legacyEnvSnapshot.OPENAI_API_MODE || "(default)");
 
     log("===========================");
+
+    // --- Telemetry ping (anonymous install counting) ---
+    try {
+      if (configStore.get("telemetryEnabled")) {
+        const deviceIdPath = join(app.getPath("userData"), "device-id.json");
+        let deviceId: string;
+        try {
+          deviceId = JSON.parse(fs.readFileSync(deviceIdPath, "utf-8")).id;
+        } catch {
+          deviceId = crypto.randomUUID();
+          fs.writeFileSync(deviceIdPath, JSON.stringify({ id: deviceId }));
+        }
+        fetch(`${DESKWAND_API_URL}/v1/telemetry/ping`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deviceId,
+            version: app.getVersion(),
+            platform: process.platform,
+          }),
+        }).catch(() => {});
+      }
+    } catch {
+      // Never block startup on telemetry failure
+    }
 
     // Initialize default working directory
     initializeDefaultWorkingDir();
@@ -3919,6 +3945,18 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       if (typeof event.payload.autoSkillLearning === "boolean") {
         configStore.update({
           autoSkillLearning: event.payload.autoSkillLearning,
+        });
+        sendToRenderer({
+          type: "config.status",
+          payload: {
+            isConfigured: configStore.isConfigured(),
+            config: configStore.getAll(),
+          },
+        });
+      }
+      if (typeof event.payload.telemetryEnabled === "boolean") {
+        configStore.update({
+          telemetryEnabled: event.payload.telemetryEnabled,
         });
         sendToRenderer({
           type: "config.status",

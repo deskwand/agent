@@ -113,6 +113,7 @@ export interface AppConfig {
   enableThinking: boolean;
   thinkingLevel: string;
   autoSkillLearning: boolean;
+  telemetryEnabled: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
@@ -133,6 +134,7 @@ interface StoredConfig {
   enableThinking: boolean;
   thinkingLevel: string;
   autoSkillLearning: boolean;
+  telemetryEnabled: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
@@ -250,6 +252,7 @@ function defaultStoredConfig(): StoredConfig {
     enableThinking: false,
     thinkingLevel: "medium",
     autoSkillLearning: true,
+    telemetryEnabled: true,
     isConfigured: false,
     visionModel: undefined,
     webAccess: normalizeWebAccessConfig(undefined),
@@ -823,6 +826,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     enableThinking: stored.enableThinking,
     thinkingLevel: stored.thinkingLevel,
     autoSkillLearning: stored.autoSkillLearning,
+    telemetryEnabled: stored.telemetryEnabled,
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
     webAccess: normalizeWebAccessConfig(stored.webAccess),

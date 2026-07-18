@@ -145,6 +145,38 @@ export function SettingsGeneral() {
         </div>
       </div>
 
+      {/* Telemetry */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-text-primary">
+          {t("general.telemetry")}
+        </h4>
+        <p className="text-xs text-text-muted">
+          {t("general.telemetryDesc")}
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => updateSettings({ telemetryEnabled: true })}
+            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+              settings.telemetryEnabled
+                ? "border-accent bg-accent/5 text-text-primary"
+                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
+            }`}
+          >
+            {t("common.enable")}
+          </button>
+          <button
+            onClick={() => updateSettings({ telemetryEnabled: false })}
+            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+              !settings.telemetryEnabled
+                ? "border-accent bg-accent/5 text-text-primary"
+                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
+            }`}
+          >
+            {t("common.disable")}
+          </button>
+        </div>
+      </div>
+
       {/* About */}
       {appVer && (
         <div className="pt-4 border-t border-border">

@@ -344,6 +344,7 @@ const defaultSettings: Settings = {
   memoryStrategy: "auto",
   maxContextTokens: 180000,
   autoSkillLearning: true,
+  telemetryEnabled: true,
 };
 
 export const useAppStore = create<AppState>((set) => ({
