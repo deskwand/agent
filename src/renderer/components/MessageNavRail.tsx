@@ -140,9 +140,9 @@ const TICK_GAP = 10;
 const HOT_ZONE_WIDTH = 64;
 const HALF_ZONE = HOT_ZONE_WIDTH / 2;
 const MAX_DIST = 96;
-const MIN_W = 8;
+const MIN_W = 5;
 const MAX_W = 28;
-const MIN_OP = 0.6;
+const MIN_OP = 0.3;
 const MAX_OP = 0.95;
 
 // ── TickMark ──
