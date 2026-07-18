@@ -29,6 +29,7 @@ export interface WebAccessConfig {
   parallelApiKey: string;
   tavilyApiKey: string;
   perplexityApiKey: string;
+  ssrfEnabled: boolean;
 }
 
 export type WebAccessErrorCode =
@@ -64,6 +65,7 @@ export const DEFAULT_WEB_ACCESS_CONFIG: WebAccessConfig = {
   parallelApiKey: "",
   tavilyApiKey: "",
   perplexityApiKey: "",
+  ssrfEnabled: false,
 };
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -101,6 +103,7 @@ export function normalizeWebAccessConfig(raw: unknown): WebAccessConfig {
     parallelApiKey: toString(value.parallelApiKey),
     tavilyApiKey: toString(value.tavilyApiKey),
     perplexityApiKey: toString(value.perplexityApiKey),
+    ssrfEnabled: value.ssrfEnabled === true,
   };
 }
 

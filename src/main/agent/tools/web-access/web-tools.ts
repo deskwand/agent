@@ -337,6 +337,7 @@ export function createWebAccessTools(
                   workspaceDir: options.workspaceDir,
                   tempDir: getWebAccessSessionTempDir(options.sessionId),
                   runtime,
+                  ssrfEnabled: config.ssrfEnabled,
                 })),
               );
             }
@@ -427,11 +428,14 @@ export function createWebAccessTools(
         options.resolveProviderAuth,
         { gemini: true },
       );
+      // Spread normalized.options (forceClone) before ssrfEnabled so
+      // the config value always takes precedence.
       const results = await fetchAllContent(normalized.urlList, signal, {
         ...normalized.options,
         workspaceDir: options.workspaceDir,
         tempDir: getWebAccessSessionTempDir(options.sessionId),
         runtime,
+        ssrfEnabled: options.getConfig().ssrfEnabled,
       });
       const responseId = randomUUID();
       options.cache.set(options.sessionId, {

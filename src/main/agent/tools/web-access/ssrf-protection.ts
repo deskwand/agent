@@ -22,6 +22,13 @@ export type ResolvedFetch = (
 interface ValidationOptions {
   lookup?: Lookup;
   /**
+   * When false, skip all SSRF IP/hostname checks entirely.
+   * Defaults to true (protection enabled) when omitted; set explicitly to
+   * false only when the caller has chosen to disable SSRF filtering
+   * (e.g. via user config).
+   */
+  ssrfEnabled?: boolean;
+  /**
    * CIDR ranges (e.g. "198.18.0.0/15") to exempt from the SSRF guard.
    * Useful when a host runs a TUN/fake-IP proxy (Surge, Clash, Mihomo, ...)
    * that resolves public domains into a reserved range. Entries are validated
@@ -62,17 +69,25 @@ async function resolveRemoteUrl(
 
   const hostname = normalizeHostname(url.hostname);
   if (!hostname) throw new Error("URL must include a hostname");
-  if (hostname === "localhost" || hostname.endsWith(".localhost")) {
-    throw new Error(`Blocked internal hostname: ${hostname}`);
-  }
 
-  const allowRanges = parseAllowRanges(options.allowRanges);
-  const literalFamily = net.isIP(hostname);
-  if (literalFamily) {
-    assertPublicAddress(hostname, hostname, allowRanges);
+  // SSRF checks — skipped when the caller explicitly sets ssrfEnabled: false
+  const ssrfEnabled = options.ssrfEnabled !== false;
+  if (ssrfEnabled) {
+    if (hostname === "localhost" || hostname.endsWith(".localhost")) {
+      throw new Error(`Blocked internal hostname: ${hostname}`);
+    }
+    const literalFamily = net.isIP(hostname);
+    if (literalFamily) {
+      assertPublicAddress(hostname, hostname, parseAllowRanges(options.allowRanges));
+      return {
+        url,
+        addresses: [{ address: hostname, family: literalFamily }],
+      };
+    }
+  } else if (net.isIP(hostname)) {
     return {
       url,
-      addresses: [{ address: hostname, family: literalFamily }],
+      addresses: [{ address: hostname, family: net.isIP(hostname) as 4 | 6 }],
     };
   }
 
@@ -86,8 +101,11 @@ async function resolveRemoteUrl(
 
   if (addresses.length === 0)
     throw new Error(`Failed to resolve ${hostname}: no addresses returned`);
-  for (const { address } of addresses) {
-    assertPublicAddress(address, hostname, allowRanges);
+  if (ssrfEnabled) {
+    const allowRanges = parseAllowRanges(options.allowRanges);
+    for (const { address } of addresses) {
+      assertPublicAddress(address, hostname, allowRanges);
+    }
   }
   return { url, addresses };
 }

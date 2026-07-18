@@ -99,6 +99,30 @@ describe("SSRF protection", () => {
     }
   });
 
+  it("skips all SSRF checks when ssrfEnabled is false", async () => {
+    // internal hostnames that would normally be blocked
+    await expect(
+      validateRemoteUrl("http://localhost/", {
+        lookup: publicLookup,
+        ssrfEnabled: false,
+      }),
+    ).resolves.toMatchObject({ hostname: "localhost" });
+
+    await expect(
+      validateRemoteUrl("http://192.168.1.1/", {
+        ssrfEnabled: false,
+      }),
+    ).resolves.toMatchObject({ hostname: "192.168.1.1" });
+
+    // DNS-resolved private addresses also pass through
+    await expect(
+      validateRemoteUrl("https://private.example/", {
+        lookup: async () => [{ address: "10.0.0.5", family: 4 }],
+        ssrfEnabled: false,
+      }),
+    ).resolves.toMatchObject({ hostname: "private.example" });
+  });
+
   it("validates redirect targets before following", async () => {
     const requested: string[] = [];
     const fetchImpl: typeof fetch = async (input) => {

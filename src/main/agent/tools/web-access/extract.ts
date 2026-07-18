@@ -63,6 +63,8 @@ export interface ExtractOptions {
   tempDir: string;
   runtime: WebSearchRuntime;
   lookup?: Lookup;
+  /** When false, skip SSRF IP/hostname checks for all fetches. */
+  ssrfEnabled?: boolean;
   /** Test seam. Production requests use the DNS-pinned transport. */
   fetch?: typeof fetch;
 }
@@ -159,7 +161,11 @@ async function extractViaHttp(
           "Accept-Language": "en-US,en;q=0.9",
         },
       },
-      { lookup: options.lookup, fetch: options.fetch },
+      {
+        lookup: options.lookup,
+        fetch: options.fetch,
+        ssrfEnabled: options.ssrfEnabled,
+      },
     );
     if (!response.ok) {
       await response.body?.cancel().catch(() => undefined);
@@ -340,16 +346,18 @@ export async function extractContent(
       errorCode: "UNSUPPORTED_CONTENT",
     };
   }
-  try {
-    await validateRemoteUrl(parsed, { lookup: options.lookup });
-  } catch (error) {
-    return {
-      url,
-      title: "",
-      content: "",
-      error: errorMessage(error),
-      errorCode: "FETCH_BLOCKED",
-    };
+  if (options.ssrfEnabled !== false) {
+    try {
+      await validateRemoteUrl(parsed, { lookup: options.lookup });
+    } catch (error) {
+      return {
+        url,
+        title: "",
+        content: "",
+        error: errorMessage(error),
+        errorCode: "FETCH_BLOCKED",
+      };
+    }
   }
 
   try {
