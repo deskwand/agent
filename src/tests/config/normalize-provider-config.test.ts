@@ -5,6 +5,7 @@ import {
   ConfigStore,
 } from "../../main/config/config-store";
 import type { ProviderProfileKey } from "../../main/config/config-store";
+import { normalizeWebAccessConfig } from "../../shared/web-access";
 
 // --------------- normalizeProviderConfig (non-custom path) ---------------
 
@@ -67,6 +68,7 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
       thinkingLevel: "medium",
       autoSkillLearning: false,
       isConfigured: false,
+      webAccess: normalizeWebAccessConfig(undefined),
       ...overrides,
     });
   }
@@ -192,6 +194,7 @@ describe("buildProjectedConfig — visionModel pass-through", () => {
       thinkingLevel: "medium",
       autoSkillLearning: false,
       isConfigured: false,
+      webAccess: normalizeWebAccessConfig(undefined),
       ...overrides,
     });
   }

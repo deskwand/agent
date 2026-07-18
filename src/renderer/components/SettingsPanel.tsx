@@ -301,6 +301,7 @@ export function SettingsPanel({
                   <SettingsAbout appVersion={appVersion} />
                 )}
               </div>
+
               <div className={activeTab === "connectors" ? "" : "hidden"}>
                 {viewedTabs.has("connectors") && (
                   <SettingsConnectors isActive={activeTab === "connectors"} />

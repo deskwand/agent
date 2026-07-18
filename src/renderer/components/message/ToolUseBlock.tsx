@@ -4,7 +4,9 @@ import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
   ChevronRight,
+  Globe,
   Loader2,
+  Search,
   XCircle,
   CheckCircle2,
 } from "lucide-react";
@@ -26,8 +28,18 @@ import { TodoWriteBlock } from "./TodoWriteBlock";
 import { FileToolBlock, canHandleFileInput } from "./FileToolBlock";
 import { BashToolBlock, canHandleBashInput } from "./BashToolBlock";
 import { getToolIcon, getToolLabel } from "./toolHelpers";
+import { MessageMarkdown } from "../MessageMarkdown";
 
 // Only allow safe image MIME types for data: URI rendering
+const WEB_SEARCH_TOOL_NAMES = new Set([
+  "web_search",
+  "websearch",
+  "web_fetch",
+  "webfetch",
+  "fetch_content",
+  "get_search_content",
+]);
+
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -133,6 +145,8 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const mcpServerName = isMCPTool
     ? block.name.match(/^mcp__(.+?)__/)?.[1]
     : null;
+  const isWebSearchTool = WEB_SEARCH_TOOL_NAMES.has(block.name);
+  const toolInput = block.input as Record<string, unknown>;
   const collapsedSummary = getCollapsedToolSummary(
     block.name,
     toolResult?.content,
@@ -140,7 +154,13 @@ export const ToolUseBlock = memo(function ToolUseBlock({
     Boolean(toolResult),
     toolResult?.diff,
   );
-  const collapsedSummaryText = formatCollapsedToolSummary(collapsedSummary, t);
+  const defaultCollapsedSummaryText = formatCollapsedToolSummary(
+    collapsedSummary,
+    t,
+  );
+  const collapsedSummaryText = toolResult?.errorCode
+    ? t(`webAccess.errors.${toolResult.errorCode}`)
+    : defaultCollapsedSummaryText;
 
   const isVisionDescribe = block.name === "vision_describe";
 
@@ -280,9 +300,58 @@ export const ToolUseBlock = memo(function ToolUseBlock({
               <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
                 {t("tool.sectionInput")}
               </div>
-              <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all bg-surface-muted rounded-lg p-2.5">
-                {JSON.stringify(block.input, null, 2)}
-              </pre>
+              {isWebSearchTool ? (
+                <div className="space-y-1">
+                  {block.name === "get_search_content" ? (
+                    <div className="text-xs text-text-secondary">
+                      responseId: {String(toolInput.responseId || "")}
+                    </div>
+                  ) : block.name === "fetch_content" ? (
+                    <>
+                      {(Array.isArray(toolInput.urls)
+                        ? (toolInput.urls as string[])
+                        : []
+                      ).map((u, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-xs text-text-secondary">
+                          <Globe className="w-3 h-3 text-text-muted flex-shrink-0" />
+                          <span className="truncate">{u}</span>
+                        </div>
+                      ))}
+                      {toolInput.url &&
+                        !Array.isArray(toolInput.urls) && (
+                        <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                          <Globe className="w-3 h-3 text-text-muted flex-shrink-0" />
+                          <span className="truncate">
+                            {String(toolInput.url)}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* web_search / websearch / web_fetch / webfetch */
+                    (Array.isArray(toolInput.queries)
+                      ? (toolInput.queries as string[])
+                      : []
+                    ).length > 0
+                      ? (toolInput.queries as string[]).map((q, i) => (
+                          <div key={i} className="flex items-center gap-1.5 text-xs text-text-secondary">
+                            <Search className="w-3 h-3 text-text-muted flex-shrink-0" />
+                            <span>{q}</span>
+                          </div>
+                        ))
+                      : (
+                        <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                          <Search className="w-3 h-3 text-text-muted flex-shrink-0" />
+                          <span>{String(toolInput.query || toolInput.url || "")}</span>
+                        </div>
+                      )
+                  )}
+                </div>
+              ) : (
+                <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all bg-surface-muted rounded-lg p-2.5">
+                  {JSON.stringify(block.input, null, 2)}
+                </pre>
+              )}
             </div>
           )}
 
@@ -335,6 +404,10 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     );
                   })}
                 </pre>
+              ) : isWebSearchTool && typeof toolResult.content === "string" ? (
+                <div className="text-xs text-text-secondary max-h-[400px] overflow-y-auto">
+                  <MessageMarkdown normalizedText={toolResult.content} />
+                </div>
               ) : (
                 shouldShowOutputText && (
                   <pre

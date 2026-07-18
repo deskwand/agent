@@ -92,7 +92,13 @@ export const ToolResultBlock = memo(function ToolResultBlock({
     block.content,
     block.isError === true,
   );
-  const collapsedSummaryText = formatCollapsedToolSummary(collapsedSummary, t);
+  const defaultCollapsedSummaryText = formatCollapsedToolSummary(
+    collapsedSummary,
+    t,
+  );
+  const collapsedSummaryText = block.errorCode
+    ? t(`webAccess.errors.${block.errorCode}`)
+    : defaultCollapsedSummaryText;
 
   const validImages =
     block.images?.filter(

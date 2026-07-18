@@ -11,6 +11,7 @@ vi.mock("../../main/agent/agent-sdk-one-shot", () => ({
 }));
 
 import type { AppConfig } from "../../main/config/config-store";
+import { normalizeWebAccessConfig } from "../../shared/web-access";
 import { MemoryLLMClient } from "../../main/memory/memory-llm-client";
 
 function makeConfig(timeoutMs: number): AppConfig {
@@ -70,6 +71,7 @@ function makeConfig(timeoutMs: number): AppConfig {
     thinkingLevel: "medium",
     autoSkillLearning: false,
     isConfigured: true,
+    webAccess: normalizeWebAccessConfig(undefined),
   };
 }
 

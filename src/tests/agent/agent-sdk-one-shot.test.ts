@@ -17,6 +17,7 @@ vi.mock("../../main/agent/shared-auth", () => ({
 }));
 
 import type { AppConfig } from "../../main/config/config-store";
+import { normalizeWebAccessConfig } from "../../shared/web-access";
 import { runPiAiOneShot } from "../../main/agent/agent-sdk-one-shot";
 
 function makeConfig(): AppConfig {
@@ -76,6 +77,7 @@ function makeConfig(): AppConfig {
     thinkingLevel: "medium",
     autoSkillLearning: false,
     isConfigured: true,
+    webAccess: normalizeWebAccessConfig(undefined),
   };
 }
 

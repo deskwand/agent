@@ -171,9 +171,16 @@ describe("getCollapsedToolSummary", () => {
     ).toEqual({ kind: "matches", count: 3 });
   });
 
-  // --- webfetch ---
-  it("returns none for webfetch", () => {
-    expect(getCollapsedToolSummary("webfetch", "hello world", false)).toEqual({
+  // --- Web Access ---
+  it.each([
+    "websearch",
+    "webfetch",
+    "web_fetch",
+    "web_search",
+    "fetch_content",
+    "get_search_content",
+  ])("returns none for %s", (toolName) => {
+    expect(getCollapsedToolSummary(toolName, "hello world", false)).toEqual({
       kind: "none",
     });
   });

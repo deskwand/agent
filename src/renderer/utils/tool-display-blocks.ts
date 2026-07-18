@@ -5,6 +5,7 @@ import { extractFilePathFromToolInput } from "./tool-output-path";
 export interface ProcessSummary {
   readCount: number;
   hasSearch: boolean;
+  hasWebSearch: boolean;
   hasBrowse: boolean;
   commandCount: number;
   hasGoal: boolean;
@@ -53,6 +54,9 @@ const PROCESS_TOOLS = new Set([
   "execute_command",
   "websearch",
   "web_fetch",
+  "web_search",
+  "fetch_content",
+  "get_search_content",
   "vision_describe",
   "office_read_xlsx",
   "office_read_docx",
@@ -78,10 +82,16 @@ const SEARCH_TOOLS = new Set([
   "glob",
 ]);
 
-const BROWSE_TOOLS = new Set([
-  // web fetch/search + all browser automation tools
+const WEB_SEARCH_TOOLS = new Set([
   "websearch",
   "web_fetch",
+  "web_search",
+  "fetch_content",
+  "get_search_content",
+]);
+
+const BROWSE_TOOLS = new Set([
+  // browser automation tools
   "internal_browser_navigate",
   "internal_browser_screenshot",
   "internal_browser_click",
@@ -134,6 +144,7 @@ const GOAL_TOOLS = new Set([
 function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   const readPaths = new Set<string>();
   let hasSearch = false;
+  let hasWebSearch = false;
   let hasBrowse = false;
   let commandCount = 0;
   let hasGoal = false;
@@ -161,6 +172,10 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
       hasSearch = true;
       countedAsSpecific = true;
     }
+    if (WEB_SEARCH_TOOLS.has(lower)) {
+      hasWebSearch = true;
+      countedAsSpecific = true;
+    }
     if (BROWSE_TOOLS.has(lower)) {
       hasBrowse = true;
       countedAsSpecific = true;
@@ -181,6 +196,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   return {
     readCount: readPaths.size,
     hasSearch,
+    hasWebSearch,
     hasBrowse,
     commandCount,
     hasGoal,
@@ -401,7 +417,7 @@ export function formatProcessSummaryLabel(
 
 export type ProcessSummaryFragment = {
   text: string;
-  iconType: "read" | "search" | "browse" | "command" | "goal" | "tool";
+  iconType: "read" | "search" | "websearch" | "browse" | "command" | "goal" | "tool";
 };
 
 export function getProcessSummaryFragments(
@@ -422,6 +438,12 @@ export function getProcessSummaryFragments(
     fragments.push({
       text: t("tool.grouped.searchedCode"),
       iconType: "search",
+    });
+  }
+  if (summary.hasWebSearch) {
+    fragments.push({
+      text: t("tool.grouped.searchedWeb"),
+      iconType: "websearch",
     });
   }
   if (summary.hasBrowse) {

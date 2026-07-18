@@ -28,8 +28,18 @@ export function getToolIcon(name: string) {
     return <Pencil className="w-3.5 h-3.5" />;
   if (n === "grep") return <Search className="w-3.5 h-3.5" />;
   if (n === "glob") return <FolderSearch className="w-3.5 h-3.5" />;
-  if (n === "websearch") return <Globe className="w-3.5 h-3.5" />;
-  if (n === "webfetch") return <Globe className="w-3.5 h-3.5" />;
+  // Keep legacy names so Web Access calls in historical sessions still render.
+  if (
+    [
+      "websearch",
+      "webfetch",
+      "web_fetch",
+      "web_search",
+      "fetch_content",
+      "get_search_content",
+    ].includes(n)
+  )
+    return <Globe className="w-3.5 h-3.5" />;
   if (n === "vision_describe") return <Eye className="w-3.5 h-3.5" />;
   if (n === "office_read_xlsx") return <Table className="w-3.5 h-3.5" />;
   if (n === "office_read_docx") return <FileText className="w-3.5 h-3.5" />;
@@ -101,12 +111,36 @@ export function getToolLabel(
       ? t("tool.labelGrep", { pattern: String(inp.pattern) })
       : t("tool.actionGrep");
   }
-  if (nameLower === "websearch") {
+  if (nameLower === "websearch" || nameLower === "web_search") {
+    const queries = Array.isArray(inp.queries) ? inp.queries : [];
+    if (queries.length > 0) {
+      return t("tool.labelWebSearchMany", { count: queries.length });
+    }
     return inp.query
       ? t("tool.labelWebSearch", { query: String(inp.query) })
       : t("tool.actionWebSearch");
   }
-  if (nameLower === "webfetch") {
+  if (nameLower === "fetch_content") {
+    const urls = Array.isArray(inp.urls) ? inp.urls : [];
+    if (urls.length > 0) {
+      return t("tool.labelFetchContentMany", { count: urls.length });
+    }
+    const url = String(inp.url || "");
+    return url
+      ? t("tool.labelFetchContent", {
+          url: url.length > 50 ? url.substring(0, 47) + "..." : url,
+        })
+      : t("tool.actionFetchContent");
+  }
+  if (nameLower === "get_search_content") {
+    const responseId = String(inp.responseId || "");
+    return responseId
+      ? t("tool.labelGetSearchContent", {
+          responseId: responseId.slice(0, 8),
+        })
+      : t("tool.actionGetSearchContent");
+  }
+  if (nameLower === "webfetch" || nameLower === "web_fetch") {
     const url = String(inp.url || "");
     return url
       ? t("tool.labelWebFetch", {

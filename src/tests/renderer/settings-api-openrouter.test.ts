@@ -8,6 +8,7 @@ import { SettingsAPI } from "../../renderer/components/settings/SettingsAPI";
 import { useAppStore } from "../../renderer/store";
 import type { AppConfig } from "../../renderer/types";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
+import { normalizeWebAccessConfig } from "../../shared/web-access";
 
 function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
@@ -39,6 +40,7 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     thinkingLevel: "medium",
     autoSkillLearning: false,
     isConfigured: false,
+    webAccess: normalizeWebAccessConfig(undefined),
     ...overrides,
   };
 }

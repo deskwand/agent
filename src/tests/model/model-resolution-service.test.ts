@@ -12,6 +12,7 @@ import type {
   AppConfig,
   ProviderProfileKey,
 } from "../../main/config/config-store";
+import { normalizeWebAccessConfig } from "../../shared/web-access";
 
 function buildAppConfig(): AppConfig {
   const providers = {
@@ -163,6 +164,7 @@ function buildAppConfig(): AppConfig {
     thinkingLevel: "medium",
     autoSkillLearning: false,
     isConfigured: true,
+    webAccess: normalizeWebAccessConfig(undefined),
   };
 }
 

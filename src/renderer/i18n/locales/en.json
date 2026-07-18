@@ -77,7 +77,63 @@
     "archivedSessionsDesc": "Browse, restore or permanently delete archived sessions",
     "about": "About",
     "aboutDesc": "Version & updates",
-    "connectorsDesc": "Manage MCP connectors"
+    "connectorsDesc": "Manage MCP connectors",
+    "tools": "Tools",
+    "toolsDesc": "Configure built-in agent tools"
+  },
+  "webAccess": {
+    "groupTitle": "Web Access",
+    "groupDescription": "Search the web and extract readable content from pages, GitHub repositories, and PDFs.",
+    "defaultProvider": "Default search provider",
+    "credentialSource": "Credential source",
+    "inherit": "Use an existing API profile",
+    "dedicated": "Use a dedicated key",
+    "profile": "API profile",
+    "apiKey": "API key",
+    "baseUrl": "Base URL (optional)",
+    "configured": "Configured",
+    "unavailable": "No compatible profile",
+    "exaZeroConfig": "Optional. Without a key, search uses Exa's zero-config MCP endpoint.",
+    "saveSuccess": "Web Access settings saved",
+    "saveError": "Failed to save Web Access settings",
+    "loadError": "Failed to load Web Access settings",
+    "providers": {
+      "auto": "Automatic",
+      "openai": "OpenAI",
+      "exa": "Exa",
+      "brave": "Brave",
+      "parallel": "Parallel",
+      "tavily": "Tavily",
+      "perplexity": "Perplexity",
+      "gemini": "Gemini"
+    },
+    "tools": {
+      "webSearch": {
+        "name": "Web search",
+        "description": "Search multiple providers and return answers with source citations."
+      },
+      "fetchContent": {
+        "name": "Fetch content",
+        "description": "Extract readable Markdown from web pages, GitHub repositories, and text PDFs."
+      },
+      "getSearchContent": {
+        "name": "Read full search content",
+        "description": "Retrieve untruncated content cached by a previous search or fetch."
+      }
+    },
+    "errors": {
+      "PROVIDER_UNAVAILABLE": "Search provider unavailable",
+      "AUTHENTICATION_FAILED": "Authentication failed",
+      "RATE_LIMITED": "Search rate limit reached",
+      "REQUEST_TIMEOUT": "Web request timed out",
+      "FETCH_BLOCKED": "The address was blocked for security",
+      "CONTENT_TOO_LARGE": "The remote content is too large",
+      "UNSUPPORTED_CONTENT": "This content type is not supported",
+      "CACHE_MISS": "Stored content was not found",
+      "CACHE_EXPIRED": "Stored content has expired",
+      "SELECTOR_NOT_FOUND": "The requested item is not in this stored result",
+      "CANCELLED": "Web request cancelled"
+    }
   },
   "marketplace": {
     "title": "Skills Cloud",
@@ -268,6 +324,7 @@
     "saveSettings": "Save Settings",
     "mainModelTab": "Main Model",
     "visionModelTab": "Vision Model",
+    "searchModelTab": "Search",
     "visionModelTitle": "Vision Model Configuration",
     "visionModelDesc": "Enable image recognition for main models that do not support multimodal input. Once configured, the AI can use the vision_describe tool to view image content.",
     "visionModelPlaceholder": "Enter vision model ID, e.g. gpt-5.4-mini, claude-haiku-4-5",
@@ -1199,6 +1256,8 @@
     "actionGlob": "Glob",
     "actionGrep": "Grep",
     "actionWebSearch": "Web search",
+    "actionFetchContent": "Fetch content",
+    "actionGetSearchContent": "Read cached content",
     "actionGetGoal": "Get Goal",
     "actionUpdateGoal": "Update Goal",
     "actionGoalComplete": "Goal Complete",
@@ -1210,6 +1269,10 @@
     "labelGlob": "Glob {{pattern}}",
     "labelGrep": "Grep \"{{pattern}}\"",
     "labelWebSearch": "Search \"{{query}}\"",
+    "labelWebSearchMany": "Search {{count}} queries",
+    "labelFetchContent": "Fetch {{url}}",
+    "labelFetchContentMany": "Fetch {{count}} URLs",
+    "labelGetSearchContent": "Read cached result {{responseId}}",
     "labelWebFetch": "Fetch {{url}}",
     "actionBrowserNavigate": "Navigate",
     "actionBrowserScreenshot": "Screenshot",
@@ -1252,6 +1315,7 @@
       "readFiles_one": "Read {{count}} file",
       "readFiles_other": "Read {{count}} files",
       "searchedCode": "Searched the code",
+      "searchedWeb": "Searched the web",
       "browsedWeb": "Browsed the web",
       "managedGoal": "Managed goal",
       "executedCommands_one": "Executed {{count}} command",

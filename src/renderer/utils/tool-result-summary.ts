@@ -91,7 +91,14 @@ function isMatchTool(name: string): boolean {
 
 function isFetchTool(name: string): boolean {
   const lower = name.toLowerCase();
-  return lower === "webfetch";
+  return [
+    "websearch",
+    "webfetch",
+    "web_fetch",
+    "web_search",
+    "fetch_content",
+    "get_search_content",
+  ].includes(lower);
 }
 
 function isVisionDescribeTool(name: string): boolean {

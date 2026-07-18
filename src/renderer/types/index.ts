@@ -1,4 +1,12 @@
 import type { ThemePreset } from "../../shared/theme";
+import type {
+  WebAccessConfig,
+  WebAccessErrorCode,
+} from "../../shared/web-access";
+export type {
+  WebAccessConfig,
+  WebAccessErrorCode,
+} from "../../shared/web-access";
 
 // Session types
 export interface Session {
@@ -94,6 +102,7 @@ export interface ToolResultContent {
   toolUseId: string;
   content: string;
   isError?: boolean;
+  errorCode?: WebAccessErrorCode;
   diff?: string; // edit tool 的展示用 diff 字符串（+/- 行号前缀格式）
   images?: Array<{
     data: string; // base64 encoded image data
@@ -812,6 +821,7 @@ export interface AppConfig {
   autoSkillLearning?: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
+  webAccess: WebAccessConfig;
 }
 
 export interface ProviderPreset {

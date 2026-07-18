@@ -68,7 +68,11 @@ import { configStore } from "../config/config-store";
 import crypto from "node:crypto";
 import { createVisionDescribeTool } from "./tools/vision-describe";
 import { createOfficeTools } from "./tools/office/office-tools";
+import { webAccessCache } from "./tools/web-access/cache";
+import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter";
+import { createWebAccessTools } from "./tools/web-access/web-tools";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
+import type { WebAccessErrorCode } from "../../shared/web-access";
 import {
   BrowserViewManager,
   BROWSER_CDP_PORT,
@@ -1710,168 +1714,11 @@ ${hints.join("\n")}
       td(getStateTool),
     ];
   }
-  private buildWebTools(): ToolDefinition[] {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const td = (t: any): any => t;
-
-    const webFetchTool = {
-      name: "web_fetch",
-      label: "Web Fetch",
-      description:
-        "Fetches a URL, extracts readable content using Firefox Reader View, and returns clean Markdown. Use for retrieving web page content.",
-      parameters: Type.Object({
-        url: Type.String({ description: "HTTP/HTTPS URL to fetch" }),
-        max_chars: Type.Optional(
-          Type.Number({
-            description: "Maximum characters to return (default: 20000)",
-          }),
-        ),
-      }),
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
-        const { url, max_chars = 20000 } = params as {
-          url: string;
-          max_chars?: number;
-        };
-
-        let parsed: URL;
-        try {
-          parsed = new URL(url);
-        } catch {
-          throw new Error("Invalid URL");
-        }
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-          throw new Error("Only HTTP/HTTPS URLs are supported");
-        }
-        if (AgentRunner.isPrivateHost(parsed.hostname)) {
-          throw new Error(
-            `Cannot fetch private/internal host: ${parsed.hostname}`,
-          );
-        }
-
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-
-        let response: Response;
-        try {
-          response = await fetch(url, {
-            signal: controller.signal,
-            headers: {
-              "User-Agent":
-                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-              "Accept-Language": "en-US,en;q=0.9",
-              Accept:
-                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            },
-          });
-        } finally {
-          clearTimeout(timeout);
-        }
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const contentType = response.headers.get("content-type") || "";
-        if (!contentType.includes("text/html")) {
-          throw new Error(
-            `Unsupported content type: ${contentType}. Only text/html is supported.`,
-          );
-        }
-
-        const contentLength = parseInt(
-          response.headers.get("content-length") || "0",
-        );
-        const MAX_HTML_BYTES = 5 * 1024 * 1024; // 5 MB
-        if (contentLength > MAX_HTML_BYTES) {
-          throw new Error(
-            `Page too large (${(contentLength / 1e6).toFixed(1)} MB). Max is 5 MB.`,
-          );
-        }
-
-        const html = await response.text();
-
-        let JSDOM: any, Readability: any, TurndownService: any;
-        try {
-          ({ JSDOM } = await import("jsdom"));
-          ({ Readability } = await import("@mozilla/readability"));
-          TurndownService = (await import("turndown")).default;
-        } catch {
-          throw new Error(
-            "web_fetch dependencies (jsdom, readability, turndown) not available. " +
-              "The app may need to be rebuilt.",
-          );
-        }
-
-        const dom = new JSDOM(html, { url });
-        const reader = new Readability(dom.window.document);
-        const article = reader.parse();
-
-        if (!article || !article.content) {
-          throw new Error("Could not extract readable content from the page");
-        }
-
-        const turndown = new TurndownService({
-          headingStyle: "atx",
-          codeBlockStyle: "fenced",
-        });
-        let markdown = turndown.turndown(article.content);
-
-        const title = article.title || dom.window.document.title || "";
-        if (title) {
-          markdown = `## ${title}\n\n${markdown}`;
-        }
-
-        if (markdown.length > max_chars) {
-          markdown = markdown.slice(0, max_chars) + "...";
-        }
-
-        return {
-          content: [{ type: "text" as const, text: markdown }],
-        };
-      },
-    };
-
-    return [td(webFetchTool)];
-  }
-
   /**
    * Check if a command contains sudo
    */
   private static isSudoCommand(command: string): boolean {
     return /\bsudo\b/.test(command);
-  }
-
-  /**
-   * Check if a hostname is a private/internal/loopback address.
-   * Prevents SSRF via web_fetch against internal networks.
-   */
-  private static isPrivateHost(hostname: string): boolean {
-    // Loopback
-    if (
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "0.0.0.0"
-    ) {
-      return true;
-    }
-    // IPv4 private ranges: 10.x, 172.16-31.x, 192.168.x, 169.254.x
-    if (
-      /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(hostname)
-    ) {
-      return true;
-    }
-    // Cloud metadata endpoints
-    if (hostname === "metadata.google.internal") {
-      return true;
-    }
-    return false;
   }
 
   /**
@@ -3104,12 +2951,12 @@ This is an isolated sandbox environment. Use ${VIRTUAL_WORKSPACE_PATH} as the ro
 5. When given a task, START DOING IT. Do not restate the task, do not list what you will do, do not ask for confirmation. Just execute.`,
         workspaceInfoPrompt,
         `\u003ccitation_requirements>\n
-If your answer uses linkable content from MCP tools, include a \"Sources:\" section and otherwise use standard Markdown links: [Title](https://deskwand.ai/chat/URL).\n
+If your answer uses linkable content from Web Access or MCP tools, include a \"Sources:\" section and otherwise use standard Markdown links: [Title](https://deskwand.ai/chat/URL).\n
 \u003c/citation_requirements>`,
         `\u003ctool_behavior\u003e\n
 Tool routing:\n
 - internal_browser_*: Use for all web browsing, interactive page operations, screenshots, form filling, and JS evaluation. The browser panel opens automatically. If it doesn't, the user may have dismissed it — they can reopen it by clicking the globe icon \ud83c\udf10 in the top toolbar. Defaults to opening local files and links in the internal browser instead of the system browser.\n
-- WebSearch/WebFetch: Use for quick lookups and content fetching when full interactive browsing is unnecessary.\n
+- web_search and fetch_content: Use for quick research and readable content retrieval when interactive browsing is unnecessary. Use get_search_content when a result was truncated.\n
 \u003c/tool_behavior\u003e`,
         this.getBundledPathHints(),
       ].filter((section): section is string =>
@@ -3126,7 +2973,18 @@ Tool routing:\n
         : [];
 
       const internalBrowserTools = this.buildInternalBrowserTools();
-      const webTools = this.buildWebTools();
+      const webTools = createWebAccessTools({
+        workspaceDir: effectiveCwd,
+        sessionId: session.id,
+        getConfig: () => configStore.get("webAccess"),
+        resolveProviderAuth: (providerName, credential) =>
+          resolveWebAccessProviderAuth(
+            providerName,
+            credential,
+            configStore.getAll(),
+          ),
+        cache: webAccessCache,
+      });
 
       const extensionCustomTools = extensionResult.customTools || [];
       const customTools = [
@@ -3853,7 +3711,16 @@ Tool routing:\n
             case "tool_execution_end": {
               if (controller.signal.aborted) break;
               const toolCallId = event.toolCallId;
-              const isError = event.isError;
+              const resultDetails =
+                event.result && typeof event.result === "object"
+                  ? (event.result as { details?: Record<string, unknown> })
+                      .details
+                  : undefined;
+              const errorCode =
+                typeof resultDetails?.errorCode === "string"
+                  ? (resultDetails.errorCode as WebAccessErrorCode)
+                  : undefined;
+              const isError = event.isError || Boolean(errorCode);
 
               // Clear partial streaming output before sending final result
               this.sendToRenderer({
@@ -3887,6 +3754,7 @@ Tool routing:\n
                     toolUseId: toolCallId,
                     content: sanitizeOutputPaths(outputText),
                     isError,
+                    ...(errorCode ? { errorCode } : {}),
                     ...(typeof (
                       event.result as { details?: Record<string, unknown> }
                     )?.details?.diff === "string"

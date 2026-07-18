@@ -77,7 +77,63 @@
     "archivedSessionsDesc": "浏览、恢复或彻底删除已归档会话",
     "about": "关于",
     "aboutDesc": "版本与更新",
-    "connectorsDesc": "管理 MCP 连接器"
+    "connectorsDesc": "管理 MCP 连接器",
+    "tools": "工具",
+    "toolsDesc": "配置内置智能体工具"
+  },
+  "webAccess": {
+    "groupTitle": "网络访问",
+    "groupDescription": "搜索互联网，并从网页、GitHub 仓库和 PDF 中提取可读内容。",
+    "defaultProvider": "默认搜索供应商",
+    "credentialSource": "凭据来源",
+    "inherit": "使用已有 API 配置",
+    "dedicated": "使用专用密钥",
+    "profile": "API 配置",
+    "apiKey": "API 密钥",
+    "baseUrl": "Base URL（可选）",
+    "configured": "已配置",
+    "unavailable": "没有兼容的配置",
+    "exaZeroConfig": "可选。不填写密钥时使用 Exa 零配置 MCP 端点。",
+    "saveSuccess": "网络访问设置已保存",
+    "saveError": "保存网络访问设置失败",
+    "loadError": "加载网络访问设置失败",
+    "providers": {
+      "auto": "自动选择",
+      "openai": "OpenAI",
+      "exa": "Exa",
+      "brave": "Brave",
+      "parallel": "Parallel",
+      "tavily": "Tavily",
+      "perplexity": "Perplexity",
+      "gemini": "Gemini"
+    },
+    "tools": {
+      "webSearch": {
+        "name": "网络搜索",
+        "description": "通过多个供应商搜索，并返回带来源引用的答案。"
+      },
+      "fetchContent": {
+        "name": "获取内容",
+        "description": "从网页、GitHub 仓库和文本 PDF 中提取可读 Markdown。"
+      },
+      "getSearchContent": {
+        "name": "读取完整搜索内容",
+        "description": "读取此前搜索或获取操作缓存的未截断内容。"
+      }
+    },
+    "errors": {
+      "PROVIDER_UNAVAILABLE": "搜索供应商不可用",
+      "AUTHENTICATION_FAILED": "身份验证失败",
+      "RATE_LIMITED": "搜索请求频率受限",
+      "REQUEST_TIMEOUT": "网络请求超时",
+      "FETCH_BLOCKED": "该地址因安全原因被拦截",
+      "CONTENT_TOO_LARGE": "远程内容过大",
+      "UNSUPPORTED_CONTENT": "暂不支持此内容类型",
+      "CACHE_MISS": "未找到缓存内容",
+      "CACHE_EXPIRED": "缓存内容已过期",
+      "SELECTOR_NOT_FOUND": "缓存结果中没有请求的内容",
+      "CANCELLED": "网络请求已取消"
+    }
   },
   "marketplace": {
     "title": "技能云",
@@ -267,6 +323,7 @@
     "saveSettings": "保存设置",
     "mainModelTab": "主模型",
     "visionModelTab": "视觉模型",
+    "searchModelTab": "搜索",
     "visionModelTitle": "视觉模型配置",
     "visionModelDesc": "为不支持多模态的主模型提供图片识别能力。配置后，AI 可通过 vision_describe 工具查看图片内容。",
     "visionModelPlaceholder": "输入视觉模型 ID，例如：gpt-5.4-mini、claude-haiku-4-5",
@@ -1195,6 +1252,8 @@
     "actionGlob": "文件匹配",
     "actionGrep": "内容搜索",
     "actionWebSearch": "网页搜索",
+    "actionFetchContent": "获取内容",
+    "actionGetSearchContent": "读取缓存内容",
     "actionGetGoal": "查看目标",
     "actionUpdateGoal": "更新目标",
     "actionGoalComplete": "完成目标",
@@ -1206,6 +1265,10 @@
     "labelGlob": "文件匹配 {{pattern}}",
     "labelGrep": "内容搜索 \"{{pattern}}\"",
     "labelWebSearch": "搜索 \"{{query}}\"",
+    "labelWebSearchMany": "搜索 {{count}} 个查询",
+    "labelFetchContent": "获取 {{url}}",
+    "labelFetchContentMany": "获取 {{count}} 个 URL",
+    "labelGetSearchContent": "读取缓存结果 {{responseId}}",
     "labelWebFetch": "获取 {{url}}",
     "actionBrowserNavigate": "导航",
     "actionBrowserScreenshot": "截图",
@@ -1248,6 +1311,7 @@
       "readFiles_one": "已读取 {{count}} 个文件",
       "readFiles_other": "已读取 {{count}} 个文件",
       "searchedCode": "已搜索了代码",
+      "searchedWeb": "已搜索了网页",
       "browsedWeb": "已浏览了网页",
       "managedGoal": "已管理目标",
       "executedCommands_one": "已执行了 {{count}} 条命令",

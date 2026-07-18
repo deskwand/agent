@@ -55,6 +55,11 @@ import {
   enrichOAuthProviderModels,
 } from "./config/config-store";
 import { runConfigApiTest } from "./config/config-test-routing";
+import {
+  normalizeWebAccessConfig,
+  type WebAccessConfig,
+} from "../shared/web-access";
+import { removeAllWebAccessTempDirs } from "./agent/tools/web-access/session-temp";
 import { listOllamaModels } from "./config/ollama-api";
 import { mcpConfigStore } from "./mcp/mcp-config-store";
 import { getSandboxAdapter, shutdownSandbox } from "./sandbox/sandbox-adapter";
@@ -1345,6 +1350,12 @@ async function cleanupSandboxResources(): Promise<void> {
   }
 
   try {
+    await removeAllWebAccessTempDirs();
+  } catch (error) {
+    logError("[App] Error cleaning Web Access temp files:", error);
+  }
+
+  try {
     closeDatabase();
   } catch (error) {
     logError("[App] Error closing database:", error);
@@ -2078,6 +2089,27 @@ ipcMain.handle("config.fetchOpenRouterModels", async () => {
   return await fetchOpenRouterModels();
 });
 
+const redactWebAccessConfig = (config: WebAccessConfig | undefined) => {
+  if (!config) return undefined;
+  const normalized = normalizeWebAccessConfig(config);
+  return {
+    ...normalized,
+    openai: {
+      ...normalized.openai,
+      apiKey: normalized.openai.apiKey ? "***" : "",
+    },
+    gemini: {
+      ...normalized.gemini,
+      apiKey: normalized.gemini.apiKey ? "***" : "",
+    },
+    exaApiKey: normalized.exaApiKey ? "***" : "",
+    braveApiKey: normalized.braveApiKey ? "***" : "",
+    parallelApiKey: normalized.parallelApiKey ? "***" : "",
+    tavilyApiKey: normalized.tavilyApiKey ? "***" : "",
+    perplexityApiKey: normalized.perplexityApiKey ? "***" : "",
+  };
+};
+
 const buildAgentRuntimeSignature = (config: AppConfig): string =>
   JSON.stringify({
     provider: config.provider,
@@ -2157,6 +2189,7 @@ ipcMain.handle("config.save", async (_event, newConfig: Partial<AppConfig>) => {
             : undefined,
         }
       : undefined,
+    webAccess: redactWebAccessConfig(newConfig.webAccess),
   });
 
   const previousConfig = configStore.getAll();

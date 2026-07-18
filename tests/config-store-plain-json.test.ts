@@ -159,4 +159,43 @@ describe('ConfigStore plain JSON behavior', () => {
     expect(store.get('activeProviderKey')).toBe('openrouter');
     expect(fs.existsSync(path.join(tempDir, 'config.json'))).toBe(true);
   });
+
+  it('creates normalized Web Access defaults', async () => {
+    const { ConfigStore } = await import('../src/main/config/config-store');
+    const store = new ConfigStore();
+
+    expect(store.get('webAccess')).toEqual({
+      defaultProvider: 'auto',
+      openai: { source: 'inherit', profileKey: '', apiKey: '', baseUrl: '' },
+      gemini: { source: 'inherit', profileKey: '', apiKey: '', baseUrl: '' },
+      exaApiKey: '',
+      braveApiKey: '',
+      parallelApiKey: '',
+      tavilyApiKey: '',
+      perplexityApiKey: '',
+    });
+  });
+
+  it('persists normalized Web Access settings', async () => {
+    const { ConfigStore } = await import('../src/main/config/config-store');
+    const store = new ConfigStore();
+
+    store.update({
+      webAccess: {
+        ...store.get('webAccess'),
+        defaultProvider: 'brave',
+        braveApiKey: 'brave-key',
+        openai: {
+          source: 'dedicated',
+          profileKey: '',
+          apiKey: 'openai-key',
+          baseUrl: 'https://api.openai.com/v1',
+        },
+      },
+    });
+
+    expect(store.get('webAccess').defaultProvider).toBe('brave');
+    expect(store.get('webAccess').braveApiKey).toBe('brave-key');
+    expect(store.get('webAccess').openai.source).toBe('dedicated');
+  });
 });

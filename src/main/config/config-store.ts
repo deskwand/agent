@@ -6,6 +6,10 @@ import {
 import type { SharedProviderPreset, VisionModelConfig } from "../../shared/api-model-presets";
 import { VALID_THEME_PRESETS } from "../../shared/theme";
 import type { ThemePreset } from "../../shared/theme";
+import {
+  normalizeWebAccessConfig,
+  type WebAccessConfig,
+} from "../../shared/web-access";
 import { logWarn } from "../utils/logger";
 import {
   normalizeAnthropicBaseUrl,
@@ -111,6 +115,7 @@ export interface AppConfig {
   autoSkillLearning: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
+  webAccess: WebAccessConfig;
 }
 
 // ── StoredConfig: what actually hits disk (no root projection dupes) ─
@@ -130,6 +135,7 @@ interface StoredConfig {
   autoSkillLearning: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
+  webAccess: WebAccessConfig;
 }
 
 export interface LegacyEnvBridgeSnapshot {
@@ -246,6 +252,7 @@ function defaultStoredConfig(): StoredConfig {
     autoSkillLearning: true,
     isConfigured: false,
     visionModel: undefined,
+    webAccess: normalizeWebAccessConfig(undefined),
   };
 }
 
@@ -818,6 +825,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     autoSkillLearning: stored.autoSkillLearning,
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
+    webAccess: normalizeWebAccessConfig(stored.webAccess),
   };
 }
 
@@ -967,6 +975,8 @@ export class ConfigStore {
       stored.autoSkillLearning = updates.autoSkillLearning;
     if (updates.visionModel !== undefined)
       stored.visionModel = updates.visionModel;
+    if (updates.webAccess !== undefined)
+      stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
 
     stored.isConfigured =
       updates.isConfigured ??

@@ -34,6 +34,8 @@ import {
 } from "../sandbox/sandbox-adapter";
 import { SandboxSync } from "../sandbox/sandbox-sync";
 import { AgentRunner } from "../agent/agent-runner";
+import { webAccessCache } from "../agent/tools/web-access/cache";
+import { removeWebAccessTempDir } from "../agent/tools/web-access/session-temp";
 import { resolveModelContextWindow } from "../agent/pi-model-resolution";
 import { configStore } from "../config/config-store";
 import {
@@ -1469,6 +1471,15 @@ export class SessionManager {
     this.messageCache.delete(sessionId);
     this.sessionTitleAttempts.delete(sessionId);
     this.titleGenerationTokens.delete(sessionId);
+    webAccessCache.clearSession(sessionId);
+    try {
+      await removeWebAccessTempDir(sessionId);
+    } catch (error) {
+      logWarn("[SessionManager] Failed to clean Web Access temp directory", {
+        sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     if (this.extensionManager) {
       await this.extensionManager.onSessionDeleted({
         sessionId,
@@ -1508,11 +1519,23 @@ export class SessionManager {
         this.messageCache.delete(sessionId);
         this.sessionTitleAttempts.delete(sessionId);
         this.titleGenerationTokens.delete(sessionId);
+        webAccessCache.clearSession(sessionId);
       }
       this.db.raw.exec("COMMIT");
     } catch (e) {
       this.db.raw.exec("ROLLBACK");
       throw e;
+    }
+
+    for (const sessionId of sessionIds) {
+      try {
+        await removeWebAccessTempDir(sessionId);
+      } catch (error) {
+        logWarn("[SessionManager] Failed to clean Web Access temp directory", {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     if (this.extensionManager) {

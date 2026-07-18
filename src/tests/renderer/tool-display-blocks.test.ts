@@ -83,6 +83,7 @@ describe("orderAssistantDisplayBlocks", () => {
         summary: {
           readCount: 1,
           hasSearch: false,
+          hasWebSearch: false,
           hasBrowse: false,
           commandCount: 0,
           hasGoal: false,                                                                      
@@ -126,6 +127,7 @@ describe("buildToolDisplayBlocks", () => {
       summary: {
         readCount: 1,
         hasSearch: true,
+        hasWebSearch: false,
         hasBrowse: false,
         commandCount: 1,
           hasGoal: false,                                                                      
@@ -195,6 +197,7 @@ describe("buildToolDisplayBlocks", () => {
       summary: {
         readCount: 1,
         hasSearch: false,
+          hasWebSearch: false,
         hasBrowse: false,
         commandCount: 0,
           hasGoal: false,                                                                      
@@ -218,6 +221,7 @@ describe("buildToolDisplayBlocks", () => {
       summary: {
         readCount: 1,
         hasSearch: false,
+          hasWebSearch: false,
         hasBrowse: false,
         commandCount: 0,
           hasGoal: false,                                                                      
@@ -250,6 +254,7 @@ describe("formatProcessSummaryLabel", () => {
         {
           readCount: 2,
           hasSearch: true,
+        hasWebSearch: false,
           hasBrowse: false,
           commandCount: 1,
           hasGoal: false,                                                                      
@@ -266,6 +271,7 @@ describe("formatProcessSummaryLabel", () => {
         {
           readCount: 0,
           hasSearch: true,
+        hasWebSearch: false,
           hasBrowse: false,
           commandCount: 0,
           hasGoal: false,                                                                      
@@ -278,7 +284,7 @@ describe("formatProcessSummaryLabel", () => {
 
   it("formats browse-only process summaries", () => {
     const blocks = buildToolDisplayBlocks([
-      toolUse("wb-1", "websearch", { query: "test" }),
+      toolUse("wb-1", "internal_browser_navigate", { url: "https://example.com" }),
       toolResult("wb-1", { content: "ok" }),
     ]);
     expect(blocks[0]).toMatchObject({
@@ -286,9 +292,10 @@ describe("formatProcessSummaryLabel", () => {
       summary: {
         readCount: 0,
         hasSearch: false,
+          hasWebSearch: false,
         hasBrowse: true,
         commandCount: 0,
-          hasGoal: false,                                                                      
+          hasGoal: false,
         usedToolCount: 0,
       },
     });
@@ -317,6 +324,23 @@ describe("formatProcessSummaryLabel", () => {
       throw new Error("expected process summary");
     }
     expect(formatProcessSummaryLabel(blocks[0].summary, t)).toBe("used 1 tool");
+  });
+});
+
+describe("Web Access process grouping", () => {
+  it("groups all new Web Access tools as web search", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("search-1", "web_search", { query: "test" }),
+      toolResult("search-1"),
+      toolUse("fetch-1", "fetch_content", { url: "https://example.com" }),
+      toolResult("fetch-1"),
+      toolUse("cache-1", "get_search_content", { responseId: "id" }),
+      toolResult("cache-1"),
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { hasWebSearch: true, usedToolCount: 0 },
+    });
   });
 });
 

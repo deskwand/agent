@@ -3,7 +3,10 @@ import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
   CheckCircle,
+  ChevronDown,
+  ChevronRight,
   Eye,
+  Globe2,
   Key,
   Loader2,
   Pencil,
@@ -22,6 +25,7 @@ import { oauthProfileKey } from "../../../shared/oauth-utils";
 import type {
   ApiProviderConfig,
   ApiProviderModel,
+  AppConfig,
   CustomProtocolType,
   ProviderPreset,
   ProviderPresets,
@@ -29,6 +33,13 @@ import type {
   ProviderType,
   VisionModelConfig,
 } from "../../types";
+import {
+  normalizeWebAccessConfig,
+  WEB_SEARCH_PROVIDERS,
+  type WebAccessAuthProvider,
+  type WebAccessConfig,
+} from "../../../shared/web-access";
+import { SettingsContentSection } from "./shared";
 
 type ProviderChoice = ProviderType;
 
@@ -325,6 +336,49 @@ function isCustomProfileKey(profileKey: ProviderProfileKey): boolean {
   return profileKey.startsWith("custom:");
 }
 
+function searchMatchingProfiles(
+  appConfig: AppConfig,
+  provider: WebAccessAuthProvider,
+): Array<{ key: string; name: string }> {
+  return Object.entries(appConfig.providers).flatMap(([key, config]) => {
+    if (!config) return [];
+    if (provider === "openai") {
+      if (
+        key === "oauth:openai-codex" ||
+        config.provider === "openai" ||
+        (config.provider !== "oauth" && config.customProtocol === "openai")
+      )
+        return [{ key, name: config.name || key }];
+      return [];
+    }
+    if (
+      config.provider === "gemini" ||
+      (config.provider !== "oauth" && config.customProtocol === "gemini")
+    )
+      return [{ key, name: config.name || key }];
+    return [];
+  });
+}
+
+function searchAddInheritedDefaults(appConfig: AppConfig): WebAccessConfig {
+  let draft = normalizeWebAccessConfig(appConfig.webAccess);
+  for (const provider of ["openai", "gemini"] as const) {
+    const credential = draft[provider];
+    if (credential.source !== "inherit" || credential.profileKey) continue;
+    const profiles = searchMatchingProfiles(appConfig, provider);
+    const selected =
+      profiles.find((p) => p.key === appConfig.activeProviderKey) ??
+      profiles[0];
+    if (selected) {
+      draft = {
+        ...draft,
+        [provider]: { ...credential, profileKey: selected.key },
+      };
+    }
+  }
+  return draft;
+}
+
 export function SettingsAPI({
   embedded = false,
   onSaved,
@@ -351,7 +405,15 @@ export function SettingsAPI({
   const [isDeleting, setIsDeleting] = useState(false);
 
   // ── Tab state ──
-  const [activeTab, setActiveTab] = useState<"main" | "vision">("main");
+  const [activeTab, setActiveTab] = useState<"main" | "vision" | "search">("main");
+
+  // ── Search / webAccess state ──
+  const [searchDraft, setSearchDraft] = useState<WebAccessConfig | null>(null);
+  const [searchExpanded, setSearchExpanded] = useState<string | null>(null);
+  const [isSearchSaving, setIsSearchSaving] = useState(false);
+  const [searchMessage, setSearchMessage] = useState<
+    "saved" | "error" | null
+  >(null);
 
   // ── Vision model state ──
   const [visionDraft, setVisionDraft] = useState<VisionModelConfig>({
@@ -397,6 +459,8 @@ export function SettingsAPI({
       if (nextConfig.visionModel) {
         setVisionDraft(nextConfig.visionModel);
       }
+      // Initialize search / webAccess state from config
+      setSearchDraft(searchAddInheritedDefaults(nextConfig));
       // Load OAuth statuses
       const statuses: Record<string, unknown> = {};
       for (const provider of OAUTH_PROVIDERS) {
@@ -926,6 +990,18 @@ export function SettingsAPI({
             <Eye className="h-3.5 w-3.5" />
             {t("api.visionModelTab")}
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("search")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === "search"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            <Globe2 className="h-3.5 w-3.5" />
+            {t("api.searchModelTab")}
+          </button>
         </div>
       )}
 
@@ -1165,6 +1241,310 @@ export function SettingsAPI({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Search tab ── */}
+      {activeTab === "search" && !embedded && searchDraft && (
+        <div className="space-y-5">
+          <SettingsContentSection
+            title={t("webAccess.groupTitle")}
+            description={t("webAccess.groupDescription")}
+          >
+            <fieldset
+              disabled={isSearchSaving}
+              className="m-0 min-w-0 space-y-3 border-0 p-0"
+            >
+              <label className="block space-y-1.5">
+                <span className="text-xs font-medium text-text-secondary">
+                  {t("webAccess.defaultProvider")}
+                </span>
+                <select
+                  value={searchDraft.defaultProvider}
+                  onChange={(event) => {
+                    setSearchDraft({
+                      ...searchDraft,
+                      defaultProvider: event.target
+                        .value as WebAccessConfig["defaultProvider"],
+                    });
+                    setSearchMessage(null);
+                  }}
+                  className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+                >
+                  {WEB_SEARCH_PROVIDERS.map((provider) => (
+                    <option key={provider} value={provider}>
+                      {t(`webAccess.providers.${provider}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {(["openai", "gemini"] as const).map((provider) => {
+                const credential = searchDraft[provider];
+                const isOpen = searchExpanded === provider;
+                return (
+                  <div
+                    key={provider}
+                    className="rounded-xl border border-border-muted"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSearchExpanded((c) =>
+                          c === provider ? null : provider,
+                        )
+                      }
+                      aria-expanded={isOpen}
+                      aria-controls={`web-access-${provider}-settings`}
+                      className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    >
+                      <span className="text-sm font-medium text-text-primary">
+                        {t(`webAccess.providers.${provider}`)}
+                      </span>
+                      {isOpen ? (
+                        <ChevronDown className="h-4 w-4 text-text-muted" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-text-muted" />
+                      )}
+                    </button>
+                    {isOpen && (
+                      <div
+                        id={`web-access-${provider}-settings`}
+                        className="space-y-3 border-t border-border-muted px-4 py-3"
+                      >
+                        <label className="block space-y-1">
+                          <span className="text-xs text-text-muted">
+                            {t("webAccess.credentialSource")}
+                          </span>
+                          <select
+                            value={credential.source}
+                            onChange={(event) => {
+                              setSearchDraft((c) =>
+                                c
+                                  ? {
+                                      ...c,
+                                      [provider]: {
+                                        ...c[provider],
+                                        source: event.target.value as
+                                          | "inherit"
+                                          | "dedicated",
+                                      },
+                                    }
+                                  : c,
+                              );
+                              setSearchMessage(null);
+                            }}
+                            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
+                          >
+                            <option value="inherit">
+                              {t("webAccess.inherit")}
+                            </option>
+                            <option value="dedicated">
+                              {t("webAccess.dedicated")}
+                            </option>
+                          </select>
+                        </label>
+                        {credential.source === "inherit" ? (
+                          <label className="block space-y-1">
+                            <span className="text-xs text-text-muted">
+                              {t("webAccess.profile")}
+                            </span>
+                            <select
+                              value={credential.profileKey}
+                              onChange={(event) => {
+                                setSearchDraft((c) =>
+                                  c
+                                    ? {
+                                        ...c,
+                                        [provider]: {
+                                          ...c[provider],
+                                          profileKey: event.target.value,
+                                        },
+                                      }
+                                    : c,
+                                );
+                              }}
+                              className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
+                            >
+                              <option value="">
+                                {t("webAccess.unavailable")}
+                              </option>
+                              {searchMatchingProfiles(
+                                appConfig || { providers: {} } as AppConfig,
+                                provider,
+                              ).map((profile) => (
+                                <option key={profile.key} value={profile.key}>
+                                  {profile.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <>
+                            <label className="block space-y-1">
+                              <span className="text-xs text-text-muted">
+                                {t("webAccess.apiKey")}
+                              </span>
+                              <input
+                                type="password"
+                                autoComplete="new-password"
+                                value={credential.apiKey}
+                                onChange={(event) => {
+                                  setSearchDraft((c) =>
+                                    c
+                                      ? {
+                                          ...c,
+                                          [provider]: {
+                                            ...c[provider],
+                                            apiKey: event.target.value,
+                                          },
+                                        }
+                                      : c,
+                                  );
+                                }}
+                                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
+                              />
+                            </label>
+                            <label className="block space-y-1">
+                              <span className="text-xs text-text-muted">
+                                {t("webAccess.baseUrl")}
+                              </span>
+                              <input
+                                value={credential.baseUrl}
+                                onChange={(event) => {
+                                  setSearchDraft((c) =>
+                                    c
+                                      ? {
+                                          ...c,
+                                          [provider]: {
+                                            ...c[provider],
+                                            baseUrl: event.target.value,
+                                          },
+                                        }
+                                      : c,
+                                  );
+                                }}
+                                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
+                              />
+                            </label>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {(
+                [
+                  ["exa", "exaApiKey"],
+                  ["brave", "braveApiKey"],
+                  ["parallel", "parallelApiKey"],
+                  ["tavily", "tavilyApiKey"],
+                  ["perplexity", "perplexityApiKey"],
+                ] as const
+              ).map(([provider, field]) => {
+                const isOpen = searchExpanded === provider;
+                return (
+                  <div
+                    key={provider}
+                    className="rounded-xl border border-border-muted"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSearchExpanded((c) =>
+                          c === provider ? null : provider,
+                        )
+                      }
+                      aria-expanded={isOpen}
+                      aria-controls={`web-access-${provider}-settings`}
+                      className="flex w-full items-center justify-between px-4 py-3 text-left"
+                    >
+                      <span className="text-sm font-medium text-text-primary">
+                        {t(`webAccess.providers.${provider}`)}
+                      </span>
+                      {isOpen ? (
+                        <ChevronDown className="h-4 w-4 text-text-muted" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-text-muted" />
+                      )}
+                    </button>
+                    {isOpen && (
+                      <div
+                        id={`web-access-${provider}-settings`}
+                        className="space-y-2 border-t border-border-muted px-4 py-3"
+                      >
+                        <label className="block space-y-1">
+                          <span className="text-xs text-text-muted">
+                            {t("webAccess.apiKey")}
+                          </span>
+                          <input
+                            type="password"
+                            autoComplete="new-password"
+                            value={String(searchDraft[field])}
+                            onChange={(event) => {
+                              setSearchDraft({
+                                ...searchDraft,
+                                [field]: event.target.value,
+                              });
+                              setSearchMessage(null);
+                            }}
+                            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
+                          />
+                        </label>
+                        {provider === "exa" && (
+                          <p className="text-xs text-text-muted">
+                            {t("webAccess.exaZeroConfig")}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!searchDraft || !window.electronAPI) return;
+                    setIsSearchSaving(true);
+                    setSearchMessage(null);
+                    try {
+                      const saved = await window.electronAPI.config.save({
+                        webAccess: searchDraft,
+                      });
+                      applyConfig(saved.config);
+                      setSearchDraft(
+                        searchAddInheritedDefaults(saved.config),
+                      );
+                      setSearchMessage("saved");
+                    } catch {
+                      setSearchMessage("error");
+                    } finally {
+                      setIsSearchSaving(false);
+                    }
+                  }}
+                  disabled={isSearchSaving}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSearchSaving ? t("common.saving") : t("common.save")}
+                </button>
+                {searchMessage && (
+                  <span
+                    className={`text-xs ${searchMessage === "saved" ? "text-success" : "text-error"}`}
+                  >
+                    {t(
+                      searchMessage === "saved"
+                        ? "webAccess.saveSuccess"
+                        : "webAccess.saveError",
+                    )}
+                  </span>
+                )}
+              </div>
+            </fieldset>
+          </SettingsContentSection>
         </div>
       )}
 
