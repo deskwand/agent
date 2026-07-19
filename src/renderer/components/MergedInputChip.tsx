@@ -133,7 +133,7 @@ export function MergedInputChip({
           setModelSearch("");
         }}
         disabled={disabled}
-        className={`inline-flex h-9 items-center gap-1.5 rounded-full border border-border-subtle bg-background/60 px-2 text-xs text-text-primary transition-[width,background-color] duration-150 hover:bg-surface-hover disabled:opacity-50 ${
+        className={`inline-flex h-9 items-center gap-1.5 rounded-2xl border border-border-subtle bg-background/60 px-2 text-xs text-text-primary transition-[width,background-color] duration-150 hover:bg-surface-hover disabled:opacity-50 ${
           menuOpen ? "w-[15rem] justify-center" : "max-w-[18rem]"
         }`}
         aria-haspopup="menu"
