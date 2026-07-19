@@ -22,6 +22,33 @@
 
 ---
 
+## 看看 DeskWand 如何工作
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://file.deskwand.com/media/demos/meeting-minutes.mp4"><img src="https://file.deskwand.com/media/demos/meeting-minutes.webp" alt="从会议记录到 Word 文档" width="100%"></a><br>
+      <strong>会议记录 → Word 文档</strong>
+    </td>
+    <td width="50%" align="center">
+      <a href="https://file.deskwand.com/media/demos/web-research.mp4"><img src="https://file.deskwand.com/media/demos/web-research.webp" alt="从网页调研到管理简报" width="100%"></a><br>
+      <strong>网页调研 → 管理简报</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://file.deskwand.com/media/demos/excel-analysis.mp4"><img src="https://file.deskwand.com/media/demos/excel-analysis.webp" alt="从 Excel 分析到图表报告" width="100%"></a><br>
+      <strong>Excel 分析 → 图表报告</strong>
+    </td>
+    <td width="50%" align="center">
+      <a href="https://file.deskwand.com/media/demos/code-fix.mp4"><img src="https://file.deskwand.com/media/demos/code-fix.webp" alt="修复代码并通过测试" width="100%"></a><br>
+      <strong>缺陷描述 → 测试通过</strong>
+    </td>
+  </tr>
+</table>
+
+---
+
 ### 安装
 
 | 平台 | 下载 |

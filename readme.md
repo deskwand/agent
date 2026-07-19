@@ -22,6 +22,33 @@
 
 ---
 
+## See DeskWand in action
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://file.deskwand.com/media/demos/meeting-minutes.mp4"><img src="https://file.deskwand.com/media/demos/meeting-minutes.webp" alt="Meeting notes to Word" width="100%"></a><br>
+      <strong>Meeting notes → Word document</strong>
+    </td>
+    <td width="50%" align="center">
+      <a href="https://file.deskwand.com/media/demos/web-research.mp4"><img src="https://file.deskwand.com/media/demos/web-research.webp" alt="Web research to executive brief" width="100%"></a><br>
+      <strong>Web research → Executive brief</strong>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://file.deskwand.com/media/demos/excel-analysis.mp4"><img src="https://file.deskwand.com/media/demos/excel-analysis.webp" alt="Excel analysis to report" width="100%"></a><br>
+      <strong>Excel analysis → Report with charts</strong>
+    </td>
+    <td width="50%" align="center">
+      <a href="https://file.deskwand.com/media/demos/code-fix.mp4"><img src="https://file.deskwand.com/media/demos/code-fix.webp" alt="Code fix and passing tests" width="100%"></a><br>
+      <strong>Bug report → Passing tests</strong>
+    </td>
+  </tr>
+</table>
+
+---
+
 ### Installation
 
 | Platform | Download |
