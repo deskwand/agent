@@ -124,6 +124,12 @@ export function SettingsPanel({
       icon: Settings,
       description: t("settings.apiSettingsDesc"),
     },
+    {
+      id: "connectors" as TabId,
+      label: t("marketplace.tabMCP"),
+      icon: Plug,
+      description: t("settings.connectorsDesc"),
+    },
     ...(SHOW_SANDBOX_TAB
       ? [
           {
@@ -163,12 +169,6 @@ export function SettingsPanel({
       label: t("settings.about"),
       icon: Info,
       description: t("settings.aboutDesc"),
-    },
-    {
-      id: "connectors" as TabId,
-      label: t("marketplace.tabMCP"),
-      icon: Plug,
-      description: t("settings.connectorsDesc"),
     },
   ];
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab);
@@ -272,6 +272,11 @@ export function SettingsPanel({
                   </>
                 )}
               </div>
+              <div className={activeTab === "connectors" ? "" : "hidden"}>
+                {viewedTabs.has("connectors") && (
+                  <SettingsConnectors isActive={activeTab === "connectors"} />
+                )}
+              </div>
               {SHOW_SANDBOX_TAB && (
                 <div className={activeTab === "sandbox" ? "" : "hidden"}>
                   {viewedTabs.has("sandbox") && <SettingsSandbox />}
@@ -299,12 +304,6 @@ export function SettingsPanel({
               <div className={activeTab === "about" ? "" : "hidden"}>
                 {viewedTabs.has("about") && (
                   <SettingsAbout appVersion={appVersion} />
-                )}
-              </div>
-
-              <div className={activeTab === "connectors" ? "" : "hidden"}>
-                {viewedTabs.has("connectors") && (
-                  <SettingsConnectors isActive={activeTab === "connectors"} />
                 )}
               </div>
             </div>
