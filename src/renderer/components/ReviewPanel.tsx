@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../i18n/config";
 import { useAppStore } from "../store";
 import { ResizeHandle } from "./ResizeHandle";
 import {
@@ -21,6 +23,7 @@ interface DiffFile {
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const colors: Record<string, string> = {
     A: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
     D: "bg-red-500/20 text-red-700 dark:text-red-300 border-red-500/30",
@@ -28,10 +31,10 @@ function StatusBadge({ status }: { status: string }) {
     R: "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30",
   };
   const labels: Record<string, string> = {
-    A: "新增",
-    D: "删除",
-    M: "修改",
-    R: "重命名",
+    A: t("reviewPanel.statusAdded"),
+    D: t("reviewPanel.statusDeleted"),
+    M: t("reviewPanel.statusModified"),
+    R: t("reviewPanel.statusRenamed"),
   };
   return (
     <span
@@ -144,6 +147,7 @@ function toSideBySide(
 // ── Component ──
 
 export function ReviewPanel() {
+  const { t } = useTranslation();
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const setReviewOpen = useAppStore((s) => s.setReviewOpen);
   const reviewTargetFile = useAppStore((s) => s.reviewTargetFile);
@@ -276,14 +280,14 @@ export function ReviewPanel() {
   const toolbar = (
     <div className="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border/20">
       <GitBranch className="w-4 h-4 text-accent" />
-      <span className="text-sm font-medium text-text-primary">代码审查</span>
+      <span className="text-sm font-medium text-text-primary">{t("reviewPanel.title")}</span>
       <span className="text-xs text-text-muted ml-2">
-        {diffFiles.length} 个文件
+        {t("reviewPanel.fileCount", { count: diffFiles.length })}
       </span>
       <button
         onClick={loadDiffFiles}
         className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors ml-2"
-        title="刷新"
+        title={t("reviewPanel.refresh")}
       >
         <RefreshCw
           className={`w-3.5 h-3.5 ${loadingFiles ? "animate-spin" : ""}`}
@@ -294,7 +298,7 @@ export function ReviewPanel() {
           setDiffViewMode((m) => (m === "unified" ? "side-by-side" : "unified"))
         }
         className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        title={diffViewMode === "unified" ? "切换到双栏" : "切换到统一"}
+        title={diffViewMode === "unified" ? t("reviewPanel.switchToSideBySide") : t("reviewPanel.switchToUnified")}
       >
         <Columns2 className="w-3.5 h-3.5" />
       </button>
@@ -302,7 +306,7 @@ export function ReviewPanel() {
       <button
         onClick={() => setIsFullscreen((f) => !f)}
         className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        title={isFullscreen ? "退出全屏" : "全屏"}
+        title={isFullscreen ? t("reviewPanel.exitFullscreen") : t("reviewPanel.fullscreen")}
       >
         {isFullscreen ? (
           <Minimize2 className="w-4 h-4" />
@@ -313,7 +317,7 @@ export function ReviewPanel() {
       <button
         onClick={handleClose}
         className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        title="关闭"
+        title={t("common.close")}
       >
         <X className="w-4 h-4" />
       </button>
@@ -384,14 +388,14 @@ function renderFileList(
     return (
       <div className="flex items-center justify-center py-8 text-text-muted">
         <Loader2 className="w-4 h-4 animate-spin mr-2" />
-        <span className="text-xs">加载中...</span>
+        <span className="text-xs">{i18n.t("common.loading")}</span>
       </div>
     );
   }
 
   if (diffFiles.length === 0) {
     return (
-      <div className="text-center py-8 text-text-muted text-xs">暂无差异</div>
+      <div className="text-center py-8 text-text-muted text-xs">{i18n.t("reviewPanel.noDiff")}</div>
     );
   }
 
@@ -445,7 +449,7 @@ function renderDiffView(
   if (!selectedFile) {
     return (
       <div className="flex items-center justify-center h-full text-text-muted text-sm">
-        选择文件查看差异
+        {i18n.t("reviewPanel.selectFileToView")}
       </div>
     );
   }
@@ -483,7 +487,7 @@ function renderDiffContent(
     return (
       <div className="flex items-center justify-center py-8 text-text-muted">
         <Loader2 className="w-4 h-4 animate-spin mr-2" />
-        <span className="text-xs">加载差异...</span>
+        <span className="text-xs">{i18n.t("reviewPanel.loadingDiff")}</span>
       </div>
     );
   }
@@ -491,7 +495,7 @@ function renderDiffContent(
   if (diffData.lines.length === 0) {
     return (
       <div className="text-center py-8 text-text-muted text-xs space-y-1">
-        <div>无内容</div>
+        <div>{i18n.t("reviewPanel.noContent")}</div>
         <div className="text-xs opacity-60 space-y-0.5 font-mono">
           <div>dir: {debugCwd || "—"}</div>
           <div>file: {debugFile || "—"}</div>

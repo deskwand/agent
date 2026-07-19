@@ -1402,5 +1402,22 @@
     "reverted": "已撤销",
     "revertFailed": "撤销失败",
     "desktopOnly": "仅桌面端可用"
+  },
+  "reviewPanel": {
+    "title": "代码审查",
+    "fileCount": "{{count}} 个文件",
+    "refresh": "刷新",
+    "switchToSideBySide": "切换到双栏",
+    "switchToUnified": "切换到统一",
+    "fullscreen": "全屏",
+    "exitFullscreen": "退出全屏",
+    "statusAdded": "新增",
+    "statusDeleted": "删除",
+    "statusModified": "修改",
+    "statusRenamed": "重命名",
+    "noDiff": "暂无差异",
+    "selectFileToView": "选择文件查看差异",
+    "loadingDiff": "加载差异...",
+    "noContent": "无内容"
   }
 }

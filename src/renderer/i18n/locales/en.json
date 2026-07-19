@@ -1406,5 +1406,22 @@
     "reverted": "Reverted",
     "revertFailed": "Revert failed",
     "desktopOnly": "Desktop only"
+  },
+  "reviewPanel": {
+    "title": "Code Review",
+    "fileCount": "{{count}} files",
+    "refresh": "Refresh",
+    "switchToSideBySide": "Side-by-side view",
+    "switchToUnified": "Unified view",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "statusAdded": "Added",
+    "statusDeleted": "Deleted",
+    "statusModified": "Modified",
+    "statusRenamed": "Renamed",
+    "noDiff": "No changes",
+    "selectFileToView": "Select a file to view diff",
+    "loadingDiff": "Loading diff...",
+    "noContent": "No content"
   }
 }
