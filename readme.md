@@ -68,7 +68,8 @@
 
 ### Documentation
 
-For configuration, models, skills, MCP, and more, see the [source](https://github.com/deskwand/agent).
+- [User Manual](https://www.deskwand.com/manual) — complete guide from getting started to advanced features
+- [Source](https://github.com/deskwand/agent) — configuration, models, skills, MCP, and more
 
 <p align="center">
   <a href="https://deskwand.com">deskwand.com</a>

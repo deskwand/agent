@@ -68,7 +68,8 @@
 
 ### 文档
 
-配置、模型、技能、MCP 等更多信息，请查看 [源码](https://github.com/deskwand/agent)。
+- [用户手册](https://www.deskwand.com/zh/manual) — 从入门到精通的全流程指南
+- [源码](https://github.com/deskwand/agent) — 配置、模型、技能、MCP 等更多信息
 
 <p align="center">
   <a href="https://deskwand.com">deskwand.com</a>
