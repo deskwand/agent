@@ -7,6 +7,8 @@ describe("resolveInputStatus", () => {
     isCompacting: false,
     compactionResult: null as "success" | "failed" | "aborted" | null,
     steeringText: "",
+    steeringAcceptedText: "",
+    steeringFailedText: "",
     shouldShowThinkingIndicator: false,
     isResponding: false,
   };
@@ -34,6 +36,8 @@ describe("resolveInputStatus", () => {
         isCompacting: true,
         compactionResult: "failed",
         steeringText: "do something",
+        steeringAcceptedText: "",
+        steeringFailedText: "",
         shouldShowThinkingIndicator: true,
         isResponding: false,
       }),
@@ -124,6 +128,55 @@ describe("resolveInputStatus", () => {
         shouldShowThinkingIndicator: true,
       }),
     ).toEqual({ type: "compaction-success" });
+  });
+
+  it("returns steering-accepted when accepted text is present", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        steeringAcceptedText: "fix login",
+      }),
+    ).toEqual({ type: "steering-accepted", text: "fix login" });
+  });
+
+  it("steering-accepted wins over steering", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        steeringText: "fix login",
+        steeringAcceptedText: "fix login",
+        shouldShowThinkingIndicator: true,
+      }),
+    ).toEqual({ type: "steering-accepted", text: "fix login" });
+  });
+
+  it("compaction-failed wins over steering-accepted", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        compactionResult: "failed",
+        steeringAcceptedText: "fix login",
+      }),
+    ).toEqual({ type: "compaction-failed" });
+  });
+
+  it("returns steering-failed when failed text is present", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        steeringFailedText: "fix login",
+      }),
+    ).toEqual({ type: "steering-failed", text: "fix login" });
+  });
+
+  it("steering-failed wins over thinking", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        steeringFailedText: "fix login",
+        shouldShowThinkingIndicator: true,
+      }),
+    ).toEqual({ type: "steering-failed", text: "fix login" });
   });
 
 });

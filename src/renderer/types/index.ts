@@ -145,6 +145,11 @@ export interface CompactionState {
   estimatedTokens?: number | null;
 }
 
+export interface SteerResult {
+  status: "pending" | "accepted" | "failed";
+  text: string;
+}
+
 // Trace types for visualization
 export interface TraceStep {
   id: string;
@@ -627,6 +632,10 @@ export type ServerEvent =
         status: Exclude<CompactionStatus, "idle">;
         estimatedTokens?: number;
       };
+    }
+  | {
+      type: "session.steer.result";
+      payload: { sessionId: string; status: "accepted" | "failed"; text: string };
     }
   | {
       type: "navigate.to";

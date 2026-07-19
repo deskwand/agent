@@ -251,6 +251,8 @@ export function ChatView() {
     turnId: string;
     text: string;
   } | null>(null);
+  const [steerDisplayReady, setSteerDisplayReady] = useState(false);
+  const steerSentAtRef = useRef(0);
   // Clear steering event when active turn changes
   useEffect(() => {
     setSteeringEvent((prev) =>
@@ -279,6 +281,9 @@ export function ChatView() {
   const dismissSessionCompaction = useAppStore(
     (s) => s.dismissSessionCompaction,
   );
+  const steerResult = sessionState?.steerResult ?? null;
+  const setSteerResult = useAppStore((s) => s.setSteerResult);
+  const clearSteerResultStore = useAppStore((s) => s.clearSteerResult);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const updateSession = useAppStore((s) => s.updateSession);
   const clearActiveTurn = useAppStore((s) => s.clearActiveTurn);
@@ -302,6 +307,33 @@ export function ChatView() {
     );
     return () => clearTimeout(id);
   }, [activeSessionId, compactionResult, dismissSessionCompaction]);
+
+  useEffect(() => {
+    if (!activeSessionId || !steerResult) return;
+    if (steerResult.status === "pending") return;
+    const timeoutMs = steerResult.status === "accepted" ? 2500 : 3000;
+    const id = setTimeout(() => {
+      clearSteerResultStore(activeSessionId);
+      setSteeringEvent(null);
+    }, timeoutMs);
+    return () => clearTimeout(id);
+  }, [activeSessionId, steerResult, clearSteerResultStore]);
+
+  // steerResult lifecycle: null → pending (handleSubmit) → accepted/failed (IPC)
+  // → null (auto-clear). steerDisplayReady gates the accepted/failed transition
+  // to guarantee a minimum 500ms gradient display phase.
+  useEffect(() => {
+    if (!steerResult || steerResult.status === "pending" || steerDisplayReady)
+      return;
+    const elapsed = Date.now() - steerSentAtRef.current;
+    const delay = Math.max(0, 500 - elapsed);
+    if (delay === 0) {
+      setSteerDisplayReady(true);
+      return;
+    }
+    const id = setTimeout(() => setSteerDisplayReady(true), delay);
+    return () => clearTimeout(id);
+  }, [steerResult, steerDisplayReady]);
 
   const activeSessionCwd = useAppStore((s) => {
     if (!activeSessionId) return undefined;
@@ -363,11 +395,21 @@ export function ChatView() {
     // must show a non-null indicator so the user never sees a blank bar
     // while the session is running / a turn is active or pending.
     const hasStreamingText = !!partialMessage?.trim();
+    const steeringAcceptedText =
+      steerResult?.status === "accepted" && steerDisplayReady
+        ? steerResult.text
+        : "";
+    const steeringFailedText =
+      steerResult?.status === "failed" && steerDisplayReady
+        ? steerResult.text
+        : "";
     return resolveInputStatus({
       isSending: isSubmitting && !canStop,
       isCompacting,
       compactionResult,
       steeringText,
+      steeringAcceptedText,
+      steeringFailedText,
       // Guard with hasActiveTurn: once the turn ends we don't show
       // "thinking" during the brief idle-window before session settles.
       shouldShowThinkingIndicator:
@@ -383,6 +425,8 @@ export function ChatView() {
     partialMessage,
     steeringEvent,
     activeTurn?.turnId,
+    steerResult,
+    steerDisplayReady,
     goalStatus,
   ]);
 
@@ -1215,6 +1259,8 @@ export function ChatView() {
     // Steering path: ephemeral turn-level event (not a chat message)
     if (isSteerRef.current) {
       isSteerRef.current = false;
+      steerSentAtRef.current = Date.now();
+      setSteerDisplayReady(false);
       if (isElectron) {
         window.electronAPI.send({
           type: "session.steer",
@@ -1223,6 +1269,7 @@ export function ChatView() {
       }
       if (activeTurn?.turnId) {
         setSteeringEvent({ turnId: activeTurn.turnId, text: rawText });
+        setSteerResult(activeSessionId, { status: "pending", text: rawText });
       }
       chatInputRef.current?.clear();
       setHasInput(false);

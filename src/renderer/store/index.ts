@@ -14,6 +14,7 @@ import type {
   PartialToolResult,
   CompactionState,
   CompactionStatus,
+  SteerResult,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
 import type { ImageSource } from "../components/ImageLightbox";
@@ -49,6 +50,7 @@ export interface SessionState {
   traceSteps: TraceStep[];
   contextWindow: number;
   compaction: CompactionState;
+  steerResult: SteerResult | null;
   partialToolResults: Record<string, PartialToolResult>;
   goalStatus?: {
     status:
@@ -79,6 +81,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   traceSteps: [],
   contextWindow: 0,
   compaction: { status: "idle" },
+  steerResult: null,
   partialToolResults: {},
 };
 
@@ -303,6 +306,8 @@ interface AppState {
     estimatedTokens?: number,
   ) => void;
   dismissSessionCompaction: (sessionId: string) => void;
+  setSteerResult: (sessionId: string, result: SteerResult | null) => void;
+  clearSteerResult: (sessionId: string) => void;
 
   setPartialToolResult: (
     sessionId: string,
@@ -514,7 +519,7 @@ export const useAppStore = create<AppState>((set) => ({
                 partialMessage: "",
                 partialThinking: "",
                 ...(message.tokenUsage
-                  ? { compaction: { status: "idle" } }
+                  ? { compaction: { status: "idle" }, steerResult: null }
                   : {}),
               }
             : {}),
@@ -921,6 +926,20 @@ export const useAppStore = create<AppState>((set) => ({
         }),
       };
     }),
+
+  setSteerResult: (sessionId, result) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        steerResult: result,
+      }),
+    })),
+
+  clearSteerResult: (sessionId) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        steerResult: null,
+      }),
+    })),
 
   setPartialToolResult: (sessionId, toolCallId, result) =>
     set((state) => {

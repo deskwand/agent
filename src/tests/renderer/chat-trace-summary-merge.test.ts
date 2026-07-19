@@ -130,6 +130,7 @@ function setSessionMessages(
         traceSteps: [],
         contextWindow: 0,
         compaction: { status: "idle" },
+        steerResult: null,
         partialToolResults: {},
       },
     },

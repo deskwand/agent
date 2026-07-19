@@ -906,7 +906,8 @@
   },
   "steer": {
     "label": "引导",
-    "eventLabel": "引导"
+    "eventLabel": "引导",
+    "notDelivered": "未送达"
   },
   "goal": {
     "active": "执行中",

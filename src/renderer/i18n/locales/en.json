@@ -908,7 +908,8 @@
   },
   "steer": {
     "label": "Steer",
-    "eventLabel": "Steer"
+    "eventLabel": "Steer",
+    "notDelivered": "not delivered"
   },
   "goal": {
     "active": "Active",

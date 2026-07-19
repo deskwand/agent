@@ -410,6 +410,13 @@ function installSharedIpcBridge(): void {
           );
           break;
 
+        case "session.steer.result":
+          store.setSteerResult(event.payload.sessionId, {
+            status: event.payload.status,
+            text: event.payload.text,
+          });
+          break;
+
         case "error":
           console.error("[useIPC] Server error:", event.payload.message);
           store.setLoading(false);

@@ -91,6 +91,7 @@ function setInitialState(): void {
         traceSteps: [],
         contextWindow: 0,
         compaction: { status: "idle" },
+        steerResult: null,
         partialToolResults: {},
       },
     },

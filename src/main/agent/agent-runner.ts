@@ -4210,8 +4210,20 @@ Tool routing:\n
     }
     cached.session
       .steer(text)
-      .then(() => log("[AgentRunner] steer delivered:", text.substring(0, 80)))
-      .catch((e) => logError("[AgentRunner] steer failed:", e));
+      .then(() => {
+        log("[AgentRunner] steer delivered:", text.substring(0, 80));
+        this.sendToRenderer({
+          type: "session.steer.result",
+          payload: { sessionId, status: "accepted", text },
+        });
+      })
+      .catch((e) => {
+        logError("[AgentRunner] steer failed:", e);
+        this.sendToRenderer({
+          type: "session.steer.result",
+          payload: { sessionId, status: "failed", text },
+        });
+      });
   }
 
   /** Manually compact the conversation for a session. */
