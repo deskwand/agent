@@ -1,4 +1,11 @@
 import { useTranslation } from "react-i18next";
+import {
+  Target,
+  CirclePause,
+  BadgeCheck,
+  Ban,
+  CircleDollarSign,
+} from "lucide-react";
 
 export type ChatInputStatus =
   | { type: "sending" }
@@ -20,9 +27,19 @@ export type ChatInputStatus =
       timeUsedSeconds?: number;
       timeBudgetSeconds?: number;
     }
-  | { type: "goal-paused"; objective: string }
-  | { type: "goal-complete"; objective: string }
-  | { type: "goal-blocked"; objective: string }
+  | { type: "goal-paused"; objective: string; iteration?: number }
+  | {
+      type: "goal-complete";
+      objective: string;
+      iteration?: number;
+      timeUsedSeconds?: number;
+    }
+  | {
+      type: "goal-blocked";
+      objective: string;
+      iteration?: number;
+      timeUsedSeconds?: number;
+    }
   | {
       type: "goal-budget-limited";
       objective: string;
@@ -36,6 +53,7 @@ export type ChatInputStatus =
 
 interface ChatInputStatusBarProps {
   status: ChatInputStatus;
+  onGoalCommand?: (action: string) => void;
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
@@ -54,92 +72,164 @@ const gradientStyles = `
 }
 `;
 
-export function ChatInputStatusBar({ status }: ChatInputStatusBarProps) {
+export function ChatInputStatusBar({
+  status,
+  onGoalCommand,
+}: ChatInputStatusBarProps) {
   const { t } = useTranslation();
 
-  // Always render a fixed-height container to prevent layout jump
+  // ── Goal status rendering ──
+  if (
+    status &&
+    (status.type === "goal-active" ||
+      status.type === "goal-paused" ||
+      status.type === "goal-complete" ||
+      status.type === "goal-blocked" ||
+      status.type === "goal-budget-limited")
+  ) {
+    const renderGoalIcon = (type: string) => {
+      const cls = "w-3.5 h-3.5 flex-shrink-0 text-text-muted";
+      switch (type) {
+        case "goal-active":
+          return <Target className={cls} />;
+        case "goal-paused":
+          return <CirclePause className={cls} />;
+        case "goal-complete":
+          return <BadgeCheck className={cls} />;
+        case "goal-blocked":
+          return <Ban className={cls} />;
+        case "goal-budget-limited":
+          return <CircleDollarSign className={cls} />;
+        default:
+          return null;
+      }
+    };
+
+    let infoText = "";
+    if (status.type === "goal-active") {
+      infoText = t("goal.turn", { n: status.iteration });
+    } else if (status.type === "goal-paused") {
+      infoText = t("goal.turnsDone", { n: status.iteration ?? 0 });
+    } else if (
+      status.type === "goal-complete" ||
+      status.type === "goal-blocked"
+    ) {
+      infoText = t("goal.turnsDone", { n: status.iteration ?? 0 });
+      const s = status.timeUsedSeconds ?? 0;
+      if (s > 0) {
+        const m = Math.floor(s / 60);
+        const sec = Math.round(s % 60);
+        infoText += ` · ${m}m${sec}s`;
+      }
+    } else if (status.type === "goal-budget-limited") {
+      infoText = t("goal.lastRound");
+    }
+
+    return (
+      <div className="min-h-5 px-1 pb-1">
+        <style>{gradientStyles}</style>
+        <div className="flex items-center gap-1.5 text-xs text-text-primary">
+          {renderGoalIcon(status.type)}
+          <span className="min-w-0 truncate gradient-text">
+            {status.objective}
+          </span>
+          <span className="flex-shrink-0 text-text-muted">{infoText}</span>
+          {status.type === "goal-active" && onGoalCommand && (
+            <button
+              type="button"
+              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-error/15 text-error hover:bg-error/25 transition-colors"
+              onClick={() => onGoalCommand("goal:pause")}
+            >
+              {t("goal.pause")}
+            </button>
+          )}
+          {status.type === "goal-paused" && onGoalCommand && (
+            <>
+              <button
+                type="button"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+                onClick={() => onGoalCommand("goal:resume")}
+              >
+                {t("goal.resume")}
+              </button>
+              <button
+                type="button"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-surface-hover text-text-muted hover:bg-surface-hover/80 transition-colors"
+                onClick={() => onGoalCommand("goal:clear")}
+              >
+                {t("goal.clear")}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Non-goal status rendering ──
   let text = "";
   let toneClass = "text-text-muted";
   let isRunning = false;
 
   if (status) {
     switch (status.type) {
-    case "sending":
-      text = t("chat.sending");
-      toneClass = "text-text-primary";
-      isRunning = true;
-      break;
-    case "thinking":
-      text = t("chat.processing");
-      toneClass = "text-text-primary";
-      isRunning = true;
-      break;
-    case "responding":
-      text = t("chat.responding");
-      toneClass = "text-text-primary";
-      isRunning = true;
-      break;
-    case "compacting":
-      text = t("chat.compacting");
-      toneClass = "text-text-primary";
-      isRunning = true;
-      break;
-    case "compaction-success":
-      text = t("chat.compacted");
-      toneClass = "text-text-muted";
-      break;
-    case "compaction-failed":
-      text = t("chat.compactFailed");
-      toneClass = "text-text-muted";
-      break;
-    case "compaction-aborted":
-      text = t("chat.compactAborted");
-      toneClass = "text-text-muted";
-      break;
-    case "steering":
-      text = `${t("steer.eventLabel")}: ${status.text}`;
-      toneClass = "text-text-primary";
-      isRunning = true;
-      break;
-    case "steering-accepted":
-      text = `\u2713 ${t("steer.eventLabel")}: ${status.text}`;
-      toneClass = "text-success font-medium";
-      break;
-    case "steering-failed":
-      text = `\u2717 ${t("steer.eventLabel")} ${t("steer.notDelivered")}`;
-      toneClass = "text-error";
-      break;
-    case "goal-active":
-      text = `${t("goal.active")}: ${status.objective} (${t("goal.turn", { n: status.iteration })})`;
-      toneClass = "text-text-primary";
-      isRunning = true;
-      break;
-    case "goal-paused":
-      text = `${t("goal.paused")}: ${status.objective}`;
-      toneClass = "text-text-primary";
-      isRunning = true;
-      break;
-    case "goal-complete":
-      text = `${t("goal.complete")}: ${status.objective}`;
-      toneClass = "text-text-muted";
-      break;
-    case "goal-blocked":
-      text = `${t("goal.blocked")}: ${status.objective}`;
-      toneClass = "text-text-muted";
-      break;
-    case "goal-budget-limited":
-      text = `${t("goal.budgetLimited")}: ${status.objective} (${t("goal.turn", { n: status.iteration })})`;
-      toneClass = "text-text-primary";
-      isRunning = true;
-      break;
+      case "sending":
+        text = t("chat.sending");
+        toneClass = "text-text-primary";
+        isRunning = true;
+        break;
+      case "thinking":
+        text = t("chat.processing");
+        toneClass = "text-text-primary";
+        isRunning = true;
+        break;
+      case "responding":
+        text = t("chat.responding");
+        toneClass = "text-text-primary";
+        isRunning = true;
+        break;
+      case "compacting":
+        text = t("chat.compacting");
+        toneClass = "text-text-primary";
+        isRunning = true;
+        break;
+      case "compaction-success":
+        text = t("chat.compacted");
+        toneClass = "text-text-muted";
+        break;
+      case "compaction-failed":
+        text = t("chat.compactFailed");
+        toneClass = "text-text-muted";
+        break;
+      case "compaction-aborted":
+        text = t("chat.compactAborted");
+        toneClass = "text-text-muted";
+        break;
+      case "steering":
+        text = `${t("steer.eventLabel")}: ${status.text}`;
+        toneClass = "text-text-primary";
+        isRunning = true;
+        break;
+      case "steering-accepted":
+        text = `\u2713 ${t("steer.eventLabel")}: ${status.text}`;
+        toneClass = "text-success font-medium";
+        break;
+      case "steering-failed":
+        text = `\u2717 ${t("steer.eventLabel")} ${t("steer.notDelivered")}`;
+        toneClass = "text-error";
+        break;
+      // goal-* handled by early return above
     }
   }
 
+  // Always render a fixed-height container to prevent layout jump
   return (
     <div className="min-h-5 px-1 pb-1">
       <style>{gradientStyles}</style>
       <div className={`flex items-center gap-1.5 text-xs ${toneClass}`}>
-        <span className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}>
+        <span
+          className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}
+        >
           {text}
         </span>
       </div>
@@ -159,7 +249,13 @@ export function resolveInputStatus(params: {
   shouldShowThinkingIndicator: boolean;
   isResponding: boolean;
   goalStatus?: {
-    status: "active" | "paused" | "complete" | "cleared" | "blocked" | "budget_limited";
+    status:
+      | "active"
+      | "paused"
+      | "complete"
+      | "cleared"
+      | "blocked"
+      | "budget_limited";
     objective?: string;
     iteration?: number;
     tokensUsed?: number;
@@ -202,16 +298,21 @@ export function resolveInputStatus(params: {
         return {
           type: "goal-paused",
           objective: params.goalStatus.objective ?? "",
+          iteration: params.goalStatus.iteration,
         };
       case "complete":
         return {
           type: "goal-complete",
           objective: params.goalStatus.objective ?? "",
+          iteration: params.goalStatus.iteration,
+          timeUsedSeconds: params.goalStatus.timeUsedSeconds,
         };
       case "blocked":
         return {
           type: "goal-blocked",
           objective: params.goalStatus.objective ?? "",
+          iteration: params.goalStatus.iteration,
+          timeUsedSeconds: params.goalStatus.timeUsedSeconds,
         };
       case "budget_limited":
         return {

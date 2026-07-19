@@ -3741,6 +3741,12 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.turnId,
       );
 
+    case "session.command":
+      return sm.handleGoalCommand(
+        event.payload.sessionId,
+        event.payload.action,
+      );
+
     case "session.setThinkingLevel":
       return sm.setSessionThinkingLevel(
         event.payload.sessionId,

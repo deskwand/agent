@@ -917,7 +917,12 @@
     "complete": "Complete",
     "blocked": "Blocked",
     "budgetLimited": "Budget exhausted",
-    "turn": "turn {{n}}"
+    "turn": "turn {{n}}",
+    "turnsDone": "{{n}} turns done",
+    "lastRound": "last round",
+    "pause": "Pause",
+    "resume": "Resume",
+    "clear": "Clear"
   },
   "slash": {
     "compact": "Compact",

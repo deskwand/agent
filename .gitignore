@@ -66,6 +66,7 @@ resources/node
 resources/tools
 resources/python
 docs/
+design-docs/
 /.mcp.json
 /eng.traineddata
 /jpn.traineddata

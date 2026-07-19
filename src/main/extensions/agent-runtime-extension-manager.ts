@@ -75,7 +75,9 @@ export class AgentRuntimeExtensionManager {
     };
   }
 
-  async afterSessionRun(context: AfterSessionRunContext): Promise<AfterSessionRunResult> {
+  async afterSessionRun(
+    context: AfterSessionRunContext,
+  ): Promise<AfterSessionRunResult> {
     const result: AfterSessionRunResult = {};
     const outcomes = await Promise.allSettled(
       this.extensions.map(async (extension) => {
@@ -99,6 +101,9 @@ export class AgentRuntimeExtensionManager {
         }
         if (!result.goalStatus && outcome.value.goalStatus) {
           result.goalStatus = outcome.value.goalStatus;
+        }
+        if (!result.summaryMessage && outcome.value.summaryMessage) {
+          result.summaryMessage = outcome.value.summaryMessage;
         }
       }
     }

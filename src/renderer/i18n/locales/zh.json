@@ -915,7 +915,12 @@
     "complete": "已完成",
     "blocked": "已阻塞",
     "budgetLimited": "预算耗尽",
-    "turn": "第{{n}}轮"
+    "turn": "第{{n}}轮",
+    "turnsDone": "已执行{{n}}轮",
+    "lastRound": "最后1轮",
+    "pause": "暂停",
+    "resume": "继续",
+    "clear": "清除"
   },
   "slash": {
     "compact": "压缩会话",
