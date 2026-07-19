@@ -111,10 +111,26 @@ describe("ArtifactCard video references", () => {
   });
 
   it("suppresses a duplicate regular row without changing the files input", async () => {
-    const files = [{ path: "output/clip.mp4", edits: 0, writes: 1 }];
+    const files = [
+      {
+        path: "output/clip.mp4",
+        edits: 0,
+        writes: 1,
+        addedLines: 0,
+        removedLines: 0,
+      },
+    ];
     await renderCard(files, [videoReference]);
     expect(container.textContent?.match(/clip\.mp4/g)).toHaveLength(1);
-    expect(files).toEqual([{ path: "output/clip.mp4", edits: 0, writes: 1 }]);
+    expect(files).toEqual([
+      {
+        path: "output/clip.mp4",
+        edits: 0,
+        writes: 1,
+        addedLines: 0,
+        removedLines: 0,
+      },
+    ]);
   });
 
   it("opens FilePreviewModal directly from a video thumbnail", async () => {
@@ -136,8 +152,20 @@ describe("ArtifactCard video references", () => {
   it("keeps non-video edited and new rows beside videos", async () => {
     await renderCard(
       [
-        { path: "src/example.ts", edits: 1, writes: 0 },
-        { path: "docs/readme.md", edits: 0, writes: 1 },
+        {
+          path: "src/example.ts",
+          edits: 1,
+          writes: 0,
+          addedLines: 0,
+          removedLines: 0,
+        },
+        {
+          path: "docs/readme.md",
+          edits: 0,
+          writes: 1,
+          addedLines: 0,
+          removedLines: 0,
+        },
       ],
       [videoReference],
     );

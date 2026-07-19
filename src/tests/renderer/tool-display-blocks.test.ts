@@ -86,7 +86,7 @@ describe("orderAssistantDisplayBlocks", () => {
           hasWebSearch: false,
           hasBrowse: false,
           commandCount: 0,
-          hasGoal: false,                                                                      
+          hasGoal: false,
           usedToolCount: 0,
         },
       },
@@ -130,7 +130,7 @@ describe("buildToolDisplayBlocks", () => {
         hasWebSearch: false,
         hasBrowse: false,
         commandCount: 1,
-          hasGoal: false,                                                                      
+        hasGoal: false,
         usedToolCount: 0,
       },
     });
@@ -197,10 +197,10 @@ describe("buildToolDisplayBlocks", () => {
       summary: {
         readCount: 1,
         hasSearch: false,
-          hasWebSearch: false,
+        hasWebSearch: false,
         hasBrowse: false,
         commandCount: 0,
-          hasGoal: false,                                                                      
+        hasGoal: false,
         usedToolCount: 0,
       },
     });
@@ -221,10 +221,10 @@ describe("buildToolDisplayBlocks", () => {
       summary: {
         readCount: 1,
         hasSearch: false,
-          hasWebSearch: false,
+        hasWebSearch: false,
         hasBrowse: false,
         commandCount: 0,
-          hasGoal: false,                                                                      
+        hasGoal: false,
         usedToolCount: 0,
       },
     });
@@ -254,10 +254,10 @@ describe("formatProcessSummaryLabel", () => {
         {
           readCount: 2,
           hasSearch: true,
-        hasWebSearch: false,
+          hasWebSearch: false,
           hasBrowse: false,
           commandCount: 1,
-          hasGoal: false,                                                                      
+          hasGoal: false,
           usedToolCount: 0,
         },
         t,
@@ -271,10 +271,10 @@ describe("formatProcessSummaryLabel", () => {
         {
           readCount: 0,
           hasSearch: true,
-        hasWebSearch: false,
+          hasWebSearch: false,
           hasBrowse: false,
           commandCount: 0,
-          hasGoal: false,                                                                      
+          hasGoal: false,
           usedToolCount: 0,
         },
         t,
@@ -284,7 +284,9 @@ describe("formatProcessSummaryLabel", () => {
 
   it("formats browse-only process summaries", () => {
     const blocks = buildToolDisplayBlocks([
-      toolUse("wb-1", "internal_browser_navigate", { url: "https://example.com" }),
+      toolUse("wb-1", "internal_browser_navigate", {
+        url: "https://example.com",
+      }),
       toolResult("wb-1", { content: "ok" }),
     ]);
     expect(blocks[0]).toMatchObject({
@@ -292,10 +294,10 @@ describe("formatProcessSummaryLabel", () => {
       summary: {
         readCount: 0,
         hasSearch: false,
-          hasWebSearch: false,
+        hasWebSearch: false,
         hasBrowse: true,
         commandCount: 0,
-          hasGoal: false,
+        hasGoal: false,
         usedToolCount: 0,
       },
     });
@@ -316,7 +318,7 @@ describe("formatProcessSummaryLabel", () => {
     expect(blocks[0]).toMatchObject({
       type: "process-summary",
       summary: {
-          hasGoal: false,                                                                      
+        hasGoal: false,
         usedToolCount: 1,
       },
     });
@@ -373,14 +375,112 @@ describe("formatResultSummaryLabel", () => {
 describe("collectResultFiles", () => {
   it("merges repeated result entries by file", () => {
     expect(
-      collectResultFiles([
-        toolUse("edit-1", "edit", { path: "src/a.ts" }),
-        toolUse("edit-2", "edit", { path: "src/a.ts" }),
-        toolUse("write-1", "write", { path: "src/b.ts" }),
-      ]),
+      collectResultFiles(
+        [
+          toolUse("edit-1", "edit", { path: "src/a.ts" }),
+          toolUse("edit-2", "edit", { path: "src/a.ts" }),
+          toolUse("write-1", "write", { path: "src/b.ts" }),
+        ],
+        [],
+      ),
     ).toEqual([
-      { path: "src/a.ts", edits: 2, writes: 0 },
-      { path: "src/b.ts", edits: 0, writes: 1 },
+      { path: "src/a.ts", edits: 2, writes: 0, addedLines: 0, removedLines: 0 },
+      { path: "src/b.ts", edits: 0, writes: 1, addedLines: 0, removedLines: 0 },
+    ]);
+  });
+
+  it("counts write lines, trimming trailing newline", () => {
+    expect(
+      collectResultFiles(
+        [toolUse("w-1", "write", { path: "a.ts", content: "foo\n" })],
+        [],
+      ),
+    ).toEqual([
+      { path: "a.ts", edits: 0, writes: 1, addedLines: 1, removedLines: 0 },
+    ]);
+  });
+
+  it("handles CRLF in write content", () => {
+    expect(
+      collectResultFiles(
+        [toolUse("w-1", "write", { path: "a.ts", content: "foo\r\nbar\r\n" })],
+        [],
+      ),
+    ).toEqual([
+      { path: "a.ts", edits: 0, writes: 1, addedLines: 2, removedLines: 0 },
+    ]);
+  });
+
+  it("counts whitespace-only as one line", () => {
+    expect(
+      collectResultFiles(
+        [toolUse("w-1", "write", { path: "a.ts", content: "   " })],
+        [],
+      ),
+    ).toEqual([
+      { path: "a.ts", edits: 0, writes: 1, addedLines: 1, removedLines: 0 },
+    ]);
+  });
+
+  it("counts a single newline as one blank line", () => {
+    expect(
+      collectResultFiles(
+        [toolUse("w-1", "write", { path: "a.ts", content: "\n" })],
+        [],
+      ),
+    ).toEqual([
+      { path: "a.ts", edits: 0, writes: 1, addedLines: 1, removedLines: 0 },
+    ]);
+  });
+
+  it("counts content with empty trailing line correctly", () => {
+    expect(
+      collectResultFiles(
+        [toolUse("w-1", "write", { path: "a.ts", content: "foo\n\n" })],
+        [],
+      ),
+    ).toEqual([
+      { path: "a.ts", edits: 0, writes: 1, addedLines: 2, removedLines: 0 },
+    ]);
+  });
+
+  it("handles truly empty content", () => {
+    expect(
+      collectResultFiles(
+        [toolUse("w-1", "write", { path: "a.ts", content: "" })],
+        [],
+      ),
+    ).toEqual([
+      { path: "a.ts", edits: 0, writes: 1, addedLines: 0, removedLines: 0 },
+    ]);
+  });
+
+  it("parses diff lines from tool result", () => {
+    expect(
+      collectResultFiles(
+        [toolUse("e-1", "edit", { path: "src/a.ts" })],
+        [toolResult("e-1", { diff: "+added line\n-removed line\n context\n" })],
+      ),
+    ).toEqual([
+      { path: "src/a.ts", edits: 1, writes: 0, addedLines: 1, removedLines: 1 },
+    ]);
+  });
+
+  it("accumulates lines across multiple edits and writes on same file", () => {
+    expect(
+      collectResultFiles(
+        [
+          toolUse("e-1", "edit", { path: "a.ts" }),
+          toolUse("e-2", "edit", { path: "a.ts" }),
+          toolUse("w-1", "write", { path: "a.ts", content: "new\nfile\n" }),
+        ],
+        [
+          toolResult("e-1", { diff: "+line1\n-line2\n" }),
+          toolResult("e-2", { diff: "+line3\n" }),
+        ],
+      ),
+    ).toEqual([
+      { path: "a.ts", edits: 2, writes: 1, addedLines: 4, removedLines: 1 },
     ]);
   });
 });

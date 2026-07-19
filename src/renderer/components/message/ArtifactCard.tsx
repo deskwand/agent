@@ -37,7 +37,10 @@ function getFileExt(filePath: string): string {
   }
   const dot = name.lastIndexOf(".");
   if (dot <= 0) return name.slice(0, 4).toUpperCase();
-  return name.slice(dot + 1).slice(0, 4).toUpperCase();
+  return name
+    .slice(dot + 1)
+    .slice(0, 4)
+    .toUpperCase();
 }
 
 function VideoThumb({ reference }: { reference: VideoReference }) {
@@ -160,17 +163,20 @@ export const ArtifactCard = memo(function ArtifactCard({
     | { kind: "video"; reference: VideoReference }
     | { kind: "file"; file: ResultFileEntry; status: "edited" | "new" }
   > = [
-    ...videoReferences.map(
-      (ref) => ({ kind: "video" as const, reference: ref }),
-    ),
-    ...editedFiles.map(
-      (file) =>
-        ({ kind: "file" as const, file, status: "edited" as const }),
-    ),
-    ...newFiles.map(
-      (file) =>
-        ({ kind: "file" as const, file, status: "new" as const }),
-    ),
+    ...videoReferences.map((ref) => ({
+      kind: "video" as const,
+      reference: ref,
+    })),
+    ...editedFiles.map((file) => ({
+      kind: "file" as const,
+      file,
+      status: "edited" as const,
+    })),
+    ...newFiles.map((file) => ({
+      kind: "file" as const,
+      file,
+      status: "new" as const,
+    })),
   ];
 
   if (allItems.length === 0) return null;
@@ -209,9 +215,7 @@ export const ArtifactCard = memo(function ArtifactCard({
       }
 
       try {
-        const result = await gitApi.revertFiles(activeSessionCwd, [
-          entry.path,
-        ]);
+        const result = await gitApi.revertFiles(activeSessionCwd, [entry.path]);
         if (result?.success) {
           setRevertedFiles((prev) => {
             const next = new Set(prev);
@@ -306,12 +310,9 @@ export const ArtifactCard = memo(function ArtifactCard({
     ],
   );
 
-  const handleClickVideo = useCallback(
-    (reference: VideoReference) => {
-      setPreviewFile({ path: reference.path, autoPlay: true });
-    },
-    [],
-  );
+  const handleClickVideo = useCallback((reference: VideoReference) => {
+    setPreviewFile({ path: reference.path, autoPlay: true });
+  }, []);
 
   return (
     <>
@@ -402,19 +403,15 @@ export const ArtifactCard = memo(function ArtifactCard({
                   <div className="mt-0.5 flex items-center gap-1.5 text-xs text-text-muted">
                     {status === "edited" ? (
                       <>
-                        {file.edits > 0 ? (
-                          <span className="text-success">+{file.edits}</span>
-                        ) : null}
-                        {file.edits > 0 && file.writes > 0 ? (
-                          <span className="text-error">-{file.writes}</span>
-                        ) : null}
+                        <span className="text-success">+{file.addedLines}</span>
+                        <span className="text-error">-{file.removedLines}</span>
                         <span>·</span>
                         <span>{t("artifactCard.statusEdited")}</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-success">+{file.writes}</span>
-                        <span className="text-error">-0</span>
+                        <span className="text-success">+{file.addedLines}</span>
+                        <span className="text-error">-{file.removedLines}</span>
                         <span>·</span>
                         <span>{t("artifactCard.statusNew")}</span>
                       </>
@@ -497,9 +494,7 @@ export const ArtifactCard = memo(function ArtifactCard({
           <FilePreviewModal
             isOpen
             filePath={previewFile.path}
-            fileName={
-              previewFile.path.split(/[/\\]/).pop() || previewFile.path
-            }
+            fileName={previewFile.path.split(/[/\\]/).pop() || previewFile.path}
             autoPlay={previewFile.autoPlay}
             onClose={() => setPreviewFile(null)}
           />,

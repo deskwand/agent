@@ -16,6 +16,8 @@ const editedFile = {
   path: "src/example.ts",
   edits: 1,
   writes: 0,
+  addedLines: 5,
+  removedLines: 2,
 };
 
 function makeSession(cwd: string): Session {

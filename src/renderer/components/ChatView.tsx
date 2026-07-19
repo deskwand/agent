@@ -774,6 +774,7 @@ export function ChatView() {
     let currentTurnToolUses: ToolUseContent[] = [];
     let currentTurnProcessToolUses: ToolUseContent[] = [];
     let currentTurnAssistantText: string[] = [];
+    let currentTurnBlocks: ContentBlock[] = [];
 
     for (let i = 0; i < mergedMessages.length; i++) {
       const msg = mergedMessages[i];
@@ -793,6 +794,7 @@ export function ChatView() {
         );
         currentTurnToolUses.push(...toolUses);
         currentTurnProcessToolUses.push(...toolUses.filter(isProcessToolUse));
+        currentTurnBlocks.push(...blocks);
 
         const msgId = String(msg.id);
         const isPartial = msgId.startsWith("partial-");
@@ -804,7 +806,7 @@ export function ChatView() {
           if (currentTurnToolUses.length > 0) {
             turnArtifactFiles.set(
               msgId,
-              collectResultFiles(currentTurnToolUses),
+              collectResultFiles(currentTurnToolUses, currentTurnBlocks),
             );
           }
           const videoReferences = extractVideoReferences(
@@ -828,6 +830,7 @@ export function ChatView() {
           currentTurnToolUses = [];
           currentTurnProcessToolUses = [];
           currentTurnAssistantText = [];
+          currentTurnBlocks = [];
         }
       }
     }

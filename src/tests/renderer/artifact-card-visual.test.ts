@@ -17,18 +17,24 @@ const editedFile: ResultFileEntry = {
   path: "src/example.ts",
   edits: 1,
   writes: 0,
+  addedLines: 5,
+  removedLines: 2,
 };
 
 const newFile: ResultFileEntry = {
   path: "src/new-file.ts",
   edits: 0,
   writes: 1,
+  addedLines: 10,
+  removedLines: 0,
 };
 
 const imageFile: ResultFileEntry = {
   path: "assets/preview.png",
   edits: 0,
   writes: 1,
+  addedLines: 0,
+  removedLines: 0,
 };
 
 function makeSession(): Session {
@@ -142,14 +148,14 @@ describe("ArtifactCard visual hierarchy", () => {
     await render([editedFile]);
 
     expect(container.textContent).toMatch(/编辑|Edited/);
-    expect(container.textContent).toContain("+1");
+    expect(container.textContent).toContain("+5");
   });
 
   it("shows new status and change count for new files", async () => {
     await render([newFile]);
 
     expect(container.textContent).toMatch(/新建|New/);
-    expect(container.textContent).toContain("+1");
+    expect(container.textContent).toContain("+10");
     expect(container.textContent).toContain("-0");
   });
 

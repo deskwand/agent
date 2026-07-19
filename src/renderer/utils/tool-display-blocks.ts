@@ -21,6 +21,8 @@ export interface ResultFileEntry {
   path: string;
   edits: number;
   writes: number;
+  addedLines: number;
+  removedLines: number;
 }
 
 export type DisplayBlock =
@@ -135,11 +137,7 @@ export function isProcessToolUse(item: ToolUseContent): boolean {
   return getToolKind(item.name) === "process";
 }
 
-const GOAL_TOOLS = new Set([
-  "get_goal",
-  "update_goal",
-  "goal_complete",
-]);
+const GOAL_TOOLS = new Set(["get_goal", "update_goal", "goal_complete"]);
 
 function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   const readPaths = new Set<string>();
@@ -241,6 +239,7 @@ export function buildProcessSummaryDisplayBlock(
 function buildSummaryBlock(
   kind: "process" | "result",
   items: ToolUseContent[],
+  blocks: ContentBlock[],
 ): DisplayBlock {
   return kind === "process"
     ? {
@@ -252,7 +251,7 @@ function buildSummaryBlock(
         type: "result-summary",
         items,
         summary: buildResultSummary(items),
-        files: collectResultFiles(items),
+        files: collectResultFiles(items, blocks),
       };
 }
 
@@ -301,7 +300,7 @@ export function buildToolDisplayBlocks(blocks: ContentBlock[]): DisplayBlock[] {
       currentKind = null;
       return;
     }
-    displayBlocks.push(buildSummaryBlock(currentKind, currentItems));
+    displayBlocks.push(buildSummaryBlock(currentKind, currentItems, blocks));
     currentItems = [];
     currentKind = null;
   };
@@ -417,7 +416,14 @@ export function formatProcessSummaryLabel(
 
 export type ProcessSummaryFragment = {
   text: string;
-  iconType: "read" | "search" | "websearch" | "browse" | "command" | "goal" | "tool";
+  iconType:
+    | "read"
+    | "search"
+    | "websearch"
+    | "browse"
+    | "command"
+    | "goal"
+    | "tool";
 };
 
 export function getProcessSummaryFragments(
@@ -505,7 +511,35 @@ export function formatResultSummaryLabel(
   return joinSummaryFragments(fragments, t);
 }
 
-export function collectResultFiles(items: ToolUseContent[]): ResultFileEntry[] {
+function countDiffLines(diff: string | undefined): {
+  added: number;
+  removed: number;
+} {
+  if (!diff) return { added: 0, removed: 0 };
+  let added = 0;
+  let removed = 0;
+  for (const line of diff.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) added += 1;
+    if (line.startsWith("-") && !line.startsWith("---")) removed += 1;
+  }
+  return { added, removed };
+}
+
+function countWriteLines(content: unknown): number {
+  if (typeof content !== "string") return 0;
+  const normalized = content.replace(/\r\n/g, "\n");
+  if (!normalized) return 0;
+  const withoutLastNewline = normalized.replace(/\n$/, "");
+  if (!withoutLastNewline) {
+    return normalized.endsWith("\n") ? 1 : 0;
+  }
+  return withoutLastNewline.split("\n").length;
+}
+
+export function collectResultFiles(
+  items: ToolUseContent[],
+  blocks: ContentBlock[],
+): ResultFileEntry[] {
   const files = new Map<string, ResultFileEntry>();
 
   for (const item of items) {
@@ -514,14 +548,29 @@ export function collectResultFiles(items: ToolUseContent[]): ResultFileEntry[] {
       continue;
     }
 
-    const current = files.get(path) ?? { path, edits: 0, writes: 0 };
+    const current = files.get(path) ?? {
+      path,
+      edits: 0,
+      writes: 0,
+      addedLines: 0,
+      removedLines: 0,
+    };
     const lower = item.name.toLowerCase();
 
     if (lower === "edit" || lower === "edit_file") {
       current.edits += 1;
+      const result = blocks.find(
+        (b) => b.type === "tool_result" && b.toolUseId === item.id,
+      );
+      if (result && result.type === "tool_result") {
+        const { added, removed } = countDiffLines(result.diff);
+        current.addedLines += added;
+        current.removedLines += removed;
+      }
     }
     if (lower === "write" || lower === "write_file") {
       current.writes += 1;
+      current.addedLines += countWriteLines(item.input.content);
     }
 
     files.set(path, current);
