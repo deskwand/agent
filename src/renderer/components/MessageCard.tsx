@@ -195,7 +195,7 @@ export const MessageCard = memo(function MessageCard({
   }
 
   return (
-    <div className="eff-message-enter">
+    <div>
       {isUser ? (
         // User message — compact bubble with action bar below
         <div className="flex justify-end group">

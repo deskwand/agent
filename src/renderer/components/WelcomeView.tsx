@@ -231,7 +231,7 @@ export function WelcomeView() {
     <div className="flex-1 flex flex-col items-center justify-center px-5 py-10 md:px-8 md:py-14">
       <div className="max-w-[840px] w-full space-y-7 animate-fade-in">
         <div className="space-y-4 text-center">
-          <p className="text-base font-medium tracking-[-0.02em] text-text-secondary text-center eff-float">
+          <p className="text-base font-medium tracking-[-0.02em] text-text-secondary text-center">
             {showProjectTitle
               ? t("welcome.titleWithProject", { projectName })
               : t("welcome.title")}

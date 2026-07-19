@@ -182,11 +182,11 @@ export function LoginModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center modal-overlay"
+      className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="card w-full max-w-sm p-6 m-4 shadow-elevated"
+        className="card w-full max-w-sm p-6 m-4 shadow-elevated animate-slide-up"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="text-base font-semibold text-text-primary mb-5 text-center">

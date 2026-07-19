@@ -17,8 +17,8 @@ export function ConfigModal({ isOpen, onClose, isFirstRun }: ConfigModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay">
-      <div className="mx-4 flex max-h-[88vh] w-full max-w-[960px] flex-col overflow-hidden rounded-6xl border border-border-subtle bg-background shadow-elevated">
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in">
+      <div className="mx-4 flex max-h-[88vh] w-full max-w-[960px] flex-col overflow-hidden rounded-6xl border border-border-subtle bg-background shadow-elevated animate-slide-up">
         <div className="flex items-center justify-between border-b border-border-muted bg-background/88 px-6 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border-subtle bg-background-secondary/88 text-accent">

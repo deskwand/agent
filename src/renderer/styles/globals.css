@@ -512,7 +512,6 @@
       color 150ms ease;
   }
   .btn:hover {
-    transform: scale(1.03);
     box-shadow: var(--shadow-elevated);
   }
   .btn:active {
@@ -538,7 +537,7 @@
     @apply w-full px-4 py-3 rounded-xl bg-surface border border-border;
     @apply text-text-primary placeholder:text-text-muted;
     @apply focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent focus:ring-opacity-30;
-    @apply transition-all duration-150;
+    @apply transition-[border-color,box-shadow,background-color,color] duration-150;
   }
 
   /* Card styles */
@@ -550,7 +549,7 @@
   .tag {
     @apply inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface;
     @apply text-sm font-medium text-text-primary;
-    @apply hover:bg-surface-hover hover:shadow-soft cursor-pointer transition-all duration-150;
+    @apply hover:bg-surface-hover hover:shadow-soft cursor-pointer transition-[background-color,box-shadow,color] duration-150;
   }
 
   /* Badge styles */
@@ -822,6 +821,12 @@
 
 /* Settings panel overlay animations */
 
+:root {
+  --motion-fast: 150ms;
+  --motion-standard: 200ms;
+  --ease-ui-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 /* Modal / panel backdrop — translucent material that pushes background back */
 .modal-overlay {
   background: rgba(0, 0, 0, 0.35);
@@ -877,6 +882,39 @@
   }
 }
 
+@keyframes toast-in-top {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-in-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes account-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .animate-fade-in {
   animation: fade-in 200ms ease-out;
 }
@@ -891,6 +929,19 @@
 
 .animate-slide-out-right {
   animation: slide-out-right 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.animate-toast-in-top {
+  animation: toast-in-top var(--motion-standard) var(--ease-ui-out);
+}
+
+.animate-toast-in-bottom {
+  animation: toast-in-bottom var(--motion-standard) var(--ease-ui-out);
+}
+
+.animate-account-menu-in {
+  transform-origin: bottom left;
+  animation: account-menu-in var(--motion-fast) var(--ease-ui-out);
 }
 
 /* ================================================================
@@ -938,29 +989,6 @@
   100% {
     transform: translate(3px, -26px) scale(0);
     opacity: 0;
-  }
-}
-
-@keyframes eff-message-in {
-  0% {
-    transform: translateY(20px);
-    opacity: 0;
-    filter: blur(4px);
-  }
-  100% {
-    transform: translateY(0);
-    opacity: 1;
-    filter: blur(0);
-  }
-}
-
-@keyframes eff-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
   }
 }
 
@@ -1012,14 +1040,6 @@
       eff-particle-3 2s ease-out 1.1s infinite;
   }
 
-  /* ── Message entrance ── */
-  .eff-message-enter {
-    animation: eff-message-in 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  }
-  .eff-message-enter--delayed {
-    animation: eff-message-in 400ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms both;
-  }
-
   /* ── Button magic (merged into .btn base class) ── */
 
   /* ── Scroll fade mask ── */
@@ -1038,12 +1058,6 @@
       black 96%,
       transparent 100%
     );
-  }
-
-  /* ── Empty state float ── */
-  .eff-float {
-    animation: eff-float 6s ease-in-out infinite;
-    will-change: transform;
   }
 
   /* ── Streaming cursor ── */
@@ -1067,6 +1081,14 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .animate-slide-up,
+  .animate-toast-in-top,
+  .animate-toast-in-bottom,
+  .animate-account-menu-in {
+    animation-name: fade-in !important;
+    animation-duration: var(--motion-fast) !important;
+    transform: none !important;
   }
   /* Replace slide animations with cross-fade */
   .animate-slide-in-right,

@@ -64,6 +64,7 @@ export function ImageLightbox({
   const [copyFeedback, setCopyFeedback] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const activePointerIdRef = useRef<number | null>(null);
 
   // Reset zoom/offset when switching images
   useEffect(() => {
@@ -131,19 +132,21 @@ export function ImageLightbox({
     [adjustZoom],
   );
 
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      if (zoom <= 1) return;
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (zoom <= 1 || activePointerIdRef.current !== null) return;
       e.preventDefault();
+      activePointerIdRef.current = e.pointerId;
+      e.currentTarget.setPointerCapture(e.pointerId);
       setIsDragging(true);
       setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
     },
     [zoom, offset],
   );
 
-  const handleMouseMove = useCallback(
-    (e: React.MouseEvent) => {
-      if (!isDragging) return;
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDragging || e.pointerId !== activePointerIdRef.current) return;
       setOffset({
         x: e.clientX - dragStart.x,
         y: e.clientY - dragStart.y,
@@ -152,9 +155,17 @@ export function ImageLightbox({
     [isDragging, dragStart],
   );
 
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
+  const handlePointerEnd = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (e.pointerId !== activePointerIdRef.current) return;
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      }
+      activePointerIdRef.current = null;
+      setIsDragging(false);
+    },
+    [],
+  );
 
   const handleDoubleClick = useCallback(() => {
     resetZoom();
@@ -343,6 +354,7 @@ export function ImageLightbox({
           <div
             className="relative select-none"
             style={{
+              touchAction: zoom > 1 ? "none" : "auto",
               cursor:
                 zoom > 1
                   ? isDragging
@@ -352,10 +364,10 @@ export function ImageLightbox({
                     ? "zoom-in"
                     : "default",
             }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerEnd}
+            onPointerCancel={handlePointerEnd}
             onDoubleClick={handleDoubleClick}
           >
             <img

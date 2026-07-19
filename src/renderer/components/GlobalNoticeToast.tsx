@@ -46,7 +46,10 @@ export function GlobalNoticeToast({ notice, onDismiss, onAction }: Props) {
   const noticeAction = notice.action;
 
   return (
-    <div className="fixed top-4 right-4 left-4 sm:left-auto z-50">
+    <div
+      key={notice.id}
+      className="fixed top-4 right-4 left-4 sm:left-auto z-50 animate-toast-in-top"
+    >
       <div
         className={`max-w-sm rounded-4xl border bg-background/92 shadow-elevated ${tone.border}`}
       >
@@ -68,7 +71,7 @@ export function GlobalNoticeToast({ notice, onDismiss, onAction }: Props) {
             <button
               type="button"
               onClick={() => onAction(noticeAction)}
-              className="w-full rounded-xl border border-accent/40 bg-accent/10 px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/20 transition-colors"
+              className="w-full rounded-xl border border-accent/40 bg-accent/10 px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/20 transition-[transform,background-color,color] active:scale-[0.97]"
             >
               {actionLabel}
             </button>

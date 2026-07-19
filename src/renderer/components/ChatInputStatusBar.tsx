@@ -130,14 +130,12 @@ export function ChatInputStatusBar({
         <style>{gradientStyles}</style>
         <div className="flex items-center gap-1.5 text-xs text-text-primary">
           {renderGoalIcon(status.type)}
-          <span className="min-w-0 truncate gradient-text">
-            {status.objective}
-          </span>
+          <span className="min-w-0 truncate">{status.objective}</span>
           <span className="flex-shrink-0 text-text-muted">{infoText}</span>
           {status.type === "goal-active" && onGoalCommand && (
             <button
               type="button"
-              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-error/15 text-error hover:bg-error/25 transition-colors"
+              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-error/15 text-error hover:bg-error/25 transition-[transform,background-color,color] active:scale-[0.97]"
               onClick={() => onGoalCommand("goal:pause")}
             >
               {t("goal.pause")}
@@ -147,14 +145,14 @@ export function ChatInputStatusBar({
             <>
               <button
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-colors"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-[transform,background-color,color] active:scale-[0.97]"
                 onClick={() => onGoalCommand("goal:resume")}
               >
                 {t("goal.resume")}
               </button>
               <button
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-surface-hover text-text-muted hover:bg-surface-hover/80 transition-colors"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-surface-hover text-text-muted hover:bg-surface-hover/80 transition-[transform,background-color,color] active:scale-[0.97]"
                 onClick={() => onGoalCommand("goal:clear")}
               >
                 {t("goal.clear")}
