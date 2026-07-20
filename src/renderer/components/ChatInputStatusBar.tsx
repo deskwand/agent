@@ -27,7 +27,7 @@ export type ChatInputStatus =
       timeUsedSeconds?: number;
       timeBudgetSeconds?: number;
     }
-  | { type: "goal-paused"; objective: string; iteration?: number }
+  | { type: "goal-paused"; objective: string; iteration?: number; timeUsedSeconds?: number }
   | {
       type: "goal-complete";
       objective: string;
@@ -105,6 +105,16 @@ export function ChatInputStatusBar({
       }
     };
 
+    function formatElapsedTime(seconds: number): string {
+      const s = Math.round(seconds);
+      if (s < 60) return t("goal.timeLessThanMinute");
+      if (s < 3600) return t("goal.timeMinutes", { n: Math.round(s / 60) });
+      const h = Math.floor(s / 3600);
+      const m = Math.round((s % 3600) / 60);
+      if (m === 0) return t("goal.timeMinutes", { n: h * 60 });
+      return t("goal.timeHoursMinutes", { h, m });
+    }
+
     let infoText = "";
     if (status.type === "goal-active") {
       infoText = t("goal.turn", { n: status.iteration });
@@ -115,14 +125,20 @@ export function ChatInputStatusBar({
       status.type === "goal-blocked"
     ) {
       infoText = t("goal.turnsDone", { n: status.iteration ?? 0 });
-      const s = status.timeUsedSeconds ?? 0;
-      if (s > 0) {
-        const m = Math.floor(s / 60);
-        const sec = Math.round(s % 60);
-        infoText += ` · ${m}m${sec}s`;
-      }
     } else if (status.type === "goal-budget-limited") {
       infoText = t("goal.lastRound");
+    }
+
+    // Append elapsed time for all goal states that have timeUsedSeconds
+    if (
+      status.timeUsedSeconds != null &&
+      status.timeUsedSeconds > 0
+    ) {
+      const isOngoing =
+        status.type === "goal-active" ||
+        status.type === "goal-paused" ||
+        status.type === "goal-budget-limited";
+      infoText += ` · ${t(isOngoing ? "goal.elapsed" : "goal.elapsedDone", { time: formatElapsedTime(status.timeUsedSeconds) })}`;
     }
 
     return (
@@ -291,6 +307,7 @@ export function resolveInputStatus(params: {
           iteration: params.goalStatus.iteration ?? 0,
           tokensUsed: params.goalStatus.tokensUsed,
           tokenBudget: params.goalStatus.tokenBudget,
+          timeUsedSeconds: params.goalStatus.timeUsedSeconds,
         };
       case "paused":
         return {

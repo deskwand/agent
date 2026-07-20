@@ -925,7 +925,12 @@
     "lastRound": "最后1轮",
     "pause": "⏸ 暂停",
     "resume": "▶ 继续",
-    "clear": "清除"
+    "clear": "清除",
+    "elapsed": "运行 {{time}}",
+    "elapsedDone": "耗时 {{time}}",
+    "timeMinutes": "{{n}} 分钟",
+    "timeHoursMinutes": "{{h}} 小时 {{m}} 分钟",
+    "timeLessThanMinute": "少于 1 分钟"
   },
   "slash": {
     "compact": "压缩会话",

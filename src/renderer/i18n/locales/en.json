@@ -927,7 +927,12 @@
     "lastRound": "last round",
     "pause": "⏸ Pause",
     "resume": "▶ Resume",
-    "clear": "Clear"
+    "clear": "Clear",
+    "elapsed": "running {{time}}",
+    "elapsedDone": "took {{time}}",
+    "timeMinutes": "{{n}} minutes",
+    "timeHoursMinutes": "{{h}}h {{m}}m",
+    "timeLessThanMinute": "less than 1 minute"
   },
   "slash": {
     "compact": "Compact",
