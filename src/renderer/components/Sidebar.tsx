@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
@@ -12,21 +13,32 @@ import {
   Folder,
   Archive,
   ChevronDown,
+  MoreHorizontal,
   SquarePen,
   Download,
+  Pin,
+  PinOff,
 } from "lucide-react";
 import { AccountMenu } from "./AccountMenu";
 import { LoginModal } from "./LoginModal";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { UpdateConfirmDialog } from "./UpdateConfirmDialog";
+import {
+  SidebarAnimatedSection,
+  SidebarGroupIcon,
+} from "./sidebar-disclosure-motion";
 import { CloudApiClient } from "../services/cloud-api";
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
-import { buildSidebarSessionGroups } from "../utils/sidebar-session-groups";
+import {
+  buildSidebarSessionGroups,
+  type SidebarPins,
+} from "../utils/sidebar-session-groups";
 
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
 const ORDINARY_SESSION_GROUP_KEY = "__ordinary_sessions__";
+const SIDEBAR_PINS_STORAGE_KEY = "deskwand.sidebarPins";
 const SESSION_OVERFLOW_BUTTON_CLASS =
   "rounded-lg bg-transparent px-3 py-1.5 text-xs text-text-muted hover:bg-transparent hover:text-text-secondary focus-visible:bg-transparent focus-visible:text-text-secondary transition-colors";
 
@@ -71,13 +83,22 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   );
   const [sessionVisibleCountOverrides, setSessionVisibleCountOverrides] =
     useState(() => new Map<string, number>());
+  const [sectionMotionVersions, setSectionMotionVersions] = useState(
+    () => new Map<string, number>(),
+  );
+  const [sidebarPins, setSidebarPins] = useState<SidebarPins>(loadSidebarPins);
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   const [cloudRestoring, setCloudRestoring] = useState(false);
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
+  const [sessionMenu, setSessionMenu] = useState<SessionMenuState | null>(null);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [currentAppVersion, setCurrentAppVersion] = useState("");
+
+  useEffect(() => {
+    saveSidebarPins(sidebarPins);
+  }, [sidebarPins]);
 
   useEffect(() => {
     if (!showProjectActions) return;
@@ -85,6 +106,24 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, [showProjectActions]);
+
+  useEffect(() => {
+    if (!sessionMenu) return;
+
+    const closeMenu = () => setSessionMenu(null);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeMenu();
+    };
+
+    document.addEventListener("click", closeMenu);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", closeMenu);
+    return () => {
+      document.removeEventListener("click", closeMenu);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", closeMenu);
+    };
+  }, [sessionMenu]);
 
   // Get current app version for update dialog
   useEffect(() => {
@@ -144,9 +183,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     }
   }, []);
 
-  const [hoveredTimeSessionId, setHoveredTimeSessionId] = useState<
-    string | null
-  >(null);
+  const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     message: string;
     onConfirm: () => void;
@@ -168,9 +205,20 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     [sessions],
   );
   const sessionGroups = useMemo(
-    () => buildSidebarSessionGroups(sessions, normalizedQuery),
-    [sessions, normalizedQuery],
+    () => buildSidebarSessionGroups(sessions, normalizedQuery, sidebarPins),
+    [sessions, normalizedQuery, sidebarPins],
   );
+  const pinnedSessionIds = useMemo(
+    () => new Set(sidebarPins.sessionIds),
+    [sidebarPins.sessionIds],
+  );
+  const pinnedProjectKeys = useMemo(
+    () => new Set(sidebarPins.projectKeys),
+    [sidebarPins.projectKeys],
+  );
+  const sessionMenuSession = sessionMenu
+    ? activeSessions.find((session) => session.id === sessionMenu.sessionId)
+    : undefined;
 
   useEffect(() => {
     if (!activeSessionId || normalizedQuery) return;
@@ -190,9 +238,30 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     if (normalizedQuery) return true;
     const override = projectExpansionOverrides.get(groupKey);
     if (override !== undefined) return override;
-    if (activeSessionId && projectSessions.some((s) => s.id === activeSessionId)) return true;
+    if (
+      activeSessionId &&
+      projectSessions.some((s) => s.id === activeSessionId)
+    )
+      return true;
     return projectIndex < DEFAULT_EXPANDED_PROJECTS;
   };
+
+  const resolveOrdinarySessionsExpanded = (): boolean => {
+    if (normalizedQuery) return true;
+    const override = projectExpansionOverrides.get(ORDINARY_SESSION_GROUP_KEY);
+    if (override !== undefined) return override;
+    if (
+      activeSessionId &&
+      sessionGroups.unscopedSessions.some(
+        (session) => session.id === activeSessionId,
+      )
+    ) {
+      return true;
+    }
+    return false;
+  };
+
+  const ordinarySessionsExpanded = resolveOrdinarySessionsExpanded();
 
   const resolveSessionVisibleCount = (
     groupKey: string,
@@ -231,6 +300,36 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     });
   };
 
+  const requestSectionMotion = (groupKey: string) => {
+    setSectionMotionVersions((current) => {
+      const next = new Map(current);
+      next.set(groupKey, (next.get(groupKey) ?? 0) + 1);
+      return next;
+    });
+  };
+
+  const handleToggleSessionPin = useCallback(
+    (event: React.MouseEvent, sessionId: string) => {
+      event.stopPropagation();
+      setSidebarPins((current) => ({
+        ...current,
+        sessionIds: toggleOrderedId(current.sessionIds, sessionId),
+      }));
+    },
+    [],
+  );
+
+  const handleToggleProjectPin = useCallback(
+    (event: React.MouseEvent, projectKey: string) => {
+      event.stopPropagation();
+      setSidebarPins((current) => ({
+        ...current,
+        projectKeys: toggleOrderedId(current.projectKeys, projectKey),
+      }));
+    },
+    [],
+  );
+
   // Unique project names with their cwds for the ▾ menu
   const projectEntries = useMemo(() => {
     const map = new Map<string, string>();
@@ -246,6 +345,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const handleSessionClick = useCallback(
     async (sessionId: string) => {
+      setSessionMenu(null);
       setShowSettings(false);
       setShowSchedule(false);
       setShowMarketplace(false);
@@ -471,13 +571,26 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive = activeSessionId === session.id && !showMarketplace;
     const hasStatusIndicator = session.status === "running";
+    const isPinned = pinnedSessionIds.has(session.id);
+    const isHovered = hoveredSessionId === session.id;
+    const isMenuOpen = sessionMenu?.sessionId === session.id;
+    const showSessionActions = isHovered || isMenuOpen;
 
     return (
       <div
         key={session.id}
         data-session-id={session.id}
         onClick={() => void handleSessionClick(session.id)}
-        className={`group relative cursor-pointer rounded-lg px-2.5 py-1.5 transition-colors border-l-[3px] border-l-transparent ${
+        onMouseEnter={() => setHoveredSessionId(session.id)}
+        onMouseLeave={() => {
+          setHoveredSessionId((current) =>
+            current === session.id ? null : current,
+          );
+          setPendingArchiveId((current) =>
+            current === session.id ? null : current,
+          );
+        }}
+        className={`group relative cursor-pointer rounded-lg px-2.5 py-1 transition-colors border-l-[3px] border-l-transparent ${
           isActive
             ? "bg-surface-active border-l-accent"
             : "hover:bg-surface-hover/60"
@@ -491,85 +604,104 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               {highlightTitle(session.title, normalizedQuery)}
             </div>
             {showRelativeTime && (
-              <div
-                className="ml-auto min-w-[3.5rem] h-6 flex-shrink-0 relative"
-                onMouseEnter={() => setHoveredTimeSessionId(session.id)}
-                onMouseLeave={() => {
-                  setHoveredTimeSessionId((prev) =>
-                    prev === session.id ? null : prev,
-                  );
-                  setPendingArchiveId((prev) =>
-                    prev === session.id ? null : prev,
-                  );
-                }}
-              >
-                {hasStatusIndicator && (
-                  <span
-                    className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center"
-                    role="status"
-                    aria-label={t("sidebar.running")}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
-                  </span>
-                )}
-
-                <span
-                  className={`absolute inset-0 flex items-center justify-end text-sm leading-5 text-text-muted text-right whitespace-nowrap transition-opacity ${
-                    hasStatusIndicator || hoveredTimeSessionId === session.id
+              <div className="ml-auto h-6 w-[4.5rem] flex-shrink-0 relative">
+                <div
+                  className={`absolute inset-0 flex items-center justify-end gap-1 transition-opacity ${
+                    showSessionActions
                       ? "opacity-0 pointer-events-none"
                       : "opacity-100"
                   }`}
                 >
-                  {formatRelativeTime(
-                    session.updatedAt || session.createdAt,
-                    t,
-                    i18n.language,
+                  {isPinned && (
+                    <Pin
+                      aria-hidden="true"
+                      className="mr-auto h-3 w-3 fill-current text-accent"
+                    />
                   )}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (pendingArchiveId === session.id) {
-                      archiveSession(session.id);
-                      setPendingArchiveId(null);
-                    } else {
-                      setPendingArchiveId(session.id);
-                    }
-                  }}
-                  className={`absolute right-6 top-0 w-6 h-6 rounded-lg flex items-center justify-center transition-[opacity,color,background-color] ${
-                    pendingArchiveId === session.id && !hasStatusIndicator
-                      ? "text-accent bg-accent-muted/20 border border-accent/30"
-                      : "text-text-muted hover:text-accent hover:bg-surface-active"
-                  } ${
-                    (pendingArchiveId === session.id ||
-                      hoveredTimeSessionId === session.id) &&
-                    !hasStatusIndicator
-                      ? "opacity-100 pointer-events-auto"
+                  {hasStatusIndicator ? (
+                    <span
+                      className="h-4 w-4 flex items-center justify-center"
+                      role="status"
+                      aria-label={t("sidebar.running")}
+                    >
+                      <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
+                    </span>
+                  ) : (
+                    <span className="text-sm leading-5 text-text-muted whitespace-nowrap">
+                      {formatRelativeTime(
+                        session.updatedAt || session.createdAt,
+                        t,
+                        i18n.language,
+                      )}
+                    </span>
+                  )}
+                </div>
+
+                <div
+                  className={`absolute inset-0 flex items-center justify-end transition-opacity ${
+                    showSessionActions
+                      ? "opacity-100"
                       : "opacity-0 pointer-events-none"
                   }`}
-                  title={
-                    pendingArchiveId === session.id
-                      ? t("common.confirm")
-                      : t("sidebar.archive")
-                  }
                 >
-                  {pendingArchiveId === session.id ? (
-                    <Check className="w-3 h-3" />
-                  ) : (
-                    <Archive className="w-3 h-3" />
+                  {!hasStatusIndicator && (
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (pendingArchiveId === session.id) {
+                          archiveSession(session.id);
+                          setPendingArchiveId(null);
+                        } else {
+                          setPendingArchiveId(session.id);
+                        }
+                      }}
+                      className={`h-6 w-6 rounded-lg flex items-center justify-center transition-colors ${
+                        pendingArchiveId === session.id
+                          ? "text-accent bg-accent-muted/20 border border-accent/30"
+                          : "text-text-muted hover:text-accent hover:bg-surface-active"
+                      }`}
+                      title={
+                        pendingArchiveId === session.id
+                          ? t("common.confirm")
+                          : t("sidebar.archive")
+                      }
+                    >
+                      {pendingArchiveId === session.id ? (
+                        <Check className="h-3 w-3" />
+                      ) : (
+                        <Archive className="h-3 w-3" />
+                      )}
+                    </button>
                   )}
-                </button>
-                <button
-                  onClick={(e) => handleDeleteSession(e, session)}
-                  className={`absolute right-0 top-0 w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-[opacity,color,background-color] ${
-                    hasStatusIndicator || hoveredTimeSessionId !== session.id
-                      ? "opacity-0 pointer-events-none"
-                      : "opacity-100 pointer-events-auto"
-                  }`}
-                  title={t("common.delete")}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setPendingArchiveId(null);
+                      if (isMenuOpen) {
+                        setSessionMenu(null);
+                        return;
+                      }
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setSessionMenu({
+                        sessionId: session.id,
+                        anchor: {
+                          top: rect.top,
+                          bottom: rect.bottom,
+                          right: rect.right,
+                        },
+                      });
+                    }}
+                    className="h-6 w-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
+                    title={t("sidebar.moreActions")}
+                    aria-label={t("sidebar.moreActions")}
+                    aria-haspopup="menu"
+                    aria-expanded={isMenuOpen}
+                  >
+                    <MoreHorizontal className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -579,16 +711,29 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   };
 
   const renderSessionList = (groupKey: string, groupSessions: Session[]) => {
-    const visibleCount = resolveSessionVisibleCount(
-      groupKey,
-      groupSessions,
+    const visibleCount = resolveSessionVisibleCount(groupKey, groupSessions);
+    const pinnedSessions = groupSessions.filter((session) =>
+      pinnedSessionIds.has(session.id),
     );
+    const unpinnedSessions = groupSessions.filter(
+      (session) => !pinnedSessionIds.has(session.id),
+    );
+    const visibleUnpinnedCount = normalizedQuery
+      ? unpinnedSessions.length
+      : Math.max(visibleCount - pinnedSessions.length, 0);
     const visibleSessions = normalizedQuery
       ? groupSessions
-      : groupSessions.slice(0, visibleCount);
-    const hiddenCount = Math.max(0, groupSessions.length - visibleCount);
+      : [...pinnedSessions, ...unpinnedSessions.slice(0, visibleUnpinnedCount)];
+    const hiddenCount = Math.max(
+      0,
+      unpinnedSessions.length - visibleUnpinnedCount,
+    );
     const nextBatchCount = Math.min(DEFAULT_VISIBLE_SESSIONS, hiddenCount);
-    const canShowLess = visibleCount > DEFAULT_VISIBLE_SESSIONS;
+    const defaultUnpinnedCount = Math.max(
+      DEFAULT_VISIBLE_SESSIONS - pinnedSessions.length,
+      0,
+    );
+    const canShowLess = visibleUnpinnedCount > defaultUnpinnedCount;
 
     return (
       <>
@@ -598,12 +743,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             {hiddenCount > 0 && (
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  requestSectionMotion(groupKey);
                   setSessionVisibleCount(
                     groupKey,
-                    visibleCount + nextBatchCount,
-                  )
-                }
+                    Math.max(visibleCount, pinnedSessions.length) +
+                      nextBatchCount,
+                  );
+                }}
                 className={`${SESSION_OVERFLOW_BUTTON_CLASS} flex-1 text-left`}
               >
                 {t("sidebar.showMoreSessions", { count: nextBatchCount })}
@@ -612,9 +759,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             {canShowLess && (
               <button
                 type="button"
-                onClick={() =>
-                  setSessionVisibleCount(groupKey, DEFAULT_VISIBLE_SESSIONS)
-                }
+                onClick={() => {
+                  requestSectionMotion(groupKey);
+                  setSessionVisibleCount(groupKey, DEFAULT_VISIBLE_SESSIONS);
+                }}
                 className={`${SESSION_OVERFLOW_BUTTON_CLASS} ml-auto flex-shrink-0 text-right`}
               >
                 {t("sidebar.showLessSessions")}
@@ -710,18 +858,60 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               </div>
             </div>
 
-            <div ref={scrollListRef} className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll">
-              <div className="space-y-0.5">
-                <div className="px-3 pb-1.5 flex items-center justify-between">
-                  <span className="text-sm font-medium leading-5 text-text-muted">
-                    {t("sidebar.allSessions")}
-                  </span>
-                </div>
-
-                {renderSessionList(
-                  ORDINARY_SESSION_GROUP_KEY,
-                  sessionGroups.unscopedSessions,
-                )}
+            <div
+              ref={scrollListRef}
+              onScroll={() => setSessionMenu(null)}
+              className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll"
+            >
+              <div>
+                <section>
+                  <button
+                    type="button"
+                    aria-expanded={ordinarySessionsExpanded}
+                    aria-label={t(
+                      ordinarySessionsExpanded
+                        ? "sidebar.collapseSessions"
+                        : "sidebar.expandSessions",
+                    )}
+                    disabled={Boolean(normalizedQuery)}
+                    onClick={() => {
+                      requestSectionMotion(ORDINARY_SESSION_GROUP_KEY);
+                      const nextExpanded = !ordinarySessionsExpanded;
+                      setProjectExpanded(
+                        ORDINARY_SESSION_GROUP_KEY,
+                        nextExpanded,
+                      );
+                      if (!nextExpanded) {
+                        setSessionVisibleCount(
+                          ORDINARY_SESSION_GROUP_KEY,
+                          DEFAULT_VISIBLE_SESSIONS,
+                        );
+                      }
+                    }}
+                    className="w-full rounded-lg px-3 py-1 flex items-center gap-1.5 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                  >
+                    <SidebarGroupIcon
+                      kind="sessions"
+                      expanded={ordinarySessionsExpanded}
+                      motionVersion={
+                        sectionMotionVersions.get(ORDINARY_SESSION_GROUP_KEY) ??
+                        0
+                      }
+                    />
+                    <span>{t("sidebar.allSessions")}</span>
+                  </button>
+                  <SidebarAnimatedSection
+                    expanded={ordinarySessionsExpanded}
+                    motionVersion={
+                      sectionMotionVersions.get(ORDINARY_SESSION_GROUP_KEY) ?? 0
+                    }
+                  >
+                    {renderSessionList(
+                      ORDINARY_SESSION_GROUP_KEY,
+                      sessionGroups.unscopedSessions,
+                    )}
+                  </SidebarAnimatedSection>
+                </section>
 
                 {sessionGroups.projectGroups.map((group, projectIndex) => {
                   const isProjectExpanded = resolveProjectExpanded(
@@ -729,11 +919,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                     projectIndex,
                     group.sessions,
                   );
+                  const isProjectPinned = pinnedProjectKeys.has(group.key);
 
                   return (
-                    <section key={group.key} className="pt-3">
+                    <section key={group.key} className="pt-1.5">
                       <div
-                        className="flex items-center justify-between"
+                        className="group/project flex items-center justify-between"
                         title={group.cwd}
                       >
                         <button
@@ -747,6 +938,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                           )}
                           disabled={Boolean(normalizedQuery)}
                           onClick={() => {
+                            requestSectionMotion(group.key);
                             const nextExpanded = !isProjectExpanded;
                             setProjectExpanded(group.key, nextExpanded);
                             if (!nextExpanded) {
@@ -756,15 +948,17 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                               );
                             }
                           }}
-                          className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-sm font-medium leading-5 text-text-muted hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                          className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-1.5 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
                         >
-                          <ChevronDown
-                            className={`h-3.5 w-3.5 flex-shrink-0 transition-transform ${
-                              isProjectExpanded ? "rotate-0" : "-rotate-90"
-                            }`}
+                          <SidebarGroupIcon
+                            kind="project"
+                            expanded={isProjectExpanded}
+                            motionVersion={
+                              sectionMotionVersions.get(group.key) ?? 0
+                            }
                           />
                           <span className="truncate">{group.name}</span>
-                          <span className="ml-auto text-xs font-normal text-text-muted">
+                          <span className="ml-auto text-xs font-normal opacity-0 transition-opacity group-hover/project:opacity-100">
                             {group.sessions.length}
                           </span>
                         </button>
@@ -774,18 +968,42 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                             event.stopPropagation();
                             void handleNewSessionInProject(group.cwd);
                           }}
-                          className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                          className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
                           title={t("sidebar.newSessionForProject")}
                           aria-label={t("sidebar.newSessionForProject")}
                         >
                           <SquarePen className="h-3.5 w-3.5" />
                         </button>
+                        <button
+                          type="button"
+                          onClick={(event) =>
+                            handleToggleProjectPin(event, group.key)
+                          }
+                          className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
+                            isProjectPinned
+                              ? "opacity-100 text-accent hover:bg-accent/10"
+                              : "opacity-0 pointer-events-none text-text-muted hover:bg-accent/10 hover:text-accent group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                          }`}
+                          title={t(
+                            isProjectPinned ? "sidebar.unpin" : "sidebar.pin",
+                          )}
+                          aria-label={t(
+                            isProjectPinned ? "sidebar.unpin" : "sidebar.pin",
+                          )}
+                        >
+                          <Pin
+                            className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
+                          />
+                        </button>
                       </div>
-                      {isProjectExpanded && (
-                        <div className="space-y-0.5">
-                          {renderSessionList(group.key, group.sessions)}
-                        </div>
-                      )}
+                      <SidebarAnimatedSection
+                        expanded={isProjectExpanded}
+                        motionVersion={
+                          sectionMotionVersions.get(group.key) ?? 0
+                        }
+                      >
+                        {renderSessionList(group.key, group.sessions)}
+                      </SidebarAnimatedSection>
                     </section>
                   );
                 })}
@@ -945,6 +1163,62 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           </>
         )}
       </aside>
+      {sessionMenu &&
+        sessionMenuSession &&
+        createPortal(
+          <div
+            role="menu"
+            onClick={(event) => event.stopPropagation()}
+            className="fixed z-50 w-36 rounded-lg border border-border-muted bg-background p-1 shadow-lg"
+            style={{
+              left: Math.max(8, sessionMenu.anchor.right - 144),
+              ...(window.innerHeight - sessionMenu.anchor.bottom >= 88
+                ? { top: sessionMenu.anchor.bottom + 4 }
+                : { bottom: window.innerHeight - sessionMenu.anchor.top + 4 }),
+            }}
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(event) => {
+                handleToggleSessionPin(event, sessionMenuSession.id);
+                setSessionMenu(null);
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-text-primary transition-colors hover:bg-surface-hover"
+            >
+              {pinnedSessionIds.has(sessionMenuSession.id) ? (
+                <PinOff className="h-3.5 w-3.5 text-text-muted" />
+              ) : (
+                <Pin className="h-3.5 w-3.5 text-text-muted" />
+              )}
+              <span>
+                {t(
+                  pinnedSessionIds.has(sessionMenuSession.id)
+                    ? "sidebar.unpin"
+                    : "sidebar.pin",
+                )}
+              </span>
+            </button>
+            {sessionMenuSession.status !== "running" && (
+              <>
+                <div className="mx-1 my-1 border-t border-border-muted" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(event) => {
+                    setSessionMenu(null);
+                    handleDeleteSession(event, sessionMenuSession);
+                  }}
+                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-error transition-colors hover:bg-surface-hover"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>{t("common.delete")}</span>
+                </button>
+              </>
+            )}
+          </div>,
+          document.body,
+        )}
       <LoginModal
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
@@ -987,6 +1261,50 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       />
     </>
   );
+}
+
+interface SessionMenuState {
+  sessionId: string;
+  anchor: {
+    top: number;
+    bottom: number;
+    right: number;
+  };
+}
+
+function stringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function loadSidebarPins(): SidebarPins {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_PINS_STORAGE_KEY);
+    if (!raw) return { sessionIds: [], projectKeys: [] };
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) {
+      return { sessionIds: [], projectKeys: [] };
+    }
+    const record = parsed as Record<string, unknown>;
+    return {
+      sessionIds: stringArray(record.sessionIds),
+      projectKeys: stringArray(record.projectKeys),
+    };
+  } catch {
+    return { sessionIds: [], projectKeys: [] };
+  }
+}
+
+function saveSidebarPins(pins: SidebarPins): void {
+  try {
+    localStorage.setItem(SIDEBAR_PINS_STORAGE_KEY, JSON.stringify(pins));
+  } catch {
+    // Keep the in-memory pin state when storage is unavailable.
+  }
+}
+
+function toggleOrderedId(ids: string[], id: string): string[] {
+  return ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
 }
 
 function getWorkspaceName(cwd: string): string {

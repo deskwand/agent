@@ -14,6 +14,16 @@ export interface SidebarSessionGroups {
   projectGroups: SidebarProjectGroup[];
 }
 
+export interface SidebarPins {
+  sessionIds: string[];
+  projectKeys: string[];
+}
+
+const EMPTY_SIDEBAR_PINS: SidebarPins = {
+  sessionIds: [],
+  projectKeys: [],
+};
+
 function sessionTime(session: Session): number {
   return session.updatedAt || session.createdAt;
 }
@@ -46,15 +56,41 @@ function isProjectSession(
   return Boolean(cwd) && workspaceName(cwd) !== DEFAULT_WORKDIR_DIRNAME;
 }
 
-function sortByActivity(sessions: Session[]): Session[] {
-  return [...sessions].sort((a, b) => sessionTime(b) - sessionTime(a));
+function buildRankMap(ids: readonly string[]): Map<string, number> {
+  return new Map(ids.map((id, index) => [id, index]));
+}
+
+function comparePinned(
+  leftKey: string,
+  rightKey: string,
+  ranks: ReadonlyMap<string, number>,
+): number | null {
+  const leftRank = ranks.get(leftKey);
+  const rightRank = ranks.get(rightKey);
+  if (leftRank === undefined && rightRank === undefined) return null;
+  if (leftRank === undefined) return 1;
+  if (rightRank === undefined) return -1;
+  return leftRank - rightRank;
+}
+
+function sortByActivity(
+  sessions: Session[],
+  pinnedSessionRanks: ReadonlyMap<string, number>,
+): Session[] {
+  return [...sessions].sort((a, b) => {
+    const pinnedOrder = comparePinned(a.id, b.id, pinnedSessionRanks);
+    return pinnedOrder ?? sessionTime(b) - sessionTime(a);
+  });
 }
 
 export function buildSidebarSessionGroups(
   sessions: Session[],
   query: string,
+  pins: SidebarPins = EMPTY_SIDEBAR_PINS,
 ): SidebarSessionGroups {
   const normalizedQuery = query.trim().toLowerCase();
+  const pinnedSessionRanks = buildRankMap(pins.sessionIds);
+  const pinnedProjectRanks = buildRankMap(pins.projectKeys);
   const unscoped: Session[] = [];
   const projects = new Map<string, { cwd: string; sessions: Session[] }>();
 
@@ -93,16 +129,19 @@ export function buildSidebarSessionGroups(
         key,
         cwd,
         name,
-        sessions: sortByActivity(visibleSessions),
+        sessions: sortByActivity(visibleSessions, pinnedSessionRanks),
         earliestCreatedAt: Math.min(...projectSessions.map((s) => s.createdAt)),
       };
     },
   )
     .filter(({ sessions }) => sessions.length > 0)
-    .sort((a, b) => b.earliestCreatedAt - a.earliestCreatedAt);
+    .sort((a, b) => {
+      const pinnedOrder = comparePinned(a.key, b.key, pinnedProjectRanks);
+      return pinnedOrder ?? b.earliestCreatedAt - a.earliestCreatedAt;
+    });
 
   return {
-    unscopedSessions: sortByActivity(unscoped),
+    unscopedSessions: sortByActivity(unscoped, pinnedSessionRanks),
     projectGroups,
   };
 }

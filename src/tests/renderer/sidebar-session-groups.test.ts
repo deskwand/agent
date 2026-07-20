@@ -155,4 +155,90 @@ describe("buildSidebarSessionGroups", () => {
     expect(result.unscopedSessions.map(({ id }) => id)).toEqual(["default"]);
     expect(result.projectGroups).toEqual([]);
   });
+
+  it("pins ordinary and project sessions in explicit order", () => {
+    const result = buildSidebarSessionGroups(
+      [
+        session("ordinary-new", { updatedAt: 40 }),
+        session("ordinary-pinned", { updatedAt: 10 }),
+        session("project-new", {
+          isProjectMode: true,
+          cwd: "/work/app",
+          updatedAt: 30,
+        }),
+        session("project-pinned", {
+          isProjectMode: true,
+          cwd: "/work/app",
+          updatedAt: 20,
+        }),
+      ],
+      "",
+      {
+        sessionIds: ["project-pinned", "ordinary-pinned"],
+        projectKeys: [],
+      },
+    );
+
+    expect(result.unscopedSessions.map(({ id }) => id)).toEqual([
+      "ordinary-pinned",
+      "ordinary-new",
+    ]);
+    expect(result.projectGroups[0].sessions.map(({ id }) => id)).toEqual([
+      "project-pinned",
+      "project-new",
+    ]);
+  });
+
+  it("pins project groups in explicit order before normally sorted groups", () => {
+    const result = buildSidebarSessionGroups(
+      [
+        session("new", {
+          isProjectMode: true,
+          cwd: "/work/new",
+          createdAt: 30,
+        }),
+        session("old", {
+          isProjectMode: true,
+          cwd: "/work/old",
+          createdAt: 10,
+        }),
+        session("middle", {
+          isProjectMode: true,
+          cwd: "/work/middle",
+          createdAt: 20,
+        }),
+      ],
+      "",
+      {
+        sessionIds: [],
+        projectKeys: ["/work/old", "/work/middle"],
+      },
+    );
+
+    expect(result.projectGroups.map(({ key }) => key)).toEqual([
+      "/work/old",
+      "/work/middle",
+      "/work/new",
+    ]);
+  });
+
+  it("preserves pin order while filtering search results", () => {
+    const result = buildSidebarSessionGroups(
+      [
+        session("first", { title: "Sidebar first", updatedAt: 10 }),
+        session("second", { title: "Sidebar second", updatedAt: 20 }),
+        session("miss", { title: "Release notes", updatedAt: 30 }),
+      ],
+      "sidebar",
+      {
+        sessionIds: ["first", "second"],
+        projectKeys: [],
+      },
+    );
+
+    expect(result.unscopedSessions.map(({ id }) => id)).toEqual([
+      "first",
+      "second",
+    ]);
+  });
 });

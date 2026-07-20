@@ -53,6 +53,7 @@ describe("Sidebar project groups", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
     localStorage.clear();
     useAppStore.setState(useAppStore.getInitialState(), true);
     container = document.createElement("div");
@@ -119,6 +120,76 @@ describe("Sidebar project groups", () => {
     return button as HTMLButtonElement;
   }
 
+  function ordinaryToggle(): HTMLButtonElement {
+    const button = Array.from(
+      container.querySelectorAll("button[aria-expanded]"),
+    ).find((candidate) =>
+      candidate.textContent?.includes(i18n.t("sidebar.allSessions")),
+    );
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  function sessionRow(sessionId: string): HTMLElement {
+    const row = container.querySelector(`[data-session-id="${sessionId}"]`);
+    expect(row).toBeTruthy();
+    return row as HTMLElement;
+  }
+
+  function pinButtonWithin(element: Element): HTMLButtonElement {
+    const button = element.querySelector(
+      `button[aria-label="${i18n.t("sidebar.pin")}"], button[aria-label="${i18n.t("sidebar.unpin")}"]`,
+    );
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  function sessionMoreButton(sessionId: string): HTMLButtonElement {
+    const button = sessionRow(sessionId).querySelector(
+      `button[aria-label="${i18n.t("sidebar.moreActions")}"]`,
+    );
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  function findSessionMenu(): HTMLElement | null {
+    return document.body.querySelector('[role="menu"]');
+  }
+
+  function sessionMenu(): HTMLElement {
+    const menu = findSessionMenu();
+    expect(menu).toBeTruthy();
+    return menu as HTMLElement;
+  }
+
+  function findMenuAction(label: string): HTMLButtonElement | undefined {
+    return Array.from(
+      sessionMenu().querySelectorAll<HTMLButtonElement>(
+        'button[role="menuitem"]',
+      ),
+    ).find((button) => button.textContent?.trim() === label);
+  }
+
+  function menuAction(label: string): HTMLButtonElement {
+    const button = findMenuAction(label);
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  async function hoverSession(sessionId: string): Promise<void> {
+    await act(async () => {
+      sessionRow(sessionId).dispatchEvent(
+        new MouseEvent("mouseover", { bubbles: true }),
+      );
+    });
+  }
+
+  async function openSessionMenu(sessionId: string): Promise<void> {
+    await hoverSession(sessionId);
+    await act(async () => sessionMoreButton(sessionId).click());
+    expect(sessionMenu()).toBeTruthy();
+  }
+
   function findButton(text: string): HTMLButtonElement | undefined {
     return Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === text,
@@ -150,11 +221,465 @@ describe("Sidebar project groups", () => {
         updatedAt: 20,
       }),
     ]);
+    await act(async () => ordinaryToggle().click());
 
     const text = container.textContent ?? "";
     expect(text.indexOf("Ordinary")).toBeLessThan(text.indexOf("deskwand"));
     expect(text.indexOf("deskwand")).toBeLessThan(text.indexOf("Project chat"));
     expect(container.textContent).not.toContain(i18n.t("sidebar.emptyTitle"));
+  });
+
+  it("fully collapses and expands ordinary sessions", async () => {
+    await render([session("ordinary", { title: "Ordinary chat" })]);
+
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+    expect(container.textContent).not.toContain("Ordinary chat");
+
+    await act(async () => ordinaryToggle().click());
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
+    expect(container.textContent).toContain("Ordinary chat");
+
+    await act(async () => ordinaryToggle().click());
+    expect(container.textContent).not.toContain("Ordinary chat");
+  });
+
+  it("uses primary state icons instead of chevrons for group state", async () => {
+    await render([
+      session("ordinary", { title: "Ordinary chat" }),
+      session("project", {
+        title: "Project chat",
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+      }),
+    ]);
+
+    const ordinary = ordinaryToggle();
+    expect(ordinary.classList.contains("text-text-primary")).toBe(true);
+    const collapsedSessionsIcon = ordinary.querySelector(
+      ".lucide-message-square",
+    ) as SVGElement;
+    const expandedSessionsIcon = ordinary.querySelector(
+      ".lucide-message-square-text",
+    ) as SVGElement;
+    expect(collapsedSessionsIcon.classList.contains("text-text-muted")).toBe(
+      false,
+    );
+    expect(collapsedSessionsIcon.style.opacity).toBe("1");
+    expect(expandedSessionsIcon.style.opacity).toBe("0");
+    expect(ordinary.querySelector(".lucide-chevron-down")).toBeNull();
+
+    await act(async () => ordinary.click());
+    expect(collapsedSessionsIcon.style.opacity).toBe("0");
+    expect(expandedSessionsIcon.style.opacity).toBe("1");
+    expect(
+      sessionRow("ordinary").querySelector(
+        ".lucide-message-square, .lucide-message-square-text, .lucide-folder, .lucide-folder-open",
+      ),
+    ).toBeNull();
+
+    const project = projectToggle("/work/deskwand");
+    expect(project.classList.contains("text-text-primary")).toBe(true);
+    const collapsedProjectIcon = project.querySelector(
+      ".lucide-folder",
+    ) as SVGElement;
+    const expandedProjectIcon = project.querySelector(
+      ".lucide-folder-open",
+    ) as SVGElement;
+    expect(collapsedProjectIcon.classList.contains("text-text-muted")).toBe(
+      false,
+    );
+    const projectCount = Array.from(project.querySelectorAll("span")).find(
+      (span) => span.textContent?.trim() === "1",
+    );
+    expect(projectCount).toBeTruthy();
+    expect(projectCount?.classList.contains("text-text-muted")).toBe(false);
+    expect(collapsedProjectIcon.style.opacity).toBe("0");
+    expect(expandedProjectIcon.style.opacity).toBe("1");
+    expect(project.querySelector(".lucide-chevron-down")).toBeNull();
+
+    await act(async () => project.click());
+    expect(collapsedProjectIcon.style.opacity).toBe("1");
+    expect(expandedProjectIcon.style.opacity).toBe("0");
+  });
+
+  it("animates only explicit disclosure and list-size clicks", async () => {
+    const animateDescriptor = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      "animate",
+    );
+    const matchMediaDescriptor = Object.getOwnPropertyDescriptor(
+      window,
+      "matchMedia",
+    );
+    const animatedTargets: Element[] = [];
+
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => ({
+        matches: false,
+        media: "(prefers-reduced-motion: reduce)",
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+    Object.defineProperty(Element.prototype, "animate", {
+      configurable: true,
+      value: function (this: Element): Animation {
+        animatedTargets.push(this);
+        return {
+          cancel: vi.fn(),
+          oncancel: null,
+          onfinish: null,
+        } as unknown as Animation;
+      },
+    });
+
+    try {
+      await render(
+        Array.from({ length: 7 }, (_, index) =>
+          session(`ordinary-${index + 1}`, {
+            title: `Ordinary ${index + 1}`,
+            updatedAt: 100 - index,
+          }),
+        ),
+      );
+
+      await act(async () => ordinaryToggle().click());
+      expect(
+        animatedTargets.some((target) => target instanceof SVGElement),
+      ).toBe(true);
+
+      animatedTargets.length = 0;
+      await act(async () =>
+        findButton(i18n.t("sidebar.showMoreSessions", { count: 2 }))?.click(),
+      );
+      expect(animatedTargets.length).toBeGreaterThan(0);
+      expect(
+        animatedTargets.some((target) => target instanceof SVGElement),
+      ).toBe(false);
+
+      animatedTargets.length = 0;
+      await search("ordinary");
+      expect(animatedTargets).toHaveLength(0);
+    } finally {
+      if (animateDescriptor) {
+        Object.defineProperty(Element.prototype, "animate", animateDescriptor);
+      } else {
+        Reflect.deleteProperty(Element.prototype, "animate");
+      }
+      if (matchMediaDescriptor) {
+        Object.defineProperty(window, "matchMedia", matchMediaDescriptor);
+      } else {
+        Reflect.deleteProperty(window, "matchMedia");
+      }
+    }
+  });
+
+  it("opens ordinary sessions for the active session", async () => {
+    useAppStore.setState({ activeSessionId: "ordinary" });
+    await render([session("ordinary", { title: "Active ordinary" })]);
+
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
+    expect(container.textContent).toContain("Active ordinary");
+  });
+
+  it("temporarily expands ordinary search results", async () => {
+    await render([session("ordinary", { title: "Find sidebar" })]);
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+
+    await search("sidebar");
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
+    expect(ordinaryToggle().disabled).toBe(true);
+    expect(container.textContent).toContain("Find sidebar");
+
+    await search("");
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("renders dense project headers with hover-only metadata", async () => {
+    await render([
+      session("project", {
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+      }),
+    ]);
+
+    const header = projectHeader("/work/deskwand");
+    expect(header?.className).toContain("group/project");
+    expect(header?.querySelector(".lucide-folder-open")).toBeTruthy();
+
+    const action = projectAction("/work/deskwand");
+    expect(action.className).toContain("opacity-0");
+    expect(action.className).toContain("pointer-events-none");
+    expect(action.className).toContain("group-hover/project:opacity-100");
+    expect(action.className).toContain(
+      "group-hover/project:pointer-events-auto",
+    );
+
+    const count = Array.from(header?.querySelectorAll("span") ?? []).find(
+      (element) => element.textContent === "1",
+    );
+    expect(count?.className).toContain("opacity-0");
+    expect(count?.className).toContain("group-hover/project:opacity-100");
+  });
+
+  it("pins an ordinary session without selecting it and persists the order", async () => {
+    await render([
+      session("newer", { title: "Newer", updatedAt: 20 }),
+      session("older", { title: "Older", updatedAt: 10 }),
+    ]);
+    await act(async () => ordinaryToggle().click());
+
+    await openSessionMenu("older");
+    await act(async () => menuAction(i18n.t("sidebar.pin")).click());
+    await flush();
+
+    expect(useAppStore.getState().activeSessionId).toBeNull();
+    expect((container.textContent ?? "").indexOf("Older")).toBeLessThan(
+      (container.textContent ?? "").indexOf("Newer"),
+    );
+    expect(
+      JSON.parse(localStorage.getItem("deskwand.sidebarPins") ?? "{}"),
+    ).toEqual({
+      sessionIds: ["older"],
+      projectKeys: [],
+    });
+
+    await openSessionMenu("older");
+    expect(menuAction(i18n.t("sidebar.unpin"))).toBeTruthy();
+    await act(async () => menuAction(i18n.t("sidebar.unpin")).click());
+    await flush();
+    expect((container.textContent ?? "").indexOf("Newer")).toBeLessThan(
+      (container.textContent ?? "").indexOf("Older"),
+    );
+    expect(
+      JSON.parse(localStorage.getItem("deskwand.sidebarPins") ?? "{}"),
+    ).toEqual({
+      sessionIds: [],
+      projectKeys: [],
+    });
+  });
+
+  it("loads persisted pin order on mount", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarPins",
+      JSON.stringify({ sessionIds: ["older"], projectKeys: [] }),
+    );
+    useAppStore.setState({ activeSessionId: "newer" });
+    await render([
+      session("newer", { title: "Newer", updatedAt: 20 }),
+      session("older", { title: "Older", updatedAt: 10 }),
+    ]);
+
+    expect((container.textContent ?? "").indexOf("Older")).toBeLessThan(
+      (container.textContent ?? "").indexOf("Newer"),
+    );
+    await openSessionMenu("older");
+    expect(menuAction(i18n.t("sidebar.unpin"))).toBeTruthy();
+  });
+
+  it("falls back to empty pins when persisted JSON is invalid", async () => {
+    localStorage.setItem("deskwand.sidebarPins", "{");
+    useAppStore.setState({ activeSessionId: "ordinary" });
+    await render([session("ordinary")]);
+
+    await openSessionMenu("ordinary");
+    expect(menuAction(i18n.t("sidebar.pin"))).toBeTruthy();
+    expect(localStorage.getItem("deskwand.sidebarPins")).toBe(
+      JSON.stringify({ sessionIds: [], projectKeys: [] }),
+    );
+  });
+
+  it("pins project groups in the project region without toggling expansion", async () => {
+    await render([
+      session("new", {
+        isProjectMode: true,
+        cwd: "/work/new",
+        createdAt: 20,
+      }),
+      session("old", {
+        isProjectMode: true,
+        cwd: "/work/old",
+        createdAt: 10,
+      }),
+    ]);
+    const oldExpanded =
+      projectToggle("/work/old").getAttribute("aria-expanded");
+
+    await act(async () => pinButtonWithin(projectHeader("/work/old")!).click());
+
+    expect(projectToggle("/work/old").getAttribute("aria-expanded")).toBe(
+      oldExpanded,
+    );
+    expect((container.textContent ?? "").indexOf("old")).toBeLessThan(
+      (container.textContent ?? "").indexOf("new"),
+    );
+    expect(
+      JSON.parse(localStorage.getItem("deskwand.sidebarPins") ?? "{}"),
+    ).toEqual({
+      sessionIds: [],
+      projectKeys: ["/work/old"],
+    });
+    expect(
+      pinButtonWithin(projectHeader("/work/old")!).getAttribute("aria-label"),
+    ).toBe(i18n.t("sidebar.unpin"));
+
+    await act(async () => pinButtonWithin(projectHeader("/work/old")!).click());
+    expect((container.textContent ?? "").indexOf("new")).toBeLessThan(
+      (container.textContent ?? "").indexOf("old"),
+    );
+    expect(
+      JSON.parse(localStorage.getItem("deskwand.sidebarPins") ?? "{}"),
+    ).toEqual({
+      sessionIds: [],
+      projectKeys: [],
+    });
+  });
+
+  it("always shows pinned sessions beyond the default limit", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarPins",
+      JSON.stringify({
+        sessionIds: [
+          "ordinary-1",
+          "ordinary-2",
+          "ordinary-3",
+          "ordinary-4",
+          "ordinary-5",
+          "ordinary-6",
+        ],
+        projectKeys: [],
+      }),
+    );
+    await render(
+      Array.from({ length: 7 }, (_, index) =>
+        session(`ordinary-${index + 1}`, {
+          title: `Ordinary ${index + 1}`,
+          updatedAt: 100 - index,
+        }),
+      ),
+    );
+    await act(async () => ordinaryToggle().click());
+
+    expect(container.textContent).toContain("Ordinary 6");
+    expect(container.textContent).not.toContain("Ordinary 7");
+    expect(
+      findButton(i18n.t("sidebar.showMoreSessions", { count: 1 }))?.className,
+    ).toContain("text-left");
+  });
+
+  it("shows archive and more actions while keeping the open trigger visible", async () => {
+    useAppStore.setState({ activeSessionId: "ordinary" });
+    await render([session("ordinary")]);
+
+    const row = sessionRow("ordinary");
+    const moreButton = sessionMoreButton("ordinary");
+    const actionRow = moreButton.parentElement;
+    expect(actionRow?.className).toContain("opacity-0");
+
+    await hoverSession("ordinary");
+    expect(actionRow?.className).toContain("opacity-100");
+    expect(actionRow?.querySelectorAll("button")).toHaveLength(2);
+    expect(
+      row.querySelector(`button[title="${i18n.t("sidebar.archive")}"]`),
+    ).toBeTruthy();
+    expect(
+      row.querySelector(`button[title="${i18n.t("common.delete")}"]`),
+    ).toBeNull();
+    expect(actionRow?.parentElement?.className).toContain("w-[4.5rem]");
+    expect(moreButton.getAttribute("aria-haspopup")).toBe("menu");
+    expect(moreButton.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => moreButton.click());
+    expect(moreButton.getAttribute("aria-expanded")).toBe("true");
+    await act(async () => {
+      row.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
+    });
+    expect(actionRow?.className).toContain("opacity-100");
+    expect(findSessionMenu()).toBeTruthy();
+  });
+
+  it("offers only pinning for a running session", async () => {
+    useAppStore.setState({ activeSessionId: "running" });
+    await render([session("running", { status: "running" })]);
+
+    const row = sessionRow("running");
+    expect(
+      row.querySelector(`button[title="${i18n.t("sidebar.archive")}"]`),
+    ).toBeNull();
+
+    await openSessionMenu("running");
+    expect(menuAction(i18n.t("sidebar.pin"))).toBeTruthy();
+    expect(findMenuAction(i18n.t("common.delete"))).toBeUndefined();
+  });
+
+  it("keeps archive inline and routes delete through the existing confirmation", async () => {
+    useAppStore.setState({ activeSessionId: "ordinary" });
+    await render([session("ordinary", { title: "Ordinary" })]);
+    await hoverSession("ordinary");
+
+    const archiveButton = sessionRow("ordinary").querySelector(
+      `button[title="${i18n.t("sidebar.archive")}"]`,
+    ) as HTMLButtonElement;
+    expect(archiveButton).toBeTruthy();
+
+    await act(async () => archiveButton.click());
+    expect(ipc.archiveSession).not.toHaveBeenCalled();
+    expect(archiveButton.title).toBe(i18n.t("common.confirm"));
+
+    await act(async () => archiveButton.click());
+    expect(ipc.archiveSession).toHaveBeenCalledWith("ordinary");
+
+    await act(async () => archiveButton.click());
+    expect(archiveButton.title).toBe(i18n.t("common.confirm"));
+    await openSessionMenu("ordinary");
+    expect(archiveButton.title).toBe(i18n.t("sidebar.archive"));
+
+    await act(async () => menuAction(i18n.t("common.delete")).click());
+    expect(findSessionMenu()).toBeNull();
+    expect(container.textContent).toContain(
+      i18n.t("sidebar.deleteConversationConfirm"),
+    );
+
+    await act(async () => findButton(i18n.t("sidebar.confirmDelete"))?.click());
+    expect(ipc.deleteSession).toHaveBeenCalledWith("ordinary");
+  });
+
+  it("closes the session menu from each dismissal interaction", async () => {
+    useAppStore.setState({ activeSessionId: "ordinary" });
+    await render([session("ordinary")]);
+
+    await openSessionMenu("ordinary");
+    await act(async () => {
+      document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(findSessionMenu()).toBeNull();
+
+    await openSessionMenu("ordinary");
+    await act(async () => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    expect(findSessionMenu()).toBeNull();
+
+    await openSessionMenu("ordinary");
+    const scrollList = container.querySelector(".sidebar-scroll");
+    expect(scrollList).toBeTruthy();
+    await act(async () => scrollList?.dispatchEvent(new Event("scroll")));
+    expect(findSessionMenu()).toBeNull();
+
+    await openSessionMenu("ordinary");
+    await act(async () => window.dispatchEvent(new Event("resize")));
+    expect(findSessionMenu()).toBeNull();
+
+    await openSessionMenu("ordinary");
+    await act(async () => sessionRow("ordinary").click());
+    expect(findSessionMenu()).toBeNull();
   });
 
   it("keeps same-named projects separate by full path", async () => {
@@ -290,12 +815,14 @@ describe("Sidebar project groups", () => {
   });
 
   it("does not render a completed-task dismissal control", async () => {
+    useAppStore.setState({ activeSessionId: "completed" });
     await render([session("completed", { status: "completed" })]);
 
     expect(container.querySelector('svg[role="button"]')).toBeNull();
   });
 
   it("derives the running indicator directly from session status", async () => {
+    useAppStore.setState({ activeSessionId: "running" });
     await render([session("running", { status: "running" })]);
 
     expect(
@@ -319,6 +846,7 @@ describe("Sidebar project groups", () => {
         }),
       ),
     );
+    await act(async () => ordinaryToggle().click());
 
     expect(container.textContent).toContain("Ordinary 5");
     expect(container.textContent).not.toContain("Ordinary 6");
@@ -414,7 +942,7 @@ describe("Sidebar project groups", () => {
     );
   });
 
-  it("keeps an older active project open but limits its sessions to five", async () => {
+  it("keeps an older active project and its active session visible", async () => {
     useAppStore.setState({ activeSessionId: "project-4-7" });
     await render([
       ...makeProjectSessions("project-1", 1, 500),
@@ -426,13 +954,6 @@ describe("Sidebar project groups", () => {
     expect(projectToggle("/work/project-4").getAttribute("aria-expanded")).toBe(
       "true",
     );
-    expect(projectSection("/work/project-4").textContent).not.toContain(
-      "project-4 chat 7",
-    );
-
-    await act(async () =>
-      findButton(i18n.t("sidebar.showMoreSessions", { count: 2 }))?.click(),
-    );
     expect(projectSection("/work/project-4").textContent).toContain(
       "project-4 chat 7",
     );
@@ -440,7 +961,7 @@ describe("Sidebar project groups", () => {
     await act(async () =>
       findButton(i18n.t("sidebar.showLessSessions"))?.click(),
     );
-    expect(projectSection("/work/project-4").textContent).not.toContain(
+    expect(projectSection("/work/project-4").textContent).toContain(
       "project-4 chat 7",
     );
   });
@@ -505,6 +1026,7 @@ describe("Sidebar project groups", () => {
       }),
     );
     await render(ordinary);
+    await act(async () => ordinaryToggle().click());
     await act(async () =>
       findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }))?.click(),
     );
