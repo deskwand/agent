@@ -314,6 +314,7 @@ export function resolveInputStatus(params: {
           type: "goal-paused",
           objective: params.goalStatus.objective ?? "",
           iteration: params.goalStatus.iteration,
+          timeUsedSeconds: params.goalStatus.timeUsedSeconds,
         };
       case "complete":
         return {
