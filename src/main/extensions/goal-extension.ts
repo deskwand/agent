@@ -743,9 +743,59 @@ function formatDuration(seconds: number): string {
   return m > 0 ? `${h}h${m}m` : `${h}h`;
 }
 
+function formatDurationNatural(seconds: number, locale: string): string {
+  const s = Math.round(seconds);
+  const isZh = locale.startsWith("zh");
+
+  if (s < 60) {
+    return isZh ? `${s} 秒` : s === 1 ? "1 second" : `${s} seconds`;
+  }
+  if (s < 3600) {
+    const m = Math.round(s / 60);
+    return isZh ? `${m} 分钟` : m === 1 ? "1 minute" : `${m} minutes`;
+  }
+  const h = Math.floor(s / 3600);
+  const m = Math.round((s % 3600) / 60);
+  if (m === 0) {
+    return isZh ? `${h} 小时` : h === 1 ? "1 hour" : `${h} hours`;
+  }
+  return isZh ? `${h} 小时 ${m} 分钟` : `${h}h ${m}m`;
+}
+
+function formatTokens(count: number, locale: string): string {
+  const rounded = Math.round(count);
+  const isZh = locale.startsWith("zh");
+
+  if (isZh) {
+    if (rounded >= 10000) {
+      // Use integer modulo to avoid floating-point edge cases with % 1
+      if (rounded % 10000 === 0) {
+        return `${rounded / 10000}万 tokens`;
+      }
+      return `${(rounded / 10000).toFixed(1)}万 tokens`;
+    }
+    return `${rounded.toLocaleString()} tokens`;
+  }
+
+  if (rounded >= 1000000) {
+    if (rounded % 1000000 === 0) {
+      return `${rounded / 1000000}M tokens`;
+    }
+    return `${(rounded / 1000000).toFixed(1)}M tokens`;
+  }
+  if (rounded >= 1000) {
+    if (rounded % 1000 === 0) {
+      return `${rounded / 1000}K tokens`;
+    }
+    return `${(rounded / 1000).toFixed(1)}K tokens`;
+  }
+  return `${rounded.toLocaleString()} tokens`;
+}
+
 function buildGoalSummaryMessage(goal: GoalState): string {
-  const timeStr = formatDuration(goal.timeUsedSeconds);
-  const tokenStr = `${Math.round(goal.tokensUsed).toLocaleString()} tokens`;
+  const locale = getLocale();
+  const timeStr = formatDurationNatural(goal.timeUsedSeconds, locale);
+  const tokenStr = formatTokens(goal.tokensUsed, locale);
   const title =
     goal.status === "complete" ? msg("summaryComplete") : msg("summaryBlocked");
   const templates: Parameters<typeof msg>[1] = {
