@@ -923,8 +923,8 @@
     "turn": "第{{n}}轮",
     "turnsDone": "已执行{{n}}轮",
     "lastRound": "最后1轮",
-    "pause": "暂停",
-    "resume": "继续",
+    "pause": "⏸ 暂停",
+    "resume": "▶ 继续",
     "clear": "清除"
   },
   "slash": {

@@ -135,7 +135,7 @@ export function ChatInputStatusBar({
           {status.type === "goal-active" && onGoalCommand && (
             <button
               type="button"
-              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-error/15 text-error hover:bg-error/25 transition-[transform,background-color,color] active:scale-[0.97]"
+              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-[transform,background-color,color] active:scale-[0.97]"
               onClick={() => onGoalCommand("goal:pause")}
             >
               {t("goal.pause")}

@@ -925,8 +925,8 @@
     "turn": "turn {{n}}",
     "turnsDone": "{{n}} turns done",
     "lastRound": "last round",
-    "pause": "Pause",
-    "resume": "Resume",
+    "pause": "⏸ Pause",
+    "resume": "▶ Resume",
     "clear": "Clear"
   },
   "slash": {
