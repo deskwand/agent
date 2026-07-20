@@ -292,7 +292,7 @@ describe("Sidebar project groups", () => {
       (span) => span.textContent?.trim() === "1",
     );
     expect(projectCount).toBeTruthy();
-    expect(projectCount?.classList.contains("text-text-muted")).toBe(false);
+    expect(projectCount?.classList.contains("text-text-muted")).toBe(true);
     expect(collapsedProjectIcon.style.opacity).toBe("0");
     expect(expandedProjectIcon.style.opacity).toBe("1");
     expect(project.querySelector(".lucide-chevron-down")).toBeNull();
@@ -1086,5 +1086,79 @@ describe("Sidebar project groups", () => {
     expect(projectToggle("c:/work/app").getAttribute("aria-expanded")).toBe(
       "false",
     );
+  });
+
+  it("shows running badge on project group icon when a session is running", async () => {
+    await render([
+      session("running-project", {
+        title: "Running project chat",
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+        updatedAt: 20,
+        status: "running",
+      }),
+    ]);
+
+    const project = projectToggle("/work/deskwand");
+    const badge = project.querySelector(
+      "span.rounded-full.bg-accent.animate-pulse",
+    ) as HTMLElement | null;
+    expect(badge).toBeTruthy();
+
+    await act(async () => project.click());
+    const badgeAfterExpand = project.querySelector(
+      "span.rounded-full.bg-accent.animate-pulse",
+    );
+    expect(badgeAfterExpand).toBeTruthy();
+  });
+
+  it("shows running badge on ordinary group icon when an ordinary session is running", async () => {
+    await render([
+      session("ordinary-running", {
+        title: "Running ordinary",
+        updatedAt: 10,
+        status: "running",
+      }),
+    ]);
+
+    const ordinary = ordinaryToggle();
+    const badge = ordinary.querySelector(
+      "span.rounded-full.bg-accent.animate-pulse",
+    ) as HTMLElement | null;
+    expect(badge).toBeTruthy();
+  });
+
+  it("hides running badge when all sessions become idle", async () => {
+    await render([
+      session("run-then-idle", {
+        title: "Was running",
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+        updatedAt: 20,
+        status: "running",
+      }),
+    ]);
+
+    expect(
+      projectToggle("/work/deskwand").querySelector(
+        "span.rounded-full.bg-accent.animate-pulse",
+      ),
+    ).toBeTruthy();
+
+    await render([
+      session("run-then-idle", {
+        title: "Was running",
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+        updatedAt: 20,
+        status: "idle",
+      }),
+    ]);
+
+    expect(
+      projectToggle("/work/deskwand").querySelector(
+        "span.rounded-full.bg-accent.animate-pulse",
+      ),
+    ).toBeNull();
   });
 });

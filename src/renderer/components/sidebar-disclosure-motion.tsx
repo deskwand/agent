@@ -22,6 +22,7 @@ interface SidebarGroupIconProps {
   expanded: boolean;
   motionVersion: number;
   kind: "sessions" | "project";
+  showRunningBadge?: boolean;
 }
 
 function isReducedMotion(): boolean {
@@ -276,6 +277,7 @@ export function SidebarGroupIcon({
   expanded,
   motionVersion,
   kind,
+  showRunningBadge = false,
 }: SidebarGroupIconProps) {
   const collapsedRef = useRef<SVGSVGElement>(null);
   const expandedRef = useRef<SVGSVGElement>(null);
@@ -339,7 +341,10 @@ export function SidebarGroupIcon({
   const iconClassName = "absolute inset-0 h-3.5 w-3.5";
 
   return (
-    <span className="relative h-3.5 w-3.5 flex-shrink-0" aria-hidden="true">
+    <span
+      className="relative h-3.5 w-3.5 flex-shrink-0 overflow-visible"
+      aria-hidden="true"
+    >
       {kind === "sessions" ? (
         <>
           <MessageSquare
@@ -366,6 +371,12 @@ export function SidebarGroupIcon({
             style={expandedStyle}
           />
         </>
+      )}
+      {showRunningBadge && (
+        <span
+          className="absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full bg-accent animate-pulse shadow-[0_0_0_2px_var(--color-background-secondary)]"
+          aria-hidden="true"
+        />
       )}
     </span>
   );

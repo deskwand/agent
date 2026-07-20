@@ -208,6 +208,18 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     () => buildSidebarSessionGroups(sessions, normalizedQuery, sidebarPins),
     [sessions, normalizedQuery, sidebarPins],
   );
+  const runningGroupKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (sessionGroups.unscopedSessions.some((s) => s.status === "running")) {
+      keys.add(ORDINARY_SESSION_GROUP_KEY);
+    }
+    for (const group of sessionGroups.projectGroups) {
+      if (group.sessions.some((s) => s.status === "running")) {
+        keys.add(group.key);
+      }
+    }
+    return keys;
+  }, [sessionGroups]);
   const pinnedSessionIds = useMemo(
     () => new Set(sidebarPins.sessionIds),
     [sidebarPins.sessionIds],
@@ -897,6 +909,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                         sectionMotionVersions.get(ORDINARY_SESSION_GROUP_KEY) ??
                         0
                       }
+                      showRunningBadge={runningGroupKeys.has(
+                        ORDINARY_SESSION_GROUP_KEY,
+                      )}
                     />
                     <span>{t("sidebar.allSessions")}</span>
                   </button>
@@ -956,9 +971,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                             motionVersion={
                               sectionMotionVersions.get(group.key) ?? 0
                             }
+                            showRunningBadge={runningGroupKeys.has(group.key)}
                           />
                           <span className="truncate">{group.name}</span>
-                          <span className="ml-auto text-xs font-normal opacity-0 transition-opacity group-hover/project:opacity-100">
+                          <span className="ml-auto text-xs font-normal text-text-muted opacity-0 transition-opacity group-hover/project:opacity-100">
                             {group.sessions.length}
                           </span>
                         </button>

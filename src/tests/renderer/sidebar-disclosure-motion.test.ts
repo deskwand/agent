@@ -181,11 +181,13 @@ describe("Sidebar disclosure motion", () => {
   function sessionIcon(
     expanded: boolean,
     motionVersion: number,
+    showRunningBadge = false,
   ): React.ReactElement {
     return React.createElement(SidebarGroupIcon, {
       kind: "sessions",
       expanded,
       motionVersion,
+      showRunningBadge,
     });
   }
 
@@ -369,5 +371,30 @@ describe("Sidebar disclosure motion", () => {
 
     await render(section(false, 2));
     expect(container.textContent).not.toContain("Conversation");
+  });
+
+  it("renders a running badge when showRunningBadge is true", async () => {
+    await render(sessionIcon(false, 0, true));
+
+    const outerSpan = container.querySelector("span.relative") as HTMLElement;
+    expect(outerSpan.classList.contains("overflow-visible")).toBe(true);
+    const badge = outerSpan.querySelector(
+      "span.rounded-full.bg-accent.animate-pulse",
+    ) as HTMLElement | null;
+    expect(badge).toBeTruthy();
+    expect(badge?.classList.contains("h-1.5")).toBe(true);
+    expect(badge?.classList.contains("w-1.5")).toBe(true);
+  });
+
+  it("does not render a running badge when showRunningBadge is false or omitted", async () => {
+    await render(sessionIcon(false, 0, false));
+    expect(
+      container.querySelector("span.rounded-full.bg-accent.animate-pulse"),
+    ).toBeNull();
+
+    await render(sessionIcon(false, 0));
+    expect(
+      container.querySelector("span.rounded-full.bg-accent.animate-pulse"),
+    ).toBeNull();
   });
 });
