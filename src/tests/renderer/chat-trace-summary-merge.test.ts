@@ -105,15 +105,14 @@ async function flush(): Promise<void> {
 function getBrowseSummaryButtons(
   container: HTMLDivElement,
 ): HTMLButtonElement[] {
-  return Array.from(container.querySelectorAll("button")).filter((element) =>
-    (element.textContent?.includes("Browsed the web") ?? false) ||
-    (element.textContent?.includes("Searched the web") ?? false),
+  return Array.from(container.querySelectorAll("button")).filter(
+    (element) =>
+      (element.textContent?.includes("Browsed the web") ?? false) ||
+      (element.textContent?.includes("Searched the web") ?? false),
   ) as HTMLButtonElement[];
 }
 
-function setSessionMessages(
-  messages: Message[],
-): void {
+function setSessionMessages(messages: Message[]): void {
   useAppStore.setState({
     sessions: [makeSession("s1")],
     activeSessionId: "s1",

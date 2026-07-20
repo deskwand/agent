@@ -745,7 +745,9 @@ export class SandboxAdapter implements SandboxExecutor {
 
     // For native mode, we need to spawn deskwand-code directly
     // This is a simplified implementation - full streaming would be more complex
-    throw new Error("DeskWand Agent execution is only supported in WSL/Lima mode");
+    throw new Error(
+      "DeskWand Agent execution is only supported in WSL/Lima mode",
+    );
   }
 }
 

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { clampZoom, stepZoom, zoomPercent } from "../../renderer/components/ImageLightbox";
+import {
+  clampZoom,
+  stepZoom,
+  zoomPercent,
+} from "../../renderer/components/ImageLightbox";
 
 describe("ImageLightbox utilities", () => {
   // ── clampZoom ──

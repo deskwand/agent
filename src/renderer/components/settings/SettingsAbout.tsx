@@ -1,11 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  RefreshCw,
-  AlertCircle,
-  CheckCircle2,
-  Download,
-} from "lucide-react";
+import { RefreshCw, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import type { ServerEvent } from "../../types";
 import logoUrl from "../../assets/logo.png";
 
@@ -124,7 +119,11 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
     <div className="flex flex-col items-center py-10 space-y-6">
       {/* Icon */}
       <div className="w-20 h-20 rounded-4xl ring-1 ring-border-subtle flex items-center justify-center shadow-sm overflow-hidden">
-        <img src={logoUrl} alt="DeskWand" className="w-full h-full object-cover" />
+        <img
+          src={logoUrl}
+          alt="DeskWand"
+          className="w-full h-full object-cover"
+        />
       </div>
 
       {/* Name + Version */}

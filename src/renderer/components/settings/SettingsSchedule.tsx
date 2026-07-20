@@ -65,7 +65,8 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
     1,
   ]);
   const [enabled, setEnabled] = useState(true);
-  const [pendingDeleteTask, setPendingDeleteTask] = useState<ScheduleTask | null>(null);
+  const [pendingDeleteTask, setPendingDeleteTask] =
+    useState<ScheduleTask | null>(null);
   const [repeatEvery, setRepeatEvery] = useState(1);
   const [repeatUnit, setRepeatUnit] = useState<ScheduleRepeatUnit>("day");
   const weekdayOptions = getWeekdayOptions(t);
@@ -751,7 +752,9 @@ export function SettingsSchedule({ isActive }: { isActive: boolean }) {
 
       <ConfirmDialog
         isOpen={pendingDeleteTask !== null}
-        title={t("schedule.deleteConfirm", { title: pendingDeleteTask?.title ?? "" })}
+        title={t("schedule.deleteConfirm", {
+          title: pendingDeleteTask?.title ?? "",
+        })}
         onConfirm={() => {
           const task = pendingDeleteTask;
           if (!task) return;

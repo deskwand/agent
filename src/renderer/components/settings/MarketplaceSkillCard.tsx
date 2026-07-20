@@ -64,9 +64,7 @@ function MarketplaceCardView({
                   key={sc.key}
                   className="text-[10px] px-1.5 py-0.5 rounded bg-surface-muted text-text-muted"
                 >
-                  {i18n.language === "en" && sc.name_en
-                    ? sc.name_en
-                    : sc.name}
+                  {i18n.language === "en" && sc.name_en ? sc.name_en : sc.name}
                 </span>
               ))}
             </div>
@@ -75,7 +73,10 @@ function MarketplaceCardView({
             {desc}
           </p>
           <div className="flex gap-4 text-xs text-text-muted">
-            <span className="flex items-center gap-1"><Users className="w-3 h-3" />{skill.installs.toLocaleString("en-US")}</span>
+            <span className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              {skill.installs.toLocaleString("en-US")}
+            </span>
             <span>v{skill.version}</span>
           </div>
         </div>

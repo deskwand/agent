@@ -227,7 +227,9 @@ export function ReviewPanel() {
       if (reviewTargetFile) {
         // reviewTargetFile may be absolute while diffFiles use relative paths
         const match = diffFiles.find(
-          (f) => f.path === reviewTargetFile || reviewTargetFile.endsWith("/" + f.path),
+          (f) =>
+            f.path === reviewTargetFile ||
+            reviewTargetFile.endsWith("/" + f.path),
         );
         if (match) {
           loadFileDiff(match.path);
@@ -237,7 +239,13 @@ export function ReviewPanel() {
       }
       loadFileDiff(diffFiles[0].path);
     }
-  }, [diffFiles, selectedFile, loadFileDiff, reviewTargetFile, setReviewTargetFile]);
+  }, [
+    diffFiles,
+    selectedFile,
+    loadFileDiff,
+    reviewTargetFile,
+    setReviewTargetFile,
+  ]);
 
   // Clear reviewTargetFile once the file has been selected
   useEffect(() => {
@@ -280,7 +288,9 @@ export function ReviewPanel() {
   const toolbar = (
     <div className="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border/20">
       <GitBranch className="w-4 h-4 text-accent" />
-      <span className="text-sm font-medium text-text-primary">{t("reviewPanel.title")}</span>
+      <span className="text-sm font-medium text-text-primary">
+        {t("reviewPanel.title")}
+      </span>
       <span className="text-xs text-text-muted ml-2">
         {t("reviewPanel.fileCount", { count: diffFiles.length })}
       </span>
@@ -298,7 +308,11 @@ export function ReviewPanel() {
           setDiffViewMode((m) => (m === "unified" ? "side-by-side" : "unified"))
         }
         className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        title={diffViewMode === "unified" ? t("reviewPanel.switchToSideBySide") : t("reviewPanel.switchToUnified")}
+        title={
+          diffViewMode === "unified"
+            ? t("reviewPanel.switchToSideBySide")
+            : t("reviewPanel.switchToUnified")
+        }
       >
         <Columns2 className="w-3.5 h-3.5" />
       </button>
@@ -306,7 +320,11 @@ export function ReviewPanel() {
       <button
         onClick={() => setIsFullscreen((f) => !f)}
         className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        title={isFullscreen ? t("reviewPanel.exitFullscreen") : t("reviewPanel.fullscreen")}
+        title={
+          isFullscreen
+            ? t("reviewPanel.exitFullscreen")
+            : t("reviewPanel.fullscreen")
+        }
       >
         {isFullscreen ? (
           <Minimize2 className="w-4 h-4" />
@@ -395,7 +413,9 @@ function renderFileList(
 
   if (diffFiles.length === 0) {
     return (
-      <div className="text-center py-8 text-text-muted text-xs">{i18n.t("reviewPanel.noDiff")}</div>
+      <div className="text-center py-8 text-text-muted text-xs">
+        {i18n.t("reviewPanel.noDiff")}
+      </div>
     );
   }
 

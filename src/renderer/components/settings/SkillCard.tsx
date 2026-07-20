@@ -51,18 +51,54 @@ function ToggleButton({
 
 /* ─── icon mapping ─── */
 
-export type SkillSource = "ai" | "custom" | "mycloud" | "team" | "builtin" | "marketplace";
+export type SkillSource =
+  | "ai"
+  | "custom"
+  | "mycloud"
+  | "team"
+  | "builtin"
+  | "marketplace";
 
 const SKILL_ICON_MAP: Record<
   SkillSource,
   { icon: typeof Bot; bgClass: string; iconClass: string; strokeWidth: number }
 > = {
-  ai: { icon: Bot, bgClass: "bg-accent", iconClass: "text-accent-foreground", strokeWidth: 2 },
-  mycloud: { icon: Cloud, bgClass: "bg-accent", iconClass: "text-accent-foreground", strokeWidth: 2 },
-  team: { icon: Users, bgClass: "bg-warning", iconClass: "text-warning-foreground", strokeWidth: 2 },
-  custom: { icon: FileCode, bgClass: "bg-success", iconClass: "text-success-foreground", strokeWidth: 2 },
-  builtin: { icon: Package, bgClass: "bg-surface-muted", iconClass: "text-text-muted", strokeWidth: 2 },
-  marketplace: { icon: Package, bgClass: "bg-accent", iconClass: "text-accent-foreground", strokeWidth: 2 },
+  ai: {
+    icon: Bot,
+    bgClass: "bg-accent",
+    iconClass: "text-accent-foreground",
+    strokeWidth: 2,
+  },
+  mycloud: {
+    icon: Cloud,
+    bgClass: "bg-accent",
+    iconClass: "text-accent-foreground",
+    strokeWidth: 2,
+  },
+  team: {
+    icon: Users,
+    bgClass: "bg-warning",
+    iconClass: "text-warning-foreground",
+    strokeWidth: 2,
+  },
+  custom: {
+    icon: FileCode,
+    bgClass: "bg-success",
+    iconClass: "text-success-foreground",
+    strokeWidth: 2,
+  },
+  builtin: {
+    icon: Package,
+    bgClass: "bg-surface-muted",
+    iconClass: "text-text-muted",
+    strokeWidth: 2,
+  },
+  marketplace: {
+    icon: Package,
+    bgClass: "bg-accent",
+    iconClass: "text-accent-foreground",
+    strokeWidth: 2,
+  },
 };
 
 function getSkillIcon(source: SkillSource) {
@@ -122,8 +158,14 @@ interface SkillActionButtonsProps {
 
 function SkillActionButtons(props: SkillActionButtonsProps) {
   const {
-    onPublish, onUpdate, onDelete, publishStatus,
-    isPublishing, isUpdating, isLoading, t,
+    onPublish,
+    onUpdate,
+    onDelete,
+    publishStatus,
+    isPublishing,
+    isUpdating,
+    isLoading,
+    t,
     iconSize = "w-3.5 h-3.5",
   } = props;
 
@@ -197,7 +239,15 @@ function SkillActionButtons(props: SkillActionButtonsProps) {
 
 function SkillCardCards(props: SkillCardProps) {
   const {
-    skill, isLoading, onToggle, footer, t, source, sourceLabel, cloudOps, onSkillMd,
+    skill,
+    isLoading,
+    onToggle,
+    footer,
+    t,
+    source,
+    sourceLabel,
+    cloudOps,
+    onSkillMd,
   } = props;
   const { icon: Icon, bgClass, iconClass, strokeWidth } = getSkillIcon(source);
   const iconSize = 48;
@@ -262,7 +312,14 @@ function SkillCardCards(props: SkillCardProps) {
 
 function SkillCardList(props: SkillCardProps) {
   const {
-    skill, isLoading, onToggle, footer, t, source, sourceLabel, onSkillMd,
+    skill,
+    isLoading,
+    onToggle,
+    footer,
+    t,
+    source,
+    sourceLabel,
+    onSkillMd,
   } = props;
   const { icon: Icon, bgClass, iconClass, strokeWidth } = getSkillIcon(source);
   const iconSize = 36;
@@ -275,7 +332,10 @@ function SkillCardList(props: SkillCardProps) {
             className={`rounded-lg flex items-center justify-center shrink-0 ${bgClass}`}
             style={{ width: iconSize, height: iconSize }}
           >
-            <Icon className={`w-4 h-4 ${iconClass}`} strokeWidth={strokeWidth} />
+            <Icon
+              className={`w-4 h-4 ${iconClass}`}
+              strokeWidth={strokeWidth}
+            />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -340,7 +400,16 @@ interface CloudOnlySkillCardProps {
 }
 
 function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
-  const { name, description, source, sourceLabel, onInstall, installing, onSkillMd, t } = props;
+  const {
+    name,
+    description,
+    source,
+    sourceLabel,
+    onInstall,
+    installing,
+    onSkillMd,
+    t,
+  } = props;
   const { icon: Icon, bgClass, iconClass, strokeWidth } = getSkillIcon(source);
   const iconSize = 48;
 
@@ -363,14 +432,18 @@ function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
                 {name}
               </button>
             ) : (
-              <h3 className="text-base font-semibold text-text-primary truncate">{name}</h3>
+              <h3 className="text-base font-semibold text-text-primary truncate">
+                {name}
+              </h3>
             )}
             <span className="text-xs px-1.5 py-0.5 rounded bg-surface-muted text-text-muted shrink-0 whitespace-nowrap">
               {sourceLabel}
             </span>
           </div>
           {description && (
-            <p className="text-sm text-text-secondary line-clamp-2">{description}</p>
+            <p className="text-sm text-text-secondary line-clamp-2">
+              {description}
+            </p>
           )}
         </div>
       </div>
@@ -393,7 +466,16 @@ function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
 }
 
 function CloudOnlyListView(props: CloudOnlySkillCardProps) {
-  const { name, description, source, sourceLabel, onInstall, installing, onSkillMd, t } = props;
+  const {
+    name,
+    description,
+    source,
+    sourceLabel,
+    onInstall,
+    installing,
+    onSkillMd,
+    t,
+  } = props;
   const { icon: Icon, bgClass, iconClass, strokeWidth } = getSkillIcon(source);
   const iconSize = 36;
 
@@ -405,7 +487,10 @@ function CloudOnlyListView(props: CloudOnlySkillCardProps) {
             className={`rounded-lg flex items-center justify-center shrink-0 ${bgClass}`}
             style={{ width: iconSize, height: iconSize }}
           >
-            <Icon className={`w-4 h-4 ${iconClass}`} strokeWidth={strokeWidth} />
+            <Icon
+              className={`w-4 h-4 ${iconClass}`}
+              strokeWidth={strokeWidth}
+            />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -417,14 +502,18 @@ function CloudOnlyListView(props: CloudOnlySkillCardProps) {
                   {name}
                 </button>
               ) : (
-                <span className="text-sm font-medium text-text-primary truncate">{name}</span>
+                <span className="text-sm font-medium text-text-primary truncate">
+                  {name}
+                </span>
               )}
               <span className="text-[10px] px-1 py-0.5 rounded bg-surface-muted text-text-muted shrink-0 whitespace-nowrap">
                 {sourceLabel}
               </span>
             </div>
             {description && (
-              <p className="text-xs text-text-muted line-clamp-1">{description}</p>
+              <p className="text-xs text-text-muted line-clamp-1">
+                {description}
+              </p>
             )}
           </div>
         </div>

@@ -45,7 +45,13 @@ describe("oauth-service helpers (via shared oauth-utils)", () => {
 
   describe("round-trip: oauthProfileKey → extractOAuthProviderId", () => {
     it("round-trips correctly", () => {
-      const ids = ["openai-codex", "github-copilot", "anthropic", "xai", "qwen"];
+      const ids = [
+        "openai-codex",
+        "github-copilot",
+        "anthropic",
+        "xai",
+        "qwen",
+      ];
       for (const id of ids) {
         const key = oauthProfileKey(id);
         const extracted = extractOAuthProviderId(key);

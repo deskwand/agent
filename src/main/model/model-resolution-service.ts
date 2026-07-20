@@ -249,14 +249,19 @@ export class ModelResolutionService {
 
     // Apply user-configured input override (takes highest priority)
     if (modelSelection.matchedModel.input !== undefined) {
-      piModel = { ...piModel, input: modelSelection.matchedModel.input } as Model<Api>;
+      piModel = {
+        ...piModel,
+        input: modelSelection.matchedModel.input,
+      } as Model<Api>;
     }
 
     // Resolve API key: for OAuth providers, fetch from AuthStorage (auto-refresh)
-    let resolvedApiKey: string | undefined = providerConfig.apiKey?.trim() || undefined;
+    let resolvedApiKey: string | undefined =
+      providerConfig.apiKey?.trim() || undefined;
     if (providerConfig.provider === "oauth") {
-      const oauthProviderId =
-        extractOAuthProviderId(providerSelection.providerProfileKey);
+      const oauthProviderId = extractOAuthProviderId(
+        providerSelection.providerProfileKey,
+      );
       resolvedApiKey = await getSharedAuthStorage().getApiKey(oauthProviderId!);
       if (!resolvedApiKey) {
         throw new Error(

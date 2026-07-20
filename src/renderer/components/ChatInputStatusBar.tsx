@@ -27,7 +27,12 @@ export type ChatInputStatus =
       timeUsedSeconds?: number;
       timeBudgetSeconds?: number;
     }
-  | { type: "goal-paused"; objective: string; iteration?: number; timeUsedSeconds?: number }
+  | {
+      type: "goal-paused";
+      objective: string;
+      iteration?: number;
+      timeUsedSeconds?: number;
+    }
   | {
       type: "goal-complete";
       objective: string;
@@ -130,10 +135,7 @@ export function ChatInputStatusBar({
     }
 
     // Append elapsed time for all goal states that have timeUsedSeconds
-    if (
-      status.timeUsedSeconds != null &&
-      status.timeUsedSeconds > 0
-    ) {
+    if (status.timeUsedSeconds != null && status.timeUsedSeconds > 0) {
       const isOngoing =
         status.type === "goal-active" ||
         status.type === "goal-paused" ||

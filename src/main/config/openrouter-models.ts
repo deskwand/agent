@@ -22,13 +22,17 @@ interface OpenRouterModelsResponse {
   data?: OpenRouterModelRecord[];
 }
 
-export function isOpenRouterFreeModel(pricing: OpenRouterPricing = {}): boolean {
+export function isOpenRouterFreeModel(
+  pricing: OpenRouterPricing = {},
+): boolean {
   const prompt = pricing.prompt;
   const completion = pricing.completion;
   return prompt === "0" && completion === "0";
 }
 
-function toModelInput(modalities?: string[]): Array<"text" | "image"> | undefined {
+function toModelInput(
+  modalities?: string[],
+): Array<"text" | "image"> | undefined {
   if (!Array.isArray(modalities)) return undefined;
   const inputs = modalities.filter(
     (modality): modality is "text" | "image" =>
@@ -50,7 +54,10 @@ function shapeModel(record: OpenRouterModelRecord) {
   };
 }
 
-function compareModels(left: OpenRouterModelRecord, right: OpenRouterModelRecord): number {
+function compareModels(
+  left: OpenRouterModelRecord,
+  right: OpenRouterModelRecord,
+): number {
   const leftFree = isOpenRouterFreeModel(left.pricing);
   const rightFree = isOpenRouterFreeModel(right.pricing);
   if (leftFree !== rightFree) {

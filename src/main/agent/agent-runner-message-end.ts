@@ -10,7 +10,7 @@ import { splitThinkTagBlocks } from "./think-tag-parser";
 // ── Locale detection ────────────────────────────────────────────────
 
 export function getLocale(): string {
-  return (app.getLocale() ?? "en");
+  return app.getLocale() ?? "en";
 }
 
 type MessageEndContentBlock = TextContent | ThinkingContent | ToolCall;
@@ -32,7 +32,10 @@ interface ResolvedMessageEndPayload {
   shouldEmitMessage: boolean;
 }
 
-export function toUserFacingErrorText(errorText: string, _locale?: string): string {
+export function toUserFacingErrorText(
+  errorText: string,
+  _locale?: string,
+): string {
   const locale = _locale ?? getLocale();
   const zh = locale.startsWith("zh");
   const lower = errorText.toLowerCase();
@@ -108,9 +111,13 @@ export function getErrorSuffix(errorText: string, _locale?: string): string {
   const locale = _locale ?? getLocale();
   const zh = locale.startsWith("zh");
   if (/\b4\d{2}\b/.test(errorText)) {
-    return zh ? "_请检查配置后重试。_" : "_Please check your configuration and retry._";
+    return zh
+      ? "_请检查配置后重试。_"
+      : "_Please check your configuration and retry._";
   }
-  return zh ? "_Agent 正在自动重试，请稍候..._" : "_Retrying automatically, please wait..._";
+  return zh
+    ? "_Agent 正在自动重试，请稍候..._"
+    : "_Retrying automatically, please wait..._";
 }
 
 export function resolveMessageEndPayload(

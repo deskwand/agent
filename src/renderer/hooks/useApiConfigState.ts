@@ -89,9 +89,7 @@ function presetForProfile(
   if (profileKey.startsWith("custom:openai")) return presets.openai;
   if (profileKey.startsWith("custom:gemini")) return presets.gemini;
   if (profileKey.startsWith("custom:")) return presets.custom;
-  return (
-    presets as unknown as Record<string, ProviderPreset>
-  )[profileKey];
+  return (presets as unknown as Record<string, ProviderPreset>)[profileKey];
 }
 
 function normalizeProfile(

@@ -207,23 +207,24 @@ export const ToolResultBlock = memo(function ToolResultBlock({
             </div>
           )}
           {block.diff ? (
-              <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted leading-snug">
-                {block.diff.split("\n").map((line, i) => {
-                  const prefix = line[0];
-                  const bgClass =
-                    prefix === "+"
-                      ? "diff-add"
-                      : prefix === "-"
-                        ? "diff-del"
-                        : "text-text-secondary";
-                  return (
-                    <div key={i} className={bgClass}>
-                      {line}
-                    </div>
-                  );
-                })}
-              </pre>
-            ) : shouldShowOutputText && (
+            <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted leading-snug">
+              {block.diff.split("\n").map((line, i) => {
+                const prefix = line[0];
+                const bgClass =
+                  prefix === "+"
+                    ? "diff-add"
+                    : prefix === "-"
+                      ? "diff-del"
+                      : "text-text-secondary";
+                return (
+                  <div key={i} className={bgClass}>
+                    {line}
+                  </div>
+                );
+              })}
+            </pre>
+          ) : (
+            shouldShowOutputText && (
               <pre
                 className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
                   block.isError
@@ -233,7 +234,8 @@ export const ToolResultBlock = memo(function ToolResultBlock({
               >
                 {block.content}
               </pre>
-            )}
+            )
+          )}
           {!preferImageOutput && hasImages && (
             <div className="mt-2 space-y-2">
               {validImages.map((image, index) => (

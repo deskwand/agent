@@ -276,12 +276,19 @@ function App() {
     browserWidthManual: boolean;
     calcHalfWidth: typeof calcHalfWidth;
   }>(null!);
-  resizeGuardRef.current = { rightPanelMode, browserWidthManual, calcHalfWidth };
+  resizeGuardRef.current = {
+    rightPanelMode,
+    browserWidthManual,
+    calcHalfWidth,
+  };
 
   useEffect(() => {
     const handleResize = () => {
-      const { rightPanelMode: mode, browserWidthManual: manual, calcHalfWidth: calc } =
-        resizeGuardRef.current;
+      const {
+        rightPanelMode: mode,
+        browserWidthManual: manual,
+        calcHalfWidth: calc,
+      } = resizeGuardRef.current;
       if (mode !== "browser" || manual) return;
       setContextPanelWidth(calc());
     };
@@ -327,94 +334,101 @@ function App() {
       {/* Main Content */}
       {isBrowserFullscreen ? (
         <Suspense
-          fallback={
-            <div className="flex-1 min-h-0 bg-background/60" />
-          }
+          fallback={<div className="flex-1 min-h-0 bg-background/60" />}
         >
           <div className="flex-1 min-h-0">
             <BrowserPanel width={window.innerWidth} />
           </div>
         </Suspense>
       ) : (
-      <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* Sidebar — always visible across all views */}
-        <>
-          <PanelErrorBoundary name="Sidebar" fallback={<div className="w-0" />}>
-            <Sidebar width={sidebarWidth} />
-          </PanelErrorBoundary>
+        <div className="flex-1 min-h-0 flex overflow-hidden">
+          {/* Sidebar — always visible across all views */}
+          <>
+            <PanelErrorBoundary
+              name="Sidebar"
+              fallback={<div className="w-0" />}
+            >
+              <Sidebar width={sidebarWidth} />
+            </PanelErrorBoundary>
 
-          {/* Sidebar resize handle */}
-          {!sidebarCollapsed && (
+            {/* Sidebar resize handle */}
+            {!sidebarCollapsed && (
+              <ResizeHandle
+                onResize={(delta) =>
+                  setSidebarWidth(
+                    Math.max(200, Math.min(400, sidebarWidth + delta)),
+                  )
+                }
+                onDoubleClick={() => setSidebarWidth(280)}
+              />
+            )}
+          </>
+
+          {/* Main Content Area */}
+          <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-background relative">
+            {showSettings ? (
+              <Suspense fallback={<MainPanelFallback />}>
+                <SettingsPanel onClose={() => setShowSettings(false)} />
+              </Suspense>
+            ) : showMarketplace ? (
+              <MarketplaceView />
+            ) : showSchedule ? (
+              <ScheduleView />
+            ) : activeSessionId ? (
+              <PanelErrorBoundary
+                name="ChatView"
+                resetKey={activeSessionId}
+                fallback={<MainPanelFallback />}
+              >
+                <Suspense fallback={<MainPanelFallback />}>
+                  <ChatView />
+                </Suspense>
+              </PanelErrorBoundary>
+            ) : (
+              <WelcomeView />
+            )}
+            {/* Artifact floating panel */}
+            {isArtifactPanelOpen && (
+              <Suspense fallback={null}>
+                <ArtifactPanel />
+              </Suspense>
+            )}
+          </main>
+
+          {/* Right Panel: File Browser or Browser */}
+          {!isFullScreenView && rightPanelMode !== null && (
             <ResizeHandle
-              onResize={(delta) =>
-                setSidebarWidth(
-                  Math.max(200, Math.min(400, sidebarWidth + delta)),
-                )
-              }
-              onDoubleClick={() => setSidebarWidth(280)}
+              onResize={(delta) => {
+                setBrowserWidthManual(true);
+                setContextPanelWidth(
+                  Math.max(
+                    rightPanelMode === "browser" ? 350 : 280,
+                    rightPanelMode === "browser"
+                      ? contextPanelWidth - delta
+                      : Math.min(480, contextPanelWidth - delta),
+                  ),
+                );
+              }}
+              onDoubleClick={() => {
+                setBrowserWidthManual(false);
+                setContextPanelWidth(calcHalfWidth());
+              }}
+              position="left"
+              className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
             />
           )}
-        </>
-
-        {/* Main Content Area */}
-        <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-background relative">
-          {showSettings ? (
-            <Suspense fallback={<MainPanelFallback />}>
-              <SettingsPanel onClose={() => setShowSettings(false)} />
-            </Suspense>
-          ) : showMarketplace ? (
-            <MarketplaceView />
-          ) : showSchedule ? (
-            <ScheduleView />
-          ) : activeSessionId ? (
-            <PanelErrorBoundary
-              name="ChatView"
-              resetKey={activeSessionId}
-              fallback={<MainPanelFallback />}
-            >
-              <Suspense fallback={<MainPanelFallback />}>
-                <ChatView />
-              </Suspense>
-            </PanelErrorBoundary>
-          ) : (
-            <WelcomeView />
-          )}
-          {/* Artifact floating panel */}
-          {isArtifactPanelOpen && (
-            <Suspense fallback={null}>
-              <ArtifactPanel />
-            </Suspense>
-          )}
-        </main>
-
-        {/* Right Panel: File Browser or Browser */}
-        {!isFullScreenView && rightPanelMode !== null && (
-          <ResizeHandle
-            onResize={(delta) => {
-              setBrowserWidthManual(true);
-              setContextPanelWidth(
-                Math.max(
-                  rightPanelMode === "browser" ? 350 : 280,
-                  rightPanelMode === "browser"
-                    ? contextPanelWidth - delta
-                    : Math.min(480, contextPanelWidth - delta),
-                ),
-              );
+          <div
+            className={`overflow-hidden flex-shrink-0 flex transition-[width] duration-300 ease-in-out ${!isFullScreenView && rightPanelMode !== null ? "" : "w-0"}`}
+            style={{
+              width:
+                !isFullScreenView && rightPanelMode !== null
+                  ? `${contextPanelWidth}px`
+                  : 0,
             }}
-            onDoubleClick={() => {
-              setBrowserWidthManual(false);
-              setContextPanelWidth(calcHalfWidth());
-            }}
-            position="left"
-            className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
-          />
-        )}
-        <div
-          className={`overflow-hidden flex-shrink-0 flex transition-[width] duration-300 ease-in-out ${!isFullScreenView && rightPanelMode !== null ? '' : 'w-0'}`}
-          style={{ width: !isFullScreenView && rightPanelMode !== null ? `${contextPanelWidth}px` : 0 }}
-        >
-          {!isFullScreenView && rightPanelMode !== null &&
-            (rightPanelMode === "browser" ? (
+          >
+            {!isFullScreenView &&
+              rightPanelMode !== null &&
+              (rightPanelMode === "browser" ? (
                 <PanelErrorBoundary
                   name="BrowserPanel"
                   fallback={
@@ -444,10 +458,9 @@ function App() {
                     <FileBrowser width={contextPanelWidth} />
                   </Suspense>
                 </PanelErrorBoundary>
-              )
-            )}
+              ))}
+          </div>
         </div>
-      </div>
       )}
 
       {/* Permission Dialog */}

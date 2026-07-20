@@ -20,6 +20,7 @@ import {
   type AgentSession as PiAgentSession,
   type ToolDefinition,
   type BashToolOptions,
+  type InlineExtension,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
 import {
@@ -65,6 +66,10 @@ import { getDefaultShell } from "../utils/shell-resolver";
 import type { SkillsAdapter } from "../skills/skills-adapter";
 import { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { configStore } from "../config/config-store";
+import { registerDeskWandProviders } from "./subagent/provider-bridge";
+import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
+import { deployBuiltinAgents } from "./subagent/agent-list";
+import type { SubagentConfig } from "../../shared/subagent-config";
 import crypto from "node:crypto";
 import { createVisionDescribeTool } from "./tools/vision-describe";
 import { createOfficeTools } from "./tools/office/office-tools";
@@ -2535,6 +2540,10 @@ ${hints.join("\n")}
           // the next query will retry.
           this._skillsSetupDone = true;
           log("[AgentRunner] Skills setup complete");
+
+          // Deploy built-in agent Markdown files to global agent dir
+          // so the subagent plugin discovers them on next load.
+          deployBuiltinAgents();
         } finally {
           this._skillsSetupInProgress = false;
         }
@@ -3090,10 +3099,18 @@ Tool routing:\n
         `[AgentRunner] Custom tools (${allCustomTools.length}): ${allCustomTools.map((t) => t.name).join(", ")}`,
       );
 
+      // Compute subagent config once for both toolsSignature and session creation.
+      const subagentConfig: SubagentConfig = configStore.getSubagentConfig();
+      const subagentEnabled =
+        true;
+
       // Detect MCP tool changes so newly enabled/disabled MCP servers take effect
-      const toolsSignature = JSON.stringify(
-        allCustomTools.map((t) => t.name).sort(),
-      );
+      const subagentSignature = subagentEnabled
+        ? JSON.stringify(subagentConfig)
+        : "";
+      const toolsSignature =
+        JSON.stringify(allCustomTools.map((t) => t.name).sort()) +
+        subagentSignature;
       if (cachedSession && cachedSession.toolsSignature !== toolsSignature) {
         logCtx(
           "[AgentRunner] Custom tools changed, recreating cached pi session:",
@@ -3159,15 +3176,44 @@ Tool routing:\n
         // ResourceLoader + ModelRegistry only needed for session creation — skip on reuse
         const { DefaultResourceLoader } =
           await import("@earendil-works/pi-coding-agent");
+        const extensionFactories: InlineExtension[] = [];
+
+        // 注入子 Agent 插件
+        if (subagentEnabled) {
+          const subagentsFactory = (
+            await import("@tintinweb/pi-subagents/dist/index.js")
+          ).default;
+          extensionFactories.push(subagentsFactory as InlineExtension);
+          log("[AgentRunner] Subagent extension factory injected");
+        }
+
+        // 注入 DeskWand Tools Extension
+        const deskwandToolExt = createDeskwandToolsExtension(
+          effectiveCwd,
+          session.id,
+          allCustomTools,
+          codingTools as ToolDefinition[],
+        );
+        if (deskwandToolExt) {
+          extensionFactories.push(deskwandToolExt);
+        }
+
         const resourceLoader = new DefaultResourceLoader({
           cwd: effectiveCwd,
           agentDir: userDeskWandDir,
           additionalSkillPaths: skillPaths,
           appendSystemPrompt: coworkAppendPrompt,
+          ...(extensionFactories.length > 0 ? { extensionFactories } : {}),
         });
         await resourceLoader.reload();
 
         const modelRegistry = ModelRegistry.inMemory(authStorage);
+
+        // 将 DeskWand Provider Profiles 注册为独立命名空间，供子 Agent 使用。
+        if (subagentEnabled) {
+          await registerDeskWandProviders(modelRegistry);
+          log("[AgentRunner] Subagent providers registered");
+        }
 
         // Ollama-specific compaction tuning based on actual context window
         const contextWindow = piModel.contextWindow || 128000;
@@ -3251,6 +3297,49 @@ Tool routing:\n
             ),
           );
         }
+
+        // Wire subagent lifecycle events to renderer
+        const piEvents = (piSession as any).events;
+        piEvents?.on?.("subagents:started", (data: any) => {
+          (this as any).sendToRenderer({
+            type: "subagent.lifecycle",
+            payload: {
+              sessionId: session.id,
+              agentId: data.id,
+              agentType: data.type,
+              parentToolCallId: data.parentToolCallId,
+              status: "running",
+            },
+          });
+        });
+        piEvents?.on?.("subagents:completed", (data: any) => {
+          (this as any).sendToRenderer({
+            type: "subagent.lifecycle",
+            payload: {
+              sessionId: session.id,
+              agentId: data.id,
+              agentType: data.type,
+              parentToolCallId: data.parentToolCallId,
+              status: "completed",
+              toolUses: data.toolUses,
+              tokens: data.tokens,
+              durationMs: data.durationMs,
+            },
+          });
+        });
+        piEvents?.on?.("subagents:failed", (data: any) => {
+          (this as any).sendToRenderer({
+            type: "subagent.lifecycle",
+            payload: {
+              sessionId: session.id,
+              agentId: data.id,
+              agentType: data.type,
+              parentToolCallId: data.parentToolCallId,
+              status: "error",
+              error: data.error,
+            },
+          });
+        });
 
         // Store session for reuse — evict oldest if cache is full
         if (this.piSessions.size >= AgentRunner.MAX_CACHED_SESSIONS) {

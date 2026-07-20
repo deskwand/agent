@@ -18,11 +18,7 @@ import {
   shouldPreferToolResultImages,
   shouldRenderToolResultText,
 } from "../../utils/tool-result-summary";
-import type {
-  ToolUseContent,
-  ContentBlock,
-  Message,
-} from "../../types";
+import type { ToolUseContent, ContentBlock, Message } from "../../types";
 import { AskUserQuestionBlock } from "./AskUserQuestionBlock";
 import { TodoWriteBlock } from "./TodoWriteBlock";
 import { FileToolBlock, canHandleFileInput } from "./FileToolBlock";
@@ -39,6 +35,8 @@ const WEB_SEARCH_TOOL_NAMES = new Set([
   "fetch_content",
   "get_search_content",
 ]);
+
+const AGENT_TOOL_NAMES = new Set(["Agent"]);
 
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/png",
@@ -126,7 +124,12 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       canHandleBashInput(block.input as Record<string, unknown> | undefined)
     ) {
       return (
-        <BashToolBlock block={block} allBlocks={allBlocks} message={message} showIcon={showIcon} />
+        <BashToolBlock
+          block={block}
+          allBlocks={allBlocks}
+          message={message}
+          showIcon={showIcon}
+        />
       );
     }
   }
@@ -143,7 +146,8 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const isGoalTool =
     block.name === "get_goal" ||
     block.name === "update_goal" ||
-    block.name === "goal_complete";
+    block.name === "goal_complete" ||
+    block.name === "Agent";
 
   const label = getToolLabel(block.name, block.input, t);
 
@@ -162,6 +166,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
     ? block.name.match(/^mcp__(.+?)__/)?.[1]
     : null;
   const isWebSearchTool = WEB_SEARCH_TOOL_NAMES.has(block.name);
+  const isAgentTool = AGENT_TOOL_NAMES.has(block.name);
   const toolInput = block.input as Record<string, unknown>;
   const collapsedSummary = getCollapsedToolSummary(
     block.name,
@@ -274,19 +279,26 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           </span>
           {!isRunning && collapsedSummary.kind === "diff" && (
             <span className="whitespace-nowrap text-xs text-text-muted inline-flex items-center gap-1">
-              · <span className="diff-add rounded-sm px-0.5">+{collapsedSummary.added}</span>
-              <span className="diff-del rounded-sm px-0.5">-{collapsedSummary.removed}</span>
+              ·{" "}
+              <span className="diff-add rounded-sm px-0.5">
+                +{collapsedSummary.added}
+              </span>
+              <span className="diff-del rounded-sm px-0.5">
+                -{collapsedSummary.removed}
+              </span>
             </span>
           )}
-          {!isRunning && collapsedSummary.kind !== "diff" && collapsedSummaryText && (
-            <span
-              className={`whitespace-nowrap text-xs ${
-                isError ? "text-error" : "text-text-muted"
-              }`}
-            >
-              · {collapsedSummaryText}
-            </span>
-          )}
+          {!isRunning &&
+            collapsedSummary.kind !== "diff" &&
+            collapsedSummaryText && (
+              <span
+                className={`whitespace-nowrap text-xs ${
+                  isError ? "text-error" : "text-text-muted"
+                }`}
+              >
+                · {collapsedSummaryText}
+              </span>
+            )}
           <span
             className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-text-muted transition-opacity ${
               expanded
@@ -330,13 +342,15 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                         ? (toolInput.urls as string[])
                         : []
                       ).map((u, i) => (
-                        <div key={i} className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <div
+                          key={i}
+                          className="flex items-center gap-1.5 text-xs text-text-secondary"
+                        >
                           <Globe className="w-3 h-3 text-text-muted flex-shrink-0" />
                           <span className="truncate">{u}</span>
                         </div>
                       ))}
-                      {toolInput.url &&
-                        !Array.isArray(toolInput.urls) && (
+                      {toolInput.url && !Array.isArray(toolInput.urls) && (
                         <div className="flex items-center gap-1.5 text-xs text-text-secondary">
                           <Globe className="w-3 h-3 text-text-muted flex-shrink-0" />
                           <span className="truncate">
@@ -345,24 +359,38 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                         </div>
                       )}
                     </>
-                  ) : (
-                    /* web_search / websearch / web_fetch / webfetch */
-                    (Array.isArray(toolInput.queries)
+                  ) : /* web_search / websearch / web_fetch / webfetch */
+                  (Array.isArray(toolInput.queries)
                       ? (toolInput.queries as string[])
                       : []
-                    ).length > 0
-                      ? (toolInput.queries as string[]).map((q, i) => (
-                          <div key={i} className="flex items-center gap-1.5 text-xs text-text-secondary">
-                            <Search className="w-3 h-3 text-text-muted flex-shrink-0" />
-                            <span>{q}</span>
-                          </div>
-                        ))
-                      : (
-                        <div className="flex items-center gap-1.5 text-xs text-text-secondary">
-                          <Search className="w-3 h-3 text-text-muted flex-shrink-0" />
-                          <span>{String(toolInput.query || toolInput.url || "")}</span>
-                        </div>
-                      )
+                    ).length > 0 ? (
+                    (toolInput.queries as string[]).map((q, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-1.5 text-xs text-text-secondary"
+                      >
+                        <Search className="w-3 h-3 text-text-muted flex-shrink-0" />
+                        <span>{q}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                      <Search className="w-3 h-3 text-text-muted flex-shrink-0" />
+                      <span>
+                        {String(toolInput.query || toolInput.url || "")}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : isAgentTool ? (
+                <div className="text-xs text-text-secondary space-y-1">
+                  {(toolInput.subagent_type as string) && (
+                    <div className="flex items-center gap-1.5">
+                      <span>{toolInput.subagent_type as string}</span>
+                    </div>
+                  )}
+                  {(toolInput.description as string) && (
+                    <div className="truncate">{toolInput.description as string}</div>
                   )}
                 </div>
               ) : (
@@ -422,7 +450,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     );
                   })}
                 </pre>
-              ) : isWebSearchTool && typeof toolResult.content === "string" ? (
+              ) : (isWebSearchTool || isAgentTool) && typeof toolResult.content === "string" ? (
                 <div className="text-xs text-text-secondary max-h-[400px] overflow-y-auto">
                   <MessageMarkdown normalizedText={toolResult.content} />
                 </div>

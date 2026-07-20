@@ -10,9 +10,7 @@ export type SlashItem =
   | { category: "command"; command: SlashCommand }
   | { category: "skill"; skill: { name: string; description?: string } };
 
-export function getBuiltinCommands(
-  t: (key: string) => string,
-): SlashCommand[] {
+export function getBuiltinCommands(t: (key: string) => string): SlashCommand[] {
   return [
     {
       name: "compact",

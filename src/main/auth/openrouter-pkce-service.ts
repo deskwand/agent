@@ -72,7 +72,9 @@ function toBase64Url(buffer: Buffer): string {
     .replace(/=+$/g, "");
 }
 
-export function createPkcePair(randomBytesImpl: RandomBytesLike = crypto.randomBytes): {
+export function createPkcePair(
+  randomBytesImpl: RandomBytesLike = crypto.randomBytes,
+): {
   verifier: string;
   challenge: string;
 } {
@@ -87,19 +89,27 @@ export async function startOpenRouterCallbackServer(): Promise<OpenRouterCallbac
   let server: http.Server | undefined;
   const waitForCode = new Promise<string>((resolve, reject) => {
     server = http.createServer((request, response) => {
-      const requestUrl = request.url ? new URL(request.url, "http://127.0.0.1") : undefined;
+      const requestUrl = request.url
+        ? new URL(request.url, "http://127.0.0.1")
+        : undefined;
       const code = requestUrl?.searchParams.get("code")?.trim();
       const error = requestUrl?.searchParams.get("error")?.trim();
 
       if (error) {
-        response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
-        response.end("OpenRouter authorization failed. You can close this tab.");
+        response.writeHead(400, {
+          "Content-Type": "text/plain; charset=utf-8",
+        });
+        response.end(
+          "OpenRouter authorization failed. You can close this tab.",
+        );
         reject(new Error(error));
         return;
       }
 
       if (!code) {
-        response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+        response.writeHead(400, {
+          "Content-Type": "text/plain; charset=utf-8",
+        });
         response.end("Missing authorization code. You can close this tab.");
         reject(new Error("Missing authorization code"));
         return;
@@ -185,7 +195,8 @@ export class OpenRouterPkceService {
     this.providerName = deps.providerName || "OpenRouter";
     this.store = deps.store || new ElectronOpenRouterCredentialStore();
     this.openExternal = deps.openExternal || shell.openExternal;
-    this.createCallbackServer = deps.createCallbackServer || startOpenRouterCallbackServer;
+    this.createCallbackServer =
+      deps.createCallbackServer || startOpenRouterCallbackServer;
     this.exchangeCode = deps.exchangeCode || exchangeOpenRouterCode;
     this.createPkce = deps.createPkce || createPkcePair;
   }

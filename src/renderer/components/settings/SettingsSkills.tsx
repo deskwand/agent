@@ -79,7 +79,9 @@ function loadMarketCache(): MarketCacheEntry | null {
 function saveMarketCache(data: MarketCacheEntry): void {
   try {
     localStorage.setItem(MARKET_CACHE_KEY, JSON.stringify(data));
-  } catch { /* quota exceeded, ignore */ }
+  } catch {
+    /* quota exceeded, ignore */
+  }
 }
 
 function loadCategoriesCache(): CategoriesCacheEntry | null {
@@ -94,7 +96,9 @@ function loadCategoriesCache(): CategoriesCacheEntry | null {
 function saveCategoriesCache(data: CategoriesCacheEntry): void {
   try {
     localStorage.setItem(CATEGORIES_CACHE_KEY, JSON.stringify(data));
-  } catch { /* quota exceeded, ignore */ }
+  } catch {
+    /* quota exceeded, ignore */
+  }
 }
 
 function loadDetailCache(): Map<string, string | null> {
@@ -103,7 +107,9 @@ function loadDetailCache(): Map<string, string | null> {
     if (raw) {
       return new Map(JSON.parse(raw) as [string, string | null][]);
     }
-  } catch { /* ignore corrupt data */ }
+  } catch {
+    /* ignore corrupt data */
+  }
   return new Map();
 }
 
@@ -113,7 +119,9 @@ function saveDetailCache(cache: Map<string, string | null>): void {
       DETAIL_CACHE_KEY,
       JSON.stringify([...cache.entries()]),
     );
-  } catch { /* quota exceeded, ignore */ }
+  } catch {
+    /* quota exceeded, ignore */
+  }
 }
 
 function clearAllMarketplaceCaches(): void {
@@ -121,7 +129,9 @@ function clearAllMarketplaceCaches(): void {
     localStorage.removeItem(MARKET_CACHE_KEY);
     localStorage.removeItem(CATEGORIES_CACHE_KEY);
     localStorage.removeItem(DETAIL_CACHE_KEY);
-  } catch { /* noop */ }
+  } catch {
+    /* noop */
+  }
 }
 
 /* ─── main component ─── */
@@ -131,10 +141,15 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const [skills, setSkills] = useState<Skill[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<LocalizedBanner | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<{skillId: string; skillName: string} | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{
+    skillId: string;
+    skillName: string;
+  } | null>(null);
   const cloudConfig = useAppStore((s) => s.cloudConfig);
   const skillRefreshKey = useAppStore((s) => s.skillRefreshKey);
-  const incrementSkillRefreshKey = useAppStore((s) => s.incrementSkillRefreshKey);
+  const incrementSkillRefreshKey = useAppStore(
+    (s) => s.incrementSkillRefreshKey,
+  );
   const activeTeamId = useAppStore((s) => s.activeTeamId);
   const activeTeamName = useAppStore((s) => s.activeTeamName);
   const [publishError, setPublishError] = useState<string | null>(null);
@@ -143,12 +158,17 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   const [publishStatus, setPublishStatus] = useState<
     Map<string, "unpublished" | "published" | "outdated" | "has_update">
   >(new Map());
-  const [mdModal, setMdModal] = useState<{ name: string; content: string | null } | null>(null);
+  const [mdModal, setMdModal] = useState<{
+    name: string;
+    content: string | null;
+  } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [cloudSkills, setCloudSkills] = useState<CloudSkill[]>([]);
   const [teamCloudSkills, setTeamCloudSkills] = useState<CloudSkill[]>([]);
   const [unshareTarget, setUnshareTarget] = useState<CloudSkill | null>(null);
-  const [deleteCloudTarget, setDeleteCloudTarget] = useState<CloudSkill | null>(null);
+  const [deleteCloudTarget, setDeleteCloudTarget] = useState<CloudSkill | null>(
+    null,
+  );
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [installingId, setInstallingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"cards" | "list">(() => {
@@ -161,12 +181,18 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   });
 
   // Marketplace state
-  const [marketplaceSkills, setMarketplaceSkills] = useState<MarketplaceSkill[]>([]);
+  const [marketplaceSkills, setMarketplaceSkills] = useState<
+    MarketplaceSkill[]
+  >([]);
   const [marketplaceTotal, setMarketplaceTotal] = useState(0);
   const [marketplacePage, setMarketplacePage] = useState(0);
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
-  const [marketplaceCategory, setMarketplaceCategory] = useState<string | null>(null);
-  const [installingMarketplaceSlug, setInstallingMarketplaceSlug] = useState<string | null>(null);
+  const [marketplaceCategory, setMarketplaceCategory] = useState<string | null>(
+    null,
+  );
+  const [installingMarketplaceSlug, setInstallingMarketplaceSlug] = useState<
+    string | null
+  >(null);
   const [allCategories, setAllCategories] = useState<
     Array<{ key: string; name: string }>
   >([]);
@@ -175,15 +201,27 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   // Cache refs (initialized from localStorage)
   const marketCache = useRef<MarketCacheEntry | null>(loadMarketCache());
   const abortRef = useRef<AbortController | null>(null);
-  const categoriesCache = useRef<CategoriesCacheEntry | null>(loadCategoriesCache());
+  const categoriesCache = useRef<CategoriesCacheEntry | null>(
+    loadCategoriesCache(),
+  );
 
   function toggleViewMode(mode: "cards" | "list") {
     setViewMode(mode);
-    try { localStorage.setItem("skillViewMode", mode); } catch { /* noop */ }
+    try {
+      localStorage.setItem("skillViewMode", mode);
+    } catch {
+      /* noop */
+    }
   }
 
   // ─── filter + search state ───
-  type FilterKey = "ai" | "mycloud" | "team" | "builtin" | "marketplace" | "installed";
+  type FilterKey =
+    | "ai"
+    | "mycloud"
+    | "team"
+    | "builtin"
+    | "marketplace"
+    | "installed";
   const [filterKey, setFilterKey] = useState<FilterKey>("marketplace");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -226,7 +264,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (!cloudConfig?.token || !isActive) return;
     const client = new CloudApiClient(cloudConfig.token);
-    client.getMySkills()
+    client
+      .getMySkills()
       .then(setCloudSkills)
       .catch((err: unknown) => {
         const e = err as Error & { status?: number };
@@ -238,7 +277,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (!cloudConfig?.token || !activeTeamId || !isActive) return;
     const client = new CloudApiClient(cloudConfig.token);
-    client.getTeamSkills(activeTeamId)
+    client
+      .getTeamSkills(activeTeamId)
       .then(setTeamCloudSkills)
       .catch((err: unknown) => {
         const e = err as Error & { status?: number };
@@ -250,7 +290,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   useEffect(() => {
     if (!isActive) return;
     const checkStatus = async () => {
-      const newStatus = new Map<string, "unpublished" | "published" | "outdated" | "has_update">();
+      const newStatus = new Map<
+        string,
+        "unpublished" | "published" | "outdated" | "has_update"
+      >();
       const all = skills.filter((s) => s.type !== "builtin");
       if (all.length === 0) {
         setPublishStatus(newStatus);
@@ -265,16 +308,21 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
               window.electronAPI.skills.readFingerprint(skill.name),
               window.electronAPI.skills.readInstalledMeta(skill.name),
             ]);
-            const cloudSkill = cloudSkills.find(
-              (cs) => cs.name.toLowerCase() === skill.name.toLowerCase()
-            ) || teamCloudSkills.find(
-              (cs) => cs.name.toLowerCase() === skill.name.toLowerCase()
-            );
+            const cloudSkill =
+              cloudSkills.find(
+                (cs) => cs.name.toLowerCase() === skill.name.toLowerCase(),
+              ) ||
+              teamCloudSkills.find(
+                (cs) => cs.name.toLowerCase() === skill.name.toLowerCase(),
+              );
             if (!cloudSkill) {
               newStatus.set(skill.name, "unpublished");
             } else if (storedFp) {
               if (storedFp === localFp) {
-                if (installedMeta && installedMeta.version < cloudSkill.current_version) {
+                if (
+                  installedMeta &&
+                  installedMeta.version < cloudSkill.current_version
+                ) {
                   newStatus.set(skill.name, "has_update");
                 } else {
                   newStatus.set(skill.name, "published");
@@ -304,15 +352,18 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   // ─── cloud skill name lookups (for OR-based filtering) ───
   const myCloudSkillNames = useMemo(
     () => new Set(cloudSkills.map((cs) => cs.name.toLowerCase())),
-    [cloudSkills]
+    [cloudSkills],
   );
   const teamCloudSkillNames = useMemo(
     () => new Set(teamCloudSkills.map((cs) => cs.name.toLowerCase())),
-    [teamCloudSkills]
+    [teamCloudSkills],
   );
 
   // ─── unified display list ───
-  const localSkillNames = useMemo(() => new Set(skills.map((s) => s.name.toLowerCase())), [skills]);
+  const localSkillNames = useMemo(
+    () => new Set(skills.map((s) => s.name.toLowerCase())),
+    [skills],
+  );
 
   const displaySkills = useMemo((): DisplaySkill[] => {
     const result: DisplaySkill[] = [];
@@ -320,10 +371,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     // 1. Local skills
     for (const s of skills) {
       const isFromMyCloud = cloudSkills.some(
-        (cs) => cs.name.toLowerCase() === s.name.toLowerCase()
+        (cs) => cs.name.toLowerCase() === s.name.toLowerCase(),
       );
       const isFromTeam = teamCloudSkills.some(
-        (cs) => cs.name.toLowerCase() === s.name.toLowerCase()
+        (cs) => cs.name.toLowerCase() === s.name.toLowerCase(),
       );
 
       let source: DisplaySkill["source"];
@@ -340,10 +391,14 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       }
 
       const cloudData = isFromMyCloud
-        ? cloudSkills.find((cs) => cs.name.toLowerCase() === s.name.toLowerCase())
+        ? cloudSkills.find(
+            (cs) => cs.name.toLowerCase() === s.name.toLowerCase(),
+          )
         : isFromTeam
-        ? teamCloudSkills.find((cs) => cs.name.toLowerCase() === s.name.toLowerCase())
-        : undefined;
+          ? teamCloudSkills.find(
+              (cs) => cs.name.toLowerCase() === s.name.toLowerCase(),
+            )
+          : undefined;
 
       result.push({
         id: s.id,
@@ -363,7 +418,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     // 2. Cloud-only skills (deduplicate across mycloud + team)
     const addedCloudNames = new Set<string>();
     for (const cs of cloudSkills) {
-      if (!localSkillNames.has(cs.name.toLowerCase()) && !addedCloudNames.has(cs.name.toLowerCase())) {
+      if (
+        !localSkillNames.has(cs.name.toLowerCase()) &&
+        !addedCloudNames.has(cs.name.toLowerCase())
+      ) {
         addedCloudNames.add(cs.name.toLowerCase());
         result.push({
           id: `cloud-${cs.id}`,
@@ -381,7 +439,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     }
 
     for (const cs of teamCloudSkills) {
-      if (!localSkillNames.has(cs.name.toLowerCase()) && !addedCloudNames.has(cs.name.toLowerCase())) {
+      if (
+        !localSkillNames.has(cs.name.toLowerCase()) &&
+        !addedCloudNames.has(cs.name.toLowerCase())
+      ) {
         addedCloudNames.add(cs.name.toLowerCase());
         result.push({
           id: `team-${cs.id}`,
@@ -413,18 +474,29 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     if (filterKey === "installed") {
       list = list.filter((s) => s.source !== "builtin" && !s.isCloudOnly);
     } else if (filterKey === "ai") list = list.filter((s) => s.source === "ai");
-    else if (filterKey === "mycloud") list = list.filter((s) => myCloudSkillNames.has(s.name.toLowerCase()));
-    else if (filterKey === "team") list = list.filter((s) => teamCloudSkillNames.has(s.name.toLowerCase()));
-    else if (filterKey === "builtin") list = list.filter((s) => s.source === "builtin");
+    else if (filterKey === "mycloud")
+      list = list.filter((s) => myCloudSkillNames.has(s.name.toLowerCase()));
+    else if (filterKey === "team")
+      list = list.filter((s) => teamCloudSkillNames.has(s.name.toLowerCase()));
+    else if (filterKey === "builtin")
+      list = list.filter((s) => s.source === "builtin");
     else if (filterKey === "marketplace") list = [];
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       list = list.filter(
-        (s) => s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)
+        (s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.description.toLowerCase().includes(q),
       );
     }
     return list;
-  }, [displaySkills, filterKey, searchQuery, myCloudSkillNames, teamCloudSkillNames]);
+  }, [
+    displaySkills,
+    filterKey,
+    searchQuery,
+    myCloudSkillNames,
+    teamCloudSkillNames,
+  ]);
 
   // ─── handlers ───
 
@@ -475,7 +547,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     setPublishingId(skillName);
     let fingerprint = "";
     try {
-      fingerprint = await window.electronAPI.skills.computeContentFingerprint(skillName);
+      fingerprint =
+        await window.electronAPI.skills.computeContentFingerprint(skillName);
       const zipBuffer = await window.electronAPI.skills.packageToZip(skillName);
       const blob = new Blob([zipBuffer], { type: "application/zip" });
       const formData = new FormData();
@@ -499,7 +572,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         useAppStore.getState().setCloudConfig(null);
       } else if (e?.status === 409) {
         setPublishError(t("skillMarket.duplicateContent"));
-        await window.electronAPI.skills.writeFingerprint(skillName, fingerprint);
+        await window.electronAPI.skills.writeFingerprint(
+          skillName,
+          fingerprint,
+        );
         setPublishStatus((prev) => new Map(prev).set(skillName, "published"));
       } else {
         setPublishError(e?.message || t("skillMarket.publishFailed"));
@@ -510,24 +586,29 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   }
 
   async function handleUpdate(skillName: string) {
-    const cloudSkill = cloudSkills.find(
-      (cs) => cs.name.toLowerCase() === skillName.toLowerCase()
-    ) || teamCloudSkills.find(
-      (cs) => cs.name.toLowerCase() === skillName.toLowerCase()
-    );
+    const cloudSkill =
+      cloudSkills.find(
+        (cs) => cs.name.toLowerCase() === skillName.toLowerCase(),
+      ) ||
+      teamCloudSkills.find(
+        (cs) => cs.name.toLowerCase() === skillName.toLowerCase(),
+      );
     if (!cloudSkill || !cloudConfig?.token) return;
     setUpdatingId(skillName);
     try {
       const client = new CloudApiClient(cloudConfig.token);
       const isMyCloud = cloudSkills.some(
-        (cs) => cs.name.toLowerCase() === skillName.toLowerCase()
+        (cs) => cs.name.toLowerCase() === skillName.toLowerCase(),
       );
       const downloadPath = isMyCloud
         ? `/api/skills/${cloudSkill.id}/versions/${cloudSkill.current_version}/download`
         : `/api/teams/${activeTeamId}/skills/${cloudSkill.id}/versions/${cloudSkill.current_version}/download`;
       const { blob, filename } = await client.downloadSkill(downloadPath);
       const buffer = await blob.arrayBuffer();
-      const tmpPath = await window.electronAPI.file.saveToTemp(buffer, filename);
+      const tmpPath = await window.electronAPI.file.saveToTemp(
+        buffer,
+        filename,
+      );
       const extractDir = await window.electronAPI.file.extractArchive(tmpPath);
       try {
         await window.electronAPI.skills.install(extractDir);
@@ -558,21 +639,29 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     setInstallingId(cloudSkill.id);
     try {
       const client = new CloudApiClient(cloudConfig.token);
-      const downloadPath = source === "mycloud"
-        ? `/api/skills/${cloudSkill.id}/versions/${cloudSkill.current_version}/download`
-        : `/api/teams/${activeTeamId}/skills/${cloudSkill.id}/versions/${cloudSkill.current_version}/download`;
+      const downloadPath =
+        source === "mycloud"
+          ? `/api/skills/${cloudSkill.id}/versions/${cloudSkill.current_version}/download`
+          : `/api/teams/${activeTeamId}/skills/${cloudSkill.id}/versions/${cloudSkill.current_version}/download`;
       const { blob, filename } = await client.downloadSkill(downloadPath);
       if (isElectron) {
         const buffer = await blob.arrayBuffer();
-        const tmpPath = await window.electronAPI.file.saveToTemp(buffer, filename);
-        const extractDir = await window.electronAPI.file.extractArchive(tmpPath);
+        const tmpPath = await window.electronAPI.file.saveToTemp(
+          buffer,
+          filename,
+        );
+        const extractDir =
+          await window.electronAPI.file.extractArchive(tmpPath);
         try {
           const result = await window.electronAPI.skills.install(extractDir);
           if (result?.skill?.name) {
-            await window.electronAPI.skills.writeInstalledMeta(result.skill.name, {
-              skillId: cloudSkill.id,
-              version: cloudSkill.current_version,
-            });
+            await window.electronAPI.skills.writeInstalledMeta(
+              result.skill.name,
+              {
+                skillId: cloudSkill.id,
+                version: cloudSkill.current_version,
+              },
+            );
           }
         } finally {
           await window.electronAPI.file.removeTemp(extractDir).catch(() => {});
@@ -607,10 +696,15 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       const client = new CloudApiClient(cloudConfig.token);
       const cats = await client.getMarketplaceCategories();
       const isEn = i18n.language === "en";
-      const mapped: Array<{ key: string; name: string }> = cats.map(
-        (c) => ({ key: c.category, name: isEn ? c.category_name_en || c.category_name : c.category_name }),
-      );
-      categoriesCache.current = { timestamp: now, language: i18n.language, categories: mapped };
+      const mapped: Array<{ key: string; name: string }> = cats.map((c) => ({
+        key: c.category,
+        name: isEn ? c.category_name_en || c.category_name : c.category_name,
+      }));
+      categoriesCache.current = {
+        timestamp: now,
+        language: i18n.language,
+        categories: mapped,
+      };
       saveCategoriesCache(categoriesCache.current);
       setAllCategories(mapped);
     } catch {
@@ -699,7 +793,11 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
 
   function handleRefreshMarketplace() {
     marketCache.current = null;
-    try { localStorage.removeItem(MARKET_CACHE_KEY); } catch { /* noop */ }
+    try {
+      localStorage.removeItem(MARKET_CACHE_KEY);
+    } catch {
+      /* noop */
+    }
     abortRef.current?.abort();
     void loadMarketplace(1);
   }
@@ -709,7 +807,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     const nextPage = marketplacePage + 1;
     if (marketplaceSkills.length >= marketplaceTotal) return;
     void loadMarketplace(nextPage, true);
-  }, [marketplaceLoading, marketplacePage, marketplaceSkills.length, marketplaceTotal, loadMarketplace]);
+  }, [
+    marketplaceLoading,
+    marketplacePage,
+    marketplaceSkills.length,
+    marketplaceTotal,
+    loadMarketplace,
+  ]);
 
   async function doMarketplaceInstall(skill: MarketplaceSkill) {
     if (!cloudConfig?.token || !isElectron) return;
@@ -717,20 +821,29 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     try {
       const client = new CloudApiClient(cloudConfig.token);
       const installRes = await client.installMarketplaceSkill(skill.slug);
-      const dlPath = client.getSkillDownloadUrl(installRes.skill.id, installRes.skill.current_version);
+      const dlPath = client.getSkillDownloadUrl(
+        installRes.skill.id,
+        installRes.skill.current_version,
+      );
       const { blob, filename } = await client.downloadSkill(dlPath);
       const buffer = await blob.arrayBuffer();
-      const tmpPath = await window.electronAPI.file.saveToTemp(buffer, filename);
+      const tmpPath = await window.electronAPI.file.saveToTemp(
+        buffer,
+        filename,
+      );
       const extractDir = await window.electronAPI.file.extractArchive(tmpPath);
       let installedName: string | undefined;
       try {
         const result = await window.electronAPI.skills.install(extractDir);
         if (result?.skill?.name) {
           installedName = result.skill.name;
-          await window.electronAPI.skills.writeInstalledMeta(result.skill.name, {
-            skillId: installRes.skill.id,
-            version: installRes.skill.current_version,
-          });
+          await window.electronAPI.skills.writeInstalledMeta(
+            result.skill.name,
+            {
+              skillId: installRes.skill.id,
+              version: installRes.skill.current_version,
+            },
+          );
         }
       } finally {
         await window.electronAPI.file.removeTemp(extractDir).catch(() => {});
@@ -738,13 +851,16 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       incrementSkillRefreshKey();
       await loadSkills(true);
       if (installedName) {
-        setSuccessMessage(`「${installedName}」${t("skillMarket.installSuccess")}`);
+        setSuccessMessage(
+          `「${installedName}」${t("skillMarket.installSuccess")}`,
+        );
         setTimeout(() => setSuccessMessage(null), 3000);
       }
     } catch (err: unknown) {
       const e = err as Error & { status?: number };
       if (e?.status === 401) useAppStore.getState().setCloudConfig(null);
-      else if (e?.status === 404) setPublishError(t("skillMarket.skillRemoved"));
+      else if (e?.status === 404)
+        setPublishError(t("skillMarket.skillRemoved"));
       else setPublishError(e?.message || t("skillMarket.installFailed"));
     } finally {
       setInstallingMarketplaceSlug(null);
@@ -806,14 +922,14 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   // ─── cloud operations ───
   function handleUnshare(skillName: string) {
     const cloudSkill = cloudSkills.find(
-      (cs) => cs.name.toLowerCase() === skillName.toLowerCase()
+      (cs) => cs.name.toLowerCase() === skillName.toLowerCase(),
     );
     if (cloudSkill) setUnshareTarget(cloudSkill);
   }
 
   function handleDeleteCloud(skillName: string) {
     const cloudSkill = cloudSkills.find(
-      (cs) => cs.name.toLowerCase() === skillName.toLowerCase()
+      (cs) => cs.name.toLowerCase() === skillName.toLowerCase(),
     );
     if (cloudSkill) setDeleteCloudTarget(cloudSkill);
   }
@@ -840,7 +956,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       const client = new CloudApiClient(cloudConfig.token);
       await client.deleteSkill(skill.id);
       if (isElectron) {
-        await window.electronAPI.skills.deleteFingerprint(skill.name).catch(() => {});
+        await window.electronAPI.skills
+          .deleteFingerprint(skill.name)
+          .catch(() => {});
       }
       incrementSkillRefreshKey();
     } catch (err: unknown) {
@@ -869,12 +987,24 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
   function getSourceLabel(ds: DisplaySkill): string {
     let label: string;
     switch (ds.source) {
-      case "ai": label = t("skillMarket.sourceAI"); break;
-      case "custom": label = t("skillMarket.sourceCustom"); break;
-      case "mycloud": label = t("skillMarket.sourceMyCloud"); break;
-      case "team": label = `${t("skillMarket.sourceTeam")}·${ds.sourceTeam || ""}`; break;
-      case "builtin": label = t("skillMarket.sourceBuiltin"); break;
-      case "marketplace": label = t("skillMarket.sourceMarketplace"); break;
+      case "ai":
+        label = t("skillMarket.sourceAI");
+        break;
+      case "custom":
+        label = t("skillMarket.sourceCustom");
+        break;
+      case "mycloud":
+        label = t("skillMarket.sourceMyCloud");
+        break;
+      case "team":
+        label = `${t("skillMarket.sourceTeam")}·${ds.sourceTeam || ""}`;
+        break;
+      case "builtin":
+        label = t("skillMarket.sourceBuiltin");
+        break;
+      case "marketplace":
+        label = t("skillMarket.sourceMarketplace");
+        break;
     }
     // Append cloud membership for installed (non-cloud-only) skills
     if (!ds.isCloudOnly && ds.cloudMembership === "mycloud") {
@@ -927,7 +1057,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-text-muted whitespace-nowrap">
-            {filterKey === "marketplace" ? marketplaceTotal : filteredSkills.length} {t("skillMarket.skillCount")}
+            {filterKey === "marketplace"
+              ? marketplaceTotal
+              : filteredSkills.length}{" "}
+            {t("skillMarket.skillCount")}
           </span>
           <div className="flex items-center rounded-lg border border-border overflow-hidden">
             <button
@@ -990,7 +1123,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                   className="p-1 rounded-md hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
                   title={t("skillMarket.refresh")}
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${marketplaceLoading ? "animate-spin" : ""}`} />
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${marketplaceLoading ? "animate-spin" : ""}`}
+                  />
                 </button>
               </div>
               {/* Initial loading skeleton */}
@@ -1019,7 +1154,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
               {/* Skill cards */}
               {marketplaceSkills.length > 0 && (
                 <>
-                  <div className={viewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "space-y-2"}>
+                  <div
+                    className={
+                      viewMode === "cards"
+                        ? "grid grid-cols-1 md:grid-cols-2 gap-3"
+                        : "space-y-2"
+                    }
+                  >
                     {marketplaceSkills.map((ms) => (
                       <MarketplaceSkillCard
                         key={ms.slug}
@@ -1031,7 +1172,10 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                         onViewDetail={() => {
                           if (!cloudConfig?.token) return;
                           if (detailCache.current.has(ms.slug)) {
-                            setMdModal({ name: ms.name, content: detailCache.current.get(ms.slug)! });
+                            setMdModal({
+                              name: ms.name,
+                              content: detailCache.current.get(ms.slug)!,
+                            });
                             return;
                           }
                           setDetailLoading(true);
@@ -1074,132 +1218,167 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       )}
 
       {/* Login prompt for cloud tabs when not logged in */}
-      {!cloudConfig?.token && (filterKey === "marketplace" || filterKey === "mycloud" || filterKey === "team") && (
-        <div className="rounded-lg border border-border p-6 text-center max-w-sm mx-auto">
-          <Cloud className="w-8 h-8 mx-auto mb-3 text-text-muted" />
-          <p className="text-sm text-text-secondary mb-4">{t("skillMarket.loginPrompt")}</p>
-          <button
-            onClick={() => useAppStore.getState().setShowLoginModal(true)}
-            className="px-5 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-hover transition-colors"
-          >
-            {t("auth.login")}
-          </button>
-        </div>
-      )}
+      {!cloudConfig?.token &&
+        (filterKey === "marketplace" ||
+          filterKey === "mycloud" ||
+          filterKey === "team") && (
+          <div className="rounded-lg border border-border p-6 text-center max-w-sm mx-auto">
+            <Cloud className="w-8 h-8 mx-auto mb-3 text-text-muted" />
+            <p className="text-sm text-text-secondary mb-4">
+              {t("skillMarket.loginPrompt")}
+            </p>
+            <button
+              onClick={() => useAppStore.getState().setShowLoginModal(true)}
+              className="px-5 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-hover transition-colors"
+            >
+              {t("auth.login")}
+            </button>
+          </div>
+        )}
 
       {/* Unified skill list — hidden for marketplace or when login prompt shown */}
-      {filterKey !== "marketplace" && !(!cloudConfig?.token && (filterKey === "mycloud" || filterKey === "team")) && (
-      <>
-      {filteredSkills.length === 0 ? (
-        <div className="text-center py-8 text-text-muted">
-            <Package className="w-6 h-6 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">
-                {searchQuery.trim()
-                  ? t("skillMarket.noMatch")
-                  : t("skillMarket.noSkills")}
-              </p>
-        </div>
-      ) : (
-        <div className={viewMode === "cards" ? "grid grid-cols-1 md:grid-cols-2 gap-3" : "space-y-2"} style={{ scrollbarGutter: "stable" }}>
-          {filteredSkills.map((ds) => {
-            const cloudSkill = ds.cloudData;
+      {filterKey !== "marketplace" &&
+        !(
+          !cloudConfig?.token &&
+          (filterKey === "mycloud" || filterKey === "team")
+        ) && (
+          <>
+            {filteredSkills.length === 0 ? (
+              <div className="text-center py-8 text-text-muted">
+                <Package className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                <p className="text-sm">
+                  {searchQuery.trim()
+                    ? t("skillMarket.noMatch")
+                    : t("skillMarket.noSkills")}
+                </p>
+              </div>
+            ) : (
+              <div
+                className={
+                  viewMode === "cards"
+                    ? "grid grid-cols-1 md:grid-cols-2 gap-3"
+                    : "space-y-2"
+                }
+                style={{ scrollbarGutter: "stable" }}
+              >
+                {filteredSkills.map((ds) => {
+                  const cloudSkill = ds.cloudData;
 
-            // ── Cloud-only skill ──
-            if (ds.isCloudOnly && cloudSkill) {
-              return (
-                <CloudOnlySkillCard
-                  key={ds.id}
-                  name={ds.name}
-                  description={cloudSkill.description || ""}
-                  source={ds.source}
-                  sourceLabel={getSourceLabel(ds)}
-                  onInstall={() => doCloudInstall(cloudSkill, ds.source)}
-                  installing={installingId === cloudSkill.id}
-                  onSkillMd={
-                    cloudSkill.skill_md
-                      ? () => setMdModal({ name: ds.name, content: cloudSkill.skill_md ?? null })
-                      : undefined
+                  // ── Cloud-only skill ──
+                  if (ds.isCloudOnly && cloudSkill) {
+                    return (
+                      <CloudOnlySkillCard
+                        key={ds.id}
+                        name={ds.name}
+                        description={cloudSkill.description || ""}
+                        source={ds.source}
+                        sourceLabel={getSourceLabel(ds)}
+                        onInstall={() => doCloudInstall(cloudSkill, ds.source)}
+                        installing={installingId === cloudSkill.id}
+                        onSkillMd={
+                          cloudSkill.skill_md
+                            ? () =>
+                                setMdModal({
+                                  name: ds.name,
+                                  content: cloudSkill.skill_md ?? null,
+                                })
+                            : undefined
+                        }
+                        viewMode={viewMode}
+                        t={t}
+                      />
+                    );
                   }
-                  viewMode={viewMode}
-                  t={t}
-                />
-              );
-            }
 
-            // ── Installed skill ──
-            const skill = skills.find((s) => s.name === ds.name);
-            if (!skill) return null;
-            const status = publishStatus.get(ds.name);
+                  // ── Installed skill ──
+                  const skill = skills.find((s) => s.name === ds.name);
+                  if (!skill) return null;
+                  const status = publishStatus.get(ds.name);
 
-            const cloudOpsNode =
-              cloudConfig && ds.cloudMembership === "mycloud" && cloudSkill ? (
-                <>
-                  {activeTeamId &&
-                    cloudSkill.shared_teams?.some(
-                      (st: { team_id: string }) => st.team_id === activeTeamId,
-                    ) && (
-                      <span className="flex items-center gap-0.5 text-xs text-text-muted">
-                        <span>
-                          {t("skillMarket.sharedTo", { team: activeTeamName })}
-                        </span>
+                  const cloudOpsNode =
+                    cloudConfig &&
+                    ds.cloudMembership === "mycloud" &&
+                    cloudSkill ? (
+                      <>
+                        {activeTeamId &&
+                          cloudSkill.shared_teams?.some(
+                            (st: { team_id: string }) =>
+                              st.team_id === activeTeamId,
+                          ) && (
+                            <span className="flex items-center gap-0.5 text-xs text-text-muted">
+                              <span>
+                                {t("skillMarket.sharedTo", {
+                                  team: activeTeamName,
+                                })}
+                              </span>
+                              <button
+                                onClick={() => handleUnshare(skill.name)}
+                                className="p-0.5 rounded hover:bg-surface-hover hover:text-error transition-colors"
+                                title={t("skillMarket.unshare")}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          )}
                         <button
-                          onClick={() => handleUnshare(skill.name)}
-                          className="p-0.5 rounded hover:bg-surface-hover hover:text-error transition-colors"
-                          title={t("skillMarket.unshare")}
+                          onClick={() => handleDeleteCloud(skill.name)}
+                          className="flex items-center gap-1 px-1 py-0.5 rounded text-xs text-text-muted hover:text-error hover:bg-error/5 transition-colors"
+                          title={t("skillMarket.deleteCloud")}
                         >
-                          <X className="w-3 h-3" />
+                          <Trash2 className="w-3 h-3" />
+                          {t("skillMarket.deleteCloud")}
                         </button>
-                      </span>
-                    )}
-                  <button
-                    onClick={() => handleDeleteCloud(skill.name)}
-                    className="flex items-center gap-1 px-1 py-0.5 rounded text-xs text-text-muted hover:text-error hover:bg-error/5 transition-colors"
-                    title={t("skillMarket.deleteCloud")}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    {t("skillMarket.deleteCloud")}
-                  </button>
-                </>
-              ) : undefined;
+                      </>
+                    ) : undefined;
 
-            return (
-              <SkillCard
-                key={ds.id}
-                skill={skill}
-                isLoading={isLoading}
-                onToggle={() => handleToggle(skill)}
-                footer={skill.description || formatTimeAgo(skill.createdAt, t)}
-                t={t}
-                onDelete={ds.type !== "builtin" ? () => handleDelete(skill.id, skill.name) : undefined}
-                onPublish={
-                  cloudConfig && ds.type !== "builtin" && status !== "has_update"
-                    ? () => handlePublish(skill.name)
-                    : undefined
-                }
-                onUpdate={
-                  cloudConfig && status === "has_update"
-                    ? () => handleUpdate(skill.name)
-                    : undefined
-                }
-                publishStatus={status}
-                isPublishing={publishingId === skill.name}
-                isUpdating={updatingId === skill.name}
-                onSkillMd={() => openSkillMd(skill.name)}
-                viewMode={viewMode}
-                source={ds.source}
-                sourceLabel={getSourceLabel(ds)}
-                cloudOps={cloudOpsNode}
-              />
-            );
-          })}
-        </div>
-      )}
-      </>
-      )}
+                  return (
+                    <SkillCard
+                      key={ds.id}
+                      skill={skill}
+                      isLoading={isLoading}
+                      onToggle={() => handleToggle(skill)}
+                      footer={
+                        skill.description || formatTimeAgo(skill.createdAt, t)
+                      }
+                      t={t}
+                      onDelete={
+                        ds.type !== "builtin"
+                          ? () => handleDelete(skill.id, skill.name)
+                          : undefined
+                      }
+                      onPublish={
+                        cloudConfig &&
+                        ds.type !== "builtin" &&
+                        status !== "has_update"
+                          ? () => handlePublish(skill.name)
+                          : undefined
+                      }
+                      onUpdate={
+                        cloudConfig && status === "has_update"
+                          ? () => handleUpdate(skill.name)
+                          : undefined
+                      }
+                      publishStatus={status}
+                      isPublishing={publishingId === skill.name}
+                      isUpdating={updatingId === skill.name}
+                      onSkillMd={() => openSkillMd(skill.name)}
+                      viewMode={viewMode}
+                      source={ds.source}
+                      sourceLabel={getSourceLabel(ds)}
+                      cloudOps={cloudOpsNode}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
 
       <ConfirmDialog
         isOpen={pendingDelete !== null}
-        title={t("skills.deleteSkill", { name: pendingDelete?.skillName ?? "" })}
+        title={t("skills.deleteSkill", {
+          name: pendingDelete?.skillName ?? "",
+        })}
         onConfirm={() => {
           const id = pendingDelete?.skillId;
           if (!id) return;

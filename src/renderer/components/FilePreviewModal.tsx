@@ -1,12 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, memo, useRef } from "react";
-import {
-  X,
-  ExternalLink,
-  FileCode,
-  Image,
-  Loader2,
-  Video,
-} from "lucide-react";
+import { X, ExternalLink, FileCode, Image, Loader2, Video } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";

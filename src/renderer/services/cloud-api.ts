@@ -234,9 +234,7 @@ export class CloudApiClient {
     return this.request(`/api/marketplace/${slug}`);
   }
 
-  async installMarketplaceSkill(
-    slug: string,
-  ): Promise<{
+  async installMarketplaceSkill(slug: string): Promise<{
     skill: { id: string; name: string; current_version: number };
   }> {
     return this.request(`/api/marketplace/${slug}/install`, {

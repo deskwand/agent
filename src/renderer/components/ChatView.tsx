@@ -1597,7 +1597,7 @@ export function ChatView() {
             onToggleExpand={() => setIsInputExpanded((v) => !v)}
             placeholder={t("chat.typeMessage")}
             cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
-            textareaClassName="w-full resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
+            textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
             bottomSlot={
               <ChatInputBottomBar
                 onAttach={() => chatInputRef.current?.selectFiles()}

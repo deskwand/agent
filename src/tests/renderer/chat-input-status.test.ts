@@ -24,9 +24,9 @@ describe("resolveInputStatus", () => {
   });
 
   it("returns sending when isSending is true", () => {
-    expect(
-      resolveInputStatus({ ...base, isSending: true }),
-    ).toEqual({ type: "sending" });
+    expect(resolveInputStatus({ ...base, isSending: true })).toEqual({
+      type: "sending",
+    });
   });
 
   it("compacting wins over everything else", () => {
@@ -45,9 +45,9 @@ describe("resolveInputStatus", () => {
   });
 
   it("returns compaction-failed when result is failed", () => {
-    expect(
-      resolveInputStatus({ ...base, compactionResult: "failed" }),
-    ).toEqual({ type: "compaction-failed" });
+    expect(resolveInputStatus({ ...base, compactionResult: "failed" })).toEqual(
+      { type: "compaction-failed" },
+    );
   });
 
   it("returns compaction-aborted for a cancelled compaction", () => {
@@ -67,9 +67,10 @@ describe("resolveInputStatus", () => {
   });
 
   it("returns steering when steeringText is present", () => {
-    expect(
-      resolveInputStatus({ ...base, steeringText: "fix login" }),
-    ).toEqual({ type: "steering", text: "fix login" });
+    expect(resolveInputStatus({ ...base, steeringText: "fix login" })).toEqual({
+      type: "steering",
+      text: "fix login",
+    });
   });
 
   it("steering wins over thinking", () => {
@@ -89,9 +90,9 @@ describe("resolveInputStatus", () => {
   });
 
   it("returns responding when isResponding is true", () => {
-    expect(
-      resolveInputStatus({ ...base, isResponding: true }),
-    ).toEqual({ type: "responding" });
+    expect(resolveInputStatus({ ...base, isResponding: true })).toEqual({
+      type: "responding",
+    });
   });
 
   it("thinking wins over responding", () => {
@@ -178,5 +179,4 @@ describe("resolveInputStatus", () => {
       }),
     ).toEqual({ type: "steering-failed", text: "fix login" });
   });
-
 });

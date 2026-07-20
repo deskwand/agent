@@ -26,10 +26,30 @@ const IMAGE_SIGNATURES: Array<{
   ext: string;
 }> = [
   { offset: 0, bytes: [0xff, 0xd8, 0xff], mimeType: "image/jpeg", ext: ".jpg" },
-  { offset: 0, bytes: [0x89, 0x50, 0x4e, 0x47], mimeType: "image/png", ext: ".png" },
-  { offset: 0, bytes: [0x47, 0x49, 0x46, 0x38], mimeType: "image/gif", ext: ".gif" },
-  { offset: 0, bytes: [0x52, 0x49, 0x46, 0x46], mimeType: "image/webp", ext: ".webp" },
-  { offset: 8, bytes: [0x57, 0x45, 0x42, 0x50], mimeType: "image/webp", ext: ".webp" },
+  {
+    offset: 0,
+    bytes: [0x89, 0x50, 0x4e, 0x47],
+    mimeType: "image/png",
+    ext: ".png",
+  },
+  {
+    offset: 0,
+    bytes: [0x47, 0x49, 0x46, 0x38],
+    mimeType: "image/gif",
+    ext: ".gif",
+  },
+  {
+    offset: 0,
+    bytes: [0x52, 0x49, 0x46, 0x46],
+    mimeType: "image/webp",
+    ext: ".webp",
+  },
+  {
+    offset: 8,
+    bytes: [0x57, 0x45, 0x42, 0x50],
+    mimeType: "image/webp",
+    ext: ".webp",
+  },
   { offset: 0, bytes: [0x42, 0x4d], mimeType: "image/bmp", ext: ".bmp" },
 ];
 
@@ -138,10 +158,12 @@ async function callAnthropicVision(
   const data = (await response.json()) as {
     content?: Array<{ type: string; text?: string }>;
   };
-  return data.content
-    ?.filter((c) => c.type === "text")
-    .map((c) => c.text || "")
-    .join("\n") || "(no description)";
+  return (
+    data.content
+      ?.filter((c) => c.type === "text")
+      .map((c) => c.text || "")
+      .join("\n") || "(no description)"
+  );
 }
 
 async function callOpenAIVision(
@@ -204,8 +226,7 @@ async function callGeminiVision(
   signal?: AbortSignal,
   userPrompt?: string,
 ): Promise<string> {
-  const baseUrl =
-    config.baseUrl || "https://generativelanguage.googleapis.com";
+  const baseUrl = config.baseUrl || "https://generativelanguage.googleapis.com";
   const url = `${baseUrl.replace(/\/$/, "")}/v1beta/models/${config.model}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
 
   const response = await fetch(url, {
@@ -244,9 +265,8 @@ async function callGeminiVision(
     }>;
   };
   return (
-    data.candidates?.[0]?.content?.parts
-      ?.map((p) => p.text || "")
-      .join("\n") || "(no description)"
+    data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("\n") ||
+    "(no description)"
   );
 }
 
@@ -261,11 +281,29 @@ async function callVisionModel(
 
   switch (protocol) {
     case "anthropic":
-      return callAnthropicVision(config, base64Image, mimeType, signal, userPrompt);
+      return callAnthropicVision(
+        config,
+        base64Image,
+        mimeType,
+        signal,
+        userPrompt,
+      );
     case "openai":
-      return callOpenAIVision(config, base64Image, mimeType, signal, userPrompt);
+      return callOpenAIVision(
+        config,
+        base64Image,
+        mimeType,
+        signal,
+        userPrompt,
+      );
     case "gemini":
-      return callGeminiVision(config, base64Image, mimeType, signal, userPrompt);
+      return callGeminiVision(
+        config,
+        base64Image,
+        mimeType,
+        signal,
+        userPrompt,
+      );
     default:
       throw new Error(`Unsupported vision protocol: ${protocol}`);
   }
@@ -293,15 +331,18 @@ export function createVisionDescribeTool(
       "The tool returns a plain text description of the image contents, including any text present in the image.",
     parameters: Type.Object({
       path: Type.String({
-        description: "Path to the image file to describe (relative or absolute)",
-      }),
-      prompt: Type.Optional(Type.String({
         description:
-          "Custom instruction for the vision model about what to look for in this image. " +
-          "When provided, replaces the default description prompt. " +
-          "Use to extract specific information, focus on particular areas, " +
-          "or ask targeted questions about the image.",
-      })),
+          "Path to the image file to describe (relative or absolute)",
+      }),
+      prompt: Type.Optional(
+        Type.String({
+          description:
+            "Custom instruction for the vision model about what to look for in this image. " +
+            "When provided, replaces the default description prompt. " +
+            "Use to extract specific information, focus on particular areas, " +
+            "or ask targeted questions about the image.",
+        }),
+      ),
     }),
     async execute(
       _toolCallId: unknown,

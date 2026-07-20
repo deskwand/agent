@@ -56,7 +56,10 @@ async function renderPageToPng(
 ): Promise<void> {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createCanvas } = require("@napi-rs/canvas") as {
-    createCanvas: (w: number, h: number) => {
+    createCanvas: (
+      w: number,
+      h: number,
+    ) => {
       getContext: (kind: "2d") => {
         canvas: { width: number; height: number };
       } & Record<string, unknown>;

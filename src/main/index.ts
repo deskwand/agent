@@ -1085,11 +1085,7 @@ app
 
     // Initialize session manager before creating an interactive window.
     // This avoids session.start racing the startup path and hitting a null manager.
-    sessionManager = new SessionManager(
-      db,
-      sendToRenderer,
-      extensionManager,
-    );
+    sessionManager = new SessionManager(db, sendToRenderer, extensionManager);
     skillsManager = new SkillsManager(db);
     // pi-ai handles model routing natively — no proxy warmup needed
 
@@ -1971,8 +1967,7 @@ ipcMain.handle(
 
       return { success: true };
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : String(err);
+      const message = err instanceof Error ? err.message : String(err);
       return { success: false, error: message };
     }
   },
@@ -2344,6 +2339,91 @@ ipcMain.handle(
   },
 );
 
+// Subagent IPC handlers
+ipcMain.handle("subagent.listAgents", async (_event) => {
+  const { scanAgents } = await import("./agent/subagent/agent-list");
+  try {
+    // Use the most recently known working dir; fall back to home for settings-only view
+    const cwd = process.env.DESKWAND_LAST_WORKDIR || process.cwd();
+    return scanAgents(cwd);
+  } catch (err) {
+    logError("[Subagent IPC] Failed to scan agents:", err);
+    return [];
+  }
+});
+
+ipcMain.handle("subagent.setAgentModel", async (_event, name: string, model: string) => {
+  const { writeFileSync, readFileSync, existsSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
+  const targetDir = join(getAgentDir(), "agents");
+  const target = join(targetDir, `${name}.md`);
+
+  try {
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(targetDir, { recursive: true });
+    if (existsSync(target)) {
+      let content = readFileSync(target, "utf-8");
+      if (content.match(/^model:\s*.+/m)) {
+        content = content.replace(/^model:\s*.+/m, `model: ${model}`);
+      } else {
+        content = content.replace(/^---\n/, `---\nmodel: ${model}\n`);
+      }
+      writeFileSync(target, content, "utf-8");
+    } else {
+      writeFileSync(target, `---\nname: ${name}\nmodel: ${model}\nprompt_mode: append\n---\n`, "utf-8");
+    }
+    return { success: true };
+  } catch (err) {
+    logError("[Subagent IPC] Failed to set agent model:", err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle("subagent.createAgent", async (_event, name: string, description: string, prompt: string) => {
+  const { writeFileSync, mkdirSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
+  const targetDir = join(getAgentDir(), "agents");
+  const target = join(targetDir, `${name}.md`);
+
+  try {
+    mkdirSync(targetDir, { recursive: true });
+    const content = [
+      "---",
+      `name: ${name}`,
+      `description: "${description}"`,
+      "model: inherit",
+      "prompt_mode: replace",
+      "---",
+      "",
+      prompt,
+    ].join("\n");
+    writeFileSync(target, content, "utf-8");
+    return { success: true, path: target };
+  } catch (err) {
+    logError("[Subagent IPC] Failed to create agent:", err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle("subagent.deleteAgent", async (_event, name: string) => {
+  const { rmSync, existsSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
+  const target = join(getAgentDir(), "agents", `${name}.md`);
+  try {
+    if (existsSync(target)) {
+      rmSync(target);
+      return { success: true };
+    }
+    return { success: false, error: "File not found" };
+  } catch (err) {
+    logError("[Subagent IPC] Failed to delete agent:", err);
+    return { success: false, error: String(err) };
+  }
+});
+
 // MCP Server IPC handlers
 ipcMain.handle("mcp.getServers", () => {
   try {
@@ -2451,7 +2531,11 @@ ipcMain.handle("skills.getAll", async () => {
 });
 
 /** Recursively add a directory to a JSZip instance. */
-async function addDirToZip(zip: JSZip, dirPath: string, basePath: string): Promise<void> {
+async function addDirToZip(
+  zip: JSZip,
+  dirPath: string,
+  basePath: string,
+): Promise<void> {
   const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = join(dirPath, entry.name);
@@ -2487,45 +2571,55 @@ ipcMain.handle("skills.packageToZip", async (_event, skillName: string) => {
   return zipBuffer;
 });
 
-ipcMain.handle("skills.computeContentFingerprint", async (_event, skillName: string) => {
-  if (!skillsManager) {
-    throw new Error("SkillsManager not initialized");
-  }
-  const skillsPath = skillsManager.getGlobalSkillsPath();
-  const skillDir = join(skillsPath, skillName);
-  if (!fs.existsSync(skillDir)) {
-    throw new Error(`Skill folder not found: ${skillDir}`);
-  }
+ipcMain.handle(
+  "skills.computeContentFingerprint",
+  async (_event, skillName: string) => {
+    if (!skillsManager) {
+      throw new Error("SkillsManager not initialized");
+    }
+    const skillsPath = skillsManager.getGlobalSkillsPath();
+    const skillDir = join(skillsPath, skillName);
+    if (!fs.existsSync(skillDir)) {
+      throw new Error(`Skill folder not found: ${skillDir}`);
+    }
 
-  const entries: Array<{ path: string; hash: string }> = [];
-  const excludeDirs = new Set(["node_modules", ".git", "__pycache__"]);
+    const entries: Array<{ path: string; hash: string }> = [];
+    const excludeDirs = new Set(["node_modules", ".git", "__pycache__"]);
 
-  async function walk(dir: string, base: string): Promise<void> {
-    const items = await fs.promises.readdir(dir, { withFileTypes: true });
-    for (const item of items) {
-      const full = join(dir, item.name);
-      const rel = base ? `${base}/${item.name}` : item.name;
-      if (item.isDirectory() && !excludeDirs.has(item.name)) {
-        await walk(full, rel);
-      } else if (item.isFile() && !item.name.startsWith(".")) {
-        const buf = await readFile(full);
-        const hash = createHash("sha256").update(buf).digest("hex");
-        entries.push({ path: rel, hash });
+    async function walk(dir: string, base: string): Promise<void> {
+      const items = await fs.promises.readdir(dir, { withFileTypes: true });
+      for (const item of items) {
+        const full = join(dir, item.name);
+        const rel = base ? `${base}/${item.name}` : item.name;
+        if (item.isDirectory() && !excludeDirs.has(item.name)) {
+          await walk(full, rel);
+        } else if (item.isFile() && !item.name.startsWith(".")) {
+          const buf = await readFile(full);
+          const hash = createHash("sha256").update(buf).digest("hex");
+          entries.push({ path: rel, hash });
+        }
       }
     }
-  }
 
-  await walk(skillDir, "");
-  entries.sort((a, b) => a.path.localeCompare(b.path));
-  const payload = entries.map(e => `${e.path}\n${e.hash}`).join("\n");
-  return createHash("sha256").update(payload).digest("hex");
-});
+    await walk(skillDir, "");
+    entries.sort((a, b) => a.path.localeCompare(b.path));
+    const payload = entries.map((e) => `${e.path}\n${e.hash}`).join("\n");
+    return createHash("sha256").update(payload).digest("hex");
+  },
+);
 
-ipcMain.handle("skills.writeFingerprint", async (_event, skillName: string, fingerprint: string) => {
-  if (!skillsManager) throw new Error("SkillsManager not initialized");
-  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-fingerprint");
-  await writeFile(p, fingerprint, "utf-8");
-});
+ipcMain.handle(
+  "skills.writeFingerprint",
+  async (_event, skillName: string, fingerprint: string) => {
+    if (!skillsManager) throw new Error("SkillsManager not initialized");
+    const p = join(
+      skillsManager.getGlobalSkillsPath(),
+      skillName,
+      ".deskwand-fingerprint",
+    );
+    await writeFile(p, fingerprint, "utf-8");
+  },
+);
 
 ipcMain.handle("skills.readSkillMd", async (_event, skillName: string) => {
   if (!skillsManager) throw new Error("SkillsManager not initialized");
@@ -2537,31 +2631,64 @@ ipcMain.handle("skills.readSkillMd", async (_event, skillName: string) => {
   }
 });
 
-ipcMain.handle("skills.writeInstalledMeta", async (_event, skillName: string, meta: { skillId: string; version: number }) => {
-  if (!skillsManager) throw new Error("SkillsManager not initialized");
-  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-installed.json");
-  await writeFile(p, JSON.stringify(meta), "utf-8");
-});
+ipcMain.handle(
+  "skills.writeInstalledMeta",
+  async (
+    _event,
+    skillName: string,
+    meta: { skillId: string; version: number },
+  ) => {
+    if (!skillsManager) throw new Error("SkillsManager not initialized");
+    const p = join(
+      skillsManager.getGlobalSkillsPath(),
+      skillName,
+      ".deskwand-installed.json",
+    );
+    await writeFile(p, JSON.stringify(meta), "utf-8");
+  },
+);
 
-ipcMain.handle("skills.readInstalledMeta", async (_event, skillName: string) => {
-  if (!skillsManager) throw new Error("SkillsManager not initialized");
-  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-installed.json");
-  try {
-    return JSON.parse(await readFile(p, "utf-8"));
-  } catch {
-    return null;
-  }
-});
+ipcMain.handle(
+  "skills.readInstalledMeta",
+  async (_event, skillName: string) => {
+    if (!skillsManager) throw new Error("SkillsManager not initialized");
+    const p = join(
+      skillsManager.getGlobalSkillsPath(),
+      skillName,
+      ".deskwand-installed.json",
+    );
+    try {
+      return JSON.parse(await readFile(p, "utf-8"));
+    } catch {
+      return null;
+    }
+  },
+);
 
-ipcMain.handle("skills.deleteFingerprint", async (_event, skillName: string) => {
-  if (!skillsManager) throw new Error("SkillsManager not initialized");
-  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-fingerprint");
-  try { await unlink(p); } catch { /* already gone */ }
-});
+ipcMain.handle(
+  "skills.deleteFingerprint",
+  async (_event, skillName: string) => {
+    if (!skillsManager) throw new Error("SkillsManager not initialized");
+    const p = join(
+      skillsManager.getGlobalSkillsPath(),
+      skillName,
+      ".deskwand-fingerprint",
+    );
+    try {
+      await unlink(p);
+    } catch {
+      /* already gone */
+    }
+  },
+);
 
 ipcMain.handle("skills.readFingerprint", async (_event, skillName: string) => {
   if (!skillsManager) throw new Error("SkillsManager not initialized");
-  const p = join(skillsManager.getGlobalSkillsPath(), skillName, ".deskwand-fingerprint");
+  const p = join(
+    skillsManager.getGlobalSkillsPath(),
+    skillName,
+    ".deskwand-fingerprint",
+  );
   try {
     return await readFile(p, "utf-8");
   } catch {
@@ -2587,7 +2714,10 @@ ipcMain.handle(
   "file.saveToTemp",
   async (_event, buffer: ArrayBuffer, filename: string) => {
     try {
-      const tmpPath = join(tmpdir(), `deskwand-skill-${Date.now()}-${filename}`);
+      const tmpPath = join(
+        tmpdir(),
+        `deskwand-skill-${Date.now()}-${filename}`,
+      );
       await writeFile(tmpPath, Buffer.from(buffer));
       return tmpPath;
     } catch (error) {
@@ -2597,51 +2727,49 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle(
-  "file.extractArchive",
-  async (_event, archivePath: string) => {
-    try {
-      const extractDir = join(tmpdir(), `deskwand-extract-${Date.now()}`);
-      await mkdir(extractDir, { recursive: true });
+ipcMain.handle("file.extractArchive", async (_event, archivePath: string) => {
+  try {
+    const extractDir = join(tmpdir(), `deskwand-extract-${Date.now()}`);
+    await mkdir(extractDir, { recursive: true });
 
-      const zipData = await readFile(archivePath);
-      const zip = await JSZip.loadAsync(zipData);
+    const zipData = await readFile(archivePath);
+    const zip = await JSZip.loadAsync(zipData);
 
-      // Extract all files preserving directory structure
-      const entries = Object.entries(zip.files);
-      for (const [relativePath, file] of entries) {
-        if (file.dir) {
-          await mkdir(join(extractDir, relativePath), { recursive: true });
-        } else {
-          const content = await file.async("nodebuffer");
-          const targetPath = join(extractDir, relativePath);
-          const targetDir = dirname(targetPath);
-          await mkdir(targetDir, { recursive: true });
-          await writeFile(targetPath, content);
-        }
+    // Extract all files preserving directory structure
+    const entries = Object.entries(zip.files);
+    for (const [relativePath, file] of entries) {
+      if (file.dir) {
+        await mkdir(join(extractDir, relativePath), { recursive: true });
+      } else {
+        const content = await file.async("nodebuffer");
+        const targetPath = join(extractDir, relativePath);
+        const targetDir = dirname(targetPath);
+        await mkdir(targetDir, { recursive: true });
+        await writeFile(targetPath, content);
       }
-
-      return extractDir;
-    } catch (error) {
-      logError("[File] Error extracting archive:", error);
-      throw error;
-    } finally {
-      // Clean up the temp archive after extraction
-      try { await unlink(archivePath); } catch { /* best effort */ }
     }
-  },
-);
 
-ipcMain.handle(
-  "file.removeTemp",
-  async (_event, tempPath: string) => {
+    return extractDir;
+  } catch (error) {
+    logError("[File] Error extracting archive:", error);
+    throw error;
+  } finally {
+    // Clean up the temp archive after extraction
     try {
-      await rm(tempPath, { recursive: true, force: true });
-    } catch (error) {
-      // best effort — path may already be gone
+      await unlink(archivePath);
+    } catch {
+      /* best effort */
     }
-  },
-);
+  }
+});
+
+ipcMain.handle("file.removeTemp", async (_event, tempPath: string) => {
+  try {
+    await rm(tempPath, { recursive: true, force: true });
+  } catch (error) {
+    // best effort — path may already be gone
+  }
+});
 
 ipcMain.handle("skills.delete", async (_event, skillId: string) => {
   try {
@@ -3925,7 +4053,15 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       }
       if (
         typeof event.payload.themePreset === "string" &&
-        ["graphite", "paper", "void", "ocean", "forest", "ember", "aurora"].includes(event.payload.themePreset)
+        [
+          "graphite",
+          "paper",
+          "void",
+          "ocean",
+          "forest",
+          "ember",
+          "aurora",
+        ].includes(event.payload.themePreset)
       ) {
         configStore.update({
           themePreset: event.payload.themePreset as ThemePreset,

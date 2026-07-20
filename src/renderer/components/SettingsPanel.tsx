@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   ArrowLeft,
+  Bot,
   Settings,
   Shield,
   Wifi,
@@ -17,6 +18,7 @@ import { useWindowSize } from "../hooks/useWindowSize";
 import { RemoteControlPanel } from "./RemoteControlPanel";
 import { useAppStore } from "../store";
 import { SettingsAPI } from "./settings/SettingsAPI";
+import { SubagentSettings } from "./settings/SubagentSettings";
 import { SettingsSandbox } from "./settings/SettingsSandbox";
 import { SettingsGeneral } from "./settings/SettingsGeneral";
 import { SettingsLogs } from "./settings/SettingsLogs";
@@ -29,6 +31,7 @@ interface SettingsPanelProps {
   onClose: () => void;
   initialTab?:
     | "api"
+    | "subagent"
     | "sandbox"
     | "memory"
     | "remote"
@@ -41,6 +44,7 @@ interface SettingsPanelProps {
 
 type TabId =
   | "api"
+  | "subagent"
   | "sandbox"
   | "memory"
   | "remote"
@@ -54,6 +58,7 @@ const SHOW_SANDBOX_TAB = false;
 
 const VALID_TABS = new Set<TabId>([
   "api",
+  "subagent",
   ...(SHOW_SANDBOX_TAB ? (["sandbox"] as TabId[]) : []),
   "memory",
   "remote",
@@ -129,6 +134,12 @@ export function SettingsPanel({
       label: t("marketplace.tabMCP"),
       icon: Plug,
       description: t("settings.connectorsDesc"),
+    },
+    {
+      id: "subagent" as TabId,
+      label: t("subagent.title"),
+      icon: Bot,
+      description: t("subagent.defaultModel"),
     },
     ...(SHOW_SANDBOX_TAB
       ? [
@@ -276,6 +287,9 @@ export function SettingsPanel({
                 {viewedTabs.has("connectors") && (
                   <SettingsConnectors isActive={activeTab === "connectors"} />
                 )}
+              </div>
+              <div className={activeTab === "subagent" ? "" : "hidden"}>
+                {viewedTabs.has("subagent") && <SubagentSettings />}
               </div>
               {SHOW_SANDBOX_TAB && (
                 <div className={activeTab === "sandbox" ? "" : "hidden"}>

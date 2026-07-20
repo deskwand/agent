@@ -147,7 +147,10 @@ export function ScheduleEditModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/30 animate-fade-in" onClick={onClose} />
+      <div
+        className="absolute inset-0 bg-black/30 animate-fade-in"
+        onClick={onClose}
+      />
 
       {/* Modal */}
       <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-surface rounded-xl shadow-xl border border-border mx-4 animate-slide-up">
@@ -225,8 +228,7 @@ export function ScheduleEditModal({
                     onClick={() => setIsProjectOpen((v) => !v)}
                   >
                     <span className="mr-1.5 truncate text-text-primary">
-                      {cwd &&
-                      !cwd.endsWith(`/${DEFAULT_WORKDIR_DIRNAME}`)
+                      {cwd && !cwd.endsWith(`/${DEFAULT_WORKDIR_DIRNAME}`)
                         ? cwd.split("/").pop() || cwd
                         : t("schedule.defaultWorkspace")}
                     </span>

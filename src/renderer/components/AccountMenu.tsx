@@ -34,9 +34,30 @@ export function AccountMenu({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-border bg-background shadow-soft p-1.5 z-50 animate-account-menu-in">
-        <MenuItem icon={<Cloud className="w-4 h-4" />} label={t("sidebar.skillsCloud")} onClick={() => { onOpenMarketplace(); onClose(); }} />
-        <MenuItem icon={<Clock3 className="w-4 h-4" />} label={t("sidebar.automation")} onClick={() => { onOpenAutomation(); onClose(); }} />
-        <MenuItem icon={<Settings className="w-4 h-4" />} label={t("sidebar.settings")} onClick={() => { onOpenSettings(); onClose(); }} />
+        <MenuItem
+          icon={<Cloud className="w-4 h-4" />}
+          label={t("sidebar.skillsCloud")}
+          onClick={() => {
+            onOpenMarketplace();
+            onClose();
+          }}
+        />
+        <MenuItem
+          icon={<Clock3 className="w-4 h-4" />}
+          label={t("sidebar.automation")}
+          onClick={() => {
+            onOpenAutomation();
+            onClose();
+          }}
+        />
+        <MenuItem
+          icon={<Settings className="w-4 h-4" />}
+          label={t("sidebar.settings")}
+          onClick={() => {
+            onOpenSettings();
+            onClose();
+          }}
+        />
 
         <div className="mx-2 my-1 border-t border-border" />
 
@@ -57,10 +78,24 @@ export function AccountMenu({
               onClick={() => {}}
               disabled
             /> */}
-            <MenuItem icon={<LogOut className="w-4 h-4" />} label={t("auth.logout")} onClick={() => { onLogout(); onClose(); }} />
+            <MenuItem
+              icon={<LogOut className="w-4 h-4" />}
+              label={t("auth.logout")}
+              onClick={() => {
+                onLogout();
+                onClose();
+              }}
+            />
           </>
         ) : (
-          <MenuItem icon={<LogIn className="w-4 h-4" />} label={t("auth.loginEntry")} onClick={() => { onOpenLogin(); onClose(); }} />
+          <MenuItem
+            icon={<LogIn className="w-4 h-4" />}
+            label={t("auth.loginEntry")}
+            onClick={() => {
+              onOpenLogin();
+              onClose();
+            }}
+          />
         )}
       </div>
     </>

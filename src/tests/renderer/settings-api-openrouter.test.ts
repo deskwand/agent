@@ -74,12 +74,22 @@ describe("SettingsAPI OpenRouter login flow", () => {
     const fetchOpenRouterModels = vi.fn(async () => ({
       usedFallback: false,
       models: [
-        { id: "openrouter/free", label: "Free (Free)", source: "preset" as const },
+        {
+          id: "openrouter/free",
+          label: "Free (Free)",
+          source: "preset" as const,
+        },
         { id: "openrouter/paid", label: "Paid", source: "preset" as const },
       ],
     }));
-    const saveProvider = vi.fn(async () => ({ success: true, config: buildConfig() }));
-    const setActiveProvider = vi.fn(async () => ({ success: true, config: buildConfig() }));
+    const saveProvider = vi.fn(async () => ({
+      success: true,
+      config: buildConfig(),
+    }));
+    const setActiveProvider = vi.fn(async () => ({
+      success: true,
+      config: buildConfig(),
+    }));
     const get = vi.fn(async () =>
       buildConfig({
         isConfigured: true,
@@ -115,7 +125,10 @@ describe("SettingsAPI OpenRouter login flow", () => {
       openrouterAuth: {
         login,
         logout: vi.fn(async () => undefined),
-        status: vi.fn(async () => ({ loggedIn: false, providerName: "OpenRouter" })),
+        status: vi.fn(async () => ({
+          loggedIn: false,
+          providerName: "OpenRouter",
+        })),
       },
     } as unknown as typeof window.electronAPI;
 
@@ -129,7 +142,9 @@ describe("SettingsAPI OpenRouter login flow", () => {
     });
     await flush();
 
-    const button = container.querySelector('[data-testid="openrouter-oauth-connect"]');
+    const button = container.querySelector(
+      '[data-testid="openrouter-oauth-connect"]',
+    );
     expect(button).not.toBeNull();
 
     await act(async () => {
@@ -159,7 +174,10 @@ describe("SettingsAPI OpenRouter login flow", () => {
 
   it("disconnects OpenRouter and removes the provider", async () => {
     const logout = vi.fn(async () => undefined);
-    const deleteProvider = vi.fn(async () => ({ success: true, config: buildConfig() }));
+    const deleteProvider = vi.fn(async () => ({
+      success: true,
+      config: buildConfig(),
+    }));
 
     window.electronAPI = {
       config: {
@@ -173,7 +191,13 @@ describe("SettingsAPI OpenRouter login flow", () => {
                 apiKey: "sk-or-v1-test",
                 baseUrl: "https://openrouter.ai/api/v1",
                 defaultModel: "openrouter/free",
-                models: [{ id: "openrouter/free", label: "Free (Free)", source: "preset" }],
+                models: [
+                  {
+                    id: "openrouter/free",
+                    label: "Free (Free)",
+                    source: "preset",
+                  },
+                ],
                 updatedAt: "2024-01-01T00:00:00.000Z",
               },
             },
@@ -181,15 +205,24 @@ describe("SettingsAPI OpenRouter login flow", () => {
         ),
         getPresets: vi.fn(async () => API_PROVIDER_PRESETS),
         deleteProvider,
-        fetchOpenRouterModels: vi.fn(async () => ({ usedFallback: false, models: [] })),
+        fetchOpenRouterModels: vi.fn(async () => ({
+          usedFallback: false,
+          models: [],
+        })),
       },
       auth: {
         status: vi.fn(async () => ({ loggedIn: false, providerName: "OAuth" })),
       },
       openrouterAuth: {
-        login: vi.fn(async () => ({ apiKey: "sk-or-v1-test", providerName: "OpenRouter" })),
+        login: vi.fn(async () => ({
+          apiKey: "sk-or-v1-test",
+          providerName: "OpenRouter",
+        })),
         logout,
-        status: vi.fn(async () => ({ loggedIn: true, providerName: "OpenRouter" })),
+        status: vi.fn(async () => ({
+          loggedIn: true,
+          providerName: "OpenRouter",
+        })),
       },
     } as unknown as typeof window.electronAPI;
 
@@ -203,17 +236,21 @@ describe("SettingsAPI OpenRouter login flow", () => {
     });
     await flush();
 
-    const disconnectButton = container.querySelector('[data-testid="openrouter-oauth-disconnect"]');
+    const disconnectButton = container.querySelector(
+      '[data-testid="openrouter-oauth-disconnect"]',
+    );
     expect(disconnectButton).not.toBeNull();
 
     await act(async () => {
-      disconnectButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      disconnectButton?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
     });
     await flush();
 
-    const confirmButtons = Array.from(container.querySelectorAll("button")).filter(
-      (element) => element.textContent?.includes("Disconnect"),
-    );
+    const confirmButtons = Array.from(
+      container.querySelectorAll("button"),
+    ).filter((element) => element.textContent?.includes("Disconnect"));
     const confirmButton = confirmButtons[confirmButtons.length - 1] || null;
     expect(confirmButton).toBeTruthy();
 

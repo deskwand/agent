@@ -39,7 +39,12 @@ export class NativeExecutor implements SandboxExecutor {
     }
 
     this.isInitialized = true;
-    log("[NativeExecutor] Initialized shell:", getDefaultShell(), "workspace:", this.workspacePath);
+    log(
+      "[NativeExecutor] Initialized shell:",
+      getDefaultShell(),
+      "workspace:",
+      this.workspacePath,
+    );
   }
 
   /**

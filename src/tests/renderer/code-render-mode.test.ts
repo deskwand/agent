@@ -25,12 +25,18 @@ describe("getCodeRenderMode", () => {
     });
 
     it("renders URL list (multi-line, no language) as code block", () => {
-      const result = getCodeRenderMode(undefined, "https://a.com\nhttps://b.com");
+      const result = getCodeRenderMode(
+        undefined,
+        "https://a.com\nhttps://b.com",
+      );
       expect(result.isInline).toBe(false);
     });
 
     it("handles leading newline in code content (multi-line)", () => {
-      const result = getCodeRenderMode(undefined, "\nhttps://example.com\nhttps://example2.com");
+      const result = getCodeRenderMode(
+        undefined,
+        "\nhttps://example.com\nhttps://example2.com",
+      );
       expect(result.isInline).toBe(false);
     });
 
@@ -39,7 +45,6 @@ describe("getCodeRenderMode", () => {
       expect(result.isInline).toBe(true);
       expect(result.codeContent).toBe("123");
     });
-
   });
 
   describe("codeContent extraction", () => {

@@ -11,7 +11,13 @@ interface SkillMdModalProps {
   onClose: () => void;
 }
 
-export function SkillMdModal({ isOpen, title, content, loading, onClose }: SkillMdModalProps) {
+export function SkillMdModal({
+  isOpen,
+  title,
+  content,
+  loading,
+  onClose,
+}: SkillMdModalProps) {
   const { t } = useTranslation();
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -30,7 +36,9 @@ export function SkillMdModal({ isOpen, title, content, loading, onClose }: Skill
     <div
       ref={overlayRef}
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-[10vh] pb-8 px-4 overflow-y-auto"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current) onClose();
+      }}
     >
       <div className="w-full max-w-2xl rounded-xl border border-border bg-surface shadow-elevated animate-slide-up">
         <div className="flex items-center justify-between px-5 py-3 border-b border-border">

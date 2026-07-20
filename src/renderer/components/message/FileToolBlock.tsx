@@ -197,8 +197,7 @@ export const FileToolBlock = memo(function FileToolBlock({
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
       >
         {/* Status icon */}
-        <div
-          className="flex-shrink-0 pt-0.5 text-text-muted">
+        <div className="flex-shrink-0 pt-0.5 text-text-muted">
           {isRunning ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : isError ? (
@@ -210,9 +209,9 @@ export const FileToolBlock = memo(function FileToolBlock({
 
         {/* Tool icon — uses actual tool name for correct icon */}
         {showIcon ? (
-        <div className="flex-shrink-0 pt-0.5 text-text-muted">
-          {getToolIcon(block.name)}
-        </div>
+          <div className="flex-shrink-0 pt-0.5 text-text-muted">
+            {getToolIcon(block.name)}
+          </div>
         ) : null}
 
         {/* Label: action + path + stats */}

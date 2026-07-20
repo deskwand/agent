@@ -45,10 +45,11 @@ export function WelcomeView() {
   const setSettingsTab = useAppStore((state) => state.setSettingsTab);
   const appConfig = useAppConfig();
   const projectName = (() => {
-    if (!workingDir) return '';
-    return workingDir.split(/[\\/]/).filter(Boolean).pop() || '';
+    if (!workingDir) return "";
+    return workingDir.split(/[\\/]/).filter(Boolean).pop() || "";
   })();
-  const showProjectTitle = !!projectName && projectName !== DEFAULT_WORKDIR_DIRNAME;
+  const showProjectTitle =
+    !!projectName && projectName !== DEFAULT_WORKDIR_DIRNAME;
   const chatInputRef = useRef<ChatInputHandle>(null);
 
   // Model & thinking level — initialised from first available model, same source as ChatView
@@ -266,7 +267,7 @@ export function WelcomeView() {
           slashMenuDirection="down"
           placeholder={t("welcome.placeholder")}
           cardClassName="rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4"
-          textareaClassName="w-full resize-none bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted text-sm leading-relaxed overflow-hidden"
+          textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed overflow-hidden"
           bottomSlot={
             <ChatInputBottomBar
               onAttach={() => chatInputRef.current?.selectFiles()}

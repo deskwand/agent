@@ -58,9 +58,7 @@ export async function ensureFreshOAuthToken(
   }
 }
 
-async function doEnsureFresh(
-  providerId: string,
-): Promise<string | undefined> {
+async function doEnsureFresh(providerId: string): Promise<string | undefined> {
   const authStorage = getSharedAuthStorage();
   const providers = authStorage.getOAuthProviders();
   const provider = providers.find((p) => p.id === providerId);

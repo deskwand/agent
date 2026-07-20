@@ -68,7 +68,10 @@ const PROVIDER_ORDER: ProviderChoice[] = [
   "custom",
 ];
 
-const OAUTH_PROVIDER_MODELS: Record<string, Array<{ id: string; name: string }>> = {
+const OAUTH_PROVIDER_MODELS: Record<
+  string,
+  Array<{ id: string; name: string }>
+> = {
   "openai-codex": [
     { id: "gpt-5.6-sol", name: "gpt-5.6-sol" },
     { id: "gpt-5.6-terra", name: "gpt-5.6-terra" },
@@ -90,7 +93,7 @@ const OAUTH_PROVIDER_MODELS: Record<string, Array<{ id: string; name: string }>>
     { id: "gpt-5.4", name: "gpt-5.4" },
     { id: "gpt-5.4-mini", name: "gpt-5.4-mini" },
   ],
-  "anthropic": [
+  anthropic: [
     { id: "claude-opus-4-6", name: "claude-opus-4-6" },
     { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
     { id: "claude-haiku-4-5", name: "claude-haiku-4-5" },
@@ -107,8 +110,17 @@ const OAUTH_PROVIDERS = [
     noteKey: "",
     icon: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-        <path d="M12 2L21 7.5V17.5L12 23L3 17.5V7.5L12 2Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M12 7L17 10V16L12 19L7 16V10L12 7Z" fill="currentColor" opacity="0.3" />
+        <path
+          d="M12 2L21 7.5V17.5L12 23L3 17.5V7.5L12 2Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M12 7L17 10V16L12 19L7 16V10L12 7Z"
+          fill="currentColor"
+          opacity="0.3"
+        />
       </svg>
     ),
   },
@@ -132,9 +144,25 @@ const OAUTH_PROVIDERS = [
     noteKey: "api.oauthAnthropicNote",
     icon: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-        <path d="M12 3L20 9V15L12 21L4 15V9L12 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M17 9L12 12.5L7 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M12 12.5V18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path
+          d="M12 3L20 9V15L12 21L4 15V9L12 3Z"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M17 9L12 12.5L7 9"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M12 12.5V18"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
       </svg>
     ),
   },
@@ -145,9 +173,24 @@ const OAUTH_PROVIDERS = [
     noteKey: "",
     icon: (
       <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-        <path d="M5 6.5H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M5 12H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M5 17.5H19" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path
+          d="M5 6.5H19"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M5 12H19"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+        <path
+          d="M5 17.5H19"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
         <circle cx="8" cy="12" r="2.5" fill="currentColor" opacity="0.35" />
       </svg>
     ),
@@ -203,7 +246,13 @@ function modelsPresetForDraft(
     return presets.custom;
   }
   if (provider === "oauth") {
-    return { name: "OAuth", models: [], baseUrl: "", keyPlaceholder: "", keyHint: "" };
+    return {
+      name: "OAuth",
+      models: [],
+      baseUrl: "",
+      keyPlaceholder: "",
+      keyHint: "",
+    };
   }
   return (presets as unknown as Record<string, ProviderPreset>)[provider];
 }
@@ -405,15 +454,17 @@ export function SettingsAPI({
   const [isDeleting, setIsDeleting] = useState(false);
 
   // ── Tab state ──
-  const [activeTab, setActiveTab] = useState<"main" | "vision" | "search">("main");
+  const [activeTab, setActiveTab] = useState<"main" | "vision" | "search">(
+    "main",
+  );
 
   // ── Search / webAccess state ──
   const [searchDraft, setSearchDraft] = useState<WebAccessConfig | null>(null);
   const [searchExpanded, setSearchExpanded] = useState<string | null>(null);
   const [isSearchSaving, setIsSearchSaving] = useState(false);
-  const [searchMessage, setSearchMessage] = useState<
-    "saved" | "error" | null
-  >(null);
+  const [searchMessage, setSearchMessage] = useState<"saved" | "error" | null>(
+    null,
+  );
 
   // ── Vision model state ──
   const [visionDraft, setVisionDraft] = useState<VisionModelConfig>({
@@ -431,13 +482,17 @@ export function SettingsAPI({
 
   // ── OAuth state ──
   const [oauthStatuses, setOAuthStatuses] = useState<
-    Record<string, { loggedIn: boolean; expiresAt?: number; providerName: string }>
+    Record<
+      string,
+      { loggedIn: boolean; expiresAt?: number; providerName: string }
+    >
   >({});
   const [oauthLoading, setOAuthLoading] = useState<Record<string, boolean>>({});
   const [oauthErrors, setOAuthErrors] = useState<Record<string, string>>({});
-  const [pendingOAuthLogoutProviderId, setPendingOAuthLogoutProviderId] = useState<string | null>(null);
+  const [pendingOAuthLogoutProviderId, setPendingOAuthLogoutProviderId] =
+    useState<string | null>(null);
 
-  const isVisionConfigured = !!(appConfig?.visionModel?.model?.trim());
+  const isVisionConfigured = !!appConfig?.visionModel?.model?.trim();
 
   useEffect(() => {
     let cancelled = false;
@@ -465,11 +520,15 @@ export function SettingsAPI({
       const statuses: Record<string, unknown> = {};
       for (const provider of OAUTH_PROVIDERS) {
         try {
-          statuses[provider.id] = provider.id === "openrouter"
-            ? await window.electronAPI.openrouterAuth.status()
-            : await window.electronAPI.auth.status(provider.id);
+          statuses[provider.id] =
+            provider.id === "openrouter"
+              ? await window.electronAPI.openrouterAuth.status()
+              : await window.electronAPI.auth.status(provider.id);
         } catch {
-          statuses[provider.id] = { loggedIn: false, providerName: provider.name };
+          statuses[provider.id] = {
+            loggedIn: false,
+            providerName: provider.name,
+          };
         }
       }
       setOAuthStatuses(statuses as typeof oauthStatuses);
@@ -483,13 +542,11 @@ export function SettingsAPI({
   const configuredProviders = useMemo(() => {
     const providers = appConfig?.providers || {};
     return (
-      Object.entries(providers)
-        .filter(([profileKey, config]) =>
+      Object.entries(providers).filter(
+        ([profileKey, config]) =>
           config &&
           hasUsableCredentials(profileKey as ProviderProfileKey, config),
-        ) as Array<
-        [string, ApiProviderConfig]
-      >
+      ) as Array<[string, ApiProviderConfig]>
     ).map(([profileKey, config]) => ({
       profileKey: profileKey as ProviderProfileKey,
       config,
@@ -586,7 +643,11 @@ export function SettingsAPI({
       setVisionError(t("api.modelRequired"));
       return;
     }
-    if (visionDraft.enabled && !visionDraft.apiKey.trim() && visionDraft.provider !== "ollama") {
+    if (
+      visionDraft.enabled &&
+      !visionDraft.apiKey.trim() &&
+      visionDraft.provider !== "ollama"
+    ) {
       setVisionError(t("api.enterApiKey"));
       return;
     }
@@ -597,12 +658,17 @@ export function SettingsAPI({
       const config: VisionModelConfig = {
         enabled: visionDraft.enabled,
         provider: visionDraft.provider,
-        customProtocol: visionDraft.provider === "custom" ? visionDraft.customProtocol : undefined,
+        customProtocol:
+          visionDraft.provider === "custom"
+            ? visionDraft.customProtocol
+            : undefined,
         apiKey: visionDraft.apiKey,
         baseUrl: visionDraft.baseUrl || undefined,
         model: visionDraft.model,
       };
-      const saved = await window.electronAPI.config.save({ visionModel: config });
+      const saved = await window.electronAPI.config.save({
+        visionModel: config,
+      });
       applyConfig(saved.config);
       setVisionEditorOpen(false);
       setVisionSuccess(t("common.saved"));
@@ -625,14 +691,17 @@ export function SettingsAPI({
     const config: VisionModelConfig = {
       enabled: newEnabled,
       provider: saved.provider,
-      customProtocol: saved.provider === "custom" ? saved.customProtocol : undefined,
+      customProtocol:
+        saved.provider === "custom" ? saved.customProtocol : undefined,
       apiKey: saved.apiKey,
       baseUrl: saved.baseUrl || undefined,
       model: saved.model,
     };
     setIsVisionSaving(true);
     try {
-      const savedConfig = await window.electronAPI.config.save({ visionModel: config });
+      const savedConfig = await window.electronAPI.config.save({
+        visionModel: config,
+      });
       applyConfig(savedConfig.config);
       setVisionDraft((prev) => ({ ...prev, enabled: newEnabled }));
     } catch (saveError) {
@@ -750,7 +819,8 @@ export function SettingsAPI({
     try {
       if (providerId === "openrouter") {
         const loginResult = await window.electronAPI.openrouterAuth.login();
-        const modelsResult = await window.electronAPI.config.fetchOpenRouterModels();
+        const modelsResult =
+          await window.electronAPI.config.fetchOpenRouterModels();
         const providerInfo = OAUTH_PROVIDERS.find((p) => p.id === providerId);
         const models = modelsResult.models;
         const defaultModel = models[0]?.id;
@@ -836,15 +906,16 @@ export function SettingsAPI({
       } else {
         // If no known models, log a warning but still let the user proceed.
         // The model selector may be empty — they can refine models later.
-        console.warn(`[OAuth] No preset models for ${providerId}; provider saved without models.`);
+        console.warn(
+          `[OAuth] No preset models for ${providerId}; provider saved without models.`,
+        );
       }
 
       // Only update UI after config save succeeded
       const status = await window.electronAPI.auth.status(providerId);
       setOAuthStatuses((prev) => ({ ...prev, [providerId]: status }));
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Login failed";
+      const message = err instanceof Error ? err.message : "Login failed";
       setOAuthErrors((prev) => ({ ...prev, [providerId]: message }));
     } finally {
       setOAuthLoading((prev) => ({ ...prev, [providerId]: false }));
@@ -873,9 +944,10 @@ export function SettingsAPI({
     });
     // Remove provider from ConfigStore so it disappears from model selector
     try {
-      const profileKey: ProviderProfileKey = providerId === "openrouter"
-        ? "openrouter"
-        : oauthProfileKey(providerId);
+      const profileKey: ProviderProfileKey =
+        providerId === "openrouter"
+          ? "openrouter"
+          : oauthProfileKey(providerId);
       const deleted = await window.electronAPI.config.deleteProvider({
         profileKey,
       });
@@ -1044,7 +1116,8 @@ export function SettingsAPI({
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-text-primary">
-                          {config.name || providerLabel(profileKey, presets, t, config)}
+                          {config.name ||
+                            providerLabel(profileKey, presets, t, config)}
                         </p>
                         {isCustomProvider && (
                           <p className="mt-1 truncate text-xs text-text-muted">
@@ -1112,7 +1185,9 @@ export function SettingsAPI({
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-lg flex-shrink-0 text-text-primary">{provider.icon}</span>
+                      <span className="text-lg flex-shrink-0 text-text-primary">
+                        {provider.icon}
+                      </span>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-text-primary">
@@ -1148,7 +1223,9 @@ export function SettingsAPI({
                       <button
                         type="button"
                         data-testid={`${provider.id}-oauth-disconnect`}
-                        onClick={() => setPendingOAuthLogoutProviderId(provider.id)}
+                        onClick={() =>
+                          setPendingOAuthLogoutProviderId(provider.id)
+                        }
                         className="rounded-lg border border-border-muted px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-error flex-shrink-0"
                       >
                         {t("api.oauthDisconnect")}
@@ -1161,7 +1238,9 @@ export function SettingsAPI({
                         disabled={loading}
                         className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50 flex-shrink-0"
                       >
-                        {loading ? t("api.oauthLoggingIn") : t("api.oauthLoginBtn")}
+                        {loading
+                          ? t("api.oauthLoggingIn")
+                          : t("api.oauthLoginBtn")}
                       </button>
                     )}
                   </div>
@@ -1203,8 +1282,7 @@ export function SettingsAPI({
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-text-primary">
-                    🔮{" "}
-                    {providerOptionLabel(visionDraft.provider, presets, t)}
+                    🔮 {providerOptionLabel(visionDraft.provider, presets, t)}
                     {" / "}
                     {visionDraft.model}
                   </p>
@@ -1370,7 +1448,7 @@ export function SettingsAPI({
                                 {t("webAccess.unavailable")}
                               </option>
                               {searchMatchingProfiles(
-                                appConfig || { providers: {} } as AppConfig,
+                                appConfig || ({ providers: {} } as AppConfig),
                                 provider,
                               ).map((profile) => (
                                 <option key={profile.key} value={profile.key}>
@@ -1516,9 +1594,7 @@ export function SettingsAPI({
                         webAccess: searchDraft,
                       });
                       applyConfig(saved.config);
-                      setSearchDraft(
-                        searchAddInheritedDefaults(saved.config),
-                      );
+                      setSearchDraft(searchAddInheritedDefaults(saved.config));
                       setSearchMessage("saved");
                     } catch {
                       setSearchMessage("error");
@@ -1576,7 +1652,10 @@ export function SettingsAPI({
                       type="checkbox"
                       checked={visionDraft.enabled}
                       onChange={(e) =>
-                        setVisionDraft((prev) => ({ ...prev, enabled: e.target.checked }))
+                        setVisionDraft((prev) => ({
+                          ...prev,
+                          enabled: e.target.checked,
+                        }))
                       }
                       className="sr-only peer"
                     />
@@ -1596,11 +1675,16 @@ export function SettingsAPI({
                         key={provider}
                         type="button"
                         onClick={() => {
-                          const preset = (presets as unknown as Record<string, ProviderPreset>)[provider];
+                          const preset = (
+                            presets as unknown as Record<string, ProviderPreset>
+                          )[provider];
                           setVisionDraft((prev) => ({
                             ...prev,
                             provider,
-                            baseUrl: provider !== "custom" ? (preset?.baseUrl || "") : prev.baseUrl,
+                            baseUrl:
+                              provider !== "custom"
+                                ? preset?.baseUrl || ""
+                                : prev.baseUrl,
                           }));
                         }}
                         className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
@@ -1629,7 +1713,12 @@ export function SettingsAPI({
                             key={protocol}
                             type="button"
                             onClick={() => {
-                              const preset = protocol === "anthropic" ? presets.custom : protocol === "openai" ? presets.openai : presets.gemini;
+                              const preset =
+                                protocol === "anthropic"
+                                  ? presets.custom
+                                  : protocol === "openai"
+                                    ? presets.openai
+                                    : presets.gemini;
                               setVisionDraft((prev) => ({
                                 ...prev,
                                 customProtocol: protocol,
@@ -1657,21 +1746,26 @@ export function SettingsAPI({
                       <Key className="h-4 w-4" />
                       {t("api.apiKey")}
                     </label>
-                    {appConfig?.activeProviderKey && appConfig?.providers?.[appConfig.activeProviderKey]?.apiKey && (
-                      <button
-                        type="button"
-                        onClick={reuseActiveProviderApiKey}
-                        className="text-xs text-accent hover:underline"
-                      >
-                        {t("api.reuseMainModelKey")}
-                      </button>
-                    )}
+                    {appConfig?.activeProviderKey &&
+                      appConfig?.providers?.[appConfig.activeProviderKey]
+                        ?.apiKey && (
+                        <button
+                          type="button"
+                          onClick={reuseActiveProviderApiKey}
+                          className="text-xs text-accent hover:underline"
+                        >
+                          {t("api.reuseMainModelKey")}
+                        </button>
+                      )}
                   </div>
                   <input
                     type="password"
                     value={visionDraft.apiKey}
                     onChange={(event) =>
-                      setVisionDraft((prev) => ({ ...prev, apiKey: event.target.value }))
+                      setVisionDraft((prev) => ({
+                        ...prev,
+                        apiKey: event.target.value,
+                      }))
                     }
                     placeholder={t("api.enterApiKey")}
                     className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -1679,7 +1773,8 @@ export function SettingsAPI({
                 </div>
 
                 {/* Base URL (custom provider or Ollama only) */}
-                {(visionDraft.provider === "custom" || visionDraft.provider === "ollama") && (
+                {(visionDraft.provider === "custom" ||
+                  visionDraft.provider === "ollama") && (
                   <div className="space-y-3 border-b border-border-muted pb-5">
                     <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
                       <Server className="h-4 w-4" />
@@ -1689,7 +1784,10 @@ export function SettingsAPI({
                       type="text"
                       value={visionDraft.baseUrl || ""}
                       onChange={(event) =>
-                        setVisionDraft((prev) => ({ ...prev, baseUrl: event.target.value }))
+                        setVisionDraft((prev) => ({
+                          ...prev,
+                          baseUrl: event.target.value,
+                        }))
                       }
                       placeholder={t("api.enterBaseUrl")}
                       className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -1707,7 +1805,10 @@ export function SettingsAPI({
                     type="text"
                     value={visionDraft.model}
                     onChange={(event) =>
-                      setVisionDraft((prev) => ({ ...prev, model: event.target.value }))
+                      setVisionDraft((prev) => ({
+                        ...prev,
+                        model: event.target.value,
+                      }))
                     }
                     placeholder={t("api.visionModelPlaceholder")}
                     className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
@@ -1716,13 +1817,20 @@ export function SettingsAPI({
                   {visionDraft.provider !== "custom" && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {(() => {
-                        const preset = (presets as unknown as Record<string, ProviderPreset>)[visionDraft.provider];
+                        const preset = (
+                          presets as unknown as Record<string, ProviderPreset>
+                        )[visionDraft.provider];
                         if (!preset?.models) return null;
                         return preset.models.slice(0, 5).map((m) => (
                           <button
                             key={m.id}
                             type="button"
-                            onClick={() => setVisionDraft((prev) => ({ ...prev, model: m.id }))}
+                            onClick={() =>
+                              setVisionDraft((prev) => ({
+                                ...prev,
+                                model: m.id,
+                              }))
+                            }
                             className={`rounded-md border px-2 py-1 text-xs transition-colors ${
                               visionDraft.model === m.id
                                 ? "border-accent bg-accent/10 text-accent"
@@ -1787,46 +1895,47 @@ export function SettingsAPI({
         </div>
       )}
 
-      {pendingOAuthLogoutProviderId && (() => {
-        const pid = pendingOAuthLogoutProviderId;
-        const p = OAUTH_PROVIDERS.find((pp) => pp.id === pid);
-        return (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-            <div className="mx-4 w-full max-w-md rounded-2xl border border-border-muted bg-background shadow-xl">
-              <div className="border-b border-border-muted px-5 py-4">
-                <h3 className="text-sm font-medium text-text-primary">
-                  {t("api.oauthDisconnect")}
-                </h3>
-              </div>
-              <div className="space-y-4 px-5 py-4">
-                <p className="text-sm text-text-secondary">
-                  {t("api.oauthDisconnectConfirm", {
-                    name: p?.name || pid,
-                  })}
-                </p>
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={closeOAuthDisconnectDialog}
-                    className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                  >
-                    {t("common.cancel")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void confirmDisconnectOAuth(pid);
-                    }}
-                    className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90"
-                  >
+      {pendingOAuthLogoutProviderId &&
+        (() => {
+          const pid = pendingOAuthLogoutProviderId;
+          const p = OAUTH_PROVIDERS.find((pp) => pp.id === pid);
+          return (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+              <div className="mx-4 w-full max-w-md rounded-2xl border border-border-muted bg-background shadow-xl">
+                <div className="border-b border-border-muted px-5 py-4">
+                  <h3 className="text-sm font-medium text-text-primary">
                     {t("api.oauthDisconnect")}
-                  </button>
+                  </h3>
+                </div>
+                <div className="space-y-4 px-5 py-4">
+                  <p className="text-sm text-text-secondary">
+                    {t("api.oauthDisconnectConfirm", {
+                      name: p?.name || pid,
+                    })}
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={closeOAuthDisconnectDialog}
+                      className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                    >
+                      {t("common.cancel")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void confirmDisconnectOAuth(pid);
+                      }}
+                      className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90"
+                    >
+                      {t("api.oauthDisconnect")}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {pendingDeleteProfileKey && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
@@ -1841,11 +1950,7 @@ export function SettingsAPI({
                 {t("api.deleteApiConfirm", {
                   name:
                     appConfig?.providers?.[pendingDeleteProfileKey]?.name ||
-                    providerLabel(
-                      pendingDeleteProfileKey,
-                      presets,
-                      t,
-                    ),
+                    providerLabel(pendingDeleteProfileKey, presets, t),
                 })}
               </p>
               <div className="flex justify-end gap-2">
@@ -2054,9 +2159,7 @@ export function SettingsAPI({
                                   contextWindow:
                                     event.target.value &&
                                     Number(event.target.value) > 0
-                                      ? Math.round(
-                                          Number(event.target.value),
-                                        )
+                                      ? Math.round(Number(event.target.value))
                                       : undefined,
                                 })
                               }

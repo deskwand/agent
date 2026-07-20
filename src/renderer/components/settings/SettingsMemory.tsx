@@ -97,8 +97,13 @@ export function SettingsMemory() {
   const [fileContent, setFileContent] = useState<MemoryDebugFileContent | null>(
     null,
   );
-  type MaintenanceAction = "rebuildWorkspace" | "rebuildAll" | "clearWorkspace" | "clearCore";
-  const [pendingMaintenance, setPendingMaintenance] = useState<MaintenanceAction | null>(null);
+  type MaintenanceAction =
+    | "rebuildWorkspace"
+    | "rebuildAll"
+    | "clearWorkspace"
+    | "clearCore";
+  const [pendingMaintenance, setPendingMaintenance] =
+    useState<MaintenanceAction | null>(null);
   const [runtimeDraft, setRuntimeDraft] = useState<MemoryRuntimeConfig>(
     cloneRuntimeConfig(appConfig?.memoryRuntime),
   );
@@ -1102,11 +1107,19 @@ export function SettingsMemory() {
         isOpen={pendingMaintenance !== null}
         title={(() => {
           switch (pendingMaintenance) {
-            case "rebuildWorkspace": return t("memory.rebuildConfirm");
-            case "rebuildAll": return t("memory.rebuildAllConfirm", "这会清空并重建全部记忆，是否继续？");
-            case "clearWorkspace": return t("memory.clearWorkspaceConfirm");
-            case "clearCore": return t("memory.clearCoreConfirm");
-            default: return "";
+            case "rebuildWorkspace":
+              return t("memory.rebuildConfirm");
+            case "rebuildAll":
+              return t(
+                "memory.rebuildAllConfirm",
+                "这会清空并重建全部记忆，是否继续？",
+              );
+            case "clearWorkspace":
+              return t("memory.clearWorkspaceConfirm");
+            case "clearCore":
+              return t("memory.clearCoreConfirm");
+            default:
+              return "";
           }
         })()}
         onConfirm={() => {
@@ -1114,10 +1127,18 @@ export function SettingsMemory() {
           if (!action) return;
           setPendingMaintenance(null);
           switch (action) {
-            case "rebuildWorkspace": doRebuildWorkspace(); break;
-            case "rebuildAll": doRebuildAll(); break;
-            case "clearWorkspace": doClearWorkspace(); break;
-            case "clearCore": doClearCore(); break;
+            case "rebuildWorkspace":
+              doRebuildWorkspace();
+              break;
+            case "rebuildAll":
+              doRebuildAll();
+              break;
+            case "clearWorkspace":
+              doClearWorkspace();
+              break;
+            case "clearCore":
+              doClearCore();
+              break;
           }
         }}
         onCancel={() => setPendingMaintenance(null)}

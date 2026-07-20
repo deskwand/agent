@@ -674,7 +674,10 @@ export class GoalExtension implements AgentRuntimeExtension {
 
     // If goal was paused/resumed mid-turn, skip all continuation.
     const capturedGeneration = this.sessionGenerations.get(sessionId);
-    if (capturedGeneration !== undefined && capturedGeneration !== goal.generation) {
+    if (
+      capturedGeneration !== undefined &&
+      capturedGeneration !== goal.generation
+    ) {
       return this.goalStatusPayload(goal);
     }
 

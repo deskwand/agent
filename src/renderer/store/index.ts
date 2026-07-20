@@ -183,8 +183,13 @@ interface AppState {
   lightboxImages: ImageSource[];
   lightboxIndex: number;
   lightboxLoading: boolean;
-  lightboxSource: 'pasted' | 'attached' | 'message' | null;
-  openLightbox: (images: ImageSource[], index?: number, loading?: boolean, source?: 'pasted' | 'attached' | 'message') => void;
+  lightboxSource: "pasted" | "attached" | "message" | null;
+  openLightbox: (
+    images: ImageSource[],
+    index?: number,
+    loading?: boolean,
+    source?: "pasted" | "attached" | "message",
+  ) => void;
   closeLightbox: () => void;
 
   // Blocking renderer modals that must cover the native browser view
@@ -391,11 +396,11 @@ export const useAppStore = create<AppState>((set) => ({
   sandboxSyncStatus: null,
   systemDarkMode: false,
   updateReady: false,
-  updateVersion: '',
+  updateVersion: "",
   lightboxImages: [] as ImageSource[],
   lightboxIndex: 0,
   lightboxLoading: false,
-  lightboxSource: null as 'pasted' | 'attached' | 'message' | null,
+  lightboxSource: null as "pasted" | "attached" | "message" | null,
   browserOcclusionIds: new Set<string>(),
   isBrowserFullscreen: false,
   browserFullscreenSnapshot: null as {
@@ -967,7 +972,7 @@ export const useAppStore = create<AppState>((set) => ({
   setUpdateReady: (version) =>
     set({
       updateReady: version !== null,
-      updateVersion: version || '',
+      updateVersion: version || "",
     }),
 
   // Image lightbox actions
@@ -979,7 +984,12 @@ export const useAppStore = create<AppState>((set) => ({
       lightboxSource: source ?? null,
     }),
   closeLightbox: () =>
-    set({ lightboxImages: [], lightboxIndex: 0, lightboxLoading: false, lightboxSource: null }),
+    set({
+      lightboxImages: [],
+      lightboxIndex: 0,
+      lightboxLoading: false,
+      lightboxSource: null,
+    }),
 
   acquireBrowserOcclusion: (id) =>
     set((state) => {

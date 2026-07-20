@@ -19,7 +19,10 @@ import {
   formatError,
   DEFAULT_MAX_OUTPUT_BYTES,
 } from "../../main/agent/tools/office/common";
-import { readXlsx, arrayToMarkdownTable } from "../../main/agent/tools/office/xlsx-reader";
+import {
+  readXlsx,
+  arrayToMarkdownTable,
+} from "../../main/agent/tools/office/xlsx-reader";
 import { readDocx } from "../../main/agent/tools/office/docx-reader";
 
 // ── Helpers ──
@@ -39,7 +42,9 @@ afterEach(() => {
 describe("office common utilities", () => {
   describe("resolvePath", () => {
     it("returns absolute paths as-is", () => {
-      expect(resolvePath("/tmp/file.xlsx", "/workspace")).toBe("/tmp/file.xlsx");
+      expect(resolvePath("/tmp/file.xlsx", "/workspace")).toBe(
+        "/tmp/file.xlsx",
+      );
     });
 
     it("resolves relative paths against workspaceDir", () => {
@@ -110,9 +115,9 @@ describe("office common utilities", () => {
       const longText = "A".repeat(DEFAULT_MAX_OUTPUT_BYTES + 1000);
       const result = formatResult(longText, "big.xlsx");
       expect(asText(result.content[0]).text).toContain("[Truncated");
-      expect(Buffer.byteLength(asText(result.content[0]).text, "utf-8")).toBeLessThanOrEqual(
-        DEFAULT_MAX_OUTPUT_BYTES + 200,
-      );
+      expect(
+        Buffer.byteLength(asText(result.content[0]).text, "utf-8"),
+      ).toBeLessThanOrEqual(DEFAULT_MAX_OUTPUT_BYTES + 200);
     });
   });
 
@@ -120,7 +125,9 @@ describe("office common utilities", () => {
     it("returns error format", () => {
       const result = formatError("something went wrong");
       expect(result.content[0].type).toBe("text");
-      expect(asText(result.content[0]).text).toContain("Error: something went wrong");
+      expect(asText(result.content[0]).text).toContain(
+        "Error: something went wrong",
+      );
     });
   });
 });
@@ -164,7 +171,10 @@ describe("readXlsx", () => {
     // Create a minimal xlsx programmatically using SheetJS itself
     const XLSX = require("xlsx");
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([["Header", "Value"], ["A", "1"]]);
+    const ws = XLSX.utils.aoa_to_sheet([
+      ["Header", "Value"],
+      ["A", "1"],
+    ]);
     XLSX.utils.book_append_sheet(wb, ws, "Data");
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
@@ -223,13 +233,15 @@ describe("readDocx", () => {
         "</Types>",
     );
 
-    zip.folder("_rels")!.file(
-      ".rels",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
-        "</Relationships>",
-    );
+    zip
+      .folder("_rels")!
+      .file(
+        ".rels",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+          "</Relationships>",
+      );
 
     zip.folder("word")!.file("document.xml", documentXml);
 
@@ -270,16 +282,14 @@ describe("readDocx", () => {
 describe("readPptx", () => {
   it("throws on invalid buffer", async () => {
     // Dynamic import because ESM interop
-    const { readPptx } = await import(
-      "../../main/agent/tools/office/pptx-reader"
-    );
+    const { readPptx } =
+      await import("../../main/agent/tools/office/pptx-reader");
     await expect(readPptx(Buffer.from("not a zip"), false)).rejects.toThrow();
   });
 
   it("reads a pptx with text content", async () => {
-    const { readPptx } = await import(
-      "../../main/agent/tools/office/pptx-reader"
-    );
+    const { readPptx } =
+      await import("../../main/agent/tools/office/pptx-reader");
     const JSZip = require("jszip");
     const zip = new JSZip();
 
@@ -294,54 +304,68 @@ describe("readPptx", () => {
         "</Types>",
     );
 
-    zip.folder("_rels")!.file(
-      ".rels",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>' +
-        "</Relationships>",
-    );
+    zip
+      .folder("_rels")!
+      .file(
+        ".rels",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>' +
+          "</Relationships>",
+      );
 
-    zip.folder("ppt")!.file(
-      "presentation.xml",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
-        '<p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst>' +
-        "</p:presentation>",
-    );
+    zip
+      .folder("ppt")!
+      .file(
+        "presentation.xml",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
+          '<p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst>' +
+          "</p:presentation>",
+      );
 
-    zip.folder("ppt")!.folder("_rels")!.file(
-      "presentation.xml.rels",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>' +
-        "</Relationships>",
-    );
+    zip
+      .folder("ppt")!
+      .folder("_rels")!
+      .file(
+        "presentation.xml.rels",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>' +
+          "</Relationships>",
+      );
 
-    zip.folder("ppt")!.folder("slides")!.file(
-      "slide1.xml",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
-        ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
-        "<p:cSld>" +
-        "<p:spTree>" +
-        "<p:sp>" +
-        '<p:nvSpPr><p:cNvPr id="1" name="Title"/></p:nvSpPr>' +
-        "<p:txBody>" +
-        "<a:bodyPr/>" +
-        '<a:p><a:r><a:t>演示文稿</a:t></a:r></a:p>' +
-        "</p:txBody>" +
-        "</p:sp>" +
-        "</p:spTree>" +
-        "</p:cSld>" +
-        "</p:sld>",
-    );
+    zip
+      .folder("ppt")!
+      .folder("slides")!
+      .file(
+        "slide1.xml",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
+          ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+          "<p:cSld>" +
+          "<p:spTree>" +
+          "<p:sp>" +
+          '<p:nvSpPr><p:cNvPr id="1" name="Title"/></p:nvSpPr>' +
+          "<p:txBody>" +
+          "<a:bodyPr/>" +
+          "<a:p><a:r><a:t>演示文稿</a:t></a:r></a:p>" +
+          "</p:txBody>" +
+          "</p:sp>" +
+          "</p:spTree>" +
+          "</p:cSld>" +
+          "</p:sld>",
+      );
 
-    zip.folder("ppt")!.folder("slides")!.folder("_rels")!.file(
-      "slide1.xml.rels",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>',
-    );
+    zip
+      .folder("ppt")!
+      .folder("slides")!
+      .folder("_rels")!
+      .file(
+        "slide1.xml.rels",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>',
+      );
 
     const buf = await zip.generateAsync({ type: "nodebuffer" });
 
@@ -351,9 +375,8 @@ describe("readPptx", () => {
   });
 
   it("includeNotes flag adds note about skill", async () => {
-    const { readPptx } = await import(
-      "../../main/agent/tools/office/pptx-reader"
-    );
+    const { readPptx } =
+      await import("../../main/agent/tools/office/pptx-reader");
     const JSZip = require("jszip");
     const zip = new JSZip();
 
@@ -368,70 +391,91 @@ describe("readPptx", () => {
         "</Types>",
     );
 
-    zip.folder("_rels")!.file(
-      ".rels",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>' +
-        "</Relationships>",
-    );
+    zip
+      .folder("_rels")!
+      .file(
+        ".rels",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="ppt/presentation.xml"/>' +
+          "</Relationships>",
+      );
 
-    zip.folder("ppt")!.file(
-      "presentation.xml",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
-        '<p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst>' +
-        "</p:presentation>",
-    );
+    zip
+      .folder("ppt")!
+      .file(
+        "presentation.xml",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
+          '<p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst>' +
+          "</p:presentation>",
+      );
 
-    zip.folder("ppt")!.folder("_rels")!.file(
-      "presentation.xml.rels",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
-        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>' +
-        "</Relationships>",
-    );
+    zip
+      .folder("ppt")!
+      .folder("_rels")!
+      .file(
+        "presentation.xml.rels",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/>' +
+          "</Relationships>",
+      );
 
-    zip.folder("ppt")!.folder("slides")!.file(
-      "slide1.xml",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
-        ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
-        "<p:cSld>" +
-        "<p:spTree>" +
-        "<p:sp>" +
-        '<p:nvSpPr><p:cNvPr id="1" name="Title"/></p:nvSpPr>' +
-        "<p:txBody>" +
-        "<a:bodyPr/>" +
-        '<a:p><a:r><a:t>Slide text</a:t></a:r></a:p>' +
-        "</p:txBody>" +
-        "</p:sp>" +
-        "</p:spTree>" +
-        "</p:cSld>" +
-        "</p:sld>",
-    );
+    zip
+      .folder("ppt")!
+      .folder("slides")!
+      .file(
+        "slide1.xml",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
+          ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+          "<p:cSld>" +
+          "<p:spTree>" +
+          "<p:sp>" +
+          '<p:nvSpPr><p:cNvPr id="1" name="Title"/></p:nvSpPr>' +
+          "<p:txBody>" +
+          "<a:bodyPr/>" +
+          "<a:p><a:r><a:t>Slide text</a:t></a:r></a:p>" +
+          "</p:txBody>" +
+          "</p:sp>" +
+          "</p:spTree>" +
+          "</p:cSld>" +
+          "</p:sld>",
+      );
 
     // Add a notes slide for the includeNotes test
-    zip.folder("ppt")!.folder("notesSlides")!.file(
-      "notesSlide1.xml",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
-        ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
-        '<p:cSld><p:spTree><p:sp><p:txBody><a:bodyPr/><a:p><a:r><a:t>Speaker notes: remember to mention Q3 results</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>' +
-        '</p:notes>',
-    );
+    zip
+      .folder("ppt")!
+      .folder("notesSlides")!
+      .file(
+        "notesSlide1.xml",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<p:notes xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"' +
+          ' xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">' +
+          "<p:cSld><p:spTree><p:sp><p:txBody><a:bodyPr/><a:p><a:r><a:t>Speaker notes: remember to mention Q3 results</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>" +
+          "</p:notes>",
+      );
 
-    zip.folder("ppt")!.folder("notesSlides")!.folder("_rels")!.file(
-      "notesSlide1.xml.rels",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>',
-    );
+    zip
+      .folder("ppt")!
+      .folder("notesSlides")!
+      .folder("_rels")!
+      .file(
+        "notesSlide1.xml.rels",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>',
+      );
 
-    zip.folder("ppt")!.folder("slides")!.folder("_rels")!.file(
-      "slide1.xml.rels",
-      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
-        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>',
-    );
+    zip
+      .folder("ppt")!
+      .folder("slides")!
+      .folder("_rels")!
+      .file(
+        "slide1.xml.rels",
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>',
+      );
 
     const buf = await zip.generateAsync({ type: "nodebuffer" });
 
@@ -446,9 +490,8 @@ describe("readPptx", () => {
 
 describe("createOfficeTools", () => {
   async function getTools() {
-    const { createOfficeTools } = await import(
-      "../../main/agent/tools/office/office-tools"
-    );
+    const { createOfficeTools } =
+      await import("../../main/agent/tools/office/office-tools");
     return createOfficeTools(tempDir);
   }
 

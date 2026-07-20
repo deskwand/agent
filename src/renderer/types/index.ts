@@ -841,7 +841,13 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
+  subagent?: import("../../shared/subagent-config").SubagentConfig;
 }
+
+export type {
+  SubagentDefaultModel,
+  SubagentConfig,
+} from "../../shared/subagent-config";
 
 export interface ProviderPreset {
   name: string;

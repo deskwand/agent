@@ -89,20 +89,14 @@ function parseZipDirectory(buf: Buffer): Map<string, ZipEntry> {
 /**
  * Read and decompress a single file from the ZIP buffer.
  */
-function readZipEntry(
-  zipBuf: Buffer,
-  entry: ZipEntry,
-): Buffer {
+function readZipEntry(zipBuf: Buffer, entry: ZipEntry): Buffer {
   // Skip local file header (30 bytes + name + extra)
   let localPos = entry.offset;
   const localNameLen = zipBuf.readUInt16LE(localPos + 26);
   const localExtraLen = zipBuf.readUInt16LE(localPos + 28);
   localPos += 30 + localNameLen + localExtraLen;
 
-  const compressed = zipBuf.subarray(
-    localPos,
-    localPos + entry.compressedSize,
-  );
+  const compressed = zipBuf.subarray(localPos, localPos + entry.compressedSize);
 
   if (entry.compressionMethod === 0) {
     // Stored (no compression)

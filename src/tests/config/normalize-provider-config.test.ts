@@ -46,7 +46,9 @@ describe("normalizeProviderConfig — non-custom defaultModel selection", () => 
 // --------------- buildProjectedConfig — thinkingLevel ---------------
 
 describe("buildProjectedConfig — thinkingLevel persistence", () => {
-  function stub(overrides: Partial<ReturnType<typeof buildProjectedConfig>> = {}) {
+  function stub(
+    overrides: Partial<ReturnType<typeof buildProjectedConfig>> = {},
+  ) {
     return buildProjectedConfig({
       activeProviderKey: "openrouter",
       providers: {},
@@ -59,7 +61,11 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
       memoryEnabled: true,
       memoryRuntime: {
         llm: { inheritFromActive: true, timeoutMs: 180000 },
-        embedding: { inheritFromActive: true, model: "text-embedding-3-small", timeoutMs: 180000 },
+        embedding: {
+          inheritFromActive: true,
+          model: "text-embedding-3-small",
+          timeoutMs: 180000,
+        },
         useEmbedding: false,
         maxNavSteps: 2,
         ingestionConcurrency: 4,
@@ -173,7 +179,9 @@ describe("ConfigStore.saveProvider — openrouter dynamic models", () => {
 });
 
 describe("buildProjectedConfig — visionModel pass-through", () => {
-  function stub(overrides: Partial<ReturnType<typeof buildProjectedConfig>> = {}) {
+  function stub(
+    overrides: Partial<ReturnType<typeof buildProjectedConfig>> = {},
+  ) {
     return buildProjectedConfig({
       activeProviderKey: "openrouter",
       providers: {},
@@ -186,7 +194,11 @@ describe("buildProjectedConfig — visionModel pass-through", () => {
       memoryEnabled: true,
       memoryRuntime: {
         llm: { inheritFromActive: true, timeoutMs: 180000 },
-        embedding: { inheritFromActive: true, model: "text-embedding-3-small", timeoutMs: 180000 },
+        embedding: {
+          inheritFromActive: true,
+          model: "text-embedding-3-small",
+          timeoutMs: 180000,
+        },
         useEmbedding: false,
         maxNavSteps: 2,
         ingestionConcurrency: 4,

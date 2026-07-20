@@ -78,15 +78,11 @@ export function Titlebar() {
       <button
         onClick={toggleFileBrowser}
         className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-surface-hover transition-colors"
-        title={
-          rightPanelMode === "files" ? "切回上下文面板" : "文件浏览"
-        }
+        title={rightPanelMode === "files" ? "切回上下文面板" : "文件浏览"}
       >
         <FolderOpen
           className={`w-3.5 h-3.5 ${
-            rightPanelMode === "files"
-              ? "text-accent"
-              : "text-text-muted"
+            rightPanelMode === "files" ? "text-accent" : "text-text-muted"
           }`}
         />
       </button>
@@ -102,9 +98,7 @@ export function Titlebar() {
       >
         <Globe
           className={`w-3.5 h-3.5 ${
-            rightPanelMode === "browser"
-              ? "text-accent"
-              : "text-text-muted"
+            rightPanelMode === "browser" ? "text-accent" : "text-text-muted"
           }`}
         />
       </button>

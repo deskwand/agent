@@ -26,7 +26,9 @@ const PROCESS_ICON_MAP: Record<
   search: <Search className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   websearch: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   browse: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  command: <MonitorPlay className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
+  command: (
+    <MonitorPlay className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
+  ),
   tool: <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   goal: <Target className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
 };

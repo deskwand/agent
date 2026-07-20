@@ -259,6 +259,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("config.discover-local", payload),
   },
 
+  subagent: {
+    listAgents: () => ipcRenderer.invoke("subagent.listAgents"),
+    setAgentModel: (name: string, model: string) => ipcRenderer.invoke("subagent.setAgentModel", name, model),
+    createAgent: (name: string, description: string, prompt: string) => ipcRenderer.invoke("subagent.createAgent", name, description, prompt),
+    deleteAgent: (name: string) => ipcRenderer.invoke("subagent.deleteAgent", name),
+  },
+
   // Window control methods
   window: {
     minimize: () => ipcRenderer.send("window.minimize"),
@@ -1110,6 +1117,20 @@ declare global {
             canGoForward: boolean;
           }) => void,
         ) => () => void;
+      };
+      subagent: {
+        listAgents: () => Promise<
+          Array<{
+            name: string;
+            displayName: string;
+            description: string;
+            source: string;
+            markdownModel?: string;
+          }>
+        >;
+        setAgentModel: (name: string, model: string) => Promise<{ success: boolean; error?: string }>;
+        createAgent: (name: string, description: string, prompt: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+        deleteAgent: (name: string) => Promise<{ success: boolean; error?: string }>;
       };
     };
   }

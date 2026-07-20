@@ -1292,8 +1292,17 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
   // First GUI operation triggers a one-time download to ~/.deskwand/python/.
   const pyArch = process.arch === "arm64" ? "arm64" : "x64";
   const pyPlatform = PLATFORM === "darwin" ? "darwin" : "linux";
-  const pyRoot = path.join(os.homedir(), ".deskwand", "python", `${pyPlatform}-${pyArch}`);
-  const pyBin = path.join(pyRoot, "bin", `python${PLATFORM === "win32" ? ".exe" : "3"}`);
+  const pyRoot = path.join(
+    os.homedir(),
+    ".deskwand",
+    "python",
+    `${pyPlatform}-${pyArch}`,
+  );
+  const pyBin = path.join(
+    pyRoot,
+    "bin",
+    `python${PLATFORM === "win32" ? ".exe" : "3"}`,
+  );
 
   if (PLATFORM === "darwin" || PLATFORM === "linux") {
     if (!(await pathExists(pyBin))) {
@@ -1301,9 +1310,11 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
         `[resolvePythonExec] Python not found locally, downloading from CDN...`,
         "Python Resolve",
       );
-      const tmpBall = path.join(os.tmpdir(), `deskwand-python-${pyPlatform}-${pyArch}.tar.gz`);
-      const pyUrl =
-        `https://file.deskwand.com/python/${pyPlatform}-${pyArch}.tar.gz`;
+      const tmpBall = path.join(
+        os.tmpdir(),
+        `deskwand-python-${pyPlatform}-${pyArch}.tar.gz`,
+      );
+      const pyUrl = `https://file.deskwand.com/python/${pyPlatform}-${pyArch}.tar.gz`;
 
       writeMCPLog(
         `[resolvePythonExec] Downloading Python from ${pyUrl} ...`,
@@ -1317,13 +1328,19 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
             if (res.statusCode === 301 || res.statusCode === 302) {
               const redirectUrl = res.headers.location;
               res.resume(); // drain first response body
-              if (!redirectUrl) { reject(new Error("Redirect without Location header")); return; }
+              if (!redirectUrl) {
+                reject(new Error("Redirect without Location header"));
+                return;
+              }
               const r2 = https.get(redirectUrl, { timeout: 30000 }, (r3) => {
                 r3.pipe(file);
                 file.on("finish", () => file.close(() => resolve()));
               });
               r2.on("error", reject);
-              r2.on("timeout", () => { r2.destroy(); reject(new Error("Download timeout")); });
+              r2.on("timeout", () => {
+                r2.destroy();
+                reject(new Error("Download timeout"));
+              });
               return;
             }
             if (res.statusCode !== 200) {
@@ -1335,7 +1352,10 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
             file.on("finish", () => file.close(() => resolve()));
           });
           req.on("error", reject);
-          req.on("timeout", () => { req.destroy(); reject(new Error("Download timeout")); });
+          req.on("timeout", () => {
+            req.destroy();
+            reject(new Error("Download timeout"));
+          });
         });
 
         fsSync.mkdirSync(path.dirname(pyRoot), { recursive: true });
@@ -1354,7 +1374,9 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
           "Python Resolve",
         );
         // Clean up partial files
-        try { if (fsSync.existsSync(tmpBall)) fsSync.unlinkSync(tmpBall); } catch {}
+        try {
+          if (fsSync.existsSync(tmpBall)) fsSync.unlinkSync(tmpBall);
+        } catch {}
       }
     }
 
@@ -2079,7 +2101,7 @@ async function executeCliclick(
     const hint =
       "\n\nmacOS 权限提示 / Permissions:\n" +
       "- System Settings → Privacy & Security → Accessibility：允许 DeskWand\n" +
-      "- System Settings → Privacy & Security → Automation：允许 DeskWand 控制 \"System Events\"\n";
+      '- System Settings → Privacy & Security → Automation：允许 DeskWand 控制 "System Events"\n';
     throw new Error(`${baseMessage}${hint}`);
   }
 }

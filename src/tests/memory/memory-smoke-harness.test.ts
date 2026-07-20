@@ -248,7 +248,9 @@ describe("memory smoke harness", () => {
   let storageRoot: string;
 
   beforeEach(() => {
-    storageRoot = fs.mkdtempSync(path.join(os.tmpdir(), "deskwand-memory-smoke-"));
+    storageRoot = fs.mkdtempSync(
+      path.join(os.tmpdir(), "deskwand-memory-smoke-"),
+    );
     rawDb = new DatabaseSync(":memory:");
     createSchema(rawDb);
     service = new MemoryService(createDatabaseInstance(rawDb), {

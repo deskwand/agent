@@ -3,20 +3,30 @@ import {
   API_PROVIDER_PRESETS,
   PI_AI_CURATED_PRESETS,
 } from "../../shared/api-model-presets";
-import type { SharedProviderPreset, VisionModelConfig } from "../../shared/api-model-presets";
+import type {
+  SharedProviderPreset,
+  VisionModelConfig,
+} from "../../shared/api-model-presets";
 import { VALID_THEME_PRESETS } from "../../shared/theme";
 import type { ThemePreset } from "../../shared/theme";
 import {
   normalizeWebAccessConfig,
   type WebAccessConfig,
 } from "../../shared/web-access";
+import {
+  DEFAULT_SUBAGENT_CONFIG,
+  type SubagentConfig,
+} from "../../shared/subagent-config";
 import { logWarn } from "../utils/logger";
 import {
   normalizeAnthropicBaseUrl,
   shouldUseAnthropicAuthToken,
 } from "./auth-utils";
 import { resolveModelContextWindow } from "../agent/pi-model-resolution";
-import { extractOAuthProviderId, isOAuthProfileKey } from "../../shared/oauth-utils";
+import {
+  extractOAuthProviderId,
+  isOAuthProfileKey,
+} from "../../shared/oauth-utils";
 
 export type ProviderType =
   | "openrouter"
@@ -117,6 +127,7 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
+  subagent?: SubagentConfig;
 }
 
 // ── StoredConfig: what actually hits disk (no root projection dupes) ─
@@ -138,6 +149,7 @@ interface StoredConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
+  subagent?: SubagentConfig;
 }
 
 export interface LegacyEnvBridgeSnapshot {
@@ -491,7 +503,8 @@ export function normalizeProviderConfig(
     model: "",
   };
   const fallbackModel = getDefaultProviderModel(profileKey);
-  const isCustomProfile = meta.provider === "custom" || meta.provider === "oauth";
+  const isCustomProfile =
+    meta.provider === "custom" || meta.provider === "oauth";
   const rawModels = Array.isArray(raw?.models) ? raw.models : [];
   // TODO: The openrouter special-case should move to provider metadata
   // (e.g. meta.preserveDynamicModels) once a second provider needs it.
@@ -783,10 +796,12 @@ export async function getPiAiModelPresets(): Promise<typeof PROVIDER_PRESETS> {
 
 export function buildProjectedConfig(stored: StoredConfig): AppConfig {
   const activeKey = stored.activeProviderKey || "openrouter";
-  const active = normalizeProviderConfig(activeKey, stored.providers[activeKey]);
+  const active = normalizeProviderConfig(
+    activeKey,
+    stored.providers[activeKey],
+  );
   const activeModel =
-    active.models.find((m) => m.id === active.defaultModel) ||
-    active.models[0];
+    active.models.find((m) => m.id === active.defaultModel) || active.models[0];
 
   const profiles = {} as Record<ProviderProfileKey, ProviderProfile>;
   const providers = {} as Record<ProviderProfileKey, ApiProviderConfig>;
@@ -830,6 +845,9 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
     webAccess: normalizeWebAccessConfig(stored.webAccess),
+    subagent: (stored.subagent as any)?.defaultModel?.mode === "unset"
+      ? DEFAULT_SUBAGENT_CONFIG
+      : (stored.subagent ?? DEFAULT_SUBAGENT_CONFIG),
   };
 }
 
@@ -860,6 +878,16 @@ export class ConfigStore {
     return this.getAll()[key];
   }
 
+  getSubagentConfig(): SubagentConfig {
+    return this.getAll().subagent ?? DEFAULT_SUBAGENT_CONFIG;
+  }
+
+  saveSubagentConfig(config: SubagentConfig): void {
+    const stored = { ...this.store.store };
+    stored.subagent = config;
+    this.store.set(stored);
+  }
+
   // ── Write ────────────────────────────────────────────────────────
 
   set<K extends keyof AppConfig>(key: K, value: AppConfig[K]): void {
@@ -875,8 +903,7 @@ export class ConfigStore {
       targetKey = updates.activeProviderKey;
     } else if (updates.provider !== undefined) {
       const cp =
-        updates.customProtocol ??
-        defaultProtocolForProvider(updates.provider);
+        updates.customProtocol ?? defaultProtocolForProvider(updates.provider);
       targetKey = profileKeyFromProvider(updates.provider, cp);
     }
 
@@ -927,18 +954,14 @@ export class ConfigStore {
           },
           nextModel,
         );
-        merged.models = newModel
-          ? [newModel, ...merged.models]
-          : merged.models;
+        merged.models = newModel ? [newModel, ...merged.models] : merged.models;
         merged.defaultModel = nextModel;
       } else if (
         updates.contextWindow !== undefined ||
         updates.maxTokens !== undefined
       ) {
         // Update active model even when model field unchanged
-        const active = merged.models.find(
-          (m) => m.id === current.defaultModel,
-        );
+        const active = merged.models.find((m) => m.id === current.defaultModel);
         if (active) {
           if (updates.contextWindow !== undefined)
             active.contextWindow = updates.contextWindow;
@@ -981,11 +1004,13 @@ export class ConfigStore {
       stored.visionModel = updates.visionModel;
     if (updates.webAccess !== undefined)
       stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
+    if (updates.subagent !== undefined)
+      stored.subagent = updates.subagent;
 
     stored.isConfigured =
       updates.isConfigured ??
       Object.values(stored.providers).some(
-        (p) => !!(p?.apiKey?.trim()) || p?.provider === "oauth",
+        (p) => !!p?.apiKey?.trim() || p?.provider === "oauth",
       );
 
     this.store.set(stored);
@@ -993,10 +1018,9 @@ export class ConfigStore {
 
   saveProvider(payload: SaveProviderPayload): AppConfig {
     const stored = { ...this.store.store };
-    stored.providers[payload.profileKey] =
-      sanitizeSaveProviderPayload(payload);
+    stored.providers[payload.profileKey] = sanitizeSaveProviderPayload(payload);
     stored.isConfigured = Object.values(stored.providers).some(
-      (p) => !!(p?.apiKey?.trim()) || p?.provider === "oauth",
+      (p) => !!p?.apiKey?.trim() || p?.provider === "oauth",
     );
     this.store.set(stored);
     return this.getAll();
@@ -1005,7 +1029,9 @@ export class ConfigStore {
   deleteProvider(payload: { profileKey: ProviderProfileKey }): AppConfig {
     const stored = { ...this.store.store };
     const removedEntirely =
-      isCustomProfile(payload.profileKey) || isOAuthProfileKey(payload.profileKey) || payload.profileKey === "openrouter";
+      isCustomProfile(payload.profileKey) ||
+      isOAuthProfileKey(payload.profileKey) ||
+      payload.profileKey === "openrouter";
     if (removedEntirely) {
       delete stored.providers[payload.profileKey];
     } else {
@@ -1038,7 +1064,7 @@ export class ConfigStore {
       stored.activeProviderKey = fallbackKey || remaining[0];
     }
     stored.isConfigured = Object.values(stored.providers).some(
-      (p) => !!(p?.apiKey?.trim()) || p?.provider === "oauth",
+      (p) => !!p?.apiKey?.trim() || p?.provider === "oauth",
     );
     this.store.set(stored);
     return this.getAll();

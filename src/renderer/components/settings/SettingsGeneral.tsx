@@ -37,9 +37,15 @@ export function SettingsGeneral() {
     { value: "paper" as const, label: t("general.themePresetPaper", "Paper") },
     { value: "void" as const, label: t("general.themePresetVoid", "Void") },
     { value: "ocean" as const, label: t("general.themePresetOcean", "Ocean") },
-    { value: "forest" as const, label: t("general.themePresetForest", "Forest") },
+    {
+      value: "forest" as const,
+      label: t("general.themePresetForest", "Forest"),
+    },
     { value: "ember" as const, label: t("general.themePresetEmber", "Ember") },
-    { value: "aurora" as const, label: t("general.themePresetAurora", "Aurora") },
+    {
+      value: "aurora" as const,
+      label: t("general.themePresetAurora", "Aurora"),
+    },
   ];
 
   return (
@@ -150,9 +156,7 @@ export function SettingsGeneral() {
         <h4 className="text-sm font-medium text-text-primary">
           {t("general.telemetry")}
         </h4>
-        <p className="text-xs text-text-muted">
-          {t("general.telemetryDesc")}
-        </p>
+        <p className="text-xs text-text-muted">{t("general.telemetryDesc")}</p>
         <div className="flex gap-2">
           <button
             onClick={() => updateSettings({ telemetryEnabled: true })}

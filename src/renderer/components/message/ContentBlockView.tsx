@@ -288,7 +288,10 @@ export const ContentBlockView = memo(function ContentBlockView({
         className?: string;
         children?: React.ReactNode;
       }) {
-        const { isInline, codeContent, language } = getCodeRenderMode(className, children);
+        const { isInline, codeContent, language } = getCodeRenderMode(
+          className,
+          children,
+        );
 
         if (isInline) {
           const parts = splitTextByFileMentions(codeContent);
@@ -391,167 +394,167 @@ export const ContentBlockView = memo(function ContentBlockView({
   const content = (() => {
     switch (block.type) {
       case "text": {
-      const textBlock = block as { type: "text"; text: string };
-      const text = textBlock.text || "";
-      const normalizedText = normalizeCitationMarkdownLinks(
-        normalizeLocalFileMarkdownLinks(normalizeLatexDelimiters(text)),
-      );
-
-      if (!text) {
-        return (
-          <span className="text-text-muted italic">
-            {t("messageCard.emptyText")}
-          </span>
+        const textBlock = block as { type: "text"; text: string };
+        const text = textBlock.text || "";
+        const normalizedText = normalizeCitationMarkdownLinks(
+          normalizeLocalFileMarkdownLinks(normalizeLatexDelimiters(text)),
         );
-      }
 
-      // Simple text display for user messages, Markdown for assistant
-      if (isUser) {
+        if (!text) {
+          return (
+            <span className="text-text-muted italic">
+              {t("messageCard.emptyText")}
+            </span>
+          );
+        }
+
+        // Simple text display for user messages, Markdown for assistant
+        if (isUser) {
+          return (
+            <p className="message-user-text text-text-primary whitespace-pre-wrap break-words text-left">
+              {text}
+              {isStreaming && <span className="eff-cursor" />}
+            </p>
+          );
+        }
+
         return (
-          <p className="message-user-text text-text-primary whitespace-pre-wrap break-words text-left">
-            {text}
-            {isStreaming && (
-              <span className="eff-cursor" />
-            )}
-          </p>
-        );
-      }
-
-      return (
-        <PanelErrorBoundary
-          name="MessageMarkdown"
-          fallback={
-            <div className="prose-chat max-w-full text-text-primary whitespace-pre-wrap break-words">
-              {normalizedText}
-            </div>
-          }
-        >
-          <Suspense
+          <PanelErrorBoundary
+            name="MessageMarkdown"
             fallback={
               <div className="prose-chat max-w-full text-text-primary whitespace-pre-wrap break-words">
                 {normalizedText}
               </div>
             }
           >
-            <MessageMarkdown
-              normalizedText={normalizedText}
-              components={markdownComponents}
-            />
-          </Suspense>
-        </PanelErrorBoundary>
-      );
-    }
-
-    case "image": {
-      const imageBlock = block as {
-        type: "image";
-        source: { type: "base64"; media_type: string; data: string };
-      };
-      if (!imageBlock.source?.media_type || !imageBlock.source?.data) {
-        return null;
-      }
-      const ALLOWED_IMAGE_TYPES = new Set([
-        "image/jpeg",
-        "image/png",
-        "image/gif",
-        "image/webp",
-      ]);
-      if (!ALLOWED_IMAGE_TYPES.has(imageBlock.source.media_type)) {
-        return null;
-      }
-      const { source } = imageBlock;
-      const imageSrc = `data:${source.media_type};base64,${source.data}`;
-
-      const handleImageClick = () => {
-        if (!allBlocks) return;
-        const allImages: ImageSource[] = allBlocks
-          .filter(
-            (b): b is ImageContent =>
-              b.type === "image" &&
-              b.source?.media_type != null &&
-              b.source?.data != null &&
-              ALLOWED_IMAGE_TYPES.has(b.source.media_type),
-          )
-          .map((b) => ({
-            src: `data:${b.source.media_type};base64,${b.source.data}`,
-          }));
-        if (allImages.length === 0) return;
-        const clickedIdx = allImages.findIndex(
-          (img) => img.src === imageSrc,
+            <Suspense
+              fallback={
+                <div className="prose-chat max-w-full text-text-primary whitespace-pre-wrap break-words">
+                  {normalizedText}
+                </div>
+              }
+            >
+              <MessageMarkdown
+                normalizedText={normalizedText}
+                components={markdownComponents}
+              />
+            </Suspense>
+          </PanelErrorBoundary>
         );
-        openLightbox(allImages, clickedIdx >= 0 ? clickedIdx : 0, false, 'message');
-      };
+      }
 
-      return (
-        <div className={`${isUser ? "inline-block" : ""}`}>
-          <img
-            src={imageSrc}
-            alt={t("messageCard.pastedContentAlt")}
-            className="w-full max-w-full rounded-lg border border-border cursor-pointer hover:opacity-90 transition-opacity"
-            style={{ maxHeight: "600px", objectFit: "contain" }}
-            onClick={handleImageClick}
-          />
-        </div>
-      );
-    }
+      case "image": {
+        const imageBlock = block as {
+          type: "image";
+          source: { type: "base64"; media_type: string; data: string };
+        };
+        if (!imageBlock.source?.media_type || !imageBlock.source?.data) {
+          return null;
+        }
+        const ALLOWED_IMAGE_TYPES = new Set([
+          "image/jpeg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+        ]);
+        if (!ALLOWED_IMAGE_TYPES.has(imageBlock.source.media_type)) {
+          return null;
+        }
+        const { source } = imageBlock;
+        const imageSrc = `data:${source.media_type};base64,${source.data}`;
 
-    case "file_attachment": {
-      const fileBlock = block as FileAttachmentContent;
-      const attachmentPath = fileBlock.relativePath
-        ? `${currentWorkingDir}/${fileBlock.relativePath}`
-        : undefined;
-      const iDot = fileBlock.filename.lastIndexOf(".");
-      const attExt = iDot > 0 ? fileBlock.filename.slice(iDot).toLowerCase() : "";
-      const canPreview =
-        attachmentPath && isPreviewableExt(attExt);
+        const handleImageClick = () => {
+          if (!allBlocks) return;
+          const allImages: ImageSource[] = allBlocks
+            .filter(
+              (b): b is ImageContent =>
+                b.type === "image" &&
+                b.source?.media_type != null &&
+                b.source?.data != null &&
+                ALLOWED_IMAGE_TYPES.has(b.source.media_type),
+            )
+            .map((b) => ({
+              src: `data:${b.source.media_type};base64,${b.source.data}`,
+            }));
+          if (allImages.length === 0) return;
+          const clickedIdx = allImages.findIndex((img) => img.src === imageSrc);
+          openLightbox(
+            allImages,
+            clickedIdx >= 0 ? clickedIdx : 0,
+            false,
+            "message",
+          );
+        };
 
-      return (
-        <div
-          className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden ${canPreview ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
-          onClick={() => {
-            if (canPreview && attachmentPath) {
-              setPreviewFile({
-                path: attachmentPath,
-                name: fileBlock.filename,
-              });
-            }
-          }}
-
-        >
-          <FileText className="w-4 h-4 text-accent flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs text-text-primary truncate">
-              {fileBlock.filename}
-            </p>
+        return (
+          <div className={`${isUser ? "inline-block" : ""}`}>
+            <img
+              src={imageSrc}
+              alt={t("messageCard.pastedContentAlt")}
+              className="w-full max-w-full rounded-lg border border-border cursor-pointer hover:opacity-90 transition-opacity"
+              style={{ maxHeight: "600px", objectFit: "contain" }}
+              onClick={handleImageClick}
+            />
           </div>
-        </div>
-      );
-    }
+        );
+      }
 
-    case "tool_use":
-      return (
-        <ToolUseBlock
-          block={block as ToolUseContent}
-          allBlocks={allBlocks}
-          message={message}
-        />
-      );
+      case "file_attachment": {
+        const fileBlock = block as FileAttachmentContent;
+        const attachmentPath = fileBlock.relativePath
+          ? `${currentWorkingDir}/${fileBlock.relativePath}`
+          : undefined;
+        const iDot = fileBlock.filename.lastIndexOf(".");
+        const attExt =
+          iDot > 0 ? fileBlock.filename.slice(iDot).toLowerCase() : "";
+        const canPreview = attachmentPath && isPreviewableExt(attExt);
 
-    case "tool_result":
-      return (
-        <ToolResultBlock
-          block={block as ToolResultContent}
-          allBlocks={allBlocks}
-          message={message}
-        />
-      );
+        return (
+          <div
+            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden ${canPreview ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
+            onClick={() => {
+              if (canPreview && attachmentPath) {
+                setPreviewFile({
+                  path: attachmentPath,
+                  name: fileBlock.filename,
+                });
+              }
+            }}
+          >
+            <FileText className="w-4 h-4 text-accent flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-text-primary truncate">
+                {fileBlock.filename}
+              </p>
+            </div>
+          </div>
+        );
+      }
 
-    case "thinking":
-      return (
-        <ThinkingBlock
-          block={block as { type: "thinking"; thinking: string }}
-        />
-      );
+      case "tool_use":
+        return (
+          <ToolUseBlock
+            block={block as ToolUseContent}
+            allBlocks={allBlocks}
+            message={message}
+          />
+        );
+
+      case "tool_result":
+        return (
+          <ToolResultBlock
+            block={block as ToolResultContent}
+            allBlocks={allBlocks}
+            message={message}
+          />
+        );
+
+      case "thinking":
+        return (
+          <ThinkingBlock
+            block={block as { type: "thinking"; thinking: string }}
+          />
+        );
 
       default:
         return null;

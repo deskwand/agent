@@ -317,9 +317,13 @@ function installSharedIpcBridge(): void {
         }
 
         case "stream.executionTime":
-          store.updateMessage(event.payload.sessionId, event.payload.messageId, {
-            executionTimeMs: event.payload.executionTimeMs,
-          });
+          store.updateMessage(
+            event.payload.sessionId,
+            event.payload.messageId,
+            {
+              executionTimeMs: event.payload.executionTimeMs,
+            },
+          );
           break;
 
         // Empty content is the clear signal sent from tool_execution_end.
@@ -357,10 +361,7 @@ function installSharedIpcBridge(): void {
             "[useIPC] config.status received:",
             event.payload.isConfigured,
           );
-          applyConfigSnapshot(
-            event.payload.config,
-            event.payload.isConfigured,
-          );
+          applyConfigSnapshot(event.payload.config, event.payload.isConfigured);
           break;
         }
 
@@ -484,7 +485,6 @@ function installSharedIpcBridge(): void {
       console.error("[useIPC] Failed to bootstrap config/theme state:", error);
     }
   })();
-
 }
 
 export function useIPC() {
@@ -576,7 +576,10 @@ export function useIPC() {
             "grep",
           ],
           memoryEnabled: true,
-          isProjectMode: !!cwd && !cwd.endsWith(`/${DEFAULT_WORKDIR_DIRNAME}`) && !cwd.endsWith(`\\${DEFAULT_WORKDIR_DIRNAME}`),
+          isProjectMode:
+            !!cwd &&
+            !cwd.endsWith(`/${DEFAULT_WORKDIR_DIRNAME}`) &&
+            !cwd.endsWith(`\\${DEFAULT_WORKDIR_DIRNAME}`),
           thinkingLevel: thinkingLevel || "medium",
           providerProfileKey,
           model,
@@ -650,7 +653,10 @@ export function useIPC() {
           addMessage(session.id, userMessage);
           startExecutionClock(session.id, userMessage.timestamp);
           // Clear completed goal status when user sends a new message
-          if (useAppStore.getState().sessionStates[session.id]?.goalStatus?.status === "complete") {
+          if (
+            useAppStore.getState().sessionStates[session.id]?.goalStatus
+              ?.status === "complete"
+          ) {
             useAppStore.getState().setGoalStatus(session.id, undefined);
           }
 

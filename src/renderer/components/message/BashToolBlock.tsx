@@ -70,7 +70,7 @@ export const BashToolBlock = memo(function BashToolBlock({
   const partialToolResult = useAppStore((s) =>
     message?.sessionId
       ? (s.sessionStates[message.sessionId]?.partialToolResults?.[block.id] ??
-          null)
+        null)
       : null,
   );
   const [expanded, setExpanded] = useState(false);
@@ -153,8 +153,7 @@ export const BashToolBlock = memo(function BashToolBlock({
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
       >
         {/* Status icon */}
-        <div
-          className="flex-shrink-0 pt-0.5 text-text-muted">
+        <div className="flex-shrink-0 pt-0.5 text-text-muted">
           {isRunning ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : isError ? (
@@ -166,9 +165,9 @@ export const BashToolBlock = memo(function BashToolBlock({
 
         {/* Tool icon */}
         {showIcon ? (
-        <div className="flex-shrink-0 pt-0.5 text-text-muted">
-          {getToolIcon(block.name)}
-        </div>
+          <div className="flex-shrink-0 pt-0.5 text-text-muted">
+            {getToolIcon(block.name)}
+          </div>
         ) : null}
 
         {/* Label: $ command · exit N */}
@@ -198,17 +197,20 @@ export const BashToolBlock = memo(function BashToolBlock({
       </button>
 
       {/* Expanded content — streaming during execution, terminal after */}
-      {expanded && isRunning && partialToolResult && partialToolResult.content && (
-        <div className="animate-fade-in px-3 py-2">
-          <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
-            <Loader2 className="w-3 h-3 animate-spin text-accent" />
-            {t("tool.sectionStreaming")}
+      {expanded &&
+        isRunning &&
+        partialToolResult &&
+        partialToolResult.content && (
+          <div className="animate-fade-in px-3 py-2">
+            <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin text-accent" />
+              {t("tool.sectionStreaming")}
+            </div>
+            <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">
+              {partialToolResult.content}
+            </pre>
           </div>
-          <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">
-            {partialToolResult.content}
-          </pre>
-        </div>
-      )}
+        )}
 
       {expanded && !isRunning && (
         <div className="animate-fade-in mx-3 mb-3 rounded-lg overflow-hidden border border-surface-muted">

@@ -455,6 +455,13 @@
     color-scheme: light dark;
   }
 
+  /* Consistent focus ring for native form elements — overrides browser's default outline */
+  select,
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+  textarea {
+    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-30;
+  }
+
   /* Custom scrollbar — only on non-macOS platforms.
      macOS uses native overlay scrollbars which are better. */
   @supports not (font: -apple-system-body) {

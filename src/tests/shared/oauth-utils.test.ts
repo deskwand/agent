@@ -16,7 +16,9 @@ describe("oauthProfileKey", () => {
 describe("extractOAuthProviderId", () => {
   it("extracts provider ID from oauth: profile key", () => {
     expect(extractOAuthProviderId("oauth:openai-codex")).toBe("openai-codex");
-    expect(extractOAuthProviderId("oauth:github-copilot")).toBe("github-copilot");
+    expect(extractOAuthProviderId("oauth:github-copilot")).toBe(
+      "github-copilot",
+    );
   });
 
   it("returns undefined for non-oauth keys", () => {

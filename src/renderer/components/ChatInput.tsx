@@ -275,7 +275,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         return updated;
       });
       // Close lightbox only if currently showing pasted images
-      if (lightboxSource === 'pasted') closeLightbox();
+      if (lightboxSource === "pasted") closeLightbox();
     };
 
     const removeFile = (index: number) => {
@@ -289,7 +289,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         return updated;
       });
       // Close lightbox only if removing an image file while showing attached images
-      if (lightboxSource === 'attached' && isImage) closeLightbox();
+      if (lightboxSource === "attached" && isImage) closeLightbox();
     };
 
     // --- File selection ---
@@ -620,7 +620,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     src={img.url}
                     alt={t("common.pastedImageAlt", { index: index + 1 })}
                     className="w-full aspect-square object-cover rounded-lg border border-border block cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => openLightbox(pastedImages.map((img) => ({ src: img.url })), index, false, 'pasted')}
+                    onClick={() =>
+                      openLightbox(
+                        pastedImages.map((img) => ({ src: img.url })),
+                        index,
+                        false,
+                        "pasted",
+                      )
+                    }
                   />
                   <button
                     type="button"
@@ -666,7 +673,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     name: f.file.name,
                     filePath: f.file.path || undefined,
                   }));
-                  openLightbox(initialImages, startIdx >= 0 ? startIdx : 0, true, 'attached');
+                  openLightbox(
+                    initialImages,
+                    startIdx >= 0 ? startIdx : 0,
+                    true,
+                    "attached",
+                  );
 
                   const loadedImages = await Promise.all(
                     imageFiles.map(async (f) => {
@@ -718,7 +730,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
                   // Discard results if a newer click started loading
                   if (token !== attachLoadTokenRef.current) return;
-                  openLightbox(loadedImages, startIdx >= 0 ? startIdx : 0, false, 'attached');
+                  openLightbox(
+                    loadedImages,
+                    startIdx >= 0 ? startIdx : 0,
+                    false,
+                    "attached",
+                  );
                 };
 
                 return (

@@ -12,7 +12,11 @@ import { detectImageMimeType } from "../../main/agent/tools/vision-describe";
 
 // ── Helpers ──
 
-function writeMinimalImage(dir: string, name: string, header: number[]): string {
+function writeMinimalImage(
+  dir: string,
+  name: string,
+  header: number[],
+): string {
   const filePath = path.join(dir, name);
   const buf = Buffer.alloc(64, 0);
   for (let i = 0; i < header.length; i++) {
@@ -57,8 +61,8 @@ describe("vision-describe MIME detection", () => {
     buf[1] = 0x49; // I
     buf[2] = 0x46; // F
     buf[3] = 0x46; // F
-    buf[8] = 0x57;  // W
-    buf[9] = 0x45;  // E
+    buf[8] = 0x57; // W
+    buf[9] = 0x45; // E
     buf[10] = 0x42; // B
     buf[11] = 0x50; // P
     const fp = path.join(tempDir, "test.webp");
@@ -73,13 +77,19 @@ describe("vision-describe MIME detection", () => {
 
   it("detects SVG by content (xml)", () => {
     const fp = path.join(tempDir, "test.svg");
-    fs.writeFileSync(fp, '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg">');
+    fs.writeFileSync(
+      fp,
+      '<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg">',
+    );
     expect(detectImageMimeType(fp)).toBe("image/svg+xml");
   });
 
   it("detects SVG by content (bare svg)", () => {
     const fp = path.join(tempDir, "test.svg");
-    fs.writeFileSync(fp, '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>');
+    fs.writeFileSync(
+      fp,
+      '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40"/></svg>',
+    );
     expect(detectImageMimeType(fp)).toBe("image/svg+xml");
   });
 
@@ -116,16 +126,18 @@ describe("vision_describe tool execute — error branches", () => {
   // Loads the real tool factory but with test isolation via temp dirs
   async function runExecute(params: { path: string }) {
     // Dynamic import to avoid module caching issues
-    const { createVisionDescribeTool } = await import(
-      "../../main/agent/tools/vision-describe"
-    );
+    const { createVisionDescribeTool } =
+      await import("../../main/agent/tools/vision-describe");
     const workspaceDir = process.cwd();
-    const tool = createVisionDescribeTool({
-      enabled: true,
-      provider: "openai" as const,
-      apiKey: "sk-test",
-      model: "gpt-4o",
-    }, workspaceDir);
+    const tool = createVisionDescribeTool(
+      {
+        enabled: true,
+        provider: "openai" as const,
+        apiKey: "sk-test",
+        model: "gpt-4o",
+      },
+      workspaceDir,
+    );
     return tool.execute(
       "call-1",
       params,
@@ -139,23 +151,37 @@ describe("vision_describe tool execute — error branches", () => {
     const result = await runExecute({
       path: path.join(tempDir, "nonexistent.png"),
     });
-    expect((result.content[0] as { type: string; text?: string }).type).toBe("text");
-    expect((result.content[0] as { type: string; text?: string }).text).toContain("Error: File not found");
+    expect((result.content[0] as { type: string; text?: string }).type).toBe(
+      "text",
+    );
+    expect(
+      (result.content[0] as { type: string; text?: string }).text,
+    ).toContain("Error: File not found");
   });
 
   it("returns error when path is a directory", async () => {
     const result = await runExecute({ path: tempDir });
-    expect((result.content[0] as { type: string; text?: string }).type).toBe("text");
-    expect((result.content[0] as { type: string; text?: string }).text).toContain("Error: Not a file");
+    expect((result.content[0] as { type: string; text?: string }).type).toBe(
+      "text",
+    );
+    expect(
+      (result.content[0] as { type: string; text?: string }).text,
+    ).toContain("Error: Not a file");
   });
 
   it("returns error when file is not a recognized image", async () => {
     const txtPath = path.join(tempDir, "notes.txt");
     fs.writeFileSync(txtPath, "plain text");
     const result = await runExecute({ path: txtPath });
-    expect((result.content[0] as { type: string; text?: string }).type).toBe("text");
-    expect((result.content[0] as { type: string; text?: string }).text).toContain("Error: Not a recognized image format");
-    expect((result.content[0] as { type: string; text?: string }).text).toContain("notes.txt");
+    expect((result.content[0] as { type: string; text?: string }).type).toBe(
+      "text",
+    );
+    expect(
+      (result.content[0] as { type: string; text?: string }).text,
+    ).toContain("Error: Not a recognized image format");
+    expect(
+      (result.content[0] as { type: string; text?: string }).text,
+    ).toContain("notes.txt");
   });
 
   it("returns error when image exceeds 20 MB limit", async () => {
@@ -170,9 +196,15 @@ describe("vision_describe tool execute — error branches", () => {
     fs.closeSync(fd);
 
     const result = await runExecute({ path: bigPath });
-    expect((result.content[0] as { type: string; text?: string }).type).toBe("text");
-    expect((result.content[0] as { type: string; text?: string }).text).toContain("Error: Image too large");
-    expect((result.content[0] as { type: string; text?: string }).text).toContain("MB");
+    expect((result.content[0] as { type: string; text?: string }).type).toBe(
+      "text",
+    );
+    expect(
+      (result.content[0] as { type: string; text?: string }).text,
+    ).toContain("Error: Image too large");
+    expect(
+      (result.content[0] as { type: string; text?: string }).text,
+    ).toContain("MB");
   });
 
   it("returns SVG content as plain text (no API call)", async () => {
@@ -180,15 +212,20 @@ describe("vision_describe tool execute — error branches", () => {
     fs.writeFileSync(svgPath, '<svg><rect width="10" height="10"/></svg>');
 
     const result = await runExecute({ path: svgPath });
-    expect((result.content[0] as { type: string; text?: string }).type).toBe("text");
-    expect((result.content[0] as { type: string; text?: string }).text).toContain("[SVG Image");
-    expect((result.content[0] as { type: string; text?: string }).text).toContain("<svg>");
+    expect((result.content[0] as { type: string; text?: string }).type).toBe(
+      "text",
+    );
+    expect(
+      (result.content[0] as { type: string; text?: string }).text,
+    ).toContain("[SVG Image");
+    expect(
+      (result.content[0] as { type: string; text?: string }).text,
+    ).toContain("<svg>");
   });
 
   it("accepts optional prompt parameter in params", async () => {
-    const { createVisionDescribeTool } = await import(
-      "../../main/agent/tools/vision-describe"
-    );
+    const { createVisionDescribeTool } =
+      await import("../../main/agent/tools/vision-describe");
     const pngPath = path.join(tempDir, "prompt-test.png");
     const buf = Buffer.alloc(64, 0);
     buf[0] = 0x89;
@@ -198,12 +235,15 @@ describe("vision_describe tool execute — error branches", () => {
     fs.writeFileSync(pngPath, buf);
 
     const workspaceDir = process.cwd();
-    const tool = createVisionDescribeTool({
-      enabled: true,
-      provider: "openai" as const,
-      apiKey: "sk-test",
-      model: "gpt-4o",
-    }, workspaceDir);
+    const tool = createVisionDescribeTool(
+      {
+        enabled: true,
+        provider: "openai" as const,
+        apiKey: "sk-test",
+        model: "gpt-4o",
+      },
+      workspaceDir,
+    );
 
     // Should not throw — prompt is optional, passes through to execute
     const result = await tool.execute(
@@ -221,9 +261,8 @@ describe("vision_describe tool execute — error branches", () => {
   });
 
   it("sends custom prompt to vision API when provided", async () => {
-    const { createVisionDescribeTool } = await import(
-      "../../main/agent/tools/vision-describe"
-    );
+    const { createVisionDescribeTool } =
+      await import("../../main/agent/tools/vision-describe");
     const pngPath = path.join(tempDir, "prompt-send-test.png");
     const buf = Buffer.alloc(64, 0);
     buf[0] = 0x89;
@@ -270,16 +309,17 @@ describe("vision_describe tool execute — error branches", () => {
       // Verify the custom prompt was sent in the API request body
       expect(capturedBody).not.toBeNull();
       expect(capturedBody!).toContain(customPrompt);
-      expect(capturedBody!).not.toContain("Please describe this image in detail");
+      expect(capturedBody!).not.toContain(
+        "Please describe this image in detail",
+      );
     } finally {
       global.fetch = originalFetch;
     }
   });
 
   it("treats empty string prompt same as no prompt", async () => {
-    const { createVisionDescribeTool } = await import(
-      "../../main/agent/tools/vision-describe"
-    );
+    const { createVisionDescribeTool } =
+      await import("../../main/agent/tools/vision-describe");
     const pngPath = path.join(tempDir, "empty-prompt-test.png");
     const buf = Buffer.alloc(64, 0);
     buf[0] = 0x89;
@@ -289,12 +329,15 @@ describe("vision_describe tool execute — error branches", () => {
     fs.writeFileSync(pngPath, buf);
 
     const workspaceDir = process.cwd();
-    const tool = createVisionDescribeTool({
-      enabled: true,
-      provider: "openai" as const,
-      apiKey: "sk-test",
-      model: "gpt-4o",
-    }, workspaceDir);
+    const tool = createVisionDescribeTool(
+      {
+        enabled: true,
+        provider: "openai" as const,
+        apiKey: "sk-test",
+        model: "gpt-4o",
+      },
+      workspaceDir,
+    );
 
     // With empty prompt — should not throw or reject the parameter
     const result = await tool.execute(
@@ -321,16 +364,18 @@ describe("vision_describe tool execute — error branches", () => {
     fs.writeFileSync(pngPath, buf);
 
     try {
-      const { createVisionDescribeTool } = await import(
-        "../../main/agent/tools/vision-describe"
-      );
+      const { createVisionDescribeTool } =
+        await import("../../main/agent/tools/vision-describe");
       const workspaceDir = process.cwd();
-      const tool = createVisionDescribeTool({
-        enabled: true,
-        provider: "openai" as const,
-        apiKey: "sk-test",
-        model: "gpt-4o",
-      }, workspaceDir);
+      const tool = createVisionDescribeTool(
+        {
+          enabled: true,
+          provider: "openai" as const,
+          apiKey: "sk-test",
+          model: "gpt-4o",
+        },
+        workspaceDir,
+      );
       const result = await tool.execute(
         "call-rel",
         { path: "test-relative-vision.png" },
@@ -340,7 +385,9 @@ describe("vision_describe tool execute — error branches", () => {
       );
       // Should either reach the API (fail), or for small PNG recognize it
       // and attempt the API call — either way, not a "file not found" error
-      expect((result.content[0] as { type: string; text?: string }).text).not.toContain("Error: File not found");
+      expect(
+        (result.content[0] as { type: string; text?: string }).text,
+      ).not.toContain("Error: File not found");
     } finally {
       try {
         fs.unlinkSync(pngPath);

@@ -78,7 +78,11 @@ async function resolveRemoteUrl(
     }
     const literalFamily = net.isIP(hostname);
     if (literalFamily) {
-      assertPublicAddress(hostname, hostname, parseAllowRanges(options.allowRanges));
+      assertPublicAddress(
+        hostname,
+        hostname,
+        parseAllowRanges(options.allowRanges),
+      );
       return {
         url,
         addresses: [{ address: hostname, family: literalFamily }],

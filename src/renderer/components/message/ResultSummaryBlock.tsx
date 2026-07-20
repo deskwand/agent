@@ -7,7 +7,10 @@ import {
   type DisplayBlock,
 } from "../../utils/tool-display-blocks";
 import { extractFilePathFromToolInput } from "../../utils/tool-output-path";
-import { countDiffLines, findToolResult } from "../../utils/tool-result-summary";
+import {
+  countDiffLines,
+  findToolResult,
+} from "../../utils/tool-result-summary";
 import { shortenPath } from "./toolHelpers";
 import { ToolUseBlock } from "./ToolUseBlock";
 import { useAppStore } from "../../store";

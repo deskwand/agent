@@ -44,7 +44,9 @@ export function extractVideoReferences(
 ): VideoReference[] {
   const output = new Map<string, VideoReference>();
 
-  for (const part of splitTextByFileMentions(stripMarkdownInlineLinks(markdown))) {
+  for (const part of splitTextByFileMentions(
+    stripMarkdownInlineLinks(markdown),
+  )) {
     if (part.type === "file") addReference(output, part.value, workspacePath);
   }
 

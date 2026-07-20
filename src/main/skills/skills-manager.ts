@@ -155,7 +155,10 @@ export class SkillsManager {
           log(`Loaded built-in skill: ${skill.name}`);
         }
       } catch (error) {
-        logError("Failed to load built-in skills from .deskwand/skills:", error);
+        logError(
+          "Failed to load built-in skills from .deskwand/skills:",
+          error,
+        );
       }
     }
   }
@@ -687,10 +690,7 @@ export class SkillsManager {
       if (!frontMatter) {
         errors.push("SKILL.md has invalid or missing YAML frontmatter");
       } else {
-        if (
-          typeof frontMatter.name !== "string" ||
-          !frontMatter.name.trim()
-        ) {
+        if (typeof frontMatter.name !== "string" || !frontMatter.name.trim()) {
           errors.push('SKILL.md missing "name" in frontmatter');
         }
         if (

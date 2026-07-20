@@ -98,23 +98,33 @@ describe("chat history incremental render helpers", () => {
 
   it("waits to initialize a session window until turns are available", () => {
     expect(shouldInitializeVisibleTurns(null, null, 3)).toBe(false);
-    expect(shouldInitializeVisibleTurns("session-1", "session-1", 3)).toBe(false);
+    expect(shouldInitializeVisibleTurns("session-1", "session-1", 3)).toBe(
+      false,
+    );
     expect(shouldInitializeVisibleTurns("session-1", null, 0)).toBe(false);
     expect(shouldInitializeVisibleTurns("session-1", null, 3)).toBe(true);
   });
 
   it("uses the initial turn window on first render of a new hydrated session", () => {
-    expect(getEffectiveVisibleTurnStart("session-2", "session-1", 12, 0, 8)).toBe(4);
+    expect(
+      getEffectiveVisibleTurnStart("session-2", "session-1", 12, 0, 8),
+    ).toBe(4);
     expect(getEffectiveVisibleTurnStart("session-2", null, 12, 3, 8)).toBe(4);
   });
 
   it("keeps the current visible turn start after the session window is initialized", () => {
-    expect(getEffectiveVisibleTurnStart("session-1", "session-1", 12, 5, 8)).toBe(5);
+    expect(
+      getEffectiveVisibleTurnStart("session-1", "session-1", 12, 5, 8),
+    ).toBe(5);
   });
 
   it("clamps stale visible turn state instead of falling back to full history", () => {
-    expect(getEffectiveVisibleTurnStart("session-1", "session-1", 3, 99, 8)).toBe(2);
-    expect(getEffectiveVisibleTurnStart("session-1", "session-1", 0, 99, 8)).toBe(0);
+    expect(
+      getEffectiveVisibleTurnStart("session-1", "session-1", 3, 99, 8),
+    ).toBe(2);
+    expect(
+      getEffectiveVisibleTurnStart("session-1", "session-1", 0, 99, 8),
+    ).toBe(0);
   });
 
   it("treats any session id change as a reset boundary for prepend state", () => {
@@ -145,17 +155,17 @@ describe("chat history incremental render helpers", () => {
   });
 
   it("treats a session with no hydrated store state as loading instead of empty", () => {
-    expect(
-      shouldShowHydratingHistoryState("session-2", true, false, 0),
-    ).toBe(true);
-    expect(
-      shouldShowHydratingHistoryState("session-2", true, true, 0),
-    ).toBe(false);
-    expect(
-      shouldShowHydratingHistoryState("session-2", true, false, 1),
-    ).toBe(false);
-    expect(
-      shouldShowHydratingHistoryState("session-2", true, true, 0),
-    ).toBe(false);
+    expect(shouldShowHydratingHistoryState("session-2", true, false, 0)).toBe(
+      true,
+    );
+    expect(shouldShowHydratingHistoryState("session-2", true, true, 0)).toBe(
+      false,
+    );
+    expect(shouldShowHydratingHistoryState("session-2", true, false, 1)).toBe(
+      false,
+    );
+    expect(shouldShowHydratingHistoryState("session-2", true, true, 0)).toBe(
+      false,
+    );
   });
 });

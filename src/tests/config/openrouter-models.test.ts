@@ -22,33 +22,34 @@ describe("openrouter-models", () => {
   });
 
   it("sorts free models first and appends a free label", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          data: [
-            {
-              id: "paid/model",
-              name: "Paid Model",
-              context_length: 64000,
-              top_provider: { max_completion_tokens: 4096 },
-              architecture: { input_modalities: ["text"] },
-              pricing: { prompt: "0.000001", completion: "0.000002" },
-            },
-            {
-              id: "free/model",
-              name: "Free Model",
-              context_length: 128000,
-              top_provider: { max_completion_tokens: 8192 },
-              architecture: { input_modalities: ["text", "image"] },
-              pricing: { prompt: "0", completion: "0" },
-            },
-          ],
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      ),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "paid/model",
+                name: "Paid Model",
+                context_length: 64000,
+                top_provider: { max_completion_tokens: 4096 },
+                architecture: { input_modalities: ["text"] },
+                pricing: { prompt: "0.000001", completion: "0.000002" },
+              },
+              {
+                id: "free/model",
+                name: "Free Model",
+                context_length: 128000,
+                top_provider: { max_completion_tokens: 8192 },
+                architecture: { input_modalities: ["text", "image"] },
+                pricing: { prompt: "0", completion: "0" },
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
     );
 
     const result = await fetchOpenRouterModels(fetchMock);
@@ -65,11 +66,12 @@ describe("openrouter-models", () => {
   });
 
   it("falls back to preset models when the API returns an empty list", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ data: [] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
 
     const result = await fetchOpenRouterModels(fetchMock);

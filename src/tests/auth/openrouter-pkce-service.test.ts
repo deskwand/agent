@@ -41,11 +41,12 @@ describe("openrouter-pkce-service", () => {
   });
 
   it("exchanges an auth code for an OpenRouter API key", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ key: "sk-or-v1-test" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ key: "sk-or-v1-test" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
     );
 
     const apiKey = await exchangeOpenRouterCode(
@@ -85,12 +86,18 @@ describe("openrouter-pkce-service", () => {
         close: async () => undefined,
       }),
       exchangeCode: vi.fn(async () => "sk-or-v1-saved"),
-      createPkce: () => ({ verifier: "pkce-verifier", challenge: "pkce-challenge" }),
+      createPkce: () => ({
+        verifier: "pkce-verifier",
+        challenge: "pkce-challenge",
+      }),
     });
 
     const result = await service.login();
 
-    expect(result).toEqual({ apiKey: "sk-or-v1-saved", providerName: "OpenRouter" });
+    expect(result).toEqual({
+      apiKey: "sk-or-v1-saved",
+      providerName: "OpenRouter",
+    });
     await expect(service.status()).resolves.toEqual({
       loggedIn: true,
       providerName: "OpenRouter",

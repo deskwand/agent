@@ -100,7 +100,9 @@ export function initUpdater(
   });
 
   autoUpdater.on("download-progress", (progress) => {
-    const pct = Number.isFinite(progress.percent) ? progress.percent.toFixed(1) : "?";
+    const pct = Number.isFinite(progress.percent)
+      ? progress.percent.toFixed(1)
+      : "?";
     const txMB = Number.isFinite(progress.transferred)
       ? (progress.transferred / 1024 / 1024).toFixed(1)
       : "?";

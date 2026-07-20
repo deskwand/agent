@@ -242,9 +242,7 @@ export function createOfficeTools(workspaceDir: string): ToolDefinition[] {
           startPage,
           endPage,
         );
-        log(
-          `[OfficeReadPdf] Read "${filePath}", ${blocks.length} blocks`,
-        );
+        log(`[OfficeReadPdf] Read "${filePath}", ${blocks.length} blocks`);
 
         const sourceName = path.basename(resolved);
         const maxTextBytes = DEFAULT_MAX_OUTPUT_BYTES - 200;

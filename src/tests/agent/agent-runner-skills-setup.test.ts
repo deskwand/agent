@@ -46,7 +46,11 @@ function setupOneSkill(
   _skillName: string,
   builtinPath: string,
   userPath: string,
-  opts: { sourceInsideAsar?: boolean; forceSymlinkFail?: boolean; forceCopyFail?: boolean } = {},
+  opts: {
+    sourceInsideAsar?: boolean;
+    forceSymlinkFail?: boolean;
+    forceCopyFail?: boolean;
+  } = {},
 ): SetupResult {
   if (!fs.statSync(builtinPath).isDirectory() || fs.existsSync(userPath)) {
     return "skipped";
@@ -111,9 +115,15 @@ describe("AgentRunner skills setup resilience", () => {
       fs.writeFileSync(path.join(builtinDir, "SKILL.md"), "# Test");
       fs.mkdirSync(userDir, { recursive: true });
 
-      const result = setupOneSkill("algorithmic-art", builtinDir, path.join(userDir, "algorithmic-art"));
+      const result = setupOneSkill(
+        "algorithmic-art",
+        builtinDir,
+        path.join(userDir, "algorithmic-art"),
+      );
       expect(result).toBe("linked");
-      expect(fs.lstatSync(path.join(userDir, "algorithmic-art")).isSymbolicLink()).toBe(true);
+      expect(
+        fs.lstatSync(path.join(userDir, "algorithmic-art")).isSymbolicLink(),
+      ).toBe(true);
     });
 
     it("symlink fails → fallback to copy succeeds → returns 'copied'", () => {
@@ -124,15 +134,26 @@ describe("AgentRunner skills setup resilience", () => {
       fs.writeFileSync(path.join(builtinDir, "SKILL.md"), "# Blog writer");
       fs.mkdirSync(userDir, { recursive: true });
 
-      const result = setupOneSkill("blog-writer", builtinDir, path.join(userDir, "blog-writer"), {
-        forceSymlinkFail: true,
-      });
+      const result = setupOneSkill(
+        "blog-writer",
+        builtinDir,
+        path.join(userDir, "blog-writer"),
+        {
+          forceSymlinkFail: true,
+        },
+      );
       expect(result).toBe("copied");
       // Should be a real directory (copied), not a symlink
-      expect(fs.lstatSync(path.join(userDir, "blog-writer")).isDirectory()).toBe(true);
-      expect(fs.lstatSync(path.join(userDir, "blog-writer")).isSymbolicLink()).toBe(false);
+      expect(
+        fs.lstatSync(path.join(userDir, "blog-writer")).isDirectory(),
+      ).toBe(true);
+      expect(
+        fs.lstatSync(path.join(userDir, "blog-writer")).isSymbolicLink(),
+      ).toBe(false);
       // Content should be intact
-      expect(fs.readFileSync(path.join(userDir, "blog-writer", "SKILL.md"), "utf-8")).toContain("Blog writer");
+      expect(
+        fs.readFileSync(path.join(userDir, "blog-writer", "SKILL.md"), "utf-8"),
+      ).toContain("Blog writer");
     });
 
     it("both symlink and copy fail → returns 'failed' and cleans up", () => {
@@ -143,10 +164,15 @@ describe("AgentRunner skills setup resilience", () => {
       fs.writeFileSync(path.join(builtinDir, "SKILL.md"), "# Broken");
       fs.mkdirSync(userDir, { recursive: true });
 
-      const result = setupOneSkill("broken-skill", builtinDir, path.join(userDir, "broken-skill"), {
-        forceSymlinkFail: true,
-        forceCopyFail: true,
-      });
+      const result = setupOneSkill(
+        "broken-skill",
+        builtinDir,
+        path.join(userDir, "broken-skill"),
+        {
+          forceSymlinkFail: true,
+          forceCopyFail: true,
+        },
+      );
       expect(result).toBe("failed");
       // Target should be cleaned up (no dangling partial directory)
       expect(fs.existsSync(path.join(userDir, "broken-skill"))).toBe(false);
@@ -178,22 +204,35 @@ describe("AgentRunner skills setup resilience", () => {
       // Skill A → linked
       outcomes.push({
         skill: "skill-a",
-        result: setupOneSkill("skill-a", skillADir, path.join(userDir, "skill-a")),
+        result: setupOneSkill(
+          "skill-a",
+          skillADir,
+          path.join(userDir, "skill-a"),
+        ),
       });
 
       // Skill B → force fail
       outcomes.push({
         skill: "skill-b",
-        result: setupOneSkill("skill-b", skillBDir, path.join(userDir, "skill-b"), {
-          forceSymlinkFail: true,
-          forceCopyFail: true,
-        }),
+        result: setupOneSkill(
+          "skill-b",
+          skillBDir,
+          path.join(userDir, "skill-b"),
+          {
+            forceSymlinkFail: true,
+            forceCopyFail: true,
+          },
+        ),
       });
 
       // Skill C → linked (must still succeed despite B's failure)
       outcomes.push({
         skill: "skill-c",
-        result: setupOneSkill("skill-c", skillCDir, path.join(userDir, "skill-c")),
+        result: setupOneSkill(
+          "skill-c",
+          skillCDir,
+          path.join(userDir, "skill-c"),
+        ),
       });
 
       expect(outcomes).toContainEqual({ skill: "skill-a", result: "linked" });
@@ -216,12 +255,21 @@ describe("AgentRunner skills setup resilience", () => {
       fs.writeFileSync(path.join(builtinDir, "SKILL.md"), "# ASCII");
       fs.mkdirSync(userDir, { recursive: true });
 
-      const result = setupOneSkill("ascii-art", builtinDir, path.join(userDir, "ascii-art"), {
-        sourceInsideAsar: true,
-      });
+      const result = setupOneSkill(
+        "ascii-art",
+        builtinDir,
+        path.join(userDir, "ascii-art"),
+        {
+          sourceInsideAsar: true,
+        },
+      );
       expect(result).toBe("copied");
-      expect(fs.lstatSync(path.join(userDir, "ascii-art")).isDirectory()).toBe(true);
-      expect(fs.lstatSync(path.join(userDir, "ascii-art")).isSymbolicLink()).toBe(false);
+      expect(fs.lstatSync(path.join(userDir, "ascii-art")).isDirectory()).toBe(
+        true,
+      );
+      expect(
+        fs.lstatSync(path.join(userDir, "ascii-art")).isSymbolicLink(),
+      ).toBe(false);
     });
   });
 
@@ -235,15 +283,24 @@ describe("AgentRunner skills setup resilience", () => {
       fs.mkdirSync(userDir, { recursive: true });
 
       // First attempt: fails
-      const result1 = setupOneSkill("retry-skill", builtinDir, path.join(userDir, "retry-skill"), {
-        forceSymlinkFail: true,
-        forceCopyFail: true,
-      });
+      const result1 = setupOneSkill(
+        "retry-skill",
+        builtinDir,
+        path.join(userDir, "retry-skill"),
+        {
+          forceSymlinkFail: true,
+          forceCopyFail: true,
+        },
+      );
       expect(result1).toBe("failed");
       expect(fs.existsSync(path.join(userDir, "retry-skill"))).toBe(false);
 
       // Second attempt: succeeds (no force flags)
-      const result2 = setupOneSkill("retry-skill", builtinDir, path.join(userDir, "retry-skill"));
+      const result2 = setupOneSkill(
+        "retry-skill",
+        builtinDir,
+        path.join(userDir, "retry-skill"),
+      );
       expect(result2).toBe("linked");
       expect(fs.existsSync(path.join(userDir, "retry-skill"))).toBe(true);
     });
@@ -267,7 +324,9 @@ describe("AgentRunner skills setup resilience", () => {
 
       expect(result).toBe("skipped");
       // User's existing content is preserved, not overwritten
-      expect(fs.readFileSync(path.join(userSkillPath, "SKILL.md"), "utf-8")).toBe("# User version");
+      expect(
+        fs.readFileSync(path.join(userSkillPath, "SKILL.md"), "utf-8"),
+      ).toBe("# User version");
     });
   });
 });

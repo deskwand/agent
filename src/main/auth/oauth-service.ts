@@ -1,4 +1,11 @@
-import { app, BrowserWindow, clipboard, ipcMain, nativeTheme, shell } from "electron";
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  ipcMain,
+  nativeTheme,
+  shell,
+} from "electron";
 import type { OAuthLoginCallbacks } from "@earendil-works/pi-ai";
 import { getSharedAuthStorage } from "../agent/shared-auth";
 import type { OAuthStatusResult } from "../../shared/ipc-types";
@@ -81,7 +88,7 @@ function showBrowserDialog(opts: {
     const buttonHtml = opts.buttons
       .map(
         (btn, i) =>
-          `<button class="btn ${i === (opts.defaultId ?? 0) ? 'btn-primary' : 'btn-secondary'}" onclick="submit(${btn.value})">${btn.label}</button>`,
+          `<button class="btn ${i === (opts.defaultId ?? 0) ? "btn-primary" : "btn-secondary"}" onclick="submit(${btn.value})">${btn.label}</button>`,
       )
       .join("");
 
@@ -165,7 +172,9 @@ function createOAuthCallbacks(): OAuthLoginCallbacks {
           { label: T.continue, value: 0 },
           { label: T.cancel, value: 1 },
         ],
-        input: prompt.allowEmpty ? { placeholder: prompt.placeholder } : undefined,
+        input: prompt.allowEmpty
+          ? { placeholder: prompt.placeholder }
+          : undefined,
       });
       if (result.response !== 0) {
         throw new Error("Login cancelled");
