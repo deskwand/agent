@@ -1460,6 +1460,8 @@
     "followGlobal": "跟随全局",
     "addAgent": "新增代理",
     "addAgentTitle": "新增子代理",
+    "statusRunning": "{{count}} 个子代理运行中…{{detail}}",
+    "statusDone": "{{count}} 个子代理已完成",
     "agentName": "名称",
     "agentDescription": "描述",
     "agentPrompt": "系统提示词",

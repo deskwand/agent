@@ -205,6 +205,15 @@ export class SessionManager {
             });
           },
         },
+        onBackgroundAgentComplete: (sessionId: string, agentId: string) => {
+          const prompt = `[系统通知] 后台子代理 ${agentId} 已完成。请调用 get_subagent_result 获取结果并汇总给用户。`;
+          log("[SessionManager] auto-continue: triggering for", sessionId, agentId);
+          this.continueSession(sessionId, prompt).then(() => {
+            log("[SessionManager] auto-continue: completed ok for", agentId);
+          }).catch((e) => {
+            log("[SessionManager] auto-continue: FAILED for", agentId, String(e));
+          });
+        },
       },
       this.pathResolver,
       this.mcpManager,

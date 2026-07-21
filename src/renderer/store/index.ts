@@ -67,6 +67,12 @@ export interface SessionState {
     timeUsedSeconds?: number;
     timeBudgetSeconds?: number;
   };
+  backgroundAgents: Array<{
+    id: string;
+    type: string;
+    description: string;
+    status: "running" | "done";
+  }>;
 }
 
 const DEFAULT_SESSION_STATE: SessionState = {
@@ -83,6 +89,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   compaction: { status: "idle" },
   steerResult: null,
   partialToolResults: {},
+  backgroundAgents: [],
 };
 
 // Helper to immutably update a single session's state within the record
@@ -227,6 +234,16 @@ interface AppState {
     sessionId: string,
     goalStatus: SessionState["goalStatus"],
   ) => void;
+  addBackgroundAgent: (
+    sessionId: string,
+    agent: { id: string; type: string; description: string },
+  ) => void;
+  updateBackgroundAgentStatus: (
+    sessionId: string,
+    agentId: string,
+    status: "running" | "done",
+  ) => void;
+  removeBackgroundAgent: (sessionId: string, agentId: string) => void;
   setMessages: (sessionId: string, messages: Message[]) => void;
   setPartialMessage: (
     sessionId: string,
@@ -581,6 +598,43 @@ export const useAppStore = create<AppState>((set) => ({
         goalStatus,
       }),
     })),
+
+  addBackgroundAgent: (sessionId, agent) =>
+    set((state) => {
+      const current = state.sessionStates[sessionId] ?? DEFAULT_SESSION_STATE;
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          backgroundAgents: [
+            ...current.backgroundAgents,
+            { ...agent, status: "running" as const },
+          ],
+        }),
+      };
+    }),
+
+  updateBackgroundAgentStatus: (sessionId, agentId, status) =>
+    set((state) => {
+      const current = state.sessionStates[sessionId] ?? DEFAULT_SESSION_STATE;
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          backgroundAgents: current.backgroundAgents.map((a) =>
+            a.id === agentId ? { ...a, status } : a,
+          ),
+        }),
+      };
+    }),
+
+  removeBackgroundAgent: (sessionId, agentId) =>
+    set((state) => {
+      const current = state.sessionStates[sessionId] ?? DEFAULT_SESSION_STATE;
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          backgroundAgents: current.backgroundAgents.filter(
+            (a) => a.id !== agentId,
+          ),
+        }),
+      };
+    }),
 
   setMessages: (sessionId, messages) =>
     set((state) => ({

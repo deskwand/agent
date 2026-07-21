@@ -93,6 +93,7 @@ function setInitialState(): void {
         compaction: { status: "idle" },
         steerResult: null,
         partialToolResults: {},
+        backgroundAgents: [],
       },
     },
   });

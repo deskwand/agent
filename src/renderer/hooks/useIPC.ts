@@ -198,6 +198,24 @@ function installSharedIpcBridge(): void {
           })();
           break;
 
+        case "subagent.lifecycle": {
+          const { sessionId, agentId, agentType, description, status } =
+            event.payload;
+          if (status === "running") {
+            store.addBackgroundAgent(sessionId, {
+              id: agentId,
+              type: agentType,
+              description: description ?? "",
+            });
+          } else {
+            store.updateBackgroundAgentStatus(sessionId, agentId, "done");
+            setTimeout(() => {
+              store.removeBackgroundAgent(sessionId, agentId);
+            }, 1000);
+          }
+          break;
+        }
+
         case "session.status":
           console.log("[useIPC] session.status received:", event.payload);
           store.updateSession(event.payload.sessionId, {

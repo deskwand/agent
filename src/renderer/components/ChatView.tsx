@@ -270,6 +270,7 @@ export function ChatView() {
     activeSessionId ? s.sessionStates[activeSessionId] : undefined,
   );
   const compaction = sessionState?.compaction ?? { status: "idle" as const };
+  const backgroundAgents = sessionState?.backgroundAgents ?? [];
   const isCompacting = compaction.status === "running";
   const compactionResult =
     compaction.status === "success" ||
@@ -433,6 +434,7 @@ export function ChatView() {
             ? goalStatus
             : null
           : goalStatus,
+      backgroundAgents,
     });
   }, [
     isCompacting,
@@ -446,6 +448,7 @@ export function ChatView() {
     steerDisplayReady,
     goalStatus,
     goalTransitionVisible,
+    backgroundAgents,
   ]);
 
   const lastInputTokens = useMemo(() => {
@@ -1156,6 +1159,17 @@ export function ChatView() {
       if (container) {
         container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
       }
+    }
+
+    // When streaming just ended and the final message arrived, clear any
+    // stale isScrollingRef from ResizeObserver scrolls during streaming so
+    // the final scroll-to-bottom is never blocked.
+    const streamingJustEnded =
+      prevPartialLengthRef.current > 0 &&
+      partialLength === 0 &&
+      hasNewMessage;
+    if (streamingJustEnded) {
+      isScrollingRef.current = false;
     }
 
     // Skip scroll if already scrolling (prevent non-streaming conflicts)

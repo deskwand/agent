@@ -131,6 +131,7 @@ function setSessionMessages(messages: Message[]): void {
         compaction: { status: "idle" },
         steerResult: null,
         partialToolResults: {},
+        backgroundAgents: [],
       },
     },
   });

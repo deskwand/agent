@@ -655,6 +655,21 @@ export type ServerEvent =
       };
     }
   | { type: "native-theme.changed"; payload: { shouldUseDarkColors: boolean } }
+  | {
+      type: "subagent.lifecycle";
+      payload: {
+        sessionId: string;
+        agentId: string;
+        agentType: string;
+        description?: string;
+        parentToolCallId?: string;
+        status: "running" | "completed" | "error";
+        toolUses?: number;
+        tokens?: unknown;
+        durationMs?: number;
+        error?: string;
+      };
+    }
   | { type: "new-session" }
   | { type: "navigate"; payload: string }
   | { type: "scheduled-task.error"; payload: { taskId: string; error: string } }

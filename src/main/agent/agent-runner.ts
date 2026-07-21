@@ -21,6 +21,7 @@ import {
   type ToolDefinition,
   type BashToolOptions,
   type InlineExtension,
+  type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
 import {
@@ -535,6 +536,8 @@ interface AgentRunnerOptions {
   turnFinalizer?: TurnFinalizerOptions;
   /** Extra tools to register beyond the standard set. Used by background review. */
   customTools?: ToolDefinition[];
+  /** Called when a background subagent completes, so the host can trigger auto-continue. */
+  onBackgroundAgentComplete?: (sessionId: string, agentId: string) => void;
 }
 
 interface CachedPiSession {
@@ -562,6 +565,8 @@ interface CachedPiSession {
 export class AgentRunner {
   private sendToRenderer: (event: ServerEvent) => void;
   private saveMessage?: (message: Message) => void;
+  private onBackgroundAgentComplete?: (sessionId: string, agentId: string) => void;
+  private _backgroundAgentIds = new Set<string>();
   private requestSudoPassword?: (
     sessionId: string,
     toolUseId: string,
@@ -858,6 +863,7 @@ ${hints.join("\n")}
   ) {
     this.sendToRenderer = options.sendToRenderer;
     this.saveMessage = options.saveMessage;
+    this.onBackgroundAgentComplete = options.onBackgroundAgentComplete;
     this.requestSudoPassword = options.requestSudoPassword;
     this.pathResolver = pathResolver;
     this.mcpManager = mcpManager;
@@ -3180,11 +3186,75 @@ Tool routing:\n
 
         // 注入子 Agent 插件
         if (subagentEnabled) {
-          const subagentsFactory = (
-            await import("@tintinweb/pi-subagents/dist/index.js")
-          ).default;
-          extensionFactories.push(subagentsFactory as InlineExtension);
-          log("[AgentRunner] Subagent extension factory injected");
+          const subagentsModule = await import("@tintinweb/pi-subagents/dist/index.js");
+          const subagentsInner = subagentsModule.default as InlineExtension;
+          // Wrap factory to intercept subagent lifecycle events via ExtensionAPI's pi.events
+          const sessionId = session.id;
+          const innerFactory: ExtensionFactory =
+            typeof subagentsInner === "function"
+              ? subagentsInner
+              : (subagentsInner as { name: string; factory: ExtensionFactory }).factory;
+          const wrappedFactory: InlineExtension = {
+            name: "pi-subagents-wrapped",
+            factory: (pi) => {
+              innerFactory(pi);
+              pi.events?.on?.("subagents:created", (data: any) => {
+                if (data.isBackground) {
+                  this._backgroundAgentIds.add(data.id);
+                }
+              });
+              pi.events?.on?.("subagents:started", (data: any) => {
+                this.sendToRenderer({
+                  type: "subagent.lifecycle",
+                  payload: {
+                    sessionId,
+                    agentId: data.id,
+                    agentType: data.type,
+                    description: data.description,
+                    parentToolCallId: data.parentToolCallId,
+                    status: "running",
+                  },
+                });
+              });
+              pi.events?.on?.("subagents:completed", (data: any) => {
+                const isBackground = this._backgroundAgentIds.delete(data.id);
+                this.sendToRenderer({
+                  type: "subagent.lifecycle",
+                  payload: {
+                    sessionId,
+                    agentId: data.id,
+                    agentType: data.type,
+                    description: data.description,
+                    parentToolCallId: data.parentToolCallId,
+                    status: "completed",
+                    toolUses: data.toolUses,
+                    tokens: data.tokens,
+                    durationMs: data.durationMs,
+                  },
+                });
+                if (isBackground && this.onBackgroundAgentComplete) {
+                  this.onBackgroundAgentComplete(sessionId, data.id);
+                }
+              });
+              pi.events?.on?.("subagents:failed", (data: any) => {
+                this._backgroundAgentIds.delete(data.id);
+                this.sendToRenderer({
+                  type: "subagent.lifecycle",
+                  payload: {
+                    sessionId,
+                    agentId: data.id,
+                    agentType: data.type,
+                    description: data.description,
+                    parentToolCallId: data.parentToolCallId,
+                    status: "error",
+                    error: data.error,
+                  },
+                });
+              });
+            },
+          };
+          extensionFactories.push(wrappedFactory);
+          log("[AgentRunner] Subagent extension factory injected (wrapped for lifecycle events)");
         }
 
         // 注入 DeskWand Tools Extension
@@ -3299,48 +3369,6 @@ Tool routing:\n
         }
 
         // Wire subagent lifecycle events to renderer
-        const piEvents = (piSession as any).events;
-        piEvents?.on?.("subagents:started", (data: any) => {
-          (this as any).sendToRenderer({
-            type: "subagent.lifecycle",
-            payload: {
-              sessionId: session.id,
-              agentId: data.id,
-              agentType: data.type,
-              parentToolCallId: data.parentToolCallId,
-              status: "running",
-            },
-          });
-        });
-        piEvents?.on?.("subagents:completed", (data: any) => {
-          (this as any).sendToRenderer({
-            type: "subagent.lifecycle",
-            payload: {
-              sessionId: session.id,
-              agentId: data.id,
-              agentType: data.type,
-              parentToolCallId: data.parentToolCallId,
-              status: "completed",
-              toolUses: data.toolUses,
-              tokens: data.tokens,
-              durationMs: data.durationMs,
-            },
-          });
-        });
-        piEvents?.on?.("subagents:failed", (data: any) => {
-          (this as any).sendToRenderer({
-            type: "subagent.lifecycle",
-            payload: {
-              sessionId: session.id,
-              agentId: data.id,
-              agentType: data.type,
-              parentToolCallId: data.parentToolCallId,
-              status: "error",
-              error: data.error,
-            },
-          });
-        });
-
         // Store session for reuse — evict oldest if cache is full
         if (this.piSessions.size >= AgentRunner.MAX_CACHED_SESSIONS) {
           const oldestKey = this.piSessions.keys().next().value;
@@ -3591,6 +3619,9 @@ Tool routing:\n
               // Unified handler: send the final assistant message to the renderer.
               // Works for all providers (some emit 'done' via message_update, others don't).
               if (controller.signal.aborted) break;
+
+              // Skip non-assistant messages (toolResult, custom notifications, etc.)
+              if (event.message?.role && event.message.role !== "assistant") break;
 
               // Flush any buffered content from the think-tag parser
               const flushed = thinkParser.flush();

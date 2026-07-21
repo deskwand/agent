@@ -54,6 +54,12 @@ export type ChatInputStatus =
       timeUsedSeconds?: number;
       timeBudgetSeconds?: number;
     }
+  | {
+      type: "background-agent";
+      count: number;
+      detail?: string;
+      done?: boolean;
+    }
   | null;
 
 interface ChatInputStatusBarProps {
@@ -234,6 +240,19 @@ export function ChatInputStatusBar({
         text = `\u2717 ${t("steer.eventLabel")} ${t("steer.notDelivered")}`;
         toneClass = "text-error";
         break;
+      case "background-agent":
+        if (status.done) {
+          text = t("subagent.statusDone", { count: status.count });
+          toneClass = "text-text-muted";
+        } else {
+          text = t("subagent.statusRunning", {
+            count: status.count,
+            detail: status.detail ? ` ${status.detail}` : "",
+          });
+          toneClass = "text-text-primary";
+          isRunning = true;
+        }
+        break;
       // goal-* handled by early return above
     }
   }
@@ -279,6 +298,12 @@ export function resolveInputStatus(params: {
     timeUsedSeconds?: number;
     timeBudgetSeconds?: number;
   } | null;
+  backgroundAgents: Array<{
+    id: string;
+    type: string;
+    description: string;
+    status: "running" | "done";
+  }>;
 }): ChatInputStatus {
   if (params.isCompacting) return { type: "compacting" };
   if (params.isSending) return { type: "sending" };
@@ -349,6 +374,15 @@ export function resolveInputStatus(params: {
   }
   if (params.isResponding) {
     return { type: "responding" };
+  }
+  if (params.backgroundAgents.length > 0) {
+    const allDone = params.backgroundAgents.every((a) => a.status === "done");
+    const count = params.backgroundAgents.length;
+    const detail =
+      count === 1 && !allDone
+        ? `${params.backgroundAgents[0].type} · ${params.backgroundAgents[0].description}`
+        : undefined;
+    return { type: "background-agent", count, detail, done: allDone };
   }
   return null;
 }

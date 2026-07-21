@@ -11,6 +11,7 @@ describe("resolveInputStatus", () => {
     steeringFailedText: "",
     shouldShowThinkingIndicator: false,
     isResponding: false,
+    backgroundAgents: [],
   };
 
   it("returns null when all inputs are inactive", () => {
@@ -32,6 +33,7 @@ describe("resolveInputStatus", () => {
   it("compacting wins over everything else", () => {
     expect(
       resolveInputStatus({
+        ...base,
         isSending: true,
         isCompacting: true,
         compactionResult: "failed",
