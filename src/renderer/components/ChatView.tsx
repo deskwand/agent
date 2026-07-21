@@ -1552,7 +1552,7 @@ export function ChatView() {
                   turnProcessSummary,
                   suppressProcessSummaries,
                 }) => (
-                  <div key={message.id} className="space-y-1.5">
+                  <div key={message.id} data-message-id={message.id} className="space-y-1.5">
                     {turnProcessSummary ? (
                       <ProcessSummaryBlock
                         block={turnProcessSummary}

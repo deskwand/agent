@@ -1,7 +1,7 @@
 // MessageNavRail — 消息快速导航轨道
 // 左侧刻度标记组，Apple Dock 渐进放大 + 悬停预览 + 点击跳转
-// Tradeoff: tick 按 scroll 比例等距分布，不跟踪消息 DOM 实际位置。
-// 优势是位置稳定；劣势是消息长度差异大时不对齐物理位置。v1 接受此 tradeoff。
+// tick 视觉位置沿用均匀分布（保持稳定），但点击跳转通过 querySelector
+// 定位到实际消息 DOM 元素，不受消息长度差异影响。
 
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import type { Message, ContentBlock } from "../types";
@@ -303,11 +303,13 @@ export const MessageNavRail = memo(function MessageNavRail({
     (index: number) => {
       const container = scrollContainerRef.current;
       if (!container || n <= 1) return;
-      const ratio = index / (n - 1);
-      const target = ratio * (container.scrollHeight - container.clientHeight);
-      container.scrollTo({ top: target, behavior: "smooth" });
+      const tick = ticks[index];
+      if (!tick) return;
+      container
+        .querySelector(`[data-message-id="${tick.messageId}"]`)
+        ?.scrollIntoView({ block: "start", behavior: "smooth" });
     },
-    [scrollContainerRef, n],
+    [scrollContainerRef, n, ticks],
   );
 
   if (n === 0) return null;
