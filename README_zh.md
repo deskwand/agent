@@ -22,6 +22,54 @@
 
 ---
 
+## 什么是 DeskWand
+
+DeskWand 是基于 Pi Agent SDK 构建的生产级桌面 AI Agent。
+
+与聊天机器人不同，DeskWand 能够理解目标、规划任务、使用工具、委托子 Agent 协同工作，并在你的电脑上执行复杂任务。它会从成功的任务中学习，将其转化为可复用的技能，持续提升能力。
+
+---
+
+## 核心功能
+
+目标驱动 — 给出一个目标，Agent 自动规划并执行。
+
+子 Agent — 将复杂任务拆分为专业 Agent，并行协作。
+
+网络搜索与工具 — 突破对话边界，获取更广泛的信息和能力。
+
+桌面原生 — 直接操作你的本地文件、项目和环境。
+
+自进化技能 — 成功执行的任务可转化为可复用技能，让 Agent 日益强大。
+
+多模型支持 — 自由选择最适合你的 AI 模型。
+
+---
+
+## 基于 Pi Agent SDK 构建
+
+DeskWand 基于开源的 Pi Agent SDK 构建。Pi 提供了强大的 Agent 基础设施；DeskWand 在此基础上增加了面向日常使用的产品层，包括目标执行、子 Agent 编排、工具生态、网络能力、技能学习和完整的桌面体验。
+
+---
+
+## 工作原理
+
+```
+    Your Goal
+        |
+    Agent Planning
+        |
+    Subagents + Tools
+        |
+    Task Execution
+        |
+    New Skill Learned
+        |
+    Better Future Tasks
+```
+
+---
+
 ## 看看 DeskWand 如何工作
 
 <table>
@@ -55,7 +103,7 @@
 |------|------|
 | macOS | [`.dmg`](https://github.com/deskwand/agent/releases) |
 | Windows | [`.exe`](https://github.com/deskwand/agent/releases) |
-| Linux | [`.AppImage`](https://github.com/deskwand/agent/releases) · [`.deb`](https://github.com/deskwand/agent/releases) · [`.rpm`](https://github.com/deskwand/agent/releases) |
+| Linux | [`.AppImage`](https://github.com/deskwand/agent/releases) · [`.deb`](https://github.com/deskwand/agent/releases) |
 
 👉 [deskwand.com/#download](https://deskwand.com/#download)
 

@@ -22,6 +22,54 @@
 
 ---
 
+## What is DeskWand
+
+DeskWand is a production-ready desktop AI agent built on the Pi Agent SDK.
+
+Unlike a chatbot, DeskWand understands goals, plans tasks, uses tools, delegates work to subagents, and executes complex tasks on your computer. It learns from successful tasks and turns them into reusable skills, becoming more capable over time.
+
+---
+
+## Features
+
+Goal-driven agents — Give a goal, and let the agent plan and execute.
+
+Subagents — Break complex tasks into specialized agents that work in parallel.
+
+Web search and tools — Access information and capabilities beyond conversation.
+
+Desktop native — Work with your local files, projects, and environment.
+
+Self-improving skills — Successful tasks can become reusable skills, making your agent more capable over time.
+
+Multi-model support — Use the AI models that work best for you.
+
+---
+
+## Built with Pi Agent SDK
+
+DeskWand is built on top of the Pi Agent SDK, an open-source agent framework. Pi provides a powerful agent foundation; DeskWand adds the product layer for an everyday desktop AI agent, including goal execution, subagent orchestration, tool ecosystem, web capabilities, skill learning, and a full desktop experience.
+
+---
+
+## How it works
+
+```
+    Your Goal
+        |
+    Agent Planning
+        |
+    Subagents + Tools
+        |
+    Task Execution
+        |
+    New Skill Learned
+        |
+    Better Future Tasks
+```
+
+---
+
 ## See DeskWand in action
 
 <table>
@@ -55,7 +103,7 @@
 |----------|----------|
 | macOS | [`.dmg`](https://github.com/deskwand/agent/releases) |
 | Windows | [`.exe`](https://github.com/deskwand/agent/releases) |
-| Linux | [`.AppImage`](https://github.com/deskwand/agent/releases) · [`.deb`](https://github.com/deskwand/agent/releases) · [`.rpm`](https://github.com/deskwand/agent/releases) |
+| Linux | [`.AppImage`](https://github.com/deskwand/agent/releases) · [`.deb`](https://github.com/deskwand/agent/releases) |
 
 👉 [deskwand.com/#download](https://deskwand.com/#download)
 
