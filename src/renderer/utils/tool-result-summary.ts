@@ -18,13 +18,7 @@ export type CollapsedToolSummary =
   | { kind: "chars"; count: number }
   | { kind: "modified" }
   | { kind: "diff"; added: number; removed: number }
-  | { kind: "exitLine"; text: string }
-  | {
-      kind: "agentStats";
-      duration: string;
-      tools: number;
-      tokens: string;
-    };
+  | { kind: "exitLine"; text: string };
 
 function isFileReadTool(name: string): boolean {
   const lower = name.toLowerCase();
@@ -228,22 +222,6 @@ export function getCollapsedToolSummary(
     return { kind: "none" };
   }
 
-  // Agent tool — extract clean summary from output stats line
-  if (toolNameLower === "agent") {
-    const stats = normalized.match(
-      /completed in ([\d.]+s) \((\d+) tool uses?, ([\d.]+[km]?) tokens?\.?\)/i,
-    );
-    if (stats) {
-      return {
-        kind: "agentStats",
-        duration: stats[1],
-        tools: Number(stats[2]),
-        tokens: stats[3],
-      };
-    }
-    return { kind: "text", text: getFirstContentLine(normalized) };
-  }
-
   // Vision describe — no summary needed
   if (isVisionDescribeTool(toolNameLower)) {
     return { kind: "none" };
@@ -299,13 +277,6 @@ export function formatCollapsedToolSummary(
   }
   if (summary.kind === "screenshot") {
     return t("tool.summaryScreenshot");
-  }
-  if (summary.kind === "agentStats") {
-    return t("tool.summaryAgentStats", {
-      tools: summary.tools,
-      tokens: summary.tokens,
-      duration: summary.duration,
-    });
   }
   if (summary.kind === "error") {
     return summary.text;

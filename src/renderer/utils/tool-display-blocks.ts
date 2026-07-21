@@ -8,6 +8,7 @@ export interface ProcessSummary {
   hasWebSearch: boolean;
   hasBrowse: boolean;
   commandCount: number;
+  subagentCount: number;
   hasGoal: boolean;
   usedToolCount: number;
 }
@@ -54,6 +55,7 @@ const PROCESS_TOOLS = new Set([
   "glob",
   "bash",
   "execute_command",
+  "agent",
   "websearch",
   "web_fetch",
   "web_search",
@@ -145,6 +147,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   let hasWebSearch = false;
   let hasBrowse = false;
   let commandCount = 0;
+  let subagentCount = 0;
   let hasGoal = false;
   let usedToolCount = 0;
 
@@ -182,6 +185,10 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
       commandCount += 1;
       countedAsSpecific = true;
     }
+    if (lower === "agent") {
+      subagentCount += 1;
+      countedAsSpecific = true;
+    }
     if (GOAL_TOOLS.has(lower)) {
       hasGoal = true;
       countedAsSpecific = true;
@@ -197,6 +204,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     hasWebSearch,
     hasBrowse,
     commandCount,
+    subagentCount,
     hasGoal,
     usedToolCount,
   };
@@ -393,6 +401,9 @@ export function formatProcessSummaryLabel(
   if (summary.hasSearch) {
     fragments.push(t("tool.grouped.searchedCode"));
   }
+  if (summary.hasWebSearch) {
+    fragments.push(t("tool.grouped.searchedWeb"));
+  }
   if (summary.hasBrowse) {
     fragments.push(t("tool.grouped.browsedWeb"));
   }
@@ -400,6 +411,13 @@ export function formatProcessSummaryLabel(
     fragments.push(
       t(pluralKey("tool.grouped.executedCommands", summary.commandCount), {
         count: summary.commandCount,
+      }),
+    );
+  }
+  if (summary.subagentCount > 0) {
+    fragments.push(
+      t(pluralKey("tool.grouped.startedSubagents", summary.subagentCount), {
+        count: summary.subagentCount,
       }),
     );
   }
@@ -422,6 +440,7 @@ export type ProcessSummaryFragment = {
     | "websearch"
     | "browse"
     | "command"
+    | "subagent"
     | "goal"
     | "tool";
 };
@@ -467,6 +486,17 @@ export function getProcessSummaryFragments(
         },
       ),
       iconType: "command",
+    });
+  }
+  if (summary.subagentCount > 0) {
+    fragments.push({
+      text: t(
+        pluralKey("tool.grouped.startedSubagents", summary.subagentCount),
+        {
+          count: summary.subagentCount,
+        },
+      ),
+      iconType: "subagent",
     });
   }
   if (summary.hasGoal) {

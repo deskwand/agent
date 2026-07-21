@@ -146,8 +146,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const isGoalTool =
     block.name === "get_goal" ||
     block.name === "update_goal" ||
-    block.name === "goal_complete" ||
-    block.name === "Agent";
+    block.name === "goal_complete";
 
   const label = getToolLabel(block.name, block.input, t);
 
@@ -253,7 +252,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
       >
         {/* Status icon — goal tools are status queries, no execution indicator needed */}
-        {!isGoalTool && (
+        {!isGoalTool && !isAgentTool && (
           <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-text-muted">
             {isRunning ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />

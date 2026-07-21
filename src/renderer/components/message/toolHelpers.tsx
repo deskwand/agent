@@ -256,5 +256,9 @@ export function getToolLabel(
     return t("tool.actionGoalComplete");
   }
 
+  if (nameLower === "agent") {
+    return t("tool.actionAgent");
+  }
+
   return name;
 }

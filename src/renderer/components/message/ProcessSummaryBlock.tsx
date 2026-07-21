@@ -7,6 +7,7 @@ import {
   Search,
   Globe,
   MonitorPlay,
+  Bot,
   Target,
   Wrench,
 } from "lucide-react";
@@ -29,6 +30,7 @@ const PROCESS_ICON_MAP: Record<
   command: (
     <MonitorPlay className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
   ),
+  subagent: <Bot className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   tool: <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   goal: <Target className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
 };

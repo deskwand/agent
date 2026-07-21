@@ -86,6 +86,7 @@ describe("orderAssistantDisplayBlocks", () => {
           hasWebSearch: false,
           hasBrowse: false,
           commandCount: 0,
+          subagentCount: 0,
           hasGoal: false,
           usedToolCount: 0,
         },
@@ -130,6 +131,7 @@ describe("buildToolDisplayBlocks", () => {
         hasWebSearch: false,
         hasBrowse: false,
         commandCount: 1,
+        subagentCount: 0,
         hasGoal: false,
         usedToolCount: 0,
       },
@@ -200,6 +202,7 @@ describe("buildToolDisplayBlocks", () => {
         hasWebSearch: false,
         hasBrowse: false,
         commandCount: 0,
+        subagentCount: 0,
         hasGoal: false,
         usedToolCount: 0,
       },
@@ -224,7 +227,26 @@ describe("buildToolDisplayBlocks", () => {
         hasWebSearch: false,
         hasBrowse: false,
         commandCount: 0,
+        subagentCount: 0,
         hasGoal: false,
+        usedToolCount: 0,
+      },
+    });
+  });
+
+  it("counts subagents in process summaries", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("agent-1", "Agent", {
+        subagent_type: "general-purpose",
+        description: "run task",
+      }),
+      toolResult("agent-1", { content: "done" }),
+    ]);
+
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: {
+        subagentCount: 1,
         usedToolCount: 0,
       },
     });
@@ -240,6 +262,8 @@ describe("formatProcessSummaryLabel", () => {
       "tool.grouped.browsedWeb": "browsed the web",
       "tool.grouped.executedCommands_one": `executed ${options?.count} command`,
       "tool.grouped.executedCommands_other": `executed ${options?.count} commands`,
+      "tool.grouped.startedSubagents_one": `started ${options?.count} subagent`,
+      "tool.grouped.startedSubagents_other": `started ${options?.count} subagents`,
       "tool.grouped.usedTools_one": `used ${options?.count} tool`,
       "tool.grouped.usedTools_other": `used ${options?.count} tools`,
       "tool.grouped.joinAnd": " and ",
@@ -257,6 +281,7 @@ describe("formatProcessSummaryLabel", () => {
           hasWebSearch: false,
           hasBrowse: false,
           commandCount: 1,
+          subagentCount: 0,
           hasGoal: false,
           usedToolCount: 0,
         },
@@ -274,12 +299,31 @@ describe("formatProcessSummaryLabel", () => {
           hasWebSearch: false,
           hasBrowse: false,
           commandCount: 0,
+          subagentCount: 0,
           hasGoal: false,
           usedToolCount: 0,
         },
         t,
       ),
     ).toBe("searched code");
+  });
+
+  it("formats subagent-only process summaries", () => {
+    expect(
+      formatProcessSummaryLabel(
+        {
+          readCount: 0,
+          hasSearch: false,
+          hasWebSearch: false,
+          hasBrowse: false,
+          commandCount: 0,
+          subagentCount: 1,
+          hasGoal: false,
+          usedToolCount: 0,
+        },
+        t,
+      ),
+    ).toBe("started 1 subagent");
   });
 
   it("formats browse-only process summaries", () => {
@@ -297,6 +341,7 @@ describe("formatProcessSummaryLabel", () => {
         hasWebSearch: false,
         hasBrowse: true,
         commandCount: 0,
+        subagentCount: 0,
         hasGoal: false,
         usedToolCount: 0,
       },
@@ -319,6 +364,7 @@ describe("formatProcessSummaryLabel", () => {
       type: "process-summary",
       summary: {
         hasGoal: false,
+        subagentCount: 0,
         usedToolCount: 1,
       },
     });
@@ -341,7 +387,7 @@ describe("Web Access process grouping", () => {
     ]);
     expect(blocks[0]).toMatchObject({
       type: "process-summary",
-      summary: { hasWebSearch: true, usedToolCount: 0 },
+      summary: { hasWebSearch: true, subagentCount: 0, usedToolCount: 0 },
     });
   });
 });
