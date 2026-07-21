@@ -154,8 +154,8 @@ export function ChatInputStatusBar({
         <style>{gradientStyles}</style>
         <div className="flex items-center gap-1.5 text-xs text-text-primary">
           {renderGoalIcon(status.type)}
-          <span className="min-w-0 truncate">{status.objective}</span>
-          <span className="flex-shrink-0 text-text-muted">{infoText}</span>
+          <span className={`min-w-0 truncate ${status.type === "goal-active" ? "gradient-text" : ""}`}>{status.objective}</span>
+          <span className={`flex-shrink-0 text-text-muted ${status.type === "goal-active" ? "gradient-text" : ""}`}>{infoText}</span>
           {status.type === "goal-active" && onGoalCommand && (
             <button
               type="button"
