@@ -102,6 +102,8 @@ function isFetchTool(name: string): boolean {
     "web_search",
     "fetch_content",
     "get_search_content",
+    "get_subagent_result",
+    "steer_subagent",
   ].includes(lower);
 }
 
