@@ -261,7 +261,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   subagent: {
     listAgents: () => ipcRenderer.invoke("subagent.listAgents"),
-    setAgentModel: (name: string, model: string) => ipcRenderer.invoke("subagent.setAgentModel", name, model),
+    setAgentModel: (name: string, model: string, thinking?: string) => ipcRenderer.invoke("subagent.setAgentModel", name, model, thinking),
     createAgent: (name: string, description: string, prompt: string) => ipcRenderer.invoke("subagent.createAgent", name, description, prompt),
     deleteAgent: (name: string) => ipcRenderer.invoke("subagent.deleteAgent", name),
   },
