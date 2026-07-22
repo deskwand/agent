@@ -44,6 +44,7 @@ export class AgentRuntimeExtensionManager {
     context: BeforeSessionRunContext,
   ): Promise<BeforeSessionRunResult> {
     const promptPrefixes: string[] = [];
+    const systemPromptSuffixes: string[] = [];
     const customTools: AgentRuntimeCustomTool[] = [];
 
     for (const extension of this.extensions) {
@@ -58,6 +59,9 @@ export class AgentRuntimeExtensionManager {
         if (result.promptPrefix?.trim()) {
           promptPrefixes.push(result.promptPrefix.trim());
         }
+        if (result.systemPromptSuffix?.trim()) {
+          systemPromptSuffixes.push(result.systemPromptSuffix.trim());
+        }
         if (result.customTools?.length) {
           customTools.push(...result.customTools);
         }
@@ -71,6 +75,7 @@ export class AgentRuntimeExtensionManager {
 
     return {
       promptPrefix: promptPrefixes.join("\n\n").trim() || undefined,
+      systemPromptSuffix: systemPromptSuffixes.join("\n\n").trim() || undefined,
       customTools: mergeCustomTools(customTools),
     };
   }

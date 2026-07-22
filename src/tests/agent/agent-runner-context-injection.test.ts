@@ -69,7 +69,7 @@ describe("AgentRunner contextualPrompt injection ordering", () => {
     const src = readSource();
 
     const guardIdx = src.indexOf(
-      "if (!cachedSession && !historyWasInjected && !piSessionFile)",
+      "if (!cachedSession && !historyWasInjected && !sessionFileForRun)",
     );
     const reInjectCallIdx = src.indexOf(
       'injectHistoryPreamble(contextualPrompt, "Tools change cold-start")',

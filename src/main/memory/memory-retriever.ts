@@ -55,6 +55,9 @@ export class MemoryRetriever {
     const experienceWorkspace =
       explicitSourceWorkspace ??
       (scope === "workspace" ? defaultWorkspace : null);
+    if (scope === "workspace" && !experienceWorkspace) {
+      return [];
+    }
     const limit = Math.min(Math.max(params.limit || 8, 1), 50);
     const results: MemorySearchResult[] = [];
 
@@ -194,9 +197,13 @@ export class MemoryRetriever {
       if (sourceWorkspace && item.sourceWorkspace !== sourceWorkspace) {
         continue;
       }
+      const title =
+        item.sourceSessionTitle ||
+        this.deps.getSessionTitle(item.sessionId) ||
+        "";
       const score = lexicalScore(
         query,
-        [item.summary, ...item.keywords].join(" "),
+        [title, item.summary, ...item.keywords].join(" "),
       );
       if (score <= 0) {
         continue;
@@ -208,9 +215,13 @@ export class MemoryRetriever {
       if (sourceWorkspace && item.sourceWorkspace !== sourceWorkspace) {
         continue;
       }
+      const title =
+        item.sourceSessionTitle ||
+        this.deps.getSessionTitle(item.sessionId) ||
+        "";
       const score = lexicalScore(
         query,
-        [item.summary, item.details, item.rawText, ...item.keywords].join(" "),
+        [title, item.summary, ...item.keywords].join(" "),
       );
       if (score <= 0) {
         continue;

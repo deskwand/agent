@@ -1,8 +1,10 @@
 import type {
   AgentRuntimeExtension,
+  BeforeSessionRunContext,
   BeforeSessionRunResult,
 } from "../extensions/agent-runtime-extension";
 import { logError } from "../utils/logger";
+import { MEMORY_POLICY_PROMPT } from "./memory-policy";
 import type { MemoryService } from "./memory-service";
 
 export class MemoryExtension implements AgentRuntimeExtension {
@@ -12,16 +14,14 @@ export class MemoryExtension implements AgentRuntimeExtension {
 
   async beforeSessionRun({
     session,
-    prompt,
-  }: Parameters<
-    NonNullable<AgentRuntimeExtension["beforeSessionRun"]>
-  >[0]): Promise<BeforeSessionRunResult | void> {
+  }: BeforeSessionRunContext): Promise<BeforeSessionRunResult | void> {
     if (!this.memoryService.isEnabled() || !session.memoryEnabled) {
       return;
     }
 
     return {
-      promptPrefix: await this.memoryService.buildPromptPrefix(session, prompt),
+      systemPromptSuffix: MEMORY_POLICY_PROMPT,
+      customTools: this.memoryService.getTools(session.cwd),
     };
   }
 

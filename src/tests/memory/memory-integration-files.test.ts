@@ -10,11 +10,11 @@ describe("memory integration wiring", () => {
   it("registers the memory extension in the main process and exposes IPC handlers", () => {
     const mainIndex = readProjectFile("src/main/index.ts");
     expect(mainIndex).toContain("new MemoryExtension(memoryService)");
-    expect(mainIndex).toContain("ipcMain.handle('memory.getOverview'");
-    expect(mainIndex).toContain("'memory.search'");
-    expect(mainIndex).toContain("'memory.listFiles'");
-    expect(mainIndex).toContain("'memory.inspectSession'");
-    expect(mainIndex).toContain("ipcMain.handle('memory.setEnabled'");
+    expect(mainIndex).toContain('ipcMain.handle("memory.getOverview"');
+    expect(mainIndex).toContain('"memory.search"');
+    expect(mainIndex).toContain('ipcMain.handle("memory.listFiles"');
+    expect(mainIndex).toContain('"memory.inspectSession"');
+    expect(mainIndex).toContain('ipcMain.handle("memory.setEnabled"');
   });
 
   it("injects runtime plugin skill paths and extension hooks into the agent runner", () => {
@@ -25,9 +25,10 @@ describe("memory integration wiring", () => {
     expect(runner).toContain("resolveSkillPaths()");
     expect(runner).toContain("this.extensionManager.beforeSessionRun");
     expect(runner).toContain("skillsSignature");
-    expect(memoryExtension).not.toContain(
-      "customTools: this.memoryService.getTools()",
+    expect(memoryExtension).toContain(
+      "customTools: this.memoryService.getTools(session.cwd)",
     );
+    expect(memoryExtension).toContain("systemPromptSuffix");
   });
 
   it("adds a dedicated Memory settings tab and preload bridge", () => {
@@ -39,11 +40,11 @@ describe("memory integration wiring", () => {
       "src/renderer/components/settings/SettingsMemory.tsx",
     );
 
-    expect(settingsPanel).toContain("id: 'memory'");
+    expect(settingsPanel).toContain('id: "memory"');
     expect(settingsPanel).toContain("<SettingsMemory />");
     expect(preload).toContain("memory: {");
-    expect(preload).toContain("ipcRenderer.invoke('memory.search'");
-    expect(preload).toContain("ipcRenderer.invoke('memory.listFiles')");
+    expect(preload).toContain('ipcRenderer.invoke("memory.search"');
+    expect(preload).toContain('ipcRenderer.invoke("memory.listFiles")');
     expect(memorySettings).toContain("window.electronAPI.memory.search");
     expect(memorySettings).toContain("window.electronAPI.memory.readFile");
     expect(memorySettings).toContain(
@@ -61,10 +62,34 @@ describe("memory integration wiring", () => {
       "src/main/session/session-manager.ts",
     );
     expect(sessionManager).toContain(
-      "configStore.get('memoryEnabled') !== false",
+      'configStore.get("memoryEnabled") !== false',
     );
     expect(sessionManager).toContain("memoryEnabled?: boolean");
     expect(sessionManager).toContain("afterSessionRun");
+  });
+
+  it("describes memory as on-demand rather than automatically injected", () => {
+    const en = JSON.parse(
+      readProjectFile("src/renderer/i18n/locales/en.json"),
+    ) as {
+      settings: { memoryDesc: string };
+      memory: { description: string; toggleHint: string };
+    };
+    const zh = JSON.parse(
+      readProjectFile("src/renderer/i18n/locales/zh.json"),
+    ) as {
+      settings: { memoryDesc: string };
+      memory: { description: string; toggleHint: string };
+    };
+
+    expect(en.settings.memoryDesc).toContain("on-demand");
+    expect(en.memory.description).toContain("never automatically injected");
+    expect(en.memory.toggleHint).toContain("on-demand");
+    expect(en.memory.toggleHint).not.toContain("auto-recall");
+    expect(zh.settings.memoryDesc).toContain("按需检索");
+    expect(zh.memory.description).toContain("不会自动注入");
+    expect(zh.memory.toggleHint).toContain("按需");
+    expect(zh.memory.toggleHint).not.toContain("自动注入");
   });
 
   it("removes unused SQLite memory tables from schema initialization", () => {

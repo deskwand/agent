@@ -96,6 +96,10 @@ import {
   normalizeToolExecutionResultForUi,
 } from "./tool-result-utils";
 import { modelResolutionService } from "../model/model-resolution-service";
+import { MEMORY_POLICY_SCHEMA_VERSION } from "../memory/memory-policy";
+import { piSessionFileContainsLegacyMemoryContext } from "./pi-session-safety";
+
+export { piSessionFileContainsLegacyMemoryContext };
 
 // Virtual workspace path shown to the model (hides real sandbox path)
 const VIRTUAL_WORKSPACE_PATH = "/workspace";
@@ -546,6 +550,7 @@ interface CachedPiSession {
   runtimeSignature: string;
   skillsSignature?: string;
   toolsSignature?: string;
+  extensionSignature: string;
   ollamaNumCtx?: { value: number };
   /** Extension commands registered via pi.registerCommand (e.g. /subagents-doctor) */
   extensionCommands?: { name: string; description: string }[];
@@ -2656,7 +2661,53 @@ ${hints.join("\n")}
             existingMessages,
             isColdStart: !cachedSession,
           })
-        : { promptPrefix: undefined, customTools: [] };
+        : {
+            promptPrefix: undefined,
+            systemPromptSuffix: undefined,
+            customTools: [],
+          };
+      const systemPromptSuffix =
+        extensionResult.systemPromptSuffix?.trim() || "";
+      const extensionSignature = JSON.stringify({
+        policyVersion: systemPromptSuffix.includes("<memory-policy>")
+          ? MEMORY_POLICY_SCHEMA_VERSION
+          : "",
+        systemPromptSuffix,
+        tools: (extensionResult.customTools || [])
+          .map((tool) => tool.name)
+          .sort(),
+      });
+      if (
+        cachedSession &&
+        cachedSession.extensionSignature !== extensionSignature
+      ) {
+        logCtx(
+          "[AgentRunner] Extension policy changed, recreating cached pi session:",
+          session.id,
+        );
+        try {
+          cachedSession.session.dispose();
+        } catch (disposeError) {
+          logWarn(
+            "[AgentRunner] dispose error while recreating pi session for extension policy:",
+            disposeError,
+          );
+        }
+        this.piSessions.delete(session.id);
+        cachedSession = undefined;
+      }
+
+      let sessionFileForRun = piSessionFile;
+      if (
+        !cachedSession &&
+        piSessionFileContainsLegacyMemoryContext(sessionFileForRun)
+      ) {
+        logWarn(
+          "[AgentRunner] Ignoring pi session file with legacy memory context; rebuilding from database messages:",
+          { sessionId: session.id, filePath: sessionFileForRun },
+        );
+        sessionFileForRun = null;
+      }
 
       let contextualPrompt = prompt;
       let historyWasInjected = false;
@@ -2741,12 +2792,12 @@ ${hints.join("\n")}
       };
 
       if (!cachedSession) {
-        if (piSessionFile) {
+        if (sessionFileForRun) {
           // pi session file provides structured history via buildSessionContext(),
           // no text preamble needed.
           logCtx(
             "[AgentRunner] Cold start with pi session file:",
-            piSessionFile,
+            sessionFileForRun,
           );
         } else {
           historyWasInjected = injectHistoryPreamble(prompt, "Cold start");
@@ -2976,6 +3027,9 @@ Tool routing:\n
       ].filter((section): section is string =>
         Boolean(section && section.trim()),
       );
+      const appendSystemPrompt = systemPromptSuffix
+        ? [...coworkAppendPrompt, systemPromptSuffix]
+        : coworkAppendPrompt;
 
       logTiming("before pi-coding-agent session creation", runStartTime);
 
@@ -3113,6 +3167,7 @@ Tool routing:\n
       const toolsSignature =
         JSON.stringify(allCustomTools.map((t) => t.name).sort()) +
         subagentSignature;
+      let cacheInvalidatedByTools = false;
       if (cachedSession && cachedSession.toolsSignature !== toolsSignature) {
         logCtx(
           "[AgentRunner] Custom tools changed, recreating cached pi session:",
@@ -3128,11 +3183,25 @@ Tool routing:\n
         }
         this.piSessions.delete(session.id);
         cachedSession = undefined;
+        cacheInvalidatedByTools = true;
+      }
+
+      if (
+        cacheInvalidatedByTools &&
+        !cachedSession &&
+        sessionFileForRun &&
+        piSessionFileContainsLegacyMemoryContext(sessionFileForRun)
+      ) {
+        logWarn(
+          "[AgentRunner] Ignoring pi session file with legacy memory context after tool change:",
+          { sessionId: session.id, filePath: sessionFileForRun },
+        );
+        sessionFileForRun = null;
       }
 
       // If toolsSignature just invalidated the cached session, re-inject
       // conversation history that was skipped above.
-      if (!cachedSession && !historyWasInjected && !piSessionFile) {
+      if (!cachedSession && !historyWasInjected && !sessionFileForRun) {
         injectHistoryPreamble(contextualPrompt, "Tools change cold-start");
       }
 
@@ -3269,7 +3338,7 @@ Tool routing:\n
           cwd: effectiveCwd,
           agentDir: userDeskWandDir,
           additionalSkillPaths: skillPaths,
-          appendSystemPrompt: coworkAppendPrompt,
+          appendSystemPrompt,
           ...(extensionFactories.length > 0 ? { extensionFactories } : {}),
         });
         await resourceLoader.reload();
@@ -3312,11 +3381,11 @@ Tool routing:\n
           compactionSettings = { enabled: true };
         }
 
-        const sessionDir = piSessionFile
+        const sessionDir = sessionFileForRun
           ? undefined
           : path.join(userDeskWandDir, "pi-sessions", session.id);
-        const piSessionManager = piSessionFile
-          ? PiSessionManager.open(piSessionFile)
+        const piSessionManager = sessionFileForRun
+          ? PiSessionManager.open(sessionFileForRun)
           : PiSessionManager.create(effectiveCwd, sessionDir);
 
         const { session: newPiSession, extensionsResult } =
@@ -3341,7 +3410,7 @@ Tool routing:\n
         // Persist the pi session file path so cold restarts can recover
         // the full structured conversation history from JSONL.
         const newPiSessionFile = piSession.sessionFile;
-        if (newPiSessionFile && !piSessionFile) {
+        if (newPiSessionFile && !sessionFileForRun) {
           this.onSessionFileCreated?.(session.id, newPiSessionFile);
         }
 
@@ -3389,6 +3458,7 @@ Tool routing:\n
           runtimeSignature: sessionRuntimeSignature,
           skillsSignature,
           toolsSignature,
+          extensionSignature,
           extensionCommands: extCmds,
           piSessionFile: newPiSessionFile || undefined,
         });

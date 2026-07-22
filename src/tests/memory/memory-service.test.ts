@@ -563,6 +563,83 @@ describe("MemoryService", () => {
     ).toBe(true);
   });
 
+  it("fails closed for workspace search without a workspace", async () => {
+    await service.enqueueIngestion({
+      session: makeSession("session-a", "Gateway fixes", "/repo/a"),
+      prompt: "修复 gateway token rotation",
+      messages: makeMessages("session-a", [
+        {
+          role: "user",
+          text: "实现 gateway token rotation。",
+          timestamp: 1,
+        },
+        {
+          role: "assistant",
+          text: "已完成 gateway token rotation。",
+          timestamp: 2,
+        },
+      ]),
+    });
+
+    expect(
+      service.search({
+        query: "gateway token rotation",
+        scope: "workspace",
+        limit: 5,
+      }),
+    ).toEqual([]);
+  });
+
+  it("matches experience sessions by title without scanning raw text", async () => {
+    await service.enqueueIngestion({
+      session: makeSession(
+        "session-title",
+        "Nebula Lantern Decision",
+        "/repo/a",
+      ),
+      prompt: "记录偏好",
+      messages: makeMessages("session-title", [
+        { role: "user", text: "请用中文回答。", timestamp: 1 },
+        { role: "assistant", text: "好的。", timestamp: 2 },
+      ]),
+    });
+
+    const results = service.search({
+      query: "nebula lantern",
+      cwd: "/repo/a",
+      scope: "workspace",
+      limit: 5,
+    });
+
+    expect(results.some((item) => item.kind === "experience_session")).toBe(
+      true,
+    );
+  });
+
+  it("does not match experience chunks from raw text alone", async () => {
+    await service.enqueueIngestion({
+      session: makeSession("session-raw", "Raw only", "/repo/a"),
+      prompt: "store a preference",
+      messages: makeMessages("session-raw", [
+        {
+          role: "user",
+          text: "This source turn contains raw-only-needle.",
+          timestamp: 1,
+        },
+        { role: "assistant", text: "Acknowledged.", timestamp: 2 },
+      ]),
+    });
+
+    expect(
+      service.search({
+        query: "raw-only-needle",
+        cwd: "/repo/a",
+        scope: "workspace",
+        limit: 5,
+      }),
+    ).toEqual([]);
+  });
+
   it("rebuilds all memory from persisted sessions and messages", async () => {
     insertSession(rawDb, {
       id: "session-a",

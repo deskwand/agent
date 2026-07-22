@@ -13,6 +13,7 @@ export interface BeforeSessionRunContext {
 
 export interface BeforeSessionRunResult {
   promptPrefix?: string;
+  systemPromptSuffix?: string;
   customTools?: AgentRuntimeCustomTool[];
 }
 

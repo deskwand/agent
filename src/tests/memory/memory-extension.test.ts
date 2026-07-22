@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MemoryExtension } from "../../main/memory/memory-extension";
 import type { MemoryService } from "../../main/memory/memory-service";
 
@@ -17,6 +17,53 @@ function createSession() {
 }
 
 describe("MemoryExtension", () => {
+  it("returns policy and cwd-bound tools without reading saved memory", async () => {
+    const getTools = vi.fn(() => []);
+    const buildPromptPrefix = vi.fn();
+    const memoryServiceMock = {
+      isEnabled: () => true,
+      getTools,
+      buildPromptPrefix,
+    } as unknown as MemoryService;
+    const extension = new MemoryExtension(memoryServiceMock);
+    const session = { ...createSession(), cwd: "/repo/a" };
+
+    const result = await extension.beforeSessionRun!({
+      session,
+      prompt: "record a product video",
+      existingMessages: [],
+      isColdStart: true,
+    });
+
+    expect(result?.promptPrefix).toBeUndefined();
+    expect(result?.systemPromptSuffix).toContain("<memory-policy>");
+    expect(result?.systemPromptSuffix).toContain(
+      "No saved memory has been loaded",
+    );
+    expect(result?.systemPromptSuffix).toContain("memory-policy-v1");
+    expect(getTools).toHaveBeenCalledWith("/repo/a");
+    expect(buildPromptPrefix).not.toHaveBeenCalled();
+  });
+
+  it("does not expose policy or tools when memory is disabled", async () => {
+    const getTools = vi.fn(() => []);
+    const memoryServiceMock = {
+      isEnabled: () => false,
+      getTools,
+    } as unknown as MemoryService;
+    const extension = new MemoryExtension(memoryServiceMock);
+
+    const result = await extension.beforeSessionRun!({
+      session: createSession(),
+      prompt: "hello",
+      existingMessages: [],
+      isColdStart: true,
+    });
+
+    expect(result).toBeUndefined();
+    expect(getTools).not.toHaveBeenCalled();
+  });
+
   it("does not block session completion on pending memory ingestion", async () => {
     let resolveDeferred!: () => void;
     const deferred = new Promise<void>((resolve) => {

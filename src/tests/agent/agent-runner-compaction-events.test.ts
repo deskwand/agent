@@ -55,6 +55,7 @@ describe("AgentRunner manual compaction events", () => {
       runtimeSignature: "runtime",
       skillsSignature: "skills",
       toolsSignature: "tools",
+      extensionSignature: "extensions",
       extensionCommands: [],
     });
 

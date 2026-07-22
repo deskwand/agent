@@ -157,7 +157,6 @@ export class MemoryService {
   private readonly coreExtractor: CoreMemoryExtractor;
   private readonly experienceExtractor: ExperienceMemoryExtractor;
   private readonly retriever: MemoryRetriever;
-  private readonly tools: MemoryToolDefinition[];
   private currentPathsKey: string | null = null;
   private coreStore: CoreMemoryStore | null = null;
   private stateStore: MemorySessionStateStore | null = null;
@@ -190,7 +189,6 @@ export class MemoryService {
       getExperienceFilePath: () => this.getPaths().experienceFilePath,
       getSessionTitle: (sessionId) => this.getSessionTitle(sessionId),
     });
-    this.tools = createMemoryTools(this);
   }
 
   isEnabled(): boolean {
@@ -202,8 +200,8 @@ export class MemoryService {
     return { success: true, enabled };
   }
 
-  getTools(): MemoryToolDefinition[] {
-    return this.tools;
+  getTools(cwd?: string): MemoryToolDefinition[] {
+    return createMemoryTools(this, cwd);
   }
 
   search(params: MemorySearchParams): MemorySearchResult[] {
