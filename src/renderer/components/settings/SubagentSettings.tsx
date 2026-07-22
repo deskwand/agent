@@ -92,7 +92,13 @@ export function SubagentSettings() {
                 title={t("subagent.editModel") ?? "Edit model"}
                 onClick={() => {
                   setEditingAgent(agent.name);
-                  setEditingModel(agent.markdownModel && agent.markdownModel !== "inherit" ? "model" : "inherit");
+                  const hasModel = agent.markdownModel && agent.markdownModel !== "inherit";
+                  setEditingModel(hasModel ? "model" : "inherit");
+                  if (hasModel && agent.markdownModel) {
+                    const slashIdx = agent.markdownModel.indexOf("/");
+                    setEditingProvider(slashIdx > 0 ? agent.markdownModel.slice(0, slashIdx) : "");
+                    setEditingModelId(slashIdx > 0 ? agent.markdownModel.slice(slashIdx + 1) : "");
+                  }
                   setEditingThinking(agent.markdownThinking || "inherit");
                 }}
               >
