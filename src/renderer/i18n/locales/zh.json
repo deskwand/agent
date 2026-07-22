@@ -1459,6 +1459,7 @@
     "agentExplore": "代码探索",
     "agentFixer": "编码实现",
     "agentPlanner": "架构规划",
+    "agentReviewer": "审查",
     "addAgent": "新增代理",
     "addAgentTitle": "新增子代理",
     "statusRunning": "{{count}} 个子代理运行中…{{detail}}",

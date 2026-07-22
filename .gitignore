@@ -55,6 +55,7 @@ coverage/
 # DeskWand 
 .deskwand/*
 !.deskwand/skills/
+!.deskwand/agents/
 Deskwand.md
 
 

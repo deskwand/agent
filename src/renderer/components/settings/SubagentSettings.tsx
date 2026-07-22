@@ -7,6 +7,7 @@ const NAME_I18N_MAP: Record<string, string> = {
   Explore: "subagent.agentExplore",
   "general-purpose": "subagent.agentFixer",
   Plan: "subagent.agentPlanner",
+  Review: "subagent.agentReviewer",
 };
 
 function displayName(name: string, t: (key: string) => string): string {

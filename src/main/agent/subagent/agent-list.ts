@@ -43,6 +43,13 @@ const BUILTIN: AgentDescriptor[] = [
       "Read-only architecture and implementation planner. Turn goals into concrete step-by-step plans.",
     source: "builtin",
   },
+  {
+    name: "Review",
+    displayName: "Review",
+    description:
+      "Systematic reviewer. Analyze code changes, design docs, or architecture proposals.",
+    source: "builtin",
+  },
 ];
 
 /**
@@ -184,7 +191,7 @@ export function deployBuiltinAgents(): void {
   }
 
   let deployed = 0;
-  for (const file of ["Explore.md", "Plan.md", "general-purpose.md"]) {
+  for (const file of ["Explore.md", "Plan.md", "general-purpose.md", "Review.md"]) {
     const target = join(targetDir, file);
     if (existsSync(target)) continue;  // cp -n
     try {

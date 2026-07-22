@@ -1463,6 +1463,7 @@
     "agentExplore": "Code Explorer",
     "agentFixer": "Fixer",
     "agentPlanner": "Planner",
+    "agentReviewer": "Review",
     "addAgent": "Add Agent",
     "addAgentTitle": "Add Subagent",
     "statusRunning": "{{count}} subagents running…{{detail}}",
