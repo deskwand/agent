@@ -259,7 +259,7 @@ function defaultStoredConfig(): StoredConfig {
     theme: "light",
     themePreset: "graphite",
     sandboxEnabled: false,
-    memoryEnabled: true,
+    memoryEnabled: false,
     memoryRuntime: defaultMemoryRuntime(),
     enableThinking: false,
     thinkingLevel: "medium",
