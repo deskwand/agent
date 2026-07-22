@@ -260,5 +260,13 @@ export function getToolLabel(
     return t("tool.actionAgent");
   }
 
+  if (nameLower === "get_subagent_result") {
+    return t("tool.actionGetSubagentResult");
+  }
+
+  if (nameLower === "steer_subagent") {
+    return t("tool.actionSteerSubagent");
+  }
+
   return name;
 }

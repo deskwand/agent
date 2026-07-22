@@ -180,7 +180,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   );
   const collapsedSummaryText = toolResult?.errorCode
     ? t(`webAccess.errors.${toolResult.errorCode}`)
-    : defaultCollapsedSummaryText;
+    : isAgentTool
+      ? [toolInput.subagent_type, toolInput.description]
+          .filter(Boolean)
+          .join(" · ")
+      : defaultCollapsedSummaryText;
 
   const isVisionDescribe = block.name === "vision_describe";
 
