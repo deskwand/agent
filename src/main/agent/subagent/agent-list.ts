@@ -16,6 +16,7 @@ export interface AgentDescriptor {
   source: "builtin" | "global" | "project";
   markdownPath?: string;
   markdownModel?: string;
+  markdownThinking?: string;
   tools?: string[];
   disallowedTools?: string[];
 }
@@ -111,6 +112,7 @@ function loadFromDir(
       source,
       markdownPath: join(dir, file),
       markdownModel: fm.model as string | undefined,
+      markdownThinking: fm.thinking as string | undefined,
       tools: Array.isArray(fm.tools) ? (fm.tools as string[]) : undefined,
       disallowedTools: Array.isArray(fm.disallowed_tools)
         ? (fm.disallowed_tools as string[])

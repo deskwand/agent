@@ -1442,6 +1442,8 @@
     "agentList": "代理列表",
     "inheritMain": "跟随主模型",
     "customModel": "自定义模型",
+    "thinkingLabel": "思考强度",
+    "modelLabel": "模型",
     "unconfigured": "未配置，代理工具将不可用",
     "unconfiguredSeg": "未配置",
     "inheritSeg": "跟随主模型",

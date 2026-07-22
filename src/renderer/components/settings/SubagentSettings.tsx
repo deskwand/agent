@@ -18,6 +18,7 @@ interface AgentRow {
   displayName: string;
   source: "builtin" | "global" | "project";
   markdownModel?: string;
+  markdownThinking?: string;
 }
 
 function modelDisplay(raw: string, providers: Record<string, any>): string {
@@ -37,6 +38,7 @@ export function SubagentSettings() {
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [editingModel, setEditingModel] = useState("inherit");
+  const [editingThinking, setEditingThinking] = useState("inherit");
   const [editingProvider, setEditingProvider] = useState("");
   const [editingModelId, setEditingModelId] = useState("");
   const [newName, setNewName] = useState("");
@@ -90,7 +92,8 @@ export function SubagentSettings() {
                 title={t("subagent.editModel") ?? "Edit model"}
                 onClick={() => {
                   setEditingAgent(agent.name);
-                  setEditingModel(agent.markdownModel ? "model" : "inherit");
+                  setEditingModel(agent.markdownModel && agent.markdownModel !== "inherit" ? "model" : "inherit");
+                  setEditingThinking(agent.markdownThinking || "inherit");
                 }}
               >
                 <Pencil size={14} />
@@ -126,28 +129,54 @@ export function SubagentSettings() {
 
         {/* 编辑模型弹窗 */}
         {editingAgent && (
-          <div className="mt-3 p-3 border border-border-muted rounded-lg space-y-2">
+          <div className="mt-3 p-4 border border-border-muted rounded-lg space-y-3">
             <p className="text-sm font-medium">{editingAgent} {t("subagent.editModel")}</p>
-            <select className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary" value={editingModel} onChange={(e) => setEditingModel(e.target.value)}>
-              <option value="inherit">{t("subagent.inheritMain")}</option>
-              <option value="model">{t("subagent.customModel")}</option>
-            </select>
+
+            <div>
+              <p className="text-xs text-text-muted mb-1">{t("subagent.modelLabel")}</p>
+              <select className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary" value={editingModel} onChange={(e) => setEditingModel(e.target.value)}>
+                <option value="inherit">{t("subagent.inheritMain")}</option>
+                <option value="model">{t("subagent.customModel")}</option>
+              </select>
+            </div>
+
             {editingModel === "model" && (
-              <div className="flex gap-2">
-                <select className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary" value={editingProvider} onChange={(e) => setEditingProvider(e.target.value)}>
-                  <option value="">{t("subagent.selectProvider")}</option>
-                  {providerKeys.map((k) => (<option key={k} value={k}>{appConfig?.providers[k]?.name || k}</option>))}
-                </select>
-                <select className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary" value={editingModelId} onChange={(e) => setEditingModelId(e.target.value)}>
-                  <option value="">{t("subagent.selectModel")}</option>
-                  {(appConfig?.providers[editingProvider] as ApiProviderConfig | undefined)?.models.map((m) => (<option key={m.id} value={m.id}>{m.label || m.id}</option>))}
-                </select>
-              </div>
+              <>
+                <div className="flex gap-2">
+                  <select className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary" value={editingProvider} onChange={(e) => setEditingProvider(e.target.value)}>
+                    <option value="">{t("subagent.selectProvider")}</option>
+                    {providerKeys.map((k) => (<option key={k} value={k}>{appConfig?.providers[k]?.name || k}</option>))}
+                  </select>
+                  <select className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary" value={editingModelId} onChange={(e) => setEditingModelId(e.target.value)}>
+                    <option value="">{t("subagent.selectModel")}</option>
+                    {(appConfig?.providers[editingProvider] as ApiProviderConfig | undefined)?.models.map((m) => (<option key={m.id} value={m.id}>{m.label || m.id}</option>))}
+                  </select>
+                </div>
+
+                <div>
+                  <p className="text-xs text-text-muted mb-1">{t("subagent.thinkingLabel")}</p>
+                  <select
+                    className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+                    value={editingThinking}
+                    onChange={(e) => setEditingThinking(e.target.value)}
+                  >
+                    <option value="inherit">{t("subagent.inheritMain")}</option>
+                    <option value="off">off</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high</option>
+                    <option value="max">max</option>
+                  </select>
+                </div>
+              </>
             )}
-            <div className="flex gap-2">
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button className="rounded-lg border px-3 py-1.5 text-sm" onClick={() => setEditingAgent(null)}>{t("common.cancel") ?? "取消"}</button>
               <button className="rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground" onClick={async () => {
                 const model = editingModel === "model" ? `${editingProvider}/${editingModelId}` : "inherit";
-                await window.electronAPI.subagent.setAgentModel(editingAgent, model);
+                const thinking = editingThinking === "inherit" ? undefined : editingThinking;
+                await window.electronAPI.subagent.setAgentModel(editingAgent, model, thinking);
                 setEditingAgent(null);
                 const list = await window.electronAPI.subagent.listAgents();
                 if (Array.isArray(list)) setAgents(list as AgentRow[]);

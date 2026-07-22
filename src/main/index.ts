@@ -2352,7 +2352,7 @@ ipcMain.handle("subagent.listAgents", async (_event) => {
   }
 });
 
-ipcMain.handle("subagent.setAgentModel", async (_event, name: string, model: string) => {
+ipcMain.handle("subagent.setAgentModel", async (_event, name: string, model: string, thinking?: string) => {
   const { writeFileSync, readFileSync, existsSync } = await import("node:fs");
   const { join } = await import("node:path");
   const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
@@ -2364,14 +2364,26 @@ ipcMain.handle("subagent.setAgentModel", async (_event, name: string, model: str
     mkdirSync(targetDir, { recursive: true });
     if (existsSync(target)) {
       let content = readFileSync(target, "utf-8");
+      // Write/update model
       if (content.match(/^model:\s*.+/m)) {
         content = content.replace(/^model:\s*.+/m, `model: ${model}`);
       } else {
         content = content.replace(/^---\n/, `---\nmodel: ${model}\n`);
       }
+      // Write/update thinking
+      if (thinking && thinking !== "inherit") {
+        if (content.match(/^thinking:\s*.+/m)) {
+          content = content.replace(/^thinking:\s*.+/m, `thinking: ${thinking}`);
+        } else {
+          content = content.replace(/^---\n/, `---\nthinking: ${thinking}\n`);
+        }
+      } else {
+        content = content.replace(/^thinking:\s*.+\n/m, "");
+      }
       writeFileSync(target, content, "utf-8");
     } else {
-      writeFileSync(target, `---\nname: ${name}\nmodel: ${model}\nprompt_mode: append\n---\n`, "utf-8");
+      const thinkingLine = thinking && thinking !== "inherit" ? `\nthinking: ${thinking}` : "";
+      writeFileSync(target, `---\nname: ${name}\nmodel: ${model}${thinkingLine}\nprompt_mode: append\n---\n`, "utf-8");
     }
     return { success: true };
   } catch (err) {

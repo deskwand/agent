@@ -1128,7 +1128,7 @@ declare global {
             markdownModel?: string;
           }>
         >;
-        setAgentModel: (name: string, model: string) => Promise<{ success: boolean; error?: string }>;
+        setAgentModel: (name: string, model: string, thinking?: string) => Promise<{ success: boolean; error?: string }>;
         createAgent: (name: string, description: string, prompt: string) => Promise<{ success: boolean; path?: string; error?: string }>;
         deleteAgent: (name: string) => Promise<{ success: boolean; error?: string }>;
       };

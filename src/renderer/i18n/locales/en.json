@@ -1446,6 +1446,8 @@
     "agentList": "Agent List",
     "inheritMain": "Follow Main Model",
     "customModel": "Custom Model",
+    "thinkingLabel": "Thinking Level",
+    "modelLabel": "Model",
     "unconfigured": "Unconfigured — Agent tool unavailable",
     "unconfiguredSeg": "Unconfigured",
     "inheritSeg": "Follow Main",
