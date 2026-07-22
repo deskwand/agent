@@ -168,7 +168,11 @@ export function deployBuiltinAgents(): void {
 
   // 源目录：与 .deskwand/skills 同级
   const sourceCandidates = [
-    join(dirname(dirname(dirname(dirname(__dirname)))), ".deskwand", "agents"),
+    join(
+      dirname(dirname(dirname(dirname(dirname(__dirname))))),
+      ".deskwand",
+      "agents",
+    ),
     join(process.resourcesPath || "", "agents"),
   ];
 
