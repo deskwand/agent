@@ -360,6 +360,7 @@ async function stepAuth(
 
     try {
       const { GoogleGenAI } =
+        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
         (await import("@google/genai")) as typeof import("@google/genai");
       const clientBaseUrl = resolveClientBaseUrl(input);
       const httpOptions = {

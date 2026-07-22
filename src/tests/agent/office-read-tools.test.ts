@@ -169,6 +169,7 @@ describe("readXlsx", () => {
 
   it("throws on non-existent sheet name", () => {
     // Create a minimal xlsx programmatically using SheetJS itself
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const XLSX = require("xlsx");
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
@@ -184,6 +185,7 @@ describe("readXlsx", () => {
   });
 
   it("reads a single-sheet workbook", () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const XLSX = require("xlsx");
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
@@ -201,6 +203,7 @@ describe("readXlsx", () => {
   });
 
   it("reads a specific sheet by name", () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const XLSX = require("xlsx");
     const wb = XLSX.utils.book_new();
     const ws1 = XLSX.utils.aoa_to_sheet([["SheetOne"]]);
@@ -220,6 +223,7 @@ describe("readXlsx", () => {
 
 describe("readDocx", () => {
   async function createDocxBuffer(documentXml: string): Promise<Buffer> {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const JSZip = require("jszip");
     const zip = new JSZip();
 
@@ -290,6 +294,7 @@ describe("readPptx", () => {
   it("reads a pptx with text content", async () => {
     const { readPptx } =
       await import("../../main/agent/tools/office/pptx-reader");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const JSZip = require("jszip");
     const zip = new JSZip();
 
@@ -377,6 +382,7 @@ describe("readPptx", () => {
   it("includeNotes flag adds note about skill", async () => {
     const { readPptx } =
       await import("../../main/agent/tools/office/pptx-reader");
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const JSZip = require("jszip");
     const zip = new JSZip();
 

@@ -1376,6 +1376,7 @@ async function resolvePythonExec(): Promise<PythonExec | null> {
         // Clean up partial files
         try {
           if (fsSync.existsSync(tmpBall)) fsSync.unlinkSync(tmpBall);
+          // eslint-disable-next-line no-empty
         } catch {}
       }
     }

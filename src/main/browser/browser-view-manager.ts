@@ -1,4 +1,5 @@
-import { WebContentsView, BrowserWindow } from "electron";
+import type { BrowserWindow, WebContents } from "electron";
+import { WebContentsView } from "electron";
 
 /** CDP remote debugging port shared with agent-runner. */
 export const BROWSER_CDP_PORT = "9224";
@@ -108,7 +109,7 @@ export class BrowserViewManager {
   }
 
   /** Expose the underlying WebContents for puppeteer/CDP integration. */
-  getWebContents(): import("electron").WebContents | null {
+  getWebContents(): WebContents | null {
     return this.view?.webContents ?? null;
   }
 

@@ -11,7 +11,8 @@ import { MessageRouter } from "./message-router";
 import { FeishuChannel } from "./channels/feishu";
 import { SlackChannel } from "./channels/slack";
 import { remoteConfigStore } from "./remote-config-store";
-import { tunnelManager, TunnelStatus } from "./tunnel-manager";
+import type { TunnelStatus } from "./tunnel-manager";
+import { tunnelManager } from "./tunnel-manager";
 import { buildRemoteSessionTitle } from "./remote-title";
 import type {
   GatewayStatus,

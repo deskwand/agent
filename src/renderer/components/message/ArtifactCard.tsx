@@ -179,8 +179,6 @@ export const ArtifactCard = memo(function ArtifactCard({
     })),
   ];
 
-  if (allItems.length === 0) return null;
-
   const handleCopyPath = useCallback(async (path: string) => {
     try {
       await navigator.clipboard.writeText(path);
@@ -313,6 +311,8 @@ export const ArtifactCard = memo(function ArtifactCard({
   const handleClickVideo = useCallback((reference: VideoReference) => {
     setPreviewFile({ path: reference.path, autoPlay: true });
   }, []);
+
+  if (allItems.length === 0) return null;
 
   return (
     <>

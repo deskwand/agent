@@ -23,8 +23,9 @@
  */
 
 import { log, logError } from "../utils/logger";
+import type {
+  BackgroundReviewService} from "./background-review";
 import {
-  BackgroundReviewService,
   type ReviewTurnSnapshot,
 } from "./background-review";
 import { configStore } from "../config/config-store";

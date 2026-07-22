@@ -34,6 +34,7 @@ async function readResponseWithLimit(
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (signal?.aborted) {
       await reader.cancel(signal.reason).catch(() => undefined);

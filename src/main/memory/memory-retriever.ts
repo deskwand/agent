@@ -5,7 +5,7 @@ import type {
   MemorySearchResult,
   SessionMemoryItem,
 } from "./memory-types";
-import { ExperienceMemoryStore } from "./experience-memory-store";
+import type { ExperienceMemoryStore } from "./experience-memory-store";
 import {
   lexicalScore,
   normalizeWorkspaceKey,

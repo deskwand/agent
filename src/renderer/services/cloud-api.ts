@@ -141,8 +141,10 @@ export class CloudApiClient {
 
   // ── My Skills ──
 
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   async getMySkills(): Promise<import("../types").CloudSkill[]> {
     const res = await this.request<{
+      // eslint-disable-next-line @typescript-eslint/consistent-type-imports
       skills: import("../types").CloudSkill[];
     }>("/api/skills/mine");
     return res.skills;
@@ -166,8 +168,10 @@ export class CloudApiClient {
 
   async getTeamSkills(
     teamId: string,
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   ): Promise<import("../types").CloudSkill[]> {
     const res = await this.request<{
+      // eslint-disable-next-line @typescript-eslint/consistent-type-imports
       skills: import("../types").CloudSkill[];
     }>(`/api/teams/${teamId}/skills`);
     return res.skills;
@@ -201,9 +205,11 @@ export class CloudApiClient {
   // ── Marketplace ──
 
   async getMarketplaceCategories(): Promise<
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     import("../types").MarketplaceCategory[]
   > {
     const res = await this.request<{
+      // eslint-disable-next-line @typescript-eslint/consistent-type-imports
       categories: import("../types").MarketplaceCategory[];
     }>("/api/marketplace/categories");
     return res.categories;
@@ -215,6 +221,7 @@ export class CloudApiClient {
     page?: number;
     limit?: number;
   }): Promise<{
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     skills: import("../types").MarketplaceSkill[];
     total: number;
     page: number;
@@ -230,6 +237,7 @@ export class CloudApiClient {
 
   async getMarketplaceSkillDetail(
     slug: string,
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   ): Promise<import("../types").MarketplaceSkill> {
     return this.request(`/api/marketplace/${slug}`);
   }

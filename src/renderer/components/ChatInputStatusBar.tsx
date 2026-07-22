@@ -116,6 +116,7 @@ export function ChatInputStatusBar({
       }
     };
 
+    // eslint-disable-next-line no-inner-declarations
     function formatElapsedTime(seconds: number): string {
       const s = Math.round(seconds);
       if (s < 60) return t("goal.timeLessThanMinute");

@@ -8,7 +8,8 @@
  * - Path handling (minimal conversion - Lima mounts /Users directly)
  */
 
-import { spawn, exec, execFile, ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
+import { spawn, exec, execFile } from "child_process";
 import { promisify } from "util";
 import { v4 as uuidv4 } from "uuid";
 import * as path from "path";

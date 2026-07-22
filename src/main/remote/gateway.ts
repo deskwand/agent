@@ -6,11 +6,12 @@
 import * as crypto from "crypto";
 import { EventEmitter } from "events";
 import { WebSocketServer, WebSocket } from "ws";
-import {
-  createServer,
+import type {
   Server as HttpServer,
   IncomingMessage,
-  ServerResponse,
+  ServerResponse} from "http";
+import {
+  createServer
 } from "http";
 import { log, logError, logWarn } from "../utils/logger";
 import type {
@@ -24,7 +25,7 @@ import type {
   PairedUser,
   GatewayEvent,
 } from "./types";
-import { MessageRouter } from "./message-router";
+import type { MessageRouter } from "./message-router";
 
 // WebSocket client connection
 interface WSClient {

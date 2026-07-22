@@ -465,9 +465,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const cursorPos = textarea.selectionStart;
         const before = currentValue.slice(0, slashStartIndex);
         const after = currentValue.slice(cursorPos);
-        let replacement: string;
         // category === "skill" — all skills use /skill:name syntax
-        replacement = `/skill:${item.skill.name} `;
+        const replacement = `/skill:${item.skill.name} `;
         const newValue = before + replacement + after;
         setPrompt(newValue);
         textarea.value = newValue;

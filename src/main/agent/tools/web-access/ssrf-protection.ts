@@ -249,6 +249,7 @@ export async function fetchRemoteUrl(
       ((response.status === 301 || response.status === 302) &&
         requestInit.method?.toUpperCase() === "POST")
     ) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { body: _body, ...nextInit } = requestInit;
       requestInit = { ...nextInit, method: "GET" };
     }

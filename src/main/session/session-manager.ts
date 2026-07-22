@@ -26,8 +26,9 @@ import type {
 } from "../../renderer/types";
 import type { DatabaseInstance, TraceStepRow } from "../db/database";
 import { PathResolver } from "../sandbox/path-resolver";
+import type {
+  SandboxAdapter} from "../sandbox/sandbox-adapter";
 import {
-  SandboxAdapter,
   getSandboxAdapter,
   initializeSandbox,
   reinitializeSandbox,
@@ -45,8 +46,8 @@ import {
 import type { ProviderProfileKey } from "../config/config-store";
 import { MCPManager } from "../mcp/mcp-manager";
 import { mcpConfigStore } from "../mcp/mcp-config-store";
-import { BrowserViewManager } from "../browser/browser-view-manager";
-import { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
+import type { BrowserViewManager } from "../browser/browser-view-manager";
+import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { BackgroundReviewService } from "../agent/background-review";
 import { app } from "electron";
 import {
@@ -1725,7 +1726,7 @@ export class SessionManager {
   }
 
   async deleteProjectByCwd(cwd: string): Promise<string[]> {
-    const normalizedCwd = cwd.trim().replace(/[\/]+$/, "");
+    const normalizedCwd = cwd.trim().replace(/[/]+$/, "");
     if (!normalizedCwd) {
       return [];
     }

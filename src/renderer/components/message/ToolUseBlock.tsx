@@ -82,6 +82,19 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const [expanded, setExpanded] = useState(false);
   const { t } = useTranslation();
 
+  // Compute toolResult here so the useMemo below is always called (hooks must be unconditional)
+  const toolResult = findToolResult(block.id, allBlocks, allMessages);
+  const isVisionDescribe = block.name === "vision_describe";
+
+  // Strip the [Image description of xxx]\n\n prefix from vision_describe output
+  const visionDescriptionText = useMemo(() => {
+    if (!isVisionDescribe || !toolResult?.content) return null;
+    const text =
+      typeof toolResult.content === "string" ? toolResult.content : "";
+    const match = text.match(/^\[Image description of .+?\]\n\n/);
+    return match ? text.slice(match[0].length) : text;
+  }, [isVisionDescribe, toolResult?.content]);
+
   // Special-case tool UIs
   if (block.name === "AskUserQuestion") {
     return <AskUserQuestionBlock block={block} />;
@@ -134,9 +147,6 @@ export const ToolUseBlock = memo(function ToolUseBlock({
     }
   }
 
-  // Find matching tool_result: first in same message, then across all session messages
-  const toolResult = findToolResult(block.id, allBlocks, allMessages);
-
   // Determine state: running / success / error
   // Only show spinner if session still has an active turn; otherwise treat as done
   const hasActiveTurn = Boolean(activeTurn);
@@ -185,17 +195,6 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           .filter(Boolean)
           .join(" · ")
       : defaultCollapsedSummaryText;
-
-  const isVisionDescribe = block.name === "vision_describe";
-
-  // Strip the [Image description of xxx]\n\n prefix from vision_describe output
-  const visionDescriptionText = useMemo(() => {
-    if (!isVisionDescribe || !toolResult?.content) return null;
-    const text =
-      typeof toolResult.content === "string" ? toolResult.content : "";
-    const match = text.match(/^\[Image description of .+?\]\n\n/);
-    return match ? text.slice(match[0].length) : text;
-  }, [isVisionDescribe, toolResult?.content]);
 
   const validImages =
     toolResult?.images?.filter(

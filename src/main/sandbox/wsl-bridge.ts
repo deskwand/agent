@@ -8,7 +8,8 @@
  * - Path conversion between Windows and WSL
  */
 
-import { spawn, execFile, ChildProcess } from "child_process";
+import type { ChildProcess } from "child_process";
+import { spawn, execFile } from "child_process";
 import { promisify } from "util";
 import { v4 as uuidv4 } from "uuid";
 import * as path from "path";

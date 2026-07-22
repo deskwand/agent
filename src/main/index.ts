@@ -767,7 +767,7 @@ function createProjectDirectory(name: string): {
 function normalizeWorkspacePath(
   workspacePath: string | null | undefined,
 ): string {
-  return workspacePath?.trim().replace(/[\/]+$/, "") || "";
+  return workspacePath?.trim().replace(/[/]+$/, "") || "";
 }
 
 function getWorkspacePathUnsupportedReason(

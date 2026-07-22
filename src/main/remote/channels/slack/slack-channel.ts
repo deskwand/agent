@@ -14,7 +14,9 @@ import type {
 } from "../../types";
 
 // Lazy-loaded Slack SDK types
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type SlackApp = import("@slack/bolt").App;
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 type SlackWebClient = import("@slack/web-api").WebClient;
 
 export class SlackChannel extends ChannelBase {

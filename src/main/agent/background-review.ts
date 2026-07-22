@@ -14,7 +14,7 @@
 
 import * as os from "node:os";
 import { AgentRunner } from "./agent-runner";
-import { PathResolver } from "../sandbox/path-resolver";
+import type { PathResolver } from "../sandbox/path-resolver";
 import { buildSkillWriteTools } from "../skills/skill-write-tools";
 import { buildMemoryWriteTools } from "../memory/memory-write-tools";
 import { BACKGROUND_REVIEW_SYSTEM_PROMPT } from "./review-prompts";

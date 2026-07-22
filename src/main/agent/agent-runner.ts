@@ -38,8 +38,8 @@ import type {
   ContentBlock,
 } from "../../renderer/types";
 import { v4 as uuidv4 } from "uuid";
-import { PathResolver } from "../sandbox/path-resolver";
-import { MCPManager } from "../mcp/mcp-manager";
+import type { PathResolver } from "../sandbox/path-resolver";
+import type { MCPManager } from "../mcp/mcp-manager";
 import { mcpConfigStore } from "../mcp/mcp-config-store";
 import {
   log,
@@ -65,7 +65,7 @@ import {
 } from "../utils/artifact-parser";
 import { getDefaultShell } from "../utils/shell-resolver";
 import type { SkillsAdapter } from "../skills/skills-adapter";
-import { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
+import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { configStore } from "../config/config-store";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
@@ -78,8 +78,9 @@ import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter"
 import { createWebAccessTools } from "./tools/web-access/web-tools";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
 import type { WebAccessErrorCode } from "../../shared/web-access";
+import type {
+  BrowserViewManager} from "../browser/browser-view-manager";
 import {
-  BrowserViewManager,
   BROWSER_CDP_PORT,
 } from "../browser/browser-view-manager";
 import { TurnFinalizer, type TurnFinalizerOptions } from "./turn-finalizer";
@@ -771,7 +772,7 @@ ${hints.join("\n")}
    */
   private physicalDirExists(dirPath: string): boolean {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/consistent-type-imports
       const originalFs = require("original-fs") as typeof import("fs");
       return (
         originalFs.existsSync(dirPath) &&
@@ -1054,6 +1055,7 @@ ${hints.join("\n")}
     const bvm = this._browserViewManager;
     if (!bvm) return [];
 
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
     const self = this;
 
     const withPage = <T>(
@@ -2348,7 +2350,7 @@ ${hints.join("\n")}
         maxTokens: resolvedRuntime.maxTokens,
       };
       const provider = resolvedRuntime.providerType || "anthropic";
-      let piModel = resolvedRuntime.piModel;
+      const piModel = resolvedRuntime.piModel;
 
       logCtx(
         "[AgentRunner] Model resolution trace:",
@@ -3009,14 +3011,14 @@ This is an isolated sandbox environment. Use ${VIRTUAL_WORKSPACE_PATH} as the ro
       const coworkAppendPrompt = [
         "You are an DeskWand assistant. Be concise, accurate, and tool-capable.",
         `CRITICAL BEHAVIORAL RULES:\n
-1. CHAT FIRST: By default, respond to the user in plain text within the conversation. Do NOT create, write, or edit files unless the user explicitly asks you to (e.g., \"create a file\", \"write this to...\", \"edit the code\", \"save as...\", mentions a specific file path, or describes code changes they want applied). For questions, summaries, explanations, analysis, and general conversation — always reply directly in chat text.\n
+1. CHAT FIRST: By default, respond to the user in plain text within the conversation. Do NOT create, write, or edit files unless the user explicitly asks you to (e.g., "create a file", "write this to...", "edit the code", "save as...", mentions a specific file path, or describes code changes they want applied). For questions, summaries, explanations, analysis, and general conversation — always reply directly in chat text.\n
 2. When a request is actionable, proceed immediately with reasonable assumptions. If you need clarification, ask briefly in plain text.\n
-3. For relative time windows like \"within two days\" in browsing or research tasks, assume the most recent two relevant publication days unless the user explicitly defines another date range.\n
+3. For relative time windows like "within two days" in browsing or research tasks, assume the most recent two relevant publication days unless the user explicitly defines another date range.\n
 4. For bracketed placeholders like [Agent], [Topic], etc., treat the word inside brackets as the literal search keyword unless the user says otherwise.\n
 5. When given a task, START DOING IT. Do not restate the task, do not list what you will do, do not ask for confirmation. Just execute.`,
         workspaceInfoPrompt,
         `\u003ccitation_requirements>\n
-If your answer uses linkable content from Web Access or MCP tools, include a \"Sources:\" section and otherwise use standard Markdown links: [Title](https://deskwand.ai/chat/URL).\n
+If your answer uses linkable content from Web Access or MCP tools, include a "Sources:" section and otherwise use standard Markdown links: [Title](https://deskwand.ai/chat/URL).\n
 \u003c/citation_requirements>`,
         `\u003ctool_behavior\u003e\n
 Tool routing:\n

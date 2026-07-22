@@ -27,7 +27,7 @@ import { getAgentCreatedSkillNames, addManifestEntry } from "./agent-manifest";
 import { getAllUsageStats, setSkillStatus } from "./skill-usage-tracker";
 import { CURATOR_SYSTEM_PROMPT } from "../agent/curator-prompts";
 import { AgentRunner } from "../agent/agent-runner";
-import { PathResolver } from "../sandbox/path-resolver";
+import type { PathResolver } from "../sandbox/path-resolver";
 import { buildSkillWriteTools } from "./skill-write-tools";
 import {
   applyAutomaticTransitions,

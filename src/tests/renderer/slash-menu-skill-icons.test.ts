@@ -65,6 +65,7 @@ describe("SlashMenu skill source badges", () => {
           "text-text-muted",
         );
       }
+      // eslint-disable-next-line no-misleading-character-class
       expect(document.body.textContent).not.toMatch(/[📦🔌✏️🤖]/u);
     },
   );

@@ -17,7 +17,7 @@ import {
   type WebAccessErrorCode,
   type WebAccessToolDetails,
 } from "../../../../shared/web-access";
-import { WebAccessCache } from "./cache";
+import type { WebAccessCache } from "./cache";
 import type {
   ResolvedWebAccessAuth,
   ResolveWebAccessProviderAuth,

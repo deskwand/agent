@@ -265,6 +265,7 @@ export class GoalExtension implements AgentRuntimeExtension {
     let tools = this.goalTools.get(sessionId);
     if (!tools) {
       const sid = sessionId;
+      // eslint-disable-next-line @typescript-eslint/no-this-alias
       const self = this;
 
       // ── get_goal ──

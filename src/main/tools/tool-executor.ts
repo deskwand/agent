@@ -3,7 +3,7 @@ import * as os from "os";
 import * as path from "path";
 import { spawn } from "child_process";
 import { glob } from "glob";
-import { PathResolver } from "../sandbox/path-resolver";
+import type { PathResolver } from "../sandbox/path-resolver";
 import type {
   ToolResult,
   ExecutionContext,

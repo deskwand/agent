@@ -11,7 +11,8 @@
  * - Path resolution
  */
 
-import { dialog, BrowserWindow } from "electron";
+import type { BrowserWindow } from "electron";
+import { dialog } from "electron";
 import { log, logWarn, logError } from "../utils/logger";
 import { WSLBridge, pathConverter } from "./wsl-bridge";
 import { LimaBridge, limaPathConverter } from "./lima-bridge";

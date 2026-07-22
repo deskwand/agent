@@ -249,7 +249,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     }): Promise<ProviderModelInfo[]> =>
       ipcRenderer.invoke("config.listModels", payload),
     fetchOpenRouterModels: (): Promise<
-      import("../shared/ipc-types").OpenRouterModelsResult
+      import("../shared/ipc-types").OpenRouterModelsResult // eslint-disable-line @typescript-eslint/consistent-type-imports
     > => ipcRenderer.invoke("config.fetchOpenRouterModels"),
     diagnose: (input: DiagnosticInput): Promise<DiagnosticResult> =>
       ipcRenderer.invoke("config.diagnose", input),
@@ -591,25 +591,29 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("auth.login", providerId, force),
     logout: (providerId: string): Promise<void> =>
       ipcRenderer.invoke("auth.logout", providerId),
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     status: (
       providerId: string,
-    ): Promise<import("../shared/ipc-types").OAuthStatusResult> =>
+    ): Promise<import("../shared/ipc-types").OAuthStatusResult> => // eslint-disable-line @typescript-eslint/consistent-type-imports
       ipcRenderer.invoke("auth.status", providerId),
   },
 
   openrouterAuth: {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     login: (): Promise<import("../shared/ipc-types").OpenRouterLoginResult> =>
       ipcRenderer.invoke("openrouterAuth.login"),
     logout: (): Promise<void> => ipcRenderer.invoke("openrouterAuth.logout"),
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     status: (): Promise<
-      import("../shared/ipc-types").OpenRouterAuthStatusResult
+      import("../shared/ipc-types").OpenRouterAuthStatusResult // eslint-disable-line @typescript-eslint/consistent-type-imports
     > => ipcRenderer.invoke("openrouterAuth.status"),
   },
 
   // Cloud Auth (Google OAuth login for DeskWand cloud)
   cloudAuth: {
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     googleLogin: (): Promise<
-      import("../shared/ipc-types").CloudAuthLoginResult
+      import("../shared/ipc-types").CloudAuthLoginResult // eslint-disable-line @typescript-eslint/consistent-type-imports
     > => ipcRenderer.invoke("cloudAuth.googleLogin"),
   },
 
@@ -737,8 +741,9 @@ declare global {
           apiKey: string;
           baseUrl?: string;
         }) => Promise<ProviderModelInfo[]>;
+        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
         fetchOpenRouterModels: () => Promise<
-          import("../shared/ipc-types").OpenRouterModelsResult
+          import("../shared/ipc-types").OpenRouterModelsResult // eslint-disable-line @typescript-eslint/consistent-type-imports
         >;
         diagnose: (input: DiagnosticInput) => Promise<DiagnosticResult>;
         discoverLocal: (payload?: {
@@ -1007,22 +1012,26 @@ declare global {
       auth: {
         login: (providerId: string, force?: boolean) => Promise<void>;
         logout: (providerId: string) => Promise<void>;
+        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
         status: (
           providerId: string,
-        ) => Promise<import("../shared/ipc-types").OAuthStatusResult>;
+        ) => Promise<import("../shared/ipc-types").OAuthStatusResult>; // eslint-disable-line @typescript-eslint/consistent-type-imports
       };
       openrouterAuth: {
+        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
         login: () => Promise<
-          import("../shared/ipc-types").OpenRouterLoginResult
+          import("../shared/ipc-types").OpenRouterLoginResult // eslint-disable-line @typescript-eslint/consistent-type-imports
         >;
         logout: () => Promise<void>;
+        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
         status: () => Promise<
-          import("../shared/ipc-types").OpenRouterAuthStatusResult
+          import("../shared/ipc-types").OpenRouterAuthStatusResult // eslint-disable-line @typescript-eslint/consistent-type-imports
         >;
       };
       cloudAuth: {
+        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
         googleLogin: () => Promise<
-          import("../shared/ipc-types").CloudAuthLoginResult
+          import("../shared/ipc-types").CloudAuthLoginResult // eslint-disable-line @typescript-eslint/consistent-type-imports
         >;
       };
       browser: {

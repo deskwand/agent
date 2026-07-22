@@ -54,7 +54,7 @@ async function renderPageToPng(
   scale: number,
   outputPath: string,
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { createCanvas } = require("@napi-rs/canvas") as {
     createCanvas: (
       w: number,

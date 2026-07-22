@@ -12,7 +12,7 @@
  */
 import * as http from "http";
 import { URL } from "url";
-import { BrowserWindow } from "electron";
+import type { BrowserWindow } from "electron";
 import { log, logError, logWarn } from "./utils/logger";
 
 const PORT = 19888;

@@ -485,7 +485,7 @@ function installSharedIpcBridge(): void {
     }
   });
 
-  let disposed = false;
+  const disposed = false;
   void (async () => {
     try {
       const [config, isConfiguredNow, systemTheme] = await Promise.all([

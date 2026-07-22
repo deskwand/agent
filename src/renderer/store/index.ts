@@ -444,6 +444,7 @@ export const useAppStore = create<AppState>((set) => ({
 
   removeSession: (sessionId) =>
     set((state) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { [sessionId]: _, ...restSessionStates } = state.sessionStates;
       return {
         sessions: state.sessions.filter((s) => s.id !== sessionId),
@@ -1005,6 +1006,7 @@ export const useAppStore = create<AppState>((set) => ({
       const ss = getSession(state.sessionStates, sessionId);
       const current = ss.partialToolResults;
       if (result === null) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { [toolCallId]: _, ...rest } = current;
         return {
           sessionStates: patchSession(state.sessionStates, sessionId, {

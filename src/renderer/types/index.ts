@@ -856,6 +856,7 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   subagent?: import("../../shared/subagent-config").SubagentConfig;
 }
 

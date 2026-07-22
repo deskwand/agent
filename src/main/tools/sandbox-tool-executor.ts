@@ -8,8 +8,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import { glob } from "glob";
-import { SandboxAdapter, getSandboxAdapter } from "../sandbox/sandbox-adapter";
-import { PathResolver } from "../sandbox/path-resolver";
+import type { SandboxAdapter} from "../sandbox/sandbox-adapter";
+import { getSandboxAdapter } from "../sandbox/sandbox-adapter";
+import type { PathResolver } from "../sandbox/path-resolver";
 // Logger imports removed - using sandbox adapter's internal logging
 import type {
   ToolResult,

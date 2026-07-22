@@ -79,7 +79,6 @@ export const BashToolBlock = memo(function BashToolBlock({
   // Extract command
   const inp = block.input as Record<string, unknown>;
   const cmd = (inp?.command || inp?.cmd || "") as string;
-  if (!cmd.trim()) return null;
 
   // Find matching tool_result
   let toolResult = allBlocks?.find(
@@ -137,6 +136,8 @@ export const BashToolBlock = memo(function BashToolBlock({
       : duration < 1000
         ? `${duration}ms`
         : `${(duration / 1000).toFixed(1)}s`;
+
+  if (!cmd.trim()) return null;
 
   return (
     <div
