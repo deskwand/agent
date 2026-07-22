@@ -14,7 +14,6 @@ import {
   type WebAccessConfig,
 } from "../../shared/web-access";
 import {
-  DEFAULT_SUBAGENT_CONFIG,
   type SubagentConfig,
 } from "../../shared/subagent-config";
 import { logWarn } from "../utils/logger";
@@ -845,9 +844,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
     webAccess: normalizeWebAccessConfig(stored.webAccess),
-    subagent: (stored.subagent as any)?.defaultModel?.mode === "unset"
-      ? DEFAULT_SUBAGENT_CONFIG
-      : (stored.subagent ?? DEFAULT_SUBAGENT_CONFIG),
+    subagent: stored.subagent,
   };
 }
 
@@ -876,16 +873,6 @@ export class ConfigStore {
 
   get<K extends keyof AppConfig>(key: K): AppConfig[K] {
     return this.getAll()[key];
-  }
-
-  getSubagentConfig(): SubagentConfig {
-    return this.getAll().subagent ?? DEFAULT_SUBAGENT_CONFIG;
-  }
-
-  saveSubagentConfig(config: SubagentConfig): void {
-    const stored = { ...this.store.store };
-    stored.subagent = config;
-    this.store.set(stored);
   }
 
   // ── Write ────────────────────────────────────────────────────────

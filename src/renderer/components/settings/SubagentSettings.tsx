@@ -1,11 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckCircle, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import type {
-  AppConfig,
-  SubagentDefaultModel,
-  ApiProviderConfig,
-} from "../../types";
+import { Pencil, Plus, Trash2 } from "lucide-react";
+import type { AppConfig, ApiProviderConfig } from "../../types";
 
 const NAME_I18N_MAP: Record<string, string> = {
   Explore: "subagent.agentExplore",
@@ -24,12 +20,21 @@ interface AgentRow {
   markdownModel?: string;
 }
 
+function modelDisplay(raw: string, providers: Record<string, any>): string {
+  const slashIdx = raw.indexOf("/");
+  if (slashIdx === -1) return raw;
+  const providerKey = raw.slice(0, slashIdx);
+  const modelId = raw.slice(slashIdx + 1);
+  const provider = providers[providerKey];
+  const providerName = provider?.name || providerKey;
+  const modelLabel = provider?.models?.find((m: any) => m.id === modelId)?.label || modelId;
+  return `${providerName} / ${modelLabel}`;
+}
+
 export function SubagentSettings() {
   const { t } = useTranslation();
   const [appConfig, setAppConfig] = useState<AppConfig | null>(null);
   const [agents, setAgents] = useState<AgentRow[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [editingAgent, setEditingAgent] = useState<string | null>(null);
   const [editingModel, setEditingModel] = useState("inherit");
   const [editingProvider, setEditingProvider] = useState("");
@@ -40,22 +45,10 @@ export function SubagentSettings() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [deletingAgent, setDeletingAgent] = useState<string | null>(null);
 
-  const [defaultModel, setDefaultModel] = useState<SubagentDefaultModel>({
-    mode: "inherit",
-  });
-  const [provider, setProvider] = useState("");
-  const [modelId, setModelId] = useState("");
-
   useEffect(() => {
     (async () => {
       const config = await window.electronAPI.config.get();
       setAppConfig(config);
-      const dm = config.subagent?.defaultModel ?? { mode: "inherit" };
-      setDefaultModel(dm as SubagentDefaultModel);
-      if (dm.mode === "model") {
-        setProvider(dm.providerProfileKey);
-        setModelId(dm.modelId);
-      }
     })();
   }, []);
 
@@ -68,88 +61,10 @@ export function SubagentSettings() {
     })();
   }, []);
 
-  const handleSave = useCallback(async () => {
-    setSaving(true);
-    try {
-      const nextDM: SubagentDefaultModel =
-        defaultModel.mode === "model"
-          ? { mode: "model", providerProfileKey: provider, modelId }
-          : { mode: "inherit" };
-      await window.electronAPI.config.save({
-        subagent: { defaultModel: nextDM },
-      } as Partial<AppConfig>);
-      setDefaultModel(nextDM);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } finally {
-      setSaving(false);
-    }
-  }, [defaultModel, provider, modelId]);
-
   const providerKeys = Object.keys(appConfig?.providers ?? {});
 
   return (
     <div className="px-2 py-1 space-y-4">
-      <div className="flex items-center gap-3">
-        <select
-          className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
-          value={defaultModel.mode}
-          onChange={(e) => {
-            const mode = e.target.value as SubagentDefaultModel["mode"];
-            if (mode === "inherit") {
-              setDefaultModel({ mode: "inherit" });
-            } else {
-              setDefaultModel({ mode: "model", providerProfileKey: provider, modelId });
-            }
-          }}
-        >
-          <option value="inherit">{t("subagent.inheritMain")}</option>
-          <option value="model">{t("subagent.modelSeg")}</option>
-        </select>
-
-        {defaultModel.mode === "model" && (
-          <>
-            <select
-              className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-            >
-              <option value="">{t("subagent.selectProvider")}</option>
-              {providerKeys.map((k) => (
-                <option key={k} value={k}>{appConfig?.providers[k]?.name || k}</option>
-              ))}
-            </select>
-            <select
-              className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
-              value={modelId}
-              onChange={(e) => setModelId(e.target.value)}
-            >
-              <option value="">{t("subagent.selectModel")}</option>
-              {(appConfig?.providers[provider] as ApiProviderConfig | undefined)?.models.map((m) => (
-                <option key={m.id} value={m.id}>{m.label || m.id}</option>
-              ))}
-            </select>
-          </>
-        )}
-
-        <button
-          type="button"
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          disabled={saving}
-          onClick={handleSave}
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-          {t("common.save")}
-        </button>
-
-        {saved && (
-          <div className="flex items-center gap-2 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
-            <CheckCircle className="h-4 w-4" />
-            {t("common.saved")}
-          </div>
-        )}
-      </div>
-
       {/* Agent 列表 */}
       <div>
         <p className="text-xs text-text-muted mb-2">{t("subagent.agentList")}</p>
@@ -162,17 +77,12 @@ export function SubagentSettings() {
               <span className="text-sm font-medium">
                 {displayName(agent.name, t)}
               </span>
-              <span className="text-xs text-text-muted bg-muted px-1.5 py-0.5 rounded">
-                {agent.source === "builtin"
-                  ? t("subagent.sourceBuiltin")
-                  : agent.source === "project"
-                    ? t("subagent.sourceProject")
-                    : t("subagent.sourceGlobal")}
-              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-text-muted">
-                {agent.markdownModel ? agent.markdownModel : t("subagent.followGlobal")}
+                {!agent.markdownModel || agent.markdownModel === "inherit"
+                  ? t("subagent.inheritMain")
+                  : modelDisplay(agent.markdownModel, appConfig?.providers ?? {})}
               </span>
               <button
                 type="button"
@@ -220,7 +130,7 @@ export function SubagentSettings() {
             <p className="text-sm font-medium">{editingAgent} {t("subagent.editModel")}</p>
             <select className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary" value={editingModel} onChange={(e) => setEditingModel(e.target.value)}>
               <option value="inherit">{t("subagent.inheritMain")}</option>
-              <option value="model">{t("subagent.modelSeg")}</option>
+              <option value="model">{t("subagent.customModel")}</option>
             </select>
             {editingModel === "model" && (
               <div className="flex gap-2">

@@ -70,7 +70,6 @@ import { configStore } from "../config/config-store";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
 import { deployBuiltinAgents } from "./subagent/agent-list";
-import type { SubagentConfig } from "../../shared/subagent-config";
 import crypto from "node:crypto";
 import { createVisionDescribeTool } from "./tools/vision-describe";
 import { createOfficeTools } from "./tools/office/office-tools";
@@ -3106,14 +3105,11 @@ Tool routing:\n
       );
 
       // Compute subagent config once for both toolsSignature and session creation.
-      const subagentConfig: SubagentConfig = configStore.getSubagentConfig();
       const subagentEnabled =
         true;
 
       // Detect MCP tool changes so newly enabled/disabled MCP servers take effect
-      const subagentSignature = subagentEnabled
-        ? JSON.stringify(subagentConfig)
-        : "";
+      const subagentSignature = subagentEnabled ? "1" : "";
       const toolsSignature =
         JSON.stringify(allCustomTools.map((t) => t.name).sort()) +
         subagentSignature;
@@ -3197,7 +3193,8 @@ Tool routing:\n
           const wrappedFactory: InlineExtension = {
             name: "pi-subagents-wrapped",
             factory: (pi) => {
-              innerFactory(pi);
+
+          innerFactory(pi);
               pi.events?.on?.("subagents:created", (data: any) => {
                 if (data.isBackground) {
                   this._backgroundAgentIds.add(data.id);

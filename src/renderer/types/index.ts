@@ -859,10 +859,7 @@ export interface AppConfig {
   subagent?: import("../../shared/subagent-config").SubagentConfig;
 }
 
-export type {
-  SubagentDefaultModel,
-  SubagentConfig,
-} from "../../shared/subagent-config";
+export type { SubagentConfig } from "../../shared/subagent-config";
 
 export interface ProviderPreset {
   name: string;
