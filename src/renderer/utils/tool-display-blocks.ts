@@ -16,6 +16,8 @@ export interface ProcessSummary {
   commandCount: number;
   subagentCount: number;
   subagents?: SubagentSummary[];
+  subagentResultCount?: number;
+  subagentSteerCount?: number;
   hasGoal: boolean;
   usedToolCount: number;
 }
@@ -63,6 +65,8 @@ const PROCESS_TOOLS = new Set([
   "bash",
   "execute_command",
   "agent",
+  "get_subagent_result",
+  "steer_subagent",
   "websearch",
   "web_fetch",
   "web_search",
@@ -161,6 +165,8 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   let commandCount = 0;
   let subagentCount = 0;
   const subagents: SubagentSummary[] = [];
+  let subagentResultCount = 0;
+  let subagentSteerCount = 0;
   let hasGoal = false;
   let usedToolCount = 0;
 
@@ -215,6 +221,14 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
       });
       countedAsSpecific = true;
     }
+    if (lower === "get_subagent_result") {
+      subagentResultCount += 1;
+      countedAsSpecific = true;
+    }
+    if (lower === "steer_subagent") {
+      subagentSteerCount += 1;
+      countedAsSpecific = true;
+    }
     if (GOAL_TOOLS.has(lower)) {
       hasGoal = true;
       countedAsSpecific = true;
@@ -233,6 +247,8 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     commandCount,
     subagentCount,
     subagents,
+    subagentResultCount,
+    subagentSteerCount,
     hasGoal,
     usedToolCount,
   };
@@ -469,6 +485,18 @@ export function formatProcessSummaryLabel(
     const details = formatSubagentDetails(summary.subagents, t);
     fragments.push(details ? `${countLabel} · ${details}` : countLabel);
   }
+  if ((summary.subagentResultCount ?? 0) > 0) {
+    const count = summary.subagentResultCount ?? 0;
+    fragments.push(
+      t(pluralKey("tool.grouped.gotSubagentResults", count), { count }),
+    );
+  }
+  if ((summary.subagentSteerCount ?? 0) > 0) {
+    const count = summary.subagentSteerCount ?? 0;
+    fragments.push(
+      t(pluralKey("tool.grouped.steeredSubagents", count), { count }),
+    );
+  }
   if (summary.usedToolCount > 0) {
     fragments.push(
       t(pluralKey("tool.grouped.usedTools", summary.usedToolCount), {
@@ -551,6 +579,20 @@ export function getProcessSummaryFragments(
     const details = formatSubagentDetails(summary.subagents, t);
     fragments.push({
       text: details ? `${countLabel} · ${details}` : countLabel,
+      iconType: "subagent",
+    });
+  }
+  if ((summary.subagentResultCount ?? 0) > 0) {
+    const count = summary.subagentResultCount ?? 0;
+    fragments.push({
+      text: t(pluralKey("tool.grouped.gotSubagentResults", count), { count }),
+      iconType: "subagent",
+    });
+  }
+  if ((summary.subagentSteerCount ?? 0) > 0) {
+    const count = summary.subagentSteerCount ?? 0;
+    fragments.push({
+      text: t(pluralKey("tool.grouped.steeredSubagents", count), { count }),
       iconType: "subagent",
     });
   }

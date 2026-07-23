@@ -13,6 +13,8 @@ import type {
   ToolResultContent,
   ToolUseContent,
 } from "../../renderer/types";
+import en from "../../renderer/i18n/locales/en.json";
+import zh from "../../renderer/i18n/locales/zh.json";
 
 function toolUse(
   id: string,
@@ -259,6 +261,29 @@ describe("buildToolDisplayBlocks", () => {
       },
     });
   });
+
+  it("groups subagent result and steering tools as separate operations", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("result-1", "get_subagent_result", { agent_id: "agent-1" }),
+      toolResult("result-1"),
+      toolUse("steer-1", "steer_subagent", {
+        agent_id: "agent-1",
+        message: "Focus on renderer tests",
+      }),
+      toolResult("steer-1"),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: {
+        subagentCount: 0,
+        subagentResultCount: 1,
+        subagentSteerCount: 1,
+        usedToolCount: 0,
+      },
+    });
+  });
 });
 
 describe("formatProcessSummaryLabel", () => {
@@ -277,6 +302,10 @@ describe("formatProcessSummaryLabel", () => {
       "tool.grouped.startedSubagents_other": `started ${options?.count} subagents`,
       "tool.grouped.subagentDetail": `${String(options?.name)}: ${String(options?.description)}`,
       "tool.grouped.subagentDetailSeparator": "; ",
+      "tool.grouped.gotSubagentResults_one": `Retrieved ${options?.count} subagent result`,
+      "tool.grouped.gotSubagentResults_other": `Retrieved ${options?.count} subagent results`,
+      "tool.grouped.steeredSubagents_one": `Steered ${options?.count} subagent`,
+      "tool.grouped.steeredSubagents_other": `Steered ${options?.count} subagents`,
       "tool.grouped.usedTools_one": `used ${options?.count} tool`,
       "tool.grouped.usedTools_other": `used ${options?.count} tools`,
       "tool.grouped.joinAnd": " and ",
@@ -371,6 +400,43 @@ describe("formatProcessSummaryLabel", () => {
         iconType: "subagent",
       },
     ]);
+  });
+
+  it("formats subagent result and steering operations separately", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("result-1", "get_subagent_result", { agent_id: "agent-1" }),
+      toolResult("result-1"),
+      toolUse("result-2", "get_subagent_result", { agent_id: "agent-2" }),
+      toolResult("result-2"),
+      toolUse("steer-1", "steer_subagent", {
+        agent_id: "agent-1",
+        message: "Focus on tests",
+      }),
+      toolResult("steer-1"),
+    ]);
+
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      { text: "Retrieved 2 subagent results", iconType: "subagent" },
+      { text: "Steered 1 subagent", iconType: "subagent" },
+    ]);
+  });
+
+  it("defines localized subagent operation summaries", () => {
+    expect(en.tool.grouped).toMatchObject({
+      gotSubagentResults_one: "Retrieved {{count}} subagent result",
+      gotSubagentResults_other: "Retrieved {{count}} subagent results",
+      steeredSubagents_one: "Steered {{count}} subagent",
+      steeredSubagents_other: "Steered {{count}} subagents",
+    });
+    expect(zh.tool.grouped).toMatchObject({
+      gotSubagentResults_one: "已获取 {{count}} 次子代理结果",
+      gotSubagentResults_other: "已获取 {{count}} 次子代理结果",
+      steeredSubagents_one: "已引导 {{count}} 次子代理",
+      steeredSubagents_other: "已引导 {{count}} 次子代理",
+    });
   });
 
   it("formats browse-only process summaries", () => {
