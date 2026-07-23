@@ -93,6 +93,9 @@ const PROCESS_TOOLS = new Set([
   "internal_browser_evaluate",
   "internal_browser_wait_for",
   "internal_browser_get_state",
+  "get_goal",
+  "update_goal",
+  "goal_complete",
 ]);
 
 const SEARCH_TOOLS = new Set([
