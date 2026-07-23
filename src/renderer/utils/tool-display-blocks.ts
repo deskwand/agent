@@ -7,6 +7,7 @@ export interface ProcessSummary {
   hasSearch: boolean;
   hasWebSearch: boolean;
   hasBrowse: boolean;
+  hasMemory: boolean;
   commandCount: number;
   subagentCount: number;
   hasGoal: boolean;
@@ -61,6 +62,8 @@ const PROCESS_TOOLS = new Set([
   "web_search",
   "fetch_content",
   "get_search_content",
+  "memory_search",
+  "memory_read",
   "vision_describe",
   "office_read_xlsx",
   "office_read_docx",
@@ -93,6 +96,8 @@ const WEB_SEARCH_TOOLS = new Set([
   "fetch_content",
   "get_search_content",
 ]);
+
+const MEMORY_TOOLS = new Set(["memory_search", "memory_read"]);
 
 const BROWSE_TOOLS = new Set([
   // browser automation tools
@@ -146,6 +151,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   let hasSearch = false;
   let hasWebSearch = false;
   let hasBrowse = false;
+  let hasMemory = false;
   let commandCount = 0;
   let subagentCount = 0;
   let hasGoal = false;
@@ -181,6 +187,10 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
       hasBrowse = true;
       countedAsSpecific = true;
     }
+    if (MEMORY_TOOLS.has(lower)) {
+      hasMemory = true;
+      countedAsSpecific = true;
+    }
     if (lower === "bash" || lower === "execute_command") {
       commandCount += 1;
       countedAsSpecific = true;
@@ -203,6 +213,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     hasSearch,
     hasWebSearch,
     hasBrowse,
+    hasMemory,
     commandCount,
     subagentCount,
     hasGoal,
@@ -407,6 +418,9 @@ export function formatProcessSummaryLabel(
   if (summary.hasBrowse) {
     fragments.push(t("tool.grouped.browsedWeb"));
   }
+  if (summary.hasMemory) {
+    fragments.push(t("tool.grouped.consultedMemory"));
+  }
   if (summary.commandCount > 0) {
     fragments.push(
       t(pluralKey("tool.grouped.executedCommands", summary.commandCount), {
@@ -439,6 +453,7 @@ export type ProcessSummaryFragment = {
     | "search"
     | "websearch"
     | "browse"
+    | "memory"
     | "command"
     | "subagent"
     | "goal"
@@ -475,6 +490,12 @@ export function getProcessSummaryFragments(
     fragments.push({
       text: t("tool.grouped.browsedWeb"),
       iconType: "browse",
+    });
+  }
+  if (summary.hasMemory) {
+    fragments.push({
+      text: t("tool.grouped.consultedMemory"),
+      iconType: "memory",
     });
   }
   if (summary.commandCount > 0) {

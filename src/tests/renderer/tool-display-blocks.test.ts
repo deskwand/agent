@@ -5,6 +5,7 @@ import {
   filterAssistantVisibleBlocks,
   formatProcessSummaryLabel,
   formatResultSummaryLabel,
+  getProcessSummaryFragments,
   orderAssistantDisplayBlocks,
 } from "../../renderer/utils/tool-display-blocks";
 import type {
@@ -85,6 +86,7 @@ describe("orderAssistantDisplayBlocks", () => {
           hasSearch: false,
           hasWebSearch: false,
           hasBrowse: false,
+          hasMemory: false,
           commandCount: 0,
           subagentCount: 0,
           hasGoal: false,
@@ -280,6 +282,7 @@ describe("formatProcessSummaryLabel", () => {
           hasSearch: true,
           hasWebSearch: false,
           hasBrowse: false,
+          hasMemory: false,
           commandCount: 1,
           subagentCount: 0,
           hasGoal: false,
@@ -298,6 +301,7 @@ describe("formatProcessSummaryLabel", () => {
           hasSearch: true,
           hasWebSearch: false,
           hasBrowse: false,
+          hasMemory: false,
           commandCount: 0,
           subagentCount: 0,
           hasGoal: false,
@@ -316,6 +320,7 @@ describe("formatProcessSummaryLabel", () => {
           hasSearch: false,
           hasWebSearch: false,
           hasBrowse: false,
+          hasMemory: false,
           commandCount: 0,
           subagentCount: 1,
           hasGoal: false,
@@ -388,6 +393,77 @@ describe("Web Access process grouping", () => {
     expect(blocks[0]).toMatchObject({
       type: "process-summary",
       summary: { hasWebSearch: true, subagentCount: 0, usedToolCount: 0 },
+    });
+  });
+});
+
+describe("Memory process grouping", () => {
+  const t = ((key: string) => {
+    const map: Record<string, string> = {
+      "tool.grouped.consultedMemory": "Consulted memory",
+      "tool.grouped.joinAnd": " and ",
+      "tool.grouped.joinComma": ", ",
+    };
+    return map[key] ?? key;
+  }) as never;
+
+  it.each([
+    { toolName: "memory_search", input: { query: "project convention" } },
+    { toolName: "memory_read", input: { id: "memory-1" } },
+  ])("groups $toolName as a Memory process", ({ toolName, input }) => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("memory-1", toolName, input),
+      toolResult("memory-1"),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { hasMemory: true, usedToolCount: 0 },
+    });
+  });
+
+  it("summarizes adjacent Memory tools with one dedicated fragment", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("mem-search-1", "memory_search", {
+        query: "project convention",
+      }),
+      toolResult("mem-search-1"),
+      toolUse("mem-read-1", "memory_read", { id: "memory-1" }),
+      toolResult("mem-read-1"),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      { text: "Consulted memory", iconType: "memory" },
+    ]);
+    expect(formatProcessSummaryLabel(blocks[0].summary, t)).toBe(
+      "Consulted memory",
+    );
+  });
+
+  it("combines Memory with other process-tool categories", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("read-1", "read", { path: "src/a.ts" }),
+      toolResult("read-1"),
+      toolUse("mem-search-1", "memory_search", { query: "convention" }),
+      toolResult("mem-search-1"),
+      toolUse("bash-1", "bash", { command: "npm test" }),
+      toolResult("bash-1"),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: {
+        readCount: 1,
+        hasMemory: true,
+        commandCount: 1,
+        usedToolCount: 0,
+      },
     });
   });
 });

@@ -1335,6 +1335,7 @@
       "searchedCode": "已搜索了代码",
       "searchedWeb": "已搜索了网页",
       "browsedWeb": "已浏览了网页",
+      "consultedMemory": "已查阅记忆",
       "managedGoal": "已管理目标",
       "executedCommands_one": "已执行了 {{count}} 条命令",
       "executedCommands_other": "已执行了 {{count}} 条命令",

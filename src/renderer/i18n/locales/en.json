@@ -1339,6 +1339,7 @@
       "searchedCode": "Searched the code",
       "searchedWeb": "Searched the web",
       "browsedWeb": "Browsed the web",
+      "consultedMemory": "Consulted memory",
       "managedGoal": "Managed goal",
       "executedCommands_one": "Executed {{count}} command",
       "executedCommands_other": "Executed {{count}} commands",
