@@ -18,6 +18,7 @@ import {
   BrowserWindow,
   ipcMain,
   dialog,
+  screen,
   shell,
   Menu,
   nativeTheme,
@@ -523,10 +524,11 @@ function createWindow() {
   const isMac = process.platform === "darwin";
   const isWindows = process.platform === "win32";
 
-  // Base window options
+  // Base window options — constrained to workArea to avoid extending behind Dock/menu bar
+  const { width: workWidth, height: workHeight } = screen.getPrimaryDisplay().workAreaSize;
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
-    width: 1400,
-    height: 900,
+    width: Math.min(1400, workWidth),
+    height: Math.min(900, workHeight),
     minWidth: 800,
     minHeight: 600,
     backgroundColor: THEME.background,
