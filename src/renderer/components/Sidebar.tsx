@@ -39,6 +39,7 @@ const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
 const ORDINARY_SESSION_GROUP_KEY = "__ordinary_sessions__";
 const SIDEBAR_PINS_STORAGE_KEY = "deskwand.sidebarPins";
+const SIDEBAR_GROUP_EXPANSION_STORAGE_KEY = "deskwand.sidebarGroupExpansion";
 const SESSION_OVERFLOW_BUTTON_CLASS =
   "rounded-lg bg-transparent px-3 py-1.5 text-xs text-text-muted hover:bg-transparent hover:text-text-secondary focus-visible:bg-transparent focus-visible:text-text-secondary transition-colors";
 
@@ -79,7 +80,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [projectExpansionOverrides, setProjectExpansionOverrides] = useState(
-    () => new Map<string, boolean>(),
+    () => loadGroupExpansion(),
   );
   const [sessionVisibleCountOverrides, setSessionVisibleCountOverrides] =
     useState(() => new Map<string, number>());
@@ -99,6 +100,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   useEffect(() => {
     saveSidebarPins(sidebarPins);
   }, [sidebarPins]);
+
+  useEffect(() => {
+    saveGroupExpansion(projectExpansionOverrides);
+  }, [projectExpansionOverrides]);
 
   useEffect(() => {
     if (!showProjectActions) return;
@@ -1316,6 +1321,35 @@ function saveSidebarPins(pins: SidebarPins): void {
     localStorage.setItem(SIDEBAR_PINS_STORAGE_KEY, JSON.stringify(pins));
   } catch {
     // Keep the in-memory pin state when storage is unavailable.
+  }
+}
+
+function loadGroupExpansion(): Map<string, boolean> {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_GROUP_EXPANSION_STORAGE_KEY);
+    if (!raw) return new Map();
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) {
+      return new Map();
+    }
+    const entries = Object.entries(parsed as Record<string, unknown>).filter(
+      ([, v]) => typeof v === "boolean",
+    ) as [string, boolean][];
+    return new Map(entries);
+  } catch {
+    return new Map();
+  }
+}
+
+function saveGroupExpansion(state: Map<string, boolean>): void {
+  try {
+    const obj: Record<string, boolean> = {};
+    state.forEach((v, k) => {
+      obj[k] = v;
+    });
+    localStorage.setItem(SIDEBAR_GROUP_EXPANSION_STORAGE_KEY, JSON.stringify(obj));
+  } catch {
+    // Keep the in-memory state when storage is unavailable.
   }
 }
 

@@ -1162,3 +1162,276 @@ describe("Sidebar project groups", () => {
     ).toBeNull();
   });
 });
+
+describe("Sidebar group expansion persistence", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
+    localStorage.clear();
+    useAppStore.setState(useAppStore.getInitialState(), true);
+    container = document.createElement("div");
+    document.body.innerHTML = "";
+    document.body.appendChild(container);
+    root = createRoot(container);
+  });
+
+  afterEach(async () => {
+    await act(async () => root.unmount());
+  });
+
+  async function render(sessions: Session[]): Promise<void> {
+    await act(async () => {
+      useAppStore.setState({ sessions });
+      root.render(React.createElement(Sidebar, { width: 280 }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+  }
+
+  function ordinarySessions(): Session[] {
+    return [
+      session("ordinary-1", { title: "Ordinary 1", updatedAt: 30 }),
+      session("ordinary-2", { title: "Ordinary 2", updatedAt: 20 }),
+    ];
+  }
+
+  function makeProjectSessions(
+    projectName: string,
+    count: number,
+    updatedAt: number,
+  ): Session[] {
+    return Array.from({ length: count }, (_, index) =>
+      session(`${projectName}-${index + 1}`, {
+        title: `${projectName} chat ${index + 1}`,
+        isProjectMode: true,
+        cwd: `/work/${projectName}`,
+        updatedAt: updatedAt - index,
+      }),
+    );
+  }
+
+  function ordinaryToggle(): HTMLButtonElement {
+    const button = Array.from(
+      container.querySelectorAll("button[aria-expanded]"),
+    ).find((candidate) =>
+      candidate.textContent?.includes(i18n.t("sidebar.allSessions")),
+    );
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  function projectToggle(cwd: string): HTMLButtonElement {
+    const header = Array.from(container.querySelectorAll("[title]")).find(
+      (element) => element.getAttribute("title") === cwd,
+    );
+    expect(header).toBeTruthy();
+    const section = header?.closest("section");
+    expect(section).toBeTruthy();
+    const button = section?.querySelector("button[aria-expanded]");
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  function projectSection(cwd: string): HTMLElement {
+    const header = Array.from(container.querySelectorAll("[title]")).find(
+      (element) => element.getAttribute("title") === cwd,
+    );
+    expect(header).toBeTruthy();
+    const section = header?.closest("section");
+    expect(section).toBeTruthy();
+    return section as HTMLElement;
+  }
+
+  it("persists expansion state across re-renders", async () => {
+    const sessions: Session[] = [
+      ...ordinarySessions(),
+      ...makeProjectSessions("proj-a", 1, 500),
+      ...makeProjectSessions("proj-b", 1, 400),
+      ...makeProjectSessions("proj-c", 1, 300),
+      ...makeProjectSessions("proj-d", 1, 200),
+    ];
+
+    // First render: toggle ordinary open, collapse the 2nd project
+    await render(sessions);
+    await act(async () => ordinaryToggle().click());
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
+
+    await act(async () => projectToggle("/work/proj-b").click());
+    expect(projectToggle("/work/proj-b").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+
+    // Verify localStorage was written
+    const stored = JSON.parse(
+      localStorage.getItem("deskwand.sidebarGroupExpansion") ?? "{}",
+    );
+    expect(stored["__ordinary_sessions__"]).toBe(true);
+    expect(stored["/work/proj-b"]).toBe(false);
+
+    // Re-render: state should survive
+    await render(sessions);
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
+    expect(projectToggle("/work/proj-b").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+    // Un-toggled projects should follow default (first 3 expanded)
+    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    expect(projectToggle("/work/proj-d").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+  });
+
+  it("loads persisted expansion state on mount", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarGroupExpansion",
+      JSON.stringify({
+        __ordinary_sessions__: true,
+        "/work/proj-a": false,
+        "/work/proj-b": true,
+      }),
+    );
+
+    await render([
+      ...makeProjectSessions("proj-a", 1, 500),
+      ...makeProjectSessions("proj-b", 1, 400),
+      ...makeProjectSessions("proj-c", 1, 300),
+      ...makeProjectSessions("proj-d", 1, 200),
+    ]);
+
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
+    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+    expect(projectToggle("/work/proj-b").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    // proj-c should follow default (3rd project, index < 3 → expanded)
+    expect(projectToggle("/work/proj-c").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+
+  it("falls back to defaults with invalid JSON", async () => {
+    localStorage.setItem("deskwand.sidebarGroupExpansion", "{");
+
+    await render([
+      ...makeProjectSessions("proj-a", 1, 500),
+      ...makeProjectSessions("proj-b", 1, 400),
+      ...makeProjectSessions("proj-c", 1, 300),
+      ...makeProjectSessions("proj-d", 1, 200),
+    ]);
+
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+    expect(projectToggle("/work/proj-d").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+  });
+
+  it("falls back to defaults with non-object stored value", async () => {
+    localStorage.setItem("deskwand.sidebarGroupExpansion", "42");
+
+    await render([...makeProjectSessions("proj-a", 1, 500)]);
+
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+
+  it("filters non-boolean values from stored data", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarGroupExpansion",
+      JSON.stringify({
+        __ordinary_sessions__: "not-a-bool",
+        "/work/proj-a": true,
+      }),
+    );
+
+    await render([...makeProjectSessions("proj-a", 1, 500)]);
+
+    // The string value is filtered out, falls back to default (collapsed)
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+    // proj-a has a valid boolean → respected
+    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+
+  it("does not dirty manual expansion overrides during search", async () => {
+    await render([
+      ...ordinarySessions(),
+      ...makeProjectSessions("proj-a", 1, 300),
+    ]);
+
+    // Collapse proj-a (index 0, normally expanded by default)
+    await act(async () => projectToggle("/work/proj-a").click());
+    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+
+    // Search — expands all matching groups
+    const input = container.querySelector("input");
+    expect(input).toBeTruthy();
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "proj");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(projectToggle("/work/proj-a").disabled).toBe(true);
+
+    // Clear search — manual override should still hold
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, "");
+      input?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+  });
+
+  it("does not alter stored state when localStorage is unavailable", async () => {
+    localStorage.clear();
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    localStorage.setItem = () => {
+      throw new Error("Storage full");
+    };
+
+    try {
+      await render([
+        ...ordinarySessions(),
+        ...makeProjectSessions("proj-a", 1, 300),
+      ]);
+
+      // Should still render and toggle without crashing
+      await act(async () => ordinaryToggle().click());
+      expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
+
+      await act(async () => ordinaryToggle().click());
+      expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+    } finally {
+      localStorage.setItem = originalSetItem;
+    }
+  });
+});
