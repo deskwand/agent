@@ -1236,16 +1236,6 @@ describe("Sidebar group expansion persistence", () => {
     return button as HTMLButtonElement;
   }
 
-  function projectSection(cwd: string): HTMLElement {
-    const header = Array.from(container.querySelectorAll("[title]")).find(
-      (element) => element.getAttribute("title") === cwd,
-    );
-    expect(header).toBeTruthy();
-    const section = header?.closest("section");
-    expect(section).toBeTruthy();
-    return section as HTMLElement;
-  }
-
   it("persists expansion state across re-renders", async () => {
     const sessions: Session[] = [
       ...ordinarySessions(),
