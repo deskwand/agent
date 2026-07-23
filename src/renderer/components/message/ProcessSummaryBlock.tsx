@@ -60,9 +60,12 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
         aria-expanded={expanded}
         className="group flex w-full items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] text-text-muted transition-colors hover:bg-surface-hover/40"
       >
-        <span className="inline-flex items-center gap-1.5 min-w-0">
+        <span className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-nowrap">
           {fragments.map((frag, fi) => (
-            <span key={fi} className="inline-flex items-center gap-1">
+            <span
+              key={fi}
+              className={`inline-flex items-center gap-1 min-w-0 whitespace-nowrap${frag.iconType !== 'subagent' ? ' flex-shrink-0' : ''}`}
+            >
               {fi > 0 && fi < fragments.length - 1 && (
                 <span className="text-text-muted">
                   {t("tool.grouped.joinComma")}
@@ -75,7 +78,9 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 </span>
               )}
               {PROCESS_ICON_MAP[frag.iconType]}
-              <span>{frag.text}</span>
+              <span className="truncate" title={frag.text}>
+                {frag.text}
+              </span>
             </span>
           ))}
         </span>
