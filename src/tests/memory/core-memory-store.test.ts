@@ -17,6 +17,30 @@ describe("CoreMemoryStore", () => {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
+  it("keeps in-memory state unchanged when durable writes fail", () => {
+    const store = new CoreMemoryStore(filePath);
+    store.applyActions([
+      { op: "upsert", category: "preferences", key: "language", value: "中文" },
+    ]);
+    fs.rmSync(filePath);
+    fs.mkdirSync(filePath);
+
+    expect(() =>
+      store.applyActions([
+        {
+          op: "upsert",
+          category: "skills",
+          key: "typescript",
+          value: "熟悉 TypeScript",
+        },
+      ]),
+    ).toThrow();
+    expect(store.getRaw()).toEqual({ "preferences.language": "中文" });
+
+    expect(() => store.clear()).toThrow();
+    expect(store.getRaw()).toEqual({ "preferences.language": "中文" });
+  });
+
   it("keeps newly applied memories when the store is at capacity", () => {
     const store = new CoreMemoryStore(filePath, 2);
     store.applyActions([

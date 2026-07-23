@@ -74,6 +74,8 @@ const PROCESS_TOOLS = new Set([
   "get_search_content",
   "memory_search",
   "memory_read",
+  "memory_upsert",
+  "memory_delete",
   "vision_describe",
   "office_read_xlsx",
   "office_read_docx",
@@ -107,7 +109,12 @@ const WEB_SEARCH_TOOLS = new Set([
   "get_search_content",
 ]);
 
-const MEMORY_TOOLS = new Set(["memory_search", "memory_read"]);
+const MEMORY_TOOLS = new Set([
+  "memory_search",
+  "memory_read",
+  "memory_upsert",
+  "memory_delete",
+]);
 
 const BROWSE_TOOLS = new Set([
   // browser automation tools

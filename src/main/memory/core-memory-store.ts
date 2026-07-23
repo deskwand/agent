@@ -61,21 +61,17 @@ export class CoreMemoryStore {
       ...appliedKeys,
       ...Object.keys(nextMemory).filter((key) => !appliedKeys.has(key)),
     ].slice(0, this.maxItems);
-    for (const key of Object.keys(this.memory)) {
-      delete this.memory[key];
-    }
-    for (const key of orderedKeys) {
-      this.memory[key] = nextMemory[key];
-    }
-    this.save();
+    const boundedMemory = Object.fromEntries(
+      orderedKeys.map((key) => [key, nextMemory[key]]),
+    );
+    saveJsonFile(this.filePath, boundedMemory);
+    this.replaceMemory(boundedMemory);
     return applied;
   }
 
   clear(): void {
-    for (const key of Object.keys(this.memory)) {
-      delete this.memory[key];
-    }
-    this.save();
+    saveJsonFile(this.filePath, {});
+    this.replaceMemory({});
   }
 
   toPromptBlock(): string {
@@ -84,5 +80,12 @@ export class CoreMemoryStore {
 
   save(): void {
     saveJsonFile(this.filePath, this.memory);
+  }
+
+  private replaceMemory(nextMemory: Record<string, string>): void {
+    for (const key of Object.keys(this.memory)) {
+      delete this.memory[key];
+    }
+    Object.assign(this.memory, nextMemory);
   }
 }

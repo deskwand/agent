@@ -5,14 +5,49 @@ interface SessionStateFile {
   sessions: Record<string, MemorySessionStateRecord>;
 }
 
+interface StoredSessionStateRecord extends Omit<
+  MemorySessionStateRecord,
+  "lastReviewedMessageCount"
+> {
+  lastReviewedMessageCount?: number;
+  lastProcessedMessageCount?: number;
+}
+
+interface StoredSessionStateFile {
+  sessions?: Record<string, StoredSessionStateRecord>;
+}
+
+function normalizeMessageCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? Math.floor(value)
+    : 0;
+}
+
 export class MemorySessionStateStore {
   private readonly state: SessionStateFile;
 
   constructor(private readonly filePath: string) {
-    this.state = loadJsonFile<SessionStateFile>(filePath, { sessions: {} });
-    if (!this.state.sessions || typeof this.state.sessions !== "object") {
-      this.state.sessions = {};
+    const loaded = loadJsonFile<StoredSessionStateFile>(filePath, {
+      sessions: {},
+    });
+    const sessions: Record<string, MemorySessionStateRecord> = {};
+    for (const [sessionId, record] of Object.entries(loaded.sessions || {})) {
+      if (!record || typeof record !== "object") {
+        continue;
+      }
+      sessions[sessionId] = {
+        sessionId: record.sessionId || sessionId,
+        sourceWorkspace: record.sourceWorkspace,
+        lastReviewedMessageCount: normalizeMessageCount(
+          record.lastReviewedMessageCount ?? record.lastProcessedMessageCount,
+        ),
+        lastIngestedAt: record.lastIngestedAt,
+        lastError: record.lastError,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+      };
     }
+    this.state = { sessions };
   }
 
   getPath(): string {

@@ -6,7 +6,7 @@
  * create/patch/extend skills.
  *
  * In Hermes Agent, ``spawn_background_review_thread`` forks the full AIAgent
- * with a whitelist of skill_manage + memory tools.
+ * with a restricted skill-management tool set.
  * In deskwand, a light AgentRunner fork replaces Hermes' Python AIAgent fork.
  *
  * Adapted from Hermes Agent background_review.py:400-608
@@ -16,11 +16,9 @@ import * as os from "node:os";
 import { AgentRunner } from "./agent-runner";
 import type { PathResolver } from "../sandbox/path-resolver";
 import { buildSkillWriteTools } from "../skills/skill-write-tools";
-import { buildMemoryWriteTools } from "../memory/memory-write-tools";
 import { BACKGROUND_REVIEW_SYSTEM_PROMPT } from "./review-prompts";
 import { log, logError } from "../utils/logger";
 import type { AppConfig } from "../config/config-store";
-import type { CoreMemoryStore } from "../memory/core-memory-store";
 import type { SkillsAdapter } from "../skills/skills-adapter";
 import type { Session, Message } from "../../renderer/types";
 
@@ -36,7 +34,6 @@ export interface ReviewTurnSnapshot {
 export interface BackgroundReviewOptions {
   config: AppConfig;
   globalSkillsPath: string;
-  coreStore?: CoreMemoryStore;
   pathResolver: PathResolver;
   skillsAdapter?: SkillsAdapter;
   /** Timeout in ms for the review agent runner (default 120s). */
@@ -58,8 +55,7 @@ export class BackgroundReviewService {
    * Review a turn snapshot by forking a lightweight AgentRunner.
    *
    * The forked runner can use skill_create/skill_patch/skill_add_reference
-   * to write new skills, and read to inspect existing ones.  Memory tools
-   * (memory_upsert/memory_delete) are also available.
+   * to write new skills, and read to inspect existing ones.
    *
    * Fire-and-forget: errors are logged, never thrown to the caller.
    */
@@ -72,7 +68,7 @@ export class BackgroundReviewService {
       const turnText = snapshot.messages
         .map((m) => `[${m.role}]: ${m.content}`)
         .join("\n\n");
-      const prompt = `Review this conversation turn and decide if any skills or memory entries should be created or updated.
+      const prompt = `Review this conversation turn and decide if any skills should be created or updated.
 
 ## Conversation
 
@@ -91,11 +87,6 @@ learning opportunities.`;
           },
         }),
       ];
-      const { coreStore } = this.options;
-      if (coreStore) {
-        reviewTools.push(...buildMemoryWriteTools({ coreStore }));
-      }
-
       // 3. Create a lightweight AgentRunner fork
       //    - no-op sendToRenderer (never leaks to UI)
       //    - no MCP, no extensions, no browser

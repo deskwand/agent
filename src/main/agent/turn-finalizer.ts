@@ -3,7 +3,7 @@
  *
  * Hook executed after every agent turn completes.
  *
- * Determines whether a background review (skill + memory) should run,
+ * Determines whether a background skill review should run,
  * based purely on a turn counter — same approach as Hermes Agent.
  *
  * Hermes uses _skill_nudge_interval (default 10 tool-iterations).
@@ -24,9 +24,8 @@
 
 import { log, logError } from "../utils/logger";
 import type {
-  BackgroundReviewService} from "./background-review";
-import {
-  type ReviewTurnSnapshot,
+  BackgroundReviewService,
+  ReviewTurnSnapshot,
 } from "./background-review";
 import { configStore } from "../config/config-store";
 import type { Message } from "../../renderer/types";
@@ -44,7 +43,7 @@ export interface TurnCompleteParams {
   hasFinalResponse: boolean;
   /** Whether the turn was interrupted (user abort, error). */
   interrupted: boolean;
-  /** Whether the session is in project mode (cwd is set) — when true, skill + memory review are skipped. */
+  /** Whether the session is in project mode (cwd is set) — when true, skill review is skipped. */
   isProjectMode: boolean;
 }
 
@@ -53,8 +52,6 @@ export interface TurnFinalizerOptions {
   getReviewService: () => BackgroundReviewService | null;
   /** Number of turns between skill reviews (default 3). */
   skillReviewInterval?: number;
-  /** Maximum turns before forcing a review (default 10). */
-  forceReviewAfterTurns?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +77,6 @@ function extractTextContent(msg: Message): string {
 export class TurnFinalizer {
   private readonly options: TurnFinalizerOptions;
   private turnsSinceLastSkillReview = 0;
-  private turnsSinceLastMemoryReview = 0;
   private pendingReview: Promise<void> | null = null;
 
   constructor(options: TurnFinalizerOptions) {
@@ -98,54 +94,30 @@ export class TurnFinalizer {
     }
 
     this.turnsSinceLastSkillReview++;
-    this.turnsSinceLastMemoryReview++;
 
-    // Skill review: every N turns (if the model hasn't produced anything
-    // worth learning, that's fine — the LLM decides).  Forced review
-    // (forceReviewAfterTurns) is naturally covered because the counter
-    // resets to 0 after every review, so the interval itself acts as the
-    // upper bound.  This mirrors Hermes' _skill_nudge_interval.
     const interval = this.options.skillReviewInterval ?? 3;
-
-    let shouldReviewSkills = this.turnsSinceLastSkillReview >= interval;
-
-    // Gate: autoSkillLearning controls skill review + curator
-    if (shouldReviewSkills && !configStore.getAll().autoSkillLearning) {
-      this.turnsSinceLastSkillReview = 0;
-      shouldReviewSkills = false;
-    }
-
-    // Gate: skip skill + memory review in project mode
-    if (params.isProjectMode) {
-      if (shouldReviewSkills) {
-        log("[TurnFinalizer] Skipping skill review: project mode (cwd is set)");
-        this.turnsSinceLastSkillReview = 0;
-        shouldReviewSkills = false;
-      }
-      if (this.turnsSinceLastMemoryReview >= 2) {
-        log(
-          "[TurnFinalizer] Skipping memory review: project mode (cwd is set)",
-        );
-        this.turnsSinceLastMemoryReview = 0;
-      }
-    }
-
-    // Memory review: every 2 turns (lighter weight)
-    const shouldReviewMemory = this.turnsSinceLastMemoryReview >= 2;
-
-    if (!shouldReviewSkills && !shouldReviewMemory) {
+    if (this.turnsSinceLastSkillReview < interval) {
       return;
     }
 
-    // Don't stack reviews — if one is pending, skip
+    if (!configStore.getAll().autoSkillLearning) {
+      this.turnsSinceLastSkillReview = 0;
+      return;
+    }
+
+    if (params.isProjectMode) {
+      log("[TurnFinalizer] Skipping skill review: project mode (cwd is set)");
+      this.turnsSinceLastSkillReview = 0;
+      return;
+    }
+
     if (this.pendingReview) {
       log("[TurnFinalizer] Previous review still pending, skipping");
       return;
     }
 
     log(
-      `[TurnFinalizer] Triggering review: skills=${shouldReviewSkills}, memory=${shouldReviewMemory}, ` +
-        `turnsSinceSkill=${this.turnsSinceLastSkillReview}`,
+      `[TurnFinalizer] Triggering skill review after ${this.turnsSinceLastSkillReview} turns`,
     );
 
     const service = this.options.getReviewService();
@@ -154,9 +126,7 @@ export class TurnFinalizer {
       return;
     }
 
-    // Reset counters
-    if (shouldReviewSkills) this.turnsSinceLastSkillReview = 0;
-    if (shouldReviewMemory) this.turnsSinceLastMemoryReview = 0;
+    this.turnsSinceLastSkillReview = 0;
 
     // Build snapshot from last turn's messages
     const snapshot = this.buildSnapshot(params.messages);

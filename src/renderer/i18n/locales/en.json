@@ -221,10 +221,10 @@
   },
   "memory": {
     "title": "Memory",
-    "description": "Long-term memory is retrieved through memory tools only when needed and is never automatically injected into the current conversation context.",
+    "description": "Long-term memory is retrieved through memory tools only when needed and is never automatically injected into the current conversation context. Stable profile facts are reviewed in the background every 10 user turns or saved when you explicitly ask.",
     "enabled": "Enabled",
     "disabled": "Disabled",
-    "toggleHint": "Turning this off stops future ingestion and on-demand retrieval, but keeps existing records.",
+    "toggleHint": "Turning this off stops selective background learning, explicit memory writes, and on-demand retrieval, but keeps existing records.",
     "enableAction": "Enable Memory",
     "disableAction": "Disable Memory",
     "enabledStatus": "Memory is enabled",

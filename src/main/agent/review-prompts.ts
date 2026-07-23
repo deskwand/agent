@@ -1,11 +1,10 @@
 /**
  * @module main/agent/review-prompts
  *
- * System prompts for background skill and memory review.
+ * System prompt for background skill review.
  *
  * The BACKGROUND_REVIEW_SYSTEM_PROMPT instructs the forked AgentRunner to
- * use its tools (skill_create, skill_patch, skill_add_reference, read,
- * memory_upsert, memory_delete) — no YAML parsing needed.
+ * use its skill-management tools without involving long-term memory.
  *
  * Adapted from Hermes Agent background_review.py:
  *   - _COMBINED_REVIEW_PROMPT (lines 44-83)
@@ -50,11 +49,6 @@ Aim for CLASS-LEVEL skills with rich SKILL.md, not one-session-one-skill
 micro-entries. A skill named "fix-login-bug-2026" is too narrow.
 A skill named "auth-debugging" with troubleshooting patterns is good.
 
-## Memory
-
-When user expresses preferences or personal details, use memory_upsert.
-When old preferences are contradicted, use memory_delete.
-
 ## How to work
 
 1. Use read to inspect SKILL.md files before you patch or extend them
@@ -72,6 +66,4 @@ When old preferences are contradicted, use memory_delete.
 - skill_create — create a new agent skill
 - skill_patch — update a section in an existing agent skill
 - skill_add_reference — add a reference/script/template file to a skill
-- memory_upsert — remember user preferences
-- memory_delete — remove outdated preferences
 `;

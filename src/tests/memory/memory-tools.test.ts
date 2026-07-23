@@ -54,6 +54,76 @@ function searchResult(
 }
 
 describe("memory tools", () => {
+  it("exposes explicit read and write tools", () => {
+    const service = {
+      search: vi.fn(),
+      read: vi.fn(),
+      upsertCoreMemory: vi.fn(),
+      deleteCoreMemory: vi.fn(),
+    } as unknown as MemoryService;
+
+    expect(
+      createMemoryTools(service, "/repo/a").map((tool) => tool.name),
+    ).toEqual([
+      "memory_search",
+      "memory_read",
+      "memory_upsert",
+      "memory_delete",
+    ]);
+  });
+
+  it("awaits explicit memory upserts and deletes", async () => {
+    const upsertCoreMemory = vi.fn(async () => []);
+    const deleteCoreMemory = vi.fn(async () => []);
+    const service = {
+      search: vi.fn(),
+      read: vi.fn(),
+      upsertCoreMemory,
+      deleteCoreMemory,
+    } as unknown as MemoryService;
+    const tools = createMemoryTools(service, "/repo/a");
+
+    const upsertText = await executeTool(tools, "memory_upsert", {
+      category: "preferences",
+      key: "response-language",
+      value: "Use Chinese by default.",
+    });
+    const deleteText = await executeTool(tools, "memory_delete", {
+      key: "preferences.response-language",
+    });
+
+    expect(upsertCoreMemory).toHaveBeenCalledWith(
+      "preferences",
+      "response-language",
+      "Use Chinese by default.",
+    );
+    expect(deleteCoreMemory).toHaveBeenCalledWith(
+      "preferences.response-language",
+    );
+    expect(upsertText).toContain("Memory upserted");
+    expect(deleteText).toContain("Memory deleted");
+  });
+
+  it("does not report success when an explicit memory write fails", async () => {
+    const service = {
+      search: vi.fn(),
+      read: vi.fn(),
+      upsertCoreMemory: vi.fn(async () => {
+        throw new Error("write failed");
+      }),
+      deleteCoreMemory: vi.fn(),
+    } as unknown as MemoryService;
+    const tools = createMemoryTools(service, "/repo/a");
+
+    await expect(
+      executeTool(tools, "memory_upsert", {
+        category: "preferences",
+        key: "response-language",
+        value: "Use Chinese by default.",
+      }),
+    ).rejects.toThrow("write failed");
+  });
+
   it("defaults to the bound workspace", async () => {
     const search = vi.fn(() => [searchResult()]);
     const service = { search, read: vi.fn() } as unknown as MemoryService;

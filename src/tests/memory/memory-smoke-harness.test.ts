@@ -286,87 +286,77 @@ describe("memory smoke harness", () => {
     fs.rmSync(storageRoot, { recursive: true, force: true });
   });
 
-  it("simulates multi-session recall across same and different workspaces", async () => {
-    const workspaceA = "/repo/workspace-a";
-    const workspaceB = "/repo/workspace-b";
-
-    await service.enqueueIngestion({
-      session: {
-        id: "a-1",
-        title: "Gateway implementation",
-        status: "idle",
-        cwd: workspaceA,
-        mountedPaths: [],
-        allowedTools: [],
-        memoryEnabled: true,
-        isProjectMode: !!workspaceA,
-        createdAt: 1000,
-        updatedAt: 1000,
-      },
-      prompt: "实现 gateway token rotation",
-      messages: makeMessages("a-1", [
-        { role: "user", text: "请用中文回答。", timestamp: 1 },
-        { role: "assistant", text: "好的。", timestamp: 2 },
+  it("supports explicit writes and ten-turn selective background learning", async () => {
+    const session = {
+      id: "selective-review",
+      title: "Selective review",
+      status: "idle" as const,
+      cwd: "/repo/workspace-a",
+      mountedPaths: [],
+      allowedTools: [],
+      memoryEnabled: true,
+      isProjectMode: true,
+      createdAt: 1000,
+      updatedAt: 1000,
+    };
+    const messages = makeMessages(
+      session.id,
+      Array.from({ length: 10 }, (_, index) => [
         {
-          role: "user",
-          text: "在 workspace A 里实现 gateway token rotation，并同步 remote gateway。",
-          timestamp: 3,
+          role: "user" as const,
+          text: index === 0 ? "请用中文回答。" : `user-${index + 1}`,
+          timestamp: index * 2 + 1,
         },
         {
-          role: "assistant",
-          text: "已在 workspace A 完成 gateway token rotation。",
-          timestamp: 4,
+          role: "assistant" as const,
+          text: `assistant-${index + 1}`,
+          timestamp: index * 2 + 2,
         },
-      ]),
-    });
-
-    await service.enqueueIngestion({
-      session: {
-        id: "b-1",
-        title: "Other workspace",
-        status: "idle",
-        cwd: workspaceB,
-        mountedPaths: [],
-        allowedTools: [],
-        memoryEnabled: true,
-        isProjectMode: !!workspaceB,
-        createdAt: 2000,
-        updatedAt: 2000,
-      },
-      prompt: "记录别的事情",
-      messages: makeMessages("b-1", [
-        {
-          role: "user",
-          text: "在 workspace B 中讨论不相关的话题。",
-          timestamp: 5,
-        },
-        { role: "assistant", text: "已记录。", timestamp: 6 },
-      ]),
-    });
-
-    const sameWorkspacePrompt = await service.buildPromptPrefix(
-      { cwd: workspaceA },
-      "继续 gateway token rotation",
-    );
-    const otherWorkspacePrompt = await service.buildPromptPrefix(
-      { cwd: workspaceB },
-      "继续 gateway token rotation",
+      ]).flat(),
     );
 
-    expect(sameWorkspacePrompt).toContain("gateway token rotation");
-    expect(sameWorkspacePrompt).toContain("<experience_memory");
-    expect(otherWorkspacePrompt).toContain("workspace A");
-    expect(otherWorkspacePrompt).toContain("source=/repo/workspace-a");
-    expect(otherWorkspacePrompt).toContain("<core_memory>");
+    await service.upsertCoreMemory(
+      "preferences",
+      "response_style",
+      "回答保持简洁",
+    );
+    await service.enqueueIngestion({
+      session,
+      prompt: "turn 9",
+      messages: messages.slice(0, 18),
+    });
+    expect(service.getOverview().coreCount).toBe(1);
+
+    await service.enqueueIngestion({
+      session,
+      prompt: "turn 10",
+      messages,
+    });
+
+    const overview = service.getOverview(session.cwd);
+    expect(overview.coreCount).toBe(2);
+    expect(overview.experienceSessionCount).toBe(0);
+    expect(overview.experienceChunkCount).toBe(0);
+    expect(
+      service.search({ query: "中文", scope: "global", limit: 5 }),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "core",
+          title: "preferences.response_language",
+        }),
+      ]),
+    );
   });
 
-  it("keeps the manual live checklist alongside deterministic smoke coverage", async () => {
-    const checklist = fs.readFileSync(
-      path.resolve(process.cwd(), "docs/memory-live-smoke-checklist.md"),
-      "utf8",
-    );
-    expect(checklist).toContain("Cross-Workspace Recall");
-    expect(checklist).toContain("Source Provenance");
-    expect(checklist).toContain("Non-Interactive Flows");
+  it("exposes read and explicit write tools together", () => {
+    expect(
+      service.getTools("/repo/workspace-a").map((tool) => tool.name),
+    ).toEqual([
+      "memory_search",
+      "memory_read",
+      "memory_upsert",
+      "memory_delete",
+    ]);
   });
 });

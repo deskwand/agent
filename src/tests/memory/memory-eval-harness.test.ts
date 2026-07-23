@@ -97,16 +97,28 @@ class EvalMockLLM implements MemoryLLMClientLike {
     if (request.systemPrompt.includes("Memory Profiler")) {
       return {
         text: JSON.stringify({
-          actions: request.userPrompt.includes("中文")
-            ? [
-                {
-                  op: "upsert",
-                  category: "preferences",
-                  key: "response_language",
-                  value: "中文",
-                },
-              ]
-            : [],
+          actions: [
+            ...(request.userPrompt.includes("中文")
+              ? [
+                  {
+                    op: "upsert",
+                    category: "preferences",
+                    key: "response_language",
+                    value: "中文",
+                  },
+                ]
+              : []),
+            ...(request.userPrompt.includes("TypeScript")
+              ? [
+                  {
+                    op: "upsert",
+                    category: "skills",
+                    key: "frontend_stack",
+                    value: "长期使用 TypeScript 和 React。",
+                  },
+                ]
+              : []),
+          ],
         }),
       };
     }
@@ -317,8 +329,51 @@ describe("MemoryEvalHarness and MemoryPromptOptimizer", () => {
     const report = await harness.run({ artifactDir });
 
     expect(report.caseResults.length).toBeGreaterThan(1);
-    expect(report.averageScore).toBeGreaterThan(0.5);
+    expect(report.averageScore).toBeGreaterThan(0.8);
+    for (const caseResult of report.caseResults) {
+      for (const queryResult of caseResult.queryResults) {
+        expect(queryResult.matchedExpectedHits).toEqual(
+          queryResult.expectedHits,
+        );
+        expect(queryResult.promptPrefix).toContain("type: core");
+      }
+    }
+    expect(service.getOverview()).toMatchObject({
+      experienceSessionCount: 0,
+      experienceChunkCount: 0,
+    });
     expect(fs.existsSync(path.join(artifactDir, "report.json"))).toBe(true);
+  });
+
+  it("pads short custom cases to the selective review interval", async () => {
+    const harness = new MemoryEvalHarness(service, llm);
+    const report = await harness.run({
+      artifactDir: path.join(tempRoot, "custom-short-eval"),
+      cases: [
+        {
+          id: "custom-short",
+          title: "Short custom case",
+          sessionTitle: "Short preference",
+          messages: [
+            { role: "user", text: "请以后默认用中文回答。", timestamp: 1 },
+            { role: "assistant", text: "好的。", timestamp: 2 },
+          ],
+          queries: [
+            {
+              id: "custom-query",
+              prompt: "中文",
+              expectedHits: ["中文"],
+            },
+          ],
+        },
+      ],
+      useModelJudge: false,
+    });
+
+    expect(report.averageScore).toBe(1);
+    expect(report.caseResults[0].queryResults[0].promptPrefix).toContain(
+      "type: core",
+    );
   });
 
   it("uses the configured eval artifacts root when no artifactDir is passed", async () => {

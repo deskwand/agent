@@ -7,7 +7,6 @@ import type { DatabaseInstance, SessionRow } from "../db/database";
 import { log, logError, logWarn } from "../utils/logger";
 import { CoreMemoryStore } from "./core-memory-store";
 import { CoreMemoryExtractor } from "./core-memory-extractor";
-import { ExperienceMemoryExtractor } from "./experience-memory-extractor";
 import { ExperienceMemoryStore } from "./experience-memory-store";
 import { MemoryIngestionQueue } from "./memory-ingestion-queue";
 import type { MemoryLLMClientLike } from "./memory-llm-client";
@@ -16,7 +15,8 @@ import { DEFAULT_MEMORY_PROMPTS, type MemoryPromptSet } from "./memory-prompts";
 import { MemoryRetriever } from "./memory-retriever";
 import { MemorySessionStateStore } from "./memory-state-store";
 import type {
-  ChunkMemoryItem,
+  AppliedCoreMemoryAction,
+  CoreMemoryCategory,
   MemoryDebugFileContent,
   MemoryDebugFileInfo,
   MemoryIngestionInput,
@@ -30,12 +30,10 @@ import type {
   ProgressiveRetrievalResult,
 } from "./memory-types";
 import {
-  extractKeywords,
   formatTimestamp,
   getFileSizeBytes,
   getFileTimestampMs,
   isSubPath,
-  isoNow,
   loadJsonFile,
   messagesToTranscript,
   normalizeWorkspaceKey,
@@ -49,16 +47,6 @@ interface MemoryPaths {
   experienceFilePath: string;
   stateFilePath: string;
   artifactsDir: string;
-}
-
-interface ExtractionBundle {
-  sessionRow: SessionRow;
-  session: MemoryIngestionInput["session"];
-  sourceWorkspace: string | null;
-  sessionDate: string;
-  fullMessages: MemoryIngestionInput["messages"];
-  fullTurns: MemoryTranscriptTurn[];
-  extracted: Awaited<ReturnType<ExperienceMemoryExtractor["extractSession"]>>;
 }
 
 interface ExpandedChunkData {
@@ -75,6 +63,14 @@ interface ExpandedSessionData {
   sourceWorkspace: string | null;
   sourceSessionTitle?: string;
   chunks: Array<{ chunkId: string; summary: string; keywords: string[] }>;
+}
+
+const MEMORY_REVIEW_USER_TURN_INTERVAL = 10;
+const MEMORY_REVIEW_CONTEXT_USER_TURNS = 2;
+
+interface MemoryIngestionOptions {
+  expectedGeneration?: number;
+  reviewFromStart?: boolean;
 }
 
 function isFilesystemRootPath(filePath: string): boolean {
@@ -151,11 +147,12 @@ function escapeMemoryContextText(text: string): string {
 }
 
 export class MemoryService {
+  private static readonly GLOBAL_WRITE_QUEUE_KEY = "global-memory-write";
   private readonly queue = new MemoryIngestionQueue();
   private readonly deletedSessionIds = new Set<string>();
+  private memoryGeneration = 0;
   private readonly llmClient: MemoryLLMClientLike;
   private readonly coreExtractor: CoreMemoryExtractor;
-  private readonly experienceExtractor: ExperienceMemoryExtractor;
   private readonly retriever: MemoryRetriever;
   private currentPathsKey: string | null = null;
   private coreStore: CoreMemoryStore | null = null;
@@ -178,10 +175,6 @@ export class MemoryService {
       this.llmClient,
       promptSet.coreMemoryUpdateSystemPrompt,
     );
-    this.experienceExtractor = new ExperienceMemoryExtractor(
-      this.llmClient,
-      promptSet.sessionChunkExtractionPrompt,
-    );
     this.retriever = new MemoryRetriever({
       getCoreEntries: () => this.getCoreStore().getEntries(),
       getCoreFilePath: () => this.getPaths().coreFilePath,
@@ -202,6 +195,24 @@ export class MemoryService {
 
   getTools(cwd?: string): MemoryToolDefinition[] {
     return createMemoryTools(this, cwd);
+  }
+
+  upsertCoreMemory(
+    category: CoreMemoryCategory,
+    key: string,
+    value: string,
+  ): Promise<AppliedCoreMemoryAction[]> {
+    return this.queue.enqueue(MemoryService.GLOBAL_WRITE_QUEUE_KEY, async () =>
+      this.getCoreStore().applyActions([
+        { op: "upsert", category, key, value },
+      ]),
+    );
+  }
+
+  deleteCoreMemory(key: string): Promise<AppliedCoreMemoryAction[]> {
+    return this.queue.enqueue(MemoryService.GLOBAL_WRITE_QUEUE_KEY, async () =>
+      this.getCoreStore().applyActions([{ op: "delete", key }]),
+    );
   }
 
   search(params: MemorySearchParams): MemorySearchResult[] {
@@ -425,7 +436,11 @@ export class MemoryService {
       throw new Error("Workspace path is required");
     }
 
-    this.clearWorkspace(cwd);
+    const rebuildGeneration = ++this.memoryGeneration;
+    await this.waitForPriorCoreWrites();
+    if (rebuildGeneration !== this.memoryGeneration) {
+      return { success: true, workspaceKey };
+    }
     const sessionRows = this.db.sessions
       .getAll()
       .filter(
@@ -435,7 +450,7 @@ export class MemoryService {
       )
       .sort((a, b) => a.created_at - b.created_at);
 
-    await this.batchRebuild(sessionRows);
+    await this.batchRebuild(sessionRows, rebuildGeneration);
     return { success: true, workspaceKey };
   }
 
@@ -445,31 +460,41 @@ export class MemoryService {
     sessionCount: number;
   }> {
     const paths = this.getPaths();
-    safeRemoveFile(paths.coreFilePath);
-    safeRemoveFile(paths.experienceFilePath);
-    safeRemoveFile(paths.stateFilePath);
-    fs.rmSync(paths.artifactsDir, { recursive: true, force: true });
-    this.resetStores();
+    const rebuildGeneration = ++this.memoryGeneration;
+    await this.queue.enqueue(MemoryService.GLOBAL_WRITE_QUEUE_KEY, async () => {
+      safeRemoveFile(paths.coreFilePath);
+      safeRemoveFile(paths.stateFilePath);
+      fs.rmSync(paths.artifactsDir, { recursive: true, force: true });
+      this.resetStores();
+    });
 
     const sessionRows = this.db.sessions
       .getAll()
       .filter((session) => session.memory_enabled === 1)
       .sort((a, b) => a.created_at - b.created_at);
-    await this.batchRebuild(sessionRows);
-    const overview = this.getOverview();
+    await this.batchRebuild(sessionRows, rebuildGeneration);
+    const workspaceCount = new Set(
+      sessionRows
+        .map((session) => normalizeWorkspaceKey(session.cwd))
+        .filter((workspace): workspace is string => Boolean(workspace)),
+    ).size;
     return {
       success: true,
-      workspaceCount: overview.sourceWorkspaceCount,
+      workspaceCount,
       sessionCount: sessionRows.length,
     };
   }
 
-  clearWorkspace(cwd: string): { success: boolean; workspaceKey: string } {
+  async clearWorkspace(
+    cwd: string,
+  ): Promise<{ success: boolean; workspaceKey: string }> {
     const workspaceKey = normalizeWorkspaceKey(cwd);
     if (!workspaceKey) {
       throw new Error("Workspace path is required");
     }
 
+    this.memoryGeneration += 1;
+    await this.waitForPriorCoreWrites();
     const store = this.getExperienceStore();
     store.removeBySourceWorkspace(workspaceKey);
     store.save();
@@ -477,8 +502,11 @@ export class MemoryService {
     return { success: true, workspaceKey };
   }
 
-  clearCoreMemory(): { success: boolean } {
-    this.getCoreStore().clear();
+  async clearCoreMemory(): Promise<{ success: boolean }> {
+    this.memoryGeneration += 1;
+    await this.queue.enqueue(MemoryService.GLOBAL_WRITE_QUEUE_KEY, async () =>
+      this.getCoreStore().clear(),
+    );
     return { success: true };
   }
 
@@ -494,22 +522,44 @@ export class MemoryService {
     });
   }
 
-  private async batchRebuild(sessionRows: SessionRow[]): Promise<void> {
-    if (!sessionRows.length) {
-      return;
-    }
-    const bundles = await this.extractExperienceBundles(sessionRows);
-    const sortedBundles = [...bundles].sort(
-      (a, b) => a.session.createdAt - b.session.createdAt,
-    );
-    for (const bundle of sortedBundles) {
-      await this.ingestExtractedBundle(bundle);
+  private async batchRebuild(
+    sessionRows: SessionRow[],
+    rebuildGeneration: number,
+  ): Promise<void> {
+    for (const sessionRow of sessionRows) {
+      if (rebuildGeneration !== this.memoryGeneration) {
+        return;
+      }
+      const session = this.sessionRowToSession(sessionRow);
+      const messages = this.getMessagesForSession(sessionRow.id);
+      await this.queue.enqueue(session.id, async () => {
+        if (rebuildGeneration !== this.memoryGeneration) {
+          return;
+        }
+        this.getStateStore().delete(session.id);
+        await this.ingest(
+          { session, prompt: "", messages },
+          {
+            expectedGeneration: rebuildGeneration,
+            reviewFromStart: true,
+          },
+        );
+      });
     }
   }
 
-  private async ingest(input: MemoryIngestionInput): Promise<void> {
+  private async ingest(
+    input: MemoryIngestionInput,
+    options: MemoryIngestionOptions = {},
+  ): Promise<void> {
     const { session, messages } = input;
     if (!session.memoryEnabled || !messages.length) {
+      return;
+    }
+    if (
+      options.expectedGeneration !== undefined &&
+      options.expectedGeneration !== this.memoryGeneration
+    ) {
       return;
     }
 
@@ -521,63 +571,72 @@ export class MemoryService {
     const sourceWorkspace = normalizeWorkspaceKey(session.cwd);
     const stateStore = this.getStateStore();
     const previousState = stateStore.get(session.id);
-    const lastProcessedMessageCount =
-      previousState?.lastProcessedMessageCount || 0;
+    const lastReviewedMessageCount = options.reviewFromStart
+      ? 0
+      : previousState?.lastReviewedMessageCount || 0;
 
-    if (messages.length <= lastProcessedMessageCount) {
+    if (messages.length <= lastReviewedMessageCount) {
       return;
     }
 
-    const fullTurns = messagesToTranscript(messages);
-    const deltaTurns = messagesToTranscript(
-      messages.slice(lastProcessedMessageCount),
+    const unseenMessages = messages.slice(lastReviewedMessageCount);
+    const unseenUserTurns = unseenMessages.filter(
+      (message) => message.role === "user" && !message.autoGenerated,
+    ).length;
+    if (unseenUserTurns < MEMORY_REVIEW_USER_TURN_INTERVAL) {
+      return;
+    }
+
+    const reviewMessages = this.selectReviewMessages(
+      messages,
+      lastReviewedMessageCount,
     );
+    const reviewTurns = messagesToTranscript(reviewMessages);
     const sessionDate = this.resolveSessionDate(session, messages);
+    const reviewGeneration =
+      options.expectedGeneration ?? this.memoryGeneration;
+    if (reviewGeneration !== this.memoryGeneration) {
+      return;
+    }
 
     try {
-      await this.updateCoreMemory(session.id, sessionDate, deltaTurns);
+      const reviewApplied = await this.updateCoreMemory(
+        session.id,
+        sessionDate,
+        reviewTurns,
+        reviewGeneration,
+      );
+      if (!reviewApplied) {
+        return;
+      }
       if (this.deletedSessionIds.has(session.id)) {
         stateStore.delete(session.id);
         return;
-      }
-      if (fullTurns.length) {
-        const extracted = await this.experienceExtractor.extractSession({
-          sessionId: session.id,
-          sessionDate,
-          turns: fullTurns,
-        });
-        if (this.deletedSessionIds.has(session.id)) {
-          stateStore.delete(session.id);
-          return;
-        }
-        await this.storeExperienceSession({
-          sourceWorkspace,
-          sessionId: session.id,
-          sessionTitle: session.title,
-          sessionDate,
-          sessionCreatedAt: session.createdAt,
-          fullTurns,
-          extracted,
-        });
       }
 
       stateStore.set({
         sessionId: session.id,
         sourceWorkspace,
-        lastProcessedMessageCount: messages.length,
+        lastReviewedMessageCount: messages.length,
         lastIngestedAt: Date.now(),
         lastError: null,
         createdAt: previousState?.createdAt || Date.now(),
         updatedAt: Date.now(),
       });
-      log("[MemoryService] Ingested memory for session:", session.id);
+      log("[MemoryService] Reviewed core memory for session:", session.id);
     } catch (error) {
+      if (
+        reviewGeneration !== this.memoryGeneration ||
+        this.deletedSessionIds.has(session.id)
+      ) {
+        return;
+      }
       const message = error instanceof Error ? error.message : String(error);
-      logError("[MemoryService] Failed to ingest memory:", error);
+      logError("[MemoryService] Failed to review core memory:", error);
       stateStore.set({
         sessionId: session.id,
         sourceWorkspace,
-        lastProcessedMessageCount,
+        lastReviewedMessageCount,
         lastIngestedAt: previousState?.lastIngestedAt || null,
         lastError: message,
         createdAt: previousState?.createdAt || Date.now(),
@@ -586,85 +645,50 @@ export class MemoryService {
     }
   }
 
-  private async ingestExtractedBundle(bundle: ExtractionBundle): Promise<void> {
-    await this.updateCoreMemory(
-      bundle.session.id,
-      bundle.sessionDate,
-      bundle.fullTurns,
+  private selectReviewMessages(
+    messages: MemoryIngestionInput["messages"],
+    lastReviewedMessageCount: number,
+  ): MemoryIngestionInput["messages"] {
+    const autoGeneratedTurnIds = new Set(
+      messages.flatMap((message) =>
+        message.autoGenerated && message.turnId ? [message.turnId] : [],
+      ),
     );
-    if (bundle.fullTurns.length) {
-      await this.storeExperienceSession({
-        sourceWorkspace: bundle.sourceWorkspace,
-        sessionId: bundle.session.id,
-        sessionTitle: bundle.session.title,
-        sessionDate: bundle.sessionDate,
-        sessionCreatedAt: bundle.session.createdAt,
-        fullTurns: bundle.fullTurns,
-        extracted: bundle.extracted,
-      });
+    let contextStart = lastReviewedMessageCount;
+    let precedingUserTurns = 0;
+    for (let index = lastReviewedMessageCount - 1; index >= 0; index -= 1) {
+      if (messages[index].role !== "user" || messages[index].autoGenerated) {
+        continue;
+      }
+      contextStart = index;
+      precedingUserTurns += 1;
+      if (precedingUserTurns >= MEMORY_REVIEW_CONTEXT_USER_TURNS) {
+        break;
+      }
     }
-    this.getStateStore().set({
-      sessionId: bundle.session.id,
-      sourceWorkspace: bundle.sourceWorkspace,
-      lastProcessedMessageCount: bundle.fullMessages.length,
-      lastIngestedAt: Date.now(),
-      lastError: null,
-      createdAt: bundle.session.createdAt,
-      updatedAt: Date.now(),
-    });
-  }
-
-  private async extractExperienceBundles(
-    sessionRows: SessionRow[],
-  ): Promise<ExtractionBundle[]> {
-    const concurrency = this.getAppConfig().memoryRuntime.ingestionConcurrency;
-    const tasks = sessionRows.map((sessionRow) => async () => {
-      const session = this.sessionRowToSession(sessionRow);
-      const fullMessages = this.getMessagesForSession(sessionRow.id);
-      const fullTurns = messagesToTranscript(fullMessages);
-      const sessionDate = this.resolveSessionDate(session, fullMessages);
-      const sourceWorkspace = normalizeWorkspaceKey(session.cwd);
-      const extracted = fullTurns.length
-        ? await this.experienceExtractor.extractSession({
-            sessionId: session.id,
-            sessionDate,
-            turns: fullTurns,
-          })
-        : { sessionSummary: "", sessionKeywords: [], chunks: [] };
-      return {
-        sessionRow,
-        session,
-        sourceWorkspace,
-        sessionDate,
-        fullMessages,
-        fullTurns,
-        extracted,
-      } satisfies ExtractionBundle;
-    });
-
-    const bundles: ExtractionBundle[] = [];
-    let cursor = 0;
-    const workers = Array.from(
-      { length: Math.min(concurrency, tasks.length) },
-      async () => {
-        while (cursor < tasks.length) {
-          const index = cursor;
-          cursor += 1;
-          bundles[index] = await tasks[index]();
-        }
-      },
-    );
-    await Promise.all(workers);
-    return bundles.filter(Boolean);
+    return messages
+      .slice(contextStart)
+      .filter(
+        (message) =>
+          !message.autoGenerated &&
+          (!message.turnId || !autoGeneratedTurnIds.has(message.turnId)),
+      );
   }
 
   private async updateCoreMemory(
     sessionId: string,
     sessionDate: string,
     turns: MemoryTranscriptTurn[],
-  ): Promise<void> {
+    reviewGeneration: number,
+  ): Promise<boolean> {
     if (!turns.length) {
-      return;
+      return true;
+    }
+    if (
+      reviewGeneration !== this.memoryGeneration ||
+      this.deletedSessionIds.has(sessionId)
+    ) {
+      return false;
     }
     const coreStore = this.getCoreStore();
     const actions = await this.coreExtractor.extract({
@@ -673,85 +697,35 @@ export class MemoryService {
       turns,
       existingCorePromptBlock: coreStore.toPromptBlock(),
     });
-    if (actions.length) {
-      coreStore.applyActions(actions);
+    if (
+      reviewGeneration !== this.memoryGeneration ||
+      this.deletedSessionIds.has(sessionId)
+    ) {
+      return false;
     }
+    if (!actions.length) {
+      return true;
+    }
+    return this.queue.enqueue(
+      MemoryService.GLOBAL_WRITE_QUEUE_KEY,
+      async () => {
+        if (
+          reviewGeneration !== this.memoryGeneration ||
+          this.deletedSessionIds.has(sessionId)
+        ) {
+          return false;
+        }
+        coreStore.applyActions(actions);
+        return true;
+      },
+    );
   }
 
-  private async storeExperienceSession(input: {
-    sourceWorkspace: string | null;
-    sessionId: string;
-    sessionTitle?: string;
-    sessionDate: string;
-    sessionCreatedAt: number;
-    fullTurns: MemoryTranscriptTurn[];
-    extracted: Awaited<ReturnType<ExperienceMemoryExtractor["extractSession"]>>;
-  }): Promise<void> {
-    const store = this.getExperienceStore();
-    const existing = store.getSession(input.sessionId);
-    const ingestedAt = isoNow();
-    const sourceWorkspaceLabel = this.resolveWorkspaceLabel(
-      input.sourceWorkspace,
+  private waitForPriorCoreWrites(): Promise<void> {
+    return this.queue.enqueue(
+      MemoryService.GLOBAL_WRITE_QUEUE_KEY,
+      async () => undefined,
     );
-
-    const chunkInputs: Array<Omit<ChunkMemoryItem, "id">> = [];
-    for (const chunk of input.extracted.chunks) {
-      const rawText = this.extractRawText(input.fullTurns, chunk.sourceTurns);
-      const searchableText = [chunk.summary, chunk.details, ...chunk.keywords]
-        .join(" ")
-        .trim();
-      chunkInputs.push({
-        sessionId: input.sessionId,
-        sourceWorkspace: input.sourceWorkspace,
-        sourceWorkspaceLabel,
-        sourceSessionId: input.sessionId,
-        sourceSessionTitle: input.sessionTitle,
-        sourceSessionDate: input.sessionDate,
-        summary: chunk.summary,
-        details: chunk.details,
-        keywords: chunk.keywords.length
-          ? chunk.keywords
-          : extractKeywords(searchableText),
-        sourceTurns: chunk.sourceTurns,
-        rawText,
-        sessionDate: input.sessionDate,
-        createdAt:
-          existing?.createdAt || new Date(input.sessionCreatedAt).toISOString(),
-        ingestedAt,
-        embedding: await this.embedText(searchableText),
-      });
-    }
-
-    const sessionSearchable = [
-      input.extracted.sessionSummary,
-      ...input.extracted.sessionKeywords,
-    ]
-      .join(" ")
-      .trim();
-    store.replaceSession(
-      input.sessionId,
-      {
-        sessionId: input.sessionId,
-        sourceWorkspace: input.sourceWorkspace,
-        sourceWorkspaceLabel,
-        sourceSessionId: input.sessionId,
-        sourceSessionTitle: input.sessionTitle,
-        sourceSessionDate: input.sessionDate,
-        summary: input.extracted.sessionSummary,
-        keywords: input.extracted.sessionKeywords.length
-          ? input.extracted.sessionKeywords
-          : extractKeywords(sessionSearchable),
-        chunkIds: [],
-        rawSession: input.fullTurns,
-        sessionDate: input.sessionDate,
-        createdAt:
-          existing?.createdAt || new Date(input.sessionCreatedAt).toISOString(),
-        ingestedAt,
-        embedding: await this.embedText(sessionSearchable),
-      },
-      chunkInputs,
-    );
-    store.save();
   }
 
   private async buildExperienceContext(
@@ -907,18 +881,6 @@ export class MemoryService {
     }
   }
 
-  private extractRawText(
-    turns: MemoryTranscriptTurn[],
-    sourceTurns: number[],
-  ): string {
-    return [...sourceTurns]
-      .sort((a, b) => a - b)
-      .map((turnNumber) => turns[turnNumber - 1])
-      .filter((turn): turn is MemoryTranscriptTurn => Boolean(turn))
-      .map((turn) => `${turn.role}: ${turn.content}`)
-      .join("\n");
-  }
-
   private resolveSessionDate(
     session: MemoryIngestionInput["session"],
     messages: MemoryIngestionInput["messages"],
@@ -928,16 +890,6 @@ export class MemoryService {
       session.updatedAt ||
       session.createdAt;
     return formatTimestamp(timestamp);
-  }
-
-  private resolveWorkspaceLabel(
-    sourceWorkspace: string | null,
-  ): string | undefined {
-    if (!sourceWorkspace) {
-      return undefined;
-    }
-    const basename = path.basename(sourceWorkspace);
-    return basename || sourceWorkspace;
   }
 
   private sessionRowToSession(
@@ -963,25 +915,35 @@ export class MemoryService {
   private getMessagesForSession(
     sessionId: string,
   ): MemoryIngestionInput["messages"] {
-    return this.db.messages.getBySessionId(sessionId).map((row) => ({
-      id: row.id,
-      sessionId: row.session_id,
-      role: row.role as MemoryIngestionInput["messages"][number]["role"],
-      content: this.safeParseContent(row.content),
-      timestamp: row.timestamp,
-      executionTimeMs: row.execution_time_ms || undefined,
-    }));
+    return this.db.messages.getBySessionId(sessionId).map((row) => {
+      const content = this.safeParseContent(row.content);
+      const firstBlock = content[0];
+      const autoGenerated =
+        firstBlock?.type === "text" && firstBlock.text === "__autoGenerated__";
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        role: row.role as MemoryIngestionInput["messages"][number]["role"],
+        content: autoGenerated ? content.slice(1) : content,
+        timestamp: row.timestamp,
+        executionTimeMs: row.execution_time_ms || undefined,
+        turnId: row.turn_id || undefined,
+        autoGenerated: autoGenerated || undefined,
+      };
+    });
   }
 
   private getSessionTitle(sessionId: string): string | undefined {
     return this.db.sessions.get(sessionId)?.title || undefined;
   }
 
-  private safeParseContent(raw: string) {
+  private safeParseContent(
+    raw: string,
+  ): MemoryIngestionInput["messages"][number]["content"] {
     try {
       const parsed = JSON.parse(raw) as unknown;
       return Array.isArray(parsed)
-        ? parsed
+        ? (parsed as MemoryIngestionInput["messages"][number]["content"])
         : [{ type: "text", text: String(parsed) }];
     } catch {
       return [{ type: "text", text: raw }];

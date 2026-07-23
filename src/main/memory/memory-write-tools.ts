@@ -1,24 +1,9 @@
-/**
- * @module main/memory/memory-write-tools
- *
- * Agent-facing tools for upserting and deleting core memory entries.
- *
- * These tools wrap the existing CoreMemoryStore.applyActions() and are
- * intended for use by the background review agent (and optionally by
- * the main agent when memory write is enabled).
- *
- * Exports both ToolDefinitions (for pi-agent registration) and raw
- * functions (for programmatic use by BackgroundReviewService).
- */
-
 import { Type } from "@sinclair/typebox";
-import type { CoreMemoryStore } from "./core-memory-store";
-import type { AppliedCoreMemoryAction } from "./memory-types";
-import { log } from "../utils/logger";
-
-// ---------------------------------------------------------------------------
-// Shared parameter schemas
-// ---------------------------------------------------------------------------
+import type {
+  AppliedCoreMemoryAction,
+  CoreMemoryCategory,
+  MemoryToolDefinition,
+} from "./memory-types";
 
 const CategoryEnum = Type.Union([
   Type.Literal("identity"),
@@ -30,123 +15,76 @@ const CategoryEnum = Type.Union([
 const MemoryUpsertParams = Type.Object({
   category: CategoryEnum,
   key: Type.String({
+    minLength: 1,
     description:
       "Short, stable key for this memory entry (e.g. 'coding-style')",
   }),
-  value: Type.String({ description: "The memory value to store" }),
-  reason: Type.Optional(
-    Type.String({
-      description:
-        "Why this memory is being recorded (helps with future review)",
-    }),
-  ),
+  value: Type.String({
+    minLength: 1,
+    maxLength: 500,
+    description: "A compact, stable cross-session fact to remember",
+  }),
 });
 
 const MemoryDeleteParams = Type.Object({
   key: Type.String({
-    description:
-      "The combined key (e.g. 'preferences: coding-style') to delete",
+    minLength: 1,
+    description: "The combined key (e.g. 'preferences.coding-style') to delete",
   }),
-  reason: Type.Optional(
-    Type.String({ description: "Why this memory is being deleted" }),
-  ),
 });
 
-// ---------------------------------------------------------------------------
-// Raw functions (for programmatic use)
-// ---------------------------------------------------------------------------
-
 export interface MemoryWriteOptions {
-  coreStore: CoreMemoryStore;
+  upsert: (
+    category: CoreMemoryCategory,
+    key: string,
+    value: string,
+  ) => Promise<AppliedCoreMemoryAction[]>;
+  delete: (key: string) => Promise<AppliedCoreMemoryAction[]>;
 }
 
-export function memoryUpsert(
-  category: string,
-  key: string,
-  value: string,
+export function buildMemoryWriteTools(
   options: MemoryWriteOptions,
-): AppliedCoreMemoryAction[] {
-  const actions = options.coreStore.applyActions([
-    {
-      op: "upsert",
-      category: category as AppliedCoreMemoryAction["category"],
-      key,
-      value,
-    },
-  ]);
-  log(`[MemoryWrite] Upserted memory: ${category}: ${key}`);
-  return actions;
-}
-
-export function memoryDelete(
-  key: string,
-  options: MemoryWriteOptions,
-): AppliedCoreMemoryAction[] {
-  const actions = options.coreStore.applyActions([{ op: "delete", key }]);
-  log(`[MemoryWrite] Deleted memory: ${key}`);
-  return actions;
-}
-
-// ---------------------------------------------------------------------------
-// ToolDefinitions (for pi-agent registration)
-// ---------------------------------------------------------------------------
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function buildMemoryWriteTools(options: MemoryWriteOptions): any[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const memoryUpsertTool: any = {
+): MemoryToolDefinition[] {
+  const memoryUpsertTool: MemoryToolDefinition = {
     name: "memory_upsert",
     label: "memory_upsert",
     description:
-      "Upsert a core memory entry. Use this to remember user preferences, identity details, " +
-      "skills, and interests. The entry is keyed by category + key. If an entry with the " +
-      "same combined key exists, it will be updated. Max 24 entries total.",
-    parameters: MemoryUpsertParams as never,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    execute: async (
-      _toolCallId: string,
-      params: unknown,
-      _signal: unknown,
-      _onUpdate: unknown,
-      _ctx: unknown,
-    ) => {
-      const { category, key, value } = params as {
-        category: string;
+      "Remember or replace stable cross-session user identity, preference, skill, or interest information. Use only when the user explicitly asks to remember it.",
+    parameters: MemoryUpsertParams,
+    async execute(_toolCallId, params) {
+      const input = params as {
+        category: CoreMemoryCategory;
         key: string;
         value: string;
       };
-      memoryUpsert(category, key, value, options);
+      const category = input.category;
+      const key = String(input.key || "").trim();
+      const value = String(input.value || "").trim();
+      await options.upsert(category, key, value);
       return {
         content: [
           {
             type: "text" as const,
-            text: `Memory upserted: ${category}: ${key}`,
+            text: `Memory upserted: ${category}.${key}`,
           },
         ],
+        details: undefined as unknown,
       };
     },
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const memoryDeleteTool: any = {
+  const memoryDeleteTool: MemoryToolDefinition = {
     name: "memory_delete",
     label: "memory_delete",
     description:
-      "Delete an obsolete or contradicted core memory entry. Use the combined key " +
-      "(e.g. 'preferences: coding-style') to identify the entry.",
-    parameters: MemoryDeleteParams as never,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    execute: async (
-      _toolCallId: string,
-      params: unknown,
-      _signal: unknown,
-      _onUpdate: unknown,
-      _ctx: unknown,
-    ) => {
-      const { key } = params as { key: string };
-      memoryDelete(key, options);
+      "Forget obsolete or contradicted Core Memory when the user explicitly asks. Use the combined key returned by memory_search.",
+    parameters: MemoryDeleteParams,
+    async execute(_toolCallId, params) {
+      const key = String((params as { key: string }).key || "").trim();
+      await options.delete(key);
       return {
         content: [{ type: "text" as const, text: `Memory deleted: ${key}` }],
+        details: undefined as unknown,
       };
     },
   };

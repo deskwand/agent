@@ -40,7 +40,9 @@ describe("MemoryExtension", () => {
     expect(result?.systemPromptSuffix).toContain(
       "No saved memory has been loaded",
     );
-    expect(result?.systemPromptSuffix).toContain("memory-policy-v1");
+    expect(result?.systemPromptSuffix).toContain("memory-policy-v2");
+    expect(result?.systemPromptSuffix).toContain("memory_upsert");
+    expect(result?.systemPromptSuffix).toContain("memory_delete");
     expect(getTools).toHaveBeenCalledWith("/repo/a");
     expect(buildPromptPrefix).not.toHaveBeenCalled();
   });

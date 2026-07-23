@@ -518,6 +518,15 @@ describe("Memory process grouping", () => {
   it.each([
     { toolName: "memory_search", input: { query: "project convention" } },
     { toolName: "memory_read", input: { id: "memory-1" } },
+    {
+      toolName: "memory_upsert",
+      input: {
+        category: "preferences",
+        key: "language",
+        value: "中文",
+      },
+    },
+    { toolName: "memory_delete", input: { key: "preferences.language" } },
   ])("groups $toolName as a Memory process", ({ toolName, input }) => {
     const blocks = buildToolDisplayBlocks([
       toolUse("memory-1", toolName, input),

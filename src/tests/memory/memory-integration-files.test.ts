@@ -57,6 +57,20 @@ describe("memory integration wiring", () => {
     expect(memorySettings).toContain("promptIterationRounds");
   });
 
+  it("keeps background skill review separate from memory learning", () => {
+    const finalizer = readProjectFile("src/main/agent/turn-finalizer.ts");
+    const backgroundReview = readProjectFile(
+      "src/main/agent/background-review.ts",
+    );
+    const reviewPrompt = readProjectFile("src/main/agent/review-prompts.ts");
+
+    expect(finalizer).not.toContain("turnsSinceLastMemoryReview");
+    expect(backgroundReview).not.toContain("memory-write-tools");
+    expect(backgroundReview).not.toContain("coreStore");
+    expect(reviewPrompt).not.toContain("memory_upsert");
+    expect(reviewPrompt).not.toContain("memory_delete");
+  });
+
   it("defaults new sessions to the global memory toggle", () => {
     const sessionManager = readProjectFile(
       "src/main/session/session-manager.ts",
@@ -84,10 +98,12 @@ describe("memory integration wiring", () => {
 
     expect(en.settings.memoryDesc).toContain("on-demand");
     expect(en.memory.description).toContain("never automatically injected");
+    expect(en.memory.description).toContain("every 10 user turns");
     expect(en.memory.toggleHint).toContain("on-demand");
     expect(en.memory.toggleHint).not.toContain("auto-recall");
     expect(zh.settings.memoryDesc).toContain("按需检索");
     expect(zh.memory.description).toContain("不会自动注入");
+    expect(zh.memory.description).toContain("每 10 个用户回合");
     expect(zh.memory.toggleHint).toContain("按需");
     expect(zh.memory.toggleHint).not.toContain("自动注入");
   });

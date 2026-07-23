@@ -6,6 +6,7 @@ import type {
   MemorySearchScope,
   MemoryToolDefinition,
 } from "./memory-types";
+import { buildMemoryWriteTools } from "./memory-write-tools";
 
 const MAX_SEARCH_OUTPUT_CHARS = 6_000;
 const MAX_READ_OUTPUT_CHARS = 4_000;
@@ -275,5 +276,13 @@ export function createMemoryTools(
     },
   };
 
-  return [searchTool, readTool];
+  return [
+    searchTool,
+    readTool,
+    ...buildMemoryWriteTools({
+      upsert: (category, key, value) =>
+        memoryService.upsertCoreMemory(category, key, value),
+      delete: (key) => memoryService.deleteCoreMemory(key),
+    }),
+  ];
 }

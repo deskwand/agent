@@ -65,67 +65,74 @@ export interface MemoryEvalReport {
   artifactDir: string;
 }
 
+function padToReviewInterval(
+  messages: MemoryEvalMessage[],
+): MemoryEvalMessage[] {
+  const padded = [...messages];
+  let userTurns = padded.filter((message) => message.role === "user").length;
+  let timestamp =
+    padded.reduce((latest, message) => Math.max(latest, message.timestamp), 0) +
+    1;
+  while (userTurns < 10) {
+    padded.push({
+      role: "user",
+      text: `继续第 ${userTurns + 1} 个测试回合，不新增长期信息。`,
+      timestamp,
+    });
+    timestamp += 1;
+    padded.push({
+      role: "assistant",
+      text: "好的，继续。",
+      timestamp,
+    });
+    timestamp += 1;
+    userTurns += 1;
+  }
+  return padded;
+}
+
 const DEFAULT_EVAL_CASES: MemoryEvalCase[] = [
   {
-    id: "cross-workspace-code",
-    title: "跨 workspace 代码经验召回",
+    id: "stable-language-preference",
+    title: "跨 workspace 稳定语言偏好召回",
     workspace: "/eval/workspace-a",
-    sessionTitle: "Gateway token rotation",
-    messages: [
+    sessionTitle: "Language preference",
+    messages: padToReviewInterval([
       { role: "user", text: "请以后默认用中文回答。", timestamp: 1 },
       { role: "assistant", text: "好的，我会默认使用中文。", timestamp: 2 },
-      {
-        role: "user",
-        text: "在 workspace A 中实现 gateway token rotation，并记录 remote gateway 的同步约束。",
-        timestamp: 3,
-      },
-      {
-        role: "assistant",
-        text: "已完成 gateway token rotation，并说明 remote gateway 需要同步更新。",
-        timestamp: 4,
-      },
-    ],
+    ]),
     queries: [
       {
-        id: "query-a1",
-        prompt: "继续 gateway token rotation，提醒我上次的关键约束。",
-        workspace: "/eval/workspace-a",
-        expectedHits: [
-          "gateway token rotation",
-          "remote gateway",
-          "source=/eval/workspace-a",
-        ],
-      },
-      {
-        id: "query-a2",
-        prompt: "我偏好什么回答风格？",
+        id: "query-language",
+        prompt: "中文",
+        workspace: "/eval/workspace-b",
         expectedHits: ["中文"],
       },
     ],
   },
   {
-    id: "cross-workspace-design",
-    title: "另一个 workspace 的设计决策",
+    id: "stable-technical-skills",
+    title: "跨 workspace 稳定技术栈召回",
     workspace: "/eval/workspace-b",
-    sessionTitle: "Order state machine",
-    messages: [
+    sessionTitle: "Technical skills",
+    messages: padToReviewInterval([
       {
         role: "user",
-        text: "在 workspace B 中，我们决定订单状态机不要把 refunded 和 cancelled 合并。",
-        timestamp: 10,
+        text: "我长期使用 TypeScript 和 React，这是我的稳定技术栈。",
+        timestamp: 100,
       },
       {
         role: "assistant",
-        text: "已记录：refunded 和 cancelled 代表不同的财务语义，需要保留独立状态。",
-        timestamp: 11,
+        text: "了解，你长期使用 TypeScript 和 React。",
+        timestamp: 101,
       },
-    ],
+    ]),
     queries: [
       {
-        id: "query-b1",
-        prompt: "为什么 refunded 和 cancelled 不能合并？",
-        workspace: "/eval/workspace-b",
-        expectedHits: ["refunded", "cancelled", "财务语义"],
+        id: "query-skills",
+        prompt: "TypeScript React",
+        workspace: "/eval/workspace-a",
+        expectedHits: ["TypeScript", "React"],
       },
     ],
   },
@@ -197,6 +204,7 @@ export class MemoryEvalHarness {
 
     for (const testCase of cases) {
       const sessionId = `${testCase.id}-session`;
+      const messages = padToReviewInterval(testCase.messages);
       await this.service.enqueueIngestion({
         session: {
           id: sessionId,
@@ -207,21 +215,31 @@ export class MemoryEvalHarness {
           allowedTools: [],
           memoryEnabled: true,
           isProjectMode: !!testCase.workspace,
-          createdAt: testCase.messages[0]?.timestamp || Date.now(),
-          updatedAt:
-            testCase.messages[testCase.messages.length - 1]?.timestamp ||
-            Date.now(),
+          createdAt: messages[0]?.timestamp || Date.now(),
+          updatedAt: messages[messages.length - 1]?.timestamp || Date.now(),
         },
         prompt: testCase.messages[0]?.text || testCase.title,
-        messages: createMessages(sessionId, testCase.messages),
+        messages: createMessages(sessionId, messages),
       });
 
       const queryResults: MemoryEvalQueryResult[] = [];
       for (const query of testCase.queries) {
-        const promptPrefix = await this.service.buildPromptPrefix(
-          { cwd: query.workspace || testCase.workspace },
-          query.prompt,
-        );
+        const promptPrefix = this.service
+          .search({
+            query: query.prompt,
+            cwd: query.workspace || testCase.workspace,
+            scope: "global",
+            limit: 8,
+          })
+          .map((result) =>
+            [
+              `type: ${result.kind}`,
+              `title: ${result.title}`,
+              `summary: ${result.summary}`,
+              `workspace: ${result.kind === "core" ? "global" : result.sourceWorkspace || "unknown"}`,
+            ].join("\n"),
+          )
+          .join("\n\n");
         const scoring = scorePromptPrefix(
           promptPrefix,
           query.expectedHits,

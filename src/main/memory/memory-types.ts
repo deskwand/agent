@@ -193,7 +193,7 @@ export interface MemoryIngestionInput {
 export interface MemorySessionStateRecord {
   sessionId: string;
   sourceWorkspace?: string | null;
-  lastProcessedMessageCount: number;
+  lastReviewedMessageCount: number;
   lastIngestedAt?: number | null;
   lastError?: string | null;
   createdAt: number;

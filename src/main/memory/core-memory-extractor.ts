@@ -2,9 +2,19 @@ import { CORE_MEMORY_UPDATE_SYSTEM_PROMPT } from "./memory-prompts";
 import type { MemoryLLMClientLike } from "./memory-llm-client";
 import type {
   CoreMemoryActionInput,
+  CoreMemoryCategory,
   MemoryTranscriptTurn,
 } from "./memory-types";
 import { compactTranscript, extractJson } from "./memory-utils";
+
+const MAX_ACTIONS = 5;
+const MAX_VALUE_CHARS = 500;
+const CORE_CATEGORIES = new Set<CoreMemoryCategory>([
+  "identity",
+  "preferences",
+  "skills",
+  "interests",
+]);
 
 export class CoreMemoryExtractor {
   constructor(
@@ -75,17 +85,43 @@ export class CoreMemoryExtractor {
         if (!key) {
           return null;
         }
+        const parsedCategory =
+          typeof input.category === "string"
+            ? (input.category.trim() as CoreMemoryCategory)
+            : undefined;
+        const category =
+          parsedCategory && CORE_CATEGORIES.has(parsedCategory)
+            ? parsedCategory
+            : undefined;
+        if (op === "delete") {
+          if (input.category != null && !category) {
+            return null;
+          }
+          return {
+            op,
+            category,
+            key,
+            value: null,
+          } satisfies CoreMemoryActionInput;
+        }
+        const value = typeof input.value === "string" ? input.value.trim() : "";
+        if (
+          !category ||
+          !CORE_CATEGORIES.has(category) ||
+          !value ||
+          value.length > MAX_VALUE_CHARS
+        ) {
+          return null;
+        }
         return {
           op,
-          category:
-            typeof input.category === "string"
-              ? (input.category.trim() as CoreMemoryActionInput["category"])
-              : undefined,
+          category,
           key,
-          value: typeof input.value === "string" ? input.value.trim() : null,
+          value,
         } satisfies CoreMemoryActionInput;
       })
-      .filter((item): item is CoreMemoryActionInput => Boolean(item));
+      .filter((item): item is CoreMemoryActionInput => Boolean(item))
+      .slice(0, MAX_ACTIONS);
 
     return normalized;
   }
