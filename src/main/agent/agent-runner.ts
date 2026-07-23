@@ -3353,34 +3353,68 @@ Tool routing:\n
           log("[AgentRunner] Subagent providers registered");
         }
 
-        // Ollama-specific compaction tuning based on actual context window
+        // Context-aware compaction tuning based on window size.
+        // Tiers: < 16K disabled, 16K-64K (25% reserve), 64K-256K (20%),
+        // >= 256K (15%). Boundaries are exclusive (e.g. 65536 → 20% tier).
+        // Research (Claude Code @ 80%, Anthropic compaction @ 150K default,
+        // Harbor Support 60-75% utilization target) recommends triggering at
+        // 75-85% rather than at 100%, so one compaction pass has enough
+        // headroom to bring context back under the limit.
         const contextWindow = piModel.contextWindow || 128000;
         let compactionSettings: {
           enabled: boolean;
           reserveTokens?: number;
           keepRecentTokens?: number;
         };
-        if (provider === "ollama" && contextWindow < 16384) {
-          // Very small context: disable compaction (weak models produce unreliable summaries)
+        if (contextWindow < 16384) {
+          // Tiny window: disable auto-compaction (weak models produce
+          // unreliable summaries and may not have enough capacity for the
+          // summarization call itself).
           compactionSettings = { enabled: false };
           log(
-            "[AgentRunner] Ollama small context model, disabling auto-compaction (contextWindow:",
-            contextWindow,
-            ")",
+            "[AgentRunner] Context window < 16K (provider:",
+            piModel.provider,
+            "model:",
+            piModel.id,
+            "), disabling auto-compaction",
           );
-        } else if (provider === "ollama" && contextWindow < 65536) {
-          // Medium context: scale reserves proportionally
+        } else if (contextWindow < 65536) {
+          // Small window: reserve 25% as headroom, keep 30% of recent
+          // history. Higher keepRecent because small-window models need
+          // more verbatim context to stay coherent.
           compactionSettings = {
             enabled: true,
-            reserveTokens: Math.floor(contextWindow * 0.15),
+            reserveTokens: Math.floor(contextWindow * 0.25),
+            keepRecentTokens: Math.floor(contextWindow * 0.3),
+          };
+          log(
+            "[AgentRunner] Small context, scaled compaction:",
+            JSON.stringify(compactionSettings),
+          );
+        } else if (contextWindow < 262144) {
+          // Medium window (64K-256K, e.g. GPT-4o, Claude Sonnet/Opus,
+          // Codex): reserve 20%, keep 25% recent history.
+          compactionSettings = {
+            enabled: true,
+            reserveTokens: Math.floor(contextWindow * 0.2),
             keepRecentTokens: Math.floor(contextWindow * 0.25),
           };
           log(
-            "[AgentRunner] Ollama medium context, scaled compaction:",
+            "[AgentRunner] Medium context, 20% compaction reserve:",
             JSON.stringify(compactionSettings),
           );
         } else {
-          compactionSettings = { enabled: true };
+          // Large window (256K+, e.g. GPT-5, Claude Fable/Opus 4.5+):
+          // reserve 15% (still 38K+ headroom), keep 20% recent history.
+          compactionSettings = {
+            enabled: true,
+            reserveTokens: Math.floor(contextWindow * 0.15),
+            keepRecentTokens: Math.floor(contextWindow * 0.2),
+          };
+          log(
+            "[AgentRunner] Large context, 15% compaction reserve:",
+            JSON.stringify(compactionSettings),
+          );
         }
 
         const sessionDir = sessionFileForRun
