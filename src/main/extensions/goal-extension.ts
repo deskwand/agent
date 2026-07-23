@@ -13,6 +13,7 @@ import type {
   CommandResult,
   SessionDeletedContext,
 } from "./agent-runtime-extension";
+import type { DatabaseInstance, GoalRow } from "../db/database";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ type GoalStatus =
   | "blocked"
   | "budget_limited";
 
-interface GoalState {
+export interface GoalState {
   objective: string;
   status: GoalStatus;
   iteration: number;
@@ -107,7 +108,7 @@ Make concrete progress. When done, call update_goal with status "complete".
 Use get_goal to check your current budget consumption at any time.`;
 }
 
-function buildResumePrompt(goal: GoalState): string {
+export function buildResumePrompt(goal: GoalState): string {
   return `Resume working toward the active goal: ${goal.objective}
 This is turn #${goal.iteration}. Pick up where you left off.`;
 }
@@ -198,6 +199,8 @@ function msg(key: string, params?: Record<string, string | number>): string {
 export class GoalExtension implements AgentRuntimeExtension {
   readonly name = "goal";
 
+  constructor(private db: DatabaseInstance) {}
+
   /** Goal state keyed by sessionId, so multiple sessions do not interfere. */
   private goals: Map<string, GoalState> = new Map();
 
@@ -215,12 +218,87 @@ export class GoalExtension implements AgentRuntimeExtension {
 
   private setGoal(sessionId: string, goal: GoalState): void {
     this.goals.set(sessionId, goal);
+    try {
+      this.db.goals.upsert({
+        session_id: sessionId,
+        objective: goal.objective,
+        status: goal.status,
+        iteration: goal.iteration,
+        first_turn_done: goal.firstTurnDone ? 1 : 0,
+        generation: goal.generation,
+        token_budget: goal.tokenBudget ?? null,
+        tokens_used: goal.tokensUsed,
+        time_budget_seconds: goal.timeBudgetSeconds ?? null,
+        time_used_seconds: goal.timeUsedSeconds,
+        started_at: goal.startedAt,
+        ended_at: goal.endedAt ?? null,
+      });
+    } catch (error) {
+      // best-effort: DB write failure does not affect in-memory state
+      console.error("[GoalExtension] Failed to persist goal:", error);
+    }
   }
 
-  private deleteGoal(sessionId: string): void {
+  public deleteGoal(sessionId: string): void {
     this.goals.delete(sessionId);
     this.goalTools.delete(sessionId);
     this.sessionGenerations.delete(sessionId);
+    try {
+      this.db.goals.delete(sessionId);
+    } catch (error) {
+      console.error("[GoalExtension] Failed to delete goal from DB:", error);
+    }
+  }
+
+  /**
+   * Recover goal states from DB into memory on app startup.
+   * Terminal state residuals (complete/blocked/cleared) are cleaned up directly.
+   * Returns recovered goals for the caller (SessionManager) to process.
+   */
+  recoverGoals(): Array<{ sessionId: string; goal: GoalState }> {
+    let rows: GoalRow[];
+    try {
+      rows = this.db.goals.getAll();
+    } catch (error) {
+      console.error("[GoalExtension] Failed to load goals from DB:", error);
+      return [];
+    }
+
+    const recovered: Array<{ sessionId: string; goal: GoalState }> = [];
+    for (const row of rows) {
+      // Clean up terminal state residuals
+      if (
+        row.status === "complete" ||
+        row.status === "blocked" ||
+        row.status === "cleared"
+      ) {
+        try {
+          this.db.goals.delete(row.session_id);
+        } catch {
+          // best-effort cleanup
+        }
+        continue;
+      }
+
+      const goal: GoalState = {
+        objective: row.objective,
+        status: row.status as GoalStatus,
+        iteration: row.iteration,
+        firstTurnDone: row.first_turn_done === 1,
+        generation: row.generation,
+        tokenBudget: row.token_budget ?? undefined,
+        tokensUsed: row.tokens_used,
+        timeBudgetSeconds: row.time_budget_seconds ?? undefined,
+        timeUsedSeconds: row.time_used_seconds,
+        startedAt: row.started_at,
+        endedAt: row.ended_at ?? undefined,
+      };
+
+      this.goals.set(row.session_id, goal);
+      recovered.push({ sessionId: row.session_id, goal });
+    }
+
+    return recovered;
   }
 
   private updateGoalUsage(
@@ -332,6 +410,7 @@ export class GoalExtension implements AgentRuntimeExtension {
           if (parsed.status === "complete") {
             goal.status = "complete";
             goal.endedAt = Date.now();
+            self.setGoal(sid, goal);
             return {
               content: [
                 {
@@ -345,6 +424,7 @@ export class GoalExtension implements AgentRuntimeExtension {
           if (parsed.status === "blocked") {
             goal.status = "blocked";
             goal.endedAt = Date.now();
+            self.setGoal(sid, goal);
             return {
               content: [
                 {
@@ -403,6 +483,7 @@ export class GoalExtension implements AgentRuntimeExtension {
           }
           goal.status = "complete";
           goal.endedAt = Date.now();
+          self.setGoal(sid, goal);
           return {
             content: [
               {
@@ -515,6 +596,7 @@ export class GoalExtension implements AgentRuntimeExtension {
       return { handled: true, message: msg("noGoalToPause") };
     }
     goal.status = "paused";
+    this.setGoal(sessionId, goal);
     return {
       handled: true,
       message: msg("paused", { objective: goal.objective }),
@@ -540,6 +622,7 @@ export class GoalExtension implements AgentRuntimeExtension {
 
     goal.status = "active";
     goal.generation++;
+    this.setGoal(sessionId, goal);
     const firstTurnPrompt = buildResumePrompt(goal);
     return {
       handled: true,
@@ -639,6 +722,9 @@ export class GoalExtension implements AgentRuntimeExtension {
     }
     goal.firstTurnDone = true;
 
+    // Persist iteration / firstTurnDone for restart recovery
+    this.setGoal(sessionId, goal);
+
     // Snapshot generation to detect pause/resume mid-turn
     this.sessionGenerations.set(sessionId, goal.generation);
 
@@ -659,6 +745,11 @@ export class GoalExtension implements AgentRuntimeExtension {
     // have accurate data.
     this.updateGoalUsage(sessionId, ctx);
     goal.timeUsedSeconds = (Date.now() - goal.startedAt) / 1000;
+
+    // Persist budget stats for restart recovery (skip if about to delete)
+    if (goal.status === "active" || goal.status === "budget_limited") {
+      this.setGoal(sessionId, goal);
+    }
 
     if (goal.status !== "active") {
       if (goal.status === "complete" || goal.status === "blocked") {
@@ -685,6 +776,7 @@ export class GoalExtension implements AgentRuntimeExtension {
     // ── Guardrail 1: max iterations ──
     if (goal.iteration >= MAX_GOAL_ITERATIONS) {
       goal.status = "paused";
+      this.setGoal(sessionId, goal);
       return this.goalStatusPayload(goal);
     }
 
@@ -694,6 +786,7 @@ export class GoalExtension implements AgentRuntimeExtension {
       goal.timeUsedSeconds >= goal.timeBudgetSeconds
     ) {
       goal.status = "budget_limited";
+      this.setGoal(sessionId, goal);
       const continuePrompt = buildBudgetLimitedPrompt(goal, "time");
       return { continuePrompt, ...this.goalStatusPayload(goal) };
     }
@@ -701,6 +794,7 @@ export class GoalExtension implements AgentRuntimeExtension {
     // ── Guardrail 3: token budget (budget_limited for one more turn, not immediate pause) ──
     if (goal.tokenBudget !== undefined && goal.tokensUsed >= goal.tokenBudget) {
       goal.status = "budget_limited";
+      this.setGoal(sessionId, goal);
       const continuePrompt = buildBudgetLimitedPrompt(goal, "token");
       return { continuePrompt, ...this.goalStatusPayload(goal) };
     }

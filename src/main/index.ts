@@ -1082,12 +1082,15 @@ app
     memoryService = new MemoryService(db);
     const extensionManager = new AgentRuntimeExtensionManager([
       new MemoryExtension(memoryService),
-      new GoalExtension(),
+      new GoalExtension(db),
     ]);
 
     // Initialize session manager before creating an interactive window.
     // This avoids session.start racing the startup path and hitting a null manager.
     sessionManager = new SessionManager(db, sendToRenderer, extensionManager);
+
+    // Recover goals that were active before last shutdown
+    sessionManager.recoverGoals();
     skillsManager = new SkillsManager(db);
     // pi-ai handles model routing natively — no proxy warmup needed
 

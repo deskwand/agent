@@ -223,6 +223,12 @@ function createDatabaseInstance(db: DatabaseSync): DatabaseInstance {
       getAll: vi.fn(() => []),
       delete: vi.fn(),
     },
+    goals: {
+      upsert: vi.fn(),
+      get: vi.fn(),
+      getAll: vi.fn(() => []),
+      delete: vi.fn(),
+    },
     prepare: (sql: string) => db.prepare(sql),
     exec: (sql: string) => db.exec(sql),
     close: () => db.close(),

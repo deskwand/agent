@@ -49,6 +49,8 @@ import { mcpConfigStore } from "../mcp/mcp-config-store";
 import type { BrowserViewManager } from "../browser/browser-view-manager";
 import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { BackgroundReviewService } from "../agent/background-review";
+import { buildResumePrompt } from "../extensions/goal-extension";
+import type { GoalState } from "../extensions/goal-extension";
 import { app } from "electron";
 import {
   log,
@@ -1387,6 +1389,44 @@ export class SessionManager {
           undefined,
           undefined,
           true,
+        );
+      }
+    }
+  }
+
+  /**
+   * Recover active goals from DB on app startup.
+   * Called after SessionManager construction, when sessions are queryable.
+   */
+  recoverGoals(): void {
+    if (!this.extensionManager) return;
+
+    const goalExt = this.extensionManager.getExtension<{
+      readonly name: string;
+      recoverGoals(): Array<{ sessionId: string; goal: { status: string; objective: string; iteration: number } }>;
+      deleteGoal(sessionId: string): void;
+    }>("goal");
+
+    if (!goalExt) return;
+
+    const recovered = goalExt.recoverGoals();
+
+    for (const { sessionId, goal } of recovered) {
+      const session = this.loadSession(sessionId);
+
+      // Orphan record: session deleted, clean up DB
+      if (!session) {
+        goalExt.deleteGoal(sessionId);
+        continue;
+      }
+
+      if (goal.status === "active" || goal.status === "budget_limited") {
+        const resumePrompt = buildResumePrompt(goal as GoalState);
+        this.enqueuePrompt(session, resumePrompt, undefined, undefined, true);
+        log(
+          "[SessionManager] Goal auto-resumed for session:",
+          sessionId,
+          goal.status,
         );
       }
     }

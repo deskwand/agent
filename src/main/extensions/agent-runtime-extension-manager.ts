@@ -40,6 +40,10 @@ export class AgentRuntimeExtensionManager {
     this.extensions.push(extension);
   }
 
+  getExtension<T extends AgentRuntimeExtension>(name: string): T | undefined {
+    return this.extensions.find((e) => e.name === name) as T | undefined;
+  }
+
   async beforeSessionRun(
     context: BeforeSessionRunContext,
   ): Promise<BeforeSessionRunResult> {

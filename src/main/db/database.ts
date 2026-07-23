@@ -61,6 +61,13 @@ export interface DatabaseInstance {
     delete: (id: string) => void;
   };
 
+  goals: {
+    upsert: (goal: GoalRow) => void;
+    get: (sessionId: string) => GoalRow | undefined;
+    getAll: () => GoalRow[];
+    delete: (sessionId: string) => void;
+  };
+
   // For compatibility with old interface
   prepare: (sql: string) => StatementSync;
   exec: (sql: string) => void;
@@ -130,6 +137,21 @@ export interface ScheduledTaskRow {
   last_error: string | null;
   created_at: number;
   updated_at: number;
+}
+
+export interface GoalRow {
+  session_id: string;
+  objective: string;
+  status: string;
+  iteration: number;
+  first_turn_done: number;
+  generation: number;
+  token_budget: number | null;
+  tokens_used: number;
+  time_budget_seconds: number | null;
+  time_used_seconds: number;
+  started_at: number;
+  ended_at: number | null;
 }
 
 let db: DatabaseInstance | null = null;
@@ -441,6 +463,25 @@ function initializeSchema(database: DatabaseSync): void {
     ON scheduled_tasks(enabled, next_run_at)
   `);
 
+    // Create goals table
+    database.exec(`
+    CREATE TABLE IF NOT EXISTS goals (
+      session_id          TEXT PRIMARY KEY,
+      objective           TEXT NOT NULL,
+      status              TEXT NOT NULL DEFAULT 'active',
+      iteration           INTEGER NOT NULL DEFAULT 0,
+      first_turn_done     INTEGER NOT NULL DEFAULT 0,
+      generation          INTEGER NOT NULL DEFAULT 1,
+      token_budget        REAL,
+      tokens_used         REAL NOT NULL DEFAULT 0,
+      time_budget_seconds REAL,
+      time_used_seconds   REAL NOT NULL DEFAULT 0,
+      started_at          INTEGER NOT NULL,
+      ended_at            INTEGER,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    )
+  `);
+
     log("[Database] Schema initialized");
   } catch (error) {
     logError("[Database] Schema initialization failed:", error);
@@ -601,6 +642,26 @@ export function initDatabase(): DatabaseInstance {
 
   const deleteScheduledTaskStmt = rawDb.prepare(`
     DELETE FROM scheduled_tasks WHERE id = ?
+  `);
+
+  const upsertGoal = rawDb.prepare(`
+    INSERT OR REPLACE INTO goals
+    (session_id, objective, status, iteration, first_turn_done, generation,
+     token_budget, tokens_used, time_budget_seconds, time_used_seconds,
+     started_at, ended_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const getGoalStmt = rawDb.prepare(`
+    SELECT * FROM goals WHERE session_id = ?
+  `);
+
+  const getAllGoalsStmt = rawDb.prepare(`
+    SELECT * FROM goals ORDER BY started_at ASC
+  `);
+
+  const deleteGoalStmt = rawDb.prepare(`
+    DELETE FROM goals WHERE session_id = ?
   `);
 
   db = {
@@ -816,6 +877,37 @@ export function initDatabase(): DatabaseInstance {
 
       delete: (id: string) => {
         deleteScheduledTaskStmt.run(id);
+      },
+    },
+
+    goals: {
+      upsert: (goal: GoalRow) => {
+        upsertGoal.run(
+          goal.session_id,
+          goal.objective,
+          goal.status,
+          goal.iteration,
+          goal.first_turn_done,
+          goal.generation,
+          goal.token_budget,
+          goal.tokens_used,
+          goal.time_budget_seconds,
+          goal.time_used_seconds,
+          goal.started_at,
+          goal.ended_at,
+        );
+      },
+
+      get: (sessionId: string): GoalRow | undefined => {
+        return getGoalStmt.get(sessionId) as GoalRow | undefined;
+      },
+
+      getAll: (): GoalRow[] => {
+        return getAllGoalsStmt.all() as unknown as GoalRow[];
+      },
+
+      delete: (sessionId: string) => {
+        deleteGoalStmt.run(sessionId);
       },
     },
 
