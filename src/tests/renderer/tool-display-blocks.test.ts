@@ -723,3 +723,88 @@ describe("collectResultFiles", () => {
     ]);
   });
 });
+
+describe("Goal tools in process summary", () => {
+  const t = ((key: string, opts?: Record<string, unknown>) => {
+    if (key === "tool.grouped.managedGoal") return "managed goal";
+    if (key.startsWith("tool.grouped.")) return key;
+    return key;
+  }) as (key: string, opts?: Record<string, unknown>) => string;
+
+  it("groups get_goal into process summary with hasGoal", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("g-1", "get_goal", {}),
+      toolResult("g-1", { content: "Objective: test" }),
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { hasGoal: true, usedToolCount: 0 },
+    });
+  });
+
+  it("groups update_goal into process summary with hasGoal", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("g-2", "update_goal", { status: "complete", summary: "done" }),
+      toolResult("g-2", { content: "Goal marked complete" }),
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { hasGoal: true },
+    });
+  });
+
+  it("groups goal_complete into process summary with hasGoal", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("g-3", "goal_complete", { summary: "done" }),
+      toolResult("g-3", { content: "Goal marked complete" }),
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { hasGoal: true },
+    });
+  });
+
+  it("getProcessSummaryFragments includes goal icon fragment when hasGoal", () => {
+    const fragments = getProcessSummaryFragments(
+      {
+        readCount: 0,
+        hasSearch: false,
+        hasWebSearch: false,
+        hasBrowse: false,
+        hasMemory: false,
+        commandCount: 0,
+        subagentCount: 0,
+        subagents: [],
+        subagentResultCount: 0,
+        subagentSteerCount: 0,
+        hasGoal: true,
+        usedToolCount: 0,
+      },
+      t,
+    );
+    const goalFragment = fragments.find((f) => f.iconType === "goal");
+    expect(goalFragment).toBeDefined();
+    expect(goalFragment?.text).toBe("managed goal");
+  });
+
+  it("getProcessSummaryFragments excludes goal fragment when hasGoal is false", () => {
+    const fragments = getProcessSummaryFragments(
+      {
+        readCount: 0,
+        hasSearch: false,
+        hasWebSearch: false,
+        hasBrowse: false,
+        hasMemory: false,
+        commandCount: 0,
+        subagentCount: 0,
+        subagents: [],
+        subagentResultCount: 0,
+        subagentSteerCount: 0,
+        hasGoal: false,
+        usedToolCount: 0,
+      },
+      t,
+    );
+    expect(fragments.find((f) => f.iconType === "goal")).toBeUndefined();
+  });
+});
