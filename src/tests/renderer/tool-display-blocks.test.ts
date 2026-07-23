@@ -725,11 +725,11 @@ describe("collectResultFiles", () => {
 });
 
 describe("Goal tools in process summary", () => {
-  const t = ((key: string, opts?: Record<string, unknown>) => {
+  const t = ((key: string) => {
     if (key === "tool.grouped.managedGoal") return "managed goal";
     if (key.startsWith("tool.grouped.")) return key;
     return key;
-  }) as (key: string, opts?: Record<string, unknown>) => string;
+  }) as never;
 
   it("groups get_goal into process summary with hasGoal", () => {
     const blocks = buildToolDisplayBlocks([
