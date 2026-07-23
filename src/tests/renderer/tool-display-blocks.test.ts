@@ -236,11 +236,11 @@ describe("buildToolDisplayBlocks", () => {
     });
   });
 
-  it("counts subagents in process summaries", () => {
+  it("captures subagent names and task descriptions in process summaries", () => {
     const blocks = buildToolDisplayBlocks([
       toolUse("agent-1", "Agent", {
-        subagent_type: "general-purpose",
-        description: "run task",
+        subagent_type: "Explore",
+        description: "Inspect message rendering",
       }),
       toolResult("agent-1", { content: "done" }),
     ]);
@@ -249,6 +249,12 @@ describe("buildToolDisplayBlocks", () => {
       type: "process-summary",
       summary: {
         subagentCount: 1,
+        subagents: [
+          {
+            name: "Explore",
+            description: "Inspect message rendering",
+          },
+        ],
         usedToolCount: 0,
       },
     });
@@ -256,7 +262,10 @@ describe("buildToolDisplayBlocks", () => {
 });
 
 describe("formatProcessSummaryLabel", () => {
-  const t = ((key: string, options?: { count?: number }) => {
+  const t = ((
+    key: string,
+    options?: { count?: number; name?: string; description?: string },
+  ) => {
     const map: Record<string, string> = {
       "tool.grouped.readFiles_one": `${options?.count} file read`,
       "tool.grouped.readFiles_other": `${options?.count} files read`,
@@ -266,6 +275,8 @@ describe("formatProcessSummaryLabel", () => {
       "tool.grouped.executedCommands_other": `executed ${options?.count} commands`,
       "tool.grouped.startedSubagents_one": `started ${options?.count} subagent`,
       "tool.grouped.startedSubagents_other": `started ${options?.count} subagents`,
+      "tool.grouped.subagentDetail": `${String(options?.name)}: ${String(options?.description)}`,
+      "tool.grouped.subagentDetailSeparator": "; ",
       "tool.grouped.usedTools_one": `used ${options?.count} tool`,
       "tool.grouped.usedTools_other": `used ${options?.count} tools`,
       "tool.grouped.joinAnd": " and ",
@@ -312,7 +323,7 @@ describe("formatProcessSummaryLabel", () => {
     ).toBe("searched code");
   });
 
-  it("formats subagent-only process summaries", () => {
+  it("formats subagent names and task descriptions", () => {
     expect(
       formatProcessSummaryLabel(
         {
@@ -322,13 +333,44 @@ describe("formatProcessSummaryLabel", () => {
           hasBrowse: false,
           hasMemory: false,
           commandCount: 0,
-          subagentCount: 1,
+          subagentCount: 2,
+          subagents: [
+            { name: "Explore", description: "Inspect rendering" },
+            { name: "Review", description: "Review the design" },
+          ],
           hasGoal: false,
           usedToolCount: 0,
         },
         t,
       ),
-    ).toBe("started 1 subagent");
+    ).toBe(
+      "started 2 subagents · Explore: Inspect rendering; Review: Review the design",
+    );
+  });
+
+  it("includes subagent details in the icon-aware group fragment", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("agent-1", "Agent", {
+        subagent_type: "Explore",
+        description: "Inspect rendering",
+      }),
+      toolResult("agent-1"),
+      toolUse("agent-2", "Agent", {
+        subagent_type: "Review",
+        description: "Review the design",
+      }),
+      toolResult("agent-2"),
+    ]);
+
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      {
+        text: "started 2 subagents · Explore: Inspect rendering; Review: Review the design",
+        iconType: "subagent",
+      },
+    ]);
   });
 
   it("formats browse-only process summaries", () => {

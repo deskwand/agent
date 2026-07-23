@@ -290,7 +290,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
               </span>
             </span>
           )}
-          {!isRunning &&
+          {(!isRunning || isAgentTool) &&
             collapsedSummary.kind !== "diff" &&
             collapsedSummaryText && (
               <span

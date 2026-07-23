@@ -2,6 +2,11 @@ import type { TFunction } from "i18next";
 import type { ContentBlock, ToolResultContent, ToolUseContent } from "../types";
 import { extractFilePathFromToolInput } from "./tool-output-path";
 
+export interface SubagentSummary {
+  name: string;
+  description: string;
+}
+
 export interface ProcessSummary {
   readCount: number;
   hasSearch: boolean;
@@ -10,6 +15,7 @@ export interface ProcessSummary {
   hasMemory: boolean;
   commandCount: number;
   subagentCount: number;
+  subagents?: SubagentSummary[];
   hasGoal: boolean;
   usedToolCount: number;
 }
@@ -154,6 +160,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   let hasMemory = false;
   let commandCount = 0;
   let subagentCount = 0;
+  const subagents: SubagentSummary[] = [];
   let hasGoal = false;
   let usedToolCount = 0;
 
@@ -197,6 +204,15 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     }
     if (lower === "agent") {
       subagentCount += 1;
+      const input = item.input as Record<string, unknown>;
+      subagents.push({
+        name:
+          typeof input.subagent_type === "string"
+            ? input.subagent_type.trim()
+            : "",
+        description:
+          typeof input.description === "string" ? input.description.trim() : "",
+      });
       countedAsSpecific = true;
     }
     if (GOAL_TOOLS.has(lower)) {
@@ -216,6 +232,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     hasMemory,
     commandCount,
     subagentCount,
+    subagents,
     hasGoal,
     usedToolCount,
   };
@@ -395,6 +412,22 @@ function pluralKey(baseKey: string, count: number): string {
   return `${baseKey}_${count === 1 ? "one" : "other"}`;
 }
 
+function formatSubagentDetails(
+  subagents: SubagentSummary[] | undefined,
+  t: TFunction,
+): string {
+  const details = (subagents ?? [])
+    .map(({ name, description }) => {
+      if (name && description) {
+        return t("tool.grouped.subagentDetail", { name, description });
+      }
+      return name || description;
+    })
+    .filter(Boolean);
+
+  return details.join(t("tool.grouped.subagentDetailSeparator"));
+}
+
 /** @deprecated Use getProcessSummaryFragments for icon-aware rendering */
 export function formatProcessSummaryLabel(
   summary: ProcessSummary,
@@ -429,11 +462,12 @@ export function formatProcessSummaryLabel(
     );
   }
   if (summary.subagentCount > 0) {
-    fragments.push(
-      t(pluralKey("tool.grouped.startedSubagents", summary.subagentCount), {
-        count: summary.subagentCount,
-      }),
+    const countLabel = t(
+      pluralKey("tool.grouped.startedSubagents", summary.subagentCount),
+      { count: summary.subagentCount },
     );
+    const details = formatSubagentDetails(summary.subagents, t);
+    fragments.push(details ? `${countLabel} · ${details}` : countLabel);
   }
   if (summary.usedToolCount > 0) {
     fragments.push(
@@ -510,13 +544,13 @@ export function getProcessSummaryFragments(
     });
   }
   if (summary.subagentCount > 0) {
+    const countLabel = t(
+      pluralKey("tool.grouped.startedSubagents", summary.subagentCount),
+      { count: summary.subagentCount },
+    );
+    const details = formatSubagentDetails(summary.subagents, t);
     fragments.push({
-      text: t(
-        pluralKey("tool.grouped.startedSubagents", summary.subagentCount),
-        {
-          count: summary.subagentCount,
-        },
-      ),
+      text: details ? `${countLabel} · ${details}` : countLabel,
       iconType: "subagent",
     });
   }

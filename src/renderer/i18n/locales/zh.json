@@ -1341,6 +1341,8 @@
       "executedCommands_other": "已执行了 {{count}} 条命令",
       "startedSubagents_one": "已启动 {{count}} 个子代理",
       "startedSubagents_other": "已启动 {{count}} 个子代理",
+      "subagentDetail": "{{name}}：{{description}}",
+      "subagentDetailSeparator": "；",
       "usedTools_one": "已使用 {{count}} 个工具",
       "usedTools_other": "已使用 {{count}} 个工具",
       "modifiedFiles_one": "已修改 {{count}} 个文件",
