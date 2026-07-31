@@ -1,0 +1,101 @@
+diff --git a/node_modules/@tintinweb/pi-subagents/dist/agent-manager.js b/node_modules/@tintinweb/pi-subagents/dist/agent-manager.js
+index 5619e26..1e98ec1 100644
+--- a/node_modules/@tintinweb/pi-subagents/dist/agent-manager.js
++++ b/node_modules/@tintinweb/pi-subagents/dist/agent-manager.js
+@@ -11,6 +11,10 @@ import { isAbsolute } from "node:path";
+ import { resumeAgent, runAgent } from "./agent-runner.js";
+ import { addUsage } from "./usage.js";
+ import { cleanupWorktree, createWorktree, pruneWorktrees, } from "./worktree.js";
++/** Internal agent-lifecycle debug logger. Stubbed: upstream pi-subagents@0.14.3 omits the definition. */
++const agentLog = () => {};
++/** Brief batch-operation logger. Stubbed: same upstream omission. */
++const agentLogBrief = () => {};
+ /** Default max concurrent background agents. */
+ const DEFAULT_MAX_CONCURRENT = 4;
+ /**
+@@ -445,6 +449,8 @@ export class AgentManager {
+     }
+     /** Dispose a record's session and remove it from the map. */
+     removeRecord(id, record) {
++        const rmReason = new Error().stack?.split("\n")[2]?.trim()?.slice(0, 120) || "";
++        agentLog("REMOVE", id, `status=${record.status} consumed=${record.resultConsumed} completedAt=${record.completedAt} caller=${rmReason}`);
+         record.session?.dispose?.();
+         record.session = undefined;
+         this.agents.delete(id);
+@@ -466,6 +472,7 @@ export class AgentManager {
+      * (resultConsumed=false) — they will be evicted by the 10-minute cleanup timer instead.
+      */
+     clearCompleted(skipUnconsumed = false) {
++        agentLogBrief(`CLEAR_COMPLETED skipUnconsumed=${skipUnconsumed} mapSize=${this.agents.size}`);
+         for (const [id, record] of this.agents) {
+             if (record.status === "running" || record.status === "queued")
+                 continue;
+@@ -518,6 +525,8 @@ export class AgentManager {
+         }
+     }
+     dispose() {
++        const survivingIds = [...this.agents.keys()];
++        agentLogBrief(`DISPOSE clearing ${survivingIds.length} agents: [${survivingIds.join(",")}]`);
+         clearInterval(this.cleanupInterval);
+         // Clear queue
+         this.queue = [];
+diff --git a/node_modules/@tintinweb/pi-subagents/dist/index.js b/node_modules/@tintinweb/pi-subagents/dist/index.js
+index ab65ef1..7d81a82 100644
+--- a/node_modules/@tintinweb/pi-subagents/dist/index.js
++++ b/node_modules/@tintinweb/pi-subagents/dist/index.js
+@@ -9,8 +9,9 @@
+  * Commands:
+  *   /agents                 — Interactive agent management menu
+  */
+-import { existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
++import { appendFileSync, existsSync, mkdirSync, readFileSync, unlinkSync } from "node:fs";
+ import { join } from "node:path";
++import { tmpdir } from "node:os";
+ import { defineTool, getAgentDir, getSettingsListTheme } from "@earendil-works/pi-coding-agent";
+ import { Container, Key, matchesKey, SettingsList, Spacer, Text } from "@earendil-works/pi-tui";
+ import { Type } from "@sinclair/typebox";
+@@ -33,6 +34,11 @@ import { FleetList } from "./ui/fleet-list.js";
+ import { showSchedulesMenu } from "./ui/schedule-menu.js";
+ import { addUsage, getLifetimeTotal, getSessionContextPercent } from "./usage.js";
+ // ---- Shared helpers ----
++// --- diagnostic logging for intermittent "Agent not found" bug ---
++const DIAG_LOG = join(tmpdir(), "deskwand-agent-diag.log");
++function diagLog(msg) {
++    try { appendFileSync(DIAG_LOG, `[${new Date().toISOString()}] IDX ${msg}\n`); } catch {}
++}
+ /** Tool execute return value for a text response. */
+ function textResult(msg, details) {
+     return { content: [{ type: "text", text: msg }], details: details };
+@@ -488,6 +494,7 @@ export default function (pi) {
+     // This also wires the RPC handlers and broadcasts readiness — on the first
+     // bound session_start, so a filtered-out activation never advertises (#142).
+     pi.on("session_start", async (_event, ctx) => {
++        diagLog(`SESSION_START mapSize=${manager.agents.size} hasRpc=${!!rpcHandle}`);
+         currentCtx = ctx;
+         manager.clearCompleted(true);
+         // Guard mirrors the `!scheduler.isActive()` pattern below: session_start
+@@ -508,12 +515,14 @@ export default function (pi) {
+             startScheduler(ctx);
+     });
+     pi.on("session_before_switch", () => {
++        diagLog(`SESSION_BEFORE_SWITCH mapSize=${manager.agents.size}`);
+         manager.clearCompleted(true);
+         scheduler.stop();
+     });
+     // On shutdown, abort all agents immediately and clean up.
+     // If the session is going down, there's nothing left to consume agent results.
+     pi.on("session_shutdown", async () => {
++        diagLog(`SESSION_SHUTDOWN mapSize=${manager.agents.size} queueLen=${manager.queue.length}`);
+         rpcHandle?.unsubSpawn();
+         rpcHandle?.unsubStop();
+         rpcHandle?.unsubPing();
+@@ -1300,6 +1309,9 @@ Terse command-style prompts produce shallow, generic work.
+         execute: async (_toolCallId, params, signal, _onUpdate, _ctx) => {
+             const record = manager.getRecord(params.agent_id);
+             if (!record) {
++                // Diagnostic: log the miss with all current agent ids
++                const allIds = [...manager.agents.keys()].join(",");
++                diagLog(`GET_RESULT_MISS id=${params.agent_id} knownIds=[${allIds}] mapSize=${manager.agents.size}`);
+                 return textResult(`Agent not found: "${params.agent_id}". It may have been cleaned up.`);
+             }
+             // Wait for completion if requested. Cancellation stops only this tool

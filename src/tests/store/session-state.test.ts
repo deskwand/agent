@@ -517,6 +517,76 @@ describe("SessionState unified store", () => {
     });
   });
 
+  describe("backgroundAgents", () => {
+    const agent = {
+      id: "agent-1",
+      type: "Explore",
+      description: "find bug",
+    };
+
+    it("should add a background agent", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().addBackgroundAgent("s1", agent);
+
+      const bg = useAppStore.getState().sessionStates["s1"].backgroundAgents;
+      expect(bg).toHaveLength(1);
+      expect(bg[0]).toMatchObject({ id: "agent-1", type: "Explore", status: "running" });
+    });
+
+    it("should be idempotent — adding same agent ID twice only adds once", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().addBackgroundAgent("s1", agent);
+      useAppStore.getState().addBackgroundAgent("s1", agent);
+
+      expect(
+        useAppStore.getState().sessionStates["s1"].backgroundAgents,
+      ).toHaveLength(1);
+    });
+
+    it("should update agent status", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().addBackgroundAgent("s1", agent);
+      useAppStore
+        .getState()
+        .updateBackgroundAgentStatus("s1", "agent-1", "done");
+
+      expect(
+        useAppStore.getState().sessionStates["s1"].backgroundAgents[0].status,
+      ).toBe("done");
+    });
+
+    it("should remove agent by ID", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().addBackgroundAgent("s1", agent);
+      useAppStore
+        .getState()
+        .addBackgroundAgent("s1", {
+          id: "agent-2",
+          type: "Review",
+          description: "check",
+        });
+
+      useAppStore.getState().removeBackgroundAgent("s1", "agent-1");
+
+      const bg = useAppStore.getState().sessionStates["s1"].backgroundAgents;
+      expect(bg).toHaveLength(1);
+      expect(bg[0].id).toBe("agent-2");
+    });
+
+    it("should isolate background agents per session", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().addSession(makeSession("s2"));
+      useAppStore.getState().addBackgroundAgent("s1", agent);
+
+      expect(
+        useAppStore.getState().sessionStates["s1"].backgroundAgents,
+      ).toHaveLength(1);
+      expect(
+        useAppStore.getState().sessionStates["s2"].backgroundAgents,
+      ).toHaveLength(0);
+    });
+  });
+
   describe("cross-session isolation", () => {
     it("should not affect other sessions when updating one", () => {
       useAppStore.getState().addSession(makeSession("s1"));

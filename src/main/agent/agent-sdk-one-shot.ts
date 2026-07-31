@@ -18,7 +18,7 @@ import {
 } from "../config/auth-utils";
 import { log, logWarn } from "../utils/logger";
 import { normalizeGeneratedTitle } from "../session/session-title-utils";
-import { getSharedAuthStorage, ensureFreshOAuthToken } from "./shared-auth";
+import { resolveProviderApiKey } from "./shared-model-runtime";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import {
   applyPiModelRuntimeOverrides,
@@ -286,20 +286,9 @@ export async function runPiAiOneShot(
   // piModel is guaranteed non-undefined after synthetic fallback
   const resolvedModel = piModel!;
 
-  // Set API key via AuthStorage (for agent sessions) AND env vars (for pi-ai completeSimple)
   let apiKey: string | undefined = config.apiKey?.trim();
-  // For OAuth providers, fetch the access token from auth.json
   if (!apiKey && activeIsOAuth && oauthPiProvider) {
-    apiKey = (await ensureFreshOAuthToken(oauthPiProvider)) || undefined;
-  }
-  if (apiKey) {
-    const authStorage = getSharedAuthStorage();
-    // Set for the config provider
-    authStorage.setRuntimeApiKey(effectiveProvider, apiKey);
-    // Also set for the model's native provider if different
-    if (resolvedModel.provider !== effectiveProvider) {
-      authStorage.setRuntimeApiKey(resolvedModel.provider, apiKey);
-    }
+    apiKey = await resolveProviderApiKey(oauthPiProvider);
   }
 
   const start = Date.now();

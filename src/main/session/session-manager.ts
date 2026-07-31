@@ -800,13 +800,30 @@ export class SessionManager {
           // IMPORTANT: Use path.basename() to extract only the filename, not the full path
           const fallbackFilename =
             fileBlock.filename || sourcePath || `attachment-${Date.now()}`;
-          const destFilename = path.basename(fallbackFilename);
-          if (!destFilename) continue;
+          const baseFilename = path.basename(fallbackFilename);
+          if (!baseFilename) continue;
+          const inlineDataBase64 = fileBlock.inlineDataBase64;
+          const hasInlineData = inlineDataBase64 !== undefined;
+          const extension = path.extname(baseFilename);
+          const stem = path.basename(baseFilename, extension);
+          const destFilename = hasInlineData
+            ? `${stem}-${uuidv4()}${extension}`
+            : baseFilename;
           const destPath = path.join(tmpDir, destFilename);
           let actualSize = 0;
 
-          // Copy file to .tmp directory
-          if (sourcePath && fs.existsSync(sourcePath)) {
+          // Inline data is authoritative. Never substitute a local file when
+          // a remote attachment also supplies a display filename/path.
+          if (hasInlineData) {
+            const buffer = Buffer.from(inlineDataBase64, "base64");
+            fs.writeFileSync(destPath, buffer);
+            actualSize = buffer.length;
+            log(
+              "[SessionManager] Wrote file from inline data:",
+              destPath,
+              `(${actualSize} bytes)`,
+            );
+          } else if (sourcePath && fs.existsSync(sourcePath)) {
             fs.copyFileSync(sourcePath, destPath);
 
             // Get actual file size
@@ -817,15 +834,6 @@ export class SessionManager {
               "[SessionManager] Copied file:",
               sourcePath,
               "->",
-              destPath,
-              `(${actualSize} bytes)`,
-            );
-          } else if (fileBlock.inlineDataBase64) {
-            const buffer = Buffer.from(fileBlock.inlineDataBase64, "base64");
-            fs.writeFileSync(destPath, buffer);
-            actualSize = buffer.length;
-            log(
-              "[SessionManager] Wrote file from inline data:",
               destPath,
               `(${actualSize} bytes)`,
             );

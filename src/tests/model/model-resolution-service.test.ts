@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
+const resolveProviderApiKeyMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../main/agent/shared-model-runtime", () => ({
+  resolveProviderApiKey: resolveProviderApiKeyMock,
+}));
+
 vi.mock("../../main/config/ollama-api", () => ({
   fetchOllamaModelInfo: vi.fn(async () => ({
     contextWindow: undefined,
@@ -265,5 +271,27 @@ describe("ModelResolutionService", () => {
         appConfig,
       }),
     ).rejects.toThrow(/api key/i);
+  });
+
+  it("resolves an OAuth profile through ModelRuntime auth", async () => {
+    resolveProviderApiKeyMock.mockResolvedValue("oauth-token");
+    const appConfig = buildAppConfig();
+    appConfig.providers["oauth:openai-codex"] = {
+      provider: "oauth",
+      customProtocol: "openai",
+      apiKey: "",
+      defaultModel: "gpt-5.4",
+      models: [{ id: "gpt-5.4", label: "gpt-5.4", source: "preset" }],
+      updatedAt: "2026-07-27T00:00:00.000Z",
+    };
+
+    const result = await service.resolve({
+      sessionProviderProfileKey: "oauth:openai-codex",
+      sessionModel: "gpt-5.4",
+      appConfig,
+    });
+
+    expect(resolveProviderApiKeyMock).toHaveBeenCalledWith("openai-codex");
+    expect(result.apiKey).toBe("oauth-token");
   });
 });

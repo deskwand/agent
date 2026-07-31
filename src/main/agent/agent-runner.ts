@@ -24,12 +24,7 @@ import {
   type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
-import {
-  getSharedAuthStorage,
-  ensureFreshOAuthToken,
-  ModelRegistry,
-} from "./shared-auth";
-import { extractOAuthProviderId } from "../../shared/oauth-utils";
+import { getSharedModelRuntime } from "./shared-model-runtime";
 import type {
   Session,
   Message,
@@ -2329,12 +2324,6 @@ ${hints.join("\n")}
 
       logTiming("before pi-ai model resolution", runStartTime);
 
-      // Pre-refresh OAuth token so the SDK picks up a fresh key
-      if (session.providerProfileKey?.startsWith("oauth:")) {
-        const oauthId = extractOAuthProviderId(session.providerProfileKey);
-        if (oauthId) await ensureFreshOAuthToken(oauthId);
-      }
-
       const resolvedRuntime = await modelResolutionService.resolve({
         sessionProviderProfileKey: session.providerProfileKey,
         sessionModel: session.model,
@@ -2379,20 +2368,20 @@ ${hints.join("\n")}
         },
       });
 
-      // Set up API keys via AuthStorage
-      const authStorage = getSharedAuthStorage();
+      const modelRuntime = await getSharedModelRuntime();
       const apiKey = runtimeConfig.apiKey?.trim();
-      if (apiKey) {
-        // Map our config provider to pi-ai provider name
+      if (apiKey && provider !== "oauth") {
         const piProvider =
           provider === "custom"
             ? runtimeConfig.customProtocol || "anthropic"
             : provider;
-        authStorage.setRuntimeApiKey(piProvider, apiKey);
-        // Also set the key for the model's native provider (e.g., when using
-        // google/gemini via openrouter, pi-ai looks up "google" not "openrouter")
+        await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
+          allowNetwork: false,
+        });
         if (piModel.provider !== piProvider) {
-          authStorage.setRuntimeApiKey(piModel.provider, apiKey);
+          await modelRuntime.setRuntimeApiKey(piModel.provider, apiKey, {
+            allowNetwork: false,
+          });
           log(
             "[AgentRunner] Set runtime API key for model provider:",
             piModel.provider,
@@ -2402,23 +2391,23 @@ ${hints.join("\n")}
           "[AgentRunner] Set runtime API key for config provider:",
           piProvider,
         );
-      } else {
-        if (provider === "ollama") {
-          log(
-            "[AgentRunner] Ollama configured without explicit API key; relying on OpenAI-compatible placeholder/env auth path",
-            safeStringify({
-              provider,
-              modelProvider: piModel.provider,
-              modelId: piModel.id,
-              baseUrl: piModel.baseUrl || runtimeConfig.baseUrl || "",
-            }),
-          );
-        } else {
-          logWarn(
-            "[AgentRunner] No API key configured for provider:",
+      } else if (provider === "oauth") {
+        log("[AgentRunner] OAuth authentication delegated to ModelRuntime");
+      } else if (provider === "ollama") {
+        log(
+          "[AgentRunner] Ollama configured without explicit API key; relying on OpenAI-compatible placeholder/env auth path",
+          safeStringify({
             provider,
-          );
-        }
+            modelProvider: piModel.provider,
+            modelId: piModel.id,
+            baseUrl: piModel.baseUrl || runtimeConfig.baseUrl || "",
+          }),
+        );
+      } else {
+        logWarn(
+          "[AgentRunner] No API key configured for provider:",
+          provider,
+        );
       }
 
       // baseUrl is now embedded in the model object via resolvePiModel()
@@ -3246,7 +3235,7 @@ Tool routing:\n
         logTiming("pi-coding-agent session reused", runStartTime);
       } else {
         // First query in this session — create new pi-coding-agent session
-        // ResourceLoader + ModelRegistry only needed for session creation — skip on reuse
+        // ResourceLoader is only needed for session creation — skip on reuse
         const { DefaultResourceLoader } =
           await import("@earendil-works/pi-coding-agent");
         const extensionFactories: InlineExtension[] = [];
@@ -3269,20 +3258,20 @@ Tool routing:\n
               pi.events?.on?.("subagents:created", (data: any) => {
                 if (data.isBackground) {
                   this._backgroundAgentIds.add(data.id);
+                  // Send lifecycle event immediately on creation so the renderer
+                  // tracks the agent before the parent session can transition to idle.
+                  this.sendToRenderer({
+                    type: "subagent.lifecycle",
+                    payload: {
+                      sessionId,
+                      agentId: data.id,
+                      agentType: data.type,
+                      description: data.description,
+                      parentToolCallId: data.parentToolCallId,
+                      status: "running",
+                    },
+                  });
                 }
-              });
-              pi.events?.on?.("subagents:started", (data: any) => {
-                this.sendToRenderer({
-                  type: "subagent.lifecycle",
-                  payload: {
-                    sessionId,
-                    agentId: data.id,
-                    agentType: data.type,
-                    description: data.description,
-                    parentToolCallId: data.parentToolCallId,
-                    status: "running",
-                  },
-                });
               });
               pi.events?.on?.("subagents:completed", (data: any) => {
                 const isBackground = this._backgroundAgentIds.delete(data.id);
@@ -3345,11 +3334,9 @@ Tool routing:\n
         });
         await resourceLoader.reload();
 
-        const modelRegistry = ModelRegistry.inMemory(authStorage);
-
         // 将 DeskWand Provider Profiles 注册为独立命名空间，供子 Agent 使用。
         if (subagentEnabled) {
-          await registerDeskWandProviders(modelRegistry);
+          await registerDeskWandProviders(modelRuntime);
           log("[AgentRunner] Subagent providers registered");
         }
 
@@ -3428,8 +3415,7 @@ Tool routing:\n
           await createAgentSession({
             model: piModel,
             thinkingLevel,
-            authStorage,
-            modelRegistry,
+            modelRuntime,
             // tools intentionally left as default — customTools (including MCP)
             // provide their own activation through includeAllExtensionTools.
             customTools: allCustomTools,

@@ -1,4 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+const resolveProviderApiKeyMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../../main/agent/shared-model-runtime", () => ({
+  resolveProviderApiKey: resolveProviderApiKeyMock,
+}));
+
 import type {
   ApiProviderConfig,
   AppConfig,
@@ -159,5 +166,24 @@ describe("resolveWebAccessProviderAuth", () => {
       provider: "openai-codex",
       apiKey: "oauth-token",
     });
+  });
+
+  it("uses the shared OAuth resolver by default", async () => {
+    resolveProviderApiKeyMock.mockResolvedValue("oauth-token");
+    const result = await resolveWebAccessProviderAuth(
+      "openai",
+      {
+        source: "inherit",
+        profileKey: "oauth:openai-codex",
+        apiKey: "",
+        baseUrl: "",
+      },
+      appConfigWithProviders({
+        "oauth:openai-codex": providerConfig("oauth", "", "openai"),
+      }),
+    );
+
+    expect(resolveProviderApiKeyMock).toHaveBeenCalledWith("openai-codex");
+    expect(result?.apiKey).toBe("oauth-token");
   });
 });

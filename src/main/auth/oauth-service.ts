@@ -6,9 +6,21 @@ import {
   nativeTheme,
   shell,
 } from "electron";
-import type { OAuthLoginCallbacks } from "@earendil-works/pi-ai";
-import { getSharedAuthStorage } from "../agent/shared-auth";
+import type {
+  AuthEvent,
+  AuthInteraction,
+  AuthPrompt,
+} from "@earendil-works/pi-ai";
+import { readStoredCredential } from "@earendil-works/pi-coding-agent";
 import type { OAuthStatusResult } from "../../shared/ipc-types";
+import { extractOAuthProviderId } from "../../shared/oauth-utils";
+import {
+  getAuthPath,
+  getSharedModelRuntime,
+} from "../agent/shared-model-runtime";
+import { buildDeskWandProviderId } from "../agent/subagent/provider-bridge";
+import { configStore } from "../config/config-store";
+import { log } from "../utils/logger";
 
 const SUPPORTED_OAUTH_PROVIDERS = [
   { id: "openai-codex", name: "OpenAI Codex" },
@@ -82,8 +94,17 @@ function showBrowserDialog(opts: {
   detail?: string;
   buttons: BrowserDialogOption[];
   defaultId?: number;
-  input?: { placeholder?: string; defaultValue?: string };
+  input?: {
+    placeholder?: string;
+    defaultValue?: string;
+    type?: "text" | "password";
+  };
+  signal?: AbortSignal;
 }): Promise<{ response: number; input?: string }> {
+  if (opts.signal?.aborted) {
+    return Promise.resolve({ response: -1 });
+  }
+
   return new Promise((resolve) => {
     const buttonHtml = opts.buttons
       .map(
@@ -93,7 +114,7 @@ function showBrowserDialog(opts: {
       .join("");
 
     const inputHtml = opts.input
-      ? `<input class="input" type="text" placeholder="${opts.input.placeholder ?? ""}" value="${opts.input.defaultValue ?? ""}" id="userInput" />`
+      ? `<input class="input" type="${opts.input.type ?? "text"}" placeholder="${opts.input.placeholder ?? ""}" value="${opts.input.defaultValue ?? ""}" id="userInput" />`
       : "";
 
     const dark = nativeTheme.shouldUseDarkColors;
@@ -123,10 +144,16 @@ ${inputHtml}
 </body></html>`)}`,
     );
 
+    const closeOnAbort = (): void => {
+      if (!win.isDestroyed()) win.close();
+    };
+    opts.signal?.addEventListener("abort", closeOnAbort, { once: true });
+
     let resolved = false;
     win.on("close", async () => {
       if (resolved) return;
       resolved = true;
+      opts.signal?.removeEventListener("abort", closeOnAbort);
       try {
         const result = await win.webContents.executeJavaScript(
           "window.__dialogResult",
@@ -143,50 +170,59 @@ ${inputHtml}
   });
 }
 
-function createOAuthCallbacks(): OAuthLoginCallbacks {
+function notifyAuth(event: AuthEvent): void {
+  if (event.type === "auth_url") {
+    void shell.openExternal(event.url);
+    return;
+  }
+  if (event.type === "device_code") {
+    clipboard.writeText(event.userCode);
+    void showBrowserDialog({
+      title: T.deviceCodeTitle,
+      message: T.verificationCode(event.userCode),
+      detail: T.deviceCodeDetail,
+      buttons: [{ label: T.openBrowser, value: 0 }],
+    }).then(() => shell.openExternal(event.verificationUri));
+    return;
+  }
+  if (event.type === "info") {
+    log("[OAuth] Provider info:", event.message);
+  }
+}
+
+async function promptAuth(
+  prompt: AuthPrompt,
+  providerName: string,
+): Promise<string> {
+  if (prompt.type === "select") {
+    const first = prompt.options[0]?.id;
+    if (!first) throw new Error("Login cancelled");
+    return first;
+  }
+
+  const result = await showBrowserDialog({
+    title: providerName,
+    message: prompt.message,
+    detail:
+      providerName === "GitHub Copilot" ? T.githubEnterpriseDetail : undefined,
+    buttons: [
+      { label: T.continue, value: 0 },
+      { label: T.cancel, value: 1 },
+    ],
+    input: {
+      placeholder: prompt.placeholder,
+      type: prompt.type === "secret" ? "password" : "text",
+    },
+    signal: prompt.signal,
+  });
+  if (result.response !== 0) throw new Error("Login cancelled");
+  return result.input?.trim() || "";
+}
+
+function createAuthInteraction(providerName: string): AuthInteraction {
   return {
-    onAuth: (info) => {
-      // Redirects to localhost callback handled by pi-ai's local server.
-      // Requires system proxy to bypass localhost (NO_PROXY=localhost,127.0.0.1).
-      void shell.openExternal(info.url);
-    },
-
-    onDeviceCode: (info) => {
-      clipboard.writeText(info.userCode);
-      void showBrowserDialog({
-        title: T.deviceCodeTitle,
-        message: T.verificationCode(info.userCode),
-        detail: T.deviceCodeDetail,
-        buttons: [{ label: T.openBrowser, value: 0 }],
-      }).then(() => {
-        void shell.openExternal(info.verificationUri);
-      });
-    },
-
-    onPrompt: async (prompt) => {
-      const result = await showBrowserDialog({
-        title: "GitHub Copilot",
-        message: prompt.message,
-        detail: T.githubEnterpriseDetail,
-        buttons: [
-          { label: T.continue, value: 0 },
-          { label: T.cancel, value: 1 },
-        ],
-        input: prompt.allowEmpty
-          ? { placeholder: prompt.placeholder }
-          : undefined,
-      });
-      if (result.response !== 0) {
-        throw new Error("Login cancelled");
-      }
-      return result.input?.trim() || "";
-    },
-
-    onSelect: async (prompt) => {
-      const id = prompt.options[0]?.id;
-      if (!id) return undefined;
-      return id;
-    },
+    notify: notifyAuth,
+    prompt: (prompt) => promptAuth(prompt, providerName),
   };
 }
 
@@ -195,45 +231,43 @@ async function handleLogin(
   providerId: string,
   force = false,
 ): Promise<void> {
-  const authStorage = getSharedAuthStorage();
+  if (!force && readStoredCredential(providerId, getAuthPath())) return;
 
-  if (!force) {
-    const existing = authStorage.get(providerId);
-    if (existing) {
-      return;
-    }
-  }
-
-  await authStorage.login(providerId, createOAuthCallbacks());
+  const runtime = await getSharedModelRuntime();
+  const providerName =
+    SUPPORTED_OAUTH_PROVIDERS.find((provider) => provider.id === providerId)
+      ?.name ?? providerId;
+  await runtime.login(providerId, "oauth", createAuthInteraction(providerName));
 }
 
 async function handleLogout(
   _event: Electron.IpcMainInvokeEvent,
   providerId: string,
 ): Promise<void> {
-  const authStorage = getSharedAuthStorage();
-  authStorage.remove(providerId);
+  const runtime = await getSharedModelRuntime();
+  await runtime.logout(providerId);
+  await runtime.removeRuntimeApiKey(providerId);
+
+  for (const profileKey of Object.keys(configStore.getAll().providers)) {
+    if (extractOAuthProviderId(profileKey) === providerId) {
+      await runtime.removeRuntimeApiKey(buildDeskWandProviderId(profileKey));
+    }
+  }
 }
 
 async function handleStatus(
   _event: Electron.IpcMainInvokeEvent,
   providerId: string,
 ): Promise<OAuthStatusResult> {
-  const authStorage = getSharedAuthStorage();
-  const provider = SUPPORTED_OAUTH_PROVIDERS.find((p) => p.id === providerId);
-  const providerName = provider?.name ?? providerId;
-
-  const cred = authStorage.get(providerId);
-  if (!cred) {
-    return { loggedIn: false, providerName };
-  }
+  const providerName =
+    SUPPORTED_OAUTH_PROVIDERS.find((provider) => provider.id === providerId)
+      ?.name ?? providerId;
+  const credential = readStoredCredential(providerId, getAuthPath());
+  if (!credential) return { loggedIn: false, providerName };
 
   return {
     loggedIn: true,
-    expiresAt:
-      cred.type === "oauth" && typeof cred.expires === "number"
-        ? cred.expires
-        : undefined,
+    expiresAt: credential.type === "oauth" ? credential.expires : undefined,
     providerName,
   };
 }

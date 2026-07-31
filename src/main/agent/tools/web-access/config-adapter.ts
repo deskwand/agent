@@ -1,5 +1,5 @@
 import type { AppConfig } from "../../../config/config-store";
-import { ensureFreshOAuthToken } from "../../shared-auth";
+import { resolveProviderApiKey } from "../../shared-model-runtime";
 import { extractOAuthProviderId } from "../../../../shared/oauth-utils";
 import type {
   WebAccessAuthProvider,
@@ -58,7 +58,7 @@ export async function resolveWebAccessProviderAuth(
   provider: WebAccessAuthProvider,
   credential: WebAccessCredential,
   appConfig: AppConfig,
-  resolveOAuthToken: OAuthTokenResolver = ensureFreshOAuthToken,
+  resolveOAuthToken: OAuthTokenResolver = resolveProviderApiKey,
 ): Promise<ResolvedWebAccessAuth | undefined> {
   if (credential.source === "dedicated") {
     return dedicatedAuth(provider, credential);

@@ -9,7 +9,7 @@ import type {
   ProviderType,
 } from "../config/config-store";
 import { fetchOllamaModelInfo } from "../config/ollama-api";
-import { getSharedAuthStorage } from "../agent/shared-auth";
+import { resolveProviderApiKey } from "../agent/shared-model-runtime";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import {
   applyPiModelRuntimeOverrides,
@@ -255,14 +255,16 @@ export class ModelResolutionService {
       } as Model<Api>;
     }
 
-    // Resolve API key: for OAuth providers, fetch from AuthStorage (auto-refresh)
+    // Resolve API key: legacy callers still require a raw OAuth token.
     let resolvedApiKey: string | undefined =
       providerConfig.apiKey?.trim() || undefined;
     if (providerConfig.provider === "oauth") {
       const oauthProviderId = extractOAuthProviderId(
         providerSelection.providerProfileKey,
       );
-      resolvedApiKey = await getSharedAuthStorage().getApiKey(oauthProviderId!);
+      resolvedApiKey = oauthProviderId
+        ? await resolveProviderApiKey(oauthProviderId)
+        : undefined;
       if (!resolvedApiKey) {
         throw new Error(
           `OAuth token not available for ${oauthProviderId}. Please log in via Settings → API.`,

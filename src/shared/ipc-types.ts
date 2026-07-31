@@ -69,6 +69,9 @@ export type RemoteChannelType =
   | "feishu"
   | "wechat"
   | "telegram"
+  | "discord"
+  | "qq"
+  | "slack"
   | "dingtalk"
   | "websocket";
 
@@ -88,42 +91,8 @@ export interface FeishuChannelConfig {
   defaultGroupSettings?: { requireMention: boolean };
 }
 
-/** Gateway authentication config. */
-export interface GatewayAuthConfig {
-  mode: "token" | "allowlist" | "pairing" | "open";
-  token?: string;
-  allowlist?: string[];
-  requirePairing?: boolean;
-}
-
-/** Tunnel configuration. */
-export interface TunnelConfig {
-  enabled: boolean;
-  type: "frp" | "ngrok" | "cloudflare";
-  frp?: {
-    serverAddr: string;
-    serverPort: number;
-    token?: string;
-    subdomain?: string;
-  };
-  ngrok?: { authToken: string; region?: string };
-  cloudflare?: { tunnelToken: string };
-}
-
-/** Gateway (remote server) configuration. */
-export interface GatewayConfig {
-  enabled: boolean;
-  port: number;
-  bind: "127.0.0.1" | "0.0.0.0";
-  auth: GatewayAuthConfig;
-  tunnel?: TunnelConfig;
-  defaultWorkingDirectory?: string;
-  autoApproveSafeTools?: boolean;
-}
-
 /** Full remote configuration returned by remote.getConfig. */
 export interface RemoteConfig {
-  gateway: GatewayConfig;
   channels: {
     feishu?: FeishuChannelConfig;
     wechat?: Record<string, unknown>;
@@ -131,36 +100,6 @@ export interface RemoteConfig {
     dingtalk?: Record<string, unknown>;
     websocket?: Record<string, unknown>;
   };
-}
-
-/** A user that has been paired with a remote channel. */
-export interface PairedUser {
-  userId: string;
-  userName?: string;
-  channelType: RemoteChannelType;
-  pairedAt: number;
-  lastActiveAt: number;
-}
-
-/** A pending pairing request. */
-export interface PairingRequest {
-  code: string;
-  channelType: RemoteChannelType;
-  userId: string;
-  userName?: string;
-  createdAt: number;
-  expiresAt: number;
-}
-
-/** An active remote session mapping. */
-export interface RemoteSessionMapping {
-  channelType: RemoteChannelType;
-  channelId: string;
-  userId?: string;
-  sessionId: string;
-  workingDirectory?: string;
-  createdAt: number;
-  lastActiveAt: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -209,4 +148,70 @@ export interface CloudAuthLoginResult {
     level: string;
     credits_balance: number;
   };
+}
+
+// ---------------------------------------------------------------------------
+// Channel Instance Configuration & Status (Task 13)
+// ---------------------------------------------------------------------------
+
+/** Channel types supported by the independent runtime. */
+export type ChannelRuntimeInstanceType =
+  | "feishu"
+  | "wechat"
+  | "telegram"
+  | "discord"
+  | "qq"
+  | "slack";
+
+/** A single channel instance (named configuration of a channel type). */
+export interface ChannelInstanceConfig {
+  id: string;
+  name: string;
+  type: ChannelRuntimeInstanceType;
+  enabled: boolean;
+  /** Type-specific config with credentials masked when returned to renderer. */
+  config: Record<string, unknown>;
+}
+
+/** Runtime status of a single channel instance. */
+export interface ChannelInstanceStatus {
+  id: string;
+  name: string;
+  type: ChannelRuntimeInstanceType;
+  enabled: boolean;
+  connected: boolean;
+  state: "stopped" | "starting" | "connected" | "reconnecting" | "failed" | "draining" | "stopping";
+  error?: string;
+  lastActiveAt?: number;
+}
+
+/** Policy configuration for a channel instance. */
+export interface ChannelInstancePolicy {
+  dmPolicy: "open" | "pairing" | "allowlist";
+  requireMention?: boolean;
+  allowFrom?: string[];
+}
+
+/** A log entry for a channel instance. */
+export interface ChannelInstanceLog {
+  timestamp: number;
+  level: "info" | "warn" | "error";
+  message: string;
+  instanceId: string;
+}
+
+// ---------------------------------------------------------------------------
+// Channel Pairing
+// ---------------------------------------------------------------------------
+
+/** Pairing event emitted during channel login flows (e.g. WeChat QR). */
+export interface ChannelPairingEvent {
+  version: 1;
+  channelType: ChannelRuntimeInstanceType;
+  channelInstanceId: string;
+  generation: number;
+  state: "pending" | "scanned" | "confirmed" | "expired" | "failed";
+  imageUrl?: string;
+  errorCode?: string;
+  timestamp: number;
 }

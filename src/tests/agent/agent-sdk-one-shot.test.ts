@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const completeSimpleMock = vi.hoisted(() => vi.fn());
+const resolveProviderApiKeyMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@earendil-works/pi-ai/compat", () => ({
   completeSimple: completeSimpleMock,
@@ -9,11 +10,8 @@ vi.mock("@earendil-works/pi-ai/compat", () => ({
   getModel: vi.fn(() => undefined),
 }));
 
-vi.mock("../../main/agent/shared-auth", () => ({
-  getSharedAuthStorage: () => ({
-    setRuntimeApiKey: vi.fn(),
-  }),
-  ModelRegistry: vi.fn(),
+vi.mock("../../main/agent/shared-model-runtime", () => ({
+  resolveProviderApiKey: resolveProviderApiKeyMock,
 }));
 
 import type { AppConfig } from "../../main/config/config-store";
@@ -102,6 +100,33 @@ describe("runPiAiOneShot", () => {
       apiKey: "test-key",
       temperature: 0.2,
       maxTokens: 1234,
+    });
+  });
+
+  it("resolves OAuth through the shared ModelRuntime adapter", async () => {
+    const config = makeConfig();
+    config.provider = "oauth";
+    config.apiKey = "";
+    config.activeProfileKey = "oauth:openai-codex";
+    config.activeProviderKey = "oauth:openai-codex";
+    config.model = "gpt-5.4";
+    config.providers = {
+      "oauth:openai-codex": {
+        provider: "oauth",
+        customProtocol: "openai",
+        apiKey: "",
+        defaultModel: "gpt-5.4",
+        models: [{ id: "gpt-5.4", label: "gpt-5.4", source: "preset" }],
+        updatedAt: "2026-07-27T00:00:00.000Z",
+      },
+    };
+    resolveProviderApiKeyMock.mockResolvedValue("oauth-token");
+
+    await runPiAiOneShot("hello", "system", config);
+
+    expect(resolveProviderApiKeyMock).toHaveBeenCalledWith("openai-codex");
+    expect(completeSimpleMock.mock.calls[0][2]).toMatchObject({
+      apiKey: "oauth-token",
     });
   });
 });

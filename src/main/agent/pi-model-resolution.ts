@@ -398,6 +398,20 @@ export function resolvePiRegistryModel(
       return applyPiModelRuntimeOverrides(model, options);
     }
   }
+
+  // Cross-provider fallback: the same model may appear under multiple
+  // providers in the registry (e.g. deepseek-v4-pro is registered under
+  // "deepseek", but a custom provider won't match that via candidate lookup).
+  const modelId = modelString.includes("/")
+    ? modelString.split("/").slice(1).join("/")
+    : modelString;
+  for (const provider of getProviders()) {
+    const match = getModels(provider).find((m) => m.id === modelId);
+    if (match) {
+      return applyPiModelRuntimeOverrides(match, options);
+    }
+  }
+
   return undefined;
 }
 

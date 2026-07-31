@@ -3,14 +3,16 @@
  * 注册为独立命名空间 `deskwand:<profileKey>`，确保凭证隔离。
  */
 
-import type { Model } from "@earendil-works/pi-ai";
-import type { ModelRegistry } from "@earendil-works/pi-coding-agent";
-import { getSharedAuthStorage } from "../shared-auth";
+import type { Api, Model } from "@earendil-works/pi-ai";
+import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { modelResolutionService } from "../../model/model-resolution-service";
 import { configStore, type AppConfig } from "../../config/config-store";
 import { log, logWarn } from "../../utils/logger";
 
 const DESKWAND_PROVIDER_PREFIX = "deskwand:";
+const DESKWAND_RUNTIME_API_KEY_PLACEHOLDER = "deskwand-runtime-placeholder";
+
+let providerSyncTail: Promise<void> = Promise.resolve();
 
 /**
  * 构建设置页 Provider Profile 的独立 Pi Provider ID。
@@ -52,7 +54,7 @@ interface ResolvedProviderEntry {
   models: Array<{
     id: string;
     name: string;
-    api: string;
+    api: Api;
     baseUrl?: string;
     reasoning: boolean;
     input: ("text" | "image")[];
@@ -103,7 +105,7 @@ async function resolveProfileEntry(
     const models = profile.models.map((m) => ({
       id: m.id,
       name: m.label || m.id,
-      api: resolved.piModel.api as string,
+      api: resolved.piModel.api,
       baseUrl: effectiveBaseUrl,
       reasoning: false,
       input: resolved.piModel.input as ("text" | "image")[],
@@ -128,51 +130,74 @@ async function resolveProfileEntry(
 }
 
 /**
- * 将所有已配置且可用的 Provider Profile 注册到 Model Registry。
+ * 将所有已配置且可用的 Provider Profile 注册到 Model Runtime。
  * 每个 Profile 获得独立命名空间，凭证和 Endpoint 互不污染。
  */
-export async function registerDeskWandProviders(
-  registry: ModelRegistry,
+export function registerDeskWandProviders(
+  runtime: ModelRuntime,
   appConfig: AppConfig = configStore.getAll(),
 ): Promise<void> {
-  const authStorage = getSharedAuthStorage();
-  let registered = 0;
+  const run = providerSyncTail.then(() =>
+    syncDeskWandProviders(runtime, appConfig),
+  );
+  providerSyncTail = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
-  for (const rawKey of Object.keys(appConfig.providers)) {
-    const profileKey = rawKey;
+async function syncDeskWandProviders(
+  runtime: ModelRuntime,
+  appConfig: AppConfig,
+): Promise<void> {
+  const entries: ResolvedProviderEntry[] = [];
+  for (const profileKey of Object.keys(appConfig.providers)) {
     const entry = await resolveProfileEntry(profileKey, appConfig);
-    if (!entry) continue;
+    if (entry) entries.push(entry);
+  }
 
-    const { providerId, baseUrl, apiKey, models } = entry;
-
-    registry.registerProvider(providerId, {
-      name: profileKey,
-      baseUrl,
-      apiKey,
-      models,
-    });
-
-    if (apiKey) {
-      authStorage.setRuntimeApiKey(providerId, apiKey);
+  const desiredIds = new Set(entries.map((entry) => entry.providerId));
+  for (const providerId of runtime.getRegisteredProviderIds()) {
+    if (
+      providerId.startsWith(DESKWAND_PROVIDER_PREFIX) &&
+      !desiredIds.has(providerId)
+    ) {
+      runtime.unregisterProvider(providerId);
+      await runtime.removeRuntimeApiKey(providerId);
     }
+  }
 
-    registered++;
+  for (const entry of entries) {
+    runtime.registerProvider(entry.providerId, {
+      name: entry.providerId.slice(DESKWAND_PROVIDER_PREFIX.length),
+      baseUrl: entry.baseUrl,
+      apiKey: DESKWAND_RUNTIME_API_KEY_PLACEHOLDER,
+      models: entry.models,
+    });
+    if (entry.apiKey) {
+      await runtime.setRuntimeApiKey(entry.providerId, entry.apiKey, {
+        allowNetwork: false,
+      });
+    } else {
+      await runtime.removeRuntimeApiKey(entry.providerId);
+    }
     log(
-      `[SubagentProviderBridge] Registered ${providerId} with ${models.length} models`,
+      `[SubagentProviderBridge] Registered ${entry.providerId} with ${entry.models.length} models`,
     );
   }
 
-  log(`[SubagentProviderBridge] Registered ${registered} provider(s)`);
+  log(`[SubagentProviderBridge] Registered ${entries.length} provider(s)`);
 }
 
 /**
  * 根据模型规范（"deskwand:<profileKey>/<modelId>" 或 "provider/model"）
- * 从 registry 精确查找 Model。找不到返回 undefined，不模糊匹配。
+ * 从 runtime 精确查找 Model。找不到返回 undefined，不模糊匹配。
  */
 export function resolveDeskWandModel(
   modelSpec: string,
-  registry: ModelRegistry,
-): Model<any> | undefined {
+  runtime: ModelRuntime,
+): Model<Api> | undefined {
   const trimmed = modelSpec.trim();
   if (!trimmed) return undefined;
 
@@ -182,5 +207,5 @@ export function resolveDeskWandModel(
   const provider = trimmed.slice(0, slashIdx);
   const modelId = trimmed.slice(slashIdx + 1);
 
-  return registry.find(provider, modelId) as Model<any> | undefined;
+  return runtime.getModel(provider, modelId);
 }
