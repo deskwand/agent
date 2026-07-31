@@ -30,6 +30,11 @@ export interface GatewayConfig {
 
   /** Auto-approve safe tools without user confirmation */
   autoApproveSafeTools?: boolean;
+
+  /** When true, channel instance credentials (bot tokens, app secrets, etc.)
+   *  are stored via Electron safeStorage instead of plaintext in
+   *  remote-config.json. Defaults to false for backward compatibility. */
+  secureChannelSecrets?: boolean;
 }
 
 export interface GatewayAuthConfig {
@@ -84,68 +89,6 @@ export type ChannelType =
   | "dingtalk"
   | "websocket"
   | "slack";
-
-export interface ChannelConfig {
-  /** Channel type */
-  type: ChannelType;
-
-  /** Whether this channel is enabled */
-  enabled: boolean;
-
-  /** Channel-specific configuration */
-  config:
-    | FeishuChannelConfig
-    | WechatChannelConfig
-    | TelegramChannelConfig
-    | DingtalkChannelConfig
-    | WebSocketChannelConfig
-    | SlackChannelConfig;
-}
-
-// Feishu (飞书) Channel
-export interface FeishuChannelConfig {
-  type: "feishu";
-
-  /** App ID from Feishu Open Platform */
-  appId: string;
-
-  /** App Secret from Feishu Open Platform */
-  appSecret: string;
-
-  /** Verification token for webhook validation */
-  verificationToken?: string;
-
-  /** Encrypt key for message encryption */
-  encryptKey?: string;
-
-  /** Use WebSocket mode instead of webhook (recommended for local dev) */
-  useWebSocket?: boolean;
-
-  /** Direct message policy */
-  dm: {
-    /** Policy for handling DMs from unknown users */
-    policy: "open" | "pairing" | "allowlist";
-
-    /** Allowed user open_ids (when policy is 'allowlist') */
-    allowFrom?: string[];
-  };
-
-  /** Group configuration */
-  groups?: {
-    [chatId: string]: {
-      /** Whether to require @mention to activate */
-      requireMention: boolean;
-
-      /** Allowed users in this group */
-      allowFrom?: string[];
-    };
-  };
-
-  /** Default group settings (when not specified per-group) */
-  defaultGroupSettings?: {
-    requireMention: boolean;
-  };
-}
 
 // WeChat Channel (via wechaty)
 export interface WechatChannelConfig {
@@ -564,7 +507,6 @@ export interface GatewayStatus {
 export interface RemoteConfig {
   gateway: GatewayConfig;
   channels: {
-    feishu?: FeishuChannelConfig;
     wechat?: WechatChannelConfig;
     telegram?: TelegramChannelConfig;
     dingtalk?: DingtalkChannelConfig;
