@@ -9,12 +9,28 @@ import { promisify } from "util";
 import { ChannelBase, withRetry } from "../channel-base";
 import { log, logError, logWarn } from "../../../utils/logger";
 import type {
-  FeishuChannelConfig,
   RemoteMessage,
   RemoteResponse,
   RemoteContent,
   RemoteResponseContent,
 } from "../../types";
+
+// Inline type (moved from deleted remote/types.ts; shared/ipc-types.ts owns the canonical definition)
+interface FeishuChannelConfig {
+  type: "feishu";
+  appId: string;
+  appSecret: string;
+  verificationToken?: string;
+  encryptKey?: string;
+  useWebSocket?: boolean;
+  dm: {
+    policy: "open" | "pairing" | "allowlist";
+    allowFrom?: string[];
+  };
+  groups?: Record<string, { requireMention: boolean; allowFrom?: string[] }>;
+  defaultGroupSettings?: { requireMention: boolean };
+}
+
 import { FeishuAPI } from "./feishu-api";
 import { FeishuWSClient } from "./feishu-ws-client";
 
