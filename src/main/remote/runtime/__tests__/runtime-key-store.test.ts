@@ -223,24 +223,29 @@ describe("RuntimeKeyStore", () => {
   // Unavailable encryption
   // -----------------------------------------------------------------------
 
-  it("throws when safeStorage encryption is unavailable", async () => {
+  it("falls back to plaintext key when safeStorage encryption is unavailable", async () => {
     const { root, storage } = await createStore();
     storage.available = false;
 
     const store = new RuntimeKeyStore(root, storage);
-    await expect(store.loadOrCreate()).rejects.toThrow(
-      "RUNTIME_KEYSTORE_ENCRYPTION_UNAVAILABLE",
-    );
+    const key = await store.loadOrCreate();
+    expect(key.length).toBe(32);
+
+    // Key is persisted and reloadable in fallback mode.
+    const store2 = new RuntimeKeyStore(root, storage);
+    const key2 = await store2.loadOrCreate();
+    expect(key2.equals(key)).toBe(true);
   });
 
-  it("throws on unavailable encryption even when a key file exists", async () => {
+  it("throws on unavailable encryption when an encrypted key file already exists", async () => {
     const { root, storage } = await createStore();
 
-    // First, create a valid key with encryption available
+    // First, create a valid encrypted key with encryption available
     const store1 = new RuntimeKeyStore(root, storage);
     await store1.loadOrCreate();
 
-    // Then, try to load with encryption unavailable
+    // Then, try to load with encryption unavailable — decrypting the
+    // existing ciphertext is impossible; throwing prevents silent data loss.
     storage.available = false;
     const store2 = new RuntimeKeyStore(root, storage);
     await expect(store2.loadOrCreate()).rejects.toThrow(

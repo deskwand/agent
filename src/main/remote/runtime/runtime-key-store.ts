@@ -25,6 +25,13 @@ interface EncryptedKey {
   ciphertext: string;
 }
 
+/** Plaintext fallback payload (used only when safeStorage is unavailable). */
+interface PlaintextKey {
+  version: 1;
+  format: "plaintext";
+  key: string;
+}
+
 /**
  * Stores the Runtime payload-encryption key using Electron safeStorage.
  *
@@ -56,8 +63,22 @@ export class RuntimeKeyStore {
   }
 
   private async doLoadOrCreate(): Promise<Buffer> {
-    if (!this.storage.isEncryptionAvailable()) {
-      throw new Error("RUNTIME_KEYSTORE_ENCRYPTION_UNAVAILABLE");
+    const encryptionAvailable = this.storage.isEncryptionAvailable();
+
+    // safeStorage unavailable: use the plaintext fallback file format
+    // (0600 permissions). If an encrypted key already exists we cannot
+    // decrypt it — throwing prevents silent key rotation / data loss.
+    if (!encryptionAvailable) {
+      const existingPlain = await this.tryLoadPlaintext();
+      if (existingPlain) return existingPlain;
+
+      const existingEncrypted = await this.tryLoad();
+      if (existingEncrypted) {
+        throw new Error("RUNTIME_KEYSTORE_ENCRYPTION_UNAVAILABLE");
+      }
+
+      await mkdir(this.secretsDir, { recursive: true, mode: 0o700 });
+      return this.createPlaintextExclusive();
     }
 
     const existing = await this.tryLoad();
@@ -146,12 +167,80 @@ export class RuntimeKeyStore {
       await rm(tmpPath, { force: true }).catch(() => undefined);
     }
   }
-}
+  /** Load a plaintext-fallback key file, or null when absent. */
+  private async tryLoadPlaintext(): Promise<Buffer | null> {
+    const filePath = join(this.secretsDir, KEY_FILE);
+    let raw: string;
+    try {
+      raw = await readFile(filePath, "utf8");
+    } catch (error) {
+      if (isNodeError(error, "ENOENT")) return null;
+      throw new Error("RUNTIME_KEYSTORE_READ_FAILED");
+    }
 
+    let payload: unknown;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      throw new Error("RUNTIME_KEYSTORE_CORRUPT");
+    }
+    if (!isPlaintextPayload(payload)) {
+      return null; // encrypted format — caller decides
+    }
+
+    const key = Buffer.from(payload.key, "base64");
+    if (key.length !== KEY_BYTES) {
+      throw new Error("RUNTIME_KEYSTORE_CORRUPT");
+    }
+    return key;
+  }
+
+  /** Create the plaintext-fallback key file with an exclusive link. */
+  private async createPlaintextExclusive(): Promise<Buffer> {
+    const key = randomBytes(KEY_BYTES);
+    const payload: PlaintextKey = {
+      version: 1,
+      format: "plaintext",
+      key: key.toString("base64"),
+    };
+    const filePath = join(this.secretsDir, KEY_FILE);
+    const tmpPath = `${filePath}.${process.pid}.${randomBytes(8).toString("hex")}.tmp`;
+
+    try {
+      await writeFile(tmpPath, `${JSON.stringify(payload)}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+      });
+      await chmod(tmpPath, 0o600);
+      try {
+        await link(tmpPath, filePath);
+        await chmod(filePath, 0o600);
+        return key;
+      } catch (error) {
+        if (!isNodeError(error, "EEXIST")) throw error;
+        const winner = await this.tryLoadPlaintext();
+        if (!winner) throw new Error("RUNTIME_KEYSTORE_CREATE_RACE");
+        return winner;
+      }
+    } finally {
+      await rm(tmpPath, { force: true }).catch(() => undefined);
+    }
+  }
+}
 function isEncryptedPayload(value: unknown): value is EncryptedKey {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
   return record.version === 1 && typeof record.ciphertext === "string";
+}
+
+function isPlaintextPayload(value: unknown): value is PlaintextKey {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    record.version === 1 &&
+    record.format === "plaintext" &&
+    typeof record.key === "string"
+  );
 }
 
 function isNodeError(error: unknown, code: string): boolean {
