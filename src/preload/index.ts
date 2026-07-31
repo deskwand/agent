@@ -23,17 +23,16 @@ import type {
   MemoryInspectSessionResult,
 } from "../renderer/types";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
+import type { ChannelPairingEvent } from "../shared/ipc-types";
 import type {
   McpServerConfig,
   McpTool,
   McpServerStatus,
   McpPresetsMap,
   RemoteConfig,
-  GatewayConfig,
-  FeishuChannelConfig,
-  PairedUser,
-  PairingRequest,
-  RemoteSessionMapping,
+  ChannelInstanceConfig,
+  ChannelInstanceLog,
+  ChannelInstanceStatus,
 } from "../shared/ipc-types";
 
 // Fan out one IPC listener to all active renderer subscribers.
@@ -47,6 +46,8 @@ const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent["type"]>(
   [
     "session.start",
     "session.continue",
+    "session.setThinkingLevel",
+    "session.setProviderModel",
     "session.stop",
     "session.compact",
     "session.abortCompaction",
@@ -468,61 +469,25 @@ contextBridge.exposeInMainWorld("electronAPI", {
   remote: {
     getConfig: (): Promise<RemoteConfig> =>
       ipcRenderer.invoke("remote.getConfig"),
-    getStatus: (): Promise<{
-      running: boolean;
-      port?: number;
-      publicUrl?: string;
-      channels: Array<{ type: string; connected: boolean; error?: string }>;
-      activeSessions: number;
-      pendingPairings: number;
-    }> => ipcRenderer.invoke("remote.getStatus"),
-    setEnabled: (
-      enabled: boolean,
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("remote.setEnabled", enabled),
-    updateGatewayConfig: (
-      config: Partial<GatewayConfig>,
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("remote.updateGatewayConfig", config),
-    updateFeishuConfig: (
-      config: FeishuChannelConfig,
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("remote.updateFeishuConfig", config),
-    getPairedUsers: (): Promise<PairedUser[]> =>
-      ipcRenderer.invoke("remote.getPairedUsers"),
-    getPendingPairings: (): Promise<PairingRequest[]> =>
-      ipcRenderer.invoke("remote.getPendingPairings"),
-    approvePairing: (
-      channelType: string,
-      userId: string,
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("remote.approvePairing", channelType, userId),
-    revokePairing: (
-      channelType: string,
-      userId: string,
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("remote.revokePairing", channelType, userId),
-    rejectPairing: (
-      channelType: string,
-      userId: string,
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("remote.rejectPairing", channelType, userId),
-    getRemoteSessions: (): Promise<RemoteSessionMapping[]> =>
-      ipcRenderer.invoke("remote.getRemoteSessions"),
-    clearRemoteSession: (
-      sessionId: string,
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("remote.clearRemoteSession", sessionId),
-    getTunnelStatus: (): Promise<{
-      connected: boolean;
-      url: string | null;
-      provider: string;
-      error?: string;
-    }> => ipcRenderer.invoke("remote.getTunnelStatus"),
-    getWebhookUrl: (): Promise<string | null> =>
-      ipcRenderer.invoke("remote.getWebhookUrl"),
-    restart: (): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("remote.restart"),
+    listChannels: (): Promise<ChannelInstanceConfig[]> =>
+      ipcRenderer.invoke("remote.listChannels"),
+    createChannel: (
+      input: Omit<ChannelInstanceConfig, "id">,
+    ): Promise<ChannelInstanceConfig> =>
+      ipcRenderer.invoke("remote.createChannel", input),
+    updateChannel: (
+      id: string,
+      patch: Partial<Pick<ChannelInstanceConfig, "name" | "enabled" | "config">>,
+    ): Promise<ChannelInstanceConfig | null> =>
+      ipcRenderer.invoke("remote.updateChannel", id, patch),
+    deleteChannel: (id: string): Promise<boolean> =>
+      ipcRenderer.invoke("remote.deleteChannel", id),
+    getChannelStatus: (): Promise<ChannelInstanceStatus[]> =>
+      ipcRenderer.invoke("remote.getChannelStatus"),
+    getChannelPairings: (): Promise<ChannelPairingEvent[]> =>
+      ipcRenderer.invoke("remote.getChannelPairings"),
+    getChannelLogs: (instanceId: string): Promise<ChannelInstanceLog[]> =>
+      ipcRenderer.invoke("remote.getChannelLogs", instanceId),
   },
 
   schedule: {
@@ -922,49 +887,18 @@ declare global {
       };
       remote: {
         getConfig: () => Promise<RemoteConfig>;
-        getStatus: () => Promise<{
-          running: boolean;
-          port?: number;
-          publicUrl?: string;
-          channels: Array<{ type: string; connected: boolean; error?: string }>;
-          activeSessions: number;
-          pendingPairings: number;
-        }>;
-        setEnabled: (
-          enabled: boolean,
-        ) => Promise<{ success: boolean; error?: string }>;
-        updateGatewayConfig: (
-          config: Partial<GatewayConfig>,
-        ) => Promise<{ success: boolean; error?: string }>;
-        updateFeishuConfig: (
-          config: FeishuChannelConfig,
-        ) => Promise<{ success: boolean; error?: string }>;
-        getPairedUsers: () => Promise<PairedUser[]>;
-        getPendingPairings: () => Promise<PairingRequest[]>;
-        approvePairing: (
-          channelType: string,
-          userId: string,
-        ) => Promise<{ success: boolean; error?: string }>;
-        revokePairing: (
-          channelType: string,
-          userId: string,
-        ) => Promise<{ success: boolean; error?: string }>;
-        rejectPairing: (
-          channelType: string,
-          userId: string,
-        ) => Promise<{ success: boolean; error?: string }>;
-        getRemoteSessions: () => Promise<RemoteSessionMapping[]>;
-        clearRemoteSession: (
-          sessionId: string,
-        ) => Promise<{ success: boolean; error?: string }>;
-        getTunnelStatus: () => Promise<{
-          connected: boolean;
-          url: string | null;
-          provider: string;
-          error?: string;
-        }>;
-        getWebhookUrl: () => Promise<string | null>;
-        restart: () => Promise<{ success: boolean; error?: string }>;
+        listChannels: () => Promise<ChannelInstanceConfig[]>;
+        createChannel: (
+          input: Omit<ChannelInstanceConfig, "id">,
+        ) => Promise<ChannelInstanceConfig>;
+        updateChannel: (
+          id: string,
+          patch: Partial<Pick<ChannelInstanceConfig, "name" | "enabled" | "config">>,
+        ) => Promise<ChannelInstanceConfig | null>;
+        deleteChannel: (id: string) => Promise<boolean>;
+        getChannelStatus: () => Promise<ChannelInstanceStatus[]>;
+        getChannelPairings: () => Promise<ChannelPairingEvent[]>;
+        getChannelLogs: (instanceId: string) => Promise<ChannelInstanceLog[]>;
       };
       schedule: {
         list: () => Promise<ScheduleTask[]>;

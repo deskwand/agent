@@ -78,12 +78,14 @@ import type {
   ProviderModelInfo,
 } from "../renderer/types";
 import { remoteManager, type AgentExecutor } from "./remote/remote-manager";
+import { remoteRuntimeBootstrap } from "./remote/runtime/remote-runtime-bootstrap";
+import { routeRuntimeAssistantEvent } from "./remote/runtime/runtime-session-event-router";
 import { remoteConfigStore } from "./remote/remote-config-store";
 import type {
-  GatewayConfig,
-  FeishuChannelConfig,
-  ChannelType,
-} from "./remote/types";
+  ChannelInstanceConfig,
+  ChannelInstanceLog,
+  ChannelInstanceStatus,
+} from "../shared/ipc-types";
 import { startNavServer, stopNavServer } from "./nav-server";
 import {
   ScheduledTaskManager,
@@ -868,7 +870,7 @@ async function startSandboxBootstrap(): Promise<void> {
   }
 }
 
-// 发送事件到渲染进程（含远程会话拦截）
+// 发送事件到渲染进程（含远程会话路由）
 function sendToRenderer(event: ServerEvent) {
   const payload =
     "payload" in event
@@ -876,104 +878,17 @@ function sendToRenderer(event: ServerEvent) {
       : undefined;
   const sessionId = payload?.sessionId;
 
-  // 判断是否远程会话
-  if (sessionId && remoteManager.isRemoteSession(sessionId)) {
-    // 处理远程会话事件
-
-    // 拦截 stream.message，用于回传到远程通道
+  // 判断是否为远程运行时会话，路由助理事件到远程通道
+  if (
+    sessionId &&
+    remoteRuntimeBootstrap.isAgentSession(sessionId)
+  ) {
     if (event.type === "stream.message") {
-      const message = payload.message as {
-        role?: string;
-        content?: Array<{ type: string; text?: string }>;
-      };
-      if (message?.role === "assistant" && message?.content) {
-        // 提取助手文本内容
-        const textContent = message.content
-          .filter((c) => c.type === "text" && c.text)
-          .map((c) => c.text)
-          .join("\n");
-
-        if (textContent) {
-          // 发送到远程通道（带缓冲）
-          remoteManager
-            .sendResponseToChannel(sessionId, textContent)
-            .catch((err: Error) => {
-              logError("[Remote] Failed to send response to channel:", err);
-            });
-        }
-      }
-    }
-
-    // 拦截 trace.step 作为工具进度
-    if (event.type === "trace.step") {
-      const step = payload.step as {
-        type?: string;
-        toolName?: string;
-        status?: string;
-        title?: string;
-      };
-      if (step?.type === "tool_call" && step?.toolName) {
-        remoteManager
-          .sendToolProgress(
-            sessionId,
-            step.toolName,
-            step.status === "completed"
-              ? "completed"
-              : step.status === "error"
-                ? "error"
-                : "running",
-          )
-          .catch((err: Error) => {
-            logError("[Remote] Failed to send tool progress:", err);
-          });
-      }
-    }
-
-    // trace.update 预留；当前主要用 trace.step
-
-    // 拦截 session.status 用于清理
-    if (event.type === "session.status") {
-      const status = payload.status as string;
-      if (status === "idle" || status === "error") {
-        // 会话结束，清空缓冲
-        remoteManager.clearSessionBuffer(sessionId).catch((err: Error) => {
-          logError("[Remote] Failed to clear session buffer:", err);
-        });
-      }
-    }
-
-    // 拦截 permission.request
-    if (
-      event.type === "permission.request" &&
-      payload.toolUseId &&
-      payload.toolName
-    ) {
-      log("[Remote] Intercepting permission for remote session:", sessionId);
-      remoteManager
-        .handlePermissionRequest(
-          sessionId,
-          payload.toolUseId as string,
-          payload.toolName as string,
-          (payload.input as Record<string, unknown> | undefined) ?? {},
-        )
-        .then((result) => {
-          if (result !== null && sessionManager) {
-            let permissionResult: "allow" | "deny" | "allow_always";
-            if (result.allow) {
-              permissionResult = result.remember ? "allow_always" : "allow";
-            } else {
-              permissionResult = "deny";
-            }
-            sessionManager.handlePermissionResponse(
-              payload.toolUseId as string,
-              permissionResult,
-            );
-          }
-        })
-        .catch((err) => {
-          logError("[Remote] Failed to handle permission request:", err);
-        });
-      return; // 不发送到本地 UI
+      routeRuntimeAssistantEvent(
+        event,
+        remoteRuntimeBootstrap,
+        () => logError("[RemoteRuntime] Agent response delivery failed"),
+      );
     }
   }
 
@@ -1216,15 +1131,15 @@ app
     // 初始化远程管理器
     remoteManager.setRendererCallback(sendToRenderer);
     const agentExecutor: AgentExecutor = {
-      startSession: async (title, prompt, cwd) => {
+      startSession: async (title, prompt, cwd, content, turnId) => {
         if (!sessionManager) throw new Error("Session manager not initialized");
         const unsupportedReason = getWorkspacePathUnsupportedReason(cwd);
         if (unsupportedReason) {
           throw new Error(unsupportedReason);
         }
-        return sessionManager.startSession(title, prompt, cwd);
+        return sessionManager.startSession(title, prompt, cwd, undefined, content, undefined, undefined, undefined, undefined, turnId);
       },
-      continueSession: async (sessionId, prompt, content, cwd) => {
+      continueSession: async (sessionId, prompt, content, cwd, turnId) => {
         if (!sessionManager) throw new Error("Session manager not initialized");
         if (cwd) {
           const result = await setWorkingDir(cwd, sessionId);
@@ -1234,7 +1149,7 @@ app
             );
           }
         }
-        await sessionManager.continueSession(sessionId, prompt, content);
+        await sessionManager.continueSession(sessionId, prompt, content, undefined, undefined, turnId);
       },
       stopSession: async (sessionId) => {
         if (!sessionManager) throw new Error("Session manager not initialized");
@@ -1253,12 +1168,11 @@ app
     };
     remoteManager.setAgentExecutor(agentExecutor);
 
-    // 远程控制启用时启动
-    if (remoteConfigStore.isEnabled()) {
-      remoteManager.start().catch((error) => {
-        logError("[App] Failed to start remote control:", error);
-      });
-    }
+    // Start remote manager unconditionally. The runtime bootstrap is a safe
+    // no-op when no channel instances are configured.
+    remoteManager.start().catch((error) => {
+      logError("[App] Failed to start remote control:", error);
+    });
 
     app.on("activate", () => {
       const hasVisibleWindow = BrowserWindow.getAllWindows().some(
@@ -3284,190 +3198,85 @@ ipcMain.handle("remote.getConfig", () => {
   }
 });
 
-ipcMain.handle("remote.getStatus", () => {
-  try {
-    return remoteManager.getStatus();
-  } catch (error) {
-    logError("[Remote] Error getting status:", error);
+ipcMain.handle("remote.listChannels", () => {
+  return remoteConfigStore.listChannelInstances();
+});
+
+ipcMain.handle(
+  "remote.createChannel",
+  async (
+    _event,
+    input: Omit<ChannelInstanceConfig, "id">,
+  ): Promise<ChannelInstanceConfig> => {
+    const created = remoteConfigStore.createChannelInstance(input);
+    await remoteManager.refreshRuntimeChannels();
+    return (
+      remoteConfigStore
+        .listChannelInstances()
+        .find((item) => item.id === created.id) ?? created
+    );
+  },
+);
+
+ipcMain.handle(
+  "remote.updateChannel",
+  async (
+    _event,
+    id: string,
+    patch: Partial<Pick<ChannelInstanceConfig, "name" | "enabled" | "config">>,
+  ): Promise<ChannelInstanceConfig | null> => {
+    const updated = remoteConfigStore.updateChannelInstance(id, patch);
+    if (!updated) return null;
+    await remoteManager.refreshRuntimeChannels();
+    return (
+      remoteConfigStore
+        .listChannelInstances()
+        .find((item) => item.id === updated.id) ?? updated
+    );
+  },
+);
+
+ipcMain.handle("remote.deleteChannel", async (_event, id: string): Promise<boolean> => {
+  const deleted = remoteConfigStore.deleteChannelInstance(id);
+  if (deleted) {
+    await remoteManager.refreshRuntimeChannels();
+  }
+  return deleted;
+});
+
+ipcMain.handle("remote.getChannelStatus", (): ChannelInstanceStatus[] => {
+  const runtimeStatus = new Map(
+    remoteManager.getRuntimeStatus().map((status) => [
+      status.channelInstanceId,
+      status,
+    ]),
+  );
+  return remoteConfigStore.listChannelInstances().map((instance) => {
+    const status = runtimeStatus.get(instance.id);
     return {
-      running: false,
-      channels: [],
-      activeSessions: 0,
-      pendingPairings: 0,
+      ...instance,
+      connected: status?.state === "connected",
+      state: status?.state ?? "stopped",
+      error: status?.errorCode,
+      lastActiveAt: status?.timestamp,
     };
-  }
+  });
 });
 
-ipcMain.handle("remote.setEnabled", async (_event, enabled: boolean) => {
-  try {
-    remoteConfigStore.setEnabled(enabled);
-
-    if (enabled) {
-      await remoteManager.start();
-    } else {
-      await remoteManager.stop();
-    }
-
-    return { success: true };
-  } catch (error) {
-    logError("[Remote] Error setting enabled:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
+ipcMain.handle("remote.getChannelPairings", () => {
+  return remoteRuntimeBootstrap.getPairingSnapshots();
 });
 
-ipcMain.handle(
-  "remote.updateGatewayConfig",
-  async (_event, config: Partial<GatewayConfig>) => {
-    try {
-      await remoteManager.updateGatewayConfig(config);
-      return { success: true };
-    } catch (error) {
-      logError("[Remote] Error updating gateway config:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  },
-);
-
-ipcMain.handle(
-  "remote.updateFeishuConfig",
-  async (_event, config: FeishuChannelConfig) => {
-    try {
-      await remoteManager.updateFeishuConfig(config);
-      return { success: true };
-    } catch (error) {
-      logError("[Remote] Error updating Feishu config:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  },
-);
-
-ipcMain.handle("remote.getPairedUsers", () => {
-  try {
-    return remoteManager.getPairedUsers();
-  } catch (error) {
-    logError("[Remote] Error getting paired users:", error);
-    return [];
-  }
+ipcMain.handle("remote.getChannelLogs", (_event, instanceId: string): ChannelInstanceLog[] => {
+  return [{
+    instanceId,
+    timestamp: Date.now(),
+    level: "info",
+    message: "Channel log collection is not enabled.",
+  }];
 });
 
-ipcMain.handle("remote.getPendingPairings", () => {
-  try {
-    return remoteManager.getPendingPairings();
-  } catch (error) {
-    logError("[Remote] Error getting pending pairings:", error);
-    return [];
-  }
-});
 
-ipcMain.handle(
-  "remote.approvePairing",
-  (_event, channelType: ChannelType, userId: string) => {
-    try {
-      const success = remoteManager.approvePairing(channelType, userId);
-      return { success };
-    } catch (error) {
-      logError("[Remote] Error approving pairing:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  },
-);
-
-ipcMain.handle(
-  "remote.revokePairing",
-  (_event, channelType: ChannelType, userId: string) => {
-    try {
-      const success = remoteManager.revokePairing(channelType, userId);
-      return { success };
-    } catch (error) {
-      logError("[Remote] Error revoking pairing:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  },
-);
-
-ipcMain.handle(
-  "remote.rejectPairing",
-  (_event, channelType: ChannelType, userId: string) => {
-    try {
-      const success = remoteManager.rejectPairing(channelType, userId);
-      return { success };
-    } catch (error) {
-      logError("[Remote] Error rejecting pairing:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  },
-);
-
-ipcMain.handle("remote.getRemoteSessions", () => {
-  try {
-    return remoteManager.getRemoteSessions();
-  } catch (error) {
-    logError("[Remote] Error getting remote sessions:", error);
-    return [];
-  }
-});
-
-ipcMain.handle("remote.clearRemoteSession", (_event, sessionId: string) => {
-  try {
-    const success = remoteManager.clearRemoteSession(sessionId);
-    return { success };
-  } catch (error) {
-    logError("[Remote] Error clearing remote session:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
-});
-
-ipcMain.handle("remote.getTunnelStatus", () => {
-  try {
-    return remoteManager.getTunnelStatus();
-  } catch (error) {
-    logError("[Remote] Error getting tunnel status:", error);
-    return { connected: false, url: null, provider: "none" };
-  }
-});
-
-ipcMain.handle("remote.getWebhookUrl", () => {
-  try {
-    return remoteManager.getFeishuWebhookUrl();
-  } catch (error) {
-    logError("[Remote] Error getting webhook URL:", error);
-    return null;
-  }
-});
-
-ipcMain.handle("remote.restart", async () => {
-  try {
-    await remoteManager.restart();
-    return { success: true };
-  } catch (error) {
-    logError("[Remote] Error restarting:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
-});
 
 ipcMain.handle("schedule.list", () => {
   try {
@@ -4143,3 +3952,9 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       return null;
   }
 }
+
+/**
+ * Validate and convert a ChannelInstancePolicy (from renderer IPC) into a
+ * ChannelPolicyConfig-compatible blob stored as ChannelInstanceRecord.policy.
+ * Returns undefined when the input is malformed — fail closed.
+ */
