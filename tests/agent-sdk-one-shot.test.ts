@@ -3,7 +3,7 @@ import type { AppConfig } from '../src/main/config/config-store';
 
 const mocks = vi.hoisted(() => ({
   completeSimple: vi.fn(),
-  setRuntimeApiKey: vi.fn(),
+  resolveProviderApiKey: vi.fn(),
   resolvePiRegistryModel: vi.fn(),
   buildSyntheticPiModel: vi.fn(),
 }));
@@ -44,14 +44,12 @@ vi.mock('electron-store', () => {
   };
 });
 
-vi.mock('@earendil-works/pi-ai', () => ({
+vi.mock('@earendil-works/pi-ai/compat', () => ({
   completeSimple: mocks.completeSimple,
 }));
 
-vi.mock('../src/main/agent/shared-auth', () => ({
-  getSharedAuthStorage: () => ({
-    setRuntimeApiKey: mocks.setRuntimeApiKey,
-  }),
+vi.mock('../src/main/agent/shared-model-runtime', () => ({
+  resolveProviderApiKey: mocks.resolveProviderApiKey,
 }));
 
 vi.mock('../src/main/agent/pi-model-resolution', () => ({
@@ -158,7 +156,7 @@ function createConfig(overrides: Partial<AppConfig> = {}): AppConfig {
 describe('probeWithAgentSdk', () => {
   beforeEach(() => {
     mocks.completeSimple.mockReset();
-    mocks.setRuntimeApiKey.mockReset();
+    mocks.resolveProviderApiKey.mockReset();
     mocks.resolvePiRegistryModel.mockReset();
     mocks.buildSyntheticPiModel.mockReset();
 

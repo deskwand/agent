@@ -130,6 +130,12 @@ export const protocol = {
   handle: noopAsync,
 };
 
+export const safeStorage = {
+  isEncryptionAvailable: () => true,
+  encryptString: (value: string) => Buffer.from(`mock:${value}`, "utf8"),
+  decryptString: (value: Buffer) => value.toString("utf8").replace(/^mock:/, ""),
+};
+
 const electron = {
   app,
   ipcMain,
