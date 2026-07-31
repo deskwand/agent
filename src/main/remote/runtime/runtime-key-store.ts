@@ -9,7 +9,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { join } from "node:path";
-import { log } from "../../utils/logger";
+import { log, logWarn } from "../../utils/logger";
 
 export interface RuntimeSecureStorage {
   isEncryptionAvailable(): boolean;
@@ -69,6 +69,10 @@ export class RuntimeKeyStore {
     // (0600 permissions). If an encrypted key already exists we cannot
     // decrypt it — throwing prevents silent key rotation / data loss.
     if (!encryptionAvailable) {
+      logWarn(
+        "[RuntimeKeyStore] safeStorage encryption unavailable — " +
+          "using 0600 plaintext key fallback. Payload encryption is degraded.",
+      );
       const existingPlain = await this.tryLoadPlaintext();
       if (existingPlain) return existingPlain;
 
