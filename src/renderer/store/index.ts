@@ -603,6 +603,10 @@ export const useAppStore = create<AppState>((set) => ({
   addBackgroundAgent: (sessionId, agent) =>
     set((state) => {
       const current = state.sessionStates[sessionId] ?? DEFAULT_SESSION_STATE;
+      // Idempotent: skip if this agent is already tracked
+      if (current.backgroundAgents.some((a) => a.id === agent.id)) {
+        return {};
+      }
       return {
         sessionStates: patchSession(state.sessionStates, sessionId, {
           backgroundAgents: [

@@ -477,8 +477,26 @@ function installSharedIpcBridge(): void {
           }
           break;
 
-        default:
+        // Remote channel events consumed by the channel catalog component
+        // via its own subscription; nothing to do here.
+        case "remote.channelPairing":
+          break;
+
+        default: {
+          const eventType = String(event.type);
+          if (eventType.startsWith("remote.")) {
+            if (eventType === "remote.channelStatus") {
+              // Consumed by the channel catalog subscription.
+              break;
+            }
+            // Unknown remote.* events (e.g. runtime_gaps, typos) are not
+            // consumed anywhere; log at debug level to stay visible without
+            // noise.
+            console.debug("[useIPC] Unhandled remote event:", eventType);
+            break;
+          }
           console.log("[useIPC] Unknown server event:", event);
+        }
       }
     } catch (err) {
       console.error("[useIPC] Error handling server event:", event.type, err);

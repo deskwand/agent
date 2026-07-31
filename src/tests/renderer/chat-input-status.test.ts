@@ -181,4 +181,79 @@ describe("resolveInputStatus", () => {
       }),
     ).toEqual({ type: "steering-failed", text: "fix login" });
   });
+
+  // ── backgroundAgents ──
+
+  it("returns background-agent for a single running agent", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        backgroundAgents: [
+          { id: "a", type: "Explore", description: "search code", status: "running" },
+        ],
+      }),
+    ).toEqual({
+      type: "background-agent",
+      count: 1,
+      detail: "Explore · search code",
+      done: false,
+    });
+  });
+
+  it("returns background-agent with count for multiple agents", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        backgroundAgents: [
+          { id: "a", type: "Explore", description: "find bug", status: "running" },
+          { id: "b", type: "Review", description: "check fix", status: "running" },
+        ],
+      }),
+    ).toEqual({
+      type: "background-agent",
+      count: 2,
+      detail: undefined,
+      done: false,
+    });
+  });
+
+  it("returns background-agent done when all agents completed", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        backgroundAgents: [
+          { id: "a", type: "Explore", description: "find bug", status: "done" },
+        ],
+      }),
+    ).toEqual({
+      type: "background-agent",
+      count: 1,
+      detail: undefined,
+      done: true,
+    });
+  });
+
+  it("thinking wins over background-agent", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        shouldShowThinkingIndicator: true,
+        backgroundAgents: [
+          { id: "a", type: "Explore", description: "search", status: "running" },
+        ],
+      }),
+    ).toEqual({ type: "thinking" });
+  });
+
+  it("responding wins over background-agent", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        isResponding: true,
+        backgroundAgents: [
+          { id: "a", type: "Explore", description: "search", status: "running" },
+        ],
+      }),
+    ).toEqual({ type: "responding" });
+  });
 });

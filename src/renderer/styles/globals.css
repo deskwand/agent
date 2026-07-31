@@ -1110,3 +1110,31 @@
     animation-name: fade-out !important;
   }
 }
+
+/* ── Channel Instance Catalog ── */
+@layer components {
+  .dot-connected { @apply bg-success; }
+  .dot-starting { @apply bg-warning motion-safe:animate-pulse; }
+  .dot-reconnecting { @apply bg-warning motion-safe:animate-pulse; }
+  .dot-failed { @apply bg-error; }
+  .dot-stopped { @apply bg-text-muted; }
+
+  .status-connected { @apply text-success; }
+  .status-starting { @apply text-warning; }
+  .status-reconnecting { @apply text-warning; }
+  .status-failed { @apply text-error; }
+  .status-stopped { @apply text-text-muted; }
+
+  .toggle-track {
+    @apply relative h-5 w-9 cursor-pointer rounded-full bg-border-subtle transition-colors duration-200;
+  }
+  .toggle-track.toggle-on {
+    @apply bg-success;
+  }
+  .toggle-knob {
+    @apply absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-all duration-200;
+  }
+  .toggle-track.toggle-on .toggle-knob {
+    @apply left-[18px];
+  }
+}

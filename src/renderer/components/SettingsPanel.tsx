@@ -161,7 +161,7 @@ export function SettingsPanel({
       id: "remote" as TabId,
       label: t("settings.remote", "远程控制"),
       icon: Wifi,
-      description: t("settings.remoteDesc", "通过飞书等平台远程使用"),
+      description: t("settings.remoteDesc", "通过已连接的频道远程使用"),
     },
     {
       id: "logs" as TabId,

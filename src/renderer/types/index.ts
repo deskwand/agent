@@ -7,6 +7,8 @@ export type {
   WebAccessConfig,
   WebAccessErrorCode,
 } from "../../shared/web-access";
+import type { ChannelPairingEvent } from "../../shared/ipc-types";
+import type { ChannelInstanceStatus } from "../../shared/ipc-types";
 
 // Session types
 export interface Session {
@@ -704,6 +706,14 @@ export type ServerEvent =
         timeUsedSeconds?: number;
         timeBudgetSeconds?: number;
       };
+    }
+  | {
+      type: "remote.channelPairing";
+      payload: ChannelPairingEvent;
+    }
+  | {
+      type: "remote.channelStatus";
+      payload: ChannelInstanceStatus;
     }
   | {
       type: "error";
