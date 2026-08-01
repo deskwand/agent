@@ -241,12 +241,6 @@ export function shouldShowHydratingHistoryState(
 
 const INITIAL_VISIBLE_TURNS = 8;
 const PREPEND_TURNS = 6;
-// Kill threshold: any real upward movement beyond 1px cancels follow.
-const BOTTOM_EPSILON_PX = 1;
-// Recovery threshold: coming back within 80px of the bottom re-enables
-// follow even mid-stream (a scroll event can never observe an exact-bottom
-// position while content is growing, so the recovery window must be wide).
-const NEAR_BOTTOM_PX = 80;
 // Wheel deltas below this are trackpad jitter, not a scroll gesture.
 const WHEEL_KILL_THRESHOLD_PX = 4;
 // Fire a little before the user hits absolute top to hide prepend latency.
@@ -373,15 +367,13 @@ export function ChatView() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const isUserAtBottomRef = useRef(true);
-  const autoFollowRef = useRef(true);
+  // Single-source follow state: true while the user is at the physical
+  // bottom. Written ONLY by user-input events (wheel/scroll) and explicit
+  // actions (send, button, session switch). Content-growth paths read it
+  // and pin unconditionally — they never infer intent.
+  const isAtBottomRef = useRef(true);
   const previousScrollTopRef = useRef(0);
-  const upwardScrollIntentRef = useRef(false);
   const prevMessageCountRef = useRef(0);
-  const prevPartialLengthRef = useRef(0);
-  const scrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scrollRequestRef = useRef<number | null>(null);
-  const isScrollingRef = useRef(false);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const previousSessionIdRef = useRef<string | null>(null);
   const initializedSessionIdRef = useRef<string | null>(null);
@@ -986,93 +978,38 @@ export function ChatView() {
     );
   }, [effectiveVisibleTurnStartIndex]);
 
-  const updateScrollToBottomVisibility = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return true;
-    const distanceToBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isAtBottom = distanceToBottom <= NEAR_BOTTOM_PX;
-    isUserAtBottomRef.current = isAtBottom;
-    return isAtBottom;
-  }, []);
-
-  const syncAutoFollowState = useCallback(() => {
+  const syncFollowFromScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-
-    const isNearBottom = updateScrollToBottomVisibility();
-    const distanceToBottom =
-      container.scrollHeight - container.scrollTop - container.clientHeight;
-    const scrolledAwayFromBottom =
-      container.scrollTop < previousScrollTopRef.current &&
-      distanceToBottom > BOTTOM_EPSILON_PX;
-    previousScrollTopRef.current = container.scrollTop;
-
-    if (upwardScrollIntentRef.current || scrolledAwayFromBottom) {
-      autoFollowRef.current = false;
-    } else if (!autoFollowRef.current && distanceToBottom <= NEAR_BOTTOM_PX) {
-      autoFollowRef.current = true;
-    } else if (autoFollowRef.current && !isNearBottom) {
-      autoFollowRef.current = false;
+    const maxScrollTop = container.scrollHeight - container.clientHeight;
+    const st = container.scrollTop;
+    if (st < previousScrollTopRef.current && maxScrollTop - st > 1) {
+      // Moving up (or content shrank without clamping to the bottom):
+      // the user left the bottom → stop following.
+      isAtBottomRef.current = false;
+    } else if (st > previousScrollTopRef.current && st >= maxScrollTop - 1) {
+      // Scrolled DOWN to the physical bottom → resume following. Requires
+      // downward movement so a wheel-up with the viewport still parked at
+      // the bottom (no scroll event yet) cannot be revived by the
+      // intervening bottom-position scroll event.
+      isAtBottomRef.current = true;
     }
-    if (scrolledAwayFromBottom) upwardScrollIntentRef.current = false;
-
-    setShowScrollToBottom(!autoFollowRef.current);
-  }, [updateScrollToBottomVisibility]);
-
-  // Debounced scroll function to prevent scroll conflicts
-  const scrollToBottom = useRef(
-    (behavior: ScrollBehavior = "auto", immediate: boolean = false) => {
-      // Cancel any pending scroll requests
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = null;
-      }
-      if (scrollRequestRef.current) {
-        cancelAnimationFrame(scrollRequestRef.current);
-        scrollRequestRef.current = null;
-      }
-
-      const performScroll = () => {
-        const container = scrollContainerRef.current;
-        if (!container || !autoFollowRef.current) return;
-
-        // Mark as scrolling to prevent concurrent scrolls
-        isScrollingRef.current = true;
-
-        container.scrollTo({ top: container.scrollHeight, behavior });
-
-        // Reset scrolling flag after a short delay
-        setTimeout(
-          () => {
-            isScrollingRef.current = false;
-          },
-          behavior === "smooth" ? 300 : 50,
-        );
-      };
-
-      if (immediate) {
-        performScroll();
-      } else {
-        // Use RAF + timeout for debouncing
-        scrollRequestRef.current = requestAnimationFrame(() => {
-          scrollTimeoutRef.current = setTimeout(performScroll, 16); // ~1 frame delay
-        });
-      }
-    },
-  ).current;
+    previousScrollTopRef.current = st;
+    setShowScrollToBottom(!isAtBottomRef.current);
+  }, []);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
-    syncAutoFollowState();
+    syncFollowFromScroll();
     const onScroll = () => {
-      syncAutoFollowState();
+      syncFollowFromScroll();
       if (container.scrollTop <= LOAD_OLDER_THRESHOLD_PX) {
         loadOlderTurns();
       }
     };
     container.addEventListener("scroll", onScroll, { passive: true });
+
     // Wheel fires before the first scroll event, so an incoming token cannot
     // pull the viewport back down while the upward gesture is starting.
     const onWheel = (e: WheelEvent) => {
@@ -1099,29 +1036,23 @@ export function ChatView() {
         return;
       }
       if (e.deltaY < 0) {
-        previousScrollTopRef.current = container.scrollTop;
-        upwardScrollIntentRef.current = true;
-        autoFollowRef.current = false;
+        isAtBottomRef.current = false;
         setShowScrollToBottom(true);
-      } else if (e.deltaY > 0) {
-        upwardScrollIntentRef.current = false;
+        // Chromium cancels in-flight programmatic smooth-scroll animations
+        // on user wheel input, so an ongoing button/send glide cannot reach
+        // the bottom and falsely revive follow. Browser behavior dependency
+        // (not testable in jsdom) — covered by manual checklist item 7.
       }
+      // Downward wheels leave the state untouched; the scroll event
+      // confirms arrival at the physical bottom.
     };
     container.addEventListener("wheel", onWheel, { passive: true });
+
     return () => {
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("wheel", onWheel);
     };
-  }, [loadOlderTurns, syncAutoFollowState]);
-
-  useEffect(() => {
-    updateScrollToBottomVisibility();
-  }, [
-    updateScrollToBottomVisibility,
-    messages.length,
-    partialMessage.length,
-    displayedMessages.length,
-  ]);
+  }, [loadOlderTurns, syncFollowFromScroll]);
 
   useEffect(() => {
     const anchor = pendingPrependAnchorRef.current;
@@ -1163,63 +1094,26 @@ export function ChatView() {
   ]);
 
   useLayoutEffect(() => {
-    const messageCount = messages.length;
-    // Only track visible content: thinking blocks are always filtered out
-    // by filterAssistantVisibleBlocks (see tool-display-blocks.ts)
-    const partialLength = partialMessage.length;
-    const hasNewMessage = messageCount !== prevMessageCountRef.current;
-    const isStreamingTick =
-      partialLength !== prevPartialLengthRef.current && !hasNewMessage;
+    const container = scrollContainerRef.current;
+    if (!container) return;
 
-    // Streaming tick: keep following unless upward user input latched
-    // auto-follow off. It is restored only at the actual bottom or by button.
-    if (isStreamingTick && autoFollowRef.current) {
-      const container = scrollContainerRef.current;
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-      }
-    }
-
-    // Own new message: scroll directly to bottom, bypassing scroll guards
-    // (useEffect B runs after useEffect A flips isUserAtBottomRef=false,
-    //  so we must scroll before the isUserAtBottomRef check)
+    const hasNewMessage = messages.length !== prevMessageCountRef.current;
+    const lastMessage = messages[messages.length - 1];
     const isOwnNewMessage =
-      hasNewMessage && messages[messages.length - 1]?.role === "user";
+      hasNewMessage &&
+      lastMessage?.role === "user" &&
+      !lastMessage.autoGenerated;
     if (isOwnNewMessage) {
-      autoFollowRef.current = true;
-      upwardScrollIntentRef.current = false;
-      const container = scrollContainerRef.current;
-      if (container) {
-        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-      }
+      // Sending a message is an explicit return-to-bottom action.
+      isAtBottomRef.current = true;
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    } else if (isAtBottomRef.current) {
+      // Any content growth (streaming tick, new message, in-place refresh)
+      // pins unconditionally — no debounce, no guard: idempotent.
+      container.scrollTop = container.scrollHeight;
     }
 
-    // When streaming just ended and the final message arrived, clear any
-    // stale isScrollingRef from ResizeObserver scrolls during streaming so
-    // the final scroll-to-bottom is never blocked.
-    const streamingJustEnded =
-      prevPartialLengthRef.current > 0 && partialLength === 0 && hasNewMessage;
-    if (streamingJustEnded) {
-      isScrollingRef.current = false;
-    }
-
-    // Skip scroll if already scrolling (prevent non-streaming conflicts)
-    if (isScrollingRef.current) {
-      prevMessageCountRef.current = messageCount;
-      prevPartialLengthRef.current = partialLength;
-      return;
-    }
-
-    if (autoFollowRef.current) {
-      if (!isStreamingTick && !isOwnNewMessage) {
-        // New message from others or message change - keep following until user scrolls away
-        const behavior: ScrollBehavior = hasNewMessage ? "smooth" : "auto";
-        scrollToBottom(behavior, false);
-      }
-    }
-
-    prevMessageCountRef.current = messageCount;
-    prevPartialLengthRef.current = partialLength;
+    prevMessageCountRef.current = messages.length;
   }, [messages.length, partialMessage.length]);
 
   // Additional scroll trigger for content height changes (e.g., TodoWrite expand/collapse)
@@ -1229,10 +1123,9 @@ export function ChatView() {
     if (!container || !messagesContainer) return;
 
     const resizeObserver = new ResizeObserver(() => {
-      // Keep correcting layout growth while auto-follow is active, even if a
-      // previous programmatic scroll is still settling.
-      if (autoFollowRef.current) {
-        scrollToBottom("auto", false);
+      const container = scrollContainerRef.current;
+      if (container && isAtBottomRef.current) {
+        container.scrollTop = container.scrollHeight;
       }
     });
 
@@ -1243,27 +1136,15 @@ export function ChatView() {
     };
   }, []); // ResizeObserver is stable — no need to recreate on message count changes
 
-  // Cleanup scroll timeouts on unmount
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-      if (scrollRequestRef.current) {
-        cancelAnimationFrame(scrollRequestRef.current);
-      }
-    };
-  }, []);
-
   useEffect(() => {
     chatInputRef.current?.focus();
     // 重置跟随状态，覆盖旧会话中用户手动上滚的残留
-    autoFollowRef.current = true;
+    isAtBottomRef.current = true;
     previousScrollTopRef.current = 0;
-    upwardScrollIntentRef.current = false;
     setIsInputExpanded(false);
     const rafId = requestAnimationFrame(() => {
-      scrollToBottom("auto", true);
+      const c = scrollContainerRef.current;
+      if (c) c.scrollTo({ top: c.scrollHeight, behavior: "auto" });
     });
     return () => cancelAnimationFrame(rafId);
   }, [activeSessionId]);
@@ -1508,9 +1389,7 @@ export function ChatView() {
   }, []);
 
   const scrollToBottomByButton = () => {
-    autoFollowRef.current = true;
-    upwardScrollIntentRef.current = false;
-    isUserAtBottomRef.current = true;
+    isAtBottomRef.current = true;
     setShowScrollToBottom(false);
     const c = scrollContainerRef.current;
     c?.scrollTo({ top: c.scrollHeight, behavior: "smooth" });

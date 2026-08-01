@@ -215,7 +215,6 @@ describe("ChatView auto-follow", () => {
     scrollHeight = 1120;
     await act(async () => {
       resizeCallbacks.get(messagesContainer!)?.([], {} as ResizeObserver);
-      await vi.advanceTimersByTimeAsync(16);
     });
 
     const distanceToBottom =
@@ -253,7 +252,6 @@ describe("ChatView auto-follow", () => {
     scrollHeight = 1120;
     await act(async () => {
       resizeCallbacks.get(messagesContainer!)?.([], {} as ResizeObserver);
-      await vi.advanceTimersByTimeAsync(16);
     });
 
     expect(scrollContainer!.scrollTop).toBe(500);
@@ -329,7 +327,9 @@ describe("ChatView auto-follow", () => {
     expect(scrollContainer!.scrollTop).toBe(490);
   });
 
-  it("keeps upward intent latched through an intervening bottom scroll event", async () => {
+  it("does not follow after wheel-up even when a bottom scroll event intervenes", async () => {
+    // wheel-up kills follow immediately; an intervening scroll event
+    // reporting the bottom does not revive it.
     await act(async () => root.render(React.createElement(ChatView)));
 
     const scrollContainer =
@@ -456,10 +456,9 @@ describe("ChatView auto-follow", () => {
     });
 
     // Next token must pin to the new bottom. Use a different-length token
-    // so the streaming tick fires directly (equal lengths would route the
-    // pin through the debounced path, which needs timer advancement).
-    // jsdom does not clamp direct scrollTop assignments, so assert distance
-    // (same style as test 1).
+    // so the layout effect re-runs (its deps are [messages.length,
+    // partialMessage.length]). jsdom does not clamp direct scrollTop
+    // assignments, so assert distance (same style as test 1).
     scrollHeight = 1300;
     await act(async () => {
       useAppStore.setState((state) => ({
@@ -595,7 +594,7 @@ describe("ChatView auto-follow", () => {
     expect(scrollContainer!.scrollTop).toBe(1010);
   });
 
-  it("scroll-to-bottom button works while a smooth scroll is still settling", async () => {
+  it("scroll-to-bottom button restores follow after a wheel-up kill", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       callback(0);
@@ -615,8 +614,8 @@ describe("ChatView auto-follow", () => {
     scrollContainer!.scrollTop = 500;
     scrollContainer!.dispatchEvent(new Event("scroll"));
 
-    // New assistant message triggers a debounced smooth scrollToBottom →
-    // isScrollingRef latches for 300ms.
+    // New assistant message arrives (non-own: pins directly under the new
+    // single-source follow state).
     await act(async () => {
       useAppStore.setState((state) => ({
         sessionStates: {
@@ -631,7 +630,6 @@ describe("ChatView auto-follow", () => {
           },
         },
       }));
-      await vi.advanceTimersByTimeAsync(16); // fire the debounced scroll
     });
 
     // User scrolls up while the smooth scroll settles (follow off)
@@ -697,5 +695,205 @@ describe("ChatView auto-follow", () => {
     });
 
     expect(scrollContainer!.scrollTop).toBe(500);
+  });
+
+  it("keeps following when a scroll event fires mid-growth without reaching the bottom", async () => {
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // Content grows via the RO-only path (tool result streaming); the
+    // viewport has not been pinned yet. A scroll event fires while the user
+    // is still at the bottom position — e.g. the tail of a programmatic
+    // smooth scroll, or a tiny downward nudge. This must NOT kill follow.
+    scrollHeight = 1500;
+    await act(async () => {
+      scrollContainer!.scrollTop = 600; // mid-state, not at the new bottom
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // More growth: follow must still pin. Direct scrollTop assignment in
+    // jsdom is not clamped, so assert distance (real-browser semantics).
+    scrollHeight = 1600;
+    const messagesContainer = scrollContainer!.firstElementChild!;
+    await act(async () => {
+      resizeCallbacks.get(messagesContainer)?.([], {} as ResizeObserver);
+    });
+
+    const distanceToBottom = scrollHeight - scrollContainer!.scrollTop - 500;
+    expect(distanceToBottom).toBeLessThanOrEqual(1);
+  });
+
+  it("resumes following the moment the user reaches the physical bottom mid-stream", async () => {
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // Scroll up to read history (follow killed)
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -20 }),
+      );
+      scrollContainer!.scrollTop = 300;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // Streaming continues; content grows
+    scrollHeight = 1500;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "t1",
+          },
+        },
+      }));
+    });
+    expect(scrollContainer!.scrollTop).toBe(300);
+
+    // User scrolls back down; the browser clamps scrollTop to the CURRENT
+    // physical max at the moment of the scroll event. Content has NOT grown
+    // since the last token, so the physical max is still 1000 — reaching it
+    // must resume follow. (Growth simulation happens AFTER the revive.)
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: 700 }),
+      );
+      scrollContainer!.scrollTop = 1000;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // Next growth must pin to the new bottom. Direct scrollTop assignment
+    // in jsdom is not clamped, so assert distance (real-browser semantics).
+    scrollHeight = 1700;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "t2x",
+          },
+        },
+      }));
+    });
+
+    const distanceToBottom = scrollHeight - scrollContainer!.scrollTop - 500;
+    expect(distanceToBottom).toBeLessThanOrEqual(1);
+  });
+
+  it("does not drag a history-reading user down when tool output grows", async () => {
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // User scrolls up to read history (follow killed)
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -20 }),
+      );
+      scrollContainer!.scrollTop = 300;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // Tool output grows (RO path, follow OFF) — must NOT pin. Guards the
+    // ResizeObserver branch with follow off (regression lock).
+    scrollHeight = 1500;
+    const messagesContainer = scrollContainer!.firstElementChild!;
+    await act(async () => {
+      resizeCallbacks.get(messagesContainer)?.([], {} as ResizeObserver);
+    });
+
+    expect(scrollContainer!.scrollTop).toBe(300);
+  });
+
+  it("does not force-follow when an auto-generated user message lands while reading history", async () => {
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // User scrolls up to read history (follow killed)
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -20 }),
+      );
+      scrollContainer!.scrollTop = 300;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // An auto-generated user message lands (goal runs append these; they are
+    // hidden from display) — must NOT be treated as an explicit send.
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            messages: [
+              ...state.sessionStates.s1!.messages,
+              { ...makeMessage("auto1", "user"), autoGenerated: true },
+            ],
+          },
+        },
+      }));
+    });
+
+    // Streaming continues — follow must stay OFF
+    scrollHeight = 1200;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "next token",
+          },
+        },
+      }));
+    });
+
+    expect(scrollContainer!.scrollTop).toBe(300);
   });
 });
