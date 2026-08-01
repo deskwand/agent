@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   AlertCircle,
+  Bot,
   CheckCircle,
   ChevronDown,
   ChevronRight,
@@ -11,6 +12,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Search,
   Server,
   Trash2,
   X,
@@ -39,6 +41,7 @@ import {
   type WebAccessAuthProvider,
   type WebAccessConfig,
 } from "../../../shared/web-access";
+import { ProviderBrandIcon, resolveProviderBrand } from "./provider-icons";
 import { SettingsContentSection } from "./shared";
 
 type ProviderChoice = ProviderType;
@@ -108,92 +111,28 @@ const OAUTH_PROVIDERS = [
     name: "OpenAI Codex",
     descriptionKey: "api.oauthOpenAIDesc",
     noteKey: "",
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-        <path
-          d="M12 2L21 7.5V17.5L12 23L3 17.5V7.5L12 2Z"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M12 7L17 10V16L12 19L7 16V10L12 7Z"
-          fill="currentColor"
-          opacity="0.3"
-        />
-      </svg>
-    ),
+    brand: "openai",
   },
   {
     id: "github-copilot",
     name: "GitHub Copilot",
     descriptionKey: "api.oauthGitHubDesc",
     noteKey: "",
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-        <circle cx="9" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" />
-        <circle cx="15" cy="12" r="5" stroke="currentColor" strokeWidth="1.5" />
-        <circle cx="12" cy="12" r="2" fill="currentColor" />
-      </svg>
-    ),
+    brand: "github",
   },
   {
     id: "anthropic",
     name: "Anthropic",
     descriptionKey: "api.oauthAnthropicDesc",
     noteKey: "api.oauthAnthropicNote",
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-        <path
-          d="M12 3L20 9V15L12 21L4 15V9L12 3Z"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M17 9L12 12.5L7 9"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M12 12.5V18"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-      </svg>
-    ),
+    brand: "anthropic",
   },
   {
     id: "openrouter",
     name: "OpenRouter",
     descriptionKey: "api.oauthOpenRouterDesc",
     noteKey: "",
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-        <path
-          d="M5 6.5H19"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M5 12H19"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M5 17.5H19"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        />
-        <circle cx="8" cy="12" r="2.5" fill="currentColor" opacity="0.35" />
-      </svg>
-    ),
+    brand: "openrouter",
   },
 ] as const;
 
@@ -233,6 +172,24 @@ function providerOptionLabel(
     ? t("api.otherProvider")
     : (presets as unknown as Record<string, ProviderPreset>)[provider]?.name ||
         provider;
+}
+
+/** 视觉模型卡片名称：custom 按协议显示品牌名（OpenAI/Anthropic/Gemini） */
+const VISION_PROTOCOL_NAMES: Record<CustomProtocolType, string> = {
+  anthropic: "Anthropic",
+  openai: "OpenAI",
+  gemini: "Gemini",
+};
+
+function visionProviderName(
+  provider: ProviderType,
+  customProtocol: CustomProtocolType | undefined,
+  presets: ProviderPresets,
+  t: (key: string) => string,
+): string {
+  return provider === "custom"
+    ? VISION_PROTOCOL_NAMES[customProtocol ?? "anthropic"]
+    : providerOptionLabel(provider, presets, t);
 }
 
 function modelsPresetForDraft(
@@ -1042,12 +999,13 @@ export function SettingsAPI({
           <button
             type="button"
             onClick={() => setActiveTab("main")}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "main"
                 ? "border-accent text-accent"
                 : "border-transparent text-text-muted hover:text-text-secondary"
             }`}
           >
+            <Bot className="h-3.5 w-3.5" />
             {t("api.mainModelTab")}
           </button>
           <button
@@ -1115,9 +1073,20 @@ export function SettingsAPI({
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-text-primary">
-                          {config.name ||
-                            providerLabel(profileKey, presets, t, config)}
+                        <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-primary">
+                          <ProviderBrandIcon
+                            brand={
+                              resolveProviderBrand(
+                                profileKeyToProvider(profileKey).provider,
+                                config.customProtocol,
+                              ) ?? "custom"
+                            }
+                            className="h-4 w-4 flex-shrink-0"
+                          />
+                          <span className="truncate">
+                            {config.name ||
+                              providerLabel(profileKey, presets, t, config)}
+                          </span>
                         </p>
                         {isCustomProvider && (
                           <p className="mt-1 truncate text-xs text-text-muted">
@@ -1185,9 +1154,10 @@ export function SettingsAPI({
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="text-lg flex-shrink-0 text-text-primary">
-                        {provider.icon}
-                      </span>
+                      <ProviderBrandIcon
+                        brand={provider.brand}
+                        className="h-5 w-5 flex-shrink-0"
+                      />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium text-text-primary">
@@ -1281,10 +1251,26 @@ export function SettingsAPI({
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-text-primary">
-                    🔮 {providerOptionLabel(visionDraft.provider, presets, t)}
-                    {" / "}
-                    {visionDraft.model}
+                  <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-primary">
+                    <ProviderBrandIcon
+                      brand={
+                        resolveProviderBrand(
+                          visionDraft.provider,
+                          visionDraft.customProtocol,
+                        ) ?? "custom"
+                      }
+                      className="h-4 w-4 flex-shrink-0"
+                    />
+                    <span className="truncate">
+                      {visionProviderName(
+                        visionDraft.provider,
+                        visionDraft.customProtocol,
+                        presets,
+                        t,
+                      )}
+                      {" / "}
+                      {visionDraft.model}
+                    </span>
                   </p>
                   <p className="mt-1 truncate text-xs text-text-muted">
                     API Key: {maskApiKey(visionDraft.apiKey)}
@@ -1376,7 +1362,11 @@ export function SettingsAPI({
                       aria-controls={`web-access-${provider}-settings`}
                       className="flex w-full items-center justify-between px-4 py-3 text-left"
                     >
-                      <span className="text-sm font-medium text-text-primary">
+                      <span className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                        <ProviderBrandIcon
+                          brand={provider}
+                          className="h-4 w-4 flex-shrink-0"
+                        />
                         {t(`webAccess.providers.${provider}`)}
                       </span>
                       {isOpen ? (
@@ -1539,7 +1529,8 @@ export function SettingsAPI({
                       aria-controls={`web-access-${provider}-settings`}
                       className="flex w-full items-center justify-between px-4 py-3 text-left"
                     >
-                      <span className="text-sm font-medium text-text-primary">
+                      <span className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                        <Search className="h-4 w-4 flex-shrink-0" />
                         {t(`webAccess.providers.${provider}`)}
                       </span>
                       {isOpen ? (
@@ -1687,12 +1678,16 @@ export function SettingsAPI({
                                 : prev.baseUrl,
                           }));
                         }}
-                        className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                           visionDraft.provider === provider
                             ? "border-accent bg-accent/10 font-medium text-accent"
                             : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                         }`}
                       >
+                        <ProviderBrandIcon
+                          brand={provider}
+                          className="h-4 w-4 flex-shrink-0"
+                        />
                         {providerOptionLabel(provider, presets, t)}
                       </button>
                     ))}
@@ -2011,12 +2006,16 @@ export function SettingsAPI({
                         key={provider}
                         type="button"
                         onClick={() => selectProvider(provider)}
-                        className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                        className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                           draft.provider === provider
                             ? "border-accent bg-accent/10 font-medium text-accent"
                             : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                         }`}
                       >
+                        <ProviderBrandIcon
+                          brand={provider}
+                          className="h-4 w-4 flex-shrink-0"
+                        />
                         {providerOptionLabel(provider, presets, t)}
                       </button>
                     ))}
