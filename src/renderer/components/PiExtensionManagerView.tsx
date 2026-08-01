@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PiExtensionManagerState } from "../../shared/ipc-types";
 import type { ServerEvent } from "../types";
+import { PiMarketDetail } from "./PiMarketDetail";
+import { PiMarketList } from "./PiMarketList";
 
 /**
  * Pi 扩展管理视图：展示兼容 SDK 版本、已安装包与已加载扩展，
@@ -13,6 +15,8 @@ export function PiExtensionManagerView() {
   const [sourceInput, setSourceInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [view, setView] = useState<"market" | "installed">("market");
+  const [selectedName, setSelectedName] = useState<string | null>(null);
 
   const refresh = () => {
     window.electronAPI.piExtensions
@@ -69,6 +73,13 @@ export function PiExtensionManagerView() {
     );
   }
 
+  const installedNames = normalizeInstalledSources(state.packages);
+  const selectedInstalled = selectedName
+    ? state.packages.find(
+        (pkg) => isInstalled(normalizeInstalledSources([pkg]), selectedName),
+      )
+    : undefined;
+
   return (
     <div className="p-6 text-sm">
       <div className="mb-4 flex items-center gap-3">
@@ -78,11 +89,59 @@ export function PiExtensionManagerView() {
         </span>
       </div>
 
-      {notice && (
-        <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">
-          {notice}
+      <div className="mb-4 inline-flex rounded-lg border border-border bg-muted/50 p-0.5">
+        <button
+          type="button"
+          className={
+            view === "market"
+              ? "rounded-md bg-background px-3 py-1 text-sm font-medium shadow-sm"
+              : "rounded-md px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
+          }
+          onClick={() => setView("market")}
+        >
+          {t("piExtensions.viewMarket")}
+        </button>
+        <button
+          type="button"
+          className={
+            view === "installed"
+              ? "rounded-md bg-background px-3 py-1 text-sm font-medium shadow-sm"
+              : "rounded-md px-3 py-1 text-sm text-muted-foreground hover:text-foreground"
+          }
+          onClick={() => setView("installed")}
+        >
+          {t("piExtensions.viewInstalled")}
+        </button>
+      </div>
+
+      {view === "market" ? (
+        <div className="flex items-start gap-4">
+          <PiMarketList
+            installedNames={installedNames}
+            selectedName={selectedName}
+            onSelect={(pkg) => setSelectedName(pkg.name)}
+          />
+          <PiMarketDetail
+            name={selectedName ?? ""}
+            installed={selectedInstalled !== undefined}
+            installedSource={
+              selectedInstalled
+                ? {
+                    source: selectedInstalled.source,
+                    scope: selectedInstalled.scope,
+                  }
+                : undefined
+            }
+            onInstalledChange={refresh}
+          />
         </div>
-      )}
+      ) : (
+        <>
+          {notice && (
+            <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">
+              {notice}
+            </div>
+          )}
 
       <div className="mb-6 flex gap-2">
         <input
@@ -191,6 +250,47 @@ export function PiExtensionManagerView() {
           </ul>
         )}
       </div>
+        </>
+      )}
     </div>
   );
+}
+
+/**
+ * 归一化已安装包的 source 为市场包名：
+ * - `npm:` 前缀与尾部版本段去除：`npm:pi-x@^1.0` → `pi-x`，`npm:@scope/pkg@2.0.0` → `@scope/pkg`（保留 scope 斜杠）
+ * - `git:` 前缀去除并取最后一个路径段：`git:github.com/user/repo@v1` → `repo`
+ * - 本地路径取最后一个路径段：`/tmp/local-ext` → `local-ext`
+ */
+export function normalizeInstalledSources(
+  packages: Array<{ source: string; scope: string }>,
+): string[] {
+  return packages.map((pkg) => {
+    let name = pkg.source;
+    if (name.startsWith("npm:")) {
+      return stripVersionSegment(name.slice("npm:".length));
+    }
+    if (name.startsWith("git:")) {
+      name = name.slice("git:".length).replace(/^.*\//, "");
+      return stripVersionSegment(name);
+    }
+    return name.replace(/\/+$/, "").split("/").pop() ?? name;
+  });
+}
+
+/** 去掉包名尾部的版本段，保留 scoped 包的 scope 斜杠。 */
+function stripVersionSegment(name: string): string {
+  const at = name.lastIndexOf("@");
+  if (at <= 0) return name;
+  if (name.startsWith("@")) {
+    const slash = name.indexOf("/");
+    if (slash > 0 && at > slash) return name.slice(0, at);
+    return name;
+  }
+  return name.slice(0, at);
+}
+
+/** 判断归一化后的包名是否已安装（精确匹配）。 */
+export function isInstalled(installed: string[], name: string): boolean {
+  return installed.includes(name);
 }

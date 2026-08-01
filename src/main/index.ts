@@ -54,6 +54,7 @@ import {
   resizeTuiModal,
 } from "./extensions/ui/pi-ui-runtime";
 import { PiPackageService } from "./extensions/pi-package-service";
+import { PiMarketService } from "./extensions/pi-market-service";
 import { applyPiPackageDirFix } from "./extensions/pi-sdk-path";
 import { VERSION } from "@earendil-works/pi-coding-agent";
 import {
@@ -1627,6 +1628,31 @@ ipcMain.handle("pi-ext.update", async (_e, source?: string) => {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
+  }
+});
+
+// ── Pi Market（npm registry 浏览）─────────────────────────────────
+const piMarketService = new PiMarketService();
+
+ipcMain.handle("pi-market.search", async (_e, query: string, page: number) => {
+  try {
+    return await piMarketService.search(query, page);
+  } catch (error) {
+    logError("[IPC] pi-market.search failed:", error);
+    return { total: 0, objects: [] };
+  }
+});
+
+ipcMain.handle("pi-market.download", async (_e, name: string) => {
+  return piMarketService.download(name);
+});
+
+ipcMain.handle("pi-market.detail", async (_e, name: string) => {
+  try {
+    return await piMarketService.detail(name);
+  } catch (error) {
+    logError("[IPC] pi-market.detail failed:", error);
+    return null;
   }
 });
 

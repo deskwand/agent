@@ -1485,6 +1485,8 @@
     "tab": "Pi Extensions",
     "tabDesc": "Install and manage Pi extensions",
     "title": "Pi Extensions",
+    "viewMarket": "Market",
+    "viewInstalled": "Installed",
     "sdkVersion": "SDK {{version}} compatible",
     "installPlaceholder": "npm:pkg@1.0.0 / git:github.com/user/repo / ./local/path",
     "install": "Install",
@@ -1496,6 +1498,18 @@
     "noExtensions": "No extensions loaded yet",
     "installWarning": "⚠ Extensions run with full system access and can execute arbitrary code. Only install from sources you trust.",
     "modalTitle": "Pi Extension",
-    "unsupportedNote": "⚠ Unsupported extension capabilities: navigateTree (branch switching — DeskWand context comes from DB messages). Extensions that take over the terminal (vim/htop/ssh via raw stdio) are also unsupported."
+    "unsupportedNote": "⚠ Unsupported extension capabilities: navigateTree (branch switching — DeskWand context comes from DB messages). Extensions that take over the terminal (vim/htop/ssh via raw stdio) are also unsupported.",
+    "marketSearchPlaceholder": "Search extensions / skills / prompts…",
+    "marketRetry": "Retry",
+    "marketLoadStopped": "Showing first 240 results",
+    "marketEmpty": "No matching packages found",
+    "marketInstalled": "Installed",
+    "marketDownloads": "{{count}} downloads/mo",
+    "marketSelectHint": "Select a package from the list to view details",
+    "marketNpm": "npm",
+    "marketRepository": "Repository",
+    "marketHomepage": "Homepage",
+    "marketActionFailed": "Operation failed",
+    "marketDetailFailed": "Failed to load package details"
   }
 }

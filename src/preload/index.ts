@@ -34,6 +34,8 @@ import type {
   ChannelInstanceLog,
   ChannelInstanceStatus,
   PiExtensionManagerState,
+  PiMarketSearchResultDto,
+  PiMarketDetailDto,
 } from "../shared/ipc-types";
 
 // Fan out one IPC listener to all active renderer subscribers.
@@ -153,6 +155,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
         success: boolean;
         error?: string;
       }>,
+  },
+
+  // ── Pi Market（npm registry 浏览）──────────────────────────────
+  piMarket: {
+    search: (query: string, page: number) =>
+      ipcRenderer.invoke(
+        "pi-market.search",
+        query,
+        page,
+      ) as Promise<PiMarketSearchResultDto>,
+    download: (name: string) =>
+      ipcRenderer.invoke("pi-market.download", name) as Promise<number>,
+    detail: (name: string) =>
+      ipcRenderer.invoke(
+        "pi-market.detail",
+        name,
+      ) as Promise<PiMarketDetailDto | null>,
   },
 
   // ── Pi Extension UI（对话框往返）──────────────────────────────
@@ -1175,6 +1194,31 @@ declare global {
           success: boolean;
           error?: string;
         }>;
+      };
+      piMarket: {
+        search: (query: string, page: number) => Promise<{
+          total: number;
+          objects: Array<{
+            name: string;
+            description: string;
+            version: string;
+            author?: string;
+            date?: string;
+            type: "extension" | "skill" | "prompt" | "theme" | "package";
+          }>;
+        }>;
+        download: (name: string) => Promise<number>;
+        detail: (name: string) => Promise<{
+          name: string;
+          description: string;
+          version: string;
+          author?: string;
+          date?: string;
+          type: "extension" | "skill" | "prompt" | "theme" | "package";
+          gallery?: { video?: string; image?: string };
+          repository?: string;
+          homepage?: string;
+        } | null>;
       };
       piUi: {
         respond: (id: string, result: unknown) => Promise<unknown>;

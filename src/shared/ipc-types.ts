@@ -277,3 +277,33 @@ export interface PiTuiOpenEvent {
 export interface PiTuiFrameEvent {
   chunk: string;
 }
+
+// ---------------------------------------------------------------------------
+// Pi Market
+// ---------------------------------------------------------------------------
+
+/** Pi 市场条目类型（由 npm keywords 推导，镜像 PiMarketService.PiPackageType）。 */
+export type PiMarketType = "extension" | "skill" | "prompt" | "theme" | "package";
+
+/** Pi 市场搜索结果条目（镜像 PiMarketService.PiMarketPackage）。 */
+export interface PiMarketPackageDto {
+  name: string;
+  description: string;
+  version: string;
+  author?: string;
+  date?: string;
+  type: PiMarketType;
+}
+
+/** Pi 市场搜索结果（镜像 PiMarketService.PiMarketSearchResult）。 */
+export interface PiMarketSearchResultDto {
+  total: number;
+  objects: PiMarketPackageDto[];
+}
+
+/** Pi 市场包详情（镜像 PiMarketService.PiMarketDetail）。 */
+export interface PiMarketDetailDto extends PiMarketPackageDto {
+  gallery?: { video?: string; image?: string };
+  repository?: string;
+  homepage?: string;
+}

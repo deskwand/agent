@@ -1481,6 +1481,8 @@
     "tab": "Pi 扩展",
     "tabDesc": "安装和管理 Pi 扩展",
     "title": "Pi 扩展",
+    "viewMarket": "市场",
+    "viewInstalled": "已安装",
     "sdkVersion": "兼容 SDK {{version}}",
     "installPlaceholder": "npm:pkg@1.0.0 / git:github.com/user/repo / ./local/path",
     "install": "安装",
@@ -1492,6 +1494,18 @@
     "noExtensions": "尚未加载任何扩展",
     "installWarning": "⚠ 扩展拥有完整系统权限，可执行任意代码。仅安装你信任的来源。",
     "modalTitle": "Pi 扩展",
-    "unsupportedNote": "⚠ 不支持的扩展能力：navigateTree（branch 切换，DeskWand 上下文来自数据库消息）。终端接管类扩展（vim/htop/ssh 直接占用 stdio）也不支持。"
+    "unsupportedNote": "⚠ 不支持的扩展能力：navigateTree（branch 切换，DeskWand 上下文来自数据库消息）。终端接管类扩展（vim/htop/ssh 直接占用 stdio）也不支持。",
+    "marketSearchPlaceholder": "搜索扩展 / skill / prompt…",
+    "marketRetry": "重试",
+    "marketLoadStopped": "仅显示前 240 个结果",
+    "marketEmpty": "未找到匹配的扩展",
+    "marketInstalled": "已安装",
+    "marketDownloads": "{{count}} 下载/月",
+    "marketSelectHint": "从左侧选择一个扩展查看详情",
+    "marketNpm": "npm",
+    "marketRepository": "仓库",
+    "marketHomepage": "主页",
+    "marketActionFailed": "操作失败",
+    "marketDetailFailed": "无法加载扩展详情"
   }
 }
