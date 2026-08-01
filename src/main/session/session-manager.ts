@@ -302,6 +302,18 @@ export class SessionManager {
     }
   }
 
+  /**
+   * Invalidate cached pi sessions after plugin install/remove/update so the
+   * next message rebuilds each session's ExtensionRunner with the new
+   * extension command set (dynamic interception matches the runner again).
+   * Mirrors invalidateSkillsSetup.
+   */
+  invalidatePiPluginSessions(): void {
+    if (this.agentRunner && "clearAllSdkSessions" in this.agentRunner) {
+      (this.agentRunner as AgentRunner).clearAllSdkSessions();
+    }
+  }
+
   /** Return extension commands from plugin-loaded extensions (e.g. /subagents-doctor). */
   getExtensionCommands(): { name: string; description: string }[] {
     if (this.agentRunner && "getExtensionCommands" in this.agentRunner) {

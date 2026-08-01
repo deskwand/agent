@@ -751,6 +751,11 @@ export type ServerEvent =
   | { type: "pi.tui.open"; payload: PiTuiOpenEvent }
   | { type: "pi.tui.close"; payload: Record<string, never> }
   | { type: "pi.tui.frame"; payload: PiTuiFrameEvent }
+  | { type: "commands.changed"; payload: { cwd: string } }
+  | {
+      type: "pi.command-executing";
+      payload: { sessionId: string; command: string };
+    }
   | { type: "session.activate"; payload: { session: Session } }
   | { type: "pi.set-editor-text"; payload: { text: string } }
   | { type: "session.create"; payload: { session: Session } };

@@ -793,6 +793,7 @@
     "apiConfigured": "API 已配置",
     "apiNotConfigured": "API 未配置",
     "user": "用户",
+    "plugins": "插件",
     "openProject": "打开已有项目",
     "newProject": "新建项目",
     "createProjectTitle": "新建项目",
@@ -934,7 +935,8 @@
     "compact": "压缩会话",
     "compactDesc": "手动压缩当前会话上下文",
     "goal": "目标执行",
-    "goalDesc": "设定目标，由 Agent 自主循环执行直到完成"
+    "goalDesc": "设定目标，由 Agent 自主循环执行直到完成",
+    "pluginCommand": "插件命令"
   },
   "context": {
     "progress": "进度",
@@ -1473,14 +1475,15 @@
     "slack": "Slack",
     "wechat": "微信"
   },
+  "plugins": {
+    "title": "插件"
+  },
   "piExtensions": {
     "trustTitle": "信任此项目?",
-    "trustMessage": "该项目包含 .pi 扩展或配置。扩展拥有完整系统权限。信任 {cwd} 吗?",
+    "trustMessage": "该项目包含 .pi 插件或配置。插件拥有完整系统权限。信任 {cwd} 吗?",
     "trustAllow": "信任",
     "trustDeny": "拒绝",
-    "tab": "Pi 扩展",
-    "tabDesc": "安装和管理 Pi 扩展",
-    "title": "Pi 扩展",
+    "title": "插件",
     "viewMarket": "市场",
     "viewInstalled": "已安装",
     "sdkVersion": "兼容 SDK {{version}}",
@@ -1490,22 +1493,23 @@
     "noPackages": "尚未安装任何包",
     "update": "更新",
     "remove": "卸载",
-    "extensions": "已加载扩展",
-    "noExtensions": "尚未加载任何扩展",
-    "installWarning": "⚠ 扩展拥有完整系统权限，可执行任意代码。仅安装你信任的来源。",
-    "modalTitle": "Pi 扩展",
-    "unsupportedNote": "⚠ 不支持的扩展能力：navigateTree（branch 切换，DeskWand 上下文来自数据库消息）。终端接管类扩展（vim/htop/ssh 直接占用 stdio）也不支持。",
-    "marketSearchPlaceholder": "搜索扩展 / skill / prompt…",
+    "extensions": "已加载插件",
+    "noExtensions": "尚未加载任何插件",
+    "installWarning": "⚠ 插件拥有完整系统权限，可执行任意代码。仅安装你信任的来源。",
+    "modalTitle": "插件",
+    "unsupportedNote": "⚠ 不支持的插件能力：navigateTree（branch 切换，DeskWand 上下文来自数据库消息）。终端接管类插件（vim/htop/ssh 直接占用 stdio）也不支持。",
+    "marketSearchPlaceholder": "搜索插件 / skill / prompt…",
+    "commandExecuting": "执行插件命令 /{{command}}…",
     "marketRetry": "重试",
     "marketLoadStopped": "仅显示前 240 个结果",
-    "marketEmpty": "未找到匹配的扩展",
+    "marketEmpty": "未找到匹配的插件",
     "marketInstalled": "已安装",
     "marketDownloads": "{{count}} 下载/月",
-    "marketSelectHint": "从左侧选择一个扩展查看详情",
+    "marketSelectHint": "从左侧选择一个插件查看详情",
     "marketNpm": "npm",
     "marketRepository": "仓库",
     "marketHomepage": "主页",
     "marketActionFailed": "操作失败",
-    "marketDetailFailed": "无法加载扩展详情"
+    "marketDetailFailed": "无法加载插件详情"
   }
 }

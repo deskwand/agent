@@ -9,7 +9,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { PiTrustResolver } from "./pi-trust-resolver";
 import * as path from "node:path";
-import { log, logError } from "../utils/logger";
+import { log, logError, logWarn } from "../utils/logger";
 
 export interface PiHostOptions {
   cwd: string;
@@ -114,9 +114,26 @@ export class PiExtensionHost {
    */
   getRegisteredCommands(): PiRegisteredCommand[] {
     const commands: PiRegisteredCommand[] = [];
+    const commandSources: string[] = [];
     for (const ext of this.getExtensionsResult().extensions) {
       for (const [name, cmd] of ext.commands) {
         commands.push({ name, description: cmd.description });
+        commandSources.push(ext.path);
+      }
+    }
+    // 重名诊断：SDK 会对重名命令加 :occurrence 后缀（仅第一个经 /name 执行），
+    // 记录各来源扩展路径，便于排查用户输入原始名不匹配的情况。
+    const counts = new Map<string, string[]>();
+    for (let i = 0; i < commands.length; i++) {
+      const arr = counts.get(commands[i].name) ?? [];
+      arr.push(commandSources[i]);
+      counts.set(commands[i].name, arr);
+    }
+    for (const [name, paths] of counts) {
+      if (paths.length > 1) {
+        logWarn(
+          `[PiExtensionHost] Duplicate command "${name}" from ${paths.length} extensions (${paths.join(", ")}); /${name} invokes the first, others via /${name}:N`,
+        );
       }
     }
     return commands;

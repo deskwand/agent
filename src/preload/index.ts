@@ -36,6 +36,7 @@ import type {
   PiExtensionManagerState,
   PiMarketSearchResultDto,
   PiMarketDetailDto,
+  PiCommandListDto,
 } from "../shared/ipc-types";
 
 // Fan out one IPC listener to all active renderer subscribers.
@@ -185,6 +186,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     input: (data: string) => ipcRenderer.invoke("pi-tui.input", data),
     resize: (columns: number, rows: number) =>
       ipcRenderer.invoke("pi-tui.resize", columns, rows),
+  },
+
+  // ── Pi unified command registry ─────────────────────────────────
+  piCommands: {
+    list: (cwd?: string) =>
+      ipcRenderer.invoke("commands.list", cwd) as Promise<PiCommandListDto>,
   },
 
   // Platform info
@@ -1226,6 +1233,15 @@ declare global {
       piTui: {
         input: (data: string) => Promise<unknown>;
         resize: (columns: number, rows: number) => Promise<unknown>;
+      };
+      piCommands: {
+        list: (cwd?: string) => Promise<{
+          commands: Array<{
+            name: string;
+            description?: string;
+            source: "builtin" | "extension";
+          }>;
+        }>;
       };
     };
   }

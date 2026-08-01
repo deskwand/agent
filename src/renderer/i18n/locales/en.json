@@ -792,6 +792,7 @@
     "apiConfigured": "API Configured",
     "apiNotConfigured": "API Not Configured",
     "user": "User",
+    "plugins": "Plugins",
     "searchPlaceholder": "Search sessions or projects...",
     "newChat": "New",
     "openProject": "Open Project",
@@ -936,7 +937,8 @@
     "compact": "Compact",
     "compactDesc": "Manually compact current session context",
     "goal": "Goal",
-    "goalDesc": "Set a goal for the agent to autonomously work toward"
+    "goalDesc": "Set a goal for the agent to autonomously work toward",
+    "pluginCommand": "Plugin"
   },
   "context": {
     "progress": "Progress",
@@ -1477,14 +1479,15 @@
     "slack": "Slack",
     "wechat": "WeChat"
   },
+  "plugins": {
+    "title": "Plugins"
+  },
   "piExtensions": {
     "trustTitle": "Trust this project?",
-    "trustMessage": "This project contains .pi extensions or config. Extensions have full system access. Trust {cwd}?",
+    "trustMessage": "This project contains .pi plugins or config. Plugins have full system access. Trust {cwd}?",
     "trustAllow": "Trust",
     "trustDeny": "Deny",
-    "tab": "Pi Extensions",
-    "tabDesc": "Install and manage Pi extensions",
-    "title": "Pi Extensions",
+    "title": "Plugins",
     "viewMarket": "Market",
     "viewInstalled": "Installed",
     "sdkVersion": "SDK {{version}} compatible",
@@ -1494,22 +1497,23 @@
     "noPackages": "No packages installed yet",
     "update": "Update",
     "remove": "Remove",
-    "extensions": "Loaded extensions",
-    "noExtensions": "No extensions loaded yet",
-    "installWarning": "⚠ Extensions run with full system access and can execute arbitrary code. Only install from sources you trust.",
-    "modalTitle": "Pi Extension",
-    "unsupportedNote": "⚠ Unsupported extension capabilities: navigateTree (branch switching — DeskWand context comes from DB messages). Extensions that take over the terminal (vim/htop/ssh via raw stdio) are also unsupported.",
-    "marketSearchPlaceholder": "Search extensions / skills / prompts…",
+    "extensions": "Loaded plugins",
+    "noExtensions": "No plugins loaded yet",
+    "installWarning": "⚠ Plugins run with full system access and can execute arbitrary code. Only install from sources you trust.",
+    "modalTitle": "Plugin",
+    "unsupportedNote": "⚠ Unsupported plugin capabilities: navigateTree (branch switching — DeskWand context comes from DB messages). Plugins that take over the terminal (vim/htop/ssh via raw stdio) are also unsupported.",
+    "marketSearchPlaceholder": "Search plugins / skills / prompts…",
+    "commandExecuting": "Executing plugin command /{{command}}…",
     "marketRetry": "Retry",
     "marketLoadStopped": "Showing first 240 results",
-    "marketEmpty": "No matching packages found",
+    "marketEmpty": "No matching plugins found",
     "marketInstalled": "Installed",
     "marketDownloads": "{{count}} downloads/mo",
-    "marketSelectHint": "Select a package from the list to view details",
+    "marketSelectHint": "Select a plugin from the list to view details",
     "marketNpm": "npm",
     "marketRepository": "Repository",
     "marketHomepage": "Homepage",
     "marketActionFailed": "Operation failed",
-    "marketDetailFailed": "Failed to load package details"
+    "marketDetailFailed": "Failed to load plugin details"
   }
 }

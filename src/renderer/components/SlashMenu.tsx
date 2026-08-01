@@ -180,6 +180,7 @@ export function SlashMenu({
                 </div>
                 {commandItems.map((item, idx) => {
                   if (item.category !== "command") return null;
+                  const isExtension = item.command.source === "extension";
                   return (
                     <MenuItem
                       key={`cmd:${item.command.name}`}
@@ -189,12 +190,22 @@ export function SlashMenu({
                       label={`/${item.command.name}`}
                       description={item.command.description}
                       icon={
-                        <Zap className="w-4 h-4 text-accent flex-shrink-0" />
+                        isExtension ? (
+                          <Package className="w-4 h-4 text-text-muted flex-shrink-0" />
+                        ) : (
+                          <Zap className="w-4 h-4 text-accent flex-shrink-0" />
+                        )
                       }
                       badge={
-                        <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-                          {t("chat.slashTabCommands")}
-                        </span>
+                        isExtension ? (
+                          <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">
+                            {t("slash.pluginCommand")}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                            {t("chat.slashTabCommands")}
+                          </span>
+                        )
                       }
                     />
                   );
@@ -235,6 +246,7 @@ export function SlashMenu({
           /* Single tab view */
           displayItems.map((item, idx) => {
             if (item.category === "command") {
+              const isExtension = item.command.source === "extension";
               return (
                 <MenuItem
                   key={`cmd:${item.command.name}`}
@@ -243,7 +255,20 @@ export function SlashMenu({
                   onSelect={() => onSelect(item)}
                   label={`/${item.command.name}`}
                   description={item.command.description}
-                  icon={<Zap className="w-4 h-4 text-accent flex-shrink-0" />}
+                  icon={
+                    isExtension ? (
+                      <Package className="w-4 h-4 text-text-muted flex-shrink-0" />
+                    ) : (
+                      <Zap className="w-4 h-4 text-accent flex-shrink-0" />
+                    )
+                  }
+                  badge={
+                    isExtension ? (
+                      <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">
+                        {t("slash.pluginCommand")}
+                      </span>
+                    ) : undefined
+                  }
                 />
               );
             }

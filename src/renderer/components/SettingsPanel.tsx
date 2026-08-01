@@ -12,10 +12,8 @@ import {
   Archive,
   Info,
   Plug,
-  Package,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { PiExtensionManagerView } from "./PiExtensionManagerView";
 import { useWindowSize } from "../hooks/useWindowSize";
 import { RemoteControlPanel } from "./RemoteControlPanel";
 import { useAppStore } from "../store";
@@ -41,8 +39,7 @@ interface SettingsPanelProps {
     | "general"
     | "archived"
     | "about"
-    | "connectors"
-    | "extensions";
+    | "connectors";
 }
 
 type TabId =
@@ -55,8 +52,7 @@ type TabId =
   | "general"
   | "archived"
   | "about"
-  | "connectors"
-  | "extensions";
+  | "connectors";
 
 const SHOW_SANDBOX_TAB = false;
 
@@ -71,7 +67,6 @@ const VALID_TABS = new Set<TabId>([
   "archived",
   "about",
   "connectors",
-  "extensions",
 ]);
 
 export function SettingsPanel({
@@ -185,12 +180,6 @@ export function SettingsPanel({
       label: t("settings.about"),
       icon: Info,
       description: t("settings.aboutDesc"),
-    },
-    {
-      id: "extensions" as TabId,
-      label: t("piExtensions.tab"),
-      icon: Package,
-      description: t("piExtensions.tabDesc"),
     },
   ];
   const activeTabMeta = tabs.find((tab) => tab.id === activeTab);
@@ -330,9 +319,6 @@ export function SettingsPanel({
                 {viewedTabs.has("about") && (
                   <SettingsAbout appVersion={appVersion} />
                 )}
-              </div>
-              <div className={activeTab === "extensions" ? "" : "hidden"}>
-                {viewedTabs.has("extensions") && <PiExtensionManagerView />}
               </div>
             </div>
           </div>

@@ -9,12 +9,16 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { useCurrentSession } from "../store/selectors";
 import { useIPC } from "../hooks/useIPC";
 import { X, Image as ImageIcon } from "lucide-react";
 import type { ImageSource } from "./ImageLightbox";
 import type { Skill } from "../types";
 import {
+  filterCommands,
   getBuiltinCommands,
+  mergeSlashCommands,
+  toSlashCommands,
   type SlashCommand,
   type SlashItem,
 } from "../slash-commands";
@@ -103,6 +107,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     // --- Slash command menu ---
     const [slashSkills, setSlashSkills] = useState<Skill[]>([]);
+    const [extensionCommands, setExtensionCommands] = useState<SlashCommand[]>(
+      [],
+    );
     const [showSlashMenu, setShowSlashMenu] = useState(false);
     const [slashFilter, setSlashFilter] = useState("");
     const [slashStartIndex, setSlashStartIndex] = useState(-1);
@@ -158,6 +165,39 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         })
         .catch(() => {});
     }, [isElectron, showSlashMenu]);
+
+    // --- Load extension commands for slash menu (per active session cwd) ---
+    const activeSessionCwd = useCurrentSession()?.cwd;
+    useEffect(() => {
+      if (!isElectron || !window.electronAPI?.piCommands) return;
+      let disposed = false;
+      const refresh = () => {
+        window.electronAPI.piCommands
+          .list(activeSessionCwd)
+          .then((dto) => {
+            if (!disposed) {
+              setExtensionCommands(toSlashCommands(dto.commands));
+            }
+          })
+          .catch(() => {});
+      };
+      refresh();
+      // Refresh when a plugin is installed/uninstalled. The registry is
+      // per-cwd; when the session has no cwd we fall back to the default
+      // host, so refresh unconditionally in that case.
+      const unsubscribe = window.electronAPI.on((event) => {
+        if (
+          event.type === "commands.changed" &&
+          (!activeSessionCwd || event.payload.cwd === activeSessionCwd)
+        ) {
+          refresh();
+        }
+      });
+      return () => {
+        disposed = true;
+        unsubscribe();
+      };
+    }, [isElectron, activeSessionCwd]);
 
     // --- Click outside to close slash menu ---
     // Pi 扩展 setEditorText：写入输入框并清空待处理状态
@@ -324,20 +364,24 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     selectFilesRef.current = handleFileSelect;
 
     // --- Slash menu helpers ---
-    const filterText = slashFilter.toLowerCase();
     const builtinCommands = useMemo(() => getBuiltinCommands(t), [t]);
+    const allCommands = useMemo(
+      () => mergeSlashCommands(builtinCommands, extensionCommands),
+      [builtinCommands, extensionCommands],
+    );
     const filteredCommands = useMemo(() => {
       const recency = loadSlashRecency();
-      const cmds = slashFilter
-        ? builtinCommands.filter(
-            (c) =>
-              c.name.toLowerCase().includes(filterText) ||
-              c.description.toLowerCase().includes(filterText),
-          )
-        : builtinCommands;
-      return sortByRecency(cmds, (c) => `cmd:${c.name}`, recency);
+      // Commands use exact-prefix matching (exact-prefix priority over skills)
+      const cmds = slashFilter ? filterCommands(allCommands, slashFilter) : allCommands;
+      // 内置命令保留既有 recency；扩展命令按注册顺序（spec：不做命令 recency）
+      const builtins = cmds.filter((c) => c.source === "builtin");
+      const extensions = cmds.filter((c) => c.source === "extension");
+      return [
+        ...sortByRecency(builtins, (c) => `cmd:${c.name}`, recency),
+        ...extensions,
+      ];
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [builtinCommands, slashFilter, recencyVersion]);
+    }, [allCommands, slashFilter, recencyVersion]);
 
     // Skills filtered by current text (preserving Skill type for SlashMenu badges)
     const filteredSlashSkills = useMemo(() => {
@@ -433,11 +477,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const selectSlashItem = useCallback(
       (item: SlashItem) => {
         // Record recency before any early-return path
-        saveSlashRecency(
-          item.category === "command"
-            ? `cmd:${item.command.name}`
-            : `skill:${item.skill.name}`,
-        );
+        // （扩展命令不记录 recency——按注册顺序展示，spec 决策）
+        if (
+          item.category !== "command" ||
+          item.command.source === "builtin"
+        ) {
+          saveSlashRecency(
+            item.category === "command"
+              ? `cmd:${item.command.name}`
+              : `skill:${item.skill.name}`,
+          );
+        }
         setRecencyVersion((v) => v + 1);
 
         if (item.category === "command") {
@@ -447,7 +497,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             closeSlashMenu();
             return;
           }
-          // For other builtin commands (e.g. goal), insert text
+          // For other commands (goal, extension commands), insert text
           const textarea = textareaRef.current;
           if (!textarea || slashStartIndex < 0) return;
           const currentValue = textarea.value;

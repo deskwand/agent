@@ -62,6 +62,7 @@ import { getDefaultShell } from "../utils/shell-resolver";
 import type { SkillsAdapter } from "../skills/skills-adapter";
 import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { PiExtensionHost } from "../extensions/pi-extension-host";
+import { buildInterceptedPrompt } from "../extensions/pi-command-registry";
 import { getPiUiBridge, resetUiState } from "../extensions/ui/pi-ui-runtime";
 import { PiSessionBridge, type PiReplacedContext } from "../extensions/pi-session-bridge";
 import { configStore } from "../config/config-store";
@@ -3600,6 +3601,13 @@ Tool routing:\n
                 `[AgentRunner] Extension error (${error.extensionPath}):`,
                 error.error,
               );
+              // Command handler errors propagate here: the SDK catches handler
+              // throws in _tryExecuteExtensionCommand and emits them with
+              // event: "command" (prompt() itself does not throw), so this is
+              // the only path that sees them. Surface as an error toast.
+              if (error.event === "command") {
+                getPiUiBridge()?.notify(error.error, "error");
+              }
             },
           });
         }
@@ -4380,17 +4388,28 @@ Tool routing:\n
         // attempt double-intercept. The "/..." text appears in the context and
         // the LLM will interpret it naturally as a user instruction.
         let finalPrompt = contextualPrompt;
+        // 拦截结果提升到外层作用域（imageGuidancePrefix 拼接处需判断）
+        let mapped: { hit: string; finalPrompt: string } | null = null;
         if (prompt.startsWith("/")) {
           const spaceIdx = prompt.indexOf(" ");
           const cmdName =
             spaceIdx > 0 ? prompt.slice(1, spaceIdx) : prompt.slice(1);
           const cached = this.piSessions.get(session.id);
+          // 单一真相来源：cached.extensionCommands（会话创建时从 createAgentSession
+          // 的 extensionsResult 提取——与 SDK runner 同源）。命中 = SDK 必执行。
           const extCmds = cached?.extensionCommands ?? [];
-          if (extCmds.some((c) => c.name === cmdName)) {
-            finalPrompt = prompt;
+          mapped = buildInterceptedPrompt(extCmds, prompt);
+          if (mapped) {
+            finalPrompt = mapped.finalPrompt;
+            this.sendToRenderer({
+              type: "pi.command-executing",
+              payload: { sessionId: session.id, command: mapped.hit },
+            });
             log(
               "[AgentRunner] Extension command detected, passing raw prompt:",
               prompt,
+              "→",
+              mapped.finalPrompt,
             );
           } else {
             log(
@@ -4403,8 +4422,9 @@ Tool routing:\n
         }
 
         // Prepend image guidance to the final prompt if user sent images
-        // to a non-multimodal model.
-        if (imageGuidancePrefix) {
+        // to a non-multimodal model. 拦截命中的扩展命令是自包含的（不经 LLM），
+        // 前缀拼接会破坏 SDK 的 startsWith("/") 检测——跳过前缀保证命令必执行。
+        if (imageGuidancePrefix && !mapped) {
           finalPrompt = imageGuidancePrefix + finalPrompt;
         }
 

@@ -278,6 +278,18 @@ export interface PiTuiFrameEvent {
   chunk: string;
 }
 
+/** 统一命令注册表条目（内置或扩展来源，镜像 PiCommandEntry）。 */
+export interface PiCommandDto {
+  name: string;
+  description?: string;
+  source: "builtin" | "extension";
+}
+
+/** `commands.list` 的返回结构。 */
+export interface PiCommandListDto {
+  commands: PiCommandDto[];
+}
+
 // ---------------------------------------------------------------------------
 // Pi Market
 // ---------------------------------------------------------------------------

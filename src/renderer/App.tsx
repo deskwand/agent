@@ -27,6 +27,7 @@ import { ResizeHandle } from "./components/ResizeHandle";
 import { WelcomeView } from "./components/WelcomeView";
 import { ScheduleView } from "./components/ScheduleView";
 import { MarketplaceView } from "./components/MarketplaceView";
+import { PluginsView } from "./components/PluginsView";
 import { PermissionDialog } from "./components/PermissionDialog";
 import { SudoPasswordDialog } from "./components/SudoPasswordDialog";
 import { ExtensionDialogs } from "./components/ExtensionDialogs";
@@ -97,6 +98,7 @@ function App() {
   const { showSettings } = useSettingsState();
   const showSchedule = useScheduleViewState();
   const { showMarketplace } = useMarketplaceViewState();
+  const showPlugins = useAppStore((s) => s.showPlugins);
   const { showConfigModal, isConfigured, appConfig } = useConfigModalState();
   const lightboxState = useImageLightboxState();
   const globalNotice = useGlobalNotice();
@@ -217,6 +219,7 @@ function App() {
   const isFullScreenView =
     showSettings ||
     showMarketplace ||
+    showPlugins ||
     showSchedule ||
     isReviewOpen ||
     showConfigModal;
@@ -374,6 +377,8 @@ function App() {
               </Suspense>
             ) : showMarketplace ? (
               <MarketplaceView />
+            ) : showPlugins ? (
+              <PluginsView />
             ) : showSchedule ? (
               <ScheduleView />
             ) : activeSessionId ? (

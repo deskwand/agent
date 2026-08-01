@@ -58,6 +58,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
   const showMarketplace = useAppStore((s) => s.showMarketplace);
   const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
+  const showPlugins = useAppStore((s) => s.showPlugins);
+  const setShowPlugins = useAppStore((s) => s.setShowPlugins);
   const cloudConfig = useAppStore((s) => s.cloudConfig);
   const showLoginModal = useAppStore((s) => s.showLoginModal);
   const setShowLoginModal = useAppStore((s) => s.setShowLoginModal);
@@ -366,6 +368,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       setShowSettings(false);
       setShowSchedule(false);
       setShowMarketplace(false);
+      setShowPlugins(false);
       if (activeSessionId === sessionId) return;
 
       const existingMessages = sessionStates[sessionId]?.messages;
@@ -427,6 +430,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       sessionStates,
       setActiveSession,
       setMessages,
+      setShowPlugins,
       setShowSettings,
       setTraceSteps,
     ],
@@ -437,7 +441,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     setShowSettings(false);
     setShowSchedule(false);
     setShowMarketplace(false);
-  }, [setActiveSession, setShowSettings, setShowSchedule, setShowMarketplace]);
+    setShowPlugins(false);
+  }, [setActiveSession, setShowSettings, setShowSchedule, setShowMarketplace, setShowPlugins]);
 
   const handleDeleteSession = useCallback(
     (e: React.MouseEvent, session: Session) => {
@@ -586,7 +591,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   };
 
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
-    const isActive = activeSessionId === session.id && !showMarketplace;
+    const isActive = activeSessionId === session.id && !showMarketplace && !showPlugins;
     const hasStatusIndicator = session.status === "running";
     const isPinned = pinnedSessionIds.has(session.id);
     const isHovered = hoveredSessionId === session.id;
@@ -1076,16 +1081,25 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 onOpenSettings={() => {
                   setShowMarketplace(false);
                   setShowSchedule(false);
+                  setShowPlugins(false);
                   setShowSettings(true);
                 }}
                 onOpenMarketplace={() => {
                   setShowSettings(false);
                   setShowSchedule(false);
+                  setShowPlugins(false);
                   setShowMarketplace(true);
+                }}
+                onOpenPlugins={() => {
+                  setShowSettings(false);
+                  setShowSchedule(false);
+                  setShowMarketplace(false);
+                  setShowPlugins(true);
                 }}
                 onOpenAutomation={() => {
                   setShowSettings(false);
                   setShowMarketplace(false);
+                  setShowPlugins(false);
                   setShowSchedule(true);
                 }}
                 onLogout={() => {

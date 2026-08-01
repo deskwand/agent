@@ -19,6 +19,8 @@ import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
 
+let commandToastSeq = 0;
+let notifyToastSeq = 0;
 let sharedIpcInitialized = false;
 
 function installSharedIpcBridge(): void {
@@ -251,9 +253,19 @@ function installSharedIpcBridge(): void {
             type?: string;
           };
           store.setGlobalNotice({
-            id: `pi-notify-${Date.now()}`,
+            id: `pi-notify-${notifyToastSeq++}`,
             message: payload.message,
             type: (payload.type === "error" ? "error" : "info") as "error" | "info",
+          });
+          break;
+        }
+
+        case "pi.command-executing": {
+          const { command } = event.payload;
+          store.setGlobalNotice({
+            id: `pi-command-${commandToastSeq++}`,
+            message: i18n.t("piExtensions.commandExecuting", { command }),
+            type: "info",
           });
           break;
         }
@@ -515,11 +527,13 @@ function installSharedIpcBridge(): void {
           store.setShowSettings(false);
           store.setShowSchedule(false);
           store.setShowMarketplace(false);
+          store.setShowPlugins(false);
           break;
 
         case "navigate":
           if (event.payload === "settings") {
             store.setShowSettings(true);
+            store.setShowPlugins(false);
           }
           break;
 

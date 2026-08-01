@@ -44,6 +44,7 @@ import {
 } from "./browser/browser-view-manager";
 import { AgentRuntimeExtensionManager } from "./extensions/agent-runtime-extension-manager";
 import { PiExtensionHost } from "./extensions/pi-extension-host";
+import { mergeCommandEntries } from "./extensions/pi-command-registry";
 import { PiTrustResolver } from "./extensions/pi-trust-resolver";
 import {
   initPiUiRuntime,
@@ -1480,6 +1481,29 @@ ipcMain.handle("pi-ext.list-extensions", () => {
   );
 });
 
+ipcMain.handle("commands.list", async (_e, cwd?: string) => {
+  const host = cwd
+    ? PiExtensionHost.getOrCreate({ cwd, agentDir: piAgentDir })
+    : getPiHostForCwd();
+  // 惰性加载：新建/重建的 host extensionsResult 为空（getOrCreate 不触发加载），
+  // 与 pi-ext.list-state 的既有模式一致；reload 失败时返回空列表不崩溃。
+  if (host.getExtensionsResult().extensions.length === 0) {
+    try {
+      await host.reloadResources();
+    } catch (error) {
+      logWarn("[IPC] commands.list reload failed:", error);
+    }
+  }
+  return {
+    commands: mergeCommandEntries(
+      undefined,
+      host
+        .getRegisteredCommands()
+        .map((c) => ({ ...c, source: "extension" as const })),
+    ),
+  };
+});
+
 // ── Pi Extension UI Bridge + TUI Modal（进程级单例）─────────────────
 
 function sendPiServerEvent(type: string, payload: unknown): void {
@@ -1589,6 +1613,10 @@ ipcMain.handle(
     try {
       await piPackageService.install(source, { local });
       await getPiHostForCwd().reloadResources();
+      // 使已缓存会话失效：下条消息重建 runner 与快照（拦截 = 执行 同源保证）
+      sessionManager?.invalidatePiPluginSessions();
+      // 注：仅对默认 host 的 cwd 发射——其他 cwd 的 host 未 reload（per-cwd 陈旧性，spec 接受）
+      sendPiServerEvent("commands.changed", { cwd: getPiHostForCwd().cwd });
       return { success: true };
     } catch (error) {
       logError("[IPC] pi-ext.install failed:", error);
@@ -1606,6 +1634,8 @@ ipcMain.handle(
     try {
       await piPackageService.remove(source, { local });
       await getPiHostForCwd().reloadResources();
+      sessionManager?.invalidatePiPluginSessions();
+      sendPiServerEvent("commands.changed", { cwd: getPiHostForCwd().cwd });
       return { success: true };
     } catch (error) {
       logError("[IPC] pi-ext.remove failed:", error);
@@ -1621,6 +1651,8 @@ ipcMain.handle("pi-ext.update", async (_e, source?: string) => {
   try {
     await piPackageService.update(source);
     await getPiHostForCwd().reloadResources();
+    sessionManager?.invalidatePiPluginSessions();
+    sendPiServerEvent("commands.changed", { cwd: getPiHostForCwd().cwd });
     return { success: true };
   } catch (error) {
     logError("[IPC] pi-ext.update failed:", error);
