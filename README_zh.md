@@ -44,6 +44,16 @@ DeskWand 是基于 Pi Agent SDK 构建的生产级桌面 AI Agent。
 
 多模型支持 — 自由选择最适合你的 AI 模型。
 
+Pi 扩展与市场 — 运行 Pi CLI 扩展，从内置包市场安装插件、技能和提示词。
+
+消息渠道 — 通过 Telegram、Discord、QQ、Slack、微信、飞书与你的 Agent 交互。
+
+---
+
+### 渠道
+
+随时随地与你的 Agent 对话：**Telegram · Discord · QQ · Slack · 微信 · 飞书**
+
 ---
 
 ## 基于 Pi Agent SDK 构建

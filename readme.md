@@ -44,6 +44,16 @@ Self-improving skills — Successful tasks can become reusable skills, making yo
 
 Multi-model support — Use the AI models that work best for you.
 
+Pi extensions & marketplace — Run Pi CLI extensions and install plugins, skills, and prompts from the built-in package marketplace.
+
+Messaging channels — Reach your agent from Telegram, Discord, QQ, Slack, WeChat, and Feishu.
+
+---
+
+### Channels
+
+Talk to your agent from anywhere: **Telegram · Discord · QQ · Slack · WeChat · Feishu**
+
 ---
 
 ## Built with Pi Agent SDK
