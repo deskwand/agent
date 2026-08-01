@@ -22,9 +22,14 @@ import {
   type BashToolOptions,
   type InlineExtension,
   type ExtensionFactory,
+  type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
-import { getSharedModelRuntime } from "./shared-model-runtime";
+import { getAuthPath, registerSessionModelRuntime, unregisterSessionModelRuntime } from "./shared-model-runtime";
+import {
+  createSessionModelRuntime,
+  getOrCreateSessionRuntime,
+} from "./session-runtime-cache";
 import type {
   Session,
   Message,
@@ -611,6 +616,7 @@ export class AgentRunner {
   > | null = null;
   private activeControllers: Map<string, AbortController> = new Map();
   private piSessions: Map<string, CachedPiSession> = new Map();
+  private sessionModelRuntimes: Map<string, ModelRuntime> = new Map();
   private piSessionBridge: PiSessionBridge | undefined;
   private createSessionRecord: ((title: string, cwd?: string) => Session | null) | undefined;
   private enqueuePromptForSession: ((sessionId: string, prompt: string) => void) | undefined;
@@ -710,6 +716,11 @@ export class AgentRunner {
    */
   clearSdkSession(sessionId: string): void {
     const cached = this.piSessions.get(sessionId);
+    const runtime = this.sessionModelRuntimes.get(sessionId);
+    if (runtime) {
+      unregisterSessionModelRuntime(runtime);
+      this.sessionModelRuntimes.delete(sessionId);
+    }
     if (cached) {
       try {
         cached.session.dispose();
@@ -2480,7 +2491,15 @@ ${hints.join("\n")}
         },
       });
 
-      const modelRuntime = await getSharedModelRuntime();
+      const modelRuntime = await getOrCreateSessionRuntime(
+        this.sessionModelRuntimes,
+        session.id,
+        async () => {
+          const runtime = await createSessionModelRuntime(getAuthPath());
+          registerSessionModelRuntime(runtime);
+          return runtime;
+        },
+      );
       const apiKey = runtimeConfig.apiKey?.trim();
       if (apiKey && provider !== "oauth") {
         const piProvider =
@@ -3646,7 +3665,12 @@ Tool routing:\n
               }
               resetUiState();
             }
+            const evictedRuntime = this.sessionModelRuntimes.get(oldestKey);
+            if (evictedRuntime) {
+              unregisterSessionModelRuntime(evictedRuntime);
+            }
             this.piSessions.delete(oldestKey);
+            this.sessionModelRuntimes.delete(oldestKey);
             log("[AgentRunner] Evicted oldest cached session:", oldestKey);
           }
         }

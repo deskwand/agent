@@ -28,6 +28,7 @@ vi.mock("@earendil-works/pi-coding-agent", () => ({
 vi.mock("../../main/agent/shared-model-runtime", () => ({
   getAuthPath: vi.fn(() => "/tmp/deskwand/auth.json"),
   getSharedModelRuntime: vi.fn(async () => modelRuntimeMock),
+  invalidateSessionRuntimeApiKeys: vi.fn(),
 }));
 
 vi.mock("../../main/agent/subagent/provider-bridge", () => ({
@@ -136,6 +137,8 @@ describe("oauth-service", () => {
   });
 
   it("removes persistent and runtime auth on logout", async () => {
+    const { invalidateSessionRuntimeApiKeys } =
+      await import("../../main/agent/shared-model-runtime");
     await handler("auth.logout")({}, "openai-codex");
 
     expect(modelRuntimeMock.logout).toHaveBeenCalledWith("openai-codex");
@@ -143,6 +146,12 @@ describe("oauth-service", () => {
       "openai-codex",
     );
     expect(modelRuntimeMock.removeRuntimeApiKey).toHaveBeenCalledWith(
+      "deskwand:oauth:openai-codex",
+    );
+    expect(invalidateSessionRuntimeApiKeys).toHaveBeenCalledWith(
+      "openai-codex",
+    );
+    expect(invalidateSessionRuntimeApiKeys).toHaveBeenCalledWith(
       "deskwand:oauth:openai-codex",
     );
   });

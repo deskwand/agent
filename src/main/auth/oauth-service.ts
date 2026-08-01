@@ -17,6 +17,7 @@ import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import {
   getAuthPath,
   getSharedModelRuntime,
+  invalidateSessionRuntimeApiKeys,
 } from "../agent/shared-model-runtime";
 import { buildDeskWandProviderId } from "../agent/subagent/provider-bridge";
 import { configStore } from "../config/config-store";
@@ -247,10 +248,13 @@ async function handleLogout(
   const runtime = await getSharedModelRuntime();
   await runtime.logout(providerId);
   await runtime.removeRuntimeApiKey(providerId);
+  await invalidateSessionRuntimeApiKeys(providerId);
 
   for (const profileKey of Object.keys(configStore.getAll().providers)) {
     if (extractOAuthProviderId(profileKey) === providerId) {
-      await runtime.removeRuntimeApiKey(buildDeskWandProviderId(profileKey));
+      const deskwandProviderId = buildDeskWandProviderId(profileKey);
+      await runtime.removeRuntimeApiKey(deskwandProviderId);
+      await invalidateSessionRuntimeApiKeys(deskwandProviderId);
     }
   }
 }

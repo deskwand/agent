@@ -10,13 +10,21 @@ const agentRunnerContent = readFileSync(
 );
 
 describe("AgentRunner ModelRuntime integration", () => {
-  it("uses the shared ModelRuntime without masking OAuth credentials", () => {
+  it("routes auth through per-session ModelRuntime without masking OAuth credentials", () => {
+    expect(agentRunnerContent).toContain('from "./shared-model-runtime"');
+    expect(agentRunnerContent).toContain("registerSessionModelRuntime");
+    expect(agentRunnerContent).toContain("unregisterSessionModelRuntime");
     expect(agentRunnerContent).toContain(
-      'import { getSharedModelRuntime } from "./shared-model-runtime"',
+      "const modelRuntime = await getOrCreateSessionRuntime(",
     );
     expect(agentRunnerContent).toContain(
-      "const modelRuntime = await getSharedModelRuntime()",
+      "sessionModelRuntimes.delete(sessionId)",
     );
+    // 锁定 round-1 修复：unregister 与 map delete 必须成对相邻（防回归）
+    expect(agentRunnerContent).toMatch(
+      /unregisterSessionModelRuntime\(runtime\);\s+this\.sessionModelRuntimes\.delete\(sessionId\);/,
+    );
+    expect(agentRunnerContent).toContain("sessionModelRuntimes.get(oldestKey)");
     expect(agentRunnerContent).toContain("modelRuntime,");
     expect(agentRunnerContent).toContain('provider !== "oauth"');
     expect(agentRunnerContent).not.toContain("ensureFreshOAuthToken");
