@@ -21,7 +21,8 @@
     "optional": "optional",
     "back": "Back",
     "appLogoAlt": "DeskWand logo",
-    "pastedImageAlt": "Pasted {{index}}"
+    "pastedImageAlt": "Pasted {{index}}",
+    "confirm": "Confirm"
   },
   "welcome": {
     "title": "How can I help you today?",
@@ -1475,5 +1476,26 @@
     "qq": "QQ",
     "slack": "Slack",
     "wechat": "WeChat"
+  },
+  "piExtensions": {
+    "trustTitle": "Trust this project?",
+    "trustMessage": "This project contains .pi extensions or config. Extensions have full system access. Trust {cwd}?",
+    "trustAllow": "Trust",
+    "trustDeny": "Deny",
+    "tab": "Pi Extensions",
+    "tabDesc": "Install and manage Pi extensions",
+    "title": "Pi Extensions",
+    "sdkVersion": "SDK {{version}} compatible",
+    "installPlaceholder": "npm:pkg@1.0.0 / git:github.com/user/repo / ./local/path",
+    "install": "Install",
+    "packages": "Installed packages",
+    "noPackages": "No packages installed yet",
+    "update": "Update",
+    "remove": "Remove",
+    "extensions": "Loaded extensions",
+    "noExtensions": "No extensions loaded yet",
+    "installWarning": "⚠ Extensions run with full system access and can execute arbitrary code. Only install from sources you trust.",
+    "modalTitle": "Pi Extension",
+    "unsupportedNote": "⚠ Unsupported extension capabilities: navigateTree (branch switching — DeskWand context comes from DB messages). Extensions that take over the terminal (vim/htop/ssh via raw stdio) are also unsupported."
   }
 }

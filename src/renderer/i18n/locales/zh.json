@@ -21,7 +21,8 @@
     "optional": "可选",
     "back": "返回",
     "appLogoAlt": "DeskWand 标志",
-    "pastedImageAlt": "粘贴图片 {{index}}"
+    "pastedImageAlt": "粘贴图片 {{index}}",
+    "confirm": "确认"
   },
   "welcome": {
     "title": "今天我能为您做些什么？",
@@ -1471,5 +1472,26 @@
     "qq": "QQ",
     "slack": "Slack",
     "wechat": "微信"
+  },
+  "piExtensions": {
+    "trustTitle": "信任此项目?",
+    "trustMessage": "该项目包含 .pi 扩展或配置。扩展拥有完整系统权限。信任 {cwd} 吗?",
+    "trustAllow": "信任",
+    "trustDeny": "拒绝",
+    "tab": "Pi 扩展",
+    "tabDesc": "安装和管理 Pi 扩展",
+    "title": "Pi 扩展",
+    "sdkVersion": "兼容 SDK {{version}}",
+    "installPlaceholder": "npm:pkg@1.0.0 / git:github.com/user/repo / ./local/path",
+    "install": "安装",
+    "packages": "已安装包",
+    "noPackages": "尚未安装任何包",
+    "update": "更新",
+    "remove": "卸载",
+    "extensions": "已加载扩展",
+    "noExtensions": "尚未加载任何扩展",
+    "installWarning": "⚠ 扩展拥有完整系统权限，可执行任意代码。仅安装你信任的来源。",
+    "modalTitle": "Pi 扩展",
+    "unsupportedNote": "⚠ 不支持的扩展能力：navigateTree（branch 切换，DeskWand 上下文来自数据库消息）。终端接管类扩展（vim/htop/ssh 直接占用 stdio）也不支持。"
   }
 }

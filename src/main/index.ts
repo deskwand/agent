@@ -27,7 +27,7 @@ import {
 import { join, resolve, dirname, isAbsolute, basename, extname } from "path";
 import * as fs from "fs";
 import { writeFile, mkdir, readFile, unlink, rm } from "fs/promises";
-import { tmpdir } from "os";
+import { tmpdir, homedir } from "os";
 import JSZip from "jszip";
 import { createHash } from "crypto";
 import { execFileSync } from "child_process";
@@ -43,6 +43,19 @@ import {
   BROWSER_CDP_PORT,
 } from "./browser/browser-view-manager";
 import { AgentRuntimeExtensionManager } from "./extensions/agent-runtime-extension-manager";
+import { PiExtensionHost } from "./extensions/pi-extension-host";
+import { PiTrustResolver } from "./extensions/pi-trust-resolver";
+import {
+  initPiUiRuntime,
+  resolveUiDialog,
+  pendingDialogs,
+  injectTuiInput,
+  notifyTerminalInput,
+  resizeTuiModal,
+} from "./extensions/ui/pi-ui-runtime";
+import { PiPackageService } from "./extensions/pi-package-service";
+import { applyPiPackageDirFix } from "./extensions/pi-sdk-path";
+import { VERSION } from "@earendil-works/pi-coding-agent";
 import {
   buildLegacyEnvBridgeSnapshot,
   configStore,
@@ -661,6 +674,10 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+    // 释放挂起的 Pi 扩展对话框（renderer 已销毁，无法响应）
+    for (const [id] of pendingDialogs) {
+      resolveUiDialog(id, undefined);
+    }
   });
 
   // Notify renderer of fullscreen state changes (for macOS titlebar spacer)
@@ -1402,6 +1419,215 @@ ipcMain.handle("openrouterAuth.status", async () => {
 });
 ipcMain.handle("cloudAuth.googleLogin", async () => {
   return startGoogleAuth();
+});
+
+// ── Pi Extension IPC handlers ──
+// 信任解析：复用共享 ~/.pi/agent/trust.json，询问时经 server-event 弹 renderer Modal。
+const piAgentDir = join(homedir(), ".pi", "agent");
+const piTrustResolver = new PiTrustResolver(piAgentDir);
+const piTrustPending = new Map<string, (decision: boolean | null) => void>();
+
+ipcMain.handle("pi-ext.resolve-trust", async (_event, cwd: string) => {
+  try {
+    const host = PiExtensionHost.getOrCreate({ cwd, agentDir: piAgentDir });
+    const decision = await piTrustResolver.resolve({
+      cwd,
+      agentDir: piAgentDir,
+      settingsManager: host.getSettingsManager(),
+      askUser: (targetCwd) =>
+        new Promise<boolean | null>((resolve) => {
+          piTrustPending.set(targetCwd, resolve);
+          mainWindow?.webContents.send("server-event", {
+            type: "pi.trust-prompt",
+            payload: { cwd: targetCwd },
+          });
+        }),
+    });
+    return decision;
+  } catch (error) {
+    logError("[IPC] pi-ext.resolve-trust failed:", error);
+    return "undecided";
+  }
+});
+
+ipcMain.handle(
+  "pi-ext.respond-trust",
+  (_event, cwd: string, decision: "trusted" | "untrusted" | "cancel") => {
+    const resolve = piTrustPending.get(cwd);
+    if (resolve) {
+      piTrustPending.delete(cwd);
+      resolve(decision === "cancel" ? null : decision === "trusted");
+    }
+    return true;
+  },
+);
+
+ipcMain.handle("pi-ext.sdk-version", () => {
+  return VERSION;
+});
+
+ipcMain.handle("pi-ext.list-extensions", () => {
+  const hosts = [...PiExtensionHost.registry.values()];
+  return hosts.flatMap((host) =>
+    host.getExtensionsResult().extensions.map((ext) => ({
+      path: ext.path,
+      source: ext.sourceInfo.source ?? "unknown",
+      scope: ext.sourceInfo.scope ?? "unknown",
+      origin: ext.sourceInfo.origin ?? "top-level",
+      error: undefined as string | undefined,
+    })),
+  );
+});
+
+// ── Pi Extension UI Bridge + TUI Modal（进程级单例）─────────────────
+
+function sendPiServerEvent(type: string, payload: unknown): void {
+  mainWindow?.webContents.send("server-event", { type, payload });
+}
+
+// ── Pi SDK 包目录修复 ──────────────────────────────────────────────
+// vite 打包后 __dirname 指向 dist-electron/main，SDK 的 getPackageDir()
+// 向上找 package.json 会解析到 DeskWand 自身，导致 getThemesDir() 指向
+// 不存在的 src/modes/interactive/theme（initTheme 崩溃）。
+// 用 SDK 官方支持的 PI_PACKAGE_DIR 覆盖包目录解析（dev 与 asar 均可用）。
+try {
+  if (!applyPiPackageDirFix(app.getAppPath())) {
+    logWarn(
+      "[PiSdkPath] pi-coding-agent package dir not found; theme loading may fail in bundled builds",
+    );
+  }
+} catch {
+  // 路径解析失败时保持默认行为（node_modules 环境不受影响）
+}
+
+initPiUiRuntime({
+  sendEvent: sendPiServerEvent,
+  setWindowTitle: (title) => {
+    try {
+      mainWindow?.setTitle(title);
+    } catch {
+      // 窗口已销毁时忽略
+    }
+  },
+  setEditorText: (text) => sendPiServerEvent("pi.set-editor-text", { text }),
+});
+
+ipcMain.handle("pi-ui.response", (_e, id: string, result: unknown) => {
+  if (resolveUiDialog(id, result)) {
+    return true;
+  }
+  return false;
+});
+
+// 无响应兜底：renderer 关闭/崩溃时释放挂起的 dialog（幂等）。
+// 不做定时全局 sweep——那会误杀用户正在思考的活跃对话框；
+// 改为窗口 closed 回调统一清理（见 createWindow）。
+
+ipcMain.handle("pi-tui.input", (_e, data: string) => {
+  injectTuiInput(data);
+  notifyTerminalInput(data);
+  return true;
+});
+
+ipcMain.handle("pi-tui.resize", (_e, columns: number, rows: number) => {
+  resizeTuiModal(columns, rows);
+  return true;
+});
+
+// ── Pi Package management ────────────────────────────────────────
+function getPiHostForCwd(): PiExtensionHost {
+  const cwd = currentWorkingDir || process.cwd();
+  return PiExtensionHost.getOrCreate({
+    cwd,
+    agentDir: piAgentDir,
+    // 项目信任询问：经 server-event 弹 renderer 信任 Modal（复用上方 pending 机制）
+    onTrustPrompt: (targetCwd) =>
+      new Promise<boolean | null>((resolve) => {
+        piTrustPending.set(targetCwd, resolve);
+        mainWindow?.webContents.send("server-event", {
+          type: "pi.trust-prompt",
+          payload: { cwd: targetCwd },
+        });
+      }),
+  });
+}
+
+const piPackageService = new PiPackageService(getPiHostForCwd);
+piPackageService.onProgress((event) => {
+  sendPiServerEvent("pi.package-progress", event);
+});
+
+ipcMain.handle("pi-ext.list-state", async () => {
+  const host = getPiHostForCwd();
+  if (host.getExtensionsResult().extensions.length === 0) {
+    try {
+      await host.reloadResources();
+    } catch {
+      // 诊断信息已由 getExtensionErrors 暴露，这里不阻断列表
+    }
+  }
+  return {
+    sdkVersion: host.getCompatibleSdkVersion(),
+    packages: piPackageService.list(),
+    extensions: host
+      .getExtensionsResult()
+      .extensions.map((ext) => ({
+        path: ext.path,
+        source: ext.sourceInfo.source ?? "unknown",
+        scope: ext.sourceInfo.scope ?? "unknown",
+        origin: ext.sourceInfo.origin ?? "top-level",
+        error: undefined as string | undefined,
+      })),
+    errors: host.getExtensionErrors(),
+  };
+});
+
+ipcMain.handle(
+  "pi-ext.install",
+  async (_e, source: string, local?: boolean) => {
+    try {
+      await piPackageService.install(source, { local });
+      await getPiHostForCwd().reloadResources();
+      return { success: true };
+    } catch (error) {
+      logError("[IPC] pi-ext.install failed:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+);
+
+ipcMain.handle(
+  "pi-ext.remove",
+  async (_e, source: string, local?: boolean) => {
+    try {
+      await piPackageService.remove(source, { local });
+      await getPiHostForCwd().reloadResources();
+      return { success: true };
+    } catch (error) {
+      logError("[IPC] pi-ext.remove failed:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+);
+
+ipcMain.handle("pi-ext.update", async (_e, source?: string) => {
+  try {
+    await piPackageService.update(source);
+    await getPiHostForCwd().reloadResources();
+    return { success: true };
+  } catch (error) {
+    logError("[IPC] pi-ext.update failed:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 });
 
 ipcMain.handle("client-invoke", async (_event, data: ClientEvent) => {

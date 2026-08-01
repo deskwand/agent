@@ -16,12 +16,12 @@ describe("AgentRunner memory policy integration", () => {
       "const appendSystemPrompt = systemPromptSuffix",
       appendPromptIndex,
     );
-    const resourceLoaderIndex = text.indexOf("new DefaultResourceLoader({");
+    const hostIndex = text.indexOf("PiExtensionHost.getOrCreate({");
 
     expect(appendPromptIndex).toBeGreaterThan(-1);
     expect(suffixIndex).toBeGreaterThan(appendPromptIndex);
-    expect(suffixIndex).toBeLessThan(resourceLoaderIndex);
-    expect(text.slice(resourceLoaderIndex)).toContain("appendSystemPrompt,");
+    expect(suffixIndex).toBeLessThan(hostIndex);
+    expect(text.slice(hostIndex)).toContain("appendSystemPrompt,");
     expect(text).not.toContain(
       "contextualPrompt = `${extensionResult.systemPromptSuffix",
     );

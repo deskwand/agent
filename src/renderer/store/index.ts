@@ -123,6 +123,8 @@ interface AppState {
 
   // UI state
   isLoading: boolean;
+  /** Pi 扩展 setEditorText 待写入聊天输入框的内容（写入后清空）。 */
+  pendingEditorText: string | null;
   sidebarCollapsed: boolean;
   sidebarCollapsedBeforeBrowser: boolean;
   sidebarWidth: number;
@@ -216,6 +218,7 @@ interface AppState {
   // Actions
   setSessions: (sessions: Session[]) => void;
   addSession: (session: Session) => void;
+  setPendingEditorText: (text: string | null) => void;
   updateSession: (sessionId: string, updates: Partial<Session>) => void;
   removeSession: (sessionId: string) => void;
   removeSessions: (sessionIds: string[]) => void;
@@ -380,6 +383,7 @@ export const useAppStore = create<AppState>((set) => ({
   activeSessionId: null,
   sessionStates: {},
   isLoading: false,
+  pendingEditorText: null,
   sidebarCollapsed: false,
   sidebarCollapsedBeforeBrowser: false,
   sidebarWidth: 280,
@@ -427,6 +431,8 @@ export const useAppStore = create<AppState>((set) => ({
 
   // Session actions
   setSessions: (sessions) => set({ sessions }),
+
+  setPendingEditorText: (text) => set({ pendingEditorText: text }),
 
   addSession: (session) =>
     set((state) => ({

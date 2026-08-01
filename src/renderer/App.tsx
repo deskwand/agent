@@ -29,6 +29,8 @@ import { ScheduleView } from "./components/ScheduleView";
 import { MarketplaceView } from "./components/MarketplaceView";
 import { PermissionDialog } from "./components/PermissionDialog";
 import { SudoPasswordDialog } from "./components/SudoPasswordDialog";
+import { ExtensionDialogs } from "./components/ExtensionDialogs";
+import { PiTuiModal } from "./components/PiTuiModal";
 import { Titlebar } from "./components/Titlebar";
 import { SandboxSetupDialog } from "./components/SandboxSetupDialog";
 import { SandboxSyncToast } from "./components/SandboxSyncToast";
@@ -465,6 +467,12 @@ function App() {
 
       {/* Permission Dialog */}
       {pendingPermission && <PermissionDialog permission={pendingPermission} />}
+
+      {/* Pi Extension dialogs (ui requests + trust prompt) */}
+      <ExtensionDialogs />
+
+      {/* Pi TUI Modal (custom components) */}
+      <PiTuiModal />
 
       {/* Sudo Password Dialog */}
       {pendingSudoPassword && (

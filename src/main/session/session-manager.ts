@@ -196,6 +196,14 @@ export class SessionManager {
           toolUseId: string,
           command: string,
         ) => this.requestSudoPassword(sessionId, toolUseId, command),
+        createSessionRecord: (title: string, cwd?: string) =>
+          this.createSessionRecord(title, cwd),
+        enqueuePromptForSession: (sessionId: string, prompt: string) =>
+          this.enqueuePromptForSession(sessionId, prompt),
+        findSessionByPiFile: (piFile: string) =>
+          this.findSessionByPiFile(piFile),
+        activateSession: (sessionId: string) =>
+          this.activateSession(sessionId),
         turnFinalizer: {
           getReviewService: () => {
             // Lazily create the review service with current config.
@@ -360,6 +368,42 @@ export class SessionManager {
   }
 
   // Create and start a new session
+  /**
+   * 创建 DeskWand 会话记录但不 enqueue prompt。
+   * 供 Pi 扩展的 newSession/fork 桥接使用（会话内容由扩展后续填充）。
+   */
+  /** 按 Pi session 文件查找关联的 DeskWand 会话（规范化路径比较）。 */
+  findSessionByPiFile(piFile: string): Session | null {
+    const normalized = path.resolve(piFile);
+    const rows = this.db.sessions.getAll();
+    const row = rows.find(
+      (r) => r.pi_session_file && path.resolve(r.pi_session_file) === normalized,
+    );
+    return row ? this.loadSession(row.id) : null;
+  }
+
+  /** 通知 renderer 激活指定会话（switchSession 桥接用，带完整会话对象）。 */
+  activateSession(sessionId: string): void {
+    const session = this.loadSession(sessionId);
+    if (!session) return;
+    this.sendToRenderer({
+      type: "session.activate",
+      payload: { session },
+    });
+  }
+
+  createSessionRecord(title: string, cwd?: string): Session {
+    const session = this.createSession(title, cwd);
+    this.saveSession(session);
+    log("[SessionManager] Created session record (no prompt):", session.id, title);
+    // 通知 renderer 立即显示（Pi 扩展 newSession/fork 桥接创建）
+    this.sendToRenderer({
+      type: "session.create",
+      payload: { session },
+    });
+    return session;
+  }
+
   async startSession(
     title: string,
     prompt: string,
@@ -1440,6 +1484,18 @@ export class SessionManager {
     }
   }
 
+  /**
+   * 对指定会话发起 prompt（enqueuePrompt 的公开包装，供 Pi 扩展桥接使用）。
+   */
+  enqueuePromptForSession(sessionId: string, prompt: string): void {
+    const session = this.loadSession(sessionId);
+    if (!session) {
+      logError("[SessionManager] enqueuePromptForSession: session not found", sessionId);
+      return;
+    }
+    this.enqueuePrompt(session, prompt);
+  }
+
   private enqueuePrompt(
     session: Session,
     prompt: string,
@@ -1607,6 +1663,9 @@ export class SessionManager {
 
     // Stop if running
     this.stopSession(sessionId);
+
+    // 释放关联的 SDK 会话（触发扩展 session_shutdown + UI 清理）
+    this.agentRunner.clearSdkSession?.(sessionId);
 
     // Sync and cleanup sandbox if it exists for this session
     if (SandboxSync.hasSession(sessionId)) {

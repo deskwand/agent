@@ -239,6 +239,52 @@ function installSharedIpcBridge(): void {
           store.updateSession(event.payload.sessionId, event.payload.updates);
           break;
 
+        case "pi.set-editor-text": {
+          const payload = event.payload as { text: string };
+          store.setPendingEditorText(payload.text);
+          break;
+        }
+
+        case "pi.notify": {
+          const payload = event.payload as {
+            message: string;
+            type?: string;
+          };
+          store.setGlobalNotice({
+            id: `pi-notify-${Date.now()}`,
+            message: payload.message,
+            type: (payload.type === "error" ? "error" : "info") as "error" | "info",
+          });
+          break;
+        }
+
+        case "session.create": {
+          const { session } = event.payload;
+          if (!store.sessions.some((s) => s.id === session.id)) {
+            store.addSession(session);
+          }
+          break;
+        }
+
+        case "session.activate":
+          // Pi 扩展 switchSession 桥接：加载并激活指定会话
+          (async () => {
+            const { session } = event.payload;
+            const known = store.sessions.some((s) => s.id === session.id);
+            if (!known) {
+              store.addSession(session);
+            } else {
+              store.updateSession(session.id, session);
+            }
+            const messages = await invoke<Message[]>({
+              type: "session.getMessages",
+              payload: { sessionId: session.id },
+            });
+            if (messages) store.setMessages(session.id, messages);
+            store.setActiveSession(session.id);
+          })();
+          break;
+
         case "stream.message": {
           // Clear only this turn's pending buffers to avoid wiping queued turns
           const completedTurnId =

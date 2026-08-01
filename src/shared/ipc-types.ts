@@ -215,3 +215,65 @@ export interface ChannelPairingEvent {
   errorCode?: string;
   timestamp: number;
 }
+
+// ---------------------------------------------------------------------------
+// Pi Extension
+// ---------------------------------------------------------------------------
+
+/** 已加载的 Pi 扩展信息（用于管理界面展示）。 */
+export interface PiExtensionInfo {
+  path: string;
+  source: string;
+  scope: string;
+  origin: string;
+  error?: string;
+}
+
+/** 项目信任询问请求（main → renderer）。 */
+export interface PiTrustPrompt {
+  cwd: string;
+}
+
+/** 用户对信任询问的响应（renderer → main）。 */
+export type PiTrustResponse = "trusted" | "untrusted" | "cancel";
+
+/** 扩展 UI 对话框请求（复用官方 RPC extension_ui_request 形状）。 */
+export interface PiUiRequest {
+  type: "extension_ui_request";
+  id: string;
+  method: "select" | "confirm" | "input" | "editor";
+  title: string;
+  message?: string;
+  options?: string[];
+  placeholder?: string;
+  prefill?: string;
+  timeout?: number;
+}
+
+/** 已配置的 Pi 包（管理界面展示）。 */
+export interface PiPackageDto {
+  source: string;
+  scope: "user" | "project";
+  installedPath?: string;
+  type: "npm" | "git" | "local";
+}
+
+/** Pi 扩展管理界面完整状态。 */
+export interface PiExtensionManagerState {
+  sdkVersion: string;
+  packages: PiPackageDto[];
+  extensions: PiExtensionInfo[];
+  errors: { path: string; error: string }[];
+}
+
+/** TUI Modal 打开事件（main → renderer）。 */
+export interface PiTuiOpenEvent {
+  width: number;
+  height: number;
+  title?: string;
+}
+
+/** TUI Modal 渲染帧（main → renderer，已按帧批量）。 */
+export interface PiTuiFrameEvent {
+  chunk: string;
+}

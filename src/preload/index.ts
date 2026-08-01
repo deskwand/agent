@@ -33,6 +33,7 @@ import type {
   ChannelInstanceConfig,
   ChannelInstanceLog,
   ChannelInstanceStatus,
+  PiExtensionManagerState,
 } from "../shared/ipc-types";
 
 // Fan out one IPC listener to all active renderer subscribers.
@@ -113,6 +114,58 @@ contextBridge.exposeInMainWorld("electronAPI", {
       throw new Error(`Unauthorized event type: ${event.type}`);
     }
     return ipcRenderer.invoke("client-invoke", event);
+  },
+
+  // ── Pi Extension（信任解析 / 管理）────────────────────────────
+  piExtensions: {
+    resolveTrust: (cwd: string) =>
+      ipcRenderer.invoke("pi-ext.resolve-trust", cwd) as Promise<
+        "trusted" | "untrusted" | "undecided" | "cancel"
+      >,
+    respondTrust: (cwd: string, decision: "trusted" | "untrusted" | "cancel") =>
+      ipcRenderer.invoke("pi-ext.respond-trust", cwd, decision),
+    sdkVersion: () =>
+      ipcRenderer.invoke("pi-ext.sdk-version") as Promise<string>,
+    listExtensions: () =>
+      ipcRenderer.invoke("pi-ext.list-extensions") as Promise<
+        Array<{
+          path: string;
+          source: string;
+          scope: string;
+          origin: string;
+          error?: string;
+        }>
+      >,
+    listState: () =>
+      ipcRenderer.invoke("pi-ext.list-state") as Promise<PiExtensionManagerState>,
+    installPackage: (source: string, local?: boolean) =>
+      ipcRenderer.invoke("pi-ext.install", source, local) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+    removePackage: (source: string, local?: boolean) =>
+      ipcRenderer.invoke("pi-ext.remove", source, local) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+    updatePackage: (source?: string) =>
+      ipcRenderer.invoke("pi-ext.update", source) as Promise<{
+        success: boolean;
+        error?: string;
+      }>,
+  },
+
+  // ── Pi Extension UI（对话框往返）──────────────────────────────
+  piUi: {
+    respond: (id: string, result: unknown) =>
+      ipcRenderer.invoke("pi-ui.response", id, result),
+  },
+
+  // ── Pi TUI Modal ────────────────────────────────────────────────
+  piTui: {
+    input: (data: string) => ipcRenderer.invoke("pi-tui.input", data),
+    resize: (columns: number, rows: number) =>
+      ipcRenderer.invoke("pi-tui.resize", columns, rows),
   },
 
   // Platform info
@@ -1074,6 +1127,61 @@ declare global {
         setAgentModel: (name: string, model: string, thinking?: string) => Promise<{ success: boolean; error?: string }>;
         createAgent: (name: string, description: string, prompt: string) => Promise<{ success: boolean; path?: string; error?: string }>;
         deleteAgent: (name: string) => Promise<{ success: boolean; error?: string }>;
+      };
+      piExtensions: {
+        resolveTrust: (cwd: string) => Promise<
+          "trusted" | "untrusted" | "undecided" | "cancel"
+        >;
+        respondTrust: (
+          cwd: string,
+          decision: "trusted" | "untrusted" | "cancel",
+        ) => Promise<unknown>;
+        sdkVersion: () => Promise<string>;
+        listExtensions: () => Promise<
+          Array<{
+            path: string;
+            source: string;
+            scope: string;
+            origin: string;
+            error?: string;
+          }>
+        >;
+        listState: () => Promise<{
+          sdkVersion: string;
+          packages: Array<{
+            source: string;
+            scope: "user" | "project";
+            installedPath?: string;
+            type: "npm" | "git" | "local";
+          }>;
+          extensions: Array<{
+            path: string;
+            source: string;
+            scope: string;
+            origin: string;
+            error?: string;
+          }>;
+          errors: Array<{ path: string; error: string }>;
+        }>;
+        installPackage: (source: string, local?: boolean) => Promise<{
+          success: boolean;
+          error?: string;
+        }>;
+        removePackage: (source: string, local?: boolean) => Promise<{
+          success: boolean;
+          error?: string;
+        }>;
+        updatePackage: (source?: string) => Promise<{
+          success: boolean;
+          error?: string;
+        }>;
+      };
+      piUi: {
+        respond: (id: string, result: unknown) => Promise<unknown>;
+      };
+      piTui: {
+        input: (data: string) => Promise<unknown>;
+        resize: (columns: number, rows: number) => Promise<unknown>;
       };
     };
   }

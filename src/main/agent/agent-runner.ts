@@ -61,6 +61,9 @@ import {
 import { getDefaultShell } from "../utils/shell-resolver";
 import type { SkillsAdapter } from "../skills/skills-adapter";
 import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
+import { PiExtensionHost } from "../extensions/pi-extension-host";
+import { getPiUiBridge, resetUiState } from "../extensions/ui/pi-ui-runtime";
+import { PiSessionBridge, type PiReplacedContext } from "../extensions/pi-session-bridge";
 import { configStore } from "../config/config-store";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
@@ -376,6 +379,20 @@ function buildMcpCustomTools(mcpManager: MCPManager): ToolDefinition[] {
  * GUI apps on macOS don't inherit shell PATH, so we need to extract it
  */
 
+/** 提取 Pi entry 消息的文本内容（fork 物化用）。 */
+function extractTextContent(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter(
+      (b): b is { type?: string; text?: string } =>
+        b !== null && typeof b === "object",
+    )
+    .filter((b) => b.type === "text")
+    .map((b) => b.text ?? "")
+    .join(" ")
+    .trim();
+}
+
 function safeStringify(value: unknown, space = 0): string {
   try {
     return JSON.stringify(value, null, space);
@@ -537,6 +554,14 @@ interface AgentRunnerOptions {
   customTools?: ToolDefinition[];
   /** Called when a background subagent completes, so the host can trigger auto-continue. */
   onBackgroundAgentComplete?: (sessionId: string, agentId: string) => void;
+  /** 扩展 newSession/fork 时创建 DeskWand 会话记录（不 enqueue prompt）。 */
+  createSessionRecord?: (title: string, cwd?: string) => Session | null;
+  /** 对指定会话发起 prompt（扩展 newSession 的 withSession 转发）。 */
+  enqueuePromptForSession?: (sessionId: string, prompt: string) => void;
+  /** 按 Pi session 文件查找 DeskWand 会话（switchSession 用）。 */
+  findSessionByPiFile?: (piFile: string) => Session | null;
+  /** 通知 renderer 激活指定会话（switchSession 用）。 */
+  activateSession?: (sessionId: string) => void;
 }
 
 interface CachedPiSession {
@@ -585,6 +610,11 @@ export class AgentRunner {
   > | null = null;
   private activeControllers: Map<string, AbortController> = new Map();
   private piSessions: Map<string, CachedPiSession> = new Map();
+  private piSessionBridge: PiSessionBridge | undefined;
+  private createSessionRecord: ((title: string, cwd?: string) => Session | null) | undefined;
+  private enqueuePromptForSession: ((sessionId: string, prompt: string) => void) | undefined;
+  private findSessionByPiFile: ((piFile: string) => Session | null) | undefined;
+  private activateSession: ((sessionId: string) => void) | undefined;
   private _turnFinalizer: TurnFinalizer | null = null;
   onSessionFileCreated?: (sessionId: string, path: string) => void;
   private _customTools: ToolDefinition[] = [];
@@ -599,6 +629,81 @@ export class AgentRunner {
   private _skillsSetupInProgress = false;
 
   /**
+   * 扩展 newSession/fork 桥接：创建 DeskWand 会话记录 + 关联新 Pi SessionManager。
+   * replacedContext 为轻量桥接（只实现 sendUserMessage/sendMessage 转发到新会话，
+   * 不借用旧会话的运行时 ctx——SDK 语义：旧 ctx 已失效）。
+   */
+  private async createDeskWandSessionForExtension(
+    cwd: string,
+    title?: string,
+    piSessionFile?: string,
+  ): Promise<{
+    sessionId: string;
+    piSessionManager: PiSessionManager;
+    replacedContext: PiReplacedContext;
+  } | null> {
+    if (!this.createSessionRecord) return null;
+    const session = this.createSessionRecord(title ?? "Extension session", cwd);
+    if (!session) return null;
+    const userDeskWandDir = this.getAppDeskWandDir();
+    const sessionDir = path.join(userDeskWandDir, "pi-sessions", session.id);
+    // fork 场景：关联已分叉的 Pi session 文件；否则新建空文件
+    const piSessionManager = piSessionFile
+      ? PiSessionManager.open(piSessionFile, sessionDir)
+      : PiSessionManager.create(cwd, sessionDir);
+    if (piSessionFile) {
+      this.onSessionFileCreated?.(session.id, piSessionFile);
+    }
+    const replacedContext: PiReplacedContext = {
+      sendUserMessage: async (content: string | unknown[]) => {
+        const text = typeof content === "string" ? content : JSON.stringify(content);
+        this.enqueuePromptForSession?.(session.id, text);
+      },
+      sendMessage: async (message: { content?: string; customType?: string }) => {
+        const text =
+          typeof message.content === "string"
+            ? `[${message.customType ?? "extension"}] ${message.content}`
+            : JSON.stringify(message);
+        this.enqueuePromptForSession?.(session.id, text);
+      },
+      // 默认 ui 面；bridge 在 withSession 时用 uiAdapter 覆盖
+      ui: { setEditorText: () => {} },
+    };
+    return { sessionId: session.id, piSessionManager, replacedContext };
+  }
+
+  /**
+   * 物化 Pi branch 消息到 DeskWand 会话数据库（fork 场景）。
+   * entries 为 Pi SessionEntry[]；只物化 user/assistant 文本消息。
+   */
+  private async materializeMessagesForExtension(
+    sessionId: string,
+    entries: unknown[],
+  ): Promise<void> {
+    if (!this.saveMessage) return;
+    const now = Date.now();
+    let seq = 0;
+    for (const entry of entries) {
+      const e = entry as {
+        type?: string;
+        message?: { role?: string; content?: unknown };
+      };
+      if (e.type !== "message" || !e.message) continue;
+      const role = e.message.role;
+      if (role !== "user" && role !== "assistant") continue;
+      const text = extractTextContent(e.message.content);
+      if (!text) continue;
+      this.saveMessage({
+        id: `fork-${sessionId}-${seq++}`,
+        sessionId,
+        role,
+        content: [{ type: "text", text }],
+        timestamp: now + seq,
+      });
+    }
+  }
+
+  /**
    * Clear SDK session cache for a session
    * Called when session's cwd changes - SDK sessions are bound to cwd
    */
@@ -610,6 +715,8 @@ export class AgentRunner {
       } catch (e) {
         logWarn("[AgentRunner] dispose error:", e);
       }
+      // 会话关闭/淘汰：解绑扩展 UI（关闭 TUI Modal、清终端输入订阅）
+      resetUiState();
       this.piSessions.delete(sessionId);
       log("[AgentRunner] Disposed pi session for:", sessionId);
     }
@@ -865,6 +972,10 @@ ${hints.join("\n")}
     this.saveMessage = options.saveMessage;
     this.onBackgroundAgentComplete = options.onBackgroundAgentComplete;
     this.requestSudoPassword = options.requestSudoPassword;
+    this.createSessionRecord = options.createSessionRecord;
+    this.enqueuePromptForSession = options.enqueuePromptForSession;
+    this.findSessionByPiFile = options.findSessionByPiFile;
+    this.activateSession = options.activateSession;
     this.pathResolver = pathResolver;
     this.mcpManager = mcpManager;
     this._skillsAdapter = skillsAdapter;
@@ -3236,8 +3347,6 @@ Tool routing:\n
       } else {
         // First query in this session — create new pi-coding-agent session
         // ResourceLoader is only needed for session creation — skip on reuse
-        const { DefaultResourceLoader } =
-          await import("@earendil-works/pi-coding-agent");
         const extensionFactories: InlineExtension[] = [];
 
         // 注入子 Agent 插件
@@ -3325,14 +3434,27 @@ Tool routing:\n
           extensionFactories.push(deskwandToolExt);
         }
 
-        const resourceLoader = new DefaultResourceLoader({
+        // ── Pi Extension Host（按 cwd 复用）──────────────────────────────
+        // 负责扩展/包/设置/信任的加载与生命周期。agentDir 固定为 ~/.pi/agent
+        // （与 Pi CLI 共用同一套配置/扩展/信任，spec 决策 A）。首次使用时
+        // 强制加载并解析项目信任；reload 内部幂等。
+        const piAgentDir = path.join(os.homedir(), ".pi", "agent");
+        const piHost = PiExtensionHost.getOrCreate({
           cwd: effectiveCwd,
-          agentDir: userDeskWandDir,
+          agentDir: piAgentDir,
           additionalSkillPaths: skillPaths,
           appendSystemPrompt,
-          ...(extensionFactories.length > 0 ? { extensionFactories } : {}),
+          ...(extensionFactories.length > 0
+            ? { inlineExtensionFactories: extensionFactories }
+            : {}),
         });
-        await resourceLoader.reload();
+        if (
+          piHost.getExtensionsResult().extensions.length === 0 &&
+          piHost.getExtensionErrors().length === 0
+        ) {
+          await piHost.reloadResources({ resolveProjectTrust: true });
+        }
+        const resourceLoader = piHost.getResourceLoader();
 
         // 将 DeskWand Provider Profiles 注册为独立命名空间，供子 Agent 使用。
         if (subagentEnabled) {
@@ -3436,6 +3558,52 @@ Tool routing:\n
           this.onSessionFileCreated?.(session.id, newPiSessionFile);
         }
 
+        // Bind extension UI context（P1：mode "tui"；P2：commandContextActions 会话控制）
+        const piUiBridge = getPiUiBridge();
+        if (piUiBridge) {
+          this.piSessionBridge = new PiSessionBridge(
+            piSession,
+            {
+              onSessionShutdownCleanup: () => {
+                resetUiState();
+              },
+              createDeskWandSession: async ({ cwd, title, piSessionFile }) => {
+                return this.createDeskWandSessionForExtension(cwd, title, piSessionFile);
+              },
+              materializeMessages: (sessionId, entries) =>
+                this.materializeMessagesForExtension(sessionId, entries),
+              findDeskWandSessionByPiFile: (piFile) => {
+                const s = this.findSessionByPiFile?.(piFile);
+                return s ? s.id : null;
+              },
+              activateSession: (sessionId) =>
+                this.activateSession?.(sessionId),
+              uiAdapter: {
+                setEditorText: (text) => {
+                  getPiUiBridge()?.setEditorText(text);
+                },
+                notify: (message, type) => {
+                  getPiUiBridge()?.notify(message, type ?? "info");
+                },
+              },
+              enqueuePrompt: (sessionId, prompt) =>
+                this.enqueuePromptForSession?.(sessionId, prompt),
+            },
+            effectiveCwd,
+          );
+          await piSession.bindExtensions({
+            uiContext: piUiBridge,
+            mode: "tui",
+            commandContextActions: this.piSessionBridge.buildCommandContextActions(),
+            onError: (error) => {
+              logError(
+                `[AgentRunner] Extension error (${error.extensionPath}):`,
+                error.error,
+              );
+            },
+          });
+        }
+
         // Extract extension commands (registered via pi.registerCommand during load)
         const extCmds: { name: string; description: string }[] = [];
         for (const ext of extensionsResult.extensions) {
@@ -3468,6 +3636,7 @@ Tool routing:\n
               } catch (e) {
                 logWarn("[AgentRunner] dispose error on eviction:", e);
               }
+              resetUiState();
             }
             this.piSessions.delete(oldestKey);
             log("[AgentRunner] Evicted oldest cached session:", oldestKey);

@@ -9,6 +9,11 @@ export type {
 } from "../../shared/web-access";
 import type { ChannelPairingEvent } from "../../shared/ipc-types";
 import type { ChannelInstanceStatus } from "../../shared/ipc-types";
+import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
+import type {
+  PiTuiOpenEvent,
+  PiTuiFrameEvent,
+} from "../../shared/ipc-types";
 
 // Session types
 export interface Session {
@@ -722,7 +727,33 @@ export type ServerEvent =
         code?: "CONFIG_REQUIRED_ACTIVE_SET";
         action?: "open_api_settings";
       };
-    };
+    }
+  | { type: "pi.trust-prompt"; payload: PiTrustPrompt }
+  | { type: "pi.ui-request"; payload: PiUiRequest }
+  | { type: "pi.notify"; payload: { message: string; type: string } }
+  | {
+      type: "pi.set-status";
+      payload: { key: string; text: string | undefined };
+    }
+  | {
+      type: "pi.set-widget";
+      payload: { key: string; lines: string[] | undefined };
+    }
+  | {
+      type: "pi.package-progress";
+      payload: {
+        action: string;
+        source?: string;
+        message?: string;
+        type?: string;
+      };
+    }
+  | { type: "pi.tui.open"; payload: PiTuiOpenEvent }
+  | { type: "pi.tui.close"; payload: Record<string, never> }
+  | { type: "pi.tui.frame"; payload: PiTuiFrameEvent }
+  | { type: "session.activate"; payload: { session: Session } }
+  | { type: "pi.set-editor-text"; payload: { text: string } }
+  | { type: "session.create"; payload: { session: Session } };
 
 // Settings types
 export interface Settings {

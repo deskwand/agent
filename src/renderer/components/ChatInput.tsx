@@ -160,6 +160,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     }, [isElectron, showSlashMenu]);
 
     // --- Click outside to close slash menu ---
+    // Pi 扩展 setEditorText：写入输入框并清空待处理状态
+    const pendingEditorText = useAppStore((s) => s.pendingEditorText);
+    useEffect(() => {
+      if (pendingEditorText === null) return;
+      setPrompt(pendingEditorText);
+      useAppStore.getState().setPendingEditorText(null);
+    }, [pendingEditorText]);
+
     useEffect(() => {
       if (!showSlashMenu) return;
       function handleClick(e: MouseEvent) {
