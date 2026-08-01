@@ -1,4 +1,11 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useCallback,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   useActiveSessionId,
@@ -234,7 +241,14 @@ export function shouldShowHydratingHistoryState(
 
 const INITIAL_VISIBLE_TURNS = 8;
 const PREPEND_TURNS = 6;
+// Kill threshold: any real upward movement beyond 1px cancels follow.
 const BOTTOM_EPSILON_PX = 1;
+// Recovery threshold: coming back within 80px of the bottom re-enables
+// follow even mid-stream (a scroll event can never observe an exact-bottom
+// position while content is growing, so the recovery window must be wide).
+const NEAR_BOTTOM_PX = 80;
+// Wheel deltas below this are trackpad jitter, not a scroll gesture.
+const WHEEL_KILL_THRESHOLD_PX = 4;
 // Fire a little before the user hits absolute top to hide prepend latency.
 const LOAD_OLDER_THRESHOLD_PX = 160;
 
@@ -977,7 +991,7 @@ export function ChatView() {
     if (!container) return true;
     const distanceToBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
-    const isAtBottom = distanceToBottom <= 80;
+    const isAtBottom = distanceToBottom <= NEAR_BOTTOM_PX;
     isUserAtBottomRef.current = isAtBottom;
     return isAtBottom;
   }, []);
@@ -996,10 +1010,7 @@ export function ChatView() {
 
     if (upwardScrollIntentRef.current || scrolledAwayFromBottom) {
       autoFollowRef.current = false;
-    } else if (
-      !autoFollowRef.current &&
-      distanceToBottom <= BOTTOM_EPSILON_PX
-    ) {
+    } else if (!autoFollowRef.current && distanceToBottom <= NEAR_BOTTOM_PX) {
       autoFollowRef.current = true;
     } else if (autoFollowRef.current && !isNearBottom) {
       autoFollowRef.current = false;
@@ -1065,6 +1076,28 @@ export function ChatView() {
     // Wheel fires before the first scroll event, so an incoming token cannot
     // pull the viewport back down while the upward gesture is starting.
     const onWheel = (e: WheelEvent) => {
+      // Ignore trackpad jitter (sub-threshold pixel deltas at gesture
+      // start/end). Line/notch-mode deltas are always intentional.
+      if (
+        e.deltaMode === WheelEvent.DOM_DELTA_PIXEL &&
+        Math.abs(e.deltaY) < WHEEL_KILL_THRESHOLD_PX
+      ) {
+        return;
+      }
+      // A wheel inside a nested scrollable (tool output, bash output, ...)
+      // scrolls that element only — it is not a chat-scroll gesture, so it
+      // must not cancel follow. The chat container itself also carries the
+      // overflow-y-auto class, so `!== container` separates the two.
+      // Assumption: every overflow-y-auto descendant of the container is
+      // independently scrollable. A decorative (non-scrolling) element
+      // carrying that class would swallow wheel intent — keep the
+      // convention when adding new scrollable blocks.
+      if (
+        e.target instanceof Element &&
+        e.target.closest(".overflow-y-auto") !== container
+      ) {
+        return;
+      }
       if (e.deltaY < 0) {
         previousScrollTopRef.current = container.scrollTop;
         upwardScrollIntentRef.current = true;
@@ -1129,7 +1162,7 @@ export function ChatView() {
     loadOlderTurns,
   ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const messageCount = messages.length;
     // Only track visible content: thinking blocks are always filtered out
     // by filterAssistantVisibleBlocks (see tool-display-blocks.ts)
@@ -1165,9 +1198,7 @@ export function ChatView() {
     // stale isScrollingRef from ResizeObserver scrolls during streaming so
     // the final scroll-to-bottom is never blocked.
     const streamingJustEnded =
-      prevPartialLengthRef.current > 0 &&
-      partialLength === 0 &&
-      hasNewMessage;
+      prevPartialLengthRef.current > 0 && partialLength === 0 && hasNewMessage;
     if (streamingJustEnded) {
       isScrollingRef.current = false;
     }
@@ -1477,7 +1508,6 @@ export function ChatView() {
   }, []);
 
   const scrollToBottomByButton = () => {
-    if (isScrollingRef.current) return;
     autoFollowRef.current = true;
     upwardScrollIntentRef.current = false;
     isUserAtBottomRef.current = true;
@@ -1552,7 +1582,11 @@ export function ChatView() {
                   turnProcessSummary,
                   suppressProcessSummaries,
                 }) => (
-                  <div key={message.id} data-message-id={message.id} className="space-y-1.5">
+                  <div
+                    key={message.id}
+                    data-message-id={message.id}
+                    className="space-y-1.5"
+                  >
                     {turnProcessSummary ? (
                       <ProcessSummaryBlock
                         block={turnProcessSummary}

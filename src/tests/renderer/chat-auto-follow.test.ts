@@ -401,4 +401,301 @@ describe("ChatView auto-follow", () => {
 
     expect(scrollContainer!.scrollTop).toBe(910);
   });
+
+  it("resumes following when the user scrolls back to the bottom mid-stream", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // Scroll up to read history
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -20 }),
+      );
+      scrollContainer!.scrollTop = 300;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // Streaming continues while reading — must not yank
+    scrollHeight = 1200;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "t1",
+          },
+        },
+      }));
+    });
+    expect(scrollContainer!.scrollTop).toBe(300);
+
+    // Scroll back to the bottom (max = 700) mid-stream
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: 400 }),
+      );
+      scrollContainer!.scrollTop = 700;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // Next token must pin to the new bottom. Use a different-length token
+    // so the streaming tick fires directly (equal lengths would route the
+    // pin through the debounced path, which needs timer advancement).
+    // jsdom does not clamp direct scrollTop assignments, so assert distance
+    // (same style as test 1).
+    scrollHeight = 1300;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "t2x",
+          },
+        },
+      }));
+    });
+    const distanceToBottom = scrollHeight - scrollContainer!.scrollTop - 500;
+    expect(distanceToBottom).toBeLessThanOrEqual(1);
+  });
+
+  it("kills follow on a small scrollbar-style upward move (no wheel event)", async () => {
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // 10px upward move via scrollbar/keyboard — no wheel event at all
+    await act(async () => {
+      scrollContainer!.scrollTop = 490;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // Streaming continues — follow must stay OFF (killed by the upward move)
+    scrollHeight = 1010;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "next token",
+          },
+        },
+      }));
+    });
+
+    expect(scrollContainer!.scrollTop).toBe(490);
+  });
+
+  it("ignores a 1px upward wheel jitter at the bottom", async () => {
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -1 }),
+      );
+    });
+
+    // Streaming continues — follow must survive the jitter
+    scrollHeight = 1010;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "next token",
+          },
+        },
+      }));
+    });
+
+    expect(scrollContainer!.scrollTop).toBe(1010);
+  });
+
+  it("does not kill follow when the wheel scrolls a nested overflow area", async () => {
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // Simulate a tool-output block (nested overflow-y-auto element)
+    const inner = document.createElement("div");
+    inner.className = "overflow-y-auto";
+    scrollContainer!.appendChild(inner);
+
+    await act(async () => {
+      inner.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -20 }),
+      );
+    });
+
+    // Streaming continues — follow must survive (container never scrolled)
+    scrollHeight = 1010;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "next token",
+          },
+        },
+      }));
+    });
+
+    expect(scrollContainer!.scrollTop).toBe(1010);
+  });
+
+  it("scroll-to-bottom button works while a smooth scroll is still settling", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    const scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // New assistant message triggers a debounced smooth scrollToBottom →
+    // isScrollingRef latches for 300ms.
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            messages: [
+              ...state.sessionStates.s1!.messages,
+              makeMessage("a2", "assistant"),
+            ],
+            partialMessage: "",
+          },
+        },
+      }));
+      await vi.advanceTimersByTimeAsync(16); // fire the debounced scroll
+    });
+
+    // User scrolls up while the smooth scroll settles (follow off)
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -20 }),
+      );
+      scrollContainer!.scrollTop = 400;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    // Click the button within the 300ms window — must still work
+    const btn = container.querySelector<HTMLButtonElement>(
+      "button[aria-label='Scroll to bottom']",
+    );
+    expect(btn).not.toBeNull();
+    await act(async () => {
+      btn!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(scrollContainer!.scrollTop).toBe(500);
+  });
+
+  it("treats line-mode wheel deltas as intentional (bypass jitter filter)", async () => {
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    // Notch-mode wheel (deltaMode=LINE): 1 notch upward is intentional, so
+    // the sub-4px jitter filter must NOT apply — follow gets killed.
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", {
+          bubbles: true,
+          deltaY: -1,
+          deltaMode: WheelEvent.DOM_DELTA_LINE,
+        }),
+      );
+    });
+
+    // Streaming continues — follow must stay OFF (killed by the notch)
+    scrollHeight = 1010;
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            partialMessage: "next token",
+          },
+        },
+      }));
+    });
+
+    expect(scrollContainer!.scrollTop).toBe(500);
+  });
 });
