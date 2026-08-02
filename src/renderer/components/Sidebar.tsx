@@ -18,6 +18,9 @@ import {
   Download,
   Pin,
   PinOff,
+  Clock3,
+  Cloud,
+  Package,
 } from "lucide-react";
 import { AccountMenu } from "./AccountMenu";
 import { LoginModal } from "./LoginModal";
@@ -59,6 +62,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const showMarketplace = useAppStore((s) => s.showMarketplace);
   const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
   const showPlugins = useAppStore((s) => s.showPlugins);
+  const showSchedule = useAppStore((s) => s.showSchedule);
   const setShowPlugins = useAppStore((s) => s.setShowPlugins);
   const cloudConfig = useAppStore((s) => s.cloudConfig);
   const showLoginModal = useAppStore((s) => s.showLoginModal);
@@ -444,6 +448,30 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     setShowPlugins(false);
   }, [setActiveSession, setShowSettings, setShowSchedule, setShowMarketplace, setShowPlugins]);
 
+  const openMarketplace = useCallback(() => {
+    setAccountMenuOpen(false);
+    setShowSettings(false);
+    setShowSchedule(false);
+    setShowPlugins(false);
+    setShowMarketplace(true);
+  }, [setShowSettings, setShowSchedule, setShowPlugins, setShowMarketplace]);
+
+  const openPlugins = useCallback(() => {
+    setAccountMenuOpen(false);
+    setShowSettings(false);
+    setShowSchedule(false);
+    setShowMarketplace(false);
+    setShowPlugins(true);
+  }, [setShowSettings, setShowSchedule, setShowMarketplace, setShowPlugins]);
+
+  const openAutomation = useCallback(() => {
+    setAccountMenuOpen(false);
+    setShowSettings(false);
+    setShowMarketplace(false);
+    setShowPlugins(false);
+    setShowSchedule(true);
+  }, [setShowSettings, setShowMarketplace, setShowPlugins, setShowSchedule]);
+
   const handleDeleteSession = useCallback(
     (e: React.MouseEvent, session: Session) => {
       e.stopPropagation();
@@ -591,7 +619,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   };
 
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
-    const isActive = activeSessionId === session.id && !showMarketplace && !showPlugins;
+    const isActive =
+      activeSessionId === session.id &&
+      !showMarketplace &&
+      !showPlugins &&
+      !showSchedule;
     const hasStatusIndicator = session.status === "running";
     const isPinned = pinnedSessionIds.has(session.id);
     const isHovered = hoveredSessionId === session.id;
@@ -804,6 +836,51 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       >
         {!sidebarCollapsed && (
           <>
+            <div className="px-3 pt-3 pb-1.5">
+              <div className="flex flex-col gap-0.5">
+                <button
+                  type="button"
+                  onClick={openMarketplace}
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
+                    showMarketplace
+                      ? "bg-surface-active border-l-accent text-text-primary"
+                      : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
+                  }`}
+                  aria-current={showMarketplace ? "page" : undefined}
+                >
+                  <Cloud className="w-4 h-4 text-text-muted flex-shrink-0" />
+                  <span className="truncate">{t("sidebar.skillsCloud")}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={openPlugins}
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
+                    showPlugins
+                      ? "bg-surface-active border-l-accent text-text-primary"
+                      : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
+                  }`}
+                  aria-current={showPlugins ? "page" : undefined}
+                >
+                  <Package className="w-4 h-4 text-text-muted flex-shrink-0" />
+                  <span className="truncate">{t("sidebar.plugins")}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={openAutomation}
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
+                    showSchedule
+                      ? "bg-surface-active border-l-accent text-text-primary"
+                      : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
+                  }`}
+                  aria-current={showSchedule ? "page" : undefined}
+                >
+                  <Clock3 className="w-4 h-4 text-text-muted flex-shrink-0" />
+                  <span className="truncate">{t("sidebar.automation")}</span>
+                </button>
+              </div>
+              <div className="mx-2 mt-2 border-t border-border-muted" />
+            </div>
+
             <div className="px-4 pt-3 pb-2">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 min-w-0">
@@ -1083,24 +1160,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   setShowSchedule(false);
                   setShowPlugins(false);
                   setShowSettings(true);
-                }}
-                onOpenMarketplace={() => {
-                  setShowSettings(false);
-                  setShowSchedule(false);
-                  setShowPlugins(false);
-                  setShowMarketplace(true);
-                }}
-                onOpenPlugins={() => {
-                  setShowSettings(false);
-                  setShowSchedule(false);
-                  setShowMarketplace(false);
-                  setShowPlugins(true);
-                }}
-                onOpenAutomation={() => {
-                  setShowSettings(false);
-                  setShowMarketplace(false);
-                  setShowPlugins(false);
-                  setShowSchedule(true);
                 }}
                 onLogout={() => {
                   setAccountMenuOpen(false);

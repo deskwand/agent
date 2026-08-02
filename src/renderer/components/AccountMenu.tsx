@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { LogIn, User, Settings, LogOut, Clock3, Cloud, Package } from "lucide-react";
+import { LogIn, User, Settings, LogOut } from "lucide-react";
 import type { CloudConfig } from "../types";
 
 interface AccountMenuProps {
@@ -8,9 +8,6 @@ interface AccountMenuProps {
   cloudRestoring?: boolean;
   onOpenLogin: () => void;
   onOpenSettings: () => void;
-  onOpenAutomation: () => void;
-  onOpenMarketplace: () => void;
-  onOpenPlugins: () => void;
   onLogout: () => void;
   onClose: () => void;
 }
@@ -21,9 +18,6 @@ export function AccountMenu({
   cloudRestoring,
   onOpenLogin,
   onOpenSettings,
-  onOpenAutomation,
-  onOpenMarketplace,
-  onOpenPlugins,
   onLogout,
   onClose,
 }: AccountMenuProps) {
@@ -36,30 +30,6 @@ export function AccountMenu({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-border bg-background shadow-soft p-1.5 z-50 animate-account-menu-in">
-        <MenuItem
-          icon={<Cloud className="w-4 h-4" />}
-          label={t("sidebar.skillsCloud")}
-          onClick={() => {
-            onOpenMarketplace();
-            onClose();
-          }}
-        />
-        <MenuItem
-          icon={<Package className="w-4 h-4" />}
-          label={t("sidebar.plugins")}
-          onClick={() => {
-            onOpenPlugins();
-            onClose();
-          }}
-        />
-        <MenuItem
-          icon={<Clock3 className="w-4 h-4" />}
-          label={t("sidebar.automation")}
-          onClick={() => {
-            onOpenAutomation();
-            onClose();
-          }}
-        />
         <MenuItem
           icon={<Settings className="w-4 h-4" />}
           label={t("sidebar.settings")}
