@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { CloudApiClient } from "../services/cloud-api";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
+import { buildDeskwandProviderPayload } from "../utils/cloud-provider";
 import type { CloudConfig } from "../types";
 import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 
@@ -59,6 +60,14 @@ async function completeLogin(
     config.modes = await cloudApi.getModes();
   } catch {
     /* modes optional */
+  }
+  if (config.modes.length > 0) {
+    try {
+      const payload = buildDeskwandProviderPayload(config.modes, result.token);
+      await window.electronAPI.config.saveProvider(payload);
+    } catch {
+      /* provider injection optional */
+    }
   }
   try {
     const me = await cloudApi.getMe();

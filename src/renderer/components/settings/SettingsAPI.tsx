@@ -501,6 +501,7 @@ export function SettingsAPI({
     return (
       Object.entries(providers).filter(
         ([profileKey, config]) =>
+          profileKey !== "custom:deskwand" &&
           config &&
           hasUsableCredentials(profileKey as ProviderProfileKey, config),
       ) as Array<[string, ApiProviderConfig]>

@@ -182,6 +182,13 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         } catch (e: any) {
           if (e?.status === 401) {
             localStorage.removeItem("deskwand.cloud");
+            try {
+              await window.electronAPI.config.deleteProvider({
+                profileKey: "custom:deskwand",
+              });
+            } catch {
+              /* ignore */
+            }
           }
           // 网络错误时保留 localStorage，下次启动再试
         } finally {
@@ -1299,6 +1306,13 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           if (cloudConfig?.token) {
             try {
               await new CloudApiClient(cloudConfig.token).logout();
+            } catch {
+              /* ignore */
+            }
+            try {
+              await window.electronAPI.config.deleteProvider({
+                profileKey: "custom:deskwand",
+              });
             } catch {
               /* ignore */
             }
