@@ -1396,6 +1396,10 @@
       "TIMEOUT": "授权超时，请重试"
     }
   },
+  "topUp": {
+    "insufficientCredits": "点数不足，请充值后继续使用",
+    "goTopUp": "去充值"
+  },
   "update": {
     "title": "发现新版本",
     "description": "DeskWand v{{version}} 已下载完毕，重启应用即可完成更新",

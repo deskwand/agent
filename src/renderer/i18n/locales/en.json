@@ -1400,6 +1400,10 @@
       "TIMEOUT": "Authorization timed out, please try again"
     }
   },
+  "topUp": {
+    "insufficientCredits": "Insufficient credits, please top up to continue",
+    "goTopUp": "Top up"
+  },
   "update": {
     "title": "New Version Available",
     "description": "DeskWand v{{version}} has been downloaded. Restart to complete the update.",

@@ -19,6 +19,7 @@ import { ContentBlockView } from "./message/ContentBlockView";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
 import { ArtifactCard } from "./message/ArtifactCard";
+import { useAppStore } from "../store";
 
 interface MessageCardProps {
   message: Message;
@@ -192,6 +193,22 @@ export const MessageCard = memo(function MessageCard({
       </button>
     </div>
   );
+
+  if (message.code === "INSUFFICIENT_CREDITS") {
+    return (
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
+        <p className="text-sm text-text-primary">
+          {t("topUp.insufficientCredits")}
+        </p>
+        <button
+          className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-white"
+          onClick={() => useAppStore.getState().setTopUpOpen(true)}
+        >
+          {t("topUp.goTopUp")}
+        </button>
+      </div>
+    );
+  }
 
   if (!isUser && visibleBlocks.length === 0) {
     return null;

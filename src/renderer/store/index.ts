@@ -160,6 +160,9 @@ interface AppState {
   // Cloud auth
   cloudConfig: CloudConfig | null;
   setCloudConfig: (config: CloudConfig | null) => void;
+  // Top-up dialog
+  topUpOpen: boolean;
+  setTopUpOpen: (open: boolean) => void;
   // Cloud — active team
   activeTeamId: string | null;
   setActiveTeamId: (id: string | null) => void;
@@ -404,6 +407,7 @@ export const useAppStore = create<AppState>((set) => ({
   appConfig: null,
   isConfigured: false,
   cloudConfig: null,
+  topUpOpen: false,
   activeTeamId: null,
   activeTeamName: "",
   skillRefreshKey: 0,
@@ -944,6 +948,7 @@ export const useAppStore = create<AppState>((set) => ({
       /* localStorage unavailable */
     }
   },
+  setTopUpOpen: (open: boolean) => set({ topUpOpen: open }),
   setShowLoginModal: (show) => set({ showLoginModal: show }),
   setShowConfigModal: (show) => set({ showConfigModal: show }),
   markInitialConfigStatusSeen: () => set({ hasSeenInitialConfigStatus: true }),
