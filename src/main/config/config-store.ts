@@ -13,9 +13,7 @@ import {
   normalizeWebAccessConfig,
   type WebAccessConfig,
 } from "../../shared/web-access";
-import {
-  type SubagentConfig,
-} from "../../shared/subagent-config";
+import { type SubagentConfig } from "../../shared/subagent-config";
 import { logWarn } from "../utils/logger";
 import {
   normalizeAnthropicBaseUrl,
@@ -35,7 +33,8 @@ export type ProviderType =
   | "openai"
   | "gemini"
   | "ollama"
-  | "oauth";
+  | "oauth"
+  | "zhipu";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
@@ -991,8 +990,7 @@ export class ConfigStore {
       stored.visionModel = updates.visionModel;
     if (updates.webAccess !== undefined)
       stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
-    if (updates.subagent !== undefined)
-      stored.subagent = updates.subagent;
+    if (updates.subagent !== undefined) stored.subagent = updates.subagent;
 
     stored.isConfigured =
       updates.isConfigured ??

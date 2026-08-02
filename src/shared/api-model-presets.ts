@@ -5,7 +5,8 @@ export type SharedProviderType =
   | "custom"
   | "openai"
   | "gemini"
-  | "ollama";
+  | "ollama"
+  | "zhipu";
 
 export type SharedCustomProtocolType = "anthropic" | "openai" | "gemini";
 
@@ -33,6 +34,7 @@ export interface SharedProviderPresets {
   custom: SharedProviderPreset;
   openai: SharedProviderPreset;
   gemini: SharedProviderPreset;
+  zhipu: SharedProviderPreset;
 }
 
 export interface ModelInputGuidance {
@@ -138,6 +140,13 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
     keyPlaceholder: "sk-xxx",
     keyHint: "输入你的 API Key",
   },
+  zhipu: {
+    name: "智谱",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    models: [{ id: "glm-4.6v-flash", name: "glm-4.6v-flash" }],
+    keyPlaceholder: "你的智谱 API Key",
+    keyHint: "从 bigmodel.cn（国内）/ z.ai（国际）获取，两站 Key 不互通",
+  },
 };
 
 export const PI_AI_CURATED_PRESETS: Record<
@@ -237,6 +246,13 @@ export function getModelInputGuidance(
     return {
       placeholder: "deepseek-v4-pro, deepseek-v4-flash, deepseek-chat",
       hint: "Use the exact model ID for the selected protocol or endpoint.",
+    };
+  }
+
+  if (provider === "zhipu") {
+    return {
+      placeholder: "glm-4.6v-flash, glm-5",
+      hint: "Use the exact model ID for the selected region endpoint.",
     };
   }
 

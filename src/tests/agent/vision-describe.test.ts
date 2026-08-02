@@ -8,7 +8,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { detectImageMimeType } from "../../main/agent/tools/vision-describe";
+import {
+  detectImageMimeType,
+  protocolForProvider,
+} from "../../main/agent/tools/vision-describe";
 
 // ── Helpers ──
 
@@ -395,5 +398,26 @@ describe("vision_describe tool execute — error branches", () => {
         // cleanup best-effort
       }
     }
+  });
+});
+
+// ── Protocol mapping ──
+
+describe("vision-describe protocol mapping", () => {
+  it("maps zhipu to openai protocol", () => {
+    expect(protocolForProvider("zhipu")).toBe("openai");
+  });
+
+  it("keeps existing provider mappings", () => {
+    expect(protocolForProvider("anthropic")).toBe("anthropic");
+    expect(protocolForProvider("openai")).toBe("openai");
+    expect(protocolForProvider("deepseek")).toBe("openai");
+    expect(protocolForProvider("gemini")).toBe("gemini");
+    expect(protocolForProvider("ollama")).toBe("openai");
+    expect(protocolForProvider("openrouter")).toBe("openai");
+    expect(protocolForProvider("custom", "openai")).toBe("openai");
+    expect(protocolForProvider("custom", "gemini")).toBe("gemini");
+    expect(protocolForProvider("custom", "anthropic")).toBe("anthropic");
+    expect(protocolForProvider("custom")).toBe("anthropic");
   });
 });

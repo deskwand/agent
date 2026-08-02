@@ -10,10 +10,7 @@ export type {
 import type { ChannelPairingEvent } from "../../shared/ipc-types";
 import type { ChannelInstanceStatus } from "../../shared/ipc-types";
 import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
-import type {
-  PiTuiOpenEvent,
-  PiTuiFrameEvent,
-} from "../../shared/ipc-types";
+import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
 
 // Session types
 export interface Session {
@@ -807,7 +804,8 @@ export type ProviderType =
   | "openai"
   | "gemini"
   | "ollama"
-  | "oauth";
+  | "oauth"
+  | "zhipu";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export interface VisionModelConfig {
   enabled: boolean;
@@ -923,6 +921,7 @@ export interface ProviderPresets {
   custom: ProviderPreset;
   openai: ProviderPreset;
   gemini: ProviderPreset;
+  zhipu: ProviderPreset;
 }
 
 export interface ProviderModelInfo {

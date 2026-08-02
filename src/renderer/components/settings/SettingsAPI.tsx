@@ -71,6 +71,23 @@ const PROVIDER_ORDER: ProviderChoice[] = [
   "custom",
 ];
 
+/** 视觉模型设置页的 provider 列表：在主模型列表基础上追加「智谱」 */
+const VISION_PROVIDER_ORDER: ProviderChoice[] = [...PROVIDER_ORDER, "zhipu"];
+
+/** 智谱区域端点（两站 API Key 不互通，仅 baseUrl 不同） */
+const ZHIPU_REGIONS = [
+  {
+    id: "cn",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    labelKey: "api.zhipuRegionCn",
+  },
+  {
+    id: "global",
+    baseUrl: "https://api.z.ai/api/paas/v4",
+    labelKey: "api.zhipuRegionGlobal",
+  },
+] as const;
+
 const OAUTH_PROVIDER_MODELS: Record<
   string,
   Array<{ id: string; name: string }>
@@ -1661,7 +1678,7 @@ export function SettingsAPI({
                     {t("api.provider")}
                   </label>
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                    {PROVIDER_ORDER.map((provider) => (
+                    {VISION_PROVIDER_ORDER.map((provider) => (
                       <button
                         key={provider}
                         type="button"
@@ -1676,6 +1693,10 @@ export function SettingsAPI({
                               provider !== "custom"
                                 ? preset?.baseUrl || ""
                                 : prev.baseUrl,
+                            model:
+                              provider === "zhipu"
+                                ? "glm-4.6v-flash"
+                                : prev.model,
                           }));
                         }}
                         className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
@@ -1731,6 +1752,40 @@ export function SettingsAPI({
                         ),
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Zhipu region selector */}
+                {visionDraft.provider === "zhipu" && (
+                  <div className="space-y-3 border-b border-border-muted pb-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <Globe2 className="h-4 w-4" />
+                      {t("api.region")}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ZHIPU_REGIONS.map((region) => (
+                        <button
+                          key={region.id}
+                          type="button"
+                          onClick={() =>
+                            setVisionDraft((prev) => ({
+                              ...prev,
+                              baseUrl: region.baseUrl,
+                            }))
+                          }
+                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                            visionDraft.baseUrl === region.baseUrl
+                              ? "border-accent bg-accent/10 font-medium text-accent"
+                              : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                          }`}
+                        >
+                          {t(region.labelKey)}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-text-muted">
+                      {t("api.zhipuRegionHint")}
+                    </p>
                   </div>
                 )}
 
