@@ -3970,7 +3970,8 @@ Tool routing:\n
                 );
               }
               if (resolvedPayload.errorText) {
-                terminalErrorText = resolvedPayload.errorText;
+                const errorText = resolvedPayload.errorText;
+                terminalErrorText = errorText;
                 if (!hasEmittedError) {
                   hasEmittedError = true;
                   this.sendMessage(session.id, {
@@ -3981,11 +3982,14 @@ Tool routing:\n
                     content: [
                       {
                         type: "text",
-                        text: `**Error**: ${resolvedPayload.errorText}\n\n${getErrorSuffix(resolvedPayload.errorText)}`,
+                        text: `**Error**: ${errorText}\n\n${getErrorSuffix(errorText)}`,
                       },
                     ],
                     timestamp: Date.now(),
                     executionTimeMs: Date.now() - runStartTime,
+                    code: detectInsufficientCredits(errorText)
+                      ? "INSUFFICIENT_CREDITS"
+                      : undefined,
                   });
                 }
                 break;

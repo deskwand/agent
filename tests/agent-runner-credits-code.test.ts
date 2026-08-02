@@ -9,11 +9,11 @@ const runnerPath = path.resolve(
 const typesPath = path.resolve(process.cwd(), "src/renderer/types/index.ts");
 
 describe("Agent runner credits error propagation", () => {
-  it("attaches INSUFFICIENT_CREDITS code in both error message paths", () => {
+  it("attaches INSUFFICIENT_CREDITS code in all error message paths", () => {
     const source = fs.readFileSync(runnerPath, "utf8");
     const occurrences =
       source.split("code: detectInsufficientCredits(errorText)").length - 1;
-    expect(occurrences).toBe(2);
+    expect(occurrences).toBe(3);
     expect(source).toContain('? "INSUFFICIENT_CREDITS"');
   });
 
