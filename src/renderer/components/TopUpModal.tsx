@@ -217,6 +217,11 @@ export function TopUpModal() {
               ))}
             </div>
             <p className="text-xs text-text-muted">{t("topUp.chainHint")}</p>
+            {payStatus === "networkError" && (
+              <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-text-muted">
+                {t("topUp.networkError")}
+              </p>
+            )}
             <div className="flex gap-2">
               <button
                 className="flex-1 rounded-lg border border-border py-2 text-sm text-text-primary"
