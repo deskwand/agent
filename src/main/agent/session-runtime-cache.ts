@@ -1,4 +1,5 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { createFreshOAuthCredentialStore } from "./fresh-oauth-credential-store";
 
 /**
  * Per-session ModelRuntime 实例缓存。
@@ -32,5 +33,6 @@ export function createSessionModelRuntime(
     authPath,
     modelsPath: null,
     allowModelNetwork: false,
+    credentials: createFreshOAuthCredentialStore(authPath),
   });
 }

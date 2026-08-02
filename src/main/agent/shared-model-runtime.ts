@@ -1,6 +1,7 @@
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { app } from "electron";
 import { join } from "node:path";
+import { createFreshOAuthCredentialStore } from "./fresh-oauth-credential-store";
 import { logWarn } from "../utils/logger";
 
 let sharedModelRuntimePromise: Promise<ModelRuntime> | undefined;
@@ -43,6 +44,7 @@ export function getSharedModelRuntime(): Promise<ModelRuntime> {
     authPath: getAuthPath(),
     modelsPath: null,
     allowModelNetwork: false,
+    credentials: createFreshOAuthCredentialStore(getAuthPath()),
   }).catch((error: unknown) => {
     sharedModelRuntimePromise = undefined;
     throw error;

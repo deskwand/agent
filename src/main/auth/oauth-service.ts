@@ -201,6 +201,16 @@ async function promptAuth(
     return first;
   }
 
+  if (prompt.type === "manual_code") {
+    // 浏览器登录是主路径（auth_url 已打开系统浏览器）；manual_code
+    // 只是登录失败时的兑底输入。不弹应用内窗口，挂起直到登录流程
+    // 结束（signal abort 自动解除），保持与旧版一致的直跳浏览器体验。
+    return new Promise<string>((_resolve, reject) => {
+      const onAbort = () => reject(new Error("Login cancelled"));
+      prompt.signal?.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+
   const result = await showBrowserDialog({
     title: providerName,
     message: prompt.message,

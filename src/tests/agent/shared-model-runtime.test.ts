@@ -30,11 +30,14 @@ describe("shared-model-runtime", () => {
     expect(first).toBe(runtime);
     expect(second).toBe(runtime);
     expect(createModelRuntimeMock).toHaveBeenCalledTimes(1);
-    expect(createModelRuntimeMock).toHaveBeenCalledWith({
-      authPath: "/tmp/deskwand-user-data/auth.json",
-      modelsPath: null,
-      allowModelNetwork: false,
-    });
+    expect(createModelRuntimeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        authPath: "/tmp/deskwand-user-data/auth.json",
+        modelsPath: null,
+        allowModelNetwork: false,
+        credentials: expect.any(Object),
+      }),
+    );
   });
 
   it("retries after initialization failure", async () => {
