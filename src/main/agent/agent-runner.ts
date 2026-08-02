@@ -94,6 +94,7 @@ import {
   toUserFacingErrorText,
   getErrorSuffix,
 } from "./agent-runner-message-end";
+import { detectInsufficientCredits } from "./credits-error";
 import { buildPiSessionRuntimeSignature } from "./pi-session-runtime";
 import { ThinkTagStreamParser } from "./think-tag-parser";
 import {
@@ -4269,6 +4270,9 @@ Tool routing:\n
               content: [{ type: "text", text: `**Error**: ${errorText}` }],
               timestamp: Date.now(),
               executionTimeMs: Date.now() - runStartTime,
+              code: detectInsufficientCredits(errorText)
+                ? "INSUFFICIENT_CREDITS"
+                : undefined,
             });
           }
         }
@@ -4515,6 +4519,9 @@ Tool routing:\n
           content: [{ type: "text", text: `**Error**: ${errorText}` }],
           timestamp: Date.now(),
           executionTimeMs: Date.now() - runStartTime,
+          code: detectInsufficientCredits(errorText)
+            ? "INSUFFICIENT_CREDITS"
+            : undefined,
         };
         this.sendMessage(session.id, errorMsg);
 
