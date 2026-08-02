@@ -31,6 +31,7 @@ import { PermissionDialog } from "./components/PermissionDialog";
 import { SudoPasswordDialog } from "./components/SudoPasswordDialog";
 import { ExtensionDialogs } from "./components/ExtensionDialogs";
 import { PiTuiModal } from "./components/PiTuiModal";
+import { TopUpModal } from "./components/TopUpModal";
 import { Titlebar } from "./components/Titlebar";
 import { SandboxSetupDialog } from "./components/SandboxSetupDialog";
 import { SandboxSyncToast } from "./components/SandboxSyncToast";
@@ -469,6 +470,9 @@ function App() {
 
       {/* Pi TUI Modal (custom components) */}
       <PiTuiModal />
+
+      {/* Top Up Modal (crypto top-up) */}
+      <TopUpModal />
 
       {/* Sudo Password Dialog */}
       {pendingSudoPassword && (
