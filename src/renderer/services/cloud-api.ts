@@ -82,6 +82,8 @@ export class CloudApiClient {
     email: string;
     level: string;
     credits_balance: number;
+    free_credits_remaining: number;
+    free_quota_expires_at: string | null;
   }> {
     return this.request("/api/auth/me");
   }
@@ -252,5 +254,53 @@ export class CloudApiClient {
 
   getSkillDownloadUrl(skillId: string, version: number): string {
     return `/api/skills/${skillId}/versions/${version}/download`;
+  }
+
+  // ── Top-Up ──
+
+  async createTopUpOrder(
+    amountCents: number,
+    chain: "bsc" | "arb",
+  ): Promise<{
+    id: string;
+    chain: string;
+    amount_cents: number;
+    deposit_address: string;
+    expires_at: string;
+  }> {
+    const res = await this.request<{
+      order: {
+        id: string;
+        chain: string;
+        amount_cents: number;
+        deposit_address: string;
+        expires_at: string;
+      };
+    }>("/api/payments/orders", {
+      method: "POST",
+      body: JSON.stringify({ amount_cents: amountCents, chain }),
+    });
+    return res.order;
+  }
+
+  async getTopUpOrder(id: string): Promise<{
+    id: string;
+    status: "pending" | "confirmed" | "expired";
+    credits: number;
+    tx_hash: string;
+    confirmed_at: string | null;
+    expires_at: string;
+  }> {
+    const res = await this.request<{
+      order: {
+        id: string;
+        status: "pending" | "confirmed" | "expired";
+        credits: number;
+        tx_hash: string;
+        confirmed_at: string | null;
+        expires_at: string;
+      };
+    }>(`/api/payments/orders/${id}`);
+    return res.order;
   }
 }

@@ -51,12 +51,21 @@ async function completeLogin(
     email: result.user.email,
     level: result.user.level,
     creditsBalance: result.user.credits_balance,
+    freeCreditsRemaining: 0,
+    freeQuotaExpiresAt: null,
     modes: [],
   };
   try {
     config.modes = await cloudApi.getModes();
   } catch {
     /* modes optional */
+  }
+  try {
+    const me = await cloudApi.getMe();
+    config.freeCreditsRemaining = me.free_credits_remaining;
+    config.freeQuotaExpiresAt = me.free_quota_expires_at;
+  } catch {
+    /* free quota optional */
   }
   onSuccess(config);
 }

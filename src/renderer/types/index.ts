@@ -1043,6 +1043,8 @@ export interface CloudConfig {
   email: string;
   level: string;
   creditsBalance: number;
+  freeCreditsRemaining: number;
+  freeQuotaExpiresAt: string | null;
   modes: Array<{ id: string; name: string; model: string }>;
 }
 
