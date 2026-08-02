@@ -248,7 +248,7 @@ function defaultMemoryRuntime(): MemoryRuntimeConfig {
   };
 }
 
-function defaultStoredConfig(): StoredConfig {
+export function defaultStoredConfig(): StoredConfig {
   return {
     activeProviderKey: "openrouter",
     providers: {},
@@ -258,7 +258,7 @@ function defaultStoredConfig(): StoredConfig {
     theme: "light",
     themePreset: "graphite",
     sandboxEnabled: false,
-    memoryEnabled: false,
+    memoryEnabled: true,
     memoryRuntime: defaultMemoryRuntime(),
     enableThinking: false,
     thinkingLevel: "medium",

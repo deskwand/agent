@@ -1,0 +1,8 @@
+import { describe, expect, it } from "vitest";
+import { defaultStoredConfig } from "../../main/config/config-store";
+
+describe("defaultStoredConfig", () => {
+  it("defaults the global memory switch to enabled", () => {
+    expect(defaultStoredConfig().memoryEnabled).toBe(true);
+  });
+});
