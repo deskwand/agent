@@ -201,7 +201,7 @@ export const MessageCard = memo(function MessageCard({
           {t("topUp.insufficientCredits")}
         </p>
         <button
-          className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-white"
+          className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground"
           onClick={() => useAppStore.getState().setTopUpOpen(true)}
         >
           {t("topUp.goTopUp")}
