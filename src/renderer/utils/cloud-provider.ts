@@ -24,7 +24,8 @@ export function buildDeskwandProviderPayload(
       name: "DeskWand 云",
       baseUrl: `${DESKWAND_API_URL}/api/models`,
       apiKey: token,
-      defaultModel: modes[0]?.model ?? "",
+      defaultModel:
+        modes.find((m) => m.id === "standard")?.model ?? modes[0]?.model ?? "",
       // config-store 的 normalizeProviderModel 会把缺失的 source 默认成 "preset"，
       // 这里保持 payload 只含 id/label（与纯函数测试契约一致）。
       models: modes.map(

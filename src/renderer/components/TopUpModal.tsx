@@ -15,6 +15,7 @@ type PayStatus =
   | "confirmed"
   | "orderExpired"
   | "timeout"
+  | "tooManyPending"
   | "networkError";
 
 const QUICK_AMOUNTS = [500, 1000, 2500, 5000]; // $5 / $10 / $25 / $50（美分）
@@ -114,8 +115,12 @@ export function TopUpModal() {
       } catch {
         setQrDataUrl("");
       }
-    } catch {
-      setPayStatus("networkError");
+    } catch (e: unknown) {
+      // fetchCore 抛出的错误带 { code, status }（Error 对象属性），网络错误无 code
+      const code = (e as { code?: unknown }).code;
+      setPayStatus(
+        code === "TOO_MANY_PENDING" ? "tooManyPending" : "networkError",
+      );
     } finally {
       setCreating(false);
     }
@@ -222,6 +227,11 @@ export function TopUpModal() {
                 {t("topUp.networkError")}
               </p>
             )}
+            {payStatus === "tooManyPending" && (
+              <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-text-muted">
+                {t("topUp.tooManyPending")}
+              </p>
+            )}
             <div className="flex gap-2">
               <button
                 className="flex-1 rounded-lg border border-border py-2 text-sm text-text-primary"
@@ -309,9 +319,9 @@ export function TopUpModal() {
                 {t("topUp.timeout")}
               </p>
             )}
-            {payStatus === "networkError" && (
+            {payStatus === "tooManyPending" && (
               <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-text-muted">
-                {t("topUp.networkError")}
+                {t("topUp.tooManyPending")}
               </p>
             )}
             <button

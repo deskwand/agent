@@ -94,7 +94,7 @@ import {
   toUserFacingErrorText,
   getErrorSuffix,
 } from "./agent-runner-message-end";
-import { detectInsufficientCredits } from "./credits-error";
+import { detectInsufficientCredits, toErrorText } from "./credits-error";
 import { buildPiSessionRuntimeSignature } from "./pi-session-runtime";
 import { ThinkTagStreamParser } from "./think-tag-parser";
 import {
@@ -438,26 +438,6 @@ function summarizeMessageForLog(message: unknown): Record<string, unknown> {
     }),
     usage: normalizeTokenUsage(typedMessage.usage),
   };
-}
-
-function toErrorText(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  if (error && typeof error === "object") {
-    const maybeMessage = (error as { message?: unknown }).message;
-    if (typeof maybeMessage === "string" && maybeMessage.trim()) {
-      return maybeMessage;
-    }
-  }
-  const serialized = safeStringify(error);
-  if (serialized.startsWith("[Unserializable:")) {
-    return String(error);
-  }
-  return serialized;
 }
 
 function normalizeTokenUsage(

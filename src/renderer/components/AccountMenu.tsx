@@ -29,9 +29,11 @@ export function AccountMenu({
 
   // Server sends free quota expiry as 'YYYY-MM-DD HH:MM:SS' in UTC.
   const quotaExpiresAt = cloudConfig?.freeQuotaExpiresAt ?? null;
-  const quotaExpiresDate = quotaExpiresAt
-    ? new Date(quotaExpiresAt.replace(" ", "T") + "Z")
-    : null;
+  const quotaExpiresDate = (() => {
+    if (!quotaExpiresAt) return null;
+    const t = Date.parse(quotaExpiresAt.replace(" ", "T") + "Z");
+    return Number.isFinite(t) ? new Date(t) : null;
+  })();
 
   return (
     <>
