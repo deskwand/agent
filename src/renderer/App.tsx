@@ -18,7 +18,7 @@ import {
   useSandboxSyncStatus,
   usePendingDialogs,
   useScheduleViewState,
-  useMarketplaceViewState,
+  useAppsViewState,
 } from "./store/selectors";
 import { useIPC } from "./hooks/useIPC";
 import { useWindowSize } from "./hooks/useWindowSize";
@@ -26,8 +26,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { WelcomeView } from "./components/WelcomeView";
 import { ScheduleView } from "./components/ScheduleView";
-import { MarketplaceView } from "./components/MarketplaceView";
-import { PluginsView } from "./components/PluginsView";
+import { AppsView } from "./components/AppsView";
 import { PermissionDialog } from "./components/PermissionDialog";
 import { SudoPasswordDialog } from "./components/SudoPasswordDialog";
 import { ExtensionDialogs } from "./components/ExtensionDialogs";
@@ -97,8 +96,7 @@ function App() {
   const systemDarkMode = useSystemDarkMode();
   const { showSettings } = useSettingsState();
   const showSchedule = useScheduleViewState();
-  const { showMarketplace } = useMarketplaceViewState();
-  const showPlugins = useAppStore((s) => s.showPlugins);
+  const showApps = useAppsViewState();
   const { showConfigModal, isConfigured, appConfig } = useConfigModalState();
   const lightboxState = useImageLightboxState();
   const globalNotice = useGlobalNotice();
@@ -215,14 +213,9 @@ function App() {
 
   // Sync browser WebContentsView visibility with panel state.
   // WebContentsView is a native Electron layer — any full-screen React view
-  // (settings, marketplace, schedule, review, config modal) must hide it.
+  // (settings, apps, schedule, review, config modal) must hide it.
   const isFullScreenView =
-    showSettings ||
-    showMarketplace ||
-    showPlugins ||
-    showSchedule ||
-    isReviewOpen ||
-    showConfigModal;
+    showSettings || showApps || showSchedule || isReviewOpen || showConfigModal;
 
   useLayoutEffect(() => {
     if (
@@ -375,10 +368,8 @@ function App() {
               <Suspense fallback={<MainPanelFallback />}>
                 <SettingsPanel onClose={() => setShowSettings(false)} />
               </Suspense>
-            ) : showMarketplace ? (
-              <MarketplaceView />
-            ) : showPlugins ? (
-              <PluginsView />
+            ) : showApps ? (
+              <AppsView />
             ) : showSchedule ? (
               <ScheduleView />
             ) : activeSessionId ? (

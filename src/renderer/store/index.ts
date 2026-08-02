@@ -132,8 +132,7 @@ interface AppState {
   browserWidthManual: boolean;
   showSettings: boolean;
   showSchedule: boolean;
-  showMarketplace: boolean;
-  showPlugins: boolean;
+  showApps: boolean;
   settingsTab: string | null;
 
   rightPanelMode: "files" | "browser" | null;
@@ -286,8 +285,7 @@ interface AppState {
   setContextPanelWidth: (width: number) => void;
   setShowSettings: (show: boolean) => void;
   setShowSchedule: (show: boolean) => void;
-  setShowMarketplace: (show: boolean) => void;
-  setShowPlugins: (show: boolean) => void;
+  setShowApps: (show: boolean) => void;
   setSettingsTab: (tab: string | null) => void;
 
   setRightPanelMode: (mode: "files" | "browser" | null) => void;
@@ -393,8 +391,7 @@ export const useAppStore = create<AppState>((set) => ({
   browserWidthManual: false,
   showSettings: false,
   showSchedule: false,
-  showMarketplace: false,
-  showPlugins: false,
+  showApps: false,
   settingsTab: null,
   rightPanelMode: null as "files" | "browser" | null,
   isReviewOpen: false,
@@ -870,8 +867,7 @@ export const useAppStore = create<AppState>((set) => ({
   setContextPanelWidth: (width) => set({ contextPanelWidth: width }),
   setShowSettings: (show) => set({ showSettings: show }),
   setShowSchedule: (show) => set({ showSchedule: show }),
-  setShowMarketplace: (show) => set({ showMarketplace: show }),
-  setShowPlugins: (show) => set({ showPlugins: show }),
+  setShowApps: (show) => set({ showApps: show }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
   setReviewOpen: (open) => set({ isReviewOpen: open }),

@@ -19,8 +19,7 @@ import {
   Pin,
   PinOff,
   Clock3,
-  Cloud,
-  Package,
+  LayoutGrid,
 } from "lucide-react";
 import { AccountMenu } from "./AccountMenu";
 import { LoginModal } from "./LoginModal";
@@ -59,11 +58,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
-  const showMarketplace = useAppStore((s) => s.showMarketplace);
-  const setShowMarketplace = useAppStore((s) => s.setShowMarketplace);
-  const showPlugins = useAppStore((s) => s.showPlugins);
+  const showApps = useAppStore((s) => s.showApps);
+  const setShowApps = useAppStore((s) => s.setShowApps);
   const showSchedule = useAppStore((s) => s.showSchedule);
-  const setShowPlugins = useAppStore((s) => s.setShowPlugins);
   const cloudConfig = useAppStore((s) => s.cloudConfig);
   const showLoginModal = useAppStore((s) => s.showLoginModal);
   const setShowLoginModal = useAppStore((s) => s.setShowLoginModal);
@@ -371,8 +368,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       setSessionMenu(null);
       setShowSettings(false);
       setShowSchedule(false);
-      setShowMarketplace(false);
-      setShowPlugins(false);
+      setShowApps(false);
       if (activeSessionId === sessionId) return;
 
       const existingMessages = sessionStates[sessionId]?.messages;
@@ -434,7 +430,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       sessionStates,
       setActiveSession,
       setMessages,
-      setShowPlugins,
+      setShowApps,
       setShowSettings,
       setTraceSteps,
     ],
@@ -444,33 +440,22 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     setActiveSession(null);
     setShowSettings(false);
     setShowSchedule(false);
-    setShowMarketplace(false);
-    setShowPlugins(false);
-  }, [setActiveSession, setShowSettings, setShowSchedule, setShowMarketplace, setShowPlugins]);
+    setShowApps(false);
+  }, [setActiveSession, setShowSettings, setShowSchedule, setShowApps]);
 
-  const openMarketplace = useCallback(() => {
+  const openApps = useCallback(() => {
     setAccountMenuOpen(false);
     setShowSettings(false);
     setShowSchedule(false);
-    setShowPlugins(false);
-    setShowMarketplace(true);
-  }, [setShowSettings, setShowSchedule, setShowPlugins, setShowMarketplace]);
-
-  const openPlugins = useCallback(() => {
-    setAccountMenuOpen(false);
-    setShowSettings(false);
-    setShowSchedule(false);
-    setShowMarketplace(false);
-    setShowPlugins(true);
-  }, [setShowSettings, setShowSchedule, setShowMarketplace, setShowPlugins]);
+    setShowApps(true);
+  }, [setShowSettings, setShowSchedule, setShowApps]);
 
   const openAutomation = useCallback(() => {
     setAccountMenuOpen(false);
     setShowSettings(false);
-    setShowMarketplace(false);
-    setShowPlugins(false);
+    setShowApps(false);
     setShowSchedule(true);
-  }, [setShowSettings, setShowMarketplace, setShowPlugins, setShowSchedule]);
+  }, [setShowSettings, setShowApps, setShowSchedule]);
 
   const handleDeleteSession = useCallback(
     (e: React.MouseEvent, session: Session) => {
@@ -621,8 +606,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive =
       activeSessionId === session.id &&
-      !showMarketplace &&
-      !showPlugins &&
+      !showApps &&
       !showSchedule;
     const hasStatusIndicator = session.status === "running";
     const isPinned = pinnedSessionIds.has(session.id);
@@ -840,29 +824,16 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               <div className="flex flex-col gap-0.5">
                 <button
                   type="button"
-                  onClick={openMarketplace}
+                  onClick={openApps}
                   className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
-                    showMarketplace
+                    showApps
                       ? "bg-surface-active border-l-accent text-text-primary"
                       : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
                   }`}
-                  aria-current={showMarketplace ? "page" : undefined}
+                  aria-current={showApps ? "page" : undefined}
                 >
-                  <Cloud className="w-4 h-4 text-text-muted flex-shrink-0" />
-                  <span className="truncate">{t("sidebar.skillsCloud")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={openPlugins}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
-                    showPlugins
-                      ? "bg-surface-active border-l-accent text-text-primary"
-                      : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
-                  }`}
-                  aria-current={showPlugins ? "page" : undefined}
-                >
-                  <Package className="w-4 h-4 text-text-muted flex-shrink-0" />
-                  <span className="truncate">{t("sidebar.plugins")}</span>
+                  <LayoutGrid className="w-4 h-4 text-text-muted flex-shrink-0" />
+                  <span className="truncate">{t("sidebar.apps")}</span>
                 </button>
                 <button
                   type="button"
@@ -1156,9 +1127,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 cloudRestoring={cloudRestoring}
                 onOpenLogin={() => setShowLoginModal(true)}
                 onOpenSettings={() => {
-                  setShowMarketplace(false);
+                  setShowApps(false);
                   setShowSchedule(false);
-                  setShowPlugins(false);
                   setShowSettings(true);
                 }}
                 onLogout={() => {

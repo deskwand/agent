@@ -139,6 +139,9 @@
     "desc": "浏览和安装技能，管理你的云端技能库",
     "tabMCP": "MCP"
   },
+  "apps": {
+    "title": "应用"
+  },
   "skillMarket": {
     "tabMySkills": "我的技能",
     "publishUpdate": "保存更新",
@@ -793,7 +796,6 @@
     "apiConfigured": "API 已配置",
     "apiNotConfigured": "API 未配置",
     "user": "用户",
-    "plugins": "插件",
     "openProject": "打开已有项目",
     "newProject": "新建项目",
     "createProjectTitle": "新建项目",
@@ -807,7 +809,7 @@
     "previousWeek": "最近 7 天",
     "older": "更早",
     "settings": "设置",
-    "skillsCloud": "技能云",
+    "apps": "应用",
     "allSessions": "会话",
     "emptyTitle": "还没有会话",
     "emptyHint": "点击「新建」开始",

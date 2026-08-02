@@ -139,6 +139,9 @@
     "desc": "Browse and install skills, manage your cloud skill library",
     "tabMCP": "MCP"
   },
+  "apps": {
+    "title": "Apps"
+  },
   "skillMarket": {
     "tabMySkills": "My Skills",
     "publishUpdate": "Save Update",
@@ -792,7 +795,6 @@
     "apiConfigured": "API Configured",
     "apiNotConfigured": "API Not Configured",
     "user": "User",
-    "plugins": "Plugins",
     "searchPlaceholder": "Search sessions or projects...",
     "newChat": "New",
     "openProject": "Open Project",
@@ -808,7 +810,7 @@
     "previousWeek": "Previous 7 Days",
     "older": "Older",
     "settings": "Settings",
-    "skillsCloud": "Skills Cloud",
+    "apps": "Apps",
     "allSessions": "Sessions",
     "emptyTitle": "No sessions yet",
     "emptyHint": "Click \"New\" to start",

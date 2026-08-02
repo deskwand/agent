@@ -239,15 +239,9 @@ export function useScheduleViewState(): boolean {
   return useAppStore((s) => s.showSchedule);
 }
 
-/** Returns whether the marketplace view is active. */
-export function useMarketplaceViewState(): {
-  showMarketplace: boolean;
-} {
-  return useAppStore(
-    useShallow((s) => ({
-      showMarketplace: s.showMarketplace,
-    })),
-  );
+/** Returns whether the apps view is active. */
+export function useAppsViewState(): boolean {
+  return useAppStore((s) => s.showApps);
 }
 
 // ---------------------------------------------------------------------------

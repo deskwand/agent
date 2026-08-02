@@ -526,14 +526,13 @@ function installSharedIpcBridge(): void {
           store.setActiveSession(null);
           store.setShowSettings(false);
           store.setShowSchedule(false);
-          store.setShowMarketplace(false);
-          store.setShowPlugins(false);
+          store.setShowApps(false);
           break;
 
         case "navigate":
           if (event.payload === "settings") {
             store.setShowSettings(true);
-            store.setShowPlugins(false);
+            store.setShowApps(false);
           }
           break;
 
