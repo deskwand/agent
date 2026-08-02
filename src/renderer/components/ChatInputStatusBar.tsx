@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Target,
@@ -89,6 +90,41 @@ export function ChatInputStatusBar({
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
 
+  // Last authoritative timeUsedSeconds snapshot and its arrival time.
+  const lastReceivedRef = useRef<{
+    timeUsedSeconds: number;
+    at: number;
+  } | null>(null);
+  const timeUsedSeconds = hasTimeUsed(status)
+    ? status.timeUsedSeconds
+    : undefined;
+  useEffect(() => {
+    if (timeUsedSeconds != null) {
+      lastReceivedRef.current = {
+        timeUsedSeconds,
+        at: Date.now(),
+      };
+    }
+  }, [timeUsedSeconds]);
+
+  // Live-tick the elapsed clock while the goal is actively running.
+  const [now, setNow] = useState(() => Date.now());
+  const isTimeLive = isGoalTimeLive(status);
+  useEffect(() => {
+    if (!isTimeLive) return;
+    const at = Date.now();
+    const prev = lastReceivedRef.current;
+    if (prev) {
+      // Pause → resume re-arrives the same snapshot value, so the dep above
+      // won't re-run; rebase the local clock here instead of extrapolating
+      // from the stale pre-pause arrival time (would jump by the pause length).
+      lastReceivedRef.current = { ...prev, at };
+    }
+    setNow(at);
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isTimeLive]);
+
   // ── Goal status rendering ──
   if (
     status &&
@@ -142,12 +178,17 @@ export function ChatInputStatusBar({
     }
 
     // Append elapsed time for all goal states that have timeUsedSeconds
-    if (status.timeUsedSeconds != null && status.timeUsedSeconds > 0) {
+    const received = lastReceivedRef.current;
+    const displaySeconds =
+      status.timeUsedSeconds != null
+        ? computeElapsedSeconds(status, received?.at ?? now, now)
+        : undefined;
+    if (displaySeconds != null && displaySeconds > 0) {
       const isOngoing =
         status.type === "goal-active" ||
         status.type === "goal-paused" ||
         status.type === "goal-budget-limited";
-      infoText += ` · ${t(isOngoing ? "goal.elapsed" : "goal.elapsedDone", { time: formatElapsedTime(status.timeUsedSeconds) })}`;
+      infoText += ` · ${t(isOngoing ? "goal.elapsed" : "goal.elapsedDone", { time: formatElapsedTime(displaySeconds) })}`;
     }
 
     return (
@@ -155,8 +196,16 @@ export function ChatInputStatusBar({
         <style>{gradientStyles}</style>
         <div className="flex items-center gap-1.5 text-xs text-text-primary">
           {renderGoalIcon(status.type)}
-          <span className={`min-w-0 truncate ${status.type === "goal-active" ? "gradient-text" : ""}`}>{status.objective}</span>
-          <span className={`flex-shrink-0 text-text-muted ${status.type === "goal-active" ? "gradient-text" : ""}`}>{infoText}</span>
+          <span
+            className={`min-w-0 truncate ${status.type === "goal-active" ? "gradient-text" : ""}`}
+          >
+            {status.objective}
+          </span>
+          <span
+            className={`flex-shrink-0 text-text-muted ${status.type === "goal-active" ? "gradient-text" : ""}`}
+          >
+            {infoText}
+          </span>
           {status.type === "goal-active" && onGoalCommand && (
             <button
               type="button"
@@ -386,4 +435,30 @@ export function resolveInputStatus(params: {
     return { type: "background-agent", count, detail, done: allDone };
   }
   return null;
+}
+
+/** Goal status types whose elapsed clock keeps running (vs. frozen snapshots). */
+export function isGoalTimeLive(status: ChatInputStatus): boolean {
+  return (
+    status?.type === "goal-active" || status?.type === "goal-budget-limited"
+  );
+}
+
+/** Narrow to goal status variants that carry a timeUsedSeconds snapshot. */
+function hasTimeUsed(
+  status: ChatInputStatus,
+): status is Extract<ChatInputStatus, { timeUsedSeconds?: number }> {
+  return status !== null && "timeUsedSeconds" in status;
+}
+
+/** Seconds to display in the status bar: extrapolate from the last
+ *  authoritative snapshot for live states, frozen snapshot otherwise. */
+export function computeElapsedSeconds(
+  status: ChatInputStatus,
+  receivedAtMs: number,
+  nowMs: number,
+): number {
+  const base = hasTimeUsed(status) ? (status.timeUsedSeconds ?? 0) : 0;
+  if (!status || !isGoalTimeLive(status)) return base;
+  return base + Math.max(0, (nowMs - receivedAtMs) / 1000);
 }

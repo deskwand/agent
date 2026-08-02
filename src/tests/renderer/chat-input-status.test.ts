@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { resolveInputStatus } from "../../renderer/components/ChatInputStatusBar";
+import {
+  computeElapsedSeconds,
+  isGoalTimeLive,
+  resolveInputStatus,
+} from "../../renderer/components/ChatInputStatusBar";
 
 describe("resolveInputStatus", () => {
   const base = {
@@ -189,7 +193,12 @@ describe("resolveInputStatus", () => {
       resolveInputStatus({
         ...base,
         backgroundAgents: [
-          { id: "a", type: "Explore", description: "search code", status: "running" },
+          {
+            id: "a",
+            type: "Explore",
+            description: "search code",
+            status: "running",
+          },
         ],
       }),
     ).toEqual({
@@ -205,8 +214,18 @@ describe("resolveInputStatus", () => {
       resolveInputStatus({
         ...base,
         backgroundAgents: [
-          { id: "a", type: "Explore", description: "find bug", status: "running" },
-          { id: "b", type: "Review", description: "check fix", status: "running" },
+          {
+            id: "a",
+            type: "Explore",
+            description: "find bug",
+            status: "running",
+          },
+          {
+            id: "b",
+            type: "Review",
+            description: "check fix",
+            status: "running",
+          },
         ],
       }),
     ).toEqual({
@@ -239,7 +258,12 @@ describe("resolveInputStatus", () => {
         ...base,
         shouldShowThinkingIndicator: true,
         backgroundAgents: [
-          { id: "a", type: "Explore", description: "search", status: "running" },
+          {
+            id: "a",
+            type: "Explore",
+            description: "search",
+            status: "running",
+          },
         ],
       }),
     ).toEqual({ type: "thinking" });
@@ -251,9 +275,72 @@ describe("resolveInputStatus", () => {
         ...base,
         isResponding: true,
         backgroundAgents: [
-          { id: "a", type: "Explore", description: "search", status: "running" },
+          {
+            id: "a",
+            type: "Explore",
+            description: "search",
+            status: "running",
+          },
         ],
       }),
     ).toEqual({ type: "responding" });
+  });
+
+  // ── goal elapsed time helpers ──
+
+  const activeStatus = {
+    type: "goal-active",
+    objective: "fix login",
+    iteration: 1,
+    timeUsedSeconds: 0,
+  } as const;
+  const pausedStatus = {
+    type: "goal-paused",
+    objective: "fix login",
+    iteration: 3,
+    timeUsedSeconds: 120,
+  } as const;
+  const completeStatus = {
+    type: "goal-complete",
+    objective: "fix login",
+    iteration: 5,
+    timeUsedSeconds: 300,
+  } as const;
+  const budgetLimitedStatus = {
+    type: "goal-budget-limited",
+    objective: "fix login",
+    iteration: 4,
+    timeUsedSeconds: 240,
+    timeBudgetSeconds: 600,
+  } as const;
+
+  it("isGoalTimeLive: only active and budget-limited keep ticking", () => {
+    expect(isGoalTimeLive(activeStatus)).toBe(true);
+    expect(isGoalTimeLive(budgetLimitedStatus)).toBe(true);
+    expect(isGoalTimeLive(pausedStatus)).toBe(false);
+    expect(isGoalTimeLive(completeStatus)).toBe(false);
+    expect(isGoalTimeLive(null)).toBe(false);
+  });
+
+  it("extrapolates live elapsed from the snapshot plus local delta", () => {
+    expect(computeElapsedSeconds(activeStatus, 0, 0)).toBe(0);
+    expect(computeElapsedSeconds(activeStatus, 0, 60_000)).toBe(60);
+    expect(
+      computeElapsedSeconds(
+        { ...activeStatus, timeUsedSeconds: 120 },
+        10_000,
+        40_000,
+      ),
+    ).toBe(150);
+    expect(computeElapsedSeconds(budgetLimitedStatus, 0, 30_000)).toBe(270);
+  });
+
+  it("freezes paused and final states at the snapshot value", () => {
+    expect(computeElapsedSeconds(pausedStatus, 0, 300_000)).toBe(120);
+    expect(computeElapsedSeconds(completeStatus, 0, 300_000)).toBe(300);
+  });
+
+  it("never extrapolates backwards", () => {
+    expect(computeElapsedSeconds(activeStatus, 50_000, 10_000)).toBe(0);
   });
 });
