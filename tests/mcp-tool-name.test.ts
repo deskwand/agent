@@ -1,13 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('electron', () => ({
-  app: {
-    isPackaged: false,
-    getPath: () => '/tmp',
-    getVersion: () => '0.0.0',
-  },
-}));
-
 import { MCPManager } from '../src/main/mcp/mcp-manager';
 
 function createManagerWithTool(toolName: string) {

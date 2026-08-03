@@ -1,13 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('electron', () => ({
-  app: {
-    isPackaged: false,
-    getPath: () => '/tmp',
-    getVersion: () => '0.0.0',
-  },
-}));
-
 import { mergeShellEnvForMcp } from '../src/main/mcp/mcp-manager';
 
 describe('mcp-manager env merge', () => {
