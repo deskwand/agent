@@ -396,11 +396,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         let loadedSteps = existingSteps ?? [];
 
         if (needsMessages) {
-          const page =
-            (await getSessionMessagesPage(sessionId, null, 1000)) || {
-              messages: [],
-              hasMore: false,
-            };
+          const page = (await getSessionMessagesPage(
+            sessionId,
+            null,
+            1000,
+          )) || {
+            messages: [],
+            hasMore: false,
+          };
           if (sessionLoadSeqRef.current !== loadSeq) return;
           setMessagesTail(sessionId, page.messages, page.hasMore);
           loadedMessages = page.messages;
@@ -610,9 +613,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive =
-      activeSessionId === session.id &&
-      !showApps &&
-      !showSchedule;
+      activeSessionId === session.id && !showApps && !showSchedule;
     const hasStatusIndicator = session.status === "running";
     const isPinned = pinnedSessionIds.has(session.id);
     const isHovered = hoveredSessionId === session.id;
@@ -823,38 +824,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       >
         {!sidebarCollapsed && (
           <>
-            <div className="px-3 pt-3 pb-1.5">
-              <div className="flex flex-col gap-0.5">
-                <button
-                  type="button"
-                  onClick={openApps}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
-                    showApps
-                      ? "bg-surface-active text-text-primary"
-                      : "text-text-secondary hover:bg-surface-hover/60"
-                  }`}
-                  aria-current={showApps ? "page" : undefined}
-                >
-                  <LayoutGrid className="w-4 h-4 text-text-muted flex-shrink-0" />
-                  <span className="truncate">{t("sidebar.apps")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={openAutomation}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
-                    showSchedule
-                      ? "bg-surface-active text-text-primary"
-                      : "text-text-secondary hover:bg-surface-hover/60"
-                  }`}
-                  aria-current={showSchedule ? "page" : undefined}
-                >
-                  <Clock3 className="w-4 h-4 text-text-muted flex-shrink-0" />
-                  <span className="truncate">{t("sidebar.automation")}</span>
-                </button>
-              </div>
-              <div className="mx-2 mt-2 border-t border-border-muted" />
-            </div>
-
             <div className="px-4 pt-3 pb-2">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 min-w-0">
@@ -937,6 +906,34 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll"
             >
               <div>
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={openApps}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
+                      showApps
+                        ? "bg-surface-active text-text-primary"
+                        : "text-text-secondary hover:bg-surface-hover/60"
+                    }`}
+                    aria-current={showApps ? "page" : undefined}
+                  >
+                    <LayoutGrid className="w-4 h-4 text-text-muted flex-shrink-0" />
+                    <span className="truncate">{t("sidebar.apps")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openAutomation}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
+                      showSchedule
+                        ? "bg-surface-active text-text-primary"
+                        : "text-text-secondary hover:bg-surface-hover/60"
+                    }`}
+                    aria-current={showSchedule ? "page" : undefined}
+                  >
+                    <Clock3 className="w-4 h-4 text-text-muted flex-shrink-0" />
+                    <span className="truncate">{t("sidebar.automation")}</span>
+                  </button>
+                </div>
                 <section>
                   <button
                     type="button"
@@ -1393,7 +1390,10 @@ function saveGroupExpansion(state: Map<string, boolean>): void {
     state.forEach((v, k) => {
       obj[k] = v;
     });
-    localStorage.setItem(SIDEBAR_GROUP_EXPANSION_STORAGE_KEY, JSON.stringify(obj));
+    localStorage.setItem(
+      SIDEBAR_GROUP_EXPANSION_STORAGE_KEY,
+      JSON.stringify(obj),
+    );
   } catch {
     // Keep the in-memory state when storage is unavailable.
   }
