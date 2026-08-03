@@ -62,6 +62,11 @@ export interface SessionDeletedContext {
   session?: Session | null;
 }
 
+export interface SessionRunErrorContext {
+  sessionId: string;
+  error: unknown;
+}
+
 export interface AgentRuntimeExtension {
   name: string;
   beforeSessionRun?(
@@ -72,4 +77,7 @@ export interface AgentRuntimeExtension {
   ): Promise<AfterSessionRunResult | void>;
   onCommand?(context: CommandContext): Promise<CommandResult | void>;
   onSessionDeleted?(context: SessionDeletedContext): Promise<void>;
+  onSessionRunError?(
+    context: SessionRunErrorContext,
+  ): Promise<AfterSessionRunResult | void>;
 }

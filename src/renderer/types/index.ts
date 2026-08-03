@@ -607,7 +607,24 @@ export type ServerEvent =
     }
   | {
       type: "session.list";
-      payload: { sessions: Session[]; contextWindows?: Record<string, number> };
+      payload: {
+        sessions: Session[];
+        contextWindows?: Record<string, number>;
+        goalStatuses?: Record<
+          string,
+          {
+            status:
+              | "active"
+              | "paused"
+              | "complete"
+              | "cleared"
+              | "blocked"
+              | "budget_limited";
+            objective: string;
+            iteration: number;
+          }
+        >;
+      };
     }
   | { type: "permission.request"; payload: PermissionRequest }
   | { type: "permission.dismiss"; payload: { toolUseId: string } }

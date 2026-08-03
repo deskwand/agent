@@ -163,6 +163,16 @@ export class SessionManager {
     this.sandboxAdapter = getSandboxAdapter();
     this.extensionManager = extensionManager;
 
+    // Let the goal extension ask whether a session is actually running,
+    // so resume can restart stalled (active-but-idle) goals.
+    const goalExt = this.extensionManager?.getExtension<{
+      readonly name: string;
+      setSessionStateProvider(fn: (sessionId: string) => boolean): void;
+    }>("goal");
+    goalExt?.setSessionStateProvider((sessionId) =>
+      this.isSessionRunning(sessionId),
+    );
+
     // Store user skills path for lazy BackgroundReviewService creation
     this._userSkillsPath = path.join(
       app.getPath("home"),
@@ -589,6 +599,20 @@ export class SessionManager {
   listSessions(): {
     sessions: Session[];
     contextWindows: Record<string, number>;
+    goalStatuses: Record<
+      string,
+      {
+        status:
+          | "active"
+          | "paused"
+          | "complete"
+          | "cleared"
+          | "blocked"
+          | "budget_limited";
+        objective: string;
+        iteration: number;
+      }
+    >;
   } {
     const rows = this.db.sessions.getAll();
 
@@ -650,7 +674,32 @@ export class SessionManager {
         }
       }
     }
-    return { sessions, contextWindows };
+    const goalExt = this.extensionManager?.getExtension<{
+      readonly name: string;
+      getAllGoals(): Array<{ sessionId: string; goal: GoalState }>;
+    }>("goal");
+    const goalStatuses: Record<
+      string,
+      {
+        status:
+          | "active"
+          | "paused"
+          | "complete"
+          | "cleared"
+          | "blocked"
+          | "budget_limited";
+        objective: string;
+        iteration: number;
+      }
+    > = {};
+    for (const { sessionId, goal } of goalExt?.getAllGoals() ?? []) {
+      goalStatuses[sessionId] = {
+        status: goal.status,
+        objective: goal.objective,
+        iteration: goal.iteration,
+      };
+    }
+    return { sessions, contextWindows, goalStatuses };
   }
 
   setSessionThinkingLevel(
@@ -1291,6 +1340,23 @@ export class SessionManager {
           type: "error",
           payload: { message: errorText },
         });
+        // Let runtime extensions react to the failed run (e.g. the goal
+        // extension pauses an active goal so the UI shows a resume button
+        // instead of silently stalling with a stale "active" state).
+        if (this.extensionManager) {
+          const errorResult = await this.extensionManager
+            .onSessionRunError({ sessionId: session.id, error })
+            .catch(() => undefined);
+          if (errorResult?.goalStatus) {
+            this.sendToRenderer({
+              type: "goal.status",
+              payload: {
+                sessionId: session.id,
+                ...errorResult.goalStatus,
+              },
+            });
+          }
+        }
       }
     }); // end runWithLogContext
   }
@@ -1456,6 +1522,11 @@ export class SessionManager {
         );
       }
     }
+  }
+
+  /** Whether the session's prompt queue is currently being processed. */
+  isSessionRunning(sessionId: string): boolean {
+    return this.activeSessions.has(sessionId);
   }
 
   /**

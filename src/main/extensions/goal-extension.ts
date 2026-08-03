@@ -12,12 +12,13 @@ import type {
   CommandContext,
   CommandResult,
   SessionDeletedContext,
+  SessionRunErrorContext,
 } from "./agent-runtime-extension";
 import type { DatabaseInstance, GoalRow } from "../db/database";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-const MAX_GOAL_ITERATIONS = 50;
+export const MAX_GOAL_ITERATIONS = 50;
 
 type GoalStatus =
   | "active"
@@ -204,6 +205,13 @@ export class GoalExtension implements AgentRuntimeExtension {
   /** Goal state keyed by sessionId, so multiple sessions do not interfere. */
   private goals: Map<string, GoalState> = new Map();
 
+  /** Injected by SessionManager: whether the session's queue is actively running. */
+  private isSessionRunning?: (sessionId: string) => boolean;
+
+  setSessionStateProvider(fn: (sessionId: string) => boolean): void {
+    this.isSessionRunning = fn;
+  }
+
   /** Per-session goal tools (get_goal, update_goal). */
   private goalTools: Map<string, AgentRuntimeCustomTool[]> = new Map();
 
@@ -299,6 +307,13 @@ export class GoalExtension implements AgentRuntimeExtension {
     }
 
     return recovered;
+  }
+
+  getAllGoals(): Array<{ sessionId: string; goal: GoalState }> {
+    return Array.from(this.goals.entries()).map(([sessionId, goal]) => ({
+      sessionId,
+      goal,
+    }));
   }
 
   private updateGoalUsage(
@@ -616,12 +631,18 @@ export class GoalExtension implements AgentRuntimeExtension {
         message: msg("goalIsStatus", { status: goal.status }),
       };
     }
-    if (goal.status === "active") {
+    const sessionIdle = !this.isSessionRunning?.(sessionId);
+    if (goal.status === "active" && !sessionIdle) {
       return { handled: true, message: msg("alreadyActive") };
     }
 
     goal.status = "active";
     goal.generation++;
+    // Reset the iteration cap on resume so continuation is not
+    // immediately re-paused by the max-iterations guardrail.
+    if (goal.iteration >= MAX_GOAL_ITERATIONS) {
+      goal.iteration = 0;
+    }
     this.setGoal(sessionId, goal);
     const firstTurnPrompt = buildResumePrompt(goal);
     return {
@@ -805,6 +826,18 @@ export class GoalExtension implements AgentRuntimeExtension {
 
     const continuePrompt = buildContinuePrompt(goal);
     return { continuePrompt, ...this.goalStatusPayload(goal) };
+  }
+
+  async onSessionRunError(
+    context: SessionRunErrorContext,
+  ): Promise<AfterSessionRunResult | void> {
+    const goal = this.getGoal(context.sessionId);
+    if (!goal || goal.status !== "active") {
+      return;
+    }
+    goal.status = "paused";
+    this.setGoal(context.sessionId, goal);
+    return this.goalStatusPayload(goal);
   }
 
   async onSessionDeleted(context: SessionDeletedContext): Promise<void> {

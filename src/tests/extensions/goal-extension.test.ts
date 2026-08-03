@@ -3,6 +3,7 @@ import type { GoalRow } from "../../main/db/database";
 import {
   GoalExtension,
   buildResumePrompt,
+  MAX_GOAL_ITERATIONS,
 } from "../../main/extensions/goal-extension";
 import type { GoalState } from "../../main/extensions/goal-extension";
 
@@ -214,5 +215,106 @@ describe("GoalExtension persistence", () => {
 
     expect(recovered).toHaveLength(1);
     expect(recovered[0].goal.status).toBe("budget_limited");
+  });
+});
+
+describe("GoalExtension error handling & resume semantics", () => {
+  function startGoal(ext: GoalExtension) {
+    return ext.onCommand({
+      command: "goal",
+      args: "test objective",
+      sessionId: "s1",
+    });
+  }
+
+  function goalOf(ext: GoalExtension): GoalState {
+    const goals = (ext as unknown as { goals: Map<string, GoalState> }).goals;
+    const goal = goals.get("s1");
+    if (!goal) throw new Error("goal not found");
+    return goal;
+  }
+
+  it("onSessionRunError pauses an active goal and reports status", async () => {
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+    await startGoal(ext);
+    db.goals.upsert.mockClear();
+
+    const result = await ext.onSessionRunError({
+      sessionId: "s1",
+      error: new Error("network down"),
+    });
+
+    expect(goalOf(ext).status).toBe("paused");
+    expect(result?.goalStatus?.status).toBe("paused");
+    expect(db.goals.upsert).toHaveBeenCalled();
+    const call = db.goals.upsert.mock.calls[0][0] as Record<string, unknown>;
+    expect(call.status).toBe("paused");
+  });
+
+  it("onSessionRunError is a no-op without an active goal", async () => {
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+    const result = await ext.onSessionRunError({
+      sessionId: "s1",
+      error: new Error("x"),
+    });
+    expect(result).toBeUndefined();
+  });
+
+  it("resume restarts an active goal when session is idle", async () => {
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+    ext.setSessionStateProvider(() => false); // session idle
+    await startGoal(ext);
+
+    const result = await ext.onCommand({
+      command: "goal",
+      args: "resume",
+      sessionId: "s1",
+    });
+
+    expect(result?.firstTurnPrompt).toContain("Resume working toward");
+    expect(result?.goalStatus?.status).toBe("active");
+  });
+
+  it("resume rejects with alreadyActive when session is running", async () => {
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+    ext.setSessionStateProvider(() => true); // session running
+    await startGoal(ext);
+
+    const result = await ext.onCommand({
+      command: "goal",
+      args: "resume",
+      sessionId: "s1",
+    });
+
+    expect(result?.firstTurnPrompt).toBeUndefined();
+    expect(result?.message).toBeTruthy(); // alreadyActive 文案
+  });
+
+  it("resume resets iteration when at the max-iteration cap", async () => {
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+    ext.setSessionStateProvider(() => false);
+    await startGoal(ext);
+    goalOf(ext).iteration = MAX_GOAL_ITERATIONS;
+    goalOf(ext).status = "paused";
+
+    await ext.onCommand({ command: "goal", args: "resume", sessionId: "s1" });
+
+    expect(goalOf(ext).iteration).toBe(0);
+  });
+
+  it("getAllGoals returns in-memory goals keyed by session", async () => {
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+    await startGoal(ext);
+
+    const all = ext.getAllGoals();
+    expect(all).toHaveLength(1);
+    expect(all[0].sessionId).toBe("s1");
+    expect(all[0].goal.status).toBe("active");
   });
 });

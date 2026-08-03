@@ -313,4 +313,71 @@ describe("GoalExtension integration (real SQLite)", () => {
     rawDb.close();
     rmSync(tmpDir, { recursive: true });
   });
+
+  it("onSessionRunError pauses an active goal and persists to DB", async () => {
+    const { db, rawDb, tmpDir } = createRealDb();
+    const now = Date.now();
+
+    rawDb
+      .prepare(
+        "INSERT INTO sessions (id, title, status, cwd, mounted_paths, allowed_tools, memory_enabled, thinking_level, is_project_mode, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run("s1", "Test", "idle", "/tmp", "[]", "[]", 0, "medium", 0, 0, now, now);
+
+    const ext = new GoalExtension(db as never);
+
+    await ext.onCommand({
+      command: "goal",
+      args: "build a calculator",
+      sessionId: "s1",
+    });
+
+    const result = await ext.onSessionRunError({
+      sessionId: "s1",
+      error: new Error("network down"),
+    });
+
+    expect(result?.goalStatus?.status).toBe("paused");
+    const row = db.goals.get("s1");
+    expect(row?.status).toBe("paused");
+
+    rawDb.close();
+    rmSync(tmpDir, { recursive: true });
+  });
+
+  it("resume restarts an active-but-idle goal and persists generation bump", async () => {
+    const { db, rawDb, tmpDir } = createRealDb();
+    const now = Date.now();
+
+    rawDb
+      .prepare(
+        "INSERT INTO sessions (id, title, status, cwd, mounted_paths, allowed_tools, memory_enabled, thinking_level, is_project_mode, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run("s1", "Test", "idle", "/tmp", "[]", "[]", 0, "medium", 0, 0, now, now);
+
+    const ext = new GoalExtension(db as never);
+    ext.setSessionStateProvider(() => false); // session idle after a crash
+
+    await ext.onCommand({
+      command: "goal",
+      args: "build a calculator",
+      sessionId: "s1",
+    });
+
+    // Simulate the stalled state: goal active but session not running
+    const result = await ext.onCommand({
+      command: "goal",
+      args: "resume",
+      sessionId: "s1",
+    });
+
+    expect(result?.firstTurnPrompt).toContain("Resume working toward");
+    const row = db.goals.get("s1");
+    expect(row?.status).toBe("active");
+    expect(row?.generation).toBe(2);
+
+    rawDb.close();
+    rmSync(tmpDir, { recursive: true });
+  });
 });
+

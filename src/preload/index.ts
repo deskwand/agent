@@ -56,6 +56,12 @@ const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent["type"]>(
     "session.compact",
     "session.abortCompaction",
     "session.steer",
+    "session.command",
+    "session.archive",
+    "session.unarchive",
+    "session.batchArchive",
+    "session.batchUnarchive",
+    "session.archiveDelete",
     "session.delete",
     "session.batchDelete",
     "session.list",
@@ -74,6 +80,20 @@ const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent["type"]>(
     "update.install",
   ],
 );
+
+// Compile-time exhaustiveness: every renderer→main event type must be in the
+// allowlist. Adding a new ClientEvent type without allowlisting it breaks the
+// build instead of silently dropping IPC in production.
+type AllowedClientEventType = (typeof ALLOWED_CLIENT_EVENTS) extends ReadonlySet<
+  infer T
+>
+  ? T
+  : never;
+type MissingClientEventTypes = Exclude<ClientEvent["type"], AllowedClientEventType>;
+const _exhaustiveAllowlistCheck: MissingClientEventTypes extends never
+  ? true
+  : never = true;
+void _exhaustiveAllowlistCheck;
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object

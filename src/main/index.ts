@@ -4044,6 +4044,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         payload: {
           sessions: result.sessions,
           contextWindows: result.contextWindows,
+          goalStatuses: result.goalStatuses,
         },
       });
       return result.sessions;

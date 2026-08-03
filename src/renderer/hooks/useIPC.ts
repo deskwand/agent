@@ -154,6 +154,21 @@ function installSharedIpcBridge(): void {
       switch (event.type) {
         case "session.list":
           store.setSessions(event.payload.sessions);
+          // Sync goal states restored by the main process at startup so the
+          // status bar reflects real goal status immediately after restart.
+          if (event.payload.goalStatuses) {
+            for (const [sessionId, g] of Object.entries(
+              event.payload.goalStatuses,
+            )) {
+              if (g) {
+                store.setGoalStatus(sessionId, {
+                  status: g.status,
+                  objective: g.objective,
+                  iteration: g.iteration,
+                });
+              }
+            }
+          }
           // Auto-restore last session with messages loaded (avoid white screen on restart)
           (async () => {
             try {
