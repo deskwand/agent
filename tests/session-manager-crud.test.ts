@@ -79,10 +79,14 @@ function makeDb(overrides: Partial<DatabaseInstance> = {}): DatabaseInstance {
 // listSessions
 // ------------------------------------------------------------------
 describe('SessionManager.listSessions', () => {
-  it('returns empty array when database is empty', () => {
+  it('returns empty sessions when database is empty', () => {
     const db = makeDb();
     const manager = new SessionManager(db, vi.fn());
-    expect(manager.listSessions()).toEqual([]);
+    // listSessions returns a grouped result object (sessions + contextWindows + goalStatuses)
+    const result = manager.listSessions();
+    expect(result.sessions).toEqual([]);
+    expect(result.contextWindows).toEqual({});
+    expect(result.goalStatuses).toEqual({});
     expect(db.sessions.getAll).toHaveBeenCalledTimes(1);
   });
 
@@ -112,7 +116,7 @@ describe('SessionManager.listSessions', () => {
     });
 
     const manager = new SessionManager(db, vi.fn());
-    const sessions = manager.listSessions();
+    const { sessions } = manager.listSessions();
 
     expect(sessions).toHaveLength(1);
     const s = sessions[0];
@@ -153,7 +157,7 @@ describe('SessionManager.listSessions', () => {
     });
 
     const manager = new SessionManager(db, vi.fn());
-    const [s] = manager.listSessions();
+    const [s] = manager.listSessions().sessions;
 
     expect(s.mountedPaths).toEqual([]);
     expect(s.allowedTools).toEqual([]);

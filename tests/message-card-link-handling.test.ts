@@ -18,7 +18,7 @@ describe('MessageCard local link handling', () => {
     const source = readAllMessageContent();
 
     expect(source).toContain(
-      'const localFilePath = resolveLocalFilePathFromHref(href, currentWorkingDir);'
+      'const localFilePath = resolveLocalFilePathFromHref('
     );
     expect(source).toContain("title={localFilePath}");
     expect(source).toContain('await window.electronAPI.showItemInFolder(');
@@ -33,12 +33,13 @@ describe('MessageCard local link handling', () => {
 
     expect(source).toContain('const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);');
     expect(source).toContain('if (!revealed) {');
-    expect(source).toContain("message: t('context.revealFailed')");
+    expect(source).toContain('message: t("context.revealFailed")');
   });
 
   it('treats Windows forward-slash paths as absolute file targets', () => {
     const source = readAllMessageContent();
 
-    expect(source).toContain('const resolveFilePath = (value: string) => resolvePathAgainstWorkspace(value, currentWorkingDir);');
+    expect(source).toContain('const resolveFilePath = (value: string) =>');
+    expect(source).toContain('resolvePathAgainstWorkspace(value, currentWorkingDir);');
   });
 });

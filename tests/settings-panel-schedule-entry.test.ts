@@ -1,104 +1,85 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
-// SettingsPanel was split — schedule content lives in settings/SettingsSchedule.tsx
-const settingsPanelPath = path.resolve(process.cwd(), 'src/renderer/components/SettingsPanel.tsx');
-const settingsDir = path.resolve(process.cwd(), 'src/renderer/components/settings');
-const settingsPanelContent = [
-  readFileSync(settingsPanelPath, 'utf8'),
-  ...readdirSync(settingsDir).map((f) => readFileSync(path.join(settingsDir, f), 'utf8')),
-].join('\n');
+// Schedule moved out of SettingsPanel — it is now a calendar-first standalone
+// view (App shell entry) with the form logic extracted into useScheduleForm.
+const appPath = path.resolve(process.cwd(), 'src/renderer/App.tsx');
+const scheduleFiles = [
+  path.resolve(process.cwd(), 'src/renderer/hooks/useScheduleForm.ts'),
+  path.resolve(process.cwd(), 'src/renderer/components/ScheduleView.tsx'),
+  path.resolve(process.cwd(), 'src/renderer/components/ScheduleCalendar.tsx'),
+  path.resolve(process.cwd(), 'src/renderer/components/ScheduleToolbar.tsx'),
+  path.resolve(process.cwd(), 'src/renderer/components/ScheduleEditModal.tsx'),
+];
+const appContent = readFileSync(appPath, 'utf8');
+const scheduleContent = scheduleFiles
+  .map((f) => readFileSync(f, 'utf8'))
+  .join('\n');
 
-describe('SettingsPanel schedule tab entry', () => {
-  it('renders schedule tab id', () => {
-    expect(settingsPanelContent).toContain("id: 'schedule' as TabId");
+describe('Schedule entry and form', () => {
+  it('renders the schedule view from the app shell', () => {
+    expect(appContent).toContain('const showSchedule = useScheduleViewState();');
+    expect(appContent).toContain('showSchedule ? (');
+    expect(appContent).toContain('<ScheduleView />');
   });
 
   it('uses schedule i18n keys', () => {
-    expect(settingsPanelContent).toContain("t('settings.schedule'");
-    expect(settingsPanelContent).toContain("t('settings.scheduleDesc'");
+    expect(scheduleContent).toContain('t("schedule.calendarCreateTitle")');
+    expect(scheduleContent).toContain('t("schedule.mode")');
   });
 
   it('handles null nextRunAt explicitly', () => {
-    expect(settingsPanelContent).toContain('task.nextRunAt === null');
-    expect(settingsPanelContent).toContain("t('schedule.nextRunNone')");
-    expect(settingsPanelContent).toContain("t('schedule.nextRun', { value: formatTime(task.nextRunAt) })");
+    expect(scheduleContent).toContain('nextRunAt === null');
+    expect(scheduleContent).toContain('t("schedule.previewAutoFind", { value: formatAppDateTime(nextRunAt) })');
   });
 
   it('avoids resetting schedule time when editing without changing runAt', () => {
-    expect(settingsPanelContent).toContain('shouldResetScheduleTime');
-    expect(settingsPanelContent).toContain('runAt !== originalRunAtInput');
+    expect(scheduleContent).toContain('shouldResetScheduleTime');
+    expect(scheduleContent).toContain('runAt !== originalRunAtInput');
   });
 
-  it('polls schedule list in background', () => {
-    expect(settingsPanelContent).toContain("void loadTasks({ silent: true })");
+  it('refreshes the schedule list in the background after mount and save', () => {
+    expect(scheduleContent).toContain('const loadTasks = useCallback(async () => {');
+    expect(scheduleContent).toContain('useEffect(() => {\n    loadTasks();');
+    expect(scheduleContent).toContain('onSaved={handleSaved}');
   });
 
-  it('validates future run time and suggests runNow for immediate execution', () => {
-    expect(settingsPanelContent).toContain("setError({ key: 'schedule.futureTimeRequired' })");
+  it('validates future run time before submit', () => {
+    expect(scheduleContent).toContain('setError({ key: "schedule.futureTimeRequired" })');
+    expect(scheduleContent).toContain('runAtValue <= Date.now()');
   });
 
   it('shows model-generated title hints and only regenerates on prompt change', () => {
-    expect(settingsPanelContent).toContain("t('schedule.autoTitleLabel')");
-    expect(settingsPanelContent).toContain('previewTitle');
-    expect(settingsPanelContent).toContain('shouldRegenerateTitle');
-    expect(settingsPanelContent).toContain("t('schedule.autoTitleChangedHint')");
-    expect(settingsPanelContent).toContain("t('schedule.autoTitleUnchangedHint')");
+    expect(scheduleContent).toContain('previewTitle');
+    expect(scheduleContent).toContain('shouldRegenerateTitle');
+    expect(scheduleContent).toContain('t("schedule.autoTitleCreating")');
+    expect(scheduleContent).toContain('t("schedule.autoTitleEditingChanged")');
   });
 
-  it('renders schedule rule and last-run details for better task readability', () => {
-    expect(settingsPanelContent).toContain("t('schedule.strategy', {");
-    expect(settingsPanelContent).toContain('formatScheduleRule(task, t, weekdayOptions)');
-    expect(settingsPanelContent).toContain("t('schedule.lastRunNever')");
-    expect(settingsPanelContent).toContain("t('schedule.lastRun', { value: formatTime(task.lastRunAt) })");
-    expect(settingsPanelContent).toContain('{task.title}');
-    expect(settingsPanelContent).toContain("t('schedule.recentSession', { value: task.lastRunSessionId })");
+  it('supports once, daily and weekly multi-slot schedule editing', () => {
+    expect(scheduleContent).toContain("const [scheduleMode, setScheduleMode] = useState<ScheduleFormMode>(\"once\")");
+    expect(scheduleContent).toContain('{t("schedule.mode")}');
+    expect(scheduleContent).toContain('{t("schedule.weekday")}');
+    expect(scheduleContent).toContain('{t("schedule.times")}');
+    expect(scheduleContent).toContain('t("schedule.previewAutoFind", {');
   });
 
-  it('supports daily and weekly multi-slot schedule editing', () => {
-    expect(settingsPanelContent).toContain("const [scheduleMode, setScheduleMode] = useState<ScheduleFormMode>('once')");
-    expect(settingsPanelContent).toContain('<ScheduleSelectMenu');
-    expect(settingsPanelContent).toContain('<TimeMultiSelectMenu');
-    expect(settingsPanelContent).toContain("label={t('schedule.mode')}");
-    expect(settingsPanelContent).toContain("label={t('schedule.weekday')}");
-    expect(settingsPanelContent).toContain("label={t('schedule.times')}");
-    expect(settingsPanelContent).toContain("t('schedule.previewAutoFind'");
+  it('keeps fixed half-hour quick slots plus editable custom time entries', () => {
+    expect(scheduleContent).toContain('const TIMES_30MIN: string[]');
+    expect(scheduleContent).toContain('placeholder="HH:mm"');
+    expect(scheduleContent).toContain('function isValidTimeValue(value: string): boolean');
+    expect(scheduleContent).toContain('t("schedule.addTime")');
   });
 
-  it('allows editable custom time entries instead of fixed half-hour slots', () => {
-    expect(settingsPanelContent).toContain("t('schedule.pickerEditTimes')");
-    expect(settingsPanelContent).toContain("t('schedule.pickerAnyHHmm')");
-    expect(settingsPanelContent).toContain('type="time"');
-    expect(settingsPanelContent).toContain("t('schedule.pickerSuggestions')");
-    expect(settingsPanelContent).toContain('function isValidTimeValue(value: string): boolean');
-    expect(settingsPanelContent).toContain('const [openUpward, setOpenUpward] = useState(false)');
-    expect(settingsPanelContent).toContain('min-w-[92px]');
-    expect(settingsPanelContent).toContain('w-[min(22rem,calc(100vw-2rem))]');
-    expect(settingsPanelContent).toContain('rounded-full border px-3 py-1.5 text-sm');
-  });
-
-  it('formats daily and weekly schedule rules from scheduleConfig', () => {
-    expect(settingsPanelContent).toContain("if (task.scheduleConfig?.kind === 'daily')");
-    expect(settingsPanelContent).toContain("if (task.scheduleConfig?.kind === 'weekly')");
-    expect(settingsPanelContent).toContain("t('schedule.ruleWeekly'");
-  });
-
-  it('shows clear stop semantics hint', () => {
-    expect(settingsPanelContent).toContain("title={");
-    expect(settingsPanelContent).toContain("t('schedule.stopExecution')");
-  });
-
-  it('provides stop-run control for running scheduled sessions', () => {
-    expect(settingsPanelContent).toContain("type: 'session.stop'");
-    expect(settingsPanelContent).toContain("t('schedule.stopRunTitleActive')");
-    expect(settingsPanelContent).toContain("t('schedule.stopRunTitleIdle')");
-    expect(settingsPanelContent).toContain("setError({ key: 'schedule.noSessionToStop' })");
+  it('maps daily and weekly scheduleConfig kinds when editing a task', () => {
+    expect(scheduleContent).toContain('task.scheduleConfig?.kind === "weekly"');
+    expect(scheduleContent).toContain('buildScheduleConfigFromForm(');
   });
 
   it('saves cwd in create and update payloads so backend validation can reject unsupported paths early', () => {
-    expect(settingsPanelContent).toContain("cwd: cwd.trim() || workingDir || ''");
-    expect(settingsPanelContent).toContain('const updated = await window.electronAPI.schedule.update(editingId, payload);');
-    expect(settingsPanelContent).toContain('await window.electronAPI.schedule.create(payload);');
+    expect(scheduleContent).toContain('cwd: cwd.trim() || workingDirRef.current || ""');
+    expect(scheduleContent).toContain('const updated = await window.electronAPI.schedule.update(');
+    expect(scheduleContent).toContain('await window.electronAPI.schedule.create(payload);');
   });
 });

@@ -8,9 +8,9 @@ const viteConfigContent = readFileSync(viteConfigPath, 'utf8');
 describe('vite watch ignores build artifacts', () => {
   it('ignores packaged and build output directories to avoid reload spam', () => {
     expect(viteConfigContent).toContain('const ignoredWatchPaths = [');
-    expect(viteConfigContent).toContain("'**/release/**'");
-    expect(viteConfigContent).toContain("'**/dist/**'");
-    expect(viteConfigContent).toContain("'**/dist-electron/**'");
+    expect(viteConfigContent).toContain('"**/release/**"');
+    expect(viteConfigContent).toContain('"**/dist/**"');
+    expect(viteConfigContent).toContain('"**/dist-electron/**"');
     expect(viteConfigContent).toContain('ignored: ignoredWatchPaths');
   });
 });

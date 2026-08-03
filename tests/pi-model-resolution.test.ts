@@ -41,13 +41,15 @@ describe('pi model resolution helpers', () => {
     expect(
       resolvePiModelString({ provider: 'openai', customProtocol: 'openai', model: 'gpt-5.4' })
     ).toBe('openai/gpt-5.4');
+    // Custom profiles keep the raw provider prefix; the protocol (customProtocol)
+    // is applied later during route/registry resolution.
     expect(
       resolvePiModelString({
         provider: 'custom',
         customProtocol: 'gemini',
         model: 'gemini-3-flash-preview',
       })
-    ).toBe('gemini/gemini-3-flash-preview');
+    ).toBe('custom/gemini-3-flash-preview');
     expect(
       resolvePiModelString({
         provider: 'anthropic',

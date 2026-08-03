@@ -213,6 +213,10 @@ describe("renderer motion policy", () => {
     expect(globalStyles).toContain(
       "transition-[background-color,box-shadow,color] duration-150",
     );
-    expect(globalStyles).not.toContain("transition-all");
+    // transition-all is allowed exactly once, scoped to the toggle-knob
+    // switch animation (left-position slide needs it); everything else
+    // must use scoped transition properties.
+    expect((globalStyles.match(/transition-all/g) || []).length).toBe(1);
+    expect(globalStyles).toMatch(/\.toggle-knob\s*\{[\s\S]*?transition-all/);
   });
 });

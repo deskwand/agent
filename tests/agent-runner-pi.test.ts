@@ -8,7 +8,7 @@ const agentRunnerContent = readFileSync(agentRunnerPath, 'utf8');
 describe('AgentRunner pi-coding-agent integration', () => {
   it('avoids dynamic re-import shadowing for config store singletons', () => {
     expect(agentRunnerContent).toContain(
-      "import { mcpConfigStore } from '../mcp/mcp-config-store'"
+      'import { mcpConfigStore } from "../mcp/mcp-config-store"'
     );
     expect(agentRunnerContent).not.toContain(
       "const { configStore } = await import('../config/config-store')"
@@ -35,31 +35,31 @@ describe('AgentRunner pi-coding-agent integration', () => {
     expect(agentRunnerContent).toContain('const textOnlyMessages = conversationMessages');
     expect(agentRunnerContent).toContain('textOnlyMessages.slice(0, -1)');
     expect(agentRunnerContent).toContain(
-      "textOnlyMessages[textOnlyMessages.length - 1]?.role === 'user'"
+      'textOnlyMessages[textOnlyMessages.length - 1]?.role === "user"'
     );
   });
 
   it('keeps MCP server logging compact unless full debug logging is enabled', () => {
-    expect(agentRunnerContent).toContain("log('[AgentRunner] Final mcpServers summary:'");
-    expect(agentRunnerContent).toContain("if (process.env.COWORK_LOG_SDK_MESSAGES_FULL === '1') {");
-    expect(agentRunnerContent).toContain("log('[AgentRunner] Final mcpServers config:'");
+    expect(agentRunnerContent).toContain('"[AgentRunner] Final mcpServers summary:"');
+    expect(agentRunnerContent).toContain('if (process.env.COWORK_LOG_SDK_MESSAGES_FULL === "1") {');
+    expect(agentRunnerContent).toContain('"[AgentRunner] Final mcpServers config:"');
   });
 
   it('summarizes noisy SDK message updates instead of logging every text delta', () => {
     expect(agentRunnerContent).toContain('const streamEventCounts = new Map<string, number>();');
-    expect(agentRunnerContent).toContain(
-      "if (updateType !== 'text_delta' && updateType !== 'thinking_delta') {"
-    );
-    expect(agentRunnerContent).toContain("'[AgentRunner] Event: message_end'");
+    expect(agentRunnerContent).toContain('updateType !== "text_delta" &&');
+    expect(agentRunnerContent).toContain('updateType !== "thinking_delta" &&');
+    expect(agentRunnerContent).toContain('"[AgentRunner] Event: message_end"');
     expect(agentRunnerContent).toContain('messageUpdateCounts: getStreamEventSummary()');
-    expect(agentRunnerContent).toContain("if (process.env.COWORK_LOG_SDK_MESSAGES_FULL === '1') {");
-    expect(agentRunnerContent).toContain("'[AgentRunner] message_end raw message:'");
+    expect(agentRunnerContent).toContain('if (process.env.COWORK_LOG_SDK_MESSAGES_FULL === "1") {');
+    expect(agentRunnerContent).toContain('"[AgentRunner] message_end raw message:"');
   });
 
   it('reuses the shared user-facing error helper', () => {
     expect(agentRunnerContent).toContain(
-      "import { resolveMessageEndPayload, toUserFacingErrorText } from './agent-runner-message-end'"
+      'from "./agent-runner-message-end"'
     );
+    expect(agentRunnerContent).toContain('toUserFacingErrorText,');
     expect(agentRunnerContent).toContain(
       'const errorText = toUserFacingErrorText(toErrorText(error));'
     );
@@ -73,7 +73,7 @@ describe('AgentRunner pi-coding-agent integration', () => {
 
   it('recreates cached pi sessions when the runtime signature changes', () => {
     expect(agentRunnerContent).toContain(
-      "import { buildPiSessionRuntimeSignature } from './pi-session-runtime'"
+      'import { buildPiSessionRuntimeSignature } from "./pi-session-runtime"'
     );
     expect(agentRunnerContent).toContain(
       'const sessionRuntimeSignature = buildPiSessionRuntimeSignature({'
@@ -86,9 +86,17 @@ describe('AgentRunner pi-coding-agent integration', () => {
   });
 
   it('uses the normalized route protocol so openrouter follows the openai-compatible path', () => {
-    expect(agentRunnerContent).toContain('resolvePiRouteProtocol');
-    expect(agentRunnerContent).toContain('const configProtocol = resolvePiRouteProtocol(');
-    expect(agentRunnerContent).toContain('resolveSyntheticPiModelFallback');
+    // Route protocol normalization moved to pi-model-resolution.ts, which is
+    // consumed by agent-sdk-one-shot.ts and agent-runner.ts.
+    const modelResolutionPath = path.resolve(
+      process.cwd(),
+      'src/main/agent/pi-model-resolution.ts'
+    );
+    const modelResolutionContent = readFileSync(modelResolutionPath, 'utf8');
+
+    expect(modelResolutionContent).toContain('export function resolvePiRouteProtocol(');
+    expect(modelResolutionContent).toContain('if (provider === "openrouter") return "openai";');
+    expect(modelResolutionContent).toContain('export function resolveSyntheticPiModelFallback(');
   });
 
   it('nudges the model to proceed with reasonable assumptions', () => {
@@ -99,13 +107,13 @@ describe('AgentRunner pi-coding-agent integration', () => {
 
   it('routes MCP image results through structured helpers instead of stringifying base64 into text', () => {
     expect(agentRunnerContent).toContain(
-      "import {\n  normalizeMcpToolResultForModel,\n  normalizeToolExecutionResultForUi,\n} from './tool-result-utils'"
+      'normalizeMcpToolResultForModel,\n  normalizeToolExecutionResultForUi,\n} from "./tool-result-utils"'
     );
     expect(agentRunnerContent).toContain(
       'const normalizedResult = normalizeMcpToolResultForModel(result);'
     );
     expect(agentRunnerContent).toContain(
-      'const normalizedToolResult = normalizeToolExecutionResultForUi(event.result);'
+      'const normalizedToolResult = normalizeToolExecutionResultForUi('
     );
     expect(agentRunnerContent).not.toContain('else textParts.push(JSON.stringify(part));');
     expect(agentRunnerContent).not.toContain(": JSON.stringify(event.result || '');");
@@ -130,7 +138,7 @@ describe('AgentRunner pi-coding-agent integration', () => {
     expect(agentRunnerContent).not.toContain("if (shouldEmitThinking) {");
     expect(agentRunnerContent).toContain("if (parsed.thinking) {");
     expect(agentRunnerContent).toContain("if (flushed.thinking) {");
-    expect(agentRunnerContent).toContain("} else if (block.type === 'thinking') {");
+    expect(agentRunnerContent).toContain('} else if (block.type === "thinking") {');
     expect(agentRunnerContent).toContain("contentBlocks.push({");
     expect(agentRunnerContent).toContain("thinking: block.thinking,");
   });

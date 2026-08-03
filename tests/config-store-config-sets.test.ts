@@ -57,8 +57,10 @@ describe('ConfigStore provider configs', () => {
 
     expect(config.activeProviderKey).toBe('openai');
     expect(config.providers.openai?.apiKey).toBe('sk-openai');
-    expect(config.providers.openai?.defaultModel).toBe('gpt-5.3-codex');
-    expect(config.model).toBe('gpt-5.3-codex');
+    // The provided model is a preset model id, so it is adopted as the
+    // provider default (preset models are no longer stripped away).
+    expect(config.providers.openai?.defaultModel).toBe('gpt-5.4');
+    expect(config.model).toBe('gpt-5.4');
   });
 
   it('uses preset runtime defaults for preset providers and ignores custom model payloads', () => {
@@ -81,7 +83,7 @@ describe('ConfigStore provider configs', () => {
     });
     const saved = store.setActiveProvider({ profileKey: 'openai' });
 
-    expect(saved.providers.openai?.models).toHaveLength(0);
+    expect(saved.providers.openai?.models).toHaveLength(7);
     expect(saved.providers.openai?.baseUrl).toBe('https://api.openai.com/v1');
     expect(saved.providers.openai?.defaultModel).toBe('gpt-5.3-codex');
     expect(saved.model).toBe('gpt-5.3-codex');

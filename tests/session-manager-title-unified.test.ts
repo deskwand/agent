@@ -83,7 +83,7 @@ describe('SessionManager unified title generation', () => {
     configStore.set('provider', 'openai');
     configStore.set('customProtocol', 'openai');
     configStore.set('apiKey', 'sk-test');
-    configStore.set('model', 'gpt-4.1');
+    configStore.set('model', 'gpt-5.4');
     mockedGenerateTitleWithAgentSdk.mockClear();
   });
 
@@ -114,7 +114,7 @@ describe('SessionManager unified title generation', () => {
       'Please generate title',
       expect.objectContaining({
         provider: 'openai',
-        model: 'gpt-4.1',
+        model: 'gpt-5.4',
       })
     );
   });

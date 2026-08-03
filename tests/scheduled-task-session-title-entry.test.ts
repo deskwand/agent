@@ -8,7 +8,8 @@ describe('scheduled task session title wiring', () => {
     const content = readFileSync(indexPath, 'utf8');
     expect(content).toContain('async function resolveScheduledTaskTitle(');
     expect(content).toContain('sessionManager.generateScheduledTaskTitle');
-    expect(content).toContain("ipcMain.handle('schedule.create', async");
-    expect(content).toContain("ipcMain.handle('schedule.update', async");
+    expect(content).toContain('ipcMain.handle(');
+    expect(content).toContain('"schedule.create"');
+    expect(content).toContain('"schedule.update"');
   });
 });

@@ -106,7 +106,7 @@ describe('wsl-bridge distro name validation', () => {
 
 describe('lima-bridge execLimaShellWithRetry uses execFileAsync', () => {
   it('imports execFile from child_process', () => {
-    expect(limaBridgeSrc).toMatch(/import\s*\{[^}]*execFile[^}]*\}\s*from\s*'child_process'/);
+    expect(limaBridgeSrc).toMatch(/import\s*\{[^}]*execFile[^}]*\}\s*from\s*["']child_process["']/);
   });
 
   it('creates execFileAsync via promisify', () => {
@@ -123,14 +123,14 @@ describe('lima-bridge execLimaShellWithRetry uses execFileAsync', () => {
     expect(fnBody).not.toContain('execAsync(');
 
     // Should pass arguments as array, not string interpolation
-    expect(fnBody).toContain("['shell', LIMA_INSTANCE_NAME, '--', 'bash', '-c', command]");
+    expect(fnBody).toContain('["shell", LIMA_INSTANCE_NAME, "--", "bash", "-c", command]');
   });
 });
 
 describe('wsl-bridge agent path metacharacter check', () => {
   it('validates wslAgentPath for shell metacharacters before use', () => {
-    const startAgentStart = wslBridgeSrc.indexOf('private async startAgent()');
-    const startAgentEnd = wslBridgeSrc.indexOf("log('[WSL] Agent is ready')", startAgentStart);
+    const startAgentStart = wslBridgeSrc.indexOf('private async startAgent(');
+    const startAgentEnd = wslBridgeSrc.indexOf('log("[WSL] Agent is ready")', startAgentStart);
     const startAgentBody = wslBridgeSrc.substring(startAgentStart, startAgentEnd);
 
     // Should check for metacharacters
@@ -144,7 +144,7 @@ describe('rm -rf symlink protection', () => {
     const cleanupStart = sandboxSyncSrc.indexOf('static async cleanup(sessionId: string)');
     const cleanupEnd = sandboxSyncSrc.indexOf(
       '}',
-      sandboxSyncSrc.indexOf("logError('[SandboxSync] Cleanup failed:", cleanupStart)
+      sandboxSyncSrc.indexOf('logError("[SandboxSync] Cleanup failed:', cleanupStart)
     );
     const cleanupBody = sandboxSyncSrc.substring(cleanupStart, cleanupEnd);
 
@@ -175,8 +175,8 @@ describe('sandbox-sync wslExec is async with stderr capture', () => {
   });
 
   it('imports execFile and promisify for async execution', () => {
-    expect(sandboxSyncSrc).toContain("import { execFile } from 'child_process'");
-    expect(sandboxSyncSrc).toContain("import { promisify } from 'util'");
+    expect(sandboxSyncSrc).toContain('import { execFile } from "child_process"');
+    expect(sandboxSyncSrc).toContain('import { promisify } from "util"');
     expect(sandboxSyncSrc).toContain('const execFileAsync = promisify(execFile)');
   });
 
