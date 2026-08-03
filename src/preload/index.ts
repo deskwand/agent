@@ -306,20 +306,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("git.revertFiles", cwd, paths),
   },
 
-  artifacts: {
-    listRecentFiles: (
-      cwd: string,
-      sinceMs: number,
-      limit = 50,
-    ): Promise<Array<{ path: string; modifiedAt: number; size: number }>> =>
-      ipcRenderer.invoke(
-        "artifacts.listRecentFiles",
-        cwd,
-        sinceMs,
-        Math.min(limit, 500),
-      ),
-  },
-
   // Config methods
   config: {
     get: (): Promise<AppConfig> => ipcRenderer.invoke("config.get"),
@@ -778,13 +764,6 @@ declare global {
           cwd: string,
           paths: string[],
         ) => Promise<{ success: boolean; error?: string }>;
-      };
-      artifacts: {
-        listRecentFiles: (
-          cwd: string,
-          sinceMs: number,
-          limit?: number,
-        ) => Promise<Array<{ path: string; modifiedAt: number; size: number }>>;
       };
       config: {
         get: () => Promise<AppConfig>;

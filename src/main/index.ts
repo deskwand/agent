@@ -134,7 +134,6 @@ import {
   setDevLogsEnabled,
   isDevLogsEnabled,
 } from "./utils/logger";
-import { listRecentWorkspaceFiles } from "./utils/recent-workspace-files";
 import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
@@ -2173,16 +2172,6 @@ ipcMain.handle(
       const message = err instanceof Error ? err.message : String(err);
       return { success: false, error: message };
     }
-  },
-);
-
-ipcMain.handle(
-  "artifacts.listRecentFiles",
-  async (_event, cwd: string, sinceMs: number, limit: number = 50) => {
-    if (!cwd || !isAbsolute(cwd)) {
-      return [];
-    }
-    return listRecentWorkspaceFiles(cwd, sinceMs, limit);
   },
 );
 
