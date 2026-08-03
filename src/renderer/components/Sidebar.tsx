@@ -628,10 +628,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             current === session.id ? null : current,
           );
         }}
-        className={`group relative cursor-pointer rounded-lg px-2.5 py-1 transition-colors border-l-[3px] border-l-transparent ${
-          isActive
-            ? "bg-surface-active border-l-accent"
-            : "hover:bg-surface-hover/60"
+        className={`group relative cursor-pointer rounded-lg px-2.5 py-1 transition-colors ${
+          isActive ? "bg-surface-active" : "hover:bg-surface-hover/60"
         }`}
       >
         <div className="flex items-center gap-2">
@@ -825,10 +823,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 <button
                   type="button"
                   onClick={openApps}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
                     showApps
-                      ? "bg-surface-active border-l-accent text-text-primary"
-                      : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
+                      ? "bg-surface-active text-text-primary"
+                      : "text-text-secondary hover:bg-surface-hover/60"
                   }`}
                   aria-current={showApps ? "page" : undefined}
                 >
@@ -838,10 +836,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 <button
                   type="button"
                   onClick={openAutomation}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
+                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
                     showSchedule
-                      ? "bg-surface-active border-l-accent text-text-primary"
-                      : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
+                      ? "bg-surface-active text-text-primary"
+                      : "text-text-secondary hover:bg-surface-hover/60"
                   }`}
                   aria-current={showSchedule ? "page" : undefined}
                 >

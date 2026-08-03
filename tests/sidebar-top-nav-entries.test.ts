@@ -32,10 +32,14 @@ describe("Sidebar top nav entries", () => {
     for (const flag of ["showApps", "showSchedule"]) {
       expect(sidebarContent).toContain(flag);
     }
-    const activeClassCount =
-      sidebarContent.split("bg-surface-active border-l-accent").length - 1;
-    // one per nav entry plus the pre-existing session item usage
-    expect(activeClassCount).toBeGreaterThanOrEqual(2);
+    // active state is driven by the flags via background color only;
+    // the accent left-border quote bar was removed per design
+    const activeBgCount =
+      sidebarContent.split('"bg-surface-active text-text-primary"').length - 1;
+    // one per nav entry (apps + automation)
+    expect(activeBgCount).toBeGreaterThanOrEqual(2);
+    expect(sidebarContent).not.toContain("border-l-accent");
+    expect(sidebarContent).not.toContain("border-l-[3px]");
     expect(sidebarContent).toContain('aria-current={showApps ? "page"');
   });
 
