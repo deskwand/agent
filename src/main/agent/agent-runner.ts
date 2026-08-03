@@ -25,7 +25,11 @@ import {
   type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
-import { getAuthPath, registerSessionModelRuntime, unregisterSessionModelRuntime } from "./shared-model-runtime";
+import {
+  getAuthPath,
+  registerSessionModelRuntime,
+  unregisterSessionModelRuntime,
+} from "./shared-model-runtime";
 import {
   createSessionModelRuntime,
   getOrCreateSessionRuntime,
@@ -69,7 +73,10 @@ import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-e
 import { PiExtensionHost } from "../extensions/pi-extension-host";
 import { buildInterceptedPrompt } from "../extensions/pi-command-registry";
 import { getPiUiBridge, resetUiState } from "../extensions/ui/pi-ui-runtime";
-import { PiSessionBridge, type PiReplacedContext } from "../extensions/pi-session-bridge";
+import {
+  PiSessionBridge,
+  type PiReplacedContext,
+} from "../extensions/pi-session-bridge";
 import { configStore } from "../config/config-store";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
@@ -82,11 +89,8 @@ import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter"
 import { createWebAccessTools } from "./tools/web-access/web-tools";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
 import type { WebAccessErrorCode } from "../../shared/web-access";
-import type {
-  BrowserViewManager} from "../browser/browser-view-manager";
-import {
-  BROWSER_CDP_PORT,
-} from "../browser/browser-view-manager";
+import type { BrowserViewManager } from "../browser/browser-view-manager";
+import { BROWSER_CDP_PORT } from "../browser/browser-view-manager";
 import { TurnFinalizer, type TurnFinalizerOptions } from "./turn-finalizer";
 import type { Browser, Page, Locator } from "playwright-core";
 import {
@@ -596,7 +600,10 @@ interface CachedPiSession {
 export class AgentRunner {
   private sendToRenderer: (event: ServerEvent) => void;
   private saveMessage?: (message: Message) => void;
-  private onBackgroundAgentComplete?: (sessionId: string, agentId: string) => void;
+  private onBackgroundAgentComplete?: (
+    sessionId: string,
+    agentId: string,
+  ) => void;
   private _backgroundAgentIds = new Set<string>();
   private requestSudoPassword?: (
     sessionId: string,
@@ -618,8 +625,12 @@ export class AgentRunner {
   private piSessions: Map<string, CachedPiSession> = new Map();
   private sessionModelRuntimes: Map<string, ModelRuntime> = new Map();
   private piSessionBridge: PiSessionBridge | undefined;
-  private createSessionRecord: ((title: string, cwd?: string) => Session | null) | undefined;
-  private enqueuePromptForSession: ((sessionId: string, prompt: string) => void) | undefined;
+  private createSessionRecord:
+    | ((title: string, cwd?: string) => Session | null)
+    | undefined;
+  private enqueuePromptForSession:
+    | ((sessionId: string, prompt: string) => void)
+    | undefined;
   private findSessionByPiFile: ((piFile: string) => Session | null) | undefined;
   private activateSession: ((sessionId: string) => void) | undefined;
   private _turnFinalizer: TurnFinalizer | null = null;
@@ -663,10 +674,14 @@ export class AgentRunner {
     }
     const replacedContext: PiReplacedContext = {
       sendUserMessage: async (content: string | unknown[]) => {
-        const text = typeof content === "string" ? content : JSON.stringify(content);
+        const text =
+          typeof content === "string" ? content : JSON.stringify(content);
         this.enqueuePromptForSession?.(session.id, text);
       },
-      sendMessage: async (message: { content?: string; customType?: string }) => {
+      sendMessage: async (message: {
+        content?: string;
+        customType?: string;
+      }) => {
         const text =
           typeof message.content === "string"
             ? `[${message.customType ?? "extension"}] ${message.content}`
@@ -2535,10 +2550,7 @@ ${hints.join("\n")}
           }),
         );
       } else {
-        logWarn(
-          "[AgentRunner] No API key configured for provider:",
-          provider,
-        );
+        logWarn("[AgentRunner] No API key configured for provider:", provider);
       }
 
       // baseUrl is now embedded in the model object via resolvePiModel()
@@ -3281,8 +3293,7 @@ Tool routing:\n
       );
 
       // Compute subagent config once for both toolsSignature and session creation.
-      const subagentEnabled =
-        true;
+      const subagentEnabled = true;
 
       // Detect MCP tool changes so newly enabled/disabled MCP servers take effect
       const subagentSignature = subagentEnabled ? "1" : "";
@@ -3371,19 +3382,20 @@ Tool routing:\n
 
         // 注入子 Agent 插件
         if (subagentEnabled) {
-          const subagentsModule = await import("@tintinweb/pi-subagents/dist/index.js");
+          const subagentsModule =
+            await import("@tintinweb/pi-subagents/dist/index.js");
           const subagentsInner = subagentsModule.default as InlineExtension;
           // Wrap factory to intercept subagent lifecycle events via ExtensionAPI's pi.events
           const sessionId = session.id;
           const innerFactory: ExtensionFactory =
             typeof subagentsInner === "function"
               ? subagentsInner
-              : (subagentsInner as { name: string; factory: ExtensionFactory }).factory;
+              : (subagentsInner as { name: string; factory: ExtensionFactory })
+                  .factory;
           const wrappedFactory: InlineExtension = {
             name: "pi-subagents-wrapped",
             factory: (pi) => {
-
-          innerFactory(pi);
+              innerFactory(pi);
               pi.events?.on?.("subagents:created", (data: any) => {
                 if (data.isBackground) {
                   this._backgroundAgentIds.add(data.id);
@@ -3440,7 +3452,9 @@ Tool routing:\n
             },
           };
           extensionFactories.push(wrappedFactory);
-          log("[AgentRunner] Subagent extension factory injected (wrapped for lifecycle events)");
+          log(
+            "[AgentRunner] Subagent extension factory injected (wrapped for lifecycle events)",
+          );
         }
 
         // 注入 DeskWand Tools Extension
@@ -3459,14 +3473,13 @@ Tool routing:\n
         // （与 Pi CLI 共用同一套配置/扩展/信任，spec 决策 A）。首次使用时
         // 强制加载并解析项目信任；reload 内部幂等。
         const piAgentDir = path.join(os.homedir(), ".pi", "agent");
+        // 注意：getOrCreate 是 per-cwd 缓存，构造参数（含 skillPaths/appendSystemPrompt）
+        // 仅在首次创建 host 时生效；会话级派生 loader 通过下方 overrides 显式传当前值。
         const piHost = PiExtensionHost.getOrCreate({
           cwd: effectiveCwd,
           agentDir: piAgentDir,
           additionalSkillPaths: skillPaths,
           appendSystemPrompt,
-          ...(extensionFactories.length > 0
-            ? { inlineExtensionFactories: extensionFactories }
-            : {}),
         });
         if (
           piHost.getExtensionsResult().extensions.length === 0 &&
@@ -3474,7 +3487,17 @@ Tool routing:\n
         ) {
           await piHost.reloadResources({ resolveProjectTrust: true });
         }
-        const resourceLoader = piHost.getResourceLoader();
+        // 会话级 resourceLoader：复用 host 的磁盘扩展/信任/设置，
+        // 追加本会话 inline 工厂（pi-subagents、deskwand-tools）。
+        // 不进入 PiExtensionHost 进程级缓存，避免跨会话工厂闭包串路由。
+        // skillPaths/appendSystemPrompt 显式传当前值（host 缓存后不再更新）。
+        const resourceLoader =
+          extensionFactories.length > 0
+            ? await piHost.createSessionResourceLoader(extensionFactories, {
+                additionalSkillPaths: skillPaths,
+                appendSystemPrompt,
+              })
+            : piHost.getResourceLoader();
 
         // 将 DeskWand Provider Profiles 注册为独立命名空间，供子 Agent 使用。
         if (subagentEnabled) {
@@ -3588,7 +3611,11 @@ Tool routing:\n
                 resetUiState();
               },
               createDeskWandSession: async ({ cwd, title, piSessionFile }) => {
-                return this.createDeskWandSessionForExtension(cwd, title, piSessionFile);
+                return this.createDeskWandSessionForExtension(
+                  cwd,
+                  title,
+                  piSessionFile,
+                );
               },
               materializeMessages: (sessionId, entries) =>
                 this.materializeMessagesForExtension(sessionId, entries),
@@ -3596,8 +3623,7 @@ Tool routing:\n
                 const s = this.findSessionByPiFile?.(piFile);
                 return s ? s.id : null;
               },
-              activateSession: (sessionId) =>
-                this.activateSession?.(sessionId),
+              activateSession: (sessionId) => this.activateSession?.(sessionId),
               uiAdapter: {
                 setEditorText: (text) => {
                   getPiUiBridge()?.setEditorText(text);
@@ -3614,7 +3640,8 @@ Tool routing:\n
           await piSession.bindExtensions({
             uiContext: piUiBridge,
             mode: "tui",
-            commandContextActions: this.piSessionBridge.buildCommandContextActions(),
+            commandContextActions:
+              this.piSessionBridge.buildCommandContextActions(),
             onError: (error) => {
               logError(
                 `[AgentRunner] Extension error (${error.extensionPath}):`,
@@ -3911,7 +3938,8 @@ Tool routing:\n
               if (controller.signal.aborted) break;
 
               // Skip non-assistant messages (toolResult, custom notifications, etc.)
-              if (event.message?.role && event.message.role !== "assistant") break;
+              if (event.message?.role && event.message.role !== "assistant")
+                break;
 
               // Flush any buffered content from the think-tag parser
               const flushed = thinkParser.flush();

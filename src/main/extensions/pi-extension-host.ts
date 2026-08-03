@@ -16,11 +16,9 @@ export interface PiHostOptions {
   agentDir: string;
   additionalSkillPaths?: string[];
   appendSystemPrompt?: string[];
-  inlineExtensionFactories?: InlineExtension[];
   /** 项目信任询问回调（null = 用户取消/放弃决定）。用于 resolveProjectTrust 链路。 */
   onTrustPrompt?: (cwd: string) => Promise<boolean | null>;
 }
-
 export interface PiReloadOptions {
   /** 是否在 reload 前解析项目信任（通过 onTrustPrompt + PiTrustResolver）。 */
   resolveProjectTrust?: boolean;
@@ -59,7 +57,8 @@ export class PiExtensionHost {
   private readonly settingsManager: SettingsManager;
   private readonly packageManager: DefaultPackageManager;
   private readonly resourceLoader: DefaultResourceLoader;
-  private readonly inlineExtensionFactories: InlineExtension[];
+  private readonly additionalSkillPaths: string[] = [];
+  private readonly appendSystemPrompt: string[] = [];
   private readonly onTrustPrompt?: (cwd: string) => Promise<boolean | null>;
   private trustResolver?: PiTrustResolver;
 
@@ -74,14 +73,15 @@ export class PiExtensionHost {
       agentDir: this.agentDir,
       settingsManager: this.settingsManager,
     });
-    this.inlineExtensionFactories = [...(options.inlineExtensionFactories ?? [])];
+    this.additionalSkillPaths = [...(options.additionalSkillPaths ?? [])];
+    this.appendSystemPrompt = [...(options.appendSystemPrompt ?? [])];
     this.resourceLoader = new DefaultResourceLoader({
       cwd: this.cwd,
       agentDir: this.agentDir,
       settingsManager: this.settingsManager,
       additionalSkillPaths: options.additionalSkillPaths,
       appendSystemPrompt: options.appendSystemPrompt,
-      extensionFactories: this.inlineExtensionFactories,
+      extensionFactories: [],
     });
   }
 
@@ -95,6 +95,38 @@ export class PiExtensionHost {
 
   getResourceLoader(): DefaultResourceLoader {
     return this.resourceLoader;
+  }
+
+  /**
+   * 派生一个会话级 resourceLoader：复用本 host 的 cwd/agentDir/settingsManager
+   * （磁盘扩展、信任状态共享），并追加该会话专属的 inline 扩展工厂。
+   *
+   * 与 getOrCreate 的进程级缓存不同，派生 loader 不进入 registry——
+   * 调用方（AgentRunner）每次创建 pi session 时调用，生命周期随会话。
+   * 磁盘扩展经 SDK 模块级缓存（loadExtensionsCached）复用，reload 成本可控。
+   *
+   * overrides 可覆盖 host 首次构造时固定的 skillPaths/appendSystemPrompt
+   * （getOrCreate 缓存后新传入值会被忽略，会话级派生必须显式传当前值）。
+   */
+  async createSessionResourceLoader(
+    extraFactories: InlineExtension[],
+    overrides?: {
+      additionalSkillPaths?: string[];
+      appendSystemPrompt?: string[];
+    },
+  ): Promise<DefaultResourceLoader> {
+    const loader = new DefaultResourceLoader({
+      cwd: this.cwd,
+      agentDir: this.agentDir,
+      settingsManager: this.settingsManager,
+      additionalSkillPaths:
+        overrides?.additionalSkillPaths ?? this.additionalSkillPaths,
+      appendSystemPrompt:
+        overrides?.appendSystemPrompt ?? this.appendSystemPrompt,
+      extensionFactories: extraFactories,
+    });
+    await loader.reload();
+    return loader;
   }
 
   getExtensionsResult(): LoadExtensionsResult {
@@ -166,7 +198,10 @@ export class PiExtensionHost {
           `${this.getExtensionsResult().extensions.length} extensions`,
       );
     } catch (error) {
-      logError(`[PiExtensionHost] Resource reload failed for ${this.cwd}:`, error);
+      logError(
+        `[PiExtensionHost] Resource reload failed for ${this.cwd}:`,
+        error,
+      );
       throw error;
     }
   }

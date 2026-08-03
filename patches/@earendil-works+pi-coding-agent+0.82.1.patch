@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-index 099e74e..f53ea9c 100644
+index 099e74e..ce57356 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-@@ -64,16 +64,117 @@ function getAliases() {
+@@ -64,16 +64,186 @@ function getAliases() {
          return _aliases;
      const __dirname = path.dirname(fileURLToPath(import.meta.url));
      const packageIndex = path.resolve(__dirname, "../..", "index.js");
@@ -40,6 +40,37 @@ index 099e74e..f53ea9c 100644
 +        const subpath = pkgName === specifier
 +            ? "."
 +            : "./" + parts.slice(pkgName.startsWith("@") ? 2 : 1).join("/");
++        // Packaged (hoisted) layout: electron-builder lifts @earendil-works/*
++        // deps to the app's top-level node_modules. packagesRoot is
++        // <app>/node_modules/@earendil-works/pi-coding-agent, so the
++        // top-level node_modules root is two levels up.
++        const topLevelNodeModules = path.resolve(packagesRoot, "../..");
++        const hoistedPkgRoot = path.join(topLevelNodeModules, pkgName);
++        if (fs.existsSync(hoistedPkgRoot)) {
++            const hoistedPkgJsonPath = path.join(hoistedPkgRoot, "package.json");
++            if (fs.existsSync(hoistedPkgJsonPath)) {
++                try {
++                    const hoistedPkg = JSON.parse(fs.readFileSync(hoistedPkgJsonPath, "utf-8"));
++                    if (typeof hoistedPkg.exports === "object" && hoistedPkg.exports !== null) {
++                        const hoistedTarget = hoistedPkg.exports[subpath];
++                        if (typeof hoistedTarget === "string") {
++                            const hoistedResolved = path.join(hoistedPkgRoot, hoistedTarget);
++                            if (fs.existsSync(hoistedResolved)) return hoistedResolved;
++                        } else if (typeof hoistedTarget === "object" && hoistedTarget !== null) {
++                            const hoistedEntry = hoistedTarget.import || hoistedTarget.default || hoistedTarget.require;
++                            if (typeof hoistedEntry === "string") {
++                                const hoistedResolved = path.join(hoistedPkgRoot, hoistedEntry);
++                                if (fs.existsSync(hoistedResolved)) return hoistedResolved;
++                            }
++                        }
++                    }
++                    if (typeof hoistedPkg.main === "string") {
++                        const hoistedResolved = path.join(hoistedPkgRoot, hoistedPkg.main);
++                        if (fs.existsSync(hoistedResolved)) return hoistedResolved;
++                    }
++                } catch { /* ignore */ }
++            }
++        }
 +        const pkgRoot = path.join(packagesRoot, "node_modules", pkgName);
 +        if (!fs.existsSync(pkgRoot)) return require.resolve(specifier);
 +        const pkgJsonPath = path.join(pkgRoot, "package.json");
@@ -103,7 +134,45 @@ index 099e74e..f53ea9c 100644
 +            }
 +        }
 +
-+        // 4. Fallback: read package.json main
++        // 4. Packaged (hoisted) layout: electron-builder lifts @earendil-works/*
++        // deps to the app's top-level node_modules root (packagesRoot/../..).
++        {
++            const topLevelNodeModules = path.resolve(packagesRoot, "../..");
++            // Strip subpath specifier (e.g. "@earendil-works/pi-ai/compat" →
++            // "@earendil-works/pi-ai") so we look under the package dir, not a
++            // non-existent "<pkg>/compat" dir. Mirrors step 3's basePkg logic.
++            const parts = specifier.split("/");
++            const basePkg = specifier.startsWith("@") && parts.length >= 2
++                ? parts.slice(0, 2).join("/")
++                : parts[0];
++            const topNmPath = path.join(topLevelNodeModules, basePkg, workspaceRelativePath);
++            if (fs.existsSync(topNmPath)) return topNmPath;
++            const relParts = workspaceRelativePath.split("/");
++            if (relParts.length > 1) {
++                const topStripped = path.join(topLevelNodeModules, basePkg, ...relParts.slice(1));
++                if (fs.existsSync(topStripped)) return topStripped;
++            }
++            // read package.json main/exports as last resort before require.resolve
++            const topPkgRoot = path.join(topLevelNodeModules, basePkg);
++            if (fs.existsSync(topPkgRoot)) {
++                const topPkgJsonPath = path.join(topPkgRoot, "package.json");
++                if (fs.existsSync(topPkgJsonPath)) {
++                    try {
++                        const topPkg = JSON.parse(fs.readFileSync(topPkgJsonPath, "utf-8"));
++                        const topEntry =
++                            (typeof topPkg.exports === "object" && typeof topPkg.exports["."]?.import === "string")
++                                ? topPkg.exports["."].import
++                                : topPkg.main;
++                        if (typeof topEntry === "string") {
++                            const topEntryPath = path.join(topPkgRoot, topEntry);
++                            if (fs.existsSync(topEntryPath)) return topEntryPath;
++                        }
++                    } catch { /* ignore */ }
++                }
++            }
++        }
++
++        // 5. Fallback: read package.json main
 +        const pkgRoot = path.join(packagesRoot, "node_modules", specifier);
 +        if (fs.existsSync(pkgRoot)) {
 +            const pkgJsonPath = path.join(pkgRoot, "package.json");
@@ -127,7 +196,7 @@ index 099e74e..f53ea9c 100644
      };
      const piCodingAgentEntry = packageIndex;
      const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
-@@ -106,6 +207,7 @@ function getAliases() {
+@@ -106,6 +276,7 @@ function getAliases() {
          "@sinclair/typebox/compile": typeboxCompileEntry,
          "@sinclair/typebox/value": typeboxValueEntry,
      };
