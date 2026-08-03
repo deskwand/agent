@@ -45,10 +45,14 @@ let ipcListener:
   | ((event: Electron.IpcRendererEvent, data: ServerEvent) => void)
   | null = null;
 
-// Allowlist of valid ClientEvent types to prevent spoofing arbitrary IPC channels
-const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent["type"]>(
-  [
-    "session.start",
+// Allowlist of valid ClientEvent types to prevent spoofing arbitrary IPC channels.
+// No type annotation on the Set: `ReadonlySet<string>` or
+// `Set<ClientEvent["type"]>` widen the element type to the whole union, which
+// makes the Exclude-based exhaustiveness check below compare the union against
+// itself (always passes). The element type must be inferred from the literal
+// array via `as const`.
+const ALLOWED_CLIENT_EVENTS = new Set([
+  "session.start",
     "session.continue",
     "session.setThinkingLevel",
     "session.setProviderModel",
@@ -66,6 +70,7 @@ const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent["type"]>(
     "session.batchDelete",
     "session.list",
     "session.getMessages",
+    "session.getMessagesPage",
     "session.getTraceSteps",
     "permission.response",
     "sudo.password.response",
@@ -78,8 +83,7 @@ const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent["type"]>(
     "project.delete",
     "update.check",
     "update.install",
-  ],
-);
+  ] as const);
 
 // Compile-time exhaustiveness: every renderer→main event type must be in the
 // allowlist. Adding a new ClientEvent type without allowlisting it breaks the

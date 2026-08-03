@@ -40,6 +40,10 @@ export interface SessionExecutionClock {
 // Unified per-session state that replaces 8 parallel xxxBySession Maps
 export interface SessionState {
   historyHydrated: boolean;
+  /** Whether older history exists beyond the in-memory window. */
+  hasMoreOlder: boolean;
+  /** Id of the oldest message in the in-memory window (paging cursor). */
+  oldestMessageId: string | null;
   messages: Message[];
   partialByTurn: Record<string, { message: string; thinking: string }>;
   partialMessage: string;
@@ -75,8 +79,18 @@ export interface SessionState {
   }>;
 }
 
+// Store window cap. prependOlderMessages allows the window to grow to
+// cap + page size before trimming the oldest messages (returning how many
+// were trimmed so the render window start can be remapped); trimming on
+// every prepend would discard the very page just loaded. Kept in sync
+// with the ChatView locals MAX_MEMORY_WINDOW_MESSAGES / LOAD_OLDER_PAGE_SIZE.
+const MAX_MEMORY_WINDOW_MESSAGES = 2000;
+const MESSAGE_PAGE_SIZE = 1000;
+
 const DEFAULT_SESSION_STATE: SessionState = {
   historyHydrated: false,
+  hasMoreOlder: false,
+  oldestMessageId: null,
   messages: [],
   partialByTurn: {},
   partialMessage: "",
@@ -248,6 +262,17 @@ interface AppState {
   ) => void;
   removeBackgroundAgent: (sessionId: string, agentId: string) => void;
   setMessages: (sessionId: string, messages: Message[]) => void;
+  setMessagesTail: (
+    sessionId: string,
+    messages: Message[],
+    hasMore: boolean,
+  ) => void;
+  prependOlderMessages: (
+    sessionId: string,
+    older: Message[],
+    hasMore: boolean,
+  ) => number;
+  trimMessagesToWindow: (sessionId: string, keepCount: number) => void;
   setPartialMessage: (
     sessionId: string,
     partial: string,
@@ -654,6 +679,52 @@ export const useAppStore = create<AppState>((set) => ({
         historyHydrated: true,
       }),
     })),
+
+  setMessagesTail: (sessionId, messages, hasMore) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        messages,
+        hasMoreOlder: hasMore,
+        oldestMessageId: messages[0]?.id ?? null,
+        historyHydrated: true,
+      }),
+    })),
+
+  prependOlderMessages: (sessionId, older, hasMore) => {
+    let trimmedCount = 0;
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      const merged = [...older, ...ss.messages];
+      let messages = merged;
+      const cap = MAX_MEMORY_WINDOW_MESSAGES + MESSAGE_PAGE_SIZE;
+      if (merged.length > cap) {
+        trimmedCount = merged.length - MAX_MEMORY_WINDOW_MESSAGES;
+        messages = merged.slice(trimmedCount);
+      }
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          messages,
+          hasMoreOlder: hasMore,
+          oldestMessageId: messages[0]?.id ?? ss.oldestMessageId,
+          historyHydrated: true,
+        }),
+      };
+    });
+    return trimmedCount;
+  },
+
+  trimMessagesToWindow: (sessionId, keepCount) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      if (ss.messages.length <= keepCount) return {};
+      const messages = ss.messages.slice(-keepCount);
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          messages,
+          oldestMessageId: messages[0]?.id ?? null,
+        }),
+      };
+    }),
 
   setPartialMessage: (sessionId, partial, turnId) =>
     set((state) => {
@@ -1132,23 +1203,31 @@ if (typeof window !== "undefined") {
         typeof window.electronAPI?.invoke === "function"
       ) {
         try {
-          const [messages, traceSteps] = await Promise.all([
+          const [page, traceSteps] = await Promise.all([
             window.electronAPI.invoke({
-              type: "session.getMessages",
-              payload: { sessionId },
+              type: "session.getMessagesPage",
+              payload: { sessionId, beforeId: null, limit: 1000 },
             }),
             window.electronAPI.invoke({
               type: "session.getTraceSteps",
               payload: { sessionId },
             }),
           ]);
-          store.setMessages(sessionId, Array.isArray(messages) ? messages : []);
+          const pageResult = page as {
+            messages?: unknown;
+            hasMore?: unknown;
+          } | null;
+          store.setMessagesTail(
+            sessionId,
+            Array.isArray(pageResult?.messages) ? pageResult.messages : [],
+            Boolean(pageResult?.hasMore),
+          );
           store.setTraceSteps(
             sessionId,
             Array.isArray(traceSteps) ? traceSteps : [],
           );
         } catch {
-          store.setMessages(sessionId, []);
+          store.setMessagesTail(sessionId, [], false);
           store.setTraceSteps(sessionId, []);
         }
       }

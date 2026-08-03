@@ -51,7 +51,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessionStates = useAppStore((s) => s.sessionStates);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
-  const setMessages = useAppStore((s) => s.setMessages);
+  const setMessagesTail = useAppStore((s) => s.setMessagesTail);
   const setTraceSteps = useAppStore((s) => s.setTraceSteps);
   const workingDir = useAppStore((s) => s.workingDir);
   const setWorkingDir = useAppStore((s) => s.setWorkingDir);
@@ -74,7 +74,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     invoke,
     deleteSession,
     archiveSession,
-    getSessionMessages,
+    getSessionMessagesPage,
     getSessionTraceSteps,
     changeWorkingDir,
     createProject,
@@ -374,7 +374,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       const existingMessages = sessionStates[sessionId]?.messages;
       const existingSteps = sessionStates[sessionId]?.traceSteps;
       const needsMessages =
-        isElectron && (!existingMessages || existingMessages.length === 0);
+        isElectron && !sessionStates[sessionId]?.historyHydrated;
       const needsTraceSteps =
         isElectron && (!existingSteps || existingSteps.length === 0);
 
@@ -396,9 +396,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         let loadedSteps = existingSteps ?? [];
 
         if (needsMessages) {
-          loadedMessages = (await getSessionMessages(sessionId)) || [];
+          const page =
+            (await getSessionMessagesPage(sessionId, null, 1000)) || {
+              messages: [],
+              hasMore: false,
+            };
           if (sessionLoadSeqRef.current !== loadSeq) return;
-          setMessages(sessionId, loadedMessages);
+          setMessagesTail(sessionId, page.messages, page.hasMore);
+          loadedMessages = page.messages;
         }
 
         if (needsTraceSteps) {
@@ -424,12 +429,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     },
     [
       activeSessionId,
-      getSessionMessages,
+      getSessionMessagesPage,
       getSessionTraceSteps,
       isElectron,
       sessionStates,
       setActiveSession,
-      setMessages,
+      setMessagesTail,
       setShowApps,
       setShowSettings,
       setTraceSteps,

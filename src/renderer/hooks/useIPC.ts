@@ -187,17 +187,23 @@ function installSharedIpcBridge(): void {
                 event.payload.sessions.some((s) => s.id === lastId)
               ) {
                 if (store.activeSessionId !== lastId) {
-                  const [messages, steps] = await Promise.all([
-                    invoke<Message[]>({
-                      type: "session.getMessages",
-                      payload: { sessionId: lastId },
+                  const [page, steps] = await Promise.all([
+                    invoke<{ messages: Message[]; hasMore: boolean }>({
+                      type: "session.getMessagesPage",
+                      payload: {
+                        sessionId: lastId,
+                        beforeId: null,
+                        limit: 1000,
+                      },
                     }),
                     invoke<TraceStep[]>({
                       type: "session.getTraceSteps",
                       payload: { sessionId: lastId },
                     }),
                   ]);
-                  if (messages) store.setMessages(lastId, messages);
+                  if (page) {
+                    store.setMessagesTail(lastId, page.messages, page.hasMore);
+                  }
                   if (steps) store.setTraceSteps(lastId, steps);
                   store.setActiveSession(lastId);
                 }
@@ -303,11 +309,16 @@ function installSharedIpcBridge(): void {
             } else {
               store.updateSession(session.id, session);
             }
-            const messages = await invoke<Message[]>({
-              type: "session.getMessages",
-              payload: { sessionId: session.id },
+            const page = await invoke<{
+              messages: Message[];
+              hasMore: boolean;
+            }>({
+              type: "session.getMessagesPage",
+              payload: { sessionId: session.id, beforeId: null, limit: 1000 },
             });
-            if (messages) store.setMessages(session.id, messages);
+            if (page) {
+              store.setMessagesTail(session.id, page.messages, page.hasMore);
+            }
             store.setActiveSession(session.id);
           })();
           break;
@@ -1064,19 +1075,18 @@ export function useIPC() {
     send({ type: "session.list", payload: {} });
   }, [send]);
 
-  // Get messages for a session (from persistent storage)
-  const getSessionMessages = useCallback(
-    async (sessionId: string): Promise<Message[]> => {
-      if (!isElectron) {
-        console.log("[useIPC] Browser mode - no persistent messages");
-        return [];
-      }
-      console.log("[useIPC] Getting messages for session:", sessionId);
-      const messages = await invoke<Message[]>({
-        type: "session.getMessages",
-        payload: { sessionId },
+  // Get a page of messages (tail page when beforeId is null)
+  const getSessionMessagesPage = useCallback(
+    async (
+      sessionId: string,
+      beforeId: string | null,
+      limit: number,
+    ): Promise<{ messages: Message[]; hasMore: boolean } | null> => {
+      if (!isElectron) return { messages: [], hasMore: false };
+      return invoke<{ messages: Message[]; hasMore: boolean }>({
+        type: "session.getMessagesPage",
+        payload: { sessionId, beforeId, limit },
       });
-      return messages || [];
     },
     [invoke],
   );
@@ -1218,7 +1228,7 @@ export function useIPC() {
     batchUnarchiveSessions,
     permanentDeleteArchived,
     listSessions,
-    getSessionMessages,
+    getSessionMessagesPage,
     getSessionTraceSteps,
     respondToPermission,
     respondToSudoPassword,

@@ -509,6 +509,10 @@ export type ClientEvent =
   | { type: "session.archiveDelete"; payload: { sessionId: string } }
   | { type: "session.list"; payload: Record<string, never> }
   | { type: "session.getMessages"; payload: { sessionId: string } }
+  | {
+      type: "session.getMessagesPage";
+      payload: { sessionId: string; beforeId: string | null; limit: number };
+    }
   | { type: "session.getTraceSteps"; payload: { sessionId: string } }
   | {
       type: "permission.response";

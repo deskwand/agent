@@ -4053,6 +4053,13 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
     case "session.getMessages":
       return sm.getMessages(event.payload.sessionId);
 
+    case "session.getMessagesPage":
+      return sm.getMessagesPage(
+        event.payload.sessionId,
+        event.payload.beforeId,
+        event.payload.limit,
+      );
+
     case "session.getTraceSteps":
       return sm.getTraceSteps(event.payload.sessionId);
 

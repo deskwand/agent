@@ -8,7 +8,10 @@ type ExposedElectronApi = {
 
 // Every renderer→main event type. Kept in sync with the ClientEvent union by
 // the type-level assertion below: adding a new member here is a compile error.
-const ALL_CLIENT_EVENT_TYPES: ReadonlyArray<ClientEvent["type"]> = [
+// `as const` is required: a `ReadonlyArray<ClientEvent["type"]>` annotation
+// would widen the element type to the whole union, making the exhaustiveness
+// check below compare the union against itself (always true).
+const ALL_CLIENT_EVENT_TYPES = [
   "session.start",
   "session.continue",
   "session.setThinkingLevel",
@@ -27,6 +30,7 @@ const ALL_CLIENT_EVENT_TYPES: ReadonlyArray<ClientEvent["type"]> = [
   "session.archiveDelete",
   "session.list",
   "session.getMessages",
+  "session.getMessagesPage",
   "session.getTraceSteps",
   "permission.response",
   "sudo.password.response",
@@ -39,12 +43,17 @@ const ALL_CLIENT_EVENT_TYPES: ReadonlyArray<ClientEvent["type"]> = [
   "project.delete",
   "update.check",
   "update.install",
-];
+] as const satisfies ReadonlyArray<ClientEvent["type"]>;
 
 // Compile-time: the list above must cover the whole ClientEvent union, so a
 // newly added event type forces an update here (and, via the preload's own
 // exhaustive check, a matching allowlist entry).
-type _ExhaustiveEventTypes = ClientEvent["type"] extends (typeof ALL_CLIENT_EVENT_TYPES)[number]
+// Tuple form (not a naked type parameter) so the conditional does NOT
+// distribute over the union: with distribution, a missing member collapses
+// to `true | never` = `true` and the check silently passes.
+type _ExhaustiveEventTypes = [ClientEvent["type"]] extends [
+  (typeof ALL_CLIENT_EVENT_TYPES)[number],
+]
   ? true
   : never;
 const _check: _ExhaustiveEventTypes = true;

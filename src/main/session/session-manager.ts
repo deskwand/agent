@@ -11,6 +11,7 @@
  *
  * Dependencies: database, agent-runner, config-store, mcp-manager, sandbox-adapter
  */
+import { sliceCachedPage } from "./message-paging";
 import { v4 as uuidv4 } from "uuid";
 import * as fs from "fs";
 import * as path from "path";
@@ -26,8 +27,7 @@ import type {
 } from "../../renderer/types";
 import type { DatabaseInstance, TraceStepRow } from "../db/database";
 import { PathResolver } from "../sandbox/path-resolver";
-import type {
-  SandboxAdapter} from "../sandbox/sandbox-adapter";
+import type { SandboxAdapter } from "../sandbox/sandbox-adapter";
 import {
   getSandboxAdapter,
   initializeSandbox,
@@ -142,6 +142,15 @@ export class SessionManager {
   private sessionTitleAttempts: Set<string> = new Set();
   private titleGenerationTokens: Map<string, symbol> = new Map();
   private messageCache: Map<string, Message[]> = new Map();
+  /**
+   * Sessions whose cache holds the COMPLETE history. saveMessage seeds a
+   * partial [message] cache on miss; only a full getMessages() (or a page
+   * served from a complete cache) marks a session here. Consumers must not
+   * serve pages from a partial cache or older history is silently lost
+   * (e.g. after a renderer reload, the tail fetch would return just the
+   * few messages saved this run with hasMore=false).
+   */
+  private fullyLoadedSessions: Set<string> = new Set();
   private static readonly MAX_CACHE_SIZE = 100;
 
   constructor(
@@ -212,8 +221,7 @@ export class SessionManager {
           this.enqueuePromptForSession(sessionId, prompt),
         findSessionByPiFile: (piFile: string) =>
           this.findSessionByPiFile(piFile),
-        activateSession: (sessionId: string) =>
-          this.activateSession(sessionId),
+        activateSession: (sessionId: string) => this.activateSession(sessionId),
         turnFinalizer: {
           getReviewService: () => {
             // Lazily create the review service with current config.
@@ -228,12 +236,22 @@ export class SessionManager {
         },
         onBackgroundAgentComplete: (sessionId: string, agentId: string) => {
           const prompt = `[系统通知] 后台子代理 ${agentId} 已完成。请调用 get_subagent_result 获取结果并汇总给用户。`;
-          log("[SessionManager] auto-continue: triggering for", sessionId, agentId);
-          this.continueSession(sessionId, prompt).then(() => {
-            log("[SessionManager] auto-continue: completed ok for", agentId);
-          }).catch((e) => {
-            log("[SessionManager] auto-continue: FAILED for", agentId, String(e));
-          });
+          log(
+            "[SessionManager] auto-continue: triggering for",
+            sessionId,
+            agentId,
+          );
+          this.continueSession(sessionId, prompt)
+            .then(() => {
+              log("[SessionManager] auto-continue: completed ok for", agentId);
+            })
+            .catch((e) => {
+              log(
+                "[SessionManager] auto-continue: FAILED for",
+                agentId,
+                String(e),
+              );
+            });
         },
       },
       this.pathResolver,
@@ -399,7 +417,8 @@ export class SessionManager {
     const normalized = path.resolve(piFile);
     const rows = this.db.sessions.getAll();
     const row = rows.find(
-      (r) => r.pi_session_file && path.resolve(r.pi_session_file) === normalized,
+      (r) =>
+        r.pi_session_file && path.resolve(r.pi_session_file) === normalized,
     );
     return row ? this.loadSession(row.id) : null;
   }
@@ -417,7 +436,11 @@ export class SessionManager {
   createSessionRecord(title: string, cwd?: string): Session {
     const session = this.createSession(title, cwd);
     this.saveSession(session);
-    log("[SessionManager] Created session record (no prompt):", session.id, title);
+    log(
+      "[SessionManager] Created session record (no prompt):",
+      session.id,
+      title,
+    );
     // 通知 renderer 立即显示（Pi 扩展 newSession/fork 桥接创建）
     this.sendToRenderer({
       type: "session.create",
@@ -1538,7 +1561,10 @@ export class SessionManager {
 
     const goalExt = this.extensionManager.getExtension<{
       readonly name: string;
-      recoverGoals(): Array<{ sessionId: string; goal: { status: string; objective: string; iteration: number } }>;
+      recoverGoals(): Array<{
+        sessionId: string;
+        goal: { status: string; objective: string; iteration: number };
+      }>;
       deleteGoal(sessionId: string): void;
     }>("goal");
 
@@ -1573,7 +1599,10 @@ export class SessionManager {
   enqueuePromptForSession(sessionId: string, prompt: string): void {
     const session = this.loadSession(sessionId);
     if (!session) {
-      logError("[SessionManager] enqueuePromptForSession: session not found", sessionId);
+      logError(
+        "[SessionManager] enqueuePromptForSession: session not found",
+        sessionId,
+      );
       return;
     }
     this.enqueuePrompt(session, prompt);
@@ -1709,6 +1738,7 @@ export class SessionManager {
     }
     this.promptQueues.delete(sessionId);
     this.messageCache.delete(sessionId);
+    this.fullyLoadedSessions.delete(sessionId);
 
     // If processQueue is running, let its finally block handle the idle transition.
     // Otherwise (e.g. stopping an already-idle session), set idle directly.
@@ -1768,6 +1798,7 @@ export class SessionManager {
     // Delete from database (messages will be deleted automatically via CASCADE)
     this.db.sessions.delete(sessionId);
     this.messageCache.delete(sessionId);
+    this.fullyLoadedSessions.delete(sessionId);
     this.sessionTitleAttempts.delete(sessionId);
     this.titleGenerationTokens.delete(sessionId);
     webAccessCache.clearSession(sessionId);
@@ -1816,6 +1847,7 @@ export class SessionManager {
       for (const sessionId of sessionIds) {
         this.db.sessions.delete(sessionId);
         this.messageCache.delete(sessionId);
+        this.fullyLoadedSessions.delete(sessionId);
         this.sessionTitleAttempts.delete(sessionId);
         this.titleGenerationTokens.delete(sessionId);
         webAccessCache.clearSession(sessionId);
@@ -2043,6 +2075,8 @@ export class SessionManager {
         if (firstKey) this.messageCache.delete(firstKey);
       }
       this.messageCache.set(message.sessionId, [message]);
+      // A miss means we may not hold the full history anymore.
+      this.fullyLoadedSessions.delete(message.sessionId);
     }
 
     log("[SessionManager] Message saved:", message.id, "role:", message.role);
@@ -2051,7 +2085,7 @@ export class SessionManager {
   // Get messages for a session
   getMessages(sessionId: string): Message[] {
     const cached = this.messageCache.get(sessionId);
-    if (cached) {
+    if (cached && this.fullyLoadedSessions.has(sessionId)) {
       return [...cached];
     }
 
@@ -2075,7 +2109,48 @@ export class SessionManager {
       };
     });
     this.messageCache.set(sessionId, messages);
+    this.fullyLoadedSessions.add(sessionId);
     return [...messages];
+  }
+
+  // Get a page of messages for a session (newest tail page when
+  // beforeId is null, older pages via id cursor). Serves from the
+  // in-memory cache when present, falls back to a DB query.
+  getMessagesPage(
+    sessionId: string,
+    beforeId: string | null,
+    limit: number,
+  ): { messages: Message[]; hasMore: boolean } {
+    const cached = this.messageCache.get(sessionId);
+    if (cached && this.fullyLoadedSessions.has(sessionId)) {
+      const fromCache = sliceCachedPage(cached, beforeId, limit);
+      if (fromCache) return fromCache;
+      // Cursor no longer in cache — fall through to DB.
+    }
+
+    const { rows, hasMore } = this.db.messages.getMessagesPage(
+      sessionId,
+      beforeId,
+      limit,
+    );
+    const messages = rows.map((row) => {
+      const content = this.normalizeContent(row.content);
+      const firstBlock = content[0];
+      const autoGenerated =
+        firstBlock?.type === "text" && firstBlock.text === "__autoGenerated__";
+      return {
+        id: row.id,
+        sessionId: row.session_id,
+        role: row.role as Message["role"],
+        content: autoGenerated ? content.slice(1) : content,
+        timestamp: row.timestamp,
+        tokenUsage: row.token_usage ? JSON.parse(row.token_usage) : undefined,
+        executionTimeMs: row.execution_time_ms ?? undefined,
+        turnId: row.turn_id ?? undefined,
+        autoGenerated: autoGenerated || undefined,
+      };
+    });
+    return { messages, hasMore };
   }
 
   private normalizeContent(raw: string): ContentBlock[] {
