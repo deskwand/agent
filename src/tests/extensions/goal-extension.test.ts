@@ -276,6 +276,9 @@ describe("GoalExtension error handling & resume semantics", () => {
 
     expect(result?.firstTurnPrompt).toContain("Resume working toward");
     expect(result?.goalStatus?.status).toBe("active");
+    // Below the cap: plain resume message, no cap notice
+    expect(result?.message).toContain("Goal resumed:");
+    expect(result?.message).not.toContain("cap");
   });
 
   it("resume rejects with alreadyActive when session is running", async () => {
@@ -294,17 +297,32 @@ describe("GoalExtension error handling & resume semantics", () => {
     expect(result?.message).toBeTruthy(); // alreadyActive 文案
   });
 
-  it("resume resets iteration when at the max-iteration cap", async () => {
+  it("resume resets iteration to 1 and explains the cap when at the max-iteration cap", async () => {
     const db = createMockDb();
     const ext = new GoalExtension(db as never);
     ext.setSessionStateProvider(() => false);
     await startGoal(ext);
     goalOf(ext).iteration = MAX_GOAL_ITERATIONS;
     goalOf(ext).status = "paused";
+    db.goals.upsert.mockClear();
 
-    await ext.onCommand({ command: "goal", args: "resume", sessionId: "s1" });
+    const result = await ext.onCommand({
+      command: "goal",
+      args: "resume",
+      sessionId: "s1",
+    });
 
-    expect(goalOf(ext).iteration).toBe(0);
+    // New cycle restarts counting; never shows turn 0
+    expect(goalOf(ext).iteration).toBe(1);
+    // Persisted row carries the restarted counter (restart-recovery path)
+    const call = db.goals.upsert.mock.calls[0][0];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    expect(call.iteration).toBe(1);
+    expect(result?.firstTurnPrompt).toContain("This is turn #1");
+    expect(result?.firstTurnPrompt).not.toContain("turn #0");
+    // Resume response tells the user the cap was reached
+    // (unit tests run with electron mock locale "en")
+    expect(result?.message).toContain("50-turn cap");
   });
 
   it("getAllGoals returns in-memory goals keyed by session", async () => {
