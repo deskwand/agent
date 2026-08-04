@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import type { ProviderProfileKey, ThinkingLevel } from "../types";
@@ -121,7 +128,7 @@ export function MergedInputChip({
     return () => window.removeEventListener("resize", updateModelMenuMaxHeight);
   }, [activeSubmenu, menuOpen, updateModelMenuMaxHeight]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!menuOpen || activeSubmenu !== "model") return;
     const list = modelListRef.current;
     if (!list) return;

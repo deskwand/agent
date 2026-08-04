@@ -285,6 +285,9 @@ describe("MergedInputChip", () => {
   it("hides the search box when the model list fits", () => {
     render();
     act(() => trigger().click());
+    vi.spyOn(primaryMenu(), "getBoundingClientRect").mockReturnValue({
+      bottom: 420,
+    } as DOMRect);
     mockListMetrics(modelList(), 100, 364);
     hover(modelRow());
 
@@ -303,6 +306,9 @@ describe("MergedInputChip", () => {
       window.HTMLInputElement.prototype,
       "value",
     )?.set;
+    // 模拟过滤后列表放得下：此时 showModelSearch 将变为 false，
+    // 输入框可见性完全依赖「搜索词非空」守卫
+    mockListMetrics(modelList(), 100, 364);
     act(() => {
       setter?.call(input, "Two");
       input.dispatchEvent(new Event("input", { bubbles: true }));
@@ -310,14 +316,35 @@ describe("MergedInputChip", () => {
     // 过滤后列表放得下，但搜索词非空 → 输入框必须保持可见
     expect(modelList().querySelector("input")).not.toBeNull();
 
-    // 模拟窗口变化使完整列表放得下（clientHeight 不变、scrollHeight 变小）
-    mockListMetrics(modelList(), 100, 364);
+    // 清空搜索词 → 按溢出状态重新判断 → 放得下则收起
     act(() => {
       setter?.call(input, "");
       input.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    // 清空搜索词后按溢出状态重新判断 → 放得下则收起
     expect(modelList().querySelector("input")).toBeNull();
+  });
+
+  it("keeps the search box visible after clearing while the list still overflows", () => {
+    render();
+    act(() => trigger().click());
+    mockListMetrics(modelList(), 500, 364);
+    hover(modelRow());
+
+    const input = modelList().querySelector("input")!;
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    act(() => {
+      setter?.call(input, "Two");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    act(() => {
+      setter?.call(input, "");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    // 完整列表仍溢出 → 重新判断后搜索框保持可见
+    expect(modelList().querySelector("input")).not.toBeNull();
   });
 
   it("closes on outside click", () => {
