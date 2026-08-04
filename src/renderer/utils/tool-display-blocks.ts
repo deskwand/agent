@@ -9,6 +9,7 @@ export interface SubagentSummary {
 
 export interface ProcessSummary {
   readCount: number;
+  browseDirCount?: number;
   hasSearch: boolean;
   hasWebSearch: boolean;
   hasBrowse: boolean;
@@ -62,6 +63,8 @@ const PROCESS_TOOLS = new Set([
   "read_file",
   "grep",
   "glob",
+  "find",
+  "ls",
   "bash",
   "execute_command",
   "agent",
@@ -102,6 +105,12 @@ const SEARCH_TOOLS = new Set([
   // grep/glob = code search only; web/browser tools are BROWSE_TOOLS
   "grep",
   "glob",
+  "find",
+]);
+
+const FILE_BROWSE_TOOLS = new Set([
+  // ls lists directory contents — its own summary group
+  "ls",
 ]);
 
 const WEB_SEARCH_TOOLS = new Set([
@@ -168,6 +177,7 @@ const GOAL_TOOLS = new Set(["get_goal", "update_goal", "goal_complete"]);
 
 function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   const readPaths = new Set<string>();
+  let browseDirCount = 0;
   let hasSearch = false;
   let hasWebSearch = false;
   let hasBrowse = false;
@@ -200,6 +210,12 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     }
     if (SEARCH_TOOLS.has(lower)) {
       hasSearch = true;
+      countedAsSpecific = true;
+    }
+    if (FILE_BROWSE_TOOLS.has(lower)) {
+      // Count invocations (not unique directories) — same convention as
+      // commandCount / subagentResultCount; readCount dedupes by path.
+      browseDirCount += 1;
       countedAsSpecific = true;
     }
     if (WEB_SEARCH_TOOLS.has(lower)) {
@@ -250,6 +266,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
 
   return {
     readCount: readPaths.size,
+    browseDirCount,
     hasSearch,
     hasWebSearch,
     hasBrowse,
@@ -523,6 +540,7 @@ export type ProcessSummaryFragment = {
   iconType:
     | "read"
     | "search"
+    | "filebrowse"
     | "websearch"
     | "browse"
     | "memory"
@@ -544,6 +562,18 @@ export function getProcessSummaryFragments(
         count: summary.readCount,
       }),
       iconType: "read",
+    });
+  }
+  if ((summary.browseDirCount ?? 0) > 0) {
+    fragments.push({
+      text: t(
+        pluralKey(
+          "tool.grouped.browsedDirectories",
+          summary.browseDirCount ?? 0,
+        ),
+        { count: summary.browseDirCount ?? 0 },
+      ),
+      iconType: "filebrowse",
     });
   }
   if (summary.hasSearch) {

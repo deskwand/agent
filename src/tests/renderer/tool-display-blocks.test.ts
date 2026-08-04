@@ -808,3 +808,73 @@ describe("Goal tools in process summary", () => {
     expect(fragments.find((f) => f.iconType === "goal")).toBeUndefined();
   });
 });
+
+describe("ls/find process grouping", () => {
+  const t = ((key: string, options?: { count?: number }) => {
+    const map: Record<string, string> = {
+      "tool.grouped.readFiles_one": `${options?.count} file read`,
+      "tool.grouped.readFiles_other": `${options?.count} files read`,
+      "tool.grouped.browsedDirectories_one": `browsed ${options?.count} directory`,
+      "tool.grouped.browsedDirectories_other": `browsed ${options?.count} directories`,
+      "tool.grouped.searchedCode": "searched code",
+      "tool.grouped.joinAnd": " and ",
+      "tool.grouped.joinComma": ", ",
+    };
+    return map[key] ?? key;
+  }) as never;
+
+  it("groups ls into a file-browse fragment", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("ls-1", "ls", { path: "/tmp" }),
+      toolResult("ls-1"),
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { browseDirCount: 1, usedToolCount: 0 },
+    });
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      { text: "browsed 1 directory", iconType: "filebrowse" },
+    ]);
+  });
+
+  it("groups find into the code-search fragment", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("find-1", "find", { pattern: "*.ts" }),
+      toolResult("find-1"),
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { hasSearch: true, usedToolCount: 0 },
+    });
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+  });
+
+  it("mixes ls and read without cross-counting", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("ls-1", "ls", { path: "/tmp" }),
+      toolResult("ls-1"),
+      toolUse("read-1", "read", { path: "src/a.ts" }),
+      toolResult("read-1"),
+    ]);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { readCount: 1, browseDirCount: 1, usedToolCount: 0 },
+    });
+  });
+
+  it("defines localized file-browse summaries", () => {
+    expect(en.tool.grouped).toMatchObject({
+      browsedDirectories_one: "Browsed {{count}} directory",
+      browsedDirectories_other: "Browsed {{count}} directories",
+    });
+    expect(zh.tool.grouped).toMatchObject({
+      browsedDirectories_one: "已浏览 {{count}} 个目录",
+      browsedDirectories_other: "已浏览 {{count}} 个目录",
+    });
+  });
+});
