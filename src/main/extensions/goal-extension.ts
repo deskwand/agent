@@ -412,9 +412,33 @@ export class GoalExtension implements AgentRuntimeExtension {
         ) => {
           const parsed = params as UpdateGoalInput;
           const goal = self.getGoal(sid);
+          if (!goal) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "There is no active goal to update.",
+                },
+              ],
+              details: {},
+            };
+          }
+          // 终态幂等：complete/blocked 已收尾，重复调用不再报"无活跃目标"
+          if (goal.status === "complete" || goal.status === "blocked") {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Goal is already ${goal.status}.`,
+                },
+              ],
+              details: {},
+            };
+          }
           if (
-            !goal ||
-            (goal.status !== "active" && goal.status !== "budget_limited")
+            goal.status !== "active" &&
+            goal.status !== "budget_limited" &&
+            goal.status !== "paused"
           ) {
             return {
               content: [
@@ -486,9 +510,33 @@ export class GoalExtension implements AgentRuntimeExtension {
         ) => {
           const parsed = params as { summary: string };
           const goal = self.getGoal(sid);
+          if (!goal) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "There is no active goal to complete.",
+                },
+              ],
+              details: {},
+            };
+          }
+          // 终态幂等：已 complete 的 goal 重复标记返回提示而非误导性错误
+          if (goal.status === "complete" || goal.status === "blocked") {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Goal is already ${goal.status}.`,
+                },
+              ],
+              details: {},
+            };
+          }
           if (
-            !goal ||
-            (goal.status !== "active" && goal.status !== "budget_limited")
+            goal.status !== "active" &&
+            goal.status !== "budget_limited" &&
+            goal.status !== "paused"
           ) {
             return {
               content: [
@@ -747,9 +795,19 @@ export class GoalExtension implements AgentRuntimeExtension {
     ctx: BeforeSessionRunContext,
   ): Promise<BeforeSessionRunResult | void> {
     const sessionId = ctx.session.id;
+
+    // 工具全局常驻：无论有无 goal、无论 goal 状态，get_goal/update_goal
+    // 始终注入。工具列表因此全局恒定——goal 的整个生命周期（启动/暂停/
+    // 完成/清除）都不改变系统提示的工具列表，不触发 pi session 重建、
+    // 不破坏提示词缓存（prompt cache 前缀匹配）。
+    const tools = this.ensureGoalTools(sessionId);
+
     const goal = this.getGoal(sessionId);
     if (!goal || goal.status !== "active") {
-      return;
+      // 无 goal 或非 active（paused/budget_limited/complete/blocked）：
+      // 只注入工具。get_goal 对无目标返回 "No active goal"，update_goal
+      // 同样安全拒绝——模型可查询状态或收尾，目标永不悬死。
+      return { customTools: tools };
     }
 
     // Increment iteration at the start of continuation turns.
@@ -765,7 +823,6 @@ export class GoalExtension implements AgentRuntimeExtension {
     this.sessionGenerations.set(sessionId, goal.generation);
 
     const promptPrefix = buildGoalSystemPrompt(goal);
-    const tools = this.ensureGoalTools(sessionId);
     return { promptPrefix, customTools: tools };
   }
 

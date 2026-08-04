@@ -381,3 +381,300 @@ describe("GoalExtension integration (real SQLite)", () => {
   });
 });
 
+
+describe("goal tools decoupled from status (prompt cache stability)", () => {
+  it("paused goal still injects get_goal/update_goal tools via beforeSessionRun", async () => {
+    const { db, rawDb, tmpDir } = createRealDb();
+    const now = Date.now();
+    rawDb
+      .prepare(
+        "INSERT INTO sessions (id, title, status, cwd, mounted_paths, allowed_tools, memory_enabled, thinking_level, is_project_mode, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run("s1", "Test", "idle", "/tmp", "[]", "[]", 0, "medium", 0, 0, now, now);
+
+    const ext = new GoalExtension(db as never);
+    await ext.onCommand({ command: "goal", args: "task", sessionId: "s1" });
+    await ext.onCommand({ command: "goal", args: "pause", sessionId: "s1" });
+
+    const result = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+
+    expect(result?.customTools?.map((t) => t.name)).toEqual([
+      "get_goal",
+      "update_goal",
+      "goal_complete",
+    ]);
+    // 非 active 不注入执行提示，只保持工具可用
+    expect(result?.promptPrefix).toBeUndefined();
+
+    rawDb.close();
+    rmSync(tmpDir, { recursive: true });
+  });
+
+  it("budget_limited goal still injects tools via beforeSessionRun", async () => {
+    const { db, rawDb, tmpDir } = createRealDb();
+    const now = Date.now();
+    rawDb
+      .prepare(
+        "INSERT INTO sessions (id, title, status, cwd, mounted_paths, allowed_tools, memory_enabled, thinking_level, is_project_mode, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run("s1", "Test", "idle", "/tmp", "[]", "[]", 0, "medium", 0, 0, now, now);
+
+    const ext = new GoalExtension(db as never);
+    await ext.onCommand({ command: "goal", args: "task", sessionId: "s1" });
+
+    // Force budget_limited state directly (simulate budget exhaustion)
+    rawDb
+      .prepare(
+        "UPDATE goals SET token_budget = 10, tokens_used = 100, status = 'budget_limited' WHERE session_id = 's1'",
+      )
+      .run();
+    // Reload in-memory state from DB row (simulate recovery semantics)
+    const recovered = ext.recoverGoals();
+    expect(recovered.find((r) => r.sessionId === "s1")?.goal.status).toBe(
+      "budget_limited",
+    );
+
+    const result = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+
+    expect(result?.customTools?.map((t) => t.name)).toEqual([
+      "get_goal",
+      "update_goal",
+      "goal_complete",
+    ]);
+    expect(result?.promptPrefix).toBeUndefined();
+
+    rawDb.close();
+    rmSync(tmpDir, { recursive: true });
+  });
+
+  it("update_goal accepts complete while goal is paused", async () => {
+    const { db, rawDb, tmpDir } = createRealDb();
+    const now = Date.now();
+    rawDb
+      .prepare(
+        "INSERT INTO sessions (id, title, status, cwd, mounted_paths, allowed_tools, memory_enabled, thinking_level, is_project_mode, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run("s1", "Test", "idle", "/tmp", "[]", "[]", 0, "medium", 0, 0, now, now);
+
+    const ext = new GoalExtension(db as never);
+    await ext.onCommand({ command: "goal", args: "task", sessionId: "s1" });
+    await ext.onCommand({ command: "goal", args: "pause", sessionId: "s1" });
+
+    const result = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+    const updateGoalTool = result?.customTools?.find(
+      (t) => t.name === "update_goal",
+    );
+    expect(updateGoalTool).toBeDefined();
+
+    // Invoke update_goal with complete on a paused goal
+    const toolResult = await (
+      updateGoalTool as NonNullable<typeof updateGoalTool>
+    ).execute(
+      "call_1",
+      { status: "complete", summary: "work finished before pause" },
+      undefined,
+      undefined,
+      {} as never,
+    );
+    expect(JSON.stringify(toolResult)).toContain("Goal marked complete");
+
+    const row = db.goals.get("s1");
+    expect(row?.status).toBe("complete");
+
+    rawDb.close();
+    rmSync(tmpDir, { recursive: true });
+  });
+});
+
+describe("paused goal closure via afterSessionRun", () => {
+  it("update_goal complete on paused goal then afterSessionRun closes the loop", async () => {
+    const { db, rawDb, tmpDir } = createRealDb();
+    const now = Date.now();
+    rawDb
+      .prepare(
+        "INSERT INTO sessions (id, title, status, cwd, mounted_paths, allowed_tools, memory_enabled, thinking_level, is_project_mode, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run("s1", "Test", "idle", "/tmp", "[]", "[]", 0, "medium", 0, 0, now, now);
+
+    const ext = new GoalExtension(db as never);
+    await ext.onCommand({ command: "goal", args: "task", sessionId: "s1" });
+    await ext.onCommand({ command: "goal", args: "pause", sessionId: "s1" });
+
+    // Model closes the paused goal via update_goal complete
+    const before = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+    const updateGoalTool = before?.customTools?.find(
+      (t) => t.name === "update_goal",
+    );
+    await (
+      updateGoalTool as NonNullable<typeof updateGoalTool>
+    ).execute(
+      "call_1",
+      { status: "complete", summary: "finished before pause" },
+      undefined,
+      undefined,
+      {} as never,
+    );
+
+    // afterSessionRun must close the loop: summary, goal deleted, no continue
+    const after = await ext.afterSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      messages: [],
+    });
+    expect(after?.summaryMessage).toBeDefined();
+    expect(after?.summaryMessage).toContain("Goal Complete");
+    expect(after?.continuePrompt).toBeUndefined();
+    expect(db.goals.get("s1")).toBeUndefined();
+
+    // Tools stay globally resident after the goal is gone (constant tool list)
+    const later = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+    expect(later?.customTools?.map((t) => t.name)).toEqual([
+      "get_goal",
+      "update_goal",
+      "goal_complete",
+    ]);
+    expect(later?.promptPrefix).toBeUndefined();
+    // get_goal reports no active goal on a session without one
+    const getGoalTool = later?.customTools?.find((t) => t.name === "get_goal");
+    const getResult = await (
+      getGoalTool as NonNullable<typeof getGoalTool>
+    ).execute("call_3", {}, undefined, undefined, {} as never);
+    expect(JSON.stringify(getResult)).toContain("No active goal");
+
+    rawDb.close();
+    rmSync(tmpDir, { recursive: true });
+  });
+
+  it("terminal complete state still injects tools and update_goal is idempotent", async () => {
+    const { db, rawDb, tmpDir } = createRealDb();
+    const now = Date.now();
+    rawDb
+      .prepare(
+        "INSERT INTO sessions (id, title, status, cwd, mounted_paths, allowed_tools, memory_enabled, thinking_level, is_project_mode, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run("s1", "Test", "idle", "/tmp", "[]", "[]", 0, "medium", 0, 0, now, now);
+
+    const ext = new GoalExtension(db as never);
+    await ext.onCommand({ command: "goal", args: "task", sessionId: "s1" });
+
+    // Force terminal complete state (update_goal executed, before afterSessionRun cleanup)
+    const before = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+    const updateGoalTool = before?.customTools?.find(
+      (t) => t.name === "update_goal",
+    );
+    await (
+      updateGoalTool as NonNullable<typeof updateGoalTool>
+    ).execute(
+      "call_1",
+      { status: "complete", summary: "done" },
+      undefined,
+      undefined,
+      {} as never,
+    );
+    expect(db.goals.get("s1")?.status).toBe("complete");
+
+    // Terminal state still injects tools (no premature tool disappearance)
+    const terminal = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+    expect(terminal?.customTools?.map((t) => t.name)).toEqual([
+      "get_goal",
+      "update_goal",
+      "goal_complete",
+    ]);
+
+    // Repeated update_goal on terminal state is idempotent, not misleading
+    const again = await (
+      updateGoalTool as NonNullable<typeof updateGoalTool>
+    ).execute(
+      "call_2",
+      { status: "complete", summary: "again" },
+      undefined,
+      undefined,
+      {} as never,
+    );
+    expect(JSON.stringify(again)).toContain("already complete");
+
+    rawDb.close();
+    rmSync(tmpDir, { recursive: true });
+  });
+});
+
+describe("goal tools globally resident (constant tool list)", () => {
+  it("injects tools even without any goal record (no session rebuild on /goal start)", async () => {
+    const { db, rawDb, tmpDir } = createRealDb();
+    const now = Date.now();
+    rawDb
+      .prepare(
+        "INSERT INTO sessions (id, title, status, cwd, mounted_paths, allowed_tools, memory_enabled, thinking_level, is_project_mode, archived, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+      )
+      .run("s1", "Test", "idle", "/tmp", "[]", "[]", 0, "medium", 0, 0, now, now);
+
+    const ext = new GoalExtension(db as never);
+
+    // No goal record yet — tools are already resident
+    const noGoal = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+    expect(noGoal?.customTools?.map((t) => t.name)).toEqual([
+      "get_goal",
+      "update_goal",
+      "goal_complete",
+    ]);
+    expect(noGoal?.promptPrefix).toBeUndefined();
+
+    // Starting a goal must not change the tool list (signature stays constant)
+    await ext.onCommand({ command: "goal", args: "task", sessionId: "s1" });
+    const withGoal = await ext.beforeSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      existingMessages: [],
+      isColdStart: false,
+    });
+    expect(withGoal?.customTools?.map((t) => t.name)).toEqual([
+      "get_goal",
+      "update_goal",
+      "goal_complete",
+    ]);
+    expect(withGoal?.promptPrefix).toContain("## Active Goal");
+
+    rawDb.close();
+    rmSync(tmpDir, { recursive: true });
+  });
+});
