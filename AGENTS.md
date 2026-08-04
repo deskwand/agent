@@ -1,142 +1,67 @@
 # AGENTS.md
 
-本文档用于指导 AI Agent 在本仓库中安全、规范、高效地工作。
-
----
+本文档指导 AI Agent 在本仓库安全、规范、高效地工作。技术栈、依赖与脚本以 `package.json` 为准。
 
 ## 1. 项目概述
 
-- **项目名**: deskwand（Oh My Agent）— 开源 AI 智能助手桌面应用
-- **类型**: Electron 桌面应用（主进程）+ React + Tailwind 渲染层
-- **语言**: TypeScript（strict 模式），Node.js ≥ 22
-- **包管理器**: npm
-- **许可证**: MIT
-- **目标平台**: Windows (.exe) + macOS (.dmg)，通过 electron-builder 打包
+- **deskwand（Oh My Agent）**：开源 AI 智能助手桌面应用
+- Electron 主进程 + React/Tailwind 渲染层，TypeScript strict，npm，MIT
+- 构建目标：Windows (.exe) + macOS (.dmg)，electron-builder 打包
 
----
-
-## 2. 技术栈与常用命令
-
-### 核心技术栈
-
-| 层 | 技术 |
-|----|------|
-| 桌面框架 | Electron 35 |
-| UI | React 18 + Tailwind CSS 3 + Vite 7 |
-| 状态管理 | zustand |
-| 国际化 | i18next（zh / en） |
-| 本地数据库 | better-sqlite3 |
-| AI SDK | @anthropic-ai/sdk / openai / @google/genai / @pi-ai/client |
-| 协议 | @modelcontextprotocol/sdk（MCP） |
-| 远程控制 | @larksuite/node-sdk / @slack/bolt |
-| 测试 | Vitest 4 |
-| 代码规范 | ESLint + Prettier + lint-staged + husky |
-| 提交规范 | commitlint（Conventional Commits） |
-
-### 常用命令
+## 2. 常用命令
 
 ```bash
-npm run dev          # 开发模式（Vite + Electron）
-npm run dev:mac      # macOS 开发模式
-npm run dev:win      # Windows 开发模式
-npm run build        # 生产构建
-npm run build:mac    # 构建 macOS .dmg
-npm run build:win    # 构建 Windows .exe
-npm test             # 运行 Vitest 测试
-npm run lint         # ESLint 检查
-npm run lint:fix     # ESLint 自动修复
-npm run format       # Prettier 格式化
-npm run format:check # Prettier 格式检查
+npm run dev                      # 开发模式
+npm run build                    # 生产构建（当前平台；macOS 构建 .dmg）
+npm run build:win-x64            # 构建 Windows .exe
+npm test                         # 全部测试
+npx vitest run <file> -t "<name>"  # 聚焦单个测试用例
+npm run lint:fix && npm run format:check   # 提交前检查
 ```
 
----
+提交前必跑：`npm run lint:fix && npm run format:check && npm test`
 
-## 3. 架构与约定
+## 3. 代码风格
 
-### 目录结构
+- 文件名 `kebab-case`；常量 `UPPER_SNAKE_CASE`
+- **UI 字符串一律走 i18n**，新增文案必须同步更新 `src/renderer/i18n/locales/zh.json` 与 `en.json`：
 
-```
-src/
-├── main/       # Electron 主进程（Node.js 环境，可访问系统 API）
-├── preload/    # 预加载脚本（桥接层，暴露最小化 API 给渲染进程）
-├── renderer/   # React UI（浏览器环境，禁止直接访问 Node.js）
-├── shared/     # 共享类型、常量、工具函数（主进程与渲染进程共用）
-└── tests/      # 测试文件
-```
+  ```ts
+  // ❌ "保存失败" — 硬编码
+  // ✅ const { t } = useTranslation(); t('settings.saveFailed')
+  ```
 
-### 架构原则
+- 颜色用语义 Token（`bg-success`、`text-error`），禁止硬编码色值（多主题/深浅兼容）
 
-- **进程隔离**: 主进程与渲染进程严格分离，所有跨进程通信通过 preload + IPC 桥接
-- **类型优先**: 共享类型统一定义在 `src/shared/`，两进程共同引用；避免重复定义
-- **新 UI 字符串走 i18n**: 使用 `useTranslation()` hook 或 `i18next.t()`，同步添加到 `src/renderer/i18n/locales/zh.json` 和 `en.json`
-- **状态管理**: 跨组件状态用 zustand store，局部状态用 React useState
+## 4. 架构要点
 
-### 命名约定
+- **进程隔离**：跨进程通信只经 preload + IPC；渲染进程禁止使用 Node.js API（fs/path/child_process）
+- **类型优先**：共享类型统一定义在 `src/shared/`；修改时检查所有引用方
+- 跨组件状态用 zustand store，局部状态用 useState；禁止直接操作 DOM（`querySelector` 等）
+- 新增/接入 Tool 时，必须评估聊天过程摘要中的 Tool Group 归类、计数、图标与中英文文案，不得作为未分组工具展示
 
-| 元素 | 风格 | 示例 |
-|------|------|------|
-| 文件名 | kebab-case | `user-settings.ts`、`chat-panel.tsx` |
-| React 组件 | PascalCase | `ChatPanel`、`UserSettings` |
-| 函数/变量 | camelCase | `getUserConfig`、`isSandboxReady` |
-| 常量 | UPPER_SNAKE_CASE | `MAX_RETRY_COUNT` |
-| 类型/接口 | PascalCase | `UserConfig`、`SandboxStatus` |
+## 5. 约束
 
-### 提交规范
+- 禁止 `any`（优先 `unknown` + 类型守卫；个别场景在 PR 注释理由；ESLint warn 级检查）
+- 禁止遗留 `console.log`（结构化 logger 与沙盒协议输出除外；ESLint warn 级检查）
+- 沙盒模块（`src/main/sandbox/`，WSL2/Lima）保持自包含：禁止外部网络依赖；考虑 Windows/macOS 差异
+- 新增依赖前确认许可证兼容 MIT/BSD/Apache-2.0
+- **禁止破坏提示词缓存**：编辑文件优先在尾部追加，避免在头部无必要插入、重排或改写大段内容；新增类型/函数/常量尽量靠文件尾部
+- 提交规范由 commitlint + husky 强制（Conventional Commits、英文信息、禁止 `--no-verify`、禁止 force push main/dev），细则以 `commitlint.config.cjs` 为准
 
-- **Conventional Commits**，允许 type：`build | chore | ci | docs | feat | fix | merge | perf | refactor | revert | style | test`
-- **提交信息必须使用英文**，标题不超过 72 字符，正文每行不超过 72 字符
-- commitlint + husky 在 commit 时自动校验格式
-- PR 分支策略：功能/修复 → `dev`；紧急修复 → `main`
+## 6. 工作流
 
----
+1. 从 `dev` 拉最新，创建 `feature/xxx` 或 `fix/xxx` 分支
+2. 开发中遵守上述约束；新增功能必须同步写 Vitest 测试
+3. 提交前跑 §2 检查命令，提交后创建 PR → `dev`（紧急修复 → `main`）
 
-## 4. 约束与禁止项
+### 高风险区域（改动前先阅读相关文件上下文）
 
-### 🚫 禁止行为
-
-| 禁止项 | 说明 |
-|--------|------|
-| 禁止 `any` 类型 | 优先使用 `unknown` + 类型守卫；确有必要的个别场景需在 PR 中注释说明理由 |
-| 禁止渲染进程使用 Node.js API | `fs`、`path`、`child_process` 等一律通过 preload + IPC 间接调用 |
-| 禁止硬编码 UI 字符串 | 所有面向用户的文字必须走 i18next；仅技术日志、错误码、console 调试输出可例外 |
-| 禁止硬编码颜色值 | 使用语义 Token（如 `bg-success`、`text-error`），适配多主题和深浅模式 |
-| 禁止直接操作 DOM | 禁止 `document.querySelector` 等；使用 React ref 或状态驱动 |
-| 禁止 `--no-verify` 跳过 hooks | 不得绕过 commitlint、lint-staged、husky |
-| 禁止 force push 到 main/dev | `git push --force` 仅允许在个人 feature 分支 |
-| 禁止遗留 `console.log` | 调试日志用完即删；持久日志使用结构化 logger |
-| 禁止 `@ts-ignore` / `@ts-expect-error` 无注释 | 确有需要时须附注原因和移除条件 |
-| 禁止引入非宽松许可证依赖 | 新增依赖前确认许可证兼容 MIT/BSD/Apache-2.0 |
-| 禁止沙盒代码引入外部网络依赖 | 沙盒模块（WSL2/Lima）保持自包含 |
-| 禁止破坏提示词缓存 | 编辑文件时优先在尾部追加；避免在文件头部无必要地插入、重排或改写大段内容。新增类型/函数/常量尽量靠文件尾部 |
-
----
-
-## 5. 工作流
-
-### 日常开发流程
-
-1. 从 `dev` 拉最新代码，创建 `feature/xxx` 或 `fix/xxx` 分支
-2. 开发中遵守命名约定、类型规则、i18n 要求
-3. 提交前执行：`npm run lint:fix && npm run format:check && npm test`
-4. 使用 Conventional Commits 格式提交
-5. 推送并创建 PR → `dev`
-6. CI 全部通过 + 至少一个 reviewer 批准后合并
-
-### AI Agent 工作规则
-
-- **修改代码前须征得用户同意**，不得在未经确认的情况下直接改动任何源文件
-- **提交代码前须征得用户同意**，不得在未经确认的情况下执行 `git commit` 或 `git push`
-- 修改代码前先阅读相关文件上下文，不修改无关区域
-- 新增功能必须同步写 Vitest 测试
-- 新增 UI 字符串必须同步更新 `zh.json` 和 `en.json`
-- 新增或接入 Tool 时，必须评估其在聊天过程摘要中的 Tool Group 归类、计数、图标与中英文文案，不得默认作为未分组工具展示
-- 修改 `src/shared/` 类型时，检查所有引用方是否兼容
-- 修改沙盒代码（`src/main/sandbox/`）时考虑跨平台（Windows/macOS）行为差异
-- **设计文档与实现计划不单独建文件、不提交 git**：brainstorming 产出的设计文档、writing-plans 产出的实现计划，一律按「日期 + 主题」小节追加写入本文件尾部（`## 6. 设计与计划记录`），完成后无需 commit
-
-### 高风险区域
-
-- `src/main/sandbox/` — 沙盒隔离与跨平台适配，修改后需在双平台验证
-- `src/main/ipc/` — 进程间通信，注意安全边界与最小化 API 暴露
+- `src/main/sandbox/` — 沙盒隔离与跨平台适配，需双平台验证
+- `src/main/ipc/` — 进程间通信，安全边界与最小化 API 暴露
 - `src/preload/` — 桥接层，只暴露必要 API，不得扩大权限面
-- `electron-builder` 配置 — 打包、签名、平台差异
+- `electron-builder.yml` — 打包、签名、平台差异
+
+## 7. 设计文档与实现计划
+
+brainstorming 设计文档、writing-plans 实现计划写入 `design-docs/`（已 gitignore，不提交 git），按「日期-主题」命名。**不要写进本文件**——本文件保持精简，只存对 Agent 有长期指导价值的规则。
