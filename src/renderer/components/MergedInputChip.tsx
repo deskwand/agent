@@ -44,6 +44,8 @@ export function MergedInputChip({
   );
   const containerRef = useRef<HTMLDivElement>(null);
   const primaryMenuRef = useRef<HTMLDivElement>(null);
+  const [showModelSearch, setShowModelSearch] = useState(false);
+  const modelListRef = useRef<HTMLDivElement>(null);
 
   const filteredModelOptions = useMemo(() => {
     const query = modelSearch.trim().toLowerCase();
@@ -118,6 +120,13 @@ export function MergedInputChip({
     window.addEventListener("resize", updateModelMenuMaxHeight);
     return () => window.removeEventListener("resize", updateModelMenuMaxHeight);
   }, [activeSubmenu, menuOpen, updateModelMenuMaxHeight]);
+
+  useEffect(() => {
+    if (!menuOpen || activeSubmenu !== "model") return;
+    const list = modelListRef.current;
+    if (!list) return;
+    setShowModelSearch(list.scrollHeight > list.clientHeight);
+  }, [menuOpen, activeSubmenu, modelMenuMaxHeight, modelSearch]);
 
   const disabled = modelMenuDisabled || modelOptions.length === 0;
   const combinedLabel = `${t("chat.model")}, ${t("chat.thinkingLevel")}`;
@@ -204,6 +213,7 @@ export function MergedInputChip({
         </button>
 
         <div
+          ref={modelListRef}
           role="listbox"
           aria-label={t("chat.model")}
           aria-hidden={activeSubmenu !== "model"}
@@ -215,14 +225,16 @@ export function MergedInputChip({
               : "pointer-events-none invisible translate-x-2 opacity-0"
           }`}
         >
-          <input
-            type="text"
-            value={modelSearch}
-            onChange={(event) => setModelSearch(event.target.value)}
-            onClick={(event) => event.stopPropagation()}
-            placeholder={t("chat.searchModel")}
-            className="sticky top-0 z-10 mb-1.5 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
-          />
+          {(showModelSearch || modelSearch !== "") && (
+            <input
+              type="text"
+              value={modelSearch}
+              onChange={(event) => setModelSearch(event.target.value)}
+              onClick={(event) => event.stopPropagation()}
+              placeholder={t("chat.searchModel")}
+              className="sticky top-0 z-10 mb-1.5 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+            />
+          )}
 
           {filteredModelOptions.length === 0 ? (
             <div className="px-2.5 py-3 text-center text-xs text-text-muted">
