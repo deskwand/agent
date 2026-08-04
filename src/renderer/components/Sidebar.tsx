@@ -34,6 +34,7 @@ import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import {
   buildSidebarSessionGroups,
+  isSessionBusy,
   type SidebarPins,
 } from "../utils/sidebar-session-groups";
 
@@ -218,16 +219,24 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   );
   const runningGroupKeys = useMemo(() => {
     const keys = new Set<string>();
-    if (sessionGroups.unscopedSessions.some((s) => s.status === "running")) {
+    if (
+      sessionGroups.unscopedSessions.some((s) =>
+        isSessionBusy(s, sessionStates[s.id]?.backgroundAgents),
+      )
+    ) {
       keys.add(ORDINARY_SESSION_GROUP_KEY);
     }
     for (const group of sessionGroups.projectGroups) {
-      if (group.sessions.some((s) => s.status === "running")) {
+      if (
+        group.sessions.some((s) =>
+          isSessionBusy(s, sessionStates[s.id]?.backgroundAgents),
+        )
+      ) {
         keys.add(group.key);
       }
     }
     return keys;
-  }, [sessionGroups]);
+  }, [sessionGroups, sessionStates]);
   const pinnedSessionIds = useMemo(
     () => new Set(sidebarPins.sessionIds),
     [sidebarPins.sessionIds],
@@ -614,7 +623,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive =
       activeSessionId === session.id && !showApps && !showSchedule;
-    const hasStatusIndicator = session.status === "running";
+    const hasStatusIndicator = isSessionBusy(
+      session,
+      sessionStates[session.id]?.backgroundAgents,
+    );
     const isPinned = pinnedSessionIds.has(session.id);
     const isHovered = hoveredSessionId === session.id;
     const isMenuOpen = sessionMenu?.sessionId === session.id;
