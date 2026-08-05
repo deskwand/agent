@@ -904,7 +904,8 @@
     "alreadyCompacted": "上下文已压缩",
     "expandInput": "展开输入框",
     "collapseInput": "收起输入框",
-    "openCodeReview": "代码审查 · {{count}} 个文件变更"
+    "openCodeReview": "代码审查 · {{count}} 个文件变更",
+    "compactSkipped": "当前会话没有可压缩的内容"
   },
   "steer": {
     "label": "引导",

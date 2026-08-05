@@ -99,6 +99,7 @@ import {
   getErrorSuffix,
 } from "./agent-runner-message-end";
 import { buildPiSessionRuntimeSignature } from "./pi-session-runtime";
+import { resolveCompactionSettingsForWindow } from "./compaction-settings";
 import { ThinkTagStreamParser } from "./think-tag-parser";
 import {
   normalizeMcpToolResultForModel,
@@ -572,6 +573,8 @@ interface AgentRunnerOptions {
   findSessionByPiFile?: (piFile: string) => Session | null;
   /** 通知 renderer 激活指定会话（switchSession 用）。 */
   activateSession?: (sessionId: string) => void;
+  /** 按会话 id 查询基本信息（冷启动手动压缩时从 JSONL 重建 pi session 用）。 */
+  getSessionInfo?: (sessionId: string) => Session | null;
 }
 
 interface CachedPiSession {
@@ -587,6 +590,8 @@ interface CachedPiSession {
   extensionCommands?: { name: string; description: string }[];
   /** JSONL session file path for persistence across restarts */
   piSessionFile?: string;
+  /** ModelRuntime this cold-start created (unregister after dispose). */
+  createdRuntime?: ModelRuntime;
 }
 
 /**
@@ -624,6 +629,11 @@ export class AgentRunner {
   private activeControllers: Map<string, AbortController> = new Map();
   private piSessions: Map<string, CachedPiSession> = new Map();
   private sessionModelRuntimes: Map<string, ModelRuntime> = new Map();
+  private getSessionInfo: ((sessionId: string) => Session | null) | undefined;
+  /** Sessions whose compaction is currently in flight (double-trigger guard). */
+  private compactInFlight: Set<string> = new Set();
+  /** Cold-start compaction sessions (opened from persisted JSONL), keyed by session id. */
+  private coldStartCompactionSessions: Map<string, PiAgentSession> = new Map();
   private piSessionBridge: PiSessionBridge | undefined;
   private createSessionRecord:
     | ((title: string, cwd?: string) => Session | null)
@@ -1003,6 +1013,7 @@ ${hints.join("\n")}
     this.enqueuePromptForSession = options.enqueuePromptForSession;
     this.findSessionByPiFile = options.findSessionByPiFile;
     this.activateSession = options.activateSession;
+    this.getSessionInfo = options.getSessionInfo;
     this.pathResolver = pathResolver;
     this.mcpManager = mcpManager;
     this._skillsAdapter = skillsAdapter;
@@ -4681,70 +4692,253 @@ Tool routing:\n
     sessionId: string,
     instructions?: string,
   ): Promise<"compacted" | "already-compacted" | "skipped"> {
-    const cached = this.piSessions.get(sessionId);
-    if (!cached) {
-      // pi session is lazily created on first message; if none exists yet
-      // there's nothing in memory to compact — this is a no-op.
-      logWarn("[AgentRunner] No active pi session to compact for:", sessionId);
-      return "skipped";
+    // Guard against double-trigger before the renderer's running-event
+    // round-trip (e.g. two rapid /compact invocations).
+    if (this.compactInFlight.has(sessionId)) {
+      log("[AgentRunner] Compaction already in flight for session:", sessionId);
+      return "already-compacted";
     }
-    this.sendToRenderer({
-      type: "session.compaction",
-      payload: { sessionId, status: "running" },
-    });
+    this.compactInFlight.add(sessionId);
+    let cached: CachedPiSession | null = this.piSessions.get(sessionId) ?? null;
     try {
-      const result = await cached.session.compact(instructions);
+      // No in-memory pi session (app restart, aborted run, cache eviction):
+      // restore a minimal session from the persisted JSONL so manual
+      // compaction still works for long conversations — the most common
+      // /compact scenario.
+      if (!cached) {
+        const session = this.getSessionInfo?.(sessionId);
+        const piSessionFile = session?.piSessionFile;
+        if (!session || !piSessionFile || !fs.existsSync(piSessionFile)) {
+          // No persisted conversation — nothing in memory or on disk to compact.
+          logWarn(
+            "[AgentRunner] No pi session or session file to compact for:",
+            sessionId,
+          );
+          return "skipped";
+        }
+        if (piSessionFileContainsLegacyMemoryContext(piSessionFile)) {
+          // Legacy memory-context files are ignored by the runner (rebuilds
+          // from DB); compacting them would summarize stale content.
+          logWarn(
+            "[AgentRunner] Skipping compact for legacy memory-context session file:",
+            sessionId,
+          );
+          return "skipped";
+        }
+        try {
+          cached = await this.createColdStartSessionForCompaction(
+            sessionId,
+            session,
+            piSessionFile,
+          );
+        } catch (error) {
+          logError(
+            "[AgentRunner] Failed to restore pi session for compaction:",
+            error,
+          );
+          this.sendToRenderer({
+            type: "session.compaction",
+            payload: { sessionId, status: "failed" },
+          });
+          throw error;
+        }
+        if (!cached) {
+          // Compaction disabled for this session's context window (< 16K).
+          logWarn(
+            "[AgentRunner] Compaction disabled for small context window:",
+            sessionId,
+          );
+          return "skipped";
+        }
+        this.coldStartCompactionSessions.set(sessionId, cached.session);
+      }
+
       this.sendToRenderer({
         type: "session.compaction",
-        payload: {
-          sessionId,
-          status: "success",
-          ...(typeof result.estimatedTokensAfter === "number"
-            ? { estimatedTokens: result.estimatedTokensAfter }
-            : {}),
-        },
+        payload: { sessionId, status: "running" },
       });
-      log("[AgentRunner] Compaction completed for session:", sessionId);
-      return "compacted";
-    } catch (error: unknown) {
-      const errorName =
-        error instanceof Error ? error.name : "UnknownCompactionError";
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes("Already compacted")) {
+      try {
+        const result = await cached.session.compact(instructions);
         this.sendToRenderer({
           type: "session.compaction",
-          payload: { sessionId, status: "success" },
+          payload: {
+            sessionId,
+            status: "success",
+            ...(typeof result.estimatedTokensAfter === "number"
+              ? { estimatedTokens: result.estimatedTokensAfter }
+              : {}),
+          },
         });
-        log("[AgentRunner] Session already compacted:", sessionId);
-        return "already-compacted";
-      }
-      // Treat intentional abort as a normal completion
-      if (
-        errorMessage.toLowerCase().includes("abort") ||
-        errorName === "AbortError"
-      ) {
-        this.sendToRenderer({
-          type: "session.compaction",
-          payload: { sessionId, status: "aborted" },
-        });
-        log("[AgentRunner] Compaction aborted for session:", sessionId);
+        log("[AgentRunner] Compaction completed for session:", sessionId);
         return "compacted";
+      } catch (error: unknown) {
+        const errorName =
+          error instanceof Error ? error.name : "UnknownCompactionError";
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes("Already compacted")) {
+          this.sendToRenderer({
+            type: "session.compaction",
+            payload: { sessionId, status: "success" },
+          });
+          log("[AgentRunner] Session already compacted:", sessionId);
+          return "already-compacted";
+        }
+        // Below the compaction threshold — inform the user instead of
+        // surfacing it as a failure.
+        if (errorMessage.includes("Nothing to compact")) {
+          log("[AgentRunner] Nothing to compact for session:", sessionId);
+          return "skipped";
+        }
+        // Treat intentional abort as a normal completion
+        if (
+          errorMessage.toLowerCase().includes("abort") ||
+          errorName === "AbortError"
+        ) {
+          this.sendToRenderer({
+            type: "session.compaction",
+            payload: { sessionId, status: "aborted" },
+          });
+          log("[AgentRunner] Compaction aborted for session:", sessionId);
+          return "compacted";
+        }
+        this.sendToRenderer({
+          type: "session.compaction",
+          payload: { sessionId, status: "failed" },
+        });
+        throw error;
       }
-      this.sendToRenderer({
-        type: "session.compaction",
-        payload: { sessionId, status: "failed" },
+    } finally {
+      this.compactInFlight.delete(sessionId);
+      // Dispose the cold-restored session — it lacks the full tool/extension
+      // setup a real run needs; the next run rebuilds it properly. Identity
+      // check via the map: the cached path never enters it.
+      const tempSession = this.coldStartCompactionSessions.get(sessionId);
+      if (cached && tempSession === cached.session) {
+        this.coldStartCompactionSessions.delete(sessionId);
+        try {
+          cached.session.dispose();
+        } catch (disposeError) {
+          logWarn(
+            "[AgentRunner] dispose error on cold-start compact:",
+            disposeError,
+          );
+        }
+        // Release the ModelRuntime this cold-start created (if any) so
+        // repeated cold compacts across many sessions don't accumulate.
+        if (cached.createdRuntime) {
+          unregisterSessionModelRuntime(cached.createdRuntime);
+          this.sessionModelRuntimes.delete(sessionId);
+        }
+      }
+    }
+  }
+
+  /**
+   * Build a minimal pi session from the persisted JSONL so manual compaction
+   * works after restart/abort/eviction when no in-memory session exists.
+   * The session is intentionally light (no tools/extensions): compaction
+   * only needs model + auth + session history for the summarization call.
+   */
+  private async createColdStartSessionForCompaction(
+    sessionId: string,
+    session: Session,
+    restoreFile: string,
+  ): Promise<CachedPiSession | null> {
+    const resolvedRuntime = await modelResolutionService.resolve({
+      sessionProviderProfileKey: session.providerProfileKey,
+      sessionModel: session.model,
+      appConfig: configStore.getAll(),
+    });
+    const provider = resolvedRuntime.providerType || "anthropic";
+    const piModel = resolvedRuntime.piModel;
+    const apiKey = resolvedRuntime.apiKey?.trim();
+
+    // Compaction is deliberately disabled for tiny windows (< 16K): weak
+    // models produce unreliable summaries. prepareCompaction() ignores the
+    // enabled flag, so short-circuit here instead of reporting
+    // "Nothing to compact" for a large session.
+    const compactionSettings = resolveCompactionSettingsForWindow(
+      piModel.contextWindow || 128000,
+    );
+    if (!compactionSettings.enabled) {
+      return null;
+    }
+
+    let createdRuntime: ModelRuntime | undefined;
+    const modelRuntime = await getOrCreateSessionRuntime(
+      this.sessionModelRuntimes,
+      sessionId,
+      async () => {
+        const runtime = await createSessionModelRuntime(getAuthPath());
+        registerSessionModelRuntime(runtime);
+        createdRuntime = runtime;
+        return runtime;
+      },
+    );
+    if (apiKey && provider !== "oauth") {
+      const piProvider =
+        provider === "custom"
+          ? resolvedRuntime.customProtocol || "anthropic"
+          : provider;
+      await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
+        allowNetwork: false,
       });
+      if (piModel.provider !== piProvider) {
+        await modelRuntime.setRuntimeApiKey(piModel.provider, apiKey, {
+          allowNetwork: false,
+        });
+      }
+    }
+
+    const thinkingLevel = session.thinkingLevel ?? "medium";
+    const effectiveCwd = session.cwd || app.getPath("userData");
+    let piSession: PiAgentSession;
+    try {
+      const created = await createAgentSession({
+        model: piModel,
+        thinkingLevel,
+        modelRuntime,
+        sessionManager: PiSessionManager.open(restoreFile),
+        settingsManager: PiSettingsManager.inMemory({
+          compaction: compactionSettings,
+          retry: { enabled: true, maxRetries: 2 },
+        }),
+        cwd: effectiveCwd,
+        noTools: "all",
+      });
+      piSession = created.session;
+    } catch (error) {
+      // Session creation failed after the runtime was registered — release it.
+      if (createdRuntime) {
+        unregisterSessionModelRuntime(createdRuntime);
+        this.sessionModelRuntimes.delete(sessionId);
+      }
       throw error;
     }
+    log(
+      "[AgentRunner] Cold-start compact: restored pi session from:",
+      restoreFile,
+    );
+    return {
+      session: piSession,
+      modelId: piModel.id,
+      thinkingLevel,
+      runtimeSignature: "",
+      extensionSignature: "",
+      createdRuntime,
+      piSessionFile: restoreFile,
+    };
   }
 
   /** Abort an in-progress manual compaction for a session. */
   abortCompaction(sessionId: string): void {
     const cached = this.piSessions.get(sessionId);
-    if (!cached) return;
+    const coldStart = this.coldStartCompactionSessions.get(sessionId);
+    const target = cached?.session ?? coldStart;
+    if (!target) return;
     log("[AgentRunner] Aborting compaction for session:", sessionId);
-    cached.session.abortCompaction();
+    target.abortCompaction();
   }
 
   private sendTraceStep(sessionId: string, step: TraceStep): void {

@@ -1406,6 +1406,11 @@ export function ChatView() {
         setSessionCompaction(activeSessionId, "success");
       } else if (res.status === "skipped") {
         dismissSessionCompaction(activeSessionId);
+        setGlobalNotice({
+          id: `compact-skipped-${Date.now()}`,
+          type: "info",
+          message: t("chat.compactSkipped"),
+        });
       }
     } catch {
       setSessionCompaction(activeSessionId, "failed");

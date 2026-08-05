@@ -222,6 +222,7 @@ export class SessionManager {
         findSessionByPiFile: (piFile: string) =>
           this.findSessionByPiFile(piFile),
         activateSession: (sessionId: string) => this.activateSession(sessionId),
+        getSessionInfo: (sessionId: string) => this.loadSession(sessionId),
         turnFinalizer: {
           getReviewService: () => {
             // Lazily create the review service with current config.

@@ -906,7 +906,8 @@
     "alreadyCompacted": "Context already compacted",
     "expandInput": "Expand input",
     "collapseInput": "Collapse input",
-    "openCodeReview": "Code Review · {{count}} changed files"
+    "openCodeReview": "Code Review · {{count}} changed files",
+    "compactSkipped": "Nothing to compact in this session"
   },
   "steer": {
     "label": "Steer",
