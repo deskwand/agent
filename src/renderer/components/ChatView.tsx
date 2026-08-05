@@ -107,101 +107,6 @@ function appendMergedLiveBlock(
   target.push(block);
 }
 
-export interface TurnRange {
-  start: number;
-  end: number;
-}
-
-export function buildTurnRanges(messages: Message[]): TurnRange[] {
-  if (messages.length === 0) return [];
-
-  const userIndexes = messages.flatMap((message, index) =>
-    message.role === "user" ? [index] : [],
-  );
-
-  if (userIndexes.length === 0) {
-    // System-only conversation (for example a preamble) — treat as a single turn.
-    return [{ start: 0, end: messages.length }];
-  }
-
-  return userIndexes.map((userIndex, index) => ({
-    start: index === 0 ? 0 : userIndex,
-    end: userIndexes[index + 1] ?? messages.length,
-  }));
-}
-
-export function getInitialVisibleTurnStart(
-  totalTurns: number,
-  initialVisibleTurns: number,
-): number {
-  return Math.max(totalTurns - initialVisibleTurns, 0);
-}
-
-export function getPreviousVisibleTurnStart(
-  currentStart: number,
-  prependTurns: number,
-): number {
-  return Math.max(currentStart - prependTurns, 0);
-}
-
-export function getPrependedVisibleTurnStart(
-  currentStart: number,
-  turnCount: number,
-  prependTurns: number,
-): number {
-  if (turnCount <= 0) return 0;
-  return getPreviousVisibleTurnStart(
-    Math.min(currentStart, turnCount - 1),
-    prependTurns,
-  );
-}
-
-export function getEffectiveVisibleTurnStart(
-  activeSessionId: string | null,
-  initializedSessionId: string | null,
-  turnCount: number,
-  visibleTurnStartIndex: number,
-  initialVisibleTurns: number,
-): number {
-  if (turnCount === 0) return 0;
-  if (
-    shouldInitializeVisibleTurns(
-      activeSessionId,
-      initializedSessionId,
-      turnCount,
-    )
-  ) {
-    return getInitialVisibleTurnStart(turnCount, initialVisibleTurns);
-  }
-  return Math.min(visibleTurnStartIndex, turnCount - 1);
-}
-
-export function getVisibleMessageStartIndex(
-  turnRanges: TurnRange[],
-  visibleTurnStartIndex: number,
-): number {
-  return turnRanges[visibleTurnStartIndex]?.start ?? 0;
-}
-
-export function shouldInitializeVisibleTurns(
-  activeSessionId: string | null,
-  initializedSessionId: string | null,
-  turnCount: number,
-): boolean {
-  return (
-    Boolean(activeSessionId) &&
-    activeSessionId !== initializedSessionId &&
-    turnCount > 0
-  );
-}
-
-export function canLoadOlderTurns(
-  isLoadingOlder: boolean,
-  visibleTurnStartIndex: number,
-): boolean {
-  return !isLoadingOlder && visibleTurnStartIndex > 0;
-}
-
 export function didSessionHistoryScopeChange(
   previousSessionId: string | null,
   activeSessionId: string | null,
@@ -212,9 +117,21 @@ export function didSessionHistoryScopeChange(
 export function shouldAutoFillViewport(
   scrollHeight: number,
   clientHeight: number,
-  visibleTurnStartIndex: number,
+  visibleMessageStartIndex: number,
 ): boolean {
-  return visibleTurnStartIndex > 0 && scrollHeight <= clientHeight;
+  return visibleMessageStartIndex > 0 && scrollHeight <= clientHeight;
+}
+
+export function shouldInitializeVisibleWindow(
+  activeSessionId: string | null,
+  initializedSessionId: string | null,
+  messageCount: number,
+): boolean {
+  return (
+    Boolean(activeSessionId) &&
+    activeSessionId !== initializedSessionId &&
+    messageCount > 0
+  );
 }
 
 export function getAnchoredScrollTop(
@@ -239,8 +156,20 @@ export function shouldShowHydratingHistoryState(
   );
 }
 
-const INITIAL_VISIBLE_TURNS = 8;
-const PREPEND_TURNS = 6;
+// Render window is a FIXED-SIZE message window, not a turn window:
+// in agent sessions a single turn can span hundreds of tool messages,
+// so an 8-turn window could render thousands of MessageCards and take
+// seconds to open. The window slides from the tail (initial/at-bottom)
+// or follows the scroll position into older history.
+const MAX_RENDER_MESSAGES = 400;
+const PREPEND_MESSAGES = 200;
+// Page size for fetching older history and the store window cap,
+// kept in sync with MESSAGE_PAGE_SIZE / MAX_WINDOW_MESSAGES.
+const LOAD_OLDER_PAGE_SIZE = 1000;
+const MAX_MEMORY_WINDOW_MESSAGES = 2000;
+// Nav-rail dock: cap the tick count (sampled uniformly) so user-dense
+// sessions keep a stable dock while user-sparse ones never empty out.
+const MAX_DOCK_TICKS = 50;
 // Wheel deltas below this are trackpad jitter, not a scroll gesture.
 const WHEEL_KILL_THRESHOLD_PX = 4;
 // Fire a little before the user hits absolute top to hide prepend latency.
@@ -279,6 +208,10 @@ export function ChatView() {
   );
   const compaction = sessionState?.compaction ?? { status: "idle" as const };
   const backgroundAgents = sessionState?.backgroundAgents ?? [];
+  const hasMoreOlder = sessionState?.hasMoreOlder ?? false;
+  const oldestMessageId = sessionState?.oldestMessageId ?? null;
+  const prependOlderMessages = useAppStore((s) => s.prependOlderMessages);
+  const trimMessagesToWindow = useAppStore((s) => s.trimMessagesToWindow);
   const isCompacting = compaction.status === "running";
   const compactionResult =
     compaction.status === "success" ||
@@ -302,6 +235,7 @@ export function ChatView() {
     stopSession,
     setSessionThinkingLevel,
     setSessionProviderModel,
+    getSessionMessagesPage,
     isElectron,
   } = useIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -358,7 +292,7 @@ export function ChatView() {
   >([]);
   const [showConnectorLabel, setShowConnectorLabel] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [visibleTurnStartIndex, setVisibleTurnStartIndex] = useState(0);
+  const [visibleMessageStartIndex, setVisibleMessageStartIndex] = useState(0);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
   const headerRef = useRef<HTMLDivElement>(null);
@@ -381,8 +315,11 @@ export function ChatView() {
     scrollHeight: number;
     scrollTop: number;
   } | null>(null);
+  const pendingDockJumpRef = useRef<string | null>(null);
   const isLoadingOlderRef = useRef(false);
-  const turnCountRef = useRef(0);
+  // Bumped on every session switch; async stage-2 continuations check it
+  // so a fetch started for the old session cannot prepend into the new one.
+  const sessionGenerationRef = useRef(0);
 
   const hasActiveTurn = Boolean(activeTurn);
 
@@ -689,36 +626,28 @@ export function ChatView() {
     partialMessage,
   ]);
 
-  const turnRanges = useMemo(
-    () => buildTurnRanges(displayedMessages),
-    [displayedMessages],
-  );
-  turnCountRef.current = turnRanges.length;
+  // Keep the window pinned to the tail while the user is at the bottom,
+  // so streamed messages stay visible as the list grows.
+  useEffect(() => {
+    if (!isAtBottomRef.current || !activeSessionId) return;
+    const tailStart = Math.max(
+      0,
+      displayedMessages.length - MAX_RENDER_MESSAGES,
+    );
+    setVisibleMessageStartIndex((current) =>
+      current === tailStart ? current : tailStart,
+    );
+  }, [activeSessionId, displayedMessages.length]);
 
-  const effectiveVisibleTurnStartIndex = useMemo(
-    () =>
-      getEffectiveVisibleTurnStart(
-        activeSessionId,
-        initializedSessionIdRef.current,
-        turnRanges.length,
-        visibleTurnStartIndex,
-        INITIAL_VISIBLE_TURNS,
-      ),
-    [activeSessionId, turnRanges.length, visibleTurnStartIndex],
-  );
-
-  const visibleMessageStartIndex = useMemo(
-    () =>
-      getVisibleMessageStartIndex(turnRanges, effectiveVisibleTurnStartIndex),
-    [turnRanges, effectiveVisibleTurnStartIndex],
-  );
-
+  // Fixed-size sliding window: [start, start + MAX_RENDER_MESSAGES).
   const visibleMessages = useMemo(
-    () => displayedMessages.slice(visibleMessageStartIndex),
+    () =>
+      displayedMessages.slice(
+        visibleMessageStartIndex,
+        visibleMessageStartIndex + MAX_RENDER_MESSAGES,
+      ),
     [displayedMessages, visibleMessageStartIndex],
   );
-  // TODO: add bottom-side reclamation if very long sessions still degrade
-  // after repeated prepends; v1 only windows older history from the top.
 
   // Merge pure-tool messages (no text blocks) into the preceding assistant
   // message so buildToolDisplayBlocks can group all tool_use/tool_result together.
@@ -872,42 +801,89 @@ export function ChatView() {
     });
   }, [mergedMessages, hoistedProcessSummaryTurnIds, activeSessionCwd]);
 
+  // Dock ticks are anchored to the IN-MEMORY window (all loaded history),
+  // not the render window: sliding the render window while scrolling up
+  // must not change the tick count. User-dense sessions are capped by
+  // uniform sampling so the dock stays stable there too.
   const railTicks = useMemo<RailTickEntry[]>(() => {
-    const entries: RailTickEntry[] = [];
-    const ve = visibleTurnEntries;
-    for (let i = 0; i < ve.length; i++) {
-      const msg = ve[i].message;
-      if (msg.role !== "user") continue;
-      let assistantText: string | null = null;
-      for (let j = i + 1; j < ve.length; j++) {
-        const next = ve[j].message;
-        if (next.role === "user") {
-          if (
-            Array.isArray(next.content) &&
-            next.content.some((b) => b.type === "tool_result")
-          ) {
-            continue;
-          }
-          break;
-        }
-        if (next.role === "assistant") {
-          const result = getTurnPreviewText(next, 100);
-          if (result.kind === "text") {
-            assistantText = result.value;
-          } else if (!assistantText && result.kind !== "empty") {
-            assistantText = result.value;
-          }
+    const userMsgs = displayedMessages.filter((m) => m.role === "user");
+    if (userMsgs.length === 0) return [];
+    const sampled =
+      userMsgs.length > MAX_DOCK_TICKS
+        ? Array.from(
+            { length: MAX_DOCK_TICKS },
+            (_, i) =>
+              userMsgs[
+                Math.round((i * (userMsgs.length - 1)) / (MAX_DOCK_TICKS - 1))
+              ],
+          )
+        : userMsgs;
+    // One pass over the displayed list: attach the preview of the first
+    // assistant message that follows each sampled user message.
+    const assistantByUser = new Map<string, string | null>();
+    let pendingUser: Message | null = null;
+    for (const msg of displayedMessages) {
+      if (msg.role === "user") {
+        pendingUser = msg;
+        continue;
+      }
+      if (msg.role === "assistant" && pendingUser) {
+        const result = getTurnPreviewText(msg, 100);
+        if (result.kind !== "empty" && !assistantByUser.has(pendingUser.id)) {
+          assistantByUser.set(pendingUser.id, result.value);
         }
       }
+    }
+    return sampled.map((msg) => {
       const userResult = getTurnPreviewText(msg, 100);
-      entries.push({
+      return {
         messageId: String(msg.id),
         userPreview: userResult.kind !== "empty" ? userResult.value : "",
-        assistantPreview: assistantText,
-      });
-    }
-    return entries;
-  }, [visibleTurnEntries]);
+        assistantPreview: assistantByUser.get(String(msg.id)) ?? null,
+      };
+    });
+  }, [displayedMessages]);
+
+  const handleDockTickSelect = useCallback(
+    (messageId: string) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      // A dock jump is an explicit leave-bottom intent: without this, the
+      // smooth scrollIntoView's first scroll event can still see
+      // isAtBottomRef=true (scrollTop has not moved yet) and the bottom
+      // reclamation branch would snap the window back to the tail,
+      // removing the very message we just jumped to.
+      isAtBottomRef.current = false;
+      const target = container.querySelector(
+        `[data-message-id="${messageId}"]`,
+      );
+      if (target) {
+        target.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
+      // Target is outside the render window: slide the window to it and
+      // jump via the effect below once it is rendered.
+      const idx = displayedMessages.findIndex(
+        (m) => String(m.id) === messageId,
+      );
+      if (idx === -1) return;
+      pendingDockJumpRef.current = messageId;
+      setVisibleMessageStartIndex(Math.max(0, idx - PREPEND_MESSAGES));
+    },
+    [displayedMessages],
+  );
+
+  // Runs after the render-window slide commits, so the target message is
+  // guaranteed to be in the DOM (a requestAnimationFrame could fire before
+  // React flushes and the jump would silently no-op).
+  useEffect(() => {
+    const messageId = pendingDockJumpRef.current;
+    if (!messageId) return;
+    pendingDockJumpRef.current = null;
+    scrollContainerRef.current
+      ?.querySelector(`[data-message-id="${messageId}"]`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [visibleMessageStartIndex]);
 
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,
@@ -931,37 +907,63 @@ export function ChatView() {
     pendingPrependAnchorRef.current = null;
     isLoadingOlderRef.current = false;
     setIsLoadingOlder(false);
-    setVisibleTurnStartIndex(0);
+    setVisibleMessageStartIndex(0);
+    sessionGenerationRef.current += 1;
+    pendingDockJumpRef.current = null;
   }, [activeSessionId]);
 
   useEffect(() => {
     if (
       !activeSessionId ||
-      !shouldInitializeVisibleTurns(
+      !shouldInitializeVisibleWindow(
         activeSessionId,
         initializedSessionIdRef.current,
-        turnRanges.length,
+        displayedMessages.length,
       )
     ) {
       return;
     }
     initializedSessionIdRef.current = activeSessionId;
-    setVisibleTurnStartIndex(
-      getInitialVisibleTurnStart(turnRanges.length, INITIAL_VISIBLE_TURNS),
+    setVisibleMessageStartIndex(
+      Math.max(0, displayedMessages.length - MAX_RENDER_MESSAGES),
     );
-  }, [activeSessionId, turnRanges.length]);
+  }, [activeSessionId, displayedMessages.length]);
 
-  const loadOlderTurns = useCallback(() => {
+  const loadOlderTurns = useCallback(async () => {
     const container = scrollContainerRef.current;
-    if (
-      !container ||
-      !canLoadOlderTurns(
-        isLoadingOlderRef.current,
-        effectiveVisibleTurnStartIndex,
-      )
-    ) {
+    if (!container || isLoadingOlderRef.current || !activeSessionId) {
       return;
     }
+
+    if (visibleMessageStartIndex > 0) {
+      // Stage 1: slide the render window further into older history.
+      const nextStart = Math.max(
+        0,
+        visibleMessageStartIndex - PREPEND_MESSAGES,
+      );
+      isLoadingOlderRef.current = true;
+      pendingPrependAnchorRef.current = {
+        scrollHeight: container.scrollHeight,
+        scrollTop: container.scrollTop,
+      };
+      setIsLoadingOlder(true);
+      setVisibleMessageStartIndex(nextStart);
+      if (nextStart === visibleMessageStartIndex) {
+        // Start index cannot move (already 0): React bails out, the
+        // anchor effect never fires — clear the flags manually so the
+        // spinner stops and later loads are not blocked.
+        requestAnimationFrame(() => {
+          pendingPrependAnchorRef.current = null;
+          isLoadingOlderRef.current = false;
+          setIsLoadingOlder(false);
+        });
+      }
+      return;
+    }
+
+    // Stage 2: render window is at the top of the in-memory window —
+    // fetch the next older page from the main process.
+    if (!hasMoreOlder) return;
 
     isLoadingOlderRef.current = true;
     pendingPrependAnchorRef.current = {
@@ -969,14 +971,77 @@ export function ChatView() {
       scrollTop: container.scrollTop,
     };
     setIsLoadingOlder(true);
-    setVisibleTurnStartIndex((currentStart) =>
-      getPrependedVisibleTurnStart(
-        currentStart,
-        turnCountRef.current,
-        PREPEND_TURNS,
-      ),
-    );
-  }, [effectiveVisibleTurnStartIndex]);
+
+    let prependApplied = false;
+    const fetchGeneration = sessionGenerationRef.current;
+    try {
+      const page = await getSessionMessagesPage(
+        activeSessionId,
+        oldestMessageId,
+        LOAD_OLDER_PAGE_SIZE,
+      );
+      if (fetchGeneration !== sessionGenerationRef.current) {
+        // Session switched while the fetch was in flight: drop the page.
+        // The switch effect already cleared the loading flags.
+        return;
+      }
+      if (!page || page.messages.length === 0) {
+        if (page) prependOlderMessages(activeSessionId, [], page.hasMore);
+        return;
+      }
+      // prependOlderMessages trims the oldest messages when the store
+      // window exceeds its cap and returns how many were dropped; the
+      // boundary (page tail) shifts forward by that amount.
+      const trimmed = prependOlderMessages(
+        activeSessionId,
+        page.messages,
+        page.hasMore,
+      );
+      // Render window slides to just above the prepended boundary so the
+      // previously visible content stays on screen; the page itself stays
+      // above the window (message-granularity, no turn math needed).
+      const boundary = page.messages.filter((m) => !m.autoGenerated).length;
+      const newStart = Math.max(0, boundary - trimmed - PREPEND_MESSAGES);
+      setVisibleMessageStartIndex(newStart);
+      prependApplied = true;
+      if (newStart === 0) {
+        // Extreme case: the page still contains fewer than two user
+        // messages after alignment, so the render window start cannot
+        // move — the anchor effect never fires and the spinner would
+        // spin forever. Clear the flags here; the window stays intact
+        // and shows the whole merged list, which is correct content.
+        requestAnimationFrame(() => {
+          pendingPrependAnchorRef.current = null;
+          isLoadingOlderRef.current = false;
+          setIsLoadingOlder(false);
+        });
+      }
+    } catch {
+      // Keep the current window intact; the spinner clears below and
+      // the next scroll-to-top retries.
+    } finally {
+      if (!prependApplied && fetchGeneration === sessionGenerationRef.current) {
+        // Failed or empty fetch: no render-window change coming, so
+        // the anchor effect will not fire — clear everything now.
+        // The generation guard matters: a STALE continuation must not
+        // touch the flags, or it would steal the new session's scroll
+        // anchor and re-open the load gate, letting auto-fill start a
+        // second stage-2 with the same cursor (duplicate prepend).
+        pendingPrependAnchorRef.current = null;
+        isLoadingOlderRef.current = false;
+        setIsLoadingOlder(false);
+      }
+      // Success path: the anchor effect (deps: [visibleMessageStartIndex])
+      // applies the anchor and clears isLoadingOlder after commit.
+    }
+  }, [
+    activeSessionId,
+    getSessionMessagesPage,
+    hasMoreOlder,
+    oldestMessageId,
+    prependOlderMessages,
+    visibleMessageStartIndex,
+  ]);
 
   const syncFollowFromScroll = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -1004,6 +1069,20 @@ export function ChatView() {
     syncFollowFromScroll();
     const onScroll = () => {
       syncFollowFromScroll();
+      if (
+        isAtBottomRef.current &&
+        visibleMessageStartIndex > 0 &&
+        activeSessionId
+      ) {
+        // Returned to the bottom after loading history: collapse the
+        // render window to the tail and reclaim the in-memory window.
+        // Safe to re-run: same start index bails out and trim is a no-op
+        // once the window is within the cap.
+        setVisibleMessageStartIndex(
+          Math.max(0, displayedMessages.length - MAX_RENDER_MESSAGES),
+        );
+        trimMessagesToWindow(activeSessionId, MAX_MEMORY_WINDOW_MESSAGES);
+      }
       if (container.scrollTop <= LOAD_OLDER_THRESHOLD_PX) {
         loadOlderTurns();
       }
@@ -1052,7 +1131,14 @@ export function ChatView() {
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("wheel", onWheel);
     };
-  }, [loadOlderTurns, syncFollowFromScroll]);
+  }, [
+    activeSessionId,
+    displayedMessages.length,
+    loadOlderTurns,
+    syncFollowFromScroll,
+    trimMessagesToWindow,
+    visibleMessageStartIndex,
+  ]);
 
   useEffect(() => {
     const anchor = pendingPrependAnchorRef.current;
@@ -1067,7 +1153,7 @@ export function ChatView() {
     pendingPrependAnchorRef.current = null;
     isLoadingOlderRef.current = false;
     setIsLoadingOlder(false);
-  }, [visibleTurnStartIndex]);
+  }, [visibleMessageStartIndex]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -1078,7 +1164,7 @@ export function ChatView() {
         shouldAutoFillViewport(
           container.scrollHeight,
           container.clientHeight,
-          effectiveVisibleTurnStartIndex,
+          visibleMessageStartIndex,
         )
       ) {
         loadOlderTurns();
@@ -1088,9 +1174,9 @@ export function ChatView() {
     return () => cancelAnimationFrame(rafId);
   }, [
     displayedMessages.length,
-    effectiveVisibleTurnStartIndex,
     isLoadingOlder,
     loadOlderTurns,
+    visibleMessageStartIndex,
   ]);
 
   useLayoutEffect(() => {
@@ -1607,6 +1693,7 @@ export function ChatView() {
       <MessageNavRail
         ticks={railTicks}
         scrollContainerRef={scrollContainerRef}
+        onTickSelect={handleDockTickSelect}
       />
     </div>
   );

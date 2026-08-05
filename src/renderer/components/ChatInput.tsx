@@ -23,6 +23,11 @@ import {
   type SlashItem,
 } from "../slash-commands";
 import { SlashMenu, type SlashTab } from "./SlashMenu";
+import {
+  loadSlashRecency,
+  saveSlashRecency,
+  sortByRecency,
+} from "../slash-recency";
 import { compressImageForLLM } from "../utils/image-compress";
 
 export interface ChatInputAttachedFile {
@@ -372,14 +377,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const filteredCommands = useMemo(() => {
       const recency = loadSlashRecency();
       // Commands use exact-prefix matching (exact-prefix priority over skills)
-      const cmds = slashFilter ? filterCommands(allCommands, slashFilter) : allCommands;
-      // 内置命令保留既有 recency；扩展命令按注册顺序（spec：不做命令 recency）
-      const builtins = cmds.filter((c) => c.source === "builtin");
-      const extensions = cmds.filter((c) => c.source === "extension");
-      return [
-        ...sortByRecency(builtins, (c) => `cmd:${c.name}`, recency),
-        ...extensions,
-      ];
+      const cmds = slashFilter
+        ? filterCommands(allCommands, slashFilter)
+        : allCommands;
+      return sortByRecency(cmds, (c) => `cmd:${c.name}`, recency);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [allCommands, slashFilter, recencyVersion]);
 
@@ -398,23 +399,41 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       return sortByRecency(skills, (s) => `skill:${s.name}`, recency);
     }, [slashSkills, slashFilter, recencyVersion]);
 
-    // Flattened version used for getSlashItemByIndex lookup
-    const filteredSkillsFlat = useMemo(
-      () =>
-        filteredSlashSkills.map((s) => ({
-          name: s.name,
-          description: s.description,
-        })),
-      [filteredSlashSkills],
-    );
+    // Merged "all" tab list: commands then skills, ordered by overall recency.
+    // Input order [commands..., skills...] keeps the never-used default order
+    // identical to the previous grouped view: builtin → plugin → skills.
+    const filteredAllItems = useMemo(() => {
+      const recency = loadSlashRecency();
+      const cmds: SlashItem[] = filteredCommands.map((c) => ({
+        category: "command",
+        command: c,
+      }));
+      const skills: SlashItem[] = filteredSlashSkills.map((s) => ({
+        category: "skill",
+        skill: { name: s.name, description: s.description },
+      }));
+      return sortByRecency(
+        [...cmds, ...skills],
+        (item) =>
+          item.category === "command"
+            ? `cmd:${item.command.name}`
+            : `skill:${item.skill.name}`,
+        recency,
+      );
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filteredCommands, filteredSlashSkills, recencyVersion]);
 
     // Compute count of items in current tab for keyboard nav clamping
     const visibleItemCount = useMemo(() => {
-      if (slashActiveTab === "all")
-        return filteredCommands.length + filteredSlashSkills.length;
+      if (slashActiveTab === "all") return filteredAllItems.length;
       if (slashActiveTab === "commands") return filteredCommands.length;
       return filteredSlashSkills.length;
-    }, [slashActiveTab, filteredCommands.length, filteredSlashSkills.length]);
+    }, [
+      slashActiveTab,
+      filteredAllItems.length,
+      filteredCommands.length,
+      filteredSlashSkills.length,
+    ]);
 
     const handleTabChange = useCallback((tab: SlashTab) => {
       setSlashActiveTab(tab);
@@ -430,24 +449,18 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const getSlashItemByIndex = (
       tab: SlashTab,
       idx: number,
-      cmds: SlashCommand[],
-      skills: { name: string; description?: string }[],
     ): SlashItem | null => {
-      if (tab === "all") {
-        if (idx < cmds.length)
-          return { category: "command", command: cmds[idx] };
-        const skillIdx = idx - cmds.length;
-        if (skillIdx >= 0 && skillIdx < skills.length)
-          return { category: "skill", skill: skills[skillIdx] };
-        return null;
-      }
+      if (tab === "all") return filteredAllItems[idx] ?? null;
       if (tab === "commands") {
-        return idx < cmds.length
-          ? { category: "command", command: cmds[idx] }
-          : null;
+        const cmd = filteredCommands[idx];
+        return cmd ? { category: "command", command: cmd } : null;
       }
-      return idx < skills.length
-        ? { category: "skill", skill: skills[idx] }
+      const skill = filteredSlashSkills[idx];
+      return skill
+        ? {
+            category: "skill",
+            skill: { name: skill.name, description: skill.description },
+          }
         : null;
     };
 
@@ -477,17 +490,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const selectSlashItem = useCallback(
       (item: SlashItem) => {
         // Record recency before any early-return path
-        // （扩展命令不记录 recency——按注册顺序展示，spec 决策）
-        if (
-          item.category !== "command" ||
-          item.command.source === "builtin"
-        ) {
-          saveSlashRecency(
-            item.category === "command"
-              ? `cmd:${item.command.name}`
-              : `skill:${item.skill.name}`,
-          );
-        }
+        saveSlashRecency(
+          item.category === "command"
+            ? `cmd:${item.command.name}`
+            : `skill:${item.skill.name}`,
+        );
         setRecencyVersion((v) => v + 1);
 
         if (item.category === "command") {
@@ -833,6 +840,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 <SlashMenu
                   commands={filteredCommands}
                   skills={filteredSlashSkills}
+                  allItems={filteredAllItems}
                   activeTab={slashActiveTab}
                   selectedIndex={slashSelectedIndex}
                   onSelect={selectSlashItem}
@@ -956,8 +964,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                       const item = getSlashItemByIndex(
                         slashActiveTab,
                         slashSelectedIndex,
-                        filteredCommands,
-                        filteredSkillsFlat,
                       );
                       if (item) selectSlashItem(item);
                       return;
@@ -1018,57 +1024,3 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
   },
 );
-
-/* ─── Slash recency helpers ─── */
-
-/** Read recent slash usage from localStorage. Returns {} on any error. */
-function loadSlashRecency(): Record<string, number> {
-  try {
-    const raw = localStorage.getItem("slashRecency");
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed))
-      return {};
-    return parsed as Record<string, number>;
-  } catch {
-    return {};
-  }
-}
-
-/** Write/update a recency entry, trim to max 10. Failures are silent. */
-function saveSlashRecency(key: string): void {
-  try {
-    const recency = loadSlashRecency();
-    recency[key] = Date.now();
-    const entries = Object.entries(recency)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10);
-    localStorage.setItem(
-      "slashRecency",
-      JSON.stringify(Object.fromEntries(entries)),
-    );
-  } catch {
-    /* localStorage full or disabled — silently ignore */
-  }
-}
-
-/** Sort items: those present in recency first (by desc timestamp), rest unchanged. */
-function sortByRecency<T>(
-  items: T[],
-  getKey: (item: T) => string,
-  recency: Record<string, number>,
-): T[] {
-  const withRecency: T[] = [];
-  const withoutRecency: T[] = [];
-  for (const item of items) {
-    if (recency[getKey(item)] != null) {
-      withRecency.push(item);
-    } else {
-      withoutRecency.push(item);
-    }
-  }
-  withRecency.sort(
-    (a, b) => (recency[getKey(b)] ?? 0) - (recency[getKey(a)] ?? 0),
-  );
-  return withRecency.concat(withoutRecency);
-}

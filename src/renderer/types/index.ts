@@ -509,6 +509,10 @@ export type ClientEvent =
   | { type: "session.archiveDelete"; payload: { sessionId: string } }
   | { type: "session.list"; payload: Record<string, never> }
   | { type: "session.getMessages"; payload: { sessionId: string } }
+  | {
+      type: "session.getMessagesPage";
+      payload: { sessionId: string; beforeId: string | null; limit: number };
+    }
   | { type: "session.getTraceSteps"; payload: { sessionId: string } }
   | {
       type: "permission.response";
@@ -607,7 +611,24 @@ export type ServerEvent =
     }
   | {
       type: "session.list";
-      payload: { sessions: Session[]; contextWindows?: Record<string, number> };
+      payload: {
+        sessions: Session[];
+        contextWindows?: Record<string, number>;
+        goalStatuses?: Record<
+          string,
+          {
+            status:
+              | "active"
+              | "paused"
+              | "complete"
+              | "cleared"
+              | "blocked"
+              | "budget_limited";
+            objective: string;
+            iteration: number;
+          }
+        >;
+      };
     }
   | { type: "permission.request"; payload: PermissionRequest }
   | { type: "permission.dismiss"; payload: { toolUseId: string } }

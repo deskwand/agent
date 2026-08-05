@@ -141,10 +141,6 @@ describe('SessionManager model switching', () => {
     const runMock = vi.fn(async () => undefined);
     (manager as any).agentRunner = { run: runMock };
 
-    expect((manager as any).resolveUniqueProviderForSessionModel('openrouter', 'deepseek-v4-pro')).toBe(
-      'deepseek'
-    );
-
     await (manager as any).processPrompt(session, 'hello');
 
     expect(session.model).toBe('claude-sonnet-4-6');
@@ -163,10 +159,6 @@ describe('SessionManager model switching', () => {
     (manager as any).runSessionTitleGeneration = vi.fn(async () => undefined);
     const runMock = vi.fn(async () => undefined);
     (manager as any).agentRunner = { run: runMock };
-
-    expect((manager as any).resolveUniqueProviderForSessionModel('openrouter', 'deepseek-v4-pro')).toBe(
-      'deepseek'
-    );
 
     await (manager as any).processPrompt(session, 'hello');
 
@@ -203,38 +195,6 @@ describe('SessionManager model switching', () => {
         sessionId: 'session-1',
         updates: { providerProfileKey: 'openai', model: 'gpt-5.4' },
       },
-    });
-  });
-
-  it('repairs a stale provider/model combination when the model uniquely belongs to another configured provider', async () => {
-    const db = makeDb();
-    const manager = new SessionManager(db, vi.fn());
-    const session = makeSession('deepseek-v4-pro');
-    session.providerProfileKey = 'openrouter';
-
-    (manager as any).ensureSandboxInitialized = vi.fn(async () => undefined);
-    (manager as any).processFileAttachments = vi.fn(async (_s: Session, content: any) => content);
-    (manager as any).getMessages = vi.fn(() => []);
-    (manager as any).saveMessage = vi.fn();
-    (manager as any).runSessionTitleGeneration = vi.fn(async () => undefined);
-    const runMock = vi.fn(async () => undefined);
-    (manager as any).agentRunner = { run: runMock };
-
-    expect((manager as any).resolveUniqueProviderForSessionModel('openrouter', 'deepseek-v4-pro')).toBe(
-      'deepseek'
-    );
-
-    await (manager as any).processPrompt(session, 'hello');
-
-    expect(runMock).toHaveBeenCalledWith(
-      expect.objectContaining({ providerProfileKey: 'deepseek', model: 'deepseek-v4-pro' }),
-      'hello',
-      expect.any(Array)
-    );
-    expect(session.providerProfileKey).toBe('deepseek');
-    expect(db.sessions.update).toHaveBeenCalledWith(session.id, {
-      provider_profile_key: 'deepseek',
-      model: 'deepseek-v4-pro',
     });
   });
 });

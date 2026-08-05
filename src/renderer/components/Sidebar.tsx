@@ -34,6 +34,7 @@ import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import {
   buildSidebarSessionGroups,
+  isSessionBusy,
   type SidebarPins,
 } from "../utils/sidebar-session-groups";
 
@@ -51,7 +52,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessionStates = useAppStore((s) => s.sessionStates);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
-  const setMessages = useAppStore((s) => s.setMessages);
+  const setMessagesTail = useAppStore((s) => s.setMessagesTail);
   const setTraceSteps = useAppStore((s) => s.setTraceSteps);
   const workingDir = useAppStore((s) => s.workingDir);
   const setWorkingDir = useAppStore((s) => s.setWorkingDir);
@@ -74,7 +75,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     invoke,
     deleteSession,
     archiveSession,
-    getSessionMessages,
+    getSessionMessagesPage,
     getSessionTraceSteps,
     changeWorkingDir,
     createProject,
@@ -218,16 +219,24 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   );
   const runningGroupKeys = useMemo(() => {
     const keys = new Set<string>();
-    if (sessionGroups.unscopedSessions.some((s) => s.status === "running")) {
+    if (
+      sessionGroups.unscopedSessions.some((s) =>
+        isSessionBusy(s, sessionStates[s.id]?.backgroundAgents),
+      )
+    ) {
       keys.add(ORDINARY_SESSION_GROUP_KEY);
     }
     for (const group of sessionGroups.projectGroups) {
-      if (group.sessions.some((s) => s.status === "running")) {
+      if (
+        group.sessions.some((s) =>
+          isSessionBusy(s, sessionStates[s.id]?.backgroundAgents),
+        )
+      ) {
         keys.add(group.key);
       }
     }
     return keys;
-  }, [sessionGroups]);
+  }, [sessionGroups, sessionStates]);
   const pinnedSessionIds = useMemo(
     () => new Set(sidebarPins.sessionIds),
     [sidebarPins.sessionIds],
@@ -374,7 +383,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       const existingMessages = sessionStates[sessionId]?.messages;
       const existingSteps = sessionStates[sessionId]?.traceSteps;
       const needsMessages =
-        isElectron && (!existingMessages || existingMessages.length === 0);
+        isElectron && !sessionStates[sessionId]?.historyHydrated;
       const needsTraceSteps =
         isElectron && (!existingSteps || existingSteps.length === 0);
 
@@ -396,9 +405,17 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         let loadedSteps = existingSteps ?? [];
 
         if (needsMessages) {
-          loadedMessages = (await getSessionMessages(sessionId)) || [];
+          const page = (await getSessionMessagesPage(
+            sessionId,
+            null,
+            1000,
+          )) || {
+            messages: [],
+            hasMore: false,
+          };
           if (sessionLoadSeqRef.current !== loadSeq) return;
-          setMessages(sessionId, loadedMessages);
+          setMessagesTail(sessionId, page.messages, page.hasMore);
+          loadedMessages = page.messages;
         }
 
         if (needsTraceSteps) {
@@ -424,12 +441,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     },
     [
       activeSessionId,
-      getSessionMessages,
+      getSessionMessagesPage,
       getSessionTraceSteps,
       isElectron,
       sessionStates,
       setActiveSession,
-      setMessages,
+      setMessagesTail,
       setShowApps,
       setShowSettings,
       setTraceSteps,
@@ -605,10 +622,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive =
-      activeSessionId === session.id &&
-      !showApps &&
-      !showSchedule;
-    const hasStatusIndicator = session.status === "running";
+      activeSessionId === session.id && !showApps && !showSchedule;
+    const hasStatusIndicator = isSessionBusy(
+      session,
+      sessionStates[session.id]?.backgroundAgents,
+    );
     const isPinned = pinnedSessionIds.has(session.id);
     const isHovered = hoveredSessionId === session.id;
     const isMenuOpen = sessionMenu?.sessionId === session.id;
@@ -628,10 +646,8 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             current === session.id ? null : current,
           );
         }}
-        className={`group relative cursor-pointer rounded-lg px-2.5 py-1 transition-colors border-l-[3px] border-l-transparent ${
-          isActive
-            ? "bg-surface-active border-l-accent"
-            : "hover:bg-surface-hover/60"
+        className={`group relative cursor-pointer rounded-lg px-2.5 py-1 transition-colors ${
+          isActive ? "bg-surface-active" : "hover:bg-surface-hover/60"
         }`}
       >
         <div className="flex items-center gap-2">
@@ -820,38 +836,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       >
         {!sidebarCollapsed && (
           <>
-            <div className="px-3 pt-3 pb-1.5">
-              <div className="flex flex-col gap-0.5">
-                <button
-                  type="button"
-                  onClick={openApps}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
-                    showApps
-                      ? "bg-surface-active border-l-accent text-text-primary"
-                      : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
-                  }`}
-                  aria-current={showApps ? "page" : undefined}
-                >
-                  <LayoutGrid className="w-4 h-4 text-text-muted flex-shrink-0" />
-                  <span className="truncate">{t("sidebar.apps")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={openAutomation}
-                  className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors border-l-[3px] ${
-                    showSchedule
-                      ? "bg-surface-active border-l-accent text-text-primary"
-                      : "border-l-transparent text-text-secondary hover:bg-surface-hover/60"
-                  }`}
-                  aria-current={showSchedule ? "page" : undefined}
-                >
-                  <Clock3 className="w-4 h-4 text-text-muted flex-shrink-0" />
-                  <span className="truncate">{t("sidebar.automation")}</span>
-                </button>
-              </div>
-              <div className="mx-2 mt-2 border-t border-border-muted" />
-            </div>
-
             <div className="px-4 pt-3 pb-2">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 min-w-0">
@@ -934,6 +918,34 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll"
             >
               <div>
+                <div className="flex flex-col gap-0.5">
+                  <button
+                    type="button"
+                    onClick={openApps}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
+                      showApps
+                        ? "bg-surface-active text-text-primary"
+                        : "text-text-secondary hover:bg-surface-hover/60"
+                    }`}
+                    aria-current={showApps ? "page" : undefined}
+                  >
+                    <LayoutGrid className="w-4 h-4 text-text-muted flex-shrink-0" />
+                    <span className="truncate">{t("sidebar.apps")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openAutomation}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
+                      showSchedule
+                        ? "bg-surface-active text-text-primary"
+                        : "text-text-secondary hover:bg-surface-hover/60"
+                    }`}
+                    aria-current={showSchedule ? "page" : undefined}
+                  >
+                    <Clock3 className="w-4 h-4 text-text-muted flex-shrink-0" />
+                    <span className="truncate">{t("sidebar.automation")}</span>
+                  </button>
+                </div>
                 <section>
                   <button
                     type="button"
@@ -1390,7 +1402,10 @@ function saveGroupExpansion(state: Map<string, boolean>): void {
     state.forEach((v, k) => {
       obj[k] = v;
     });
-    localStorage.setItem(SIDEBAR_GROUP_EXPANSION_STORAGE_KEY, JSON.stringify(obj));
+    localStorage.setItem(
+      SIDEBAR_GROUP_EXPANSION_STORAGE_KEY,
+      JSON.stringify(obj),
+    );
   } catch {
     // Keep the in-memory state when storage is unavailable.
   }

@@ -145,3 +145,26 @@ export function buildSidebarSessionGroups(
     projectGroups,
   };
 }
+
+/** 后台子代理最小结构（与 store SessionState.backgroundAgents 对齐） */
+export interface SidebarBackgroundAgent {
+  id: string;
+  type: string;
+  description: string;
+  status: "running" | "done";
+}
+
+/**
+ * 会话是否有活跃工作需要侧栏显示"运行中"指示：
+ * 主轮次运行中，或有后台子代理仍处于 running。
+ * 注意：不能用 length > 0 —— 完成事件后代理以 done 状态保留 1 秒才移除。
+ */
+export function isSessionBusy(
+  session: Session,
+  backgroundAgents?: SidebarBackgroundAgent[],
+): boolean {
+  return (
+    session.status === "running" ||
+    (backgroundAgents?.some((agent) => agent.status === "running") ?? false)
+  );
+}

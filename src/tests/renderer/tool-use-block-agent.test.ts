@@ -29,6 +29,8 @@ const message: Message = {
 function runningSessionState(): SessionState {
   return {
     historyHydrated: true,
+    hasMoreOlder: false,
+    oldestMessageId: null,
     messages: [message],
     partialByTurn: {},
     partialMessage: "",

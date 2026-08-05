@@ -15,7 +15,8 @@ describe('WelcomeView submit guards', () => {
   it('only clears the composer after startSession returns a created session', () => {
     const source = fs.readFileSync(welcomeViewPath, 'utf8');
 
-    expect(source).toContain('const session = await startSession(sessionTitle, contentBlocks, workingDir || undefined);');
+    expect(source).toContain('const session = await startSession(');
+    expect(source).toContain('workingDir || undefined,');
     expect(source).toContain('if (session) {');
     expect(source).toContain('chatInputRef.current?.clear();');
   });

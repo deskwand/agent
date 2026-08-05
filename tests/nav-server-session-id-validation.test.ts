@@ -48,8 +48,8 @@ describe('nav-server sessionId validation', () => {
   it('hydrates session history before direct renderer session navigation', () => {
     const source = fs.readFileSync(rendererStorePath, 'utf8');
     expect(source).toContain('w.__navigate = async (page: string, tab?: string, sessionId?: string) => {');
-    expect(source).toContain('type: "session.getMessages"');
+    expect(source).toContain('type: "session.getMessagesPage"');
     expect(source).toContain('type: "session.getTraceSteps"');
-    expect(source).toContain('store.setMessages(sessionId, Array.isArray(messages) ? messages : []);');
+    expect(source).toContain('store.setMessagesTail(');
   });
 });

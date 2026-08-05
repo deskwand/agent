@@ -1,4 +1,4 @@
-import { Globe } from "lucide-react";
+import { Folder, FolderSearch, Globe } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import type { TFunction } from "i18next";
 import {
@@ -17,6 +17,9 @@ const labels: Record<string, string> = {
   "tool.labelGetSearchContent": "Read cached result {{responseId}}",
   "tool.actionWebFetch": "Fetch URL",
   "tool.labelWebFetch": "Fetch {{url}}",
+  "tool.labelLs": "List {{path}}",
+  "tool.actionLs": "List directory",
+  "tool.labelFind": 'Find "{{pattern}}"',
 };
 
 const t = ((key: string, options?: Record<string, unknown>) => {
@@ -60,5 +63,18 @@ describe("Web Access tool labels", () => {
     expect(getToolLabel("web_fetch", { url: "https://old.example" }, t)).toBe(
       "Fetch https://old.example",
     );
+  });
+});
+
+describe("ls/find tool icons and labels", () => {
+  it("renders Folder icon for ls and FolderSearch for find", () => {
+    expect(getToolIcon("ls").type).toBe(Folder);
+    expect(getToolIcon("find").type).toBe(FolderSearch);
+  });
+
+  it("formats ls and find labels", () => {
+    expect(getToolLabel("ls", { path: "/tmp" }, t)).toBe("List tmp");
+    expect(getToolLabel("ls", {}, t)).toBe("List directory");
+    expect(getToolLabel("find", { pattern: "*.ts" }, t)).toBe('Find "*.ts"');
   });
 });

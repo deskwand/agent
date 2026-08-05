@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-index 099e74e..91161de 100644
+index 099e74e..ce57356 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-@@ -64,16 +64,179 @@ function getAliases() {
+@@ -64,16 +64,186 @@ function getAliases() {
          return _aliases;
      const __dirname = path.dirname(fileURLToPath(import.meta.url));
      const packageIndex = path.resolve(__dirname, "../..", "index.js");
@@ -138,15 +138,22 @@ index 099e74e..91161de 100644
 +        // deps to the app's top-level node_modules root (packagesRoot/../..).
 +        {
 +            const topLevelNodeModules = path.resolve(packagesRoot, "../..");
-+            const topNmPath = path.join(topLevelNodeModules, specifier, workspaceRelativePath);
++            // Strip subpath specifier (e.g. "@earendil-works/pi-ai/compat" →
++            // "@earendil-works/pi-ai") so we look under the package dir, not a
++            // non-existent "<pkg>/compat" dir. Mirrors step 3's basePkg logic.
++            const parts = specifier.split("/");
++            const basePkg = specifier.startsWith("@") && parts.length >= 2
++                ? parts.slice(0, 2).join("/")
++                : parts[0];
++            const topNmPath = path.join(topLevelNodeModules, basePkg, workspaceRelativePath);
 +            if (fs.existsSync(topNmPath)) return topNmPath;
 +            const relParts = workspaceRelativePath.split("/");
 +            if (relParts.length > 1) {
-+                const topStripped = path.join(topLevelNodeModules, specifier, ...relParts.slice(1));
++                const topStripped = path.join(topLevelNodeModules, basePkg, ...relParts.slice(1));
 +                if (fs.existsSync(topStripped)) return topStripped;
 +            }
 +            // read package.json main/exports as last resort before require.resolve
-+            const topPkgRoot = path.join(topLevelNodeModules, specifier);
++            const topPkgRoot = path.join(topLevelNodeModules, basePkg);
 +            if (fs.existsSync(topPkgRoot)) {
 +                const topPkgJsonPath = path.join(topPkgRoot, "package.json");
 +                if (fs.existsSync(topPkgJsonPath)) {
@@ -189,7 +196,7 @@ index 099e74e..91161de 100644
      };
      const piCodingAgentEntry = packageIndex;
      const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
-@@ -106,6 +269,7 @@ function getAliases() {
+@@ -106,6 +276,7 @@ function getAliases() {
          "@sinclair/typebox/compile": typeboxCompileEntry,
          "@sinclair/typebox/value": typeboxValueEntry,
      };

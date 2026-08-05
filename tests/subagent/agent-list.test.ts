@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { scanAgents } from "../../src/main/agent/subagent/agent-list";
+
+// Point the global agents dir at a nonexistent path so the test is hermetic
+// (a real user dir may contain deployed builtin agents, which would shadow
+// the builtin entries via the global source).
+vi.mock("@earendil-works/pi-coding-agent", () => ({
+  getAgentDir: () => "/tmp/nonexistent-pi-agent-dir",
+}));
 
 describe("scanAgents", () => {
   it("returns built-in agents when no custom dirs exist", () => {

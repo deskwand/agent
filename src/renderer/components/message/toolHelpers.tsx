@@ -9,6 +9,7 @@ import {
   Search,
   Globe,
   FolderSearch,
+  Folder,
   Eye,
   Table,
   Presentation,
@@ -28,6 +29,8 @@ export function getToolIcon(name: string) {
     return <Pencil className="w-3.5 h-3.5" />;
   if (n === "grep") return <Search className="w-3.5 h-3.5" />;
   if (n === "glob") return <FolderSearch className="w-3.5 h-3.5" />;
+  if (n === "ls") return <Folder className="w-3.5 h-3.5" />;
+  if (n === "find") return <FolderSearch className="w-3.5 h-3.5" />;
   // Keep legacy names so Web Access calls in historical sessions still render.
   if (
     [
@@ -105,6 +108,13 @@ export function getToolLabel(
     return inp.pattern
       ? t("tool.labelGlob", { pattern: String(inp.pattern) })
       : t("tool.actionGlob");
+  }
+  if (nameLower === "ls") {
+    const p = String(inp.path || "");
+    return p ? t("tool.labelLs", { path: shortenPath(p) }) : t("tool.actionLs");
+  }
+  if (nameLower === "find") {
+    return t("tool.labelFind", { pattern: String(inp.pattern ?? "") });
   }
   if (nameLower === "grep") {
     return inp.pattern

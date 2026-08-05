@@ -144,7 +144,7 @@ describe('getArtifactSteps', () => {
     expect(displayArtifactSteps).toHaveLength(1);
   });
 
-  it('prefers concrete file operations over explicit artifact summaries', () => {
+  it('keeps artifact summaries and concrete file operations in the display list', () => {
     const steps: TraceStep[] = [
       {
         id: 'artifact_1',
@@ -168,13 +168,16 @@ describe('getArtifactSteps', () => {
 
     const { artifactSteps, fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
 
+    // displayArtifactSteps is the artifact summaries + file steps; the
+    // panel deduplicates by resolved path downstream.
     expect(artifactSteps).toHaveLength(1);
     expect(fileSteps).toHaveLength(1);
-    expect(displayArtifactSteps).toHaveLength(1);
-    expect(displayArtifactSteps[0].toolName).toBe('Write');
+    expect(displayArtifactSteps).toHaveLength(2);
+    expect(displayArtifactSteps[0].toolName).toBe('artifact');
+    expect(displayArtifactSteps[1].toolName).toBe('Write');
   });
 
-  it('shows completed edit steps even when artifact summaries also exist', () => {
+  it('shows completed edit steps alongside artifact summaries', () => {
     const steps: TraceStep[] = [
       {
         id: 'artifact_1',
@@ -201,11 +204,11 @@ describe('getArtifactSteps', () => {
 
     expect(artifactSteps).toHaveLength(1);
     expect(fileSteps).toHaveLength(1);
-    expect(displayArtifactSteps).toHaveLength(1);
-    expect(displayArtifactSteps[0].toolName).toBe('Edit');
+    expect(displayArtifactSteps).toHaveLength(2);
+    expect(displayArtifactSteps[1].toolName).toBe('Edit');
   });
 
-  it('ignores explicit artifact summaries when a write step already covers the same path', () => {
+  it('keeps both the artifact summary and the write step covering the same path', () => {
     const steps: TraceStep[] = [
       {
         id: 'artifact_1',
@@ -228,10 +231,13 @@ describe('getArtifactSteps', () => {
       },
     ];
 
-    const { displayArtifactSteps } = getArtifactSteps(steps);
+    const { artifactSteps, fileSteps, displayArtifactSteps } = getArtifactSteps(steps);
 
-    expect(displayArtifactSteps).toHaveLength(1);
-    expect(displayArtifactSteps[0].toolName).toBe('Write');
+    // Both are retained here; the panel deduplicates by resolved path.
+    expect(artifactSteps).toHaveLength(1);
+    expect(fileSteps).toHaveLength(1);
+    expect(displayArtifactSteps).toHaveLength(2);
+    expect(displayArtifactSteps[1].toolName).toBe('Write');
   });
 
   it('includes screenshot tools when they return a concrete output path', () => {
@@ -254,7 +260,7 @@ describe('getArtifactSteps', () => {
     expect(displayArtifactSteps[0].toolName).toBe('screenshot');
   });
 
-  it('does not show artifact summaries by themselves in the artifacts panel list', () => {
+  it('includes artifact summaries in the display list even without file steps', () => {
     const steps: TraceStep[] = [
       {
         id: 'artifact_only',
@@ -271,7 +277,8 @@ describe('getArtifactSteps', () => {
 
     expect(artifactSteps).toHaveLength(1);
     expect(fileSteps).toHaveLength(0);
-    expect(displayArtifactSteps).toHaveLength(0);
+    expect(displayArtifactSteps).toHaveLength(1);
+    expect(displayArtifactSteps[0].toolName).toBe('artifact');
   });
 
   it('excludes Bash tool from file steps (relies on recent-files fallback)', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useAppStore } from "../../renderer/store";
-import type { MountedPath } from "../../renderer/types";
+import type { Message, MountedPath } from "../../renderer/types";
 
 // Reset store before each test
 beforeEach(() => {
@@ -530,7 +530,11 @@ describe("SessionState unified store", () => {
 
       const bg = useAppStore.getState().sessionStates["s1"].backgroundAgents;
       expect(bg).toHaveLength(1);
-      expect(bg[0]).toMatchObject({ id: "agent-1", type: "Explore", status: "running" });
+      expect(bg[0]).toMatchObject({
+        id: "agent-1",
+        type: "Explore",
+        status: "running",
+      });
     });
 
     it("should be idempotent — adding same agent ID twice only adds once", () => {
@@ -558,13 +562,11 @@ describe("SessionState unified store", () => {
     it("should remove agent by ID", () => {
       useAppStore.getState().addSession(makeSession("s1"));
       useAppStore.getState().addBackgroundAgent("s1", agent);
-      useAppStore
-        .getState()
-        .addBackgroundAgent("s1", {
-          id: "agent-2",
-          type: "Review",
-          description: "check",
-        });
+      useAppStore.getState().addBackgroundAgent("s1", {
+        id: "agent-2",
+        type: "Review",
+        description: "check",
+      });
 
       useAppStore.getState().removeBackgroundAgent("s1", "agent-1");
 
@@ -606,5 +608,98 @@ describe("SessionState unified store", () => {
         100000,
       );
     });
+  });
+});
+
+describe("message windowing (paged history)", () => {
+  function msg(id: string, ts: number): Message {
+    return {
+      id,
+      sessionId: "s1",
+      role: "user",
+      content: [],
+      timestamp: ts,
+    } as Message;
+  }
+
+  it("setMessagesTail stores tail page and paging flags", () => {
+    const store = useAppStore.getState();
+    store.setMessagesTail("s1", [msg("m1", 1), msg("m2", 2)], true);
+    const ss = useAppStore.getState().sessionStates["s1"];
+    expect(ss.messages.map((m) => m.id)).toEqual(["m1", "m2"]);
+    expect(ss.historyHydrated).toBe(true);
+    expect(ss.hasMoreOlder).toBe(true);
+    expect(ss.oldestMessageId).toBe("m1");
+  });
+
+  it("prependOlderMessages inserts at the front and moves the cursor", () => {
+    const store = useAppStore.getState();
+    store.setMessagesTail("s2", [msg("m3", 3), msg("m4", 4)], true);
+    store.prependOlderMessages("s2", [msg("m1", 1), msg("m2", 2)], false);
+    const ss = useAppStore.getState().sessionStates["s2"];
+    expect(ss.messages.map((m) => m.id)).toEqual(["m1", "m2", "m3", "m4"]);
+    expect(ss.oldestMessageId).toBe("m1");
+    expect(ss.hasMoreOlder).toBe(false);
+    expect(ss.historyHydrated).toBe(true);
+  });
+
+  it("trimMessagesToWindow keeps only the newest messages and resets cursor", () => {
+    const store = useAppStore.getState();
+    const all = Array.from({ length: 5 }, (_, i) => msg(`m${i + 1}`, i + 1));
+    store.setMessagesTail("s3", all, true);
+    store.trimMessagesToWindow("s3", 2);
+    const ss = useAppStore.getState().sessionStates["s3"];
+    expect(ss.messages.map((m) => m.id)).toEqual(["m4", "m5"]);
+    expect(ss.oldestMessageId).toBe("m4");
+  });
+
+  it("prependOlderMessages does not trim the just-loaded page", () => {
+    const store = useAppStore.getState();
+    store.setMessagesTail("s4", [msg("m3", 3), msg("m4", 4)], true);
+    store.prependOlderMessages("s4", [msg("m1", 1), msg("m2", 2)], true);
+    const ss = useAppStore.getState().sessionStates["s4"];
+    expect(ss.messages).toHaveLength(4);
+  });
+
+  it("prependOlderMessages trims the oldest messages past the cap and reports the count", () => {
+    const store = useAppStore.getState();
+    // 内存窗口上限 2000 + 页 1000 = 3000；构造 3000 条再 prepend 1000 → 4000 → trim 到 2000
+    const tail = Array.from({ length: 3000 }, (_, i) =>
+      msg(`m${i + 1}`, i + 1),
+    );
+    store.setMessagesTail("s6", tail, true);
+    const older = Array.from({ length: 1000 }, (_, i) =>
+      msg(`old${i + 1}`, i + 1),
+    );
+    const trimmed = store.prependOlderMessages("s6", older, true);
+    const ss = useAppStore.getState().sessionStates["s6"];
+    expect(trimmed).toBe(2000);
+    expect(ss.messages).toHaveLength(2000);
+    // 保留的是最新的 2000 条：old 1000 条全部被 trim，尾部 2000 条保留
+    expect(ss.messages[0].id).toBe("m1001");
+    expect(ss.oldestMessageId).toBe("m1001");
+  });
+
+  it("prependOlderMessages does not trim below the cap threshold", () => {
+    const store = useAppStore.getState();
+    const tail = Array.from({ length: 2500 }, (_, i) =>
+      msg(`m${i + 1}`, i + 1),
+    );
+    store.setMessagesTail("s7", tail, true);
+    const older = Array.from({ length: 400 }, (_, i) =>
+      msg(`old${i + 1}`, i + 1),
+    );
+    const trimmed = store.prependOlderMessages("s7", older, true);
+    expect(trimmed).toBe(0);
+    const ss = useAppStore.getState().sessionStates["s7"];
+    expect(ss.messages).toHaveLength(2900); // 2500 + 400 < 3000，不 trim
+  });
+
+  it("addMessage still works after paging (tail append, no trim)", () => {
+    const store = useAppStore.getState();
+    store.setMessagesTail("s5", [msg("m1", 1)], false);
+    store.addMessage("s5", msg("m2", 2));
+    const ss = useAppStore.getState().sessionStates["s5"];
+    expect(ss.messages.map((m) => m.id)).toEqual(["m1", "m2"]);
   });
 });

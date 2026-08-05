@@ -14,6 +14,7 @@ export function eventRequiresSessionManager(event: ClientEvent): boolean {
     case "project.delete":
     case "session.list":
     case "session.getMessages":
+    case "session.getMessagesPage":
     case "session.getTraceSteps":
     case "permission.response":
       return true;

@@ -134,7 +134,6 @@ import {
   setDevLogsEnabled,
   isDevLogsEnabled,
 } from "./utils/logger";
-import { listRecentWorkspaceFiles } from "./utils/recent-workspace-files";
 import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
@@ -2176,16 +2175,6 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle(
-  "artifacts.listRecentFiles",
-  async (_event, cwd: string, sinceMs: number, limit: number = 50) => {
-    if (!cwd || !isAbsolute(cwd)) {
-      return [];
-    }
-    return listRecentWorkspaceFiles(cwd, sinceMs, limit);
-  },
-);
-
 ipcMain.handle("video.getSourceUrl", (event, filePath: string) => {
   if (
     !mainWindow ||
@@ -4044,6 +4033,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         payload: {
           sessions: result.sessions,
           contextWindows: result.contextWindows,
+          goalStatuses: result.goalStatuses,
         },
       });
       return result.sessions;
@@ -4051,6 +4041,13 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
 
     case "session.getMessages":
       return sm.getMessages(event.payload.sessionId);
+
+    case "session.getMessagesPage":
+      return sm.getMessagesPage(
+        event.payload.sessionId,
+        event.payload.beforeId,
+        event.payload.limit,
+      );
 
     case "session.getTraceSteps":
       return sm.getTraceSteps(event.payload.sessionId);

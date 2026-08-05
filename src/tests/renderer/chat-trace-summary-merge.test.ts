@@ -119,6 +119,8 @@ function setSessionMessages(messages: Message[]): void {
     sessionStates: {
       s1: {
         historyHydrated: true,
+        hasMoreOlder: false,
+        oldestMessageId: null,
         messages,
         partialByTurn: {},
         partialMessage: "",

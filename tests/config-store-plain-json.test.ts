@@ -173,6 +173,7 @@ describe('ConfigStore plain JSON behavior', () => {
       parallelApiKey: '',
       tavilyApiKey: '',
       perplexityApiKey: '',
+      ssrfEnabled: false,
     });
   });
 

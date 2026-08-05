@@ -26,7 +26,7 @@ describe('AgentRunner internal browser stale page recovery', () => {
     expect(agentRunnerContent).toContain('private async _withBrowserPage<T>(');
     expect(agentRunnerContent).toContain('hit stale browser state; retrying once');
     expect(agentRunnerContent).toContain('this._resetBrowserState(`${operation} retry`)');
-    expect(agentRunnerContent).toContain('const withPage = <T,>(');
+    expect(agentRunnerContent).toContain('const withPage = <T>(');
   });
 
   it('checks cached pages for actual usability, not just closed state', () => {

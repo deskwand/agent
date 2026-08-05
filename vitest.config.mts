@@ -5,6 +5,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // pi-coding-agent resolves its package dir from PI_PACKAGE_DIR first.
+    // The DeskWand/pi agent shell exports it pointing into the installed
+    // app.asar (unreadable via plain fs) — neutralize it so tests resolve
+    // the local node_modules copy.
+    env: { PI_PACKAGE_DIR: '' },
     // Resolve Electron to a stable test double so CI does not depend on the
     // postinstall-generated `node_modules/electron/path.txt` file.
     alias: {
