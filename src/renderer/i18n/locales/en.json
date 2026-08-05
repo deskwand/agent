@@ -99,6 +99,7 @@
     "providers": {
       "auto": "Automatic",
       "openai": "OpenAI",
+      "deepseek": "DeepSeek",
       "exa": "Exa",
       "brave": "Brave",
       "parallel": "Parallel",

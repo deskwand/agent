@@ -374,6 +374,11 @@ function searchMatchingProfiles(
         return [{ key, name: config.name || key }];
       return [];
     }
+    if (provider === "deepseek") {
+      if (config.provider === "deepseek")
+        return [{ key, name: config.name || key }];
+      return [];
+    }
     if (
       config.provider === "gemini" ||
       (config.provider !== "oauth" && config.customProtocol === "gemini")
@@ -385,7 +390,7 @@ function searchMatchingProfiles(
 
 function searchAddInheritedDefaults(appConfig: AppConfig): WebAccessConfig {
   let draft = normalizeWebAccessConfig(appConfig.webAccess);
-  for (const provider of ["openai", "gemini"] as const) {
+  for (const provider of ["openai", "gemini", "deepseek"] as const) {
     const credential = draft[provider];
     if (credential.source !== "inherit" || credential.profileKey) continue;
     const profiles = searchMatchingProfiles(appConfig, provider);
@@ -1360,7 +1365,7 @@ export function SettingsAPI({
                 </select>
               </label>
 
-              {(["openai", "gemini"] as const).map((provider) => {
+              {(["openai", "gemini", "deepseek"] as const).map((provider) => {
                 const credential = searchDraft[provider];
                 const isOpen = searchExpanded === provider;
                 return (

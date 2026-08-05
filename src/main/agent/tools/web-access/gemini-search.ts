@@ -4,6 +4,8 @@ import type {
   WebSearchProvider,
 } from "../../../../shared/web-access";
 import { searchWithBrave } from "./brave";
+import type { DeepSeekWebSearchAuth } from "./config-adapter";
+import { searchWithDeepSeek } from "./deepseek-search";
 import type { GeminiApiAuth, OpenAIWebSearchAuth } from "./config-adapter";
 import { searchWithExa } from "./exa";
 import { searchWithGeminiApi } from "./gemini-api";
@@ -17,6 +19,7 @@ export interface WebSearchRuntime {
   defaultProvider: WebSearchProvider;
   openai?: OpenAIWebSearchAuth;
   gemini?: GeminiApiAuth;
+  deepseek?: DeepSeekWebSearchAuth;
   exaApiKey?: string;
   braveApiKey?: string;
   parallelApiKey?: string;
@@ -70,6 +73,13 @@ async function explicitSearch(
     if (!result) throw new Error("Exa search returned no results");
     return { ...result, provider };
   }
+  if (provider === "deepseek") {
+    if (!runtime.deepseek)
+      throw new Error("DeepSeek search provider unavailable");
+    const result = await searchWithDeepSeek(query, options, runtime.deepseek);
+    if (!result) throw new Error("DeepSeek search returned no results");
+    return { ...result, provider };
+  }
   if (provider === "brave") {
     if (!runtime.braveApiKey)
       throw new Error("Brave search provider unavailable");
@@ -116,6 +126,7 @@ function isProviderAvailable(
   if (provider === "exa") return true;
   if (provider === "openai")
     return Boolean(runtime.openai) && shouldTryOpenAI(options);
+  if (provider === "deepseek") return Boolean(runtime.deepseek);
   if (provider === "gemini") return Boolean(runtime.gemini);
   const keyMap: Record<string, keyof WebSearchRuntime> = {
     brave: "braveApiKey",
@@ -156,6 +167,7 @@ export async function search(
   // Step 2: Standard fallback chain (exa first — free, no key needed)
   const standardChain: Array<Exclude<WebSearchProvider, "auto">> = [
     "exa",
+    "deepseek",
     "brave",
     "parallel",
     "tavily",
