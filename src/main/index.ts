@@ -68,7 +68,7 @@ import {
   type ThemePreset,
   type SaveProviderPayload,
   type ProviderProfileKey,
-  enrichOAuthProviderModels,
+  enrichProviderModelsFromRegistry,
 } from "./config/config-store";
 import { runConfigApiTest } from "./config/config-test-routing";
 import {
@@ -2418,8 +2418,8 @@ ipcMain.handle(
   async (_event, payload: SaveProviderPayload) => {
     log("[Config] Saving provider:", payload.profileKey);
     const previousConfig = configStore.getAll();
-    // Enrich OAuth models from pi-ai built-in registry (authoritative source)
-    const enriched = await enrichOAuthProviderModels(payload);
+    // Enrich provider models from pi-ai built-in registry (authoritative source)
+    const enriched = await enrichProviderModelsFromRegistry(payload);
     configStore.saveProvider(enriched);
     const updatedConfig = await syncConfigAfterMutation(previousConfig);
     return { success: true, config: updatedConfig };

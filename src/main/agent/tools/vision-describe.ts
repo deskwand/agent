@@ -103,6 +103,8 @@ export function protocolForProvider(
   }
   // openrouter: use OpenAI-compatible endpoint
   if (provider === "openrouter") return "openai";
+  // opencode: use OpenAI-compatible endpoint (chat/completions + responses)
+  if (provider === "opencode" || provider === "opencode-go") return "openai";
   return "anthropic";
 }
 

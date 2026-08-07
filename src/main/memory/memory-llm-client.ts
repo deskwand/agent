@@ -170,6 +170,8 @@ export class MemoryLLMClient implements MemoryLLMClientLike {
       provider === "deepseek" ||
       provider === "openrouter" ||
       provider === "ollama" ||
+      provider === "opencode" ||
+      provider === "opencode-go" ||
       (provider === "custom" && protocol === "openai");
 
     if (!isOpenAiCompatible) {

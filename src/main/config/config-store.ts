@@ -34,7 +34,9 @@ export type ProviderType =
   | "gemini"
   | "ollama"
   | "oauth"
-  | "zhipu";
+  | "zhipu"
+  | "opencode"
+  | "opencode-go";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
@@ -167,7 +169,7 @@ export interface LegacyEnvBridgeSnapshot {
 }
 
 export const PROVIDER_PRESETS = API_PROVIDER_PRESETS;
-const PI_AI_CURATED: Record<string, { piProvider: string; pick: string[] }> =
+const PI_AI_CURATED: Record<string, { piProvider: string; pick?: string[] }> =
   PI_AI_CURATED_PRESETS;
 
 const VALID_THEMES: AppTheme[] = ["dark", "light", "system"];
@@ -197,6 +199,16 @@ const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
     apiKey: "",
     baseUrl: "https://generativelanguage.googleapis.com",
     model: "gemini-2.5-flash",
+  },
+  opencode: {
+    apiKey: "",
+    baseUrl: "https://opencode.ai/zen/v1",
+    model: "gpt-5.6-luna",
+  },
+  "opencode-go": {
+    apiKey: "",
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    model: "kimi-k3",
   },
   "custom:anthropic": {
     apiKey: "",
@@ -292,6 +304,8 @@ function profileKeyFromProvider(
 export function profileKeyToProvider(profileKey: ProviderProfileKey): {
   provider: ProviderType;
   customProtocol: CustomProtocolType;
+  /** 保存时保留注册表动态 enrich 的模型列表（而非静态预设） */
+  preserveDynamicModels?: boolean;
 } {
   if (isOAuthProfileKey(profileKey))
     return { provider: "oauth" as ProviderType, customProtocol: "anthropic" };
@@ -303,6 +317,24 @@ export function profileKeyToProvider(profileKey: ProviderProfileKey): {
     return { provider: "deepseek", customProtocol: "openai" };
   if (profileKey === "gemini")
     return { provider: "gemini", customProtocol: "gemini" };
+  if (profileKey === "opencode")
+    return {
+      provider: "opencode",
+      customProtocol: "openai",
+      preserveDynamicModels: true,
+    };
+  if (profileKey === "opencode-go")
+    return {
+      provider: "opencode-go",
+      customProtocol: "openai",
+      preserveDynamicModels: true,
+    };
+  if (profileKey === "openrouter")
+    return {
+      provider: "openrouter",
+      customProtocol: "anthropic",
+      preserveDynamicModels: true,
+    };
   return { provider: profileKey as ProviderType, customProtocol: "anthropic" };
 }
 
@@ -310,6 +342,12 @@ function defaultProtocolForProvider(
   provider: ProviderType,
 ): CustomProtocolType {
   if (provider === "openai" || provider === "deepseek") return "openai";
+  if (
+    provider === "opencode" ||
+    provider === "opencode-go" ||
+    provider === "ollama"
+  )
+    return "openai";
   if (provider === "gemini") return "gemini";
   return "anthropic";
 }
@@ -389,7 +427,9 @@ function isProviderType(value: unknown): value is ProviderType {
     value === "openai" ||
     value === "gemini" ||
     value === "ollama" ||
-    value === "oauth"
+    value === "oauth" ||
+    value === "opencode" ||
+    value === "opencode-go"
   );
 }
 
@@ -504,10 +544,11 @@ export function normalizeProviderConfig(
   const isCustomProfile =
     meta.provider === "custom" || meta.provider === "oauth";
   const rawModels = Array.isArray(raw?.models) ? raw.models : [];
-  // TODO: The openrouter special-case should move to provider metadata
-  // (e.g. meta.preserveDynamicModels) once a second provider needs it.
+  // Provider metadata flag: openrouter/opencode keep dynamically enriched
+  // models from the pi-ai registry instead of the static preset list.
   const preserveRawModels =
-    isCustomProfile || (profileKey === "openrouter" && rawModels.length > 0);
+    isCustomProfile ||
+    (meta.preserveDynamicModels === true && rawModels.length > 0);
   const deduped = new Map<string, ApiProviderModel>();
 
   if (preserveRawModels) {
@@ -567,17 +608,27 @@ function clearProviderConfig(
 }
 
 /**
- * Attempt to enrich an OAuth provider payload with models from the
+ * Attempt to enrich a provider payload with models from the
  * pi-ai built-in registry (which is the authoritative source for
- * OAuth provider models). Falls back to the renderer-provided models
- * if pi-ai is unavailable or does not know the provider.
+ * OAuth and opencode provider models). Falls back to the
+ * renderer-provided models if pi-ai is unavailable or does not know
+ * the provider.
  */
-export async function enrichOAuthProviderModels(
+export async function enrichProviderModelsFromRegistry(
   payload: SaveProviderPayload,
 ): Promise<SaveProviderPayload> {
-  if (payload.config.provider !== "oauth") return payload;
+  const provider = payload.config.provider;
+  if (
+    provider !== "oauth" &&
+    provider !== "opencode" &&
+    provider !== "opencode-go"
+  )
+    return payload;
   try {
-    const providerId = extractOAuthProviderId(payload.profileKey);
+    const providerId =
+      provider === "oauth"
+        ? extractOAuthProviderId(payload.profileKey)
+        : provider;
     if (!providerId) return payload;
     const { getModels } = await import("@earendil-works/pi-ai/compat");
     const piModels = getModels(providerId as Parameters<typeof getModels>[0]);
@@ -590,17 +641,25 @@ export async function enrichOAuthProviderModels(
       maxTokens: m.maxTokens,
       input: m.input,
     }));
+    // Keep an explicit non-empty defaultModel when it exists in the
+    // enriched set (e.g. the plan-aware defaults set by the UI);
+    // otherwise fall back to the registry-order first model.
+    const defaultModel =
+      payload.config.defaultModel &&
+      models.some((m) => m.id === payload.config.defaultModel)
+        ? payload.config.defaultModel
+        : models[0]?.id || payload.config.defaultModel;
     return {
       ...payload,
       config: {
         ...payload.config,
         models,
-        defaultModel: models[0]?.id || payload.config.defaultModel,
+        defaultModel,
       },
     };
   } catch (error) {
     logWarn(
-      "[Config] Failed to enrich OAuth models from pi-ai, using renderer fallback:",
+      "[Config] Failed to enrich provider models from pi-ai, using renderer fallback:",
       error,
     );
     return payload;
@@ -770,11 +829,16 @@ export async function getPiAiModelPresets(): Promise<typeof PROVIDER_PRESETS> {
       if (!registryModels?.length) continue;
       const registryIds = new Set(registryModels.map((item) => item.id));
       const models = curated.pick
-        .filter((id) => registryIds.has(id))
-        .map((id) => {
-          const found = registryModels.find((item) => item.id === id);
-          return { id, name: found?.name || id };
-        });
+        ? curated.pick
+            .filter((id) => registryIds.has(id))
+            .map((id) => {
+              const found = registryModels.find((item) => item.id === id);
+              return { id, name: found?.name || id };
+            })
+        : registryModels.map((item) => ({
+            id: item.id,
+            name: item.name || item.id,
+          }));
       if (models.length > 0) {
         result[providerKey] = { ...preset, models };
       }

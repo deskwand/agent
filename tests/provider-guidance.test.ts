@@ -60,4 +60,13 @@ describe('provider guidance helpers', () => {
       'emptyProbeGeneric'
     );
   });
+
+  it('detects OpenCode Zen and prefers the dedicated provider tab', () => {
+    const setup = detectCommonProviderSetup('https://opencode.ai/zen/v1');
+    expect(setup?.id).toBe('opencode');
+    expect(setup?.preferProviderTab).toBe('opencode');
+    expect(detectCommonProviderSetup('https://opencode.ai/zen/go/v1')?.id).toBe(
+      'opencode'
+    );
+  });
 });

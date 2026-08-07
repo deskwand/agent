@@ -826,7 +826,9 @@ export type ProviderType =
   | "gemini"
   | "ollama"
   | "oauth"
-  | "zhipu";
+  | "zhipu"
+  | "opencode"
+  | "opencode-go";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export interface VisionModelConfig {
   enabled: boolean;
@@ -943,6 +945,8 @@ export interface ProviderPresets {
   openai: ProviderPreset;
   gemini: ProviderPreset;
   zhipu: ProviderPreset;
+  opencode: ProviderPreset;
+  "opencode-go": ProviderPreset;
 }
 
 export interface ProviderModelInfo {

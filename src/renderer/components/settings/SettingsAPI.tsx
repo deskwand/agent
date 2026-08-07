@@ -64,6 +64,7 @@ interface ProviderDraft {
 
 const PROVIDER_ORDER: ProviderChoice[] = [
   "openrouter",
+  "opencode",
   "anthropic",
   "deepseek",
   "openai",
@@ -71,8 +72,11 @@ const PROVIDER_ORDER: ProviderChoice[] = [
   "custom",
 ];
 
-/** 视觉模型设置页的 provider 列表：在主模型列表基础上追加「智谱」 */
-const VISION_PROVIDER_ORDER: ProviderChoice[] = [...PROVIDER_ORDER, "zhipu"];
+/** 视觉模型设置页的 provider 列表：在主模型列表基础上追加「智谱」，排除 OpenCode（MVP 不含视觉） */
+const VISION_PROVIDER_ORDER: ProviderChoice[] = [
+  ...PROVIDER_ORDER.filter((provider) => provider !== "opencode"),
+  "zhipu",
+];
 
 /** 智谱区域端点（两站 API Key 不互通，仅 baseUrl 不同） */
 const ZHIPU_REGIONS = [
@@ -85,6 +89,20 @@ const ZHIPU_REGIONS = [
     id: "global",
     baseUrl: "https://api.z.ai/api/paas/v4",
     labelKey: "api.zhipuRegionGlobal",
+  },
+] as const;
+
+/** OpenCode 订阅计划：Zen（按量付费）与 Go（$10/月订阅），同一账号同一 API Key */
+const OPENCODE_PLANS = [
+  {
+    id: "zen",
+    provider: "opencode" as const,
+    labelKey: "api.opencodePlanZen",
+  },
+  {
+    id: "go",
+    provider: "opencode-go" as const,
+    labelKey: "api.opencodePlanGo",
   },
 ] as const;
 
@@ -248,6 +266,12 @@ function hasUsableCredentials(
   return Boolean(apiKey);
 }
 
+/** OpenCode 各计划的默认模型（与 config-store defaultProfiles 保持一致，成本均衡优先） */
+const OPENCODE_DEFAULT_MODELS: Partial<Record<ProviderType, string>> = {
+  opencode: "gpt-5.6-luna",
+  "opencode-go": "kimi-k3",
+};
+
 function createEmptyDraft(
   provider: ProviderType,
   presets: ProviderPresets,
@@ -267,7 +291,8 @@ function createEmptyDraft(
     name: "",
     apiKey: "",
     baseUrl: preset.baseUrl,
-    defaultModel: defaultPresetModel?.id || "",
+    defaultModel:
+      OPENCODE_DEFAULT_MODELS[provider] || defaultPresetModel?.id || "",
     models: [],
   };
 }
@@ -310,8 +335,13 @@ function sanitizeDraft(
       ...draft,
       name: draft.name.trim(),
       apiKey: draft.apiKey.trim(),
+      customProtocol:
+        draft.provider === "opencode" || draft.provider === "opencode-go"
+          ? "openai"
+          : draft.customProtocol,
       baseUrl: preset.baseUrl,
-      defaultModel: presetModels[0]?.id || "",
+      defaultModel:
+        OPENCODE_DEFAULT_MODELS[draft.provider] || presetModels[0]?.id || "",
       models: [],
     };
   }
@@ -2081,6 +2111,35 @@ export function SettingsAPI({
                     ))}
                   </div>
                 </div>
+
+                {(draft.provider === "opencode" ||
+                  draft.provider === "opencode-go") && (
+                  <div className="space-y-3 border-b border-border-muted py-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <Globe2 className="h-4 w-4" />
+                      {t("api.opencodePlan")}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {OPENCODE_PLANS.map((plan) => (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => selectProvider(plan.provider)}
+                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                            draft.provider === plan.provider
+                              ? "border-accent bg-accent/10 font-medium text-accent"
+                              : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                          }`}
+                        >
+                          {t(plan.labelKey)}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-text-muted">
+                      {t("api.opencodePlanHint")}
+                    </p>
+                  </div>
+                )}
 
                 {isCustomDraft && (
                   <div className="space-y-3 border-b border-border-muted py-5">

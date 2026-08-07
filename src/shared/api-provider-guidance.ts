@@ -11,6 +11,7 @@ export type CommonProviderSetupId =
   | "ollama"
   | "gemini-custom"
   | "minimax"
+  | "opencode"
   | "generic-openai";
 
 export interface CommonProviderSetup {
@@ -140,6 +141,21 @@ export const COMMON_PROVIDER_SETUPS: CommonProviderSetup[] = [
       hosts: ["api.minimax.chat"],
       hostContains: ["minimax"],
       pathPrefixes: ["/v1"],
+    },
+  },
+  {
+    id: "opencode",
+    nameKey: "api.guidance.setups.opencode.name",
+    noteKey: "api.guidance.setups.opencode.note",
+    applyProvider: "custom",
+    recommendedProtocol: "openai",
+    recommendedBaseUrl: "https://opencode.ai/zen/v1",
+    exampleModel: "gpt-5.6-luna",
+    protocolLabel: "OpenCode",
+    preferProviderTab: "opencode",
+    matcher: {
+      hosts: ["opencode.ai"],
+      pathPrefixes: ["/zen"],
     },
   },
   {
