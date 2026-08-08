@@ -32,7 +32,11 @@ import type {
   ProviderProfileKey,
   ApiProviderConfig,
   ToolUseContent,
+  QueuedInput,
+  ImageContent,
+  FileAttachmentContent,
 } from "../types";
+import { mergeSteerEntries } from "../steer-entries";
 import {
   buildProcessSummaryDisplayBlock,
   collectResultFiles,
@@ -46,7 +50,14 @@ import {
   extractVideoReferences,
   type VideoReference,
 } from "../utils/video-reference";
-import { Plug, ChevronsDown, Loader2 } from "lucide-react";
+import {
+  Plug,
+  ChevronsDown,
+  Loader2,
+  Navigation,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
   ChatInput,
@@ -54,6 +65,7 @@ import {
   type ChatInputSubmitData,
 } from "./ChatInput";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
+import { ChatInputQueueBar } from "./ChatInputQueueBar";
 import { ChatInputStatusBar, resolveInputStatus } from "./ChatInputStatusBar";
 import {
   MessageNavRail,
@@ -184,18 +196,6 @@ export function ChatView() {
   const { partialMessage } = useActivePartialContent();
   const activeTurn = useActiveTurn();
   const pendingTurns = usePendingTurns();
-  const [steeringEvent, setSteeringEvent] = useState<{
-    turnId: string;
-    text: string;
-  } | null>(null);
-  const [steerDisplayReady, setSteerDisplayReady] = useState(false);
-  const steerSentAtRef = useRef(0);
-  // Clear steering event when active turn changes
-  useEffect(() => {
-    setSteeringEvent((prev) =>
-      prev && activeTurn && prev.turnId === activeTurn.turnId ? prev : null,
-    );
-  }, [activeTurn?.turnId]);
 
   const appConfig = useAppConfig();
   const contextWindow = useAppStore((s) =>
@@ -223,10 +223,13 @@ export function ChatView() {
   const dismissSessionCompaction = useAppStore(
     (s) => s.dismissSessionCompaction,
   );
-  const steerResult = sessionState?.steerResult ?? null;
-  const setSteerResult = useAppStore((s) => s.setSteerResult);
+  const steerRecords = sessionState?.steerRecords ?? [];
+  const inputQueue = sessionState?.inputQueue ?? [];
   const setGoalStatus = useAppStore((s) => s.setGoalStatus);
-  const clearSteerResultStore = useAppStore((s) => s.clearSteerResult);
+  const enqueueInput = useAppStore((s) => s.enqueueInput);
+  const removeInput = useAppStore((s) => s.removeInput);
+  const addSteerRecord = useAppStore((s) => s.addSteerRecord);
+  const failPendingSteerRecords = useAppStore((s) => s.failPendingSteerRecords);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const updateSession = useAppStore((s) => s.updateSession);
   const clearActiveTurn = useAppStore((s) => s.clearActiveTurn);
@@ -240,8 +243,6 @@ export function ChatView() {
   } = useIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
-  const [hasInput, setHasInput] = useState(false);
-  const isSteerRef = useRef(false);
   useEffect(() => {
     if (!activeSessionId || !compactionResult) return;
     const timeoutMs = compactionResult === "success" ? 3000 : 5000;
@@ -252,32 +253,50 @@ export function ChatView() {
     return () => clearTimeout(id);
   }, [activeSessionId, compactionResult, dismissSessionCompaction]);
 
+  // 会话回到 idle 时：仍处于 injecting 的引导记录标记失败并回填输入框
   useEffect(() => {
-    if (!activeSessionId || !steerResult) return;
-    if (steerResult.status === "pending") return;
-    const timeoutMs = steerResult.status === "accepted" ? 2500 : 3000;
-    const id = setTimeout(() => {
-      clearSteerResultStore(activeSessionId);
-      setSteeringEvent(null);
-    }, timeoutMs);
-    return () => clearTimeout(id);
-  }, [activeSessionId, steerResult, clearSteerResultStore]);
-
-  // steerResult lifecycle: null → pending (handleSubmit) → accepted/failed (IPC)
-  // → null (auto-clear). steerDisplayReady gates the accepted/failed transition
-  // to guarantee a minimum 500ms gradient display phase.
-  useEffect(() => {
-    if (!steerResult || steerResult.status === "pending" || steerDisplayReady)
-      return;
-    const elapsed = Date.now() - steerSentAtRef.current;
-    const delay = Math.max(0, 500 - elapsed);
-    if (delay === 0) {
-      setSteerDisplayReady(true);
-      return;
+    if (!activeSessionId || activeSession?.status !== "idle") return;
+    const freshIds = steerRecords
+      .filter((r) => r.status === "injecting" && Date.now() - r.ts < 500)
+      .map((r) => r.id);
+    if (freshIds.length > 0) {
+      const id = setTimeout(() => {
+        const stillPending = useAppStore
+          .getState()
+          .sessionStates[
+            activeSessionId
+          ]?.steerRecords.filter((r) => freshIds.includes(r.id) && r.status === "injecting");
+        if (stillPending && stillPending.length > 0) {
+          const failedIds = failPendingSteerRecords(
+            activeSessionId,
+            "session-stopped",
+          );
+          if (failedIds.length > 0) {
+            const record = useAppStore
+              .getState()
+              .sessionStates[
+                activeSessionId
+              ]?.steerRecords.find((r) => r.id === failedIds[0]);
+            if (record) chatInputRef.current?.setPrompt(record.text);
+          }
+        }
+      }, 500);
+      return () => clearTimeout(id);
     }
-    const id = setTimeout(() => setSteerDisplayReady(true), delay);
-    return () => clearTimeout(id);
-  }, [steerResult, steerDisplayReady]);
+    const failedIds = failPendingSteerRecords(
+      activeSessionId,
+      "session-stopped",
+    );
+    if (failedIds.length > 0) {
+      const record = steerRecords.find((r) => failedIds.includes(r.id));
+      if (record) chatInputRef.current?.setPrompt(record.text);
+    }
+  }, [
+    activeSessionId,
+    activeSession?.status,
+    failPendingSteerRecords,
+    steerRecords,
+  ]);
 
   const activeSessionCwd = useAppStore((s) => {
     if (!activeSessionId) return undefined;
@@ -307,6 +326,8 @@ export function ChatView() {
   // and pin unconditionally — they never infer intent.
   const isAtBottomRef = useRef(true);
   const previousScrollTopRef = useRef(0);
+  const autoDrainRef = useRef(false);
+  const stopRequestedRef = useRef(false);
   const prevMessageCountRef = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const previousSessionIdRef = useRef<string | null>(null);
@@ -343,29 +364,14 @@ export function ChatView() {
   const canStop = isSessionRunning || hasActiveTurn || pendingCount > 0;
 
   const inputStatus = useMemo(() => {
-    const steeringText =
-      steeringEvent && activeTurn && steeringEvent.turnId === activeTurn.turnId
-        ? steeringEvent.text.trim().replace(/\s+/g, " ").slice(0, 120)
-        : "";
     // Mirror the stop button: whenever canStop is true the status bar
     // must show a non-null indicator so the user never sees a blank bar
     // while the session is running / a turn is active or pending.
     const hasStreamingText = !!partialMessage?.trim();
-    const steeringAcceptedText =
-      steerResult?.status === "accepted" && steerDisplayReady
-        ? steerResult.text
-        : "";
-    const steeringFailedText =
-      steerResult?.status === "failed" && steerDisplayReady
-        ? steerResult.text
-        : "";
     return resolveInputStatus({
       isSending: isSubmitting && !canStop,
       isCompacting,
       compactionResult,
-      steeringText,
-      steeringAcceptedText,
-      steeringFailedText,
       // Guard with hasActiveTurn: once the turn ends we don't show
       // "thinking" during the brief idle-window before session settles.
       shouldShowThinkingIndicator:
@@ -385,10 +391,6 @@ export function ChatView() {
     canStop,
     hasActiveTurn,
     partialMessage,
-    steeringEvent,
-    activeTurn?.turnId,
-    steerResult,
-    steerDisplayReady,
     goalStatus,
     goalTransitionVisible,
     backgroundAgents,
@@ -843,6 +845,12 @@ export function ChatView() {
       };
     });
   }, [displayedMessages]);
+
+  // 引导记录按时间戳合并进消息流时间轴（时序一致；不进 messages store）
+  const mergedTurnEntries = useMemo(
+    () => mergeSteerEntries(visibleTurnEntries, steerRecords),
+    [visibleTurnEntries, steerRecords],
+  );
 
   const handleDockTickSelect = useCallback(
     (messageId: string) => {
@@ -1307,23 +1315,12 @@ export function ChatView() {
     const rawText = data.text.trim();
     if (!rawText && data.images.length === 0 && data.files.length === 0) return;
 
-    // Steering path: ephemeral turn-level event (not a chat message)
-    if (isSteerRef.current) {
-      isSteerRef.current = false;
-      steerSentAtRef.current = Date.now();
-      setSteerDisplayReady(false);
-      if (isElectron) {
-        window.electronAPI.send({
-          type: "session.steer",
-          payload: { sessionId: activeSessionId, prompt: rawText },
-        });
-      }
-      if (activeTurn?.turnId) {
-        setSteeringEvent({ turnId: activeTurn.turnId, text: rawText });
-        setSteerResult(activeSessionId, { status: "pending", text: rawText });
-      }
+    // Non-idle send (text and/or attachments): route into the queue area
+    // (replaces the old queued message-card path).
+    if (canStop) {
+      const { images, files } = buildAttachmentBlocks(data);
+      enqueueInput(activeSessionId, rawText, images, files);
       chatInputRef.current?.clear();
-      setHasInput(false);
       setTimeout(() => chatInputRef.current?.focus(), 0);
       return;
     }
@@ -1331,34 +1328,10 @@ export function ChatView() {
     // Normal send path
     setIsSubmitting(true);
     try {
-      const contentBlocks: ContentBlock[] = [];
-
-      data.images.forEach((img) => {
-        contentBlocks.push({
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: img.mediaType as
-              | "image/jpeg"
-              | "image/png"
-              | "image/gif"
-              | "image/webp",
-            data: img.base64,
-          },
-        });
-      });
-
-      data.files.forEach((file) => {
-        contentBlocks.push({
-          type: "file_attachment",
-          filename: file.name,
-          relativePath: file.path,
-          size: file.size,
-          mimeType: file.type,
-          inlineDataBase64: file.inlineDataBase64,
-        });
-      });
-
+      const contentBlocks: ContentBlock[] = [
+        ...buildAttachmentBlocks(data).images,
+        ...buildAttachmentBlocks(data).files,
+      ];
       if (rawText) {
         contentBlocks.push({
           type: "text",
@@ -1373,12 +1346,40 @@ export function ChatView() {
         activeSession?.model,
       );
       chatInputRef.current?.clear();
-      setHasInput(false);
     } finally {
       setIsSubmitting(false);
       setTimeout(() => chatInputRef.current?.focus(), 0);
     }
   };
+
+  /** 将 ChatInputSubmitData 的图片/文件转为 ContentBlock 附件块（入队与发送共用）。 */
+  function buildAttachmentBlocks(data: ChatInputSubmitData): {
+    images: ImageContent[];
+    files: FileAttachmentContent[];
+  } {
+    return {
+      images: data.images.map((img) => ({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: img.mediaType as
+            | "image/jpeg"
+            | "image/png"
+            | "image/gif"
+            | "image/webp",
+          data: img.base64,
+        },
+      })),
+      files: data.files.map((file) => ({
+        type: "file_attachment",
+        filename: file.name,
+        relativePath: file.path,
+        size: file.size,
+        mimeType: file.type,
+        inlineDataBase64: file.inlineDataBase64,
+      })),
+    };
+  }
 
   const handleCompact = async (instructions?: string) => {
     if (!activeSessionId || isCompacting || hasActiveTurn || !isElectron) {
@@ -1465,6 +1466,7 @@ export function ChatView() {
   const handleStop = () => {
     if (canStop) {
       if (activeSessionId) {
+        stopRequestedRef.current = true; // 用户主动停止：抑制队列自动执行一次
         stopSession(activeSessionId);
         updateSession(activeSessionId, { status: "idle" });
         clearActiveTurn(activeSessionId);
@@ -1474,10 +1476,110 @@ export function ChatView() {
     chatInputRef.current?.submit();
   };
 
-  const handleSteer = useCallback(() => {
-    isSteerRef.current = true;
-    chatInputRef.current?.submit();
-  }, []);
+  /** 统一出队发送入口：自动执行与手动引导（idle）共用，防双回合。 */
+  const sendQueuedItem = useCallback(
+    (item: QueuedInput) => {
+      if (!activeSessionId || isCompacting) return; // 压缩中禁止发送（与 handleSubmit 守卫一致）
+      autoDrainRef.current = true;
+      removeInput(activeSessionId, item.id);
+      const contentBlocks: ContentBlock[] = [
+        ...(item.images ?? []),
+        ...(item.files ?? []),
+      ];
+      if (item.text) {
+        contentBlocks.push({ type: "text", text: item.text });
+      }
+      // 发送失败（会话删除/非法 model 等）：复位 in-flight guard，避免队列永久卡死
+      continueSession(
+        activeSessionId,
+        contentBlocks,
+        activeSession?.providerProfileKey,
+        activeSession?.model,
+      ).catch(() => {
+        autoDrainRef.current = false;
+      });
+    },
+    [
+      activeSessionId,
+      isCompacting,
+      continueSession,
+      removeInput,
+      activeSession?.providerProfileKey,
+      activeSession?.model,
+    ],
+  );
+
+  const handleQueueSteer = useCallback(
+    (inputId: string) => {
+      if (!activeSessionId) return;
+      const item = useAppStore
+        .getState()
+        .sessionStates[
+          activeSessionId
+        ]?.inputQueue.find((i) => i.id === inputId);
+      if (!item) return;
+      if (!canStop) {
+        // idle：作为普通消息发送并触发回合
+        sendQueuedItem(item);
+        return;
+      }
+      removeInput(activeSessionId, inputId);
+      // 引导注入：图片随注入（SDK steer 支持 images）；
+      // 文件 SDK 不支持 → 降级为文本说明（自动执行/普通发送时完整支持）。
+      const fileNotes = (item.files ?? [])
+        .map((f) => `[${f.filename}]`)
+        .join(" ");
+      const imageNote =
+        (item.images ?? []).length > 0 ? `[${t("steer.imageAttachment")}]` : "";
+      const steerText = [item.text, imageNote, fileNotes]
+        .filter(Boolean)
+        .join(" ");
+      const recordId = addSteerRecord(activeSessionId, steerText);
+      if (isElectron) {
+        window.electronAPI.send({
+          type: "session.steer",
+          payload: {
+            sessionId: activeSessionId,
+            prompt: steerText,
+            requestId: recordId,
+            images: item.images,
+          },
+        });
+      }
+    },
+    [
+      activeSessionId,
+      canStop,
+      isElectron,
+      removeInput,
+      addSteerRecord,
+      sendQueuedItem,
+    ],
+  );
+
+  // 会话空闲 + 队列非空 → 自动执行第一条（FIFO）；用户 stop 抑制一次
+  const previousDrainSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    // 跨会话切换：复位上一会话的 in-flight / stop 抑制标记，避免静默失效
+    if (previousDrainSessionIdRef.current !== activeSessionId) {
+      previousDrainSessionIdRef.current = activeSessionId ?? null;
+      autoDrainRef.current = false;
+      stopRequestedRef.current = false;
+    }
+    if (!activeSessionId || activeSession?.status !== "idle") {
+      autoDrainRef.current = false;
+      return;
+    }
+    if (stopRequestedRef.current) {
+      stopRequestedRef.current = false;
+      return;
+    }
+    if (autoDrainRef.current) return;
+    const queue =
+      useAppStore.getState().sessionStates[activeSessionId]?.inputQueue ?? [];
+    if (queue.length === 0) return;
+    sendQueuedItem(queue[0]);
+  }, [activeSessionId, activeSession?.status, inputQueue.length, sendQueuedItem]);
 
   const scrollToBottomByButton = () => {
     isAtBottomRef.current = true;
@@ -1528,7 +1630,7 @@ export function ChatView() {
             ref={messagesContainerRef}
             className="w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
           >
-            {displayedMessages.length === 0 ? (
+            {mergedTurnEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-28 text-text-muted space-y-3 text-center">
                 <p className="text-xs uppercase tracking-[0.16em] text-text-muted/80">
                   DeskWand
@@ -1542,35 +1644,86 @@ export function ChatView() {
                 </p>
               </div>
             ) : (
-              visibleTurnEntries.map(
-                ({
-                  message,
-                  isStreaming,
-                  isLatestRound,
-                  artifactFiles,
-                  videoReferences,
-                  turnProcessSummary,
-                  suppressProcessSummaries,
-                }) => (
+              mergedTurnEntries.map((entry) =>
+                "message" in entry ? (
+                  (() => {
+                    const {
+                      message,
+                      isStreaming,
+                      isLatestRound,
+                      artifactFiles,
+                      videoReferences,
+                      turnProcessSummary,
+                      suppressProcessSummaries,
+                    } = entry;
+                    return (
+                      <div
+                        key={message.id}
+                        data-message-id={message.id}
+                        className="space-y-1.5"
+                      >
+                        {turnProcessSummary ? (
+                          <ProcessSummaryBlock
+                            block={turnProcessSummary}
+                            message={message}
+                          />
+                        ) : null}
+                        <MessageCard
+                          message={message}
+                          isStreaming={isStreaming}
+                          isLatestRound={isLatestRound}
+                          artifactFiles={artifactFiles}
+                          videoReferences={videoReferences}
+                          suppressProcessSummaries={suppressProcessSummaries}
+                        />
+                      </div>
+                    );
+                  })()
+                ) : (
                   <div
-                    key={message.id}
-                    data-message-id={message.id}
-                    className="space-y-1.5"
+                    key={entry.id}
+                    className="flex items-center gap-2 px-1 text-xs"
                   >
-                    {turnProcessSummary ? (
-                      <ProcessSummaryBlock
-                        block={turnProcessSummary}
-                        message={message}
-                      />
-                    ) : null}
-                    <MessageCard
-                      message={message}
-                      isStreaming={isStreaming}
-                      isLatestRound={isLatestRound}
-                      artifactFiles={artifactFiles}
-                      videoReferences={videoReferences}
-                      suppressProcessSummaries={suppressProcessSummaries}
+                    <Navigation
+                      className={`h-3.5 w-3.5 flex-shrink-0 ${
+                        entry.status === "failed"
+                          ? "text-error"
+                          : "text-text-muted"
+                      }`}
                     />
+                    <span
+                      className="min-w-0 flex-1 truncate text-text-secondary"
+                      title={entry.text}
+                    >
+                      {entry.text}
+                    </span>
+                    <span
+                      className={`flex-shrink-0 ${
+                        entry.status === "delivered"
+                          ? "text-success"
+                          : entry.status === "failed"
+                            ? "text-error"
+                            : "text-text-muted"
+                      }`}
+                    >
+                      {entry.status === "injecting" && (
+                        <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+                      )}
+                      {entry.status === "delivered" && (
+                        <CheckCircle2 className="mr-1 inline h-3 w-3" />
+                      )}
+                      {entry.status === "failed" && (
+                        <XCircle className="mr-1 inline h-3 w-3" />
+                      )}
+                      {entry.status === "injecting" && t("steer.injecting")}
+                      {entry.status === "delivered" && t("steer.delivered")}
+                      {entry.status === "failed" &&
+                        (entry.reason === "no-active-session"
+                          ? t("steer.reasonNoActiveSession")
+                          : entry.reason === "sdk-error"
+                            ? t("steer.reasonSdkError")
+                            : t("steer.reasonSessionStopped"))}
+                    </span>
                   </div>
                 ),
               )
@@ -1596,6 +1749,17 @@ export function ChatView() {
 
       {/* Input */}
       <div className="bg-transparent">
+        {inputQueue.length > 0 && (
+          <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
+            <ChatInputQueueBar
+              items={inputQueue}
+              onSteer={handleQueueSteer}
+              onRemove={(id) =>
+                activeSessionId && removeInput(activeSessionId, id)
+              }
+            />
+          </div>
+        )}
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
           <ChatInputStatusBar
             status={inputStatus}
@@ -1608,7 +1772,6 @@ export function ChatView() {
             onSubmit={handleSubmit}
             onCompact={handleCompact}
             onCommand={handleCommand}
-            onInputChange={setHasInput}
             disabled={isSubmitting}
             submitDisabled={isCompacting}
             isExpanded={isInputExpanded}
@@ -1688,8 +1851,6 @@ export function ChatView() {
                 submitDisabled={isCompacting}
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
-                onSteer={handleSteer}
-                hasInput={hasInput}
               />
             }
           />

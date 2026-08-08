@@ -150,9 +150,29 @@ export interface CompactionState {
   estimatedTokens?: number | null;
 }
 
-export interface SteerResult {
-  status: "pending" | "accepted" | "failed";
+/** 输入框上方排队区条目（非 idle 发送时产生，含附件）。 */
+export interface QueuedInput {
+  id: string;
   text: string;
+  ts: number;
+  images?: ImageContent[];
+  files?: FileAttachmentContent[];
+}
+
+export type SteerRecordStatus = "injecting" | "delivered" | "failed";
+
+export type SteerFailReason =
+  | "no-active-session"
+  | "sdk-error"
+  | "session-stopped";
+
+/** 消息流内联引导记录。id 同时作为 IPC requestId 用于送达匹配。 */
+export interface SteerRecord {
+  id: string;
+  text: string;
+  status: SteerRecordStatus;
+  reason?: SteerFailReason;
+  ts: number;
 }
 
 // Trace types for visualization
@@ -494,7 +514,12 @@ export type ClientEvent =
   | { type: "session.abortCompaction"; payload: { sessionId: string } }
   | {
       type: "session.steer";
-      payload: { sessionId: string; prompt: string };
+      payload: {
+        sessionId: string;
+        prompt: string;
+        requestId: string;
+        images?: ImageContent[];
+      };
     }
   | {
       type: "session.command";
@@ -669,7 +694,13 @@ export type ServerEvent =
         sessionId: string;
         status: "accepted" | "failed";
         text: string;
+        requestId: string;
+        reason?: SteerFailReason;
       };
+    }
+  | {
+      type: "session.steer.delivered";
+      payload: { sessionId: string; text: string; requestId: string };
     }
   | {
       type: "navigate.to";

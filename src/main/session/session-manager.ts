@@ -24,6 +24,7 @@ import type {
   TextContent,
   TraceStep,
   FileAttachmentContent,
+  ImageContent,
 } from "../../renderer/types";
 import type { DatabaseInstance, TraceStepRow } from "../db/database";
 import { PathResolver } from "../sandbox/path-resolver";
@@ -88,7 +89,7 @@ interface IAgentRunner {
   ): Promise<"compacted" | "already-compacted" | "skipped">;
   abortCompaction(sessionId: string): void;
   getExtensionCommands?(): { name: string; description: string }[];
-  steer?(sessionId: string, text: string): void;
+  steer?(sessionId: string, text: string, requestId: string, images?: ImageContent[]): void;
 }
 
 const WORKSPACE_MOUNT_VIRTUAL_PATH = "/mnt/workspace";
@@ -1764,11 +1765,16 @@ export class SessionManager {
   }
 
   /** Inject a steering message during agent execution. */
-  steerSession(sessionId: string, text: string): void {
+  steerSession(
+    sessionId: string,
+    text: string,
+    requestId: string,
+    images?: ImageContent[],
+  ): void {
     if (!this.loadSession(sessionId)) throw new Error("Session not found");
     // Steering is a turn-level ephemeral event, not a chat message —
     // do not persist to DB. It lives in the live turn context only.
-    this.agentRunner.steer?.(sessionId, text);
+    this.agentRunner.steer?.(sessionId, text, requestId, images);
   }
 
   // Delete a session

@@ -10,9 +10,6 @@ describe("resolveInputStatus", () => {
     isSending: false,
     isCompacting: false,
     compactionResult: null as "success" | "failed" | "aborted" | null,
-    steeringText: "",
-    steeringAcceptedText: "",
-    steeringFailedText: "",
     shouldShowThinkingIndicator: false,
     isResponding: false,
     backgroundAgents: [],
@@ -41,9 +38,6 @@ describe("resolveInputStatus", () => {
         isSending: true,
         isCompacting: true,
         compactionResult: "failed",
-        steeringText: "do something",
-        steeringAcceptedText: "",
-        steeringFailedText: "",
         shouldShowThinkingIndicator: true,
         isResponding: false,
       }),
@@ -60,33 +54,6 @@ describe("resolveInputStatus", () => {
     expect(
       resolveInputStatus({ ...base, compactionResult: "aborted" }),
     ).toEqual({ type: "compaction-aborted" });
-  });
-
-  it("compaction-failed wins over steering", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        compactionResult: "failed",
-        steeringText: "do something",
-      }),
-    ).toEqual({ type: "compaction-failed" });
-  });
-
-  it("returns steering when steeringText is present", () => {
-    expect(resolveInputStatus({ ...base, steeringText: "fix login" })).toEqual({
-      type: "steering",
-      text: "fix login",
-    });
-  });
-
-  it("steering wins over thinking", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        steeringText: "fix login",
-        shouldShowThinkingIndicator: true,
-      }),
-    ).toEqual({ type: "steering", text: "fix login" });
   });
 
   it("returns thinking when shouldShowThinkingIndicator is true", () => {
@@ -117,16 +84,6 @@ describe("resolveInputStatus", () => {
     ).toEqual({ type: "compaction-success" });
   });
 
-  it("compaction-success is hidden by steering", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        compactionResult: "success",
-        steeringText: "fix login",
-      }),
-    ).toEqual({ type: "steering", text: "fix login" });
-  });
-
   it("compaction-success wins over thinking", () => {
     expect(
       resolveInputStatus({
@@ -135,55 +92,6 @@ describe("resolveInputStatus", () => {
         shouldShowThinkingIndicator: true,
       }),
     ).toEqual({ type: "compaction-success" });
-  });
-
-  it("returns steering-accepted when accepted text is present", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        steeringAcceptedText: "fix login",
-      }),
-    ).toEqual({ type: "steering-accepted", text: "fix login" });
-  });
-
-  it("steering-accepted wins over steering", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        steeringText: "fix login",
-        steeringAcceptedText: "fix login",
-        shouldShowThinkingIndicator: true,
-      }),
-    ).toEqual({ type: "steering-accepted", text: "fix login" });
-  });
-
-  it("compaction-failed wins over steering-accepted", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        compactionResult: "failed",
-        steeringAcceptedText: "fix login",
-      }),
-    ).toEqual({ type: "compaction-failed" });
-  });
-
-  it("returns steering-failed when failed text is present", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        steeringFailedText: "fix login",
-      }),
-    ).toEqual({ type: "steering-failed", text: "fix login" });
-  });
-
-  it("steering-failed wins over thinking", () => {
-    expect(
-      resolveInputStatus({
-        ...base,
-        steeringFailedText: "fix login",
-        shouldShowThinkingIndicator: true,
-      }),
-    ).toEqual({ type: "steering-failed", text: "fix login" });
   });
 
   // ── backgroundAgents ──

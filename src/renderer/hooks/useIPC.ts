@@ -276,7 +276,9 @@ function installSharedIpcBridge(): void {
           store.setGlobalNotice({
             id: `pi-notify-${notifyToastSeq++}`,
             message: payload.message,
-            type: (payload.type === "error" ? "error" : "info") as "error" | "info",
+            type: (payload.type === "error" ? "error" : "info") as
+              | "error"
+              | "info",
           });
           break;
         }
@@ -514,11 +516,45 @@ function installSharedIpcBridge(): void {
           break;
 
         case "session.steer.result":
-          store.setSteerResult(event.payload.sessionId, {
-            status: event.payload.status,
-            text: event.payload.text,
-          });
+          if (event.payload.status === "failed") {
+            store.updateSteerRecord(
+              event.payload.sessionId,
+              event.payload.requestId,
+              {
+                status: "failed",
+                reason: event.payload.reason,
+              },
+            );
+          }
+          // accepted（已入队）不改变状态：仍为 injecting，等待 delivered 事件
           break;
+
+        case "session.steer.delivered": {
+          // 保证 injecting 态至少展示 500ms，避免一闪而过
+          const ss =
+            useAppStore.getState().sessionStates[event.payload.sessionId];
+          const record = ss?.steerRecords.find(
+            (r) => r.id === event.payload.requestId,
+          );
+          const elapsed = record ? Date.now() - record.ts : 0;
+          const delay = Math.max(0, 500 - elapsed);
+          setTimeout(() => {
+            // 延迟期间记录可能已被其他路径（如回合结束后 idle 兜底）标为 failed，
+            // 此时不再翻绿——否则用户会看到 failed → 回填输入框 → 又变绿。
+            const latest = useAppStore
+              .getState()
+              .sessionStates[event.payload.sessionId]?.steerRecords.find(
+                (r) => r.id === event.payload.requestId,
+              );
+            if (latest?.status === "failed") return;
+            store.updateSteerRecord(
+              event.payload.sessionId,
+              event.payload.requestId,
+              { status: "delivered" },
+            );
+          }, delay);
+          break;
+        }
 
         case "error":
           console.error("[useIPC] Server error:", event.payload.message);

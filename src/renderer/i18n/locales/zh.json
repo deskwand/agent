@@ -918,8 +918,13 @@
   },
   "steer": {
     "label": "引导",
-    "eventLabel": "引导",
-    "notDelivered": "未送达"
+    "remove": "删除",
+    "injecting": "注入中",
+    "delivered": "已注入",
+    "reasonNoActiveSession": "会话已结束",
+    "reasonSdkError": "引导消息不被支持",
+    "reasonSessionStopped": "会话已停止，未送达",
+    "imageAttachment": "图片"
   },
   "goal": {
     "active": "执行中",

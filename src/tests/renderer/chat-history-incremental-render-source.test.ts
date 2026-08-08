@@ -19,7 +19,7 @@ describe("ChatView incremental history wiring", () => {
     expect(source).toContain(
       "displayedMessages.slice(\n        visibleMessageStartIndex,\n        visibleMessageStartIndex + MAX_RENDER_MESSAGES,",
     );
-    expect(source).toContain("visibleTurnEntries.map(");
+    expect(source).toContain("mergedTurnEntries.map(");
   });
 
   it("anchors dock ticks to the in-memory window, not the render window", () => {

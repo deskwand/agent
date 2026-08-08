@@ -40,6 +40,7 @@ import type {
   TraceStep,
   ServerEvent,
   ContentBlock,
+  ImageContent,
 } from "../../renderer/types";
 import { v4 as uuidv4 } from "uuid";
 import type { PathResolver } from "../sandbox/path-resolver";
@@ -629,6 +630,13 @@ export class AgentRunner {
   private activeControllers: Map<string, AbortController> = new Map();
   private piSessions: Map<string, CachedPiSession> = new Map();
   private sessionModelRuntimes: Map<string, ModelRuntime> = new Map();
+  /** requestId → { text }，steer() 入队成功但尚未被消费的引导（送达确认用）。 */
+  private pendingSteerDeliveries: Map<
+    string,
+    Array<{ requestId: string; text: string }>
+  > = new Map();
+  /** 每 session 最近一次 queue_update 的 steering 队列长度（送达判定基线）。 */
+  private lastSteeringLengths: Map<string, number> = new Map();
   private getSessionInfo: ((sessionId: string) => Session | null) | undefined;
   /** Sessions whose compaction is currently in flight (double-trigger guard). */
   private compactInFlight: Set<string> = new Set();
@@ -755,6 +763,8 @@ export class AgentRunner {
       // 会话关闭/淘汰：解绑扩展 UI（关闭 TUI Modal、清终端输入订阅）
       resetUiState();
       this.piSessions.delete(sessionId);
+      this.pendingSteerDeliveries.delete(sessionId);
+      this.lastSteeringLengths.delete(sessionId);
       log("[AgentRunner] Disposed pi session for:", sessionId);
     }
   }
@@ -3868,13 +3878,18 @@ Tool routing:\n
           }
 
           switch (event.type) {
-            case "queue_update":
+            case "queue_update": {
+              // harness 事件形状为 { steer: [...] }，session mirror 为 { steering: [...] }；
+              // session 会把 harness 事件原样 re-emit，因此两种都可能收到，需归一化。
+              const steering = this.resolveQueueUpdateSteering(event);
               log(
                 "[AgentRunner] queue_update steering=%d followUp=%d",
-                event.steering.length,
-                event.followUp.length,
+                steering.length,
+                event.followUp?.length ?? 0,
               );
+              this.handleQueueUpdate(session.id, steering);
               break;
+            }
             case "message_update": {
               if (controller.signal.aborted) break;
               const ame = event.assistantMessageEvent;
@@ -4224,7 +4239,18 @@ Tool routing:\n
             }
 
             case "agent_end": {
-              logCtx("[AgentRunner] Agent finished");
+              logCtx(
+                "[AgentRunner] Agent finished",
+                "willRetry:",
+                event.willRetry,
+              );
+              // 回合自然结束且无重试：flush 未送达的 steer（failed(session-stopped)
+              // 标红 + 回填输入框），并清掉 harness 残留队列，防下个回合 runLoop
+              // drain 旧 steer 造成双注入。willRetry 存在时不清——重试时 runLoop
+              // 仍会 drain，steer 还有机会注入。
+              if (!event.willRetry) {
+                this.flushUndeliveredSteers(session.id);
+              }
               break;
             }
 
@@ -4663,29 +4689,130 @@ Tool routing:\n
   }
 
   /** Inject a steering message during agent execution (SDK native steer). */
-  steer(sessionId: string, text: string): void {
+  steer(sessionId: string, text: string, requestId: string, images?: ImageContent[]): void {
     const cached = this.piSessions.get(sessionId);
     if (!cached) {
       logWarn("[AgentRunner] steer: no active piSession for", sessionId);
+      this.sendToRenderer({
+        type: "session.steer.result",
+        payload: {
+          sessionId,
+          status: "failed",
+          text,
+          requestId,
+          reason: "no-active-session",
+        },
+      });
       return;
     }
+    // 转换 renderer ImageContent（source 嵌套）→ pi-ai ImageContent（data/mimeType 平铺）
+    const piImages = (images ?? []).map((img) => ({
+      type: "image" as const,
+      data: img.source.data,
+      mimeType: img.source.media_type,
+    }));
     cached.session
-      .steer(text)
+      .steer(text, piImages)
       .then(() => {
-        log("[AgentRunner] steer delivered:", text.substring(0, 80));
+        log("[AgentRunner] steer queued:", text.substring(0, 80));
+        // 建立送达基线：resolve 后消息已在队列，读取当前长度。
+        // 若读数为 0（极快消费场景，消息入队即被注入）→ 直接 delivered，
+        // 避免基线缺失导致记录永久卡在 injecting。
+        const queueLen =
+          typeof cached.session.getSteeringMessages === "function"
+            ? cached.session.getSteeringMessages().length
+            : 0;
+        if (queueLen === 0) {
+          this.sendToRenderer({
+            type: "session.steer.delivered",
+            payload: { sessionId, text, requestId },
+          });
+        } else {
+          const pending = this.pendingSteerDeliveries.get(sessionId) ?? [];
+          pending.push({ requestId, text });
+          this.pendingSteerDeliveries.set(sessionId, pending);
+        }
+        this.lastSteeringLengths.set(sessionId, queueLen);
         this.sendToRenderer({
           type: "session.steer.result",
-          payload: { sessionId, status: "accepted", text },
+          payload: { sessionId, status: "accepted", text, requestId },
         });
       })
       .catch((e) => {
         logError("[AgentRunner] steer failed:", e);
         this.sendToRenderer({
           type: "session.steer.result",
-          payload: { sessionId, status: "failed", text },
+          payload: {
+            sessionId,
+            status: "failed",
+            text,
+            requestId,
+            reason: "sdk-error",
+          },
         });
       });
   }
+
+  /** queue_update 送达判定：队列长度较上次快照减少 n → 按 FIFO 把最早的
+   *  n 条 pending steer 标记为 delivered（不做文本匹配，规避 SDK 文本规范化）。
+   *  用箭头函数属性保证被测试/订阅方直接调用时 this 绑定正确。 */
+  private handleQueueUpdate = (
+    sessionId: string,
+    steering: readonly string[],
+  ): void => {
+    const prevLen = this.lastSteeringLengths.get(sessionId);
+    const newLen = steering.length;
+    if (prevLen !== undefined && newLen < prevLen) {
+      const pending = this.pendingSteerDeliveries.get(sessionId);
+      const consumed = pending ? pending.splice(0, prevLen - newLen) : [];
+      for (const item of consumed) {
+        this.sendToRenderer({
+          type: "session.steer.delivered",
+          payload: {
+            sessionId,
+            text: item.text,
+            requestId: item.requestId,
+          },
+        });
+      }
+    }
+    this.lastSteeringLengths.set(sessionId, newLen);
+  };
+
+  /** queue_update 事件两种形状归一化：harness 事件用 steer key，session mirror
+   *  用 steering key（session 会把 harness 事件原样 re-emit，两种都可能收到）。
+   *  用箭头函数属性保证被测试/订阅方直接调用时 this 绑定正确。 */
+  private resolveQueueUpdateSteering = (event: {
+    steering?: readonly string[];
+    steer?: readonly string[];
+  }): readonly string[] => event.steer ?? event.steering ?? [];
+
+  /** agent 回合结束（无重试）时 flush 未送达的 steer：对每条 pending 发
+   *  failed(session-stopped) 事件（渲染层标红、回填输入框），并调用
+   *  session.clearQueue() 清掉 harness 残留队列，防下个回合 runLoop drain
+   *  旧 steer 造成双注入。用箭头函数属性保证被测试/订阅方直接调用时 this
+   *  绑定正确。 */
+  private flushUndeliveredSteers = (sessionId: string): void => {
+    const pending = this.pendingSteerDeliveries.get(sessionId);
+    if (!pending || pending.length === 0) return;
+    for (const item of pending) {
+      this.sendToRenderer({
+        type: "session.steer.result",
+        payload: {
+          sessionId,
+          status: "failed",
+          text: item.text,
+          requestId: item.requestId,
+          reason: "session-stopped",
+        },
+      });
+    }
+    this.pendingSteerDeliveries.delete(sessionId);
+    const cached = this.piSessions.get(sessionId);
+    if (cached) {
+      cached.session.clearQueue();
+    }
+  };
 
   /** Manually compact the conversation for a session. */
   async compact(

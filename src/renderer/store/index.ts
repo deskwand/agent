@@ -14,7 +14,11 @@ import type {
   PartialToolResult,
   CompactionState,
   CompactionStatus,
-  SteerResult,
+  QueuedInput,
+  SteerRecord,
+  SteerFailReason,
+  ImageContent,
+  FileAttachmentContent,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
 import type { ImageSource } from "../components/ImageLightbox";
@@ -54,7 +58,8 @@ export interface SessionState {
   traceSteps: TraceStep[];
   contextWindow: number;
   compaction: CompactionState;
-  steerResult: SteerResult | null;
+  inputQueue: QueuedInput[];
+  steerRecords: SteerRecord[];
   partialToolResults: Record<string, PartialToolResult>;
   goalStatus?: {
     status:
@@ -101,7 +106,8 @@ const DEFAULT_SESSION_STATE: SessionState = {
   traceSteps: [],
   contextWindow: 0,
   compaction: { status: "idle" },
-  steerResult: null,
+  inputQueue: [],
+  steerRecords: [],
   partialToolResults: {},
   backgroundAgents: [],
 };
@@ -356,8 +362,23 @@ interface AppState {
     estimatedTokens?: number,
   ) => void;
   dismissSessionCompaction: (sessionId: string) => void;
-  setSteerResult: (sessionId: string, result: SteerResult | null) => void;
-  clearSteerResult: (sessionId: string) => void;
+  enqueueInput: (
+    sessionId: string,
+    text: string,
+    images?: ImageContent[],
+    files?: FileAttachmentContent[],
+  ) => string;
+  removeInput: (sessionId: string, id: string) => void;
+  addSteerRecord: (sessionId: string, text: string) => string;
+  updateSteerRecord: (
+    sessionId: string,
+    id: string,
+    updates: Partial<Pick<SteerRecord, "status" | "reason">>,
+  ) => void;
+  failPendingSteerRecords: (
+    sessionId: string,
+    reason: SteerFailReason,
+  ) => string[];
 
   setPartialToolResult: (
     sessionId: string,
@@ -573,7 +594,7 @@ export const useAppStore = create<AppState>((set) => ({
                 partialMessage: "",
                 partialThinking: "",
                 ...(message.tokenUsage
-                  ? { compaction: { status: "idle" }, steerResult: null }
+                  ? { compaction: { status: "idle" } }
                   : {}),
               }
             : {}),
@@ -1068,19 +1089,84 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 
-  setSteerResult: (sessionId, result) =>
-    set((state) => ({
-      sessionStates: patchSession(state.sessionStates, sessionId, {
-        steerResult: result,
-      }),
-    })),
+  enqueueInput: (sessionId, text, images, files) => {
+    const id = `queue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ts = Date.now();
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          inputQueue: [...ss.inputQueue, { id, text, ts, images, files }],
+        }),
+      };
+    });
+    return id;
+  },
 
-  clearSteerResult: (sessionId) =>
-    set((state) => ({
-      sessionStates: patchSession(state.sessionStates, sessionId, {
-        steerResult: null,
-      }),
-    })),
+  removeInput: (sessionId, id) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          inputQueue: ss.inputQueue.filter((item) => item.id !== id),
+        }),
+      };
+    }),
+
+  addSteerRecord: (sessionId, text) => {
+    const id = `steer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ts = Date.now();
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          steerRecords: [
+            ...ss.steerRecords,
+            { id, text, status: "injecting" as const, ts },
+          ],
+        }),
+      };
+    });
+    return id;
+  },
+
+  updateSteerRecord: (sessionId, id, updates) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      const target = ss.steerRecords.find((r) => r.id === id);
+      if (!target) return {};
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          steerRecords: ss.steerRecords.map((r) =>
+            r.id === id ? { ...r, ...updates } : r,
+          ),
+        }),
+      };
+    }),
+
+  failPendingSteerRecords: (sessionId, reason) => {
+    const failedIds: string[] = [];
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      let changed = false;
+      const records = ss.steerRecords.map((r) => {
+        if (r.status === "injecting") {
+          changed = true;
+          failedIds.push(r.id);
+          return { ...r, status: "failed" as const, reason };
+        }
+        return r;
+      });
+      return changed
+        ? {
+            sessionStates: patchSession(state.sessionStates, sessionId, {
+              steerRecords: records,
+            }),
+          }
+        : {};
+    });
+    return failedIds;
+  },
 
   setPartialToolResult: (sessionId, toolCallId, result) =>
     set((state) => {

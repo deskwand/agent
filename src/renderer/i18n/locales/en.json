@@ -920,8 +920,13 @@
   },
   "steer": {
     "label": "Steer",
-    "eventLabel": "Steer",
-    "notDelivered": "not delivered"
+    "remove": "Remove",
+    "injecting": "Injecting",
+    "delivered": "Delivered",
+    "reasonNoActiveSession": "Session ended",
+    "reasonSdkError": "Steering message not supported",
+    "reasonSessionStopped": "Session stopped, not delivered",
+    "imageAttachment": "Image"
   },
   "goal": {
     "active": "Active",

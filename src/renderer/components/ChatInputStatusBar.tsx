@@ -16,9 +16,6 @@ export type ChatInputStatus =
   | { type: "compaction-success" }
   | { type: "compaction-failed" }
   | { type: "compaction-aborted" }
-  | { type: "steering"; text: string }
-  | { type: "steering-accepted"; text: string }
-  | { type: "steering-failed"; text: string }
   | {
       type: "goal-active";
       objective: string;
@@ -277,19 +274,6 @@ export function ChatInputStatusBar({
         text = t("chat.compactAborted");
         toneClass = "text-text-muted";
         break;
-      case "steering":
-        text = `${t("steer.eventLabel")}: ${status.text}`;
-        toneClass = "text-text-primary";
-        isRunning = true;
-        break;
-      case "steering-accepted":
-        text = `\u2713 ${t("steer.eventLabel")}: ${status.text}`;
-        toneClass = "text-success font-medium";
-        break;
-      case "steering-failed":
-        text = `\u2717 ${t("steer.eventLabel")} ${t("steer.notDelivered")}`;
-        toneClass = "text-error";
-        break;
       case "background-agent":
         if (status.done) {
           text = t("subagent.statusDone", { count: status.count });
@@ -328,9 +312,6 @@ export function resolveInputStatus(params: {
   isSending: boolean;
   isCompacting: boolean;
   compactionResult: "success" | "failed" | "aborted" | null;
-  steeringText: string;
-  steeringAcceptedText: string;
-  steeringFailedText: string;
   shouldShowThinkingIndicator: boolean;
   isResponding: boolean;
   goalStatus?: {
@@ -362,15 +343,6 @@ export function resolveInputStatus(params: {
   }
   if (params.compactionResult === "aborted") {
     return { type: "compaction-aborted" };
-  }
-  if (params.steeringAcceptedText) {
-    return { type: "steering-accepted", text: params.steeringAcceptedText };
-  }
-  if (params.steeringFailedText) {
-    return { type: "steering-failed", text: params.steeringFailedText };
-  }
-  if (params.steeringText) {
-    return { type: "steering", text: params.steeringText };
   }
   if (params.compactionResult === "success") {
     return { type: "compaction-success" };
