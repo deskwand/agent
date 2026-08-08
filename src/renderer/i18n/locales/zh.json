@@ -342,6 +342,10 @@
     "zhipuRegionCn": "国内站 (open.bigmodel.cn)",
     "zhipuRegionGlobal": "国际站 (api.z.ai)",
     "zhipuRegionHint": "两站 API Key 不互通，请使用与所选站点对应的 Key",
+    "opencodePlan": "订阅计划",
+    "opencodePlanZen": "Zen · 按量付费",
+    "opencodePlanGo": "Go · $10/月订阅",
+    "opencodePlanHint": "同一账号、同一 API Key（从 opencode.ai/auth 获取），两种订阅共用；Go 为开源模型精选订阅，含用量限额",
     "reuseMainModelKey": "复用主模型 Key",
     "openSettingsAction": "打开 API 设置",
     "configRequiredActiveSet": "当前方案未配置可用凭证，请先在 API 设置中完成配置",
@@ -431,6 +435,10 @@
         "genericOpenAI": {
           "name": "通用 OpenAI 兼容服务",
           "note": "适用于自定义中继、网关或模拟 OpenAI API 的推理服务。"
+        },
+        "opencode": {
+          "name": "OpenCode Zen/Go",
+          "note": "OpenCode 官方网关（订阅制/按量付费）。推荐直接使用专用的 OpenCode 配置入口。"
         }
       }
     },

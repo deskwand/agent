@@ -108,6 +108,8 @@ function isOpenAICompatible(input: DiagnosticInput): boolean {
     input.provider === "deepseek" ||
     input.provider === "ollama" ||
     input.provider === "openrouter" ||
+    input.provider === "opencode" ||
+    input.provider === "opencode-go" ||
     (input.provider === "custom" && input.customProtocol === "openai")
   );
 }

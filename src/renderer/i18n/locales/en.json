@@ -343,6 +343,10 @@
     "zhipuRegionCn": "China (open.bigmodel.cn)",
     "zhipuRegionGlobal": "Global (api.z.ai)",
     "zhipuRegionHint": "API keys are not interchangeable between the two sites; use the key from the matching site",
+    "opencodePlan": "Subscription Plan",
+    "opencodePlanZen": "Zen · Pay as you go",
+    "opencodePlanGo": "Go · $10/mo subscription",
+    "opencodePlanHint": "Same account and API key (get it at opencode.ai/auth) work for both plans; Go is a curated open-model subscription with usage limits",
     "reuseMainModelKey": "Reuse Main Model Key",
     "openSettingsAction": "Open API Settings",
     "configRequiredActiveSet": "The current config set does not have usable credentials. Finish setup in API Settings first.",
@@ -432,6 +436,10 @@
         "genericOpenAI": {
           "name": "Generic OpenAI-compatible",
           "note": "Use this for custom relays, gateways, or inference servers that mimic the OpenAI API."
+        },
+        "opencode": {
+          "name": "OpenCode Zen/Go",
+          "note": "OpenCode official gateway (subscription / pay-as-you-go). Prefer the dedicated OpenCode provider tab."
         }
       }
     },
