@@ -166,13 +166,16 @@ export type SteerFailReason =
   | "sdk-error"
   | "session-stopped";
 
-/** 消息流内联引导记录。id 同时作为 IPC requestId 用于送达匹配。 */
+/** 消息流内联引导记录。id 同时作为 IPC requestId 用于送达匹配。
+ *  anchorMessageId = 注入时刻最后一条可见消息的 id（渲染时锚定时序位置）。
+ *  注意：会话 compaction 会整体替换消息，锚点随之失效（记录 fallback 到末尾）。 */
 export interface SteerRecord {
   id: string;
   text: string;
   status: SteerRecordStatus;
   reason?: SteerFailReason;
   ts: number;
+  anchorMessageId?: string;
 }
 
 // Trace types for visualization

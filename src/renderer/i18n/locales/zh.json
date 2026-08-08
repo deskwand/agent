@@ -921,12 +921,13 @@
   "steer": {
     "label": "引导",
     "remove": "删除",
-    "injecting": "注入中",
-    "delivered": "已注入",
+    "injecting": "引导中",
+    "delivered": "已引导",
     "reasonNoActiveSession": "会话已结束",
-    "reasonSdkError": "引导消息不被支持",
-    "reasonSessionStopped": "会话已停止，未送达",
-    "imageAttachment": "图片"
+    "reasonSdkError": "消息不被支持",
+    "reasonSessionStopped": "会话已停止",
+    "imageAttachment": "图片",
+    "failed": "引导失败"
   },
   "goal": {
     "active": "执行中",

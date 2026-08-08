@@ -19,6 +19,7 @@ const ALL_CLIENT_EVENT_TYPES = [
   "session.stop",
   "session.compact",
   "session.abortCompaction",
+  "session.fork",
   "session.steer",
   "session.command",
   "session.delete",

@@ -923,12 +923,13 @@
   "steer": {
     "label": "Steer",
     "remove": "Remove",
-    "injecting": "Injecting",
-    "delivered": "Delivered",
+    "injecting": "Steering",
+    "delivered": "Steered",
     "reasonNoActiveSession": "Session ended",
-    "reasonSdkError": "Steering message not supported",
-    "reasonSessionStopped": "Session stopped, not delivered",
-    "imageAttachment": "Image"
+    "reasonSdkError": "Message not supported",
+    "reasonSessionStopped": "Session stopped",
+    "imageAttachment": "Image",
+    "failed": "Steering failed"
   },
   "goal": {
     "active": "Active",

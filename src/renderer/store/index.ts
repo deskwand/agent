@@ -369,7 +369,11 @@ interface AppState {
     files?: FileAttachmentContent[],
   ) => string;
   removeInput: (sessionId: string, id: string) => void;
-  addSteerRecord: (sessionId: string, text: string) => string;
+  addSteerRecord: (
+    sessionId: string,
+    text: string,
+    anchorMessageId?: string,
+  ) => string;
   updateSteerRecord: (
     sessionId: string,
     id: string,
@@ -1113,7 +1117,7 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 
-  addSteerRecord: (sessionId, text) => {
+  addSteerRecord: (sessionId, text, anchorMessageId) => {
     const id = `steer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const ts = Date.now();
     set((state) => {
@@ -1122,7 +1126,7 @@ export const useAppStore = create<AppState>((set) => ({
         sessionStates: patchSession(state.sessionStates, sessionId, {
           steerRecords: [
             ...ss.steerRecords,
-            { id, text, status: "injecting" as const, ts },
+            { id, text, status: "injecting" as const, ts, anchorMessageId },
           ],
         }),
       };
