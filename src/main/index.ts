@@ -3968,6 +3968,13 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.turnId,
       );
 
+    case "session.fork":
+      return sm.forkSession(
+        event.payload.sessionId,
+        event.payload.messageId,
+        event.payload.titleSuffix,
+      );
+
     case "session.command":
       return sm.handleGoalCommand(
         event.payload.sessionId,

@@ -846,6 +846,31 @@ export function useIPC() {
     ],
   );
 
+  const forkSession = useCallback(
+    async (sessionId: string, messageId: string, titleSuffix: string) => {
+      try {
+        const session = await invoke<Session>({
+          type: "session.fork",
+          payload: { sessionId, messageId, titleSuffix },
+        });
+        if (session) {
+          addSession(session);
+          useAppStore.getState().setActiveSession(session.id);
+        }
+        return session;
+      } catch (e) {
+        useAppStore.getState().setGlobalNotice({
+          id: `notice-session-fork-${Date.now()}`,
+          type: "error",
+          message: e instanceof Error ? e.message : i18n.t("chat.forkFailed"),
+          messageKey: e instanceof Error ? undefined : "chat.forkFailed",
+        });
+        return undefined;
+      }
+    },
+    [invoke, addSession],
+  );
+
   const setSessionThinkingLevel = useCallback(
     (sessionId: string, thinkingLevel: ThinkingLevel) => {
       updateSession(sessionId, { thinkingLevel });
@@ -1253,6 +1278,7 @@ export function useIPC() {
     invoke,
     startSession,
     continueSession,
+    forkSession,
     setSessionThinkingLevel,
     setSessionProviderModel,
     stopSession,
