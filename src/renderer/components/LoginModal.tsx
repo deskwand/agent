@@ -52,8 +52,6 @@ async function completeLogin(
     email: result.user.email,
     level: result.user.level,
     creditsBalance: result.user.credits_balance,
-    freeCreditsRemaining: 0,
-    freeQuotaExpiresAt: null,
     modes: [],
   };
   try {
@@ -68,13 +66,6 @@ async function completeLogin(
     } catch {
       /* provider injection optional */
     }
-  }
-  try {
-    const me = await cloudApi.getMe();
-    config.freeCreditsRemaining = me.free_credits_remaining;
-    config.freeQuotaExpiresAt = me.free_quota_expires_at;
-  } catch {
-    /* free quota optional */
   }
   onSuccess(config);
 }

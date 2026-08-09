@@ -82,8 +82,6 @@ export class CloudApiClient {
     email: string;
     level: string;
     credits_balance: number;
-    free_credits_remaining: number;
-    free_quota_expires_at: string | null;
   }> {
     return this.request("/api/auth/me");
   }
@@ -170,7 +168,7 @@ export class CloudApiClient {
 
   async getTeamSkills(
     teamId: string,
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   ): Promise<import("../types").CloudSkill[]> {
     const res = await this.request<{
       // eslint-disable-next-line @typescript-eslint/consistent-type-imports
@@ -239,7 +237,7 @@ export class CloudApiClient {
 
   async getMarketplaceSkillDetail(
     slug: string,
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   ): Promise<import("../types").MarketplaceSkill> {
     return this.request(`/api/marketplace/${slug}`);
   }

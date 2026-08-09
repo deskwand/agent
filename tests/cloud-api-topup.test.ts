@@ -68,7 +68,7 @@ describe("CloudApiClient topup methods", () => {
     expect(order.status).toBe("pending");
   });
 
-  it("getMe returns free quota fields in snake_case", async () => {
+  it("getMe returns credits balance", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -78,8 +78,6 @@ describe("CloudApiClient topup methods", () => {
               email: "a@b.com",
               level: "default",
               credits_balance: 100,
-              free_credits_remaining: 2000,
-              free_quota_expires_at: "2026-08-31 00:00:00",
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           ),
@@ -89,7 +87,6 @@ describe("CloudApiClient topup methods", () => {
     const api = new CloudApiClient("tok");
     const me = await api.getMe();
 
-    expect(me.free_credits_remaining).toBe(2000);
-    expect(me.free_quota_expires_at).toBe("2026-08-31 00:00:00");
+    expect(me.credits_balance).toBe(100);
   });
 });

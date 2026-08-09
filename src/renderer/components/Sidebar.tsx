@@ -176,8 +176,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             email: me.email,
             level: me.level,
             creditsBalance: me.credits_balance,
-            freeCreditsRemaining: me.free_credits_remaining,
-            freeQuotaExpiresAt: me.free_quota_expires_at,
             modes,
           });
         } catch (e: any) {
