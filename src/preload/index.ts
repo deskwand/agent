@@ -54,7 +54,6 @@ let ipcListener:
 const ALLOWED_CLIENT_EVENTS = new Set([
   "session.start",
     "session.continue",
-    "session.fork",
     "session.setThinkingLevel",
     "session.setProviderModel",
     "session.stop",

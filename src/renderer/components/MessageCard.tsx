@@ -2,7 +2,7 @@
 // Delegates block rendering to ContentBlockView and its sub-components.
 import { useState, memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Copy, Check, Clock, XCircle, GitBranch } from "lucide-react";
+import { Copy, Check, Clock, XCircle } from "lucide-react";
 import type {
   Message,
   ContentBlock,
@@ -32,9 +32,6 @@ interface MessageCardProps {
   videoReferences?: VideoReference[];
   /** Hide process summaries when ChatView renders a turn-level summary. */
   suppressProcessSummaries?: boolean;
-  /** 分叉入口：仅助手消息显示；forkDisabled 时禁用（如会话无 piSessionFile） */
-  onForkMessage?: (message: Message) => void;
-  forkDisabled?: boolean;
 }
 
 function formatRelativeTime(timestamp: number, locale: string): string {
@@ -71,23 +68,11 @@ export const MessageCard = memo(function MessageCard({
   artifactFiles = [],
   videoReferences = [],
   suppressProcessSummaries = false,
-  onForkMessage,
-  forkDisabled,
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
   const isUser = message.role === "user";
   const isQueued = message.localStatus === "queued";
   const isCancelled = message.localStatus === "cancelled";
-  // 工具结果独立行（role=assistant + 单个 tool_result 块）不可作为分叉点
-  const isToolResultRow =
-    message.role === "assistant" &&
-    message.content.length === 1 &&
-    message.content[0].type === "tool_result";
-  const canFork =
-    message.role === "assistant" &&
-    !isToolResultRow &&
-    !isQueued &&
-    !isCancelled;
   const rawContent = message.content as unknown;
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
@@ -206,21 +191,6 @@ export const MessageCard = memo(function MessageCard({
           <Copy className="w-3 h-3" />
         )}
       </button>
-      {canFork && onForkMessage ? (
-        <button
-          type="button"
-          onClick={() => onForkMessage(message)}
-          disabled={forkDisabled}
-          title={t(
-            forkDisabled
-              ? "messageCard.forkUnavailable"
-              : "messageCard.forkMessage",
-          )}
-          className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:text-text-muted"
-        >
-          <GitBranch className="w-3 h-3" />
-        </button>
-      ) : null}
     </div>
   );
 

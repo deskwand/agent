@@ -499,14 +499,6 @@ export type ClientEvent =
       };
     }
   | {
-      type: "session.fork";
-      payload: {
-        sessionId: string;
-        messageId: string;
-        titleSuffix: string;
-      };
-    }
-  | {
       type: "session.setThinkingLevel";
       payload: { sessionId: string; thinkingLevel: ThinkingLevel };
     }

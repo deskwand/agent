@@ -916,9 +916,7 @@
     "expandInput": "Expand input",
     "collapseInput": "Collapse input",
     "openCodeReview": "Code Review · {{count}} changed files",
-    "compactSkipped": "Nothing to compact in this session",
-    "forkFailed": "Failed to fork session. Please try again.",
-    "forkSuffix": " (fork)"
+    "compactSkipped": "Nothing to compact in this session"
   },
   "steer": {
     "label": "Steer",
@@ -1006,9 +1004,7 @@
     "noQuestions": "No questions",
     "question": "Question",
     "thinking": "Thinking",
-    "executionTime": "Execution time: {{time}}",
-    "forkMessage": "Fork from here",
-    "forkUnavailable": "Fork unavailable for this session"
+    "executionTime": "Execution time: {{time}}"
   },
   "schedule": {
     "createTitle": "Create Schedule",

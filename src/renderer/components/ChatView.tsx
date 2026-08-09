@@ -236,7 +236,6 @@ export function ChatView() {
   const {
     continueSession,
     stopSession,
-    forkSession,
     setSessionThinkingLevel,
     setSessionProviderModel,
     getSessionMessagesPage,
@@ -316,7 +315,6 @@ export function ChatView() {
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
   const headerRef = useRef<HTMLDivElement>(null);
-  const forkInFlightRef = useRef(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const connectorMeasureRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -852,20 +850,6 @@ export function ChatView() {
   const mergedTurnEntries = useMemo(
     () => mergeSteerEntries(visibleTurnEntries, steerRecords),
     [visibleTurnEntries, steerRecords],
-  );
-
-  const handleForkMessage = useCallback(
-    async (message: Message) => {
-      if (!activeSession) return;
-      if (forkInFlightRef.current) return;
-      forkInFlightRef.current = true;
-      try {
-        await forkSession(activeSession.id, message.id, t("chat.forkSuffix"));
-      } finally {
-        forkInFlightRef.current = false;
-      }
-    },
-    [activeSession, forkSession, t],
   );
 
   const handleDockTickSelect = useCallback(
@@ -1702,8 +1686,6 @@ export function ChatView() {
                           artifactFiles={artifactFiles}
                           videoReferences={videoReferences}
                           suppressProcessSummaries={suppressProcessSummaries}
-                          onForkMessage={handleForkMessage}
-                          forkDisabled={!activeSession?.piSessionFile}
                         />
                       </div>
                     );
