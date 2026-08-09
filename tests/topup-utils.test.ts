@@ -3,6 +3,7 @@ import {
   parseAmountToCents,
   creditsForAmountCents,
   waitForOrderConfirmation,
+  usdForCredits,
 } from "../src/renderer/utils/topup";
 
 describe("parseAmountToCents", () => {
@@ -62,5 +63,24 @@ describe("waitForOrderConfirmation", () => {
     );
     expect(result).toBe("confirmed");
     expect(calls).toBe(2);
+  });
+});
+
+describe("usdForCredits", () => {
+  it("formats whole dollars", () => {
+    expect(usdForCredits(10000)).toBe("$10.00");
+    expect(usdForCredits(2000)).toBe("$2.00");
+  });
+  it("rounds to cents (avoid 0.015 float trap — use 17)", () => {
+    expect(usdForCredits(17)).toBe("$0.02"); // 0.017 → 2 分
+    expect(usdForCredits(1234)).toBe("$1.23"); // 1.234 → 1.23
+  });
+  it("shows <$0.01 instead of misleading $0.00", () => {
+    expect(usdForCredits(3)).toBe("<$0.01"); // 0.003
+    expect(usdForCredits(1)).toBe("<$0.01");
+    expect(usdForCredits(4)).toBe("<$0.01"); // 0.004（边界内）
+  });
+  it("zero credits is exactly $0.00", () => {
+    expect(usdForCredits(0)).toBe("$0.00");
   });
 });

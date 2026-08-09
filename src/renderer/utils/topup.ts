@@ -51,3 +51,15 @@ export async function waitForOrderConfirmation(
     await sleep(intervalMs);
   }
 }
+
+/** 1 credit = $0.001；与服务端充值入账公式（$1 = 1000 credits）严格一致，勿单独调整 */
+const CREDITS_PER_USD = 1000;
+
+/** credits → 美元展示串：四舍五入到分；不足 $0.005 → "<$0.01"；0 → "$0.00" */
+export function usdForCredits(credits: number): string {
+  const usd = credits / CREDITS_PER_USD;
+  if (usd <= 0) return "$0.00";
+  const cents = Math.round(usd * 100);
+  if (cents <= 0) return "<$0.01";
+  return `$${(cents / 100).toFixed(2)}`;
+}

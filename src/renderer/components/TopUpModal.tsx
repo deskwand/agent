@@ -6,6 +6,7 @@ import { CloudApiClient } from "../services/cloud-api";
 import {
   creditsForAmountCents,
   parseAmountToCents,
+  usdForCredits,
   waitForOrderConfirmation,
 } from "../utils/topup";
 
@@ -171,7 +172,8 @@ export function TopUpModal() {
             />
             {parsedCents !== null && (
               <p className="text-sm text-text-muted">
-                {t("topUp.creditsHint", {
+                {t("topUp.amountEqualsCredits", {
+                  usd: `$${(parsedCents / 100).toFixed(2)}`,
                   credits: creditsForAmountCents(parsedCents).toLocaleString(),
                 })}
               </p>
@@ -300,15 +302,18 @@ export function TopUpModal() {
               {t("topUp.waitingTitle")}
             </p>
             <p className="text-sm text-text-muted">{t("topUp.waitingHint")}</p>
-            {payStatus === "confirmed" && (
-              <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
-                {t("topUp.confirmed", {
-                  credits: creditsForAmountCents(
-                    amountCents ?? 0,
-                  ).toLocaleString(),
-                })}
-              </p>
-            )}
+            {payStatus === "confirmed" &&
+              (() => {
+                const granted = creditsForAmountCents(amountCents ?? 0);
+                return (
+                  <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
+                    {t("topUp.confirmed", {
+                      credits: granted.toLocaleString(),
+                      usd: usdForCredits(granted),
+                    })}
+                  </p>
+                );
+              })()}
             {payStatus === "orderExpired" && (
               <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">
                 {t("topUp.orderExpired")}

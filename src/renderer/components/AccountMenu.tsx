@@ -73,8 +73,7 @@ export function AccountMenu({
                 <span className="text-text-muted">
                   {t("accountMenu.freeQuota")}
                 </span>
-                {quotaExpiresDate &&
-                quotaExpiresDate.getTime() > Date.now() ? (
+                {quotaExpiresDate && quotaExpiresDate.getTime() > Date.now() ? (
                   <span className="text-text-primary truncate">
                     {cloudConfig.freeCreditsRemaining} ·{" "}
                     {t("accountMenu.expiresOn", {
