@@ -78,8 +78,6 @@ export function TopUpModal() {
             useAppStore.getState().setCloudConfig({
               ...snapshot,
               creditsBalance: me.credits_balance,
-              freeCreditsRemaining: me.free_credits_remaining,
-              freeQuotaExpiresAt: me.free_quota_expires_at,
             });
           }
         } catch {

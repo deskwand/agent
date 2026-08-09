@@ -1444,9 +1444,6 @@
   },
   "accountMenu": {
     "topUpBalance": "充值余额",
-    "freeQuota": "免费额度",
-    "quotaExpired": "已过期",
-    "expiresOn": "{{date}} 到期",
     "topUpAction": "充值"
   },
   "update": {

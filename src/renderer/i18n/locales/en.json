@@ -1448,9 +1448,6 @@
   },
   "accountMenu": {
     "topUpBalance": "Top Up Balance",
-    "freeQuota": "Free Quota",
-    "quotaExpired": "Expired",
-    "expiresOn": "Expires {{date}}",
     "topUpAction": "Top Up"
   },
   "update": {

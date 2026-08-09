@@ -27,14 +27,6 @@ export function AccountMenu({
 
   const isLoggedIn = cloudConfig?.isLoggedIn ?? false;
 
-  // Server sends free quota expiry as 'YYYY-MM-DD HH:MM:SS' in UTC.
-  const quotaExpiresAt = cloudConfig?.freeQuotaExpiresAt ?? null;
-  const quotaExpiresDate = (() => {
-    if (!quotaExpiresAt) return null;
-    const t = Date.parse(quotaExpiresAt.replace(" ", "T") + "Z");
-    return Number.isFinite(t) ? new Date(t) : null;
-  })();
-
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
@@ -68,23 +60,6 @@ export function AccountMenu({
                 <span className="text-text-primary font-medium">
                   {cloudConfig.creditsBalance.toLocaleString()}
                 </span>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-text-muted">
-                  {t("accountMenu.freeQuota")}
-                </span>
-                {quotaExpiresDate && quotaExpiresDate.getTime() > Date.now() ? (
-                  <span className="text-text-primary truncate">
-                    {cloudConfig.freeCreditsRemaining} ·{" "}
-                    {t("accountMenu.expiresOn", {
-                      date: quotaExpiresDate.toLocaleDateString(),
-                    })}
-                  </span>
-                ) : (
-                  <span className="text-text-muted">
-                    {t("accountMenu.quotaExpired")}
-                  </span>
-                )}
               </div>
             </div>
             <MenuItem
