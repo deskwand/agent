@@ -31,9 +31,8 @@ interface MessageCardProps {
   videoReferences?: VideoReference[];
   /** Hide process summaries when ChatView renders a turn-level summary. */
   suppressProcessSummaries?: boolean;
-  /** 分叉入口：仅助手消息显示；forkDisabled 时禁用（如会话无 piSessionFile） */
+  /** 分叉入口：仅助手消息显示（tool_result 行/流式中/排队中/已取消除外） */
   onForkMessage?: (message: Message) => void;
-  forkDisabled?: boolean;
 }
 
 function formatRelativeTime(timestamp: number, locale: string): string {
@@ -71,7 +70,6 @@ export const MessageCard = memo(function MessageCard({
   videoReferences = [],
   suppressProcessSummaries = false,
   onForkMessage,
-  forkDisabled,
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
   const isUser = message.role === "user";
@@ -86,7 +84,8 @@ export const MessageCard = memo(function MessageCard({
     message.role === "assistant" &&
     !isToolResultRow &&
     !isQueued &&
-    !isCancelled;
+    !isCancelled &&
+    !isStreaming;
   const rawContent = message.content as unknown;
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
@@ -209,13 +208,8 @@ export const MessageCard = memo(function MessageCard({
         <button
           type="button"
           onClick={() => onForkMessage(message)}
-          disabled={forkDisabled}
-          title={t(
-            forkDisabled
-              ? "messageCard.forkUnavailable"
-              : "messageCard.forkMessage",
-          )}
-          className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:text-text-muted"
+          title={t("messageCard.forkMessage")}
+          className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
         >
           <GitBranch className="w-3 h-3" />
         </button>
