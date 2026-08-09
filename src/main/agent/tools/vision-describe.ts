@@ -88,12 +88,13 @@ const DEFAULT_VISION_PROMPT =
 
 // ── API helpers ─────────────────────────────────────────────────────
 
-function protocolForProvider(
+export function protocolForProvider(
   provider: SharedProviderType,
   customProtocol?: SharedCustomProtocolType,
 ): "anthropic" | "openai" | "gemini" {
   if (provider === "gemini") return "gemini";
-  if (provider === "openai" || provider === "deepseek") return "openai";
+  if (provider === "openai" || provider === "deepseek" || provider === "zhipu")
+    return "openai";
   if (provider === "ollama") return "openai";
   if (provider === "custom") {
     if (customProtocol === "openai") return "openai";
@@ -102,6 +103,8 @@ function protocolForProvider(
   }
   // openrouter: use OpenAI-compatible endpoint
   if (provider === "openrouter") return "openai";
+  // opencode: use OpenAI-compatible endpoint (chat/completions + responses)
+  if (provider === "opencode" || provider === "opencode-go") return "openai";
   return "anthropic";
 }
 

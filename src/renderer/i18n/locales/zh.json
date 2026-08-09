@@ -99,6 +99,7 @@
     "providers": {
       "auto": "自动选择",
       "openai": "OpenAI",
+      "deepseek": "DeepSeek",
       "exa": "Exa",
       "brave": "Brave",
       "parallel": "Parallel",
@@ -337,6 +338,14 @@
     "visionModelDisabledHint": "已禁用 — vision_describe 工具不会注册",
     "visionModelEditTitle": "编辑视觉模型",
     "visionModelEnable": "启用视觉模型",
+    "region": "站点区域",
+    "zhipuRegionCn": "国内站 (open.bigmodel.cn)",
+    "zhipuRegionGlobal": "国际站 (api.z.ai)",
+    "zhipuRegionHint": "两站 API Key 不互通，请使用与所选站点对应的 Key",
+    "opencodePlan": "订阅计划",
+    "opencodePlanZen": "Zen · 按量付费",
+    "opencodePlanGo": "Go · $10/月订阅",
+    "opencodePlanHint": "同一账号、同一 API Key（从 opencode.ai/auth 获取），两种订阅共用；Go 为开源模型精选订阅，含用量限额",
     "reuseMainModelKey": "复用主模型 Key",
     "openSettingsAction": "打开 API 设置",
     "configRequiredActiveSet": "当前方案未配置可用凭证，请先在 API 设置中完成配置",
@@ -347,14 +356,6 @@
     "refreshModelsFailed": "刷新模型失败，请检查 URL 或服务状态",
     "manualModel": "手动输入",
     "useDetectedModels": "使用探测列表",
-    "discoverLocalOllama": "发现本地 Ollama",
-    "discoveringLocalOllama": "发现中...",
-    "discoverLocalOllamaHint": "先填写 Ollama 端点，系统会自动拉取模型列表；只有拉取不到时才需要手动输入模型。",
-    "localOllamaDiscovered": "已发现本地 Ollama，可用模型 {{count}} 个。",
-    "localOllamaNotFound": "未发现本地 Ollama 服务，请先执行 `ollama serve` 后重试。",
-    "localOllamaNoModels": "已发现本地 Ollama 服务，但当前没有可用模型。",
-    "localOllamaModelUnavailable": "已发现本地 Ollama，但模型 {{model}} 目前无法完成最小推理请求。",
-    "localOllamaModelLoading": "已发现本地 Ollama，但模型仍在加载中，大型模型可能需要一分钟左右。",
     "enableThinking": "启用思考模式",
     "enableThinkingHint": "显示 DeskWand 的思考过程。这提供更多透明度，但可能增加 token 消耗。",
     "enableThinkingOllamaHint": "大多数 Ollama 模型不支持思考模式，仅在模型明确支持时启用。",
@@ -434,6 +435,10 @@
         "genericOpenAI": {
           "name": "通用 OpenAI 兼容服务",
           "note": "适用于自定义中继、网关或模拟 OpenAI API 的推理服务。"
+        },
+        "opencode": {
+          "name": "OpenCode Zen/Go",
+          "note": "OpenCode 官方网关（订阅制/按量付费）。推荐直接使用专用的 OpenCode 配置入口。"
         }
       }
     },
@@ -908,12 +913,21 @@
     "alreadyCompacted": "上下文已压缩",
     "expandInput": "展开输入框",
     "collapseInput": "收起输入框",
-    "openCodeReview": "代码审查 · {{count}} 个文件变更"
+    "openCodeReview": "代码审查 · {{count}} 个文件变更",
+    "compactSkipped": "当前会话没有可压缩的内容",
+    "forkFailed": "分叉失败，请稍后重试",
+    "forkSuffix": "（分叉）"
   },
   "steer": {
     "label": "引导",
-    "eventLabel": "引导",
-    "notDelivered": "未送达"
+    "remove": "删除",
+    "injecting": "引导中",
+    "delivered": "已引导",
+    "reasonNoActiveSession": "会话已结束",
+    "reasonSdkError": "消息不被支持",
+    "reasonSessionStopped": "会话已停止",
+    "imageAttachment": "图片",
+    "failed": "引导失败"
   },
   "goal": {
     "active": "执行中",
@@ -990,7 +1004,9 @@
     "noQuestions": "暂无问题",
     "question": "问题",
     "thinking": "思考",
-    "executionTime": "执行时间: {{time}}"
+    "executionTime": "执行时间: {{time}}",
+    "forkMessage": "从此处分叉",
+    "forkUnavailable": "该会话暂不支持分叉"
   },
   "schedule": {
     "createTitle": "新建定时任务",
@@ -1026,8 +1042,6 @@
     "taskMissing": "任务不存在或已被删除",
     "saveFailed": "保存定时任务失败",
     "toggleFailed": "切换状态失败",
-    "runNowSuccess": "已触发立即执行",
-    "runNowFailed": "立即执行失败",
     "noSessionToStop": "该任务暂无可停止的执行会话",
     "notRunning": "该任务尚未开始执行或已完成",
     "stopRunFailed": "停止执行失败",
@@ -1262,6 +1276,7 @@
     "actionBash": "运行命令",
     "actionGlob": "文件匹配",
     "actionGrep": "内容搜索",
+    "actionLs": "浏览目录",
     "actionWebSearch": "网页搜索",
     "actionFetchContent": "获取内容",
     "actionGetSearchContent": "读取缓存内容",
@@ -1278,6 +1293,8 @@
     "labelBash": "$ {{command}}",
     "labelGlob": "文件匹配 {{pattern}}",
     "labelGrep": "内容搜索 \"{{pattern}}\"",
+    "labelLs": "浏览 {{path}}",
+    "labelFind": "查找 \"{{pattern}}\"",
     "labelWebSearch": "搜索 \"{{query}}\"",
     "labelWebSearchMany": "搜索 {{count}} 个查询",
     "labelFetchContent": "获取 {{url}}",
@@ -1324,6 +1341,8 @@
     "grouped": {
       "readFiles_one": "已读取 {{count}} 个文件",
       "readFiles_other": "已读取 {{count}} 个文件",
+      "browsedDirectories_one": "已浏览 {{count}} 个目录",
+      "browsedDirectories_other": "已浏览 {{count}} 个目录",
       "searchedCode": "已搜索了代码",
       "searchedWeb": "已搜索了网页",
       "browsedWeb": "已浏览了网页",

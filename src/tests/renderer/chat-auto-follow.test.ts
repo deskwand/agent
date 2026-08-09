@@ -81,6 +81,8 @@ function setInitialState(): void {
     sessionStates: {
       s1: {
         historyHydrated: true,
+        hasMoreOlder: false,
+        oldestMessageId: null,
         messages: [makeMessage("u1", "user"), makeMessage("a1", "assistant")],
         partialByTurn: {},
         partialMessage: "",
@@ -91,7 +93,8 @@ function setInitialState(): void {
         traceSteps: [],
         contextWindow: 0,
         compaction: { status: "idle" },
-        steerResult: null,
+        inputQueue: [],
+        steerRecords: [],
         partialToolResults: {},
         backgroundAgents: [],
       },

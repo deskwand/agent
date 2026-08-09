@@ -8,6 +8,8 @@ import type {
 
 const OPENAI_BASE_URL = "https://api.openai.com/v1";
 const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com";
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const DEEPSEEK_SEARCH_MODEL = "deepseek-v4-flash";
 
 export interface OpenAIWebSearchAuth {
   provider: "openai" | "openai-codex";
@@ -23,7 +25,16 @@ export interface GeminiApiAuth {
   baseUrl: string;
 }
 
-export type ResolvedWebAccessAuth = OpenAIWebSearchAuth | GeminiApiAuth;
+export interface DeepSeekWebSearchAuth {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
+export type ResolvedWebAccessAuth =
+  | OpenAIWebSearchAuth
+  | GeminiApiAuth
+  | DeepSeekWebSearchAuth;
 export type OAuthTokenResolver = (
   providerId: string,
 ) => Promise<string | undefined>;
@@ -36,6 +47,18 @@ function dedicatedAuth(
   provider: WebAccessAuthProvider,
   credential: WebAccessCredential,
 ): ResolvedWebAccessAuth | undefined {
+  if (provider === "deepseek") {
+    // 本地代理场景 apiKey 可为空；但全空（无 key 无 baseUrl）视为未配置，
+    // 避免 auto 链在 exa 失败后对官方端点做确定性无效请求
+    if (!credential.apiKey.trim() && !credential.baseUrl.trim()) {
+      return undefined;
+    }
+    return {
+      apiKey: credential.apiKey.trim(),
+      baseUrl: credential.baseUrl.trim() || DEEPSEEK_BASE_URL,
+      model: DEEPSEEK_SEARCH_MODEL,
+    };
+  }
   const apiKey = credential.apiKey.trim();
   if (!apiKey) return undefined;
   if (provider === "openai") {
@@ -84,6 +107,20 @@ export async function resolveWebAccessProviderAuth(
   }
   if (profile.provider === "oauth") return undefined;
 
+  if (provider === "deepseek") {
+    if (profile.provider !== "deepseek" && profileKey !== "deepseek") {
+      return undefined;
+    }
+    if (!profile.apiKey.trim() && !profile.baseUrl?.trim()) {
+      return undefined;
+    }
+    return {
+      apiKey: profile.apiKey.trim(),
+      baseUrl: profile.baseUrl?.trim() || DEEPSEEK_BASE_URL,
+      model: DEEPSEEK_SEARCH_MODEL,
+    };
+  }
+
   const apiKey = profile.apiKey.trim();
   if (!apiKey) return undefined;
   if (
@@ -109,4 +146,15 @@ export async function resolveWebAccessProviderAuth(
     };
   }
   return undefined;
+}
+
+/**
+ * DeepSeekWebSearchAuth 没有 provider 字段，其余两种都有。
+ * 注意：此判别依赖该结构差异——若未来 DeepSeekWebSearchAuth
+ * 增加 provider 字段或联合类型新增无 provider 字段的成员，需同步调整。
+ */
+export function isDeepSeekAuth(
+  auth: ResolvedWebAccessAuth,
+): auth is DeepSeekWebSearchAuth {
+  return !("provider" in auth);
 }

@@ -82,6 +82,7 @@ import type {
   MessageRow,
   SessionRow,
 } from "../../main/db/database";
+import { queryMessagesPage } from "../../main/db/database";
 import { MemoryEvalHarness } from "../../main/memory/memory-eval-harness";
 import type {
   MemoryCompletionRequest,
@@ -264,6 +265,10 @@ function createDatabaseInstance(db: DatabaseSync): DatabaseInstance {
               "SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp ASC",
             )
             .all(sessionId) as unknown as MessageRow[],
+      ),
+      getMessagesPage: vi.fn(
+        (sessionId: string, beforeId: string | null, limit: number) =>
+          queryMessagesPage(db, sessionId, beforeId, limit),
       ),
       delete: vi.fn(),
       deleteBySessionId: vi.fn(),

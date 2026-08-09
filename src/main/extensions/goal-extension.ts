@@ -12,12 +12,13 @@ import type {
   CommandContext,
   CommandResult,
   SessionDeletedContext,
+  SessionRunErrorContext,
 } from "./agent-runtime-extension";
 import type { DatabaseInstance, GoalRow } from "../db/database";
 
 // ─── Types ───────────────────────────────────────────────────────────
 
-const MAX_GOAL_ITERATIONS = 50;
+export const MAX_GOAL_ITERATIONS = 50;
 
 type GoalStatus =
   | "active"
@@ -139,6 +140,8 @@ const MSG: Record<string, Record<string, string>> = {
     started: "目标已启动: {{objective}}{{budget}}",
     paused: "目标已暂停: {{objective}}",
     resumed: "目标已恢复: {{objective}}",
+    resumedAtCap:
+      "目标已恢复: {{objective}}。已达 {{max}} 轮上限，恢复后计数重新开始",
     cleared: "目标已清除。",
     needObjective: "请提供一个目标描述。",
     goalIsStatus: "目标状态为 {{status}}，请用 /goal <目标> 创建新目标。",
@@ -161,6 +164,8 @@ const MSG: Record<string, Record<string, string>> = {
     started: "Goal started: {{objective}}{{budget}}",
     paused: "Goal paused: {{objective}}",
     resumed: "Goal resumed: {{objective}}",
+    resumedAtCap:
+      "Goal resumed: {{objective}}. Reached the {{max}}-turn cap; counting restarts",
     cleared: "Goal cleared.",
     needObjective: "Please provide a goal objective.",
     goalIsStatus: "Goal is {{status}}; start a new one with /goal <objective>.",
@@ -203,6 +208,13 @@ export class GoalExtension implements AgentRuntimeExtension {
 
   /** Goal state keyed by sessionId, so multiple sessions do not interfere. */
   private goals: Map<string, GoalState> = new Map();
+
+  /** Injected by SessionManager: whether the session's queue is actively running. */
+  private isSessionRunning?: (sessionId: string) => boolean;
+
+  setSessionStateProvider(fn: (sessionId: string) => boolean): void {
+    this.isSessionRunning = fn;
+  }
 
   /** Per-session goal tools (get_goal, update_goal). */
   private goalTools: Map<string, AgentRuntimeCustomTool[]> = new Map();
@@ -301,6 +313,13 @@ export class GoalExtension implements AgentRuntimeExtension {
     return recovered;
   }
 
+  getAllGoals(): Array<{ sessionId: string; goal: GoalState }> {
+    return Array.from(this.goals.entries()).map(([sessionId, goal]) => ({
+      sessionId,
+      goal,
+    }));
+  }
+
   private updateGoalUsage(
     sessionId: string,
     ctx: AfterSessionRunContext,
@@ -393,9 +412,33 @@ export class GoalExtension implements AgentRuntimeExtension {
         ) => {
           const parsed = params as UpdateGoalInput;
           const goal = self.getGoal(sid);
+          if (!goal) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "There is no active goal to update.",
+                },
+              ],
+              details: {},
+            };
+          }
+          // 终态幂等：complete/blocked 已收尾，重复调用不再报"无活跃目标"
+          if (goal.status === "complete" || goal.status === "blocked") {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Goal is already ${goal.status}.`,
+                },
+              ],
+              details: {},
+            };
+          }
           if (
-            !goal ||
-            (goal.status !== "active" && goal.status !== "budget_limited")
+            goal.status !== "active" &&
+            goal.status !== "budget_limited" &&
+            goal.status !== "paused"
           ) {
             return {
               content: [
@@ -467,9 +510,33 @@ export class GoalExtension implements AgentRuntimeExtension {
         ) => {
           const parsed = params as { summary: string };
           const goal = self.getGoal(sid);
+          if (!goal) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "There is no active goal to complete.",
+                },
+              ],
+              details: {},
+            };
+          }
+          // 终态幂等：已 complete 的 goal 重复标记返回提示而非误导性错误
+          if (goal.status === "complete" || goal.status === "blocked") {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Goal is already ${goal.status}.`,
+                },
+              ],
+              details: {},
+            };
+          }
           if (
-            !goal ||
-            (goal.status !== "active" && goal.status !== "budget_limited")
+            goal.status !== "active" &&
+            goal.status !== "budget_limited" &&
+            goal.status !== "paused"
           ) {
             return {
               content: [
@@ -616,17 +683,34 @@ export class GoalExtension implements AgentRuntimeExtension {
         message: msg("goalIsStatus", { status: goal.status }),
       };
     }
-    if (goal.status === "active") {
+    const sessionIdle = !this.isSessionRunning?.(sessionId);
+    if (goal.status === "active" && !sessionIdle) {
       return { handled: true, message: msg("alreadyActive") };
     }
 
     goal.status = "active";
     goal.generation++;
+    const atMaxCap = goal.iteration >= MAX_GOAL_ITERATIONS;
+    // Reset the iteration cap on resume so continuation is not
+    // immediately re-paused by the max-iterations guardrail.
+    // Restart counting (at 1, never 0) and tell the user when the
+    // cap was reached.
+    if (atMaxCap) {
+      goal.iteration = 1;
+    }
     this.setGoal(sessionId, goal);
+    // NOTE: the resume prompt shows the pre-increment value (turn #1);
+    // the running turn's beforeSessionRun increments it to 2 — same
+    // display off-by-one as "continuation #N", declared out of scope.
     const firstTurnPrompt = buildResumePrompt(goal);
     return {
       handled: true,
-      message: msg("resumed", { objective: goal.objective }),
+      message: atMaxCap
+        ? msg("resumedAtCap", {
+            objective: goal.objective,
+            max: MAX_GOAL_ITERATIONS,
+          })
+        : msg("resumed", { objective: goal.objective }),
       firstTurnPrompt,
       goalStatus: this.goalStatusPayload(goal).goalStatus,
       clearAutoGenerated: true,
@@ -711,9 +795,19 @@ export class GoalExtension implements AgentRuntimeExtension {
     ctx: BeforeSessionRunContext,
   ): Promise<BeforeSessionRunResult | void> {
     const sessionId = ctx.session.id;
+
+    // 工具全局常驻：无论有无 goal、无论 goal 状态，get_goal/update_goal
+    // 始终注入。工具列表因此全局恒定——goal 的整个生命周期（启动/暂停/
+    // 完成/清除）都不改变系统提示的工具列表，不触发 pi session 重建、
+    // 不破坏提示词缓存（prompt cache 前缀匹配）。
+    const tools = this.ensureGoalTools(sessionId);
+
     const goal = this.getGoal(sessionId);
     if (!goal || goal.status !== "active") {
-      return;
+      // 无 goal 或非 active（paused/budget_limited/complete/blocked）：
+      // 只注入工具。get_goal 对无目标返回 "No active goal"，update_goal
+      // 同样安全拒绝——模型可查询状态或收尾，目标永不悬死。
+      return { customTools: tools };
     }
 
     // Increment iteration at the start of continuation turns.
@@ -729,7 +823,6 @@ export class GoalExtension implements AgentRuntimeExtension {
     this.sessionGenerations.set(sessionId, goal.generation);
 
     const promptPrefix = buildGoalSystemPrompt(goal);
-    const tools = this.ensureGoalTools(sessionId);
     return { promptPrefix, customTools: tools };
   }
 
@@ -805,6 +898,18 @@ export class GoalExtension implements AgentRuntimeExtension {
 
     const continuePrompt = buildContinuePrompt(goal);
     return { continuePrompt, ...this.goalStatusPayload(goal) };
+  }
+
+  async onSessionRunError(
+    context: SessionRunErrorContext,
+  ): Promise<AfterSessionRunResult | void> {
+    const goal = this.getGoal(context.sessionId);
+    if (!goal || goal.status !== "active") {
+      return;
+    }
+    goal.status = "paused";
+    this.setGoal(context.sessionId, goal);
+    return this.goalStatusPayload(goal);
   }
 
   async onSessionDeleted(context: SessionDeletedContext): Promise<void> {

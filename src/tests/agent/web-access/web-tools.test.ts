@@ -261,6 +261,7 @@ describe("createWebAccessTools", () => {
     expect(resolveProviderAuth.mock.calls.map((call) => call[0])).toEqual([
       "openai",
       "gemini",
+      "deepseek",
     ]);
 
     await fetchTool.execute(
@@ -273,6 +274,7 @@ describe("createWebAccessTools", () => {
     expect(resolveProviderAuth.mock.calls.map((call) => call[0])).toEqual([
       "openai",
       "gemini",
+      "deepseek",
       "gemini",
     ]);
   });

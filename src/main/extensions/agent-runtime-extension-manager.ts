@@ -8,6 +8,7 @@ import type {
   CommandContext,
   CommandResult,
   SessionDeletedContext,
+  SessionRunErrorContext,
 } from "./agent-runtime-extension";
 import { logError, logWarn } from "../utils/logger";
 
@@ -113,6 +114,35 @@ export class AgentRuntimeExtensionManager {
         }
         if (!result.summaryMessage && outcome.value.summaryMessage) {
           result.summaryMessage = outcome.value.summaryMessage;
+        }
+      }
+    }
+    return result;
+  }
+
+  async onSessionRunError(
+    context: SessionRunErrorContext,
+  ): Promise<AfterSessionRunResult> {
+    const result: AfterSessionRunResult = {};
+    const outcomes = await Promise.allSettled(
+      this.extensions.map(async (extension) => {
+        if (!extension.onSessionRunError) {
+          return;
+        }
+        try {
+          return await extension.onSessionRunError(context);
+        } catch (error) {
+          logError(
+            `[AgentRuntimeExtensionManager] onSessionRunError failed for ${extension.name}:`,
+            error,
+          );
+        }
+      }),
+    );
+    for (const outcome of outcomes) {
+      if (outcome.status === "fulfilled" && outcome.value) {
+        if (!result.goalStatus && outcome.value.goalStatus) {
+          result.goalStatus = outcome.value.goalStatus;
         }
       }
     }

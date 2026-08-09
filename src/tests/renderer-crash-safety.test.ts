@@ -150,10 +150,11 @@ describe("getCollapsedToolSummary (defensive)", () => {
     ).toEqual({ kind: "none" });
   });
 
-  it("counts one-line string content instead of echoing it", () => {
+  it("returns first-line preview for file read content", () => {
+    // Read tools now return a first-line text preview instead of a line count
     expect(getCollapsedToolSummary("Read", "hello", false)).toEqual({
-      kind: "lines",
-      count: 1,
+      kind: "text",
+      text: "hello",
     });
   });
 
@@ -193,9 +194,11 @@ describe("getCollapsedToolSummary (defensive)", () => {
     });
   });
 
-  it("returns line count for multi-line content", () => {
+  it("returns line count for long multi-line content of non-file tools", () => {
     const content = "line1\nline2\nline3\nline4\nline5\n" + "x".repeat(60);
-    expect(getCollapsedToolSummary("Read", content, false)).toEqual({
+    // "Read" is a file-read tool (first-line preview); line counting applies
+    // to tools without a specific summary strategy.
+    expect(getCollapsedToolSummary("SomeTool", content, false)).toEqual({
       kind: "lines",
       count: 6,
     });

@@ -224,10 +224,10 @@ export function SettingsPanel({
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               title={compactSidebar ? tab.label : undefined}
-              className={`w-full flex items-center ${compactSidebar ? "justify-center p-2.5" : "gap-3 px-3.5 py-3"} rounded-lg text-left transition-colors active:scale-[0.98] border-l-2 ${
+              className={`w-full flex items-center ${compactSidebar ? "justify-center p-2.5" : "gap-3 px-3.5 py-3"} rounded-lg text-left transition-colors active:scale-[0.98] ${
                 activeTab === tab.id
-                  ? "bg-accent/10 text-text-primary font-medium border-accent"
-                  : "hover:bg-surface-hover text-text-secondary hover:text-text-primary border-transparent"
+                  ? "bg-accent/10 text-text-primary font-medium"
+                  : "hover:bg-surface-hover text-text-secondary hover:text-text-primary"
               }`}
             >
               <tab.icon className="w-4.5 h-4.5 flex-shrink-0" />

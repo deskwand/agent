@@ -59,6 +59,8 @@ export function resolvePiRouteProtocol(
   }
   if (provider === "ollama") return "openai";
   if (provider === "deepseek") return "openai";
+  if (provider === "opencode") return "opencode";
+  if (provider === "opencode-go") return "opencode-go";
   if (provider === "openai") return "openai";
   if (provider === "openrouter") return "openai";
   if (provider === "gemini") return "gemini";

@@ -45,21 +45,33 @@ let ipcListener:
   | ((event: Electron.IpcRendererEvent, data: ServerEvent) => void)
   | null = null;
 
-// Allowlist of valid ClientEvent types to prevent spoofing arbitrary IPC channels
-const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent["type"]>(
-  [
-    "session.start",
+// Allowlist of valid ClientEvent types to prevent spoofing arbitrary IPC channels.
+// No type annotation on the Set: `ReadonlySet<string>` or
+// `Set<ClientEvent["type"]>` widen the element type to the whole union, which
+// makes the Exclude-based exhaustiveness check below compare the union against
+// itself (always passes). The element type must be inferred from the literal
+// array via `as const`.
+const ALLOWED_CLIENT_EVENTS = new Set([
+  "session.start",
     "session.continue",
+    "session.fork",
     "session.setThinkingLevel",
     "session.setProviderModel",
     "session.stop",
     "session.compact",
     "session.abortCompaction",
     "session.steer",
+    "session.command",
+    "session.archive",
+    "session.unarchive",
+    "session.batchArchive",
+    "session.batchUnarchive",
+    "session.archiveDelete",
     "session.delete",
     "session.batchDelete",
     "session.list",
     "session.getMessages",
+    "session.getMessagesPage",
     "session.getTraceSteps",
     "permission.response",
     "sudo.password.response",
@@ -72,8 +84,21 @@ const ALLOWED_CLIENT_EVENTS: ReadonlySet<string> = new Set<ClientEvent["type"]>(
     "project.delete",
     "update.check",
     "update.install",
-  ],
-);
+  ] as const);
+
+// Compile-time exhaustiveness: every renderer→main event type must be in the
+// allowlist. Adding a new ClientEvent type without allowlisting it breaks the
+// build instead of silently dropping IPC in production.
+type AllowedClientEventType = (typeof ALLOWED_CLIENT_EVENTS) extends ReadonlySet<
+  infer T
+>
+  ? T
+  : never;
+type MissingClientEventTypes = Exclude<ClientEvent["type"], AllowedClientEventType>;
+const _exhaustiveAllowlistCheck: MissingClientEventTypes extends never
+  ? true
+  : never = true;
+void _exhaustiveAllowlistCheck;
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -280,20 +305,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
       paths: string[],
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke("git.revertFiles", cwd, paths),
-  },
-
-  artifacts: {
-    listRecentFiles: (
-      cwd: string,
-      sinceMs: number,
-      limit = 50,
-    ): Promise<Array<{ path: string; modifiedAt: number; size: number }>> =>
-      ipcRenderer.invoke(
-        "artifacts.listRecentFiles",
-        cwd,
-        sinceMs,
-        Math.min(limit, 500),
-      ),
   },
 
   // Config methods
@@ -754,13 +765,6 @@ declare global {
           cwd: string,
           paths: string[],
         ) => Promise<{ success: boolean; error?: string }>;
-      };
-      artifacts: {
-        listRecentFiles: (
-          cwd: string,
-          sinceMs: number,
-          limit?: number,
-        ) => Promise<Array<{ path: string; modifiedAt: number; size: number }>>;
       };
       config: {
         get: () => Promise<AppConfig>;

@@ -221,11 +221,14 @@ const TickMark = memo(function TickMark({
 interface MessageNavRailProps {
   ticks: RailTickEntry[];
   scrollContainerRef: React.RefObject<HTMLElement>;
+  /** Host-provided jump handler (can expand the render window first). */
+  onTickSelect?: (messageId: string) => void;
 }
 
 export const MessageNavRail = memo(function MessageNavRail({
   ticks,
   scrollContainerRef,
+  onTickSelect,
 }: MessageNavRailProps) {
   const railRef = useRef<HTMLDivElement>(null);
   const [railHeight, setRailHeight] = useState(0);
@@ -305,11 +308,15 @@ export const MessageNavRail = memo(function MessageNavRail({
       if (!container || n <= 1) return;
       const tick = ticks[index];
       if (!tick) return;
+      if (onTickSelect) {
+        onTickSelect(tick.messageId);
+        return;
+      }
       container
         .querySelector(`[data-message-id="${tick.messageId}"]`)
         ?.scrollIntoView({ block: "start", behavior: "smooth" });
     },
-    [scrollContainerRef, n, ticks],
+    [scrollContainerRef, n, ticks, onTickSelect],
   );
 
   if (n === 0) return null;

@@ -1,6 +1,7 @@
 export const WEB_SEARCH_PROVIDERS = [
   "auto",
   "openai",
+  "deepseek",
   "exa",
   "brave",
   "parallel",
@@ -10,7 +11,7 @@ export const WEB_SEARCH_PROVIDERS = [
 ] as const;
 
 export type WebSearchProvider = (typeof WEB_SEARCH_PROVIDERS)[number];
-export type WebAccessAuthProvider = "openai" | "gemini";
+export type WebAccessAuthProvider = "openai" | "gemini" | "deepseek";
 export type WebAccessCredentialSource = "inherit" | "dedicated";
 
 export interface WebAccessCredential {
@@ -24,6 +25,7 @@ export interface WebAccessConfig {
   defaultProvider: WebSearchProvider;
   openai: WebAccessCredential;
   gemini: WebAccessCredential;
+  deepseek: WebAccessCredential;
   exaApiKey: string;
   braveApiKey: string;
   parallelApiKey: string;
@@ -60,6 +62,7 @@ export const DEFAULT_WEB_ACCESS_CONFIG: WebAccessConfig = {
   defaultProvider: "auto",
   openai: { source: "inherit", profileKey: "", apiKey: "", baseUrl: "" },
   gemini: { source: "inherit", profileKey: "", apiKey: "", baseUrl: "" },
+  deepseek: { source: "inherit", profileKey: "", apiKey: "", baseUrl: "" },
   exaApiKey: "",
   braveApiKey: "",
   parallelApiKey: "",
@@ -98,6 +101,7 @@ export function normalizeWebAccessConfig(raw: unknown): WebAccessConfig {
     defaultProvider: normalizeProvider(value.defaultProvider),
     openai: normalizeCredential(value.openai),
     gemini: normalizeCredential(value.gemini),
+    deepseek: normalizeCredential(value.deepseek),
     exaApiKey: toString(value.exaApiKey),
     braveApiKey: toString(value.braveApiKey),
     parallelApiKey: toString(value.parallelApiKey),

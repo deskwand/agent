@@ -42,6 +42,11 @@ export interface DatabaseInstance {
       updates: Partial<Pick<MessageRow, "execution_time_ms">>,
     ) => void;
     getBySessionId: (sessionId: string) => MessageRow[];
+    getMessagesPage: (
+      sessionId: string,
+      beforeId: string | null,
+      limit: number,
+    ) => { rows: MessageRow[]; hasMore: boolean };
     delete: (id: string) => void;
     deleteBySessionId: (sessionId: string) => void;
   };
@@ -763,6 +768,12 @@ export function initDatabase(): DatabaseInstance {
         ) as unknown as MessageRow[];
       },
 
+      getMessagesPage: (
+        sessionId: string,
+        beforeId: string | null,
+        limit: number,
+      ) => queryMessagesPage(rawDb, sessionId, beforeId, limit),
+
       delete: (id: string) => {
         deleteMessageStmt.run(id);
       },
@@ -943,4 +954,156 @@ export function closeDatabase(): void {
     db = null;
     log("[Database] Database closed");
   }
+}
+
+/**
+ * Cursor-paginated message query for a session, ordered by
+ * (timestamp DESC, rowid DESC) so pages never overlap or skip —
+ * rowid breaks ties between messages saved in the same millisecond.
+ * `beforeId` is the id of the oldest message already loaded by the
+ * caller; pass null to fetch the newest page (the session tail).
+ * Returns rows in ascending (oldest → newest) order with `hasMore`.
+ */
+export function queryMessagesPage(
+  rawDb: DatabaseSync,
+  sessionId: string,
+  beforeId: string | null,
+  limit: number,
+): { rows: MessageRow[]; hasMore: boolean } {
+  if (limit <= 0) return { rows: [], hasMore: false };
+
+  let anchor: { timestamp: number; rowid: number } | undefined;
+  if (beforeId) {
+    anchor = rawDb
+      .prepare(
+        "SELECT timestamp, rowid FROM messages WHERE id = ? AND session_id = ?",
+      )
+      .get(beforeId, sessionId) as
+      | { timestamp: number; rowid: number }
+      | undefined;
+    if (!anchor) {
+      // Cursor points at a message that no longer exists (deleted or
+      // never belonged to this session) — stop pagination silently.
+      return { rows: [], hasMore: false };
+    }
+  }
+
+  const rows = (anchor
+    ? rawDb
+        .prepare(
+          `SELECT * FROM messages
+           WHERE session_id = ?
+             AND (timestamp < ? OR (timestamp = ? AND rowid < ?))
+           ORDER BY timestamp DESC, rowid DESC
+           LIMIT ?`,
+        )
+        .all(
+          sessionId,
+          anchor.timestamp,
+          anchor.timestamp,
+          anchor.rowid,
+          limit + 1,
+        )
+    : rawDb
+        .prepare(
+          `SELECT * FROM messages
+           WHERE session_id = ?
+           ORDER BY timestamp DESC, rowid DESC
+           LIMIT ?`,
+        )
+        .all(sessionId, limit + 1)) as unknown as MessageRow[];
+
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+  const aligned = alignPageStart(rawDb, sessionId, page.reverse());
+  return { rows: aligned.rows, hasMore: aligned.hasMore };
+}
+
+// A page must start at a user message and contain at least two user
+// messages, so the render window start (the turn containing the page
+// tail) is never turn index 0. Real agent sessions can run for hundreds
+// of tool messages between user prompts (measured: up to 791 in one
+// turn); without alignment, a page of mostly assistant messages makes
+// the first turn span the whole page and the prepend lands on the same
+// render start index, stalling the loading spinner.
+// Incremental batches: a turn can span up to ~800 messages, but most
+// pages only miss a few trailing assistant messages — a big batch would
+// inflate the window for every page. An ODD batch size matters: in the
+// common user/assistant alternation a batch starting at a user message
+// ends on an assistant when even-sized, so the page head would never
+// become a user message and the loop would extend until history is
+// exhausted. 51 x 32 covers the largest observed turn (~790).
+const ALIGN_BATCH_SIZE = 51;
+const ALIGN_MAX_ROUNDS = 32;
+
+function alignPageStart(
+  rawDb: DatabaseSync,
+  sessionId: string,
+  page: MessageRow[],
+): { rows: MessageRow[]; hasMore: boolean } {
+  const userCount = (rows: MessageRow[]): number =>
+    rows.filter((r) => r.role === "user").length;
+
+  let rounds = 0;
+  while (
+    page.length > 0 &&
+    rounds < ALIGN_MAX_ROUNDS &&
+    (page[0].role !== "user" || userCount(page) < 2)
+  ) {
+    const head = page[0];
+    const headAnchor = rawDb
+      .prepare(
+        "SELECT timestamp, rowid FROM messages WHERE id = ? AND session_id = ?",
+      )
+      .get(head.id, sessionId) as
+      | { timestamp: number; rowid: number }
+      | undefined;
+    if (!headAnchor) break;
+    const more = rawDb
+      .prepare(
+        `SELECT * FROM messages
+         WHERE session_id = ?
+           AND (timestamp < ? OR (timestamp = ? AND rowid < ?))
+         ORDER BY timestamp DESC, rowid DESC
+         LIMIT ?`,
+      )
+      .all(
+        sessionId,
+        headAnchor.timestamp,
+        headAnchor.timestamp,
+        headAnchor.rowid,
+        ALIGN_BATCH_SIZE,
+      ) as unknown as MessageRow[];
+    if (more.length === 0) break;
+    page = [...more.reverse(), ...page];
+    rounds += 1;
+  }
+
+  // Re-probe hasMore against the (possibly extended) page head.
+  if (page.length === 0) return { rows: [], hasMore: false };
+  const head = page[0];
+  const headAnchor = rawDb
+    .prepare(
+      "SELECT timestamp, rowid FROM messages WHERE id = ? AND session_id = ?",
+    )
+    .get(head.id, sessionId) as
+    | { timestamp: number; rowid: number }
+    | undefined;
+  const hasMore = Boolean(
+    headAnchor &&
+    rawDb
+      .prepare(
+        `SELECT 1 AS x FROM messages
+           WHERE session_id = ?
+             AND (timestamp < ? OR (timestamp = ? AND rowid < ?))
+           LIMIT 1`,
+      )
+      .get(
+        sessionId,
+        headAnchor.timestamp,
+        headAnchor.timestamp,
+        headAnchor.rowid,
+      ),
+  );
+  return { rows: page, hasMore };
 }

@@ -154,6 +154,21 @@ function installSharedIpcBridge(): void {
       switch (event.type) {
         case "session.list":
           store.setSessions(event.payload.sessions);
+          // Sync goal states restored by the main process at startup so the
+          // status bar reflects real goal status immediately after restart.
+          if (event.payload.goalStatuses) {
+            for (const [sessionId, g] of Object.entries(
+              event.payload.goalStatuses,
+            )) {
+              if (g) {
+                store.setGoalStatus(sessionId, {
+                  status: g.status,
+                  objective: g.objective,
+                  iteration: g.iteration,
+                });
+              }
+            }
+          }
           // Auto-restore last session with messages loaded (avoid white screen on restart)
           (async () => {
             try {
@@ -172,17 +187,23 @@ function installSharedIpcBridge(): void {
                 event.payload.sessions.some((s) => s.id === lastId)
               ) {
                 if (store.activeSessionId !== lastId) {
-                  const [messages, steps] = await Promise.all([
-                    invoke<Message[]>({
-                      type: "session.getMessages",
-                      payload: { sessionId: lastId },
+                  const [page, steps] = await Promise.all([
+                    invoke<{ messages: Message[]; hasMore: boolean }>({
+                      type: "session.getMessagesPage",
+                      payload: {
+                        sessionId: lastId,
+                        beforeId: null,
+                        limit: 1000,
+                      },
                     }),
                     invoke<TraceStep[]>({
                       type: "session.getTraceSteps",
                       payload: { sessionId: lastId },
                     }),
                   ]);
-                  if (messages) store.setMessages(lastId, messages);
+                  if (page) {
+                    store.setMessagesTail(lastId, page.messages, page.hasMore);
+                  }
                   if (steps) store.setTraceSteps(lastId, steps);
                   store.setActiveSession(lastId);
                 }
@@ -255,7 +276,9 @@ function installSharedIpcBridge(): void {
           store.setGlobalNotice({
             id: `pi-notify-${notifyToastSeq++}`,
             message: payload.message,
-            type: (payload.type === "error" ? "error" : "info") as "error" | "info",
+            type: (payload.type === "error" ? "error" : "info") as
+              | "error"
+              | "info",
           });
           break;
         }
@@ -288,11 +311,16 @@ function installSharedIpcBridge(): void {
             } else {
               store.updateSession(session.id, session);
             }
-            const messages = await invoke<Message[]>({
-              type: "session.getMessages",
-              payload: { sessionId: session.id },
+            const page = await invoke<{
+              messages: Message[];
+              hasMore: boolean;
+            }>({
+              type: "session.getMessagesPage",
+              payload: { sessionId: session.id, beforeId: null, limit: 1000 },
             });
-            if (messages) store.setMessages(session.id, messages);
+            if (page) {
+              store.setMessagesTail(session.id, page.messages, page.hasMore);
+            }
             store.setActiveSession(session.id);
           })();
           break;
@@ -488,11 +516,45 @@ function installSharedIpcBridge(): void {
           break;
 
         case "session.steer.result":
-          store.setSteerResult(event.payload.sessionId, {
-            status: event.payload.status,
-            text: event.payload.text,
-          });
+          if (event.payload.status === "failed") {
+            store.updateSteerRecord(
+              event.payload.sessionId,
+              event.payload.requestId,
+              {
+                status: "failed",
+                reason: event.payload.reason,
+              },
+            );
+          }
+          // accepted（已入队）不改变状态：仍为 injecting，等待 delivered 事件
           break;
+
+        case "session.steer.delivered": {
+          // 保证 injecting 态至少展示 500ms，避免一闪而过
+          const ss =
+            useAppStore.getState().sessionStates[event.payload.sessionId];
+          const record = ss?.steerRecords.find(
+            (r) => r.id === event.payload.requestId,
+          );
+          const elapsed = record ? Date.now() - record.ts : 0;
+          const delay = Math.max(0, 500 - elapsed);
+          setTimeout(() => {
+            // 延迟期间记录可能已被其他路径（如回合结束后 idle 兜底）标为 failed，
+            // 此时不再翻绿——否则用户会看到 failed → 回填输入框 → 又变绿。
+            const latest = useAppStore
+              .getState()
+              .sessionStates[event.payload.sessionId]?.steerRecords.find(
+                (r) => r.id === event.payload.requestId,
+              );
+            if (latest?.status === "failed") return;
+            store.updateSteerRecord(
+              event.payload.sessionId,
+              event.payload.requestId,
+              { status: "delivered" },
+            );
+          }, delay);
+          break;
+        }
 
         case "error":
           console.error("[useIPC] Server error:", event.payload.message);
@@ -784,6 +846,31 @@ export function useIPC() {
     ],
   );
 
+  const forkSession = useCallback(
+    async (sessionId: string, messageId: string, titleSuffix: string) => {
+      try {
+        const session = await invoke<Session>({
+          type: "session.fork",
+          payload: { sessionId, messageId, titleSuffix },
+        });
+        if (session) {
+          addSession(session);
+          useAppStore.getState().setActiveSession(session.id);
+        }
+        return session;
+      } catch (e) {
+        useAppStore.getState().setGlobalNotice({
+          id: `notice-session-fork-${Date.now()}`,
+          type: "error",
+          message: e instanceof Error ? e.message : i18n.t("chat.forkFailed"),
+          messageKey: e instanceof Error ? undefined : "chat.forkFailed",
+        });
+        return undefined;
+      }
+    },
+    [invoke, addSession],
+  );
+
   const setSessionThinkingLevel = useCallback(
     (sessionId: string, thinkingLevel: ThinkingLevel) => {
       updateSession(sessionId, { thinkingLevel });
@@ -1049,19 +1136,18 @@ export function useIPC() {
     send({ type: "session.list", payload: {} });
   }, [send]);
 
-  // Get messages for a session (from persistent storage)
-  const getSessionMessages = useCallback(
-    async (sessionId: string): Promise<Message[]> => {
-      if (!isElectron) {
-        console.log("[useIPC] Browser mode - no persistent messages");
-        return [];
-      }
-      console.log("[useIPC] Getting messages for session:", sessionId);
-      const messages = await invoke<Message[]>({
-        type: "session.getMessages",
-        payload: { sessionId },
+  // Get a page of messages (tail page when beforeId is null)
+  const getSessionMessagesPage = useCallback(
+    async (
+      sessionId: string,
+      beforeId: string | null,
+      limit: number,
+    ): Promise<{ messages: Message[]; hasMore: boolean } | null> => {
+      if (!isElectron) return { messages: [], hasMore: false };
+      return invoke<{ messages: Message[]; hasMore: boolean }>({
+        type: "session.getMessagesPage",
+        payload: { sessionId, beforeId, limit },
       });
-      return messages || [];
     },
     [invoke],
   );
@@ -1192,6 +1278,7 @@ export function useIPC() {
     invoke,
     startSession,
     continueSession,
+    forkSession,
     setSessionThinkingLevel,
     setSessionProviderModel,
     stopSession,
@@ -1203,7 +1290,7 @@ export function useIPC() {
     batchUnarchiveSessions,
     permanentDeleteArchived,
     listSessions,
-    getSessionMessages,
+    getSessionMessagesPage,
     getSessionTraceSteps,
     respondToPermission,
     respondToSudoPassword,

@@ -6,7 +6,6 @@ import {
   Square,
   Maximize2,
   Minimize2,
-  Target,
 } from "lucide-react";
 import { MergedInputChip } from "./MergedInputChip";
 
@@ -36,8 +35,6 @@ export interface ChatInputBottomBarProps {
   submitDisabled?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
-  onSteer?: () => void;
-  hasInput?: boolean;
 }
 
 export function ChatInputBottomBar({
@@ -60,8 +57,6 @@ export function ChatInputBottomBar({
   submitDisabled = false,
   isExpanded = false,
   onToggleExpand,
-  onSteer,
-  hasInput = false,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
@@ -146,19 +141,6 @@ export function ChatInputBottomBar({
             ) : (
               <Maximize2 className="w-4 h-4" />
             )}
-          </button>
-        )}
-
-        {/* Steering: one-click guidance injection when agent is running */}
-        {canStop && onSteer && hasInput && (
-          <button
-            type="button"
-            onClick={onSteer}
-            className="inline-flex items-center gap-1 h-9 px-2.5 rounded-full border border-border bg-surface text-text-secondary hover:bg-surface-hover hover:text-text-primary text-xs font-medium transition-colors"
-            title={t("steer.label")}
-          >
-            <Target className="w-3.5 h-3.5" />
-            <span>{t("steer.label")}</span>
           </button>
         )}
 

@@ -11,6 +11,7 @@ import {
   Brain,
   Target,
   Wrench,
+  Folder,
 } from "lucide-react";
 import type { Message, ContentBlock } from "../../types";
 import {
@@ -25,6 +26,7 @@ const PROCESS_ICON_MAP: Record<
   React.ReactNode
 > = {
   read: <BookOpen className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
+  filebrowse: <Folder className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   search: <Search className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   websearch: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   browse: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
@@ -64,7 +66,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
           {fragments.map((frag, fi) => (
             <span
               key={fi}
-              className={`inline-flex items-center gap-1 min-w-0 whitespace-nowrap${frag.iconType !== 'subagent' ? ' flex-shrink-0' : ''}`}
+              className={`inline-flex items-center gap-1 min-w-0 whitespace-nowrap${frag.iconType !== "subagent" ? " flex-shrink-0" : ""}`}
             >
               {fi > 0 && fi < fragments.length - 1 && (
                 <span className="text-text-muted">

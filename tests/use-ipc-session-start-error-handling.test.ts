@@ -10,7 +10,7 @@ describe('useIPC session start error handling', () => {
 
     expect(source).toContain('id: `notice-session-start-${Date.now()}`');
     expect(source).toContain(
-      "message: e instanceof Error ? e.message : i18n.t('chat.startFailed')"
+      'message: e instanceof Error ? e.message : i18n.t("chat.startFailed")'
     );
     expect(source).not.toContain('throw e;');
   });

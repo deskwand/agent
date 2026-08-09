@@ -12,14 +12,14 @@ describe('Sandbox executor containment wiring', () => {
     const wslSource = fs.readFileSync(wslAgentPath, 'utf8');
     const limaSource = fs.readFileSync(limaAgentPath, 'utf8');
 
-    expect(nativeSource).toContain("import { isPathWithinRoot } from '../tools/path-containment';");
+    expect(nativeSource).toContain('import { isPathWithinRoot } from "../tools/path-containment";');
     expect(nativeSource).toContain('isPathWithinRoot(targetCheck, workspaceCheck, isWindows)');
     expect(nativeSource).toContain('isPathWithinRoot(realCheck, workspaceCheck, isWindows)');
 
-    expect(wslSource).toContain("import { isPathWithinRoot } from './path-containment';");
+    expect(wslSource).toContain('import { isPathWithinRoot } from "./path-containment";');
     expect(wslSource).toContain('isPathWithinRoot(resolved, this.workspacePath)');
 
-    expect(limaSource).toContain("import { isPathWithinRoot } from './path-containment';");
+    expect(limaSource).toContain('import { isPathWithinRoot } from "./path-containment";');
     expect(limaSource).toContain('isPathWithinRoot(resolved, this.workspacePath)');
   });
 });

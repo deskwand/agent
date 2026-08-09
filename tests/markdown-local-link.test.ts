@@ -16,7 +16,7 @@ describe('normalizeLocalFileMarkdownLinks', () => {
 
     const output = normalizeLocalFileMarkdownLinks(input);
 
-    expect(output).toContain('[北京未来一个月天气介绍.docx](file:///Users/haoqing/Library/Application%20Support/oma/default_working_dir/%E5%8C%97%E4%BA%AC%E6%9C%AA%E6%9D%A5%E4%B8%80%E4%B8%AA%E6%9C%88%E5%A4%A9%E6%B0%94%E4%BB%8B%E7%BB%8D.docx)');
+    expect(output).toContain('[北京未来一个月天气介绍.docx](file:///Users/haoqing/Library/Application%20Support/deskwandgt/default_working_dir/%E5%8C%97%E4%BA%AC%E6%9C%AA%E6%9D%A5%E4%B8%80%E4%B8%AA%E6%9C%88%E5%A4%A9%E6%B0%94%E4%BB%8B%E7%BB%8D.docx)');
   });
 
   it('keeps web links unchanged', () => {
@@ -34,7 +34,7 @@ describe('normalizeLocalFileMarkdownLinks', () => {
 
 describe('extractLocalFilePathFromHref', () => {
   it('extracts decoded local path from file URL', () => {
-    const href = 'file:///Users/haoqing/Library/Application%20Support/oma/%E6%B5%8B%E8%AF%95.docx';
+    const href = 'file:///Users/haoqing/Library/Application%20Support/deskwandgt/%E6%B5%8B%E8%AF%95.docx';
     expect(extractLocalFilePathFromHref(href)).toBe('/Users/haoqing/Library/Application Support/deskwandgt/测试.docx');
   });
 
@@ -68,7 +68,7 @@ describe('resolveLocalFilePathFromHref', () => {
   });
 
   it('normalizes line breaks before resolving local href', () => {
-    const href = '/Users/haoqing/Library/Application\n Support/oma/default_working_dir/文档.docx';
+    const href = '/Users/haoqing/Library/Application\n Support/deskwandgt/default_working_dir/文档.docx';
     expect(resolveLocalFilePathFromHref(href, null))
       .toBe('/Users/haoqing/Library/Application Support/deskwandgt/default_working_dir/文档.docx');
   });

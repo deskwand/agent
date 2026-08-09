@@ -14,7 +14,11 @@ import type {
   PartialToolResult,
   CompactionState,
   CompactionStatus,
-  SteerResult,
+  QueuedInput,
+  SteerRecord,
+  SteerFailReason,
+  ImageContent,
+  FileAttachmentContent,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
 import type { ImageSource } from "../components/ImageLightbox";
@@ -40,6 +44,10 @@ export interface SessionExecutionClock {
 // Unified per-session state that replaces 8 parallel xxxBySession Maps
 export interface SessionState {
   historyHydrated: boolean;
+  /** Whether older history exists beyond the in-memory window. */
+  hasMoreOlder: boolean;
+  /** Id of the oldest message in the in-memory window (paging cursor). */
+  oldestMessageId: string | null;
   messages: Message[];
   partialByTurn: Record<string, { message: string; thinking: string }>;
   partialMessage: string;
@@ -50,7 +58,8 @@ export interface SessionState {
   traceSteps: TraceStep[];
   contextWindow: number;
   compaction: CompactionState;
-  steerResult: SteerResult | null;
+  inputQueue: QueuedInput[];
+  steerRecords: SteerRecord[];
   partialToolResults: Record<string, PartialToolResult>;
   goalStatus?: {
     status:
@@ -75,8 +84,18 @@ export interface SessionState {
   }>;
 }
 
+// Store window cap. prependOlderMessages allows the window to grow to
+// cap + page size before trimming the oldest messages (returning how many
+// were trimmed so the render window start can be remapped); trimming on
+// every prepend would discard the very page just loaded. Kept in sync
+// with the ChatView locals MAX_MEMORY_WINDOW_MESSAGES / LOAD_OLDER_PAGE_SIZE.
+const MAX_MEMORY_WINDOW_MESSAGES = 2000;
+const MESSAGE_PAGE_SIZE = 1000;
+
 const DEFAULT_SESSION_STATE: SessionState = {
   historyHydrated: false,
+  hasMoreOlder: false,
+  oldestMessageId: null,
   messages: [],
   partialByTurn: {},
   partialMessage: "",
@@ -87,7 +106,8 @@ const DEFAULT_SESSION_STATE: SessionState = {
   traceSteps: [],
   contextWindow: 0,
   compaction: { status: "idle" },
-  steerResult: null,
+  inputQueue: [],
+  steerRecords: [],
   partialToolResults: {},
   backgroundAgents: [],
 };
@@ -251,6 +271,17 @@ interface AppState {
   ) => void;
   removeBackgroundAgent: (sessionId: string, agentId: string) => void;
   setMessages: (sessionId: string, messages: Message[]) => void;
+  setMessagesTail: (
+    sessionId: string,
+    messages: Message[],
+    hasMore: boolean,
+  ) => void;
+  prependOlderMessages: (
+    sessionId: string,
+    older: Message[],
+    hasMore: boolean,
+  ) => number;
+  trimMessagesToWindow: (sessionId: string, keepCount: number) => void;
   setPartialMessage: (
     sessionId: string,
     partial: string,
@@ -334,8 +365,27 @@ interface AppState {
     estimatedTokens?: number,
   ) => void;
   dismissSessionCompaction: (sessionId: string) => void;
-  setSteerResult: (sessionId: string, result: SteerResult | null) => void;
-  clearSteerResult: (sessionId: string) => void;
+  enqueueInput: (
+    sessionId: string,
+    text: string,
+    images?: ImageContent[],
+    files?: FileAttachmentContent[],
+  ) => string;
+  removeInput: (sessionId: string, id: string) => void;
+  addSteerRecord: (
+    sessionId: string,
+    text: string,
+    anchorMessageId?: string,
+  ) => string;
+  updateSteerRecord: (
+    sessionId: string,
+    id: string,
+    updates: Partial<Pick<SteerRecord, "status" | "reason">>,
+  ) => void;
+  failPendingSteerRecords: (
+    sessionId: string,
+    reason: SteerFailReason,
+  ) => string[];
 
   setPartialToolResult: (
     sessionId: string,
@@ -552,7 +602,7 @@ export const useAppStore = create<AppState>((set) => ({
                 partialMessage: "",
                 partialThinking: "",
                 ...(message.tokenUsage
-                  ? { compaction: { status: "idle" }, steerResult: null }
+                  ? { compaction: { status: "idle" } }
                   : {}),
               }
             : {}),
@@ -658,6 +708,52 @@ export const useAppStore = create<AppState>((set) => ({
         historyHydrated: true,
       }),
     })),
+
+  setMessagesTail: (sessionId, messages, hasMore) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, {
+        messages,
+        hasMoreOlder: hasMore,
+        oldestMessageId: messages[0]?.id ?? null,
+        historyHydrated: true,
+      }),
+    })),
+
+  prependOlderMessages: (sessionId, older, hasMore) => {
+    let trimmedCount = 0;
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      const merged = [...older, ...ss.messages];
+      let messages = merged;
+      const cap = MAX_MEMORY_WINDOW_MESSAGES + MESSAGE_PAGE_SIZE;
+      if (merged.length > cap) {
+        trimmedCount = merged.length - MAX_MEMORY_WINDOW_MESSAGES;
+        messages = merged.slice(trimmedCount);
+      }
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          messages,
+          hasMoreOlder: hasMore,
+          oldestMessageId: messages[0]?.id ?? ss.oldestMessageId,
+          historyHydrated: true,
+        }),
+      };
+    });
+    return trimmedCount;
+  },
+
+  trimMessagesToWindow: (sessionId, keepCount) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      if (ss.messages.length <= keepCount) return {};
+      const messages = ss.messages.slice(-keepCount);
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          messages,
+          oldestMessageId: messages[0]?.id ?? null,
+        }),
+      };
+    }),
 
   setPartialMessage: (sessionId, partial, turnId) =>
     set((state) => {
@@ -1002,19 +1098,84 @@ export const useAppStore = create<AppState>((set) => ({
       };
     }),
 
-  setSteerResult: (sessionId, result) =>
-    set((state) => ({
-      sessionStates: patchSession(state.sessionStates, sessionId, {
-        steerResult: result,
-      }),
-    })),
+  enqueueInput: (sessionId, text, images, files) => {
+    const id = `queue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ts = Date.now();
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          inputQueue: [...ss.inputQueue, { id, text, ts, images, files }],
+        }),
+      };
+    });
+    return id;
+  },
 
-  clearSteerResult: (sessionId) =>
-    set((state) => ({
-      sessionStates: patchSession(state.sessionStates, sessionId, {
-        steerResult: null,
-      }),
-    })),
+  removeInput: (sessionId, id) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          inputQueue: ss.inputQueue.filter((item) => item.id !== id),
+        }),
+      };
+    }),
+
+  addSteerRecord: (sessionId, text, anchorMessageId) => {
+    const id = `steer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const ts = Date.now();
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          steerRecords: [
+            ...ss.steerRecords,
+            { id, text, status: "injecting" as const, ts, anchorMessageId },
+          ],
+        }),
+      };
+    });
+    return id;
+  },
+
+  updateSteerRecord: (sessionId, id, updates) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      const target = ss.steerRecords.find((r) => r.id === id);
+      if (!target) return {};
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          steerRecords: ss.steerRecords.map((r) =>
+            r.id === id ? { ...r, ...updates } : r,
+          ),
+        }),
+      };
+    }),
+
+  failPendingSteerRecords: (sessionId, reason) => {
+    const failedIds: string[] = [];
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      let changed = false;
+      const records = ss.steerRecords.map((r) => {
+        if (r.status === "injecting") {
+          changed = true;
+          failedIds.push(r.id);
+          return { ...r, status: "failed" as const, reason };
+        }
+        return r;
+      });
+      return changed
+        ? {
+            sessionStates: patchSession(state.sessionStates, sessionId, {
+              steerRecords: records,
+            }),
+          }
+        : {};
+    });
+    return failedIds;
+  },
 
   setPartialToolResult: (sessionId, toolCallId, result) =>
     set((state) => {
@@ -1137,23 +1298,31 @@ if (typeof window !== "undefined") {
         typeof window.electronAPI?.invoke === "function"
       ) {
         try {
-          const [messages, traceSteps] = await Promise.all([
+          const [page, traceSteps] = await Promise.all([
             window.electronAPI.invoke({
-              type: "session.getMessages",
-              payload: { sessionId },
+              type: "session.getMessagesPage",
+              payload: { sessionId, beforeId: null, limit: 1000 },
             }),
             window.electronAPI.invoke({
               type: "session.getTraceSteps",
               payload: { sessionId },
             }),
           ]);
-          store.setMessages(sessionId, Array.isArray(messages) ? messages : []);
+          const pageResult = page as {
+            messages?: unknown;
+            hasMore?: unknown;
+          } | null;
+          store.setMessagesTail(
+            sessionId,
+            Array.isArray(pageResult?.messages) ? pageResult.messages : [],
+            Boolean(pageResult?.hasMore),
+          );
           store.setTraceSteps(
             sessionId,
             Array.isArray(traceSteps) ? traceSteps : [],
           );
         } catch {
-          store.setMessages(sessionId, []);
+          store.setMessagesTail(sessionId, [], false);
           store.setTraceSteps(sessionId, []);
         }
       }

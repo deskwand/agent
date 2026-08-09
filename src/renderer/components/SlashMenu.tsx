@@ -9,6 +9,9 @@ export type SlashTab = "all" | "commands" | "skills";
 interface SlashMenuProps {
   commands: SlashCommand[];
   skills: Skill[];
+  // Optional: merged "all" list. Defaults to commands+skills when absent
+  // (kept optional so direct-render callers/tests without the prop keep working).
+  allItems?: SlashItem[];
   activeTab: SlashTab;
   selectedIndex: number;
   onSelect: (item: SlashItem) => void;
@@ -55,6 +58,7 @@ export const SLASH_MENU_CONTAINER_CLASS =
 export function SlashMenu({
   commands,
   skills,
+  allItems,
   activeTab,
   selectedIndex,
   onSelect,
@@ -73,11 +77,9 @@ export function SlashMenu({
     skill: { name: s.name, description: s.description },
   }));
 
-  const allItems = [...commandItems, ...skillItems];
-
   const displayItems =
     activeTab === "all"
-      ? allItems
+      ? (allItems ?? [...commandItems, ...skillItems])
       : activeTab === "commands"
         ? commandItems
         : skillItems;
@@ -170,80 +172,7 @@ export function SlashMenu({
           <div className="flex items-center justify-center h-16 text-sm text-text-muted">
             {t("chat.slashNoMatch")}
           </div>
-        ) : activeTab === "all" ? (
-          /* Grouped view */
-          <>
-            {hasCommands && (
-              <div className="mb-1">
-                <div className="px-2.5 py-1 text-[11px] text-text-muted font-semibold uppercase tracking-wide">
-                  {t("chat.slashTabCommands")} · {commandItems.length}
-                </div>
-                {commandItems.map((item, idx) => {
-                  if (item.category !== "command") return null;
-                  const isExtension = item.command.source === "extension";
-                  return (
-                    <MenuItem
-                      key={`cmd:${item.command.name}`}
-                      index={idx}
-                      selectedIndex={selectedIndex}
-                      onSelect={() => onSelect(item)}
-                      label={`/${item.command.name}`}
-                      description={item.command.description}
-                      icon={
-                        isExtension ? (
-                          <Package className="w-4 h-4 text-text-muted flex-shrink-0" />
-                        ) : (
-                          <Zap className="w-4 h-4 text-accent flex-shrink-0" />
-                        )
-                      }
-                      badge={
-                        isExtension ? (
-                          <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">
-                            {t("slash.pluginCommand")}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
-                            {t("chat.slashTabCommands")}
-                          </span>
-                        )
-                      }
-                    />
-                  );
-                })}
-              </div>
-            )}
-            {hasCommands && hasSkills && (
-              <div className="mx-2 my-1 border-t border-border" />
-            )}
-            {hasSkills && (
-              <div className="mt-1">
-                <div className="px-2.5 py-1 text-[11px] text-text-muted font-semibold uppercase tracking-wide">
-                  {t("chat.slashTabSkills")} · {skillItems.length}
-                </div>
-                {skillItems.map((item, idx) => {
-                  if (item.category !== "skill") return null;
-                  const skill = skills.find((s) => s.name === item.skill.name);
-                  const type = skill?.type ?? "builtin";
-                  return (
-                    <MenuItem
-                      key={`skill:${item.skill.name}`}
-                      index={commandItems.length + idx}
-                      selectedIndex={selectedIndex}
-                      onSelect={() => onSelect(item)}
-                      label={`/skill:${item.skill.name}`}
-                      description={item.skill.description}
-                      icon={
-                        <Sparkles className="w-4 h-4 text-text-muted flex-shrink-0" />
-                      }
-                      badge={<SkillTypeBadge type={type} />}
-                    />
-                  );
-                })}
-              </div>
-            )}
-          </>
         ) : (
-          /* Single tab view */
           displayItems.map((item, idx) => {
             if (item.category === "command") {
               const isExtension = item.command.source === "extension";
@@ -266,6 +195,10 @@ export function SlashMenu({
                     isExtension ? (
                       <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded">
                         {t("slash.pluginCommand")}
+                      </span>
+                    ) : activeTab === "all" ? (
+                      <span className="text-[10px] text-accent bg-accent/10 px-1.5 py-0.5 rounded">
+                        {t("chat.slashTabCommands")}
                       </span>
                     ) : undefined
                   }

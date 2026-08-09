@@ -20,10 +20,9 @@ describe('useIPC config/status gating', () => {
   it('maps active-set config-required errors to a global notice with open settings action', () => {
     const source = fs.readFileSync(useIPCPath, 'utf8');
 
-    expect(source).toContain("event.payload.code === 'CONFIG_REQUIRED_ACTIVE_SET'");
+    expect(source).toContain('event.payload.code === "CONFIG_REQUIRED_ACTIVE_SET"');
     expect(source).toContain('store.setGlobalNotice({');
-    expect(source).toContain(
-      "event.payload.action === 'open_api_settings' ? 'open_api_settings' : undefined"
-    );
+    expect(source).toContain('event.payload.action === "open_api_settings"');
+    expect(source).toContain('? "open_api_settings"');
   });
 });

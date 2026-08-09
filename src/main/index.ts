@@ -68,7 +68,7 @@ import {
   type ThemePreset,
   type SaveProviderPayload,
   type ProviderProfileKey,
-  enrichOAuthProviderModels,
+  enrichProviderModelsFromRegistry,
 } from "./config/config-store";
 import { runConfigApiTest } from "./config/config-test-routing";
 import {
@@ -134,7 +134,6 @@ import {
   setDevLogsEnabled,
   isDevLogsEnabled,
 } from "./utils/logger";
-import { listRecentWorkspaceFiles } from "./utils/recent-workspace-files";
 import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
@@ -2176,16 +2175,6 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle(
-  "artifacts.listRecentFiles",
-  async (_event, cwd: string, sinceMs: number, limit: number = 50) => {
-    if (!cwd || !isAbsolute(cwd)) {
-      return [];
-    }
-    return listRecentWorkspaceFiles(cwd, sinceMs, limit);
-  },
-);
-
 ipcMain.handle("video.getSourceUrl", (event, filePath: string) => {
   if (
     !mainWindow ||
@@ -2429,8 +2418,8 @@ ipcMain.handle(
   async (_event, payload: SaveProviderPayload) => {
     log("[Config] Saving provider:", payload.profileKey);
     const previousConfig = configStore.getAll();
-    // Enrich OAuth models from pi-ai built-in registry (authoritative source)
-    const enriched = await enrichOAuthProviderModels(payload);
+    // Enrich provider models from pi-ai built-in registry (authoritative source)
+    const enriched = await enrichProviderModelsFromRegistry(payload);
     configStore.saveProvider(enriched);
     const updatedConfig = await syncConfigAfterMutation(previousConfig);
     return { success: true, config: updatedConfig };
@@ -3979,6 +3968,13 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.turnId,
       );
 
+    case "session.fork":
+      return sm.forkSession(
+        event.payload.sessionId,
+        event.payload.messageId,
+        event.payload.titleSuffix,
+      );
+
     case "session.command":
       return sm.handleGoalCommand(
         event.payload.sessionId,
@@ -4013,7 +4009,12 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       return { success: true };
 
     case "session.steer":
-      sm.steerSession(event.payload.sessionId, event.payload.prompt);
+      sm.steerSession(
+        event.payload.sessionId,
+        event.payload.prompt,
+        event.payload.requestId,
+        event.payload.images,
+      );
       return { success: true };
 
     case "session.delete":
@@ -4044,6 +4045,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         payload: {
           sessions: result.sessions,
           contextWindows: result.contextWindows,
+          goalStatuses: result.goalStatuses,
         },
       });
       return result.sessions;
@@ -4051,6 +4053,13 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
 
     case "session.getMessages":
       return sm.getMessages(event.payload.sessionId);
+
+    case "session.getMessagesPage":
+      return sm.getMessagesPage(
+        event.payload.sessionId,
+        event.payload.beforeId,
+        event.payload.limit,
+      );
 
     case "session.getTraceSteps":
       return sm.getTraceSteps(event.payload.sessionId);

@@ -64,12 +64,47 @@ interface ProviderDraft {
 
 const PROVIDER_ORDER: ProviderChoice[] = [
   "openrouter",
+  "opencode",
   "anthropic",
   "deepseek",
   "openai",
   "gemini",
   "custom",
 ];
+
+/** 视觉模型设置页的 provider 列表：在主模型列表基础上追加「智谱」，排除 OpenCode（MVP 不含视觉） */
+const VISION_PROVIDER_ORDER: ProviderChoice[] = [
+  ...PROVIDER_ORDER.filter((provider) => provider !== "opencode"),
+  "zhipu",
+];
+
+/** 智谱区域端点（两站 API Key 不互通，仅 baseUrl 不同） */
+const ZHIPU_REGIONS = [
+  {
+    id: "cn",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    labelKey: "api.zhipuRegionCn",
+  },
+  {
+    id: "global",
+    baseUrl: "https://api.z.ai/api/paas/v4",
+    labelKey: "api.zhipuRegionGlobal",
+  },
+] as const;
+
+/** OpenCode 订阅计划：Zen（按量付费）与 Go（$10/月订阅），同一账号同一 API Key */
+const OPENCODE_PLANS = [
+  {
+    id: "zen",
+    provider: "opencode" as const,
+    labelKey: "api.opencodePlanZen",
+  },
+  {
+    id: "go",
+    provider: "opencode-go" as const,
+    labelKey: "api.opencodePlanGo",
+  },
+] as const;
 
 const OAUTH_PROVIDER_MODELS: Record<
   string,
@@ -231,6 +266,12 @@ function hasUsableCredentials(
   return Boolean(apiKey);
 }
 
+/** OpenCode 各计划的默认模型（与 config-store defaultProfiles 保持一致，成本均衡优先） */
+const OPENCODE_DEFAULT_MODELS: Partial<Record<ProviderType, string>> = {
+  opencode: "gpt-5.6-luna",
+  "opencode-go": "kimi-k3",
+};
+
 function createEmptyDraft(
   provider: ProviderType,
   presets: ProviderPresets,
@@ -250,7 +291,8 @@ function createEmptyDraft(
     name: "",
     apiKey: "",
     baseUrl: preset.baseUrl,
-    defaultModel: defaultPresetModel?.id || "",
+    defaultModel:
+      OPENCODE_DEFAULT_MODELS[provider] || defaultPresetModel?.id || "",
     models: [],
   };
 }
@@ -293,8 +335,13 @@ function sanitizeDraft(
       ...draft,
       name: draft.name.trim(),
       apiKey: draft.apiKey.trim(),
+      customProtocol:
+        draft.provider === "opencode" || draft.provider === "opencode-go"
+          ? "openai"
+          : draft.customProtocol,
       baseUrl: preset.baseUrl,
-      defaultModel: presetModels[0]?.id || "",
+      defaultModel:
+        OPENCODE_DEFAULT_MODELS[draft.provider] || presetModels[0]?.id || "",
       models: [],
     };
   }
@@ -357,6 +404,11 @@ function searchMatchingProfiles(
         return [{ key, name: config.name || key }];
       return [];
     }
+    if (provider === "deepseek") {
+      if (config.provider === "deepseek")
+        return [{ key, name: config.name || key }];
+      return [];
+    }
     if (
       config.provider === "gemini" ||
       (config.provider !== "oauth" && config.customProtocol === "gemini")
@@ -368,7 +420,7 @@ function searchMatchingProfiles(
 
 function searchAddInheritedDefaults(appConfig: AppConfig): WebAccessConfig {
   let draft = normalizeWebAccessConfig(appConfig.webAccess);
-  for (const provider of ["openai", "gemini"] as const) {
+  for (const provider of ["openai", "gemini", "deepseek"] as const) {
     const credential = draft[provider];
     if (credential.source !== "inherit" || credential.profileKey) continue;
     const profiles = searchMatchingProfiles(appConfig, provider);
@@ -1344,7 +1396,7 @@ export function SettingsAPI({
                 </select>
               </label>
 
-              {(["openai", "gemini"] as const).map((provider) => {
+              {(["openai", "gemini", "deepseek"] as const).map((provider) => {
                 const credential = searchDraft[provider];
                 const isOpen = searchExpanded === provider;
                 return (
@@ -1662,7 +1714,7 @@ export function SettingsAPI({
                     {t("api.provider")}
                   </label>
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                    {PROVIDER_ORDER.map((provider) => (
+                    {VISION_PROVIDER_ORDER.map((provider) => (
                       <button
                         key={provider}
                         type="button"
@@ -1677,6 +1729,10 @@ export function SettingsAPI({
                               provider !== "custom"
                                 ? preset?.baseUrl || ""
                                 : prev.baseUrl,
+                            model:
+                              provider === "zhipu"
+                                ? "glm-4.6v-flash"
+                                : prev.model,
                           }));
                         }}
                         className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
@@ -1732,6 +1788,40 @@ export function SettingsAPI({
                         ),
                       )}
                     </div>
+                  </div>
+                )}
+
+                {/* Zhipu region selector */}
+                {visionDraft.provider === "zhipu" && (
+                  <div className="space-y-3 border-b border-border-muted pb-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <Globe2 className="h-4 w-4" />
+                      {t("api.region")}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ZHIPU_REGIONS.map((region) => (
+                        <button
+                          key={region.id}
+                          type="button"
+                          onClick={() =>
+                            setVisionDraft((prev) => ({
+                              ...prev,
+                              baseUrl: region.baseUrl,
+                            }))
+                          }
+                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                            visionDraft.baseUrl === region.baseUrl
+                              ? "border-accent bg-accent/10 font-medium text-accent"
+                              : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                          }`}
+                        >
+                          {t(region.labelKey)}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-text-muted">
+                      {t("api.zhipuRegionHint")}
+                    </p>
                   </div>
                 )}
 
@@ -2022,6 +2112,35 @@ export function SettingsAPI({
                     ))}
                   </div>
                 </div>
+
+                {(draft.provider === "opencode" ||
+                  draft.provider === "opencode-go") && (
+                  <div className="space-y-3 border-b border-border-muted py-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <Globe2 className="h-4 w-4" />
+                      {t("api.opencodePlan")}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {OPENCODE_PLANS.map((plan) => (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => selectProvider(plan.provider)}
+                          className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
+                            draft.provider === plan.provider
+                              ? "border-accent bg-accent/10 font-medium text-accent"
+                              : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                          }`}
+                        >
+                          {t(plan.labelKey)}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-text-muted">
+                      {t("api.opencodePlanHint")}
+                    </p>
+                  </div>
+                )}
 
                 {isCustomDraft && (
                   <div className="space-y-3 border-b border-border-muted py-5">

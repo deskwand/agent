@@ -18,9 +18,10 @@ import {
   type WebAccessToolDetails,
 } from "../../../../shared/web-access";
 import type { WebAccessCache } from "./cache";
-import type {
-  ResolvedWebAccessAuth,
-  ResolveWebAccessProviderAuth,
+import {
+  isDeepSeekAuth,
+  type ResolvedWebAccessAuth,
+  type ResolveWebAccessProviderAuth,
 } from "./config-adapter";
 import { fetchAllContent } from "./extract";
 import { normalizeFetchContentParams } from "./fetch-params";
@@ -96,7 +97,7 @@ async function buildRuntime(
     provider: WebAccessAuthProvider,
     credential: WebAccessCredential,
   ) => Promise<ResolvedWebAccessAuth | undefined>,
-  needs: { openai?: boolean; gemini?: boolean },
+  needs: { openai?: boolean; gemini?: boolean; deepseek?: boolean },
   authErrorsFatal = false,
 ): Promise<WebSearchRuntime> {
   const authErrors: Partial<Record<WebAccessAuthProvider, string>> = {};
@@ -115,17 +116,26 @@ async function buildRuntime(
       return undefined;
     }
   };
-  const [openai, gemini] = await Promise.all([
+  const [openai, gemini, deepseek] = await Promise.all([
     resolveOptional("openai", config.openai, needs.openai),
     resolveOptional("gemini", config.gemini, needs.gemini),
+    resolveOptional("deepseek", config.deepseek, needs.deepseek),
   ]);
   return {
     defaultProvider: config.defaultProvider,
     openai:
-      openai?.provider === "openai" || openai?.provider === "openai-codex"
+      openai !== undefined &&
+      "provider" in openai &&
+      (openai.provider === "openai" || openai.provider === "openai-codex")
         ? openai
         : undefined,
-    gemini: gemini?.provider === "gemini" ? gemini : undefined,
+    gemini:
+      gemini !== undefined &&
+      "provider" in gemini &&
+      gemini.provider === "gemini"
+        ? gemini
+        : undefined,
+    deepseek: deepseek && isDeepSeekAuth(deepseek) ? deepseek : undefined,
     exaApiKey: config.exaApiKey.trim() || undefined,
     braveApiKey: config.braveApiKey.trim() || undefined,
     parallelApiKey: config.parallelApiKey.trim() || undefined,
@@ -277,7 +287,7 @@ export function createWebAccessTools(
         runtime = await buildRuntime(
           config,
           options.resolveProviderAuth,
-          { openai: true, gemini: true },
+          { openai: true, gemini: true, deepseek: true },
           false,
         );
       } catch (error) {

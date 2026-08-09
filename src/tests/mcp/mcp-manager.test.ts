@@ -4,15 +4,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock electron
-vi.mock("electron", () => ({
-  app: {
-    isPackaged: false,
-    getPath: () => "/tmp/deskwand-test",
-  },
-  BrowserWindow: {
-    getAllWindows: () => [],
-  },
-}));
 
 // Mock logger to suppress output during tests
 vi.mock("../../main/utils/logger", () => ({

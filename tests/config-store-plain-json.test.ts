@@ -168,11 +168,13 @@ describe('ConfigStore plain JSON behavior', () => {
       defaultProvider: 'auto',
       openai: { source: 'inherit', profileKey: '', apiKey: '', baseUrl: '' },
       gemini: { source: 'inherit', profileKey: '', apiKey: '', baseUrl: '' },
+      deepseek: { source: 'inherit', profileKey: '', apiKey: '', baseUrl: '' },
       exaApiKey: '',
       braveApiKey: '',
       parallelApiKey: '',
       tavilyApiKey: '',
       perplexityApiKey: '',
+      ssrfEnabled: false,
     });
   });
 

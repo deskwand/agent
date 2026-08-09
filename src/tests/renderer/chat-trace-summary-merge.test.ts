@@ -119,6 +119,8 @@ function setSessionMessages(messages: Message[]): void {
     sessionStates: {
       s1: {
         historyHydrated: true,
+        hasMoreOlder: false,
+        oldestMessageId: null,
         messages,
         partialByTurn: {},
         partialMessage: "",
@@ -129,7 +131,8 @@ function setSessionMessages(messages: Message[]): void {
         traceSteps: [],
         contextWindow: 0,
         compaction: { status: "idle" },
-        steerResult: null,
+        inputQueue: [],
+        steerRecords: [],
         partialToolResults: {},
         backgroundAgents: [],
       },

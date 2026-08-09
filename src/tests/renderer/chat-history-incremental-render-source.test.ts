@@ -10,33 +10,30 @@ function readChatView(): string {
 }
 
 describe("ChatView incremental history wiring", () => {
-  it("renders from a sliced message window instead of mapping the full history directly", () => {
+  it("renders from a fixed-size message window instead of the full history", () => {
     const source = readChatView();
-    expect(source).toContain("const INITIAL_VISIBLE_TURNS = 8;");
-    expect(source).toContain("const PREPEND_TURNS = 6;");
+    expect(source).toContain("const MAX_RENDER_MESSAGES = 400;");
     expect(source).toContain(
-      "const [visibleTurnStartIndex, setVisibleTurnStartIndex] = useState(0);",
+      "const [visibleMessageStartIndex, setVisibleMessageStartIndex] = useState(0);",
     );
     expect(source).toContain(
-      "const turnRanges = useMemo(() => buildTurnRanges(displayedMessages)",
+      "displayedMessages.slice(\n        visibleMessageStartIndex,\n        visibleMessageStartIndex + MAX_RENDER_MESSAGES,",
     );
-    expect(source).toContain("const visibleMessages = useMemo(() =>");
-    expect(source).toContain(
-      "displayedMessages.slice(visibleMessageStartIndex)",
-    );
-    expect(source).toContain(
-      "visibleTurnEntries.map(({ message, isStreaming, isLatestRound, artifactFiles }) => (",
-    );
+    expect(source).toContain("mergedTurnEntries.map(");
   });
 
-  it("shows a top loading affordance while prepending older turns", () => {
+  it("anchors dock ticks to the in-memory window, not the render window", () => {
+    const source = readChatView();
+    expect(source).toContain(
+      "// Dock ticks are anchored to the IN-MEMORY window (all loaded history),",
+    );
+    expect(source).toContain("const MAX_DOCK_TICKS = 50;");
+    expect(source).toContain("onTickSelect={handleDockTickSelect}");
+  });
+
+  it("shows a top loading affordance while fetching older history", () => {
     const source = readChatView();
     expect(source).toContain("isLoadingOlder && displayedMessages.length > 0");
     expect(source).toContain("<Loader2");
-  });
-
-  it("documents the current one-sided windowing tradeoff", () => {
-    const source = readChatView();
-    expect(source).toContain("TODO: add bottom-side reclamation");
   });
 });

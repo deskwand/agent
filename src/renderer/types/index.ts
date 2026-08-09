@@ -10,10 +10,7 @@ export type {
 import type { ChannelPairingEvent } from "../../shared/ipc-types";
 import type { ChannelInstanceStatus } from "../../shared/ipc-types";
 import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
-import type {
-  PiTuiOpenEvent,
-  PiTuiFrameEvent,
-} from "../../shared/ipc-types";
+import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
 
 // Session types
 export interface Session {
@@ -154,9 +151,32 @@ export interface CompactionState {
   estimatedTokens?: number | null;
 }
 
-export interface SteerResult {
-  status: "pending" | "accepted" | "failed";
+/** 输入框上方排队区条目（非 idle 发送时产生，含附件）。 */
+export interface QueuedInput {
+  id: string;
   text: string;
+  ts: number;
+  images?: ImageContent[];
+  files?: FileAttachmentContent[];
+}
+
+export type SteerRecordStatus = "injecting" | "delivered" | "failed";
+
+export type SteerFailReason =
+  | "no-active-session"
+  | "sdk-error"
+  | "session-stopped";
+
+/** 消息流内联引导记录。id 同时作为 IPC requestId 用于送达匹配。
+ *  anchorMessageId = 注入时刻最后一条可见消息的 id（渲染时锚定时序位置）。
+ *  注意：会话 compaction 会整体替换消息，锚点随之失效（记录 fallback 到末尾）。 */
+export interface SteerRecord {
+  id: string;
+  text: string;
+  status: SteerRecordStatus;
+  reason?: SteerFailReason;
+  ts: number;
+  anchorMessageId?: string;
 }
 
 // Trace types for visualization
@@ -479,6 +499,14 @@ export type ClientEvent =
       };
     }
   | {
+      type: "session.fork";
+      payload: {
+        sessionId: string;
+        messageId: string;
+        titleSuffix: string;
+      };
+    }
+  | {
       type: "session.setThinkingLevel";
       payload: { sessionId: string; thinkingLevel: ThinkingLevel };
     }
@@ -498,7 +526,12 @@ export type ClientEvent =
   | { type: "session.abortCompaction"; payload: { sessionId: string } }
   | {
       type: "session.steer";
-      payload: { sessionId: string; prompt: string };
+      payload: {
+        sessionId: string;
+        prompt: string;
+        requestId: string;
+        images?: ImageContent[];
+      };
     }
   | {
       type: "session.command";
@@ -513,6 +546,10 @@ export type ClientEvent =
   | { type: "session.archiveDelete"; payload: { sessionId: string } }
   | { type: "session.list"; payload: Record<string, never> }
   | { type: "session.getMessages"; payload: { sessionId: string } }
+  | {
+      type: "session.getMessagesPage";
+      payload: { sessionId: string; beforeId: string | null; limit: number };
+    }
   | { type: "session.getTraceSteps"; payload: { sessionId: string } }
   | {
       type: "permission.response";
@@ -611,7 +648,24 @@ export type ServerEvent =
     }
   | {
       type: "session.list";
-      payload: { sessions: Session[]; contextWindows?: Record<string, number> };
+      payload: {
+        sessions: Session[];
+        contextWindows?: Record<string, number>;
+        goalStatuses?: Record<
+          string,
+          {
+            status:
+              | "active"
+              | "paused"
+              | "complete"
+              | "cleared"
+              | "blocked"
+              | "budget_limited";
+            objective: string;
+            iteration: number;
+          }
+        >;
+      };
     }
   | { type: "permission.request"; payload: PermissionRequest }
   | { type: "permission.dismiss"; payload: { toolUseId: string } }
@@ -652,7 +706,13 @@ export type ServerEvent =
         sessionId: string;
         status: "accepted" | "failed";
         text: string;
+        requestId: string;
+        reason?: SteerFailReason;
       };
+    }
+  | {
+      type: "session.steer.delivered";
+      payload: { sessionId: string; text: string; requestId: string };
     }
   | {
       type: "navigate.to";
@@ -808,7 +868,10 @@ export type ProviderType =
   | "openai"
   | "gemini"
   | "ollama"
-  | "oauth";
+  | "oauth"
+  | "zhipu"
+  | "opencode"
+  | "opencode-go";
 export type CustomProtocolType = "anthropic" | "openai" | "gemini";
 export interface VisionModelConfig {
   enabled: boolean;
@@ -924,6 +987,9 @@ export interface ProviderPresets {
   custom: ProviderPreset;
   openai: ProviderPreset;
   gemini: ProviderPreset;
+  zhipu: ProviderPreset;
+  opencode: ProviderPreset;
+  "opencode-go": ProviderPreset;
 }
 
 export interface ProviderModelInfo {

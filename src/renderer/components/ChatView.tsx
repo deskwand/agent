@@ -32,7 +32,11 @@ import type {
   ProviderProfileKey,
   ApiProviderConfig,
   ToolUseContent,
+  QueuedInput,
+  ImageContent,
+  FileAttachmentContent,
 } from "../types";
+import { mergeSteerEntries, resolveAnchorMessageId } from "../steer-entries";
 import {
   buildProcessSummaryDisplayBlock,
   collectResultFiles,
@@ -46,7 +50,14 @@ import {
   extractVideoReferences,
   type VideoReference,
 } from "../utils/video-reference";
-import { Plug, ChevronsDown, Loader2 } from "lucide-react";
+import {
+  Plug,
+  ChevronsDown,
+  Loader2,
+  Navigation,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
   ChatInput,
@@ -54,6 +65,7 @@ import {
   type ChatInputSubmitData,
 } from "./ChatInput";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
+import { ChatInputQueueBar } from "./ChatInputQueueBar";
 import { ChatInputStatusBar, resolveInputStatus } from "./ChatInputStatusBar";
 import {
   MessageNavRail,
@@ -107,101 +119,6 @@ function appendMergedLiveBlock(
   target.push(block);
 }
 
-export interface TurnRange {
-  start: number;
-  end: number;
-}
-
-export function buildTurnRanges(messages: Message[]): TurnRange[] {
-  if (messages.length === 0) return [];
-
-  const userIndexes = messages.flatMap((message, index) =>
-    message.role === "user" ? [index] : [],
-  );
-
-  if (userIndexes.length === 0) {
-    // System-only conversation (for example a preamble) — treat as a single turn.
-    return [{ start: 0, end: messages.length }];
-  }
-
-  return userIndexes.map((userIndex, index) => ({
-    start: index === 0 ? 0 : userIndex,
-    end: userIndexes[index + 1] ?? messages.length,
-  }));
-}
-
-export function getInitialVisibleTurnStart(
-  totalTurns: number,
-  initialVisibleTurns: number,
-): number {
-  return Math.max(totalTurns - initialVisibleTurns, 0);
-}
-
-export function getPreviousVisibleTurnStart(
-  currentStart: number,
-  prependTurns: number,
-): number {
-  return Math.max(currentStart - prependTurns, 0);
-}
-
-export function getPrependedVisibleTurnStart(
-  currentStart: number,
-  turnCount: number,
-  prependTurns: number,
-): number {
-  if (turnCount <= 0) return 0;
-  return getPreviousVisibleTurnStart(
-    Math.min(currentStart, turnCount - 1),
-    prependTurns,
-  );
-}
-
-export function getEffectiveVisibleTurnStart(
-  activeSessionId: string | null,
-  initializedSessionId: string | null,
-  turnCount: number,
-  visibleTurnStartIndex: number,
-  initialVisibleTurns: number,
-): number {
-  if (turnCount === 0) return 0;
-  if (
-    shouldInitializeVisibleTurns(
-      activeSessionId,
-      initializedSessionId,
-      turnCount,
-    )
-  ) {
-    return getInitialVisibleTurnStart(turnCount, initialVisibleTurns);
-  }
-  return Math.min(visibleTurnStartIndex, turnCount - 1);
-}
-
-export function getVisibleMessageStartIndex(
-  turnRanges: TurnRange[],
-  visibleTurnStartIndex: number,
-): number {
-  return turnRanges[visibleTurnStartIndex]?.start ?? 0;
-}
-
-export function shouldInitializeVisibleTurns(
-  activeSessionId: string | null,
-  initializedSessionId: string | null,
-  turnCount: number,
-): boolean {
-  return (
-    Boolean(activeSessionId) &&
-    activeSessionId !== initializedSessionId &&
-    turnCount > 0
-  );
-}
-
-export function canLoadOlderTurns(
-  isLoadingOlder: boolean,
-  visibleTurnStartIndex: number,
-): boolean {
-  return !isLoadingOlder && visibleTurnStartIndex > 0;
-}
-
 export function didSessionHistoryScopeChange(
   previousSessionId: string | null,
   activeSessionId: string | null,
@@ -212,9 +129,21 @@ export function didSessionHistoryScopeChange(
 export function shouldAutoFillViewport(
   scrollHeight: number,
   clientHeight: number,
-  visibleTurnStartIndex: number,
+  visibleMessageStartIndex: number,
 ): boolean {
-  return visibleTurnStartIndex > 0 && scrollHeight <= clientHeight;
+  return visibleMessageStartIndex > 0 && scrollHeight <= clientHeight;
+}
+
+export function shouldInitializeVisibleWindow(
+  activeSessionId: string | null,
+  initializedSessionId: string | null,
+  messageCount: number,
+): boolean {
+  return (
+    Boolean(activeSessionId) &&
+    activeSessionId !== initializedSessionId &&
+    messageCount > 0
+  );
 }
 
 export function getAnchoredScrollTop(
@@ -239,8 +168,20 @@ export function shouldShowHydratingHistoryState(
   );
 }
 
-const INITIAL_VISIBLE_TURNS = 8;
-const PREPEND_TURNS = 6;
+// Render window is a FIXED-SIZE message window, not a turn window:
+// in agent sessions a single turn can span hundreds of tool messages,
+// so an 8-turn window could render thousands of MessageCards and take
+// seconds to open. The window slides from the tail (initial/at-bottom)
+// or follows the scroll position into older history.
+const MAX_RENDER_MESSAGES = 400;
+const PREPEND_MESSAGES = 200;
+// Page size for fetching older history and the store window cap,
+// kept in sync with MESSAGE_PAGE_SIZE / MAX_WINDOW_MESSAGES.
+const LOAD_OLDER_PAGE_SIZE = 1000;
+const MAX_MEMORY_WINDOW_MESSAGES = 2000;
+// Nav-rail dock: cap the tick count (sampled uniformly) so user-dense
+// sessions keep a stable dock while user-sparse ones never empty out.
+const MAX_DOCK_TICKS = 50;
 // Wheel deltas below this are trackpad jitter, not a scroll gesture.
 const WHEEL_KILL_THRESHOLD_PX = 4;
 // Fire a little before the user hits absolute top to hide prepend latency.
@@ -255,18 +196,6 @@ export function ChatView() {
   const { partialMessage } = useActivePartialContent();
   const activeTurn = useActiveTurn();
   const pendingTurns = usePendingTurns();
-  const [steeringEvent, setSteeringEvent] = useState<{
-    turnId: string;
-    text: string;
-  } | null>(null);
-  const [steerDisplayReady, setSteerDisplayReady] = useState(false);
-  const steerSentAtRef = useRef(0);
-  // Clear steering event when active turn changes
-  useEffect(() => {
-    setSteeringEvent((prev) =>
-      prev && activeTurn && prev.turnId === activeTurn.turnId ? prev : null,
-    );
-  }, [activeTurn?.turnId]);
 
   const appConfig = useAppConfig();
   const contextWindow = useAppStore((s) =>
@@ -279,6 +208,10 @@ export function ChatView() {
   );
   const compaction = sessionState?.compaction ?? { status: "idle" as const };
   const backgroundAgents = sessionState?.backgroundAgents ?? [];
+  const hasMoreOlder = sessionState?.hasMoreOlder ?? false;
+  const oldestMessageId = sessionState?.oldestMessageId ?? null;
+  const prependOlderMessages = useAppStore((s) => s.prependOlderMessages);
+  const trimMessagesToWindow = useAppStore((s) => s.trimMessagesToWindow);
   const isCompacting = compaction.status === "running";
   const compactionResult =
     compaction.status === "success" ||
@@ -290,24 +223,27 @@ export function ChatView() {
   const dismissSessionCompaction = useAppStore(
     (s) => s.dismissSessionCompaction,
   );
-  const steerResult = sessionState?.steerResult ?? null;
-  const setSteerResult = useAppStore((s) => s.setSteerResult);
+  const steerRecords = sessionState?.steerRecords ?? [];
+  const inputQueue = sessionState?.inputQueue ?? [];
   const setGoalStatus = useAppStore((s) => s.setGoalStatus);
-  const clearSteerResultStore = useAppStore((s) => s.clearSteerResult);
+  const enqueueInput = useAppStore((s) => s.enqueueInput);
+  const removeInput = useAppStore((s) => s.removeInput);
+  const addSteerRecord = useAppStore((s) => s.addSteerRecord);
+  const failPendingSteerRecords = useAppStore((s) => s.failPendingSteerRecords);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const updateSession = useAppStore((s) => s.updateSession);
   const clearActiveTurn = useAppStore((s) => s.clearActiveTurn);
   const {
     continueSession,
     stopSession,
+    forkSession,
     setSessionThinkingLevel,
     setSessionProviderModel,
+    getSessionMessagesPage,
     isElectron,
   } = useIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
-  const [hasInput, setHasInput] = useState(false);
-  const isSteerRef = useRef(false);
   useEffect(() => {
     if (!activeSessionId || !compactionResult) return;
     const timeoutMs = compactionResult === "success" ? 3000 : 5000;
@@ -318,32 +254,50 @@ export function ChatView() {
     return () => clearTimeout(id);
   }, [activeSessionId, compactionResult, dismissSessionCompaction]);
 
+  // 会话回到 idle 时：仍处于 injecting 的引导记录标记失败并回填输入框
   useEffect(() => {
-    if (!activeSessionId || !steerResult) return;
-    if (steerResult.status === "pending") return;
-    const timeoutMs = steerResult.status === "accepted" ? 2500 : 3000;
-    const id = setTimeout(() => {
-      clearSteerResultStore(activeSessionId);
-      setSteeringEvent(null);
-    }, timeoutMs);
-    return () => clearTimeout(id);
-  }, [activeSessionId, steerResult, clearSteerResultStore]);
-
-  // steerResult lifecycle: null → pending (handleSubmit) → accepted/failed (IPC)
-  // → null (auto-clear). steerDisplayReady gates the accepted/failed transition
-  // to guarantee a minimum 500ms gradient display phase.
-  useEffect(() => {
-    if (!steerResult || steerResult.status === "pending" || steerDisplayReady)
-      return;
-    const elapsed = Date.now() - steerSentAtRef.current;
-    const delay = Math.max(0, 500 - elapsed);
-    if (delay === 0) {
-      setSteerDisplayReady(true);
-      return;
+    if (!activeSessionId || activeSession?.status !== "idle") return;
+    const freshIds = steerRecords
+      .filter((r) => r.status === "injecting" && Date.now() - r.ts < 500)
+      .map((r) => r.id);
+    if (freshIds.length > 0) {
+      const id = setTimeout(() => {
+        const stillPending = useAppStore
+          .getState()
+          .sessionStates[
+            activeSessionId
+          ]?.steerRecords.filter((r) => freshIds.includes(r.id) && r.status === "injecting");
+        if (stillPending && stillPending.length > 0) {
+          const failedIds = failPendingSteerRecords(
+            activeSessionId,
+            "session-stopped",
+          );
+          if (failedIds.length > 0) {
+            const record = useAppStore
+              .getState()
+              .sessionStates[
+                activeSessionId
+              ]?.steerRecords.find((r) => r.id === failedIds[0]);
+            if (record) chatInputRef.current?.setPrompt(record.text);
+          }
+        }
+      }, 500);
+      return () => clearTimeout(id);
     }
-    const id = setTimeout(() => setSteerDisplayReady(true), delay);
-    return () => clearTimeout(id);
-  }, [steerResult, steerDisplayReady]);
+    const failedIds = failPendingSteerRecords(
+      activeSessionId,
+      "session-stopped",
+    );
+    if (failedIds.length > 0) {
+      const record = steerRecords.find((r) => failedIds.includes(r.id));
+      if (record) chatInputRef.current?.setPrompt(record.text);
+    }
+  }, [
+    activeSessionId,
+    activeSession?.status,
+    failPendingSteerRecords,
+    steerRecords,
+  ]);
 
   const activeSessionCwd = useAppStore((s) => {
     if (!activeSessionId) return undefined;
@@ -358,10 +312,11 @@ export function ChatView() {
   >([]);
   const [showConnectorLabel, setShowConnectorLabel] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [visibleTurnStartIndex, setVisibleTurnStartIndex] = useState(0);
+  const [visibleMessageStartIndex, setVisibleMessageStartIndex] = useState(0);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
   const headerRef = useRef<HTMLDivElement>(null);
+  const forkInFlightRef = useRef(false);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const connectorMeasureRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -373,6 +328,8 @@ export function ChatView() {
   // and pin unconditionally — they never infer intent.
   const isAtBottomRef = useRef(true);
   const previousScrollTopRef = useRef(0);
+  const autoDrainRef = useRef(false);
+  const stopRequestedRef = useRef(false);
   const prevMessageCountRef = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
   const previousSessionIdRef = useRef<string | null>(null);
@@ -381,8 +338,11 @@ export function ChatView() {
     scrollHeight: number;
     scrollTop: number;
   } | null>(null);
+  const pendingDockJumpRef = useRef<string | null>(null);
   const isLoadingOlderRef = useRef(false);
-  const turnCountRef = useRef(0);
+  // Bumped on every session switch; async stage-2 continuations check it
+  // so a fetch started for the old session cannot prepend into the new one.
+  const sessionGenerationRef = useRef(0);
 
   const hasActiveTurn = Boolean(activeTurn);
 
@@ -406,29 +366,14 @@ export function ChatView() {
   const canStop = isSessionRunning || hasActiveTurn || pendingCount > 0;
 
   const inputStatus = useMemo(() => {
-    const steeringText =
-      steeringEvent && activeTurn && steeringEvent.turnId === activeTurn.turnId
-        ? steeringEvent.text.trim().replace(/\s+/g, " ").slice(0, 120)
-        : "";
     // Mirror the stop button: whenever canStop is true the status bar
     // must show a non-null indicator so the user never sees a blank bar
     // while the session is running / a turn is active or pending.
     const hasStreamingText = !!partialMessage?.trim();
-    const steeringAcceptedText =
-      steerResult?.status === "accepted" && steerDisplayReady
-        ? steerResult.text
-        : "";
-    const steeringFailedText =
-      steerResult?.status === "failed" && steerDisplayReady
-        ? steerResult.text
-        : "";
     return resolveInputStatus({
       isSending: isSubmitting && !canStop,
       isCompacting,
       compactionResult,
-      steeringText,
-      steeringAcceptedText,
-      steeringFailedText,
       // Guard with hasActiveTurn: once the turn ends we don't show
       // "thinking" during the brief idle-window before session settles.
       shouldShowThinkingIndicator:
@@ -448,10 +393,6 @@ export function ChatView() {
     canStop,
     hasActiveTurn,
     partialMessage,
-    steeringEvent,
-    activeTurn?.turnId,
-    steerResult,
-    steerDisplayReady,
     goalStatus,
     goalTransitionVisible,
     backgroundAgents,
@@ -689,36 +630,28 @@ export function ChatView() {
     partialMessage,
   ]);
 
-  const turnRanges = useMemo(
-    () => buildTurnRanges(displayedMessages),
-    [displayedMessages],
-  );
-  turnCountRef.current = turnRanges.length;
+  // Keep the window pinned to the tail while the user is at the bottom,
+  // so streamed messages stay visible as the list grows.
+  useEffect(() => {
+    if (!isAtBottomRef.current || !activeSessionId) return;
+    const tailStart = Math.max(
+      0,
+      displayedMessages.length - MAX_RENDER_MESSAGES,
+    );
+    setVisibleMessageStartIndex((current) =>
+      current === tailStart ? current : tailStart,
+    );
+  }, [activeSessionId, displayedMessages.length]);
 
-  const effectiveVisibleTurnStartIndex = useMemo(
-    () =>
-      getEffectiveVisibleTurnStart(
-        activeSessionId,
-        initializedSessionIdRef.current,
-        turnRanges.length,
-        visibleTurnStartIndex,
-        INITIAL_VISIBLE_TURNS,
-      ),
-    [activeSessionId, turnRanges.length, visibleTurnStartIndex],
-  );
-
-  const visibleMessageStartIndex = useMemo(
-    () =>
-      getVisibleMessageStartIndex(turnRanges, effectiveVisibleTurnStartIndex),
-    [turnRanges, effectiveVisibleTurnStartIndex],
-  );
-
+  // Fixed-size sliding window: [start, start + MAX_RENDER_MESSAGES).
   const visibleMessages = useMemo(
-    () => displayedMessages.slice(visibleMessageStartIndex),
+    () =>
+      displayedMessages.slice(
+        visibleMessageStartIndex,
+        visibleMessageStartIndex + MAX_RENDER_MESSAGES,
+      ),
     [displayedMessages, visibleMessageStartIndex],
   );
-  // TODO: add bottom-side reclamation if very long sessions still degrade
-  // after repeated prepends; v1 only windows older history from the top.
 
   // Merge pure-tool messages (no text blocks) into the preceding assistant
   // message so buildToolDisplayBlocks can group all tool_use/tool_result together.
@@ -872,42 +805,109 @@ export function ChatView() {
     });
   }, [mergedMessages, hoistedProcessSummaryTurnIds, activeSessionCwd]);
 
+  // Dock ticks are anchored to the IN-MEMORY window (all loaded history),
+  // not the render window: sliding the render window while scrolling up
+  // must not change the tick count. User-dense sessions are capped by
+  // uniform sampling so the dock stays stable there too.
   const railTicks = useMemo<RailTickEntry[]>(() => {
-    const entries: RailTickEntry[] = [];
-    const ve = visibleTurnEntries;
-    for (let i = 0; i < ve.length; i++) {
-      const msg = ve[i].message;
-      if (msg.role !== "user") continue;
-      let assistantText: string | null = null;
-      for (let j = i + 1; j < ve.length; j++) {
-        const next = ve[j].message;
-        if (next.role === "user") {
-          if (
-            Array.isArray(next.content) &&
-            next.content.some((b) => b.type === "tool_result")
-          ) {
-            continue;
-          }
-          break;
-        }
-        if (next.role === "assistant") {
-          const result = getTurnPreviewText(next, 100);
-          if (result.kind === "text") {
-            assistantText = result.value;
-          } else if (!assistantText && result.kind !== "empty") {
-            assistantText = result.value;
-          }
+    const userMsgs = displayedMessages.filter((m) => m.role === "user");
+    if (userMsgs.length === 0) return [];
+    const sampled =
+      userMsgs.length > MAX_DOCK_TICKS
+        ? Array.from(
+            { length: MAX_DOCK_TICKS },
+            (_, i) =>
+              userMsgs[
+                Math.round((i * (userMsgs.length - 1)) / (MAX_DOCK_TICKS - 1))
+              ],
+          )
+        : userMsgs;
+    // One pass over the displayed list: attach the preview of the first
+    // assistant message that follows each sampled user message.
+    const assistantByUser = new Map<string, string | null>();
+    let pendingUser: Message | null = null;
+    for (const msg of displayedMessages) {
+      if (msg.role === "user") {
+        pendingUser = msg;
+        continue;
+      }
+      if (msg.role === "assistant" && pendingUser) {
+        const result = getTurnPreviewText(msg, 100);
+        if (result.kind !== "empty" && !assistantByUser.has(pendingUser.id)) {
+          assistantByUser.set(pendingUser.id, result.value);
         }
       }
+    }
+    return sampled.map((msg) => {
       const userResult = getTurnPreviewText(msg, 100);
-      entries.push({
+      return {
         messageId: String(msg.id),
         userPreview: userResult.kind !== "empty" ? userResult.value : "",
-        assistantPreview: assistantText,
-      });
-    }
-    return entries;
-  }, [visibleTurnEntries]);
+        assistantPreview: assistantByUser.get(String(msg.id)) ?? null,
+      };
+    });
+  }, [displayedMessages]);
+
+  // 引导记录按时间戳合并进消息流时间轴（时序一致；不进 messages store）
+  const mergedTurnEntries = useMemo(
+    () => mergeSteerEntries(visibleTurnEntries, steerRecords),
+    [visibleTurnEntries, steerRecords],
+  );
+
+  const handleForkMessage = useCallback(
+    async (message: Message) => {
+      if (!activeSession) return;
+      if (forkInFlightRef.current) return;
+      forkInFlightRef.current = true;
+      try {
+        await forkSession(activeSession.id, message.id, t("chat.forkSuffix"));
+      } finally {
+        forkInFlightRef.current = false;
+      }
+    },
+    [activeSession, forkSession, t],
+  );
+
+  const handleDockTickSelect = useCallback(
+    (messageId: string) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      // A dock jump is an explicit leave-bottom intent: without this, the
+      // smooth scrollIntoView's first scroll event can still see
+      // isAtBottomRef=true (scrollTop has not moved yet) and the bottom
+      // reclamation branch would snap the window back to the tail,
+      // removing the very message we just jumped to.
+      isAtBottomRef.current = false;
+      const target = container.querySelector(
+        `[data-message-id="${messageId}"]`,
+      );
+      if (target) {
+        target.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
+      // Target is outside the render window: slide the window to it and
+      // jump via the effect below once it is rendered.
+      const idx = displayedMessages.findIndex(
+        (m) => String(m.id) === messageId,
+      );
+      if (idx === -1) return;
+      pendingDockJumpRef.current = messageId;
+      setVisibleMessageStartIndex(Math.max(0, idx - PREPEND_MESSAGES));
+    },
+    [displayedMessages],
+  );
+
+  // Runs after the render-window slide commits, so the target message is
+  // guaranteed to be in the DOM (a requestAnimationFrame could fire before
+  // React flushes and the jump would silently no-op).
+  useEffect(() => {
+    const messageId = pendingDockJumpRef.current;
+    if (!messageId) return;
+    pendingDockJumpRef.current = null;
+    scrollContainerRef.current
+      ?.querySelector(`[data-message-id="${messageId}"]`)
+      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [visibleMessageStartIndex]);
 
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,
@@ -931,37 +931,63 @@ export function ChatView() {
     pendingPrependAnchorRef.current = null;
     isLoadingOlderRef.current = false;
     setIsLoadingOlder(false);
-    setVisibleTurnStartIndex(0);
+    setVisibleMessageStartIndex(0);
+    sessionGenerationRef.current += 1;
+    pendingDockJumpRef.current = null;
   }, [activeSessionId]);
 
   useEffect(() => {
     if (
       !activeSessionId ||
-      !shouldInitializeVisibleTurns(
+      !shouldInitializeVisibleWindow(
         activeSessionId,
         initializedSessionIdRef.current,
-        turnRanges.length,
+        displayedMessages.length,
       )
     ) {
       return;
     }
     initializedSessionIdRef.current = activeSessionId;
-    setVisibleTurnStartIndex(
-      getInitialVisibleTurnStart(turnRanges.length, INITIAL_VISIBLE_TURNS),
+    setVisibleMessageStartIndex(
+      Math.max(0, displayedMessages.length - MAX_RENDER_MESSAGES),
     );
-  }, [activeSessionId, turnRanges.length]);
+  }, [activeSessionId, displayedMessages.length]);
 
-  const loadOlderTurns = useCallback(() => {
+  const loadOlderTurns = useCallback(async () => {
     const container = scrollContainerRef.current;
-    if (
-      !container ||
-      !canLoadOlderTurns(
-        isLoadingOlderRef.current,
-        effectiveVisibleTurnStartIndex,
-      )
-    ) {
+    if (!container || isLoadingOlderRef.current || !activeSessionId) {
       return;
     }
+
+    if (visibleMessageStartIndex > 0) {
+      // Stage 1: slide the render window further into older history.
+      const nextStart = Math.max(
+        0,
+        visibleMessageStartIndex - PREPEND_MESSAGES,
+      );
+      isLoadingOlderRef.current = true;
+      pendingPrependAnchorRef.current = {
+        scrollHeight: container.scrollHeight,
+        scrollTop: container.scrollTop,
+      };
+      setIsLoadingOlder(true);
+      setVisibleMessageStartIndex(nextStart);
+      if (nextStart === visibleMessageStartIndex) {
+        // Start index cannot move (already 0): React bails out, the
+        // anchor effect never fires — clear the flags manually so the
+        // spinner stops and later loads are not blocked.
+        requestAnimationFrame(() => {
+          pendingPrependAnchorRef.current = null;
+          isLoadingOlderRef.current = false;
+          setIsLoadingOlder(false);
+        });
+      }
+      return;
+    }
+
+    // Stage 2: render window is at the top of the in-memory window —
+    // fetch the next older page from the main process.
+    if (!hasMoreOlder) return;
 
     isLoadingOlderRef.current = true;
     pendingPrependAnchorRef.current = {
@@ -969,14 +995,77 @@ export function ChatView() {
       scrollTop: container.scrollTop,
     };
     setIsLoadingOlder(true);
-    setVisibleTurnStartIndex((currentStart) =>
-      getPrependedVisibleTurnStart(
-        currentStart,
-        turnCountRef.current,
-        PREPEND_TURNS,
-      ),
-    );
-  }, [effectiveVisibleTurnStartIndex]);
+
+    let prependApplied = false;
+    const fetchGeneration = sessionGenerationRef.current;
+    try {
+      const page = await getSessionMessagesPage(
+        activeSessionId,
+        oldestMessageId,
+        LOAD_OLDER_PAGE_SIZE,
+      );
+      if (fetchGeneration !== sessionGenerationRef.current) {
+        // Session switched while the fetch was in flight: drop the page.
+        // The switch effect already cleared the loading flags.
+        return;
+      }
+      if (!page || page.messages.length === 0) {
+        if (page) prependOlderMessages(activeSessionId, [], page.hasMore);
+        return;
+      }
+      // prependOlderMessages trims the oldest messages when the store
+      // window exceeds its cap and returns how many were dropped; the
+      // boundary (page tail) shifts forward by that amount.
+      const trimmed = prependOlderMessages(
+        activeSessionId,
+        page.messages,
+        page.hasMore,
+      );
+      // Render window slides to just above the prepended boundary so the
+      // previously visible content stays on screen; the page itself stays
+      // above the window (message-granularity, no turn math needed).
+      const boundary = page.messages.filter((m) => !m.autoGenerated).length;
+      const newStart = Math.max(0, boundary - trimmed - PREPEND_MESSAGES);
+      setVisibleMessageStartIndex(newStart);
+      prependApplied = true;
+      if (newStart === 0) {
+        // Extreme case: the page still contains fewer than two user
+        // messages after alignment, so the render window start cannot
+        // move — the anchor effect never fires and the spinner would
+        // spin forever. Clear the flags here; the window stays intact
+        // and shows the whole merged list, which is correct content.
+        requestAnimationFrame(() => {
+          pendingPrependAnchorRef.current = null;
+          isLoadingOlderRef.current = false;
+          setIsLoadingOlder(false);
+        });
+      }
+    } catch {
+      // Keep the current window intact; the spinner clears below and
+      // the next scroll-to-top retries.
+    } finally {
+      if (!prependApplied && fetchGeneration === sessionGenerationRef.current) {
+        // Failed or empty fetch: no render-window change coming, so
+        // the anchor effect will not fire — clear everything now.
+        // The generation guard matters: a STALE continuation must not
+        // touch the flags, or it would steal the new session's scroll
+        // anchor and re-open the load gate, letting auto-fill start a
+        // second stage-2 with the same cursor (duplicate prepend).
+        pendingPrependAnchorRef.current = null;
+        isLoadingOlderRef.current = false;
+        setIsLoadingOlder(false);
+      }
+      // Success path: the anchor effect (deps: [visibleMessageStartIndex])
+      // applies the anchor and clears isLoadingOlder after commit.
+    }
+  }, [
+    activeSessionId,
+    getSessionMessagesPage,
+    hasMoreOlder,
+    oldestMessageId,
+    prependOlderMessages,
+    visibleMessageStartIndex,
+  ]);
 
   const syncFollowFromScroll = useCallback(() => {
     const container = scrollContainerRef.current;
@@ -1004,6 +1093,20 @@ export function ChatView() {
     syncFollowFromScroll();
     const onScroll = () => {
       syncFollowFromScroll();
+      if (
+        isAtBottomRef.current &&
+        visibleMessageStartIndex > 0 &&
+        activeSessionId
+      ) {
+        // Returned to the bottom after loading history: collapse the
+        // render window to the tail and reclaim the in-memory window.
+        // Safe to re-run: same start index bails out and trim is a no-op
+        // once the window is within the cap.
+        setVisibleMessageStartIndex(
+          Math.max(0, displayedMessages.length - MAX_RENDER_MESSAGES),
+        );
+        trimMessagesToWindow(activeSessionId, MAX_MEMORY_WINDOW_MESSAGES);
+      }
       if (container.scrollTop <= LOAD_OLDER_THRESHOLD_PX) {
         loadOlderTurns();
       }
@@ -1052,7 +1155,14 @@ export function ChatView() {
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("wheel", onWheel);
     };
-  }, [loadOlderTurns, syncFollowFromScroll]);
+  }, [
+    activeSessionId,
+    displayedMessages.length,
+    loadOlderTurns,
+    syncFollowFromScroll,
+    trimMessagesToWindow,
+    visibleMessageStartIndex,
+  ]);
 
   useEffect(() => {
     const anchor = pendingPrependAnchorRef.current;
@@ -1067,7 +1177,7 @@ export function ChatView() {
     pendingPrependAnchorRef.current = null;
     isLoadingOlderRef.current = false;
     setIsLoadingOlder(false);
-  }, [visibleTurnStartIndex]);
+  }, [visibleMessageStartIndex]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -1078,7 +1188,7 @@ export function ChatView() {
         shouldAutoFillViewport(
           container.scrollHeight,
           container.clientHeight,
-          effectiveVisibleTurnStartIndex,
+          visibleMessageStartIndex,
         )
       ) {
         loadOlderTurns();
@@ -1088,9 +1198,9 @@ export function ChatView() {
     return () => cancelAnimationFrame(rafId);
   }, [
     displayedMessages.length,
-    effectiveVisibleTurnStartIndex,
     isLoadingOlder,
     loadOlderTurns,
+    visibleMessageStartIndex,
   ]);
 
   useLayoutEffect(() => {
@@ -1221,23 +1331,12 @@ export function ChatView() {
     const rawText = data.text.trim();
     if (!rawText && data.images.length === 0 && data.files.length === 0) return;
 
-    // Steering path: ephemeral turn-level event (not a chat message)
-    if (isSteerRef.current) {
-      isSteerRef.current = false;
-      steerSentAtRef.current = Date.now();
-      setSteerDisplayReady(false);
-      if (isElectron) {
-        window.electronAPI.send({
-          type: "session.steer",
-          payload: { sessionId: activeSessionId, prompt: rawText },
-        });
-      }
-      if (activeTurn?.turnId) {
-        setSteeringEvent({ turnId: activeTurn.turnId, text: rawText });
-        setSteerResult(activeSessionId, { status: "pending", text: rawText });
-      }
+    // Non-idle send (text and/or attachments): route into the queue area
+    // (replaces the old queued message-card path).
+    if (canStop) {
+      const { images, files } = buildAttachmentBlocks(data);
+      enqueueInput(activeSessionId, rawText, images, files);
       chatInputRef.current?.clear();
-      setHasInput(false);
       setTimeout(() => chatInputRef.current?.focus(), 0);
       return;
     }
@@ -1245,34 +1344,10 @@ export function ChatView() {
     // Normal send path
     setIsSubmitting(true);
     try {
-      const contentBlocks: ContentBlock[] = [];
-
-      data.images.forEach((img) => {
-        contentBlocks.push({
-          type: "image",
-          source: {
-            type: "base64",
-            media_type: img.mediaType as
-              | "image/jpeg"
-              | "image/png"
-              | "image/gif"
-              | "image/webp",
-            data: img.base64,
-          },
-        });
-      });
-
-      data.files.forEach((file) => {
-        contentBlocks.push({
-          type: "file_attachment",
-          filename: file.name,
-          relativePath: file.path,
-          size: file.size,
-          mimeType: file.type,
-          inlineDataBase64: file.inlineDataBase64,
-        });
-      });
-
+      const contentBlocks: ContentBlock[] = [
+        ...buildAttachmentBlocks(data).images,
+        ...buildAttachmentBlocks(data).files,
+      ];
       if (rawText) {
         contentBlocks.push({
           type: "text",
@@ -1287,12 +1362,40 @@ export function ChatView() {
         activeSession?.model,
       );
       chatInputRef.current?.clear();
-      setHasInput(false);
     } finally {
       setIsSubmitting(false);
       setTimeout(() => chatInputRef.current?.focus(), 0);
     }
   };
+
+  /** 将 ChatInputSubmitData 的图片/文件转为 ContentBlock 附件块（入队与发送共用）。 */
+  function buildAttachmentBlocks(data: ChatInputSubmitData): {
+    images: ImageContent[];
+    files: FileAttachmentContent[];
+  } {
+    return {
+      images: data.images.map((img) => ({
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: img.mediaType as
+            | "image/jpeg"
+            | "image/png"
+            | "image/gif"
+            | "image/webp",
+          data: img.base64,
+        },
+      })),
+      files: data.files.map((file) => ({
+        type: "file_attachment",
+        filename: file.name,
+        relativePath: file.path,
+        size: file.size,
+        mimeType: file.type,
+        inlineDataBase64: file.inlineDataBase64,
+      })),
+    };
+  }
 
   const handleCompact = async (instructions?: string) => {
     if (!activeSessionId || isCompacting || hasActiveTurn || !isElectron) {
@@ -1320,6 +1423,11 @@ export function ChatView() {
         setSessionCompaction(activeSessionId, "success");
       } else if (res.status === "skipped") {
         dismissSessionCompaction(activeSessionId);
+        setGlobalNotice({
+          id: `compact-skipped-${Date.now()}`,
+          type: "info",
+          message: t("chat.compactSkipped"),
+        });
       }
     } catch {
       setSessionCompaction(activeSessionId, "failed");
@@ -1374,6 +1482,7 @@ export function ChatView() {
   const handleStop = () => {
     if (canStop) {
       if (activeSessionId) {
+        stopRequestedRef.current = true; // 用户主动停止：抑制队列自动执行一次
         stopSession(activeSessionId);
         updateSession(activeSessionId, { status: "idle" });
         clearActiveTurn(activeSessionId);
@@ -1383,10 +1492,121 @@ export function ChatView() {
     chatInputRef.current?.submit();
   };
 
-  const handleSteer = useCallback(() => {
-    isSteerRef.current = true;
-    chatInputRef.current?.submit();
-  }, []);
+  /** 统一出队发送入口：自动执行与手动引导（idle）共用，防双回合。 */
+  const sendQueuedItem = useCallback(
+    (item: QueuedInput) => {
+      if (!activeSessionId || isCompacting) return; // 压缩中禁止发送（与 handleSubmit 守卫一致）
+      autoDrainRef.current = true;
+      removeInput(activeSessionId, item.id);
+      const contentBlocks: ContentBlock[] = [
+        ...(item.images ?? []),
+        ...(item.files ?? []),
+      ];
+      if (item.text) {
+        contentBlocks.push({ type: "text", text: item.text });
+      }
+      // 发送失败（会话删除/非法 model 等）：复位 in-flight guard，避免队列永久卡死
+      continueSession(
+        activeSessionId,
+        contentBlocks,
+        activeSession?.providerProfileKey,
+        activeSession?.model,
+      ).catch(() => {
+        autoDrainRef.current = false;
+      });
+    },
+    [
+      activeSessionId,
+      isCompacting,
+      continueSession,
+      removeInput,
+      activeSession?.providerProfileKey,
+      activeSession?.model,
+    ],
+  );
+
+  const handleQueueSteer = useCallback(
+    (inputId: string) => {
+      if (!activeSessionId) return;
+      const item = useAppStore
+        .getState()
+        .sessionStates[
+          activeSessionId
+        ]?.inputQueue.find((i) => i.id === inputId);
+      if (!item) return;
+      if (!canStop) {
+        // idle：作为普通消息发送并触发回合
+        sendQueuedItem(item);
+        return;
+      }
+      removeInput(activeSessionId, inputId);
+      // 引导注入：图片随注入（SDK steer 支持 images）；
+      // 文件 SDK 不支持 → 降级为文本说明（自动执行/普通发送时完整支持）。
+      const fileNotes = (item.files ?? [])
+        .map((f) => `[${f.filename}]`)
+        .join(" ");
+      const imageNote =
+        (item.images ?? []).length > 0 ? `[${t("steer.imageAttachment")}]` : "";
+      const steerText = [item.text, imageNote, fileNotes]
+        .filter(Boolean)
+        .join(" ");
+      // 锚点 = 注入时刻最后一条**可见**消息 id（渲染时固定时序位置）。
+      // 必须跳过 autoGenerated 消息（goal 自动 prompt 等，UI 不可见——
+      // 锚到它们会导致渲染时找不到锚点而 fallback 沉底），且 assistant
+      // 消息锚到同回合第一条（合并后保留的 id）。
+      const messages =
+        useAppStore.getState().sessionStates[activeSessionId]?.messages ?? [];
+      const anchorMessageId = resolveAnchorMessageId(messages);
+      const recordId = addSteerRecord(
+        activeSessionId,
+        steerText,
+        anchorMessageId,
+      );
+      if (isElectron) {
+        window.electronAPI.send({
+          type: "session.steer",
+          payload: {
+            sessionId: activeSessionId,
+            prompt: steerText,
+            requestId: recordId,
+            images: item.images,
+          },
+        });
+      }
+    },
+    [
+      activeSessionId,
+      canStop,
+      isElectron,
+      removeInput,
+      addSteerRecord,
+      sendQueuedItem,
+    ],
+  );
+
+  // 会话空闲 + 队列非空 → 自动执行第一条（FIFO）；用户 stop 抑制一次
+  const previousDrainSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    // 跨会话切换：复位上一会话的 in-flight / stop 抑制标记，避免静默失效
+    if (previousDrainSessionIdRef.current !== activeSessionId) {
+      previousDrainSessionIdRef.current = activeSessionId ?? null;
+      autoDrainRef.current = false;
+      stopRequestedRef.current = false;
+    }
+    if (!activeSessionId || activeSession?.status !== "idle") {
+      autoDrainRef.current = false;
+      return;
+    }
+    if (stopRequestedRef.current) {
+      stopRequestedRef.current = false;
+      return;
+    }
+    if (autoDrainRef.current) return;
+    const queue =
+      useAppStore.getState().sessionStates[activeSessionId]?.inputQueue ?? [];
+    if (queue.length === 0) return;
+    sendQueuedItem(queue[0]);
+  }, [activeSessionId, activeSession?.status, inputQueue.length, sendQueuedItem]);
 
   const scrollToBottomByButton = () => {
     isAtBottomRef.current = true;
@@ -1437,7 +1657,7 @@ export function ChatView() {
             ref={messagesContainerRef}
             className="w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
           >
-            {displayedMessages.length === 0 ? (
+            {mergedTurnEntries.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-28 text-text-muted space-y-3 text-center">
                 <p className="text-xs uppercase tracking-[0.16em] text-text-muted/80">
                   DeskWand
@@ -1451,35 +1671,86 @@ export function ChatView() {
                 </p>
               </div>
             ) : (
-              visibleTurnEntries.map(
-                ({
-                  message,
-                  isStreaming,
-                  isLatestRound,
-                  artifactFiles,
-                  videoReferences,
-                  turnProcessSummary,
-                  suppressProcessSummaries,
-                }) => (
+              mergedTurnEntries.map((entry) =>
+                "message" in entry ? (
+                  (() => {
+                    const {
+                      message,
+                      isStreaming,
+                      isLatestRound,
+                      artifactFiles,
+                      videoReferences,
+                      turnProcessSummary,
+                      suppressProcessSummaries,
+                    } = entry;
+                    return (
+                      <div
+                        key={message.id}
+                        data-message-id={message.id}
+                        className="space-y-1.5"
+                      >
+                        {turnProcessSummary ? (
+                          <ProcessSummaryBlock
+                            block={turnProcessSummary}
+                            message={message}
+                          />
+                        ) : null}
+                        <MessageCard
+                          message={message}
+                          isStreaming={isStreaming}
+                          isLatestRound={isLatestRound}
+                          artifactFiles={artifactFiles}
+                          videoReferences={videoReferences}
+                          suppressProcessSummaries={suppressProcessSummaries}
+                          onForkMessage={handleForkMessage}
+                          forkDisabled={!activeSession?.piSessionFile}
+                        />
+                      </div>
+                    );
+                  })()
+                ) : (
                   <div
-                    key={message.id}
-                    data-message-id={message.id}
-                    className="space-y-1.5"
+                    key={entry.id}
+                    className="flex items-center gap-2 px-1 text-xs"
                   >
-                    {turnProcessSummary ? (
-                      <ProcessSummaryBlock
-                        block={turnProcessSummary}
-                        message={message}
-                      />
-                    ) : null}
-                    <MessageCard
-                      message={message}
-                      isStreaming={isStreaming}
-                      isLatestRound={isLatestRound}
-                      artifactFiles={artifactFiles}
-                      videoReferences={videoReferences}
-                      suppressProcessSummaries={suppressProcessSummaries}
+                    <Navigation
+                      className={`h-3.5 w-3.5 flex-shrink-0 ${
+                        entry.status === "failed"
+                          ? "text-error"
+                          : "text-text-muted"
+                      }`}
                     />
+                    <span
+                      className="min-w-0 flex-1 truncate text-text-secondary"
+                      title={entry.text}
+                    >
+                      {entry.text}
+                    </span>
+                    <span
+                      className={`flex-shrink-0 ${
+                        entry.status === "failed" ? "text-error" : "text-text-muted"
+                      }`}
+                    >
+                      {entry.status === "injecting" && (
+                        <Loader2 className="mr-1 inline h-3 w-3 animate-spin" />
+                      )}
+                      {entry.status === "delivered" && (
+                        <CheckCircle2 className="mr-1 inline h-3 w-3" />
+                      )}
+                      {entry.status === "failed" && (
+                        <XCircle className="mr-1 inline h-3 w-3" />
+                      )}
+                      {entry.status === "injecting" && t("steer.injecting")}
+                      {entry.status === "delivered" && t("steer.delivered")}
+                      {entry.status === "failed" &&
+                        `${t("steer.failed")}: ${
+                          entry.reason === "no-active-session"
+                            ? t("steer.reasonNoActiveSession")
+                            : entry.reason === "sdk-error"
+                              ? t("steer.reasonSdkError")
+                              : t("steer.reasonSessionStopped")
+                        }`}
+                    </span>
                   </div>
                 ),
               )
@@ -1505,6 +1776,17 @@ export function ChatView() {
 
       {/* Input */}
       <div className="bg-transparent">
+        {inputQueue.length > 0 && (
+          <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
+            <ChatInputQueueBar
+              items={inputQueue}
+              onSteer={handleQueueSteer}
+              onRemove={(id) =>
+                activeSessionId && removeInput(activeSessionId, id)
+              }
+            />
+          </div>
+        )}
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
           <ChatInputStatusBar
             status={inputStatus}
@@ -1517,7 +1799,6 @@ export function ChatView() {
             onSubmit={handleSubmit}
             onCompact={handleCompact}
             onCommand={handleCommand}
-            onInputChange={setHasInput}
             disabled={isSubmitting}
             submitDisabled={isCompacting}
             isExpanded={isInputExpanded}
@@ -1597,8 +1878,6 @@ export function ChatView() {
                 submitDisabled={isCompacting}
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
-                onSteer={handleSteer}
-                hasInput={hasInput}
               />
             }
           />
@@ -1607,6 +1886,7 @@ export function ChatView() {
       <MessageNavRail
         ticks={railTicks}
         scrollContainerRef={scrollContainerRef}
+        onTickSelect={handleDockTickSelect}
       />
     </div>
   );

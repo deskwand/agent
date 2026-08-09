@@ -14,28 +14,49 @@ const sidebarContent = readFileSync(sidebarPath, "utf8");
 const accountMenuContent = readFileSync(accountMenuPath, "utf8");
 
 describe("Sidebar top nav entries", () => {
-  it("renders apps and automation entries above the session search bar", () => {
+  it("renders apps and automation entries inside the scrollable area below the search bar", () => {
     const searchBarIndex = sidebarContent.indexOf(
       't("sidebar.searchPlaceholder")',
     );
     expect(searchBarIndex).toBeGreaterThan(-1);
+    const scrollAreaIndex = sidebarContent.indexOf("sidebar-scroll");
+    expect(scrollAreaIndex).toBeGreaterThan(-1);
+    const firstSectionIndex = sidebarContent.indexOf("<section>");
+    expect(firstSectionIndex).toBeGreaterThan(-1);
     for (const key of ['t("sidebar.apps")', 't("sidebar.automation")']) {
       const index = sidebarContent.indexOf(key);
       expect(index, `${key} must exist in Sidebar.tsx`).toBeGreaterThan(-1);
-      expect(index, `${key} must appear above the search bar`).toBeLessThan(
-        searchBarIndex,
-      );
+      expect(
+        index,
+        `${key} must appear below the search bar (moved into scroll area)`,
+      ).toBeGreaterThan(searchBarIndex);
+      expect(
+        index,
+        `${key} must be inside the scrollable session area`,
+      ).toBeGreaterThan(scrollAreaIndex);
+      expect(
+        index,
+        `${key} must be at the top of the scroll area, before the first session section`,
+      ).toBeLessThan(firstSectionIndex);
     }
+    // no divider between the nav entries and the session list
+    expect(sidebarContent).not.toContain(
+      'className="mx-2 mt-2 border-t border-border-muted"',
+    );
   });
 
   it("drives active state from the apps and schedule flags", () => {
     for (const flag of ["showApps", "showSchedule"]) {
       expect(sidebarContent).toContain(flag);
     }
-    const activeClassCount =
-      sidebarContent.split("bg-surface-active border-l-accent").length - 1;
-    // one per nav entry plus the pre-existing session item usage
-    expect(activeClassCount).toBeGreaterThanOrEqual(2);
+    // active state is driven by the flags via background color only;
+    // the accent left-border quote bar was removed per design
+    const activeBgCount =
+      sidebarContent.split('"bg-surface-active text-text-primary"').length - 1;
+    // one per nav entry (apps + automation)
+    expect(activeBgCount).toBeGreaterThanOrEqual(2);
+    expect(sidebarContent).not.toContain("border-l-accent");
+    expect(sidebarContent).not.toContain("border-l-[3px]");
     expect(sidebarContent).toContain('aria-current={showApps ? "page"');
   });
 

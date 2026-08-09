@@ -5,7 +5,10 @@ export type SharedProviderType =
   | "custom"
   | "openai"
   | "gemini"
-  | "ollama";
+  | "ollama"
+  | "zhipu"
+  | "opencode"
+  | "opencode-go";
 
 export type SharedCustomProtocolType = "anthropic" | "openai" | "gemini";
 
@@ -33,6 +36,9 @@ export interface SharedProviderPresets {
   custom: SharedProviderPreset;
   openai: SharedProviderPreset;
   gemini: SharedProviderPreset;
+  zhipu: SharedProviderPreset;
+  opencode: SharedProviderPreset;
+  "opencode-go": SharedProviderPreset;
 }
 
 export interface ModelInputGuidance {
@@ -138,11 +144,51 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
     keyPlaceholder: "sk-xxx",
     keyHint: "输入你的 API Key",
   },
+  zhipu: {
+    name: "智谱",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    models: [{ id: "glm-4.6v-flash", name: "glm-4.6v-flash" }],
+    keyPlaceholder: "你的智谱 API Key",
+    keyHint: "从 bigmodel.cn（国内）/ z.ai（国际）获取，两站 Key 不互通",
+  },
+  opencode: {
+    name: "OpenCode",
+    baseUrl: "https://opencode.ai/zen/v1",
+    models: [
+      { id: "gpt-5.6-luna", name: "gpt-5.6-luna" },
+      { id: "gpt-5.5", name: "gpt-5.5" },
+      { id: "gpt-5.4", name: "gpt-5.4" },
+      { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
+      { id: "kimi-k3", name: "kimi-k3" },
+      { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
+      { id: "glm-5.2", name: "glm-5.2" },
+      { id: "gemini-3.6-flash", name: "gemini-3.6-flash" },
+      { id: "grok-4.5", name: "grok-4.5" },
+    ],
+    keyPlaceholder: "sk-...",
+    keyHint: "从 opencode.ai/auth 获取",
+  },
+  "opencode-go": {
+    name: "OpenCode Go",
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    models: [
+      { id: "kimi-k3", name: "kimi-k3" },
+      { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
+      { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
+      { id: "glm-5.2", name: "glm-5.2" },
+      { id: "gpt-5.6-luna", name: "gpt-5.6-luna" },
+      { id: "qwen3.7-plus", name: "qwen3.7-plus" },
+      { id: "minimax-m3", name: "minimax-m3" },
+      { id: "grok-4.5", name: "grok-4.5" },
+    ],
+    keyPlaceholder: "sk-...",
+    keyHint: "从 opencode.ai/auth 获取",
+  },
 };
 
 export const PI_AI_CURATED_PRESETS: Record<
   string,
-  { piProvider: string; pick: string[] }
+  { piProvider: string; pick?: string[] }
 > = {
   openrouter: {
     piProvider: "openrouter",
@@ -190,6 +236,8 @@ export const PI_AI_CURATED_PRESETS: Record<
       "gemini-2.5-flash-lite",
     ],
   },
+  opencode: { piProvider: "opencode" },
+  "opencode-go": { piProvider: "opencode-go" },
 };
 
 export function getModelInputGuidance(
@@ -240,11 +288,25 @@ export function getModelInputGuidance(
     };
   }
 
+  if (provider === "zhipu") {
+    return {
+      placeholder: "glm-4.6v-flash, glm-5",
+      hint: "Use the exact model ID for the selected region endpoint.",
+    };
+  }
+
   if (provider === "gemini") {
     return {
       placeholder:
         "gemini-3.1-pro-preview, gemini-3-flash-preview, gemini-2.5-flash",
       hint: "Use the exact model ID for the selected protocol or endpoint.",
+    };
+  }
+
+  if (provider === "opencode" || provider === "opencode-go") {
+    return {
+      placeholder: "gpt-5.6-luna, kimi-k3, claude-sonnet-4-6",
+      hint: "Use the exact model ID for the selected OpenCode plan endpoint.",
     };
   }
 

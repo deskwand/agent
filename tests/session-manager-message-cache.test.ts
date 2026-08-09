@@ -114,7 +114,7 @@ describe('SessionManager message cache', () => {
     expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
   });
 
-  it('populates cache when saveMessage is called for an uncached session', () => {
+  it('does not serve a partial cache seeded by saveMessage before a full load', () => {
     const db = makeDb();
     // Override getBySessionId to return empty for 's2'
     db.messages.getBySessionId = vi.fn((_id: string) => []);
@@ -129,14 +129,19 @@ describe('SessionManager message cache', () => {
       timestamp: 10,
     });
 
-    // getMessages should now return the saved message from cache (not DB)
+    // saveMessage only seeds a partial [message] cache; a session is served
+    // from cache only after a full getMessages() load, so the DB is queried
+    // here (the mock returns no rows yet).
     const msgs = manager.getMessages('s2');
-    expect(msgs).toHaveLength(1);
-    expect(msgs[0].id).toBe('msg-a');
-    // DB should not have been queried since the message was cached by saveMessage
-    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(0);
+    expect(msgs).toHaveLength(0);
+    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
 
-    // Saving another message appends to the cache
+    // After a full load the cache is complete; further getMessages calls
+    // are served from cache without hitting the DB.
+    manager.getMessages('s2');
+    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
+
+    // Saving another message appends to the complete cache
     manager.saveMessage({
       id: 'msg-b',
       sessionId: 's2',
@@ -145,8 +150,8 @@ describe('SessionManager message cache', () => {
       timestamp: 20,
     });
     const msgs2 = manager.getMessages('s2');
-    expect(msgs2).toHaveLength(2);
-    expect(msgs2[1].id).toBe('msg-b');
-    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(0);
+    expect(msgs2).toHaveLength(1);
+    expect(msgs2[0].id).toBe('msg-b');
+    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
   });
 });

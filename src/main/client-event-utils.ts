@@ -4,6 +4,7 @@ export function eventRequiresSessionManager(event: ClientEvent): boolean {
   switch (event.type) {
     case "session.start":
     case "session.continue":
+    case "session.fork":
     case "session.setThinkingLevel":
     case "session.setProviderModel":
     case "session.stop":
@@ -14,6 +15,7 @@ export function eventRequiresSessionManager(event: ClientEvent): boolean {
     case "project.delete":
     case "session.list":
     case "session.getMessages":
+    case "session.getMessagesPage":
     case "session.getTraceSteps":
     case "permission.response":
       return true;

@@ -29,6 +29,8 @@ const message: Message = {
 function runningSessionState(): SessionState {
   return {
     historyHydrated: true,
+    hasMoreOlder: false,
+    oldestMessageId: null,
     messages: [message],
     partialByTurn: {},
     partialMessage: "",
@@ -39,7 +41,8 @@ function runningSessionState(): SessionState {
     traceSteps: [],
     contextWindow: 0,
     compaction: { status: "idle" },
-    steerResult: null,
+    inputQueue: [],
+    steerRecords: [],
     partialToolResults: {},
     backgroundAgents: [],
   };

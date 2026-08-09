@@ -25,7 +25,11 @@ import {
   type ModelRuntime,
 } from "@earendil-works/pi-coding-agent";
 import { Type, type TSchema } from "@sinclair/typebox";
-import { getAuthPath, registerSessionModelRuntime, unregisterSessionModelRuntime } from "./shared-model-runtime";
+import {
+  getAuthPath,
+  registerSessionModelRuntime,
+  unregisterSessionModelRuntime,
+} from "./shared-model-runtime";
 import {
   createSessionModelRuntime,
   getOrCreateSessionRuntime,
@@ -36,6 +40,7 @@ import type {
   TraceStep,
   ServerEvent,
   ContentBlock,
+  ImageContent,
 } from "../../renderer/types";
 import { v4 as uuidv4 } from "uuid";
 import type { PathResolver } from "../sandbox/path-resolver";
@@ -69,7 +74,10 @@ import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-e
 import { PiExtensionHost } from "../extensions/pi-extension-host";
 import { buildInterceptedPrompt } from "../extensions/pi-command-registry";
 import { getPiUiBridge, resetUiState } from "../extensions/ui/pi-ui-runtime";
-import { PiSessionBridge, type PiReplacedContext } from "../extensions/pi-session-bridge";
+import {
+  PiSessionBridge,
+  type PiReplacedContext,
+} from "../extensions/pi-session-bridge";
 import { configStore } from "../config/config-store";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
@@ -82,11 +90,8 @@ import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter"
 import { createWebAccessTools } from "./tools/web-access/web-tools";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
 import type { WebAccessErrorCode } from "../../shared/web-access";
-import type {
-  BrowserViewManager} from "../browser/browser-view-manager";
-import {
-  BROWSER_CDP_PORT,
-} from "../browser/browser-view-manager";
+import type { BrowserViewManager } from "../browser/browser-view-manager";
+import { BROWSER_CDP_PORT } from "../browser/browser-view-manager";
 import { TurnFinalizer, type TurnFinalizerOptions } from "./turn-finalizer";
 import type { Browser, Page, Locator } from "playwright-core";
 import {
@@ -96,6 +101,7 @@ import {
 } from "./agent-runner-message-end";
 import { detectInsufficientCredits, toErrorText } from "./credits-error";
 import { buildPiSessionRuntimeSignature } from "./pi-session-runtime";
+import { resolveCompactionSettingsForWindow } from "./compaction-settings";
 import { ThinkTagStreamParser } from "./think-tag-parser";
 import {
   normalizeMcpToolResultForModel,
@@ -549,6 +555,8 @@ interface AgentRunnerOptions {
   findSessionByPiFile?: (piFile: string) => Session | null;
   /** 通知 renderer 激活指定会话（switchSession 用）。 */
   activateSession?: (sessionId: string) => void;
+  /** 按会话 id 查询基本信息（冷启动手动压缩时从 JSONL 重建 pi session 用）。 */
+  getSessionInfo?: (sessionId: string) => Session | null;
 }
 
 interface CachedPiSession {
@@ -564,6 +572,8 @@ interface CachedPiSession {
   extensionCommands?: { name: string; description: string }[];
   /** JSONL session file path for persistence across restarts */
   piSessionFile?: string;
+  /** ModelRuntime this cold-start created (unregister after dispose). */
+  createdRuntime?: ModelRuntime;
 }
 
 /**
@@ -577,7 +587,10 @@ interface CachedPiSession {
 export class AgentRunner {
   private sendToRenderer: (event: ServerEvent) => void;
   private saveMessage?: (message: Message) => void;
-  private onBackgroundAgentComplete?: (sessionId: string, agentId: string) => void;
+  private onBackgroundAgentComplete?: (
+    sessionId: string,
+    agentId: string,
+  ) => void;
   private _backgroundAgentIds = new Set<string>();
   private requestSudoPassword?: (
     sessionId: string,
@@ -598,9 +611,25 @@ export class AgentRunner {
   private activeControllers: Map<string, AbortController> = new Map();
   private piSessions: Map<string, CachedPiSession> = new Map();
   private sessionModelRuntimes: Map<string, ModelRuntime> = new Map();
+  /** requestId → { text }，steer() 入队成功但尚未被消费的引导（送达确认用）。 */
+  private pendingSteerDeliveries: Map<
+    string,
+    Array<{ requestId: string; text: string }>
+  > = new Map();
+  /** 每 session 最近一次 queue_update 的 steering 队列长度（送达判定基线）。 */
+  private lastSteeringLengths: Map<string, number> = new Map();
+  private getSessionInfo: ((sessionId: string) => Session | null) | undefined;
+  /** Sessions whose compaction is currently in flight (double-trigger guard). */
+  private compactInFlight: Set<string> = new Set();
+  /** Cold-start compaction sessions (opened from persisted JSONL), keyed by session id. */
+  private coldStartCompactionSessions: Map<string, PiAgentSession> = new Map();
   private piSessionBridge: PiSessionBridge | undefined;
-  private createSessionRecord: ((title: string, cwd?: string) => Session | null) | undefined;
-  private enqueuePromptForSession: ((sessionId: string, prompt: string) => void) | undefined;
+  private createSessionRecord:
+    | ((title: string, cwd?: string) => Session | null)
+    | undefined;
+  private enqueuePromptForSession:
+    | ((sessionId: string, prompt: string) => void)
+    | undefined;
   private findSessionByPiFile: ((piFile: string) => Session | null) | undefined;
   private activateSession: ((sessionId: string) => void) | undefined;
   private _turnFinalizer: TurnFinalizer | null = null;
@@ -644,10 +673,14 @@ export class AgentRunner {
     }
     const replacedContext: PiReplacedContext = {
       sendUserMessage: async (content: string | unknown[]) => {
-        const text = typeof content === "string" ? content : JSON.stringify(content);
+        const text =
+          typeof content === "string" ? content : JSON.stringify(content);
         this.enqueuePromptForSession?.(session.id, text);
       },
-      sendMessage: async (message: { content?: string; customType?: string }) => {
+      sendMessage: async (message: {
+        content?: string;
+        customType?: string;
+      }) => {
         const text =
           typeof message.content === "string"
             ? `[${message.customType ?? "extension"}] ${message.content}`
@@ -711,6 +744,8 @@ export class AgentRunner {
       // 会话关闭/淘汰：解绑扩展 UI（关闭 TUI Modal、清终端输入订阅）
       resetUiState();
       this.piSessions.delete(sessionId);
+      this.pendingSteerDeliveries.delete(sessionId);
+      this.lastSteeringLengths.delete(sessionId);
       log("[AgentRunner] Disposed pi session for:", sessionId);
     }
   }
@@ -969,6 +1004,7 @@ ${hints.join("\n")}
     this.enqueuePromptForSession = options.enqueuePromptForSession;
     this.findSessionByPiFile = options.findSessionByPiFile;
     this.activateSession = options.activateSession;
+    this.getSessionInfo = options.getSessionInfo;
     this.pathResolver = pathResolver;
     this.mcpManager = mcpManager;
     this._skillsAdapter = skillsAdapter;
@@ -2516,10 +2552,7 @@ ${hints.join("\n")}
           }),
         );
       } else {
-        logWarn(
-          "[AgentRunner] No API key configured for provider:",
-          provider,
-        );
+        logWarn("[AgentRunner] No API key configured for provider:", provider);
       }
 
       // baseUrl is now embedded in the model object via resolvePiModel()
@@ -3262,8 +3295,7 @@ Tool routing:\n
       );
 
       // Compute subagent config once for both toolsSignature and session creation.
-      const subagentEnabled =
-        true;
+      const subagentEnabled = true;
 
       // Detect MCP tool changes so newly enabled/disabled MCP servers take effect
       const subagentSignature = subagentEnabled ? "1" : "";
@@ -3352,19 +3384,20 @@ Tool routing:\n
 
         // 注入子 Agent 插件
         if (subagentEnabled) {
-          const subagentsModule = await import("@tintinweb/pi-subagents/dist/index.js");
+          const subagentsModule =
+            await import("@tintinweb/pi-subagents/dist/index.js");
           const subagentsInner = subagentsModule.default as InlineExtension;
           // Wrap factory to intercept subagent lifecycle events via ExtensionAPI's pi.events
           const sessionId = session.id;
           const innerFactory: ExtensionFactory =
             typeof subagentsInner === "function"
               ? subagentsInner
-              : (subagentsInner as { name: string; factory: ExtensionFactory }).factory;
+              : (subagentsInner as { name: string; factory: ExtensionFactory })
+                  .factory;
           const wrappedFactory: InlineExtension = {
             name: "pi-subagents-wrapped",
             factory: (pi) => {
-
-          innerFactory(pi);
+              innerFactory(pi);
               pi.events?.on?.("subagents:created", (data: any) => {
                 if (data.isBackground) {
                   this._backgroundAgentIds.add(data.id);
@@ -3421,7 +3454,9 @@ Tool routing:\n
             },
           };
           extensionFactories.push(wrappedFactory);
-          log("[AgentRunner] Subagent extension factory injected (wrapped for lifecycle events)");
+          log(
+            "[AgentRunner] Subagent extension factory injected (wrapped for lifecycle events)",
+          );
         }
 
         // 注入 DeskWand Tools Extension
@@ -3440,14 +3475,13 @@ Tool routing:\n
         // （与 Pi CLI 共用同一套配置/扩展/信任，spec 决策 A）。首次使用时
         // 强制加载并解析项目信任；reload 内部幂等。
         const piAgentDir = path.join(os.homedir(), ".pi", "agent");
+        // 注意：getOrCreate 是 per-cwd 缓存，构造参数（含 skillPaths/appendSystemPrompt）
+        // 仅在首次创建 host 时生效；会话级派生 loader 通过下方 overrides 显式传当前值。
         const piHost = PiExtensionHost.getOrCreate({
           cwd: effectiveCwd,
           agentDir: piAgentDir,
           additionalSkillPaths: skillPaths,
           appendSystemPrompt,
-          ...(extensionFactories.length > 0
-            ? { inlineExtensionFactories: extensionFactories }
-            : {}),
         });
         if (
           piHost.getExtensionsResult().extensions.length === 0 &&
@@ -3455,7 +3489,17 @@ Tool routing:\n
         ) {
           await piHost.reloadResources({ resolveProjectTrust: true });
         }
-        const resourceLoader = piHost.getResourceLoader();
+        // 会话级 resourceLoader：复用 host 的磁盘扩展/信任/设置，
+        // 追加本会话 inline 工厂（pi-subagents、deskwand-tools）。
+        // 不进入 PiExtensionHost 进程级缓存，避免跨会话工厂闭包串路由。
+        // skillPaths/appendSystemPrompt 显式传当前值（host 缓存后不再更新）。
+        const resourceLoader =
+          extensionFactories.length > 0
+            ? await piHost.createSessionResourceLoader(extensionFactories, {
+                additionalSkillPaths: skillPaths,
+                appendSystemPrompt,
+              })
+            : piHost.getResourceLoader();
 
         // 将 DeskWand Provider Profiles 注册为独立命名空间，供子 Agent 使用。
         if (subagentEnabled) {
@@ -3569,7 +3613,11 @@ Tool routing:\n
                 resetUiState();
               },
               createDeskWandSession: async ({ cwd, title, piSessionFile }) => {
-                return this.createDeskWandSessionForExtension(cwd, title, piSessionFile);
+                return this.createDeskWandSessionForExtension(
+                  cwd,
+                  title,
+                  piSessionFile,
+                );
               },
               materializeMessages: (sessionId, entries) =>
                 this.materializeMessagesForExtension(sessionId, entries),
@@ -3577,8 +3625,7 @@ Tool routing:\n
                 const s = this.findSessionByPiFile?.(piFile);
                 return s ? s.id : null;
               },
-              activateSession: (sessionId) =>
-                this.activateSession?.(sessionId),
+              activateSession: (sessionId) => this.activateSession?.(sessionId),
               uiAdapter: {
                 setEditorText: (text) => {
                   getPiUiBridge()?.setEditorText(text);
@@ -3595,7 +3642,8 @@ Tool routing:\n
           await piSession.bindExtensions({
             uiContext: piUiBridge,
             mode: "tui",
-            commandContextActions: this.piSessionBridge.buildCommandContextActions(),
+            commandContextActions:
+              this.piSessionBridge.buildCommandContextActions(),
             onError: (error) => {
               logError(
                 `[AgentRunner] Extension error (${error.extensionPath}):`,
@@ -3811,13 +3859,18 @@ Tool routing:\n
           }
 
           switch (event.type) {
-            case "queue_update":
+            case "queue_update": {
+              // harness 事件形状为 { steer: [...] }，session mirror 为 { steering: [...] }；
+              // session 会把 harness 事件原样 re-emit，因此两种都可能收到，需归一化。
+              const steering = this.resolveQueueUpdateSteering(event);
               log(
                 "[AgentRunner] queue_update steering=%d followUp=%d",
-                event.steering.length,
-                event.followUp.length,
+                steering.length,
+                event.followUp?.length ?? 0,
               );
+              this.handleQueueUpdate(session.id, steering);
               break;
+            }
             case "message_update": {
               if (controller.signal.aborted) break;
               const ame = event.assistantMessageEvent;
@@ -3892,7 +3945,8 @@ Tool routing:\n
               if (controller.signal.aborted) break;
 
               // Skip non-assistant messages (toolResult, custom notifications, etc.)
-              if (event.message?.role && event.message.role !== "assistant") break;
+              if (event.message?.role && event.message.role !== "assistant")
+                break;
 
               // Flush any buffered content from the think-tag parser
               const flushed = thinkParser.flush();
@@ -4170,7 +4224,18 @@ Tool routing:\n
             }
 
             case "agent_end": {
-              logCtx("[AgentRunner] Agent finished");
+              logCtx(
+                "[AgentRunner] Agent finished",
+                "willRetry:",
+                event.willRetry,
+              );
+              // 回合自然结束且无重试：flush 未送达的 steer（failed(session-stopped)
+              // 标红 + 回填输入框），并清掉 harness 残留队列，防下个回合 runLoop
+              // drain 旧 steer 造成双注入。willRetry 存在时不清——重试时 runLoop
+              // 仍会 drain，steer 还有机会注入。
+              if (!event.willRetry) {
+                this.flushUndeliveredSteers(session.id);
+              }
               break;
             }
 
@@ -4615,99 +4680,383 @@ Tool routing:\n
   }
 
   /** Inject a steering message during agent execution (SDK native steer). */
-  steer(sessionId: string, text: string): void {
+  steer(sessionId: string, text: string, requestId: string, images?: ImageContent[]): void {
     const cached = this.piSessions.get(sessionId);
     if (!cached) {
       logWarn("[AgentRunner] steer: no active piSession for", sessionId);
+      this.sendToRenderer({
+        type: "session.steer.result",
+        payload: {
+          sessionId,
+          status: "failed",
+          text,
+          requestId,
+          reason: "no-active-session",
+        },
+      });
       return;
     }
+    // 转换 renderer ImageContent（source 嵌套）→ pi-ai ImageContent（data/mimeType 平铺）
+    const piImages = (images ?? []).map((img) => ({
+      type: "image" as const,
+      data: img.source.data,
+      mimeType: img.source.media_type,
+    }));
     cached.session
-      .steer(text)
+      .steer(text, piImages)
       .then(() => {
-        log("[AgentRunner] steer delivered:", text.substring(0, 80));
+        log("[AgentRunner] steer queued:", text.substring(0, 80));
+        // 建立送达基线：resolve 后消息已在队列，读取当前长度。
+        // 若读数为 0（极快消费场景，消息入队即被注入）→ 直接 delivered，
+        // 避免基线缺失导致记录永久卡在 injecting。
+        const queueLen =
+          typeof cached.session.getSteeringMessages === "function"
+            ? cached.session.getSteeringMessages().length
+            : 0;
+        if (queueLen === 0) {
+          this.sendToRenderer({
+            type: "session.steer.delivered",
+            payload: { sessionId, text, requestId },
+          });
+        } else {
+          const pending = this.pendingSteerDeliveries.get(sessionId) ?? [];
+          pending.push({ requestId, text });
+          this.pendingSteerDeliveries.set(sessionId, pending);
+        }
+        this.lastSteeringLengths.set(sessionId, queueLen);
         this.sendToRenderer({
           type: "session.steer.result",
-          payload: { sessionId, status: "accepted", text },
+          payload: { sessionId, status: "accepted", text, requestId },
         });
       })
       .catch((e) => {
         logError("[AgentRunner] steer failed:", e);
         this.sendToRenderer({
           type: "session.steer.result",
-          payload: { sessionId, status: "failed", text },
+          payload: {
+            sessionId,
+            status: "failed",
+            text,
+            requestId,
+            reason: "sdk-error",
+          },
         });
       });
   }
+
+  /** queue_update 送达判定：队列长度较上次快照减少 n → 按 FIFO 把最早的
+   *  n 条 pending steer 标记为 delivered（不做文本匹配，规避 SDK 文本规范化）。
+   *  用箭头函数属性保证被测试/订阅方直接调用时 this 绑定正确。 */
+  private handleQueueUpdate = (
+    sessionId: string,
+    steering: readonly string[],
+  ): void => {
+    const prevLen = this.lastSteeringLengths.get(sessionId);
+    const newLen = steering.length;
+    if (prevLen !== undefined && newLen < prevLen) {
+      const pending = this.pendingSteerDeliveries.get(sessionId);
+      const consumed = pending ? pending.splice(0, prevLen - newLen) : [];
+      for (const item of consumed) {
+        this.sendToRenderer({
+          type: "session.steer.delivered",
+          payload: {
+            sessionId,
+            text: item.text,
+            requestId: item.requestId,
+          },
+        });
+      }
+    }
+    this.lastSteeringLengths.set(sessionId, newLen);
+  };
+
+  /** queue_update 事件两种形状归一化：harness 事件用 steer key，session mirror
+   *  用 steering key（session 会把 harness 事件原样 re-emit，两种都可能收到）。
+   *  用箭头函数属性保证被测试/订阅方直接调用时 this 绑定正确。 */
+  private resolveQueueUpdateSteering = (event: {
+    steering?: readonly string[];
+    steer?: readonly string[];
+  }): readonly string[] => event.steer ?? event.steering ?? [];
+
+  /** agent 回合结束（无重试）时 flush 未送达的 steer：对每条 pending 发
+   *  failed(session-stopped) 事件（渲染层标红、回填输入框），并调用
+   *  session.clearQueue() 清掉 harness 残留队列，防下个回合 runLoop drain
+   *  旧 steer 造成双注入。用箭头函数属性保证被测试/订阅方直接调用时 this
+   *  绑定正确。 */
+  private flushUndeliveredSteers = (sessionId: string): void => {
+    const pending = this.pendingSteerDeliveries.get(sessionId);
+    if (!pending || pending.length === 0) return;
+    for (const item of pending) {
+      this.sendToRenderer({
+        type: "session.steer.result",
+        payload: {
+          sessionId,
+          status: "failed",
+          text: item.text,
+          requestId: item.requestId,
+          reason: "session-stopped",
+        },
+      });
+    }
+    this.pendingSteerDeliveries.delete(sessionId);
+    const cached = this.piSessions.get(sessionId);
+    if (cached) {
+      cached.session.clearQueue();
+    }
+  };
 
   /** Manually compact the conversation for a session. */
   async compact(
     sessionId: string,
     instructions?: string,
   ): Promise<"compacted" | "already-compacted" | "skipped"> {
-    const cached = this.piSessions.get(sessionId);
-    if (!cached) {
-      // pi session is lazily created on first message; if none exists yet
-      // there's nothing in memory to compact — this is a no-op.
-      logWarn("[AgentRunner] No active pi session to compact for:", sessionId);
-      return "skipped";
+    // Guard against double-trigger before the renderer's running-event
+    // round-trip (e.g. two rapid /compact invocations).
+    if (this.compactInFlight.has(sessionId)) {
+      log("[AgentRunner] Compaction already in flight for session:", sessionId);
+      return "already-compacted";
     }
-    this.sendToRenderer({
-      type: "session.compaction",
-      payload: { sessionId, status: "running" },
-    });
+    this.compactInFlight.add(sessionId);
+    let cached: CachedPiSession | null = this.piSessions.get(sessionId) ?? null;
     try {
-      const result = await cached.session.compact(instructions);
+      // No in-memory pi session (app restart, aborted run, cache eviction):
+      // restore a minimal session from the persisted JSONL so manual
+      // compaction still works for long conversations — the most common
+      // /compact scenario.
+      if (!cached) {
+        const session = this.getSessionInfo?.(sessionId);
+        const piSessionFile = session?.piSessionFile;
+        if (!session || !piSessionFile || !fs.existsSync(piSessionFile)) {
+          // No persisted conversation — nothing in memory or on disk to compact.
+          logWarn(
+            "[AgentRunner] No pi session or session file to compact for:",
+            sessionId,
+          );
+          return "skipped";
+        }
+        if (piSessionFileContainsLegacyMemoryContext(piSessionFile)) {
+          // Legacy memory-context files are ignored by the runner (rebuilds
+          // from DB); compacting them would summarize stale content.
+          logWarn(
+            "[AgentRunner] Skipping compact for legacy memory-context session file:",
+            sessionId,
+          );
+          return "skipped";
+        }
+        try {
+          cached = await this.createColdStartSessionForCompaction(
+            sessionId,
+            session,
+            piSessionFile,
+          );
+        } catch (error) {
+          logError(
+            "[AgentRunner] Failed to restore pi session for compaction:",
+            error,
+          );
+          this.sendToRenderer({
+            type: "session.compaction",
+            payload: { sessionId, status: "failed" },
+          });
+          throw error;
+        }
+        if (!cached) {
+          // Compaction disabled for this session's context window (< 16K).
+          logWarn(
+            "[AgentRunner] Compaction disabled for small context window:",
+            sessionId,
+          );
+          return "skipped";
+        }
+        this.coldStartCompactionSessions.set(sessionId, cached.session);
+      }
+
       this.sendToRenderer({
         type: "session.compaction",
-        payload: {
-          sessionId,
-          status: "success",
-          ...(typeof result.estimatedTokensAfter === "number"
-            ? { estimatedTokens: result.estimatedTokensAfter }
-            : {}),
-        },
+        payload: { sessionId, status: "running" },
       });
-      log("[AgentRunner] Compaction completed for session:", sessionId);
-      return "compacted";
-    } catch (error: unknown) {
-      const errorName =
-        error instanceof Error ? error.name : "UnknownCompactionError";
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes("Already compacted")) {
+      try {
+        const result = await cached.session.compact(instructions);
         this.sendToRenderer({
           type: "session.compaction",
-          payload: { sessionId, status: "success" },
+          payload: {
+            sessionId,
+            status: "success",
+            ...(typeof result.estimatedTokensAfter === "number"
+              ? { estimatedTokens: result.estimatedTokensAfter }
+              : {}),
+          },
         });
-        log("[AgentRunner] Session already compacted:", sessionId);
-        return "already-compacted";
-      }
-      // Treat intentional abort as a normal completion
-      if (
-        errorMessage.toLowerCase().includes("abort") ||
-        errorName === "AbortError"
-      ) {
-        this.sendToRenderer({
-          type: "session.compaction",
-          payload: { sessionId, status: "aborted" },
-        });
-        log("[AgentRunner] Compaction aborted for session:", sessionId);
+        log("[AgentRunner] Compaction completed for session:", sessionId);
         return "compacted";
+      } catch (error: unknown) {
+        const errorName =
+          error instanceof Error ? error.name : "UnknownCompactionError";
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes("Already compacted")) {
+          this.sendToRenderer({
+            type: "session.compaction",
+            payload: { sessionId, status: "success" },
+          });
+          log("[AgentRunner] Session already compacted:", sessionId);
+          return "already-compacted";
+        }
+        // Below the compaction threshold — inform the user instead of
+        // surfacing it as a failure.
+        if (errorMessage.includes("Nothing to compact")) {
+          log("[AgentRunner] Nothing to compact for session:", sessionId);
+          return "skipped";
+        }
+        // Treat intentional abort as a normal completion
+        if (
+          errorMessage.toLowerCase().includes("abort") ||
+          errorName === "AbortError"
+        ) {
+          this.sendToRenderer({
+            type: "session.compaction",
+            payload: { sessionId, status: "aborted" },
+          });
+          log("[AgentRunner] Compaction aborted for session:", sessionId);
+          return "compacted";
+        }
+        this.sendToRenderer({
+          type: "session.compaction",
+          payload: { sessionId, status: "failed" },
+        });
+        throw error;
       }
-      this.sendToRenderer({
-        type: "session.compaction",
-        payload: { sessionId, status: "failed" },
+    } finally {
+      this.compactInFlight.delete(sessionId);
+      // Dispose the cold-restored session — it lacks the full tool/extension
+      // setup a real run needs; the next run rebuilds it properly. Identity
+      // check via the map: the cached path never enters it.
+      const tempSession = this.coldStartCompactionSessions.get(sessionId);
+      if (cached && tempSession === cached.session) {
+        this.coldStartCompactionSessions.delete(sessionId);
+        try {
+          cached.session.dispose();
+        } catch (disposeError) {
+          logWarn(
+            "[AgentRunner] dispose error on cold-start compact:",
+            disposeError,
+          );
+        }
+        // Release the ModelRuntime this cold-start created (if any) so
+        // repeated cold compacts across many sessions don't accumulate.
+        if (cached.createdRuntime) {
+          unregisterSessionModelRuntime(cached.createdRuntime);
+          this.sessionModelRuntimes.delete(sessionId);
+        }
+      }
+    }
+  }
+
+  /**
+   * Build a minimal pi session from the persisted JSONL so manual compaction
+   * works after restart/abort/eviction when no in-memory session exists.
+   * The session is intentionally light (no tools/extensions): compaction
+   * only needs model + auth + session history for the summarization call.
+   */
+  private async createColdStartSessionForCompaction(
+    sessionId: string,
+    session: Session,
+    restoreFile: string,
+  ): Promise<CachedPiSession | null> {
+    const resolvedRuntime = await modelResolutionService.resolve({
+      sessionProviderProfileKey: session.providerProfileKey,
+      sessionModel: session.model,
+      appConfig: configStore.getAll(),
+    });
+    const provider = resolvedRuntime.providerType || "anthropic";
+    const piModel = resolvedRuntime.piModel;
+    const apiKey = resolvedRuntime.apiKey?.trim();
+
+    // Compaction is deliberately disabled for tiny windows (< 16K): weak
+    // models produce unreliable summaries. prepareCompaction() ignores the
+    // enabled flag, so short-circuit here instead of reporting
+    // "Nothing to compact" for a large session.
+    const compactionSettings = resolveCompactionSettingsForWindow(
+      piModel.contextWindow || 128000,
+    );
+    if (!compactionSettings.enabled) {
+      return null;
+    }
+
+    let createdRuntime: ModelRuntime | undefined;
+    const modelRuntime = await getOrCreateSessionRuntime(
+      this.sessionModelRuntimes,
+      sessionId,
+      async () => {
+        const runtime = await createSessionModelRuntime(getAuthPath());
+        registerSessionModelRuntime(runtime);
+        createdRuntime = runtime;
+        return runtime;
+      },
+    );
+    if (apiKey && provider !== "oauth") {
+      const piProvider =
+        provider === "custom"
+          ? resolvedRuntime.customProtocol || "anthropic"
+          : provider;
+      await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
+        allowNetwork: false,
       });
+      if (piModel.provider !== piProvider) {
+        await modelRuntime.setRuntimeApiKey(piModel.provider, apiKey, {
+          allowNetwork: false,
+        });
+      }
+    }
+
+    const thinkingLevel = session.thinkingLevel ?? "medium";
+    const effectiveCwd = session.cwd || app.getPath("userData");
+    let piSession: PiAgentSession;
+    try {
+      const created = await createAgentSession({
+        model: piModel,
+        thinkingLevel,
+        modelRuntime,
+        sessionManager: PiSessionManager.open(restoreFile),
+        settingsManager: PiSettingsManager.inMemory({
+          compaction: compactionSettings,
+          retry: { enabled: true, maxRetries: 2 },
+        }),
+        cwd: effectiveCwd,
+        noTools: "all",
+      });
+      piSession = created.session;
+    } catch (error) {
+      // Session creation failed after the runtime was registered — release it.
+      if (createdRuntime) {
+        unregisterSessionModelRuntime(createdRuntime);
+        this.sessionModelRuntimes.delete(sessionId);
+      }
       throw error;
     }
+    log(
+      "[AgentRunner] Cold-start compact: restored pi session from:",
+      restoreFile,
+    );
+    return {
+      session: piSession,
+      modelId: piModel.id,
+      thinkingLevel,
+      runtimeSignature: "",
+      extensionSignature: "",
+      createdRuntime,
+      piSessionFile: restoreFile,
+    };
   }
 
   /** Abort an in-progress manual compaction for a session. */
   abortCompaction(sessionId: string): void {
     const cached = this.piSessions.get(sessionId);
-    if (!cached) return;
+    const coldStart = this.coldStartCompactionSessions.get(sessionId);
+    const target = cached?.session ?? coldStart;
+    if (!target) return;
     log("[AgentRunner] Aborting compaction for session:", sessionId);
-    cached.session.abortCompaction();
+    target.abortCompaction();
   }
 
   private sendTraceStep(sessionId: string, step: TraceStep): void {
