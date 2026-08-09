@@ -2,7 +2,7 @@
 // Delegates block rendering to ContentBlockView and its sub-components.
 import { useState, memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Copy, Check, Clock, XCircle } from "lucide-react";
+import { Copy, Check, Clock, XCircle, GitBranch } from "lucide-react";
 import type {
   Message,
   ContentBlock,
@@ -32,6 +32,8 @@ interface MessageCardProps {
   videoReferences?: VideoReference[];
   /** Hide process summaries when ChatView renders a turn-level summary. */
   suppressProcessSummaries?: boolean;
+  /** 分叉入口：仅助手消息显示（tool_result 行/流式中/排队中/已取消除外） */
+  onForkMessage?: (message: Message) => void;
 }
 
 function formatRelativeTime(timestamp: number, locale: string): string {
@@ -68,11 +70,38 @@ export const MessageCard = memo(function MessageCard({
   artifactFiles = [],
   videoReferences = [],
   suppressProcessSummaries = false,
+  onForkMessage,
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
+
+  // 余额不足（402 INSUFFICIENT_CREDITS）：渲染充值引导卡片，替代原始错误文本
+  if (message.code === "INSUFFICIENT_CREDITS") {
+    return (
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
+        <p className="text-sm text-text-primary">{t("topUp.insufficientCredits")}</p>
+        <button
+          className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground"
+          onClick={() => useAppStore.getState().setTopUpOpen(true)}
+        >
+          {t("topUp.goTopUp")}
+        </button>
+      </div>
+    );
+  }
   const isUser = message.role === "user";
   const isQueued = message.localStatus === "queued";
   const isCancelled = message.localStatus === "cancelled";
+  // 工具结果独立行（role=assistant + 单个 tool_result 块）不可作为分叉点
+  const isToolResultRow =
+    message.role === "assistant" &&
+    message.content.length === 1 &&
+    message.content[0].type === "tool_result";
+  const canFork =
+    message.role === "assistant" &&
+    !isToolResultRow &&
+    !isQueued &&
+    !isCancelled &&
+    !isStreaming;
   const rawContent = message.content as unknown;
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
@@ -191,24 +220,18 @@ export const MessageCard = memo(function MessageCard({
           <Copy className="w-3 h-3" />
         )}
       </button>
+      {canFork && onForkMessage ? (
+        <button
+          type="button"
+          onClick={() => onForkMessage(message)}
+          title={t("messageCard.forkMessage")}
+          className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
+        >
+          <GitBranch className="w-3 h-3" />
+        </button>
+      ) : null}
     </div>
   );
-
-  if (message.code === "INSUFFICIENT_CREDITS") {
-    return (
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
-        <p className="text-sm text-text-primary">
-          {t("topUp.insufficientCredits")}
-        </p>
-        <button
-          className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground"
-          onClick={() => useAppStore.getState().setTopUpOpen(true)}
-        >
-          {t("topUp.goTopUp")}
-        </button>
-      </div>
-    );
-  }
 
   if (!isUser && visibleBlocks.length === 0) {
     return null;

@@ -113,6 +113,16 @@ export function isProviderProfileKey(
   );
 }
 
+/**
+ * deskwand 把每次工具结果落库为独立行：role="assistant" + 单个 tool_result 块
+ * （agent-runner 的 sendMessage 流程）。这类行不能作为分叉点。
+ */
+function isToolResultMessage(message: Message): boolean {
+  return (
+    message.content.length === 1 && message.content[0].type === "tool_result"
+  );
+}
+
 export class SessionManager {
   private db: DatabaseInstance;
   private sendToRenderer: (event: ServerEvent) => void;
@@ -484,6 +494,64 @@ export class SessionManager {
     return session;
   }
 
+  /**
+   * 在指定助手消息处创建分叉会话：从权威源（DB）复制分叉点及之前的历史消息到
+   * 新会话，之后截断，原会话不动。新会话不关联 piSessionFile（缓存），继续对话
+   * 走冷启动路径（injectHistoryPreamble 注入历史），缓存由 pi 自动重建。
+   * 新会话继承源会话设置，status 为 idle。
+   * @throws 校验失败 / 复制失败时抛中文 Error
+   */
+  async forkSession(
+    sessionId: string,
+    messageId: string,
+    titleSuffix: string,
+  ): Promise<Session> {
+    const source = this.loadSession(sessionId);
+    if (!source) throw new Error("会话不存在");
+    const messages = this.getMessages(sessionId);
+    const target = messages.find((m) => m.id === messageId);
+    if (!target) throw new Error("分叉点消息不存在");
+    if (target.role !== "assistant" || isToolResultMessage(target)) {
+      throw new Error("仅支持从助手消息分叉");
+    }
+
+    const newSession = this.createSession(
+      `${source.title}${titleSuffix}`,
+      source.cwd,
+      source.allowedTools,
+      source.memoryEnabled,
+      source.thinkingLevel,
+      source.providerProfileKey,
+      source.model,
+      source.mountedPaths,
+    );
+    newSession.status = "idle";
+
+    try {
+      this.saveSession(newSession);
+      const forkPointIdx = messages.findIndex((m) => m.id === messageId);
+      if (forkPointIdx < 0) throw new Error("分叉点消息不存在");
+      let seq = 0;
+      for (let i = 0; i <= forkPointIdx; i++) {
+        const msg = messages[i];
+        this.saveMessage({
+          ...msg,
+          id: `fork-${newSession.id}-${seq++}`,
+          sessionId: newSession.id,
+        });
+      }
+      return newSession;
+    } catch (error) {
+      // 无半成品：复制失败删除新会话记录（新会话无文件/目录，无需额外清理）
+      try {
+        this.db.sessions.delete(newSession.id);
+      } catch {
+        // 忽略清理失败
+      }
+      throw error;
+    }
+  }
+
   // Create a new session object
   private buildMountedPaths(cwd?: string): Session["mountedPaths"] {
     if (!cwd) {
@@ -500,6 +568,7 @@ export class SessionManager {
     thinkingLevel?: Session["thinkingLevel"],
     providerProfileKey?: Session["providerProfileKey"],
     model?: string,
+    mountedPaths?: Session["mountedPaths"],
   ): Session {
     const now = Date.now();
     // Prefer frontend-provided cwd; fallback to app config, then external env vars,
@@ -521,7 +590,7 @@ export class SessionManager {
       title,
       status: "running",
       cwd: effectiveCwd,
-      mountedPaths: this.buildMountedPaths(effectiveCwd),
+      mountedPaths: mountedPaths ?? this.buildMountedPaths(effectiveCwd),
       allowedTools: allowedTools || [
         "askuserquestion",
         "todowrite",

@@ -1004,7 +1004,8 @@
     "noQuestions": "No questions",
     "question": "Question",
     "thinking": "Thinking",
-    "executionTime": "Execution time: {{time}}"
+    "executionTime": "Execution time: {{time}}",
+    "forkMessage": "Fork from here"
   },
   "schedule": {
     "createTitle": "Create Schedule",
