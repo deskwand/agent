@@ -14,6 +14,7 @@ type ExposedElectronApi = {
 const ALL_CLIENT_EVENT_TYPES = [
   "session.start",
   "session.continue",
+  "session.fork",
   "session.setThinkingLevel",
   "session.setProviderModel",
   "session.stop",
@@ -81,11 +82,9 @@ describe("preload ALLOWED_CLIENT_EVENTS", () => {
 
       return {
         contextBridge: {
-          exposeInMainWorld: vi.fn(
-            (_name: string, api: ExposedElectronApi) => {
-              exposedApi = api;
-            },
-          ),
+          exposeInMainWorld: vi.fn((_name: string, api: ExposedElectronApi) => {
+            exposedApi = api;
+          }),
         },
         ipcRenderer,
       };
