@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { AppConfig, ApiProviderConfig } from "../../types";
+import { modelDisplay } from "../../utils/subagent-model-display";
+import { DESKWAND_PROVIDER_PREFIX } from "../../../shared/deskwand-provider";
 
 const NAME_I18N_MAP: Record<string, string> = {
   Explore: "subagent.agentExplore",
@@ -20,17 +22,6 @@ interface AgentRow {
   source: "builtin" | "global" | "project";
   markdownModel?: string;
   markdownThinking?: string;
-}
-
-function modelDisplay(raw: string, providers: Record<string, any>): string {
-  const slashIdx = raw.indexOf("/");
-  if (slashIdx === -1) return raw;
-  const providerKey = raw.slice(0, slashIdx);
-  const modelId = raw.slice(slashIdx + 1);
-  const provider = providers[providerKey];
-  const providerName = provider?.name || providerKey;
-  const modelLabel = provider?.models?.find((m: any) => m.id === modelId)?.label || modelId;
-  return `${providerName} / ${modelLabel}`;
 }
 
 export function SubagentSettings() {
@@ -97,7 +88,11 @@ export function SubagentSettings() {
                   setEditingModel(hasModel ? "model" : "inherit");
                   if (hasModel && agent.markdownModel) {
                     const slashIdx = agent.markdownModel.indexOf("/");
-                    setEditingProvider(slashIdx > 0 ? agent.markdownModel.slice(0, slashIdx) : "");
+                    let provider = slashIdx > 0 ? agent.markdownModel.slice(0, slashIdx) : "";
+                    if (provider.startsWith(DESKWAND_PROVIDER_PREFIX)) {
+                      provider = provider.slice(DESKWAND_PROVIDER_PREFIX.length);
+                    }
+                    setEditingProvider(provider);
                     setEditingModelId(slashIdx > 0 ? agent.markdownModel.slice(slashIdx + 1) : "");
                   }
                   setEditingThinking(agent.markdownThinking || "inherit");

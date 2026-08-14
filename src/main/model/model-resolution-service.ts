@@ -11,6 +11,7 @@ import type {
 import { fetchOllamaModelInfo } from "../config/ollama-api";
 import { resolveProviderApiKey } from "../agent/shared-model-runtime";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
+import { DESKWAND_PROVIDER_PREFIX } from "../../shared/deskwand-provider";
 import {
   applyPiModelRuntimeOverrides,
   buildSyntheticPiModel,
@@ -275,6 +276,20 @@ export class ModelResolutionService {
       throw new Error(
         `API key not configured for ${providerSelection.providerProfileKey}. Please update Settings → API.`,
       );
+    }
+
+    // Custom profiles: pin the model identity to the deskwand:<profileKey>
+    // namespace instead of the native registry provider the model fell back
+    // to (e.g. "deepseek"). This keeps credentials/baseUrl bound to the
+    // profile, so the main agent never writes a custom profile's key onto a
+    // native provider — the root cause of subagent 401s (fuzzy model
+    // resolution then matches the polluted native provider with the wrong
+    // key against the official endpoint).
+    if (providerConfig.provider === "custom") {
+      piModel = {
+        ...piModel,
+        provider: `${DESKWAND_PROVIDER_PREFIX}${providerSelection.providerProfileKey}`,
+      } as Model<Api>;
     }
 
     return {

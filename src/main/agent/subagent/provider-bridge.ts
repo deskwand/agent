@@ -5,11 +5,11 @@
 
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
+import { DESKWAND_PROVIDER_PREFIX } from "../../../shared/deskwand-provider";
 import { modelResolutionService } from "../../model/model-resolution-service";
 import { configStore, type AppConfig } from "../../config/config-store";
 import { log, logWarn } from "../../utils/logger";
 
-const DESKWAND_PROVIDER_PREFIX = "deskwand:";
 const DESKWAND_RUNTIME_API_KEY_PLACEHOLDER = "deskwand-runtime-placeholder";
 
 let providerSyncTail: Promise<void> = Promise.resolve();

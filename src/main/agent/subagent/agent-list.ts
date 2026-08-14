@@ -4,10 +4,12 @@
  * 优先级：项目 > 全局 > 内置。同名 Agent 高优先级覆盖。
  */
 
-import { readdirSync, readFileSync, existsSync, copyFileSync, mkdirSync } from "node:fs";
+import { readdirSync, readFileSync, existsSync, copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { log } from "../../utils/logger";
+import { log, logWarn } from "../../utils/logger";
+import { normalizeSubagentModelSpec, upsertFrontmatterField } from "./model-spec";
+import { DESKWAND_PROVIDER_PREFIX } from "../../../shared/deskwand-provider";
 
 export interface AgentDescriptor {
   name: string;
@@ -207,4 +209,74 @@ export function deployBuiltinAgents(): void {
   }
 
   log(`[AgentList] Deployed ${deployed} built-in agent(s) to ${targetDir}`);
+}
+
+/**
+ * 迁移全局 agent 文件中缺少 deskwand: 前缀的 model spec。
+ * - "provider/model" → "deskwand:provider/model"（安全补前缀）
+ * - 裸模型名（无 "/"，如 "deepseek-v4-flash"）→ 无法推断 provider，logWarn 跳过
+ * - "inherit" 与已带 "deskwand:" 前缀 → 不动
+ * 返回迁移的文件数。
+ *
+ * @param profileKeys 已配置的 provider profileKey 集合；spec 中 provider 不在
+ * 集合内时跳过并告警（避免补前缀后 exact match 仍失败、造成"假迁移"）。
+ */
+export function migrateAgentModelSpecs(profileKeys: ReadonlySet<string>): number {
+  const targetDir = join(getAgentDir(), "agents");
+  if (!existsSync(targetDir)) return 0;
+
+  let migrated = 0;
+  let files: string[];
+  try {
+    files = readdirSync(targetDir).filter((f) => f.endsWith(".md"));
+  } catch {
+    return 0;
+  }
+
+  for (const file of files) {
+    const target = join(targetDir, file);
+    let content: string;
+    try {
+      content = readFileSync(target, "utf-8");
+    } catch {
+      continue;
+    }
+
+    const fm = parseSimpleFrontmatter(content);
+    const raw = fm.model as string | undefined;
+    if (!raw || raw === "inherit") continue;
+
+    const slashIdx = raw.indexOf("/");
+    if (slashIdx === -1) {
+      // 裸模型名：无法推断 provider，提示用户在设置页重新选择
+      logWarn(
+        `[AgentList] Agent ${file} uses bare model "${raw}" without provider prefix; re-set it in Settings → Subagents`,
+      );
+      continue;
+    }
+
+    const provider = raw.slice(0, slashIdx);
+    if (provider.startsWith(DESKWAND_PROVIDER_PREFIX)) continue;
+    if (!profileKeys.has(provider)) {
+      logWarn(
+        `[AgentList] Agent ${file} model provider "${provider}" is not a configured profile; re-set it in Settings → Subagents`,
+      );
+      continue;
+    }
+
+    const normalized = normalizeSubagentModelSpec(raw);
+    if (normalized === raw) continue;
+
+    const updated = upsertFrontmatterField(content, "model", normalized);
+    if (updated === content) continue;
+    try {
+      writeFileSync(target, updated, "utf-8");
+      migrated += 1;
+      log(`[AgentList] Migrated ${file} model: ${raw} → ${normalized}`);
+    } catch (err: unknown) {
+      logWarn(`[AgentList] Failed to migrate ${file}:`, err);
+    }
+  }
+
+  return migrated;
 }
