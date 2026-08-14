@@ -24,41 +24,37 @@
 
 ## What is DeskWand
 
-DeskWand is a production-ready desktop AI agent built on the Pi Agent SDK.
+DeskWand is a desktop AI agent built on the Pi Agent SDK.
 
-Unlike a chatbot, DeskWand understands goals, plans tasks, uses tools, delegates work to subagents, and executes complex tasks on your computer. It learns from successful tasks and turns them into reusable skills, becoming more capable over time.
+Unlike a chatbot, DeskWand understands goals, plans tasks, uses tools, delegates work to subagents, and executes complex tasks on your computer. It learns from successful tasks and turns them into reusable skills, so it gets better over time.
 
 ---
 
 ## Features
 
-Goal-driven agents — Give a goal, and let the agent plan and execute.
+**Goal-driven agents.** Give it a goal and the agent plans and executes.
 
-Subagents — Break complex tasks into specialized agents that work in parallel.
+**Subagents.** Break complex tasks into specialized agents that work in parallel.
 
-Web search and tools — Access information and capabilities beyond conversation.
+**Web search and tools.** Search works out of the box, no setup needed.
 
-Desktop native — Work with your local files, projects, and environment.
+**Desktop native.** Work with your local files, projects, and environment.
 
-Self-improving skills — Successful tasks can become reusable skills, making your agent more capable over time.
+**Self-improving skills.** Successful tasks can become reusable skills.
 
-Multi-model support — Use the AI models that work best for you.
+**Multi-model support.** Use the AI models that work best for you.
 
-Pi extensions & marketplace — Run Pi CLI extensions and install plugins, skills, and prompts from the built-in package marketplace.
+**Standalone vision model.** Set a separate vision model so non-multimodal models like DeepSeek can read images too.
 
-Messaging channels — Reach your agent from Telegram, Discord, QQ, Slack, WeChat, and Feishu.
+**Pi extensions & marketplace.** Run Pi CLI extensions and install plugins, skills, and prompts from the built-in package marketplace.
 
----
-
-### Channels
-
-Talk to your agent from anywhere: **Telegram · Discord · QQ · Slack · WeChat · Feishu**
+**Messaging channels.** Reach your agent from Telegram, Discord, QQ, Slack, WeChat, or Feishu.
 
 ---
 
 ## Built with Pi Agent SDK
 
-DeskWand is built on top of the Pi Agent SDK, an open-source agent framework. Pi provides a powerful agent foundation; DeskWand adds the product layer for an everyday desktop AI agent, including goal execution, subagent orchestration, tool ecosystem, web capabilities, skill learning, and a full desktop experience.
+DeskWand is built on the Pi Agent SDK, an open-source agent framework. Pi provides the agent foundation; DeskWand adds the desktop product layer: goal execution, subagent orchestration, tools, web capabilities, and skill learning.
 
 ---
 
@@ -115,19 +111,19 @@ DeskWand is built on top of the Pi Agent SDK, an open-source agent framework. Pi
 | Windows | [`.exe`](https://github.com/deskwand/agent/releases) |
 | Linux | [`.AppImage`](https://github.com/deskwand/agent/releases) · [`.deb`](https://github.com/deskwand/agent/releases) |
 
-👉 [deskwand.com/#download](https://deskwand.com/#download)
+[deskwand.com/#download](https://deskwand.com/#download)
 
-### Quick Start
+### Quick start
 
 1. Download and install
 2. Add your API key
 3. Choose a model
-4. Set a goal — DeskWand plans, executes, and auto-continues
+4. Set a goal, and DeskWand plans, executes, and auto-continues
 
 ### Documentation
 
-- [User Manual](https://www.deskwand.com/manual) — complete guide from getting started to advanced features
-- [Source](https://github.com/deskwand/agent) — configuration, models, skills, MCP, and more
+- [User Manual](https://www.deskwand.com/manual): the complete guide, from getting started to advanced features
+- [Source](https://github.com/deskwand/agent): configuration, models, skills, MCP, and more
 
 <p align="center">
   <a href="https://deskwand.com">deskwand.com</a>

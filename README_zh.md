@@ -24,41 +24,37 @@
 
 ## 什么是 DeskWand
 
-DeskWand 是基于 Pi Agent SDK 构建的生产级桌面 AI Agent。
+DeskWand 是基于 Pi Agent SDK 构建的桌面 AI Agent。
 
-与聊天机器人不同，DeskWand 能够理解目标、规划任务、使用工具、委托子 Agent 协同工作，并在你的电脑上执行复杂任务。它会从成功的任务中学习，将其转化为可复用的技能，持续提升能力。
+与聊天机器人不同，DeskWand 能够理解目标、规划任务、使用工具、委托子 Agent 协同工作，并在你的电脑上执行复杂任务。它会从成功的任务中学习，把经验沉淀为可复用技能，越用越顺手。
 
 ---
 
 ## 核心功能
 
-目标驱动 — 给出一个目标，Agent 自动规划并执行。
+**目标驱动。** 给出一个目标，Agent 自动规划并执行。
 
-子 Agent — 将复杂任务拆分为专业 Agent，并行协作。
+**子 Agent。** 将复杂任务拆分为专业 Agent，并行协作。
 
-网络搜索与工具 — 突破对话边界，获取更广泛的信息和能力。
+**网络搜索与工具。** 搜索开箱即用，无需配置。
 
-桌面原生 — 直接操作你的本地文件、项目和环境。
+**桌面原生。** 直接操作你的本地文件、项目和开发环境。
 
-自进化技能 — 成功执行的任务可转化为可复用技能，让 Agent 日益强大。
+**自进化技能。** 成功执行的任务可转化为可复用技能。
 
-多模型支持 — 自由选择最适合你的 AI 模型。
+**多模型支持。** 自由选择最适合你的 AI 模型。
 
-Pi 扩展与市场 — 运行 Pi CLI 扩展，从内置包市场安装插件、技能和提示词。
+**独立视觉模型。** 支持独立配置视觉模型，解决 DeepSeek 等非多模态模型的识图问题。
 
-消息渠道 — 通过 Telegram、Discord、QQ、Slack、微信、飞书与你的 Agent 交互。
+**Pi 扩展与市场。** 运行 Pi CLI 扩展，从内置包市场安装插件、技能和提示词。
 
----
-
-### 渠道
-
-随时随地与你的 Agent 对话：**Telegram · Discord · QQ · Slack · 微信 · 飞书**
+**消息渠道。** 通过 Telegram、Discord、QQ、Slack、微信、飞书与你的 Agent 交互。
 
 ---
 
 ## 基于 Pi Agent SDK 构建
 
-DeskWand 基于开源的 Pi Agent SDK 构建。Pi 提供了强大的 Agent 基础设施；DeskWand 在此基础上增加了面向日常使用的产品层，包括目标执行、子 Agent 编排、工具生态、网络能力、技能学习和完整的桌面体验。
+DeskWand 基于开源的 Pi Agent SDK 构建。Pi 提供 Agent 基础设施，DeskWand 在此基础上加上产品层：目标执行、子 Agent 编排、工具生态、网络能力和技能学习。
 
 ---
 
@@ -115,19 +111,19 @@ DeskWand 基于开源的 Pi Agent SDK 构建。Pi 提供了强大的 Agent 基�
 | Windows | [`.exe`](https://github.com/deskwand/agent/releases) |
 | Linux | [`.AppImage`](https://github.com/deskwand/agent/releases) · [`.deb`](https://github.com/deskwand/agent/releases) |
 
-👉 [deskwand.com/#download](https://deskwand.com/#download)
+[deskwand.com/#download](https://deskwand.com/#download)
 
 ### 快速开始
 
 1. 下载并安装
 2. 添加你的 API Key
 3. 选择一个模型
-4. 设定目标——DeskWand 自动规划、执行、持续推进
+4. 设定目标，DeskWand 会自动规划、执行并持续推进
 
 ### 文档
 
-- [用户手册](https://www.deskwand.com/zh/manual) — 从入门到精通的全流程指南
-- [源码](https://github.com/deskwand/agent) — 配置、模型、技能、MCP 等更多信息
+- [用户手册](https://www.deskwand.com/zh/manual)：从安装到高级功能的完整指南
+- [源码](https://github.com/deskwand/agent)：配置、模型、技能、MCP 等
 
 <p align="center">
   <a href="https://deskwand.com">deskwand.com</a>
