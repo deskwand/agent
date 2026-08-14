@@ -158,7 +158,8 @@ export const MessageCard = memo(function MessageCard({
     !isStreaming &&
     !isQueued &&
     !isCancelled &&
-    groupedDisplayBlocks.length > 0;
+    groupedDisplayBlocks.length > 0 &&
+    (isUser || isLatestRound);
 
   // Extract all text content for copying. For assistant messages all visible
   // text blocks include markdown code fences — no separate code block type exists.
