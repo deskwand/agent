@@ -1703,7 +1703,6 @@ export function ChatView() {
                           videoReferences={videoReferences}
                           suppressProcessSummaries={suppressProcessSummaries}
                           onForkMessage={handleForkMessage}
-                          forkDisabled={!activeSession?.piSessionFile}
                         />
                       </div>
                     );

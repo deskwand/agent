@@ -12,6 +12,7 @@ describe('useIPC session fork', () => {
     expect(source).toContain('payload: { sessionId, messageId, titleSuffix }');
     expect(source).toContain('addSession(session)');
     expect(source).toContain('setActiveSession(session.id)');
+    expect(source).toContain('setMessagesTail(session.id, page.messages, page.hasMore)');
     expect(source).toContain('id: `notice-session-fork-${Date.now()}`');
     expect(source).not.toContain('throw e;');
   });

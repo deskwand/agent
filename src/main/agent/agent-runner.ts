@@ -81,7 +81,7 @@ import {
 import { configStore } from "../config/config-store";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
-import { deployBuiltinAgents } from "./subagent/agent-list";
+import { deployBuiltinAgents, migrateAgentModelSpecs } from "./subagent/agent-list";
 import crypto from "node:crypto";
 import { createVisionDescribeTool } from "./tools/vision-describe";
 import { createOfficeTools } from "./tools/office/office-tools";
@@ -2540,7 +2540,7 @@ ${hints.join("\n")}
       if (apiKey && provider !== "oauth") {
         const piProvider =
           provider === "custom"
-            ? runtimeConfig.customProtocol || "anthropic"
+            ? piModel.provider
             : provider;
         await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
           allowNetwork: false,
@@ -2709,6 +2709,15 @@ ${hints.join("\n")}
           // Deploy built-in agent Markdown files to global agent dir
           // so the subagent plugin discovers them on next load.
           deployBuiltinAgents();
+          try {
+            migrateAgentModelSpecs(
+              new Set(Object.keys(configStore.getAll().providers ?? {})),
+            );
+          } catch (err) {
+            // Migration is best-effort; failure must not abort the query
+            // nor permanently skip it (retried on next run).
+            logWarn("[AgentRunner] Agent model migration failed:", err);
+          }
         } finally {
           this._skillsSetupInProgress = false;
         }
@@ -5003,11 +5012,13 @@ Tool routing:\n
         return runtime;
       },
     );
+    // Custom profiles resolve to deskwand:<profileKey> providers (see
+    // modelResolutionService) — register them on this runtime so auth
+    // resolution for the compaction summarization call can find them.
+    await registerDeskWandProviders(modelRuntime);
     if (apiKey && provider !== "oauth") {
       const piProvider =
-        provider === "custom"
-          ? resolvedRuntime.customProtocol || "anthropic"
-          : provider;
+        provider === "custom" ? piModel.provider : provider;
       await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
         allowNetwork: false,
       });

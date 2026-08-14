@@ -1005,8 +1005,7 @@
     "question": "问题",
     "thinking": "思考",
     "executionTime": "执行时间: {{time}}",
-    "forkMessage": "从此处分叉",
-    "forkUnavailable": "该会话暂不支持分叉"
+    "forkMessage": "从此处分叉"
   },
   "schedule": {
     "createTitle": "新建定时任务",

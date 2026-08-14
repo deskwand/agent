@@ -21,13 +21,24 @@ const isElectron =
 
 let commandToastSeq = 0;
 let notifyToastSeq = 0;
-let sharedIpcInitialized = false;
+let sharedIpcRefCount = 0;
+let sharedIpcUnsubscribe: (() => void) | null = null;
 
-function installSharedIpcBridge(): void {
-  if (sharedIpcInitialized) {
-    return;
+function installSharedIpcBridge(): () => void {
+  if (sharedIpcRefCount === 0) {
+    sharedIpcUnsubscribe = registerSharedIpcListener();
   }
-  sharedIpcInitialized = true;
+  sharedIpcRefCount += 1;
+  return () => {
+    sharedIpcRefCount -= 1;
+    if (sharedIpcRefCount === 0 && sharedIpcUnsubscribe) {
+      sharedIpcUnsubscribe();
+      sharedIpcUnsubscribe = null;
+    }
+  };
+}
+
+function registerSharedIpcListener(): () => void {
   // --- RAF batching for high-frequency events ---
   const pendingPartials: Record<string, Record<string, string[]>> = {};
   let partialRafId: number | null = null;
@@ -147,7 +158,7 @@ function installSharedIpcBridge(): void {
     return window.electronAPI.invoke<T>(event);
   };
 
-  window.electronAPI.on((event: ServerEvent) => {
+  const unsubscribe = window.electronAPI.on((event: ServerEvent) => {
     const store = useAppStore.getState();
 
     try {
@@ -642,6 +653,8 @@ function installSharedIpcBridge(): void {
       console.error("[useIPC] Failed to bootstrap config/theme state:", error);
     }
   })();
+
+  return unsubscribe;
 }
 
 export function useIPC() {
@@ -653,7 +666,7 @@ export function useIPC() {
     }
 
     console.log("[useIPC] Ensuring shared IPC listener");
-    installSharedIpcBridge();
+    return installSharedIpcBridge();
   }, []);
 
   // Get actions for the rest of the hook
@@ -844,31 +857,6 @@ export function useIPC() {
       clearActiveTurn,
       startExecutionClock,
     ],
-  );
-
-  const forkSession = useCallback(
-    async (sessionId: string, messageId: string, titleSuffix: string) => {
-      try {
-        const session = await invoke<Session>({
-          type: "session.fork",
-          payload: { sessionId, messageId, titleSuffix },
-        });
-        if (session) {
-          addSession(session);
-          useAppStore.getState().setActiveSession(session.id);
-        }
-        return session;
-      } catch (e) {
-        useAppStore.getState().setGlobalNotice({
-          id: `notice-session-fork-${Date.now()}`,
-          type: "error",
-          message: e instanceof Error ? e.message : i18n.t("chat.forkFailed"),
-          messageKey: e instanceof Error ? undefined : "chat.forkFailed",
-        });
-        return undefined;
-      }
-    },
-    [invoke, addSession],
   );
 
   const setSessionThinkingLevel = useCallback(
@@ -1166,6 +1154,48 @@ export function useIPC() {
       );
     },
     [invoke],
+  );
+
+  const forkSession = useCallback(
+    async (sessionId: string, messageId: string, titleSuffix: string) => {
+      let session: Session | undefined;
+      try {
+        session = await invoke<Session>({
+          type: "session.fork",
+          payload: { sessionId, messageId, titleSuffix },
+        });
+      } catch (e) {
+        useAppStore.getState().setGlobalNotice({
+          id: `notice-session-fork-${Date.now()}`,
+          type: "error",
+          message: e instanceof Error ? e.message : i18n.t("chat.forkFailed"),
+          messageKey: e instanceof Error ? undefined : "chat.forkFailed",
+        });
+        return undefined;
+      }
+      if (!session) return session;
+      addSession(session);
+      // 预载新会话消息与 trace（与 Sidebar 会话切换同序列）：setActiveSession
+      // 编程式切换绕过了 Sidebar 的 historyHydrated 预载，不预载则新会话显示空欢迎页。
+      // 预载失败不阻塞切换——historyHydrated 仍为 false，点侧栏该会话会重新预载。
+      try {
+        const page =
+          (await getSessionMessagesPage(session.id, null, 1000)) || {
+            messages: [],
+            hasMore: false,
+          };
+        useAppStore
+          .getState()
+          .setMessagesTail(session.id, page.messages, page.hasMore);
+        const steps = (await getSessionTraceSteps(session.id)) || [];
+        useAppStore.getState().setTraceSteps(session.id, steps);
+      } catch {
+        // 预载失败静默降级（侧栏点击可重试）
+      }
+      useAppStore.getState().setActiveSession(session.id);
+      return session;
+    },
+    [invoke, addSession, getSessionMessagesPage, getSessionTraceSteps],
   );
 
   const respondToPermission = useCallback(

@@ -18,15 +18,12 @@ describe("MessageCard fork button", () => {
   it("助手消息显示分叉按钮（GitBranch），用户消息不显示", () => {
     expect(messageCardContent).toContain("canFork && onForkMessage");
     expect(messageCardContent).toContain("GitBranch");
-    expect(messageCardContent).toContain("messageCard.forkUnavailable");
     expect(messageCardContent).toContain("messageCard.forkMessage");
-    expect(messageCardContent).toContain("disabled={forkDisabled}");
     expect(messageCardContent).toContain("onForkMessage?: (message: Message) => void");
   });
 
-  it("ChatView 传入 onForkMessage 与 forkDisabled（无 piSessionFile 禁用）", () => {
+  it("ChatView 传入 onForkMessage（防双击）", () => {
     expect(chatViewContent).toContain("onForkMessage={handleForkMessage}");
-    expect(chatViewContent).toContain("forkDisabled={!activeSession?.piSessionFile}");
     expect(chatViewContent).toContain("forkSession(activeSession.id, message.id");
     expect(chatViewContent).toContain('t("chat.forkSuffix")');
   });
