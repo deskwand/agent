@@ -154,6 +154,29 @@ export function getAnchoredScrollTop(
   return previousScrollTop + (nextScrollHeight - previousScrollHeight);
 }
 
+/**
+ * Follow-state change for a chat-container wheel gesture (already filtered:
+ * not trackpad jitter, not inside a nested scrollable).
+ * - Upward wheel: user leaves the bottom → stop following.
+ * - Downward wheel at the physical bottom (including the no-overflow case
+ *   where scrollTop = maxScrollTop = 0): user re-commits to the bottom →
+ *   resume following. Mirrors the scroll-event bottom-arrival revival in
+ *   syncFollowFromScroll, but works when no scroll event can fire — a short
+ *   tail cannot scroll, so an accidental wheel-up would otherwise leave
+ *   follow dead forever and the next streamed message would land below the
+ *   fold.
+ * Returns null when the gesture should not change follow state.
+ */
+export function resolveWheelFollowChange(
+  deltaY: number,
+  scrollTop: number,
+  maxScrollTop: number,
+): boolean | null {
+  if (deltaY < 0) return false;
+  if (deltaY > 0 && scrollTop >= maxScrollTop - 1) return true;
+  return null;
+}
+
 export function shouldShowHydratingHistoryState(
   activeSessionId: string | null,
   hasActiveSession: boolean,
@@ -1138,16 +1161,25 @@ export function ChatView() {
       ) {
         return;
       }
-      if (e.deltaY < 0) {
+      const followChange = resolveWheelFollowChange(
+        e.deltaY,
+        container.scrollTop,
+        container.scrollHeight - container.clientHeight,
+      );
+      if (followChange === false) {
         isAtBottomRef.current = false;
         setShowScrollToBottom(true);
         // Chromium cancels in-flight programmatic smooth-scroll animations
         // on user wheel input, so an ongoing button/send glide cannot reach
         // the bottom and falsely revive follow. Browser behavior dependency
         // (not testable in jsdom) — covered by manual checklist item 7.
+      } else if (followChange === true) {
+        // Downward wheel at the physical bottom: the user re-commits to the
+        // bottom, so follow resumes here (not via a scroll event — a short
+        // tail cannot scroll and would never fire one).
+        isAtBottomRef.current = true;
+        setShowScrollToBottom(false);
       }
-      // Downward wheels leave the state untouched; the scroll event
-      // confirms arrival at the physical bottom.
     };
     container.addEventListener("wheel", onWheel, { passive: true });
 
