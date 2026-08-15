@@ -10,6 +10,7 @@ import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import type { ProviderProfileKey, ThinkingLevel } from "../types";
 import type { ModelOptionGroup } from "./ChatInputBottomBar";
+import { resolveModelLabel } from "../utils/model-label";
 
 export interface MergedInputChipProps {
   model: string;
@@ -43,6 +44,11 @@ export function MergedInputChip({
   onSelectThinkingLevel,
 }: MergedInputChipProps) {
   const { t } = useTranslation();
+  const currentModelLabel = resolveModelLabel(
+    modelOptions,
+    activeProviderProfileKey,
+    model,
+  );
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSubmenu, setActiveSubmenu] = useState<ActiveSubmenu>(null);
   const [modelSearch, setModelSearch] = useState("");
@@ -158,7 +164,7 @@ export function MergedInputChip({
         title={combinedLabel}
       >
         <span className="max-w-[11rem] truncate">
-          {model || t("chat.noModel")}
+          {currentModelLabel || t("chat.noModel")}
         </span>
         <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
         <ChevronDown
@@ -193,7 +199,7 @@ export function MergedInputChip({
           <span className="font-medium">{t("chat.model")}</span>
           <span className="flex min-w-0 items-center gap-2 text-text-muted">
             <span className="max-w-[9rem] truncate">
-              {model || t("chat.noModel")}
+              {currentModelLabel || t("chat.noModel")}
             </span>
             <ChevronRight className="h-4 w-4 shrink-0" />
           </span>
