@@ -95,7 +95,7 @@ export function AppsView() {
         className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 lg:px-8"
         style={{ scrollbarGutter: "stable" }}
       >
-        <div className="max-w-[920px] w-full min-w-0 mx-auto">
+        <div className="w-full min-w-0">
           {activeTab === "skills" ? (
             <SettingsSkills isActive={true} />
           ) : (
