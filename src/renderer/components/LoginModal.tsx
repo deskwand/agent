@@ -56,16 +56,31 @@ async function completeLogin(
   };
   try {
     config.modes = await cloudApi.getModes();
-  } catch {
-    /* modes optional */
+    console.log(
+      "[cloud] modes fetched:",
+      config.modes.length,
+      config.modes.map((m) => m.id),
+    );
+  } catch (e) {
+    console.error("[cloud] getModes failed:", e);
   }
   if (config.modes.length > 0) {
     try {
       const payload = buildDeskwandProviderPayload(config.modes, result.token);
-      await window.electronAPI.config.saveProvider(payload);
-    } catch {
-      /* provider injection optional */
+      const saved = await window.electronAPI.config.saveProvider(payload);
+      console.log(
+        "[cloud] provider injected:",
+        payload.profileKey,
+        "success:",
+        saved?.success,
+        "models:",
+        config.modes.length,
+      );
+    } catch (e) {
+      console.error("[cloud] saveProvider failed:", e);
     }
+  } else {
+    console.warn("[cloud] modes empty — skipping provider injection");
   }
   onSuccess(config);
 }
