@@ -1567,5 +1567,9 @@
     "marketHomepage": "Homepage",
     "marketActionFailed": "Operation failed",
     "marketDetailFailed": "Failed to load plugin details"
+  },
+  "modelMenu": {
+    "custom": "Custom",
+    "back": "Back"
   }
 }

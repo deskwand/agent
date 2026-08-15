@@ -1563,5 +1563,9 @@
     "marketHomepage": "主页",
     "marketActionFailed": "操作失败",
     "marketDetailFailed": "无法加载插件详情"
+  },
+  "modelMenu": {
+    "custom": "自定义",
+    "back": "返回"
   }
 }

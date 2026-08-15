@@ -11,6 +11,7 @@ import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import type { ProviderProfileKey, ThinkingLevel } from "../types";
 import type { ModelOptionGroup } from "./ChatInputBottomBar";
 import { resolveModelLabel } from "../utils/model-label";
+import { useAppStore } from "../store";
 
 export interface MergedInputChipProps {
   model: string;
@@ -44,6 +45,9 @@ export function MergedInputChip({
   onSelectThinkingLevel,
 }: MergedInputChipProps) {
   const { t } = useTranslation();
+  const cloudConfig = useAppStore((s) => s.cloudConfig);
+  const isLoggedIn = cloudConfig?.isLoggedIn ?? false;
+  const isCloudMode = activeProviderProfileKey === "custom:deskwand";
   const currentModelLabel = resolveModelLabel(
     modelOptions,
     activeProviderProfileKey,
@@ -58,6 +62,7 @@ export function MergedInputChip({
   const containerRef = useRef<HTMLDivElement>(null);
   const primaryMenuRef = useRef<HTMLDivElement>(null);
   const [showModelSearch, setShowModelSearch] = useState(false);
+  const [panelView, setPanelView] = useState<"modes" | "custom">("modes");
   const modelListRef = useRef<HTMLDivElement>(null);
 
   const filteredModelOptions = useMemo(() => {
@@ -79,6 +84,7 @@ export function MergedInputChip({
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
     setActiveSubmenu(null);
+    setPanelView("modes");
     setModelSearch("");
   }, []);
 
@@ -150,7 +156,10 @@ export function MergedInputChip({
         type="button"
         onClick={() => {
           if (disabled) return;
-          setMenuOpen((open) => !open);
+          setMenuOpen((open) => {
+            if (open) setPanelView("modes");
+            return !open;
+          });
           setActiveSubmenu(null);
           setModelSearch("");
         }}
@@ -166,7 +175,9 @@ export function MergedInputChip({
         <span className="max-w-[11rem] truncate">
           {currentModelLabel || t("chat.noModel")}
         </span>
-        <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
+        {!isCloudMode && (
+          <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
+        )}
         <ChevronDown
           className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${menuOpen ? "rotate-180" : ""}`}
         />
@@ -205,25 +216,27 @@ export function MergedInputChip({
           </span>
         </button>
 
-        <button
-          type="button"
-          onMouseEnter={() => openSubmenu("thinking")}
-          onClick={() => openSubmenu("thinking")}
-          className={`flex h-9 items-center justify-between gap-3 rounded-lg px-3 text-sm transition-colors ${
-            activeSubmenu === "thinking"
-              ? "bg-surface-hover text-text-primary"
-              : "text-text-primary hover:bg-surface-hover"
-          }`}
-          aria-haspopup="listbox"
-          aria-expanded={activeSubmenu === "thinking"}
-          aria-label={t("chat.thinkingLevel")}
-        >
-          <span className="font-medium">{t("chat.thinkingLevel")}</span>
-          <span className="flex items-center gap-2 text-text-muted">
-            <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
-            <ChevronRight className="h-4 w-4 shrink-0" />
-          </span>
-        </button>
+        {!isCloudMode && (
+          <button
+            type="button"
+            onMouseEnter={() => openSubmenu("thinking")}
+            onClick={() => openSubmenu("thinking")}
+            className={`flex h-9 items-center justify-between gap-3 rounded-lg px-3 text-sm transition-colors ${
+              activeSubmenu === "thinking"
+                ? "bg-surface-hover text-text-primary"
+                : "text-text-primary hover:bg-surface-hover"
+            }`}
+            aria-haspopup="listbox"
+            aria-expanded={activeSubmenu === "thinking"}
+            aria-label={t("chat.thinkingLevel")}
+          >
+            <span className="font-medium">{t("chat.thinkingLevel")}</span>
+            <span className="flex items-center gap-2 text-text-muted">
+              <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
+              <ChevronRight className="h-4 w-4 shrink-0" />
+            </span>
+          </button>
+        )}
 
         <div
           ref={modelListRef}
@@ -249,43 +262,119 @@ export function MergedInputChip({
             />
           )}
 
-          {filteredModelOptions.length === 0 ? (
-            <div className="px-2.5 py-3 text-center text-xs text-text-muted">
-              {t("chat.noModelMatch")}
-            </div>
-          ) : (
-            filteredModelOptions.map((group) => (
+          {(() => {
+            const searching = modelSearch.trim() !== "";
+            const cloudGroup = modelOptions.find(
+              (g) => g.profileKey === "custom:deskwand",
+            );
+            const customGroups = modelOptions.filter(
+              (g) => g.profileKey !== "custom:deskwand",
+            );
+            const renderGroupItems = (group: ModelOptionGroup) =>
+              group.items.map((item) => {
+                const selected =
+                  group.profileKey === activeProviderProfileKey &&
+                  item.id === model;
+
+                return (
+                  <button
+                    key={`${group.profileKey}:${item.id}`}
+                    type="button"
+                    onClick={() => onSelectModel(group.profileKey, item.id)}
+                    className={`flex h-9 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-left text-sm transition-colors ${
+                      selected
+                        ? "bg-surface-hover text-text-primary"
+                        : "text-text-primary hover:bg-surface-hover"
+                    }`}
+                    role="option"
+                    aria-selected={selected}
+                    title={item.name}
+                  >
+                    <span className="truncate">{item.name}</span>
+                    {selected && <Check className="h-4 w-4 shrink-0" />}
+                  </button>
+                );
+              });
+
+            // 搜索中：云模式与自定义模型合并过滤（现有行为）
+            if (searching) {
+              if (filteredModelOptions.length === 0) {
+                return (
+                  <div className="px-2.5 py-3 text-center text-xs text-text-muted">
+                    {t("chat.noModelMatch")}
+                  </div>
+                );
+              }
+              return filteredModelOptions.map((group) => (
+                <div key={group.profileKey} className="mb-1 last:mb-0">
+                  <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
+                    {group.groupLabel}
+                  </div>
+                  {renderGroupItems(group)}
+                </div>
+              ));
+            }
+
+            // 登录态 + 云模式视图：云分组平铺 + 「自定义」入口
+            if (isLoggedIn && panelView === "modes" && cloudGroup) {
+              return (
+                <>
+                  {renderGroupItems(cloudGroup)}
+                  <div className="my-1 border-t border-border" />
+                  <button
+                    type="button"
+                    onMouseEnter={() => setPanelView("custom")}
+                    onClick={() => setPanelView("custom")}
+                    className="flex h-9 w-full items-center justify-between rounded-lg px-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-hover"
+                  >
+                    {t("modelMenu.custom")}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-text-muted" />
+                  </button>
+                </>
+              );
+            }
+
+            // 登录态 + 自定义视图：返回行 + 非云分组
+            if (isLoggedIn && panelView === "custom") {
+              return (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPanelView("modes")}
+                    className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-sm text-text-muted transition-colors hover:bg-surface-hover"
+                  >
+                    <ChevronRight className="h-4 w-4 rotate-180" />
+                    {t("modelMenu.back")}
+                  </button>
+                  {customGroups.map((group) => (
+                    <div key={group.profileKey} className="mb-1 last:mb-0">
+                      <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
+                        {group.groupLabel}
+                      </div>
+                      {renderGroupItems(group)}
+                    </div>
+                  ))}
+                </>
+              );
+            }
+
+            // 未登录：现状全量平铺
+            if (filteredModelOptions.length === 0) {
+              return (
+                <div className="px-2.5 py-3 text-center text-xs text-text-muted">
+                  {t("chat.noModelMatch")}
+                </div>
+              );
+            }
+            return filteredModelOptions.map((group) => (
               <div key={group.profileKey} className="mb-1 last:mb-0">
                 <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
                   {group.groupLabel}
                 </div>
-                {group.items.map((item) => {
-                  const selected =
-                    group.profileKey === activeProviderProfileKey &&
-                    item.id === model;
-
-                  return (
-                    <button
-                      key={`${group.profileKey}:${item.id}`}
-                      type="button"
-                      onClick={() => onSelectModel(group.profileKey, item.id)}
-                      className={`flex h-9 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-left text-sm transition-colors ${
-                        selected
-                          ? "bg-surface-hover text-text-primary"
-                          : "text-text-primary hover:bg-surface-hover"
-                      }`}
-                      role="option"
-                      aria-selected={selected}
-                      title={item.name}
-                    >
-                      <span className="truncate">{item.name}</span>
-                      {selected && <Check className="h-4 w-4 shrink-0" />}
-                    </button>
-                  );
-                })}
+                {renderGroupItems(group)}
               </div>
-            ))
-          )}
+            ));
+          })()}
         </div>
 
         <div

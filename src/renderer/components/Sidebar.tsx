@@ -162,7 +162,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       (async () => {
         try {
           const me = await new CloudApiClient(c.token).getMe();
-          let modes: Array<{ id: string; name: string; model: string }> = [];
+          let modes: Array<{
+            id: string;
+            name: string;
+            model: string;
+            thinkingLevel: string;
+          }> = [];
           try {
             const res = await new CloudApiClient(c.token).getModes();
             modes = res;

@@ -87,10 +87,15 @@ export class CloudApiClient {
   }
 
   async getModes(): Promise<
-    Array<{ id: string; name: string; model: string }>
+    Array<{ id: string; name: string; model: string; thinkingLevel: string }>
   > {
     const res = await this.request<{
-      modes: Array<{ id: string; name: string; model: string }>;
+      modes: Array<{
+        id: string;
+        name: string;
+        model: string;
+        thinkingLevel: string;
+      }>;
     }>("/api/models/modes");
     return res.modes;
   }
