@@ -18,12 +18,38 @@ describe("buildDeskwandProviderPayload", () => {
     expect(payload.config.baseUrl).toBe("https://api.deskwand.com/api/models");
   });
 
-  it("maps modes to models with label (normalizeProviderModel keeps label only)", () => {
-    expect(payload.config.models).toEqual([
-      { id: "deepseek-v4-flash", label: "标准" },
-      { id: "gpt-5.4", label: "专家" },
-      { id: "deepseek-v4-pro", label: "编程" },
-    ]);
+  it("translates mode labels via injected t with server name fallback", () => {
+    const zhT = (key: string, opts?: { defaultValue: string }) =>
+      ({ "modes.standard": "标准", "modes.coding": "编程" })[key] ??
+      opts?.defaultValue ??
+      key;
+    const enT = (key: string, opts?: { defaultValue: string }) =>
+      ({ "modes.standard": "Standard", "modes.coding": "Coding" })[key] ??
+      opts?.defaultValue ??
+      key;
+
+    expect(
+      buildDeskwandProviderPayload(MODES, "tok123", zhT).config.models.map(
+        (m) => m.label,
+      ),
+    ).toEqual(["标准", "专家", "编程"]);
+
+    expect(
+      buildDeskwandProviderPayload(MODES, "tok123", enT).config.models.map(
+        (m) => m.label,
+      ),
+    ).toEqual(["Standard", "专家", "Coding"]);
+  });
+
+  it("falls back to server names when no translator is provided", () => {
+    expect(
+      buildDeskwandProviderPayload(MODES, "tok123").config.models.map(
+        (m) => m.label,
+      ),
+    ).toEqual(["标准", "专家", "编程"]);
+    expect(buildDeskwandProviderPayload(MODES, "tok123").config.name).toBe(
+      "DeskWand 云",
+    );
   });
 
   it("defaults to the standard mode model and carries the token as apiKey", () => {

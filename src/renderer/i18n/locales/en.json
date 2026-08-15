@@ -1447,8 +1447,9 @@
     "back": "Back"
   },
   "accountMenu": {
-    "topUpBalance": "Top Up Balance",
-    "topUpAction": "Top Up"
+    "balance": "Balance",
+    "topUpAction": "Top Up",
+    "creditsUnit": "credits"
   },
   "update": {
     "title": "New Version Available",
@@ -1570,6 +1571,15 @@
   },
   "modelMenu": {
     "custom": "Custom",
-    "back": "Back"
+    "back": "Back",
+    "thinkingWithValue": "Thinking: {{value}}"
+  },
+  "modes": {
+    "standard": "Standard",
+    "coding": "Coding",
+    "expert": "Expert"
+  },
+  "providers": {
+    "deskwandCloud": "DeskWand Cloud"
   }
 }

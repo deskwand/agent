@@ -5,12 +5,21 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MergedInputChip } from "../../renderer/components/MergedInputChip";
 import type { ModelOptionGroup } from "../../renderer/components/ChatInputBottomBar";
+import { useAppStore } from "../../renderer/store";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
 const modelOptions: ModelOptionGroup[] = [
+  {
+    profileKey: "custom:deskwand" as never,
+    groupLabel: "DeskWand 云",
+    items: [
+      { id: "deepseek-v4-flash", name: "标准" },
+      { id: "deepseek-v4-pro", name: "编程" },
+    ],
+  },
   {
     profileKey: "profile-a" as never,
     groupLabel: "Provider A",
@@ -46,7 +55,7 @@ const baseProps = {
   onSelectThinkingLevel: vi.fn(),
 };
 
-describe("MergedInputChip", () => {
+describe("MergedInputChip (single-panel)", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -61,6 +70,7 @@ describe("MergedInputChip", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.clearAllMocks();
+    useAppStore.getState().setCloudConfig(null);
   });
 
   function render(props = {}) {
@@ -75,315 +85,172 @@ describe("MergedInputChip", () => {
     return container.querySelector('button[aria-haspopup="menu"]')!;
   }
 
-  function primaryMenu(): HTMLElement {
+  function panel(): HTMLElement {
     return container.querySelector('[role="menu"]')!;
   }
 
-  function modelRow(): HTMLButtonElement {
-    return container.querySelector(
-      'button[aria-haspopup="listbox"][aria-label="chat.model"]',
-    )!;
-  }
-
-  function thinkingRow(): HTMLButtonElement {
-    return container.querySelector(
-      'button[aria-haspopup="listbox"][aria-label="chat.thinkingLevel"]',
-    )!;
-  }
-
-  function modelList(): HTMLElement {
-    return container.querySelector(
-      '[role="listbox"][aria-label="chat.model"]',
-    )!;
-  }
-
-  function thinkingList(): HTMLElement {
-    return container.querySelector(
-      '[role="listbox"][aria-label="chat.thinkingLevel"]',
-    )!;
-  }
-
-  function hover(element: Element) {
+  function click(el: Element | undefined) {
+    if (!el) throw new Error("element not found");
     act(() => {
-      element.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-    });
-  }
-
-  function mockListMetrics(
-    list: HTMLElement,
-    scrollHeight: number,
-    clientHeight: number,
-  ) {
-    Object.defineProperty(list, "scrollHeight", {
-      configurable: true,
-      value: scrollHeight,
-    });
-    Object.defineProperty(list, "clientHeight", {
-      configurable: true,
-      value: clientHeight,
+      el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
   }
 
   it("renders one trigger chip with model and thinking level", () => {
     render();
-    expect(
-      container.querySelectorAll('button[aria-haspopup="menu"]'),
-    ).toHaveLength(1);
-    expect(trigger().textContent).toContain("model-1");
+    expect(trigger().textContent).toContain("Model One");
     expect(trigger().textContent).toContain("chat.thinkingLevel.medium");
   });
 
-  it("opens a compact fixed menu and expands the trigger to the same width", () => {
+  it("opens the panel on chip click", () => {
     render();
-    expect(trigger().className).not.toContain("w-[15rem]");
-
-    act(() => trigger().click());
-
-    const menu = primaryMenu();
-    expect(menu.getAttribute("aria-hidden")).toBe("false");
-    expect(menu.className).toContain("right-0");
-    expect(menu.className).toContain("bottom-[calc(100%+8px)]");
-    expect(menu.className).toContain("w-[15rem]");
-    expect(menu.className).not.toContain("w-[17rem]");
-    expect(menu.className).toContain("flex-col");
-    expect(menu.className).toContain("p-1");
-    expect(menu.className).not.toContain("p-1.5");
-    expect(trigger().className).toContain("w-[15rem]");
-    expect(modelRow().className).toContain("h-9");
-    expect(modelRow().className).not.toContain("h-11");
-    expect(thinkingRow().className).toContain("h-9");
-    expect(thinkingRow().className).not.toContain("h-11");
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
+    click(trigger());
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    expect(panel()).toBeDefined();
   });
 
-  it("shows current values and chevrons in the two primary rows", () => {
+  it("shows non-cloud groups plus thinking row in non-cloud mode", () => {
     render();
-    act(() => trigger().click());
-
-    expect(modelRow().textContent).toContain("model-1");
-    expect(thinkingRow().textContent).toContain("chat.thinkingLevel.medium");
-    expect(modelRow().querySelector("svg")).toBeTruthy();
-    expect(thinkingRow().querySelector("svg")).toBeTruthy();
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(text).toContain("Provider A");
+    expect(text).toContain("Provider B");
+    expect(text).not.toContain("DeskWand 云");
+    expect(text).toContain("modelMenu.thinkingWithValue");
   });
 
-  it("opens the complete model submenu to the left on hover", () => {
+  it("shows cloud modes and custom entry when in cloud mode", () => {
+    useAppStore.getState().setCloudConfig({
+      serverUrl: "",
+      token: "",
+      isLoggedIn: true,
+      email: "a@b.com",
+      level: "default",
+      creditsBalance: 100,
+      modes: [],
+    });
+    render({
+      model: "deepseek-v4-flash",
+      activeProviderProfileKey: "custom:deskwand",
+    });
+    expect(trigger().textContent).not.toContain("chat.thinkingLevel");
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(text).toContain("标准");
+    expect(text).toContain("编程");
+    expect(text).toContain("modelMenu.custom");
+    expect(text).not.toContain("Provider A");
+  });
+
+  it("switches to custom view on custom entry click", () => {
+    useAppStore.getState().setCloudConfig({
+      serverUrl: "",
+      token: "",
+      isLoggedIn: true,
+      email: "a@b.com",
+      level: "default",
+      creditsBalance: 100,
+      modes: [],
+    });
+    render({
+      model: "deepseek-v4-flash",
+      activeProviderProfileKey: "custom:deskwand",
+    });
+    click(trigger());
+    const customButton = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent?.includes("modelMenu.custom"),
+    );
+    click(customButton);
+    const text = panel().textContent ?? "";
+    expect(text).toContain("Provider A");
+    expect(text).toContain("modelMenu.back");
+    expect(text).toContain("modelMenu.thinkingWithValue");
+  });
+
+  it("selects a thinking level and returns to the entry view", () => {
+    useAppStore.getState().setCloudConfig({
+      serverUrl: "",
+      token: "",
+      isLoggedIn: true,
+      email: "a@b.com",
+      level: "default",
+      creditsBalance: 100,
+      modes: [],
+    });
+    render({
+      model: "deepseek-v4-flash",
+      activeProviderProfileKey: "custom:deskwand",
+    });
+    click(trigger());
+    const customButton = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent?.includes("modelMenu.custom"),
+    );
+    click(customButton);
+    const thinkingRow = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent?.includes("modelMenu.thinkingWithValue"),
+    );
+    click(thinkingRow);
+    expect(panel().textContent).toContain("chat.thinkingLevel.high");
+    const highButton = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent?.includes("chat.thinkingLevel.high"),
+    );
+    click(highButton);
+    expect(baseProps.onSelectThinkingLevel).toHaveBeenCalledWith("high");
+    // 自动回进入前视图（custom）
+    expect(panel().textContent).toContain("Provider A");
+  });
+
+  it("closes on outside click", () => {
     render();
-    act(() => trigger().click());
-    vi.spyOn(primaryMenu(), "getBoundingClientRect").mockReturnValue({
-      bottom: 420,
-    } as DOMRect);
-    mockListMetrics(modelList(), 500, 364);
-    hover(modelRow());
-
-    const list = modelList();
-    expect(list.getAttribute("aria-hidden")).toBe("false");
-    expect(list.className).toContain("absolute");
-    expect(list.className).toContain("right-[calc(100%+4px)]");
-    expect(list.className).toContain("bottom-0");
-    expect(list.className).not.toContain("top-0");
-    expect(list.className).not.toContain("max-h-[80vh]");
-    // Reserve the 40px titlebar plus a 16px visual margin.
-    expect(list.style.maxHeight).toBe("364px");
-    expect(list.className).toContain("overflow-y-auto");
-    expect(list.querySelector("input")?.className).toContain("sticky");
-    expect(list.textContent).toContain("Provider A");
-    expect(list.textContent).toContain("Provider B");
-    expect(list.textContent).toContain("Model One");
-    expect(list.textContent).toContain("Model Two");
-    expect(list.textContent).toContain("Model Three");
-    for (const option of list.querySelectorAll('[role="option"]')) {
-      expect(option.className).toContain("h-9");
-    }
+    click(trigger());
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+    act(() => {
+      document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("opens every thinking option to the right on hover", () => {
+  it("shows cloud modes and custom entry regardless of current provider", () => {
+    useAppStore.getState().setCloudConfig({
+      serverUrl: "",
+      token: "",
+      isLoggedIn: true,
+      email: "a@b.com",
+      level: "default",
+      creditsBalance: 100,
+      modes: [],
+    });
+    render(); // activeProviderProfileKey = "profile-a"（BYOK）
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(text).toContain("标准");
+    expect(text).toContain("编程");
+    expect(text).toContain("modelMenu.custom");
+    expect(text).not.toContain("Provider A"); // BYOK 分组在「自定义」视图
+  });
+
+  it("hides cloud modes when not logged in", () => {
+    render(); // cloudConfig 默认 null
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(text).not.toContain("标准");
+    expect(text).toContain("Provider A");
+  });
+
+  it("shows no-match row when search filters everything out", () => {
     render();
-    act(() => trigger().click());
-    hover(thinkingRow());
-
-    const list = thinkingList();
-    expect(list.getAttribute("aria-hidden")).toBe("false");
-    expect(list.className).toContain("absolute");
-    expect(list.className).toContain("left-[calc(100%+4px)]");
-    expect(list.className).toContain("bottom-0");
-    expect(list.className).not.toContain("top-0");
-    expect(list.className).not.toContain("max-h-");
-    expect(list.className).not.toContain("overflow-y-auto");
-    for (const level of ["off", "minimal", "low", "medium", "high", "xhigh"]) {
-      expect(list.textContent).toContain(`chat.thinkingLevel.${level}`);
-    }
-    for (const option of list.querySelectorAll('[role="option"]')) {
-      expect(option.className).toContain("h-9");
-    }
-  });
-
-  it("switches from the model submenu to the thinking submenu", () => {
-    render();
-    act(() => trigger().click());
-    hover(modelRow());
-    expect(modelList().getAttribute("aria-hidden")).toBe("false");
-
-    hover(thinkingRow());
-    expect(modelList().getAttribute("aria-hidden")).toBe("true");
-    expect(thinkingList().getAttribute("aria-hidden")).toBe("false");
-  });
-
-  it("keeps the primary menu open after model selection", () => {
-    const onSelectModel = vi.fn();
-    render({ onSelectModel });
-    act(() => trigger().click());
-    hover(modelRow());
-
-    const modelTwo = Array.from(
-      modelList().querySelectorAll('[role="option"]'),
-    ).find((element) =>
-      element.textContent?.includes("Model Two"),
-    ) as HTMLElement;
-    act(() => modelTwo.click());
-
-    expect(onSelectModel).toHaveBeenCalledWith("profile-a", "model-2");
-    expect(primaryMenu().getAttribute("aria-hidden")).toBe("false");
-  });
-
-  it("keeps the primary menu open after thinking selection", () => {
-    const onSelectThinkingLevel = vi.fn();
-    render({ onSelectThinkingLevel });
-    act(() => trigger().click());
-    hover(thinkingRow());
-
-    const extreme = Array.from(
-      thinkingList().querySelectorAll('[role="option"]'),
-    ).find((element) =>
-      element.textContent?.includes("chat.thinkingLevel.xhigh"),
-    ) as HTMLElement;
-    act(() => extreme.click());
-
-    expect(onSelectThinkingLevel).toHaveBeenCalledWith("xhigh");
-    expect(primaryMenu().getAttribute("aria-hidden")).toBe("false");
-  });
-
-  it("filters the model submenu without closing it", () => {
-    render();
-    act(() => trigger().click());
-    mockListMetrics(modelList(), 500, 364);
-    hover(modelRow());
-
-    const input = modelList().querySelector("input")!;
+    click(trigger());
+    const input = panel().querySelector("input");
+    expect(input).toBeDefined();
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
         "value",
       )?.set;
-      setter?.call(input, "Two");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
+      setter?.call(input, "zzz-nothing");
+      input!.dispatchEvent(new Event("input", { bubbles: true }));
     });
-
-    expect(modelList().textContent).toContain("Model Two");
-    expect(modelList().textContent).not.toContain("Model One");
-    expect(primaryMenu().getAttribute("aria-hidden")).toBe("false");
-  });
-
-  it("hides the search box when the model list fits", () => {
-    render();
-    act(() => trigger().click());
-    vi.spyOn(primaryMenu(), "getBoundingClientRect").mockReturnValue({
-      bottom: 420,
-    } as DOMRect);
-    mockListMetrics(modelList(), 100, 364);
-    hover(modelRow());
-
-    expect(modelList().querySelector("input")).toBeNull();
-  });
-
-  it("keeps the search box visible while typing and hides it after clearing", () => {
-    render();
-    act(() => trigger().click());
-    mockListMetrics(modelList(), 500, 364);
-    hover(modelRow());
-    expect(modelList().querySelector("input")).not.toBeNull();
-
-    const input = modelList().querySelector("input")!;
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value",
-    )?.set;
-    // 模拟过滤后列表放得下：此时 showModelSearch 将变为 false，
-    // 输入框可见性完全依赖「搜索词非空」守卫
-    mockListMetrics(modelList(), 100, 364);
-    act(() => {
-      setter?.call(input, "Two");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    // 过滤后列表放得下，但搜索词非空 → 输入框必须保持可见
-    expect(modelList().querySelector("input")).not.toBeNull();
-
-    // 清空搜索词 → 按溢出状态重新判断 → 放得下则收起
-    act(() => {
-      setter?.call(input, "");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    expect(modelList().querySelector("input")).toBeNull();
-  });
-
-  it("keeps the search box visible after clearing while the list still overflows", () => {
-    render();
-    act(() => trigger().click());
-    mockListMetrics(modelList(), 500, 364);
-    hover(modelRow());
-
-    const input = modelList().querySelector("input")!;
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value",
-    )?.set;
-    act(() => {
-      setter?.call(input, "Two");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    act(() => {
-      setter?.call(input, "");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    // 完整列表仍溢出 → 重新判断后搜索框保持可见
-    expect(modelList().querySelector("input")).not.toBeNull();
-  });
-
-  it("closes on outside click", () => {
-    render();
-    act(() => trigger().click());
-    expect(primaryMenu().getAttribute("aria-hidden")).toBe("false");
-
-    act(() => {
-      document.body.dispatchEvent(
-        new MouseEvent("mousedown", { bubbles: true }),
-      );
-    });
-    expect(primaryMenu().getAttribute("aria-hidden")).toBe("true");
-  });
-
-  it("closes on Escape", () => {
-    render();
-    act(() => trigger().click());
-    act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    });
-    expect(primaryMenu().getAttribute("aria-hidden")).toBe("true");
-  });
-
-  it("does not open while disabled or without models", () => {
-    render({ modelMenuDisabled: true });
-    act(() => trigger().click());
-    expect(primaryMenu().getAttribute("aria-hidden")).toBe("true");
-
-    act(() => {
-      root.render(
-        React.createElement(MergedInputChip, {
-          ...baseProps,
-          model: "",
-          modelOptions: [],
-        }),
-      );
-    });
-    act(() => trigger().click());
-    expect(primaryMenu().getAttribute("aria-hidden")).toBe("true");
+    expect(panel().textContent).toContain("chat.noModelMatch");
   });
 });

@@ -1443,8 +1443,9 @@
     "back": "返回"
   },
   "accountMenu": {
-    "topUpBalance": "充值余额",
-    "topUpAction": "充值"
+    "balance": "余额",
+    "topUpAction": "充值",
+    "creditsUnit": "积分"
   },
   "update": {
     "title": "发现新版本",
@@ -1566,6 +1567,15 @@
   },
   "modelMenu": {
     "custom": "自定义",
-    "back": "返回"
+    "back": "返回",
+    "thinkingWithValue": "思考：{{value}}"
+  },
+  "modes": {
+    "standard": "标准",
+    "coding": "编程",
+    "expert": "专家"
+  },
+  "providers": {
+    "deskwandCloud": "DeskWand 云"
   }
 }

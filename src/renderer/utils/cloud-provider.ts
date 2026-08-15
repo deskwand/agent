@@ -15,13 +15,18 @@ export interface CloudMode {
 export function buildDeskwandProviderPayload(
   modes: CloudMode[],
   token: string,
+  t?: (key: string, opts?: { defaultValue: string }) => string,
 ): SaveProviderPayload {
+  const labelOf = (m: CloudMode) =>
+    t ? t(`modes.${m.id}`, { defaultValue: m.name }) : m.name;
   return {
     profileKey: "custom:deskwand",
     config: {
       provider: "custom",
       customProtocol: "openai",
-      name: "DeskWand 云",
+      name: t
+        ? t("providers.deskwandCloud", { defaultValue: "DeskWand 云" })
+        : "DeskWand 云",
       baseUrl: `${DESKWAND_API_URL}/api/models`,
       apiKey: token,
       defaultModel:
@@ -29,7 +34,11 @@ export function buildDeskwandProviderPayload(
       // config-store 的 normalizeProviderModel 会把缺失的 source 默认成 "preset"，
       // 这里保持 payload 只含 id/label（与纯函数测试契约一致）。
       models: modes.map(
-        (m) => ({ id: m.model, label: m.name }) as ApiProviderModel,
+        (m) =>
+          ({
+            id: m.model,
+            label: labelOf(m),
+          }) as ApiProviderModel,
       ),
       updatedAt: new Date().toISOString(),
     },

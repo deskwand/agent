@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { LogIn, User, Settings, LogOut, Zap } from "lucide-react";
+import { LogIn, User, Settings, LogOut, Zap, Coins } from "lucide-react";
 import type { CloudConfig } from "../types";
 import { useAppStore } from "../store";
+import { CloudApiClient } from "../services/cloud-api";
 
 interface AccountMenuProps {
   isOpen: boolean;
@@ -23,6 +25,28 @@ export function AccountMenu({
   onClose,
 }: AccountMenuProps) {
   const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!isOpen || cloudRestoring || !cloudConfig?.token) return;
+    const cloudApi = new CloudApiClient(cloudConfig.token);
+    cloudApi
+      .getMe()
+      .then((me) => {
+        const snapshot = useAppStore.getState().cloudConfig;
+        // 账户可能已切换/登出：token 不符则丢弃过期响应
+        if (!snapshot || snapshot.token !== cloudConfig.token) return;
+        if (snapshot.creditsBalance !== me.credits_balance) {
+          useAppStore.getState().setCloudConfig({
+            ...snapshot,
+            creditsBalance: me.credits_balance,
+          });
+        }
+      })
+      .catch(() => {
+        /* refresh failure is silent; keep the previous balance */
+      });
+  }, [isOpen, cloudRestoring, cloudConfig?.token]);
+
   if (!isOpen) return null;
 
   const isLoggedIn = cloudConfig?.isLoggedIn ?? false;
@@ -52,24 +76,27 @@ export function AccountMenu({
               <User className="w-4 h-4 text-text-muted flex-shrink-0" />
               <span className="truncate">{cloudConfig.email}</span>
             </div>
-            <div className="flex flex-col gap-1 px-2.5 py-2 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-text-muted">
-                  {t("accountMenu.topUpBalance")}
-                </span>
-                <span className="text-text-primary font-medium">
-                  {cloudConfig.creditsBalance.toLocaleString()}
-                </span>
-              </div>
+            <div className="flex items-center gap-2 px-2.5 py-2 text-sm">
+              <Coins className="w-4 h-4 text-text-muted flex-shrink-0" />
+              <span className="text-text-muted">
+                {t("accountMenu.balance")}
+              </span>
+              <span className="ml-auto text-text-primary font-medium">
+                {cloudConfig.creditsBalance.toLocaleString()}{" "}
+                {t("accountMenu.creditsUnit")}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  useAppStore.getState().setTopUpOpen(true);
+                  onClose();
+                }}
+                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                {t("accountMenu.topUpAction")}
+              </button>
             </div>
-            <MenuItem
-              icon={<Zap className="w-4 h-4" />}
-              label={t("accountMenu.topUpAction")}
-              onClick={() => {
-                useAppStore.getState().setTopUpOpen(true);
-                onClose();
-              }}
-            />
             <div className="mx-2 my-1 border-t border-border" />
             <MenuItem
               icon={<LogOut className="w-4 h-4" />}

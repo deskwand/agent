@@ -42,6 +42,7 @@ async function completeLogin(
     token: string;
     user: { email: string; level: string; credits_balance: number };
   },
+  t: (key: string, opts?: { defaultValue: string }) => string,
   onSuccess: (config: CloudConfig) => void,
 ): Promise<void> {
   const cloudApi = new CloudApiClient(result.token);
@@ -66,7 +67,11 @@ async function completeLogin(
   }
   if (config.modes.length > 0) {
     try {
-      const payload = buildDeskwandProviderPayload(config.modes, result.token);
+      const payload = buildDeskwandProviderPayload(
+        config.modes,
+        result.token,
+        t,
+      );
       const saved = await window.electronAPI.config.saveProvider(payload);
       console.log(
         "[cloud] provider injected:",
@@ -132,7 +137,7 @@ export function LoginModal({
     setLoading(true);
     try {
       const result = await window.electronAPI.cloudAuth.googleLogin();
-      await completeLogin(result, onLoginSuccess);
+      await completeLogin(result, t, onLoginSuccess);
       onClose();
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };
@@ -188,7 +193,7 @@ export function LoginModal({
         email.trim(),
         code.trim(),
       );
-      await completeLogin(result, onLoginSuccess);
+      await completeLogin(result, t, onLoginSuccess);
       onClose();
     } catch (e: unknown) {
       const err = e as { code?: string; message?: string };

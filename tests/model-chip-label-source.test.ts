@@ -14,10 +14,10 @@ describe("Model chip label wiring", () => {
     expect(source).toContain("currentModelLabel");
   });
 
-  it("renders currentModelLabel in both chip and menu row", () => {
+  it("renders currentModelLabel in chip", () => {
     const source = fs.readFileSync(chipPath, "utf8");
     const occurrences =
       source.split('{currentModelLabel || t("chat.noModel")}').length - 1;
-    expect(occurrences).toBe(2);
+    expect(occurrences).toBe(1);
   });
 });

@@ -7,15 +7,22 @@ const menuPath = path.resolve(
   "src/renderer/components/AccountMenu.tsx",
 );
 
-describe("AccountMenu topup entry", () => {
-  it("shows paid balance", () => {
-    const source = fs.readFileSync(menuPath, "utf8");
-    expect(source).toContain("accountMenu.topUpBalance");
+describe("AccountMenu balance row", () => {
+  const source = fs.readFileSync(menuPath, "utf8");
+
+  it("shows balance with a Coins icon and inline top-up button", () => {
+    expect(source).toContain("Coins");
+    expect(source).toContain("accountMenu.balance");
+    expect(source).toContain("accountMenu.topUpAction");
   });
 
-  it("opens the topup modal from the menu", () => {
-    const source = fs.readFileSync(menuPath, "utf8");
-    expect(source).toContain("setTopUpOpen(true)");
-    expect(source).toContain("accountMenu.topUpAction");
+  it("refreshes balance on open via getMe", () => {
+    expect(source).toContain("getMe");
+    expect(source).toContain("creditsBalance");
+    expect(source).toContain("useEffect");
+  });
+
+  it("no longer renders the standalone top-up menu row", () => {
+    expect(source).not.toContain('label={t("accountMenu.topUpAction")}');
   });
 });
