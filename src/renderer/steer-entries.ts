@@ -1,7 +1,9 @@
 import type { Message, SteerRecord } from "./types";
 
 /** 消息流条目（visibleTurnEntries 的元素），含 message.id/timestamp。 */
-export type MessageTimelineEntry = { message: { id: string; timestamp: number } };
+export type MessageTimelineEntry = {
+  message: { id: string; timestamp: number };
+};
 
 /**
  * 计算引导记录的锚点消息 id：注入时刻最后一条可见消息；若它是 assistant
@@ -34,7 +36,9 @@ export function resolveAnchorMessageId(
  * 将引导记录按"注入位置"合并进消息流：记录插在其锚点消息（注入时刻消息流
  * 最后一条可见消息）之后。不用纯时间戳排序——消息 timestamp 是完成时刻语义，
  * 回合完成时会导致记录相对位置跳变。同锚点多条记录保持数组序（ts 序）；
- * 无锚点或锚点不在渲染窗口内 → 排在消息流末尾。
+ * 锚点不在渲染窗口内时按注入时刻插入窗口内第一条完成时刻晚于注入的消息
+ * 之前（窗口消息按完成顺序排列、timestamp 单调不减），全部更早则沉底——
+ * 旧记录不得沉底复现（长会话压缩后历史引导消息跳到末尾的 bug）。
  */
 export function mergeSteerEntries<E extends MessageTimelineEntry>(
   entries: E[],
@@ -45,18 +49,24 @@ export function mergeSteerEntries<E extends MessageTimelineEntry>(
   entries.forEach((entry, index) => {
     indexByMessageId.set(entry.message.id, index);
   });
-  const tailPos = entries.length;
   const positioned: Array<{ pos: number; item: E | SteerRecord }> = entries.map(
     (entry, index) => ({ pos: index, item: entry }),
   );
   for (const record of records) {
+    let pos: number;
     const anchorIndex = record.anchorMessageId
       ? indexByMessageId.get(record.anchorMessageId)
       : undefined;
-    positioned.push({
-      pos: anchorIndex !== undefined ? anchorIndex + 0.5 : tailPos + 0.5,
-      item: record,
-    });
+    if (anchorIndex !== undefined) {
+      pos = anchorIndex + 0.5;
+    } else {
+      let insertBefore = entries.findIndex(
+        (entry) => entry.message.timestamp > record.ts,
+      );
+      if (insertBefore === -1) insertBefore = entries.length;
+      pos = insertBefore - 0.5;
+    }
+    positioned.push({ pos, item: record });
   }
   // 稳定排序：同 pos（同锚点 / 同 fallback 位）保持 push 顺序（= ts 序）
   positioned.sort((a, b) => a.pos - b.pos);
