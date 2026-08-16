@@ -916,7 +916,9 @@
     "expandInput": "Expand input",
     "collapseInput": "Collapse input",
     "openCodeReview": "Code Review · {{count}} changed files",
-    "compactSkipped": "Nothing to compact in this session"
+    "compactSkipped": "Nothing to compact in this session",
+    "forkFailed": "Failed to fork session. Please try again.",
+    "forkSuffix": " (fork)"
   },
   "steer": {
     "label": "Steer",
