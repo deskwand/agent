@@ -1444,7 +1444,8 @@
     "networkError": "Failed to create order, please try again",
     "tooManyPending": "You have pending orders — finish or wait for them to expire",
     "close": "Close",
-    "back": "Back"
+    "back": "Back",
+    "chainBase": "Base"
   },
   "accountMenu": {
     "balance": "Balance",

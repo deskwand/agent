@@ -1440,7 +1440,8 @@
     "networkError": "下单失败，请稍后重试",
     "tooManyPending": "您有未完成的订单，请先完成或等待其过期",
     "close": "关闭",
-    "back": "返回"
+    "back": "返回",
+    "chainBase": "Base"
   },
   "accountMenu": {
     "balance": "余额",

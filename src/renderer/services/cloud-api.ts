@@ -263,7 +263,7 @@ export class CloudApiClient {
 
   async createTopUpOrder(
     amountCents: number,
-    chain: "bsc" | "arb",
+    chain: "bsc" | "arb" | "base",
   ): Promise<{
     id: string;
     chain: string;

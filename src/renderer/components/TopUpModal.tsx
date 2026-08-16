@@ -35,7 +35,7 @@ export function TopUpModal() {
   const [step, setStep] = useState<Step>("amount");
   const [amountInput, setAmountInput] = useState("");
   const [amountCents, setAmountCents] = useState<number | null>(null);
-  const [chain, setChain] = useState<"bsc" | "arb">("bsc");
+  const [chain, setChain] = useState<"bsc" | "arb" | "base">("bsc");
   const [order, setOrder] = useState<{
     id: string;
     deposit_address: string;
@@ -209,7 +209,7 @@ export function TopUpModal() {
               {t("topUp.chainLabel")}
             </label>
             <div className="flex flex-col gap-2">
-              {(["bsc", "arb"] as const).map((c) => (
+              {(["bsc", "arb", "base"] as const).map((c) => (
                 <button
                   key={c}
                   className={`rounded-lg border px-3 py-2 text-sm text-text-primary ${
@@ -217,7 +217,11 @@ export function TopUpModal() {
                   }`}
                   onClick={() => setChain(c)}
                 >
-                  {c === "bsc" ? t("topUp.chainBsc") : t("topUp.chainArb")}
+                  {c === "bsc"
+                    ? t("topUp.chainBsc")
+                    : c === "arb"
+                      ? t("topUp.chainArb")
+                      : t("topUp.chainBase")}
                 </button>
               ))}
             </div>
@@ -279,7 +283,7 @@ export function TopUpModal() {
                 {t("topUp.amountToSend")}
               </span>
               <span className="text-base font-semibold text-text-primary">
-                {displayAmount} USDT/USDC
+                {displayAmount} {chain === "base" ? "USDC" : "USDT/USDC"}
               </span>
             </div>
             <p className="text-xs text-text-muted">
