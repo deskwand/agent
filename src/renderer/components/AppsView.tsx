@@ -92,7 +92,7 @@ export function AppsView() {
 
       {/* Content */}
       <div
-        className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 lg:px-8"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-6"
         style={{ scrollbarGutter: "stable" }}
       >
         <div className="w-full min-w-0">

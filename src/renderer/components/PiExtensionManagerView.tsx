@@ -67,7 +67,7 @@ export function PiExtensionManagerView() {
 
   if (!state) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         {t("common.loading")}
       </div>
     );
@@ -81,7 +81,7 @@ export function PiExtensionManagerView() {
     : undefined;
 
   return (
-    <div className="p-6 text-sm">
+    <div className="text-sm">
       <div className="mb-4 flex items-center gap-3">
         <h2 className="text-base font-semibold">{t("piExtensions.title")}</h2>
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
