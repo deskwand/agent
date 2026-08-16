@@ -470,3 +470,136 @@ export function createVisionDescribeTool(
     },
   });
 }
+
+/**
+ * 云模式图片识别：走 deskwand 服务端 /api/models/vision（Qwen3-VL-Flash），
+ * 开箱即用，无需用户自配视觉模型；计费由服务端按积分扣。
+ */
+export function createDeskWandVisionTool(
+  serverUrl: string,
+  token: string,
+  workspaceDir: string,
+): ToolDefinition {
+  // Workaround for SDK ToolDefinition type strictness — same as the local factory.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const td = (t: any): any => t;
+  return td({
+    name: "vision_describe",
+    label: "Describe Image",
+    description:
+      "Read an image file and return a detailed text description. " +
+      "Use this tool when you need to see or read the contents of an image file.",
+    parameters: Type.Object({
+      path: Type.String({
+        description:
+          "Path to the image file to describe (relative or absolute)",
+      }),
+      prompt: Type.Optional(
+        Type.String({ description: "Custom instruction for the vision model" }),
+      ),
+    }),
+    async execute(
+      _toolCallId: unknown,
+      params: unknown,
+      signal: AbortSignal | undefined,
+      _onUpdate: ((update: unknown) => void) | undefined,
+      _ctx: unknown,
+    ) {
+      const { path: filePath, prompt } = params as {
+        path: string;
+        prompt?: string;
+      };
+      const resolved = path.isAbsolute(filePath)
+        ? filePath
+        : path.resolve(workspaceDir, filePath);
+      if (!fs.existsSync(resolved)) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: File not found: ${filePath}`,
+            },
+          ],
+        };
+      }
+      const stat = fs.statSync(resolved);
+      if (!stat.isFile()) {
+        return {
+          content: [
+            { type: "text" as const, text: `Error: Not a file: ${filePath}` },
+          ],
+        };
+      }
+      const mimeType = detectImageMimeType(resolved);
+      if (!mimeType || mimeType === "image/svg+xml") {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: Not a recognized image format: ${filePath}`,
+            },
+          ],
+        };
+      }
+      // 服务端视觉端点限制 5MB（服务端按解码后判，这里按文件大小预过滤）
+      if (stat.size > 5 * 1024 * 1024) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Error: Image too large: ${(stat.size / 1024 / 1024).toFixed(1)} MB. Maximum is 5 MB.`,
+            },
+          ],
+        };
+      }
+      const image = fs.readFileSync(resolved).toString("base64");
+      try {
+        const res = await fetch(`${serverUrl.replace(/\/$/, "")}/vision`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ image, mimeType, prompt }),
+          signal: signal ?? AbortSignal.timeout(60_000),
+        });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as {
+            error?: { message?: string };
+          };
+          const msg =
+            res.status === 402
+              ? "Insufficient credits, please top up to continue."
+              : (err.error?.message ??
+                `Vision failed with status ${res.status}`);
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Image recognition failed: ${msg}`,
+              },
+            ],
+          };
+        }
+        const data = (await res.json()) as { text?: string };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: data.text ?? "(no description returned)",
+            },
+          ],
+        };
+      } catch (e) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Image recognition error: ${(e as Error).message}`,
+            },
+          ],
+        };
+      }
+    },
+  });
+}

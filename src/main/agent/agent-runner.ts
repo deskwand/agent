@@ -81,15 +81,22 @@ import {
 import { configStore } from "../config/config-store";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
-import { deployBuiltinAgents, migrateAgentModelSpecs } from "./subagent/agent-list";
+import {
+  deployBuiltinAgents,
+  migrateAgentModelSpecs,
+} from "./subagent/agent-list";
 import crypto from "node:crypto";
-import { createVisionDescribeTool } from "./tools/vision-describe";
+import {
+  createVisionDescribeTool,
+  createDeskWandVisionTool,
+} from "./tools/vision-describe";
 import { createOfficeTools } from "./tools/office/office-tools";
 import { webAccessCache } from "./tools/web-access/cache";
 import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter";
 import { createWebAccessTools } from "./tools/web-access/web-tools";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
 import type { WebAccessErrorCode } from "../../shared/web-access";
+import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import type { BrowserViewManager } from "../browser/browser-view-manager";
 import { BROWSER_CDP_PORT } from "../browser/browser-view-manager";
 import { TurnFinalizer, type TurnFinalizerOptions } from "./turn-finalizer";
@@ -2519,10 +2526,7 @@ ${hints.join("\n")}
       );
       const apiKey = runtimeConfig.apiKey?.trim();
       if (apiKey && provider !== "oauth") {
-        const piProvider =
-          provider === "custom"
-            ? piModel.provider
-            : provider;
+        const piProvider = provider === "custom" ? piModel.provider : provider;
         await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
           allowNetwork: false,
         });
@@ -3275,6 +3279,19 @@ Tool routing:\n
           );
         } catch (err) {
           logWarn("[AgentRunner] Failed to create vision tool:", err);
+        }
+      } else {
+        // 云模式兜底：登录 deskwand 云（config.json 有 custom:deskwand 的云 token）则走服务端视觉
+        const providers = configStore.getAll().providers ?? {};
+        const deskwand = providers["custom:deskwand"] as
+          | { apiKey?: string; baseUrl?: string }
+          | undefined;
+        if (deskwand?.apiKey) {
+          visionTool = createDeskWandVisionTool(
+            deskwand.baseUrl || DESKWAND_API_URL,
+            deskwand.apiKey,
+            effectiveCwd,
+          );
         }
       }
 
@@ -4689,7 +4706,12 @@ Tool routing:\n
   }
 
   /** Inject a steering message during agent execution (SDK native steer). */
-  steer(sessionId: string, text: string, requestId: string, images?: ImageContent[]): void {
+  steer(
+    sessionId: string,
+    text: string,
+    requestId: string,
+    images?: ImageContent[],
+  ): void {
     const cached = this.piSessions.get(sessionId);
     if (!cached) {
       logWarn("[AgentRunner] steer: no active piSession for", sessionId);
@@ -5008,8 +5030,7 @@ Tool routing:\n
     // resolution for the compaction summarization call can find them.
     await registerDeskWandProviders(modelRuntime);
     if (apiKey && provider !== "oauth") {
-      const piProvider =
-        provider === "custom" ? piModel.provider : provider;
+      const piProvider = provider === "custom" ? piModel.provider : provider;
       await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
         allowNetwork: false,
       });
