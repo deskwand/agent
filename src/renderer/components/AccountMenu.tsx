@@ -54,7 +54,7 @@ export function AccountMenu({
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute bottom-full left-0 mb-2 w-56 rounded-xl border border-border bg-background shadow-soft p-1.5 z-50 animate-account-menu-in">
+      <div className="absolute bottom-full left-0 mb-2 w-64 rounded-xl border border-border bg-background shadow-soft p-1.5 z-50 animate-account-menu-in">
         <MenuItem
           icon={<Settings className="w-4 h-4" />}
           label={t("sidebar.settings")}
@@ -76,26 +76,28 @@ export function AccountMenu({
               <User className="w-4 h-4 text-text-muted flex-shrink-0" />
               <span className="truncate">{cloudConfig.email}</span>
             </div>
-            <div className="flex items-center gap-2 px-2.5 py-2 text-sm">
-              <Coins className="w-4 h-4 text-text-muted flex-shrink-0" />
-              <span className="text-text-muted">
-                {t("accountMenu.balance")}
-              </span>
-              <span className="ml-auto text-text-primary font-medium">
-                {cloudConfig.creditsBalance.toLocaleString()}{" "}
-                {t("accountMenu.creditsUnit")}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  useAppStore.getState().setTopUpOpen(true);
-                  onClose();
-                }}
-                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                {t("accountMenu.topUpAction")}
-              </button>
+            <div className="px-2.5 py-2">
+              <div className="flex items-center gap-2 text-xs text-text-muted">
+                <Coins className="w-4 h-4 flex-shrink-0" />
+                <span>{t("accountMenu.balance")}</span>
+              </div>
+              <div className="mt-0.5 flex items-center gap-2 pl-6 text-sm">
+                <span className="text-text-primary font-medium">
+                  {cloudConfig.creditsBalance.toLocaleString()}{" "}
+                  {t("accountMenu.creditsUnit")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    useAppStore.getState().setTopUpOpen(true);
+                    onClose();
+                  }}
+                  className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  {t("accountMenu.topUpAction")}
+                </button>
+              </div>
             </div>
             <div className="mx-2 my-1 border-t border-border" />
             <MenuItem
