@@ -574,6 +574,10 @@ export type ServerEvent =
               | "budget_limited";
             objective: string;
             iteration: number;
+            timeUsedSeconds?: number;
+            tokensUsed?: number;
+            tokenBudget?: number;
+            timeBudgetSeconds?: number;
           }
         >;
       };

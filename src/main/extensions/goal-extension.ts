@@ -44,6 +44,17 @@ export interface GoalState {
 
 // ─── Prompt templates ────────────────────────────────────────────────
 
+/** Total elapsed active seconds: accumulated time plus the current active
+ *  period's live duration. Non-active states (pause/complete/blocked) are
+ *  frozen at their accumulated value. Shared by the system prompt, status
+ *  payloads, and the session-list restore payload. */
+export function elapsedSeconds(goal: GoalState): number {
+  const live = goal.status === "active" || goal.status === "budget_limited";
+  return live
+    ? goal.timeUsedSeconds + (Date.now() - goal.startedAt) / 1000
+    : goal.timeUsedSeconds;
+}
+
 function buildGoalSystemPrompt(goal: GoalState): string {
   const lines = [`## Active Goal`];
   lines.push(`Objective: ${goal.objective}`);
@@ -53,9 +64,8 @@ function buildGoalSystemPrompt(goal: GoalState): string {
     );
   }
   if (goal.timeBudgetSeconds) {
-    const elapsed = (Date.now() - goal.startedAt) / 1000;
     lines.push(
-      `Time used: ${formatDuration(elapsed)} / ${formatDuration(goal.timeBudgetSeconds)}`,
+      `Time used: ${formatDuration(elapsedSeconds(goal))} / ${formatDuration(goal.timeBudgetSeconds)}`,
     );
   }
   lines.push(
@@ -306,6 +316,12 @@ export class GoalExtension implements AgentRuntimeExtension {
         endedAt: row.ended_at ?? undefined,
       };
 
+      // Resumable goals restart a fresh active period on recovery so the
+      // elapsed clock does not count time the app was closed.
+      if (goal.status === "active" || goal.status === "budget_limited") {
+        goal.startedAt = Date.now();
+      }
+
       this.goals.set(row.session_id, goal);
       recovered.push({ sessionId: row.session_id, goal });
     }
@@ -337,6 +353,17 @@ export class GoalExtension implements AgentRuntimeExtension {
     goal.tokensUsed = total;
   }
 
+  /** Roll the current active period into the accumulated counter and restart
+   *  the period clock. Call at every pause/terminal/checkpoint so the elapsed
+   *  time never includes paused or offline time. A no-op for paused goals:
+   *  paused time must never count (covers a mid-turn pause whose in-flight
+   *  turn later completes, and update_goal/complete invoked while paused). */
+  private checkpointElapsed(goal: GoalState): void {
+    if (goal.status === "paused") return;
+    goal.timeUsedSeconds += (Date.now() - goal.startedAt) / 1000;
+    goal.startedAt = Date.now();
+  }
+
   private goalStatusPayload(goal?: GoalState): {
     goalStatus: NonNullable<AfterSessionRunResult["goalStatus"]>;
   } {
@@ -350,7 +377,7 @@ export class GoalExtension implements AgentRuntimeExtension {
         iteration: goal.iteration,
         tokensUsed: goal.tokensUsed,
         tokenBudget: goal.tokenBudget,
-        timeUsedSeconds: goal.timeUsedSeconds,
+        timeUsedSeconds: elapsedSeconds(goal),
         timeBudgetSeconds: goal.timeBudgetSeconds,
       },
     };
@@ -387,7 +414,7 @@ export class GoalExtension implements AgentRuntimeExtension {
             `Status: ${goal.status}`,
             `Turn: ${goal.iteration}`,
             `Tokens used: ${Math.round(goal.tokensUsed).toLocaleString()}${goal.tokenBudget ? ` / ${goal.tokenBudget.toLocaleString()} (${remaining} remaining)` : " (no budget)"}`,
-            `Time used: ${formatDuration(goal.timeUsedSeconds)}${goal.timeBudgetSeconds ? ` / ${formatDuration(goal.timeBudgetSeconds)}` : " (no budget)"}`,
+            `Time used: ${formatDuration(elapsedSeconds(goal))}${goal.timeBudgetSeconds ? ` / ${formatDuration(goal.timeBudgetSeconds)}` : " (no budget)"}`,
           ];
           return {
             content: [{ type: "text" as const, text: info.join("\n") }],
@@ -451,6 +478,7 @@ export class GoalExtension implements AgentRuntimeExtension {
             };
           }
           if (parsed.status === "complete") {
+            self.checkpointElapsed(goal);
             goal.status = "complete";
             goal.endedAt = Date.now();
             self.setGoal(sid, goal);
@@ -465,6 +493,7 @@ export class GoalExtension implements AgentRuntimeExtension {
             };
           }
           if (parsed.status === "blocked") {
+            self.checkpointElapsed(goal);
             goal.status = "blocked";
             goal.endedAt = Date.now();
             self.setGoal(sid, goal);
@@ -548,6 +577,7 @@ export class GoalExtension implements AgentRuntimeExtension {
               details: {},
             };
           }
+          self.checkpointElapsed(goal);
           goal.status = "complete";
           goal.endedAt = Date.now();
           self.setGoal(sid, goal);
@@ -583,7 +613,7 @@ export class GoalExtension implements AgentRuntimeExtension {
     }
     if (goal.timeBudgetSeconds) {
       parts.push(
-        `time: ${formatDuration(goal.timeUsedSeconds)} / ${formatDuration(goal.timeBudgetSeconds)}`,
+        `time: ${formatDuration(elapsedSeconds(goal))} / ${formatDuration(goal.timeBudgetSeconds)}`,
       );
     }
     const budgetStr = parts.length ? ` | ${parts.join(", ")}` : "";
@@ -662,6 +692,7 @@ export class GoalExtension implements AgentRuntimeExtension {
     if (!goal || goal.status !== "active") {
       return { handled: true, message: msg("noGoalToPause") };
     }
+    this.checkpointElapsed(goal);
     goal.status = "paused";
     this.setGoal(sessionId, goal);
     return {
@@ -690,6 +721,7 @@ export class GoalExtension implements AgentRuntimeExtension {
 
     goal.status = "active";
     goal.generation++;
+    goal.startedAt = Date.now();
     const atMaxCap = goal.iteration >= MAX_GOAL_ITERATIONS;
     // Reset the iteration cap on resume so continuation is not
     // immediately re-paused by the max-iterations guardrail.
@@ -837,7 +869,10 @@ export class GoalExtension implements AgentRuntimeExtension {
     // Update stats before any status check so complete/blocked summaries
     // have accurate data.
     this.updateGoalUsage(sessionId, ctx);
-    goal.timeUsedSeconds = (Date.now() - goal.startedAt) / 1000;
+
+    // Roll the current active period into the accumulated counter so the
+    // elapsed clock never double-counts paused or offline time.
+    this.checkpointElapsed(goal);
 
     // Persist budget stats for restart recovery (skip if about to delete)
     if (goal.status === "active" || goal.status === "budget_limited") {
@@ -850,6 +885,15 @@ export class GoalExtension implements AgentRuntimeExtension {
         const summary = buildGoalSummaryMessage(goal);
         this.deleteGoal(sessionId);
         return { ...payload, summaryMessage: summary };
+      }
+      if (goal.status === "budget_limited") {
+        // The final "summarize only" turn after budget exhaustion is done;
+        // pause so the elapsed clock freezes. (Resuming from paused will
+        // re-hit the budget guardrail; to continue with fresh budgets start a
+        // new goal via /goal --tokens/--time <n> <objective>.)
+        goal.status = "paused";
+        this.setGoal(sessionId, goal);
+        return this.goalStatusPayload(goal);
       }
       if (goal.status === "cleared") {
         this.deleteGoal(sessionId);
@@ -907,6 +951,7 @@ export class GoalExtension implements AgentRuntimeExtension {
     if (!goal || goal.status !== "active") {
       return;
     }
+    this.checkpointElapsed(goal);
     goal.status = "paused";
     this.setGoal(context.sessionId, goal);
     return this.goalStatusPayload(goal);

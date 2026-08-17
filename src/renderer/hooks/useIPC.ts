@@ -176,6 +176,10 @@ function registerSharedIpcListener(): () => void {
                   status: g.status,
                   objective: g.objective,
                   iteration: g.iteration,
+                  timeUsedSeconds: g.timeUsedSeconds,
+                  tokensUsed: g.tokensUsed,
+                  tokenBudget: g.tokenBudget,
+                  timeBudgetSeconds: g.timeBudgetSeconds,
                 });
               }
             }

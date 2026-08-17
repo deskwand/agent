@@ -50,7 +50,10 @@ import { mcpConfigStore } from "../mcp/mcp-config-store";
 import type { BrowserViewManager } from "../browser/browser-view-manager";
 import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { BackgroundReviewService } from "../agent/background-review";
-import { buildResumePrompt } from "../extensions/goal-extension";
+import {
+  buildResumePrompt,
+  elapsedSeconds,
+} from "../extensions/goal-extension";
 import type { GoalState } from "../extensions/goal-extension";
 import { app } from "electron";
 import {
@@ -709,6 +712,10 @@ export class SessionManager {
           | "budget_limited";
         objective: string;
         iteration: number;
+        timeUsedSeconds?: number;
+        tokensUsed?: number;
+        tokenBudget?: number;
+        timeBudgetSeconds?: number;
       }
     >;
   } {
@@ -788,6 +795,10 @@ export class SessionManager {
           | "budget_limited";
         objective: string;
         iteration: number;
+        timeUsedSeconds?: number;
+        tokensUsed?: number;
+        tokenBudget?: number;
+        timeBudgetSeconds?: number;
       }
     > = {};
     for (const { sessionId, goal } of goalExt?.getAllGoals() ?? []) {
@@ -795,6 +806,10 @@ export class SessionManager {
         status: goal.status,
         objective: goal.objective,
         iteration: goal.iteration,
+        timeUsedSeconds: elapsedSeconds(goal),
+        tokensUsed: goal.tokensUsed,
+        tokenBudget: goal.tokenBudget,
+        timeBudgetSeconds: goal.timeBudgetSeconds,
       };
     }
     return { sessions, contextWindows, goalStatuses };

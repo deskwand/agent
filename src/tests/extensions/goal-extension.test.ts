@@ -3,6 +3,7 @@ import type { GoalRow } from "../../main/db/database";
 import {
   GoalExtension,
   buildResumePrompt,
+  elapsedSeconds,
   MAX_GOAL_ITERATIONS,
 } from "../../main/extensions/goal-extension";
 import type { GoalState } from "../../main/extensions/goal-extension";
@@ -334,5 +335,202 @@ describe("GoalExtension error handling & resume semantics", () => {
     expect(all).toHaveLength(1);
     expect(all[0].sessionId).toBe("s1");
     expect(all[0].goal.status).toBe("active");
+  });
+});
+
+describe("GoalExtension elapsed-time accounting", () => {
+  function startGoal(ext: GoalExtension) {
+    return ext.onCommand({
+      command: "goal",
+      args: "test objective",
+      sessionId: "s1",
+    });
+  }
+
+  function goalOf(ext: GoalExtension): GoalState {
+    const goals = (ext as unknown as { goals: Map<string, GoalState> }).goals;
+    const goal = goals.get("s1");
+    if (!goal) throw new Error("goal not found");
+    return goal;
+  }
+
+  it("pause freezes elapsed time; resume does not count paused time", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+    try {
+      const db = createMockDb();
+      const ext = new GoalExtension(db as never);
+      await startGoal(ext);
+
+      // 10s of active run, then pause.
+      vi.setSystemTime(1_000_000_000_000 + 10_000);
+      const paused = await ext.onCommand({
+        command: "goal",
+        args: "pause",
+        sessionId: "s1",
+      });
+      expect(paused?.goalStatus?.timeUsedSeconds).toBe(10);
+      expect(goalOf(ext).timeUsedSeconds).toBe(10);
+
+      // 60s pass while paused, then resume.
+      vi.setSystemTime(1_000_000_000_000 + 70_000);
+      const resumed = await ext.onCommand({
+        command: "goal",
+        args: "resume",
+        sessionId: "s1",
+      });
+      // Elapsed must NOT include the 60s pause.
+      expect(resumed?.goalStatus?.timeUsedSeconds).toBe(10);
+      expect(goalOf(ext).startedAt).toBe(1_000_000_000_000 + 70_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("recoverGoals resets the active period so offline time is not counted", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+    try {
+      const db = createMockDb([
+        {
+          session_id: "s1",
+          objective: "active goal",
+          status: "active",
+          iteration: 2,
+          first_turn_done: 1,
+          generation: 1,
+          token_budget: null,
+          tokens_used: 100,
+          time_budget_seconds: null,
+          time_used_seconds: 30,
+          started_at: 1_000_000_000_000 - 86_400_000, // a day ago
+          ended_at: null,
+        },
+      ]);
+      const ext = new GoalExtension(db as never);
+      const recovered = ext.recoverGoals();
+
+      expect(recovered).toHaveLength(1);
+      expect(recovered[0].goal.timeUsedSeconds).toBe(30);
+      // Active period restarts now, not a day ago.
+      expect(recovered[0].goal.startedAt).toBe(1_000_000_000_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("mid-turn pause does not count the in-flight turn's remaining time", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+    try {
+      const db = createMockDb();
+      const ext = new GoalExtension(db as never);
+      await startGoal(ext);
+
+      // 10s of active run, then pause mid-turn.
+      vi.setSystemTime(1_000_000_000_000 + 10_000);
+      await ext.onCommand({ command: "goal", args: "pause", sessionId: "s1" });
+      expect(goalOf(ext).timeUsedSeconds).toBe(10);
+
+      // The in-flight turn completes 30s later while still paused.
+      vi.setSystemTime(1_000_000_000_000 + 40_000);
+      await ext.afterSessionRun!({
+        session: { id: "s1" } as never,
+        prompt: "",
+        messages: [],
+      });
+
+      // The 30s post-pause tail must not be counted.
+      expect(goalOf(ext).timeUsedSeconds).toBe(10);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("budget_limited transitions to paused after the final summarize turn", async () => {
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+    await startGoal(ext);
+    goalOf(ext).status = "budget_limited";
+
+    const result = await ext.afterSessionRun!({
+      session: { id: "s1" } as never,
+      prompt: "",
+      messages: [],
+    });
+
+    expect(goalOf(ext).status).toBe("paused");
+    expect(result?.goalStatus?.status).toBe("paused");
+  });
+
+  it("elapsedSeconds extrapolates live for active/budget_limited, frozen otherwise", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+    try {
+      const base = (status: GoalState["status"]): GoalState => ({
+        objective: "x",
+        status,
+        iteration: 1,
+        firstTurnDone: true,
+        generation: 1,
+        tokensUsed: 0,
+        timeUsedSeconds: 100,
+        startedAt: 1_000_000_000_000 - 5_000, // 5s ago
+      });
+
+      expect(elapsedSeconds(base("active"))).toBe(105);
+      expect(elapsedSeconds(base("budget_limited"))).toBe(105);
+      expect(elapsedSeconds(base("paused"))).toBe(100);
+      expect(elapsedSeconds(base("complete"))).toBe(100);
+      expect(elapsedSeconds(base("blocked"))).toBe(100);
+      expect(elapsedSeconds(base("cleared"))).toBe(100);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("update_goal complete while paused does not count the paused tail", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+    try {
+      const db = createMockDb();
+      const ext = new GoalExtension(db as never);
+      await startGoal(ext);
+      // Create the per-session goal tools (get_goal/update_goal/goal_complete).
+      await ext.beforeSessionRun!({
+        session: { id: "s1" } as never,
+        prompt: "",
+        existingMessages: [],
+        isColdStart: false,
+      });
+
+      // 10s of active run, then pause mid-turn.
+      vi.setSystemTime(1_000_000_000_000 + 10_000);
+      await ext.onCommand({ command: "goal", args: "pause", sessionId: "s1" });
+      expect(goalOf(ext).timeUsedSeconds).toBe(10);
+
+      // The model completes the goal 30s later, while still paused.
+      vi.setSystemTime(1_000_000_000_000 + 40_000);
+      const tools = (
+        ext as unknown as {
+          goalTools: Map<
+            string,
+            Array<{
+              name: string;
+              execute: (id: string, params: unknown) => Promise<unknown>;
+            }>
+          >;
+        }
+      ).goalTools.get("s1");
+      const updateGoal = tools?.find((t) => t.name === "update_goal");
+      if (!updateGoal) throw new Error("update_goal tool not found");
+      await updateGoal.execute("id", { status: "complete", summary: "done" });
+
+      // The 30s paused tail must not be counted.
+      expect(goalOf(ext).timeUsedSeconds).toBe(10);
+      expect(goalOf(ext).status).toBe("complete");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

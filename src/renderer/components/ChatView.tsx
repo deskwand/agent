@@ -1487,15 +1487,13 @@ export function ChatView() {
       if (currentGoal) {
         if (goalAction === "pause") {
           setGoalStatus(activeSessionId, {
+            ...currentGoal,
             status: "paused",
-            objective: currentGoal.objective,
-            iteration: currentGoal.iteration,
           });
         } else if (goalAction === "resume") {
           setGoalStatus(activeSessionId, {
+            ...currentGoal,
             status: "active",
-            objective: currentGoal.objective,
-            iteration: currentGoal.iteration,
           });
         } else if (goalAction === "clear") {
           setGoalStatus(activeSessionId, undefined);
