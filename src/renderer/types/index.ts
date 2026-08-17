@@ -307,100 +307,11 @@ export interface MemoryTranscriptTurn {
   timestamp?: number;
 }
 
-export interface ChunkMemoryItem {
-  id: string;
-  sessionId: string;
-  sourceWorkspace?: string | null;
-  sourceWorkspaceLabel?: string;
-  sourceSessionId: string;
-  sourceSessionTitle?: string;
-  sourceSessionDate?: string;
-  summary: string;
-  details: string;
-  keywords: string[];
-  sourceTurns: number[];
-  rawText: string;
-  sessionDate: string;
-  createdAt: string;
-  ingestedAt: string;
-  embedding: number[];
-}
-
 export interface TurnState {
   turnId: string;
   userMessageId: string;
   stepId?: string;
   startedAt?: number;
-}
-
-export interface SessionMemoryItem {
-  id: string;
-  sessionId: string;
-  sourceWorkspace?: string | null;
-  sourceWorkspaceLabel?: string;
-  sourceSessionId: string;
-  sourceSessionTitle?: string;
-  sourceSessionDate?: string;
-  summary: string;
-  keywords: string[];
-  chunkIds: string[];
-  rawSession: MemoryTranscriptTurn[];
-  sessionDate: string;
-  createdAt: string;
-  ingestedAt: string;
-  embedding: number[];
-}
-
-export interface MemoryDebugFileInfo {
-  kind: "core" | "experience" | "state" | "artifacts";
-  label: string;
-  filePath: string;
-  exists: boolean;
-  sizeBytes: number;
-  updatedAt: number | null;
-  sessionCount?: number;
-  chunkCount?: number;
-}
-
-export interface MemoryDebugFileContent {
-  kind: MemoryDebugFileInfo["kind"];
-  filePath: string;
-  text: string;
-  parsed: unknown | null;
-  sizeBytes: number;
-  updatedAt: number | null;
-}
-
-export interface MemoryInspectSessionResult {
-  sourceWorkspace?: string | null;
-  filePath: string;
-  session: SessionMemoryItem;
-  chunks: ChunkMemoryItem[];
-}
-
-export interface MemoryOverview {
-  enabled: boolean;
-  storageRoot: string;
-  coreFilePath: string;
-  experienceFilePath: string;
-  stateFilePath: string;
-  coreCount: number;
-  experienceSessionCount: number;
-  experienceChunkCount: number;
-  sourceWorkspaceCount: number;
-  failedSessionCount: number;
-  latestIngestionAt: number | null;
-  latestError: string | null;
-  currentWorkspace?: {
-    workspaceKey: string;
-    experienceSessionCount: number;
-    experienceChunkCount: number;
-  };
-  topSourceWorkspaces: Array<{
-    workspaceKey: string;
-    sessionCount: number;
-    chunkCount: number;
-  }>;
 }
 
 export interface MemorySearchResult {
@@ -917,16 +828,6 @@ export interface SaveProviderPayload {
   config: ApiProviderConfig;
 }
 
-export interface MemoryModelRuntimeConfig {
-  inheritFromActive: boolean;
-  provider?: ProviderType;
-  customProtocol?: CustomProtocolType;
-  apiKey?: string;
-  baseUrl?: string;
-  model?: string;
-  timeoutMs: number;
-}
-
 export interface UtilityModelRuntimeConfig {
   inheritFromActive: boolean;
   providerProfileKey?: ProviderProfileKey;
@@ -935,16 +836,9 @@ export interface UtilityModelRuntimeConfig {
 }
 
 export interface MemoryRuntimeConfig {
-  embedding: MemoryModelRuntimeConfig;
-  useEmbedding: boolean;
   maxNavSteps: number;
   ingestionConcurrency: number;
   storageRoot?: string;
-  evalEnabled?: boolean;
-  evalWorkspaces?: string[];
-  evalMaxRounds?: number;
-  evalArtifactsRoot?: string;
-  promptIterationRounds?: number;
 }
 
 export interface AppConfig {

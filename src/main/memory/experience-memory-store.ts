@@ -9,7 +9,6 @@ import type {
   SessionMemoryItem,
 } from "./memory-types";
 import {
-  cosineSimilarity,
   lexicalScore,
   loadJsonFile,
   normalizeWorkspaceKey,
@@ -24,12 +23,6 @@ interface ExperienceMemoryFile {
 function toStringArray(value: unknown): string[] {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
-    : [];
-}
-
-function toNumberArray(value: unknown): number[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is number => typeof item === "number")
     : [];
 }
 
@@ -81,7 +74,6 @@ function normalizeChunk(item: Record<string, unknown>): ChunkMemoryItem | null {
     sessionDate: typeof item.session_date === "string" ? item.session_date : "",
     createdAt: typeof item.created_at === "string" ? item.created_at : "",
     ingestedAt: typeof item.ingested_at === "string" ? item.ingested_at : "",
-    embedding: toNumberArray(item.embedding),
   };
 }
 
@@ -146,7 +138,6 @@ function normalizeSession(
     sessionDate: typeof item.session_date === "string" ? item.session_date : "",
     createdAt: typeof item.created_at === "string" ? item.created_at : "",
     ingestedAt: typeof item.ingested_at === "string" ? item.ingested_at : "",
-    embedding: toNumberArray(item.embedding),
   };
 }
 
@@ -167,7 +158,6 @@ function chunkToFileRecord(item: ChunkMemoryItem): Record<string, unknown> {
     session_date: item.sessionDate,
     created_at: item.createdAt,
     ingested_at: item.ingestedAt,
-    embedding: item.embedding,
   };
 }
 
@@ -187,7 +177,6 @@ function sessionToFileRecord(item: SessionMemoryItem): Record<string, unknown> {
     session_date: item.sessionDate,
     created_at: item.createdAt,
     ingested_at: item.ingestedAt,
-    embedding: item.embedding,
   };
 }
 
@@ -385,7 +374,6 @@ export class ExperienceMemoryStore {
     options?: {
       chunkTopK?: number;
       sessionTopK?: number;
-      queryEmbedding?: number[];
       currentWorkspace?: string | null;
     },
   ): ProgressiveRetrievalResult {
@@ -394,13 +382,11 @@ export class ExperienceMemoryStore {
     const currentWorkspace = normalizeWorkspaceKey(
       options?.currentWorkspace || null,
     );
-    const queryEmbedding = options?.queryEmbedding;
 
     const rankedChunks = this.rankItems(
       query,
       this.chunks,
       chunkTopK,
-      queryEmbedding,
       currentWorkspace,
       (item) =>
         [
@@ -416,7 +402,6 @@ export class ExperienceMemoryStore {
       query,
       this.sessions,
       sessionTopK,
-      queryEmbedding,
       currentWorkspace,
       (item) =>
         [
@@ -513,7 +498,6 @@ export class ExperienceMemoryStore {
 
   private rankItems<
     T extends {
-      embedding: number[];
       ingestedAt: string;
       sourceWorkspace?: string | null;
     },
@@ -521,18 +505,13 @@ export class ExperienceMemoryStore {
     query: string,
     items: T[],
     topK: number,
-    queryEmbedding: number[] | undefined,
     currentWorkspace: string | null,
     textSelector: (item: T) => string,
   ): Array<{ record: T; score: number }> {
     return items
       .map((record) => {
         const lexical = lexicalScore(query, textSelector(record));
-        const embedding =
-          queryEmbedding && queryEmbedding.length && record.embedding.length
-            ? cosineSimilarity(queryEmbedding, record.embedding)
-            : 0;
-        const evidenceScore = lexical + embedding;
+        const evidenceScore = lexical;
         const score =
           evidenceScore +
           workspaceBoost(currentWorkspace, record.sourceWorkspace) +

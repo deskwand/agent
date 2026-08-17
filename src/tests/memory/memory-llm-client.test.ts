@@ -42,22 +42,9 @@ function makeConfig(timeoutMs: number): AppConfig {
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {
-      embedding: {
-        inheritFromActive: true,
-        apiKey: "",
-        baseUrl: "",
-        model: "text-embedding-3-small",
-        timeoutMs: 180000,
-      },
-      useEmbedding: false,
       maxNavSteps: 2,
       ingestionConcurrency: 4,
       storageRoot: "",
-      evalEnabled: false,
-      evalWorkspaces: [],
-      evalMaxRounds: 12,
-      evalArtifactsRoot: "",
-      promptIterationRounds: 2,
     },
     utilityRuntime: {
       inheritFromActive: true,

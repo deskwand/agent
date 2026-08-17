@@ -10,9 +10,6 @@ function createExtractor(actions: unknown[]): CoreMemoryExtractor {
     async complete(_request: MemoryCompletionRequest) {
       return { text: JSON.stringify({ actions }) };
     },
-    async embed() {
-      return [];
-    },
   };
   return new CoreMemoryExtractor(llm);
 }

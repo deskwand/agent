@@ -10,11 +10,9 @@ describe("memory integration wiring", () => {
   it("registers the memory extension in the main process and exposes IPC handlers", () => {
     const mainIndex = readProjectFile("src/main/index.ts");
     expect(mainIndex).toContain("new MemoryExtension(memoryService)");
-    expect(mainIndex).toContain('ipcMain.handle("memory.getOverview"');
     expect(mainIndex).toContain('"memory.search"');
-    expect(mainIndex).toContain('ipcMain.handle("memory.listFiles"');
-    expect(mainIndex).toContain('"memory.inspectSession"');
     expect(mainIndex).toContain('ipcMain.handle("memory.setEnabled"');
+    expect(mainIndex).toContain('ipcMain.handle("memory.clearAll"');
   });
 
   it("injects runtime plugin skill paths and extension hooks into the agent runner", () => {
@@ -44,17 +42,9 @@ describe("memory integration wiring", () => {
     expect(settingsPanel).toContain("<SettingsMemory />");
     expect(preload).toContain("memory: {");
     expect(preload).toContain('ipcRenderer.invoke("memory.search"');
-    expect(preload).toContain('ipcRenderer.invoke("memory.listFiles")');
-    expect(memorySettings).toContain("window.electronAPI.memory.search");
-    expect(memorySettings).toContain("window.electronAPI.memory.readFile");
-    expect(memorySettings).toContain(
-      "window.electronAPI.memory.inspectSession",
-    );
-    expect(memorySettings).toContain(
-      "window.electronAPI.memory.rebuildWorkspace",
-    );
-    expect(memorySettings).toContain("evalEnabled: source.evalEnabled");
-    expect(memorySettings).toContain("promptIterationRounds");
+    expect(preload).toContain('ipcRenderer.invoke("memory.clearAll")');
+    expect(memorySettings).toContain("window.electronAPI.memory.setEnabled");
+    expect(memorySettings).toContain("window.electronAPI.memory.clearAll");
   });
 
   it("keeps background skill review separate from memory learning", () => {

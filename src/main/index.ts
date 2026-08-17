@@ -541,7 +541,8 @@ function createWindow() {
   const isWindows = process.platform === "win32";
 
   // Base window options — constrained to workArea to avoid extending behind Dock/menu bar
-  const { width: workWidth, height: workHeight } = screen.getPrimaryDisplay().workAreaSize;
+  const { width: workWidth, height: workHeight } =
+    screen.getPrimaryDisplay().workAreaSize;
   const windowOptions: Electron.BrowserWindowConstructorOptions = {
     width: Math.min(1400, workWidth),
     height: Math.min(900, workHeight),
@@ -897,15 +898,10 @@ function sendToRenderer(event: ServerEvent) {
   const sessionId = payload?.sessionId;
 
   // 判断是否为远程运行时会话，路由助理事件到远程通道
-  if (
-    sessionId &&
-    remoteRuntimeBootstrap.isAgentSession(sessionId)
-  ) {
+  if (sessionId && remoteRuntimeBootstrap.isAgentSession(sessionId)) {
     if (event.type === "stream.message") {
-      routeRuntimeAssistantEvent(
-        event,
-        remoteRuntimeBootstrap,
-        () => logError("[RemoteRuntime] Agent response delivery failed"),
+      routeRuntimeAssistantEvent(event, remoteRuntimeBootstrap, () =>
+        logError("[RemoteRuntime] Agent response delivery failed"),
       );
     }
   }
@@ -1155,7 +1151,18 @@ app
         if (unsupportedReason) {
           throw new Error(unsupportedReason);
         }
-        return sessionManager.startSession(title, prompt, cwd, undefined, content, undefined, undefined, undefined, undefined, turnId);
+        return sessionManager.startSession(
+          title,
+          prompt,
+          cwd,
+          undefined,
+          content,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          turnId,
+        );
       },
       continueSession: async (sessionId, prompt, content, cwd, turnId) => {
         if (!sessionManager) throw new Error("Session manager not initialized");
@@ -1167,7 +1174,14 @@ app
             );
           }
         }
-        await sessionManager.continueSession(sessionId, prompt, content, undefined, undefined, turnId);
+        await sessionManager.continueSession(
+          sessionId,
+          prompt,
+          content,
+          undefined,
+          undefined,
+          turnId,
+        );
       },
       stopSession: async (sessionId) => {
         if (!sessionManager) throw new Error("Session manager not initialized");
@@ -1593,15 +1607,13 @@ ipcMain.handle("pi-ext.list-state", async () => {
   return {
     sdkVersion: host.getCompatibleSdkVersion(),
     packages: piPackageService.list(),
-    extensions: host
-      .getExtensionsResult()
-      .extensions.map((ext) => ({
-        path: ext.path,
-        source: ext.sourceInfo.source ?? "unknown",
-        scope: ext.sourceInfo.scope ?? "unknown",
-        origin: ext.sourceInfo.origin ?? "top-level",
-        error: undefined as string | undefined,
-      })),
+    extensions: host.getExtensionsResult().extensions.map((ext) => ({
+      path: ext.path,
+      source: ext.sourceInfo.source ?? "unknown",
+      scope: ext.sourceInfo.scope ?? "unknown",
+      origin: ext.sourceInfo.origin ?? "top-level",
+      error: undefined as string | undefined,
+    })),
     errors: host.getExtensionErrors(),
   };
 });
@@ -1627,24 +1639,21 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle(
-  "pi-ext.remove",
-  async (_e, source: string, local?: boolean) => {
-    try {
-      await piPackageService.remove(source, { local });
-      await getPiHostForCwd().reloadResources();
-      sessionManager?.invalidatePiPluginSessions();
-      sendPiServerEvent("commands.changed", { cwd: getPiHostForCwd().cwd });
-      return { success: true };
-    } catch (error) {
-      logError("[IPC] pi-ext.remove failed:", error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  },
-);
+ipcMain.handle("pi-ext.remove", async (_e, source: string, local?: boolean) => {
+  try {
+    await piPackageService.remove(source, { local });
+    await getPiHostForCwd().reloadResources();
+    sessionManager?.invalidatePiPluginSessions();
+    sendPiServerEvent("commands.changed", { cwd: getPiHostForCwd().cwd });
+    return { success: true };
+  } catch (error) {
+    logError("[IPC] pi-ext.remove failed:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
 
 ipcMain.handle("pi-ext.update", async (_e, source?: string) => {
   try {
@@ -2385,16 +2394,6 @@ ipcMain.handle("config.save", async (_event, newConfig: Partial<AppConfig>) => {
   log("[Config] Saving config:", {
     ...newConfig,
     apiKey: newConfig.apiKey ? "***" : "",
-    memoryRuntime: newConfig.memoryRuntime
-      ? {
-          embedding: newConfig.memoryRuntime.embedding
-            ? {
-                ...newConfig.memoryRuntime.embedding,
-                apiKey: newConfig.memoryRuntime.embedding.apiKey ? "***" : "",
-              }
-            : undefined,
-        }
-      : undefined,
     webAccess: redactWebAccessConfig(newConfig.webAccess),
   });
 
@@ -2537,50 +2536,57 @@ ipcMain.handle("subagent.listAgents", async (_event) => {
   }
 });
 
-ipcMain.handle("subagent.setAgentModel", async (_event, name: string, model: string, thinking?: string) => {
-  const { join } = await import("node:path");
-  const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
-  const { applySubagentModelSpec } = await import("./agent/subagent/model-spec");
-  const targetDir = join(getAgentDir(), "agents");
-  const target = join(targetDir, `${name}.md`);
+ipcMain.handle(
+  "subagent.setAgentModel",
+  async (_event, name: string, model: string, thinking?: string) => {
+    const { join } = await import("node:path");
+    const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
+    const { applySubagentModelSpec } =
+      await import("./agent/subagent/model-spec");
+    const targetDir = join(getAgentDir(), "agents");
+    const target = join(targetDir, `${name}.md`);
 
-  try {
-    const { mkdirSync } = await import("node:fs");
-    mkdirSync(targetDir, { recursive: true });
-    applySubagentModelSpec(target, model, thinking);
-    return { success: true };
-  } catch (err) {
-    logError("[Subagent IPC] Failed to set agent model:", err);
-    return { success: false, error: String(err) };
-  }
-});
+    try {
+      const { mkdirSync } = await import("node:fs");
+      mkdirSync(targetDir, { recursive: true });
+      applySubagentModelSpec(target, model, thinking);
+      return { success: true };
+    } catch (err) {
+      logError("[Subagent IPC] Failed to set agent model:", err);
+      return { success: false, error: String(err) };
+    }
+  },
+);
 
-ipcMain.handle("subagent.createAgent", async (_event, name: string, description: string, prompt: string) => {
-  const { writeFileSync, mkdirSync } = await import("node:fs");
-  const { join } = await import("node:path");
-  const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
-  const targetDir = join(getAgentDir(), "agents");
-  const target = join(targetDir, `${name}.md`);
+ipcMain.handle(
+  "subagent.createAgent",
+  async (_event, name: string, description: string, prompt: string) => {
+    const { writeFileSync, mkdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const { getAgentDir } = await import("@earendil-works/pi-coding-agent");
+    const targetDir = join(getAgentDir(), "agents");
+    const target = join(targetDir, `${name}.md`);
 
-  try {
-    mkdirSync(targetDir, { recursive: true });
-    const content = [
-      "---",
-      `name: ${name}`,
-      `description: "${description}"`,
-      "model: inherit",
-      "prompt_mode: replace",
-      "---",
-      "",
-      prompt,
-    ].join("\n");
-    writeFileSync(target, content, "utf-8");
-    return { success: true, path: target };
-  } catch (err) {
-    logError("[Subagent IPC] Failed to create agent:", err);
-    return { success: false, error: String(err) };
-  }
-});
+    try {
+      mkdirSync(targetDir, { recursive: true });
+      const content = [
+        "---",
+        `name: ${name}`,
+        `description: "${description}"`,
+        "model: inherit",
+        "prompt_mode: replace",
+        "---",
+        "",
+        prompt,
+      ].join("\n");
+      writeFileSync(target, content, "utf-8");
+      return { success: true, path: target };
+    } catch (err) {
+      logError("[Subagent IPC] Failed to create agent:", err);
+      return { success: false, error: String(err) };
+    }
+  },
+);
 
 ipcMain.handle("subagent.deleteAgent", async (_event, name: string) => {
   const { rmSync, existsSync } = await import("node:fs");
@@ -3480,20 +3486,22 @@ ipcMain.handle(
   },
 );
 
-ipcMain.handle("remote.deleteChannel", async (_event, id: string): Promise<boolean> => {
-  const deleted = remoteConfigStore.deleteChannelInstance(id);
-  if (deleted) {
-    await remoteManager.refreshRuntimeChannels();
-  }
-  return deleted;
-});
+ipcMain.handle(
+  "remote.deleteChannel",
+  async (_event, id: string): Promise<boolean> => {
+    const deleted = remoteConfigStore.deleteChannelInstance(id);
+    if (deleted) {
+      await remoteManager.refreshRuntimeChannels();
+    }
+    return deleted;
+  },
+);
 
 ipcMain.handle("remote.getChannelStatus", (): ChannelInstanceStatus[] => {
   const runtimeStatus = new Map(
-    remoteManager.getRuntimeStatus().map((status) => [
-      status.channelInstanceId,
-      status,
-    ]),
+    remoteManager
+      .getRuntimeStatus()
+      .map((status) => [status.channelInstanceId, status]),
   );
   return remoteConfigStore.listChannelInstances().map((instance) => {
     const status = runtimeStatus.get(instance.id);
@@ -3511,16 +3519,19 @@ ipcMain.handle("remote.getChannelPairings", () => {
   return remoteRuntimeBootstrap.getPairingSnapshots();
 });
 
-ipcMain.handle("remote.getChannelLogs", (_event, instanceId: string): ChannelInstanceLog[] => {
-  return [{
-    instanceId,
-    timestamp: Date.now(),
-    level: "info",
-    message: "Channel log collection is not enabled.",
-  }];
-});
-
-
+ipcMain.handle(
+  "remote.getChannelLogs",
+  (_event, instanceId: string): ChannelInstanceLog[] => {
+    return [
+      {
+        instanceId,
+        timestamp: Date.now(),
+        level: "info",
+        message: "Channel log collection is not enabled.",
+      },
+    ];
+  },
+);
 
 ipcMain.handle("schedule.list", () => {
   try {
@@ -3611,13 +3622,6 @@ ipcMain.handle("schedule.runNow", async (_event, id: string) => {
   return scheduledTaskManager.runNow(id);
 });
 
-ipcMain.handle("memory.getOverview", (_event, cwd?: string) => {
-  if (!memoryService) {
-    throw new Error("Memory service not initialized");
-  }
-  return memoryService.getOverview(cwd);
-});
-
 ipcMain.handle(
   "memory.search",
   (
@@ -3644,58 +3648,6 @@ ipcMain.handle("memory.read", (_event, id: string) => {
   return memoryService.read(id);
 });
 
-ipcMain.handle("memory.rebuildWorkspace", async (_event, cwd: string) => {
-  if (!memoryService) {
-    throw new Error("Memory service not initialized");
-  }
-  return memoryService.rebuildWorkspace(cwd);
-});
-
-ipcMain.handle("memory.clearWorkspace", (_event, cwd: string) => {
-  if (!memoryService) {
-    throw new Error("Memory service not initialized");
-  }
-  return memoryService.clearWorkspace(cwd);
-});
-
-ipcMain.handle("memory.clearCoreMemory", () => {
-  if (!memoryService) {
-    throw new Error("Memory service not initialized");
-  }
-  return memoryService.clearCoreMemory();
-});
-
-ipcMain.handle("memory.rebuildAll", async () => {
-  if (!memoryService) {
-    throw new Error("Memory service not initialized");
-  }
-  return memoryService.rebuildAll();
-});
-
-ipcMain.handle("memory.listFiles", () => {
-  if (!memoryService) {
-    throw new Error("Memory service not initialized");
-  }
-  return memoryService.listFiles();
-});
-
-ipcMain.handle("memory.readFile", (_event, filePath: string) => {
-  if (!memoryService) {
-    throw new Error("Memory service not initialized");
-  }
-  return memoryService.readFile(filePath);
-});
-
-ipcMain.handle(
-  "memory.inspectSession",
-  (_event, sessionId: string, workspaceKey?: string) => {
-    if (!memoryService) {
-      throw new Error("Memory service not initialized");
-    }
-    return memoryService.inspectSession(sessionId, workspaceKey);
-  },
-);
-
 ipcMain.handle("memory.setEnabled", (_event, enabled: boolean) => {
   if (!memoryService) {
     throw new Error("Memory service not initialized");
@@ -3710,6 +3662,13 @@ ipcMain.handle("memory.setEnabled", (_event, enabled: boolean) => {
     },
   });
   return result;
+});
+
+ipcMain.handle("memory.clearAll", async () => {
+  if (!memoryService) {
+    throw new Error("Memory service not initialized");
+  }
+  return memoryService.clearAll();
 });
 
 ipcMain.handle(

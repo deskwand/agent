@@ -18,14 +18,6 @@ const mockConfigState = vi.hoisted(() => ({
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {
-      embedding: {
-        inheritFromActive: true,
-        apiKey: "",
-        baseUrl: "",
-        model: "text-embedding-3-small",
-        timeoutMs: 180000,
-      },
-      useEmbedding: false,
       maxNavSteps: 2,
       ingestionConcurrency: 2,
       storageRoot: "",
@@ -135,10 +127,6 @@ class SmokeMemoryLLM implements MemoryLLMClientLike {
     }
 
     return { text: "{}" };
-  }
-
-  async embed(): Promise<number[]> {
-    return [];
   }
 }
 
@@ -263,14 +251,6 @@ describe("memory smoke harness", () => {
     configStore.update({
       memoryEnabled: true,
       memoryRuntime: {
-        embedding: {
-          inheritFromActive: true,
-          apiKey: "",
-          baseUrl: "",
-          model: "text-embedding-3-small",
-          timeoutMs: 180000,
-        },
-        useEmbedding: false,
         maxNavSteps: 2,
         ingestionConcurrency: 2,
         storageRoot: path.join(storageRoot, "memory-root"),
@@ -322,7 +302,10 @@ describe("memory smoke harness", () => {
       prompt: "turn 9",
       messages: messages.slice(0, 18),
     });
-    expect(service.getOverview().coreCount).toBe(1);
+    const corePath = path.join(storageRoot, "memory-root", "core_memory.json");
+    expect(
+      Object.keys(JSON.parse(fs.readFileSync(corePath, "utf8"))),
+    ).toHaveLength(1);
 
     await service.enqueueIngestion({
       session,
@@ -330,10 +313,8 @@ describe("memory smoke harness", () => {
       messages,
     });
 
-    const overview = service.getOverview(session.cwd);
-    expect(overview.coreCount).toBe(2);
-    expect(overview.experienceSessionCount).toBe(0);
-    expect(overview.experienceChunkCount).toBe(0);
+    const coreJson = JSON.parse(fs.readFileSync(corePath, "utf8"));
+    expect(Object.keys(coreJson)).toHaveLength(2);
     expect(
       service.search({ query: "中文", scope: "global", limit: 5 }),
     ).toEqual(

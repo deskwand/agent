@@ -60,12 +60,6 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
       sandboxEnabled: false,
       memoryEnabled: true,
       memoryRuntime: {
-        embedding: {
-          inheritFromActive: true,
-          model: "text-embedding-3-small",
-          timeoutMs: 180000,
-        },
-        useEmbedding: false,
         maxNavSteps: 2,
         ingestionConcurrency: 4,
       },
@@ -198,12 +192,6 @@ describe("buildProjectedConfig — visionModel pass-through", () => {
       sandboxEnabled: false,
       memoryEnabled: true,
       memoryRuntime: {
-        embedding: {
-          inheritFromActive: true,
-          model: "text-embedding-3-small",
-          timeoutMs: 180000,
-        },
-        useEmbedding: false,
         maxNavSteps: 2,
         ingestionConcurrency: 4,
       },

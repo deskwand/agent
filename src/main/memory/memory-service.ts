@@ -3,8 +3,8 @@ import * as path from "node:path";
 import { app } from "electron";
 import type { AppConfig } from "../config/config-store";
 import { configStore } from "../config/config-store";
-import type { DatabaseInstance, SessionRow } from "../db/database";
-import { log, logError, logWarn } from "../utils/logger";
+import type { DatabaseInstance } from "../db/database";
+import { log, logError } from "../utils/logger";
 import { CoreMemoryStore } from "./core-memory-store";
 import { CoreMemoryExtractor } from "./core-memory-extractor";
 import { ExperienceMemoryStore } from "./experience-memory-store";
@@ -17,11 +17,7 @@ import { MemorySessionStateStore } from "./memory-state-store";
 import type {
   AppliedCoreMemoryAction,
   CoreMemoryCategory,
-  MemoryDebugFileContent,
-  MemoryDebugFileInfo,
   MemoryIngestionInput,
-  MemoryInspectSessionResult,
-  MemoryOverview,
   MemoryReadResult,
   MemorySearchParams,
   MemorySearchResult,
@@ -31,10 +27,6 @@ import type {
 } from "./memory-types";
 import {
   formatTimestamp,
-  getFileSizeBytes,
-  getFileTimestampMs,
-  isSubPath,
-  loadJsonFile,
   messagesToTranscript,
   normalizeWorkspaceKey,
   safeRemoveFile,
@@ -46,7 +38,6 @@ interface MemoryPaths {
   coreFilePath: string;
   experienceFilePath: string;
   stateFilePath: string;
-  artifactsDir: string;
 }
 
 interface ExpandedChunkData {
@@ -107,35 +98,17 @@ function resolveMaterializedPath(filePath: string): string {
     : realExistingPath;
 }
 
-function assertSafeMemoryPaths(
-  storageRoot: string,
-  artifactsDir: string,
-): void {
+function assertSafeMemoryPaths(storageRoot: string): void {
   const resolvedStorageRoot = path.resolve(storageRoot);
-  const resolvedArtifactsDir = path.resolve(artifactsDir);
 
   if (isFilesystemRootPath(resolvedStorageRoot)) {
     throw new Error("Memory storageRoot must not be a filesystem root");
   }
-  if (isFilesystemRootPath(resolvedArtifactsDir)) {
-    throw new Error("Memory evalArtifactsRoot must not be a filesystem root");
-  }
-  if (!isSubPath(resolvedArtifactsDir, resolvedStorageRoot)) {
-    throw new Error("evalArtifactsRoot must stay inside storageRoot");
-  }
 
   const materializedStorageRoot = resolveMaterializedPath(resolvedStorageRoot);
-  const materializedArtifactsDir =
-    resolveMaterializedPath(resolvedArtifactsDir);
 
   if (isFilesystemRootPath(materializedStorageRoot)) {
     throw new Error("Memory storageRoot must not be a filesystem root");
-  }
-  if (isFilesystemRootPath(materializedArtifactsDir)) {
-    throw new Error("Memory evalArtifactsRoot must not be a filesystem root");
-  }
-  if (!isSubPath(materializedArtifactsDir, materializedStorageRoot)) {
-    throw new Error("evalArtifactsRoot must stay inside storageRoot");
   }
 }
 
@@ -223,159 +196,6 @@ export class MemoryService {
     return this.retriever.read(id);
   }
 
-  getOverview(cwd?: string): MemoryOverview {
-    const paths = this.getPaths();
-    const coreEntries = this.getCoreStore().getEntries();
-    const experienceStore = this.getExperienceStore();
-    const stateRecords = this.getStateStore().getAll();
-    const currentWorkspace = normalizeWorkspaceKey(cwd);
-    const topSourceWorkspaces = experienceStore.getStatsBySourceWorkspace();
-
-    return {
-      enabled: this.isEnabled(),
-      storageRoot: paths.storageRoot,
-      coreFilePath: paths.coreFilePath,
-      experienceFilePath: paths.experienceFilePath,
-      stateFilePath: paths.stateFilePath,
-      coreCount: coreEntries.length,
-      experienceSessionCount: experienceStore.sessions.length,
-      experienceChunkCount: experienceStore.chunks.length,
-      sourceWorkspaceCount: topSourceWorkspaces.filter(
-        (item) => item.workspaceKey !== "(none)",
-      ).length,
-      failedSessionCount: stateRecords.filter((record) =>
-        Boolean(record.lastError),
-      ).length,
-      latestIngestionAt: stateRecords.reduce<number | null>(
-        (latest, record) => {
-          if (!record.lastIngestedAt) {
-            return latest;
-          }
-          return latest === null
-            ? record.lastIngestedAt
-            : Math.max(latest, record.lastIngestedAt);
-        },
-        null,
-      ),
-      latestError:
-        stateRecords
-          .filter((record) => record.lastError)
-          .sort((a, b) => b.updatedAt - a.updatedAt)[0]?.lastError || null,
-      currentWorkspace: currentWorkspace
-        ? {
-            workspaceKey: currentWorkspace,
-            experienceSessionCount: experienceStore.sessions.filter(
-              (item) => item.sourceWorkspace === currentWorkspace,
-            ).length,
-            experienceChunkCount: experienceStore.chunks.filter(
-              (item) => item.sourceWorkspace === currentWorkspace,
-            ).length,
-          }
-        : undefined,
-      topSourceWorkspaces,
-    };
-  }
-
-  listFiles(): MemoryDebugFileInfo[] {
-    const paths = this.getPaths();
-    const experienceStore = this.getExperienceStore();
-    return [
-      {
-        kind: "core",
-        label: "core_memory.json",
-        filePath: paths.coreFilePath,
-        exists: fs.existsSync(paths.coreFilePath),
-        sizeBytes: getFileSizeBytes(paths.coreFilePath),
-        updatedAt: getFileTimestampMs(paths.coreFilePath),
-      },
-      {
-        kind: "experience",
-        label: "experience_memory.json",
-        filePath: paths.experienceFilePath,
-        exists: fs.existsSync(paths.experienceFilePath),
-        sizeBytes: getFileSizeBytes(paths.experienceFilePath),
-        updatedAt: getFileTimestampMs(paths.experienceFilePath),
-        sessionCount: experienceStore.sessions.length,
-        chunkCount: experienceStore.chunks.length,
-      },
-      {
-        kind: "state",
-        label: "session_state.json",
-        filePath: paths.stateFilePath,
-        exists: fs.existsSync(paths.stateFilePath),
-        sizeBytes: getFileSizeBytes(paths.stateFilePath),
-        updatedAt: getFileTimestampMs(paths.stateFilePath),
-      },
-      {
-        kind: "artifacts",
-        label: "eval-artifacts/",
-        filePath: paths.artifactsDir,
-        exists: fs.existsSync(paths.artifactsDir),
-        sizeBytes: getFileSizeBytes(paths.artifactsDir),
-        updatedAt: getFileTimestampMs(paths.artifactsDir),
-      },
-    ];
-  }
-
-  readFile(filePath: string): MemoryDebugFileContent {
-    const normalizedPath = this.resolveReadablePath(filePath);
-    const stat = fs.statSync(normalizedPath);
-    if (stat?.isDirectory()) {
-      const entries = fs.readdirSync(normalizedPath).sort();
-      const parsed = entries.map((name) => {
-        const fullPath = path.join(normalizedPath, name);
-        const child = fs.statSync(fullPath);
-        return {
-          name,
-          path: fullPath,
-          isDirectory: child.isDirectory(),
-          sizeBytes: child.size,
-          updatedAt: child.mtimeMs,
-        };
-      });
-      return {
-        kind: "artifacts",
-        filePath: normalizedPath,
-        text: JSON.stringify(parsed, null, 2),
-        parsed,
-        sizeBytes: stat.size,
-        updatedAt: stat.mtimeMs,
-      };
-    }
-    const raw = stat ? fs.readFileSync(normalizedPath, "utf8") : "";
-    return {
-      kind: this.resolveFileKind(normalizedPath),
-      filePath: normalizedPath,
-      text: raw,
-      parsed: raw.trim() ? loadJsonFile(normalizedPath, null) : null,
-      sizeBytes: getFileSizeBytes(normalizedPath),
-      updatedAt: getFileTimestampMs(normalizedPath),
-    };
-  }
-
-  inspectSession(
-    sessionId: string,
-    sourceWorkspace?: string,
-  ): MemoryInspectSessionResult | null {
-    const store = this.getExperienceStore();
-    const session = store.getSession(sessionId);
-    if (!session) {
-      return null;
-    }
-    if (sourceWorkspace) {
-      const normalized = normalizeWorkspaceKey(sourceWorkspace);
-      if (session.sourceWorkspace !== normalized) {
-        return null;
-      }
-    }
-    return {
-      sourceWorkspace: session.sourceWorkspace,
-      filePath: store.getPath(),
-      session,
-      chunks: store.getChunksBySession(sessionId),
-    };
-  }
-
   async buildPromptPrefix(
     session: { cwd?: string },
     prompt: string,
@@ -428,63 +248,6 @@ export class MemoryService {
     });
   }
 
-  async rebuildWorkspace(
-    cwd: string,
-  ): Promise<{ success: boolean; workspaceKey: string }> {
-    const workspaceKey = normalizeWorkspaceKey(cwd);
-    if (!workspaceKey) {
-      throw new Error("Workspace path is required");
-    }
-
-    const rebuildGeneration = ++this.memoryGeneration;
-    await this.waitForPriorCoreWrites();
-    if (rebuildGeneration !== this.memoryGeneration) {
-      return { success: true, workspaceKey };
-    }
-    const sessionRows = this.db.sessions
-      .getAll()
-      .filter(
-        (session) =>
-          normalizeWorkspaceKey(session.cwd) === workspaceKey &&
-          session.memory_enabled === 1,
-      )
-      .sort((a, b) => a.created_at - b.created_at);
-
-    await this.batchRebuild(sessionRows, rebuildGeneration);
-    return { success: true, workspaceKey };
-  }
-
-  async rebuildAll(): Promise<{
-    success: boolean;
-    workspaceCount: number;
-    sessionCount: number;
-  }> {
-    const paths = this.getPaths();
-    const rebuildGeneration = ++this.memoryGeneration;
-    await this.queue.enqueue(MemoryService.GLOBAL_WRITE_QUEUE_KEY, async () => {
-      safeRemoveFile(paths.coreFilePath);
-      safeRemoveFile(paths.stateFilePath);
-      fs.rmSync(paths.artifactsDir, { recursive: true, force: true });
-      this.resetStores();
-    });
-
-    const sessionRows = this.db.sessions
-      .getAll()
-      .filter((session) => session.memory_enabled === 1)
-      .sort((a, b) => a.created_at - b.created_at);
-    await this.batchRebuild(sessionRows, rebuildGeneration);
-    const workspaceCount = new Set(
-      sessionRows
-        .map((session) => normalizeWorkspaceKey(session.cwd))
-        .filter((workspace): workspace is string => Boolean(workspace)),
-    ).size;
-    return {
-      success: true,
-      workspaceCount,
-      sessionCount: sessionRows.length,
-    };
-  }
-
   async clearWorkspace(
     cwd: string,
   ): Promise<{ success: boolean; workspaceKey: string }> {
@@ -510,6 +273,18 @@ export class MemoryService {
     return { success: true };
   }
 
+  async clearAll(): Promise<{ success: boolean }> {
+    const paths = this.getPaths();
+    this.memoryGeneration += 1;
+    await this.queue.enqueue(MemoryService.GLOBAL_WRITE_QUEUE_KEY, async () => {
+      safeRemoveFile(paths.coreFilePath);
+      safeRemoveFile(paths.experienceFilePath);
+      safeRemoveFile(paths.stateFilePath);
+      this.resetStores();
+    });
+    return { success: true };
+  }
+
   deleteSession(sessionId: string): Promise<void> {
     this.deletedSessionIds.add(sessionId);
     return this.queue.enqueue(sessionId, async () => {
@@ -520,32 +295,6 @@ export class MemoryService {
       }
       this.getStateStore().delete(sessionId);
     });
-  }
-
-  private async batchRebuild(
-    sessionRows: SessionRow[],
-    rebuildGeneration: number,
-  ): Promise<void> {
-    for (const sessionRow of sessionRows) {
-      if (rebuildGeneration !== this.memoryGeneration) {
-        return;
-      }
-      const session = this.sessionRowToSession(sessionRow);
-      const messages = this.getMessagesForSession(sessionRow.id);
-      await this.queue.enqueue(session.id, async () => {
-        if (rebuildGeneration !== this.memoryGeneration) {
-          return;
-        }
-        this.getStateStore().delete(session.id);
-        await this.ingest(
-          { session, prompt: "", messages },
-          {
-            expectedGeneration: rebuildGeneration,
-            reviewFromStart: true,
-          },
-        );
-      });
-    }
   }
 
   private async ingest(
@@ -739,11 +488,9 @@ export class MemoryService {
     if (!store.sessions.length && !store.chunks.length) {
       return "";
     }
-    const queryEmbedding = await this.embedText(prompt);
     const retrieval = store.retrieveProgressive(prompt, {
       chunkTopK: 10,
       sessionTopK: 5,
-      queryEmbedding,
       currentWorkspace,
     });
     if (!retrieval.broadSummaries.length) {
@@ -866,21 +613,6 @@ export class MemoryService {
     return parts.join("\n");
   }
 
-  private async embedText(text: string): Promise<number[]> {
-    if (!this.getAppConfig().memoryRuntime.useEmbedding || !text.trim()) {
-      return [];
-    }
-    try {
-      return await this.llmClient.embed(text);
-    } catch (error) {
-      logWarn(
-        "[MemoryService] Embedding failed, falling back to lexical retrieval:",
-        error,
-      );
-      return [];
-    }
-  }
-
   private resolveSessionDate(
     session: MemoryIngestionInput["session"],
     messages: MemoryIngestionInput["messages"],
@@ -892,62 +624,8 @@ export class MemoryService {
     return formatTimestamp(timestamp);
   }
 
-  private sessionRowToSession(
-    row: SessionRow,
-  ): MemoryIngestionInput["session"] {
-    return {
-      id: row.id,
-      title: row.title,
-      status: row.status as MemoryIngestionInput["session"]["status"],
-      cwd: row.cwd || undefined,
-      mountedPaths: [],
-      allowedTools: [],
-      memoryEnabled: row.memory_enabled === 1,
-      isProjectMode: row.is_project_mode === 1,
-      model: row.model || undefined,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      deskWandSessionId: row.deskwand_session_id || undefined,
-      openaiThreadId: row.openai_thread_id || undefined,
-    };
-  }
-
-  private getMessagesForSession(
-    sessionId: string,
-  ): MemoryIngestionInput["messages"] {
-    return this.db.messages.getBySessionId(sessionId).map((row) => {
-      const content = this.safeParseContent(row.content);
-      const firstBlock = content[0];
-      const autoGenerated =
-        firstBlock?.type === "text" && firstBlock.text === "__autoGenerated__";
-      return {
-        id: row.id,
-        sessionId: row.session_id,
-        role: row.role as MemoryIngestionInput["messages"][number]["role"],
-        content: autoGenerated ? content.slice(1) : content,
-        timestamp: row.timestamp,
-        executionTimeMs: row.execution_time_ms || undefined,
-        turnId: row.turn_id || undefined,
-        autoGenerated: autoGenerated || undefined,
-      };
-    });
-  }
-
   private getSessionTitle(sessionId: string): string | undefined {
     return this.db.sessions.get(sessionId)?.title || undefined;
-  }
-
-  private safeParseContent(
-    raw: string,
-  ): MemoryIngestionInput["messages"][number]["content"] {
-    try {
-      const parsed = JSON.parse(raw) as unknown;
-      return Array.isArray(parsed)
-        ? (parsed as MemoryIngestionInput["messages"][number]["content"])
-        : [{ type: "text", text: String(parsed) }];
-    } catch {
-      return [{ type: "text", text: raw }];
-    }
   }
 
   private getAppConfig(): AppConfig {
@@ -957,30 +635,23 @@ export class MemoryService {
   private getPaths(): MemoryPaths {
     const configuredRoot =
       this.getAppConfig().memoryRuntime.storageRoot?.trim();
-    const configuredArtifactsRoot =
-      this.getAppConfig().memoryRuntime.evalArtifactsRoot?.trim();
     const storageRoot = path.resolve(
       configuredRoot || path.join(app.getPath("userData"), "memory"),
     );
-    const safeArtifactsDir = path.join(storageRoot, "eval-artifacts");
-    const artifactsDir = path.resolve(
-      configuredArtifactsRoot || safeArtifactsDir,
-    );
 
-    assertSafeMemoryPaths(storageRoot, artifactsDir);
+    assertSafeMemoryPaths(storageRoot);
 
     return {
       storageRoot,
       coreFilePath: path.join(storageRoot, "core_memory.json"),
       experienceFilePath: path.join(storageRoot, "experience_memory.json"),
       stateFilePath: path.join(storageRoot, "session_state.json"),
-      artifactsDir,
     };
   }
 
   private ensureStores(): void {
     const paths = this.getPaths();
-    const pathsKey = `${paths.storageRoot}::${paths.artifactsDir}`;
+    const pathsKey = paths.storageRoot;
     if (
       this.currentPathsKey === pathsKey &&
       this.coreStore &&
@@ -990,8 +661,7 @@ export class MemoryService {
       return;
     }
     fs.mkdirSync(paths.storageRoot, { recursive: true });
-    fs.mkdirSync(paths.artifactsDir, { recursive: true });
-    assertSafeMemoryPaths(paths.storageRoot, paths.artifactsDir);
+    assertSafeMemoryPaths(paths.storageRoot);
     this.currentPathsKey = pathsKey;
     this.coreStore = new CoreMemoryStore(paths.coreFilePath);
     this.stateStore = new MemorySessionStateStore(paths.stateFilePath);
@@ -1018,47 +688,5 @@ export class MemoryService {
   private getExperienceStore(): ExperienceMemoryStore {
     this.ensureStores();
     return this.experienceStore!;
-  }
-
-  private resolveFileKind(filePath: string): MemoryDebugFileInfo["kind"] {
-    const paths = this.getPaths();
-    if (filePath === paths.coreFilePath) {
-      return "core";
-    }
-    if (filePath === paths.experienceFilePath) {
-      return "experience";
-    }
-    if (filePath === paths.stateFilePath) {
-      return "state";
-    }
-    return "artifacts";
-  }
-
-  private resolveReadablePath(filePath: string): string {
-    const paths = this.getPaths();
-    assertSafeMemoryPaths(paths.storageRoot, paths.artifactsDir);
-    const requestedPath = path.resolve(filePath);
-    if (!fs.existsSync(requestedPath)) {
-      throw new Error("Requested file does not exist");
-    }
-
-    const normalizedPath = fs.realpathSync(requestedPath);
-    const allowedFiles = new Set(
-      [paths.coreFilePath, paths.experienceFilePath, paths.stateFilePath]
-        .filter((candidate) => fs.existsSync(candidate))
-        .map((candidate) => fs.realpathSync(candidate)),
-    );
-    const artifactsRoot = fs.existsSync(paths.artifactsDir)
-      ? fs.realpathSync(paths.artifactsDir)
-      : path.resolve(paths.artifactsDir);
-
-    if (
-      !allowedFiles.has(normalizedPath) &&
-      !isSubPath(normalizedPath, artifactsRoot)
-    ) {
-      throw new Error("Requested file is outside allowed memory files");
-    }
-
-    return normalizedPath;
   }
 }

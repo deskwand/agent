@@ -30,8 +30,6 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {
-      embedding: { inheritFromActive: true, timeoutMs: 180000 },
-      useEmbedding: false,
       maxNavSteps: 2,
       ingestionConcurrency: 4,
     },

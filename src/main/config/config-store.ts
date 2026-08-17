@@ -75,16 +75,6 @@ export interface SaveProviderPayload {
   config: ApiProviderConfig;
 }
 
-export interface MemoryModelRuntimeConfig {
-  inheritFromActive: boolean;
-  provider?: ProviderType;
-  customProtocol?: CustomProtocolType;
-  apiKey?: string;
-  baseUrl?: string;
-  model?: string;
-  timeoutMs: number;
-}
-
 export interface UtilityModelRuntimeConfig {
   inheritFromActive: boolean;
   providerProfileKey?: ProviderProfileKey;
@@ -93,16 +83,9 @@ export interface UtilityModelRuntimeConfig {
 }
 
 export interface MemoryRuntimeConfig {
-  embedding: MemoryModelRuntimeConfig;
-  useEmbedding: boolean;
   maxNavSteps: number;
   ingestionConcurrency: number;
   storageRoot?: string;
-  evalEnabled?: boolean;
-  evalWorkspaces?: string[];
-  evalMaxRounds?: number;
-  evalArtifactsRoot?: string;
-  promptIterationRounds?: number;
 }
 
 // ── AppConfig: external shape (consumers see this) ──────────────────
@@ -237,24 +220,9 @@ const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
 
 function defaultMemoryRuntime(): MemoryRuntimeConfig {
   return {
-    embedding: {
-      inheritFromActive: true,
-      provider: undefined,
-      customProtocol: undefined,
-      apiKey: "",
-      baseUrl: "",
-      model: "text-embedding-3-small",
-      timeoutMs: 180000,
-    },
-    useEmbedding: false,
     maxNavSteps: 2,
     ingestionConcurrency: 4,
     storageRoot: "",
-    evalEnabled: false,
-    evalWorkspaces: [],
-    evalMaxRounds: 12,
-    evalArtifactsRoot: "",
-    promptIterationRounds: 2,
   };
 }
 
@@ -421,21 +389,6 @@ export function buildLegacyEnvBridgeSnapshot(
   }
 
   return snapshot;
-}
-
-function isProviderType(value: unknown): value is ProviderType {
-  return (
-    value === "openrouter" ||
-    value === "anthropic" ||
-    value === "deepseek" ||
-    value === "custom" ||
-    value === "openai" ||
-    value === "gemini" ||
-    value === "ollama" ||
-    value === "oauth" ||
-    value === "opencode" ||
-    value === "opencode-go"
-  );
 }
 
 function isCustomProtocol(value: unknown): value is CustomProtocolType {
@@ -731,36 +684,6 @@ function sanitizeSaveProviderPayload(
   };
 }
 
-function normalizeMemoryModelRuntimeConfig(
-  raw: unknown,
-  fallback: MemoryModelRuntimeConfig,
-): MemoryModelRuntimeConfig {
-  const value =
-    typeof raw === "object" && raw !== null
-      ? (raw as Partial<MemoryModelRuntimeConfig>)
-      : {};
-  return {
-    inheritFromActive: toBoolean(
-      value.inheritFromActive,
-      fallback.inheritFromActive,
-    ),
-    provider: isProviderType(value.provider)
-      ? value.provider
-      : fallback.provider,
-    customProtocol: isCustomProtocol(value.customProtocol)
-      ? value.customProtocol
-      : fallback.customProtocol,
-    apiKey: typeof value.apiKey === "string" ? value.apiKey : fallback.apiKey,
-    baseUrl:
-      typeof value.baseUrl === "string" ? value.baseUrl : fallback.baseUrl,
-    model: typeof value.model === "string" ? value.model : fallback.model,
-    timeoutMs:
-      typeof value.timeoutMs === "number" && Number.isFinite(value.timeoutMs)
-        ? Math.max(5000, Math.round(value.timeoutMs))
-        : fallback.timeoutMs,
-  };
-}
-
 function normalizeUtilityModelRuntimeConfig(
   raw: unknown,
 ): UtilityModelRuntimeConfig {
@@ -788,11 +711,6 @@ function normalizeMemoryRuntimeConfig(raw: unknown): MemoryRuntimeConfig {
       ? (raw as Partial<MemoryRuntimeConfig>)
       : {};
   return {
-    embedding: normalizeMemoryModelRuntimeConfig(
-      value.embedding,
-      defaults.embedding,
-    ),
-    useEmbedding: toBoolean(value.useEmbedding, defaults.useEmbedding),
     maxNavSteps:
       typeof value.maxNavSteps === "number" &&
       Number.isFinite(value.maxNavSteps)
@@ -807,26 +725,6 @@ function normalizeMemoryRuntimeConfig(raw: unknown): MemoryRuntimeConfig {
       typeof value.storageRoot === "string"
         ? value.storageRoot
         : defaults.storageRoot,
-    evalEnabled: toBoolean(value.evalEnabled, defaults.evalEnabled ?? false),
-    evalWorkspaces: Array.isArray(value.evalWorkspaces)
-      ? value.evalWorkspaces.filter(
-          (item): item is string => typeof item === "string",
-        )
-      : defaults.evalWorkspaces,
-    evalMaxRounds:
-      typeof value.evalMaxRounds === "number" &&
-      Number.isFinite(value.evalMaxRounds)
-        ? Math.max(1, Math.min(100, Math.round(value.evalMaxRounds)))
-        : defaults.evalMaxRounds,
-    evalArtifactsRoot:
-      typeof value.evalArtifactsRoot === "string"
-        ? value.evalArtifactsRoot
-        : defaults.evalArtifactsRoot,
-    promptIterationRounds:
-      typeof value.promptIterationRounds === "number" &&
-      Number.isFinite(value.promptIterationRounds)
-        ? Math.max(0, Math.min(10, Math.round(value.promptIterationRounds)))
-        : defaults.promptIterationRounds,
   };
 }
 

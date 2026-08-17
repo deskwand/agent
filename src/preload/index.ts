@@ -14,13 +14,9 @@ import type {
   ScheduleUpdateInput,
   ProviderModelInfo,
   LocalOllamaDiscoveryResult,
-  MemoryOverview,
   MemorySearchResult,
   MemoryReadResult,
   MemorySearchScope,
-  MemoryDebugFileInfo,
-  MemoryDebugFileContent,
-  MemoryInspectSessionResult,
 } from "../renderer/types";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
@@ -53,48 +49,48 @@ let ipcListener:
 // array via `as const`.
 const ALLOWED_CLIENT_EVENTS = new Set([
   "session.start",
-    "session.continue",
-    "session.fork",
-    "session.setThinkingLevel",
-    "session.setProviderModel",
-    "session.stop",
-    "session.compact",
-    "session.abortCompaction",
-    "session.steer",
-    "session.command",
-    "session.archive",
-    "session.unarchive",
-    "session.batchArchive",
-    "session.batchUnarchive",
-    "session.archiveDelete",
-    "session.delete",
-    "session.batchDelete",
-    "session.list",
-    "session.getMessages",
-    "session.getMessagesPage",
-    "session.getTraceSteps",
-    "permission.response",
-    "sudo.password.response",
-    "settings.update",
-    "folder.select",
-    "workdir.get",
-    "workdir.set",
-    "workdir.select",
-    "project.create",
-    "project.delete",
-    "update.check",
-    "update.install",
-  ] as const);
+  "session.continue",
+  "session.fork",
+  "session.setThinkingLevel",
+  "session.setProviderModel",
+  "session.stop",
+  "session.compact",
+  "session.abortCompaction",
+  "session.steer",
+  "session.command",
+  "session.archive",
+  "session.unarchive",
+  "session.batchArchive",
+  "session.batchUnarchive",
+  "session.archiveDelete",
+  "session.delete",
+  "session.batchDelete",
+  "session.list",
+  "session.getMessages",
+  "session.getMessagesPage",
+  "session.getTraceSteps",
+  "permission.response",
+  "sudo.password.response",
+  "settings.update",
+  "folder.select",
+  "workdir.get",
+  "workdir.set",
+  "workdir.select",
+  "project.create",
+  "project.delete",
+  "update.check",
+  "update.install",
+] as const);
 
 // Compile-time exhaustiveness: every renderer→main event type must be in the
 // allowlist. Adding a new ClientEvent type without allowlisting it breaks the
 // build instead of silently dropping IPC in production.
-type AllowedClientEventType = (typeof ALLOWED_CLIENT_EVENTS) extends ReadonlySet<
-  infer T
->
-  ? T
-  : never;
-type MissingClientEventTypes = Exclude<ClientEvent["type"], AllowedClientEventType>;
+type AllowedClientEventType =
+  typeof ALLOWED_CLIENT_EVENTS extends ReadonlySet<infer T> ? T : never;
+type MissingClientEventTypes = Exclude<
+  ClientEvent["type"],
+  AllowedClientEventType
+>;
 const _exhaustiveAllowlistCheck: MissingClientEventTypes extends never
   ? true
   : never = true;
@@ -165,7 +161,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
         }>
       >,
     listState: () =>
-      ipcRenderer.invoke("pi-ext.list-state") as Promise<PiExtensionManagerState>,
+      ipcRenderer.invoke(
+        "pi-ext.list-state",
+      ) as Promise<PiExtensionManagerState>,
     installPackage: (source: string, local?: boolean) =>
       ipcRenderer.invoke("pi-ext.install", source, local) as Promise<{
         success: boolean;
@@ -352,9 +350,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   subagent: {
     listAgents: () => ipcRenderer.invoke("subagent.listAgents"),
-    setAgentModel: (name: string, model: string, thinking?: string) => ipcRenderer.invoke("subagent.setAgentModel", name, model, thinking),
-    createAgent: (name: string, description: string, prompt: string) => ipcRenderer.invoke("subagent.createAgent", name, description, prompt),
-    deleteAgent: (name: string) => ipcRenderer.invoke("subagent.deleteAgent", name),
+    setAgentModel: (name: string, model: string, thinking?: string) =>
+      ipcRenderer.invoke("subagent.setAgentModel", name, model, thinking),
+    createAgent: (name: string, description: string, prompt: string) =>
+      ipcRenderer.invoke("subagent.createAgent", name, description, prompt),
+    deleteAgent: (name: string) =>
+      ipcRenderer.invoke("subagent.deleteAgent", name),
   },
 
   // Window control methods
@@ -567,7 +568,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("remote.createChannel", input),
     updateChannel: (
       id: string,
-      patch: Partial<Pick<ChannelInstanceConfig, "name" | "enabled" | "config">>,
+      patch: Partial<
+        Pick<ChannelInstanceConfig, "name" | "enabled" | "config">
+      >,
     ): Promise<ChannelInstanceConfig | null> =>
       ipcRenderer.invoke("remote.updateChannel", id, patch),
     deleteChannel: (id: string): Promise<boolean> =>
@@ -598,8 +601,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   memory: {
-    getOverview: (cwd?: string): Promise<MemoryOverview> =>
-      ipcRenderer.invoke("memory.getOverview", cwd),
     search: (payload: {
       query: string;
       cwd?: string;
@@ -610,34 +611,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("memory.search", payload),
     read: (id: string): Promise<MemoryReadResult | null> =>
       ipcRenderer.invoke("memory.read", id),
-    rebuildWorkspace: (
-      cwd: string,
-    ): Promise<{ success: boolean; workspaceKey: string }> =>
-      ipcRenderer.invoke("memory.rebuildWorkspace", cwd),
-    clearWorkspace: (
-      cwd: string,
-    ): Promise<{ success: boolean; workspaceKey: string }> =>
-      ipcRenderer.invoke("memory.clearWorkspace", cwd),
-    clearCoreMemory: (): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke("memory.clearCoreMemory"),
-    rebuildAll: (): Promise<{
-      success: boolean;
-      workspaceCount: number;
-      sessionCount: number;
-    }> => ipcRenderer.invoke("memory.rebuildAll"),
-    listFiles: (): Promise<MemoryDebugFileInfo[]> =>
-      ipcRenderer.invoke("memory.listFiles"),
-    readFile: (filePath: string): Promise<MemoryDebugFileContent> =>
-      ipcRenderer.invoke("memory.readFile", filePath),
-    inspectSession: (
-      sessionId: string,
-      workspaceKey?: string,
-    ): Promise<MemoryInspectSessionResult | null> =>
-      ipcRenderer.invoke("memory.inspectSession", sessionId, workspaceKey),
     setEnabled: (
       enabled: boolean,
     ): Promise<{ success: boolean; enabled: boolean }> =>
       ipcRenderer.invoke("memory.setEnabled", enabled),
+    clearAll: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("memory.clearAll"),
   },
 
   // OAuth methods
@@ -649,7 +628,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     status: (
       providerId: string,
-    ): Promise<import("../shared/ipc-types").OAuthStatusResult> => // eslint-disable-line @typescript-eslint/consistent-type-imports
+    ): Promise<import("../shared/ipc-types").OAuthStatusResult> =>
+      // eslint-disable-line @typescript-eslint/consistent-type-imports
       ipcRenderer.invoke("auth.status", providerId),
   },
 
@@ -976,7 +956,9 @@ declare global {
         ) => Promise<ChannelInstanceConfig>;
         updateChannel: (
           id: string,
-          patch: Partial<Pick<ChannelInstanceConfig, "name" | "enabled" | "config">>,
+          patch: Partial<
+            Pick<ChannelInstanceConfig, "name" | "enabled" | "config">
+          >,
         ) => Promise<ChannelInstanceConfig | null>;
         deleteChannel: (id: string) => Promise<boolean>;
         getChannelStatus: () => Promise<ChannelInstanceStatus[]>;
@@ -995,7 +977,6 @@ declare global {
         runNow: (id: string) => Promise<ScheduleTask | null>;
       };
       memory: {
-        getOverview: (cwd?: string) => Promise<MemoryOverview>;
         search: (payload: {
           query: string;
           cwd?: string;
@@ -1004,27 +985,10 @@ declare global {
           limit?: number;
         }) => Promise<MemorySearchResult[]>;
         read: (id: string) => Promise<MemoryReadResult | null>;
-        rebuildWorkspace: (
-          cwd: string,
-        ) => Promise<{ success: boolean; workspaceKey: string }>;
-        clearWorkspace: (
-          cwd: string,
-        ) => Promise<{ success: boolean; workspaceKey: string }>;
-        clearCoreMemory: () => Promise<{ success: boolean }>;
-        rebuildAll: () => Promise<{
-          success: boolean;
-          workspaceCount: number;
-          sessionCount: number;
-        }>;
-        listFiles: () => Promise<MemoryDebugFileInfo[]>;
-        readFile: (filePath: string) => Promise<MemoryDebugFileContent>;
-        inspectSession: (
-          sessionId: string,
-          workspaceKey?: string,
-        ) => Promise<MemoryInspectSessionResult | null>;
         setEnabled: (
           enabled: boolean,
         ) => Promise<{ success: boolean; enabled: boolean }>;
+        clearAll: () => Promise<{ success: boolean }>;
       };
       auth: {
         login: (providerId: string, force?: boolean) => Promise<void>;
@@ -1154,14 +1118,24 @@ declare global {
             markdownModel?: string;
           }>
         >;
-        setAgentModel: (name: string, model: string, thinking?: string) => Promise<{ success: boolean; error?: string }>;
-        createAgent: (name: string, description: string, prompt: string) => Promise<{ success: boolean; path?: string; error?: string }>;
-        deleteAgent: (name: string) => Promise<{ success: boolean; error?: string }>;
+        setAgentModel: (
+          name: string,
+          model: string,
+          thinking?: string,
+        ) => Promise<{ success: boolean; error?: string }>;
+        createAgent: (
+          name: string,
+          description: string,
+          prompt: string,
+        ) => Promise<{ success: boolean; path?: string; error?: string }>;
+        deleteAgent: (
+          name: string,
+        ) => Promise<{ success: boolean; error?: string }>;
       };
       piExtensions: {
-        resolveTrust: (cwd: string) => Promise<
-          "trusted" | "untrusted" | "undecided" | "cancel"
-        >;
+        resolveTrust: (
+          cwd: string,
+        ) => Promise<"trusted" | "untrusted" | "undecided" | "cancel">;
         respondTrust: (
           cwd: string,
           decision: "trusted" | "untrusted" | "cancel",
@@ -1193,11 +1167,17 @@ declare global {
           }>;
           errors: Array<{ path: string; error: string }>;
         }>;
-        installPackage: (source: string, local?: boolean) => Promise<{
+        installPackage: (
+          source: string,
+          local?: boolean,
+        ) => Promise<{
           success: boolean;
           error?: string;
         }>;
-        removePackage: (source: string, local?: boolean) => Promise<{
+        removePackage: (
+          source: string,
+          local?: boolean,
+        ) => Promise<{
           success: boolean;
           error?: string;
         }>;
@@ -1207,7 +1187,10 @@ declare global {
         }>;
       };
       piMarket: {
-        search: (query: string, page: number) => Promise<{
+        search: (
+          query: string,
+          page: number,
+        ) => Promise<{
           total: number;
           objects: Array<{
             name: string;
