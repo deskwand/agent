@@ -63,3 +63,22 @@ export function usdForCredits(credits: number): string {
   if (cents <= 0) return "<$0.01";
   return `$${(cents / 100).toFixed(2)}`;
 }
+
+/** 按链构造区块浏览器交易链接（bscscan / arbiscan / basescan） */
+export function explorerTxUrl(
+  chain: "bsc" | "arb" | "base",
+  txHash: string,
+): string {
+  const base = {
+    bsc: "https://bscscan.com/tx/",
+    arb: "https://arbiscan.io/tx/",
+    base: "https://basescan.org/tx/",
+  }[chain];
+  return `${base}${txHash}`;
+}
+
+/** SQLite UTC 时间（"YYYY-MM-DD HH:MM:SS"）→ 本地化展示串；非法输入原样返回 */
+export function formatTopUpTime(sqliteUtc: string): string {
+  const d = new Date(sqliteUtc.replace(" ", "T") + "Z");
+  return Number.isNaN(d.getTime()) ? sqliteUtc : d.toLocaleString();
+}

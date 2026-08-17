@@ -1443,7 +1443,18 @@
     "tooManyPending": "您有未完成的订单，请先完成或等待其过期",
     "close": "关闭",
     "back": "返回",
-    "chainBase": "Base"
+    "chainBase": "Base",
+    "topupTab": "充值",
+    "historyTab": "记录",
+    "historyEmpty": "暂无充值记录",
+    "historyLoadMore": "加载更多",
+    "historyLoading": "加载中…",
+    "historyLoadFailed": "加载失败",
+    "historyRetry": "重试",
+    "statusPending": "待确认",
+    "statusConfirmed": "已到账",
+    "statusExpired": "已过期",
+    "viewTx": "查看交易"
   },
   "accountMenu": {
     "balance": "余额",

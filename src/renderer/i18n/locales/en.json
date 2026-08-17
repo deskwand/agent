@@ -1447,7 +1447,18 @@
     "tooManyPending": "You have pending orders — finish or wait for them to expire",
     "close": "Close",
     "back": "Back",
-    "chainBase": "Base"
+    "chainBase": "Base",
+    "topupTab": "Top up",
+    "historyTab": "History",
+    "historyEmpty": "No top-up records yet",
+    "historyLoadMore": "Load more",
+    "historyLoading": "Loading…",
+    "historyLoadFailed": "Failed to load",
+    "historyRetry": "Retry",
+    "statusPending": "Pending",
+    "statusConfirmed": "Confirmed",
+    "statusExpired": "Expired",
+    "viewTx": "View transaction"
   },
   "accountMenu": {
     "balance": "Balance",

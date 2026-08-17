@@ -2,6 +2,18 @@ import { DESKWAND_API_URL } from "../../shared/oauth-config";
 
 const SERVER_URL = DESKWAND_API_URL;
 
+export interface TopUpOrderListItem {
+  id: string;
+  chain: "bsc" | "arb" | "base";
+  amount_cents: number;
+  credits: number;
+  tx_hash: string;
+  status: "pending" | "confirmed" | "expired";
+  created_at: string;
+  confirmed_at: string | null;
+  expires_at: string;
+}
+
 export class CloudApiClient {
   private token: string;
 
@@ -305,5 +317,16 @@ export class CloudApiClient {
       };
     }>(`/api/payments/orders/${id}`);
     return res.order;
+  }
+
+  async getTopUpOrders(params: { limit?: number; offset?: number }): Promise<{
+    orders: TopUpOrderListItem[];
+    has_more: boolean;
+  }> {
+    const qs = new URLSearchParams();
+    if (params.limit) qs.set("limit", String(params.limit));
+    if (params.offset) qs.set("offset", String(params.offset));
+    const q = qs.toString();
+    return this.request(`/api/payments/orders${q ? `?${q}` : ""}`);
   }
 }

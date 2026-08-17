@@ -4,6 +4,8 @@ import {
   creditsForAmountCents,
   waitForOrderConfirmation,
   usdForCredits,
+  explorerTxUrl,
+  formatTopUpTime,
 } from "../src/renderer/utils/topup";
 
 describe("parseAmountToCents", () => {
@@ -82,5 +84,26 @@ describe("usdForCredits", () => {
   });
   it("zero credits is exactly $0.00", () => {
     expect(usdForCredits(0)).toBe("$0.00");
+  });
+});
+
+describe("explorerTxUrl", () => {
+  it("builds the chain explorer tx url", () => {
+    expect(explorerTxUrl("bsc", "0xabc")).toBe("https://bscscan.com/tx/0xabc");
+    expect(explorerTxUrl("arb", "0xabc")).toBe("https://arbiscan.io/tx/0xabc");
+    expect(explorerTxUrl("base", "0xabc")).toBe(
+      "https://basescan.org/tx/0xabc",
+    );
+  });
+});
+
+describe("formatTopUpTime", () => {
+  it("formats SQLite UTC to a non-empty string containing the year", () => {
+    const out = formatTopUpTime("2026-08-16 12:00:00");
+    expect(out.length).toBeGreaterThan(0);
+    expect(out).toContain("2026");
+  });
+  it("falls back to the raw string on invalid input", () => {
+    expect(formatTopUpTime("not-a-date")).toBe("not-a-date");
   });
 });

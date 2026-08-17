@@ -89,4 +89,47 @@ describe("CloudApiClient topup methods", () => {
 
     expect(me.credits_balance).toBe(100);
   });
+
+  it("getTopUpOrders requests list without query when empty", async () => {
+    let capturedUrl = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        capturedUrl = String(url);
+        return new Response(JSON.stringify({ orders: [], has_more: false }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const api = new CloudApiClient("tok");
+    const res = await api.getTopUpOrders({});
+
+    expect(capturedUrl).toBe("https://api.deskwand.com/api/payments/orders");
+    expect(res.orders).toEqual([]);
+    expect(res.has_more).toBe(false);
+  });
+
+  it("getTopUpOrders appends limit and offset query params", async () => {
+    let capturedUrl = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        capturedUrl = String(url);
+        return new Response(JSON.stringify({ orders: [], has_more: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }),
+    );
+
+    const api = new CloudApiClient("tok");
+    await api.getTopUpOrders({ limit: 20, offset: 40 });
+
+    const u = new URL(capturedUrl);
+    expect(u.pathname).toBe("/api/payments/orders");
+    expect(u.searchParams.get("limit")).toBe("20");
+    expect(u.searchParams.get("offset")).toBe("40");
+  });
 });
