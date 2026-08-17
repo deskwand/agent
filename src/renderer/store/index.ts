@@ -426,7 +426,7 @@ const defaultSettings: Settings = {
   ],
   memoryStrategy: "auto",
   maxContextTokens: 180000,
-  autoSkillLearning: true,
+  autoSkillLearning: false,
   telemetryEnabled: true,
 };
 

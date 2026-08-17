@@ -273,7 +273,7 @@ export function defaultStoredConfig(): StoredConfig {
     memoryRuntime: defaultMemoryRuntime(),
     enableThinking: false,
     thinkingLevel: "medium",
-    autoSkillLearning: true,
+    autoSkillLearning: false,
     telemetryEnabled: true,
     isConfigured: false,
     visionModel: undefined,
