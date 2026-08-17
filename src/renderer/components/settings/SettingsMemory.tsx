@@ -110,7 +110,7 @@ export function SettingsMemory() {
   const [isBusy, setIsBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  const enabled = overview?.enabled ?? appConfig?.memoryEnabled ?? true;
+  const enabled = overview?.enabled ?? appConfig?.memoryEnabled ?? false;
 
   const groupedResults = useMemo(() => {
     return {
