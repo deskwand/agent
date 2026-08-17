@@ -2387,13 +2387,6 @@ ipcMain.handle("config.save", async (_event, newConfig: Partial<AppConfig>) => {
     apiKey: newConfig.apiKey ? "***" : "",
     memoryRuntime: newConfig.memoryRuntime
       ? {
-          ...newConfig.memoryRuntime,
-          llm: newConfig.memoryRuntime.llm
-            ? {
-                ...newConfig.memoryRuntime.llm,
-                apiKey: newConfig.memoryRuntime.llm.apiKey ? "***" : "",
-              }
-            : undefined,
           embedding: newConfig.memoryRuntime.embedding
             ? {
                 ...newConfig.memoryRuntime.embedding,

@@ -16,6 +16,7 @@ import {
   Server,
   Trash2,
   X,
+  Zap,
 } from "lucide-react";
 import { useAppStore } from "../../store";
 import {
@@ -33,6 +34,7 @@ import type {
   ProviderPresets,
   ProviderProfileKey,
   ProviderType,
+  UtilityModelRuntimeConfig,
   VisionModelConfig,
 } from "../../types";
 import {
@@ -463,9 +465,9 @@ export function SettingsAPI({
   const [isDeleting, setIsDeleting] = useState(false);
 
   // ── Tab state ──
-  const [activeTab, setActiveTab] = useState<"main" | "vision" | "search">(
-    "main",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "main" | "vision" | "search" | "utility"
+  >("main");
 
   // ── Search / webAccess state ──
   const [searchDraft, setSearchDraft] = useState<WebAccessConfig | null>(null);
@@ -488,6 +490,18 @@ export function SettingsAPI({
   const [isVisionSaving, setIsVisionSaving] = useState(false);
   const [visionError, setVisionError] = useState("");
   const [visionSuccess, setVisionSuccess] = useState("");
+
+  // ── Utility model state ──
+  const [utilityDraft, setUtilityDraft] = useState<UtilityModelRuntimeConfig>({
+    inheritFromActive: true,
+    providerProfileKey: undefined,
+    model: "",
+    timeoutMs: 180000,
+  });
+  const [isUtilitySaving, setIsUtilitySaving] = useState(false);
+  const [utilityMessage, setUtilityMessage] = useState<
+    "saved" | "error" | null
+  >(null);
 
   // ── OAuth state ──
   const [oauthStatuses, setOAuthStatuses] = useState<
@@ -522,6 +536,9 @@ export function SettingsAPI({
       // Initialize vision model state from config
       if (nextConfig.visionModel) {
         setVisionDraft(nextConfig.visionModel);
+      }
+      if (nextConfig.utilityRuntime) {
+        setUtilityDraft(nextConfig.utilityRuntime);
       }
       // Initialize search / webAccess state from config
       setSearchDraft(searchAddInheritedDefaults(nextConfig));
@@ -1084,6 +1101,18 @@ export function SettingsAPI({
           >
             <Globe2 className="h-3.5 w-3.5" />
             {t("api.searchModelTab")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("utility")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              activeTab === "utility"
+                ? "border-accent text-accent"
+                : "border-transparent text-text-muted hover:text-text-secondary"
+            }`}
+          >
+            <Zap className="h-3.5 w-3.5" />
+            {t("api.utilityModelTab")}
           </button>
         </div>
       )}
@@ -1663,6 +1692,139 @@ export function SettingsAPI({
                   </span>
                 )}
               </div>
+            </fieldset>
+          </SettingsContentSection>
+        </div>
+      )}
+
+      {/* ── Utility model tab ── */}
+      {activeTab === "utility" && !embedded && (
+        <div className="space-y-5">
+          <SettingsContentSection
+            title={t("api.utilityModelTitle")}
+            description={t("api.utilityModelDesc")}
+          >
+            <fieldset
+              disabled={isUtilitySaving}
+              className="m-0 min-w-0 space-y-4 border-0 p-0"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-text-secondary">
+                  {t("api.utilityInheritActive")}
+                </span>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={utilityDraft.inheritFromActive}
+                    onChange={(e) => {
+                      setUtilityDraft((prev) => ({
+                        ...prev,
+                        inheritFromActive: e.target.checked,
+                      }));
+                      setUtilityMessage(null);
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-surface-hover rounded-full peer peer-checked:bg-accent peer-focus:ring-2 peer-focus:ring-accent/30 transition-colors after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
+                </label>
+              </div>
+
+              {!utilityDraft.inheritFromActive && (
+                <>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium text-text-secondary">
+                      {t("api.utilityProvider")}
+                    </span>
+                    <select
+                      value={utilityDraft.providerProfileKey || ""}
+                      onChange={(e) => {
+                        const key = e.target.value || undefined;
+                        const profile = key
+                          ? appConfig?.providers?.[key]
+                          : undefined;
+                        setUtilityDraft((prev) => ({
+                          ...prev,
+                          providerProfileKey: key,
+                          model: profile?.defaultModel || "",
+                        }));
+                        setUtilityMessage(null);
+                      }}
+                      className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+                    >
+                      <option value="">
+                        {t("api.utilityProviderPlaceholder")}
+                      </option>
+                      {Object.entries(appConfig?.providers || {}).map(
+                        ([key, cfg]) =>
+                          cfg ? (
+                            <option key={key} value={key}>
+                              {cfg.name || key}
+                            </option>
+                          ) : null,
+                      )}
+                    </select>
+                  </label>
+
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-medium text-text-secondary">
+                      {t("api.utilityModel")}
+                    </span>
+                    <select
+                      value={utilityDraft.model || ""}
+                      onChange={(e) => {
+                        setUtilityDraft((prev) => ({
+                          ...prev,
+                          model: e.target.value,
+                        }));
+                        setUtilityMessage(null);
+                      }}
+                      className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+                    >
+                      <option value="">
+                        {t("api.utilityModelPlaceholder")}
+                      </option>
+                      {(
+                        appConfig?.providers?.[
+                          utilityDraft.providerProfileKey || ""
+                        ]?.models || []
+                      ).map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label || m.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!window.electronAPI) return;
+                  setIsUtilitySaving(true);
+                  setUtilityMessage(null);
+                  try {
+                    const saved = await window.electronAPI.config.save({
+                      utilityRuntime: utilityDraft,
+                    });
+                    applyConfig(saved.config);
+                    setUtilityMessage("saved");
+                  } catch {
+                    setUtilityMessage("error");
+                  } finally {
+                    setIsUtilitySaving(false);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+              >
+                {t("api.saveUtilityModel")}
+              </button>
+              {utilityMessage === "saved" && (
+                <p className="text-xs text-success">{t("common.saved")}</p>
+              )}
+              {utilityMessage === "error" && (
+                <p className="text-xs text-error">{t("api.saveFailed")}</p>
+              )}
             </fieldset>
           </SettingsContentSection>
         </div>

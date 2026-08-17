@@ -46,13 +46,6 @@ function makeConfig(): AppConfig {
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {
-      llm: {
-        inheritFromActive: true,
-        apiKey: "",
-        baseUrl: "",
-        model: "",
-        timeoutMs: 180000,
-      },
       embedding: {
         inheritFromActive: true,
         apiKey: "",
@@ -69,6 +62,12 @@ function makeConfig(): AppConfig {
       evalMaxRounds: 12,
       evalArtifactsRoot: "",
       promptIterationRounds: 2,
+    },
+    utilityRuntime: {
+      inheritFromActive: true,
+      providerProfileKey: undefined,
+      model: "",
+      timeoutMs: 180000,
     },
     enableThinking: false,
     themePreset: "graphite",

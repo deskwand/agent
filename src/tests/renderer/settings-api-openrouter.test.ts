@@ -30,7 +30,6 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {
-      llm: { inheritFromActive: true, timeoutMs: 180000 },
       embedding: { inheritFromActive: true, timeoutMs: 180000 },
       useEmbedding: false,
       maxNavSteps: 2,

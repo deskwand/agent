@@ -85,8 +85,14 @@ export interface MemoryModelRuntimeConfig {
   timeoutMs: number;
 }
 
+export interface UtilityModelRuntimeConfig {
+  inheritFromActive: boolean;
+  providerProfileKey?: ProviderProfileKey;
+  model?: string;
+  timeoutMs: number;
+}
+
 export interface MemoryRuntimeConfig {
-  llm: MemoryModelRuntimeConfig;
   embedding: MemoryModelRuntimeConfig;
   useEmbedding: boolean;
   maxNavSteps: number;
@@ -120,6 +126,7 @@ export interface AppConfig {
   sandboxEnabled: boolean;
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
+  utilityRuntime: UtilityModelRuntimeConfig;
   enableThinking: boolean;
   thinkingLevel: string;
   autoSkillLearning: boolean;
@@ -142,6 +149,7 @@ interface StoredConfig {
   sandboxEnabled: boolean;
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
+  utilityRuntime: UtilityModelRuntimeConfig;
   enableThinking: boolean;
   thinkingLevel: string;
   autoSkillLearning: boolean;
@@ -229,15 +237,6 @@ const defaultProfiles: Record<ProviderProfileKey, ProviderProfile> = {
 
 function defaultMemoryRuntime(): MemoryRuntimeConfig {
   return {
-    llm: {
-      inheritFromActive: true,
-      provider: undefined,
-      customProtocol: undefined,
-      apiKey: "",
-      baseUrl: "",
-      model: "",
-      timeoutMs: 180000,
-    },
     embedding: {
       inheritFromActive: true,
       provider: undefined,
@@ -271,6 +270,12 @@ export function defaultStoredConfig(): StoredConfig {
     sandboxEnabled: false,
     memoryEnabled: false,
     memoryRuntime: defaultMemoryRuntime(),
+    utilityRuntime: {
+      inheritFromActive: true,
+      providerProfileKey: undefined,
+      model: "",
+      timeoutMs: 180000,
+    },
     enableThinking: false,
     thinkingLevel: "medium",
     autoSkillLearning: false,
@@ -756,6 +761,26 @@ function normalizeMemoryModelRuntimeConfig(
   };
 }
 
+function normalizeUtilityModelRuntimeConfig(
+  raw: unknown,
+): UtilityModelRuntimeConfig {
+  const value =
+    typeof raw === "object" && raw !== null
+      ? (raw as Partial<UtilityModelRuntimeConfig>)
+      : {};
+  return {
+    inheritFromActive: toBoolean(value.inheritFromActive, true),
+    providerProfileKey: isProfileKey(value.providerProfileKey)
+      ? value.providerProfileKey
+      : undefined,
+    model: typeof value.model === "string" ? value.model : "",
+    timeoutMs:
+      typeof value.timeoutMs === "number" && Number.isFinite(value.timeoutMs)
+        ? Math.max(5000, Math.round(value.timeoutMs))
+        : 180000,
+  };
+}
+
 function normalizeMemoryRuntimeConfig(raw: unknown): MemoryRuntimeConfig {
   const defaults = defaultMemoryRuntime();
   const value =
@@ -763,7 +788,6 @@ function normalizeMemoryRuntimeConfig(raw: unknown): MemoryRuntimeConfig {
       ? (raw as Partial<MemoryRuntimeConfig>)
       : {};
   return {
-    llm: normalizeMemoryModelRuntimeConfig(value.llm, defaults.llm),
     embedding: normalizeMemoryModelRuntimeConfig(
       value.embedding,
       defaults.embedding,
@@ -900,6 +924,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     sandboxEnabled: stored.sandboxEnabled,
     memoryEnabled: stored.memoryEnabled,
     memoryRuntime: stored.memoryRuntime,
+    utilityRuntime: stored.utilityRuntime,
     enableThinking: stored.enableThinking,
     thinkingLevel: stored.thinkingLevel,
     autoSkillLearning: stored.autoSkillLearning,
@@ -1043,6 +1068,10 @@ export class ConfigStore {
     if (updates.memoryRuntime !== undefined)
       stored.memoryRuntime = normalizeMemoryRuntimeConfig(
         updates.memoryRuntime,
+      );
+    if (updates.utilityRuntime !== undefined)
+      stored.utilityRuntime = normalizeUtilityModelRuntimeConfig(
+        updates.utilityRuntime,
       );
     if (updates.enableThinking !== undefined)
       stored.enableThinking = updates.enableThinking;

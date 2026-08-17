@@ -69,6 +69,10 @@ import {
   normalizeGeneratedTitle,
 } from "./session-title-utils";
 import { generateTitleWithAgentSdk } from "../agent/agent-sdk-one-shot";
+import {
+  buildUtilityAppConfig,
+  resolveUtilityModelConfig,
+} from "../memory/memory-llm-client";
 import { buildScheduledTaskTitle } from "../../shared/schedule/task-title";
 
 interface IAgentRunner {
@@ -1547,9 +1551,11 @@ export class SessionManager {
   private async generateTitleWithConfig(
     titlePrompt: string,
   ): Promise<string | null> {
-    // Always use pi-ai SDK for title generation
+    const appConfig = configStore.getAll();
+    const resolved = resolveUtilityModelConfig(appConfig, appConfig.model);
+    const titleConfig = buildUtilityAppConfig(appConfig, resolved);
     return normalizeGeneratedTitle(
-      await generateTitleWithAgentSdk(titlePrompt, configStore.getAll()),
+      await generateTitleWithAgentSdk(titlePrompt, titleConfig),
     );
   }
 

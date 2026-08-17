@@ -927,8 +927,14 @@ export interface MemoryModelRuntimeConfig {
   timeoutMs: number;
 }
 
+export interface UtilityModelRuntimeConfig {
+  inheritFromActive: boolean;
+  providerProfileKey?: ProviderProfileKey;
+  model?: string;
+  timeoutMs: number;
+}
+
 export interface MemoryRuntimeConfig {
-  llm: MemoryModelRuntimeConfig;
   embedding: MemoryModelRuntimeConfig;
   useEmbedding: boolean;
   maxNavSteps: number;
@@ -960,6 +966,7 @@ export interface AppConfig {
   sandboxEnabled?: boolean;
   memoryEnabled?: boolean;
   memoryRuntime?: MemoryRuntimeConfig;
+  utilityRuntime?: UtilityModelRuntimeConfig;
   enableThinking?: boolean;
   thinkingLevel?: string;
   autoSkillLearning?: boolean;

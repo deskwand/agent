@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type {
   AppConfig,
   CustomProtocolType,
+  ProviderProfileKey,
   ProviderType,
 } from "../config/config-store";
 import { configStore } from "../config/config-store";
@@ -83,9 +84,73 @@ function normalizeModelConfig(
   };
 }
 
-function buildAppConfig(
+export interface ResolvedUtilityModelConfig {
+  provider: ProviderType;
+  customProtocol?: CustomProtocolType;
+  apiKey: string;
+  baseUrl?: string;
+  model: string;
+  timeoutMs: number;
+  activeProviderKey: ProviderProfileKey;
+}
+
+export function resolveUtilityModelConfig(
+  appConfig: AppConfig,
+  fallbackModel: string,
+): ResolvedUtilityModelConfig {
+  const util = appConfig.utilityRuntime ?? {
+    inheritFromActive: true,
+    providerProfileKey: undefined,
+    model: "",
+    timeoutMs: 180000,
+  };
+  const inherit = util.inheritFromActive !== false;
+  const timeoutMs = Math.max(5000, util.timeoutMs || 180000);
+
+  if (inherit) {
+    return {
+      provider: appConfig.provider,
+      customProtocol: appConfig.customProtocol,
+      apiKey: appConfig.apiKey,
+      baseUrl: appConfig.baseUrl,
+      model: appConfig.model?.trim() || fallbackModel,
+      timeoutMs,
+      activeProviderKey: appConfig.activeProviderKey,
+    };
+  }
+
+  const key = util.providerProfileKey;
+  const profile = key ? appConfig.providers[key] : undefined;
+  if (profile && key) {
+    return {
+      provider: profile.provider,
+      customProtocol: profile.customProtocol,
+      apiKey: profile.apiKey || "",
+      baseUrl: profile.baseUrl,
+      model: util.model?.trim() || profile.defaultModel || fallbackModel,
+      timeoutMs,
+      activeProviderKey: key,
+    };
+  }
+
+  logWarn(
+    "[UtilityModel] providerProfileKey not found, falling back to main model:",
+    key,
+  );
+  return {
+    provider: appConfig.provider,
+    customProtocol: appConfig.customProtocol,
+    apiKey: appConfig.apiKey,
+    baseUrl: appConfig.baseUrl,
+    model: appConfig.model?.trim() || fallbackModel,
+    timeoutMs,
+    activeProviderKey: appConfig.activeProviderKey,
+  };
+}
+
+export function buildUtilityAppConfig(
   base: AppConfig,
-  resolved: ResolvedMemoryModelConfig,
+  resolved: ResolvedUtilityModelConfig,
 ): AppConfig {
   return {
     ...base,
@@ -94,6 +159,7 @@ function buildAppConfig(
     apiKey: resolved.apiKey,
     baseUrl: resolved.baseUrl,
     model: resolved.model,
+    activeProviderKey: resolved.activeProviderKey,
   };
 }
 
@@ -106,11 +172,7 @@ export class MemoryLLMClient implements MemoryLLMClientLike {
     request: MemoryCompletionRequest,
   ): Promise<MemoryCompletionResponse> {
     const appConfig = this.getConfig();
-    const llmConfig = normalizeModelConfig(
-      appConfig,
-      appConfig.memoryRuntime?.llm,
-      appConfig.model,
-    );
+    const llmConfig = resolveUtilityModelConfig(appConfig, appConfig.model);
     const controller = new AbortController();
     let timeout: ReturnType<typeof setTimeout> | undefined;
 
@@ -130,7 +192,7 @@ export class MemoryLLMClient implements MemoryLLMClientLike {
         runPiAiOneShot(
           request.userPrompt,
           request.systemPrompt,
-          buildAppConfig(appConfig, llmConfig),
+          buildUtilityAppConfig(appConfig, llmConfig),
           {
             temperature: request.temperature ?? 0,
             maxTokens: request.maxTokens ?? 16_000,

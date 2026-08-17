@@ -153,7 +153,6 @@ function buildAppConfig(): AppConfig {
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {
-      llm: { inheritFromActive: true, timeoutMs: 180000 },
       embedding: { inheritFromActive: true, timeoutMs: 180000 },
       useEmbedding: false,
       maxNavSteps: 2,
@@ -164,6 +163,12 @@ function buildAppConfig(): AppConfig {
       evalMaxRounds: 12,
       evalArtifactsRoot: "",
       promptIterationRounds: 2,
+    },
+    utilityRuntime: {
+      inheritFromActive: true,
+      providerProfileKey: undefined,
+      model: "",
+      timeoutMs: 180000,
     },
     enableThinking: false,
     themePreset: "graphite",

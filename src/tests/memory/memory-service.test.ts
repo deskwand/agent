@@ -18,13 +18,6 @@ const mockConfigState = vi.hoisted(() => ({
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {
-      llm: {
-        inheritFromActive: true,
-        apiKey: "",
-        baseUrl: "",
-        model: "",
-        timeoutMs: 180000,
-      },
       embedding: {
         inheritFromActive: true,
         apiKey: "",
@@ -476,13 +469,6 @@ describe("MemoryService", () => {
     configStore.update({
       memoryEnabled: true,
       memoryRuntime: {
-        llm: {
-          inheritFromActive: true,
-          apiKey: "",
-          baseUrl: "",
-          model: "",
-          timeoutMs: 180000,
-        },
         embedding: {
           inheritFromActive: true,
           apiKey: "",
@@ -1460,13 +1446,6 @@ describe("MemoryService", () => {
 
     configStore.update({
       memoryRuntime: {
-        llm: {
-          inheritFromActive: true,
-          apiKey: "",
-          baseUrl: "",
-          model: "",
-          timeoutMs: 180000,
-        },
         embedding: {
           inheritFromActive: true,
           apiKey: "",
@@ -1498,13 +1477,6 @@ describe("MemoryService", () => {
 
     configStore.update({
       memoryRuntime: {
-        llm: {
-          inheritFromActive: true,
-          apiKey: "",
-          baseUrl: "",
-          model: "",
-          timeoutMs: 180000,
-        },
         embedding: {
           inheritFromActive: true,
           apiKey: "",
@@ -1538,13 +1510,6 @@ describe("MemoryService", () => {
 
     configStore.update({
       memoryRuntime: {
-        llm: {
-          inheritFromActive: true,
-          apiKey: "",
-          baseUrl: "",
-          model: "",
-          timeoutMs: 180000,
-        },
         embedding: {
           inheritFromActive: true,
           apiKey: "",
@@ -1577,13 +1542,6 @@ describe("MemoryService", () => {
 
     configStore.update({
       memoryRuntime: {
-        llm: {
-          inheritFromActive: true,
-          apiKey: "",
-          baseUrl: "",
-          model: "",
-          timeoutMs: 180000,
-        },
         embedding: {
           inheritFromActive: true,
           apiKey: "",
@@ -1621,13 +1579,6 @@ describe("MemoryService", () => {
 
     configStore.update({
       memoryRuntime: {
-        llm: {
-          inheritFromActive: true,
-          apiKey: "",
-          baseUrl: "",
-          model: "",
-          timeoutMs: 180000,
-        },
         embedding: {
           inheritFromActive: true,
           apiKey: "",
@@ -1664,13 +1615,6 @@ describe("MemoryService", () => {
 
     configStore.update({
       memoryRuntime: {
-        llm: {
-          inheritFromActive: true,
-          apiKey: "",
-          baseUrl: "",
-          model: "",
-          timeoutMs: 180000,
-        },
         embedding: {
           inheritFromActive: true,
           apiKey: "",

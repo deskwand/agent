@@ -47,11 +47,16 @@ function appConfigWithProviders(providers: AppConfig["providers"]): AppConfig {
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {
-      llm: { inheritFromActive: true, timeoutMs: 180000 },
       embedding: { inheritFromActive: true, timeoutMs: 180000 },
       useEmbedding: false,
       maxNavSteps: 2,
       ingestionConcurrency: 4,
+    },
+    utilityRuntime: {
+      inheritFromActive: true,
+      providerProfileKey: undefined,
+      model: "",
+      timeoutMs: 180000,
     },
     enableThinking: false,
     thinkingLevel: "medium",

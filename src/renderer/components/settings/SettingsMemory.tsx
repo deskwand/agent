@@ -17,13 +17,6 @@ import { SettingsContentSection } from "./shared";
 type SearchMode = "workspace" | "all" | "global";
 
 const DEFAULT_MEMORY_RUNTIME: MemoryRuntimeConfig = {
-  llm: {
-    inheritFromActive: true,
-    apiKey: "",
-    baseUrl: "",
-    model: "",
-    timeoutMs: 180000,
-  },
   embedding: {
     inheritFromActive: true,
     apiKey: "",
@@ -47,7 +40,6 @@ function cloneRuntimeConfig(
 ): MemoryRuntimeConfig {
   const source = runtime || DEFAULT_MEMORY_RUNTIME;
   return {
-    llm: { ...DEFAULT_MEMORY_RUNTIME.llm, ...source.llm },
     embedding: { ...DEFAULT_MEMORY_RUNTIME.embedding, ...source.embedding },
     useEmbedding: source.useEmbedding ?? DEFAULT_MEMORY_RUNTIME.useEmbedding,
     maxNavSteps: source.maxNavSteps ?? DEFAULT_MEMORY_RUNTIME.maxNavSteps,
@@ -606,63 +598,7 @@ export function SettingsMemory() {
               />
             </LabeledField>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-3 rounded-lg border border-border-muted bg-background/80 p-3">
-              <p className="text-sm font-medium text-text-primary">
-                {t("memory.llmConfig", "Memory LLM")}
-              </p>
-              <ToggleField
-                label={t("memory.inheritActive", "继承当前激活 API")}
-                checked={runtimeDraft.llm.inheritFromActive}
-                onChange={(checked) =>
-                  setRuntimeDraft((prev) => ({
-                    ...prev,
-                    llm: { ...prev.llm, inheritFromActive: checked },
-                  }))
-                }
-              />
-              <LabeledField label={t("memory.modelOverride", "模型覆盖")}>
-                <input
-                  value={runtimeDraft.llm.model || ""}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      llm: { ...prev.llm, model: event.target.value },
-                    }))
-                  }
-                  placeholder={appConfig?.model || ""}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-              <LabeledField
-                label={t("memory.baseUrlOverride", "Base URL 覆盖")}
-              >
-                <input
-                  value={runtimeDraft.llm.baseUrl || ""}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      llm: { ...prev.llm, baseUrl: event.target.value },
-                    }))
-                  }
-                  placeholder={appConfig?.baseUrl || ""}
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-              <LabeledField label={t("memory.apiKeyOverride", "API Key 覆盖")}>
-                <input
-                  type="password"
-                  value={runtimeDraft.llm.apiKey || ""}
-                  onChange={(event) =>
-                    setRuntimeDraft((prev) => ({
-                      ...prev,
-                      llm: { ...prev.llm, apiKey: event.target.value },
-                    }))
-                  }
-                  className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-text-primary outline-none focus:border-accent"
-                />
-              </LabeledField>
-            </div>
+          <div className="grid gap-4">
             <div className="space-y-3 rounded-lg border border-border-muted bg-background/80 p-3">
               <p className="text-sm font-medium text-text-primary">
                 {t("memory.embeddingConfig", "Embedding")}

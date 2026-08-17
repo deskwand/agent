@@ -60,7 +60,6 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
       sandboxEnabled: false,
       memoryEnabled: true,
       memoryRuntime: {
-        llm: { inheritFromActive: true, timeoutMs: 180000 },
         embedding: {
           inheritFromActive: true,
           model: "text-embedding-3-small",
@@ -69,6 +68,12 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
         useEmbedding: false,
         maxNavSteps: 2,
         ingestionConcurrency: 4,
+      },
+      utilityRuntime: {
+        inheritFromActive: true,
+        providerProfileKey: undefined,
+        model: "",
+        timeoutMs: 180000,
       },
       enableThinking: false,
       thinkingLevel: "medium",
@@ -193,7 +198,6 @@ describe("buildProjectedConfig — visionModel pass-through", () => {
       sandboxEnabled: false,
       memoryEnabled: true,
       memoryRuntime: {
-        llm: { inheritFromActive: true, timeoutMs: 180000 },
         embedding: {
           inheritFromActive: true,
           model: "text-embedding-3-small",
@@ -202,6 +206,12 @@ describe("buildProjectedConfig — visionModel pass-through", () => {
         useEmbedding: false,
         maxNavSteps: 2,
         ingestionConcurrency: 4,
+      },
+      utilityRuntime: {
+        inheritFromActive: true,
+        providerProfileKey: undefined,
+        model: "",
+        timeoutMs: 180000,
       },
       enableThinking: false,
       thinkingLevel: "medium",
