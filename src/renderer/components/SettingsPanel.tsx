@@ -22,7 +22,7 @@ import { SubagentSettings } from "./settings/SubagentSettings";
 import { SettingsSandbox } from "./settings/SettingsSandbox";
 import { SettingsGeneral } from "./settings/SettingsGeneral";
 import { SettingsLogs } from "./settings/SettingsLogs";
-import { SettingsMemory } from "./settings/SettingsMemory";
+import { SettingsPersonalization } from "./settings/SettingsPersonalization";
 import { SettingsArchived } from "./settings/SettingsArchived";
 import { SettingsAbout } from "./settings/SettingsAbout";
 import { SettingsConnectors } from "./settings/SettingsConnectors";
@@ -33,7 +33,7 @@ interface SettingsPanelProps {
     | "api"
     | "subagent"
     | "sandbox"
-    | "memory"
+    | "personalization"
     | "remote"
     | "logs"
     | "general"
@@ -46,7 +46,7 @@ type TabId =
   | "api"
   | "subagent"
   | "sandbox"
-  | "memory"
+  | "personalization"
   | "remote"
   | "logs"
   | "general"
@@ -60,7 +60,7 @@ const VALID_TABS = new Set<TabId>([
   "api",
   "subagent",
   ...(SHOW_SANDBOX_TAB ? (["sandbox"] as TabId[]) : []),
-  "memory",
+  "personalization",
   "remote",
   "logs",
   "general",
@@ -152,10 +152,10 @@ export function SettingsPanel({
         ]
       : []),
     {
-      id: "memory" as TabId,
-      label: t("settings.memory"),
+      id: "personalization" as TabId,
+      label: t("settings.personalization"),
       icon: BrainCircuit,
-      description: t("settings.memoryDesc"),
+      description: t("settings.personalizationDesc"),
     },
     {
       id: "remote" as TabId,
@@ -296,8 +296,10 @@ export function SettingsPanel({
                   {viewedTabs.has("sandbox") && <SettingsSandbox />}
                 </div>
               )}
-              <div className={activeTab === "memory" ? "" : "hidden"}>
-                {viewedTabs.has("memory") && <SettingsMemory />}
+              <div className={activeTab === "personalization" ? "" : "hidden"}>
+                {viewedTabs.has("personalization") && (
+                  <SettingsPersonalization />
+                )}
               </div>
               <div className={activeTab === "remote" ? "" : "hidden"}>
                 {viewedTabs.has("remote") && (

@@ -10,6 +10,7 @@ import {
 import type { PiTrustResolver } from "./pi-trust-resolver";
 import * as path from "node:path";
 import { log, logError, logWarn } from "../utils/logger";
+import { buildAgentsFilesOverride } from "../config/global-agents-md";
 
 export interface PiHostOptions {
   cwd: string;
@@ -81,6 +82,7 @@ export class PiExtensionHost {
       settingsManager: this.settingsManager,
       additionalSkillPaths: options.additionalSkillPaths,
       appendSystemPrompt: options.appendSystemPrompt,
+      agentsFilesOverride: buildAgentsFilesOverride(),
       extensionFactories: [],
     });
   }
@@ -123,6 +125,7 @@ export class PiExtensionHost {
         overrides?.additionalSkillPaths ?? this.additionalSkillPaths,
       appendSystemPrompt:
         overrides?.appendSystemPrompt ?? this.appendSystemPrompt,
+      agentsFilesOverride: buildAgentsFilesOverride(),
       extensionFactories: extraFactories,
     });
     await loader.reload();

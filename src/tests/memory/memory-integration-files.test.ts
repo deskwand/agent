@@ -35,11 +35,11 @@ describe("memory integration wiring", () => {
     );
     const preload = readProjectFile("src/preload/index.ts");
     const memorySettings = readProjectFile(
-      "src/renderer/components/settings/SettingsMemory.tsx",
+      "src/renderer/components/settings/SettingsPersonalization.tsx",
     );
 
-    expect(settingsPanel).toContain('id: "memory"');
-    expect(settingsPanel).toContain("<SettingsMemory />");
+    expect(settingsPanel).toContain('id: "personalization"');
+    expect(settingsPanel).toContain("<SettingsPersonalization />");
     expect(preload).toContain("memory: {");
     expect(preload).toContain('ipcRenderer.invoke("memory.search"');
     expect(preload).toContain('ipcRenderer.invoke("memory.clearAll")');
@@ -76,22 +76,22 @@ describe("memory integration wiring", () => {
     const en = JSON.parse(
       readProjectFile("src/renderer/i18n/locales/en.json"),
     ) as {
-      settings: { memoryDesc: string };
+      settings: { personalizationDesc: string };
       memory: { description: string; toggleHint: string };
     };
     const zh = JSON.parse(
       readProjectFile("src/renderer/i18n/locales/zh.json"),
     ) as {
-      settings: { memoryDesc: string };
+      settings: { personalizationDesc: string };
       memory: { description: string; toggleHint: string };
     };
 
-    expect(en.settings.memoryDesc).toContain("on-demand");
+    expect(en.settings.personalizationDesc).toContain("memory");
     expect(en.memory.description).toContain("never automatically injected");
     expect(en.memory.description).toContain("every 10 user turns");
     expect(en.memory.toggleHint).toContain("on-demand");
     expect(en.memory.toggleHint).not.toContain("auto-recall");
-    expect(zh.settings.memoryDesc).toContain("按需检索");
+    expect(zh.settings.personalizationDesc).toContain("记忆");
     expect(zh.memory.description).toContain("不会自动注入");
     expect(zh.memory.description).toContain("每 10 个用户回合");
     expect(zh.memory.toggleHint).toContain("按需");

@@ -62,8 +62,8 @@
     "connectorsDesc": "Manage MCP connectors",
     "skills": "Skills",
     "skillsDesc": "Manage custom skills",
-    "memory": "Memory",
-    "memoryDesc": "Manage on-demand long-term memory",
+    "personalization": "Personalization",
+    "personalizationDesc": "Manage global rules and long-term memory",
     "schedule": "Schedules",
     "scheduleDesc": "Alarm-style prompt automation",
     "remote": "Remote Control",
@@ -237,6 +237,18 @@
     "deleteAction": "Delete",
     "clearAllConfirm": "Delete all local memory? This cannot be undone.",
     "clearAllSuccess": "Local memory deleted"
+  },
+  "agentsMd": {
+    "title": "Global AGENTS.md",
+    "description": "Global rules for every project, injected at the top of each new session's system prompt. File: ~/.deskwand/AGENTS.md",
+    "save": "Save",
+    "insertTemplate": "Insert template",
+    "replaceConfirm": "Replace current content with the template?",
+    "saved": "Saved. Takes effect in the next new session.",
+    "saveFailed": "Save failed",
+    "loadFailed": "Load failed",
+    "hint": "Changes apply to new sessions, not the current one",
+    "placeholder": "# Global rules"
   },
   "language": {
     "english": "English",

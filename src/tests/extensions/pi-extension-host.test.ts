@@ -1,9 +1,16 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { PiExtensionHost } from "../../main/extensions/pi-extension-host";
+
+const state = vi.hoisted(() => ({ mockHome: "" }));
+
+vi.mock("node:os", async (importOriginal) => {
+  const actual = (await importOriginal()) as typeof os;
+  return { ...actual, homedir: () => state.mockHome };
+});
 
 function makeTempProject(): { dir: string; agentDir: string } {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "pi-host-test-"));
@@ -160,6 +167,39 @@ export default function (pi: ExtensionAPI) {
     expect(loader).not.toBe(host.getResourceLoader());
     expect(loader.getSkills().skills).toEqual(expect.any(Array));
     expect(hostSkills).toEqual(expect.any(Array));
+  });
+
+  it("injects global ~/.deskwand/AGENTS.md first via agentsFilesOverride", async () => {
+    fs.writeFileSync(
+      path.join(ctx!.dir, "AGENTS.md"),
+      "# project rules",
+      "utf-8",
+    );
+    const fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), "global-md-home-"));
+    fs.mkdirSync(path.join(fakeHome, ".deskwand"), { recursive: true });
+    fs.writeFileSync(
+      path.join(fakeHome, ".deskwand", "AGENTS.md"),
+      "# global rules",
+      "utf-8",
+    );
+    state.mockHome = fakeHome;
+    const host = PiExtensionHost.getOrCreate({
+      cwd: ctx!.dir,
+      agentDir: ctx!.agentDir,
+    });
+    try {
+      await host.reloadResources();
+      const loader = await host.createSessionResourceLoader([]);
+      const files = loader.getAgentsFiles().agentsFiles;
+      expect(files[0].path).toBe(path.join(fakeHome, ".deskwand", "AGENTS.md"));
+      expect(files[0].content).toContain("global rules");
+      expect(files.map((f) => f.path)).toContain(
+        path.join(ctx!.dir, "AGENTS.md"),
+      );
+    } finally {
+      state.mockHome = "";
+      host.dispose();
+    }
   });
 });
 

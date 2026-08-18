@@ -72,6 +72,10 @@ import {
 } from "./config/config-store";
 import { runConfigApiTest } from "./config/config-test-routing";
 import {
+  readGlobalAgentsMd,
+  writeGlobalAgentsMd,
+} from "./config/global-agents-md";
+import {
   normalizeWebAccessConfig,
   type WebAccessConfig,
 } from "../shared/web-access";
@@ -3669,6 +3673,17 @@ ipcMain.handle("memory.clearAll", async () => {
     throw new Error("Memory service not initialized");
   }
   return memoryService.clearAll();
+});
+
+ipcMain.handle("global-agents-md:read", () => {
+  const file = readGlobalAgentsMd();
+  return file
+    ? { exists: true, content: file.content }
+    : { exists: false, content: "" };
+});
+
+ipcMain.handle("global-agents-md:write", (_event, content: string) => {
+  return writeGlobalAgentsMd(content);
 });
 
 ipcMain.handle(

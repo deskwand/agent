@@ -3,8 +3,9 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SettingsContentSection } from "./shared";
+import { SettingsGlobalAgentsMd } from "./SettingsGlobalAgentsMd";
 
-export function SettingsMemory() {
+export function SettingsPersonalization() {
   const { t } = useTranslation();
   const appConfig = useAppStore((state) => state.appConfig);
 
@@ -44,6 +45,7 @@ export function SettingsMemory() {
 
   return (
     <div className="space-y-6">
+      <SettingsGlobalAgentsMd />
       <SettingsContentSection
         title={t("memory.title")}
         description={t("memory.description")}

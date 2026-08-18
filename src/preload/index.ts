@@ -619,6 +619,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("memory.clearAll"),
   },
 
+  globalAgentsMd: {
+    read: (): Promise<{ exists: boolean; content: string }> =>
+      ipcRenderer.invoke("global-agents-md:read"),
+    write: (content: string): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("global-agents-md:write", content),
+  },
+
   // OAuth methods
   auth: {
     login: (providerId: string, force?: boolean): Promise<void> =>
@@ -989,6 +996,10 @@ declare global {
           enabled: boolean,
         ) => Promise<{ success: boolean; enabled: boolean }>;
         clearAll: () => Promise<{ success: boolean }>;
+      };
+      globalAgentsMd: {
+        read: () => Promise<{ exists: boolean; content: string }>;
+        write: (content: string) => Promise<{ ok: boolean; error?: string }>;
       };
       auth: {
         login: (providerId: string, force?: boolean) => Promise<void>;

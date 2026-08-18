@@ -62,8 +62,8 @@
     "connectorsDesc": "管理 MCP 连接器",
     "skills": "技能",
     "skillsDesc": "管理自定义技能",
-    "memory": "记忆",
-    "memoryDesc": "管理按需检索的长期记忆",
+    "personalization": "个性化",
+    "personalizationDesc": "管理全局规则与长期记忆",
     "schedule": "定时任务",
     "scheduleDesc": "闹钟式自动执行 Prompt",
     "remote": "远程控制",
@@ -236,6 +236,18 @@
     "deleteAction": "删除",
     "clearAllConfirm": "确认删除所有本地记忆？此操作不可撤销。",
     "clearAllSuccess": "本地记忆已删除"
+  },
+  "agentsMd": {
+    "title": "全局 AGENTS.md",
+    "description": "对所有项目生效的全局规则，注入每个新会话的 system prompt 顶部。文件：~/.deskwand/AGENTS.md",
+    "save": "保存",
+    "insertTemplate": "引用模板",
+    "replaceConfirm": "将用模板替换当前内容，继续？",
+    "saved": "已保存，下次新会话生效",
+    "saveFailed": "保存失败",
+    "loadFailed": "加载失败",
+    "hint": "编辑后对新会话生效，当前会话不变",
+    "placeholder": "# 全局规则"
   },
   "language": {
     "english": "English",
