@@ -4172,6 +4172,16 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
           },
         });
       }
+      if (typeof event.payload.uiFontSize === "number") {
+        configStore.update({ uiFontSize: event.payload.uiFontSize });
+        sendToRenderer({
+          type: "config.status",
+          payload: {
+            isConfigured: configStore.isConfigured(),
+            config: configStore.getAll(),
+          },
+        });
+      }
       return null;
 
     case "update.check":

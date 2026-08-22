@@ -403,6 +403,7 @@ interface AppState {
 const defaultSettings: Settings = {
   theme: "light",
   themePreset: "graphite",
+  uiFontSize: 14,
   defaultTools: [
     "askuserquestion",
     "todowrite",

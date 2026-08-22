@@ -415,6 +415,12 @@
     --line-height-chat: 1.5;
   }
 
+  /* Root font-size drives all rem-based text; scales via --ui-font-scale.
+     16px is the browser default root (1rem = 16px); 14 is the body baseline. */
+  html {
+    font-size: calc(16px * var(--ui-font-scale, 1));
+  }
+
   /* ----- Magic effect tokens — theme-aware via accent color ----- */
   :root {
     --color-magic: color-mix(in srgb, var(--color-accent) 70%, #a78bfa);

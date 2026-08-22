@@ -146,6 +146,7 @@ function registerSharedIpcListener(): () => void {
     if (config.themePreset) {
       store.setSettings({ themePreset: config.themePreset });
     }
+    store.setSettings({ uiFontSize: config.uiFontSize ?? 14 });
     store.setSettings({
       autoSkillLearning: config.autoSkillLearning ?? false,
     });

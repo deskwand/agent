@@ -740,6 +740,7 @@ export type ServerEvent =
 export interface Settings {
   theme: AppTheme;
   themePreset: ThemePreset;
+  uiFontSize: number;
   apiKey?: string;
   defaultTools: string[];
   permissionRules: PermissionRule[];
@@ -861,6 +862,7 @@ export interface AppConfig {
   defaultWorkdir?: string;
   theme?: AppTheme;
   themePreset?: ThemePreset;
+  uiFontSize?: number;
   sandboxEnabled?: boolean;
   memoryEnabled?: boolean;
   memoryRuntime?: MemoryRuntimeConfig;

@@ -18,6 +18,26 @@ export function SettingsGeneral() {
     }
   }, []);
 
+  const [fontDraft, setFontDraft] = useState<string>(
+    String(settings.uiFontSize),
+  );
+
+  // Sync the draft with the committed setting (e.g. when toggled via +/- buttons).
+  useEffect(() => {
+    setFontDraft(String(settings.uiFontSize));
+  }, [settings.uiFontSize]);
+
+  const commitFont = (value: number) => {
+    const clamped = Math.min(20, Math.max(12, Math.round(value)));
+    updateSettings({ uiFontSize: clamped });
+    setFontDraft(String(clamped));
+  };
+
+  const handleFontDraftCommit = () => {
+    const v = Number(fontDraft);
+    commitFont(Number.isFinite(v) ? v : settings.uiFontSize);
+  };
+
   const languages = [
     { code: "en", nativeName: "English" },
     { code: "zh", nativeName: "中文" },
@@ -91,6 +111,49 @@ export function SettingsGeneral() {
               {preset.label}
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* UI Font Size */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-text-primary">
+          {t("general.uiFontSize")}
+        </h4>
+        <p className="text-xs text-text-muted">{t("general.uiFontSizeDesc")}</p>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center rounded-lg border border-border bg-surface">
+            <button
+              aria-label="decrease font size"
+              onClick={() => commitFont(settings.uiFontSize - 1)}
+              disabled={settings.uiFontSize <= 12}
+              className="px-3 py-2 text-sm text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              −
+            </button>
+            <input
+              type="number"
+              min={12}
+              max={20}
+              value={fontDraft}
+              onChange={(e) => setFontDraft(e.target.value)}
+              onBlur={handleFontDraftCommit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleFontDraftCommit();
+              }}
+              className="w-16 border-x border-border bg-transparent py-2 text-center text-sm font-medium text-text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <button
+              aria-label="increase font size"
+              onClick={() => commitFont(settings.uiFontSize + 1)}
+              disabled={settings.uiFontSize >= 20}
+              className="px-3 py-2 text-sm text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+          <span className="text-sm text-text-muted">
+            {t("general.uiFontSizeUnit", "PX")}
+          </span>
         </div>
       </div>
 

@@ -88,6 +88,19 @@ export interface MemoryRuntimeConfig {
   storageRoot?: string;
 }
 
+export const UI_FONT_SIZE_MIN = 12;
+export const UI_FONT_SIZE_MAX = 20;
+export const UI_FONT_SIZE_DEFAULT = 14;
+
+/** Clamp a UI font size to the supported range; non-finite values fall back to default. */
+export function clampUiFontSize(value: number): number {
+  if (!Number.isFinite(value)) return UI_FONT_SIZE_DEFAULT;
+  return Math.min(
+    UI_FONT_SIZE_MAX,
+    Math.max(UI_FONT_SIZE_MIN, Math.round(value)),
+  );
+}
+
 // ── AppConfig: external shape (consumers see this) ──────────────────
 export interface AppConfig {
   provider: ProviderType;
@@ -106,6 +119,7 @@ export interface AppConfig {
   enableDevLogs: boolean;
   theme: AppTheme;
   themePreset: ThemePreset;
+  uiFontSize?: number;
   sandboxEnabled: boolean;
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
@@ -129,6 +143,7 @@ interface StoredConfig {
   enableDevLogs: boolean;
   theme: AppTheme;
   themePreset: ThemePreset;
+  uiFontSize?: number;
   sandboxEnabled: boolean;
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
@@ -235,6 +250,7 @@ export function defaultStoredConfig(): StoredConfig {
     enableDevLogs: false,
     theme: "light",
     themePreset: "graphite",
+    uiFontSize: UI_FONT_SIZE_DEFAULT,
     sandboxEnabled: false,
     memoryEnabled: false,
     memoryRuntime: defaultMemoryRuntime(),
@@ -819,6 +835,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     enableDevLogs: stored.enableDevLogs,
     theme: stored.theme,
     themePreset: stored.themePreset,
+    uiFontSize: stored.uiFontSize,
     sandboxEnabled: stored.sandboxEnabled,
     memoryEnabled: stored.memoryEnabled,
     memoryRuntime: stored.memoryRuntime,
@@ -977,6 +994,8 @@ export class ConfigStore {
       stored.thinkingLevel = updates.thinkingLevel;
     if (updates.autoSkillLearning !== undefined)
       stored.autoSkillLearning = updates.autoSkillLearning;
+    if (updates.uiFontSize !== undefined)
+      stored.uiFontSize = clampUiFontSize(updates.uiFontSize);
     if (updates.visionModel !== undefined)
       stored.visionModel = updates.visionModel;
     if (updates.webAccess !== undefined)

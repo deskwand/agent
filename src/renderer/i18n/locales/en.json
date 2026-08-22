@@ -220,7 +220,10 @@
     "autoSkillLearningDesc": "When enabled, the AI can automatically discover and learn new skills during conversations, and periodically curate existing ones. Turning this off stops all automatic learning and curation.",
     "autoSkillLearningProjectNote": "Not supported in project mode.",
     "telemetry": "Anonymous Usage Statistics",
-    "telemetryDesc": "Help improve DeskWand by sharing anonymous device ID and app version. No personal data is collected."
+    "telemetryDesc": "Help improve DeskWand by sharing anonymous device ID and app version. No personal data is collected.",
+    "uiFontSize": "UI Font Size",
+    "uiFontSizeDesc": "Base font size for the whole interface",
+    "uiFontSizeUnit": "PX"
   },
   "memory": {
     "title": "Memory",

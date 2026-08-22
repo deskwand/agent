@@ -166,6 +166,15 @@ function App() {
     );
   }, [settings.theme, settings.themePreset, systemDarkMode]);
 
+  // Apply UI font scale to root: scale = uiFontSize / 14 (14 = unchanged baseline).
+  // Settings.uiFontSize is non-optional (default 14), so it is always a number.
+  useLayoutEffect(() => {
+    document.documentElement.style.setProperty(
+      "--ui-font-scale",
+      String(settings.uiFontSize / 14),
+    );
+  }, [settings.uiFontSize]);
+
   // Auto-collapse panels based on window width (disabled per user preference)
   // useEffect(() => {
   //   setContextPanelCollapsed(width < 1100);
