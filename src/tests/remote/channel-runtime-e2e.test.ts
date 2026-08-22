@@ -151,12 +151,22 @@ function routeAssistant(
   turnId: string,
   text: string,
 ): boolean {
+  return routeAssistantId(bootstrap, sessionId, turnId, text, "assistant-message");
+}
+
+function routeAssistantId(
+  bootstrap: RemoteRuntimeBootstrap,
+  sessionId: string,
+  turnId: string,
+  text: string,
+  messageId: string,
+): boolean {
   const event: ServerEvent = {
     type: "stream.message",
     payload: {
       sessionId,
       message: {
-        id: "assistant-message",
+        id: messageId,
         sessionId,
         role: "assistant",
         content: [{ type: "text", text }],
@@ -176,6 +186,13 @@ function finalKey(message: UnifiedMessage): string {
     message.id,
     "reply",
   ]);
+}
+
+// A turn may emit several assistant messages; each is delivered under its own
+// outbound key derived by appending the assistant message id to the turn key.
+// routeAssistant uses message.id === "assistant-message".
+function segmentKey(message: UnifiedMessage): string {
+  return `${finalKey(message)}:assistant-message`;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +317,7 @@ describe("ChannelRuntime E2E", () => {
     const adapter = getActiveAdapter(stack.connectionManager);
 
     const m = msg();
-    const fk = finalKey(m);
+    const fk = segmentKey(m);
     const inspector = vi.fn();
 
     adapter.sendFn = async (om) => {
@@ -360,9 +377,9 @@ describe("ChannelRuntime E2E", () => {
       expect(stack.agentExecutor.startSession).toHaveBeenCalled();
     }, { timeout: 2000 });
 
-    const fk = finalKey(m);
+    const fk = segmentKey(m);
     expect(
-      routeAssistant(stack.bootstrap, "real-session-1", fk, "hello back"),
+      routeAssistant(stack.bootstrap, "real-session-1", finalKey(m), "hello back"),
     ).toBe(true);
 
     const rk = receiptKey(m);
@@ -440,9 +457,9 @@ describe("ChannelRuntime E2E", () => {
       expect(stack.agentExecutor.startSession).toHaveBeenCalled();
     });
 
-    const key = finalKey(inbound);
+    const key = segmentKey(inbound);
     expect(
-      routeAssistant(stack.bootstrap, "real-session-1", key, "hello"),
+      routeAssistant(stack.bootstrap, "real-session-1", finalKey(inbound), "hello"),
     ).toBe(true);
     await vi.waitFor(() => {
       expect(stack.persistence.getOutboundDelivery(key)?.state).toBe(
@@ -450,6 +467,48 @@ describe("ChannelRuntime E2E", () => {
       );
     });
     expect(calls).toBe(2);
+  });
+
+  // -----------------------------------------------------------------------
+  // Multi-round delivery: every assistant message of a turn is delivered
+  // -----------------------------------------------------------------------
+
+  it("delivers EVERY assistant message of a single turn (multi-step)", async () => {
+    const stack = await buildStack();
+    stacks.push(stack);
+    const adapter = getActiveAdapter(stack.connectionManager);
+
+    const sentKeys: string[] = [];
+    adapter.sendFn = async (om) => {
+      sentKeys.push(om.idempotencyKey);
+      return {
+        version: 1 as const,
+        generation: 1,
+        accepted: true,
+        committed: true,
+        outcome: "committed" as const,
+        idempotencyKey: om.idempotencyKey,
+      };
+    };
+
+    const m = msg();
+    adapter.injectMessage(m);
+    await vi.waitFor(() => {
+      expect(stack.agentExecutor.startSession).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    const turnKey = finalKey(m);
+    // Two distinct assistant messages in the SAME turn (multi-step / tool use)
+    expect(
+      routeAssistantId(stack.bootstrap, "real-session-1", turnKey, "step-1", "msg-step-1"),
+    ).toBe(true);
+    expect(
+      routeAssistantId(stack.bootstrap, "real-session-1", turnKey, "step-2", "msg-step-2"),
+    ).toBe(true);
+
+    await vi.waitFor(() => expect(sentKeys.length).toBe(2), { timeout: 2000 });
+    expect(sentKeys).toContain(`${turnKey}:msg-step-1`);
+    expect(sentKeys).toContain(`${turnKey}:msg-step-2`);
   });
 
   // -----------------------------------------------------------------------

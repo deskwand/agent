@@ -6,6 +6,10 @@ export interface RuntimeAssistantDelivery {
     sessionId: string,
     turnId: string,
     text: string,
+    // Unique assistant message id. A single turn may emit several assistant
+    // messages (multi-step / tool-use), each of which must be delivered as an
+    // independent message with its own outbound idempotency key.
+    messageId?: string,
   ): Promise<void>;
 }
 
@@ -39,7 +43,7 @@ export function routeRuntimeAssistantEvent(
   if (!text) return true;
 
   void delivery
-    .deliverAgentResponse(sessionId, message.turnId, text)
+    .deliverAgentResponse(sessionId, message.turnId, text, message.id)
     .catch(onError);
   return true;
 }

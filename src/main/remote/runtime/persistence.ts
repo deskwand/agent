@@ -3,6 +3,20 @@ import type { DatabaseSync } from "node:sqlite";
 import { RuntimeCryptoStore, type EncryptedPayload } from "./crypto-store";
 import type { ChannelSessionBinding } from "./session-router";
 
+/**
+ * Whether an outbound delivery belongs to an inbound receipt. A single inbound
+ * message may produce several assistant outbound messages (multi-step tool
+ * use); each is keyed as `<turn-level key>:<assistant message id>`.
+ */
+function isOutboundForReceipt(
+  finalIdempotencyKey: string | null | undefined,
+  idempotencyKey: string,
+): boolean {
+  if (!finalIdempotencyKey) return false;
+  if (finalIdempotencyKey === idempotencyKey) return true;
+  return idempotencyKey.startsWith(`${finalIdempotencyKey}:`);
+}
+
 export interface InboundReceiptRecord {
   version: 1;
   generation: number;
@@ -371,7 +385,12 @@ export class ChannelRuntimePersistence {
       if (!receiptCheck) {
         throw new Error("COMMIT_RECEIPT_CHECK_FAILED");
       }
-      if (receiptCheck.outbound_final_idempotency_key !== idempotencyKey) {
+      if (
+        !isOutboundForReceipt(
+          receiptCheck.outbound_final_idempotency_key,
+          idempotencyKey,
+        )
+      ) {
         throw new Error("COMMIT_UNRELATED_DELIVERY");
       }
       if (receiptCheck.state !== "processing") {
@@ -469,7 +488,12 @@ export class ChannelRuntimePersistence {
       if (!receiptCheck) {
         throw new Error("FAIL_REJECT_RECEIPT_CHECK_FAILED");
       }
-      if (receiptCheck.outbound_final_idempotency_key !== idempotencyKey) {
+      if (
+        !isOutboundForReceipt(
+          receiptCheck.outbound_final_idempotency_key,
+          idempotencyKey,
+        )
+      ) {
         throw new Error("FAIL_REJECT_UNRELATED_DELIVERY");
       }
       if (receiptCheck.state !== "processing") {

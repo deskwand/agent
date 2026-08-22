@@ -766,6 +766,7 @@ export class RemoteRuntimeBootstrap {
     sessionId: string,
     turnId: string,
     text: string,
+    messageId?: string,
   ): Promise<void> {
     if (this.stopping) return;
     if (!this.channelRuntime || !this.connectionManager) {
@@ -788,7 +789,13 @@ export class RemoteRuntimeBootstrap {
       return;
     }
 
-    const outboundKey = route.context.finalIdempotencyKey;
+    // Each assistant message within a turn gets its own outbound idempotency
+    // key. The turn-level key (finalIdempotencyKey) identifies the turn; a
+    // per-message suffix distinguishes the multiple assistant messages an
+    // agent may emit (multi-step / tool-use). Without this, every round shares
+    // one key and only the first is delivered.
+    const turnKey = route.context.finalIdempotencyKey;
+    const outboundKey = messageId ? `${turnKey}:${messageId}` : turnKey;
 
     // Deduplicate concurrent duplicate assistant events: if an operation
     // for this outbound key is already in-flight, share it.
@@ -840,7 +847,6 @@ export class RemoteRuntimeBootstrap {
       if (existing) {
         if (existing.state === "committed") {
           persistence.completeInboundReceipt(context.receiptKey);
-          this.responseRoutes.delete(turnId);
         }
         return;
       }
@@ -865,7 +871,6 @@ export class RemoteRuntimeBootstrap {
       const durable = persistence?.getOutboundDelivery(outboundKey);
       if (durable?.state === "committed") {
         persistence?.completeInboundReceipt(context.receiptKey);
-        this.responseRoutes.delete(turnId);
       }
       return;
     }
@@ -923,16 +928,29 @@ export class RemoteRuntimeBootstrap {
     }
 
     if (finalOutcome === "committed") {
-      persistence?.commitOutboundAndReceipt(
-        outboundKey,
-        context.receiptKey,
-        finalPlatformMessageId,
-      );
-      this.responseRoutes.delete(turnId);
+      // A turn may produce several assistant messages; each commits its own
+      // outbound row. The inbound receipt is completed exactly once (by the
+      // first segment) — later segments fall back to a segment-level commit so
+      // they are still recorded as delivered.
+      if (persistence?.commitOutboundAndReceipt) {
+        try {
+          persistence.commitOutboundAndReceipt(
+            outboundKey,
+            context.receiptKey,
+            finalPlatformMessageId,
+          );
+        } catch {
+          persistence.markOutboundCommitted(outboundKey, finalPlatformMessageId);
+        }
+      } else {
+        persistence?.markOutboundCommitted?.(outboundKey, finalPlatformMessageId);
+      }
     } else if (finalOutcome === "permanent_failure") {
       // Atomically mark outbound failed AND receipt rejected so the
       // duplicate-detection path in handleMessage does not see a
-      // lingering processing receipt.
+      // lingering processing receipt. A segment-level failure only marks its
+      // own row; the receipt is still completed so the turn is not re-run
+      // spuriously (which would duplicate already-delivered segments).
       if (persistence?.markOutboundFailedAndRejectReceipt) {
         try {
           persistence.markOutboundFailedAndRejectReceipt(
@@ -947,7 +965,6 @@ export class RemoteRuntimeBootstrap {
         persistence?.markOutboundFailed?.(outboundKey);
         persistence?.completeInboundReceipt?.(context.receiptKey);
       }
-      this.responseRoutes.delete(turnId);
     } else {
       // accepted, unknown, or a second retryable failure all have an
       // inconclusive external outcome and must never be sent automatically.
