@@ -918,6 +918,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 onPaste={handlePaste}
                 placeholder={placeholder}
                 disabled={disabled}
+                spellCheck={false}
                 rows={1}
                 className={textareaClassName}
                 onCompositionStart={() => {
