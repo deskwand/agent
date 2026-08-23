@@ -1198,23 +1198,42 @@ export class SessionManager {
           messageContent.map((c) => c.type),
         );
 
-        // Build enhanced prompt with file information
+        // Build enhanced prompt with file information. Image files are sent
+        // directly to vision-capable main models (see collectPromptImagesFromBlocks),
+        // so they get a neutral note instead of a Read-tool directive; non-image
+        // attachments keep the Read-tool hint.
         let enhancedPrompt = prompt;
         const fileAttachments = messageContent.filter(
           (c) => c.type === "file_attachment",
         ) as FileAttachmentContent[];
         if (fileAttachments.length > 0) {
-          const fileInfo = fileAttachments
-            .map(
-              (f) =>
-                `- ${f.filename} (${(f.size / 1024).toFixed(1)} KB) at path: ${f.relativePath}`,
-            )
-            .join("\n");
-          enhancedPrompt = `${prompt}\n\n[Attached files - use Read tool to access them]:\n${fileInfo}`;
-          logCtx(
-            "[SessionManager] Enhanced prompt with file info:",
-            enhancedPrompt,
-          );
+          const isImageFile = (f: FileAttachmentContent): boolean =>
+            (f.mimeType || "").startsWith("image/");
+          const otherFiles = fileAttachments.filter((f) => !isImageFile(f));
+          const imageFiles = fileAttachments.filter(isImageFile);
+          const parts: string[] = [];
+          if (otherFiles.length > 0) {
+            const fileInfo = otherFiles
+              .map(
+                (f) =>
+                  `- ${f.filename} (${(f.size / 1024).toFixed(1)} KB) at path: ${f.relativePath}`,
+              )
+              .join("\n");
+            parts.push(`[Attached files - use Read tool to access them]:\n${fileInfo}`);
+          }
+          if (imageFiles.length > 0) {
+            const imageInfo = imageFiles
+              .map((f) => `${f.filename} (path: ${f.relativePath})`)
+              .join(", ");
+            parts.push(`[Image attachment(s) included in this message: ${imageInfo}]`);
+          }
+          if (parts.length > 0) {
+            enhancedPrompt = `${prompt}\n\n${parts.join("\n\n")}`;
+            logCtx(
+              "[SessionManager] Enhanced prompt with file info:",
+              enhancedPrompt,
+            );
+          }
         }
 
         // ── /goal command interception ─────────────────────────────

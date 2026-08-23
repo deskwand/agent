@@ -46,6 +46,7 @@ import { v4 as uuidv4 } from "uuid";
 import type { PathResolver } from "../sandbox/path-resolver";
 import type { MCPManager } from "../mcp/mcp-manager";
 import { mcpConfigStore } from "../mcp/mcp-config-store";
+import { collectPromptImagesFromBlocks } from "./prompt-image-extract";
 import {
   log,
   logWarn,
@@ -4373,7 +4374,10 @@ Tool routing:\n
         // Check if the resolved model supports images
         const modelSupportsImages = piModel.input.includes("image");
 
-        // Extract images from last user message and convert to pi-ai ImageContent format
+        // Extract images from last user message and convert to pi-ai ImageContent
+        // format. Inline image blocks (pasted) pass through; image files attached
+        // via file_attachment (select/drag) are read and base64-encoded so a
+        // vision-capable main model receives them directly.
         const lastUserMsg = existingMessages[existingMessages.length - 1];
         const promptImages: Array<{
           type: "image";
@@ -4383,19 +4387,10 @@ Tool routing:\n
           modelSupportsImages &&
           lastUserMsg?.role === "user" &&
           Array.isArray(lastUserMsg.content)
-            ? lastUserMsg.content
-                .filter((c) => (c as { type?: string }).type === "image")
-                .map((c) => {
-                  const img = c as {
-                    type: "image";
-                    source: { data: string; media_type: string };
-                  };
-                  return {
-                    type: "image" as const,
-                    data: img.source.data,
-                    mimeType: img.source.media_type,
-                  };
-                })
+            ? collectPromptImagesFromBlocks(
+                lastUserMsg.content,
+                session.cwd || app.getPath("userData"),
+              )
             : [];
 
         // When the main model cannot view images but the user pasted images,
