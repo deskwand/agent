@@ -33,3 +33,16 @@ describe("OpenCode presets", () => {
     );
   });
 });
+
+describe("DeepSeek presets", () => {
+  it("includes the vision model in the DeepSeek provider preset", () => {
+    const ids = API_PROVIDER_PRESETS.deepseek.models.map((m) => m.id);
+    expect(ids).toContain("deepseek-v4-flash-vision-exp");
+  });
+
+  it("mentions the vision model in deepseek guidance placeholder", () => {
+    expect(getModelInputGuidance("deepseek").placeholder).toContain(
+      "deepseek-v4-flash-vision-exp",
+    );
+  });
+});
