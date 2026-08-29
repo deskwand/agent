@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { DatabaseInstance } from '../src/main/db/database';
+import type { SessionEntry } from '@earendil-works/pi-coding-agent';
 
 // --- Mocks (must be before SessionManager import) ---
 
@@ -68,12 +69,6 @@ function createMockDb() {
       getAll: vi.fn(() => []),
       update: vi.fn(),
       delete: vi.fn(),
-    },
-    messages: {
-      create: vi.fn(),
-      getBySessionId: vi.fn(() => []),
-      delete: vi.fn(),
-      deleteBySessionId: vi.fn(),
     },
     traceSteps: {
       create: vi.fn(),
@@ -208,21 +203,20 @@ describe('SessionManager cache eviction', () => {
     const manager = new SessionManager(db, vi.fn());
 
     // Fill the cache to MAX_CACHE_SIZE by fetching messages for many sessions.
-    // getMessages populates the cache via messageCache.set.
+    // getMessages populates the cache via entriesReader.
+    const reader = vi.fn((sid: string) => [
+      {
+        type: 'message',
+        id: `${sid}-msg`,
+        parentId: null,
+        timestamp: '2026-08-29T00:00:00.000Z',
+        message: { role: 'user', content: [{ type: 'text', text: `msg ${sid}` }], timestamp: 1 },
+      } as SessionEntry,
+    ]);
+    manager.setEntriesReader(reader);
     const MAX = 100; // SessionManager.MAX_CACHE_SIZE
     for (let i = 0; i < MAX + 1; i++) {
-      const sid = `session-${i}`;
-      (db.messages.getBySessionId as ReturnType<typeof vi.fn>).mockReturnValueOnce([
-        {
-          id: `m-${i}`,
-          session_id: sid,
-          role: 'user',
-          content: JSON.stringify([{ type: 'text', text: `msg ${i}` }]),
-          timestamp: i,
-          token_usage: null,
-        },
-      ]);
-      manager.getMessages(sid);
+      manager.getMessages(`session-${i}`);
     }
 
     // At this point cache has 101 entries. The oldest is 'session-0'.
@@ -239,9 +233,9 @@ describe('SessionManager cache eviction', () => {
     // session-0 should still be cached and contain the new message
     const msgs = manager.getMessages('session-0');
     expect(msgs.some((m) => m.id === 'new-msg')).toBe(true);
-    // DB should NOT have been re-read for session-0 (cache still intact)
-    const getBySessionCalls = (db.messages.getBySessionId as ReturnType<typeof vi.fn>).mock.calls;
-    const session0Reads = getBySessionCalls.filter((c: string[]) => c[0] === 'session-0');
+    // entriesReader should NOT have been re-read for session-0 (cache still intact)
+    const readerCalls = reader.mock.calls;
+    const session0Reads = readerCalls.filter((c: string[]) => c[0] === 'session-0');
     expect(session0Reads).toHaveLength(1); // only the initial getMessages call
   });
 });

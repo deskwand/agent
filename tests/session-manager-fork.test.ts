@@ -2,8 +2,8 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
-// 每个测试重建的临时 userData 目录（electron mock 的 getPath 返回它）
 let currentUserDataDir: string;
 
 vi.mock("electron", () => ({
@@ -32,11 +32,13 @@ vi.mock("electron-store", () => {
   return { default: MockStore };
 });
 
+const forkSessionFileMock = vi.fn();
 vi.mock("../src/main/agent/agent-runner", () => ({
   AgentRunner: class {
     run = vi.fn();
     cancel = vi.fn();
     handleQuestionResponse = vi.fn();
+    forkSessionFile = forkSessionFileMock;
   },
 }));
 vi.mock("../src/main/mcp/mcp-config-store", () => ({
@@ -56,17 +58,16 @@ function makeDb(overrides: Partial<DatabaseInstance> = {}): DatabaseInstance {
       update: vi.fn(),
       delete: vi.fn(),
     },
-    messages: {
+    traceSteps: {
       create: vi.fn(),
+      update: vi.fn(),
       getBySessionId: vi.fn(() => []),
       deleteBySessionId: vi.fn(),
-      update: vi.fn(),
     },
     ...(overrides as object),
   } as unknown as DatabaseInstance;
 }
 
-// loadSession 期望 DB row 形状（snake_case 字段）
 function srcSessionRow(): Record<string, unknown> {
   return {
     id: "sess-src",
@@ -90,24 +91,22 @@ function srcSessionRow(): Record<string, unknown> {
   };
 }
 
-const srcMsgRows = [
-  { id: "msg1", session_id: "sess-src", role: "user", content: JSON.stringify([{ type: "text", text: "帮我设计登录页" }]), timestamp: 1, turn_id: "u1" },
-  { id: "msg2", session_id: "sess-src", role: "assistant", content: JSON.stringify([{ type: "text", text: "方案如下" }]), timestamp: 2, turn_id: "a1" },
-  { id: "msg3", session_id: "sess-src", role: "user", content: JSON.stringify([{ type: "text", text: "改用 OAuth" }]), timestamp: 3, turn_id: "u2" },
-  { id: "msg4", session_id: "sess-src", role: "assistant", content: JSON.stringify([{ type: "tool_use", id: "call_1", name: "bash", input: { command: "ls" } }, { type: "text", text: "完成" }]), timestamp: 4, turn_id: "a2" },
-  // 工具结果独立行
-  { id: "msg-tr", session_id: "sess-src", role: "assistant", content: JSON.stringify([{ type: "tool_result", toolUseId: "call_1", content: "src\npackage.json" }]), timestamp: 5, turn_id: "tr1" },
-  { id: "msg5", session_id: "sess-src", role: "user", content: JSON.stringify([{ type: "text", text: "再想想" }]), timestamp: 6, turn_id: "u3" },
-];
+const entries: SessionEntry[] = [
+  { type: "message", id: "msg1", parentId: null, timestamp: "t1", message: { role: "user", content: [{ type: "text", text: "帮我设计登录页" }], timestamp: 1 } },
+  { type: "message", id: "msg2", parentId: "msg1", timestamp: "t2", message: { role: "assistant", content: [{ type: "text", text: "方案如下" }], timestamp: 2 } },
+  { type: "message", id: "msg3", parentId: "msg2", timestamp: "t3", message: { role: "user", content: [{ type: "text", text: "改用 OAuth" }], timestamp: 3 } },
+  { type: "message", id: "msg4", parentId: "msg3", timestamp: "t4", message: { role: "assistant", content: [{ type: "toolCall", id: "call_1", name: "bash", arguments: { command: "ls" } }, { type: "text", text: "完成" }], timestamp: 4 } },
+  { type: "message", id: "msg-tr", parentId: "msg4", timestamp: "t5", message: { role: "toolResult", toolCallId: "call_1", toolName: "bash", content: [{ type: "text", text: "src" }], isError: false, timestamp: 5 } },
+] as SessionEntry[];
 
 let manager: SessionManager;
 let db: DatabaseInstance;
-let savedRows: Record<string, unknown>[];
 let createdSessions: Session[];
 
 beforeEach(async () => {
   currentUserDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "fork-userdata-"));
-  savedRows = [];
+  forkSessionFileMock.mockReset();
+  forkSessionFileMock.mockResolvedValue("/tmp/forked.jsonl");
   createdSessions = [];
   db = makeDb({
     sessions: {
@@ -117,27 +116,21 @@ beforeEach(async () => {
       update: vi.fn(),
       delete: vi.fn(),
     },
-    messages: {
-      create: vi.fn((row: Record<string, unknown>) => { savedRows.push(row); }),
-      getBySessionId: vi.fn(() => srcMsgRows),
-      deleteBySessionId: vi.fn(),
-      update: vi.fn(),
-    },
   });
   manager = new SessionManager(db, vi.fn());
+  manager.setEntriesReader(() => entries);
 });
 
 afterEach(() => {
   fs.rmSync(currentUserDataDir, { recursive: true, force: true });
 });
 
-describe("SessionManager.forkSession", () => {
-  it("在 msg2（第一条助手消息）分叉：复制分叉点及之前消息，设置全部继承，status idle", async () => {
+describe("SessionManager.forkSession (JSONL forkFrom)", () => {
+  it("在 msg2（第一条助手消息）分叉：调 forkSessionFile、继承设置、status idle", async () => {
     const fork = await manager.forkSession("sess-src", "msg2", "（分叉）");
     expect(fork.id).not.toBe("sess-src");
     expect(fork.title).toBe("登录页设计（分叉）");
     expect(fork.status).toBe("idle");
-    expect(fork.piSessionFile).toBeUndefined();
     expect(fork.cwd).toBe("/tmp/proj");
     expect(fork.mountedPaths).toEqual([{ virtual: "/mnt/proj", real: "/tmp/proj" }]);
     expect(fork.allowedTools).toEqual(["read", "write", "bash"]);
@@ -147,50 +140,49 @@ describe("SessionManager.forkSession", () => {
     expect(fork.thinkingLevel).toBe("high");
     expect(fork.isProjectMode).toBe(true);
 
-    // 复制 msg1 + msg2，content/timestamp/turnId 原样，id 重生成
-    expect(savedRows).toHaveLength(2);
-    expect(savedRows[0].session_id).toBe(fork.id);
-    expect(JSON.parse(savedRows[0].content as string)).toEqual([{ type: "text", text: "帮我设计登录页" }]);
-    expect(savedRows[0].timestamp).toBe(1);
-    expect(savedRows[0].turn_id).toBe("u1");
-    expect(JSON.parse(savedRows[1].content as string)).toEqual([{ type: "text", text: "方案如下" }]);
-    expect(savedRows[1].timestamp).toBe(2);
-    expect(savedRows[1].turn_id).toBe("a1");
-    expect(savedRows[0].id).not.toBe("msg1");
+    expect(forkSessionFileMock).toHaveBeenCalledWith(
+      "/tmp/proj/src.jsonl",
+      fork.id,
+      "/tmp/proj",
+      "msg2",
+    );
+    expect(db.sessions.update).toHaveBeenCalledWith(fork.id, { pi_session_file: "/tmp/forked.jsonl" });
   });
 
-  it("在最后一条助手消息 a2 分叉：包含 tool_use 块（原样复制，不含其后消息）", async () => {
+  it("在助手消息 msg4（含 tool_use 块）分叉", async () => {
     const fork = await manager.forkSession("sess-src", "msg4", "（分叉）");
-    // msg1..msg4 共 4 条（不含 msg-tr 之后的 msg5）
-    expect(savedRows.map((r) => r.role)).toEqual(["user", "assistant", "user", "assistant"]);
-    expect(JSON.parse(savedRows[3].content as string)).toEqual([
-      { type: "tool_use", id: "call_1", name: "bash", input: { command: "ls" } },
-      { type: "text", text: "完成" },
-    ]);
-    expect(savedRows[3].turn_id).toBe("a2");
-    expect(fork.piSessionFile).toBeUndefined();
+    expect(forkSessionFileMock).toHaveBeenCalledWith(
+      "/tmp/proj/src.jsonl",
+      fork.id,
+      "/tmp/proj",
+      "msg4",
+    );
   });
 
-  it("工具结果独立行（tool_result 块）分叉 → 抛错，不创建会话", async () => {
+  it("工具结果（tool_result 块）分叉 → 抛错，不创建会话", async () => {
     await expect(manager.forkSession("sess-src", "msg-tr", "（分叉）")).rejects.toThrow("仅支持从助手消息分叉");
     expect(db.sessions.create).not.toHaveBeenCalled();
+    expect(forkSessionFileMock).not.toHaveBeenCalled();
   });
 
   it("用户消息分叉 → 抛错，不创建会话", async () => {
     await expect(manager.forkSession("sess-src", "msg1", "（分叉）")).rejects.toThrow("仅支持从助手消息分叉");
     expect(db.sessions.create).not.toHaveBeenCalled();
+    expect(forkSessionFileMock).not.toHaveBeenCalled();
   });
 
-  it("复制中途失败（saveMessage 抛错）→ 删除新会话记录，无半成品", async () => {
-    db.messages.create = vi.fn(() => { throw new Error("db down"); });
-    await expect(manager.forkSession("sess-src", "msg2", "（分叉）")).rejects.toThrow("db down");
+  it("forkSessionFile 失败 → 删除新会话记录，无半成品", async () => {
+    forkSessionFileMock.mockRejectedValue(new Error("fork failed"));
+    await expect(manager.forkSession("sess-src", "msg2", "（分叉）")).rejects.toThrow("fork failed");
     expect(db.sessions.delete).toHaveBeenCalledTimes(1);
   });
 
-  it("源会话完全不被修改（DB 读取之外无任何写入）", async () => {
+  it("源会话完全不被修改（仅读 + forkFrom）", async () => {
     await manager.forkSession("sess-src", "msg4", "（分叉）");
-    // 源会话只被 get 读取；sessions.update / messages.update / deleteBySessionId 均未被调用
-    expect((db.sessions.update as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
-    expect((db.messages.update as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0);
+    expect((db.sessions.update as ReturnType<typeof vi.fn>).mock.calls.length).toBeLessThanOrEqual(1);
+    // 唯一一次 update 是写入新会话的 pi_session_file
+    const updates = (db.sessions.update as ReturnType<typeof vi.fn>).mock.calls;
+    const newSessionId = createdSessions[0]?.id;
+    expect(updates.length === 0 || updates[0][0] === newSessionId).toBe(true);
   });
 });
