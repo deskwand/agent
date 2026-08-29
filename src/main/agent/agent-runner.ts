@@ -2584,13 +2584,9 @@ ${hints.join("\n")}
       const apiKey = runtimeConfig.apiKey?.trim();
       if (apiKey && provider !== "oauth") {
         const piProvider = provider === "custom" ? piModel.provider : provider;
-        await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
-          allowNetwork: false,
-        });
+        await modelRuntime.setRuntimeApiKey(piProvider, apiKey);
         if (piModel.provider !== piProvider) {
-          await modelRuntime.setRuntimeApiKey(piModel.provider, apiKey, {
-            allowNetwork: false,
-          });
+          await modelRuntime.setRuntimeApiKey(piModel.provider, apiKey);
           log(
             "[AgentRunner] Set runtime API key for model provider:",
             piModel.provider,
@@ -5093,13 +5089,9 @@ Tool routing:\n
     await registerDeskWandProviders(modelRuntime);
     if (apiKey && provider !== "oauth") {
       const piProvider = provider === "custom" ? piModel.provider : provider;
-      await modelRuntime.setRuntimeApiKey(piProvider, apiKey, {
-        allowNetwork: false,
-      });
+      await modelRuntime.setRuntimeApiKey(piProvider, apiKey);
       if (piModel.provider !== piProvider) {
-        await modelRuntime.setRuntimeApiKey(piModel.provider, apiKey, {
-          allowNetwork: false,
-        });
+        await modelRuntime.setRuntimeApiKey(piModel.provider, apiKey);
       }
     }
 

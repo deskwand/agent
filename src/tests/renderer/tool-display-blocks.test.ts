@@ -3,7 +3,6 @@ import {
   buildToolDisplayBlocks,
   collectResultFiles,
   filterAssistantVisibleBlocks,
-  formatProcessSummaryLabel,
   formatResultSummaryLabel,
   getProcessSummaryFragments,
   orderAssistantDisplayBlocks,
@@ -286,7 +285,7 @@ describe("buildToolDisplayBlocks", () => {
   });
 });
 
-describe("formatProcessSummaryLabel", () => {
+describe("process summary fragments", () => {
   const t = ((
     key: string,
     options?: { count?: number; name?: string; description?: string },
@@ -306,6 +305,8 @@ describe("formatProcessSummaryLabel", () => {
       "tool.grouped.gotSubagentResults_other": `Retrieved ${options?.count} subagent results`,
       "tool.grouped.steeredSubagents_one": `Steered ${options?.count} subagent`,
       "tool.grouped.steeredSubagents_other": `Steered ${options?.count} subagents`,
+      "tool.grouped.ranSubagentWorkflows_one": `Ran ${options?.count} subagent workflow`,
+      "tool.grouped.ranSubagentWorkflows_other": `Ran ${options?.count} subagent workflows`,
       "tool.grouped.usedTools_one": `used ${options?.count} tool`,
       "tool.grouped.usedTools_other": `used ${options?.count} tools`,
       "tool.grouped.joinAnd": " and ",
@@ -313,69 +314,6 @@ describe("formatProcessSummaryLabel", () => {
     };
     return map[key] ?? key;
   }) as never;
-
-  it("formats read, search, and command fragments in order", () => {
-    expect(
-      formatProcessSummaryLabel(
-        {
-          readCount: 2,
-          hasSearch: true,
-          hasWebSearch: false,
-          hasBrowse: false,
-          hasMemory: false,
-          commandCount: 1,
-          subagentCount: 0,
-          hasGoal: false,
-          usedToolCount: 0,
-        },
-        t,
-      ),
-    ).toBe("2 files read, searched code and executed 1 command");
-  });
-
-  it("formats search-only process summaries", () => {
-    expect(
-      formatProcessSummaryLabel(
-        {
-          readCount: 0,
-          hasSearch: true,
-          hasWebSearch: false,
-          hasBrowse: false,
-          hasMemory: false,
-          commandCount: 0,
-          subagentCount: 0,
-          hasGoal: false,
-          usedToolCount: 0,
-        },
-        t,
-      ),
-    ).toBe("searched code");
-  });
-
-  it("formats subagent names and task descriptions", () => {
-    expect(
-      formatProcessSummaryLabel(
-        {
-          readCount: 0,
-          hasSearch: false,
-          hasWebSearch: false,
-          hasBrowse: false,
-          hasMemory: false,
-          commandCount: 0,
-          subagentCount: 2,
-          subagents: [
-            { name: "Explore", description: "Inspect rendering" },
-            { name: "Review", description: "Review the design" },
-          ],
-          hasGoal: false,
-          usedToolCount: 0,
-        },
-        t,
-      ),
-    ).toBe(
-      "started 2 subagents · Explore: Inspect rendering; Review: Review the design",
-    );
-  });
 
   it("includes subagent details in the icon-aware group fragment", () => {
     const blocks = buildToolDisplayBlocks([
@@ -424,18 +362,46 @@ describe("formatProcessSummaryLabel", () => {
     ]);
   });
 
+  it("classifies SubagentWorkflow as a subagent-family process tool", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("wf-1", "SubagentWorkflow", {
+        script: "export const meta = { name: 'audit' }",
+      }),
+      toolResult("wf-1"),
+    ]);
+
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: {
+        subagentCount: 0,
+        subagentWorkflowCount: 1,
+        usedToolCount: 0,
+      },
+    });
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      { text: "Ran 1 subagent workflow", iconType: "subagent" },
+    ]);
+  });
+
   it("defines localized subagent operation summaries", () => {
     expect(en.tool.grouped).toMatchObject({
       gotSubagentResults_one: "Retrieved {{count}} subagent result",
       gotSubagentResults_other: "Retrieved {{count}} subagent results",
       steeredSubagents_one: "Steered {{count}} subagent",
       steeredSubagents_other: "Steered {{count}} subagents",
+      ranSubagentWorkflows_one: "Ran {{count}} subagent workflow",
+      ranSubagentWorkflows_other: "Ran {{count}} subagent workflows",
     });
     expect(zh.tool.grouped).toMatchObject({
       gotSubagentResults_one: "已获取 {{count}} 次子代理结果",
       gotSubagentResults_other: "已获取 {{count}} 次子代理结果",
       steeredSubagents_one: "已引导 {{count}} 次子代理",
       steeredSubagents_other: "已引导 {{count}} 次子代理",
+      ranSubagentWorkflows_one: "已运行 {{count}} 个子代理工作流",
+      ranSubagentWorkflows_other: "已运行 {{count}} 个子代理工作流",
     });
   });
 
@@ -462,9 +428,9 @@ describe("formatProcessSummaryLabel", () => {
     if (blocks[0]?.type !== "process-summary") {
       throw new Error("expected process summary");
     }
-    expect(formatProcessSummaryLabel(blocks[0].summary, t)).toBe(
-      "browsed the web",
-    );
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      { text: "browsed the web", iconType: "browse" },
+    ]);
   });
 
   it("formats generic tool-only process summaries", () => {
@@ -484,7 +450,9 @@ describe("formatProcessSummaryLabel", () => {
     if (blocks[0]?.type !== "process-summary") {
       throw new Error("expected process summary");
     }
-    expect(formatProcessSummaryLabel(blocks[0].summary, t)).toBe("used 1 tool");
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      { text: "used 1 tool", iconType: "tool" },
+    ]);
   });
 });
 
@@ -557,9 +525,6 @@ describe("Memory process grouping", () => {
     expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
       { text: "Consulted memory", iconType: "memory" },
     ]);
-    expect(formatProcessSummaryLabel(blocks[0].summary, t)).toBe(
-      "Consulted memory",
-    );
   });
 
   it("combines Memory with other process-tool categories", () => {

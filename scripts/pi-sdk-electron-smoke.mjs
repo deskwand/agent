@@ -130,7 +130,7 @@ async function main() {
             async login() {
               throw new Error("Smoke login is not used");
             },
-            async refresh(credential) {
+            async refresh(credential, _signal) {
               return {
                 ...credential,
                 access: "smoke-key",

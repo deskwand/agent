@@ -1,4 +1,9 @@
-import { TUI, getKeybindings, type Component } from "@earendil-works/pi-tui";
+import {
+  TuiMainScreen,
+  getKeybindings,
+  type Component,
+  type TUI,
+} from "@earendil-works/pi-tui";
 import { initTheme, type Theme } from "@earendil-works/pi-coding-agent";
 import { VirtualTerminal } from "./virtual-terminal";
 import { createNoopTheme } from "./theme-utils";
@@ -44,7 +49,7 @@ export class TuiModalManager {
 
   private ensureTui(): TUI {
     if (!this.tui) {
-      this.tui = new TUI(this.terminal);
+      this.tui = new TuiMainScreen(this.terminal);
       this.tui.start();
       for (const component of this.widgetComponents.values()) {
         this.tui.addChild(component);

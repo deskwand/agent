@@ -176,9 +176,7 @@ async function syncDeskWandProviders(
       models: entry.models,
     });
     if (entry.apiKey) {
-      await runtime.setRuntimeApiKey(entry.providerId, entry.apiKey, {
-        allowNetwork: false,
-      });
+      await runtime.setRuntimeApiKey(entry.providerId, entry.apiKey);
     } else {
       await runtime.removeRuntimeApiKey(entry.providerId);
     }

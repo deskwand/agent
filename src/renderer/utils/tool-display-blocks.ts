@@ -19,6 +19,7 @@ export interface ProcessSummary {
   subagents?: SubagentSummary[];
   subagentResultCount?: number;
   subagentSteerCount?: number;
+  subagentWorkflowCount?: number;
   hasGoal: boolean;
   usedToolCount: number;
 }
@@ -70,6 +71,7 @@ const PROCESS_TOOLS = new Set([
   "agent",
   "get_subagent_result",
   "steer_subagent",
+  "subagentworkflow",
   "websearch",
   "web_fetch",
   "web_search",
@@ -187,6 +189,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   const subagents: SubagentSummary[] = [];
   let subagentResultCount = 0;
   let subagentSteerCount = 0;
+  let subagentWorkflowCount = 0;
   let hasGoal = false;
   let usedToolCount = 0;
 
@@ -255,6 +258,10 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
       subagentSteerCount += 1;
       countedAsSpecific = true;
     }
+    if (lower === "subagentworkflow") {
+      subagentWorkflowCount += 1;
+      countedAsSpecific = true;
+    }
     if (GOAL_TOOLS.has(lower)) {
       hasGoal = true;
       countedAsSpecific = true;
@@ -276,6 +283,7 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     subagents,
     subagentResultCount,
     subagentSteerCount,
+    subagentWorkflowCount,
     hasGoal,
     usedToolCount,
   };
@@ -471,70 +479,6 @@ function formatSubagentDetails(
   return details.join(t("tool.grouped.subagentDetailSeparator"));
 }
 
-/** @deprecated Use getProcessSummaryFragments for icon-aware rendering */
-export function formatProcessSummaryLabel(
-  summary: ProcessSummary,
-  t: TFunction,
-): string {
-  const fragments: string[] = [];
-
-  if (summary.readCount > 0) {
-    fragments.push(
-      t(pluralKey("tool.grouped.readFiles", summary.readCount), {
-        count: summary.readCount,
-      }),
-    );
-  }
-  if (summary.hasSearch) {
-    fragments.push(t("tool.grouped.searchedCode"));
-  }
-  if (summary.hasWebSearch) {
-    fragments.push(t("tool.grouped.searchedWeb"));
-  }
-  if (summary.hasBrowse) {
-    fragments.push(t("tool.grouped.browsedWeb"));
-  }
-  if (summary.hasMemory) {
-    fragments.push(t("tool.grouped.consultedMemory"));
-  }
-  if (summary.commandCount > 0) {
-    fragments.push(
-      t(pluralKey("tool.grouped.executedCommands", summary.commandCount), {
-        count: summary.commandCount,
-      }),
-    );
-  }
-  if (summary.subagentCount > 0) {
-    const countLabel = t(
-      pluralKey("tool.grouped.startedSubagents", summary.subagentCount),
-      { count: summary.subagentCount },
-    );
-    const details = formatSubagentDetails(summary.subagents, t);
-    fragments.push(details ? `${countLabel} · ${details}` : countLabel);
-  }
-  if ((summary.subagentResultCount ?? 0) > 0) {
-    const count = summary.subagentResultCount ?? 0;
-    fragments.push(
-      t(pluralKey("tool.grouped.gotSubagentResults", count), { count }),
-    );
-  }
-  if ((summary.subagentSteerCount ?? 0) > 0) {
-    const count = summary.subagentSteerCount ?? 0;
-    fragments.push(
-      t(pluralKey("tool.grouped.steeredSubagents", count), { count }),
-    );
-  }
-  if (summary.usedToolCount > 0) {
-    fragments.push(
-      t(pluralKey("tool.grouped.usedTools", summary.usedToolCount), {
-        count: summary.usedToolCount,
-      }),
-    );
-  }
-
-  return joinSummaryFragments(fragments, t);
-}
-
 export type ProcessSummaryFragment = {
   text: string;
   iconType:
@@ -633,6 +577,13 @@ export function getProcessSummaryFragments(
     const count = summary.subagentSteerCount ?? 0;
     fragments.push({
       text: t(pluralKey("tool.grouped.steeredSubagents", count), { count }),
+      iconType: "subagent",
+    });
+  }
+  if ((summary.subagentWorkflowCount ?? 0) > 0) {
+    const count = summary.subagentWorkflowCount ?? 0;
+    fragments.push({
+      text: t(pluralKey("tool.grouped.ranSubagentWorkflows", count), { count }),
       iconType: "subagent",
     });
   }

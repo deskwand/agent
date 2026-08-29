@@ -1356,6 +1356,8 @@
       "gotSubagentResults_other": "Retrieved {{count}} subagent results",
       "steeredSubagents_one": "Steered {{count}} subagent",
       "steeredSubagents_other": "Steered {{count}} subagents",
+      "ranSubagentWorkflows_one": "Ran {{count}} subagent workflow",
+      "ranSubagentWorkflows_other": "Ran {{count}} subagent workflows",
       "usedTools_one": "Used {{count}} tool",
       "usedTools_other": "Used {{count}} tools",
       "modifiedFiles_one": "Modified {{count}} file",

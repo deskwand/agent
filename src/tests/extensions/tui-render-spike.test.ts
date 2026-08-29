@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { matchesKey, Key, TUI } from "@earendil-works/pi-tui";
+import { matchesKey, Key, TuiMainScreen } from "@earendil-works/pi-tui";
 import {
   BorderedLoader,
   ToolExecutionComponent,
@@ -43,7 +43,7 @@ describe("TUI virtual terminal spike contract", () => {
 
   it("renders official components into a memory terminal", async () => {
     const term = new MemoryTerminal();
-    const tui = new TUI(term);
+    const tui = new TuiMainScreen(term);
     const theme = createNoopTheme();
     tui.start();
     tui.addChild(new BorderedLoader(tui, theme, "Working..."));

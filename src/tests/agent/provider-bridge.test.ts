@@ -97,7 +97,6 @@ describe("registerDeskWandProviders", () => {
     expect(runtimeMock.setRuntimeApiKey).toHaveBeenCalledWith(
       "deskwand:current",
       "profile-key",
-      { allowNetwork: false },
     );
   });
 

@@ -17,6 +17,7 @@ const MAIN_SESSION_TOOLS = [
   "Agent",
   "get_subagent_result",
   "steer_subagent",
+  "SubagentWorkflow",
   "vision_describe",
   "office_read_xlsx",
   "office_read_docx",
