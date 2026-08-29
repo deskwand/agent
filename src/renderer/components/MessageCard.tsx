@@ -78,7 +78,9 @@ export const MessageCard = memo(function MessageCard({
   if (message.code === "INSUFFICIENT_CREDITS") {
     return (
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
-        <p className="text-sm text-text-primary">{t("topUp.insufficientCredits")}</p>
+        <p className="text-sm text-text-primary">
+          {t("topUp.insufficientCredits")}
+        </p>
         <button
           className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground"
           onClick={() => useAppStore.getState().setTopUpOpen(true)}
@@ -96,12 +98,6 @@ export const MessageCard = memo(function MessageCard({
     message.role === "assistant" &&
     message.content.length === 1 &&
     message.content[0].type === "tool_result";
-  const canFork =
-    message.role === "assistant" &&
-    !isToolResultRow &&
-    !isQueued &&
-    !isCancelled &&
-    !isStreaming;
   const rawContent = message.content as unknown;
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
@@ -170,12 +166,19 @@ export const MessageCard = memo(function MessageCard({
     return groups;
   }, [groupedDisplayBlocks]);
 
+  const canFork =
+    message.role === "assistant" &&
+    !isToolResultRow &&
+    !isQueued &&
+    !isCancelled &&
+    !isStreaming &&
+    groupedDisplayBlocks.length > 0;
+
   const showActions =
     !isStreaming &&
     !isQueued &&
     !isCancelled &&
-    groupedDisplayBlocks.length > 0 &&
-    (isUser || isLatestRound);
+    groupedDisplayBlocks.length > 0;
 
   // Extract all text content for copying. For assistant messages all visible
   // text blocks include markdown code fences — no separate code block type exists.
@@ -203,36 +206,44 @@ export const MessageCard = memo(function MessageCard({
 
   const timestampLabel = formatRelativeTime(message.timestamp, i18n.language);
 
-  const renderActionBar = (extraClass?: string) => (
-    <div
-      className={`flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-200 scale-90 group-hover:scale-100${extraClass ? ` ${extraClass}` : ""}`}
-    >
-      <span className="text-xs text-text-muted select-none">
-        {timestampLabel}
-      </span>
-      <button
-        onClick={handleCopy}
-        className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-        title={t("messageCard.copyMessage")}
+  const renderActionBar = (extraClass?: string) => {
+    const showFork = canFork && onForkMessage;
+    if (!showActions && !showFork) return null;
+    return (
+      <div
+        className={`flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-200 scale-90 group-hover:scale-100${extraClass ? ` ${extraClass}` : ""}`}
       >
-        {copied ? (
-          <Check className="w-3 h-3 text-success" />
-        ) : (
-          <Copy className="w-3 h-3" />
-        )}
-      </button>
-      {canFork && onForkMessage ? (
-        <button
-          type="button"
-          onClick={() => onForkMessage(message)}
-          title={t("messageCard.forkMessage")}
-          className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-        >
-          <GitBranch className="w-3 h-3" />
-        </button>
-      ) : null}
-    </div>
-  );
+        {showActions ? (
+          <>
+            <span className="text-xs text-text-muted select-none">
+              {timestampLabel}
+            </span>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
+              title={t("messageCard.copyMessage")}
+            >
+              {copied ? (
+                <Check className="w-3 h-3 text-success" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </button>
+          </>
+        ) : null}
+        {showFork ? (
+          <button
+            type="button"
+            onClick={() => onForkMessage(message)}
+            title={t("messageCard.forkMessage")}
+            className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
+          >
+            <GitBranch className="w-3 h-3" />
+          </button>
+        ) : null}
+      </div>
+    );
+  };
 
   if (!isUser && visibleBlocks.length === 0) {
     return null;
@@ -284,7 +295,7 @@ export const MessageCard = memo(function MessageCard({
                 ))
               )}
             </div>
-            {showActions && renderActionBar("mt-0.5")}
+            {renderActionBar("mt-0.5")}
           </div>
         </div>
       ) : (
@@ -356,7 +367,7 @@ export const MessageCard = memo(function MessageCard({
               isLatestRound={isLatestRound}
             />
           ) : null}
-          {showActions && renderActionBar()}
+          {renderActionBar()}
         </div>
       )}
     </div>
