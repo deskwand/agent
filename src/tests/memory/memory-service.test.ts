@@ -59,10 +59,8 @@ import os from "node:os";
 import path from "node:path";
 import type {
   DatabaseInstance,
-  MessageRow,
   SessionRow,
 } from "../../main/db/database";
-import { queryMessagesPage } from "../../main/db/database";
 import type {
   MemoryCompletionRequest,
   MemoryLLMClientLike,
@@ -192,17 +190,6 @@ function createSchema(db: DatabaseSync): void {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
-
-    CREATE TABLE messages (
-      id TEXT PRIMARY KEY,
-      session_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      content TEXT NOT NULL,
-      timestamp INTEGER NOT NULL,
-      token_usage TEXT,
-      execution_time_ms INTEGER,
-      turn_id TEXT
-    );
   `);
 }
 
@@ -225,24 +212,6 @@ function createDatabaseInstance(db: DatabaseSync): DatabaseInstance {
             .all() as unknown as SessionRow[],
       ),
       delete: vi.fn(),
-    },
-    messages: {
-      create: vi.fn(),
-      update: vi.fn(),
-      getBySessionId: vi.fn(
-        (sessionId: string) =>
-          db
-            .prepare(
-              "SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp ASC",
-            )
-            .all(sessionId) as unknown as MessageRow[],
-      ),
-      getMessagesPage: vi.fn(
-        (sessionId: string, beforeId: string | null, limit: number) =>
-          queryMessagesPage(db, sessionId, beforeId, limit),
-      ),
-      delete: vi.fn(),
-      deleteBySessionId: vi.fn(),
     },
     traceSteps: {
       create: vi.fn(),

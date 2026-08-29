@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DatabaseInstance } from '../src/main/db/database';
+import type { SessionEntry } from '@earendil-works/pi-coding-agent';
 
 vi.mock('electron', () => ({
   app: {
@@ -64,21 +65,6 @@ function makeDb() {
       update: vi.fn(),
       delete: vi.fn(),
     },
-    messages: {
-      create: vi.fn(),
-      getBySessionId: vi.fn(() => [
-        {
-          id: 'm1',
-          session_id: 's1',
-          role: 'user',
-          content: JSON.stringify([{ type: 'text', text: 'hello' }]),
-          timestamp: 1,
-          token_usage: null,
-        },
-      ]),
-      delete: vi.fn(),
-      deleteBySessionId: vi.fn(),
-    },
     traceSteps: {
       create: vi.fn(),
       update: vi.fn(),
@@ -88,17 +74,29 @@ function makeDb() {
   };
 }
 
+function userEntry(id: string, text: string): SessionEntry {
+  return {
+    type: 'message',
+    id,
+    parentId: null,
+    timestamp: '2026-08-29T00:00:00.000Z',
+    message: { role: 'user', content: [{ type: 'text', text }], timestamp: 1 },
+  } as SessionEntry;
+}
+
 describe('SessionManager message cache', () => {
-  it('reuses cached session messages and appends saved messages without rereading DB', () => {
+  it('reads from entriesReader, caches, and appends saved messages without re-reading', () => {
     const db = makeDb();
     const manager = new SessionManager(db as unknown as DatabaseInstance, vi.fn());
+    const reader = vi.fn(() => [userEntry('m1', 'hello')]);
+    manager.setEntriesReader(reader);
 
     const first = manager.getMessages('s1');
     const second = manager.getMessages('s1');
 
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(1);
-    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
+    expect(reader).toHaveBeenCalledTimes(1);
 
     manager.saveMessage({
       id: 'm2',
@@ -111,14 +109,14 @@ describe('SessionManager message cache', () => {
     const third = manager.getMessages('s1');
     expect(third).toHaveLength(2);
     expect(third[1].id).toBe('m2');
-    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
+    expect(reader).toHaveBeenCalledTimes(1);
   });
 
   it('does not serve a partial cache seeded by saveMessage before a full load', () => {
     const db = makeDb();
-    // Override getBySessionId to return empty for 's2'
-    db.messages.getBySessionId = vi.fn((_id: string) => []);
     const manager = new SessionManager(db as unknown as DatabaseInstance, vi.fn());
+    const reader = vi.fn(() => []); // empty entries
+    manager.setEntriesReader(reader);
 
     // Save a message for session 's2' which is not yet cached
     manager.saveMessage({
@@ -130,16 +128,16 @@ describe('SessionManager message cache', () => {
     });
 
     // saveMessage only seeds a partial [message] cache; a session is served
-    // from cache only after a full getMessages() load, so the DB is queried
-    // here (the mock returns no rows yet).
+    // from cache only after a full getMessages() load, so the reader is
+    // consulted here (returns empty).
     const msgs = manager.getMessages('s2');
     expect(msgs).toHaveLength(0);
-    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
+    expect(reader).toHaveBeenCalledTimes(1);
 
     // After a full load the cache is complete; further getMessages calls
-    // are served from cache without hitting the DB.
+    // are served from cache without consulting the reader.
     manager.getMessages('s2');
-    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
+    expect(reader).toHaveBeenCalledTimes(1);
 
     // Saving another message appends to the complete cache
     manager.saveMessage({
@@ -152,6 +150,6 @@ describe('SessionManager message cache', () => {
     const msgs2 = manager.getMessages('s2');
     expect(msgs2).toHaveLength(1);
     expect(msgs2[0].id).toBe('msg-b');
-    expect(db.messages.getBySessionId).toHaveBeenCalledTimes(1);
+    expect(reader).toHaveBeenCalledTimes(1);
   });
 });
