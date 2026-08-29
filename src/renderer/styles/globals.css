@@ -1079,23 +1079,10 @@
 
   /* ── Button magic (merged into .btn base class) ── */
 
-  /* ── Scroll fade mask ── */
-  .eff-scroll-fade {
-    -webkit-mask-image: linear-gradient(
-      to bottom,
-      transparent 0%,
-      black 4%,
-      black 96%,
-      transparent 100%
-    );
-    mask-image: linear-gradient(
-      to bottom,
-      transparent 0%,
-      black 4%,
-      black 96%,
-      transparent 100%
-    );
-  }
+  /* NOTE: the former .eff-scroll-fade mask was removed — a mask-image on a
+     scrollable container forces Chromium to re-rasterize the mask layer on
+     every scroll frame, defeating compositor fast-path scrolling and causing
+     janky history scroll. Do not re-introduce a mask on the chat scroller. */
 
   /* ── Streaming cursor ── */
   .eff-cursor {

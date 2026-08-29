@@ -209,6 +209,13 @@ const MAX_DOCK_TICKS = 50;
 const WHEEL_KILL_THRESHOLD_PX = 4;
 // Fire a little before the user hits absolute top to hide prepend latency.
 const LOAD_OLDER_THRESHOLD_PX = 160;
+// Stable empty arrays for MessageCard props. `?? []` literals allocate a
+// fresh array on every recompute, defeating React.memo's shallow compare and
+// forcing every historical MessageCard to re-render on each streaming tick
+// and history prepend. Sharing one stable reference keeps memoization intact
+// (these are only ever read — ArtifactCard filters/maps, never mutates).
+const EMPTY_RESULT_FILES: ResultFileEntry[] = [];
+const EMPTY_VIDEO_REFERENCES: VideoReference[] = [];
 
 export function ChatView() {
   const { t } = useTranslation();
@@ -815,8 +822,9 @@ export function ChatView() {
         // keep their natural order instead of being pushed to the end.
         isLatestRound:
           msgId.startsWith("partial-") || msgId === latestAssistantId,
-        artifactFiles: turnArtifactFiles.get(msgId) ?? [],
-        videoReferences: turnVideoReferences.get(msgId) ?? [],
+        artifactFiles: turnArtifactFiles.get(msgId) ?? EMPTY_RESULT_FILES,
+        videoReferences:
+          turnVideoReferences.get(msgId) ?? EMPTY_VIDEO_REFERENCES,
         turnProcessSummary:
           message.role === "assistant"
             ? turnProcessSummaries.get(msgId)
@@ -1686,7 +1694,7 @@ export function ChatView() {
         )}
         <div
           ref={scrollContainerRef}
-          className="h-full min-h-0 overflow-y-auto overflow-x-hidden eff-scroll-fade"
+          className="h-full min-h-0 overflow-y-auto overflow-x-hidden"
           style={{ overflowAnchor: "none" }}
         >
           <div
