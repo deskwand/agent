@@ -329,4 +329,30 @@ export class CloudApiClient {
     const q = qs.toString();
     return this.request(`/api/payments/orders${q ? `?${q}` : ""}`);
   }
+
+  // ── Vault ──
+
+  async vaultPut(id: string, payload: ArrayBuffer): Promise<void> {
+    const res = await this.fetchCore(`/api/vault/objects/${id}`, {
+      method: "PUT",
+      body: payload,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  }
+
+  async vaultList(): Promise<string[]> {
+    const res = await this.request<{ object_ids: string[] }>(
+      "/api/vault/objects",
+    );
+    return res.object_ids;
+  }
+
+  async vaultGet(id: string): Promise<ArrayBuffer> {
+    const res = await this.fetchCore(`/api/vault/objects/${id}`, {});
+    return res.arrayBuffer();
+  }
+
+  async vaultDelete(id: string): Promise<void> {
+    await this.request(`/api/vault/objects/${id}`, { method: "DELETE" });
+  }
 }

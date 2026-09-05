@@ -699,6 +699,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
       return () => ipcRenderer.removeListener("browser.state-changed", handler);
     },
   },
+
+  // Vault (E2EE encrypted file transfer)
+  vault: {
+    encryptUpload: (filePath: string) =>
+      ipcRenderer.invoke("vault.encryptUpload", filePath),
+    decryptRestore: (id: string, payloadBase64: string) =>
+      ipcRenderer.invoke("vault.decryptRestore", id, payloadBase64),
+  },
 });
 
 // Type declaration for the renderer process
@@ -1239,6 +1247,18 @@ declare global {
             description?: string;
             source: "builtin" | "extension";
           }>;
+        }>;
+      };
+      vault: {
+        encryptUpload: (filePath: string) => Promise<{
+          id: string;
+          payloadBase64: string;
+        }>;
+        decryptRestore: (
+          id: string,
+          payloadBase64: string,
+        ) => Promise<{
+          filePath: string;
         }>;
       };
     };

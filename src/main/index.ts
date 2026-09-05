@@ -33,6 +33,7 @@ import { createHash } from "crypto";
 import { execFileSync } from "child_process";
 import { config } from "dotenv";
 import { initDatabase, closeDatabase } from "./db/database";
+import { registerVaultIpc } from "./vault/ipc";
 import { SessionManager } from "./session/session-manager";
 import { SkillsManager } from "./skills/skills-manager";
 import { MemoryService } from "./memory/memory-service";
@@ -1427,6 +1428,7 @@ ipcMain.on("client-event", async (_event, data: ClientEvent) => {
 
 // ── OAuth IPC handlers ──
 initOAuthService();
+registerVaultIpc();
 ipcMain.handle("openrouterAuth.login", async () => {
   return openRouterPkceService.login();
 });
