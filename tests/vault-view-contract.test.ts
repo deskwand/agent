@@ -16,11 +16,9 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.syncComplete": "Sync complete",
   "vault.alreadyLatest": "Already up to date",
   "vault.dismiss": "Dismiss",
-  "vault.filter.all": "All",
-  "vault.filter.documents": "Documents",
+  "vault.filter.files": "Files",
   "vault.filter.skills": "Skills",
   "vault.filter.sessions": "Sessions",
-  "vault.filter.other": "Other",
   "vault.status.synced": "Synced",
   "vault.status.pending": "Pending Backup",
   "vault.status.failed": "Sync Failed",
@@ -28,7 +26,11 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.action.reveal": "Reveal in Folder",
   "vault.action.export": "Export",
   "vault.action.delete": "Delete",
+  "vault.action.more": "More actions for {{name}}",
   "vault.confirm.delete": "Delete {{name}} from your Vault?",
+  "vault.comingSoon": "Coming soon",
+  "vault.fileCount_one": "{{count}} file",
+  "vault.fileCount_other": "{{count}} files",
   "vault.empty": "No files in your Vault",
   "vault.loginHint": "Sign in to back up files to the cloud",
   "vault.recoveryCode": "Recovery code",
@@ -87,7 +89,15 @@ const TRANSLATIONS: Record<string, string> = {
 };
 
 vi.mock("react-i18next", () => {
-  const translate = (key: string) => TRANSLATIONS[key] ?? key;
+  const translate = (
+    key: string,
+    options?: { count?: number; name?: string },
+  ) => {
+    const pluralKey = options?.count === 1 ? `${key}_one` : `${key}_other`;
+    return (TRANSLATIONS[pluralKey] ?? TRANSLATIONS[key] ?? key)
+      .replace("{{count}}", String(options?.count ?? ""))
+      .replace("{{name}}", options?.name ?? "");
+  };
   return {
     useTranslation: () => ({
       t: translate,
@@ -220,6 +230,78 @@ describe("VaultView", () => {
     expect(screenText()).toContain("Pending Backup");
   });
 
+  it("renders only file, skill, and session categories", async () => {
+    await renderVault();
+
+    const tabs = Array.from(container.querySelectorAll("button")).filter(
+      (button) =>
+        ["Files", "Skills", "Sessions"].includes(button.textContent ?? ""),
+    );
+    expect(tabs).toHaveLength(3);
+    expect(screenText()).not.toContain("All");
+    expect(screenText()).not.toContain("Documents");
+    expect(screenText()).not.toContain("Other");
+    expect(container.querySelector("header")?.textContent).not.toContain(
+      "Upload",
+    );
+    expect(screenText()).toContain("1 file");
+
+    const upload = uploadButton();
+    expect(upload.closest("header")).toBeNull();
+  });
+
+  it.each(["Skills", "Sessions"])(
+    "%s shows the coming-soon state without file actions",
+    async (label) => {
+      await renderVault();
+      const tab = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === label,
+      );
+
+      await act(async () => {
+        tab?.click();
+      });
+
+      expect(screenText()).toContain("Coming soon");
+      expect(screenText()).not.toContain("readme.md");
+      expect(screenText()).not.toContain("Upload");
+    },
+  );
+
+  it("keeps file actions inside a closed more-actions menu", async () => {
+    await renderVault();
+
+    expect(screenText()).not.toContain("Reveal in Folder");
+    const more = container.querySelector(
+      'button[aria-label="More actions for readme.md"]',
+    );
+    expect(more).not.toBeNull();
+    expect(more?.getAttribute("aria-expanded")).toBe("false");
+    expect(more?.getAttribute("aria-controls")).toBe("vault-menu-readme.md");
+
+    await act(async () => {
+      more?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const menu = container.querySelector('[role="menu"]');
+    expect(menu?.textContent).toContain("Open");
+    expect(menu?.textContent).toContain("Reveal in Folder");
+    expect(menu?.textContent).toContain("Export");
+    expect(menu?.textContent).toContain("Delete");
+    expect(more?.getAttribute("aria-expanded")).toBe("true");
+    expect(more?.getAttribute("aria-controls")).toBe("vault-menu-readme.md");
+    expect(screenText()).toContain("readme.md");
+    expect(screenText()).toContain("Pending Backup");
+
+    await act(async () => {
+      more?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(more?.getAttribute("aria-expanded")).toBe("false");
+  });
+
   it("does not offer a new recovery code after initialization", async () => {
     api.getSnapshot.mockResolvedValueOnce(
       snapshot({ hasLocalIndex: true, hasLocalMek: true }),
@@ -252,7 +334,7 @@ describe("VaultView", () => {
     expect(api.restoreWithRecoveryCode).not.toHaveBeenCalled();
   });
 
-  it("blocks upload during first-time recovery-code setup", async () => {
+  it("does not offer upload during first-time recovery-code setup", async () => {
     api.getSnapshot.mockResolvedValueOnce(
       snapshot({
         items: [],
@@ -266,7 +348,11 @@ describe("VaultView", () => {
 
     await renderVault();
 
-    expect(uploadButton().disabled).toBe(true);
+    expect(
+      Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent === "Upload",
+      ),
+    ).toBeUndefined();
     expect(screenText()).toContain("Set your recovery code");
   });
 

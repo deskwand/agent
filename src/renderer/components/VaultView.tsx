@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import type {
@@ -8,7 +9,7 @@ import type {
   VaultSnapshotItem,
 } from "../../shared/vault";
 
-type Filter = "all" | "documents" | "skills" | "sessions" | "other";
+type Filter = "files" | "skills" | "sessions";
 type SyncFeedback = "idle" | "syncing" | "success" | "error";
 type EmptyVaultMode =
   | "loading"
@@ -22,31 +23,7 @@ type EmptyVaultMode =
   | "remote-error"
   | "resetting";
 
-const FILTERS: Filter[] = ["all", "documents", "skills", "sessions", "other"];
-
-const DOCUMENT_EXTENSIONS = new Set([
-  "csv",
-  "doc",
-  "docx",
-  "json",
-  "md",
-  "pdf",
-  "ppt",
-  "pptx",
-  "rtf",
-  "txt",
-  "xls",
-  "xlsx",
-]);
-const SKILL_EXTENSIONS = new Set(["skill", "zip"]);
-const SESSION_EXTENSIONS = new Set(["jsonl", "session"]);
-
-function fileCategory(ext: string): Exclude<Filter, "all"> {
-  if (DOCUMENT_EXTENSIONS.has(ext)) return "documents";
-  if (SKILL_EXTENSIONS.has(ext)) return "skills";
-  if (SESSION_EXTENSIONS.has(ext)) return "sessions";
-  return "other";
-}
+const FILTERS: Filter[] = ["files", "skills", "sessions"];
 
 function statusText(status: SyncStatus, t: (key: string) => string): string {
   if (status === "synced") return t("vault.status.synced");
@@ -122,7 +99,7 @@ export function VaultView(): JSX.Element {
   const { t } = useTranslation();
   const token = useAppStore((state) => state.cloudConfig?.token ?? null);
   const [snapshot, setSnapshot] = useState<VaultSnapshot | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>("files");
   const [remoteStatus, setRemoteStatus] = useState<VaultRemoteStatus | null>(
     null,
   );
@@ -138,6 +115,7 @@ export function VaultView(): JSX.Element {
   const [syncFeedbackMessage, setSyncFeedbackMessage] = useState<string | null>(
     null,
   );
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const syncFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoRestoreFired = useRef(false);
   const setupGenerated = useRef(false);
@@ -191,9 +169,8 @@ export function VaultView(): JSX.Element {
   );
 
   const visibleItems = useMemo(() => {
-    const items = snapshot?.items ?? [];
-    if (filter === "all") return items;
-    return items.filter((item) => fileCategory(item.ext) === filter);
+    if (filter !== "files") return [];
+    return snapshot?.items ?? [];
   }, [filter, snapshot?.items]);
 
   const runAction = useCallback(
@@ -215,6 +192,10 @@ export function VaultView(): JSX.Element {
     },
     [loadSnapshot, t],
   );
+
+  const handleUpload = useCallback(() => {
+    void runAction(() => window.electronAPI.vault.importFile());
+  }, [runAction]);
 
   const handleAutoRestore = useCallback(async () => {
     if (!token) return;
@@ -430,16 +411,6 @@ export function VaultView(): JSX.Element {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded-lg border border-border-subtle px-3 py-2 text-sm text-text-secondary hover:bg-surface-hover disabled:opacity-50"
-            onClick={() =>
-              void runAction(() => window.electronAPI.vault.importFile())
-            }
-            disabled={uploadDisabled}
-          >
-            {t("vault.upload")}
-          </button>
-          <button
-            type="button"
             className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
             onClick={() => void handleSync()}
             disabled={syncDisabled}
@@ -502,8 +473,28 @@ export function VaultView(): JSX.Element {
             ))}
           </div>
 
+          {filter === "files" && (
+            <div className="flex items-center justify-between py-3">
+              <span className="text-xs text-text-muted">
+                {t("vault.fileCount", { count: visibleItems.length })}
+              </span>
+              <button
+                type="button"
+                className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+                onClick={handleUpload}
+                disabled={uploadDisabled}
+              >
+                {t("vault.upload")}
+              </button>
+            </div>
+          )}
+
           <div className="min-h-0 flex-1 overflow-y-auto py-3">
-            {visibleItems.length === 0 ? (
+            {filter !== "files" ? (
+              <p className="py-12 text-center text-sm text-text-muted">
+                {t("vault.comingSoon")}
+              </p>
+            ) : visibleItems.length === 0 ? (
               <p className="py-12 text-center text-sm text-text-muted">
                 {t("vault.empty")}
               </p>
@@ -523,43 +514,87 @@ export function VaultView(): JSX.Element {
                         {statusText(item.syncStatus, t)}
                       </p>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="relative shrink-0">
                       <button
                         type="button"
-                        className="rounded px-2 py-1 text-xs text-text-muted hover:bg-surface-hover hover:text-text-primary"
-                        onClick={() => handleOpen(item)}
-                      >
-                        {t("vault.action.open")}
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded px-2 py-1 text-xs text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                        aria-label={t("vault.action.more", { name: item.name })}
+                        aria-haspopup="menu"
+                        aria-expanded={openMenu === item.name}
+                        aria-controls={`vault-menu-${item.name}`}
+                        className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
                         onClick={() =>
-                          void runAction(() =>
-                            window.electronAPI.vault.revealFile(item.name),
+                          setOpenMenu((current) =>
+                            current === item.name ? null : item.name,
                           )
                         }
+                        onKeyDown={(event) => {
+                          if (event.key === "Escape") {
+                            setOpenMenu(null);
+                            event.currentTarget.focus();
+                          }
+                        }}
                       >
-                        {t("vault.action.reveal")}
+                        <MoreHorizontal className="h-4 w-4" />
                       </button>
-                      <button
-                        type="button"
-                        className="rounded px-2 py-1 text-xs text-text-muted hover:bg-surface-hover hover:text-text-primary"
-                        onClick={() =>
-                          void runAction(() =>
-                            window.electronAPI.vault.exportFile(item.name),
-                          )
-                        }
-                      >
-                        {t("vault.action.export")}
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded px-2 py-1 text-xs text-error hover:bg-error/10"
-                        onClick={() => handleDelete(item)}
-                      >
-                        {t("vault.action.delete")}
-                      </button>
+                      {openMenu === item.name && (
+                        <div
+                          id={`vault-menu-${item.name}`}
+                          role="menu"
+                          className="absolute right-0 top-8 z-10 min-w-32 rounded-lg border border-border-subtle bg-background p-1 shadow-lg"
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") setOpenMenu(null);
+                          }}
+                        >
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="block w-full rounded px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                            onClick={() => {
+                              setOpenMenu(null);
+                              handleOpen(item);
+                            }}
+                          >
+                            {t("vault.action.open")}
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="block w-full rounded px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                            onClick={() => {
+                              setOpenMenu(null);
+                              void runAction(() =>
+                                window.electronAPI.vault.revealFile(item.name),
+                              );
+                            }}
+                          >
+                            {t("vault.action.reveal")}
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="block w-full rounded px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                            onClick={() => {
+                              setOpenMenu(null);
+                              void runAction(() =>
+                                window.electronAPI.vault.exportFile(item.name),
+                              );
+                            }}
+                          >
+                            {t("vault.action.export")}
+                          </button>
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="block w-full rounded px-3 py-2 text-left text-xs text-error hover:bg-error/10"
+                            onClick={() => {
+                              setOpenMenu(null);
+                              handleDelete(item);
+                            }}
+                          >
+                            {t("vault.action.delete")}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </article>
                 ))}
@@ -624,6 +659,8 @@ export function VaultView(): JSX.Element {
           handleGenerateRecoveryCode,
           handleDiscardAndRestart,
           retryAutoRestore,
+          handleUpload,
+          uploadDisabled,
           setError,
         })
       )}
@@ -714,6 +751,8 @@ interface EmptyStateHandlers {
   handleGenerateRecoveryCode: () => Promise<void>;
   handleDiscardAndRestart: () => void;
   retryAutoRestore: () => void;
+  handleUpload: () => void;
+  uploadDisabled: boolean;
   setError: (value: string | null) => void;
 }
 
@@ -863,7 +902,26 @@ function renderEmptyState(
     );
   }
 
-  // empty-ready and loading
+  if (mode === "empty-ready") {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
+        <p className="text-sm text-text-muted">{t("vault.empty")}</p>
+        {!h.token && (
+          <p className="text-xs text-text-muted">{t("vault.loginHint")}</p>
+        )}
+        <button
+          type="button"
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+          onClick={h.handleUpload}
+          disabled={h.uploadDisabled}
+        >
+          {t("vault.upload")}
+        </button>
+      </div>
+    );
+  }
+
+  // loading
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
       <p className="text-sm text-text-muted">{t("vault.empty")}</p>

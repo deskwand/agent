@@ -1586,16 +1586,17 @@
     "syncComplete": "同步完成",
     "alreadyLatest": "已是最新",
     "dismiss": "关闭",
+    "fileCount_one": "{{count}} 个文件",
+    "fileCount_other": "{{count}} 个文件",
+    "comingSoon": "敬请期待",
     "empty": "密库中暂无文件",
     "loginHint": "登录后可将文件备份到云端",
     "recoveryCode": "恢复码",
     "pendingCount": "{{count}} 项待同步",
     "filter": {
-      "all": "全部",
-      "documents": "文档",
+      "files": "文件",
       "skills": "技能",
-      "sessions": "会话",
-      "other": "其他"
+      "sessions": "会话"
     },
     "status": {
       "synced": "已同步",
@@ -1606,7 +1607,8 @@
       "open": "打开",
       "reveal": "在文件夹中显示",
       "export": "导出",
-      "delete": "删除"
+      "delete": "删除",
+      "more": "{{name}} 更多操作"
     },
     "confirm": {
       "delete": "确定从密库中删除 {{name}}？"

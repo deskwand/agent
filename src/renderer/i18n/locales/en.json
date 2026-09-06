@@ -1590,16 +1590,17 @@
     "syncComplete": "Sync complete",
     "alreadyLatest": "Already up to date",
     "dismiss": "Dismiss",
+    "fileCount_one": "{{count}} file",
+    "fileCount_other": "{{count}} files",
+    "comingSoon": "Coming soon",
     "empty": "No files in your Vault",
     "loginHint": "Sign in to back up files to the cloud",
     "recoveryCode": "Recovery code",
     "pendingCount": "{{count}} pending",
     "filter": {
-      "all": "All",
-      "documents": "Documents",
+      "files": "Files",
       "skills": "Skills",
-      "sessions": "Sessions",
-      "other": "Other"
+      "sessions": "Sessions"
     },
     "status": {
       "synced": "Synced",
@@ -1610,7 +1611,8 @@
       "open": "Open",
       "reveal": "Reveal in Folder",
       "export": "Export",
-      "delete": "Delete"
+      "delete": "Delete",
+      "more": "More actions for {{name}}"
     },
     "confirm": {
       "delete": "Delete {{name}} from your Vault?"
