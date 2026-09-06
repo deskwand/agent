@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { ConfirmDialog } from "./ConfirmDialog";
 import type {
   SyncStatus,
   VaultRemoteStatus,
@@ -11,6 +12,10 @@ import type {
 
 type Filter = "files" | "skills" | "sessions";
 type SyncFeedback = "idle" | "syncing" | "success" | "error";
+type PendingConfirmation =
+  | { kind: "delete"; item: VaultSnapshotItem }
+  | { kind: "discard-new-device" }
+  | { kind: "reset-existing" };
 type EmptyVaultMode =
   | "loading"
   | "normal"
@@ -111,6 +116,8 @@ export function VaultView(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetPending, setResetPending] = useState(false);
+  const [pendingConfirmation, setPendingConfirmation] =
+    useState<PendingConfirmation | null>(null);
   const [syncFeedback, setSyncFeedback] = useState<SyncFeedback>("idle");
   const [syncFeedbackMessage, setSyncFeedbackMessage] = useState<string | null>(
     null,
@@ -321,12 +328,7 @@ export function VaultView(): JSX.Element {
   };
 
   const handleDiscardAndRestart = () => {
-    if (!token) return;
-    if (!window.confirm(t("vault.reset.confirmNewDevice"))) return;
-    void runAction(async () => {
-      await window.electronAPI.vault.discardRemoteBackupAndStart(token);
-      return window.electronAPI.vault.getSnapshot();
-    });
+    if (token) setPendingConfirmation({ kind: "discard-new-device" });
   };
 
   const retryReset = () => {
@@ -346,16 +348,7 @@ export function VaultView(): JSX.Element {
   };
 
   const handleBeginReset = () => {
-    if (!token) return;
-    if (!window.confirm(t("vault.reset.confirmExisting"))) return;
-    void runAction(async () => {
-      const preparation =
-        await window.electronAPI.vault.beginDiscardAndReinitialize(token);
-      setRecoveryCode(preparation.recoveryCode);
-      setRecoveryConfirmed(false);
-      setResetPending(true);
-      return window.electronAPI.vault.getSnapshot();
-    });
+    if (token) setPendingConfirmation({ kind: "reset-existing" });
   };
 
   const handleOpen = (item: VaultSnapshotItem) => {
@@ -367,8 +360,36 @@ export function VaultView(): JSX.Element {
   };
 
   const handleDelete = (item: VaultSnapshotItem) => {
-    if (!window.confirm(t("vault.confirm.delete", { name: item.name }))) return;
-    void runAction(() => window.electronAPI.vault.deleteFile(item.name));
+    setPendingConfirmation({ kind: "delete", item });
+  };
+
+  const handleConfirm = () => {
+    const pending = pendingConfirmation;
+    setPendingConfirmation(null);
+    if (!pending) return;
+
+    if (pending.kind === "delete") {
+      void runAction(() =>
+        window.electronAPI.vault.deleteFile(pending.item.name),
+      );
+      return;
+    }
+    if (!token) return;
+    if (pending.kind === "discard-new-device") {
+      void runAction(async () => {
+        await window.electronAPI.vault.discardRemoteBackupAndStart(token);
+        return window.electronAPI.vault.getSnapshot();
+      });
+      return;
+    }
+    void runAction(async () => {
+      const preparation =
+        await window.electronAPI.vault.beginDiscardAndReinitialize(token);
+      setRecoveryCode(preparation.recoveryCode);
+      setRecoveryConfirmed(false);
+      setResetPending(true);
+      return window.electronAPI.vault.getSnapshot();
+    });
   };
 
   const setupBlockedByRemoteBackup =
@@ -729,6 +750,28 @@ export function VaultView(): JSX.Element {
             </button>
           </div>
         )}
+
+      <ConfirmDialog
+        isOpen={pendingConfirmation !== null}
+        title={
+          pendingConfirmation?.kind === "delete"
+            ? t("vault.confirm.delete", {
+                name: pendingConfirmation.item.name,
+              })
+            : pendingConfirmation?.kind === "discard-new-device"
+              ? t("vault.reset.confirmNewDevice")
+              : t("vault.reset.confirmExisting")
+        }
+        confirmLabel={
+          pendingConfirmation?.kind === "delete"
+            ? t("vault.confirm.deleteAction")
+            : pendingConfirmation?.kind === "discard-new-device"
+              ? t("vault.reset.discardAction")
+              : t("vault.reset.resetAction")
+        }
+        onConfirm={handleConfirm}
+        onCancel={() => setPendingConfirmation(null)}
+      />
     </section>
   );
 }

@@ -8,6 +8,8 @@ import { useAppStore } from "../src/renderer/store";
 import type { VaultSnapshot, VaultSnapshotItem } from "../src/shared/vault";
 
 const TRANSLATIONS: Record<string, string> = {
+  "common.cancel": "Cancel",
+  "common.delete": "Delete",
   "vault.title": "Vault",
   "vault.subtitle": "Local files with encrypted cloud backup",
   "vault.upload": "Upload",
@@ -28,6 +30,7 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.action.delete": "Delete",
   "vault.action.more": "More actions for {{name}}",
   "vault.confirm.delete": "Delete {{name}} from your Vault?",
+  "vault.confirm.deleteAction": "Delete",
   "vault.comingSoon": "Coming soon",
   "vault.fileCount_one": "{{count}} file",
   "vault.fileCount_other": "{{count}} files",
@@ -82,6 +85,8 @@ const TRANSLATIONS: Record<string, string> = {
     "Discard the old backup and create a new Vault? This cannot be undone.",
   "vault.reset.confirmExisting":
     "Discard the old cloud backup and start over? Your local files stay, but the cloud backup is deleted. This cannot be undone.",
+  "vault.reset.discardAction": "Discard and start fresh",
+  "vault.reset.resetAction": "Reset and reconfigure",
   "vault.reset.localFilesConflict":
     "An existing cloud backup must be discarded before these local files can start a new backup.",
   "vault.reset.retry": "Retry reset",
@@ -220,6 +225,46 @@ describe("VaultView", () => {
   function screenText(): string {
     return container.textContent ?? "";
   }
+
+  it("uses a browser confirmation dialog before deleting a file", async () => {
+    const systemConfirm = vi.spyOn(window, "confirm");
+
+    await renderVault();
+    const moreButton = container.querySelector(
+      'button[aria-label="More actions for readme.md"]',
+    );
+    expect(moreButton).toBeDefined();
+    await act(async () => moreButton!.click());
+    const deleteButton = Array.from(
+      container.querySelectorAll('[role="menuitem"]'),
+    ).find((button) => button.textContent === "Delete");
+    expect(deleteButton).toBeDefined();
+    await act(async () => deleteButton!.click());
+
+    expect(systemConfirm).not.toHaveBeenCalled();
+    expect(screenText()).toContain("Delete readme.md from your Vault?");
+    expect(api.deleteFile).not.toHaveBeenCalled();
+
+    const modal = container.querySelector(".modal-overlay");
+    expect(modal).not.toBeNull();
+    await act(async () => modal!.querySelector("button")!.click());
+    expect(api.deleteFile).not.toHaveBeenCalled();
+
+    await act(async () => moreButton!.click());
+    const reopenedDeleteButton = Array.from(
+      container.querySelectorAll('[role="menuitem"]'),
+    ).find((button) => button.textContent === "Delete");
+    expect(reopenedDeleteButton).toBeDefined();
+    await act(async () => reopenedDeleteButton!.click());
+    const reopenedModal = container.querySelector(".modal-overlay");
+    expect(reopenedModal).not.toBeNull();
+    const confirmButtons = reopenedModal!.querySelectorAll("button");
+    await act(async () => {
+      confirmButtons[confirmButtons.length - 1].click();
+      await Promise.resolve();
+    });
+    expect(api.deleteFile).toHaveBeenCalledWith("readme.md");
+  });
 
   it("renders the local snapshot without requiring cloud access", async () => {
     await renderVault();
@@ -563,7 +608,7 @@ describe("VaultView", () => {
       }),
     );
     api.checkRemoteBackup.mockResolvedValueOnce({ status: "has-backup" });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, "confirm");
 
     await renderVault();
 
@@ -575,7 +620,29 @@ describe("VaultView", () => {
       discard?.click();
     });
 
-    expect(confirmSpy).toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screenText()).toContain(
+      "Discard the old backup and create a new Vault? This cannot be undone.",
+    );
+    expect(api.discardRemoteBackupAndStart).not.toHaveBeenCalled();
+    const modal = container.querySelector(".modal-overlay");
+    expect(modal).not.toBeNull();
+    const modalButtons = modal!.querySelectorAll("button");
+    expect(modalButtons[0].textContent).toBe("Cancel");
+    expect(modalButtons[modalButtons.length - 1].textContent).toBe(
+      "Discard and start fresh",
+    );
+    await act(async () => modalButtons[0].click());
+    expect(api.discardRemoteBackupAndStart).not.toHaveBeenCalled();
+
+    await act(async () => discard?.click());
+    const reopenedModal = container.querySelector(".modal-overlay");
+    expect(reopenedModal).not.toBeNull();
+    const confirmButtons = reopenedModal!.querySelectorAll("button");
+    await act(async () => {
+      confirmButtons[confirmButtons.length - 1].click();
+      await Promise.resolve();
+    });
     expect(api.discardRemoteBackupAndStart).toHaveBeenCalledWith("token");
   });
 
@@ -593,7 +660,7 @@ describe("VaultView", () => {
       recoveryCode: "NEW-CODE",
       preservedLocalFiles: 1,
     });
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const confirmSpy = vi.spyOn(window, "confirm");
 
     await renderVault();
     const discard = Array.from(container.querySelectorAll("button")).find(
@@ -601,11 +668,32 @@ describe("VaultView", () => {
     );
     await act(async () => {
       discard?.click();
+    });
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screenText()).toContain(
+      "Discard the old cloud backup and start over? Your local files stay, but the cloud backup is deleted. This cannot be undone.",
+    );
+    expect(api.beginDiscardAndReinitialize).not.toHaveBeenCalled();
+    const modal = container.querySelector(".modal-overlay");
+    expect(modal).not.toBeNull();
+    const modalButtons = modal!.querySelectorAll("button");
+    expect(modalButtons[modalButtons.length - 1].textContent).toBe(
+      "Reset and reconfigure",
+    );
+    const cancel = modal!.querySelector("button");
+    await act(async () => cancel?.click());
+    expect(api.beginDiscardAndReinitialize).not.toHaveBeenCalled();
+
+    await act(async () => discard?.click());
+    const reopenedModal = container.querySelector(".modal-overlay");
+    expect(reopenedModal).not.toBeNull();
+    const confirmButtons = reopenedModal!.querySelectorAll("button");
+    await act(async () => {
+      confirmButtons[confirmButtons.length - 1].click();
       await Promise.resolve();
       await Promise.resolve();
     });
-
-    expect(confirmSpy).toHaveBeenCalled();
     expect(screenText()).toContain("NEW-CODE");
     const checkbox = container.querySelector(
       'input[type="checkbox"]',

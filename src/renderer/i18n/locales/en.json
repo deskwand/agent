@@ -1615,7 +1615,8 @@
       "more": "More actions for {{name}}"
     },
     "confirm": {
-      "delete": "Delete {{name}} from your Vault?"
+      "delete": "Delete {{name}} from your Vault?",
+      "deleteAction": "Delete"
     },
     "setup": {
       "open": "Set up encrypted cloud backup",
@@ -1660,6 +1661,8 @@
     "reset": {
       "discard": "Discard old backup, start fresh",
       "confirmNewDevice": "Discard the old backup and create a new Vault? This cannot be undone.",
+      "discardAction": "Discard and start fresh",
+      "resetAction": "Reset and reconfigure",
       "confirmExisting": "Discard the old cloud backup and start over? Your local files stay, but the cloud backup is deleted. This cannot be undone.",
       "localFilesConflict": "An existing cloud backup must be discarded before these local files can start a new backup.",
       "retry": "Retry reset",

@@ -1611,7 +1611,8 @@
       "more": "{{name}} 更多操作"
     },
     "confirm": {
-      "delete": "确定从密库中删除 {{name}}？"
+      "delete": "确定从密库中删除 {{name}}？",
+      "deleteAction": "删除"
     },
     "setup": {
       "open": "设置加密云备份",
@@ -1656,6 +1657,8 @@
     "reset": {
       "discard": "丢弃旧备份，创建新的 Vault",
       "confirmNewDevice": "确定要丢弃旧备份并创建新的 Vault 吗？此操作不可逆。",
+      "discardAction": "丢弃并重新开始",
+      "resetAction": "重置并重新设置",
       "confirmExisting": "确定要丢弃旧云端备份并重新设置吗？本地文件会保留，但云端备份将被删除。此操作不可逆。",
       "localFilesConflict": "已有云端备份。要为这些本地文件建立新备份，必须先丢弃旧备份。",
       "retry": "重试重置",
