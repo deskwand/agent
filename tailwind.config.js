@@ -49,9 +49,9 @@ module.exports = {
         mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'Consolas', 'monospace'],
       },
       fontSize: {
-        xs:   ['0.75rem',  { lineHeight: '1rem',     fontWeight: '500' }], // 12px — chrome/meta
-        sm:   ['0.8125rem',{ lineHeight: '1.25rem',  fontWeight: '500' }], // 13px — compact body
-        base: ['0.875rem', { lineHeight: '1.5rem',   fontWeight: '500' }], // 14px — body / chat prose
+        xs:   ['0.75rem',  { lineHeight: '1rem',     fontWeight: '400' }], // 12px — chrome/meta
+        sm:   ['0.8125rem',{ lineHeight: '1.25rem',  fontWeight: '400' }], // 13px — compact body
+        base: ['0.875rem', { lineHeight: '1.5rem',   fontWeight: '400' }], // 14px — body / chat prose
         lg:   ['0.9375rem',{ lineHeight: '1.5rem',   fontWeight: '600' }], // 15px — subtle heading
         xl:   ['1rem',     { lineHeight: '1.5rem',   fontWeight: '600' }], // 16px — section heading
         '2xl':['1.125rem', { lineHeight: '1.5rem',   fontWeight: '600' }], // 18px — stat / major heading
