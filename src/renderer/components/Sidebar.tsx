@@ -59,9 +59,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
-  const showApps = useAppStore((s) => s.showApps);
+  const setActiveView = useAppStore((s) => s.setActiveView);
+  const showApps = useAppStore((s) => s.activeView === "apps");
   const setShowApps = useAppStore((s) => s.setShowApps);
-  const showSchedule = useAppStore((s) => s.showSchedule);
+  const showSchedule = useAppStore((s) => s.activeView === "automation");
+  const showVault = useAppStore((s) => s.activeView === "vault");
   const cloudConfig = useAppStore((s) => s.cloudConfig);
   const showLoginModal = useAppStore((s) => s.showLoginModal);
   const setShowLoginModal = useAppStore((s) => s.setShowLoginModal);
@@ -485,6 +487,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     setShowApps(false);
     setShowSchedule(true);
   }, [setShowSettings, setShowApps, setShowSchedule]);
+
+  const openVault = useCallback(() => {
+    setAccountMenuOpen(false);
+    setActiveSession(null);
+    setActiveView("vault");
+  }, [setActiveSession, setActiveView]);
 
   const handleDeleteSession = useCallback(
     (e: React.MouseEvent, session: Session) => {
@@ -943,6 +951,19 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   >
                     <LayoutGrid className="w-4 h-4 text-text-muted flex-shrink-0" />
                     <span className="truncate">{t("sidebar.apps")}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openVault}
+                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
+                      showVault
+                        ? "bg-surface-active text-text-primary"
+                        : "text-text-secondary hover:bg-surface-hover/60"
+                    }`}
+                    aria-current={showVault ? "page" : undefined}
+                  >
+                    <Archive className="w-4 h-4 text-text-muted flex-shrink-0" />
+                    <span className="truncate">{t("sidebar.vault")}</span>
                   </button>
                   <button
                     type="button"

@@ -133,6 +133,8 @@ function getSession(
   return states[sessionId] ?? DEFAULT_SESSION_STATE;
 }
 
+export type ActiveView = "chat" | "apps" | "automation" | "vault" | "settings";
+
 interface AppState {
   // Sessions
   sessions: Session[];
@@ -150,9 +152,7 @@ interface AppState {
   sidebarWidth: number;
   contextPanelWidth: number;
   browserWidthManual: boolean;
-  showSettings: boolean;
-  showSchedule: boolean;
-  showApps: boolean;
+  activeView: ActiveView;
   settingsTab: string | null;
 
   rightPanelMode: "files" | "browser" | null;
@@ -317,6 +317,7 @@ interface AppState {
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSidebarWidth: (width: number) => void;
   setContextPanelWidth: (width: number) => void;
+  setActiveView: (view: ActiveView) => void;
   setShowSettings: (show: boolean) => void;
   setShowSchedule: (show: boolean) => void;
   setShowApps: (show: boolean) => void;
@@ -443,9 +444,7 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarWidth: 280,
   contextPanelWidth: 288,
   browserWidthManual: false,
-  showSettings: false,
-  showSchedule: false,
-  showApps: false,
+  activeView: "chat",
   settingsTab: null,
   rightPanelMode: null as "files" | "browser" | null,
   isReviewOpen: false,
@@ -966,9 +965,10 @@ export const useAppStore = create<AppState>((set) => ({
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   setContextPanelWidth: (width) => set({ contextPanelWidth: width }),
-  setShowSettings: (show) => set({ showSettings: show }),
-  setShowSchedule: (show) => set({ showSchedule: show }),
-  setShowApps: (show) => set({ showApps: show }),
+  setActiveView: (activeView) => set({ activeView }),
+  setShowSettings: (show) => set({ activeView: show ? "settings" : "chat" }),
+  setShowSchedule: (show) => set({ activeView: show ? "automation" : "chat" }),
+  setShowApps: (show) => set({ activeView: show ? "apps" : "chat" }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
   setReviewOpen: (open) => set({ isReviewOpen: open }),
@@ -1273,7 +1273,8 @@ if (typeof window !== "undefined") {
   w.__getNavStatus = () => {
     const s = useAppStore.getState();
     return {
-      showSettings: !!s.showSettings,
+      activeView: s.activeView,
+      showSettings: s.activeView === "settings",
       activeSessionId: s.activeSessionId || null,
       sessionCount: (s.sessions || []).length,
     };

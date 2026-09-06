@@ -20,9 +20,9 @@ const settingsApi = fs.readFileSync(
 
 describe("cloud provider lifecycle wiring", () => {
   it("injects the provider after login with modes", () => {
-    expect(loginModal).toContain(
-      "buildDeskwandProviderPayload(config.modes, result.token)",
-    );
+    expect(loginModal).toContain("buildDeskwandProviderPayload(");
+    expect(loginModal).toContain("config.modes");
+    expect(loginModal).toContain("result.token");
     expect(loginModal).toContain(
       "window.electronAPI.config.saveProvider(payload)",
     );

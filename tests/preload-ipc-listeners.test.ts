@@ -6,6 +6,9 @@ type ExposedElectronApi = {
   send: (event: ClientEvent) => void;
   on: (callback: (event: ServerEvent) => void) => () => void;
   getVideoSourceUrl: (filePath: string) => Promise<string>;
+  vault: {
+    importFile: () => Promise<unknown>;
+  };
 };
 
 describe("preload electronAPI.on", () => {
@@ -44,11 +47,9 @@ describe("preload electronAPI.on", () => {
 
       return {
         contextBridge: {
-          exposeInMainWorld: vi.fn(
-            (_name: string, api: ExposedElectronApi) => {
-              exposedApi = api;
-            },
-          ),
+          exposeInMainWorld: vi.fn((_name: string, api: ExposedElectronApi) => {
+            exposedApi = api;
+          }),
         },
         ipcRenderer,
       };
@@ -84,6 +85,12 @@ describe("preload electronAPI.on", () => {
       "video.getSourceUrl",
       "/tmp/clip.mp4",
     );
+  });
+
+  it("exposes high-level local-first Vault operations", async () => {
+    await exposedApi?.vault.importFile();
+
+    expect(ipcInvoke).toHaveBeenCalledWith("vault.importFile");
   });
 
   it("keeps remaining subscribers active after another subscriber unsubscribes", () => {

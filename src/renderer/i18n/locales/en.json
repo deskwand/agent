@@ -827,6 +827,7 @@
     "unpin": "Unpin",
     "moreActions": "More actions",
     "automation": "Automation",
+    "vault": "Vault",
     "browser": "Browser",
     "themeToggle": "Toggle theme",
     "nSelected": "{{count}} selected",
@@ -1579,6 +1580,66 @@
     "marketHomepage": "Homepage",
     "marketActionFailed": "Operation failed",
     "marketDetailFailed": "Failed to load plugin details"
+  },
+  "vault": {
+    "title": "Vault",
+    "subtitle": "Local files with encrypted cloud backup",
+    "upload": "Upload",
+    "sync": "Sync",
+    "syncing": "Syncing…",
+    "syncComplete": "Sync complete",
+    "alreadyLatest": "Already up to date",
+    "dismiss": "Dismiss",
+    "empty": "No files in your Vault",
+    "loginHint": "Sign in to back up files to the cloud",
+    "recoveryCode": "Recovery code",
+    "pendingCount": "{{count}} pending",
+    "filter": {
+      "all": "All",
+      "documents": "Documents",
+      "skills": "Skills",
+      "sessions": "Sessions",
+      "other": "Other"
+    },
+    "status": {
+      "synced": "Synced",
+      "pending": "Pending Backup",
+      "failed": "Sync Failed"
+    },
+    "action": {
+      "open": "Open",
+      "reveal": "Reveal in Folder",
+      "export": "Export",
+      "delete": "Delete"
+    },
+    "confirm": {
+      "delete": "Delete {{name}} from your Vault?"
+    },
+    "setup": {
+      "open": "Set up encrypted cloud backup",
+      "configured": "Encrypted cloud backup is set up",
+      "title": "Save your recovery code",
+      "confirmSaved": "I saved this recovery code securely",
+      "finish": "Finish setup"
+    },
+    "restore": {
+      "prompt": "A cloud backup is available. Set up your recovery code to restore it.",
+      "action": "Restore"
+    },
+    "error": {
+      "loginRequired": "Sign in to sync your Vault",
+      "setupRequired": "Set up encrypted cloud backup first",
+      "fileTooLarge": "Files must be 20 MB or smaller",
+      "localOperation": "The local Vault operation failed",
+      "syncFailed": "Cloud sync failed; your local files are safe",
+      "invalidRecoveryCode": "The recovery code is invalid",
+      "alreadyInitialized": "Encrypted backup is already set up",
+      "keychainUnavailable": "Secure key storage is unavailable on this device",
+      "recoveryMismatch": "The recovery code does not match this backup",
+      "noRemoteBackup": "No cloud backup is available",
+      "localIndexExists": "Restore is available only when the local index is missing",
+      "restoreFailed": "Cloud restore failed"
+    }
   },
   "modelMenu": {
     "custom": "Custom",

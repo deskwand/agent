@@ -228,7 +228,7 @@ export function useSettingsState(): {
 } {
   return useAppStore(
     useShallow((s) => ({
-      showSettings: s.showSettings,
+      showSettings: s.activeView === "settings",
       settingsTab: s.settingsTab,
     })),
   );
@@ -236,12 +236,12 @@ export function useSettingsState(): {
 
 /** Returns whether the schedule view is active. */
 export function useScheduleViewState(): boolean {
-  return useAppStore((s) => s.showSchedule);
+  return useAppStore((s) => s.activeView === "automation");
 }
 
 /** Returns whether the apps view is active. */
 export function useAppsViewState(): boolean {
-  return useAppStore((s) => s.showApps);
+  return useAppStore((s) => s.activeView === "apps");
 }
 
 // ---------------------------------------------------------------------------

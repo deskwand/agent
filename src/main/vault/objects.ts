@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { encryptAes, decryptAes, generateNonce } from "./crypto";
 
@@ -7,7 +7,7 @@ export async function packFile(
   filePath: string,
   mek: Buffer,
 ): Promise<{ payload: Buffer; id: string }> {
-  const plain = readFileSync(filePath);
+  const plain = await readFile(filePath);
   const nonce = generateNonce();
   const ct = encryptAes(plain, mek, nonce);
   return { payload: Buffer.concat([nonce, ct]), id: randomUUID() };

@@ -11,20 +11,18 @@ import {
   useActiveSessionId,
   useSettings,
   useSystemDarkMode,
-  useSettingsState,
   useConfigModalState,
   useGlobalNotice,
   useSandboxSetupState,
   useSandboxSyncStatus,
   usePendingDialogs,
-  useScheduleViewState,
-  useAppsViewState,
 } from "./store/selectors";
 import { useIPC } from "./hooks/useIPC";
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { WelcomeView } from "./components/WelcomeView";
+import { VaultView } from "./components/VaultView";
 import { ScheduleView } from "./components/ScheduleView";
 import { AppsView } from "./components/AppsView";
 import { PermissionDialog } from "./components/PermissionDialog";
@@ -95,9 +93,7 @@ function App() {
   const activeSessionId = useActiveSessionId();
   const settings = useSettings();
   const systemDarkMode = useSystemDarkMode();
-  const { showSettings } = useSettingsState();
-  const showSchedule = useScheduleViewState();
-  const showApps = useAppsViewState();
+  const activeView = useAppStore((state) => state.activeView);
   const { showConfigModal, isConfigured, appConfig } = useConfigModalState();
   const lightboxState = useImageLightboxState();
   const globalNotice = useGlobalNotice();
@@ -112,7 +108,7 @@ function App() {
   const setAppConfig = useAppStore((s) => s.setAppConfig);
   const clearGlobalNotice = useAppStore((s) => s.clearGlobalNotice);
   const setSandboxSetupComplete = useAppStore((s) => s.setSandboxSetupComplete);
-  const setShowSettings = useAppStore((s) => s.setShowSettings);
+  const setActiveView = useAppStore((s) => s.setActiveView);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
   const hasBrowserOcclusion = useAppStore(
@@ -225,7 +221,7 @@ function App() {
   // WebContentsView is a native Electron layer — any full-screen React view
   // (settings, apps, schedule, review, config modal) must hide it.
   const isFullScreenView =
-    showSettings || showApps || showSchedule || isReviewOpen || showConfigModal;
+    activeView !== "chat" || isReviewOpen || showConfigModal;
 
   useLayoutEffect(() => {
     if (
@@ -374,14 +370,16 @@ function App() {
 
           {/* Main Content Area */}
           <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-background relative">
-            {showSettings ? (
+            {activeView === "settings" ? (
               <Suspense fallback={<MainPanelFallback />}>
-                <SettingsPanel onClose={() => setShowSettings(false)} />
+                <SettingsPanel onClose={() => setActiveView("chat")} />
               </Suspense>
-            ) : showApps ? (
+            ) : activeView === "apps" ? (
               <AppsView />
-            ) : showSchedule ? (
+            ) : activeView === "automation" ? (
               <ScheduleView />
+            ) : activeView === "vault" ? (
+              <VaultView />
             ) : activeSessionId ? (
               <PanelErrorBoundary
                 name="ChatView"

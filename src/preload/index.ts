@@ -20,6 +20,7 @@ import type {
 } from "../renderer/types";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
+import type { RestoreResult, VaultSnapshot } from "../shared/vault";
 import type {
   McpServerConfig,
   McpTool,
@@ -700,12 +701,43 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
   },
 
-  // Vault (E2EE encrypted file transfer)
+  // Vault (local-first plaintext files with encrypted cloud backup)
   vault: {
-    encryptUpload: (filePath: string) =>
-      ipcRenderer.invoke("vault.encryptUpload", filePath),
-    decryptRestore: (id: string, payloadBase64: string) =>
-      ipcRenderer.invoke("vault.decryptRestore", id, payloadBase64),
+    getSnapshot: () =>
+      ipcRenderer.invoke("vault.getSnapshot") as Promise<VaultSnapshot>,
+    importFile: () =>
+      ipcRenderer.invoke("vault.importFile") as Promise<VaultSnapshot>,
+    openFile: (name: string) =>
+      ipcRenderer.invoke("vault.openFile", name) as Promise<{
+        error: string | null;
+      }>,
+    revealFile: (name: string) =>
+      ipcRenderer.invoke("vault.revealFile", name) as Promise<boolean>,
+    exportFile: (name: string) =>
+      ipcRenderer.invoke("vault.exportFile", name) as Promise<{
+        canceled: boolean;
+        filePath?: string;
+      }>,
+    deleteFile: (name: string) =>
+      ipcRenderer.invoke("vault.deleteFile", name) as Promise<VaultSnapshot>,
+    sync: (token: string) =>
+      ipcRenderer.invoke("vault.sync", token) as Promise<VaultSnapshot>,
+    checkRemoteBackup: (token: string) =>
+      ipcRenderer.invoke("vault.checkRemoteBackup", token) as Promise<boolean>,
+    generateRecoveryCode: () =>
+      ipcRenderer.invoke("vault.generateRecoveryCode") as Promise<string>,
+    initialize: (token: string | null, recoveryCode: string) =>
+      ipcRenderer.invoke(
+        "vault.initialize",
+        token,
+        recoveryCode,
+      ) as Promise<void>,
+    restore: (token: string, recoveryCode: string) =>
+      ipcRenderer.invoke(
+        "vault.restore",
+        token,
+        recoveryCode,
+      ) as Promise<RestoreResult>,
   },
 });
 
@@ -1250,16 +1282,26 @@ declare global {
         }>;
       };
       vault: {
-        encryptUpload: (filePath: string) => Promise<{
-          id: string;
-          payloadBase64: string;
+        getSnapshot: () => Promise<VaultSnapshot>;
+        importFile: () => Promise<VaultSnapshot>;
+        openFile: (name: string) => Promise<{ error: string | null }>;
+        revealFile: (name: string) => Promise<boolean>;
+        exportFile: (name: string) => Promise<{
+          canceled: boolean;
+          filePath?: string;
         }>;
-        decryptRestore: (
-          id: string,
-          payloadBase64: string,
-        ) => Promise<{
-          filePath: string;
-        }>;
+        deleteFile: (name: string) => Promise<VaultSnapshot>;
+        sync: (token: string) => Promise<VaultSnapshot>;
+        checkRemoteBackup: (token: string) => Promise<boolean>;
+        generateRecoveryCode: () => Promise<string>;
+        initialize: (
+          token: string | null,
+          recoveryCode: string,
+        ) => Promise<void>;
+        restore: (
+          token: string,
+          recoveryCode: string,
+        ) => Promise<RestoreResult>;
       };
     };
   }

@@ -39,7 +39,7 @@ export function Titlebar() {
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
   const toggleArtifactPanel = useAppStore((s) => s.toggleArtifactPanel);
   const isArtifactPanelOpen = useAppStore((s) => s.isArtifactPanelOpen);
-  const showSettings = useAppStore((s) => s.showSettings);
+  const showSettings = useAppStore((s) => s.activeView === "settings");
 
   const activeSessionTitle = activeSessionId
     ? (sessions.find((session) => session.id === activeSessionId)?.title ?? "")

@@ -19,8 +19,8 @@ const scheduleContent = scheduleFiles
 
 describe('Schedule entry and form', () => {
   it('renders the schedule view from the app shell', () => {
-    expect(appContent).toContain('const showSchedule = useScheduleViewState();');
-    expect(appContent).toContain('showSchedule ? (');
+    expect(appContent).toContain('activeView === "automation"');
+    expect(appContent).toContain('activeView === "automation" ? (');
     expect(appContent).toContain('<ScheduleView />');
   });
 

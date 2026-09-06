@@ -826,6 +826,7 @@
     "unpin": "取消置顶",
     "moreActions": "更多操作",
     "automation": "自动化",
+    "vault": "密库",
     "browser": "浏览器",
     "themeToggle": "切换主题",
     "nSelected": "已选 {{count}} 个",
@@ -1575,6 +1576,66 @@
     "marketHomepage": "主页",
     "marketActionFailed": "操作失败",
     "marketDetailFailed": "无法加载插件详情"
+  },
+  "vault": {
+    "title": "密库",
+    "subtitle": "本地文件，云端加密备份",
+    "upload": "上传文件",
+    "sync": "同步",
+    "syncing": "同步中…",
+    "syncComplete": "同步完成",
+    "alreadyLatest": "已是最新",
+    "dismiss": "关闭",
+    "empty": "密库中暂无文件",
+    "loginHint": "登录后可将文件备份到云端",
+    "recoveryCode": "恢复码",
+    "pendingCount": "{{count}} 项待同步",
+    "filter": {
+      "all": "全部",
+      "documents": "文档",
+      "skills": "技能",
+      "sessions": "会话",
+      "other": "其他"
+    },
+    "status": {
+      "synced": "已同步",
+      "pending": "待备份",
+      "failed": "同步失败"
+    },
+    "action": {
+      "open": "打开",
+      "reveal": "在文件夹中显示",
+      "export": "导出",
+      "delete": "删除"
+    },
+    "confirm": {
+      "delete": "确定从密库中删除 {{name}}？"
+    },
+    "setup": {
+      "open": "设置加密云备份",
+      "configured": "加密云备份已设置",
+      "title": "保存恢复码",
+      "confirmSaved": "我已安全保存恢复码",
+      "finish": "完成设置"
+    },
+    "restore": {
+      "prompt": "发现云端备份。设置恢复码后即可恢复。",
+      "action": "恢复"
+    },
+    "error": {
+      "loginRequired": "登录后才能同步密库",
+      "setupRequired": "请先设置加密云备份",
+      "fileTooLarge": "文件大小不能超过 20 MB",
+      "localOperation": "本地密库操作失败",
+      "syncFailed": "云端同步失败，本地文件未受影响",
+      "invalidRecoveryCode": "恢复码无效",
+      "alreadyInitialized": "加密云备份已经设置",
+      "keychainUnavailable": "此设备无法使用安全密钥存储",
+      "recoveryMismatch": "恢复码与此备份不匹配",
+      "noRemoteBackup": "没有可用的云端备份",
+      "localIndexExists": "只有本地索引丢失时才能恢复",
+      "restoreFailed": "云端恢复失败"
+    }
   },
   "modelMenu": {
     "custom": "自定义",
