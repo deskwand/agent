@@ -856,7 +856,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       >
         {!sidebarCollapsed && (
           <>
-            <div className="px-4 pt-3 pb-2">
+            <div className="px-4 pt-3 pb-1">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 min-w-0">
                   <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
@@ -935,14 +935,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             <div
               ref={scrollListRef}
               onScroll={() => setSessionMenu(null)}
-              className="flex-1 overflow-y-auto px-3 py-4 sidebar-scroll"
+              className="flex-1 overflow-y-auto px-3 pt-2 pb-4 sidebar-scroll"
             >
               <div>
                 <div className="flex flex-col gap-0.5">
                   <button
                     type="button"
                     onClick={openApps}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
+                    className={`flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-medium leading-5 transition-colors ${
                       showApps
                         ? "bg-surface-active text-text-primary"
                         : "text-text-secondary hover:bg-surface-hover/60"
@@ -955,7 +955,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   <button
                     type="button"
                     onClick={openVault}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
+                    className={`flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-medium leading-5 transition-colors ${
                       showVault
                         ? "bg-surface-active text-text-primary"
                         : "text-text-secondary hover:bg-surface-hover/60"
@@ -968,7 +968,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   <button
                     type="button"
                     onClick={openAutomation}
-                    className={`flex items-center gap-2 rounded-lg px-2.5 py-1 text-sm font-medium leading-5 transition-colors ${
+                    className={`flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-medium leading-5 transition-colors ${
                       showSchedule
                         ? "bg-surface-active text-text-primary"
                         : "text-text-secondary hover:bg-surface-hover/60"

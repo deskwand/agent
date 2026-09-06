@@ -23,7 +23,11 @@ describe("Sidebar top nav entries", () => {
     expect(scrollAreaIndex).toBeGreaterThan(-1);
     const firstSectionIndex = sidebarContent.indexOf("<section>");
     expect(firstSectionIndex).toBeGreaterThan(-1);
-    for (const key of ['t("sidebar.apps")', 't("sidebar.automation")']) {
+    for (const key of [
+      't("sidebar.apps")',
+      't("sidebar.vault")',
+      't("sidebar.automation")',
+    ]) {
       const index = sidebarContent.indexOf(key);
       expect(index, `${key} must exist in Sidebar.tsx`).toBeGreaterThan(-1);
       expect(
@@ -39,6 +43,13 @@ describe("Sidebar top nav entries", () => {
         `${key} must be at the top of the scroll area, before the first session section`,
       ).toBeLessThan(firstSectionIndex);
     }
+    expect(sidebarContent).toContain('className="px-4 pt-3 pb-1"');
+    expect(sidebarContent).toContain(
+      'className="flex-1 overflow-y-auto px-3 pt-2 pb-4 sidebar-scroll"',
+    );
+    expect(sidebarContent).toContain(
+      "className={`flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-medium leading-5 transition-colors ${",
+    );
     // no divider between the nav entries and the session list
     expect(sidebarContent).not.toContain(
       'className="mx-2 mt-2 border-t border-border-muted"',
@@ -46,15 +57,15 @@ describe("Sidebar top nav entries", () => {
   });
 
   it("drives active state from the apps and schedule flags", () => {
-    for (const flag of ["showApps", "showSchedule"]) {
+    for (const flag of ["showApps", "showVault", "showSchedule"]) {
       expect(sidebarContent).toContain(flag);
     }
     // active state is driven by the flags via background color only;
     // the accent left-border quote bar was removed per design
     const activeBgCount =
       sidebarContent.split('"bg-surface-active text-text-primary"').length - 1;
-    // one per nav entry (apps + automation)
-    expect(activeBgCount).toBeGreaterThanOrEqual(2);
+    // one per nav entry (apps + vault + automation)
+    expect(activeBgCount).toBeGreaterThanOrEqual(3);
     expect(sidebarContent).not.toContain("border-l-accent");
     expect(sidebarContent).not.toContain("border-l-[3px]");
     expect(sidebarContent).toContain('aria-current={showApps ? "page"');

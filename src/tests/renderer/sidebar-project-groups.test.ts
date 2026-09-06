@@ -88,6 +88,28 @@ describe("Sidebar project groups", () => {
     await flush();
   }
 
+  it("aligns top navigation and sessions on the same horizontal inset", async () => {
+    await render([]);
+
+    for (const key of ["apps", "vault", "automation"] as const) {
+      const button = Array.from(container.querySelectorAll("button")).find(
+        (candidate) =>
+          candidate.textContent?.includes(i18n.t(`sidebar.${key}`)),
+      );
+      expect(button, `${key} button must render`).toBeTruthy();
+      expect(button?.className).toContain("px-3");
+    }
+
+    const sessionsButton = Array.from(
+      container.querySelectorAll("button[aria-expanded]"),
+    ).find((button) =>
+      button.textContent?.includes(i18n.t("sidebar.allSessions")),
+    );
+
+    expect(sessionsButton).toBeTruthy();
+    expect(sessionsButton?.className).toContain("px-3");
+  });
+
   function projectHeader(cwd: string): Element | undefined {
     return Array.from(container.querySelectorAll("[title]")).find(
       (element) => element.getAttribute("title") === cwd,
