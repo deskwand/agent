@@ -6,6 +6,7 @@ import { deriveMek } from "../src/main/vault/crypto";
 import { encodeRemoteIndex } from "../src/main/vault/vault-index";
 import { LocalVaultStore } from "../src/main/vault/local-store";
 import {
+  VaultResetService,
   VaultRestoreService,
   VaultSyncService,
   type VaultCloudClient,
@@ -41,6 +42,10 @@ class FakeCloud implements VaultCloudClient {
 
   async putIndex(_token: string, payload: Buffer): Promise<void> {
     this.index = Buffer.from(payload);
+  }
+
+  async listObjectIds(): Promise<string[]> {
+    return [...this.objects.keys()];
   }
 }
 
@@ -119,15 +124,83 @@ describe("Vault local-first acceptance flow", () => {
     roots.push(restoredRoot);
     const restoredStore = new LocalVaultStore(join(restoredRoot, "vault"));
     await restoredStore.ensureDirectory();
-    await writeFile(restoredStore.filePath("document.md"), "keep-local");
     const restored = await new VaultRestoreService(
       restoredStore,
       cloud,
-    ).restore("token", code);
+      () => mek,
+      () => {},
+    ).restoreWithRecoveryCode("token", code);
 
-    expect(restored).toEqual({ restored: 1, renamed: 1 });
-    expect(
-      await readFile(restoredStore.filePath("document (1).md"), "utf8"),
-    ).toBe("remote");
+    expect(restored).toEqual({ restored: 1, renamed: 0 });
+    expect(await readFile(restoredStore.filePath("document.md"), "utf8")).toBe(
+      "remote",
+    );
+  });
+
+  it("discards old objects on a new device and writes a fresh empty index", async () => {
+    const sourceRoot = await mkdtemp(join(tmpdir(), "deskwand-vault-reset-"));
+    roots.push(sourceRoot);
+    const store = new LocalVaultStore(join(sourceRoot, "vault"));
+    await store.ensureDirectory();
+    const cloud = new FakeCloud();
+    cloud.objects.set("old-1", Buffer.from("cipher"));
+
+    const resetService = new VaultResetService(
+      store,
+      cloud,
+      () => null,
+      () => {},
+    );
+    const result = await resetService.discardWithoutLocalKey("token");
+
+    expect(result.deletedObjects).toBe(1);
+    expect(cloud.objects.size).toBe(0);
+    expect((await store.readOperationMarker())?.state).toBe(
+      "awaiting-recovery-code",
+    );
+  });
+
+  it("preserves local files when reinitializing the backup", async () => {
+    const sourceRoot = await mkdtemp(
+      join(tmpdir(), "deskwand-vault-reset-local-"),
+    );
+    roots.push(sourceRoot);
+    const store = new LocalVaultStore(join(sourceRoot, "vault"));
+    await store.ensureDirectory();
+    await writeFile(store.filePath("keep.txt"), "local");
+    await store.writeIndex({
+      version: 1,
+      files: {
+        "keep.txt": {
+          objectId: "old-1",
+          hash: "h",
+          size: 5,
+          mtime: 1,
+          syncStatus: "synced",
+          objectHash: "h",
+        },
+      },
+      pendingDeletes: [],
+    });
+    const cloud = new FakeCloud();
+    cloud.objects.set("old-1", Buffer.from("cipher"));
+
+    const resetService = new VaultResetService(
+      store,
+      cloud,
+      () => mek,
+      () => {},
+    );
+    const preparation = await resetService.beginDiscardAndReinitialize("token");
+    const result = await resetService.completeDiscardAndReinitialize(
+      "token",
+      preparation.recoveryCode,
+    );
+
+    expect(result.preservedLocalFiles).toBe(1);
+    expect(await readFile(store.filePath("keep.txt"), "utf8")).toBe("local");
+    expect((await store.readIndex()).files["keep.txt"].syncStatus).toBe(
+      "pending",
+    );
   });
 });

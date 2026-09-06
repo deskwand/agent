@@ -1620,7 +1620,11 @@
     },
     "restore": {
       "prompt": "发现云端备份。设置恢复码后即可恢复。",
-      "action": "恢复"
+      "action": "恢复",
+      "restoring": "正在恢复云端备份…",
+      "remoteError": "无法查询云端备份状态",
+      "failed": "恢复失败，请重试",
+      "retry": "重试"
     },
     "error": {
       "loginRequired": "登录后才能同步密库",
@@ -1634,7 +1638,26 @@
       "recoveryMismatch": "恢复码与此备份不匹配",
       "noRemoteBackup": "没有可用的云端备份",
       "localIndexExists": "只有本地索引丢失时才能恢复",
-      "restoreFailed": "云端恢复失败"
+      "localFilesExist": "只有本地 Vault 为空时才能恢复",
+      "restoreFailed": "云端恢复失败",
+      "sessionExpired": "登录已过期，请重新登录",
+      "permissionDenied": "没有权限访问云端备份",
+      "serverError": "云端服务暂时不可用，请稍后重试",
+      "resetFailed": "重置失败，本地文件和当前密钥已保留",
+      "resetInProgress": "正在重置并重新设置云端备份",
+      "restoreInProgress": "已有恢复操作正在进行中"
+    },
+    "firstSetup": {
+      "title": "设置恢复码",
+      "body": "生成恢复码并妥善保存。恢复码用于在其它设备恢复你的云端备份。"
+    },
+    "reset": {
+      "discard": "丢弃旧备份，创建新的 Vault",
+      "confirmNewDevice": "确定要丢弃旧备份并创建新的 Vault 吗？此操作不可逆。",
+      "confirmExisting": "确定要丢弃旧云端备份并重新设置吗？本地文件会保留，但云端备份将被删除。此操作不可逆。",
+      "localFilesConflict": "已有云端备份。要为这些本地文件建立新备份，必须先丢弃旧备份。",
+      "retry": "重试重置",
+      "inProgress": "正在重置并重新设置云端备份…"
     }
   },
   "modelMenu": {

@@ -95,6 +95,13 @@ export function initializeNewMek(recoveryCode: string): void {
   storeMek(deriveMek(recoveryCode));
 }
 
+export function replaceMek(recoveryCode: string): void {
+  if (!validateRecoveryCode(recoveryCode)) {
+    throw new Error("VAULT_INVALID_RECOVERY_CODE");
+  }
+  storeMek(deriveMek(recoveryCode));
+}
+
 export function verifyAndStoreMek(
   recoveryCode: string,
   encryptedRemoteIndex: Buffer | null,

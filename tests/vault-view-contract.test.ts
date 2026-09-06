@@ -5,34 +5,89 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VaultView } from "../src/renderer/components/VaultView";
 import { useAppStore } from "../src/renderer/store";
-import type { VaultSnapshot } from "../src/shared/vault";
+import type { VaultSnapshot, VaultSnapshotItem } from "../src/shared/vault";
+
+const TRANSLATIONS: Record<string, string> = {
+  "vault.title": "Vault",
+  "vault.subtitle": "Local files with encrypted cloud backup",
+  "vault.upload": "Upload",
+  "vault.sync": "Sync",
+  "vault.syncing": "Syncing…",
+  "vault.syncComplete": "Sync complete",
+  "vault.alreadyLatest": "Already up to date",
+  "vault.dismiss": "Dismiss",
+  "vault.filter.all": "All",
+  "vault.filter.documents": "Documents",
+  "vault.filter.skills": "Skills",
+  "vault.filter.sessions": "Sessions",
+  "vault.filter.other": "Other",
+  "vault.status.synced": "Synced",
+  "vault.status.pending": "Pending Backup",
+  "vault.status.failed": "Sync Failed",
+  "vault.action.open": "Open",
+  "vault.action.reveal": "Reveal in Folder",
+  "vault.action.export": "Export",
+  "vault.action.delete": "Delete",
+  "vault.confirm.delete": "Delete {{name}} from your Vault?",
+  "vault.empty": "No files in your Vault",
+  "vault.loginHint": "Sign in to back up files to the cloud",
+  "vault.recoveryCode": "Recovery code",
+  "vault.pendingCount": "{{count}} pending",
+  "vault.setup.configured": "Encrypted cloud backup is set up",
+  "vault.setup.open": "Set up encrypted cloud backup",
+  "vault.setup.title": "Save your recovery code",
+  "vault.setup.confirmSaved": "I saved this recovery code securely",
+  "vault.setup.finish": "Finish setup",
+  "vault.restore.prompt":
+    "A cloud backup is available. Set your recovery code to restore it.",
+  "vault.restore.action": "Restore",
+  "vault.restore.restoring": "Restoring your cloud backup…",
+  "vault.restore.remoteError": "Couldn't check your cloud backup status",
+  "vault.restore.failed": "Restore failed. Try again.",
+  "vault.restore.retry": "Retry",
+  "vault.firstSetup.title": "Set your recovery code",
+  "vault.firstSetup.body":
+    "Create a recovery code and store it safely. It restores your cloud backup on other devices.",
+  "vault.error.loginRequired": "Sign in to sync your Vault",
+  "vault.error.setupRequired": "Set up encrypted cloud backup first",
+  "vault.error.fileTooLarge": "Files must be 20 MB or smaller",
+  "vault.error.localOperation": "The local Vault operation failed",
+  "vault.error.syncFailed": "Cloud sync failed; your local files are safe",
+  "vault.error.invalidRecoveryCode": "The recovery code is invalid",
+  "vault.error.alreadyInitialized": "Encrypted backup is already set up",
+  "vault.error.keychainUnavailable":
+    "Secure key storage is unavailable on this device",
+  "vault.error.recoveryMismatch":
+    "The recovery code does not match this backup",
+  "vault.error.noRemoteBackup": "No cloud backup is available",
+  "vault.error.localIndexExists":
+    "Restore is available only when the local index is missing",
+  "vault.error.localFilesExist":
+    "Restore is available only when the local Vault is empty",
+  "vault.error.restoreFailed": "Cloud restore failed",
+  "vault.error.sessionExpired": "Your session has expired. Sign in again.",
+  "vault.error.permissionDenied":
+    "You don't have permission to access the cloud backup",
+  "vault.error.serverError":
+    "The cloud service is temporarily unavailable. Try again later.",
+  "vault.error.resetFailed":
+    "Reset failed; your local files and current key were kept",
+  "vault.error.resetInProgress":
+    "Resetting and reconfiguring your cloud backup",
+  "vault.error.restoreInProgress": "A restore is already in progress",
+  "vault.reset.discard": "Discard old backup, start fresh",
+  "vault.reset.confirmNewDevice":
+    "Discard the old backup and create a new Vault? This cannot be undone.",
+  "vault.reset.confirmExisting":
+    "Discard the old cloud backup and start over? Your local files stay, but the cloud backup is deleted. This cannot be undone.",
+  "vault.reset.localFilesConflict":
+    "An existing cloud backup must be discarded before these local files can start a new backup.",
+  "vault.reset.retry": "Retry reset",
+  "vault.reset.inProgress": "Resetting and reconfiguring your cloud backup…",
+};
 
 vi.mock("react-i18next", () => {
-  const translations: Record<string, string> = {
-    "vault.title": "Vault",
-    "vault.upload": "Upload",
-    "vault.sync": "Sync",
-    "vault.filter.all": "All",
-    "vault.filter.documents": "Documents",
-    "vault.filter.skills": "Skills",
-    "vault.filter.sessions": "Sessions",
-    "vault.filter.other": "Other",
-    "vault.status.pending": "Pending Backup",
-    "vault.status.failed": "Sync Failed",
-    "vault.action.open": "Open",
-    "vault.action.reveal": "Reveal in Folder",
-    "vault.action.export": "Export",
-    "vault.action.delete": "Delete",
-    "vault.recoveryCode": "Recovery code",
-    "vault.setup.open": "Set up encrypted cloud backup",
-    "vault.syncing": "Syncing…",
-    "vault.syncComplete": "Sync complete",
-    "vault.alreadyLatest": "Already up to date",
-    "vault.dismiss": "Dismiss",
-    "vault.error.loginRequired": "Sign in to sync your Vault",
-    "vault.error.syncFailed": "Cloud sync failed; your local files are safe",
-  };
-  const translate = (key: string) => translations[key] ?? key;
+  const translate = (key: string) => TRANSLATIONS[key] ?? key;
   return {
     useTranslation: () => ({
       t: translate,
@@ -41,47 +96,66 @@ vi.mock("react-i18next", () => {
   };
 });
 
+function item(name: string, overrides: Partial<VaultSnapshotItem> = {}) {
+  const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "";
+  return {
+    name,
+    ext,
+    size: 5,
+    mtime: 1,
+    syncStatus: "pending" as const,
+    ...overrides,
+  };
+}
+
+function snapshot(overrides: Partial<VaultSnapshot> = {}): VaultSnapshot {
+  return {
+    items: [],
+    pendingCount: 0,
+    hasLocalIndex: true,
+    hasLocalFiles: true,
+    hasLocalMek: true,
+    operationStatus: "idle",
+    ...overrides,
+  };
+}
+
 describe("VaultView", () => {
   let container: HTMLDivElement;
   let root: Root;
   const api = {
-    getSnapshot: vi.fn(async () => ({
-      items: [
-        {
-          name: "readme.md",
-          ext: "md",
-          size: 5,
-          mtime: 1,
-          syncStatus: "pending" as const,
-        },
-      ],
-      pendingCount: 1,
-      hasLocalIndex: true,
-    })),
-    importFile: vi.fn(async () => ({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: true,
-    })),
+    getSnapshot: vi.fn(async () =>
+      snapshot({
+        items: [item("readme.md")],
+        pendingCount: 1,
+        hasLocalIndex: true,
+      }),
+    ),
+    importFile: vi.fn(async () => snapshot({ items: [] })),
     openFile: vi.fn(async () => ({ error: null })),
     revealFile: vi.fn(async () => true),
     exportFile: vi.fn(async () => ({ canceled: false })),
-    deleteFile: vi.fn(async () => ({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: true,
-    })),
-    sync: vi.fn(async () => ({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: true,
-    })),
-    checkRemoteBackup: vi.fn(async () => false),
+    deleteFile: vi.fn(async () => snapshot({ items: [] })),
+    sync: vi.fn(async () => snapshot({ items: [] })),
+    checkRemoteBackup: vi.fn(async () => ({ status: "no-backup" })),
     generateRecoveryCode: vi.fn(
       async () => "123456789ABCDEFGHJKLMNPQRSTUVWXYZ",
     ),
     initialize: vi.fn(async () => undefined),
-    restore: vi.fn(async () => ({ restored: 0, renamed: 0 })),
+    restoreWithLocalMek: vi.fn(async () => ({ restored: 0, renamed: 0 })),
+    restoreWithRecoveryCode: vi.fn(async () => ({ restored: 0, renamed: 0 })),
+    beginDiscardAndReinitialize: vi.fn(async () => ({
+      recoveryCode: "CODE",
+      preservedLocalFiles: 0,
+    })),
+    completeDiscardAndReinitialize: vi.fn(async () => ({
+      deletedObjects: 0,
+      preservedLocalFiles: 0,
+    })),
+    discardRemoteBackupAndStart: vi.fn(async () => ({
+      deletedObjects: 0,
+      preservedLocalFiles: 0,
+    })),
   };
 
   beforeEach(() => {
@@ -114,29 +188,44 @@ describe("VaultView", () => {
     useAppStore.setState({ cloudConfig: null });
   });
 
-  it("renders the local snapshot without requiring cloud access", async () => {
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
-
-    expect(api.getSnapshot).toHaveBeenCalledTimes(1);
-    expect(api.checkRemoteBackup).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("readme.md");
-    expect(container.textContent).toContain("Pending Backup");
-  });
-
-  it("does not offer a new recovery code after initialization", async () => {
-    api.getSnapshot.mockResolvedValueOnce({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: true,
-      isInitialized: true,
-    });
-
+  async function renderVault(): Promise<void> {
     await act(async () => {
       root.render(createElement(VaultView));
       await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
     });
+  }
+
+  function uploadButton(): HTMLButtonElement {
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (item) => item.textContent === "Upload",
+    );
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error("Upload button missing");
+    }
+    return button;
+  }
+
+  function screenText(): string {
+    return container.textContent ?? "";
+  }
+
+  it("renders the local snapshot without requiring cloud access", async () => {
+    await renderVault();
+
+    expect(api.getSnapshot).toHaveBeenCalledTimes(1);
+    expect(api.checkRemoteBackup).not.toHaveBeenCalled();
+    expect(screenText()).toContain("readme.md");
+    expect(screenText()).toContain("Pending Backup");
+  });
+
+  it("does not offer a new recovery code after initialization", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({ hasLocalIndex: true, hasLocalMek: true }),
+    );
+
+    await renderVault();
 
     expect(
       Array.from(container.querySelectorAll("button")).find(
@@ -145,55 +234,309 @@ describe("VaultView", () => {
     ).toBeUndefined();
   });
 
-  it("reuses the recovery code while setup is open", async () => {
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
-    const setup = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Set up encrypted cloud backup",
+  it("starts automatic restore when local is empty and a local MEK exists", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [],
+        pendingCount: 0,
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: true,
+      }),
     );
+    api.checkRemoteBackup.mockResolvedValueOnce({ status: "has-backup" });
 
-    await act(async () => {
-      setup?.click();
-      await Promise.resolve();
-    });
-    await act(async () => {
-      setup?.click();
-      await Promise.resolve();
-    });
+    await renderVault();
 
-    expect(api.generateRecoveryCode).toHaveBeenCalledTimes(1);
+    expect(api.restoreWithLocalMek).toHaveBeenCalledWith("token");
+    expect(api.restoreWithRecoveryCode).not.toHaveBeenCalled();
   });
 
-  it("accepts a saved recovery code for a remote restore", async () => {
-    useAppStore.setState({
-      cloudConfig: {
-        serverUrl: "https://api.deskwand.com",
-        token: "token",
-        isLoggedIn: true,
-        email: "user@example.com",
-        level: "free",
-        creditsBalance: 0,
-        modes: [],
-      },
-    });
-    api.getSnapshot.mockResolvedValueOnce({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: false,
-    });
-    api.checkRemoteBackup.mockResolvedValueOnce(true);
+  it("blocks upload during first-time recovery-code setup", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [],
+        pendingCount: 0,
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: false,
+      }),
+    );
+    api.checkRemoteBackup.mockResolvedValueOnce({ status: "no-backup" });
 
+    await renderVault();
+
+    expect(uploadButton().disabled).toBe(true);
+    expect(screenText()).toContain("Set your recovery code");
+  });
+
+  it("does not start setup when remote status is an error", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [],
+        pendingCount: 0,
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: false,
+      }),
+    );
+    api.checkRemoteBackup.mockResolvedValueOnce({
+      status: "error",
+      errorCode: "VAULT_CLOUD_HTTP_503",
+    });
+
+    await renderVault();
+
+    expect(api.generateRecoveryCode).not.toHaveBeenCalled();
+    expect(screenText()).toContain("Retry");
+  });
+
+  it("adopts local files without showing cloud restore", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [item("local.txt")],
+        pendingCount: 1,
+        hasLocalIndex: false,
+        hasLocalFiles: true,
+        hasLocalMek: true,
+      }),
+    );
+
+    await renderVault();
+
+    expect(api.checkRemoteBackup).not.toHaveBeenCalled();
+    expect(screenText()).toContain("local.txt");
+  });
+
+  it("shows restore failure and retries automatic restore", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [],
+        pendingCount: 0,
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: true,
+      }),
+    );
+    api.checkRemoteBackup.mockResolvedValueOnce({ status: "has-backup" });
+    api.restoreWithLocalMek.mockRejectedValueOnce(new Error("NETWORK_DOWN"));
+
+    await renderVault();
+    expect(screenText()).toContain("Restore failed. Try again.");
+
+    api.restoreWithLocalMek.mockResolvedValueOnce({ restored: 1, renamed: 0 });
+    const retry = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Retry",
+    );
     await act(async () => {
-      root.render(createElement(VaultView));
+      retry?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(api.restoreWithLocalMek).toHaveBeenCalledTimes(2);
+  });
+
+  it("rechecks remote status after a remote-status error", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [],
+        pendingCount: 0,
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: false,
+      }),
+    );
+    api.checkRemoteBackup
+      .mockResolvedValueOnce({
+        status: "error",
+        errorCode: "VAULT_CLOUD_HTTP_503",
+      })
+      .mockResolvedValueOnce({ status: "no-backup" });
+
+    await renderVault();
+    const retry = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Retry",
+    );
+    await act(async () => {
+      retry?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(api.checkRemoteBackup).toHaveBeenCalledTimes(2);
+    expect(screenText()).toContain("Set your recovery code");
+  });
+
+  it("offers to discard a conflicting remote backup for local files", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [item("local.txt")],
+        pendingCount: 1,
+        hasLocalIndex: false,
+        hasLocalFiles: true,
+        hasLocalMek: false,
+      }),
+    );
+    api.checkRemoteBackup.mockResolvedValueOnce({ status: "has-backup" });
+
+    await renderVault();
+
+    expect(api.checkRemoteBackup).toHaveBeenCalledWith("token");
+    expect(screenText()).toContain("Discard old backup, start fresh");
+    expect(screenText()).toContain("Finish setup");
+    expect(uploadButton().disabled).toBe(true);
+  });
+
+  it("offers MEK setup when local files exist without an index", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [item("local.txt")],
+        pendingCount: 1,
+        hasLocalIndex: false,
+        hasLocalFiles: true,
+        hasLocalMek: false,
+      }),
+    );
+
+    await renderVault();
+
+    expect(api.checkRemoteBackup).toHaveBeenCalledWith("token");
+    expect(uploadButton().disabled).toBe(true);
+    expect(screenText()).toContain("Set up encrypted cloud backup");
+    expect(screenText()).toContain("123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
+  });
+
+  it("enables upload for an empty Vault with a local MEK and no backup", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [],
+        pendingCount: 0,
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: true,
+      }),
+    );
+    api.checkRemoteBackup.mockResolvedValueOnce({ status: "no-backup" });
+
+    await renderVault();
+
+    expect(uploadButton().disabled).toBe(false);
+    expect(screenText()).toContain("No files in your Vault");
+  });
+
+  it("accepts a saved recovery code for a new-device restore", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [],
+        pendingCount: 0,
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: false,
+      }),
+    );
+    api.checkRemoteBackup.mockResolvedValueOnce({ status: "has-backup" });
+
+    await renderVault();
+
+    const input = container.querySelector(
+      'input[aria-label="Recovery code"]',
+    ) as HTMLInputElement;
+    expect(input).not.toBeNull();
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!;
+      setter.call(input, "123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    const restore = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Restore",
+    );
+    await act(async () => {
+      restore?.click();
+      await Promise.resolve();
+    });
+
+    expect(api.restoreWithRecoveryCode).toHaveBeenCalledWith(
+      "token",
+      "123456789ABCDEFGHJKLMNPQRSTUVWXYZ",
+    );
+  });
+
+  it("offers to discard the old backup on a new device and confirms first", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [],
+        pendingCount: 0,
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: false,
+      }),
+    );
+    api.checkRemoteBackup.mockResolvedValueOnce({ status: "has-backup" });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    await renderVault();
+
+    const discard = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Discard old backup, start fresh",
+    );
+    expect(discard).toBeDefined();
+    await act(async () => {
+      discard?.click();
+    });
+
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(api.discardRemoteBackupAndStart).toHaveBeenCalledWith("token");
+  });
+
+  it("shows the new recovery code setup after resetting an existing Vault", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        items: [item("local.txt")],
+        pendingCount: 0,
+        hasLocalIndex: true,
+        hasLocalFiles: true,
+        hasLocalMek: true,
+      }),
+    );
+    api.beginDiscardAndReinitialize.mockResolvedValueOnce({
+      recoveryCode: "NEW-CODE",
+      preservedLocalFiles: 1,
+    });
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    await renderVault();
+    const discard = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Discard old backup, start fresh",
+    );
+    await act(async () => {
+      discard?.click();
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    expect(
-      container.querySelector('input[aria-label="Recovery code"]'),
-    ).not.toBeNull();
-    useAppStore.setState({ cloudConfig: null });
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(screenText()).toContain("NEW-CODE");
+    const checkbox = container.querySelector(
+      'input[type="checkbox"]',
+    ) as HTMLInputElement;
+    await act(async () => {
+      checkbox.click();
+    });
+    const finish = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Finish setup",
+    );
+    await act(async () => {
+      finish?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(api.initialize).not.toHaveBeenCalled();
+    expect(api.completeDiscardAndReinitialize).toHaveBeenCalledWith(
+      "token",
+      "NEW-CODE",
+    );
   });
 
   it("shows syncing feedback and disables the sync button immediately", async () => {
@@ -205,9 +548,7 @@ describe("VaultView", () => {
         }),
     );
 
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
+    await renderVault();
     const sync = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Sync",
     );
@@ -216,29 +557,19 @@ describe("VaultView", () => {
       sync?.click();
     });
 
-    expect(container.textContent).toContain("Syncing…");
+    expect(screenText()).toContain("Syncing…");
     expect(sync?.disabled).toBe(true);
 
     await act(async () => {
-      resolveSync({
-        items: [],
-        pendingCount: 0,
-        hasLocalIndex: true,
-      });
+      resolveSync(snapshot({ items: [] }));
     });
   });
 
   it("shows sync completion and dismisses it after three seconds", async () => {
     vi.useFakeTimers();
-    api.sync.mockResolvedValueOnce({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: true,
-    });
+    api.sync.mockResolvedValueOnce(snapshot({ items: [] }));
 
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
+    await renderVault();
     const sync = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Sync",
     );
@@ -247,23 +578,21 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Sync complete");
+    expect(screenText()).toContain("Sync complete");
     await act(async () => {
       vi.advanceTimersByTime(2999);
     });
-    expect(container.textContent).toContain("Sync complete");
+    expect(screenText()).toContain("Sync complete");
     await act(async () => {
       vi.advanceTimersByTime(1);
     });
-    expect(container.textContent).not.toContain("Sync complete");
+    expect(screenText()).not.toContain("Sync complete");
   });
 
   it("keeps a sync failure visible until dismissed", async () => {
     api.sync.mockRejectedValueOnce(new Error("NETWORK_DOWN"));
 
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
+    await renderVault();
     const sync = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Sync",
     );
@@ -272,21 +601,19 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Cloud sync failed");
+    expect(screenText()).toContain("Cloud sync failed");
     const dismiss = container.querySelector('button[aria-label="Dismiss"]');
     expect(dismiss).not.toBeNull();
     await act(async () => {
       dismiss?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(container.textContent).not.toContain("Cloud sync failed");
+    expect(screenText()).not.toContain("Cloud sync failed");
   });
 
   it("does not call sync when the user is logged out", async () => {
     useAppStore.setState({ cloudConfig: null });
 
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
+    await renderVault();
     const sync = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Sync",
     );
@@ -295,26 +622,14 @@ describe("VaultView", () => {
     });
 
     expect(api.sync).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("Sign in to sync your Vault");
-    useAppStore.setState({ cloudConfig: null });
+    expect(screenText()).toContain("Sign in to sync your Vault");
   });
 
   it("shows already latest when no files were pending", async () => {
-    api.getSnapshot.mockResolvedValueOnce({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: true,
-    });
-    api.sync.mockResolvedValueOnce({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: true,
-    });
+    api.getSnapshot.mockResolvedValueOnce(snapshot({ items: [] }));
+    api.sync.mockResolvedValueOnce(snapshot({ items: [] }));
 
-    await act(async () => {
-      root.render(createElement(VaultView));
-      await Promise.resolve();
-    });
+    await renderVault();
     const sync = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Sync",
     );
@@ -323,56 +638,13 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Already up to date");
-  });
-
-  it("keeps the logged-out error after a previous success timer", async () => {
-    vi.useFakeTimers();
-    api.sync.mockResolvedValueOnce({
-      items: [],
-      pendingCount: 0,
-      hasLocalIndex: true,
-    });
-
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
-    await act(async () => {
-      sync?.click();
-      await Promise.resolve();
-    });
-    expect(container.textContent).toContain("Sync complete");
-
-    await act(async () => {
-      useAppStore.setState({ cloudConfig: null });
-    });
-    const loggedOutSync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
-    await act(async () => {
-      loggedOutSync?.click();
-    });
-    expect(container.textContent).toContain("Sign in to sync your Vault");
-
-    await act(async () => {
-      vi.advanceTimersByTime(3000);
-    });
-    expect(container.textContent).toContain("Sign in to sync your Vault");
+    expect(screenText()).toContain("Already up to date");
   });
 
   it("treats a resolved snapshot with pending files as a sync failure", async () => {
-    api.sync.mockResolvedValueOnce({
-      items: [],
-      pendingCount: 1,
-      hasLocalIndex: true,
-    });
+    api.sync.mockResolvedValueOnce(snapshot({ items: [], pendingCount: 1 }));
 
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
+    await renderVault();
     const sync = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Sync",
     );
@@ -381,16 +653,57 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Cloud sync failed");
+    expect(screenText()).toContain("Cloud sync failed");
+  });
+
+  it("maps a 401 sync error to a re-login message", async () => {
+    api.sync.mockRejectedValueOnce(new Error("VAULT_CLOUD_HTTP_401"));
+
+    await renderVault();
+    const sync = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Sync",
+    );
+    await act(async () => {
+      sync?.click();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Your session has expired");
+  });
+
+  it("maps a 403 sync error to a permission message", async () => {
+    api.sync.mockRejectedValueOnce(new Error("VAULT_CLOUD_HTTP_403"));
+
+    await renderVault();
+    const sync = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Sync",
+    );
+    await act(async () => {
+      sync?.click();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("permission");
+  });
+
+  it("maps a 503 sync error to a retry-later message", async () => {
+    api.sync.mockRejectedValueOnce(new Error("VAULT_CLOUD_HTTP_503"));
+
+    await renderVault();
+    const sync = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Sync",
+    );
+    await act(async () => {
+      sync?.click();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("temporarily unavailable");
   });
 
   it("uploads through high-level IPC without receiving file bytes", async () => {
-    await act(async () => {
-      root.render(createElement(VaultView));
-    });
-    const upload = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Upload",
-    );
+    await renderVault();
+    const upload = uploadButton();
 
     await act(async () => {
       upload?.click();

@@ -6,6 +6,7 @@ export interface VaultCloudClient {
   deleteObject(token: string, objectId: string): Promise<void>;
   getIndex(token: string): Promise<Buffer | null>;
   putIndex(token: string, payload: Buffer): Promise<void>;
+  listObjectIds(token: string): Promise<string[]>;
 }
 
 export class FetchVaultCloudClient implements VaultCloudClient {
@@ -51,6 +52,13 @@ export class FetchVaultCloudClient implements VaultCloudClient {
     }
   }
 
+  async listObjectIds(token: string): Promise<string[]> {
+    const response = await this.request(token, "/api/vault/objects", {});
+    const payload: unknown = await response.json();
+    if (!isObjectIdPayload(payload)) throw new Error("VAULT_BAD_OBJECT_LIST");
+    return payload.object_ids;
+  }
+
   async putIndex(token: string, payload: Buffer): Promise<void> {
     await this.request(token, "/api/vault/index", {
       method: "PUT",
@@ -82,4 +90,13 @@ export class VaultCloudError extends Error {
   constructor(readonly status: number) {
     super(`VAULT_CLOUD_HTTP_${status}`);
   }
+}
+
+function isObjectIdPayload(value: unknown): value is { object_ids: string[] } {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { object_ids?: unknown };
+  return (
+    Array.isArray(candidate.object_ids) &&
+    candidate.object_ids.every((id) => typeof id === "string")
+  );
 }

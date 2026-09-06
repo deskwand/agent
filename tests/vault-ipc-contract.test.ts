@@ -1,12 +1,31 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ipcMain } from "electron";
-import { registerVaultIpc } from "../src/main/vault/ipc";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import type { VaultIpcDependencies } from "../src/main/vault/ipc";
+import {
+  classifyRemoteBackupError,
+  registerVaultIpc,
+} from "../src/main/vault/ipc";
+import { VaultCloudError } from "../src/main/vault/cloud-client";
+import { LocalVaultStore } from "../src/main/vault/local-store";
+import type { VaultSnapshot } from "../src/shared/vault";
 
 describe("Vault IPC contract", () => {
+  const roots: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(
+      roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
+    );
+  });
+
   it("registers only high-level local-first commands", () => {
     const channels: string[] = [];
     const handle = vi.spyOn(ipcMain, "handle").mockImplementation((channel) => {
       channels.push(channel);
+      return undefined as never;
     });
 
     registerVaultIpc();
@@ -22,10 +41,146 @@ describe("Vault IPC contract", () => {
       "vault.checkRemoteBackup",
       "vault.generateRecoveryCode",
       "vault.initialize",
-      "vault.restore",
+      "vault.restoreWithLocalMek",
+      "vault.restoreWithRecoveryCode",
+      "vault.beginDiscardAndReinitialize",
+      "vault.completeDiscardAndReinitialize",
+      "vault.discardRemoteBackupAndStart",
     ]);
+    expect(channels).toContain("vault.restoreWithLocalMek");
+    expect(channels).toContain("vault.restoreWithRecoveryCode");
+    expect(channels).not.toContain("vault.restore");
     expect(channels).not.toContain("vault.encryptUpload");
     expect(channels).not.toContain("vault.decryptRestore");
+    expect(channels).not.toContain("vault.getMek");
+    handle.mockRestore();
+  });
+
+  it("keeps remote errors distinct from an empty backup", () => {
+    const result = classifyRemoteBackupError(new VaultCloudError(503));
+    expect(result).toEqual({
+      status: "error",
+      errorCode: "VAULT_CLOUD_HTTP_503",
+    });
+    expect(result.status).not.toBe("no-backup");
+  });
+
+  it("exposes local-file and local-MEK presence in the snapshot", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+
+    const { store, dependencies } = await makeDependencies(
+      Buffer.from("mek"),
+      true,
+    );
+    registerVaultIpc(dependencies);
+
+    const snapshot = (await handlers.get(
+      "vault.getSnapshot",
+    )?.()) as VaultSnapshot;
+    expect(snapshot.hasLocalFiles).toBe(true);
+    expect(snapshot.hasLocalMek).toBe(true);
+    expect(snapshot.items.map((item) => item.name)).toEqual(["readme.md"]);
+    handle.mockRestore();
+  });
+
+  it("reports a missing remote backup without an error code", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), true);
+    dependencies.cloud.getIndex = async () => null;
+    registerVaultIpc(dependencies);
+
+    const fromHandler = (await handlers.get("vault.checkRemoteBackup")?.(
+      "token",
+    )) as unknown;
+    expect(fromHandler).toEqual({ status: "no-backup" });
+    handle.mockRestore();
+  });
+
+  it("exposes a remote HTTP error as a distinct status", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    dependencies.cloud.getIndex = async () => {
+      throw new VaultCloudError(503);
+    };
+    registerVaultIpc(dependencies);
+
+    const status = await handlers.get("vault.checkRemoteBackup")?.("token");
+    expect(status).toEqual({
+      status: "error",
+      errorCode: "VAULT_CLOUD_HTTP_503",
+    });
     handle.mockRestore();
   });
 });
+
+async function makeDependencies(
+  mek: Buffer,
+  withLocalFile: boolean,
+): Promise<{ store: LocalVaultStore; dependencies: VaultIpcDependencies }> {
+  const root = await mkdtemp(join(tmpdir(), "deskwand-vault-ipc-"));
+  const store = new LocalVaultStore(join(root, "vault"));
+  await store.ensureDirectory();
+  if (withLocalFile) {
+    await writeFile(join(store.rootDir, "readme.md"), "hello");
+  }
+  const cloud: VaultIpcDependencies["cloud"] = {
+    getIndex: async () => Buffer.alloc(10),
+    putObject: async () => {},
+    getObject: async () => Buffer.alloc(10),
+    deleteObject: async () => {},
+    putIndex: async () => {},
+    listObjectIds: async () => [],
+  };
+  const syncService: VaultIpcDependencies["syncService"] = {
+    sync: async () => ({ uploaded: 0, deleted: 0, pending: 0, failed: 0 }),
+  };
+  const restoreService: VaultIpcDependencies["restoreService"] = {
+    restoreWithLocalMek: async () => ({ restored: 0, renamed: 0 }),
+    restoreWithRecoveryCode: async () => ({ restored: 0, renamed: 0 }),
+  };
+  const resetService: VaultIpcDependencies["resetService"] = {
+    beginDiscardAndReinitialize: async () => ({
+      recoveryCode: "code",
+      preservedLocalFiles: 0,
+    }),
+    completeDiscardAndReinitialize: async () => ({
+      deletedObjects: 0,
+      preservedLocalFiles: 0,
+    }),
+    discardWithoutLocalKey: async () => ({
+      deletedObjects: 0,
+      preservedLocalFiles: 0,
+    }),
+  };
+  return {
+    store,
+    dependencies: {
+      store,
+      cloud,
+      syncService,
+      restoreService,
+      resetService,
+      getLocalMek: () => mek,
+    },
+  };
+}

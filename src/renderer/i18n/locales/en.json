@@ -1624,7 +1624,11 @@
     },
     "restore": {
       "prompt": "A cloud backup is available. Set up your recovery code to restore it.",
-      "action": "Restore"
+      "action": "Restore",
+      "restoring": "Restoring your cloud backup…",
+      "remoteError": "Couldn't check your cloud backup status",
+      "failed": "Restore failed. Try again.",
+      "retry": "Retry"
     },
     "error": {
       "loginRequired": "Sign in to sync your Vault",
@@ -1638,7 +1642,26 @@
       "recoveryMismatch": "The recovery code does not match this backup",
       "noRemoteBackup": "No cloud backup is available",
       "localIndexExists": "Restore is available only when the local index is missing",
-      "restoreFailed": "Cloud restore failed"
+      "localFilesExist": "Restore is available only when the local Vault is empty",
+      "restoreFailed": "Cloud restore failed",
+      "sessionExpired": "Your session has expired. Please sign in again.",
+      "permissionDenied": "You don't have permission to access the cloud backup",
+      "serverError": "The cloud service is temporarily unavailable. Try again later.",
+      "resetFailed": "Reset failed; your local files and current key were kept",
+      "resetInProgress": "Resetting and reconfiguring your cloud backup",
+      "restoreInProgress": "A restore is already in progress"
+    },
+    "firstSetup": {
+      "title": "Set your recovery code",
+      "body": "Create a recovery code and store it safely. It restores your cloud backup on other devices."
+    },
+    "reset": {
+      "discard": "Discard old backup, start fresh",
+      "confirmNewDevice": "Discard the old backup and create a new Vault? This cannot be undone.",
+      "confirmExisting": "Discard the old cloud backup and start over? Your local files stay, but the cloud backup is deleted. This cannot be undone.",
+      "localFilesConflict": "An existing cloud backup must be discarded before these local files can start a new backup.",
+      "retry": "Retry reset",
+      "inProgress": "Resetting and reconfiguring your cloud backup…"
     }
   },
   "modelMenu": {

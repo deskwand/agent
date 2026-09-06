@@ -20,7 +20,13 @@ import type {
 } from "../renderer/types";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
-import type { RestoreResult, VaultSnapshot } from "../shared/vault";
+import type {
+  RestoreResult,
+  VaultRemoteStatus,
+  VaultResetPreparation,
+  VaultResetResult,
+  VaultSnapshot,
+} from "../shared/vault";
 import type {
   McpServerConfig,
   McpTool,
@@ -723,7 +729,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     sync: (token: string) =>
       ipcRenderer.invoke("vault.sync", token) as Promise<VaultSnapshot>,
     checkRemoteBackup: (token: string) =>
-      ipcRenderer.invoke("vault.checkRemoteBackup", token) as Promise<boolean>,
+      ipcRenderer.invoke(
+        "vault.checkRemoteBackup",
+        token,
+      ) as Promise<VaultRemoteStatus>,
     generateRecoveryCode: () =>
       ipcRenderer.invoke("vault.generateRecoveryCode") as Promise<string>,
     initialize: (token: string | null, recoveryCode: string) =>
@@ -732,12 +741,33 @@ contextBridge.exposeInMainWorld("electronAPI", {
         token,
         recoveryCode,
       ) as Promise<void>,
-    restore: (token: string, recoveryCode: string) =>
+    restoreWithLocalMek: (token: string) =>
       ipcRenderer.invoke(
-        "vault.restore",
+        "vault.restoreWithLocalMek",
+        token,
+      ) as Promise<RestoreResult>,
+    restoreWithRecoveryCode: (token: string, recoveryCode: string) =>
+      ipcRenderer.invoke(
+        "vault.restoreWithRecoveryCode",
         token,
         recoveryCode,
       ) as Promise<RestoreResult>,
+    beginDiscardAndReinitialize: (token: string) =>
+      ipcRenderer.invoke(
+        "vault.beginDiscardAndReinitialize",
+        token,
+      ) as Promise<VaultResetPreparation>,
+    completeDiscardAndReinitialize: (token: string, recoveryCode: string) =>
+      ipcRenderer.invoke(
+        "vault.completeDiscardAndReinitialize",
+        token,
+        recoveryCode,
+      ) as Promise<VaultResetResult>,
+    discardRemoteBackupAndStart: (token: string) =>
+      ipcRenderer.invoke(
+        "vault.discardRemoteBackupAndStart",
+        token,
+      ) as Promise<VaultResetResult>,
   },
 });
 
@@ -1292,16 +1322,27 @@ declare global {
         }>;
         deleteFile: (name: string) => Promise<VaultSnapshot>;
         sync: (token: string) => Promise<VaultSnapshot>;
-        checkRemoteBackup: (token: string) => Promise<boolean>;
+        checkRemoteBackup: (token: string) => Promise<VaultRemoteStatus>;
         generateRecoveryCode: () => Promise<string>;
         initialize: (
           token: string | null,
           recoveryCode: string,
         ) => Promise<void>;
-        restore: (
+        restoreWithLocalMek: (token: string) => Promise<RestoreResult>;
+        restoreWithRecoveryCode: (
           token: string,
           recoveryCode: string,
         ) => Promise<RestoreResult>;
+        beginDiscardAndReinitialize: (
+          token: string,
+        ) => Promise<VaultResetPreparation>;
+        completeDiscardAndReinitialize: (
+          token: string,
+          recoveryCode: string,
+        ) => Promise<VaultResetResult>;
+        discardRemoteBackupAndStart: (
+          token: string,
+        ) => Promise<VaultResetResult>;
       };
     };
   }

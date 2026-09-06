@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   copyFile,
   mkdir,
@@ -12,10 +12,12 @@ import {
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
-import type { SyncStatus } from "../../shared/vault";
+import type { SyncStatus, VaultOperationStatus } from "../../shared/vault";
 
 const INDEX_FILE = ".vault-index.json";
 const KEYCHAIN_FILE = "vault-mek.bin";
+const OPERATION_FILE = ".vault-operation.json";
+const RESTORE_DIR = ".vault-restore";
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 export interface LocalVaultEntry {
@@ -41,20 +43,85 @@ export interface LocalVaultFile {
   hash: string;
 }
 
+export type VaultOperationState = Exclude<VaultOperationStatus, "idle">;
+
+export type VaultMarkerState = VaultOperationState | "committing";
+
+export interface VaultOperationMarker {
+  version: 1;
+  id: string;
+  kind: "restore" | "reset";
+  state: VaultMarkerState;
+  stagedDirectory?: string;
+  targetNames?: string[];
+}
+
+export interface VaultRestoreTransaction {
+  id: string;
+  state: "staging" | "committing";
+  stagedDirectory: string;
+  targetNames: string[];
+}
+
+export interface LocalVaultState {
+  hasIndex: boolean;
+  files: LocalVaultFile[];
+  operation: VaultOperationMarker | null;
+}
+
 function emptyIndex(): LocalVaultIndex {
   return { version: 1, files: {}, pendingDeletes: [] };
 }
 
 export function isReservedVaultName(name: string): boolean {
+  const normalized = name.toLowerCase();
+  const keychainFile = KEYCHAIN_FILE.toLowerCase();
+  const indexFile = INDEX_FILE.toLowerCase();
+  const operationFile = OPERATION_FILE.toLowerCase();
+  const restoreDir = RESTORE_DIR.toLowerCase();
   return (
-    name === KEYCHAIN_FILE ||
-    name === INDEX_FILE ||
-    name.startsWith(`${INDEX_FILE}.`)
+    normalized === keychainFile ||
+    normalized === indexFile ||
+    normalized.startsWith(`${indexFile}.`) ||
+    normalized === operationFile ||
+    normalized.startsWith(`${operationFile}.`) ||
+    normalized === restoreDir ||
+    normalized.startsWith(`${restoreDir}/`) ||
+    normalized.startsWith(`${restoreDir}${sep}`)
+  );
+}
+
+function isVaultName(name: string): boolean {
+  return (
+    !!name &&
+    name !== "." &&
+    name !== ".." &&
+    !name.includes("/") &&
+    !name.includes("\\")
   );
 }
 
 function isSyncStatus(value: unknown): value is SyncStatus {
   return value === "synced" || value === "pending" || value === "failed";
+}
+
+function isVaultOperationMarker(value: unknown): value is VaultOperationMarker {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<VaultOperationMarker>;
+  return (
+    candidate.version === 1 &&
+    typeof candidate.id === "string" &&
+    (candidate.kind === "restore" || candidate.kind === "reset") &&
+    (candidate.state === "restoring" ||
+      candidate.state === "committing" ||
+      candidate.state === "resetting" ||
+      candidate.state === "awaiting-recovery-code") &&
+    (candidate.stagedDirectory === undefined ||
+      typeof candidate.stagedDirectory === "string") &&
+    (candidate.targetNames === undefined ||
+      (Array.isArray(candidate.targetNames) &&
+        candidate.targetNames.every((name) => typeof name === "string")))
+  );
 }
 
 function isLocalIndex(value: unknown): value is LocalVaultIndex {
@@ -78,14 +145,10 @@ function isLocalIndex(value: unknown): value is LocalVaultIndex {
     return false;
   }
   return Object.entries(candidate.files).every(([name, entry]) => {
-    if (
-      !name ||
-      isReservedVaultName(name) ||
-      name.includes("/") ||
-      name.includes("\\")
-    ) {
-      return false;
-    }
+    // Internal/reserved names (e.g. a leaked legacy vault-mek.bin entry) are
+    // valid index entries — they are reconciled out later, not treated as
+    // corruption. Only reject path-traversal names.
+    if (!name || !isVaultName(name)) return false;
     if (!entry || typeof entry !== "object") return false;
     const item = entry as Partial<LocalVaultEntry>;
     return (
@@ -150,7 +213,7 @@ export class LocalVaultStore {
 
   async writeIndex(index: LocalVaultIndex): Promise<void> {
     await this.ensureDirectory();
-    const tempPath = `${this.indexPath}.tmp-${process.pid}-${Date.now()}`;
+    const tempPath = `${this.indexPath}.tmp-${process.pid}-${randomUUID()}`;
     const handle = await open(tempPath, "w", 0o600);
     let renamed = false;
     try {
@@ -326,6 +389,185 @@ export class LocalVaultStore {
   filePath(name: string): string {
     this.validateName(name);
     return join(this.rootDir, name);
+  }
+
+  async readOperationMarker(): Promise<VaultOperationMarker | null> {
+    try {
+      const raw = await readFile(this.operationPath(), "utf8");
+      const parsed: unknown = JSON.parse(raw);
+      if (!isVaultOperationMarker(parsed)) {
+        await rm(this.operationPath(), { force: true }).catch(() => undefined);
+        return null;
+      }
+      return parsed;
+    } catch (error: unknown) {
+      const code = error as NodeJS.ErrnoException;
+      if (code.code === "ENOENT") return null;
+      await rm(this.operationPath(), { force: true }).catch(() => undefined);
+      return null;
+    }
+  }
+
+  async writeOperationMarker(marker: VaultOperationMarker): Promise<void> {
+    await this.ensureDirectory();
+    const target = this.operationPath();
+    const tempPath = `${target}.tmp-${process.pid}-${randomUUID()}`;
+    const handle = await open(tempPath, "w", 0o600);
+    let renamed = false;
+    try {
+      await handle.writeFile(`${JSON.stringify(marker, null, 2)}\n`, "utf8");
+      await handle.sync();
+      await handle.close();
+      await rename(tempPath, target);
+      renamed = true;
+    } finally {
+      if (!renamed) {
+        await handle.close().catch(() => undefined);
+        await rm(tempPath, { force: true }).catch(() => undefined);
+      }
+    }
+  }
+
+  async clearOperationMarker(): Promise<void> {
+    await rm(this.operationPath(), { force: true });
+  }
+
+  async readState(): Promise<LocalVaultState> {
+    const hasIndex = await this.hasIndex();
+    const files = await this.scanFiles();
+    const operation = await this.readOperationMarker();
+    return { hasIndex, files, operation };
+  }
+
+  async beginRestore(targetNames: string[]): Promise<VaultRestoreTransaction> {
+    await this.ensureDirectory();
+    const id = randomUUID();
+    const stagedDirectory = join(this.rootDir, RESTORE_DIR, id);
+    const marker: VaultOperationMarker = {
+      version: 1,
+      id,
+      kind: "restore",
+      state: "restoring",
+      stagedDirectory,
+      targetNames: [...targetNames],
+    };
+    await this.writeOperationMarker(marker);
+    await mkdir(stagedDirectory, { recursive: true, mode: 0o700 });
+    return {
+      id,
+      state: "staging",
+      stagedDirectory,
+      targetNames: [...targetNames],
+    };
+  }
+
+  async stageRestoreFile(
+    transaction: VaultRestoreTransaction,
+    name: string,
+    contents: Buffer,
+  ): Promise<void> {
+    if (contents.length > MAX_FILE_SIZE)
+      throw new Error("VAULT_FILE_TOO_LARGE");
+    this.validateName(name);
+    await mkdir(transaction.stagedDirectory, { recursive: true, mode: 0o700 });
+    const handle = await open(
+      join(transaction.stagedDirectory, name),
+      "wx",
+      0o600,
+    );
+    try {
+      await handle.writeFile(contents);
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+  }
+
+  async commitRestore(
+    transaction: VaultRestoreTransaction,
+    entries: Record<string, LocalVaultEntry>,
+  ): Promise<void> {
+    const marker = await this.readOperationMarker();
+    if (marker && marker.id === transaction.id) {
+      await this.writeOperationMarker({ ...marker, state: "committing" });
+    }
+    try {
+      for (const name of transaction.targetNames) {
+        await rename(
+          join(transaction.stagedDirectory, name),
+          this.filePath(name),
+        );
+      }
+      const localIndex = await this.readIndex();
+      for (const [name, entry] of Object.entries(entries)) {
+        localIndex.files[name] = entry;
+      }
+      await this.writeIndex(localIndex);
+      await rm(transaction.stagedDirectory, {
+        recursive: true,
+        force: true,
+      });
+      await this.clearOperationMarker();
+    } catch (error: unknown) {
+      await this.rollbackRestore(transaction);
+      throw error;
+    }
+  }
+
+  async rollbackRestore(transaction: VaultRestoreTransaction): Promise<void> {
+    for (const name of transaction.targetNames) {
+      await rm(this.filePath(name), { force: true }).catch(() => undefined);
+    }
+    await rm(transaction.stagedDirectory, {
+      recursive: true,
+      force: true,
+    }).catch(() => undefined);
+    await this.clearOperationMarker();
+  }
+
+  async recoverPendingRestore(): Promise<void> {
+    const marker = await this.readOperationMarker();
+    if (!marker || marker.kind !== "restore") return;
+    const targetNames = marker.targetNames ?? [];
+
+    if (marker.state === "committing") {
+      const index = await this.readIndex();
+      let committed = true;
+      for (const name of targetNames) {
+        if (!index.files[name]) {
+          committed = false;
+          break;
+        }
+        try {
+          const metadata = await stat(this.filePath(name));
+          if (!metadata.isFile()) {
+            committed = false;
+            break;
+          }
+        } catch {
+          committed = false;
+          break;
+        }
+      }
+      if (!committed) {
+        for (const name of targetNames) {
+          await rm(this.filePath(name), { force: true }).catch(() => undefined);
+          delete index.files[name];
+        }
+        if (await this.hasIndex()) await this.writeIndex(index);
+      }
+    }
+    if (marker.stagedDirectory) {
+      await rm(marker.stagedDirectory, {
+        recursive: true,
+        force: true,
+      }).catch(() => undefined);
+    }
+    await this.clearOperationMarker();
+  }
+
+  private operationPath(): string {
+    return join(this.rootDir, OPERATION_FILE);
   }
 
   private async exists(name: string): Promise<boolean> {

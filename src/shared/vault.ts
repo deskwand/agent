@@ -8,14 +8,51 @@ export interface VaultSnapshotItem {
   syncStatus: SyncStatus;
 }
 
+export type RemoteBackupStatus =
+  | "unknown"
+  | "no-backup"
+  | "has-backup"
+  | "error";
+
+export type VaultOperationStatus =
+  | "idle"
+  | "restoring"
+  | "resetting"
+  | "awaiting-recovery-code";
+
 export interface VaultSnapshot {
   items: VaultSnapshotItem[];
   pendingCount: number;
   hasLocalIndex: boolean;
-  isInitialized?: boolean;
+  hasLocalFiles: boolean;
+  hasLocalMek: boolean;
+  operationStatus: VaultOperationStatus;
+}
+
+export interface VaultRemoteStatus {
+  status: Exclude<RemoteBackupStatus, "unknown">;
+  errorCode?: string;
 }
 
 export interface RestoreResult {
   restored: number;
   renamed: number;
 }
+
+export interface VaultResetPreparation {
+  recoveryCode: string;
+  preservedLocalFiles: number;
+}
+
+export interface VaultResetResult {
+  deletedObjects: number;
+  preservedLocalFiles: number;
+}
+
+export type VaultErrorCode =
+  | `VAULT_CLOUD_HTTP_${number}`
+  | "VAULT_RESET_FAILED"
+  | "VAULT_RESET_IN_PROGRESS"
+  | "VAULT_RESTORE_IN_PROGRESS"
+  | "VAULT_KEY_REQUIRED"
+  | "VAULT_KEYCHAIN_UNAVAILABLE";

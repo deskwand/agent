@@ -1,5 +1,6 @@
 import { describe, expect, it, afterEach } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LocalVaultStore } from "../src/main/vault/local-store";
@@ -144,5 +145,136 @@ describe("LocalVaultStore", () => {
     expect(reconciled.files["new.txt"].syncStatus).toBe("pending");
     expect(reconciled.files["deleted.txt"]).toBeUndefined();
     expect(reconciled.pendingDeletes).toEqual(["deleted-object"]);
+  });
+
+  it("never scans or targets internal Vault files", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+    await writeFile(join(store.rootDir, "vault-mek.bin"), "encrypted key");
+    await writeFile(join(store.rootDir, ".vault-index.json.tmp-stale"), "{}");
+    await writeFile(
+      join(store.rootDir, ".vault-operation.json.tmp-stale"),
+      "{}",
+    );
+    expect((await store.scanFiles()).map((file) => file.name)).not.toContain(
+      "vault-mek.bin",
+    );
+    expect((await store.scanFiles()).map((file) => file.name)).not.toContain(
+      ".vault-operation.json.tmp-stale",
+    );
+    expect(() => store.filePath("vault-mek.bin")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("Vault-MEK.BIN")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath(".VAULT-INDEX.JSON.tmp")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+    expect(() => store.filePath(".VAULT-OPERATION.JSON.tmp")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+  });
+
+  it("removes a legacy internal key entry without deleting the key file", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+    const keyPath = join(store.rootDir, "vault-mek.bin");
+    await writeFile(keyPath, "encrypted key");
+    await store.writeIndex({
+      version: 1,
+      files: {
+        "vault-mek.bin": {
+          objectId: "legacy-object",
+          hash: "hash",
+          size: 12,
+          mtime: 1,
+          syncStatus: "synced",
+        },
+      },
+      pendingDeletes: [],
+    });
+
+    const reconciled = await store.reconcile(await store.readIndex());
+    expect(reconciled.files["vault-mek.bin"]).toBeUndefined();
+    expect(reconciled.pendingDeletes).toEqual(["legacy-object"]);
+    await expect(readFile(keyPath, "utf8")).resolves.toBeTruthy();
+  });
+
+  it("recovers an interrupted staging restore on restart", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+    const transaction = await store.beginRestore(["a.txt"]);
+    await store.stageRestoreFile(transaction, "a.txt", Buffer.from("restored"));
+    expect(existsSync(join(store.rootDir, ".vault-operation.json"))).toBe(true);
+
+    const restarted = new LocalVaultStore(store.rootDir);
+    await restarted.ensureDirectory();
+    await restarted.recoverPendingRestore();
+
+    expect(existsSync(join(store.rootDir, ".vault-operation.json"))).toBe(
+      false,
+    );
+    expect(existsSync(transaction.stagedDirectory)).toBe(false);
+    expect(existsSync(join(store.rootDir, "a.txt"))).toBe(false);
+  });
+
+  it("keeps a fully committed restore after a crash before marker cleanup", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+    const transaction = await store.beginRestore(["a.txt"]);
+    await store.stageRestoreFile(transaction, "a.txt", Buffer.from("restored"));
+    await store.writeOperationMarker({
+      version: 1,
+      id: transaction.id,
+      kind: "restore",
+      state: "committing",
+      stagedDirectory: transaction.stagedDirectory,
+      targetNames: transaction.targetNames,
+    });
+    await rename(
+      join(transaction.stagedDirectory, "a.txt"),
+      store.filePath("a.txt"),
+    );
+    await store.writeIndex({
+      version: 1,
+      files: {
+        "a.txt": {
+          objectId: "remote-a",
+          hash: "hash",
+          size: 8,
+          mtime: 1,
+          syncStatus: "synced",
+        },
+      },
+      pendingDeletes: [],
+    });
+
+    const restarted = new LocalVaultStore(store.rootDir);
+    await restarted.recoverPendingRestore();
+
+    expect(await readFile(store.filePath("a.txt"), "utf8")).toBe("restored");
+    expect((await store.readIndex()).files["a.txt"]).toBeDefined();
+    expect(await store.readOperationMarker()).toBeNull();
+  });
+
+  it("cleans half-committed target files on restart", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+    const transaction = await store.beginRestore(["a.txt"]);
+    await store.stageRestoreFile(transaction, "a.txt", Buffer.from("restored"));
+    const marker = await store.readOperationMarker();
+    await store.writeOperationMarker({
+      ...marker!,
+      state: "committing",
+    });
+    await rename(
+      join(transaction.stagedDirectory, "a.txt"),
+      store.filePath("a.txt"),
+    );
+
+    const restarted = new LocalVaultStore(store.rootDir);
+    await restarted.ensureDirectory();
+    await restarted.recoverPendingRestore();
+
+    expect(existsSync(store.filePath("a.txt"))).toBe(false);
+    expect(existsSync(transaction.stagedDirectory)).toBe(false);
+    expect(await store.readOperationMarker()).toBeNull();
   });
 });

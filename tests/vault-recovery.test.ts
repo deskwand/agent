@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -116,11 +117,10 @@ describe("vault recovery", () => {
     expect(loadMek()?.equals(deriveMek(firstCode))).toBe(true);
   });
 
-  it("restores encrypted files and suffixes local name collisions", async () => {
+  it("restores encrypted files from a cloud backup", async () => {
     const root = mkdtempSync(join(tmpdir(), "deskwand-vault-restore-"));
     const store = new LocalVaultStore(join(root, "vault"));
     await store.ensureDirectory();
-    writeFileSync(join(store.rootDir, "readme.md"), "local");
     const source = join(root, "remote-readme.md");
     writeFileSync(source, "remote");
     const { id, payload } = await packFile(
@@ -132,6 +132,9 @@ describe("vault recovery", () => {
       async putObject(): Promise<void> {}
       async putIndex(): Promise<void> {}
       async deleteObject(): Promise<void> {}
+      async listObjectIds(): Promise<string[]> {
+        return [];
+      }
       async getIndex(): Promise<Buffer> {
         return encodeRemoteIndex(
           {
@@ -153,26 +156,122 @@ describe("vault recovery", () => {
       }
     }
 
+    let persisted: Buffer | null = null;
     const result = await new VaultRestoreService(
       store,
       new FakeCloud(),
-    ).restore("token", "123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
+      () => null,
+      (mek) => {
+        persisted = mek;
+      },
+    ).restoreWithRecoveryCode("token", "123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
 
-    expect(result).toEqual({ restored: 1, renamed: 1 });
-    expect(await store.scanFiles()).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ name: "readme.md" }),
-        expect.objectContaining({ name: "readme (1).md" }),
-      ]),
-    );
+    expect(result).toEqual({ restored: 1, renamed: 0 });
+    expect(
+      persisted?.equals(deriveMek("123456789ABCDEFGHJKLMNPQRSTUVWXYZ")),
+    ).toBe(true);
+    expect(await readFile(store.filePath("readme.md"), "utf8")).toBe("remote");
     rmSync(root, { recursive: true, force: true });
   });
 
-  it("indexes every file when multiple remote names collide", async () => {
+  it("restores with the stored MEK without a recovery code", async () => {
+    const root = mkdtempSync(join(tmpdir(), "deskwand-vault-restore-mek-"));
+    const store = new LocalVaultStore(join(root, "vault"));
+    await store.ensureDirectory();
+    const code = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const source = join(root, "readme.md");
+    writeFileSync(source, "hello");
+    const { id, payload } = await packFile(source, deriveMek(code));
+    const cloud: VaultCloudClient = {
+      putObject: async () => {},
+      putIndex: async () => {},
+      deleteObject: async () => {},
+      listObjectIds: async () => [],
+      getIndex: async () =>
+        encodeRemoteIndex(
+          {
+            version: 1,
+            files: {
+              "readme.md": {
+                objectId: id,
+                hash: "hash",
+                size: 5,
+                mtime: 1,
+              },
+            },
+          },
+          deriveMek(code),
+        ),
+      getObject: async () => payload,
+    };
+
+    const service = new VaultRestoreService(
+      store,
+      cloud,
+      () => deriveMek(code),
+      () => {},
+    );
+    const result = await service.restoreWithLocalMek("token");
+
+    expect(result.restored).toBe(1);
+    expect(await readFile(store.filePath("readme.md"), "utf8")).toBe("hello");
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("rejects recovery-code restore before touching local files when a different MEK exists", async () => {
+    const root = mkdtempSync(
+      join(tmpdir(), "deskwand-vault-restore-existing-mek-"),
+    );
+    const store = new LocalVaultStore(join(root, "vault"));
+    await store.ensureDirectory();
+    const code = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    const otherCode = "abcdefghijkmnopqrstuvwxyz123456789";
+    let downloaded = false;
+    const cloud: VaultCloudClient = {
+      putObject: async () => {},
+      putIndex: async () => {},
+      deleteObject: async () => {},
+      listObjectIds: async () => [],
+      getIndex: async () =>
+        encodeRemoteIndex(
+          {
+            version: 1,
+            files: {
+              "readme.md": {
+                objectId: "remote-readme",
+                hash: "hash",
+                size: 5,
+                mtime: 1,
+              },
+            },
+          },
+          deriveMek(code),
+        ),
+      getObject: async () => {
+        downloaded = true;
+        throw new Error("download must not run");
+      },
+    };
+
+    await expect(
+      new VaultRestoreService(
+        store,
+        cloud,
+        () => deriveMek(otherCode),
+        () => {
+          throw new Error("MEK must not be persisted");
+        },
+      ).restoreWithRecoveryCode("token", code),
+    ).rejects.toThrow("VAULT_ALREADY_INITIALIZED");
+    expect(downloaded).toBe(false);
+    expect(await store.scanFiles()).toEqual([]);
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it("indexes every remote file and skips internal names", async () => {
     const root = mkdtempSync(join(tmpdir(), "deskwand-vault-restore-multi-"));
     const store = new LocalVaultStore(join(root, "vault"));
     await store.ensureDirectory();
-    writeFileSync(join(store.rootDir, "report.md"), "local");
     const restoreCode = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
     const firstSource = join(root, "first.md");
     const secondSource = join(root, "second.md");
@@ -188,6 +287,7 @@ describe("vault recovery", () => {
       putObject: async () => {},
       putIndex: async () => {},
       deleteObject: async () => {},
+      listObjectIds: async () => [],
       getIndex: async () =>
         encodeRemoteIndex(
           {
@@ -222,15 +322,18 @@ describe("vault recovery", () => {
       },
     };
 
-    const result = await new VaultRestoreService(store, cloud).restore(
-      "token",
-      restoreCode,
-    );
+    const result = await new VaultRestoreService(
+      store,
+      cloud,
+      () => null,
+      () => {},
+    ).restoreWithRecoveryCode("token", restoreCode);
 
     expect(result.restored).toBe(2);
     const index = await store.readIndex();
+    expect(index.files["report.md"]).toBeDefined();
     expect(index.files["report (1).md"]).toBeDefined();
-    expect(index.files["report (1) (1).md"]).toBeDefined();
+    expect(index.files["vault-mek.bin"]).toBeUndefined();
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -239,10 +342,12 @@ describe("vault recovery", () => {
     const store = new LocalVaultStore(join(root, "vault"));
     await store.ensureDirectory();
     const code = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+    let storedMek: Buffer | null = null;
     const cloud: VaultCloudClient = {
       putObject: async () => {},
       putIndex: async () => {},
       deleteObject: async () => {},
+      listObjectIds: async () => [],
       getIndex: async () =>
         encodeRemoteIndex(
           {
@@ -263,10 +368,20 @@ describe("vault recovery", () => {
       },
     };
 
+    const service = new VaultRestoreService(
+      store,
+      cloud,
+      () => null,
+      (next) => {
+        storedMek = next;
+      },
+    );
     await expect(
-      new VaultRestoreService(store, cloud).restore("token", code),
+      service.restoreWithRecoveryCode("token", code),
     ).rejects.toThrow("NETWORK_DOWN");
-    expect(loadMek()).toBeNull();
+    expect(storedMek).toBeNull();
+    expect(await store.readOperationMarker()).toBeNull();
+    expect(await store.scanFiles()).toEqual([]);
     rmSync(root, { recursive: true, force: true });
   });
 });
