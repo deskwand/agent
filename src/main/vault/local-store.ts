@@ -12,7 +12,11 @@ import {
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
-import type { SyncStatus, VaultOperationStatus } from "../../shared/vault";
+import {
+  VAULT_LOCAL_QUOTA_BYTES,
+  type SyncStatus,
+  type VaultOperationStatus,
+} from "../../shared/vault";
 
 const INDEX_FILE = ".vault-index.json";
 const KEYCHAIN_FILE = "vault-mek.bin";
@@ -313,6 +317,14 @@ export class LocalVaultStore {
     return next;
   }
 
+  async getUsageBytes(index?: LocalVaultIndex): Promise<number> {
+    const current = index ?? (await this.reconcile(await this.readIndex()));
+    return Object.values(current.files).reduce(
+      (total, entry) => total + entry.size,
+      0,
+    );
+  }
+
   async importFile(
     sourcePath: string,
   ): Promise<{ name: string; index: LocalVaultIndex }> {
@@ -320,6 +332,14 @@ export class LocalVaultStore {
     const source = await stat(sourcePath);
     if (!source.isFile()) throw new Error("VAULT_SOURCE_NOT_FILE");
     if (source.size > MAX_FILE_SIZE) throw new Error("VAULT_FILE_TOO_LARGE");
+
+    const index = await this.reconcile(await this.readIndex());
+    if (
+      (await this.getUsageBytes(index)) + source.size >
+      VAULT_LOCAL_QUOTA_BYTES
+    ) {
+      throw new Error("VAULT_LOCAL_QUOTA_EXCEEDED");
+    }
 
     const originalName = basename(sourcePath);
     this.validateName(originalName);
@@ -339,7 +359,6 @@ export class LocalVaultStore {
     try {
       await copyFile(sourcePath, destination);
       const metadata = await stat(destination);
-      const index = await this.readIndex();
       index.files[name] = {
         objectId: null,
         hash: await fileHash(destination),

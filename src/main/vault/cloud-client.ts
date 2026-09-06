@@ -80,16 +80,35 @@ export class FetchVaultCloudClient implements VaultCloudClient {
       },
     });
     if (!response.ok) {
-      throw new VaultCloudError(response.status);
+      let code: string | undefined;
+      try {
+        const body: unknown = await response.clone().json();
+        if (isCloudErrorPayload(body)) code = body.error.code;
+      } catch {
+        // Legacy/non-JSON error responses use the HTTP status fallback.
+      }
+      throw new VaultCloudError(response.status, code);
     }
     return response;
   }
 }
 
 export class VaultCloudError extends Error {
-  constructor(readonly status: number) {
-    super(`VAULT_CLOUD_HTTP_${status}`);
+  constructor(
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(code ?? `VAULT_CLOUD_HTTP_${status}`);
   }
+}
+
+function isCloudErrorPayload(
+  value: unknown,
+): value is { error: { code: string } } {
+  if (!value || typeof value !== "object") return false;
+  const error = (value as { error?: unknown }).error;
+  if (!error || typeof error !== "object") return false;
+  return typeof (error as { code?: unknown }).code === "string";
 }
 
 function isObjectIdPayload(value: unknown): value is { object_ids: string[] } {

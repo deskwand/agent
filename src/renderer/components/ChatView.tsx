@@ -1295,7 +1295,9 @@ export function ChatView() {
     setIsInputExpanded(false);
     const rafId = requestAnimationFrame(() => {
       const c = scrollContainerRef.current;
-      if (c) c.scrollTo({ top: c.scrollHeight, behavior: "auto" });
+      if (c && typeof c.scrollTo === "function") {
+        c.scrollTo({ top: c.scrollHeight, behavior: "auto" });
+      }
     });
     return () => cancelAnimationFrame(rafId);
   }, [activeSessionId]);

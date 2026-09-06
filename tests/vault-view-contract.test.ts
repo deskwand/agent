@@ -3,6 +3,7 @@
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { VaultCloudError } from "../src/main/vault/cloud-client";
 import { VaultView } from "../src/renderer/components/VaultView";
 import { useAppStore } from "../src/renderer/store";
 import type { VaultSnapshot, VaultSnapshotItem } from "../src/shared/vault";
@@ -38,6 +39,7 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.loginHint": "Sign in to back up files to the cloud",
   "vault.recoveryCode": "Recovery code",
   "vault.pendingCount": "{{count}} pending",
+  "vault.usage": "Used {{used}} / {{quota}}",
   "vault.setup.configured": "Encrypted cloud backup is set up",
   "vault.setup.open": "Set up encrypted cloud backup",
   "vault.setup.title": "Save your recovery code",
@@ -56,8 +58,12 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.error.loginRequired": "Sign in to sync your Vault",
   "vault.error.setupRequired": "Set up encrypted cloud backup first",
   "vault.error.fileTooLarge": "Files must be 20 MB or smaller",
+  "vault.error.localQuotaExceeded":
+    "Your local Vault is full; delete files before importing another",
   "vault.error.localOperation": "The local Vault operation failed",
   "vault.error.syncFailed": "Cloud sync failed; your local files are safe",
+  "vault.error.cloudQuotaExceeded":
+    "Cloud backup storage is full; your local file was kept. Delete files or upgrade storage to retry",
   "vault.error.invalidRecoveryCode": "The recovery code is invalid",
   "vault.error.alreadyInitialized": "Encrypted backup is already set up",
   "vault.error.keychainUnavailable":
@@ -96,12 +102,19 @@ const TRANSLATIONS: Record<string, string> = {
 vi.mock("react-i18next", () => {
   const translate = (
     key: string,
-    options?: { count?: number; name?: string },
+    options?: {
+      count?: number;
+      name?: string;
+      used?: string;
+      quota?: string;
+    },
   ) => {
     const pluralKey = options?.count === 1 ? `${key}_one` : `${key}_other`;
     return (TRANSLATIONS[pluralKey] ?? TRANSLATIONS[key] ?? key)
       .replace("{{count}}", String(options?.count ?? ""))
-      .replace("{{name}}", options?.name ?? "");
+      .replace("{{name}}", options?.name ?? "")
+      .replace("{{used}}", options?.used ?? "")
+      .replace("{{quota}}", options?.quota ?? "");
   };
   return {
     useTranslation: () => ({
@@ -131,6 +144,8 @@ function snapshot(overrides: Partial<VaultSnapshot> = {}): VaultSnapshot {
     hasLocalFiles: true,
     hasLocalMek: true,
     operationStatus: "idle",
+    usedBytes: 0,
+    quotaBytes: 100 * 1024 * 1024,
     ...overrides,
   };
 }
@@ -264,6 +279,56 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
     expect(api.deleteFile).toHaveBeenCalledWith("readme.md");
+  });
+
+  it("renders local quota usage", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        usedBytes: 12 * 1024 * 1024,
+        quotaBytes: 100 * 1024 * 1024,
+      }),
+    );
+
+    await act(async () => {
+      root.render(createElement(VaultView));
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("Used 12.0 MB / 100.0 MB");
+  });
+
+  it("shows a distinct local quota error", async () => {
+    api.importFile.mockRejectedValueOnce(
+      new Error("VAULT_LOCAL_QUOTA_EXCEEDED"),
+    );
+
+    await renderVault();
+    await act(async () => {
+      uploadButton().click();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Your local Vault is full");
+  });
+
+  it("shows a distinct cloud quota error while keeping local files", async () => {
+    api.sync.mockRejectedValueOnce(
+      new VaultCloudError(413, "VAULT_QUOTA_EXCEEDED"),
+    );
+
+    await renderVault();
+    const sync = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Sync",
+    );
+    expect(sync).toBeDefined();
+
+    await act(async () => {
+      sync!.click();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("readme.md");
+    expect(screenText()).toContain("Cloud backup storage is full");
   });
 
   it("renders the local snapshot without requiring cloud access", async () => {

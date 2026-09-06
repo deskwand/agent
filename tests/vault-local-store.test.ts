@@ -1,6 +1,13 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import {
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  truncate,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LocalVaultStore } from "../src/main/vault/local-store";
@@ -81,6 +88,57 @@ describe("LocalVaultStore", () => {
       "VAULT_FILE_TOO_LARGE",
     );
     expect(await store.scanFiles()).toEqual([]);
+  });
+
+  it("allows imports that reach exactly 100 MiB in total", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+
+    for (let index = 0; index < 5; index += 1) {
+      const source = join(tmpdir(), `vault-exact-quota-${index}.bin`);
+      await writeFile(source, "");
+      await truncate(source, 20 * 1024 * 1024);
+      roots.push(source);
+      await expect(store.importFile(source)).resolves.toBeDefined();
+    }
+
+    await expect(store.getUsageBytes()).resolves.toBe(100 * 1024 * 1024);
+  });
+
+  it("rejects an import that would exceed total local quota before copying", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+    for (let index = 0; index < 5; index += 1) {
+      const existing = join(store.rootDir, `existing-${index}.bin`);
+      await writeFile(existing, "");
+      await truncate(existing, 20 * 1024 * 1024);
+    }
+    await store.writeIndex(await store.reconcile(await store.readIndex()));
+    const source = join(tmpdir(), "vault-over-quota.bin");
+    await writeFile(source, "");
+    await truncate(source, 2);
+    roots.push(source);
+
+    await expect(store.importFile(source)).rejects.toThrow(
+      "VAULT_LOCAL_QUOTA_EXCEEDED",
+    );
+    await expect(
+      readFile(join(store.rootDir, "vault-over-quota.bin")),
+    ).rejects.toThrow();
+  });
+
+  it("releases local quota after deleting a file", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+    const source = join(tmpdir(), "vault-release.bin");
+    await writeFile(source, "");
+    await truncate(source, 10);
+    roots.push(source);
+    const imported = await store.importFile(source);
+
+    await store.deleteFile(imported.name);
+
+    await expect(store.getUsageBytes()).resolves.toBe(0);
   });
 
   it("reconciles a leaked internal key entry without deleting the key file", async () => {

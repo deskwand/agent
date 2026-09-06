@@ -21,10 +21,7 @@ import type {
   VaultResetResult,
 } from "../../shared/vault";
 
-export type {
-  VaultResetPreparation,
-  VaultResetResult,
-} from "../../shared/vault";
+export type { VaultResetPreparation, VaultResetResult };
 
 export type { VaultCloudClient } from "./cloud-client";
 
@@ -33,9 +30,18 @@ export interface SyncResult {
   deleted: number;
   pending: number;
   failed: number;
+  errorCode?: string;
 }
 
 type MekProvider = () => Buffer | null;
+
+function quotaErrorCode(error: unknown): string | null {
+  if (!(error instanceof VaultCloudError)) return null;
+  return error.code === "VAULT_QUOTA_EXCEEDED" ||
+    error.message === "VAULT_QUOTA_EXCEEDED"
+    ? "VAULT_QUOTA_EXCEEDED"
+    : null;
+}
 
 export class VaultRestoreService {
   constructor(
@@ -189,10 +195,12 @@ export class VaultSyncService {
 
     const changedNames: string[] = [];
     const uploadedNames: string[] = [];
+    const previousObjectIds = new Map<string, string | null>();
     let uploaded = 0;
     let failed = 0;
     let remoteDirty = false;
     let remoteIndexReady = false;
+    let errorCode: string | undefined;
 
     for (const name of Object.keys(index.files)) {
       const entry = index.files[name];
@@ -214,6 +222,7 @@ export class VaultSyncService {
           continue;
         }
         const oldObjectId = entry.objectId;
+        previousObjectIds.set(name, oldObjectId);
         const packed = await packFile(this.store.filePath(name), mek);
         await this.cloud.putObject(token, packed.id, packed.payload);
         uploadedObjectId = packed.id;
@@ -244,7 +253,8 @@ export class VaultSyncService {
         uploadedNames.push(name);
         remoteDirty = true;
         uploaded += 1;
-      } catch {
+      } catch (error: unknown) {
+        errorCode = quotaErrorCode(error) ?? errorCode;
         entry.syncStatus = "failed";
         if (
           uploadedObjectId &&
@@ -266,15 +276,30 @@ export class VaultSyncService {
           encodeRemoteIndex(toRemoteIndex(index), mek),
         );
         remoteIndexReady = true;
-      } catch {
+      } catch (error: unknown) {
+        errorCode = quotaErrorCode(error) ?? errorCode;
         for (const name of changedNames) {
-          index.files[name].syncStatus = "failed";
+          const entry = index.files[name];
+          const uploadedObjectId = entry.objectId;
+          if (uploadedObjectId) {
+            try {
+              await this.cloud.deleteObject(token, uploadedObjectId);
+            } catch {
+              if (!index.pendingDeletes.includes(uploadedObjectId)) {
+                index.pendingDeletes.push(uploadedObjectId);
+              }
+            }
+          }
+          entry.objectId = previousObjectIds.get(name) ?? null;
+          entry.objectHash = null;
+          entry.syncStatus = "failed";
         }
         await this.store.writeIndex(index);
         failed += changedNames.length;
         uploaded -= uploadedNames.length;
         uploadedNames.length = 0;
         changedNames.length = 0;
+        previousObjectIds.clear();
       }
     }
 
@@ -313,7 +338,7 @@ export class VaultSyncService {
       Object.values(index.files).filter(
         (entry) => entry.syncStatus !== "synced",
       ).length + index.pendingDeletes.length;
-    return { uploaded, deleted, pending, failed };
+    return { uploaded, deleted, pending, failed, errorCode };
   }
 }
 

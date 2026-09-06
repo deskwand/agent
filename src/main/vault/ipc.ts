@@ -22,10 +22,11 @@ import {
   type VaultResetPreparation,
   type VaultResetResult,
 } from "./sync";
-import type {
-  VaultOperationStatus,
-  VaultRemoteStatus,
-  VaultSnapshot,
+import {
+  VAULT_LOCAL_QUOTA_BYTES,
+  type VaultOperationStatus,
+  type VaultRemoteStatus,
+  type VaultSnapshot,
 } from "../../shared/vault";
 
 export interface VaultIpcDependencies {
@@ -116,7 +117,8 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
 
   ipcMain.handle("vault.sync", async (_event, token: string) => {
     await assertNoBlockingOperation(store);
-    await syncService.sync(token);
+    const result = await syncService.sync(token);
+    if (result.errorCode) throw new Error(result.errorCode);
     return getSnapshot(store, getLocalMek);
   });
 
@@ -254,6 +256,7 @@ async function getSnapshot(
       : (operation?.state ?? "idle");
   const index = await store.reconcile(await store.readIndex());
   if (hasLocalIndex || hasLocalFiles) await store.writeIndex(index);
+  const usedBytes = await store.getUsageBytes(index);
   return {
     items: Object.entries(index.files)
       .map(([name, entry]) => ({
@@ -272,5 +275,7 @@ async function getSnapshot(
     hasLocalFiles,
     hasLocalMek,
     operationStatus,
+    usedBytes,
+    quotaBytes: VAULT_LOCAL_QUOTA_BYTES,
   };
 }

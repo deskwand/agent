@@ -13,6 +13,7 @@ import {
   VaultSyncService,
   type VaultCloudClient,
 } from "../src/main/vault/sync";
+import { VaultCloudError } from "../src/main/vault/cloud-client";
 
 const mek = deriveMek("123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
 
@@ -21,6 +22,7 @@ class FakeCloudClient implements VaultCloudClient {
   readonly deletedObjectIds: string[] = [];
   indexPayload: Buffer | null = null;
   failObjectUpload = false;
+  failObjectUploadCode: string | null = null;
   failObjectDelete = false;
   failIndex = false;
   failList = false;
@@ -32,6 +34,9 @@ class FakeCloudClient implements VaultCloudClient {
     objectId: string,
     payload: Buffer,
   ): Promise<void> {
+    if (this.failObjectUploadCode) {
+      throw new VaultCloudError(413, this.failObjectUploadCode);
+    }
     if (this.failObjectUpload) throw new Error("NETWORK_DOWN");
     this.objects.set(objectId, Buffer.from(payload));
     await this.onObjectUpload?.();
@@ -207,7 +212,28 @@ describe("VaultSyncService", () => {
     await service.sync("token");
 
     expect(cloud.objects.has("old-object")).toBe(true);
+    expect(cloud.objects.size).toBe(1);
+    expect((await store.readIndex()).files["change.txt"].objectId).toBe(
+      "old-object",
+    );
     expect((await store.readIndex()).pendingDeletes).toEqual(["old-object"]);
+    await cleanup();
+  });
+
+  it("surfaces a cloud quota error while keeping the local entry pending", async () => {
+    const store = await createStore();
+    await writeFile(join(store.rootDir, "quota.txt"), "local");
+    await store.writeIndex(await store.reconcile(await store.readIndex()));
+    const cloud = new FakeCloudClient();
+    cloud.failObjectUploadCode = "VAULT_QUOTA_EXCEEDED";
+    const service = new VaultSyncService(store, cloud, () => mek);
+
+    const result = await service.sync("token");
+
+    expect(result.errorCode).toBe("VAULT_QUOTA_EXCEEDED");
+    expect((await store.readIndex()).files["quota.txt"].syncStatus).toBe(
+      "failed",
+    );
     await cleanup();
   });
 

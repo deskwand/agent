@@ -40,6 +40,10 @@ function errorText(error: unknown, t: (key: string) => string): string {
   if (!(error instanceof Error)) return t("vault.error.localOperation");
   const message = error.message;
   if (message === "VAULT_FILE_TOO_LARGE") return t("vault.error.fileTooLarge");
+  if (message === "VAULT_LOCAL_QUOTA_EXCEEDED")
+    return t("vault.error.localQuotaExceeded");
+  if (message === "VAULT_QUOTA_EXCEEDED")
+    return t("vault.error.cloudQuotaExceeded");
   if (message === "VAULT_KEY_REQUIRED") return t("vault.error.setupRequired");
   if (message === "VAULT_RECOVERY_MISMATCH")
     return t("vault.error.recoveryMismatch");
@@ -496,9 +500,17 @@ export function VaultView(): JSX.Element {
 
           {filter === "files" && (
             <div className="flex items-center justify-between py-3">
-              <span className="text-xs text-text-muted">
-                {t("vault.fileCount", { count: visibleItems.length })}
-              </span>
+              <div className="flex flex-col gap-0.5 text-xs text-text-muted">
+                <span>
+                  {t("vault.fileCount", { count: visibleItems.length })}
+                </span>
+                <span>
+                  {t("vault.usage", {
+                    used: formatSize(snapshot?.usedBytes ?? 0),
+                    quota: formatSize(snapshot?.quotaBytes ?? 0),
+                  })}
+                </span>
+              </div>
               <button
                 type="button"
                 className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
