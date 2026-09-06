@@ -452,6 +452,9 @@ describe("VaultView", () => {
     const restore = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent === "Restore",
     );
+    expect(restore?.className).toContain("text-accent-foreground");
+    expect(restore?.className).toContain("disabled:bg-accent/40");
+    expect(restore?.className).toContain("disabled:text-text-primary");
     await act(async () => {
       restore?.click();
       await Promise.resolve();

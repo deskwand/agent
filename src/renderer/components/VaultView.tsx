@@ -440,7 +440,7 @@ export function VaultView(): JSX.Element {
           </button>
           <button
             type="button"
-            className="rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90 disabled:opacity-50"
+            className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
             onClick={() => void handleSync()}
             disabled={syncDisabled}
           >
@@ -682,7 +682,7 @@ export function VaultView(): JSX.Element {
             )}
             <button
               type="button"
-              className="mt-3 rounded bg-accent px-3 py-2 text-sm text-white disabled:opacity-50"
+              className="mt-3 rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
               onClick={() => void handleInitialize()}
               disabled={
                 !recoveryConfirmed || busy || setupBlockedByRemoteBackup
@@ -729,7 +729,7 @@ function renderEmptyState(
         <p className="text-sm text-text-muted">{t("vault.reset.inProgress")}</p>
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90 disabled:opacity-50"
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
           onClick={h.retryReset}
           disabled={h.busy || !h.token}
         >
@@ -758,7 +758,7 @@ function renderEmptyState(
         </p>
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90"
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90"
           onClick={() => {
             h.setError(null);
             h.retryRemoteStatus();
@@ -776,7 +776,7 @@ function renderEmptyState(
         <p className="text-sm text-text-muted">{t("vault.restore.failed")}</p>
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-white hover:bg-accent/90"
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90"
           onClick={h.retryAutoRestore}
         >
           {t("vault.restore.retry")}
@@ -801,7 +801,7 @@ function renderEmptyState(
         />
         <button
           type="button"
-          className="rounded bg-accent px-3 py-2 text-sm text-white disabled:opacity-50"
+          className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
           onClick={h.handleRestore}
           disabled={h.busy || !h.restoreCode}
         >
@@ -828,7 +828,7 @@ function renderEmptyState(
         {!h.recoveryCode && (
           <button
             type="button"
-            className="rounded bg-accent px-3 py-2 text-sm text-white"
+            className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground"
             onClick={() => void h.handleGenerateRecoveryCode()}
           >
             {t("vault.setup.open")}
@@ -851,7 +851,7 @@ function renderEmptyState(
             </label>
             <button
               type="button"
-              className="rounded bg-accent px-3 py-2 text-sm text-white disabled:opacity-50"
+              className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
               onClick={() => void h.handleInitialize()}
               disabled={!h.recoveryConfirmed || h.busy}
             >
