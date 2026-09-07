@@ -108,6 +108,34 @@ describe("Sidebar project groups", () => {
 
     expect(sessionsButton).toBeTruthy();
     expect(sessionsButton?.className).toContain("px-3");
+    expect(sessionsButton?.className).toContain("gap-2");
+    expect(sessionsButton?.querySelector("span.relative")?.className).toContain(
+      "h-4",
+    );
+    expect(sessionsButton?.querySelector("span.relative")?.className).toContain(
+      "w-4",
+    );
+    expect(
+      sessionsButton?.querySelector("svg")?.getAttribute("style"),
+    ).toContain("translate(-50%, -50%)");
+  });
+
+  it("keeps project group labels on the same icon spacing", async () => {
+    const projectCwd = "/tmp/sidebar-alignment-project";
+    await render([
+      session("project-session", {
+        cwd: projectCwd,
+        isProjectMode: true,
+      }),
+    ]);
+
+    const toggle = projectToggle(projectCwd);
+    expect(toggle.className).toContain("gap-2");
+    expect(toggle.querySelector("span.relative")?.className).toContain("h-4");
+    expect(toggle.querySelector("span.relative")?.className).toContain("w-4");
+    expect(toggle.querySelector("svg")?.getAttribute("style")).toContain(
+      "translate(-50%, -50%)",
+    );
   });
 
   function projectHeader(cwd: string): Element | undefined {

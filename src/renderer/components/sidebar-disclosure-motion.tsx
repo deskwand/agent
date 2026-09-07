@@ -12,6 +12,10 @@ const ICON_DURATION_MS = 120;
 const SECTION_EASING = "cubic-bezier(0.2, 0.8, 0.2, 1)";
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
+function centeredIconTransform(scale: number): string {
+  return `translate(-50%, -50%) scale(${scale})`;
+}
+
 interface SidebarAnimatedSectionProps {
   expanded: boolean;
   motionVersion: number;
@@ -310,8 +314,8 @@ export function SidebarGroupIcon({
       reducedMotion
         ? [{ opacity: 1 }, { opacity: 0 }]
         : [
-            { opacity: 1, transform: "scale(1)" },
-            { opacity: 0, transform: "scale(0.92)" },
+            { opacity: 1, transform: centeredIconTransform(1) },
+            { opacity: 0, transform: centeredIconTransform(0.92) },
           ],
       { duration: ICON_DURATION_MS, easing: SECTION_EASING },
     );
@@ -319,8 +323,8 @@ export function SidebarGroupIcon({
       reducedMotion
         ? [{ opacity: 0 }, { opacity: 1 }]
         : [
-            { opacity: 0, transform: "scale(0.92)" },
-            { opacity: 1, transform: "scale(1)" },
+            { opacity: 0, transform: centeredIconTransform(0.92) },
+            { opacity: 1, transform: centeredIconTransform(1) },
           ],
       { duration: ICON_DURATION_MS, easing: SECTION_EASING },
     );
@@ -332,17 +336,21 @@ export function SidebarGroupIcon({
 
   const collapsedStyle = {
     opacity: expanded ? 0 : 1,
-    transform: expanded ? "scale(0.92)" : "scale(1)",
+    transform: expanded
+      ? centeredIconTransform(0.92)
+      : centeredIconTransform(1),
   };
   const expandedStyle = {
     opacity: expanded ? 1 : 0,
-    transform: expanded ? "scale(1)" : "scale(0.92)",
+    transform: expanded
+      ? centeredIconTransform(1)
+      : centeredIconTransform(0.92),
   };
-  const iconClassName = "absolute inset-0 h-3.5 w-3.5";
+  const iconClassName = "absolute left-1/2 top-1/2 h-3.5 w-3.5";
 
   return (
     <span
-      className="relative h-3.5 w-3.5 flex-shrink-0 overflow-visible"
+      className="relative h-4 w-4 flex-shrink-0 overflow-visible"
       aria-hidden="true"
     >
       {kind === "sessions" ? (
