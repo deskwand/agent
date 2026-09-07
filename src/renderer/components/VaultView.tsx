@@ -478,7 +478,7 @@ export function VaultView(): JSX.Element {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+            className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
             onClick={() => void handleSync()}
             disabled={syncDisabled}
           >
@@ -616,7 +616,7 @@ export function VaultView(): JSX.Element {
               </div>
               <button
                 type="button"
-                className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+                className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
                 onClick={handleUpload}
                 disabled={uploadDisabled}
               >
@@ -835,7 +835,7 @@ export function VaultView(): JSX.Element {
             )}
             <button
               type="button"
-              className="mt-3 rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+              className="mt-3 rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40"
               onClick={() => void handleInitialize()}
               disabled={
                 !recoveryConfirmed || busy || setupBlockedByRemoteBackup
@@ -905,7 +905,7 @@ function renderEmptyState(
         <p className="text-sm text-text-muted">{t("vault.reset.inProgress")}</p>
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
           onClick={h.retryReset}
           disabled={h.busy || !h.token}
         >
@@ -977,7 +977,7 @@ function renderEmptyState(
         />
         <button
           type="button"
-          className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+          className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40"
           onClick={h.handleRestore}
           disabled={h.busy || !h.restoreCode}
         >
@@ -1020,7 +1020,7 @@ function renderEmptyState(
             </label>
             <button
               type="button"
-              className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+              className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40"
               onClick={() => void h.handleInitialize()}
               disabled={!h.recoveryConfirmed || h.busy}
             >
@@ -1041,7 +1041,7 @@ function renderEmptyState(
         )}
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40 disabled:text-text-primary"
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
           onClick={h.handleUpload}
           disabled={h.uploadDisabled}
         >

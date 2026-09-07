@@ -794,7 +794,7 @@ describe("VaultView", () => {
     );
     expect(restore?.className).toContain("text-accent-foreground");
     expect(restore?.className).toContain("disabled:bg-accent/40");
-    expect(restore?.className).toContain("disabled:text-text-primary");
+    expect(restore?.className).not.toContain("disabled:text-text-primary");
     expect(
       Array.from(container.querySelectorAll("button")).filter(
         (button) => button.textContent === "Discard old backup, start fresh",
@@ -976,6 +976,8 @@ describe("VaultView", () => {
 
     expect(screenText()).toContain("Syncing…");
     expect(sync?.disabled).toBe(true);
+    expect(sync?.className).toContain("text-accent-foreground");
+    expect(sync?.className).not.toContain("disabled:text-text-primary");
 
     await act(async () => {
       resolveSync(snapshot({ items: [] }));
