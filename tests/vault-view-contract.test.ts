@@ -376,6 +376,40 @@ describe("VaultView", () => {
     expect(api.beginDiscardAndReinitialize).not.toHaveBeenCalled();
   });
 
+  it("closes the advanced menu with Escape and returns focus to the trigger", async () => {
+    await renderVault();
+    const trigger = vaultMenuButton();
+
+    await act(async () => trigger.click());
+    const menu = container.querySelector('[role="menu"]');
+    expect(menu).not.toBeNull();
+    const reset = menu!.querySelector('[role="menuitem"]') as HTMLButtonElement;
+    expect(document.activeElement).toBe(reset);
+
+    await act(async () => {
+      reset.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("closes the advanced menu when clicking outside it", async () => {
+    await renderVault();
+    await act(async () => vaultMenuButton().click());
+    expect(container.querySelector('[role="menu"]')).not.toBeNull();
+
+    const title = container.querySelector("h1");
+    expect(title).not.toBeNull();
+    await act(async () => {
+      title!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+  });
+
   it("hides the advanced menu while a Vault operation is pending", async () => {
     api.getSnapshot.mockResolvedValueOnce(
       snapshot({ operationStatus: "awaiting-recovery-code" }),
@@ -533,6 +567,9 @@ describe("VaultView", () => {
 
     expect(api.generateRecoveryCode).not.toHaveBeenCalled();
     expect(screenText()).toContain("Retry");
+    expect(
+      container.querySelector('button[aria-label="More Vault actions"]'),
+    ).toBeNull();
   });
 
   it("adopts local files without showing cloud restore", async () => {
@@ -946,6 +983,9 @@ describe("VaultView", () => {
 
     expect(api.sync).not.toHaveBeenCalled();
     expect(screenText()).toContain("Sign in to sync your Vault");
+    expect(
+      container.querySelector('button[aria-label="More Vault actions"]'),
+    ).toBeNull();
   });
 
   it("shows already latest when no files were pending", async () => {

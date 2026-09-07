@@ -129,6 +129,7 @@ export function VaultView(): JSX.Element {
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const syncFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const advancedMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
   const advancedMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const advancedResetRef = useRef<HTMLButtonElement | null>(null);
   const autoRestoreFired = useRef(false);
@@ -453,7 +454,18 @@ export function VaultView(): JSX.Element {
   const showFiles = mode === "normal" || mode === "local-files";
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-6 py-5">
+    <section
+      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-6 py-5"
+      onClick={(event) => {
+        if (
+          advancedMenuOpen &&
+          (!(event.target instanceof Node) ||
+            !advancedMenuBoundaryRef.current?.contains(event.target))
+        ) {
+          setAdvancedMenuOpen(false);
+        }
+      }}
+    >
       <header className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-text-primary">
@@ -472,6 +484,7 @@ export function VaultView(): JSX.Element {
           </button>
           {canOpenAdvancedReset && (
             <div
+              ref={advancedMenuBoundaryRef}
               className="relative"
               onBlur={(event) => {
                 const next = event.relatedTarget;
