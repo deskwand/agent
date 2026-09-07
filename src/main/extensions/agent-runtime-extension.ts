@@ -39,6 +39,7 @@ export interface AfterSessionRunResult {
     tokenBudget?: number;
     timeUsedSeconds?: number;
     timeBudgetSeconds?: number;
+    activePeriodStartedAt?: number;
   };
   summaryMessage?: string;
 }

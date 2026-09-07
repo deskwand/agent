@@ -40,6 +40,86 @@ describe("GoalExtension persistence", () => {
     expect(call.status).toBe("active");
   });
 
+  it("start goal payload includes its active period start", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+    try {
+      const db = createMockDb();
+      const ext = new GoalExtension(db as never);
+      const result = await ext.onCommand({
+        command: "goal",
+        args: "test",
+        sessionId: "s1",
+      });
+      const snapshot = result?.goalStatus as
+        | { activePeriodStartedAt?: number; timeUsedSeconds?: number }
+        | undefined;
+
+      expect(snapshot?.activePeriodStartedAt).toBe(1_000_000_000_000);
+      expect(snapshot?.timeUsedSeconds).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps live snapshots as a base plus active-period anchor", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+    try {
+      const db = createMockDb();
+      const ext = new GoalExtension(db as never);
+      await ext.onCommand({
+        command: "goal",
+        args: "test",
+        sessionId: "s1",
+      });
+
+      vi.setSystemTime(1_000_000_060_000);
+      const result = await ext.onCommand({
+        command: "goal",
+        args: "",
+        sessionId: "s1",
+      });
+      const snapshot = result?.goalStatus as
+        | { activePeriodStartedAt?: number; timeUsedSeconds?: number }
+        | undefined;
+
+      expect(snapshot?.activePeriodStartedAt).toBe(1_000_000_000_000);
+      expect(snapshot?.timeUsedSeconds).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("restarts the active period when replacing a goal in one session", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000_000_000);
+    try {
+      const db = createMockDb();
+      const ext = new GoalExtension(db as never);
+      await ext.onCommand({
+        command: "goal",
+        args: "first goal",
+        sessionId: "s1",
+      });
+
+      vi.setSystemTime(1_000_000_060_000);
+      const result = await ext.onCommand({
+        command: "goal",
+        args: "second goal",
+        sessionId: "s1",
+      });
+      const snapshot = result?.goalStatus as
+        | { activePeriodStartedAt?: number; timeUsedSeconds?: number }
+        | undefined;
+
+      expect(snapshot?.activePeriodStartedAt).toBe(1_000_000_060_000);
+      expect(snapshot?.timeUsedSeconds).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("pause goal persists status to DB", async () => {
     const db = createMockDb();
     const ext = new GoalExtension(db as never);
@@ -381,6 +461,9 @@ describe("GoalExtension elapsed-time accounting", () => {
       });
       // Elapsed must NOT include the 60s pause.
       expect(resumed?.goalStatus?.timeUsedSeconds).toBe(10);
+      expect(resumed?.goalStatus?.activePeriodStartedAt).toBe(
+        1_000_000_000_000 + 70_000,
+      );
       expect(goalOf(ext).startedAt).toBe(1_000_000_000_000 + 70_000);
     } finally {
       vi.useRealTimers();
@@ -526,9 +609,15 @@ describe("GoalExtension elapsed-time accounting", () => {
       if (!updateGoal) throw new Error("update_goal tool not found");
       await updateGoal.execute("id", { status: "complete", summary: "done" });
 
-      // The 30s paused tail must not be counted.
+      // The 30s paused tail must not be counted immediately or after the turn closes.
       expect(goalOf(ext).timeUsedSeconds).toBe(10);
       expect(goalOf(ext).status).toBe("complete");
+      const after = await ext.afterSessionRun!({
+        session: { id: "s1" } as never,
+        prompt: "",
+        messages: [],
+      });
+      expect(after?.goalStatus?.timeUsedSeconds).toBe(10);
     } finally {
       vi.useRealTimers();
     }

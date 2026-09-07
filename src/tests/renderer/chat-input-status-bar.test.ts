@@ -64,6 +64,7 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
       objective: "fix login",
       iteration: 1,
       timeUsedSeconds: 0,
+      activePeriodStartedAt: Date.now(),
     });
     expect(container.textContent).toContain("turn:1");
     expect(container.textContent).not.toContain("elapsed:");
@@ -85,6 +86,7 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
       objective: "fix login",
       iteration: 2,
       timeUsedSeconds: 120,
+      activePeriodStartedAt: Date.now(),
     });
     expect(container.textContent).toContain("elapsed:2m");
 
@@ -97,6 +99,37 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
       vi.advanceTimersByTime(60_000);
     });
     expect(container.textContent).toContain("elapsed:4m");
+  });
+
+  it("uses the new anchor when switching live goals with the same snapshot", async () => {
+    await render({
+      type: "goal-active",
+      objective: "first goal",
+      iteration: 1,
+      timeUsedSeconds: 0,
+      activePeriodStartedAt: Date.now() - 60_000,
+    });
+    expect(container.textContent).toContain("elapsed:1m");
+
+    await act(async () =>
+      root.render(
+        React.createElement(ChatInputStatusBar, {
+          status: {
+            type: "goal-active",
+            objective: "second goal",
+            iteration: 1,
+            timeUsedSeconds: 0,
+            activePeriodStartedAt: Date.now(),
+          },
+        }),
+      ),
+    );
+    expect(container.textContent).not.toContain("elapsed:1m");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(container.textContent).toContain("elapsed:<1m");
   });
 
   it("freezes the clock while paused", async () => {
@@ -135,6 +168,7 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
       objective: "fix login",
       iteration: 2,
       timeUsedSeconds: 120,
+      activePeriodStartedAt: Date.now(),
     });
     await act(async () => {
       vi.advanceTimersByTime(60_000);
@@ -168,6 +202,7 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
             objective: "fix login",
             iteration: 2,
             timeUsedSeconds: 120,
+            activePeriodStartedAt: Date.now(),
           },
         }),
       ),

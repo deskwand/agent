@@ -20,7 +20,7 @@ import type { DatabaseInstance, GoalRow } from "../db/database";
 
 export const MAX_GOAL_ITERATIONS = 50;
 
-type GoalStatus =
+export type GoalStatus =
   | "active"
   | "paused"
   | "complete"
@@ -42,6 +42,17 @@ export interface GoalState {
   endedAt?: number;
 }
 
+export interface GoalStatusSnapshot {
+  status: GoalStatus;
+  objective?: string;
+  iteration?: number;
+  tokensUsed?: number;
+  tokenBudget?: number;
+  timeUsedSeconds?: number;
+  timeBudgetSeconds?: number;
+  activePeriodStartedAt?: number;
+}
+
 // ─── Prompt templates ────────────────────────────────────────────────
 
 /** Total elapsed active seconds: accumulated time plus the current active
@@ -53,6 +64,20 @@ export function elapsedSeconds(goal: GoalState): number {
   return live
     ? goal.timeUsedSeconds + (Date.now() - goal.startedAt) / 1000
     : goal.timeUsedSeconds;
+}
+
+export function buildGoalStatusSnapshot(goal: GoalState): GoalStatusSnapshot {
+  const live = goal.status === "active" || goal.status === "budget_limited";
+  return {
+    status: goal.status,
+    objective: goal.objective,
+    iteration: goal.iteration,
+    tokensUsed: goal.tokensUsed,
+    tokenBudget: goal.tokenBudget,
+    timeUsedSeconds: goal.timeUsedSeconds,
+    timeBudgetSeconds: goal.timeBudgetSeconds,
+    activePeriodStartedAt: live ? goal.startedAt : undefined,
+  };
 }
 
 function buildGoalSystemPrompt(goal: GoalState): string {
@@ -359,7 +384,7 @@ export class GoalExtension implements AgentRuntimeExtension {
    *  paused time must never count (covers a mid-turn pause whose in-flight
    *  turn later completes, and update_goal/complete invoked while paused). */
   private checkpointElapsed(goal: GoalState): void {
-    if (goal.status === "paused") return;
+    if (goal.status !== "active" && goal.status !== "budget_limited") return;
     goal.timeUsedSeconds += (Date.now() - goal.startedAt) / 1000;
     goal.startedAt = Date.now();
   }
@@ -370,17 +395,7 @@ export class GoalExtension implements AgentRuntimeExtension {
     if (!goal) {
       return { goalStatus: { status: "cleared" } };
     }
-    return {
-      goalStatus: {
-        status: goal.status,
-        objective: goal.objective,
-        iteration: goal.iteration,
-        tokensUsed: goal.tokensUsed,
-        tokenBudget: goal.tokenBudget,
-        timeUsedSeconds: elapsedSeconds(goal),
-        timeBudgetSeconds: goal.timeBudgetSeconds,
-      },
-    };
+    return { goalStatus: buildGoalStatusSnapshot(goal) };
   }
 
   /** Ensure per-session goal tools exist, creating them if needed.

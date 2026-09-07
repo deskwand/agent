@@ -84,22 +84,37 @@ describe("GoalExtension integration (real SQLite)", () => {
     const ext = new GoalExtension(db as never);
 
     // Start
-    await ext.onCommand({
+    const started = await ext.onCommand({
       command: "goal",
       args: "build a calculator",
       sessionId: "s1",
     });
+    expect(started?.goalStatus?.activePeriodStartedAt).toEqual(
+      expect.any(Number),
+    );
     let row = db.goals.get("s1");
     expect(row?.status).toBe("active");
     expect(row?.objective).toBe("build a calculator");
 
     // Pause
-    await ext.onCommand({ command: "goal", args: "pause", sessionId: "s1" });
+    const paused = await ext.onCommand({
+      command: "goal",
+      args: "pause",
+      sessionId: "s1",
+    });
+    expect(paused?.goalStatus?.activePeriodStartedAt).toBeUndefined();
     row = db.goals.get("s1");
     expect(row?.status).toBe("paused");
 
     // Resume
-    await ext.onCommand({ command: "goal", args: "resume", sessionId: "s1" });
+    const resumed = await ext.onCommand({
+      command: "goal",
+      args: "resume",
+      sessionId: "s1",
+    });
+    expect(resumed?.goalStatus?.activePeriodStartedAt).toEqual(
+      expect.any(Number),
+    );
     row = db.goals.get("s1");
     expect(row?.status).toBe("active");
     expect(row?.generation).toBe(2);

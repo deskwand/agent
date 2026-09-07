@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { DatabaseInstance } from '../src/main/db/database';
+import type { GoalState } from '../src/main/extensions/goal-extension';
 
 vi.mock('electron', () => ({
   app: {
@@ -88,6 +89,35 @@ describe('SessionManager.listSessions', () => {
     expect(result.contextWindows).toEqual({});
     expect(result.goalStatuses).toEqual({});
     expect(db.sessions.getAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes the active Goal period start in goalStatuses', () => {
+    const goal: GoalState = {
+      objective: 'review code',
+      status: 'active',
+      iteration: 2,
+      firstTurnDone: true,
+      generation: 1,
+      tokensUsed: 12,
+      timeUsedSeconds: 30,
+      startedAt: 1_000,
+    };
+    const extensionManager = {
+      getExtension: vi.fn(() => ({
+        setSessionStateProvider: vi.fn(),
+        getAllGoals: () => [{ sessionId: 's1', goal }],
+      })),
+    };
+    const manager = new SessionManager(
+      makeDb(),
+      vi.fn(),
+      extensionManager as never,
+    );
+
+    const result = manager.listSessions();
+
+    expect(result.goalStatuses.s1.activePeriodStartedAt).toBe(1_000);
+    expect(result.goalStatuses.s1.timeUsedSeconds).toBeGreaterThanOrEqual(30);
   });
 
   it('maps database rows to Session objects', () => {

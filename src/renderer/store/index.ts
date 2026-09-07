@@ -75,6 +75,7 @@ export interface SessionState {
     tokenBudget?: number;
     timeUsedSeconds?: number;
     timeBudgetSeconds?: number;
+    activePeriodStartedAt?: number;
   };
   backgroundAgents: Array<{
     id: string;

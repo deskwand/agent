@@ -1,4 +1,11 @@
+import * as fs from "fs";
+import * as path from "path";
 import { describe, it, expect } from "vitest";
+
+const chatViewSource = fs.readFileSync(
+  path.join(__dirname, "../../renderer/components/ChatView.tsx"),
+  "utf8",
+);
 import {
   computeElapsedSeconds,
   isGoalTimeLive,
@@ -201,6 +208,7 @@ describe("resolveInputStatus", () => {
     objective: "fix login",
     iteration: 1,
     timeUsedSeconds: 0,
+    activePeriodStartedAt: 0,
   } as const;
   const pausedStatus = {
     type: "goal-paused",
@@ -222,6 +230,25 @@ describe("resolveInputStatus", () => {
     timeBudgetSeconds: 600,
   } as const;
 
+  it("preserves the active-period anchor when resolving Goal status", () => {
+    const goalStatus = {
+      status: "active" as const,
+      objective: "fix login",
+      iteration: 1,
+      timeUsedSeconds: 120,
+      activePeriodStartedAt: 1_000_000_000_000,
+    };
+    const resolved = resolveInputStatus({
+      ...base,
+      goalStatus,
+    });
+
+    expect(resolved).toMatchObject({
+      type: "goal-active",
+      activePeriodStartedAt: 1_000_000_000_000,
+    });
+  });
+
   it("isGoalTimeLive: only active and budget-limited keep ticking", () => {
     expect(isGoalTimeLive(activeStatus)).toBe(true);
     expect(isGoalTimeLive(budgetLimitedStatus)).toBe(true);
@@ -230,25 +257,67 @@ describe("resolveInputStatus", () => {
     expect(isGoalTimeLive(null)).toBe(false);
   });
 
-  it("extrapolates live elapsed from the snapshot plus local delta", () => {
-    expect(computeElapsedSeconds(activeStatus, 0, 0)).toBe(0);
-    expect(computeElapsedSeconds(activeStatus, 0, 60_000)).toBe(60);
+  it("uses the authoritative active period start", () => {
+    const status = {
+      ...activeStatus,
+      timeUsedSeconds: 120,
+      activePeriodStartedAt: 1_000_000_000_000,
+    };
+
+    expect(computeElapsedSeconds(status, 1_000_000_063_000)).toBe(183);
+  });
+
+  it("does not extrapolate an active status without an anchor", () => {
+    const status = {
+      ...activeStatus,
+      timeUsedSeconds: 120,
+      activePeriodStartedAt: undefined,
+    };
+
+    expect(computeElapsedSeconds(status, 1_000_000_063_000)).toBe(120);
+  });
+
+  it("extrapolates live elapsed from the snapshot plus active-period delta", () => {
+    expect(computeElapsedSeconds(activeStatus, 0)).toBe(0);
+    expect(computeElapsedSeconds(activeStatus, 60_000)).toBe(60);
     expect(
       computeElapsedSeconds(
-        { ...activeStatus, timeUsedSeconds: 120 },
-        10_000,
+        {
+          ...activeStatus,
+          timeUsedSeconds: 120,
+          activePeriodStartedAt: 10_000,
+        },
         40_000,
       ),
     ).toBe(150);
-    expect(computeElapsedSeconds(budgetLimitedStatus, 0, 30_000)).toBe(270);
+    expect(
+      computeElapsedSeconds(
+        { ...budgetLimitedStatus, activePeriodStartedAt: 0 },
+        30_000,
+      ),
+    ).toBe(270);
   });
 
   it("freezes paused and final states at the snapshot value", () => {
-    expect(computeElapsedSeconds(pausedStatus, 0, 300_000)).toBe(120);
-    expect(computeElapsedSeconds(completeStatus, 0, 300_000)).toBe(300);
+    expect(computeElapsedSeconds(pausedStatus, 300_000)).toBe(120);
+    expect(computeElapsedSeconds(completeStatus, 300_000)).toBe(300);
   });
 
   it("never extrapolates backwards", () => {
-    expect(computeElapsedSeconds(activeStatus, 50_000, 10_000)).toBe(0);
+    expect(
+      computeElapsedSeconds(
+        { ...activeStatus, activePeriodStartedAt: 50_000 },
+        10_000,
+      ),
+    ).toBe(0);
+  });
+});
+
+describe("ChatView optimistic goal clock updates", () => {
+  it("rebases the clock when pausing and resuming", () => {
+    expect(chatViewSource).toContain('status: "paused"');
+    expect(chatViewSource).toContain("activePeriodStartedAt: undefined");
+    expect(chatViewSource).toContain("computeElapsedSeconds");
+    expect(chatViewSource).toContain('status: "active"');
   });
 });

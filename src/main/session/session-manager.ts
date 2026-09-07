@@ -53,10 +53,13 @@ import type { BrowserViewManager } from "../browser/browser-view-manager";
 import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { BackgroundReviewService } from "../agent/background-review";
 import {
+  buildGoalStatusSnapshot,
   buildResumePrompt,
-  elapsedSeconds,
 } from "../extensions/goal-extension";
-import type { GoalState } from "../extensions/goal-extension";
+import type {
+  GoalState,
+  GoalStatusSnapshot,
+} from "../extensions/goal-extension";
 import { app } from "electron";
 import {
   log,
@@ -734,24 +737,7 @@ export class SessionManager {
   listSessions(): {
     sessions: Session[];
     contextWindows: Record<string, number>;
-    goalStatuses: Record<
-      string,
-      {
-        status:
-          | "active"
-          | "paused"
-          | "complete"
-          | "cleared"
-          | "blocked"
-          | "budget_limited";
-        objective: string;
-        iteration: number;
-        timeUsedSeconds?: number;
-        tokensUsed?: number;
-        tokenBudget?: number;
-        timeBudgetSeconds?: number;
-      }
-    >;
+    goalStatuses: Record<string, GoalStatusSnapshot>;
   } {
     const rows = this.db.sessions.getAll();
 
@@ -817,34 +803,9 @@ export class SessionManager {
       readonly name: string;
       getAllGoals(): Array<{ sessionId: string; goal: GoalState }>;
     }>("goal");
-    const goalStatuses: Record<
-      string,
-      {
-        status:
-          | "active"
-          | "paused"
-          | "complete"
-          | "cleared"
-          | "blocked"
-          | "budget_limited";
-        objective: string;
-        iteration: number;
-        timeUsedSeconds?: number;
-        tokensUsed?: number;
-        tokenBudget?: number;
-        timeBudgetSeconds?: number;
-      }
-    > = {};
+    const goalStatuses: Record<string, GoalStatusSnapshot> = {};
     for (const { sessionId, goal } of goalExt?.getAllGoals() ?? []) {
-      goalStatuses[sessionId] = {
-        status: goal.status,
-        objective: goal.objective,
-        iteration: goal.iteration,
-        timeUsedSeconds: elapsedSeconds(goal),
-        tokensUsed: goal.tokensUsed,
-        tokenBudget: goal.tokenBudget,
-        timeBudgetSeconds: goal.timeBudgetSeconds,
-      };
+      goalStatuses[sessionId] = buildGoalStatusSnapshot(goal);
     }
     return { sessions, contextWindows, goalStatuses };
   }

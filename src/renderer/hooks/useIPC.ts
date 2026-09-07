@@ -181,6 +181,7 @@ function registerSharedIpcListener(): () => void {
                   tokensUsed: g.tokensUsed,
                   tokenBudget: g.tokenBudget,
                   timeBudgetSeconds: g.timeBudgetSeconds,
+                  activePeriodStartedAt: g.activePeriodStartedAt,
                 });
               }
             }
@@ -421,6 +422,7 @@ function registerSharedIpcListener(): () => void {
             tokenBudget: event.payload.tokenBudget,
             timeUsedSeconds: event.payload.timeUsedSeconds,
             timeBudgetSeconds: event.payload.timeBudgetSeconds,
+            activePeriodStartedAt: event.payload.activePeriodStartedAt,
           });
           break;
 

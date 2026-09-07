@@ -66,7 +66,12 @@ import {
 } from "./ChatInput";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { ChatInputQueueBar } from "./ChatInputQueueBar";
-import { ChatInputStatusBar, resolveInputStatus } from "./ChatInputStatusBar";
+import {
+  ChatInputStatusBar,
+  computeElapsedSeconds,
+  resolveInputStatus,
+  type ChatInputStatus,
+} from "./ChatInputStatusBar";
 import {
   MessageNavRail,
   getTurnPreviewText,
@@ -1496,14 +1501,30 @@ export function ChatView() {
       const currentGoal = goalStatus;
       if (currentGoal) {
         if (goalAction === "pause") {
+          const liveStatus: ChatInputStatus = {
+            type:
+              currentGoal.status === "budget_limited"
+                ? "goal-budget-limited"
+                : "goal-active",
+            objective: currentGoal.objective ?? "",
+            iteration: currentGoal.iteration ?? 0,
+            tokensUsed: currentGoal.tokensUsed,
+            tokenBudget: currentGoal.tokenBudget,
+            timeUsedSeconds: currentGoal.timeUsedSeconds,
+            timeBudgetSeconds: currentGoal.timeBudgetSeconds,
+            activePeriodStartedAt: currentGoal.activePeriodStartedAt,
+          };
           setGoalStatus(activeSessionId, {
             ...currentGoal,
             status: "paused",
+            timeUsedSeconds: computeElapsedSeconds(liveStatus, Date.now()),
+            activePeriodStartedAt: undefined,
           });
         } else if (goalAction === "resume") {
           setGoalStatus(activeSessionId, {
             ...currentGoal,
             status: "active",
+            activePeriodStartedAt: Date.now(),
           });
         } else if (goalAction === "clear") {
           setGoalStatus(activeSessionId, undefined);

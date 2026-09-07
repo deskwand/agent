@@ -572,12 +572,13 @@ export type ServerEvent =
               | "cleared"
               | "blocked"
               | "budget_limited";
-            objective: string;
-            iteration: number;
+            objective?: string;
+            iteration?: number;
             timeUsedSeconds?: number;
             tokensUsed?: number;
             tokenBudget?: number;
             timeBudgetSeconds?: number;
+            activePeriodStartedAt?: number;
           }
         >;
       };
@@ -686,6 +687,7 @@ export type ServerEvent =
         tokenBudget?: number;
         timeUsedSeconds?: number;
         timeBudgetSeconds?: number;
+        activePeriodStartedAt?: number;
       };
     }
   | {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Target,
@@ -24,6 +24,7 @@ export type ChatInputStatus =
       tokenBudget?: number;
       timeUsedSeconds?: number;
       timeBudgetSeconds?: number;
+      activePeriodStartedAt?: number;
     }
   | {
       type: "goal-paused";
@@ -51,6 +52,7 @@ export type ChatInputStatus =
       tokenBudget?: number;
       timeUsedSeconds?: number;
       timeBudgetSeconds?: number;
+      activePeriodStartedAt?: number;
     }
   | {
       type: "background-agent";
@@ -87,37 +89,12 @@ export function ChatInputStatusBar({
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
 
-  // Last authoritative timeUsedSeconds snapshot and its arrival time.
-  const lastReceivedRef = useRef<{
-    timeUsedSeconds: number;
-    at: number;
-  } | null>(null);
-  const timeUsedSeconds = hasTimeUsed(status)
-    ? status.timeUsedSeconds
-    : undefined;
-  useEffect(() => {
-    if (timeUsedSeconds != null) {
-      lastReceivedRef.current = {
-        timeUsedSeconds,
-        at: Date.now(),
-      };
-    }
-  }, [timeUsedSeconds]);
-
   // Live-tick the elapsed clock while the goal is actively running.
   const [now, setNow] = useState(() => Date.now());
   const isTimeLive = isGoalTimeLive(status);
   useEffect(() => {
     if (!isTimeLive) return;
-    const at = Date.now();
-    const prev = lastReceivedRef.current;
-    if (prev) {
-      // Pause → resume re-arrives the same snapshot value, so the dep above
-      // won't re-run; rebase the local clock here instead of extrapolating
-      // from the stale pre-pause arrival time (would jump by the pause length).
-      lastReceivedRef.current = { ...prev, at };
-    }
-    setNow(at);
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [isTimeLive]);
@@ -175,10 +152,9 @@ export function ChatInputStatusBar({
     }
 
     // Append elapsed time for all goal states that have timeUsedSeconds
-    const received = lastReceivedRef.current;
     const displaySeconds =
       status.timeUsedSeconds != null
-        ? computeElapsedSeconds(status, received?.at ?? now, now)
+        ? computeElapsedSeconds(status, now)
         : undefined;
     if (displaySeconds != null && displaySeconds > 0) {
       const isOngoing =
@@ -328,6 +304,7 @@ export function resolveInputStatus(params: {
     tokenBudget?: number;
     timeUsedSeconds?: number;
     timeBudgetSeconds?: number;
+    activePeriodStartedAt?: number;
   } | null;
   backgroundAgents: Array<{
     id: string;
@@ -357,6 +334,7 @@ export function resolveInputStatus(params: {
           tokensUsed: params.goalStatus.tokensUsed,
           tokenBudget: params.goalStatus.tokenBudget,
           timeUsedSeconds: params.goalStatus.timeUsedSeconds,
+          activePeriodStartedAt: params.goalStatus.activePeriodStartedAt,
         };
       case "paused":
         return {
@@ -388,6 +366,7 @@ export function resolveInputStatus(params: {
           tokenBudget: params.goalStatus.tokenBudget,
           timeUsedSeconds: params.goalStatus.timeUsedSeconds,
           timeBudgetSeconds: params.goalStatus.timeBudgetSeconds,
+          activePeriodStartedAt: params.goalStatus.activePeriodStartedAt,
         };
     }
   }
@@ -423,14 +402,20 @@ function hasTimeUsed(
   return status !== null && "timeUsedSeconds" in status;
 }
 
-/** Seconds to display in the status bar: extrapolate from the last
- *  authoritative snapshot for live states, frozen snapshot otherwise. */
+/** Seconds to display in the status bar: use the authoritative active
+ *  period start for live states, frozen snapshot otherwise. */
 export function computeElapsedSeconds(
   status: ChatInputStatus,
-  receivedAtMs: number,
   nowMs: number,
 ): number {
   const base = hasTimeUsed(status) ? (status.timeUsedSeconds ?? 0) : 0;
-  if (!status || !isGoalTimeLive(status)) return base;
-  return base + Math.max(0, (nowMs - receivedAtMs) / 1000);
+  if (
+    !status ||
+    (status.type !== "goal-active" && status.type !== "goal-budget-limited")
+  ) {
+    return base;
+  }
+  const startedAt = status.activePeriodStartedAt;
+  if (startedAt == null) return base;
+  return base + Math.max(0, (nowMs - startedAt) / 1000);
 }
