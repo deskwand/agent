@@ -97,6 +97,8 @@ const TRANSLATIONS: Record<string, string> = {
     "An existing cloud backup must be discarded before these local files can start a new backup.",
   "vault.reset.retry": "Retry reset",
   "vault.reset.inProgress": "Resetting and reconfiguring your cloud backup…",
+  "vault.menu.more": "More Vault actions",
+  "vault.menu.advanced": "Advanced actions",
 };
 
 vi.mock("react-i18next", () => {
@@ -237,6 +239,16 @@ describe("VaultView", () => {
     return button;
   }
 
+  function vaultMenuButton(): HTMLButtonElement {
+    const button = container.querySelector(
+      'button[aria-label="More Vault actions"]',
+    );
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error("Vault menu button missing");
+    }
+    return button;
+  }
+
   function screenText(): string {
     return container.textContent ?? "";
   }
@@ -338,6 +350,42 @@ describe("VaultView", () => {
     expect(api.checkRemoteBackup).not.toHaveBeenCalled();
     expect(screenText()).toContain("readme.md");
     expect(screenText()).toContain("Pending Backup");
+  });
+
+  it("opens the advanced menu and confirms reset through the existing flow", async () => {
+    await renderVault();
+
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    await act(async () => vaultMenuButton().click());
+
+    const menu = container.querySelector('[role="menu"]');
+    expect(menu).not.toBeNull();
+    expect(menu?.textContent).toContain("Advanced actions");
+    const reset = Array.from(menu!.querySelectorAll('[role="menuitem"]')).find(
+      (item) => item.textContent === "Discard old backup, start fresh",
+    );
+    expect(reset).toBeDefined();
+
+    await act(async () =>
+      reset!.dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(screenText()).toContain(
+      "Discard the old cloud backup and start over? Your local files stay, but the cloud backup is deleted. This cannot be undone.",
+    );
+    expect(api.beginDiscardAndReinitialize).not.toHaveBeenCalled();
+  });
+
+  it("hides the advanced menu while a Vault operation is pending", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({ operationStatus: "awaiting-recovery-code" }),
+    );
+
+    await renderVault();
+
+    expect(
+      container.querySelector('button[aria-label="More Vault actions"]'),
+    ).toBeNull();
   });
 
   it("renders only file, skill, and session categories", async () => {
@@ -577,8 +625,10 @@ describe("VaultView", () => {
     await renderVault();
 
     expect(api.checkRemoteBackup).toHaveBeenCalledWith("token");
-    expect(screenText()).toContain("Discard old backup, start fresh");
+    expect(screenText()).not.toContain("Discard old backup, start fresh");
     expect(screenText()).toContain("Finish setup");
+    await act(async () => vaultMenuButton().click());
+    expect(screenText()).toContain("Discard old backup, start fresh");
     expect(uploadButton().disabled).toBe(true);
   });
 
@@ -651,6 +701,11 @@ describe("VaultView", () => {
     expect(restore?.className).toContain("text-accent-foreground");
     expect(restore?.className).toContain("disabled:bg-accent/40");
     expect(restore?.className).toContain("disabled:text-text-primary");
+    expect(
+      Array.from(container.querySelectorAll("button")).filter(
+        (button) => button.textContent === "Discard old backup, start fresh",
+      ),
+    ).toHaveLength(0);
     await act(async () => {
       restore?.click();
       await Promise.resolve();
@@ -677,12 +732,15 @@ describe("VaultView", () => {
 
     await renderVault();
 
-    const discard = Array.from(container.querySelectorAll("button")).find(
+    await act(async () => vaultMenuButton().click());
+    const discard = Array.from(
+      container.querySelectorAll('[role="menuitem"]'),
+    ).find(
       (button) => button.textContent === "Discard old backup, start fresh",
     );
     expect(discard).toBeDefined();
     await act(async () => {
-      discard?.click();
+      discard?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     expect(confirmSpy).not.toHaveBeenCalled();
@@ -700,7 +758,17 @@ describe("VaultView", () => {
     await act(async () => modalButtons[0].click());
     expect(api.discardRemoteBackupAndStart).not.toHaveBeenCalled();
 
-    await act(async () => discard?.click());
+    await act(async () => vaultMenuButton().click());
+    const reopenedDiscard = Array.from(
+      container.querySelectorAll('[role="menuitem"]'),
+    ).find(
+      (button) => button.textContent === "Discard old backup, start fresh",
+    );
+    await act(async () => {
+      reopenedDiscard?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
     const reopenedModal = container.querySelector(".modal-overlay");
     expect(reopenedModal).not.toBeNull();
     const confirmButtons = reopenedModal!.querySelectorAll("button");
@@ -728,11 +796,14 @@ describe("VaultView", () => {
     const confirmSpy = vi.spyOn(window, "confirm");
 
     await renderVault();
-    const discard = Array.from(container.querySelectorAll("button")).find(
+    await act(async () => vaultMenuButton().click());
+    const discard = Array.from(
+      container.querySelectorAll('[role="menuitem"]'),
+    ).find(
       (button) => button.textContent === "Discard old backup, start fresh",
     );
     await act(async () => {
-      discard?.click();
+      discard?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
     expect(confirmSpy).not.toHaveBeenCalled();
@@ -750,7 +821,17 @@ describe("VaultView", () => {
     await act(async () => cancel?.click());
     expect(api.beginDiscardAndReinitialize).not.toHaveBeenCalled();
 
-    await act(async () => discard?.click());
+    await act(async () => vaultMenuButton().click());
+    const reopenedDiscard = Array.from(
+      container.querySelectorAll('[role="menuitem"]'),
+    ).find(
+      (button) => button.textContent === "Discard old backup, start fresh",
+    );
+    await act(async () => {
+      reopenedDiscard?.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
     const reopenedModal = container.querySelector(".modal-overlay");
     expect(reopenedModal).not.toBeNull();
     const confirmButtons = reopenedModal!.querySelectorAll("button");
