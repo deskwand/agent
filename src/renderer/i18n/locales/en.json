@@ -825,6 +825,8 @@
     "collapseSessions": "Collapse sessions",
     "pin": "Pin",
     "unpin": "Unpin",
+    "rename": "Rename",
+    "renameFailed": "Failed to rename session",
     "moreActions": "More actions",
     "automation": "Automation",
     "vault": "Vault",

@@ -77,6 +77,87 @@ function makeDb(overrides: Partial<DatabaseInstance> = {}): DatabaseInstance {
 }
 
 // ------------------------------------------------------------------
+// renameSession
+// ------------------------------------------------------------------
+describe('SessionManager.renameSession', () => {
+  it('persists a trimmed title and broadcasts the update', () => {
+    const sendToRenderer = vi.fn();
+    const db = makeDb({
+      sessions: {
+        create: vi.fn(),
+        get: vi.fn(() => ({ id: 's1', title: 'Old title', updated_at: 123 })),
+        getAll: vi.fn(() => []),
+        update: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as DatabaseInstance['sessions'],
+    });
+    const manager = new SessionManager(db, sendToRenderer);
+
+    const result = manager.renameSession('s1', '  New title  ');
+
+    expect(result).toMatchObject({ success: true, title: 'New title' });
+    expect(db.sessions.update).toHaveBeenCalledWith('s1', { title: 'New title' });
+    expect(sendToRenderer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'session.update',
+        payload: {
+          sessionId: 's1',
+          updates: expect.objectContaining({
+            title: 'New title',
+            updatedAt: expect.any(Number),
+          }),
+        },
+      }),
+    );
+  });
+
+  it('rejects an empty title without writing or broadcasting', () => {
+    const sendToRenderer = vi.fn();
+    const db = makeDb({
+      sessions: {
+        create: vi.fn(),
+        get: vi.fn(() => ({ id: 's1', title: 'Old title' })),
+        getAll: vi.fn(() => []),
+        update: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as DatabaseInstance['sessions'],
+    });
+    const manager = new SessionManager(db, sendToRenderer);
+
+    expect(manager.renameSession('s1', '   ')).toEqual({
+      success: false,
+      error: 'INVALID_TITLE',
+    });
+    expect(db.sessions.update).not.toHaveBeenCalled();
+    expect(sendToRenderer).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-string title without writing or broadcasting', () => {
+    const sendToRenderer = vi.fn();
+    const manager = new SessionManager(makeDb(), sendToRenderer);
+
+    expect(
+      manager.renameSession('missing', undefined as unknown as string),
+    ).toEqual({
+      success: false,
+      error: 'INVALID_TITLE',
+    });
+    expect(sendToRenderer).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing session without writing or broadcasting', () => {
+    const sendToRenderer = vi.fn();
+    const manager = new SessionManager(makeDb(), sendToRenderer);
+
+    expect(manager.renameSession('missing', 'New title')).toEqual({
+      success: false,
+      error: 'SESSION_NOT_FOUND',
+    });
+    expect(sendToRenderer).not.toHaveBeenCalled();
+  });
+});
+
+// ------------------------------------------------------------------
 // listSessions
 // ------------------------------------------------------------------
 describe('SessionManager.listSessions', () => {

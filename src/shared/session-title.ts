@@ -1,10 +1,19 @@
 export const DEFAULT_SESSION_TITLE = "New Session";
-const MAX_SESSION_TITLE_LENGTH = 50;
+export const MAX_SESSION_TITLE_LENGTH = 50;
 
-function truncateSessionTitle(value: string): string {
+export type RenameSessionResult =
+  | { success: true; title: string; updatedAt: number }
+  | { success: false; error: "SESSION_NOT_FOUND" | "INVALID_TITLE" };
+
+export function truncateSessionTitle(value: string): string {
   return value.length > MAX_SESSION_TITLE_LENGTH
     ? `${value.slice(0, Math.max(1, MAX_SESSION_TITLE_LENGTH - 3))}...`
     : value;
+}
+
+export function normalizeSessionTitle(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed ? truncateSessionTitle(trimmed) : null;
 }
 
 export function getDefaultTitleFromPrompt(prompt: string): string {

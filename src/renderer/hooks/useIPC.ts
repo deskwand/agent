@@ -13,6 +13,10 @@ import type {
   ProviderProfileKey,
 } from "../types";
 import i18n from "../i18n/config";
+import {
+  normalizeSessionTitle,
+  type RenameSessionResult,
+} from "../../shared/session-title";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 
 // Check if running in Electron
@@ -878,6 +882,30 @@ export function useIPC() {
     [send, updateSession],
   );
 
+  const renameSession = useCallback(
+    async (sessionId: string, title: string): Promise<RenameSessionResult> => {
+      const normalizedTitle = normalizeSessionTitle(title);
+      if (!normalizedTitle) return { success: false, error: "INVALID_TITLE" };
+
+      if (!isElectron) {
+        useAppStore.getState().updateSession(sessionId, {
+          title: normalizedTitle,
+        });
+        return {
+          success: true,
+          title: normalizedTitle,
+          updatedAt: Date.now(),
+        };
+      }
+
+      return invoke<RenameSessionResult>({
+        type: "session.rename",
+        payload: { sessionId, title: normalizedTitle },
+      });
+    },
+    [invoke],
+  );
+
   const setSessionProviderModel = useCallback(
     (
       sessionId: string,
@@ -1317,6 +1345,7 @@ export function useIPC() {
     continueSession,
     forkSession,
     setSessionThinkingLevel,
+    renameSession,
     setSessionProviderModel,
     stopSession,
     deleteSession,

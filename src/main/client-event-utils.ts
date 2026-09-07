@@ -10,6 +10,7 @@ export function eventRequiresSessionManager(event: ClientEvent): boolean {
     case "session.stop":
     case "session.compact":
     case "session.abortCompaction":
+    case "session.rename":
     case "session.delete":
     case "session.batchDelete":
     case "project.delete":

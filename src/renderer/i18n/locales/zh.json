@@ -824,6 +824,8 @@
     "collapseSessions": "收起会话",
     "pin": "置顶",
     "unpin": "取消置顶",
+    "rename": "重命名",
+    "renameFailed": "会话重命名失败",
     "moreActions": "更多操作",
     "automation": "自动化",
     "vault": "密库",

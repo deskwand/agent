@@ -4,6 +4,7 @@ import {
   normalizeGeneratedTitle,
   shouldGenerateTitle,
 } from '../src/main/session/session-title-utils';
+import { normalizeSessionTitle } from '../src/shared/session-title';
 
 describe('session title utils', () => {
   it('generates title only for first user message and default title', () => {
@@ -58,6 +59,16 @@ describe('session title utils', () => {
   it('normalizes generated title by taking first line and stripping quotes', () => {
     const title = normalizeGeneratedTitle('"  我的标题  "\n第二行');
     expect(title).toBe('我的标题');
+  });
+
+  it('normalizes manually entered session titles', () => {
+    expect(normalizeSessionTitle('  Project notes  ')).toBe('Project notes');
+    expect(normalizeSessionTitle('')).toBeNull();
+    expect(normalizeSessionTitle('   ')).toBeNull();
+
+    const longTitle = normalizeSessionTitle('a'.repeat(60));
+    expect(longTitle).toHaveLength(50);
+    expect(longTitle?.endsWith('...')).toBe(true);
   });
 
   it('drops synthetic empty placeholder titles', () => {

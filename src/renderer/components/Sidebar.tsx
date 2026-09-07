@@ -76,6 +76,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const {
     invoke,
     deleteSession,
+    renameSession,
     archiveSession,
     getSessionMessagesPage,
     getSessionTraceSteps,
@@ -100,6 +101,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [cloudRestoring, setCloudRestoring] = useState(false);
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
   const [sessionMenu, setSessionMenu] = useState<SessionMenuState | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingSessionTitle, setEditingSessionTitle] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [currentAppVersion, setCurrentAppVersion] = useState("");
 
@@ -511,6 +515,70 @@ export function Sidebar({ width = 280 }: { width?: number }) {
     [deleteSession, t],
   );
 
+  const beginRenameSession = useCallback((session: Session) => {
+    setSessionMenu(null);
+    setEditingSessionId(session.id);
+    setEditingSessionTitle(session.title);
+  }, []);
+
+  const cancelRenameSession = useCallback(() => {
+    setEditingSessionId(null);
+    setEditingSessionTitle("");
+  }, []);
+
+  const commitRenameSession = useCallback(
+    async (session: Session) => {
+      if (isRenaming || editingSessionId !== session.id) return;
+      const nextTitle = editingSessionTitle.trim();
+      if (!nextTitle) {
+        cancelRenameSession();
+        return;
+      }
+
+      setIsRenaming(true);
+      try {
+        const result = await renameSession(session.id, nextTitle);
+        if (!result.success) {
+          cancelRenameSession();
+          setGlobalNotice({
+            id: `notice-session-rename-${Date.now()}`,
+            type: "error",
+            message: t("sidebar.renameFailed"),
+          });
+          return;
+        }
+        cancelRenameSession();
+      } catch {
+        cancelRenameSession();
+        setGlobalNotice({
+          id: `notice-session-rename-${Date.now()}`,
+          type: "error",
+          message: t("sidebar.renameFailed"),
+        });
+      } finally {
+        setIsRenaming(false);
+      }
+    },
+    [
+      cancelRenameSession,
+      editingSessionId,
+      editingSessionTitle,
+      isRenaming,
+      renameSession,
+      setGlobalNotice,
+      t,
+    ],
+  );
+
+  useEffect(() => {
+    if (
+      editingSessionId &&
+      !sessions.some((session) => session.id === editingSessionId)
+    ) {
+      cancelRenameSession();
+    }
+  }, [cancelRenameSession, editingSessionId, sessions]);
+
   const handleSelectProjectDir = useCallback(
     async (currentPath?: string) => {
       const result = await changeWorkingDir(
@@ -672,11 +740,35 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       >
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1 flex items-center gap-2">
-            <div
-              className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? "text-text-primary" : "text-text-secondary"}`}
-            >
-              {highlightTitle(session.title, normalizedQuery)}
-            </div>
+            {editingSessionId === session.id ? (
+              <input
+                autoFocus
+                maxLength={50}
+                value={editingSessionTitle}
+                disabled={isRenaming}
+                onChange={(event) => setEditingSessionTitle(event.target.value)}
+                onClick={(event) => event.stopPropagation()}
+                onFocus={(event) => event.currentTarget.select()}
+                onBlur={() => void commitRenameSession(session)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    cancelRenameSession();
+                  } else if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  }
+                }}
+                className="min-w-0 flex-1 rounded-md border border-border-muted bg-background px-1.5 py-0.5 text-sm text-text-primary outline-none focus:border-accent"
+                aria-label={t("sidebar.rename")}
+              />
+            ) : (
+              <div
+                className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? "text-text-primary" : "text-text-secondary"}`}
+              >
+                {highlightTitle(session.title, normalizedQuery)}
+              </div>
+            )}
             {showRelativeTime && (
               <div className="ml-auto h-6 w-[4.5rem] flex-shrink-0 relative">
                 <div
@@ -1307,6 +1399,15 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                     : "sidebar.pin",
                 )}
               </span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => beginRenameSession(sessionMenuSession)}
+              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-text-primary transition-colors hover:bg-surface-hover"
+            >
+              <SquarePen className="h-3.5 w-3.5 text-text-muted" />
+              <span>{t("sidebar.rename")}</span>
             </button>
             {sessionMenuSession.status !== "running" && (
               <>

@@ -65,6 +65,7 @@ const ALLOWED_CLIENT_EVENTS = new Set([
   "session.abortCompaction",
   "session.steer",
   "session.command",
+  "session.rename",
   "session.archive",
   "session.unarchive",
   "session.batchArchive",

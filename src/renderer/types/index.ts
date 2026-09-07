@@ -448,6 +448,7 @@ export type ClientEvent =
       type: "session.command";
       payload: { sessionId: string; action: "pause" | "resume" | "clear" };
     }
+  | { type: "session.rename"; payload: { sessionId: string; title: string } }
   | { type: "session.delete"; payload: { sessionId: string } }
   | { type: "session.batchDelete"; payload: { sessionIds: string[] } }
   | { type: "session.archive"; payload: { sessionId: string } }

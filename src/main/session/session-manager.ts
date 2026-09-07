@@ -82,6 +82,10 @@ import {
   resolveUtilityModelConfig,
 } from "../memory/memory-llm-client";
 import { buildScheduledTaskTitle } from "../../shared/schedule/task-title";
+import {
+  normalizeSessionTitle,
+  type RenameSessionResult,
+} from "../../shared/session-title";
 
 interface IAgentRunner {
   run(
@@ -2080,6 +2084,34 @@ export class SessionManager {
       type: "session.status",
       payload: { sessionId, status },
     });
+  }
+
+  renameSession(sessionId: string, title: string): RenameSessionResult {
+    if (typeof sessionId !== "string" || !sessionId) {
+      return { success: false, error: "SESSION_NOT_FOUND" };
+    }
+    if (typeof title !== "string") {
+      return { success: false, error: "INVALID_TITLE" };
+    }
+
+    const existing = this.db.sessions.get(sessionId);
+    if (!existing) return { success: false, error: "SESSION_NOT_FOUND" };
+
+    const normalizedTitle = normalizeSessionTitle(title);
+    if (!normalizedTitle) return { success: false, error: "INVALID_TITLE" };
+
+    this.db.sessions.update(sessionId, { title: normalizedTitle });
+    const updatedAt = this.db.sessions.get(sessionId)?.updated_at ?? Date.now();
+    this.sessionTitleAttempts.add(sessionId);
+    this.sendToRenderer({
+      type: "session.update",
+      payload: {
+        sessionId,
+        updates: { title: normalizedTitle, updatedAt },
+      },
+    });
+
+    return { success: true, title: normalizedTitle, updatedAt };
   }
 
   private updateSessionTitle(sessionId: string, title: string): boolean {

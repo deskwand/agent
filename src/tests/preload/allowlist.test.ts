@@ -23,6 +23,7 @@ const ALL_CLIENT_EVENT_TYPES = [
   "session.steer",
   "session.fork",
   "session.command",
+  "session.rename",
   "session.delete",
   "session.batchDelete",
   "session.archive",

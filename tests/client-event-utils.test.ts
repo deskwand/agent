@@ -17,6 +17,8 @@ function makeEvent(type: ClientEvent['type']): ClientEvent {
         type,
         payload: { sessionId: 'session-1', providerProfileKey: 'openai', model: 'gpt-5.4' },
       };
+    case 'session.rename':
+      return { type, payload: { sessionId: 'session-1', title: 'New title' } };
     case 'session.stop':
     case 'session.delete':
     case 'session.getMessages':
@@ -48,6 +50,7 @@ describe('eventRequiresSessionManager', () => {
       'session.fork',
       'session.setThinkingLevel',
       'session.setProviderModel',
+      'session.rename',
       'session.stop',
       'session.delete',
       'session.list',
