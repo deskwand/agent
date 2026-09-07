@@ -1670,6 +1670,10 @@
       "localFilesConflict": "An existing cloud backup must be discarded before these local files can start a new backup.",
       "retry": "Retry reset",
       "inProgress": "Resetting and reconfiguring your cloud backup…"
+    },
+    "menu": {
+      "more": "More Vault actions",
+      "advanced": "Advanced actions"
     }
   },
   "modelMenu": {

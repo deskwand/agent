@@ -127,7 +127,10 @@ export function VaultView(): JSX.Element {
     null,
   );
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const syncFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const advancedMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const advancedResetRef = useRef<HTMLButtonElement | null>(null);
   const autoRestoreFired = useRef(false);
   const setupGenerated = useRef(false);
 
@@ -355,6 +358,31 @@ export function VaultView(): JSX.Element {
     if (token) setPendingConfirmation({ kind: "reset-existing" });
   };
 
+  const canOpenAdvancedReset =
+    Boolean(token) &&
+    snapshot !== null &&
+    snapshot.operationStatus === "idle" &&
+    ((snapshot.hasLocalIndex && snapshot.hasLocalMek) ||
+      remoteStatus?.status === "has-backup");
+
+  const handleAdvancedReset = () => {
+    setAdvancedMenuOpen(false);
+    if (!snapshot) return;
+    if (snapshot.hasLocalIndex && snapshot.hasLocalMek) {
+      handleBeginReset();
+    } else {
+      handleDiscardAndRestart();
+    }
+  };
+
+  useEffect(() => {
+    if (advancedMenuOpen) advancedResetRef.current?.focus();
+  }, [advancedMenuOpen]);
+
+  useEffect(() => {
+    if (!canOpenAdvancedReset) setAdvancedMenuOpen(false);
+  }, [canOpenAdvancedReset]);
+
   const handleOpen = (item: VaultSnapshotItem) => {
     void runAction(async () => {
       const result = await window.electronAPI.vault.openFile(item.name);
@@ -442,6 +470,66 @@ export function VaultView(): JSX.Element {
           >
             {syncFeedback === "syncing" ? t("vault.syncing") : t("vault.sync")}
           </button>
+          {canOpenAdvancedReset && (
+            <div
+              className="relative"
+              onBlur={(event) => {
+                const next = event.relatedTarget;
+                if (
+                  !(next instanceof Node) ||
+                  !event.currentTarget.contains(next)
+                ) {
+                  setAdvancedMenuOpen(false);
+                }
+              }}
+            >
+              <button
+                ref={advancedMenuTriggerRef}
+                type="button"
+                aria-label={t("vault.menu.more")}
+                aria-haspopup="menu"
+                aria-expanded={advancedMenuOpen}
+                aria-controls="vault-advanced-menu"
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                onClick={() => setAdvancedMenuOpen((open) => !open)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    setAdvancedMenuOpen(false);
+                    event.currentTarget.focus();
+                  }
+                }}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+              {advancedMenuOpen && (
+                <div
+                  id="vault-advanced-menu"
+                  role="menu"
+                  aria-label={t("vault.menu.advanced")}
+                  className="absolute right-0 top-11 z-20 min-w-64 rounded-lg border border-border-subtle bg-background p-1 shadow-lg"
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setAdvancedMenuOpen(false);
+                      advancedMenuTriggerRef.current?.focus();
+                    }
+                  }}
+                >
+                  <div className="px-3 py-2 text-xs text-text-muted">
+                    {t("vault.menu.advanced")}
+                  </div>
+                  <button
+                    ref={advancedResetRef}
+                    type="button"
+                    role="menuitem"
+                    className="block w-full rounded px-3 py-2 text-left text-sm text-error hover:bg-error/10"
+                    onClick={handleAdvancedReset}
+                  >
+                    {t("vault.reset.discard")}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -649,15 +737,6 @@ export function VaultView(): JSX.Element {
                 {t("vault.setup.open")}
               </button>
             )}
-            {snapshot?.hasLocalIndex && snapshot.hasLocalMek && (
-              <button
-                type="button"
-                className="ml-auto text-xs text-error underline-offset-2 hover:underline"
-                onClick={handleBeginReset}
-              >
-                {t("vault.reset.discard")}
-              </button>
-            )}
             {!token && (
               <span className="text-xs text-text-muted">
                 {t("vault.loginHint")}
@@ -690,7 +769,6 @@ export function VaultView(): JSX.Element {
           handleRestore,
           handleInitialize,
           handleGenerateRecoveryCode,
-          handleDiscardAndRestart,
           retryAutoRestore,
           handleUpload,
           uploadDisabled,
@@ -737,16 +815,6 @@ export function VaultView(): JSX.Element {
                       {t("vault.restore.retry")}
                     </button>
                   </>
-                )}
-                {remoteStatus.status === "has-backup" && (
-                  <button
-                    type="button"
-                    className="mt-2 text-xs text-error underline-offset-2 hover:underline"
-                    onClick={handleDiscardAndRestart}
-                    disabled={busy}
-                  >
-                    {t("vault.reset.discard")}
-                  </button>
                 )}
               </>
             )}
@@ -804,7 +872,6 @@ interface EmptyStateHandlers {
   handleRestore: () => void;
   handleInitialize: () => Promise<void>;
   handleGenerateRecoveryCode: () => Promise<void>;
-  handleDiscardAndRestart: () => void;
   retryAutoRestore: () => void;
   handleUpload: () => void;
   uploadDisabled: boolean;
@@ -900,13 +967,6 @@ function renderEmptyState(
           disabled={h.busy || !h.restoreCode}
         >
           {t("vault.restore.action")}
-        </button>
-        <button
-          type="button"
-          className="text-xs text-error underline-offset-2 hover:underline"
-          onClick={h.handleDiscardAndRestart}
-        >
-          {t("vault.reset.discard")}
         </button>
       </div>
     );

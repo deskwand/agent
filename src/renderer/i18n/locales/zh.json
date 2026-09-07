@@ -1666,6 +1666,10 @@
       "localFilesConflict": "已有云端备份。要为这些本地文件建立新备份，必须先丢弃旧备份。",
       "retry": "重试重置",
       "inProgress": "正在重置并重新设置云端备份…"
+    },
+    "menu": {
+      "more": "更多 Vault 操作",
+      "advanced": "高级操作"
     }
   },
   "modelMenu": {
