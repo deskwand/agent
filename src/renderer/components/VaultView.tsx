@@ -361,6 +361,8 @@ export function VaultView(): JSX.Element {
 
   const canOpenAdvancedReset =
     Boolean(token) &&
+    !busy &&
+    mode !== "auto-restoring" &&
     snapshot !== null &&
     snapshot.operationStatus === "idle" &&
     ((snapshot.hasLocalIndex && snapshot.hasLocalMek) ||

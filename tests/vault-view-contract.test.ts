@@ -394,6 +394,63 @@ describe("VaultView", () => {
 
     expect(container.querySelector('[role="menu"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
+    expect(api.beginDiscardAndReinitialize).not.toHaveBeenCalled();
+  });
+
+  it("hides the advanced menu while remote status is unresolved", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: false,
+      }),
+    );
+    api.checkRemoteBackup.mockImplementationOnce(() => new Promise(() => {}));
+
+    await renderVault();
+
+    expect(
+      container.querySelector('button[aria-label="More Vault actions"]'),
+    ).toBeNull();
+  });
+
+  it("hides the advanced menu while clicking sync", async () => {
+    let resolveSync!: (next: VaultSnapshot) => void;
+    api.sync.mockImplementationOnce(
+      () =>
+        new Promise<VaultSnapshot>((resolve) => {
+          resolveSync = resolve;
+        }),
+    );
+
+    await renderVault();
+    const sync = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Sync",
+    );
+    await act(async () => sync?.click());
+
+    expect(
+      container.querySelector('button[aria-label="More Vault actions"]'),
+    ).toBeNull();
+    await act(async () => resolveSync(snapshot({ items: [] })));
+  });
+
+  it("hides the advanced menu during automatic restore", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({
+        hasLocalIndex: false,
+        hasLocalFiles: false,
+        hasLocalMek: true,
+      }),
+    );
+    api.checkRemoteBackup.mockResolvedValueOnce({ status: "has-backup" });
+    api.restoreWithLocalMek.mockImplementationOnce(() => new Promise(() => {}));
+
+    await renderVault();
+
+    expect(
+      container.querySelector('button[aria-label="More Vault actions"]'),
+    ).toBeNull();
   });
 
   it("closes the advanced menu when clicking outside it", async () => {
