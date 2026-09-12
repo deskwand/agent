@@ -36,4 +36,19 @@ describe('session title flow', () => {
     // hasAttempted must be false so next session start can retry
     expect(harness.hasAttempted).toBe(false);
   });
+
+  it('names a session whose initial title came from an attachment name', async () => {
+    const harness = createTitleFlowHarness({ generatedTitle: '季度总结' });
+    await harness.runFirstMessage('', '季度总结-最终版.pptx');
+    expect(harness.updatedTitle).toBe('季度总结');
+    expect(harness.hasAttempted).toBe(true);
+  });
+
+  it('skips the API call when there is neither prompt text nor an attachment name', async () => {
+    const harness = createTitleFlowHarness({ generatedTitle: '不应被使用' });
+    await harness.runFirstMessage('', null);
+    expect(harness.generateCallCount).toBe(0);
+    expect(harness.updatedTitle).toBe(null);
+    expect(harness.hasAttempted).toBe(false);
+  });
 });

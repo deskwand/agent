@@ -4,22 +4,26 @@ export {
 } from "../../shared/session-title";
 import {
   DEFAULT_SESSION_TITLE,
-  getDefaultTitleFromPrompt,
+  getInitialSessionTitle,
 } from "../../shared/session-title";
 
 export type TitleDecisionInput = {
   userMessageCount: number;
   currentTitle: string;
   prompt: string;
+  firstAttachmentName?: string | null;
   hasAttempted: boolean;
 };
 
 export function shouldGenerateTitle(input: TitleDecisionInput): boolean {
   if (input.hasAttempted) return false;
   if (input.userMessageCount !== 1) return false;
-  const defaultTitle = getDefaultTitleFromPrompt(input.prompt);
+  const initialTitle = getInitialSessionTitle(
+    input.prompt,
+    input.firstAttachmentName,
+  );
   return (
-    input.currentTitle === defaultTitle ||
+    input.currentTitle === initialTitle ||
     input.currentTitle === DEFAULT_SESSION_TITLE
   );
 }
@@ -58,4 +62,19 @@ export function buildTitlePrompt(prompt: string): string {
     "",
     `User request / 用户请求：${prompt.trim()}`,
   ].join("\n");
+}
+
+/**
+ * 标题生成的输入文本：
+ * - 有文字 → 用文字
+ * - 无文字但有附件名 → 用附件名
+ * - 都没有（纯粘贴图片等）→ null，调用方据此短路，不发请求
+ */
+export function buildTitleInput(
+  prompt: string,
+  firstAttachmentName?: string | null,
+): string | null {
+  const text = prompt.trim();
+  if (text) return text;
+  return firstAttachmentName?.trim() || null;
 }

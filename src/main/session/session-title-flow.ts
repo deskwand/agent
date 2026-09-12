@@ -1,4 +1,5 @@
 import {
+  buildTitleInput,
   buildTitlePrompt,
   getDefaultTitleFromPrompt,
   normalizeGeneratedTitle,
@@ -8,6 +9,7 @@ import {
 type TitleFlowDeps = {
   sessionId: string;
   prompt: string;
+  firstAttachmentName?: string | null;
   userMessageCount: number;
   currentTitle: string;
   hasAttempted: boolean;
@@ -33,6 +35,7 @@ export async function maybeGenerateSessionTitle(
     userMessageCount: deps.userMessageCount,
     currentTitle: deps.currentTitle,
     prompt: deps.prompt,
+    firstAttachmentName: deps.firstAttachmentName,
     hasAttempted: deps.hasAttempted,
   });
 
@@ -49,9 +52,18 @@ export async function maybeGenerateSessionTitle(
     return;
   }
 
+  const titleInput = buildTitleInput(deps.prompt, deps.firstAttachmentName);
+  if (!titleInput) {
+    deps.log(
+      "[SessionTitle] Skip: no title input (attachment/image only)",
+      deps.sessionId,
+    );
+    return;
+  }
+
   deps.log("[SessionTitle] Generating title...", deps.sessionId);
 
-  const titlePrompt = buildTitlePrompt(deps.prompt);
+  const titlePrompt = buildTitlePrompt(titleInput);
   let generatedTitle: string | null = null;
   try {
     generatedTitle = normalizeGeneratedTitle(
