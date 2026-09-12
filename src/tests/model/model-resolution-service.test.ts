@@ -14,6 +14,7 @@ vi.mock("../../main/config/ollama-api", () => ({
 }));
 
 import { ModelResolutionService } from "../../main/model/model-resolution-service";
+import { normalizeProviderConfig } from "../../main/config/config-store";
 import type {
   AppConfig,
   ProviderProfileKey,
@@ -291,5 +292,28 @@ describe("ModelResolutionService", () => {
 
     expect(resolveProviderApiKeyMock).toHaveBeenCalledWith("openai-codex");
     expect(result.apiKey).toBe("oauth-token");
+  });
+
+  it("resolves deepseek-flash from the real preset catalog with 1M context and reasoning on", async () => {
+    // Uses the shipped preset catalog (not a hand-written fixture) so the
+    // preset -> catalog -> resolution wiring is covered. deepseek-flash is not
+    // in the pi-ai registry, so this exercises the synthetic-model path.
+    const appConfig = buildAppConfig();
+    appConfig.providers.deepseek = {
+      ...normalizeProviderConfig("deepseek", undefined),
+      apiKey: "ds-key",
+    };
+
+    const result = await service.resolve({
+      sessionProviderProfileKey: "deepseek",
+      sessionModel: "deepseek-flash",
+      appConfig,
+    });
+
+    expect(result.modelId).toBe("deepseek-flash");
+    expect(result.protocol).toBe("openai");
+    expect(result.baseUrl).toContain("api.deepseek.com");
+    expect(result.contextWindow).toBe(1_000_000);
+    expect(result.piModel.reasoning).toBe(true);
   });
 });

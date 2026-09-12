@@ -95,6 +95,7 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
         id: "deepseek-v4-flash-vision-exp",
         name: "deepseek-v4-flash-vision-exp",
       },
+      { id: "deepseek-flash", name: "deepseek-flash" },
     ],
     keyPlaceholder: "sk-...",
     keyHint: "从 platform.deepseek.com 获取",
@@ -288,7 +289,7 @@ export function getModelInputGuidance(
   if (provider === "deepseek") {
     return {
       placeholder:
-        "deepseek-v4-pro, deepseek-v4-flash, deepseek-v4-flash-vision-exp, deepseek-chat",
+        "deepseek-flash, deepseek-v4-pro, deepseek-v4-flash, deepseek-v4-flash-vision-exp, deepseek-chat",
       hint: "Use the exact model ID for the selected protocol or endpoint.",
     };
   }

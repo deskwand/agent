@@ -45,4 +45,15 @@ describe("DeepSeek presets", () => {
       "deepseek-v4-flash-vision-exp",
     );
   });
+
+  it("includes the new deepseek-flash model in the DeepSeek provider preset", () => {
+    const ids = API_PROVIDER_PRESETS.deepseek.models.map((m) => m.id);
+    expect(ids).toContain("deepseek-flash");
+  });
+
+  it("mentions deepseek-flash in deepseek guidance placeholder", () => {
+    expect(getModelInputGuidance("deepseek").placeholder).toContain(
+      "deepseek-flash",
+    );
+  });
 });

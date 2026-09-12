@@ -41,6 +41,27 @@ describe("normalizeProviderConfig — non-custom defaultModel selection", () => 
     const result = normalizeProviderConfig(profileKey, {});
     expect(result.defaultModel).toBe("claude-3-7-sonnet-latest");
   });
+
+  it("picks deepseek-flash as the deepseek default (alphabetically first preset)", () => {
+    expect(normalizeProviderConfig("deepseek", undefined).defaultModel).toBe(
+      "deepseek-flash",
+    );
+    expect(normalizeProviderConfig("deepseek", {}).defaultModel).toBe(
+      "deepseek-flash",
+    );
+  });
+
+  it("keeps an already-saved deepseek default model instead of shifting it", () => {
+    expect(
+      normalizeProviderConfig("deepseek", { defaultModel: "deepseek-v4-pro" })
+        .defaultModel,
+    ).toBe("deepseek-v4-pro");
+    expect(
+      normalizeProviderConfig("deepseek", {
+        defaultModel: "deepseek-v4-flash",
+      }).defaultModel,
+    ).toBe("deepseek-v4-flash");
+  });
 });
 
 // --------------- buildProjectedConfig — thinkingLevel ---------------

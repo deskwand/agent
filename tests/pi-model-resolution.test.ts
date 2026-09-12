@@ -4,6 +4,7 @@ import {
   buildPiModelLookupCandidates,
   buildSyntheticPiModel,
   inferPiApi,
+  resolveModelContextWindow,
   resolvePiModelString,
   resolvePiRouteProtocol,
   resolveSyntheticPiModelFallback,
@@ -270,6 +271,14 @@ describe('pi model resolution helpers', () => {
     );
     expect(deepseekV4Pro.reasoning).toBe(true);
 
+    const deepseekFlash = buildSyntheticPiModel(
+      'deepseek-flash',
+      'deepseek',
+      'openai',
+      'https://api.deepseek.com/v1'
+    );
+    expect(deepseekFlash.reasoning).toBe(true);
+
     const qwen3 = buildSyntheticPiModel(
       'qwen3:8b',
       'openai',
@@ -287,6 +296,18 @@ describe('pi model resolution helpers', () => {
 
     const llama = buildSyntheticPiModel('llama-4-scout', 'meta', 'openai');
     expect(llama.reasoning).toBe(false);
+  });
+
+  it('resolves deepseek-flash spec to 1M context and 384K max output', () => {
+    const model = buildSyntheticPiModel(
+      'deepseek-flash',
+      'deepseek',
+      'openai',
+      'https://api.deepseek.com/v1'
+    );
+    expect(model.contextWindow).toBe(1_000_000);
+    expect(model.maxTokens).toBe(384_000);
+    expect(resolveModelContextWindow('deepseek-flash')).toBe(1_000_000);
   });
 
   it('allows explicit reasoning override in buildSyntheticPiModel', () => {
