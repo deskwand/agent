@@ -34,6 +34,8 @@ type EmptyVaultMode =
 
 const FILTERS: Filter[] = ["files", "skills", "sessions"];
 
+const SYNC_LABEL_DELAY_MS = 250;
+
 function statusText(status: SyncStatus, t: (key: string) => string): string {
   if (status === "synced") return t("vault.status.synced");
   if (status === "failed") return t("vault.status.failed");
@@ -137,6 +139,7 @@ export function VaultView(): JSX.Element {
   } | null>(null);
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const syncFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncLabelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const advancedMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
   const advancedMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const advancedResetRef = useRef<HTMLButtonElement | null>(null);
@@ -146,6 +149,7 @@ export function VaultView(): JSX.Element {
   useEffect(() => {
     return () => {
       if (syncFeedbackTimer.current) clearTimeout(syncFeedbackTimer.current);
+      if (syncLabelTimer.current) clearTimeout(syncLabelTimer.current);
     };
   }, []);
 
@@ -270,42 +274,61 @@ export function VaultView(): JSX.Element {
       clearTimeout(syncFeedbackTimer.current);
       syncFeedbackTimer.current = null;
     }
+    if (syncLabelTimer.current) {
+      clearTimeout(syncLabelTimer.current);
+      syncLabelTimer.current = null;
+    }
+    setSyncFeedback("idle");
+    setSyncFeedbackMessage(null);
+
     if (!token) {
       setSyncFeedback("error");
       setSyncFeedbackMessage(t("vault.error.loginRequired"));
       return;
     }
+
     const pendingBefore = snapshot?.pendingCount ?? null;
     setBusy(true);
     setError(null);
-    setSyncFeedback("syncing");
-    setSyncFeedbackMessage(t("vault.syncing"));
+    syncLabelTimer.current = setTimeout(() => {
+      syncLabelTimer.current = null;
+      setSyncFeedback("syncing");
+    }, SYNC_LABEL_DELAY_MS);
 
+    let nextSnapshot: VaultSnapshot | null = null;
+    let syncFailure: string | null = null;
     try {
-      const nextSnapshot = await window.electronAPI.vault.sync(token);
-      setSnapshot(nextSnapshot);
-      if (nextSnapshot.pendingCount > 0) {
-        setSyncFeedback("error");
-        setSyncFeedbackMessage(t("vault.error.syncFailed"));
-        return;
-      }
-      setSyncFeedback("success");
-      setSyncFeedbackMessage(
-        pendingBefore === 0
-          ? t("vault.alreadyLatest")
-          : t("vault.syncComplete"),
-      );
-      syncFeedbackTimer.current = setTimeout(() => {
-        setSyncFeedback("idle");
-        setSyncFeedbackMessage(null);
-        syncFeedbackTimer.current = null;
-      }, 3000);
+      nextSnapshot = await window.electronAPI.vault.sync(token);
     } catch (syncError: unknown) {
-      setSyncFeedback("error");
-      setSyncFeedbackMessage(errorText(syncError, t));
+      syncFailure = errorText(syncError, t);
     } finally {
+      if (syncLabelTimer.current) {
+        clearTimeout(syncLabelTimer.current);
+        syncLabelTimer.current = null;
+      }
       setBusy(false);
     }
+
+    if (syncFailure || !nextSnapshot) {
+      setSyncFeedback("error");
+      setSyncFeedbackMessage(syncFailure ?? t("vault.error.syncFailed"));
+      return;
+    }
+    setSnapshot(nextSnapshot);
+    if (nextSnapshot.pendingCount > 0) {
+      setSyncFeedback("error");
+      setSyncFeedbackMessage(t("vault.error.syncFailed"));
+      return;
+    }
+    setSyncFeedback("success");
+    setSyncFeedbackMessage(
+      pendingBefore === 0 ? t("vault.alreadyLatest") : t("vault.syncComplete"),
+    );
+    syncFeedbackTimer.current = setTimeout(() => {
+      setSyncFeedback("idle");
+      setSyncFeedbackMessage(null);
+      syncFeedbackTimer.current = null;
+    }, 3000);
   };
 
   const handleInitialize = async () => {
@@ -367,14 +390,15 @@ export function VaultView(): JSX.Element {
     if (token) setPendingConfirmation({ kind: "reset-existing" });
   };
 
-  const canOpenAdvancedReset =
+  const advancedResetAvailable =
     Boolean(token) &&
-    !busy &&
     mode !== "auto-restoring" &&
     snapshot !== null &&
     snapshot.operationStatus === "idle" &&
     ((snapshot.hasLocalIndex && snapshot.hasLocalMek) ||
       remoteStatus?.status === "has-backup");
+
+  const canOpenAdvancedReset = advancedResetAvailable && !busy;
 
   const handleAdvancedReset = () => {
     setAdvancedMenuOpen(false);
@@ -497,15 +521,27 @@ export function VaultView(): JSX.Element {
           <p className="mt-1 text-sm text-text-muted">{t("vault.subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
+          <span
+            aria-live="polite"
+            className="w-[7rem] truncate text-right text-xs text-success"
+          >
+            {syncFeedback === "syncing" ? (
+              <span className="sr-only">{t("vault.syncing")}</span>
+            ) : syncFeedback === "success" ? (
+              (syncFeedbackMessage ?? "")
+            ) : (
+              ""
+            )}
+          </span>
           <button
             type="button"
-            className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+            className="min-w-24 rounded-lg bg-accent px-3 py-2 text-center text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
             onClick={() => void handleSync()}
             disabled={syncDisabled}
           >
             {syncFeedback === "syncing" ? t("vault.syncing") : t("vault.sync")}
           </button>
-          {canOpenAdvancedReset && (
+          {advancedResetAvailable && (
             <div
               ref={advancedMenuBoundaryRef}
               className="relative"
@@ -526,7 +562,8 @@ export function VaultView(): JSX.Element {
                 aria-haspopup="menu"
                 aria-expanded={advancedMenuOpen}
                 aria-controls="vault-advanced-menu"
-                className="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                disabled={busy}
+                className="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => setAdvancedMenuOpen((open) => !open)}
                 onKeyDown={(event) => {
                   if (event.key === "Escape") {
@@ -575,15 +612,9 @@ export function VaultView(): JSX.Element {
         </div>
       )}
 
-      {syncFeedback !== "idle" && syncFeedbackMessage && (
+      {syncFeedback === "error" && syncFeedbackMessage && (
         <div
-          className={`mt-4 flex items-center justify-between rounded-lg border px-3 py-2 text-sm ${
-            syncFeedback === "error"
-              ? "border-error/30 bg-error/10 text-error"
-              : syncFeedback === "success"
-                ? "border-success/30 bg-success/10 text-success"
-                : "border-border-subtle bg-surface text-text-secondary"
-          }`}
+          className="mt-4 flex items-center justify-between rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error"
           role="status"
         >
           <span>{syncFeedbackMessage}</span>

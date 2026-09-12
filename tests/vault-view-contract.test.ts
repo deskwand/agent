@@ -101,6 +101,10 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.menu.advanced": "Advanced actions",
 };
 
+// 记录每条被请求的 i18n key。快速同步路径下 vault.syncing 不应被请求 —— 这是
+// 唯一能观测到「中间态到底有没有渲染过」的钩子（断言最终 DOM 是观测不到的）。
+const translateCalls = vi.hoisted(() => [] as string[]);
+
 vi.mock("react-i18next", () => {
   const translate = (
     key: string,
@@ -111,6 +115,7 @@ vi.mock("react-i18next", () => {
       quota?: string;
     },
   ) => {
+    translateCalls.push(key);
     const pluralKey = options?.count === 1 ? `${key}_one` : `${key}_other`;
     return (TRANSLATIONS[pluralKey] ?? TRANSLATIONS[key] ?? key)
       .replace("{{count}}", String(options?.count ?? ""))
@@ -150,6 +155,14 @@ function snapshot(overrides: Partial<VaultSnapshot> = {}): VaultSnapshot {
     quotaBytes: 100 * 1024 * 1024,
     ...overrides,
   };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
 }
 
 describe("VaultView", () => {
@@ -248,6 +261,30 @@ describe("VaultView", () => {
       throw new Error("Vault menu button missing");
     }
     return button;
+  }
+
+  function syncButton(): HTMLButtonElement {
+    const button = Array.from(container.querySelectorAll("button")).find(
+      (item) => item.textContent === "Sync" || item.textContent === "Syncing…",
+    );
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error("Sync button missing");
+    }
+    return button;
+  }
+
+  async function flush(): Promise<void> {
+    await act(async () => {
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    });
+  }
+
+  function statusSlot(): HTMLElement {
+    const slot = container.querySelector('[aria-live="polite"]');
+    if (!(slot instanceof HTMLElement)) {
+      throw new Error("Sync status slot missing");
+    }
+    return slot;
   }
 
   function screenText(): string {
@@ -439,25 +476,33 @@ describe("VaultView", () => {
     ).toBeNull();
   });
 
-  it("hides the advanced menu while clicking sync", async () => {
-    let resolveSync!: (next: VaultSnapshot) => void;
-    api.sync.mockImplementationOnce(
-      () =>
-        new Promise<VaultSnapshot>((resolve) => {
-          resolveSync = resolve;
-        }),
-    );
+  it("keeps the advanced menu button mounted but disabled while clicking sync", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<VaultSnapshot>();
+    api.sync.mockReturnValueOnce(pending.promise);
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
-    await act(async () => sync?.click());
 
-    expect(
-      container.querySelector('button[aria-label="More Vault actions"]'),
-    ).toBeNull();
-    await act(async () => resolveSync(snapshot({ items: [] })));
+    // 先真的把菜单打开，否则「菜单被关掉」这类断言恒真。
+    await act(async () => {
+      vaultMenuButton().click();
+    });
+    expect(container.querySelector('[role="menu"]')).not.toBeNull();
+
+    await act(async () => {
+      syncButton().click();
+    });
+
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    const menuButton = vaultMenuButton();
+    expect(menuButton.disabled).toBe(true);
+    expect(menuButton.getAttribute("aria-expanded")).toBe("false");
+
+    await act(async () => {
+      pending.resolve(snapshot({ items: [] }));
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    });
+    expect(vaultMenuButton().disabled).toBe(false);
   });
 
   it("hides the advanced menu during automatic restore", async () => {
@@ -1004,32 +1049,150 @@ describe("VaultView", () => {
     );
   });
 
-  it("shows syncing feedback and disables the sync button immediately", async () => {
-    let resolveSync!: (snapshot: VaultSnapshot) => void;
+  it("keeps the click feedback immediate but delays the syncing label by 250ms", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<VaultSnapshot>();
+    api.sync.mockReturnValueOnce(pending.promise);
+
+    await renderVault();
+    const sync = syncButton();
+
+    await act(async () => {
+      sync.click();
+    });
+
+    // 点击立刻受理：按钮禁用、对比度不变，但文案还没有切
+    expect(sync.disabled).toBe(true);
+    expect(sync.textContent).toBe("Sync");
+    expect(screenText()).not.toContain("Syncing…");
+    expect(sync.className).toContain("text-accent-foreground");
+    expect(sync.className).not.toContain("disabled:text-text-primary");
+
+    await act(async () => {
+      vi.advanceTimersByTime(249);
+    });
+    expect(screenText()).not.toContain("Syncing…");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(sync.textContent).toBe("Syncing…");
+
+    await act(async () => {
+      pending.resolve(snapshot({ items: [] }));
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    });
+    expect(sync.textContent).toBe("Sync");
+  });
+
+  it("never renders the syncing label when the sync resolves quickly", async () => {
+    vi.useFakeTimers();
+    // IPC 永远不会同步返回：用一个 0ms 定时器模拟「很快但异步」的往返。
+    // 这样点击后至少会发生一次渲染 —— 否则 promise 微任务会赶在渲染之前落地，
+    // 中间态永远不会被渲染，测试就无法观察到它（也就无从检测回退）。
     api.sync.mockImplementationOnce(
       () =>
         new Promise<VaultSnapshot>((resolve) => {
-          resolveSync = resolve;
+          setTimeout(() => resolve(snapshot({ items: [] })), 0);
         }),
     );
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
-
+    translateCalls.length = 0;
     await act(async () => {
-      sync?.click();
+      syncButton().click();
     });
 
+    // 点击后的首次渲染已经在 DOM 里了：这里断言中间态从未被渲染过，
+    // 而不是只断言最终状态（只断言最终状态的话，把 250ms 延迟整个回退掉也会通过）。
+    expect(translateCalls).not.toContain("vault.syncing");
+    expect(screenText()).not.toContain("Syncing…");
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+    await flush();
+
+    // 250ms 计时器已被同步完成取消：推进过去也不会再出现中间态
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(translateCalls).not.toContain("vault.syncing");
+    expect(screenText()).not.toContain("Syncing…");
+    expect(screenText()).toContain("Sync complete");
+  });
+
+  it("keeps the sync status slot mounted across idle, syncing and success", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<VaultSnapshot>();
+    api.sync.mockReturnValueOnce(pending.promise);
+
+    await renderVault();
+    expect(statusSlot().className).toContain("w-[7rem]");
+    expect(statusSlot().textContent).toBe("");
+
+    await act(async () => {
+      syncButton().click();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
     expect(screenText()).toContain("Syncing…");
-    expect(sync?.disabled).toBe(true);
-    expect(sync?.className).toContain("text-accent-foreground");
-    expect(sync?.className).not.toContain("disabled:text-text-primary");
+    // 进行中状态只写给屏幕阅读器（sr-only），视觉上槽位仍为空
+    expect(statusSlot().textContent).toBe("Syncing…");
 
     await act(async () => {
-      resolveSync(snapshot({ items: [] }));
+      pending.resolve(snapshot({ items: [] }));
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
     });
+    expect(statusSlot().textContent).toBe("Sync complete");
+    expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it("keeps the sync status slot empty when the sync fails", async () => {
+    vi.useFakeTimers();
+    api.sync.mockRejectedValueOnce(new Error("NETWORK_DOWN"));
+
+    await renderVault();
+    await act(async () => {
+      syncButton().click();
+    });
+    await flush();
+
+    expect(statusSlot().textContent).toBe("");
+    const banner = container.querySelector('[role="status"]');
+    expect(banner?.textContent).toContain("Cloud sync failed");
+  });
+
+  it("does not add or remove header-level elements when the sync succeeds", async () => {
+    vi.useFakeTimers();
+    api.sync.mockResolvedValueOnce(snapshot({ items: [] }));
+
+    await renderVault();
+    const section = container.querySelector("section");
+    expect(section).not.toBeNull();
+
+    const structure = (): string[] =>
+      Array.from(section?.children ?? []).map(
+        (child) => `${child.tagName}.${child.className}`,
+      );
+    const before = structure();
+
+    await act(async () => {
+      syncButton().click();
+    });
+    await flush();
+
+    // 结果出现的那一刻：不能有任何兄弟节点被插入（这正是原先把内容顶下去的原因）
+    expect(screenText()).toContain("Sync complete");
+    expect(structure()).toEqual(before);
+
+    // 结果 3 秒后收回的那一刻：同样不能有节点被移除（原先的「弹回」）
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(screenText()).not.toContain("Sync complete");
+    expect(structure()).toEqual(before);
   });
 
   it("shows sync completion and dismisses it after three seconds", async () => {
