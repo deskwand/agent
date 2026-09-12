@@ -34,6 +34,7 @@ describe("Vault IPC contract", () => {
       "vault.getSnapshot",
       "vault.importFile",
       "vault.openFile",
+      "vault.getFilePath",
       "vault.revealFile",
       "vault.exportFile",
       "vault.deleteFile",
@@ -53,6 +54,36 @@ describe("Vault IPC contract", () => {
     expect(channels).not.toContain("vault.encryptUpload");
     expect(channels).not.toContain("vault.decryptRestore");
     expect(channels).not.toContain("vault.getMek");
+    handle.mockRestore();
+  });
+
+  it("resolves a vault file name to an absolute path inside the vault root", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+
+    const { store, dependencies } = await makeDependencies(
+      Buffer.from("mek"),
+      true,
+    );
+    registerVaultIpc(dependencies);
+
+    await expect(
+      handlers.get("vault.getFilePath")?.(null, "readme.md"),
+    ).resolves.toBe(join(store.rootDir, "readme.md"));
+    await expect(
+      handlers.get("vault.getFilePath")?.(null, "../secret"),
+    ).rejects.toThrow("VAULT_INVALID_NAME");
+    await expect(
+      handlers.get("vault.getFilePath")?.(null, "nested/readme.md"),
+    ).rejects.toThrow("VAULT_INVALID_NAME");
+    await expect(
+      handlers.get("vault.getFilePath")?.(null, "vault-mek.bin."),
+    ).rejects.toThrow("VAULT_INVALID_NAME");
     handle.mockRestore();
   });
 

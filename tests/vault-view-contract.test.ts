@@ -165,6 +165,7 @@ describe("VaultView", () => {
     ),
     importFile: vi.fn(async () => snapshot({ items: [] })),
     openFile: vi.fn(async () => ({ error: null })),
+    getFilePath: vi.fn(async (name: string) => `/vault/${name}`),
     revealFile: vi.fn(async () => true),
     exportFile: vi.fn(async () => ({ canceled: false })),
     deleteFile: vi.fn(async () => snapshot({ items: [] })),
@@ -251,6 +252,30 @@ describe("VaultView", () => {
 
   function screenText(): string {
     return container.textContent ?? "";
+  }
+
+  async function clickFileAction(name: string, label: string): Promise<void> {
+    const more = container.querySelector(
+      `button[aria-label="More actions for ${name}"]`,
+    );
+    if (!(more instanceof HTMLButtonElement)) {
+      throw new Error("File actions button missing");
+    }
+    await act(async () => {
+      more.click();
+    });
+    const action = Array.from(
+      container.querySelectorAll('[role="menuitem"]'),
+    ).find((menuItem) => menuItem.textContent === label);
+    if (!(action instanceof HTMLButtonElement)) {
+      throw new Error(`${label} menu item missing`);
+    }
+    await act(async () => {
+      action.click();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
   }
 
   it("uses a browser confirmation dialog before deleting a file", async () => {
@@ -549,6 +574,29 @@ describe("VaultView", () => {
     });
     expect(container.querySelector('[role="menu"]')).toBeNull();
     expect(more?.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("previews a previewable vault file inside the app", async () => {
+    await renderVault();
+
+    await clickFileAction("readme.md", "Open");
+
+    expect(api.getFilePath).toHaveBeenCalledWith("readme.md");
+    expect(api.openFile).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("/vault/readme.md");
+  });
+
+  it("leaves non-previewable vault files to the system opener", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({ items: [item("archive.zip")], hasLocalIndex: true }),
+    );
+    await renderVault();
+
+    await clickFileAction("archive.zip", "Open");
+
+    expect(api.openFile).toHaveBeenCalledWith("archive.zip");
+    expect(api.getFilePath).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain("/vault/archive.zip");
   });
 
   it("does not offer a new recovery code after initialization", async () => {

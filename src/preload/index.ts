@@ -718,6 +718,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("vault.openFile", name) as Promise<{
         error: string | null;
       }>,
+    getFilePath: (name: string) =>
+      ipcRenderer.invoke("vault.getFilePath", name) as Promise<string>,
     revealFile: (name: string) =>
       ipcRenderer.invoke("vault.revealFile", name) as Promise<boolean>,
     exportFile: (name: string) =>
@@ -1316,6 +1318,7 @@ declare global {
         getSnapshot: () => Promise<VaultSnapshot>;
         importFile: () => Promise<VaultSnapshot>;
         openFile: (name: string) => Promise<{ error: string | null }>;
+        getFilePath: (name: string) => Promise<string>;
         revealFile: (name: string) => Promise<boolean>;
         exportFile: (name: string) => Promise<{
           canceled: boolean;

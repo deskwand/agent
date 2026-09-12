@@ -95,6 +95,10 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
     return { error: error || null };
   });
 
+  ipcMain.handle("vault.getFilePath", async (_event, name: string) =>
+    store.filePath(name),
+  );
+
   ipcMain.handle("vault.revealFile", async (_event, name: string) => {
     shell.showItemInFolder(store.filePath(name));
     return true;

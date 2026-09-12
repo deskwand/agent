@@ -228,6 +228,17 @@ describe("LocalVaultStore", () => {
     expect(() => store.filePath(".VAULT-OPERATION.JSON.tmp")).toThrow(
       "VAULT_INVALID_NAME",
     );
+    // Win32 resolves these to the reserved files (trailing dots/spaces are
+    // stripped), so they must be rejected as well.
+    expect(() => store.filePath("vault-mek.bin.")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+    expect(() => store.filePath("vault-mek.bin ")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+    expect(() => store.filePath(".vault-restore.")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
   });
 
   it("removes a legacy internal key entry without deleting the key file", async () => {

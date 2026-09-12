@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { isPreviewableExt } from "../utils/file-preview";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { FilePreviewModal } from "./FilePreviewModal";
 import type {
   SyncStatus,
   VaultRemoteStatus,
@@ -127,6 +129,10 @@ export function VaultView(): JSX.Element {
     null,
   );
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const syncFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const advancedMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
@@ -387,11 +393,24 @@ export function VaultView(): JSX.Element {
   }, [canOpenAdvancedReset]);
 
   const handleOpen = (item: VaultSnapshotItem) => {
-    void runAction(async () => {
-      const result = await window.electronAPI.vault.openFile(item.name);
-      if (result.error) throw new Error(result.error);
-      return window.electronAPI.vault.getSnapshot();
-    });
+    const dotIndex = item.name.lastIndexOf(".");
+    const ext = dotIndex > 0 ? item.name.slice(dotIndex).toLowerCase() : "";
+    if (!isPreviewableExt(ext)) {
+      void runAction(async () => {
+        const result = await window.electronAPI.vault.openFile(item.name);
+        if (result.error) throw new Error(result.error);
+        return window.electronAPI.vault.getSnapshot();
+      });
+      return;
+    }
+    void (async () => {
+      try {
+        const path = await window.electronAPI.vault.getFilePath(item.name);
+        setPreviewFile({ path, name: item.name });
+      } catch (openError: unknown) {
+        setError(errorText(openError, t));
+      }
+    })();
   };
 
   const handleDelete = (item: VaultSnapshotItem) => {
@@ -866,6 +885,13 @@ export function VaultView(): JSX.Element {
         }
         onConfirm={handleConfirm}
         onCancel={() => setPendingConfirmation(null)}
+      />
+
+      <FilePreviewModal
+        isOpen={previewFile !== null}
+        filePath={previewFile?.path ?? ""}
+        fileName={previewFile?.name ?? ""}
+        onClose={() => setPreviewFile(null)}
       />
     </section>
   );

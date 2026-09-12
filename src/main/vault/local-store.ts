@@ -78,7 +78,10 @@ function emptyIndex(): LocalVaultIndex {
 }
 
 export function isReservedVaultName(name: string): boolean {
-  const normalized = name.toLowerCase();
+  // Win32 strips trailing dots and spaces when resolving a path, so
+  // "vault-mek.bin." would alias the key file (and "restore." the staging
+  // directory) on Windows. Normalize before comparing.
+  const normalized = name.toLowerCase().replace(/[. ]+$/, "");
   const keychainFile = KEYCHAIN_FILE.toLowerCase();
   const indexFile = INDEX_FILE.toLowerCase();
   const operationFile = OPERATION_FILE.toLowerCase();
