@@ -47,6 +47,13 @@
     --color-terminal-error: #f85149;
     --color-terminal-dim: #8b949e;
     --shadow-sidebar-sep: rgba(0, 0, 0, 0.3);
+    /* File type icon tiles — fixed semantic colours, independent of presets */
+    --color-file-folder: #f0a63c;
+    --color-file-media: #38a3f5;
+    --color-file-doc: #34d399;
+    --color-file-code: #a855f7;
+    --color-file-audio: #f472b6;
+    --color-file-neutral: #7c8494;
   }
   .light {
     --color-background: #ffffff;
@@ -80,6 +87,13 @@
     --color-terminal-error: #dc2626;
     --color-terminal-dim: #9ca3af;
     --shadow-sidebar-sep: rgba(0, 0, 0, 0.06);
+    /* File type icon tiles — fixed semantic colours, independent of presets */
+    --color-file-folder: #b26a00;
+    --color-file-media: #0d76c9;
+    --color-file-doc: #059669;
+    --color-file-code: #7c3aed;
+    --color-file-audio: #db2777;
+    --color-file-neutral: #5c6470;
   }
 
   /* ----- Paper — warm brown & cream, reading-focused ----- */

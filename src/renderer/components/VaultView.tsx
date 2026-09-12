@@ -3,6 +3,8 @@ import { MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { isPreviewableExt } from "../utils/file-preview";
+import { getFileKind } from "../utils/file-types";
+import { FileTypeIcon } from "./file-type-icon";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FilePreviewModal } from "./FilePreviewModal";
 import type {
@@ -660,6 +662,7 @@ export function VaultView(): JSX.Element {
                     key={item.name}
                     className="flex items-center gap-4 px-4 py-3"
                   >
+                    <FileTypeIcon kind={getFileKind(item.name)} size={24} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-text-primary">
                         {item.name}

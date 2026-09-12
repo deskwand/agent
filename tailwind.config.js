@@ -33,6 +33,14 @@ module.exports = {
         mcp: {
           DEFAULT: 'var(--color-mcp)',
         },
+        file: {
+          folder: 'var(--color-file-folder)',
+          media: 'var(--color-file-media)',
+          doc: 'var(--color-file-doc)',
+          code: 'var(--color-file-code)',
+          audio: 'var(--color-file-audio)',
+          neutral: 'var(--color-file-neutral)',
+        },
         text: {
           primary: 'var(--color-text-primary)',
           secondary: 'var(--color-text-secondary)',

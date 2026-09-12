@@ -8,21 +8,14 @@ import {
   extractFilePathFromToolOutput,
 } from "../utils/tool-output-path";
 import { getArtifactLabel, getArtifactSteps } from "../utils/artifact-steps";
-import { File, FileCode, Image, Layers } from "lucide-react";
+import { Layers } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
-import { IMAGE_EXTS, CODE_LIKE_EXTS } from "../utils/file-types";
+import { getFileKind } from "../utils/file-types";
+import { FileTypeIcon } from "./file-type-icon";
 import { isPreviewableExt } from "../utils/file-preview";
 import type { TraceStep } from "../types";
 
 const EMPTY_STEPS: TraceStep[] = [];
-
-function getFileIcon(ext: string) {
-  if (IMAGE_EXTS.has(ext))
-    return <Image className="w-4 h-4 shrink-0 text-sky-400" />;
-  if (CODE_LIKE_EXTS.has(ext))
-    return <FileCode className="w-4 h-4 shrink-0 text-accent" />;
-  return <File className="w-4 h-4 shrink-0 text-text-muted" />;
-}
 
 export function ArtifactPanel() {
   const { t } = useTranslation();
@@ -123,9 +116,6 @@ export function ArtifactPanel() {
                 artifact.label || t("context.fileCreated", "文件已创建");
               const artifactPath = artifact.path;
               const canClick = Boolean(artifactPath && canOpenPath);
-              const ext = artifactPath
-                .slice(artifactPath.lastIndexOf("."))
-                .toLowerCase();
 
               return (
                 <div
@@ -139,7 +129,7 @@ export function ArtifactPanel() {
                   }}
                   title={artifactPath || undefined}
                 >
-                  {getFileIcon(ext)}
+                  <FileTypeIcon kind={getFileKind(artifactPath)} size={16} />
                   <span className="text-sm text-text-primary truncate flex-1">
                     {label}
                   </span>

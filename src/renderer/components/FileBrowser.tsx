@@ -1,55 +1,22 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAppStore } from "../store";
-import {
-  Folder,
-  FolderOpen,
-  File,
-  FileCode,
-  Image,
-  ChevronRight,
-  ChevronDown,
-  Home,
-  Loader2,
-} from "lucide-react";
+import { ChevronRight, ChevronDown, Home, Loader2 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { FilePreviewModal } from "./FilePreviewModal";
-import { IMAGE_EXTS, CODE_LIKE_EXTS } from "../utils/file-types";
+import { getFileKind } from "../utils/file-types";
+import { FileTypeIcon } from "./file-type-icon";
 import { isPreviewableExt } from "../utils/file-preview";
 
 interface FileEntry {
   name: string;
   isDir: boolean;
   size: number;
-  ext: string;
 }
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function FileIcon({
-  entry,
-  isExpanded,
-}: {
-  entry: FileEntry;
-  isExpanded?: boolean;
-}) {
-  if (entry.isDir) {
-    return isExpanded ? (
-      <FolderOpen className="w-4 h-4 shrink-0 text-amber-400" />
-    ) : (
-      <Folder className="w-4 h-4 shrink-0 text-amber-400" />
-    );
-  }
-  if (IMAGE_EXTS.has(entry.ext)) {
-    return <Image className="w-4 h-4 shrink-0 text-sky-400" />;
-  }
-  if (CODE_LIKE_EXTS.has(entry.ext)) {
-    return <FileCode className="w-4 h-4 shrink-0 text-accent" />;
-  }
-  return <File className="w-4 h-4 shrink-0 text-text-muted" />;
 }
 
 function FileTreeItem({
@@ -121,7 +88,11 @@ function FileTreeItem({
         ) : (
           <span className="w-3 shrink-0" />
         )}
-        <FileIcon entry={entry} isExpanded={entry.isDir && expanded} />
+        <FileTypeIcon
+          kind={entry.isDir ? "folder" : getFileKind(entry.name)}
+          expanded={entry.isDir && expanded}
+          size={16}
+        />
         <span className="truncate text-text-primary">{entry.name}</span>
         {!entry.isDir && entry.size > 0 && (
           <span className="ml-auto text-xs text-text-muted shrink-0">
