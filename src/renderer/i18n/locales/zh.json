@@ -1609,7 +1609,7 @@
     "action": {
       "open": "打开",
       "reveal": "在文件夹中显示",
-      "export": "导出",
+      "export": "{{name}} 导出",
       "delete": "删除",
       "more": "{{name}} 更多操作"
     },

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Download, MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { isPreviewableExt } from "../utils/file-preview";
@@ -113,6 +113,7 @@ function describeMode(
 export function VaultView(): JSX.Element {
   const { t } = useTranslation();
   const token = useAppStore((state) => state.cloudConfig?.token ?? null);
+  const setActiveView = useAppStore((state) => state.setActiveView);
   const [snapshot, setSnapshot] = useState<VaultSnapshot | null>(null);
   const [filter, setFilter] = useState<Filter>("files");
   const [remoteStatus, setRemoteStatus] = useState<VaultRemoteStatus | null>(
@@ -514,11 +515,23 @@ export function VaultView(): JSX.Element {
       }}
     >
       <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-semibold text-text-primary">
-            {t("vault.title")}
-          </h1>
-          <p className="mt-1 text-sm text-text-muted">{t("vault.subtitle")}</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setActiveView("chat")}
+            aria-label={t("common.back")}
+            className="p-1.5 -ml-1.5 rounded-lg hover:bg-surface-hover transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-text-secondary" />
+          </button>
+          <div>
+            <h1 className="text-xl font-semibold text-text-primary">
+              {t("vault.title")}
+            </h1>
+            <p className="mt-1 text-sm text-text-muted">
+              {t("vault.subtitle")}
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <span
@@ -691,7 +704,8 @@ export function VaultView(): JSX.Element {
                 {visibleItems.map((item) => (
                   <article
                     key={item.name}
-                    className="flex items-center gap-4 px-4 py-3"
+                    className="flex select-none items-center gap-4 px-4 py-3"
+                    onDoubleClick={() => handleOpen(item)}
                   >
                     <FileTypeIcon kind={getFileKind(item.name)} size={24} />
                     <div className="min-w-0 flex-1">
@@ -703,7 +717,25 @@ export function VaultView(): JSX.Element {
                         {statusText(item.syncStatus, t)}
                       </p>
                     </div>
-                    <div className="relative shrink-0">
+                    <div
+                      className="relative flex shrink-0 items-center gap-1"
+                      onDoubleClick={(event) => event.stopPropagation()}
+                    >
+                      <button
+                        type="button"
+                        aria-label={t("vault.action.export", {
+                          name: item.name,
+                        })}
+                        className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                        onClick={(event) => {
+                          if (event.detail > 1) return;
+                          void runAction(() =>
+                            window.electronAPI.vault.exportFile(item.name),
+                          );
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                      </button>
                       <button
                         type="button"
                         aria-label={t("vault.action.more", { name: item.name })}
@@ -757,19 +789,6 @@ export function VaultView(): JSX.Element {
                             }}
                           >
                             {t("vault.action.reveal")}
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="block w-full rounded px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                            onClick={() => {
-                              setOpenMenu(null);
-                              void runAction(() =>
-                                window.electronAPI.vault.exportFile(item.name),
-                              );
-                            }}
-                          >
-                            {t("vault.action.export")}
                           </button>
                           <button
                             type="button"

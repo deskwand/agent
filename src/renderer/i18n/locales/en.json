@@ -1613,7 +1613,7 @@
     "action": {
       "open": "Open",
       "reveal": "Reveal in Folder",
-      "export": "Export",
+      "export": "Export {{name}}",
       "delete": "Delete",
       "more": "More actions for {{name}}"
     },

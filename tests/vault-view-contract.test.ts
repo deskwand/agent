@@ -11,6 +11,7 @@ import type { VaultSnapshot, VaultSnapshotItem } from "../src/shared/vault";
 const TRANSLATIONS: Record<string, string> = {
   "common.cancel": "Cancel",
   "common.delete": "Delete",
+  "common.back": "Back",
   "vault.title": "Vault",
   "vault.subtitle": "Local files with encrypted cloud backup",
   "vault.upload": "Upload",
@@ -27,7 +28,7 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.status.failed": "Sync Failed",
   "vault.action.open": "Open",
   "vault.action.reveal": "Reveal in Folder",
-  "vault.action.export": "Export",
+  "vault.action.export": "Export {{name}}",
   "vault.action.delete": "Delete",
   "vault.action.more": "More actions for {{name}}",
   "vault.confirm.delete": "Delete {{name}} from your Vault?",
@@ -261,6 +262,24 @@ describe("VaultView", () => {
       throw new Error("Vault menu button missing");
     }
     return button;
+  }
+
+  function rowExportButton(name = "readme.md"): HTMLButtonElement {
+    const button = fileRow().querySelector(
+      `button[aria-label="Export ${name}"]`,
+    );
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error("Row export button missing");
+    }
+    return button;
+  }
+
+  function fileRow(): HTMLElement {
+    const row = container.querySelector("article");
+    if (!(row instanceof HTMLElement)) {
+      throw new Error("File row missing");
+    }
+    return row;
   }
 
   function syncButton(): HTMLButtonElement {
@@ -587,9 +606,11 @@ describe("VaultView", () => {
     },
   );
 
-  it("keeps file actions inside a closed more-actions menu", async () => {
+  it("shows export in the row and keeps the rest inside the more-actions menu", async () => {
     await renderVault();
 
+    expect(rowExportButton()).toBeDefined();
+    expect(fileRow().className).toContain("select-none");
     expect(screenText()).not.toContain("Reveal in Folder");
     const more = container.querySelector(
       'button[aria-label="More actions for readme.md"]',
@@ -605,8 +626,8 @@ describe("VaultView", () => {
     const menu = container.querySelector('[role="menu"]');
     expect(menu?.textContent).toContain("Open");
     expect(menu?.textContent).toContain("Reveal in Folder");
-    expect(menu?.textContent).toContain("Export");
     expect(menu?.textContent).toContain("Delete");
+    expect(menu?.textContent).not.toContain("Export");
     expect(more?.getAttribute("aria-expanded")).toBe("true");
     expect(more?.getAttribute("aria-controls")).toBe("vault-menu-readme.md");
     expect(screenText()).toContain("readme.md");
@@ -642,6 +663,98 @@ describe("VaultView", () => {
     expect(api.openFile).toHaveBeenCalledWith("archive.zip");
     expect(api.getFilePath).not.toHaveBeenCalled();
     expect(document.body.textContent).not.toContain("/vault/archive.zip");
+  });
+
+  it("opens a previewable file when its row is double-clicked", async () => {
+    await renderVault();
+
+    await act(async () => {
+      fileRow().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    });
+    await flush();
+
+    expect(api.getFilePath).toHaveBeenCalledWith("readme.md");
+    expect(api.openFile).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("/vault/readme.md");
+  });
+
+  it("leaves non-previewable files to the system opener when their row is double-clicked", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({ items: [item("archive.zip")], hasLocalIndex: true }),
+    );
+    await renderVault();
+
+    await act(async () => {
+      fileRow().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    });
+    await flush();
+
+    expect(api.openFile).toHaveBeenCalledWith("archive.zip");
+    expect(api.getFilePath).not.toHaveBeenCalled();
+  });
+
+  it("exports the file from the row export button", async () => {
+    await renderVault();
+
+    await act(async () => {
+      rowExportButton().dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+    });
+    await flush();
+
+    expect(api.exportFile).toHaveBeenCalledWith("readme.md");
+    expect(api.getFilePath).not.toHaveBeenCalled();
+    expect(api.openFile).not.toHaveBeenCalled();
+  });
+
+  it("does not open a file when the row controls are double-clicked", async () => {
+    await renderVault();
+
+    const moreActions = container.querySelector(
+      'button[aria-label="More actions for readme.md"]',
+    );
+    if (!(moreActions instanceof HTMLButtonElement)) {
+      throw new Error("File actions button missing");
+    }
+
+    // 真实双击 = click(detail 1) + click(detail 2) + dblclick；
+    // 只派发 dblclick 测不到「第二下 click 会不会再做一次导出」。
+    await act(async () => {
+      for (const detail of [1, 2]) {
+        rowExportButton().dispatchEvent(
+          new MouseEvent("click", { bubbles: true, detail }),
+        );
+        moreActions.dispatchEvent(
+          new MouseEvent("click", { bubbles: true, detail }),
+        );
+      }
+      rowExportButton().dispatchEvent(
+        new MouseEvent("dblclick", { bubbles: true }),
+      );
+      moreActions.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    });
+    await flush();
+
+    expect(api.exportFile).toHaveBeenCalledTimes(1);
+    expect(api.getFilePath).not.toHaveBeenCalled();
+    expect(api.openFile).not.toHaveBeenCalled();
+  });
+
+  it("returns to chat from the vault header", async () => {
+    useAppStore.setState({ activeView: "vault" });
+    await renderVault();
+
+    const back = container.querySelector('button[aria-label="Back"]');
+    if (!(back instanceof HTMLButtonElement)) {
+      throw new Error("Back button missing");
+    }
+
+    await act(async () => {
+      back.click();
+    });
+
+    expect(useAppStore.getState().activeView).toBe("chat");
   });
 
   it("does not offer a new recovery code after initialization", async () => {
