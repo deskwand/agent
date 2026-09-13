@@ -25,6 +25,78 @@ function render(
   );
 }
 
+const TILE_MIN = 1.4;
+const TILE_MAX = 22.6;
+
+/**
+ * 只处理本图标集用到的命令（M/L/H/V/A/Z 及其小写相对形式），
+ * 返回路径经过的所有锚点。用于把「图形是否跑出色块」变成断言——
+ * 否则把某个 path 改到 y=99，全套测试依然全绿。
+ */
+function pathPoints(d: string): [number, number][] {
+  const tokens = d.match(/[MmLlHhVvAaZz]|-?\d*\.?\d+/g) ?? [];
+  const points: [number, number][] = [];
+  let x = 0;
+  let y = 0;
+  let i = 0;
+  let cmd = "";
+  const num = () => Number(tokens[i++]);
+  while (i < tokens.length) {
+    if (/[MmLlHhVvAaZz]/.test(tokens[i])) {
+      cmd = tokens[i++];
+      continue;
+    }
+    switch (cmd) {
+      case "M":
+      case "L":
+        x = num();
+        y = num();
+        break;
+      case "m":
+      case "l":
+        x += num();
+        y += num();
+        break;
+      case "H":
+        x = num();
+        break;
+      case "h":
+        x += num();
+        break;
+      case "V":
+        y = num();
+        break;
+      case "v":
+        y += num();
+        break;
+      case "A":
+      case "a": {
+        const rx = num();
+        const ry = num();
+        const rot = num();
+        const large = num();
+        const sweep = num();
+        const dx = num();
+        const dy = num();
+        (void rx, ry, rot, large, sweep);
+        if (cmd === "A") {
+          x = dx;
+          y = dy;
+        } else {
+          x += dx;
+          y += dy;
+        }
+        break;
+      }
+      default:
+        i += 1;
+        continue;
+    }
+    points.push([x, y]);
+  }
+  return points;
+}
+
 describe("FileTypeIcon", () => {
   it("renders a tile plus at least one glyph for every kind", () => {
     for (const kind of ALL_KINDS) {
@@ -58,6 +130,32 @@ describe("FileTypeIcon", () => {
     expect(render("code", { size: 16 })).toContain('rx="4.6"');
     expect(render("code", { size: 24 })).toContain('width="24"');
     expect(render("code", { size: 24 })).toContain('rx="6"');
+  });
+
+  it("keeps every glyph inside the tile", () => {
+    for (const kind of ALL_KINDS) {
+      for (const expanded of [false, true]) {
+        const html = render(kind, { expanded });
+        const paths = [...html.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]);
+        expect(paths.length).toBeGreaterThan(0);
+        for (const d of paths) {
+          for (const [x, y] of pathPoints(d)) {
+            expect(x, `${kind} expanded=${expanded} x`).toBeGreaterThanOrEqual(
+              TILE_MIN,
+            );
+            expect(x, `${kind} expanded=${expanded} x`).toBeLessThanOrEqual(
+              TILE_MAX,
+            );
+            expect(y, `${kind} expanded=${expanded} y`).toBeGreaterThanOrEqual(
+              TILE_MIN,
+            );
+            expect(y, `${kind} expanded=${expanded} y`).toBeLessThanOrEqual(
+              TILE_MAX,
+            );
+          }
+        }
+      }
+    }
   });
 
   it("draws the folder as two panels with a lighter front panel", () => {

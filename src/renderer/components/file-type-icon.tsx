@@ -5,8 +5,13 @@ interface TilePath {
   d: string;
   /** true = 在色块上画白色实心；false = 白色描边（1.85px，圆头圆角） */
   filled?: boolean;
-  /** 实心形的填充不透明度，用于做 Finder 式文件夹的前后层次 */
-  opacity?: number;
+  /**
+   * 实心形的填充不透明度，用于做 Finder 式文件夹的前后层次。
+   * 注意：这个 0.78 是绕过 token 的「派生色」——白字叠在 `--color-file-folder`
+   * 上得出前板色，所以以后调 `--color-file-folder` 时必须重新确认前/后板的明度差，
+   * 并把 `tests/file-icon-colors.test.ts` 的白字对比下限一起重算。
+   */
+  fillOpacity?: number;
 }
 
 /** 关闭态文件夹：后板 + 与之齐平的前板，靠明度差做出前后层次 */
@@ -18,7 +23,7 @@ const FOLDER_CLOSED: TilePath[] = [
   {
     d: "M2.6 12.8h18.4v6.1a1.7 1.7 0 0 1-1.7 1.7H4.3a1.7 1.7 0 0 1-1.7-1.7z",
     filled: true,
-    opacity: 0.78,
+    fillOpacity: 0.78,
   },
 ];
 
@@ -31,7 +36,7 @@ const FOLDER_OPEN: TilePath[] = [
   {
     d: "M7.4 11.4H21l-2.4 9.2H3.4z",
     filled: true,
-    opacity: 0.78,
+    fillOpacity: 0.78,
   },
 ];
 
@@ -107,7 +112,7 @@ export function FileTypeIcon({
   const glyphs =
     kind === "folder" && expanded ? FOLDER_OPEN : TILE_GLYPHS[kind];
   const radius = size <= 16 ? 4.6 : 6;
-  // 目前只用到 16（文件管理器、产出面板）与 24（密库）两档，其余尺寸线性外推到 6。
+  // 只有 16（文件管理器、产出面板）与 24（密库）两档在用；其余尺寸一律落到 6。
   return (
     <svg
       width={size}
@@ -130,7 +135,7 @@ export function FileTypeIcon({
           <path
             key={glyph.d}
             d={glyph.d}
-            fillOpacity={glyph.opacity}
+            fillOpacity={glyph.fillOpacity}
             className="fill-white"
           />
         ) : (
