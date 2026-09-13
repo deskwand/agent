@@ -59,19 +59,29 @@ function renderCard(
 describe("MessageCard action bar", () => {
   it("shows copy and fork for assistant messages that are not the latest round", () => {
     renderCard(makeMessage(), false, vi.fn());
-    expect(container.querySelector('[title="Copy message"]')).not.toBeNull();
-    expect(container.querySelector('[title="Fork from here"]')).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Copy message"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Fork from here"]'),
+    ).not.toBeNull();
   });
 
   it("shows the action bar for the latest assistant message", () => {
     renderCard(makeMessage(), true, vi.fn());
-    expect(container.querySelector('[title="Copy message"]')).not.toBeNull();
-    expect(container.querySelector('[title="Fork from here"]')).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Copy message"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Fork from here"]'),
+    ).not.toBeNull();
   });
 
   it("keeps the action bar for user messages regardless of round", () => {
     renderCard(makeMessage({ id: "u1", role: "user" }), false, vi.fn());
-    expect(container.querySelector('[title="Copy message"]')).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Copy message"]'),
+    ).not.toBeNull();
   });
 
   it("excludes tool_result rows from fork (source assertion)", () => {
@@ -95,16 +105,16 @@ describe("MessageCard action bar", () => {
         }),
       );
     });
-    expect(container.querySelector('[title="Fork from here"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Fork from here"]')).toBeNull();
   });
 
   it("hides fork for a queued message", () => {
     renderCard(makeMessage({ localStatus: "queued" }), true, vi.fn());
-    expect(container.querySelector('[title="Fork from here"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Fork from here"]')).toBeNull();
   });
 
   it("hides fork for a cancelled message", () => {
     renderCard(makeMessage({ localStatus: "cancelled" }), true, vi.fn());
-    expect(container.querySelector('[title="Fork from here"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Fork from here"]')).toBeNull();
   });
 });

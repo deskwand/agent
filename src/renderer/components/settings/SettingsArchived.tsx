@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import { useIPC } from "../../hooks/useIPC";
 import { Search as SearchIcon, RotateCcw, Trash2 } from "lucide-react";
+import { Tooltip } from "../Tooltip";
 
 export function SettingsArchived() {
   const { t } = useTranslation();
@@ -143,26 +144,30 @@ export function SettingsArchived() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRestore(session.id);
-                    }}
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
-                    title={t("sidebar.restore")}
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePermanentDelete(session.id);
-                    }}
-                    className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-colors"
-                    title={t("common.delete")}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  <Tooltip label={t("sidebar.restore")}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRestore(session.id);
+                      }}
+                      aria-label={t("sidebar.restore")}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                  </Tooltip>
+                  <Tooltip label={t("common.delete")}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePermanentDelete(session.id);
+                      }}
+                      aria-label={t("common.delete")}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             </div>

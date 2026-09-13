@@ -12,6 +12,7 @@ import {
 import { formatAppDateTime } from "../../utils/i18n-format";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SettingsContentSection } from "./shared";
+import { Tooltip } from "../Tooltip";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -270,13 +271,15 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               >
                 {logsDirectory}
               </button>
-              <button
-                className="shrink-0 p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-                onClick={() => navigator.clipboard.writeText(logsDirectory)}
-                title={t("common.copy")}
-              >
-                <Copy className="w-3 h-3" />
-              </button>
+              <Tooltip label={t("common.copy")}>
+                <button
+                  className="shrink-0 p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+                  onClick={() => navigator.clipboard.writeText(logsDirectory)}
+                  aria-label={t("common.copy")}
+                >
+                  <Copy className="w-3 h-3" />
+                </button>
+              </Tooltip>
             </div>
           </div>
         </SettingsContentSection>

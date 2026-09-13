@@ -15,6 +15,7 @@ import {
   Download,
 } from "lucide-react";
 import type { Skill, CloudSkill, SkillType } from "../../types";
+import { Tooltip } from "../Tooltip";
 
 /* ─── tiny internals ─── */
 
@@ -30,22 +31,24 @@ function ToggleButton({
   label: string;
 }) {
   return (
-    <button
-      onClick={onToggle}
-      disabled={isLoading}
-      className={`shrink-0 p-1.5 rounded-md transition-colors ${
-        enabled
-          ? "bg-success/10 text-success hover:bg-success/20"
-          : "bg-surface-muted text-text-muted hover:bg-surface-active"
-      }`}
-      title={label}
-    >
-      {enabled ? (
-        <Power className="w-3.5 h-3.5" />
-      ) : (
-        <PowerOff className="w-3.5 h-3.5" />
-      )}
-    </button>
+    <Tooltip label={label}>
+      <button
+        onClick={onToggle}
+        disabled={isLoading}
+        className={`shrink-0 p-1.5 rounded-md transition-colors ${
+          enabled
+            ? "bg-success/10 text-success hover:bg-success/20"
+            : "bg-surface-muted text-text-muted hover:bg-surface-active"
+        }`}
+        aria-label={label}
+      >
+        {enabled ? (
+          <Power className="w-3.5 h-3.5" />
+        ) : (
+          <PowerOff className="w-3.5 h-3.5" />
+        )}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -169,67 +172,77 @@ function SkillActionButtons(props: SkillActionButtonsProps) {
     iconSize = "w-3.5 h-3.5",
   } = props;
 
+  // 已发布态沿用改造前的语义：没有提示（空 label 时 Tooltip 只渲染 children）。
+  const publishTipLabel =
+    publishStatus === "published"
+      ? ""
+      : publishStatus === "outdated"
+        ? t("skillMarket.publishUpdate")
+        : t("skillMarket.publish");
+
   return (
     <>
       {onPublish && publishStatus !== "has_update" && (
-        <button
-          onClick={onPublish}
-          disabled={isLoading || isPublishing || publishStatus === "published"}
-          className={`p-1.5 rounded-md transition-colors ${
-            publishStatus === "published"
-              ? "bg-success/10 text-success cursor-default"
-              : publishStatus === "outdated"
-                ? "bg-accent/10 text-accent hover:bg-accent/20"
-                : isPublishing
-                  ? "bg-accent/10 text-accent/50 cursor-wait"
-                  : "bg-accent/10 text-accent hover:bg-accent/20"
-          }`}
-          title={
-            publishStatus === "published"
-              ? ""
-              : publishStatus === "outdated"
-                ? t("skillMarket.publishUpdate")
-                : t("skillMarket.publish")
-          }
-        >
-          {isPublishing ? (
-            <Loader2 className={`${iconSize} animate-spin`} />
-          ) : publishStatus === "published" ? (
-            <Check className={iconSize} />
-          ) : publishStatus === "outdated" ? (
-            <RefreshCw className={iconSize} />
-          ) : (
-            <CloudUpload className={iconSize} />
-          )}
-        </button>
+        <Tooltip label={publishTipLabel}>
+          <button
+            onClick={onPublish}
+            disabled={
+              isLoading || isPublishing || publishStatus === "published"
+            }
+            aria-label={publishTipLabel || undefined}
+            className={`p-1.5 rounded-md transition-colors ${
+              publishStatus === "published"
+                ? "bg-success/10 text-success cursor-default"
+                : publishStatus === "outdated"
+                  ? "bg-accent/10 text-accent hover:bg-accent/20"
+                  : isPublishing
+                    ? "bg-accent/10 text-accent/50 cursor-wait"
+                    : "bg-accent/10 text-accent hover:bg-accent/20"
+            }`}
+          >
+            {isPublishing ? (
+              <Loader2 className={`${iconSize} animate-spin`} />
+            ) : publishStatus === "published" ? (
+              <Check className={iconSize} />
+            ) : publishStatus === "outdated" ? (
+              <RefreshCw className={iconSize} />
+            ) : (
+              <CloudUpload className={iconSize} />
+            )}
+          </button>
+        </Tooltip>
       )}
       {onUpdate && publishStatus === "has_update" && (
-        <button
-          onClick={onUpdate}
-          disabled={isLoading || isUpdating}
-          className={`p-1.5 rounded-md transition-colors ${
-            isUpdating
-              ? "bg-accent/10 text-accent/50 cursor-wait"
-              : "bg-accent/10 text-accent hover:bg-accent/20"
-          }`}
-          title={t("skillMarket.update")}
-        >
-          {isUpdating ? (
-            <Loader2 className={`${iconSize} animate-spin`} />
-          ) : (
-            <Download className={iconSize} />
-          )}
-        </button>
+        <Tooltip label={t("skillMarket.update")}>
+          <button
+            onClick={onUpdate}
+            disabled={isLoading || isUpdating}
+            className={`p-1.5 rounded-md transition-colors ${
+              isUpdating
+                ? "bg-accent/10 text-accent/50 cursor-wait"
+                : "bg-accent/10 text-accent hover:bg-accent/20"
+            }`}
+            aria-label={t("skillMarket.update")}
+          >
+            {isUpdating ? (
+              <Loader2 className={`${iconSize} animate-spin`} />
+            ) : (
+              <Download className={iconSize} />
+            )}
+          </button>
+        </Tooltip>
       )}
       {onDelete && (
-        <button
-          onClick={onDelete}
-          disabled={isLoading}
-          className="p-1.5 rounded-md bg-error/10 text-error hover:bg-error/20 transition-colors"
-          title={t("common.delete")}
-        >
-          <Trash2 className={iconSize} />
-        </button>
+        <Tooltip label={t("common.delete")}>
+          <button
+            onClick={onDelete}
+            disabled={isLoading}
+            className="p-1.5 rounded-md bg-error/10 text-error hover:bg-error/20 transition-colors"
+            aria-label={t("common.delete")}
+          >
+            <Trash2 className={iconSize} />
+          </button>
+        </Tooltip>
       )}
     </>
   );

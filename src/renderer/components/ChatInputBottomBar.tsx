@@ -1,13 +1,8 @@
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel, ProviderProfileKey } from "../types";
-import {
-  Plus,
-  ArrowUp,
-  Square,
-  Maximize2,
-  Minimize2,
-} from "lucide-react";
+import { Plus, ArrowUp, Square, Maximize2, Minimize2 } from "lucide-react";
 import { MergedInputChip } from "./MergedInputChip";
+import { Tooltip } from "./Tooltip";
 
 export interface ModelOptionGroup {
   profileKey: ProviderProfileKey;
@@ -60,17 +55,25 @@ export function ChatInputBottomBar({
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
+  const attachTipLabel = attachTitle || t("welcome.attachFiles");
+  const expandLabel = isExpanded
+    ? t("chat.collapseInput")
+    : t("chat.expandInput");
+  const submitLabel = canStop ? t("chat.stop") : t("chat.sendMessage");
+
   return (
     <div className="mt-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-0.5">
-        <button
-          type="button"
-          onClick={onAttach}
-          className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-          title={attachTitle || t("welcome.attachFiles")}
-        >
-          <Plus className="w-4 h-4" />
-        </button>
+        <Tooltip label={attachTipLabel}>
+          <button
+            type="button"
+            onClick={onAttach}
+            aria-label={attachTipLabel}
+            className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -130,37 +133,41 @@ export function ChatInputBottomBar({
         </span>
 
         {onToggleExpand && (
-          <button
-            type="button"
-            onClick={onToggleExpand}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-            title={isExpanded ? t("chat.collapseInput") : t("chat.expandInput")}
-          >
-            {isExpanded ? (
-              <Minimize2 className="w-4 h-4" />
-            ) : (
-              <Maximize2 className="w-4 h-4" />
-            )}
-          </button>
+          <Tooltip label={expandLabel}>
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              aria-label={expandLabel}
+              className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+            >
+              {isExpanded ? (
+                <Minimize2 className="w-4 h-4" />
+              ) : (
+                <Maximize2 className="w-4 h-4" />
+              )}
+            </button>
+          </Tooltip>
         )}
 
-        <button
-          type={canStop ? "button" : "submit"}
-          onClick={canStop ? onStop : undefined}
-          disabled={!canStop && (isSubmitting || submitDisabled)}
-          className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-all duration-150 ${
-            canStop
-              ? "bg-accent text-background hover:bg-accent-hover animate-pulse"
-              : "bg-accent text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent-hover active:scale-95 active:translate-y-px"
-          }`}
-          title={canStop ? t("chat.stop") : t("chat.sendMessage")}
-        >
-          {canStop ? (
-            <Square className="w-4 h-4" />
-          ) : (
-            <ArrowUp className="w-4 h-4" />
-          )}
-        </button>
+        <Tooltip label={submitLabel}>
+          <button
+            type={canStop ? "button" : "submit"}
+            onClick={canStop ? onStop : undefined}
+            disabled={!canStop && (isSubmitting || submitDisabled)}
+            aria-label={submitLabel}
+            className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-all duration-150 ${
+              canStop
+                ? "bg-accent text-background hover:bg-accent-hover animate-pulse"
+                : "bg-accent text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent-hover active:scale-95 active:translate-y-px"
+            }`}
+          >
+            {canStop ? (
+              <Square className="w-4 h-4" />
+            ) : (
+              <ArrowUp className="w-4 h-4" />
+            )}
+          </button>
+        </Tooltip>
       </div>
     </div>
   );

@@ -857,6 +857,8 @@
   },
   "browser": {
     "placeholder": "Search or enter URL",
+    "back": "Back",
+    "forward": "Forward",
     "reload": "Reload",
     "openExternal": "Open in external browser",
     "enterFullscreen": "Fullscreen",
@@ -986,7 +988,8 @@
     "copyPath": "Copy path",
     "openInFileManager": "Open in file manager",
     "contextUsage": "Context Usage",
-    "contextUsageLabel": "{{used}} / {{total}}"
+    "contextUsageLabel": "{{used}} / {{total}}",
+    "backToWorkspace": "Back to workspace"
   },
   "artifactPanel": {
     "title": "Artifacts",

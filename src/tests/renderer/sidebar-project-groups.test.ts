@@ -194,6 +194,13 @@ describe("Sidebar project groups", () => {
     return button as HTMLButtonElement;
   }
 
+  function findActionRow(button: HTMLElement): HTMLElement | null {
+    let el = button.parentElement;
+    while (el && el.querySelectorAll("button").length < 2)
+      el = el.parentElement;
+    return el;
+  }
+
   function sessionMoreButton(sessionId: string): HTMLButtonElement {
     const button = sessionRow(sessionId).querySelector(
       `button[aria-label="${i18n.t("sidebar.moreActions")}"]`,
@@ -628,7 +635,9 @@ describe("Sidebar project groups", () => {
 
     const row = sessionRow("ordinary");
     const moreButton = sessionMoreButton("ordinary");
-    const actionRow = moreButton.parentElement;
+    // 按钮外面多了一层 Tooltip 的 .tt-anchor，不能再用 parentElement 定位动作行；
+    // 按意图找"同时装着两个动作按钮的那一行"，对包裹层数量不敏感。
+    const actionRow = findActionRow(moreButton);
     expect(actionRow?.className).toContain("opacity-0");
 
     await hoverSession("ordinary");

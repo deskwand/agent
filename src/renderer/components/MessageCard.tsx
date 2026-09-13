@@ -20,6 +20,7 @@ import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
 import { ArtifactCard } from "./message/ArtifactCard";
 import { useAppStore } from "../store";
+import { Tooltip } from "./Tooltip";
 
 interface MessageCardProps {
   message: Message;
@@ -218,28 +219,32 @@ export const MessageCard = memo(function MessageCard({
             <span className="text-xs text-text-muted select-none">
               {timestampLabel}
             </span>
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-              title={t("messageCard.copyMessage")}
-            >
-              {copied ? (
-                <Check className="w-3 h-3 text-success" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-            </button>
+            <Tooltip label={t("messageCard.copyMessage")}>
+              <button
+                onClick={handleCopy}
+                aria-label={t("messageCard.copyMessage")}
+                className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
+              >
+                {copied ? (
+                  <Check className="w-3 h-3 text-success" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
+              </button>
+            </Tooltip>
           </>
         ) : null}
         {showFork ? (
-          <button
-            type="button"
-            onClick={() => onForkMessage(message)}
-            title={t("messageCard.forkMessage")}
-            className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-          >
-            <GitBranch className="w-3 h-3" />
-          </button>
+          <Tooltip label={t("messageCard.forkMessage")}>
+            <button
+              type="button"
+              onClick={() => onForkMessage(message)}
+              aria-label={t("messageCard.forkMessage")}
+              className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
+            >
+              <GitBranch className="w-3 h-3" />
+            </button>
+          </Tooltip>
         ) : null}
       </div>
     );

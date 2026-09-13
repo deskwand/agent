@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { Tooltip } from "./Tooltip";
 import { useThemeSetting, useSystemDarkMode } from "../store/selectors";
 
 interface BrowserState {
@@ -149,6 +150,12 @@ export function BrowserPanel({ width }: { width: number }) {
     }
   }, [isBrowserFullscreen, enterBrowserFullscreen, exitBrowserFullscreen]);
 
+  // 随状态变化的提示文案，提出来供 Tooltip 的 label 与 aria-label 共用
+  const reloadLabel = status.isLoading ? t("chat.stop") : t("browser.reload");
+  const fullscreenLabel = isBrowserFullscreen
+    ? t("browser.exitFullscreen")
+    : t("browser.enterFullscreen");
+
   return (
     <div
       className="h-full flex flex-col bg-surface/96 border-l border-border-subtle"
@@ -157,37 +164,43 @@ export function BrowserPanel({ width }: { width: number }) {
       {/* Header */}
       <div className="h-10 flex items-center gap-1 px-2 border-b border-border-subtle shrink-0">
         {/* Nav buttons */}
-        <button
-          onClick={() => window.electronAPI?.browser.goBack()}
-          disabled={!status.canGoBack}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
-          title="Back"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() => window.electronAPI?.browser.goForward()}
-          disabled={!status.canGoForward}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
-          title="Forward"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-        <button
-          onClick={() =>
-            status.isLoading
-              ? window.electronAPI?.browser.stop()
-              : window.electronAPI?.browser.reload()
-          }
-          className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-          title={status.isLoading ? t("chat.stop") : t("browser.reload")}
-        >
-          {status.isLoading ? (
-            <X className="w-4 h-4" />
-          ) : (
-            <RotateCw className="w-4 h-4" />
-          )}
-        </button>
+        <Tooltip label={t("browser.back")}>
+          <button
+            onClick={() => window.electronAPI?.browser.goBack()}
+            disabled={!status.canGoBack}
+            aria-label={t("browser.back")}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        </Tooltip>
+        <Tooltip label={t("browser.forward")}>
+          <button
+            onClick={() => window.electronAPI?.browser.goForward()}
+            disabled={!status.canGoForward}
+            aria-label={t("browser.forward")}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </Tooltip>
+        <Tooltip label={reloadLabel}>
+          <button
+            onClick={() =>
+              status.isLoading
+                ? window.electronAPI?.browser.stop()
+                : window.electronAPI?.browser.reload()
+            }
+            aria-label={reloadLabel}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+          >
+            {status.isLoading ? (
+              <X className="w-4 h-4" />
+            ) : (
+              <RotateCw className="w-4 h-4" />
+            )}
+          </button>
+        </Tooltip>
 
         {/* URL bar */}
         <div className="flex-1 min-w-0 flex items-center gap-1.5 rounded-lg bg-surface-muted px-2.5 h-7">
@@ -208,48 +221,50 @@ export function BrowserPanel({ width }: { width: number }) {
         </div>
 
         {/* External open */}
-        <button
-          onClick={() => {
-            if (!status.url || status.url === "about:blank") return;
-            window.electronAPI
-              ?.openExternal(status.url)
-              ?.catch((err: unknown) => {
-                console.error("[BrowserPanel] openExternal failed:", err);
-              });
-          }}
-          disabled={!status.url || status.url === "about:blank"}
-          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-          title={t("browser.openExternal")}
-        >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </button>
+        <Tooltip label={t("browser.openExternal")}>
+          <button
+            onClick={() => {
+              if (!status.url || status.url === "about:blank") return;
+              window.electronAPI
+                ?.openExternal(status.url)
+                ?.catch((err: unknown) => {
+                  console.error("[BrowserPanel] openExternal failed:", err);
+                });
+            }}
+            disabled={!status.url || status.url === "about:blank"}
+            aria-label={t("browser.openExternal")}
+            className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+        </Tooltip>
 
         {/* Fullscreen toggle */}
-        <button
-          onClick={handleToggleFullscreen}
-          disabled={!status.url || status.url === "about:blank"}
-          className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-          title={
-            isBrowserFullscreen
-              ? t("browser.exitFullscreen")
-              : t("browser.enterFullscreen")
-          }
-        >
-          {isBrowserFullscreen ? (
-            <Minimize2 className="w-3.5 h-3.5" />
-          ) : (
-            <Maximize2 className="w-3.5 h-3.5" />
-          )}
-        </button>
+        <Tooltip label={fullscreenLabel}>
+          <button
+            onClick={handleToggleFullscreen}
+            disabled={!status.url || status.url === "about:blank"}
+            aria-label={fullscreenLabel}
+            className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+          >
+            {isBrowserFullscreen ? (
+              <Minimize2 className="w-3.5 h-3.5" />
+            ) : (
+              <Maximize2 className="w-3.5 h-3.5" />
+            )}
+          </button>
+        </Tooltip>
 
         {/* Close */}
-        <button
-          onClick={handleClose}
-          className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-          title={t("close")}
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <Tooltip label={t("common.close")}>
+          <button
+            onClick={handleClose}
+            aria-label={t("common.close")}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
 
       {status.loadError ? (

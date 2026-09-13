@@ -51,6 +51,12 @@ module.exports = {
         warning: 'var(--color-warning)',
         'warning-foreground': 'var(--color-warning-foreground)',
         error: 'var(--color-error)',
+        overlay: {
+          hover: 'var(--color-overlay-hover)',
+          press: 'var(--color-overlay-press)',
+          on: 'var(--color-overlay-on)',
+        },
+        'window-close-hover': 'var(--color-window-close-hover)',
       },
       fontFamily: {
         sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
@@ -70,6 +76,7 @@ module.exports = {
         'elevated': 'var(--shadow-elevated)',
       },
       borderRadius: {
+        control: '5px',
         'lg': '8px',
         'xl': '10px',
         '2xl': '14px',

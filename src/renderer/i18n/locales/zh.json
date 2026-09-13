@@ -856,6 +856,8 @@
   },
   "browser": {
     "placeholder": "搜索或输入网址",
+    "back": "后退",
+    "forward": "前进",
     "reload": "刷新",
     "openExternal": "在外部浏览器中打开",
     "enterFullscreen": "全屏",
@@ -984,7 +986,8 @@
     "copyPath": "复制路径",
     "openInFileManager": "在文件管理器中打开",
     "contextUsage": "上下文用量",
-    "contextUsageLabel": "{{used}} / {{total}}"
+    "contextUsageLabel": "{{used}} / {{total}}",
+    "backToWorkspace": "回到工作区"
   },
   "artifactPanel": {
     "title": "产物",

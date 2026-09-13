@@ -37,6 +37,7 @@ import {
   isSessionBusy,
   type SidebarPins,
 } from "../utils/sidebar-session-groups";
+import { Tooltip } from "./Tooltip";
 
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
@@ -840,33 +841,35 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                       )}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setPendingArchiveId(null);
-                      if (isMenuOpen) {
-                        setSessionMenu(null);
-                        return;
-                      }
-                      const rect = event.currentTarget.getBoundingClientRect();
-                      setSessionMenu({
-                        sessionId: session.id,
-                        anchor: {
-                          top: rect.top,
-                          bottom: rect.bottom,
-                          right: rect.right,
-                        },
-                      });
-                    }}
-                    className="h-6 w-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
-                    title={t("sidebar.moreActions")}
-                    aria-label={t("sidebar.moreActions")}
-                    aria-haspopup="menu"
-                    aria-expanded={isMenuOpen}
-                  >
-                    <MoreHorizontal className="h-3 w-3" />
-                  </button>
+                  <Tooltip label={t("sidebar.moreActions")}>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setPendingArchiveId(null);
+                        if (isMenuOpen) {
+                          setSessionMenu(null);
+                          return;
+                        }
+                        const rect =
+                          event.currentTarget.getBoundingClientRect();
+                        setSessionMenu({
+                          sessionId: session.id,
+                          anchor: {
+                            top: rect.top,
+                            bottom: rect.bottom,
+                            right: rect.right,
+                          },
+                        });
+                      }}
+                      className="h-6 w-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
+                      aria-label={t("sidebar.moreActions")}
+                      aria-haspopup="menu"
+                      aria-expanded={isMenuOpen}
+                    >
+                      <MoreHorizontal className="h-3 w-3" />
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             )}
@@ -961,16 +964,18 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   />
                 </div>
                 <div className="relative flex flex-shrink-0">
-                  <button
-                    onClick={() => {
-                      setWorkingDir(null);
-                      handleNewSession();
-                    }}
-                    className="h-8 w-8 rounded-l-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
-                    title={t("sidebar.newChat")}
-                  >
-                    <SquarePen className="w-4 h-4" />
-                  </button>
+                  <Tooltip label={t("sidebar.newChat")}>
+                    <button
+                      onClick={() => {
+                        setWorkingDir(null);
+                        handleNewSession();
+                      }}
+                      className="h-8 w-8 rounded-l-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                      aria-label={t("sidebar.newChat")}
+                    >
+                      <SquarePen className="w-4 h-4" />
+                    </button>
+                  </Tooltip>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1173,39 +1178,43 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                             {group.sessions.length}
                           </span>
                         </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleNewSessionInProject(group.cwd);
-                          }}
-                          className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                          title={t("sidebar.newSessionForProject")}
-                          aria-label={t("sidebar.newSessionForProject")}
-                        >
-                          <SquarePen className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) =>
-                            handleToggleProjectPin(event, group.key)
-                          }
-                          className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
-                            isProjectPinned
-                              ? "opacity-100 text-accent hover:bg-accent/10"
-                              : "opacity-0 pointer-events-none text-text-muted hover:bg-accent/10 hover:text-accent group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                          }`}
-                          title={t(
-                            isProjectPinned ? "sidebar.unpin" : "sidebar.pin",
-                          )}
-                          aria-label={t(
+                        <Tooltip label={t("sidebar.newSessionForProject")}>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleNewSessionInProject(group.cwd);
+                            }}
+                            className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                            aria-label={t("sidebar.newSessionForProject")}
+                          >
+                            <SquarePen className="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip
+                          label={t(
                             isProjectPinned ? "sidebar.unpin" : "sidebar.pin",
                           )}
                         >
-                          <Pin
-                            className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
-                          />
-                        </button>
+                          <button
+                            type="button"
+                            onClick={(event) =>
+                              handleToggleProjectPin(event, group.key)
+                            }
+                            className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
+                              isProjectPinned
+                                ? "opacity-100 text-accent hover:bg-accent/10"
+                                : "opacity-0 pointer-events-none text-text-muted hover:bg-accent/10 hover:text-accent group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                            }`}
+                            aria-label={t(
+                              isProjectPinned ? "sidebar.unpin" : "sidebar.pin",
+                            )}
+                          >
+                            <Pin
+                              className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
+                            />
+                          </button>
+                        </Tooltip>
                       </div>
                       <SidebarAnimatedSection
                         expanded={isProjectExpanded}

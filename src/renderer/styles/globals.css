@@ -477,7 +477,9 @@
 
   /* Consistent focus ring for native form elements — overrides browser's default outline */
   select,
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
+      [type="file"]
+    ):not([type="color"]),
   textarea {
     @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-30;
   }
@@ -1144,17 +1146,37 @@
 
 /* ── Channel Instance Catalog ── */
 @layer components {
-  .dot-connected { @apply bg-success; }
-  .dot-starting { @apply bg-warning motion-safe:animate-pulse; }
-  .dot-reconnecting { @apply bg-warning motion-safe:animate-pulse; }
-  .dot-failed { @apply bg-error; }
-  .dot-stopped { @apply bg-text-muted; }
+  .dot-connected {
+    @apply bg-success;
+  }
+  .dot-starting {
+    @apply bg-warning motion-safe:animate-pulse;
+  }
+  .dot-reconnecting {
+    @apply bg-warning motion-safe:animate-pulse;
+  }
+  .dot-failed {
+    @apply bg-error;
+  }
+  .dot-stopped {
+    @apply bg-text-muted;
+  }
 
-  .status-connected { @apply text-success; }
-  .status-starting { @apply text-warning; }
-  .status-reconnecting { @apply text-warning; }
-  .status-failed { @apply text-error; }
-  .status-stopped { @apply text-text-muted; }
+  .status-connected {
+    @apply text-success;
+  }
+  .status-starting {
+    @apply text-warning;
+  }
+  .status-reconnecting {
+    @apply text-warning;
+  }
+  .status-failed {
+    @apply text-error;
+  }
+  .status-stopped {
+    @apply text-text-muted;
+  }
 
   .toggle-track {
     @apply relative h-5 w-9 cursor-pointer rounded-full bg-border-subtle transition-colors duration-200;
@@ -1168,4 +1190,51 @@
   .toggle-track.toggle-on .toggle-knob {
     @apply left-[18px];
   }
+}
+
+/* Tooltip / 控件 hover 叠层
+   ------------------------------------------------------------------
+   只声明一次：值里的 var() 由 color-mix() 在使用处解析，因此这三条会跟着
+   各主题自己的 --color-text-primary / --color-accent 走，7 套预设 × 深浅
+   共 14 种组合自动适配，不需要逐个主题块重复声明。
+   前提：主题类与 data-theme-preset 都挂在 documentElement 上（见 App.tsx）。
+   回归测试：src/tests/renderer/theme-overlay-tokens.test.ts */
+:root {
+  --color-overlay-hover: color-mix(
+    in srgb,
+    var(--color-text-primary) 6%,
+    transparent
+  );
+  --color-overlay-press: color-mix(
+    in srgb,
+    var(--color-text-primary) 14%,
+    transparent
+  );
+  --color-overlay-on: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  /* Windows 原生关闭键悬停红，镜像系统配色，不随应用主题变化 */
+  --color-window-close-hover: #c42b1c;
+}
+
+/* Tooltip 气泡。定位与可见性都由 @floating-ui/react 驱动（见 Tooltip.tsx）：
+   组件只负责给出浮动坐标（position / left / top 走 inline style），这里只描述外观。 */
+.tt-anchor {
+  display: inline-flex;
+}
+
+.tt-bubble {
+  /* position / left / top 由 @floating-ui/react 经 inline style 提供 */
+  pointer-events: none;
+  z-index: 60;
+  max-width: 18rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.1875rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-elevated);
 }

@@ -21,6 +21,7 @@ import type {
   MCPPreset,
 } from "./shared";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { Tooltip } from "../Tooltip";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -604,42 +605,54 @@ function ServerCard({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onToggleEnabled}
-              disabled={isLoading}
-              className={`p-2 rounded-lg transition-colors ${
-                server.enabled
-                  ? "bg-success/10 text-success hover:bg-success/20"
-                  : "bg-surface-muted text-text-muted hover:bg-surface-active"
-              }`}
-              title={
+            <Tooltip
+              label={
                 server.enabled
                   ? t("common.disable") || "Disable"
                   : t("common.enable") || "Enable"
               }
             >
-              {server.enabled ? (
-                <Power className="w-4 h-4" />
-              ) : (
-                <PowerOff className="w-4 h-4" />
-              )}
-            </button>
-            <button
-              onClick={onEdit}
-              disabled={isLoading}
-              className="p-2 rounded-lg bg-surface-muted text-text-secondary hover:bg-surface-active transition-colors"
-              title={t("common.edit")}
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onDelete}
-              disabled={isLoading}
-              className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
-              title={t("common.delete")}
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+              <button
+                onClick={onToggleEnabled}
+                disabled={isLoading}
+                className={`p-2 rounded-lg transition-colors ${
+                  server.enabled
+                    ? "bg-success/10 text-success hover:bg-success/20"
+                    : "bg-surface-muted text-text-muted hover:bg-surface-active"
+                }`}
+                aria-label={
+                  server.enabled
+                    ? t("common.disable") || "Disable"
+                    : t("common.enable") || "Enable"
+                }
+              >
+                {server.enabled ? (
+                  <Power className="w-4 h-4" />
+                ) : (
+                  <PowerOff className="w-4 h-4" />
+                )}
+              </button>
+            </Tooltip>
+            <Tooltip label={t("common.edit")}>
+              <button
+                onClick={onEdit}
+                disabled={isLoading}
+                className="p-2 rounded-lg bg-surface-muted text-text-secondary hover:bg-surface-active transition-colors"
+                aria-label={t("common.edit")}
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+            </Tooltip>
+            <Tooltip label={t("common.delete")}>
+              <button
+                onClick={onDelete}
+                disabled={isLoading}
+                className="p-2 rounded-lg bg-error/10 text-error hover:bg-error/20 transition-colors"
+                aria-label={t("common.delete")}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -872,14 +885,16 @@ function ServerForm({
                       placeholder={`${t("mcp.envValuePlaceholder")}: ${key}`}
                       className="flex-1 px-3 py-1.5 rounded bg-background border border-border text-text-primary text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/30"
                     />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveEnvVar(key)}
-                      className="p-1.5 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors"
-                      title={t("mcp.removeVar")}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <Tooltip label={t("mcp.removeVar")}>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveEnvVar(key)}
+                        aria-label={t("mcp.removeVar")}
+                        className="p-1.5 rounded hover:bg-error/10 text-text-muted hover:text-error transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </Tooltip>
                   </div>
                 ))}
                 {Object.keys(envVars).length === 0 && !isAddingEnvVar && (

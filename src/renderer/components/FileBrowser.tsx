@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { ChevronRight, ChevronDown, Home, Loader2 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -7,6 +8,7 @@ import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
 import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
 import { openFilePathInBrowser } from "../utils/open-in-browser";
+import { Tooltip } from "./Tooltip";
 
 interface FileEntry {
   name: string;
@@ -129,6 +131,7 @@ function FileTreeItem({
 }
 
 export function FileBrowser({ width }: { width: number }) {
+  const { t } = useTranslation();
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const workingDir = useAppStore((s) => s.workingDir);
   const fileBrowserRoot = useAppStore((s) => s.fileBrowserRoot);
@@ -236,13 +239,15 @@ export function FileBrowser({ width }: { width: number }) {
     >
       {/* Header */}
       <div className="flex items-center gap-1 px-3 py-2 border-b border-border-subtle shrink-0">
-        <button
-          onClick={goToWorkspace}
-          className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors shrink-0"
-          title="回到工作区"
-        >
-          <Home className="w-3.5 h-3.5" />
-        </button>
+        <Tooltip label={t("context.backToWorkspace")}>
+          <button
+            onClick={goToWorkspace}
+            aria-label={t("context.backToWorkspace")}
+            className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors shrink-0"
+          >
+            <Home className="w-3.5 h-3.5" />
+          </button>
+        </Tooltip>
         {/* Breadcrumb */}
         <div className="flex items-center text-xs min-w-0 overflow-x-auto ml-1">
           <button

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "../i18n/config";
 import { useAppStore } from "../store";
 import { ResizeHandle } from "./ResizeHandle";
+import { Tooltip } from "./Tooltip";
 import {
   Maximize2,
   Minimize2,
@@ -285,6 +286,15 @@ export function ReviewPanel() {
     : null;
   const diffData = fileDiff ? renderDiffLines(fileDiff) : { lines: [] };
 
+  // 随状态变化的提示文案，提出来供 Tooltip 的 label 与 aria-label 共用
+  const viewModeLabel =
+    diffViewMode === "unified"
+      ? t("reviewPanel.switchToSideBySide")
+      : t("reviewPanel.switchToUnified");
+  const fullscreenLabel = isFullscreen
+    ? t("reviewPanel.exitFullscreen")
+    : t("reviewPanel.fullscreen");
+
   const toolbar = (
     <div className="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border/20">
       <GitBranch className="w-4 h-4 text-accent" />
@@ -294,51 +304,53 @@ export function ReviewPanel() {
       <span className="text-xs text-text-muted ml-2">
         {t("reviewPanel.fileCount", { count: diffFiles.length })}
       </span>
-      <button
-        onClick={loadDiffFiles}
-        className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors ml-2"
-        title={t("reviewPanel.refresh")}
-      >
-        <RefreshCw
-          className={`w-3.5 h-3.5 ${loadingFiles ? "animate-spin" : ""}`}
-        />
-      </button>
-      <button
-        onClick={() =>
-          setDiffViewMode((m) => (m === "unified" ? "side-by-side" : "unified"))
-        }
-        className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        title={
-          diffViewMode === "unified"
-            ? t("reviewPanel.switchToSideBySide")
-            : t("reviewPanel.switchToUnified")
-        }
-      >
-        <Columns2 className="w-3.5 h-3.5" />
-      </button>
+      <Tooltip label={t("reviewPanel.refresh")}>
+        <button
+          onClick={loadDiffFiles}
+          aria-label={t("reviewPanel.refresh")}
+          className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors ml-2"
+        >
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${loadingFiles ? "animate-spin" : ""}`}
+          />
+        </button>
+      </Tooltip>
+      <Tooltip label={viewModeLabel}>
+        <button
+          onClick={() =>
+            setDiffViewMode((m) =>
+              m === "unified" ? "side-by-side" : "unified",
+            )
+          }
+          aria-label={viewModeLabel}
+          className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+        >
+          <Columns2 className="w-3.5 h-3.5" />
+        </button>
+      </Tooltip>
       <div className="flex-1" />
-      <button
-        onClick={() => setIsFullscreen((f) => !f)}
-        className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        title={
-          isFullscreen
-            ? t("reviewPanel.exitFullscreen")
-            : t("reviewPanel.fullscreen")
-        }
-      >
-        {isFullscreen ? (
-          <Minimize2 className="w-4 h-4" />
-        ) : (
-          <Maximize2 className="w-4 h-4" />
-        )}
-      </button>
-      <button
-        onClick={handleClose}
-        className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        title={t("common.close")}
-      >
-        <X className="w-4 h-4" />
-      </button>
+      <Tooltip label={fullscreenLabel}>
+        <button
+          onClick={() => setIsFullscreen((f) => !f)}
+          aria-label={fullscreenLabel}
+          className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="w-4 h-4" />
+          ) : (
+            <Maximize2 className="w-4 h-4" />
+          )}
+        </button>
+      </Tooltip>
+      <Tooltip label={t("common.close")}>
+        <button
+          onClick={handleClose}
+          aria-label={t("common.close")}
+          className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </Tooltip>
     </div>
   );
 

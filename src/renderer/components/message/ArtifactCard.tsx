@@ -16,6 +16,7 @@ import { FilePreviewModal } from "../FilePreviewModal";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { isBrowserOpenableExt } from "../../utils/file-preview";
 import { openFilePathInBrowser } from "../../utils/open-in-browser";
+import { Tooltip } from "../Tooltip";
 
 interface ArtifactCardProps {
   files: ResultFileEntry[];
@@ -372,6 +373,9 @@ export const ArtifactCard = memo(function ArtifactCard({
           const reverted = revertedFiles.has(file.path);
           const ext = getFileExt(file.path);
           const canRevert = isLatestRound && !reverted && isGitRepo;
+          const revertTipLabel = isUndoDisabled
+            ? t("artifactCard.desktopOnly")
+            : t("artifactCard.revertFile");
 
           return (
             <div
@@ -428,38 +432,39 @@ export const ArtifactCard = memo(function ArtifactCard({
                 </div>
               </div>
               <div className="ml-3 flex shrink-0 items-center gap-1.5">
-                <button
-                  type="button"
-                  className="rounded-md p-1 text-text-muted hover:bg-surface-hover hover:text-text-secondary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!reverted) handleCopyPath(resolvePath(file.path));
-                  }}
-                  title={t("artifactCard.copyPath")}
-                >
-                  {copiedPath === resolvePath(file.path) ? (
-                    <Check className="h-3.5 w-3.5 text-success" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
-                </button>
-                {canRevert ? (
+                <Tooltip label={t("artifactCard.copyPath")}>
                   <button
                     type="button"
-                    className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-text-muted hover:border-error/20 hover:bg-error/5 hover:text-error"
+                    className="rounded-md p-1 text-text-muted hover:bg-surface-hover hover:text-text-secondary"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleRevertFile(file);
+                      if (!reverted) handleCopyPath(resolvePath(file.path));
                     }}
-                    title={
-                      isUndoDisabled
-                        ? t("artifactCard.desktopOnly")
-                        : t("artifactCard.revertFile")
-                    }
-                    disabled={isUndoDisabled}
+                    aria-label={t("artifactCard.copyPath")}
                   >
-                    {t("artifactCard.revert")}
+                    {copiedPath === resolvePath(file.path) ? (
+                      <Check className="h-3.5 w-3.5 text-success" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
                   </button>
+                </Tooltip>
+                {/* 还原按钮有可见文字，所以只换提示、不补 aria-label，
+                    否则会覆盖可见文字（违反 WCAG 2.5.3）。 */}
+                {canRevert ? (
+                  <Tooltip label={revertTipLabel}>
+                    <button
+                      type="button"
+                      className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-text-muted hover:border-error/20 hover:bg-error/5 hover:text-error"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRevertFile(file);
+                      }}
+                      disabled={isUndoDisabled}
+                    >
+                      {t("artifactCard.revert")}
+                    </button>
+                  </Tooltip>
                 ) : null}
                 <button
                   type="button"

@@ -73,6 +73,7 @@
     "@earendil-works/pi-ai": "^0.84.4",
     "@earendil-works/pi-coding-agent": "^0.84.4",
     "@earendil-works/pi-tui": "0.84.4",
+    "@floating-ui/react": "^0.27.20",
     "@google/genai": "^1.44.0",
     "@larksuiteoapi/node-sdk": "^1.59.0",
     "@modelcontextprotocol/sdk": "^1.26.0",

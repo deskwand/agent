@@ -13,9 +13,51 @@ import {
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { Tooltip } from "./Tooltip";
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin";
+
+interface TitlebarButtonProps {
+  /** 气泡文案，同时用作 aria-label。调用方负责 i18n。 */
+  label: string;
+  /** 面板已开启。注意与 CSS :active 伪类（物理按下）不是一回事。 */
+  isOn?: boolean;
+  /** 静止时的图标色。仅未开启时生效。 */
+  tone?: "muted" | "secondary";
+  onClick?: () => void;
+  children: React.ReactNode;
+}
+
+function TitlebarButton({
+  label,
+  isOn = false,
+  tone = "muted",
+  onClick,
+  children,
+}: TitlebarButtonProps) {
+  // 已开启与未开启是两套互斥的 class 组合，不是靠 CSS 优先级叠加：
+  // Tailwind 输出的 hover: 变体晚于无前缀的 bg-overlay-on，同时存在时会把
+  // 已开启背景盖掉。
+  const stateClasses = isOn
+    ? "bg-overlay-on text-accent active:scale-[0.96] active:duration-75"
+    : `hover:bg-overlay-hover hover:text-text-primary active:bg-overlay-press active:scale-[0.96] active:duration-75 ${
+        tone === "secondary" ? "text-text-secondary" : "text-text-muted"
+      }`;
+
+  return (
+    <Tooltip label={label}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        className={`w-7 h-7 rounded-control grid place-items-center transition-[background-color,color,transform] duration-150 ${stateClasses}`}
+      >
+        {children}
+      </button>
+    </Tooltip>
+  );
+}
 
 export function Titlebar() {
   const { t } = useTranslation();
@@ -61,59 +103,42 @@ export function Titlebar() {
 
   const rightToolbar = (
     <div className="titlebar-no-drag pr-1 flex items-center justify-end gap-0.5">
-      {/* Artifact panel toggle */}
-      <button
-        data-artifact-toggle
+      <TitlebarButton
+        label={t("artifactPanel.toggle", "产物面板")}
+        isOn={isArtifactPanelOpen}
         onClick={toggleArtifactPanel}
-        className="relative w-7 h-7 rounded-md flex items-center justify-center hover:bg-surface-hover transition-colors"
-        title={t("artifactPanel.toggle", "产物面板")}
       >
-        <Package
-          className={`w-3.5 h-3.5 ${
-            isArtifactPanelOpen ? "text-accent" : "text-text-muted"
-          }`}
-        />
-      </button>
-      {/* File browser toggle */}
-      <button
+        <Package className="w-3.5 h-3.5" />
+      </TitlebarButton>
+      <TitlebarButton
+        label={
+          rightPanelMode === "files"
+            ? t("titlebar.switchToContext")
+            : t("titlebar.fileBrowser")
+        }
+        isOn={rightPanelMode === "files"}
         onClick={toggleFileBrowser}
-        className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-surface-hover transition-colors"
-        title={rightPanelMode === "files" ? "切回上下文面板" : "文件浏览"}
       >
-        <FolderOpen
-          className={`w-3.5 h-3.5 ${
-            rightPanelMode === "files" ? "text-accent" : "text-text-muted"
-          }`}
-        />
-      </button>
-      {/* Browser toggle */}
-      <button
-        onClick={toggleBrowserPanel}
-        className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-surface-hover transition-colors"
-        title={
+        <FolderOpen className="w-3.5 h-3.5" />
+      </TitlebarButton>
+      <TitlebarButton
+        label={
           rightPanelMode === "browser"
             ? t("titlebar.switchToContext")
             : t("titlebar.builtInBrowser")
         }
+        isOn={rightPanelMode === "browser"}
+        onClick={toggleBrowserPanel}
       >
-        <Globe
-          className={`w-3.5 h-3.5 ${
-            rightPanelMode === "browser" ? "text-accent" : "text-text-muted"
-          }`}
-        />
-      </button>
-      {/* Review toggle */}
-      <button
+        <Globe className="w-3.5 h-3.5" />
+      </TitlebarButton>
+      <TitlebarButton
+        label={isReviewOpen ? t("reviewPanel.close") : t("reviewPanel.title")}
+        isOn={isReviewOpen}
         onClick={toggleReviewPanel}
-        className="relative w-7 h-7 rounded-md flex items-center justify-center hover:bg-surface-hover transition-colors"
-        title={isReviewOpen ? "关闭代码审查" : "代码审查"}
       >
-        <Diff
-          className={`w-3.5 h-3.5 ${
-            isReviewOpen ? "text-accent" : "text-text-muted"
-          }`}
-        />
-      </button>
+        <Diff className="w-3.5 h-3.5" />
+      </TitlebarButton>
     </div>
   );
 
@@ -127,21 +152,21 @@ export function Titlebar() {
         {showSessionHeader ? (
           <div className="h-full grid grid-cols-[17.5rem_1fr_18rem] items-center">
             <div className="titlebar-no-drag px-2">
-              <button
-                onClick={toggleSidebar}
-                className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-surface-hover transition-colors text-text-secondary"
-                title={
+              <TitlebarButton
+                label={
                   sidebarCollapsed
                     ? t("context.expandPanel")
                     : t("context.collapsePanel")
                 }
+                tone="secondary"
+                onClick={toggleSidebar}
               >
                 {sidebarCollapsed ? (
                   <PanelLeft className="w-3.5 h-3.5" />
                 ) : (
                   <Columns2 className="w-3.5 h-3.5" />
                 )}
-              </button>
+              </TitlebarButton>
             </div>
             <div className="text-sm font-medium text-text-primary text-center truncate px-4">
               {activeSessionTitle}
@@ -158,31 +183,45 @@ export function Titlebar() {
       {/* Window Controls (for Windows/Linux - macOS uses native traffic lights) */}
       {!isMac && (
         <div className="flex items-center titlebar-no-drag h-full">
-          <button
-            onClick={handleMinimize}
-            className="w-12 h-full flex items-center justify-center hover:bg-surface transition-colors"
-            title={t("window.minimize")}
+          <Tooltip label={t("window.minimize")}>
+            <button
+              type="button"
+              onClick={handleMinimize}
+              aria-label={t("window.minimize")}
+              className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip
+            label={isMaximized ? t("window.restore") : t("window.maximize")}
           >
-            <Minus className="w-4 h-4 text-text-secondary" />
-          </button>
-          <button
-            onClick={handleMaximize}
-            className="w-12 h-full flex items-center justify-center hover:bg-surface transition-colors"
-            title={isMaximized ? t("window.restore") : t("window.maximize")}
-          >
-            {isMaximized ? (
-              <Copy className="w-3.5 h-3.5 text-text-secondary" />
-            ) : (
-              <Square className="w-3.5 h-3.5 text-text-secondary" />
-            )}
-          </button>
-          <button
-            onClick={handleClose}
-            className="w-12 h-full flex items-center justify-center hover:bg-red-500 transition-colors group"
-            title={t("window.close")}
-          >
-            <X className="w-4 h-4 text-text-secondary group-hover:text-white" />
-          </button>
+            <button
+              type="button"
+              onClick={handleMaximize}
+              aria-label={
+                isMaximized ? t("window.restore") : t("window.maximize")
+              }
+              className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+            >
+              {isMaximized ? (
+                // lucide Copy 的两个错位叠加方框就是 Windows 11 的“还原”字形
+                <Copy className="w-3.5 h-3.5" />
+              ) : (
+                <Square className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </Tooltip>
+          <Tooltip label={t("window.close")}>
+            <button
+              type="button"
+              onClick={handleClose}
+              aria-label={t("window.close")}
+              className="group w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-window-close-hover transition-colors"
+            >
+              <X className="w-4 h-4 group-hover:text-white" />
+            </button>
+          </Tooltip>
         </div>
       )}
     </div>

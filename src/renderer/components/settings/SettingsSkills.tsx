@@ -25,6 +25,7 @@ import { MarketplaceSkillCard } from "./MarketplaceSkillCard";
 import type { MarketplaceInstallState } from "./MarketplaceSkillCard";
 import { MarketplaceCategorySidebar } from "./MarketplaceCategorySidebar";
 import { MarketplaceSkeleton } from "./MarketplaceSkeleton";
+import { Tooltip } from "../Tooltip";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -1063,28 +1064,32 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             {t("skillMarket.skillCount")}
           </span>
           <div className="flex items-center rounded-lg border border-border overflow-hidden">
-            <button
-              onClick={() => toggleViewMode("cards")}
-              className={`p-1.5 transition-colors ${
-                viewMode === "cards"
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary"
-              }`}
-              title={t("skillMarket.cardView")}
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => toggleViewMode("list")}
-              className={`p-1.5 transition-colors ${
-                viewMode === "list"
-                  ? "bg-accent/10 text-accent"
-                  : "text-text-muted hover:text-text-primary"
-              }`}
-              title={t("skillMarket.listView")}
-            >
-              <List className="w-3.5 h-3.5" />
-            </button>
+            <Tooltip label={t("skillMarket.cardView")}>
+              <button
+                onClick={() => toggleViewMode("cards")}
+                aria-label={t("skillMarket.cardView")}
+                className={`p-1.5 transition-colors ${
+                  viewMode === "cards"
+                    ? "bg-accent/10 text-accent"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
+            <Tooltip label={t("skillMarket.listView")}>
+              <button
+                onClick={() => toggleViewMode("list")}
+                aria-label={t("skillMarket.listView")}
+                className={`p-1.5 transition-colors ${
+                  viewMode === "list"
+                    ? "bg-accent/10 text-accent"
+                    : "text-text-muted hover:text-text-primary"
+                }`}
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -1117,16 +1122,18 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             <div className="flex-1 min-w-0 pl-4 relative">
               {/* Refresh button */}
               <div className="flex items-center justify-end mb-2">
-                <button
-                  onClick={handleRefreshMarketplace}
-                  disabled={marketplaceLoading}
-                  className="p-1 rounded-md hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
-                  title={t("skillMarket.refresh")}
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 ${marketplaceLoading ? "animate-spin" : ""}`}
-                  />
-                </button>
+                <Tooltip label={t("skillMarket.refresh")}>
+                  <button
+                    onClick={handleRefreshMarketplace}
+                    disabled={marketplaceLoading}
+                    className="p-1 rounded-md hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+                    aria-label={t("skillMarket.refresh")}
+                  >
+                    <RefreshCw
+                      className={`w-3.5 h-3.5 ${marketplaceLoading ? "animate-spin" : ""}`}
+                    />
+                  </button>
+                </Tooltip>
               </div>
               {/* Initial loading skeleton */}
               {marketplaceLoading && marketplaceSkills.length === 0 && (
@@ -1311,13 +1318,15 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                                   team: activeTeamName,
                                 })}
                               </span>
-                              <button
-                                onClick={() => handleUnshare(skill.name)}
-                                className="p-0.5 rounded hover:bg-surface-hover hover:text-error transition-colors"
-                                title={t("skillMarket.unshare")}
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
+                              <Tooltip label={t("skillMarket.unshare")}>
+                                <button
+                                  onClick={() => handleUnshare(skill.name)}
+                                  aria-label={t("skillMarket.unshare")}
+                                  className="p-0.5 rounded hover:bg-surface-hover hover:text-error transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </Tooltip>
                             </span>
                           )}
                         <button
