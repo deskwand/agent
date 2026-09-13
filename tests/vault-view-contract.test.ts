@@ -245,9 +245,7 @@ describe("VaultView", () => {
   }
 
   function uploadButton(): HTMLButtonElement {
-    const button = Array.from(container.querySelectorAll("button")).find(
-      (item) => item.textContent === "Upload",
-    );
+    const button = container.querySelector('button[aria-label="Upload"]');
     if (!(button instanceof HTMLButtonElement)) {
       throw new Error("Upload button missing");
     }
@@ -283,8 +281,8 @@ describe("VaultView", () => {
   }
 
   function syncButton(): HTMLButtonElement {
-    const button = Array.from(container.querySelectorAll("button")).find(
-      (item) => item.textContent === "Sync" || item.textContent === "Syncing…",
+    const button = container.querySelector(
+      'button[aria-label="Sync"], button[aria-label="Syncing…"]',
     );
     if (!(button instanceof HTMLButtonElement)) {
       throw new Error("Sync button missing");
@@ -297,6 +295,22 @@ describe("VaultView", () => {
       for (let index = 0; index < 5; index += 1) await Promise.resolve();
     });
   }
+
+  it("renders compact accessible icon actions with tooltips", async () => {
+    await renderVault();
+
+    const sync = syncButton();
+    const upload = uploadButton();
+    expect(sync.textContent).toBe("");
+    expect(upload.textContent).toBe("");
+    expect(sync.querySelector("svg.lucide-refresh-cw")).not.toBeNull();
+    expect(upload.querySelector("svg.lucide-upload")).not.toBeNull();
+
+    await act(async () => upload.focus());
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toBe(
+      "Upload",
+    );
+  });
 
   function statusSlot(): HTMLElement {
     const slot = container.querySelector('[aria-live="polite"]');
@@ -410,13 +424,11 @@ describe("VaultView", () => {
     );
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     expect(sync).toBeDefined();
 
     await act(async () => {
-      sync!.click();
+      sync.click();
       await Promise.resolve();
     });
 
@@ -831,11 +843,7 @@ describe("VaultView", () => {
 
     await renderVault();
 
-    expect(
-      Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === "Upload",
-      ),
-    ).toBeUndefined();
+    expect(container.querySelector('button[aria-label="Upload"]')).toBeNull();
     expect(screenText()).toContain("Set your recovery code");
   });
 
@@ -993,7 +1001,11 @@ describe("VaultView", () => {
 
     await renderVault();
 
-    expect(uploadButton().disabled).toBe(false);
+    const upload = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Upload",
+    );
+    expect(upload).toBeInstanceOf(HTMLButtonElement);
+    expect((upload as HTMLButtonElement).disabled).toBe(false);
     expect(screenText()).toContain("No files in your Vault");
   });
 
@@ -1204,7 +1216,7 @@ describe("VaultView", () => {
 
     // 点击立刻受理：按钮禁用、对比度不变，但文案还没有切
     expect(sync.disabled).toBe(true);
-    expect(sync.textContent).toBe("Sync");
+    expect(sync.getAttribute("aria-label")).toBe("Sync");
     expect(screenText()).not.toContain("Syncing…");
     expect(sync.className).toContain("text-accent-foreground");
     expect(sync.className).not.toContain("disabled:text-text-primary");
@@ -1217,13 +1229,13 @@ describe("VaultView", () => {
     await act(async () => {
       vi.advanceTimersByTime(1);
     });
-    expect(sync.textContent).toBe("Syncing…");
+    expect(sync.getAttribute("aria-label")).toBe("Syncing…");
 
     await act(async () => {
       pending.resolve(snapshot({ items: [] }));
       for (let index = 0; index < 5; index += 1) await Promise.resolve();
     });
-    expect(sync.textContent).toBe("Sync");
+    expect(sync.getAttribute("aria-label")).toBe("Sync");
   });
 
   it("never renders the syncing label when the sync resolves quickly", async () => {
@@ -1341,9 +1353,7 @@ describe("VaultView", () => {
     api.sync.mockResolvedValueOnce(snapshot({ items: [] }));
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     await act(async () => {
       sync?.click();
       await Promise.resolve();
@@ -1364,9 +1374,7 @@ describe("VaultView", () => {
     api.sync.mockRejectedValueOnce(new Error("NETWORK_DOWN"));
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     await act(async () => {
       sync?.click();
       await Promise.resolve();
@@ -1385,9 +1393,7 @@ describe("VaultView", () => {
     useAppStore.setState({ cloudConfig: null });
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     await act(async () => {
       sync?.click();
     });
@@ -1404,9 +1410,7 @@ describe("VaultView", () => {
     api.sync.mockResolvedValueOnce(snapshot({ items: [] }));
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     await act(async () => {
       sync?.click();
       await Promise.resolve();
@@ -1419,9 +1423,7 @@ describe("VaultView", () => {
     api.sync.mockResolvedValueOnce(snapshot({ items: [], pendingCount: 1 }));
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     await act(async () => {
       sync?.click();
       await Promise.resolve();
@@ -1434,9 +1436,7 @@ describe("VaultView", () => {
     api.sync.mockRejectedValueOnce(new Error("VAULT_CLOUD_HTTP_401"));
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     await act(async () => {
       sync?.click();
       await Promise.resolve();
@@ -1449,9 +1449,7 @@ describe("VaultView", () => {
     api.sync.mockRejectedValueOnce(new Error("VAULT_CLOUD_HTTP_403"));
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     await act(async () => {
       sync?.click();
       await Promise.resolve();
@@ -1464,9 +1462,7 @@ describe("VaultView", () => {
     api.sync.mockRejectedValueOnce(new Error("VAULT_CLOUD_HTTP_503"));
 
     await renderVault();
-    const sync = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Sync",
-    );
+    const sync = syncButton();
     await act(async () => {
       sync?.click();
       await Promise.resolve();

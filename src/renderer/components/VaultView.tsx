@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Download, MoreHorizontal } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  MoreHorizontal,
+  RefreshCw,
+  Upload,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
@@ -8,6 +14,7 @@ import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FilePreviewModal } from "./FilePreviewModal";
+import { Tooltip } from "./Tooltip";
 import type {
   SyncStatus,
   VaultRemoteStatus,
@@ -512,6 +519,8 @@ export function VaultView(): JSX.Element {
   }, [snapshot, busy, mode]);
 
   const showFiles = mode === "normal" || mode === "local-files";
+  const syncActionLabel =
+    syncFeedback === "syncing" ? t("vault.syncing") : t("vault.sync");
 
   return (
     <section
@@ -558,14 +567,21 @@ export function VaultView(): JSX.Element {
               ""
             )}
           </span>
-          <button
-            type="button"
-            className="min-w-24 rounded-lg bg-accent px-3 py-2 text-center text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
-            onClick={() => void handleSync()}
-            disabled={syncDisabled}
-          >
-            {syncFeedback === "syncing" ? t("vault.syncing") : t("vault.sync")}
-          </button>
+          <Tooltip label={syncActionLabel}>
+            <button
+              type="button"
+              aria-label={syncActionLabel}
+              className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+              onClick={() => void handleSync()}
+              disabled={syncDisabled}
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  syncFeedback === "syncing" ? "animate-spin" : ""
+                }`}
+              />
+            </button>
+          </Tooltip>
           {advancedResetAvailable && (
             <div
               ref={advancedMenuBoundaryRef}
@@ -691,14 +707,17 @@ export function VaultView(): JSX.Element {
                   })}
                 </span>
               </div>
-              <button
-                type="button"
-                className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
-                onClick={handleUpload}
-                disabled={uploadDisabled}
-              >
-                {t("vault.upload")}
-              </button>
+              <Tooltip label={t("vault.upload")}>
+                <button
+                  type="button"
+                  aria-label={t("vault.upload")}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+                  onClick={handleUpload}
+                  disabled={uploadDisabled}
+                >
+                  <Upload className="h-4 w-4" />
+                </button>
+              </Tooltip>
             </div>
           )}
 
