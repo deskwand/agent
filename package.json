@@ -70,9 +70,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@earendil-works/pi-ai": "^0.84.4",
-    "@earendil-works/pi-coding-agent": "^0.84.4",
-    "@earendil-works/pi-tui": "0.84.4",
+    "@earendil-works/pi-ai": "^0.85.1",
+    "@earendil-works/pi-coding-agent": "^0.85.1",
+    "@earendil-works/pi-tui": "0.85.1",
     "@floating-ui/react": "^0.27.20",
     "@google/genai": "^1.44.0",
     "@larksuiteoapi/node-sdk": "^1.59.0",

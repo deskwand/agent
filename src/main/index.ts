@@ -947,6 +947,8 @@ app
       process.exit(0);
     }
 
+    await configStore.syncOAuthProviderModelsFromRegistry();
+
     // Apply dev logs setting from config
     const enableDevLogs = configStore.get("enableDevLogs");
     setDevLogsEnabled(enableDevLogs);

@@ -598,46 +598,76 @@ export async function enrichProviderModelsFromRegistry(
     provider !== "opencode-go"
   )
     return payload;
+  const isOAuth = provider === "oauth";
+  const providerId = isOAuth
+    ? extractOAuthProviderId(payload.profileKey)
+    : provider;
+  if (!providerId) {
+    if (isOAuth) {
+      throw new Error(`Pi SDK has no OAuth provider for ${payload.profileKey}`);
+    }
+    return payload;
+  }
+
+  let piModels:
+    | Array<{
+        id: string;
+        name: string;
+        contextWindow?: number;
+        maxTokens?: number;
+        input?: ("text" | "image")[];
+      }>
+    | undefined;
   try {
-    const providerId =
-      provider === "oauth"
-        ? extractOAuthProviderId(payload.profileKey)
-        : provider;
-    if (!providerId) return payload;
     const { getModels } = await import("@earendil-works/pi-ai/compat");
-    const piModels = getModels(providerId as Parameters<typeof getModels>[0]);
-    if (!piModels?.length) return payload;
-    const models: ApiProviderModel[] = piModels.map((m) => ({
-      id: m.id,
-      label: m.name,
-      source: "preset" as const,
-      contextWindow: m.contextWindow,
-      maxTokens: m.maxTokens,
-      input: m.input,
-    }));
-    // Keep an explicit non-empty defaultModel when it exists in the
-    // enriched set (e.g. the plan-aware defaults set by the UI);
-    // otherwise fall back to the registry-order first model.
-    const defaultModel =
-      payload.config.defaultModel &&
-      models.some((m) => m.id === payload.config.defaultModel)
-        ? payload.config.defaultModel
-        : models[0]?.id || payload.config.defaultModel;
-    return {
-      ...payload,
-      config: {
-        ...payload.config,
-        models,
-        defaultModel,
-      },
-    };
+    piModels = getModels(providerId as Parameters<typeof getModels>[0]);
   } catch (error) {
+    if (isOAuth) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to load Pi SDK models for OAuth provider ${providerId}: ${message}`,
+      );
+    }
     logWarn(
       "[Config] Failed to enrich provider models from pi-ai, using renderer fallback:",
       error,
     );
     return payload;
   }
+
+  if (!piModels?.length) {
+    if (isOAuth) {
+      throw new Error(
+        `Pi SDK returned no models for OAuth provider ${providerId}`,
+      );
+    }
+    return payload;
+  }
+
+  const models: ApiProviderModel[] = piModels.map((m) => ({
+    id: m.id,
+    label: m.name,
+    source: "preset" as const,
+    contextWindow: m.contextWindow,
+    maxTokens: m.maxTokens,
+    input: m.input,
+  }));
+  // Keep an explicit non-empty defaultModel when it exists in the
+  // enriched set (e.g. the plan-aware defaults set by the UI);
+  // otherwise fall back to the registry-order first model.
+  const defaultModel =
+    payload.config.defaultModel &&
+    models.some((m) => m.id === payload.config.defaultModel)
+      ? payload.config.defaultModel
+      : models[0]?.id || payload.config.defaultModel;
+  return {
+    ...payload,
+    config: {
+      ...payload.config,
+      models,
+      defaultModel,
+    },
+  };
 }
 
 function sanitizeSaveProviderPayload(
@@ -1019,6 +1049,33 @@ export class ConfigStore {
     );
     this.store.set(stored);
     return this.getAll();
+  }
+
+  async syncOAuthProviderModelsFromRegistry(): Promise<void> {
+    for (const [profileKey, config] of Object.entries(
+      this.store.store.providers,
+    )) {
+      if (
+        !config ||
+        config.provider !== "oauth" ||
+        !isOAuthProfileKey(profileKey)
+      )
+        continue;
+      const providerId = extractOAuthProviderId(profileKey);
+      try {
+        const enriched = await enrichProviderModelsFromRegistry({
+          profileKey,
+          config,
+        });
+        this.saveProvider(enriched);
+      } catch (error) {
+        logWarn("[Config] Failed to sync OAuth provider models from pi-ai:", {
+          profileKey,
+          providerId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 
   deleteProvider(payload: { profileKey: ProviderProfileKey }): AppConfig {

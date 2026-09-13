@@ -108,40 +108,6 @@ const OPENCODE_PLANS = [
   },
 ] as const;
 
-const OAUTH_PROVIDER_MODELS: Record<
-  string,
-  Array<{ id: string; name: string }>
-> = {
-  "openai-codex": [
-    { id: "gpt-5.6-sol", name: "gpt-5.6-sol" },
-    { id: "gpt-5.6-terra", name: "gpt-5.6-terra" },
-    { id: "gpt-5.6-luna", name: "gpt-5.6-luna" },
-    { id: "gpt-5.5", name: "gpt-5.5" },
-    { id: "gpt-5.4", name: "gpt-5.4" },
-    { id: "gpt-5.4-mini", name: "gpt-5.4-mini" },
-    { id: "gpt-5.3-codex", name: "gpt-5.3-codex" },
-    { id: "gpt-5.3-codex-spark", name: "gpt-5.3-codex-spark" },
-    { id: "gpt-5.2", name: "gpt-5.2" },
-  ],
-  "github-copilot": [
-    { id: "claude-opus-4.7", name: "claude-opus-4.7" },
-    { id: "claude-opus-4.6", name: "claude-opus-4.6" },
-    { id: "claude-opus-4.5", name: "claude-opus-4.5" },
-    { id: "claude-sonnet-4.6", name: "claude-sonnet-4.6" },
-    { id: "claude-sonnet-4.5", name: "claude-sonnet-4.5" },
-    { id: "claude-haiku-4.5", name: "claude-haiku-4.5" },
-    { id: "gpt-5.4", name: "gpt-5.4" },
-    { id: "gpt-5.4-mini", name: "gpt-5.4-mini" },
-  ],
-  anthropic: [
-    { id: "claude-opus-4-6", name: "claude-opus-4-6" },
-    { id: "claude-sonnet-4-6", name: "claude-sonnet-4-6" },
-    { id: "claude-haiku-4-5", name: "claude-haiku-4-5" },
-    { id: "claude-sonnet-4-5", name: "claude-sonnet-4-5" },
-    { id: "claude-3-7-sonnet-latest", name: "claude-3-7-sonnet-latest" },
-  ],
-};
-
 const OAUTH_PROVIDERS = [
   {
     id: "openai-codex",
@@ -902,41 +868,34 @@ export function SettingsAPI({
       // Save OAuth provider to ConfigStore FIRST, before updating UI status.
       // If saveProvider or setActiveProvider fails, the UI won't show
       // a misleading "connected" state.
-      const models = OAUTH_PROVIDER_MODELS[providerId];
-      if (models?.length) {
-        const profileKey: ProviderProfileKey = oauthProfileKey(providerId);
-        const providerInfo = OAUTH_PROVIDERS.find((p) => p.id === providerId);
-        await window.electronAPI.config.saveProvider({
-          profileKey,
-          config: {
-            provider: "oauth",
-            customProtocol: "anthropic",
-            name: providerInfo?.name || providerId,
-            apiKey: "", // credentials live in auth.json
-            baseUrl: "",
-            defaultModel: models[0].id,
-            models: models.map((m) => ({
-              id: m.id,
-              label: m.name || m.id,
-              source: "preset" as const,
-            })),
-            updatedAt: new Date().toISOString(),
-          },
-        });
-        // Switch active provider to the newly logged-in OAuth provider
-        await window.electronAPI.config.setActiveProvider({
-          profileKey,
-          defaultModel: models[0].id,
-        });
-        const updatedConfig = await window.electronAPI.config.get();
-        applyConfig(updatedConfig);
-      } else {
-        // If no known models, log a warning but still let the user proceed.
-        // The model selector may be empty — they can refine models later.
-        console.warn(
-          `[OAuth] No preset models for ${providerId}; provider saved without models.`,
+      const profileKey: ProviderProfileKey = oauthProfileKey(providerId);
+      const providerInfo = OAUTH_PROVIDERS.find((p) => p.id === providerId);
+      const saved = await window.electronAPI.config.saveProvider({
+        profileKey,
+        config: {
+          provider: "oauth",
+          customProtocol: "anthropic",
+          name: providerInfo?.name || providerId,
+          apiKey: "", // credentials live in auth.json
+          baseUrl: "",
+          defaultModel: "",
+          models: [],
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      const defaultModel = saved.config.providers[profileKey]?.defaultModel;
+      if (!defaultModel) {
+        throw new Error(
+          `Pi SDK returned no default model for OAuth provider ${providerId}`,
         );
       }
+      // Switch active provider to the newly logged-in OAuth provider
+      await window.electronAPI.config.setActiveProvider({
+        profileKey,
+        defaultModel,
+      });
+      const updatedConfig = await window.electronAPI.config.get();
+      applyConfig(updatedConfig);
 
       // Only update UI after config save succeeded
       const status = await window.electronAPI.auth.status(providerId);

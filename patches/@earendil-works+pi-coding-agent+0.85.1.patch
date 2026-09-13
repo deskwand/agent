@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-index 099e74e..ce57356 100644
+index e8e8859..ba9ac2f 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-@@ -64,16 +64,186 @@ function getAliases() {
+@@ -68,16 +68,186 @@ function getAliases() {
          return _aliases;
      const __dirname = path.dirname(fileURLToPath(import.meta.url));
      const packageIndex = path.resolve(__dirname, "../..", "index.js");
@@ -196,7 +196,7 @@ index 099e74e..ce57356 100644
      };
      const piCodingAgentEntry = packageIndex;
      const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
-@@ -106,6 +276,7 @@ function getAliases() {
+@@ -110,6 +280,7 @@ function getAliases() {
          "@sinclair/typebox/compile": typeboxCompileEntry,
          "@sinclair/typebox/value": typeboxValueEntry,
      };
