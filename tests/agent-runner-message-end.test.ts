@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
   resolveMessageEndPayload,
   toUserFacingErrorText,
   getErrorSuffix,
 } from '../src/main/agent/agent-runner-message-end';
+import { setLocale } from '../src/main/i18n';
 
 // ── resolveMessageEndPayload (default locale: en) ──────────────────
 
@@ -68,6 +69,11 @@ describe('resolveMessageEndPayload', () => {
 // ── toUserFacingErrorText (default locale: en) ─────────────────────
 
 describe('toUserFacingErrorText (en)', () => {
+  beforeEach(() => {
+    // Module-level locale state: do not depend on other blocks resetting it.
+    setLocale(undefined);
+  });
+
   it('maps 400 / bad request to configuration hint', () => {
     const result = toUserFacingErrorText('HTTP 400: bad request - ROLE_UNSPECIFIED');
     expect(result).toContain('Request rejected (400)');
@@ -157,53 +163,62 @@ describe('toUserFacingErrorText (en)', () => {
 // ── toUserFacingErrorText (zh locale) ──────────────────────────────
 
 describe('toUserFacingErrorText (zh)', () => {
-  const zh = 'zh';
+  beforeEach(() => {
+    setLocale('zh');
+  });
+  afterEach(() => {
+    setLocale(undefined);
+  });
 
   it('maps 400 / bad request to Chinese configuration hint', () => {
-    const result = toUserFacingErrorText('HTTP 400: bad request', zh);
+    const result = toUserFacingErrorText('HTTP 400: bad request');
     expect(result).toContain('请求被拒绝（400）');
     expect(result).toContain('原始错误:');
   });
 
   it('maps first_response_timeout to Chinese', () => {
-    expect(toUserFacingErrorText('first_response_timeout', zh)).toBe(
+    expect(toUserFacingErrorText('first_response_timeout')).toBe(
       '模型响应超时，请稍后重试或检查模型/网关负载。',
     );
   });
 
   it('maps empty_success_result to Chinese', () => {
-    expect(toUserFacingErrorText('empty_success_result', zh)).toBe(
+    expect(toUserFacingErrorText('empty_success_result')).toBe(
       '模型返回空结果，可能是兼容性问题，请重试或切换协议。',
     );
   });
 
   it('maps 401 to Chinese authentication hint', () => {
-    const result = toUserFacingErrorText('Error 401: Unauthorized', zh);
+    const result = toUserFacingErrorText('Error 401: Unauthorized');
     expect(result).toContain('认证失败');
     expect(result).toContain('API Key');
   });
 
   it('maps 429 to Chinese throttle hint', () => {
-    const result = toUserFacingErrorText('429 Too Many Requests', zh);
+    const result = toUserFacingErrorText('429 Too Many Requests');
     expect(result).toContain('请求被限流（429）');
     expect(result).toContain('原始错误:');
   });
 
   it('maps 5xx to Chinese upstream service hint', () => {
-    const result = toUserFacingErrorText('HTTP 503: Service Unavailable', zh);
+    const result = toUserFacingErrorText('HTTP 503: Service Unavailable');
     expect(result).toContain('上游服务异常');
     expect(result).toContain('原始错误:');
   });
 
   it('maps network errors to Chinese', () => {
-    expect(toUserFacingErrorText('terminated', zh)).toContain('网络连接中断');
-    expect(toUserFacingErrorText('fetch failed', zh)).toContain('网络连接中断');
+    expect(toUserFacingErrorText('terminated')).toContain('网络连接中断');
+    expect(toUserFacingErrorText('fetch failed')).toContain('网络连接中断');
   });
 });
 
 // ── getErrorSuffix ─────────────────────────────────────────────────
 
 describe('getErrorSuffix', () => {
+  beforeEach(() => {
+    setLocale(undefined);
+  });
+
   it('returns config retry suffix for 4xx errors (en)', () => {
     const suffix = getErrorSuffix('HTTP 400: bad request');
     expect(suffix).toContain('check your configuration');
@@ -215,12 +230,16 @@ describe('getErrorSuffix', () => {
   });
 
   it('returns config retry suffix for 4xx errors (zh)', () => {
-    const suffix = getErrorSuffix('HTTP 400: bad request', 'zh');
+    setLocale('zh');
+    const suffix = getErrorSuffix('HTTP 400: bad request');
     expect(suffix).toContain('请检查配置后重试');
+    setLocale(undefined);
   });
 
   it('returns auto retry suffix for non-4xx errors (zh)', () => {
-    const suffix = getErrorSuffix('connection error', 'zh');
+    setLocale('zh');
+    const suffix = getErrorSuffix('connection error');
     expect(suffix).toContain('Agent 正在自动重试');
+    setLocale(undefined);
   });
 });

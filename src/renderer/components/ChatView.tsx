@@ -535,7 +535,7 @@ export function ChatView() {
       const presetLabel =
         providerConfig.name ||
         (meta.provider === "custom"
-          ? `${API_PROVIDER_PRESETS.custom.name} / ${providerConfig.customProtocol}`
+          ? `${t("api.moreModels")} / ${providerConfig.customProtocol}`
           : (
               API_PROVIDER_PRESETS as unknown as Record<
                 string,
@@ -556,7 +556,7 @@ export function ChatView() {
       groupLabel: group.groupLabel,
       items: group.items,
     }));
-  }, [appConfig?.providers]);
+  }, [appConfig?.providers, t]);
   const activeModel = activeSession?.model || appConfig?.model || "";
 
   // Strip thinking blocks from all assistant messages — thinking happens

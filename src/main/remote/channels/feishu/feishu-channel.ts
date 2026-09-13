@@ -31,6 +31,7 @@ interface FeishuChannelConfig {
   defaultGroupSettings?: { requireMention: boolean };
 }
 
+import { t } from "../../../i18n";
 import { FeishuAPI } from "./feishu-api";
 import { FeishuWSClient } from "./feishu-ws-client";
 
@@ -496,7 +497,7 @@ export class FeishuChannel extends ChannelBase {
           log("[Feishu] Unknown message type:", msgType);
           return {
             type: "text",
-            text: `[不支持的消息类型: ${msgType}]`,
+            text: t("feishu.unsupportedMessageType", { type: msgType }),
           };
       }
     } catch (error) {
@@ -706,7 +707,12 @@ export class FeishuChannel extends ChannelBase {
 
     // Limit length
     if (sanitized.length > 10000) {
-      sanitized = sanitized.substring(0, 10000) + "\n\n... (内容过长已截断)";
+      // Fixed bilingual: this text goes to whoever receives the reply on the
+      // Feishu side (channel policy can be "open"), so it must not depend on
+      // the local UI language.
+      sanitized =
+        sanitized.substring(0, 10000) +
+        "\n\n... (content truncated / 内容过长已截断)"; // i18n-allow-cjk
     }
 
     return sanitized;

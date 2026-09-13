@@ -89,6 +89,7 @@ const ALLOWED_CLIENT_EVENTS = new Set([
   "project.delete",
   "update.check",
   "update.install",
+  "i18n.setLocale",
 ] as const);
 
 // Compile-time exhaustiveness: every renderer→main event type must be in the

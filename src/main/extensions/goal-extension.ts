@@ -1,4 +1,4 @@
-import { app } from "electron";
+import { getLocale, t } from "../i18n";
 import type { TSchema } from "@sinclair/typebox";
 import { Type } from "@sinclair/typebox";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -163,75 +163,8 @@ const UpdateGoalSchema = Type.Object({
 
 type UpdateGoalInput = { status: "complete" | "blocked"; summary: string };
 
-// ─── Locale messages ────────────────────────────────────────────────
-
-const MSG: Record<string, Record<string, string>> = {
-  zh: {
-    noActiveGoal: "没有活跃的目标。",
-    noGoalToPause: "没有可暂停的目标。",
-    noGoalToResume: "没有可恢复的目标。",
-    noGoalToClear: "没有可清除的目标。",
-    alreadyActive: "目标已在执行中。",
-    started: "目标已启动: {{objective}}{{budget}}",
-    paused: "目标已暂停: {{objective}}",
-    resumed: "目标已恢复: {{objective}}",
-    resumedAtCap:
-      "目标已恢复: {{objective}}。已达 {{max}} 轮上限，恢复后计数重新开始",
-    cleared: "目标已清除。",
-    needObjective: "请提供一个目标描述。",
-    goalIsStatus: "目标状态为 {{status}}，请用 /goal <目标> 创建新目标。",
-    statusActive: "🎯 执行中 (第{{n}}轮): {{objective}}{{budget}}",
-    statusPaused: "⏸ 已暂停: {{objective}}",
-    statusComplete: "✅ 已完成: {{objective}}",
-    statusBlocked: "🚫 已阻塞: {{objective}}",
-    statusBudgetLimited: "💸 预算耗尽: {{objective}}{{budget}}",
-    summaryComplete: "目标完成",
-    summaryBlocked: "目标阻塞",
-    summaryCompleteStats: "{{n}} 轮 · {{time}} · {{tokens}}",
-    summaryBlockedStats: "{{n}} 轮 · {{time}}",
-  },
-  en: {
-    noActiveGoal: "No active goal.",
-    noGoalToPause: "No active goal to pause.",
-    noGoalToResume: "No goal to resume.",
-    noGoalToClear: "No goal to clear.",
-    alreadyActive: "Goal is already active.",
-    started: "Goal started: {{objective}}{{budget}}",
-    paused: "Goal paused: {{objective}}",
-    resumed: "Goal resumed: {{objective}}",
-    resumedAtCap:
-      "Goal resumed: {{objective}}. Reached the {{max}}-turn cap; counting restarts",
-    cleared: "Goal cleared.",
-    needObjective: "Please provide a goal objective.",
-    goalIsStatus: "Goal is {{status}}; start a new one with /goal <objective>.",
-    statusActive: "🎯 Goal active (turn {{n}}): {{objective}}{{budget}}",
-    statusPaused: "⏸ Goal paused: {{objective}}",
-    statusComplete: "✅ Goal complete: {{objective}}",
-    statusBlocked: "🚫 Goal blocked: {{objective}}",
-    statusBudgetLimited: "💸 Goal budget exhausted: {{objective}}{{budget}}",
-    summaryComplete: "Goal Complete",
-    summaryBlocked: "Goal Blocked",
-    summaryCompleteStats: "{{n}} turns · {{time}} · {{tokens}}",
-    summaryBlockedStats: "{{n}} turns · {{time}}",
-  },
-};
-
-function getLocale(): string {
-  try {
-    const l = app.getLocale();
-    return l.startsWith("zh") ? "zh" : "en";
-  } catch {
-    return "en";
-  }
-}
-
 function msg(key: string, params?: Record<string, string | number>): string {
-  const locale = getLocale();
-  const tpl = MSG[locale]?.[key] || MSG.en[key] || key;
-  if (!params) return tpl;
-  return tpl.replace(/\{\{(\w+)\}\}/g, (_, k) =>
-    params[k] !== undefined ? String(params[k]) : `{{${k}}}`,
-  );
+  return t(`goal.${key}`, params);
 }
 
 // ─── Extension ───────────────────────────────────────────────────────
@@ -1006,36 +939,48 @@ function formatDuration(seconds: number): string {
   return m > 0 ? `${h}h${m}m` : `${h}h`;
 }
 
-function formatDurationNatural(seconds: number, locale: string): string {
+/** Unit picker: singular uses *One, everything else the base key. */
+function unit(key: "seconds" | "minutes" | "hours", n: number): string {
+  return t(`goal.${key}${n === 1 ? "One" : ""}`, { n });
+}
+
+function formatDurationNatural(seconds: number): string {
   const s = Math.round(seconds);
-  const isZh = locale.startsWith("zh");
 
   if (s < 60) {
-    return isZh ? `${s} 秒` : s === 1 ? "1 second" : `${s} seconds`;
+    return unit("seconds", s);
   }
   if (s < 3600) {
     const m = Math.round(s / 60);
-    return isZh ? `${m} 分钟` : m === 1 ? "1 minute" : `${m} minutes`;
+    return unit("minutes", m);
   }
   const h = Math.floor(s / 3600);
   const m = Math.round((s % 3600) / 60);
   if (m === 0) {
-    return isZh ? `${h} 小时` : h === 1 ? "1 hour" : `${h} hours`;
+    return unit("hours", h);
   }
-  return isZh ? `${h} 小时 ${m} 分钟` : `${h}h ${m}m`;
+  return t("goal.hoursMinutes", { h, m });
 }
 
-function formatTokens(count: number, locale: string): string {
+function formatTokens(count: number): string {
   const rounded = Math.round(count);
-  const isZh = locale.startsWith("zh");
 
-  if (isZh) {
+  if (getLocale() === "zh") {
     if (rounded >= 10000) {
       // Use integer modulo to avoid floating-point edge cases with % 1
+      // Two params so each locale can pick its own unit: zh reads {{n}} (万),
+      // en reads {{k}} (K). A single {{n}} would make the en unit wrong for the
+      // fractional case ("2.5万" is 25K, not 2.50K).
       if (rounded % 10000 === 0) {
-        return `${rounded / 10000}万 tokens`;
+        return t("goal.tokensTenThousands", {
+          n: rounded / 10000,
+          k: rounded / 1000,
+        });
       }
-      return `${(rounded / 10000).toFixed(1)}万 tokens`;
+      return t("goal.tokensTenThousands", {
+        n: (rounded / 10000).toFixed(1),
+        k: (rounded / 1000).toFixed(1),
+      });
     }
     return `${rounded.toLocaleString()} tokens`;
   }
@@ -1056,9 +1001,8 @@ function formatTokens(count: number, locale: string): string {
 }
 
 function buildGoalSummaryMessage(goal: GoalState): string {
-  const locale = getLocale();
-  const timeStr = formatDurationNatural(goal.timeUsedSeconds, locale);
-  const tokenStr = formatTokens(goal.tokensUsed, locale);
+  const timeStr = formatDurationNatural(goal.timeUsedSeconds);
+  const tokenStr = formatTokens(goal.tokensUsed);
   const title =
     goal.status === "complete" ? msg("summaryComplete") : msg("summaryBlocked");
   const templates: Parameters<typeof msg>[1] = {

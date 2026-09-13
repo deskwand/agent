@@ -95,7 +95,7 @@ export function WelcomeView() {
       const presetLabel =
         providerConfig.name ||
         (meta.provider === "custom"
-          ? `${API_PROVIDER_PRESETS.custom.name} / ${providerConfig.customProtocol}`
+          ? `${t("api.moreModels")} / ${providerConfig.customProtocol}`
           : (
               API_PROVIDER_PRESETS as unknown as Record<
                 string,
@@ -116,7 +116,7 @@ export function WelcomeView() {
       groupLabel: group.groupLabel,
       items: group.items,
     }));
-  }, [appConfig?.providers]);
+  }, [appConfig?.providers, t]);
 
   useEffect(() => {
     if (

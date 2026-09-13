@@ -145,6 +145,7 @@ import {
   isDevLogsEnabled,
 } from "./utils/logger";
 import { buildDiagnosticsSummary } from "./utils/diagnostics-summary";
+import { getLocale, setLocale, t } from "./i18n";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
 import { initOAuthService } from "./auth/oauth-service";
@@ -224,8 +225,8 @@ async function resolveScheduledTaskTitle(
 ): Promise<string> {
   const normalizedPrompt = prompt.trim();
   const fallback = fallbackTitle
-    ? buildScheduledTaskTitle(fallbackTitle)
-    : buildScheduledTaskFallbackTitle(normalizedPrompt);
+    ? buildScheduledTaskTitle(fallbackTitle, getLocale())
+    : buildScheduledTaskFallbackTitle(normalizedPrompt, getLocale());
   if (!sessionManager) {
     return fallback;
   }
@@ -1124,12 +1125,15 @@ app
         if (unsupportedReason) {
           throw new Error(unsupportedReason);
         }
-        const fallbackTitle = buildScheduledTaskFallbackTitle(task.prompt);
+        const fallbackTitle = buildScheduledTaskFallbackTitle(
+          task.prompt,
+          getLocale(),
+        );
         const needsRegeneratedTitle =
           !task.title?.trim() || task.title === fallbackTitle;
         const title = needsRegeneratedTitle
           ? await resolveScheduledTaskTitle(task.prompt, task.cwd, task.title)
-          : buildScheduledTaskTitle(task.title);
+          : buildScheduledTaskTitle(task.title, getLocale());
         if (title !== task.title) {
           scheduledTaskStore.update(task.id, { title });
         }
@@ -1233,8 +1237,8 @@ app
     const message =
       error instanceof Error ? error.message : "Unknown startup error";
     dialog.showErrorBox(
-      "DeskWand 启动失败",
-      `${message}\n\n请查看日志获取更多信息。`,
+      t("errors.startupFailedTitle"),
+      t("errors.startupFailedDetail", { message }),
     );
     app.quit();
   });
@@ -3642,7 +3646,10 @@ ipcMain.handle(
         updates.title ?? existing.title,
       );
     } else if (updates.title !== undefined) {
-      normalizedUpdates.title = buildScheduledTaskTitle(updates.title);
+      normalizedUpdates.title = buildScheduledTaskTitle(
+        updates.title,
+        getLocale(),
+      );
     }
 
     return scheduledTaskManager.update(id, normalizedUpdates);
@@ -3900,6 +3907,11 @@ ipcMain.handle(
 // ---
 
 async function handleClientEvent(event: ClientEvent): Promise<unknown> {
+  if (event.type === "i18n.setLocale") {
+    setLocale(event.payload.locale);
+    return null;
+  }
+
   // Check if configured before starting sessions
   if (
     event.type === "session.start" &&
@@ -3908,7 +3920,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
     sendToRenderer({
       type: "error",
       payload: {
-        message: "当前方案未配置可用凭证，请先在 API 设置中完成配置",
+        message: t("errors.configRequiredActiveSet"),
         code: "CONFIG_REQUIRED_ACTIVE_SET",
         action: "open_api_settings",
       },

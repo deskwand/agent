@@ -11,6 +11,9 @@ vi.mock("electron", () => ({
     isPackaged: false,
     getPath: () => currentUserDataDir,
     getVersion: () => "0.0.0",
+    // Fork error messages are locale-driven now; pin zh so this file keeps
+    // asserting the Chinese copy.
+    getLocale: () => "zh",
   },
 }));
 

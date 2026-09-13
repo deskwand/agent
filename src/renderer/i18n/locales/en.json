@@ -894,6 +894,19 @@
     "slashShortcutSwitch": "Switch",
     "slashTotalItems_one": "{{count}} item",
     "slashTotalItems_other": "{{count}} items",
+    "agentRun": {
+      "status": {
+        "created": "Starting",
+        "running": "Running",
+        "completed": "Completed",
+        "steered": "Steered",
+        "stopped": "Stopped",
+        "aborted": "Aborted",
+        "error": "Failed"
+      },
+      "toolUses": "Tools: {{count}}",
+      "turns": "Turns: {{count}}"
+    },
     "slashTabCommands": "Commands",
     "slashTabSkills": "Skills",
     "thinkingLevel": "Thinking",
@@ -1236,6 +1249,10 @@
     "description": "An unexpected error occurred in the application. You can try to recover by clicking the button below.",
     "details": "Error details",
     "retry": "Try again"
+  },
+  "fileBrowser": {
+    "noWorkdir": "No working directory set",
+    "emptyDir": "Empty directory"
   },
   "filePreview": {
     "openExternal": "Open with system app",

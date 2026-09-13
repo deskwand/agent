@@ -32,3 +32,26 @@ i18n
   });
 
 export default i18n;
+
+// The main process must mirror the renderer language: it has no i18n of its
+// own. Report once after init (the languageChanged emitted during init() fires
+// before this listener is attached) and then on every change.
+function reportLocaleToMain(): void {
+  const language = i18n.resolvedLanguage || i18n.language;
+  // Do not report a guessed locale when the language is not settled yet:
+  // main then keeps its app.getLocale() fallback, which is the pre-fix
+  // behaviour, instead of being told the wrong language.
+  if (!language) return;
+  const locale = language.startsWith("zh") ? "zh" : "en";
+  try {
+    window.electronAPI?.send({
+      type: "i18n.setLocale",
+      payload: { locale },
+    });
+  } catch {
+    // IPC not ready: main falls back to the OS locale, the UI is unaffected.
+  }
+}
+
+i18n.on("languageChanged", reportLocaleToMain);
+reportLocaleToMain();

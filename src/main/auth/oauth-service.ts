@@ -1,11 +1,11 @@
 import {
-  app,
   BrowserWindow,
   clipboard,
   ipcMain,
   nativeTheme,
   shell,
 } from "electron";
+import { t } from "../i18n";
 import type {
   AuthEvent,
   AuthInteraction,
@@ -29,25 +29,22 @@ const SUPPORTED_OAUTH_PROVIDERS = [
   { id: "anthropic", name: "Anthropic" },
 ] as const;
 
-// ── Minimal in-app i18n for OAuth dialogs ────────────────────────────
+// ── Dialog copy ──────────────────────────────────────────────────────
+// Must be a function, not a module-level constant: the locale is only known
+// after the renderer reports it, so evaluating it at import time would pin
+// the language for the whole process lifetime.
 
-const isZh = (app.getLocale() ?? "en").startsWith("zh");
-
-const T = {
-  openBrowser: isZh ? "打开浏览器" : "Open Browser",
-  continue: isZh ? "继续" : "Continue",
-  cancel: isZh ? "取消" : "Cancel",
-  deviceCodeTitle: isZh ? "设备验证码" : "Device Code",
-  deviceCodeDetail: isZh
-    ? "验证码已复制到剪贴板，将打开浏览器窗口，粘贴验证码即可完成登录。"
-    : "The code has been copied to your clipboard. A browser window will open — paste the code there to complete login.",
-  verificationCode: isZh
-    ? (code: string) => `您的验证码：${code}`
-    : (code: string) => `Your verification code: ${code}`,
-  githubEnterpriseDetail: isZh
-    ? "个人账号留空，默认使用 github.com"
-    : "Leave blank for personal github.com account.",
-};
+function T() {
+  return {
+    openBrowser: t("oauth.openBrowser"),
+    continue: t("oauth.continue"),
+    cancel: t("oauth.cancel"),
+    deviceCodeTitle: t("oauth.deviceCodeTitle"),
+    deviceCodeDetail: t("oauth.deviceCodeDetail"),
+    verificationCode: (code: string) => t("oauth.verificationCode", { code }),
+    githubEnterpriseDetail: t("oauth.githubEnterpriseDetail"),
+  };
+}
 
 // ── Theme-aware CSS ──────────────────────────────────────────────────
 
@@ -177,12 +174,13 @@ function notifyAuth(event: AuthEvent): void {
     return;
   }
   if (event.type === "device_code") {
+    const T_ = T();
     clipboard.writeText(event.userCode);
     void showBrowserDialog({
-      title: T.deviceCodeTitle,
-      message: T.verificationCode(event.userCode),
-      detail: T.deviceCodeDetail,
-      buttons: [{ label: T.openBrowser, value: 0 }],
+      title: T_.deviceCodeTitle,
+      message: T_.verificationCode(event.userCode),
+      detail: T_.deviceCodeDetail,
+      buttons: [{ label: T_.openBrowser, value: 0 }],
     }).then(() => shell.openExternal(event.verificationUri));
     return;
   }
@@ -211,14 +209,15 @@ async function promptAuth(
     });
   }
 
+  const T_ = T();
   const result = await showBrowserDialog({
     title: providerName,
     message: prompt.message,
     detail:
-      providerName === "GitHub Copilot" ? T.githubEnterpriseDetail : undefined,
+      providerName === "GitHub Copilot" ? T_.githubEnterpriseDetail : undefined,
     buttons: [
-      { label: T.continue, value: 0 },
-      { label: T.cancel, value: 1 },
+      { label: T_.continue, value: 0 },
+      { label: T_.cancel, value: 1 },
     ],
     input: {
       placeholder: prompt.placeholder,

@@ -1,5 +1,6 @@
 import http from "node:http";
 import type { AddressInfo } from "node:net";
+import { t } from "../i18n";
 import { shell } from "electron";
 import {
   GOOGLE_CLIENT_ID,
@@ -68,7 +69,7 @@ export async function startGoogleAuth(): Promise<CloudAuthLoginResult> {
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
           res.end(
             "<html><body style='font-family:sans-serif;text-align:center;padding-top:80px;'>" +
-              "<h2>登录成功 ✅</h2><p>请返回 DeskWand 应用</p></body></html>",
+              t("oauth.loginSuccessPage"),
           );
           server.close();
           resolve(code);
@@ -76,10 +77,10 @@ export async function startGoogleAuth(): Promise<CloudAuthLoginResult> {
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
           res.end(
             "<html><body style='font-family:sans-serif;text-align:center;padding-top:80px;'>" +
-              "<h2>授权已取消</h2><p>请关闭此页面并返回应用</p></body></html>",
+              t("oauth.loginCancelledPage"),
           );
           server.close();
-          const err = new Error("用户取消授权");
+          const err = new Error(t("oauth.userCancelled"));
           (err as unknown as Record<string, unknown>).code = "USER_CANCELLED";
           reject(err);
         } else {
@@ -94,7 +95,7 @@ export async function startGoogleAuth(): Promise<CloudAuthLoginResult> {
 
     const timeout = setTimeout(() => {
       server.close();
-      const err = new Error("授权超时");
+      const err = new Error(t("oauth.timeout"));
       (err as unknown as Record<string, unknown>).code = "TIMEOUT";
       reject(err);
     }, OAUTH_CALLBACK_TIMEOUT_MS);

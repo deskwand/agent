@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { setLocale } from "../../main/i18n";
 import type { GoalRow } from "../../main/db/database";
 import {
   GoalExtension,
@@ -621,5 +622,40 @@ describe("GoalExtension elapsed-time accounting", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("goal messages follow the main-process locale", () => {
+  afterEach(() => {
+    setLocale(undefined);
+  });
+
+  it('returns the zh started message after setLocale("zh")', async () => {
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+    setLocale("zh");
+
+    const result = await ext.onCommand({
+      command: "goal",
+      args: "测试目标",
+      sessionId: "s1",
+    });
+
+    expect(result?.message).toContain("目标已启动: 测试目标");
+  });
+
+  it("returns the en started message by default", async () => {
+    // Do not rely on the other describe block's afterEach having run.
+    setLocale(undefined);
+    const db = createMockDb();
+    const ext = new GoalExtension(db as never);
+
+    const result = await ext.onCommand({
+      command: "goal",
+      args: "test objective",
+      sessionId: "s1",
+    });
+
+    expect(result?.message).toContain("Goal started: test objective");
   });
 });

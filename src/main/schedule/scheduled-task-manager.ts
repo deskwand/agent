@@ -15,6 +15,7 @@ import {
   buildScheduledTaskFallbackTitle,
   buildScheduledTaskTitle,
 } from "../../shared/schedule/task-title";
+import { getLocale } from "../i18n";
 import { log, logError } from "../utils/logger";
 
 export type ScheduleRepeatUnit = "minute" | "hour" | "day";
@@ -163,8 +164,8 @@ export class ScheduledTaskManager {
   create(input: ScheduledTaskCreateInput): ScheduledTask {
     const normalizedPrompt = input.prompt.trim();
     const normalizedTitle = input.title
-      ? buildScheduledTaskTitle(input.title)
-      : buildScheduledTaskFallbackTitle(normalizedPrompt);
+      ? buildScheduledTaskTitle(input.title, getLocale())
+      : buildScheduledTaskFallbackTitle(normalizedPrompt, getLocale());
     const normalizedScheduleConfig = normalizeScheduleConfig(
       input.scheduleConfig,
     );
@@ -197,7 +198,7 @@ export class ScheduledTaskManager {
     const nextTitle =
       updates.title === undefined
         ? current.title
-        : buildScheduledTaskTitle(updates.title || nextPrompt);
+        : buildScheduledTaskTitle(updates.title || nextPrompt, getLocale());
     const nextScheduleConfig =
       updates.scheduleConfig === undefined
         ? undefined

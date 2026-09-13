@@ -484,7 +484,8 @@ export type ClientEvent =
   | { type: "project.create"; payload: { name: string } }
   | { type: "project.delete"; payload: { cwd: string } }
   | { type: "update.check"; payload: Record<string, never> }
-  | { type: "update.install"; payload: Record<string, never> };
+  | { type: "update.install"; payload: Record<string, never> }
+  | { type: "i18n.setLocale"; payload: { locale: "zh" | "en" } };
 
 // Sandbox setup types (app startup)
 export type SandboxSetupPhase =

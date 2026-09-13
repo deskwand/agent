@@ -1,7 +1,17 @@
-const SCHEDULE_TITLE_PREFIX = "[定时任务]";
-const EMPTY_TITLE_FALLBACK = "未命名任务";
+export type TitleLocale = "zh" | "en";
+
+const SCHEDULE_TITLE_PREFIX: Record<TitleLocale, string> = {
+  zh: "[定时任务]",
+  en: "[Scheduled]",
+};
+const EMPTY_TITLE_FALLBACK: Record<TitleLocale, string> = {
+  zh: "未命名任务",
+  en: "Untitled task",
+};
 const DEFAULT_SUMMARY_MAX_LENGTH = 48;
-const PREFIX_PATTERN = /^\s*\[定时任务\]\s*/;
+// Must match both prefixes: when the user switches language, titles created
+// under the other language still carry a prefix that has to be stripped.
+const PREFIX_PATTERN = /^\s*(\[定时任务\]|\[Scheduled\])\s*/;
 
 function normalizeTitlePart(value: string): string {
   return value
@@ -16,11 +26,12 @@ function stripSchedulePrefix(value: string): string {
 
 export function summarizeSchedulePrompt(
   prompt: string,
+  locale: TitleLocale,
   maxLength: number = DEFAULT_SUMMARY_MAX_LENGTH,
 ): string {
   const normalizedPrompt = normalizeTitlePart(prompt);
   if (!normalizedPrompt) {
-    return EMPTY_TITLE_FALLBACK;
+    return EMPTY_TITLE_FALLBACK[locale];
   }
   if (!Number.isFinite(maxLength) || maxLength <= 0) {
     return normalizedPrompt;
@@ -31,12 +42,21 @@ export function summarizeSchedulePrompt(
   return `${normalizedPrompt.slice(0, Math.max(1, maxLength - 3))}...`;
 }
 
-export function buildScheduledTaskTitle(titleOrSummary: string): string {
+export function buildScheduledTaskTitle(
+  titleOrSummary: string,
+  locale: TitleLocale,
+): string {
   const normalized = normalizeTitlePart(stripSchedulePrefix(titleOrSummary));
-  const summary = normalized || EMPTY_TITLE_FALLBACK;
-  return `${SCHEDULE_TITLE_PREFIX} ${summary}`;
+  const summary = normalized || EMPTY_TITLE_FALLBACK[locale];
+  return `${SCHEDULE_TITLE_PREFIX[locale]} ${summary}`;
 }
 
-export function buildScheduledTaskFallbackTitle(prompt: string): string {
-  return buildScheduledTaskTitle(summarizeSchedulePrompt(prompt));
+export function buildScheduledTaskFallbackTitle(
+  prompt: string,
+  locale: TitleLocale,
+): string {
+  return buildScheduledTaskTitle(
+    summarizeSchedulePrompt(prompt, locale),
+    locale,
+  );
 }

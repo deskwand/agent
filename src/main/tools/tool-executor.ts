@@ -11,6 +11,7 @@ import type {
 } from "../../renderer/types";
 import { isUncPath } from "../../shared/local-file-path";
 import { isPathWithinRoot } from "./path-containment";
+import { t } from "../i18n";
 
 /**
  * ToolExecutor - Secure tool execution framework
@@ -199,7 +200,7 @@ export class ToolExecutor {
         error instanceof Error &&
         (error.name === "AbortError" || error.name === "TimeoutError")
       ) {
-        throw new Error("请求超时，请检查网络连接后重试");
+        throw new Error(t("errors.requestTimeout"));
       }
       throw error;
     }
@@ -246,7 +247,7 @@ export class ToolExecutor {
         error instanceof Error &&
         (error.name === "AbortError" || error.name === "TimeoutError")
       ) {
-        throw new Error("请求超时，请检查网络连接后重试");
+        throw new Error(t("errors.requestTimeout"));
       }
       throw error;
     }

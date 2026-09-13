@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Bot, Loader2 } from "lucide-react";
 
 interface AgentRunContainerProps {
@@ -10,27 +11,6 @@ interface AgentRunContainerProps {
   durationMs?: number;
   modelName?: string;
   children: React.ReactNode;
-}
-
-function statusLabel(status: string): string {
-  switch (status) {
-    case "created":
-      return "创建中";
-    case "running":
-      return "运行中";
-    case "completed":
-      return "已完成";
-    case "steered":
-      return "已引导";
-    case "stopped":
-      return "已停止";
-    case "aborted":
-      return "已终止";
-    case "error":
-      return "失败";
-    default:
-      return status;
-  }
 }
 
 function statusColor(status: string): string {
@@ -58,6 +38,7 @@ export function AgentRunContainer({
   modelName,
   children,
 }: AgentRunContainerProps) {
+  const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(status !== "running");
 
   const totalTokens = tokens?.total;
@@ -79,7 +60,7 @@ export function AgentRunContainer({
           </span>
         )}
         <span className={`text-xs ml-auto ${statusColor(status)}`}>
-          {statusLabel(status)}
+          {t(`chat.agentRun.status.${status}`, { defaultValue: status })}
         </span>
         {status === "running" && (
           <Loader2 size={12} className="animate-spin text-blue-500" />
@@ -88,8 +69,12 @@ export function AgentRunContainer({
 
       {/* 统计摘要 */}
       <div className="px-3 pb-1 flex gap-3 text-xs text-muted-foreground">
-        {toolUses !== undefined && <span>工具: {toolUses}</span>}
-        {turnCount !== undefined && <span>轮数: {turnCount}</span>}
+        {toolUses !== undefined && (
+          <span>{t("chat.agentRun.toolUses", { count: toolUses })}</span>
+        )}
+        {turnCount !== undefined && (
+          <span>{t("chat.agentRun.turns", { count: turnCount })}</span>
+        )}
         {totalTokens !== undefined && (
           <span>Tokens: {totalTokens.toLocaleString()}</span>
         )}

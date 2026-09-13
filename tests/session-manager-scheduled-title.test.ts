@@ -6,6 +6,9 @@ vi.mock('electron', () => {
       isPackaged: false,
       getPath: () => '/tmp',
       getVersion: () => '0.0.0',
+      // Scheduled-task title prefixes are locale-driven now; pin zh so this
+      // file keeps asserting the Chinese copy.
+      getLocale: () => 'zh',
     },
   };
 
@@ -81,6 +84,6 @@ describe('SessionManager scheduled title generation', () => {
 
     const title = await proto.generateScheduledTaskTitle.call(fakeManager, prompt, '/tmp/project');
 
-    expect(title).toBe(buildScheduledTaskTitle(getDefaultTitleFromPrompt(prompt)));
+    expect(title).toBe(buildScheduledTaskTitle(getDefaultTitleFromPrompt(prompt), 'zh'));
   });
 });

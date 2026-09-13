@@ -47,6 +47,7 @@ const ALL_CLIENT_EVENT_TYPES = [
   "project.delete",
   "update.check",
   "update.install",
+  "i18n.setLocale",
 ] as const satisfies ReadonlyArray<ClientEvent["type"]>;
 
 // Compile-time: the list above must cover the whole ClientEvent union, so a

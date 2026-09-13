@@ -351,7 +351,7 @@ describe('ScheduledTaskManager', () => {
       enabled: true,
     });
 
-    expect(created.title).toBe(buildScheduledTaskTitle('需要汇总论文'));
+    expect(created.title).toBe(buildScheduledTaskTitle('需要汇总论文', 'en'));
   });
 
   it('keeps existing title when prompt changes without explicit title update', () => {

@@ -37,6 +37,7 @@ function FileTreeItem({
   onFileOpen: (fullPath: string, fileName: string) => void;
   selectedPath: string | null;
 }) {
+  const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<FileEntry[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -121,7 +122,7 @@ function FileTreeItem({
               className="text-xs text-text-muted py-1"
               style={{ paddingLeft: `${(depth + 1) * 16 + 12}px` }}
             >
-              空目录
+              {t("fileBrowser.emptyDir")}
             </div>
           )}
         </div>
@@ -227,7 +228,9 @@ export function FileBrowser({ width }: { width: number }) {
         className="shrink-0 border-l border-border-subtle bg-background/60 flex items-center justify-center"
         style={{ width }}
       >
-        <div className="text-text-muted text-xs">未设置工作目录</div>
+        <div className="text-text-muted text-xs">
+          {t("fileBrowser.noWorkdir")}
+        </div>
       </div>
     );
   }
@@ -281,10 +284,12 @@ export function FileBrowser({ width }: { width: number }) {
         {loading && entries.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-text-muted">
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            <span className="text-xs">加载中...</span>
+            <span className="text-xs">{t("common.loading")}</span>
           </div>
         ) : entries.length === 0 ? (
-          <div className="text-center py-8 text-text-muted text-xs">空目录</div>
+          <div className="text-center py-8 text-text-muted text-xs">
+            {t("fileBrowser.emptyDir")}
+          </div>
         ) : (
           entries.map((entry) => (
             <FileTreeItem

@@ -83,6 +83,7 @@ import {
   type ResolvedUtilityModelConfig,
 } from "../memory/memory-llm-client";
 import { modelResolutionService } from "../model/model-resolution-service";
+import { getLocale, t } from "../i18n";
 import { buildScheduledTaskTitle } from "../../shared/schedule/task-title";
 import {
   normalizeSessionTitle,
@@ -278,7 +279,7 @@ export class SessionManager {
           },
         },
         onBackgroundAgentComplete: (sessionId: string, agentId: string) => {
-          const prompt = `[系统通知] 后台子代理 ${agentId} 已完成。请调用 get_subagent_result 获取结果并汇总给用户。`;
+          const prompt = t("agent.backgroundAgentDone", { agentId });
           log(
             "[SessionManager] auto-continue: triggering for",
             sessionId,
@@ -544,15 +545,15 @@ export class SessionManager {
     titleSuffix: string,
   ): Promise<Session> {
     const source = this.loadSession(sessionId);
-    if (!source) throw new Error("会话不存在");
+    if (!source) throw new Error(t("errors.forkSessionNotFound"));
     // 优先 messageCache（含实时 uuidv4），fallback getMessages（entries）
     const messages =
       this.messageCache.get(sessionId) ?? this.getMessages(sessionId);
     const forkIdx = messages.findIndex((m) => m.id === messageId);
-    if (forkIdx < 0) throw new Error("分叉点消息不存在");
+    if (forkIdx < 0) throw new Error(t("errors.forkPointNotFound"));
     const target = messages[forkIdx];
     if (target.role !== "assistant" || isToolResultMessage(target)) {
-      throw new Error("仅支持从助手消息分叉");
+      throw new Error(t("errors.forkAssistantOnly"));
     }
 
     const newSession = this.createSession(
@@ -571,14 +572,14 @@ export class SessionManager {
       this.saveSession(newSession);
       const sourceFile = source.piSessionFile;
       if (!sourceFile) {
-        throw new Error("源会话无 JSONL 文件，无法分叉（需先回填存量数据）");
+        throw new Error(t("errors.forkNoJsonl"));
       }
       // 定位 entry id：messages 与 entries 顺序一致（时间序），
       // 第 forkIdx 条 message entry 即分叉点对应的 entry。
       const entries = this.entriesReader ? this.entriesReader(sessionId) : null;
       const forkEntryId = locateForkEntryId(entries, forkIdx);
       if (!forkEntryId) {
-        throw new Error("分叉失败：无法在会话历史中定位分叉点");
+        throw new Error(t("errors.forkPointUnresolved"));
       }
       const forkedFile = await this.agentRunner.forkSessionFile?.(
         sourceFile,
@@ -587,7 +588,7 @@ export class SessionManager {
         forkEntryId,
       );
       if (!forkedFile) {
-        throw new Error("分叉失败：无法从源会话文件提取历史");
+        throw new Error(t("errors.forkHistoryExtractFailed"));
       }
       this.db.sessions.update(newSession.id, { pi_session_file: forkedFile });
       return newSession;
@@ -935,7 +936,7 @@ export class SessionManager {
 
   async generateScheduledTaskTitle(prompt: string): Promise<string> {
     const sessionTitle = await this.generateSessionTitleFromPrompt(prompt);
-    return buildScheduledTaskTitle(sessionTitle);
+    return buildScheduledTaskTitle(sessionTitle, getLocale());
   }
 
   /**

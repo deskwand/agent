@@ -162,6 +162,7 @@
     "loginPrompt": "登录即可使用云端技能市场，与团队分享技能",
     "search": "搜索技能...",
     "noSkills": "暂无技能",
+    "noMatch": "没有匹配的项",
     "install": "安装",
     "installed": "已安装",
     "skillCount": "个技能",
@@ -892,6 +893,19 @@
     "slashShortcutSelect": "选择",
     "slashShortcutSwitch": "切换",
     "slashTotalItems": "{{count}} 项可用",
+    "agentRun": {
+      "status": {
+        "created": "创建中",
+        "running": "运行中",
+        "completed": "已完成",
+        "steered": "已引导",
+        "stopped": "已停止",
+        "aborted": "已终止",
+        "error": "失败"
+      },
+      "toolUses": "工具: {{count}}",
+      "turns": "轮数: {{count}}"
+    },
     "slashTabCommands": "命令",
     "slashTabSkills": "技能",
     "thinkingLevel": "思考",
@@ -1235,6 +1249,10 @@
     "details": "错误详情",
     "retry": "重试"
   },
+  "fileBrowser": {
+    "noWorkdir": "未设置工作目录",
+    "emptyDir": "空目录"
+  },
   "filePreview": {
     "openExternal": "用系统应用打开",
     "loading": "加载中...",
@@ -1267,6 +1285,8 @@
     "sectionStreaming": "实时输出",
     "summaryScreenshot": "截图",
     "summaryLines": "{{count}} 行",
+    "summaryMatches": "{{count}} 处匹配",
+    "summaryChars": "{{count}} 字符",
     "summaryModified": "已修改",
     "summaryDiff": "+{{added}} -{{removed}}",
     "badgeImages": "+{{count}} 张图",
