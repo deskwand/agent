@@ -42,6 +42,27 @@ if (ymlFiles.length === 0) {
   process.exit(1);
 }
 
+const pkg = require(path.join(process.cwd(), "package.json"));
+
+// A stale manifest (e.g. a mac build from a previous version still sitting in
+// release/) would stage artifacts whose version does not match package.json.
+// Refuse instead of publishing a mixed-version release.
+const versionMismatches = [];
+for (const ymlName of ymlFiles) {
+  const content = fs.readFileSync(path.join(releaseDir, ymlName), "utf-8");
+  const match = content.match(/^version:\s*(.+)$/m);
+  if (match && match[1].trim() !== pkg.version) {
+    versionMismatches.push(`${ymlName} (${match[1].trim()})`);
+  }
+}
+if (versionMismatches.length > 0) {
+  console.error(
+    `ERROR: release/ manifests do not match package.json version ${pkg.version}: ${versionMismatches.join(", ")}`
+  );
+  console.error("       Rebuild the platform whose version is stale before publishing.");
+  process.exit(1);
+}
+
 const referencedFiles = new Set();
 for (const ymlName of ymlFiles) {
   referencedFiles.add(ymlName);
@@ -91,7 +112,6 @@ for (const { name, size } of files) {
   console.log(`  ${name.padEnd(40)} ${(size / 1024 / 1024).toFixed(1)} MB`);
 }
 
-const pkg = require(path.join(process.cwd(), "package.json"));
 console.log(`\n📦 DeskWand v${pkg.version} → ${outDir}/`);
 console.log(`   共 ${files.length} 个文件, ${(totalSize / 1024 / 1024).toFixed(1)} MB`);
 console.log(`   👉 上传此目录内容到 https://deskwand.com/ 根目录即可`);

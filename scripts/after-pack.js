@@ -277,5 +277,18 @@ module.exports = async function afterPack(context) {
     }
   }
 
+  // --- 7. @esbuild: keep only the target platform (~212MB of foreign platform binaries) ---
+  // pi-coding-agent -> chord -> esbuild ships one ~10MB binary per platform (26 dirs), all of
+  // which get installed because pi-coding-agent ships a nested npm-shrinkwrap.json.
+  // NOTE: do not try this with a per-platform `files` pattern in electron-builder.yml — a
+  // platform-level `files` array replaces the top-level `files` list, so the main matcher
+  // collapses to `**/*` and local repo junk (.codegraph/codegraph.db, 436MB) gets packed.
+  const esbuildDir = path.join(nmUnpacked, '@esbuild');
+  if (fs.existsSync(esbuildDir)) {
+    const keepDir = `${platform === 'darwin' ? 'darwin' : platform === 'win32' ? 'win32' : 'linux'}-${archName}`;
+    const removed = removeExcept(esbuildDir, [keepDir]);
+    if (removed > 0) console.log(`  ✓ @esbuild: kept ${keepDir}, removed ${removed} other platform dirs (~${removed * 10}MB)`);
+  }
+
   console.log(`✅ after-pack cleanup complete for ${platform}-${archName}\n`);
 };
