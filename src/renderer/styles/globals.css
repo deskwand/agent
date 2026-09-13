@@ -48,7 +48,7 @@
     --color-terminal-dim: #8b949e;
     --shadow-sidebar-sep: rgba(0, 0, 0, 0.3);
     /* File type icon tiles — fixed semantic colours, independent of presets */
-    --color-file-folder: #3e9bff;
+    --color-file-folder: #2b86e0;
     --color-file-media: #f0a63c;
     --color-file-doc: #34d399;
     --color-file-code: #a855f7;

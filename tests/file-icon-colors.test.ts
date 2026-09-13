@@ -85,7 +85,7 @@ describe("file icon colour tokens", () => {
   });
 
   it("uses the Finder blue for folders", () => {
-    expect(readToken(darkBlock, "folder")).toBe("#3e9bff");
+    expect(readToken(darkBlock, "folder")).toBe("#2b86e0");
     expect(readToken(lightBlock, "folder")).toBe("#0b6bcb");
   });
 

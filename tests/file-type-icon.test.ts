@@ -1,7 +1,10 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { FileTypeIcon } from "../src/renderer/components/file-type-icon";
+import {
+  FileTypeIcon,
+  FOLDER_GLYPH_FIT,
+} from "../src/renderer/components/file-type-icon";
 import type { FileKind } from "../src/renderer/utils/file-types";
 
 const ALL_KINDS: FileKind[] = [
@@ -138,24 +141,35 @@ describe("FileTypeIcon", () => {
         const html = render(kind, { expanded });
         const paths = [...html.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]);
         expect(paths.length).toBeGreaterThan(0);
+        // 文件夹字形被 FOLDER_GLYPH_FIT 缩放过，断言必须应用同一次变换，
+        // 否则这个守卫就测不到文件夹真正渲染出来的坐标。
+        const fit = kind === "folder" ? FOLDER_GLYPH_FIT : null;
         for (const d of paths) {
-          for (const [x, y] of pathPoints(d)) {
-            expect(x, `${kind} expanded=${expanded} x`).toBeGreaterThanOrEqual(
-              TILE_MIN,
-            );
-            expect(x, `${kind} expanded=${expanded} x`).toBeLessThanOrEqual(
-              TILE_MAX,
-            );
-            expect(y, `${kind} expanded=${expanded} y`).toBeGreaterThanOrEqual(
-              TILE_MIN,
-            );
-            expect(y, `${kind} expanded=${expanded} y`).toBeLessThanOrEqual(
-              TILE_MAX,
-            );
+          for (const [rawX, rawY] of pathPoints(d)) {
+            const x = fit ? (rawX - fit.fromX) * fit.scale + fit.toX : rawX;
+            const y = fit ? (rawY - fit.fromY) * fit.scale + fit.toY : rawY;
+            const where = `${kind} expanded=${expanded}`;
+            expect(x, `${where} x`).toBeGreaterThanOrEqual(TILE_MIN);
+            expect(x, `${where} x`).toBeLessThanOrEqual(TILE_MAX);
+            expect(y, `${where} y`).toBeGreaterThanOrEqual(TILE_MIN);
+            expect(y, `${where} y`).toBeLessThanOrEqual(TILE_MAX);
           }
         }
       }
     }
+  });
+
+  it("leaves the folder a visible tile rim", () => {
+    // 这是 B 方案的整个目的：原字形左右各只留 0.80px 蓝边（16px），
+    // 色块看起来像淡蓝底而非蓝文件夹。断言缩放后左右边距至少 1.2 个单位
+    // （16px 下约 0.8px→1.4px）。
+    const fold = (v: number) =>
+      (v - FOLDER_GLYPH_FIT.fromX) * FOLDER_GLYPH_FIT.scale +
+      FOLDER_GLYPH_FIT.toX;
+    const left = fold(2.6);
+    const right = fold(21.0);
+    expect(left - TILE_MIN).toBeGreaterThan(1.2);
+    expect(TILE_MAX - right).toBeGreaterThan(1.2);
   });
 
   it("draws the folder as two panels with a lighter front panel", () => {

@@ -41,6 +41,7 @@ const FOLDER_OPEN: TilePath[] = [
 ];
 
 const TILE_GLYPHS: Record<FileKind, TilePath[]> = {
+  // 注意：folder 的取值由 FileTypeIcon 在关闭/展开之间切换，不走这张表。
   folder: FOLDER_CLOSED,
   image: [
     { d: "M9 6.2a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8z", filled: true },
@@ -81,6 +82,27 @@ const TILE_GLYPHS: Record<FileKind, TilePath[]> = {
   file: [{ d: "M6.8 5.4h6.4l4.2 4.2v9H6.8z" }, { d: "M13.2 5.4v4.2h4.2" }],
 };
 
+/**
+ * 文件夹字形按 94% 缩放并向色块中心对齐。
+ * 依据：原字形在 16px 下左右各只留 0.80px 蓝边，整个色块平均色是
+ * rgb(165,209,255) 淡蓝——看起来像「白文件夹镶蓝边」而不是蓝文件夹。
+ * 图标集其余图标的边距都在 1.5–3.5px，文件夹原来是最挤的一个。
+ * 缩放同时也修正了 0.47px 的垂直偏心（原中心 y=12.7，色块中心 12）。
+ * 导出供测试把同一次变换应用到几何边界断言上。
+ */
+export const FOLDER_GLYPH_FIT = {
+  scale: 0.94,
+  fromX: 11.8,
+  fromY: 12.7,
+  toX: 12,
+  toY: 12,
+} as const;
+
+const FOLDER_GLYPH_TRANSFORM =
+  `translate(${FOLDER_GLYPH_FIT.toX} ${FOLDER_GLYPH_FIT.toY}) ` +
+  `scale(${FOLDER_GLYPH_FIT.scale}) ` +
+  `translate(${-FOLDER_GLYPH_FIT.fromX} ${-FOLDER_GLYPH_FIT.fromY})`;
+
 /** kind → 色块颜色。② 决策：按家族收色，字形负责精确类型。 */
 const KIND_TILE_CLASS: Record<FileKind, string> = {
   folder: "fill-file-folder",
@@ -113,6 +135,23 @@ export function FileTypeIcon({
     kind === "folder" && expanded ? FOLDER_OPEN : TILE_GLYPHS[kind];
   const radius = size <= 16 ? 4.6 : 6;
   // 只有 16（文件管理器、产出面板）与 24（密库）两档在用；其余尺寸一律落到 6。
+  const glyphNodes = glyphs.map((glyph) =>
+    glyph.filled ? (
+      <path
+        key={glyph.d}
+        d={glyph.d}
+        fillOpacity={glyph.fillOpacity}
+        className="fill-white"
+      />
+    ) : (
+      <path
+        key={glyph.d}
+        d={glyph.d}
+        className="fill-none stroke-white"
+        {...STROKE_PROPS}
+      />
+    ),
+  );
   return (
     <svg
       width={size}
@@ -130,22 +169,10 @@ export function FileTypeIcon({
         rx={radius}
         className={KIND_TILE_CLASS[kind]}
       />
-      {glyphs.map((glyph) =>
-        glyph.filled ? (
-          <path
-            key={glyph.d}
-            d={glyph.d}
-            fillOpacity={glyph.fillOpacity}
-            className="fill-white"
-          />
-        ) : (
-          <path
-            key={glyph.d}
-            d={glyph.d}
-            className="fill-none stroke-white"
-            {...STROKE_PROPS}
-          />
-        ),
+      {kind === "folder" ? (
+        <g transform={FOLDER_GLYPH_TRANSFORM}>{glyphNodes}</g>
+      ) : (
+        glyphNodes
       )}
     </svg>
   );
