@@ -60,6 +60,18 @@ describe("FileTypeIcon", () => {
     expect(render("code", { size: 24 })).toContain('rx="6"');
   });
 
+  it("draws the folder as two panels with a lighter front panel", () => {
+    const folder = render("folder");
+    // 后板 + 前板：Finder 式文件夹靠这个前后层次才像文件夹，
+    // 单板字形在 16px 下会退化成一块圆角矩形
+    expect(folder.match(/<path/g)?.length).toBe(2);
+    expect(folder).toContain("fill-opacity=");
+    expect(render("folder", { expanded: true })).not.toBe(folder);
+    expect(render("folder", { expanded: true }).match(/<path/g)?.length).toBe(
+      2,
+    );
+  });
+
   it("keeps the white glyph contract for filled and outline shapes", () => {
     // 实心字形（文件夹、图片、视频、音频的音符头）用 fill-white
     expect(render("folder")).toContain("fill-white");

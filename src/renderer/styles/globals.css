@@ -48,8 +48,8 @@
     --color-terminal-dim: #8b949e;
     --shadow-sidebar-sep: rgba(0, 0, 0, 0.3);
     /* File type icon tiles — fixed semantic colours, independent of presets */
-    --color-file-folder: #f0a63c;
-    --color-file-media: #38a3f5;
+    --color-file-folder: #3e9bff;
+    --color-file-media: #818cf8;
     --color-file-doc: #34d399;
     --color-file-code: #a855f7;
     --color-file-audio: #f472b6;
@@ -88,8 +88,8 @@
     --color-terminal-dim: #9ca3af;
     --shadow-sidebar-sep: rgba(0, 0, 0, 0.06);
     /* File type icon tiles — fixed semantic colours, independent of presets */
-    --color-file-folder: #b26a00;
-    --color-file-media: #0d76c9;
+    --color-file-folder: #0b6bcb;
+    --color-file-media: #4f46e5;
     --color-file-doc: #059669;
     --color-file-code: #7c3aed;
     --color-file-audio: #db2777;
@@ -477,7 +477,9 @@
 
   /* Consistent focus ring for native form elements — overrides browser's default outline */
   select,
-  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
+      [type="file"]
+    ):not([type="color"]),
   textarea {
     @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-30;
   }
@@ -1144,17 +1146,37 @@
 
 /* ── Channel Instance Catalog ── */
 @layer components {
-  .dot-connected { @apply bg-success; }
-  .dot-starting { @apply bg-warning motion-safe:animate-pulse; }
-  .dot-reconnecting { @apply bg-warning motion-safe:animate-pulse; }
-  .dot-failed { @apply bg-error; }
-  .dot-stopped { @apply bg-text-muted; }
+  .dot-connected {
+    @apply bg-success;
+  }
+  .dot-starting {
+    @apply bg-warning motion-safe:animate-pulse;
+  }
+  .dot-reconnecting {
+    @apply bg-warning motion-safe:animate-pulse;
+  }
+  .dot-failed {
+    @apply bg-error;
+  }
+  .dot-stopped {
+    @apply bg-text-muted;
+  }
 
-  .status-connected { @apply text-success; }
-  .status-starting { @apply text-warning; }
-  .status-reconnecting { @apply text-warning; }
-  .status-failed { @apply text-error; }
-  .status-stopped { @apply text-text-muted; }
+  .status-connected {
+    @apply text-success;
+  }
+  .status-starting {
+    @apply text-warning;
+  }
+  .status-reconnecting {
+    @apply text-warning;
+  }
+  .status-failed {
+    @apply text-error;
+  }
+  .status-stopped {
+    @apply text-text-muted;
+  }
 
   .toggle-track {
     @apply relative h-5 w-9 cursor-pointer rounded-full bg-border-subtle transition-colors duration-200;

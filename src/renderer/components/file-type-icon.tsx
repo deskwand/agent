@@ -5,25 +5,33 @@ interface TilePath {
   d: string;
   /** true = 在色块上画白色实心；false = 白色描边（1.85px，圆头圆角） */
   filled?: boolean;
+  /** 实心形的填充不透明度，用于做 Finder 式文件夹的前后层次 */
+  opacity?: number;
 }
 
-/** 关闭态文件夹 */
+/** 关闭态文件夹：后板 + 与之齐平的前板，靠明度差做出前后层次 */
 const FOLDER_CLOSED: TilePath[] = [
   {
-    d: "M3.5 18.2V6.8A1.8 1.8 0 0 1 5.3 5h3.3a1.8 1.8 0 0 1 1.5.8l.9 1.4h7.4A1.8 1.8 0 0 1 20.5 9v9.2a1.8 1.8 0 0 1-1.8 1.8H5.3a1.8 1.8 0 0 1-1.8-1.8z",
+    d: "M2.6 12.8V6.5A1.7 1.7 0 0 1 4.3 4.8h4.2a1.7 1.7 0 0 1 1.36.68l1.3 1.72h8.14a1.7 1.7 0 0 1 1.7 1.7v3.9z",
     filled: true,
+  },
+  {
+    d: "M2.6 12.8h18.4v6.1a1.7 1.7 0 0 1-1.7 1.7H4.3a1.7 1.7 0 0 1-1.7-1.7z",
+    filled: true,
+    opacity: 0.78,
   },
 ];
 
-/** 展开态文件夹：后板 + 前板 */
+/** 展开态文件夹：后板缩短，前板向下前方倾斜，露出后板内腔 */
 const FOLDER_OPEN: TilePath[] = [
   {
-    d: "M3.6 12.4V6.8A1.8 1.8 0 0 1 5.4 5h3.2a1.8 1.8 0 0 1 1.5.8l.9 1.4h7.4A1.8 1.8 0 0 1 20.2 9v3.4z",
+    d: "M2.6 11.4V6.5A1.7 1.7 0 0 1 4.3 4.8h4.2a1.7 1.7 0 0 1 1.36.68l1.3 1.72h8.14a1.7 1.7 0 0 1 1.7 1.7v2.5z",
     filled: true,
   },
   {
-    d: "M4.2 20.5 6.3 12.4 20.4 12.4 18.3 20.5z",
+    d: "M7.4 11.4H21l-2.4 9.2H3.4z",
     filled: true,
+    opacity: 0.78,
   },
 ];
 
@@ -119,7 +127,12 @@ export function FileTypeIcon({
       />
       {glyphs.map((glyph) =>
         glyph.filled ? (
-          <path key={glyph.d} d={glyph.d} className="fill-white" />
+          <path
+            key={glyph.d}
+            d={glyph.d}
+            fillOpacity={glyph.opacity}
+            className="fill-white"
+          />
         ) : (
           <path
             key={glyph.d}
