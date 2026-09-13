@@ -772,17 +772,6 @@ export function VaultView(): JSX.Element {
                             className="block w-full rounded px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
                             onClick={() => {
                               setOpenMenu(null);
-                              handleOpen(item);
-                            }}
-                          >
-                            {t("vault.action.open")}
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className="block w-full rounded px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                            onClick={() => {
-                              setOpenMenu(null);
                               void runAction(() =>
                                 window.electronAPI.vault.revealFile(item.name),
                               );

@@ -26,7 +26,6 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.status.synced": "Synced",
   "vault.status.pending": "Pending Backup",
   "vault.status.failed": "Sync Failed",
-  "vault.action.open": "Open",
   "vault.action.reveal": "Reveal in Folder",
   "vault.action.export": "Export {{name}}",
   "vault.action.delete": "Delete",
@@ -623,11 +622,11 @@ describe("VaultView", () => {
       more?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    const menu = container.querySelector('[role="menu"]');
-    expect(menu?.textContent).toContain("Open");
-    expect(menu?.textContent).toContain("Reveal in Folder");
-    expect(menu?.textContent).toContain("Delete");
-    expect(menu?.textContent).not.toContain("Export");
+    const menu = container.querySelector('[id="vault-menu-readme.md"]');
+    const menuItems = Array.from(
+      menu?.querySelectorAll('[role="menuitem"]') ?? [],
+    ).map((menuItem) => menuItem.textContent);
+    expect(menuItems).toEqual(["Reveal in Folder", "Delete"]);
     expect(more?.getAttribute("aria-expanded")).toBe("true");
     expect(more?.getAttribute("aria-controls")).toBe("vault-menu-readme.md");
     expect(screenText()).toContain("readme.md");
@@ -640,29 +639,6 @@ describe("VaultView", () => {
     });
     expect(container.querySelector('[role="menu"]')).toBeNull();
     expect(more?.getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("previews a previewable vault file inside the app", async () => {
-    await renderVault();
-
-    await clickFileAction("readme.md", "Open");
-
-    expect(api.getFilePath).toHaveBeenCalledWith("readme.md");
-    expect(api.openFile).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("/vault/readme.md");
-  });
-
-  it("leaves non-previewable vault files to the system opener", async () => {
-    api.getSnapshot.mockResolvedValueOnce(
-      snapshot({ items: [item("archive.zip")], hasLocalIndex: true }),
-    );
-    await renderVault();
-
-    await clickFileAction("archive.zip", "Open");
-
-    expect(api.openFile).toHaveBeenCalledWith("archive.zip");
-    expect(api.getFilePath).not.toHaveBeenCalled();
-    expect(document.body.textContent).not.toContain("/vault/archive.zip");
   });
 
   it("opens a previewable file when its row is double-clicked", async () => {
@@ -678,6 +654,16 @@ describe("VaultView", () => {
     expect(document.body.textContent).toContain("/vault/readme.md");
   });
 
+  it("reveals a vault file from the more-actions menu", async () => {
+    await renderVault();
+
+    await clickFileAction("readme.md", "Reveal in Folder");
+
+    expect(api.revealFile).toHaveBeenCalledWith("readme.md");
+    expect(api.getFilePath).not.toHaveBeenCalled();
+    expect(api.openFile).not.toHaveBeenCalled();
+  });
+
   it("leaves non-previewable files to the system opener when their row is double-clicked", async () => {
     api.getSnapshot.mockResolvedValueOnce(
       snapshot({ items: [item("archive.zip")], hasLocalIndex: true }),
@@ -691,6 +677,7 @@ describe("VaultView", () => {
 
     expect(api.openFile).toHaveBeenCalledWith("archive.zip");
     expect(api.getFilePath).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain("/vault/archive.zip");
   });
 
   it("exports the file from the row export button", async () => {

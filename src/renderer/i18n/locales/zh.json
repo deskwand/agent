@@ -1607,7 +1607,6 @@
       "failed": "同步失败"
     },
     "action": {
-      "open": "打开",
       "reveal": "在文件夹中显示",
       "export": "{{name}} 导出",
       "delete": "删除",

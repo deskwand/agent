@@ -1611,7 +1611,6 @@
       "failed": "Sync Failed"
     },
     "action": {
-      "open": "Open",
       "reveal": "Reveal in Folder",
       "export": "Export {{name}}",
       "delete": "Delete",
