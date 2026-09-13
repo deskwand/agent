@@ -21,6 +21,7 @@ interface BrowserState {
   isLoading: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  loadError?: string;
 }
 
 function normalizeUrl(input: string): string {
@@ -250,6 +251,14 @@ export function BrowserPanel({ width }: { width: number }) {
           <X className="w-4 h-4" />
         </button>
       </div>
+
+      {status.loadError ? (
+        <div className="shrink-0 border-b border-border-subtle bg-error/10 px-3 py-1.5 text-xs text-error">
+          {t("browser.loadFailed")}
+          {": "}
+          {status.loadError}
+        </div>
+      ) : null}
 
       {/* Content area — WebContentsView overlays this */}
       <div ref={contentRef} className="flex-1 min-h-0 bg-background/50" />

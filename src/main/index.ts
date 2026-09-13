@@ -42,6 +42,7 @@ import { GoalExtension } from "./extensions/goal-extension";
 import {
   BrowserViewManager,
   BROWSER_CDP_PORT,
+  installFileDownloadFallback,
 } from "./browser/browser-view-manager";
 import { AgentRuntimeExtensionManager } from "./extensions/agent-runtime-extension-manager";
 import { PiExtensionHost } from "./extensions/pi-extension-host";
@@ -922,6 +923,7 @@ app
   .whenReady()
   .then(async () => {
     await installVideoProtocol();
+    installFileDownloadFallback();
 
     // Smoke test mode: verify the app can start, then exit cleanly
     if (process.argv.includes("--smoke-test")) {

@@ -5,7 +5,8 @@ import { createPortal } from "react-dom";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
-import { isPreviewableExt } from "../utils/file-preview";
+import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
+import { openFilePathInBrowser } from "../utils/open-in-browser";
 
 interface FileEntry {
   name: string;
@@ -187,6 +188,10 @@ export function FileBrowser({ width }: { width: number }) {
   const handleFileOpen = useCallback((fullPath: string, fileName: string) => {
     const iDot = fileName.lastIndexOf(".");
     const ext = iDot > 0 ? fileName.slice(iDot).toLowerCase() : "";
+    if (isBrowserOpenableExt(ext)) {
+      openFilePathInBrowser(fullPath);
+      return;
+    }
     if (isPreviewableExt(ext)) {
       setPreviewFile({ path: fullPath, name: fileName });
     } else {

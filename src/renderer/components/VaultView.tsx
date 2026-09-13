@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download, MoreHorizontal } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
-import { isPreviewableExt } from "../utils/file-preview";
+import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
+import { openFilePathInBrowser } from "../utils/open-in-browser";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -422,6 +423,17 @@ export function VaultView(): JSX.Element {
   const handleOpen = (item: VaultSnapshotItem) => {
     const dotIndex = item.name.lastIndexOf(".");
     const ext = dotIndex > 0 ? item.name.slice(dotIndex).toLowerCase() : "";
+    if (isBrowserOpenableExt(ext)) {
+      void (async () => {
+        try {
+          const path = await window.electronAPI.vault.getFilePath(item.name);
+          openFilePathInBrowser(path);
+        } catch (openError: unknown) {
+          setError(errorText(openError, t));
+        }
+      })();
+      return;
+    }
     if (!isPreviewableExt(ext)) {
       void runAction(async () => {
         const result = await window.electronAPI.vault.openFile(item.name);

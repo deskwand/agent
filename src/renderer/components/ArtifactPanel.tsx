@@ -12,7 +12,8 @@ import { Layers } from "lucide-react";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
-import { isPreviewableExt } from "../utils/file-preview";
+import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
+import { openFilePathInBrowser } from "../utils/open-in-browser";
 import type { TraceStep } from "../types";
 
 const EMPTY_STEPS: TraceStep[] = [];
@@ -44,6 +45,10 @@ export function ArtifactPanel() {
     async (artifactPath: string, label: string) => {
       const dotIdx = artifactPath.lastIndexOf(".");
       const ext = dotIdx > 0 ? artifactPath.slice(dotIdx).toLowerCase() : "";
+      if (isBrowserOpenableExt(ext)) {
+        openFilePathInBrowser(artifactPath);
+        return;
+      }
       if (isPreviewableExt(ext)) {
         setPreviewFile({ path: artifactPath, name: label });
       } else if (canOpenPath) {

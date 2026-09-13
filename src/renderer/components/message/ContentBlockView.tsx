@@ -37,7 +37,11 @@ import { ToolUseBlock } from "./ToolUseBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
 import { FilePreviewModal } from "../FilePreviewModal";
 import type { ImageSource } from "../ImageLightbox";
-import { isPreviewableExt } from "../../utils/file-preview";
+import {
+  isBrowserOpenableExt,
+  isPreviewableExt,
+} from "../../utils/file-preview";
+import { openFilePathInBrowser } from "../../utils/open-in-browser";
 import type { ContentBlockViewProps } from "./types";
 
 const MessageMarkdown = lazy(() =>
@@ -97,6 +101,10 @@ export const ContentBlockView = memo(function ContentBlockView({
       const resolvedPath = resolveFilePath(value);
       const iDot = value.lastIndexOf(".");
       const ext = iDot > 0 ? value.slice(iDot).toLowerCase() : "";
+      if (isBrowserOpenableExt(ext)) {
+        openFilePathInBrowser(resolvedPath);
+        return;
+      }
       if (isPreviewableExt(ext)) {
         const fileName = value.split(/[/\\]/).pop() || value;
         setPreviewFile({ path: resolvedPath, name: fileName });
@@ -183,6 +191,18 @@ export const ContentBlockView = memo(function ContentBlockView({
         if (localFilePath) {
           const iDot = localFilePath.lastIndexOf(".");
           const ext = iDot > 0 ? localFilePath.slice(iDot).toLowerCase() : "";
+          if (isBrowserOpenableExt(ext)) {
+            return (
+              <button
+                type="button"
+                onClick={() => openFilePathInBrowser(localFilePath)}
+                className={getFileLinkButtonClassName()}
+                title={localFilePath}
+              >
+                {children}
+              </button>
+            );
+          }
           if (isPreviewableExt(ext)) {
             return (
               <button
@@ -508,17 +528,22 @@ export const ContentBlockView = memo(function ContentBlockView({
         const attExt =
           iDot > 0 ? fileBlock.filename.slice(iDot).toLowerCase() : "";
         const canPreview = attachmentPath && isPreviewableExt(attExt);
+        const opensInBrowser = attachmentPath && isBrowserOpenableExt(attExt);
+        const isInteractive = Boolean(canPreview || opensInBrowser);
 
         return (
           <div
-            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden ${canPreview ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
+            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden ${isInteractive ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
             onClick={() => {
-              if (canPreview && attachmentPath) {
-                setPreviewFile({
-                  path: attachmentPath,
-                  name: fileBlock.filename,
-                });
+              if (!attachmentPath || !isInteractive) return;
+              if (opensInBrowser) {
+                openFilePathInBrowser(attachmentPath);
+                return;
               }
+              setPreviewFile({
+                path: attachmentPath,
+                name: fileBlock.filename,
+              });
             }}
           >
             <FileText className="w-4 h-4 text-accent flex-shrink-0" />

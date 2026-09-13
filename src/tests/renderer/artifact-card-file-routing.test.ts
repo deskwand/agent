@@ -20,6 +20,14 @@ const editedFile = {
   removedLines: 2,
 };
 
+const editedHtmlFile = {
+  path: "src/page.html",
+  edits: 1,
+  writes: 0,
+  addedLines: 3,
+  removedLines: 1,
+};
+
 function makeSession(cwd: string): Session {
   return {
     id: "session-1",
@@ -41,10 +49,13 @@ async function flush(): Promise<void> {
   });
 }
 
-function findEditedFileRow(container: HTMLElement): HTMLElement {
+function findEditedFileRow(
+  container: HTMLElement,
+  needle = "src/example.ts",
+): HTMLElement {
   const row = Array.from(
     container.querySelectorAll<HTMLElement>('[role="button"]'),
-  ).find((element) => element.textContent?.includes("src/example.ts"));
+  ).find((element) => element.textContent?.includes(needle));
   if (!row) {
     throw new Error("Edited artifact row not found");
   }
@@ -56,6 +67,7 @@ describe("ArtifactCard edited-file routing", () => {
   let root: Root;
   let getDiffFiles: ReturnType<typeof vi.fn>;
   let readFile: ReturnType<typeof vi.fn>;
+  let navigate: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     useAppStore.setState(useAppStore.getInitialState());
@@ -71,6 +83,7 @@ describe("ArtifactCard edited-file routing", () => {
       type: "error" as const,
       message: "test preview",
     }));
+    navigate = vi.fn();
     window.electronAPI = {
       git: {
         hasChanges: vi.fn(async () => ({ isRepo: true, changeCount: 1 })),
@@ -79,6 +92,7 @@ describe("ArtifactCard edited-file routing", () => {
         getDiffFiles,
       },
       readFile,
+      browser: { navigate },
     } as unknown as typeof window.electronAPI;
 
     container = document.createElement("div");
@@ -92,11 +106,14 @@ describe("ArtifactCard edited-file routing", () => {
     vi.restoreAllMocks();
   });
 
-  async function renderAndClick(): Promise<void> {
+  async function renderAndClick(
+    files = [editedFile],
+    needle = "src/example.ts",
+  ): Promise<void> {
     await act(async () => {
       root.render(
         React.createElement(ArtifactCard, {
-          files: [editedFile],
+          files,
           videoReferences: [],
           isLatestRound: false,
         }),
@@ -104,7 +121,7 @@ describe("ArtifactCard edited-file routing", () => {
     });
     await flush();
 
-    const row = findEditedFileRow(container);
+    const row = findEditedFileRow(container, needle);
     await act(async () => {
       row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
       await Promise.resolve();
@@ -134,6 +151,8 @@ describe("ArtifactCard edited-file routing", () => {
 
     expect(readFile).toHaveBeenCalledWith("/repo/src/example.ts");
     expect(useAppStore.getState().isReviewOpen).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
+    expect(useAppStore.getState().rightPanelMode).not.toBe("browser");
   });
 
   it("ignores a diff for a different file with the same basename", async () => {
@@ -156,5 +175,29 @@ describe("ArtifactCard edited-file routing", () => {
 
     expect(readFile).toHaveBeenCalledWith("/repo/src/example.ts");
     expect(useAppStore.getState().isReviewOpen).toBe(false);
+  });
+
+  it("opens a browser-openable edited file in the internal browser", async () => {
+    useAppStore.setState({ sessions: [makeSession("/repo")] });
+    getDiffFiles.mockResolvedValue([]);
+
+    await renderAndClick([editedHtmlFile], "src/page.html");
+
+    expect(navigate).toHaveBeenCalledWith("file:///repo/src/page.html");
+    expect(useAppStore.getState().rightPanelMode).toBe("browser");
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it("keeps the diff review for a browser-openable file that still has a diff", async () => {
+    useAppStore.setState({ sessions: [makeSession("/repo")] });
+    getDiffFiles.mockResolvedValue([
+      { path: "src/page.html", additions: 3, deletions: 1, status: "M" },
+    ]);
+
+    await renderAndClick([editedHtmlFile], "src/page.html");
+
+    expect(useAppStore.getState().isReviewOpen).toBe(true);
+    expect(useAppStore.getState().reviewTargetFile).toBe("src/page.html");
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

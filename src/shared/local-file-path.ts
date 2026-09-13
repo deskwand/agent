@@ -104,3 +104,48 @@ export function localPathFromAppUrlPathname(
 
   return null;
 }
+
+const webLikeUrlPattern = /^(?:https?:\/\/|mailto:|file:\/\/|#)/i;
+
+/** 去掉 href 里混入的换行与首尾空白（从 markdown 摘出的路径常带这些）。 */
+export function normalizePathCandidate(value: string): string {
+  return value.replace(/\r/g, "").replace(/\n+/g, "").trim();
+}
+
+function encodeFilePath(pathValue: string): string {
+  return encodeURI(pathValue).replace(/#/g, "%23").replace(/\?/g, "%3F");
+}
+
+/**
+ * 本地绝对路径 → file:// URL。
+ * 非本地路径（http/mailto/#/已是 file://）与空串返回 null。
+ * 这是渲染进程唯一可用的实现（沙盒里没有 node 的 url.pathToFileURL）。
+ */
+export function toFileUrl(pathValue: string): string | null {
+  const normalizedPathValue = normalizePathCandidate(pathValue);
+  if (!normalizedPathValue) {
+    return null;
+  }
+
+  if (webLikeUrlPattern.test(normalizedPathValue)) {
+    return null;
+  }
+
+  if (normalizedPathValue.startsWith("/")) {
+    return `file://${encodeFilePath(normalizedPathValue)}`;
+  }
+
+  if (isWindowsDrivePath(normalizedPathValue)) {
+    const normalized = normalizedPathValue.replace(/\\/g, "/");
+    return `file:///${encodeFilePath(normalized)}`;
+  }
+
+  if (isUncPath(normalizedPathValue)) {
+    const normalized = normalizedPathValue
+      .replace(/^\\\\+/, "")
+      .replace(/\\/g, "/");
+    return `file://${encodeFilePath(normalized)}`;
+  }
+
+  return null;
+}

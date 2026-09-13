@@ -47,3 +47,28 @@ import { PREVIEW_EXTS } from "./file-types";
 export function isPreviewableExt(ext: string): boolean {
   return Boolean(ext && (PREVIEW_EXTS as readonly string[]).includes(ext));
 }
+
+/**
+ * 可用内置浏览器（file://）打开的扩展名。
+ * 只收「浏览器渲染就是最好的呈现方式」的类型：页面、PDF、音频。
+ * 图片（含 svg）走图片预览，文本/代码走高亮源码预览，mp4/webm 走 VideoPlayer，
+ * mov/m4v/ogv/mkv/avi 仍交给系统默认程序。
+ */
+const BROWSER_OPENABLE_EXTS = [
+  ".html",
+  ".htm",
+  ".pdf",
+  ".mp3",
+  ".wav",
+  ".m4a",
+  ".aac",
+  ".ogg",
+  ".flac",
+] as const;
+
+/** 命中即以内置浏览器打开；未命中走既有预览 / 系统程序分支。契约同 isPreviewableExt。 */
+export function isBrowserOpenableExt(ext: string): boolean {
+  return Boolean(
+    ext && (BROWSER_OPENABLE_EXTS as readonly string[]).includes(ext),
+  );
+}

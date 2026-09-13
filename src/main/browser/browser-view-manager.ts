@@ -1,5 +1,7 @@
 import type { BrowserWindow, WebContents } from "electron";
-import { WebContentsView } from "electron";
+import { session, shell, WebContentsView } from "electron";
+import { fileURLToPath } from "node:url";
+import { log, logError } from "../utils/logger";
 
 /** CDP remote debugging port shared with agent-runner. */
 export const BROWSER_CDP_PORT = "9224";
@@ -11,6 +13,8 @@ export interface BrowserStatus {
   isLoading: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  /** 主框架加载失败时的 Chromium 错误描述；新一次加载开始时清空。 */
+  loadError?: string;
 }
 /**
  * Manages the in-app embedded browser panel via Electron WebContentsView.
@@ -25,6 +29,7 @@ export class BrowserViewManager {
   private _blankPageTheme: "dark" | "light" = "light";
   private _blankPageBgColor = "#ffffff";
   private _isOnBlankPage = false;
+  private _loadError: string | undefined;
 
   // ---- lifecycle ----
 
@@ -36,14 +41,35 @@ export class BrowserViewManager {
         nodeIntegration: false,
         contextIsolation: true,
         sandbox: true,
+        // Chromium 的内置 PDF 查看器以插件形式提供：不开这个开关，
+        // 导航到 .pdf 不会渲染。其余安全开关保持不变。
+        plugins: true,
       },
     });
 
     const wc = this.view.webContents;
 
     // Track navigation events to push status updates
-    wc.on("did-start-loading", () => this._pushStatus());
+    wc.on("did-start-loading", () => {
+      this._loadError = undefined;
+      this._pushStatus();
+    });
     wc.on("did-stop-loading", () => this._pushStatus());
+    wc.on("did-finish-load", () => {
+      // 加载成功也要清：否则关掉再打开面板会看到上一次的陈旧报错。
+      this._loadError = undefined;
+      this._pushStatus();
+    });
+    wc.on(
+      "did-fail-load",
+      (_event, errorCode, errorDescription, _url, isMainFrame) => {
+        if (!isMainFrame) return;
+        // ERR_ABORTED(-3)：被下载兜底或主动 stop 打断，属正常流程，不提示。
+        if (errorCode === -3) return;
+        this._loadError = errorDescription || `(${errorCode})`;
+        this._pushStatus();
+      },
+    );
     wc.on("did-navigate", (_event, url) => {
       // Detect navigation away from the blank page
       if (url !== this._blankPageUrl()) {
@@ -143,7 +169,9 @@ export class BrowserViewManager {
       this.view!.webContents.loadURL(this._blankPageUrl());
     } else {
       this._isOnBlankPage = false;
-      this.view!.webContents.loadURL(url);
+      void this.view!.webContents.loadURL(url).catch((error: unknown) => {
+        logError("[Browser] loadURL failed:", url, error);
+      });
     }
   }
 
@@ -181,6 +209,7 @@ export class BrowserViewManager {
       isLoading: wc?.isLoading() ?? false,
       canGoBack: wc?.canGoBack() ?? false,
       canGoForward: wc?.canGoForward() ?? false,
+      loadError: this._loadError,
     };
   }
 
@@ -225,4 +254,42 @@ export class BrowserViewManager {
       ";}</style></head><body></body></html>";
     return `data:text/html;base64,${Buffer.from(html).toString("base64")}`;
   }
+}
+
+/**
+ * file:// 下载兜底。
+ *
+ * 白名单是按扩展名判断，而 Chromium 是按扩展名猜 MIME 决定「渲染还是下载」；
+ * 两者不一致时导航会变成下载，弹出莫名其妙的「保存到…」对话框。
+ * 这里把这类 file:// 下载取消掉，改用系统默认程序打开。
+ * http(s) 下载一律放行 —— agent 的浏览器自动化仍需要正常下载。
+ *
+ * 必须挂在 app 级只调一次：session 是默认 session（与主窗口、OAuth 窗口共用），
+ * 且 BrowserViewManager.destroy() 不摘监听，挂在 view 上会在窗口重建时叠加。
+ */
+export function installFileDownloadFallback(): void {
+  session.defaultSession.on("will-download", (_event, item) => {
+    const url = item.getURL();
+    if (!url.startsWith("file://")) return;
+
+    let filePath: string;
+    try {
+      filePath = fileURLToPath(url);
+    } catch (error) {
+      logError("[Browser] could not resolve download path:", url, error);
+      return;
+    }
+
+    item.cancel();
+    void shell.openPath(filePath).then((openError) => {
+      if (openError) {
+        logError("[Browser] fallback open failed:", filePath, openError);
+        return;
+      }
+      log(
+        "[Browser] opened unsupported file with the system handler:",
+        filePath,
+      );
+    });
+  });
 }

@@ -168,6 +168,7 @@ function deferred<T>() {
 describe("VaultView", () => {
   let container: HTMLDivElement;
   let root: Root;
+  const navigate = vi.fn();
   const api = {
     getSnapshot: vi.fn(async () =>
       snapshot({
@@ -211,7 +212,7 @@ describe("VaultView", () => {
     root = createRoot(container);
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
-      value: { vault: api },
+      value: { vault: api, browser: { navigate } },
     });
     useAppStore.setState({
       cloudConfig: {
@@ -662,6 +663,46 @@ describe("VaultView", () => {
     expect(api.revealFile).toHaveBeenCalledWith("readme.md");
     expect(api.getFilePath).not.toHaveBeenCalled();
     expect(api.openFile).not.toHaveBeenCalled();
+  });
+
+  it("opens a pdf in the built-in browser when its row is double-clicked", async () => {
+    // 密库是整页视图：真实使用时 activeView === "vault"，
+    // 若打开时没切回 chat，右侧面板根本不渲染（用户看不到任何反应）。
+    useAppStore.setState({ activeView: "vault" });
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({ items: [item("report.pdf")], hasLocalIndex: true }),
+    );
+    await renderVault();
+
+    await act(async () => {
+      fileRow().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    });
+    await flush();
+
+    expect(api.getFilePath).toHaveBeenCalledWith("report.pdf");
+    expect(navigate).toHaveBeenCalledWith("file:///vault/report.pdf");
+    expect(useAppStore.getState().activeView).toBe("chat");
+    expect(useAppStore.getState().rightPanelMode).toBe("browser");
+    expect(api.openFile).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain("/vault/report.pdf");
+  });
+
+  it("opens an html file in the built-in browser instead of the source preview", async () => {
+    // .html 同时在白名单与 PREVIEW_EXTS 里，是判断顺序的判别用例
+    useAppStore.setState({ activeView: "vault" });
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({ items: [item("page.html")], hasLocalIndex: true }),
+    );
+    await renderVault();
+
+    await act(async () => {
+      fileRow().dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+    });
+    await flush();
+
+    expect(navigate).toHaveBeenCalledWith("file:///vault/page.html");
+    expect(useAppStore.getState().rightPanelMode).toBe("browser");
+    expect(document.body.textContent).not.toContain("/vault/page.html");
   });
 
   it("leaves non-previewable files to the system opener when their row is double-clicked", async () => {

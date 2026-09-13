@@ -14,6 +14,8 @@ import { shortenPath } from "./toolHelpers";
 import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import { FilePreviewModal } from "../FilePreviewModal";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { isBrowserOpenableExt } from "../../utils/file-preview";
+import { openFilePathInBrowser } from "../../utils/open-in-browser";
 
 interface ArtifactCardProps {
   files: ResultFileEntry[];
@@ -251,6 +253,12 @@ export const ArtifactCard = memo(function ArtifactCard({
       if (revertedFiles.has(file.path)) return;
       const resolvedPath = resolvePath(file.path);
       const openPreview = () => {
+        const iDot = resolvedPath.lastIndexOf(".");
+        const ext = iDot > 0 ? resolvedPath.slice(iDot).toLowerCase() : "";
+        if (isBrowserOpenableExt(ext)) {
+          openFilePathInBrowser(resolvedPath);
+          return;
+        }
         setPreviewFile({ ...file, path: resolvedPath });
       };
 
