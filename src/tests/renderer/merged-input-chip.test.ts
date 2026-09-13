@@ -58,6 +58,7 @@ const baseProps = {
 describe("MergedInputChip (single-panel)", () => {
   let container: HTMLDivElement;
   let root: Root;
+  const realGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
 
   beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -69,6 +70,7 @@ describe("MergedInputChip (single-panel)", () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+    HTMLElement.prototype.getBoundingClientRect = realGetBoundingClientRect;
     vi.clearAllMocks();
     useAppStore.getState().setCloudConfig(null);
   });
@@ -83,6 +85,27 @@ describe("MergedInputChip (single-panel)", () => {
 
   function trigger(): HTMLButtonElement {
     return container.querySelector('button[aria-haspopup="menu"]')!;
+  }
+
+  // jsdom 没有布局，手动给出面板底部坐标，模拟 WelcomeView 中输入框垂直居中、
+  // 面板上方空间不足的场景（真实修复前的值可参考菜单高度 ≈ 100vh - 12rem）。
+  function stubPanelBottom(bottom: number) {
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      if (this.getAttribute?.("role") === "menu") {
+        return {
+          top: bottom - 100,
+          bottom,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: 100,
+          x: 0,
+          y: bottom - 100,
+          toJSON: () => ({}),
+        } as DOMRect;
+      }
+      return realGetBoundingClientRect.call(this);
+    };
   }
 
   function panel(): HTMLElement {
@@ -108,6 +131,21 @@ describe("MergedInputChip (single-panel)", () => {
     click(trigger());
     expect(trigger().getAttribute("aria-expanded")).toBe("true");
     expect(panel()).toBeDefined();
+  });
+
+  it("caps the panel to the space available above the chip", () => {
+    render();
+    stubPanelBottom(300);
+    click(trigger());
+    // 300 - 48(标题栏安全区)
+    expect(panel().style.maxHeight).toBe("252px");
+  });
+
+  it("keeps the 32rem ceiling when there is plenty of room", () => {
+    render();
+    stubPanelBottom(2000);
+    click(trigger());
+    expect(panel().style.maxHeight).toBe("512px");
   });
 
   it("shows non-cloud groups plus thinking row in non-cloud mode", () => {

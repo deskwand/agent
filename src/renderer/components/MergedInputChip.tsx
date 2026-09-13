@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import type { ProviderProfileKey, ThinkingLevel } from "../types";
@@ -16,6 +23,10 @@ export interface MergedInputChipProps {
   thinkingLevelOptions: ThinkingLevel[];
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
 }
+
+// 面板向上展开，顶部需要让开标题栏（h-10）并留一点呼吸空间。
+const MENU_TOP_SAFE_AREA_PX = 48;
+const MODEL_MENU_MAX_HEIGHT_PX = 512;
 
 export function MergedInputChip({
   model,
@@ -45,6 +56,28 @@ export function MergedInputChip({
     "modes" | "custom"
   >("modes");
   const containerRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
+
+  // WelcomeView 的输入框垂直居中，芯片上方的可用空间远小于 100vh - 12rem。
+  // 超出 main 的 overflow-hidden 的顶部会被裁掉且点不到，因此按面板上方的实际可用高度取上限。
+  const updatePanelMaxHeight = useCallback(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const { bottom } = menu.getBoundingClientRect();
+    // 无布局信息（jsdom 等）时保留 className 上的默认上限
+    if (bottom <= 0) return;
+    const available = Math.max(0, Math.floor(bottom - MENU_TOP_SAFE_AREA_PX));
+    setPanelMaxHeight(Math.min(MODEL_MENU_MAX_HEIGHT_PX, available));
+  }, []);
+
+  // 打开时先量一次（layout 阶段，避免首帧闪烁），窗口尺寸变化时重量。
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    updatePanelMaxHeight();
+    window.addEventListener("resize", updatePanelMaxHeight);
+    return () => window.removeEventListener("resize", updatePanelMaxHeight);
+  }, [menuOpen, updatePanelMaxHeight]);
 
   const filteredModelOptions = useMemo(() => {
     const query = modelSearch.trim().toLowerCase();
@@ -228,8 +261,14 @@ export function MergedInputChip({
 
       {menuOpen && (
         <div
+          ref={menuRef}
           role="menu"
           aria-label={t("chat.model")}
+          style={
+            panelMaxHeight === null
+              ? undefined
+              : { maxHeight: `${panelMaxHeight}px` }
+          }
           className={`absolute right-0 bottom-[calc(100%_+_8px)] z-30 ${
             panelView === "thinking"
               ? "w-[12rem]"
