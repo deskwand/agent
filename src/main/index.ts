@@ -32,7 +32,7 @@ import JSZip from "jszip";
 import { createHash } from "crypto";
 import { execFileSync } from "child_process";
 import { config } from "dotenv";
-import { initDatabase, closeDatabase } from "./db/database";
+import { initDatabase, closeDatabase, getDatabase } from "./db/database";
 import { registerVaultIpc } from "./vault/ipc";
 import { SessionManager } from "./session/session-manager";
 import { SkillsManager } from "./skills/skills-manager";
@@ -48,6 +48,7 @@ import { AgentRuntimeExtensionManager } from "./extensions/agent-runtime-extensi
 import { PiExtensionHost } from "./extensions/pi-extension-host";
 import { mergeCommandEntries } from "./extensions/pi-command-registry";
 import { PiTrustResolver } from "./extensions/pi-trust-resolver";
+import { ensureSubagentUsageReporting } from "./usage/subagent-usage-setting";
 import {
   initPiUiRuntime,
   resolveUiDialog,
@@ -59,7 +60,7 @@ import {
 import { PiPackageService } from "./extensions/pi-package-service";
 import { PiMarketService } from "./extensions/pi-market-service";
 import { applyPiPackageDirFix } from "./extensions/pi-sdk-path";
-import { VERSION } from "@earendil-works/pi-coding-agent";
+import { VERSION, getAgentDir } from "@earendil-works/pi-coding-agent";
 import {
   buildLegacyEnvBridgeSnapshot,
   configStore,
@@ -126,6 +127,9 @@ import {
   decodePathSafely,
 } from "../shared/local-file-path";
 import { eventRequiresSessionManager } from "./client-event-utils";
+import { backfillUsageFromSessions } from "./usage/usage-backfill";
+import { queryUsage } from "./usage/usage-store";
+import type { UsageRange } from "../shared/usage";
 import { getUnsupportedWorkspacePathReason } from "./workspace-path-constraints";
 import { getDefaultWorkingDirPath } from "../shared/workspace-path";
 import { DESKWAND_API_URL } from "../shared/oauth-config";
@@ -1450,6 +1454,40 @@ ipcMain.handle("cloudAuth.googleLogin", async () => {
 // 信任解析：复用共享 ~/.pi/agent/trust.json，询问时经 server-event 弹 renderer Modal。
 const piAgentDir = join(homedir(), ".pi", "agent");
 const piTrustResolver = new PiTrustResolver(piAgentDir);
+// Subagent token usage only lands in the parent session when pi-subagents'
+// reportUsage flag is on; turn it on once at startup. pi-subagents resolves its
+// settings through pi-coding-agent's getAgentDir(), which honours
+// PI_CODING_AGENT_DIR — write the flag where it will actually read it.
+ensureSubagentUsageReporting(getAgentDir());
+
+// Usage history lives in deskwand's own pi session files. userData is
+// redirected to ~/.deskwand by setup-userdata.ts.
+const USAGE_SESSIONS_ROOT = join(app.getPath("userData"), "pi-sessions");
+let usageBackfillPromise: Promise<void> | null = null;
+
+/**
+ * Runs the idempotent backfill once per app run, on the first usage query.
+ * The promise is the guard so concurrent queries share one pass; a failure
+ * clears it so the next query retries instead of caching the error.
+ */
+function ensureUsageBackfilled(): Promise<void> {
+  if (!usageBackfillPromise) {
+    usageBackfillPromise = backfillUsageFromSessions(
+      getDatabase().raw,
+      USAGE_SESSIONS_ROOT,
+    )
+      .then((result) => {
+        log(
+          `[Usage] backfill scanned=${result.scanned} inserted=${result.inserted} skipped=${result.skipped} corpusUnchanged=${result.corpusUnchanged}`,
+        );
+      })
+      .catch((error) => {
+        logWarn("[Usage] backfill failed:", error);
+        usageBackfillPromise = null;
+      });
+  }
+  return usageBackfillPromise;
+}
 const piTrustPending = new Map<string, (decision: boolean | null) => void>();
 
 ipcMain.handle("pi-ext.resolve-trust", async (_event, cwd: string) => {
@@ -4017,6 +4055,21 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
 
     case "session.getTraceSteps":
       return sm.getTraceSteps(event.payload.sessionId);
+
+    case "usage.query": {
+      await ensureUsageBackfilled();
+      // The renderer sends a widened string over IPC; anything unexpected falls
+      // back to the default range instead of producing a NaN cutoff (all-zero page).
+      const requested = event.payload.range as string;
+      const range: UsageRange =
+        requested === "7d" ||
+        requested === "30d" ||
+        requested === "90d" ||
+        requested === "all"
+          ? requested
+          : "30d";
+      return queryUsage(getDatabase().raw, range, Date.now());
+    }
 
     case "permission.response":
       return sm.handlePermissionResponse(

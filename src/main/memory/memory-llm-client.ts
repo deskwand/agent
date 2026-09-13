@@ -5,7 +5,7 @@ import type {
   ProviderType,
 } from "../config/config-store";
 import { configStore } from "../config/config-store";
-import { runPiAiOneShot } from "../agent/agent-sdk-one-shot";
+import { runPiAiOneShot, recordAuxUsage } from "../agent/agent-sdk-one-shot";
 import { logWarn } from "../utils/logger";
 
 export interface MemoryCompletionRequest {
@@ -140,6 +140,16 @@ export class MemoryLLMClient implements MemoryLLMClientLike {
         ),
         timeoutPromise,
       ]);
+      // Memory extraction has no session to attribute to: threading a sessionId
+      // through MemoryCompletionRequest and both extractors is not worth it for
+      // this volume; purpose="memory" already keeps it identifiable.
+      recordAuxUsage(
+        result.usage,
+        "memory",
+        llmConfig.model,
+        llmConfig.provider,
+        null,
+      );
       return { text: result.text };
     } finally {
       if (timeout) {

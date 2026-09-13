@@ -20,6 +20,7 @@ import {
   closeSync,
 } from "fs";
 import { log, logError, logWarn } from "../utils/logger";
+import { createUsageSchema } from "../usage/usage-store";
 
 export interface DatabaseInstance {
   // Raw database access (for advanced queries)
@@ -426,6 +427,10 @@ function initializeSchema(database: DatabaseSync): void {
       FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
     )
   `);
+
+    // Local usage stats: append-only counter rows (see
+    // design-docs/2026-09-13-local-usage-stats-design.md).
+    createUsageSchema(database);
 
     log("[Database] Schema initialized");
   } catch (error) {

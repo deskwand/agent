@@ -98,6 +98,13 @@ import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter"
 import { createWebAccessTools } from "./tools/web-access/web-tools";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
 import type { WebAccessErrorCode } from "../../shared/web-access";
+import { getDatabase } from "../db/database";
+import { normalizeTokenUsage } from "../usage/normalize-usage";
+import {
+  buildChatUsageRecord,
+  buildSubagentUsageRecord,
+} from "../usage/usage-records";
+import { recordUsage } from "../usage/usage-store";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import type { BrowserViewManager } from "../browser/browser-view-manager";
 import { BROWSER_CDP_PORT } from "../browser/browser-view-manager";
@@ -452,93 +459,6 @@ function summarizeMessageForLog(message: unknown): Record<string, unknown> {
       return typeof type === "string" ? type : "unknown";
     }),
     usage: normalizeTokenUsage(typedMessage.usage),
-  };
-}
-
-function normalizeTokenUsage(
-  usage: unknown,
-  provider?: string,
-): Message["tokenUsage"] | undefined {
-  if (!usage || typeof usage !== "object") {
-    return undefined;
-  }
-
-  const raw = usage as {
-    input?: unknown;
-    output?: unknown;
-    input_tokens?: unknown;
-    output_tokens?: unknown;
-    inputTokens?: unknown;
-    outputTokens?: unknown;
-    cacheRead?: unknown;
-    cacheWrite?: unknown;
-    cache_read_input_tokens?: unknown;
-    cacheReadInputTokens?: unknown;
-    cacheWriteInputTokens?: unknown;
-    cache_creation_input_tokens?: unknown;
-    input_token_details?: {
-      cached_tokens?: unknown;
-      cache_read_input_tokens?: unknown;
-      cache_write_tokens?: unknown;
-    };
-    usage?: {
-      inputTokenDetails?: {
-        cachedTokens?: unknown;
-      };
-    };
-  };
-
-  const input = raw.input ?? raw.input_tokens ?? raw.inputTokens;
-  const output = raw.output ?? raw.output_tokens ?? raw.outputTokens;
-
-  if (typeof input !== "number" || typeof output !== "number") {
-    return undefined;
-  }
-
-  const cacheReadCandidates = [
-    raw.cacheRead,
-    raw.cache_read_input_tokens,
-    raw.cacheReadInputTokens,
-    raw.input_token_details?.cached_tokens,
-    raw.input_token_details?.cache_read_input_tokens,
-    raw.usage?.inputTokenDetails?.cachedTokens,
-  ];
-  const cacheReadRaw = cacheReadCandidates.find(
-    (value) => typeof value === "number",
-  );
-  const cacheRead =
-    typeof cacheReadRaw === "number" && cacheReadRaw >= 0
-      ? Math.floor(cacheReadRaw)
-      : undefined;
-
-  const cacheWriteCandidates = [
-    raw.cacheWrite,
-    raw.cacheWriteInputTokens,
-    raw.cache_creation_input_tokens,
-    raw.input_token_details?.cache_write_tokens,
-  ];
-  const cacheWriteRaw = cacheWriteCandidates.find(
-    (value) => typeof value === "number",
-  );
-  const cacheWrite =
-    typeof cacheWriteRaw === "number" && cacheWriteRaw >= 0
-      ? Math.floor(cacheWriteRaw)
-      : undefined;
-
-  // Provider semantics: Anthropic's input includes cacheRead; OpenAI's input excludes both cacheRead and cacheWrite.
-  // We need totalPromptInput = the full prompt tokens sent (what counts against the context window).
-  const isAnthropic =
-    provider === "anthropic" || provider === "cloudflare-ai-gateway";
-  const totalPromptInput = isAnthropic
-    ? Math.floor(input) // input already includes cacheRead
-    : Math.floor(input) + (cacheRead ?? 0) + (cacheWrite ?? 0); // input = prompt_tokens - cacheRead - cacheWrite
-
-  return {
-    input: Math.floor(input),
-    output: Math.floor(output),
-    totalPromptInput,
-    ...(typeof cacheRead === "number" ? { cacheRead } : {}),
-    ...(typeof cacheWrite === "number" ? { cacheWrite } : {}),
   };
 }
 
@@ -3324,6 +3244,7 @@ Tool routing:\n
           visionTool = createVisionDescribeTool(
             visionModelConfig,
             effectiveCwd,
+            session.id,
           );
           log(
             "[AgentRunner] Vision model configured:",
@@ -4155,24 +4076,43 @@ Tool routing:\n
                   type: "stream.partial",
                   payload: { sessionId: session.id, delta: "", turnId },
                 });
-                if (contentBlocks.length > 0) {
-                  const msgWithUsage = msg as { usage?: unknown };
-                  const tokenUsage = normalizeTokenUsage(
-                    msgWithUsage.usage,
-                    piModel.provider,
+                // Usage is normalized (and recorded) outside the render guard:
+                // a message with usage but no displayable block was still billed.
+                const msgWithUsage = msg as { usage?: unknown };
+                const tokenUsage = normalizeTokenUsage(
+                  msgWithUsage.usage,
+                  piModel.provider,
+                );
+                if (msgWithUsage.usage) {
+                  log(
+                    "[AgentRunner] normalized usage:",
+                    safeStringify(
+                      {
+                        raw: msgWithUsage.usage,
+                        normalized: tokenUsage,
+                      },
+                      2,
+                    ),
                   );
-                  if (msgWithUsage.usage) {
-                    log(
-                      "[AgentRunner] normalized usage:",
-                      safeStringify(
-                        {
-                          raw: msgWithUsage.usage,
-                          normalized: tokenUsage,
-                        },
-                        2,
+                }
+                if (tokenUsage) {
+                  try {
+                    recordUsage(
+                      getDatabase().raw,
+                      buildChatUsageRecord(
+                        session.id,
+                        msg,
+                        { provider: piModel.provider, model: session.model },
+                        tokenUsage,
+                        Date.now(),
                       ),
                     );
+                  } catch (error) {
+                    // A failed insert must never break the chat stream.
+                    logWarn("[AgentRunner] usage record failed:", error);
                   }
+                }
+                if (contentBlocks.length > 0) {
                   const assistantMsg: Message = {
                     id: uuidv4(),
                     sessionId: session.id,
@@ -4249,6 +4189,24 @@ Tool routing:\n
                   ? (resultDetails.errorCode as WebAccessErrorCode)
                   : undefined;
               const isError = event.isError || Boolean(errorCode);
+
+              // Subagent usage only reaches us when pi-subagents' reportUsage is
+              // on (see ensureSubagentUsageReporting). It is the aggregate of every
+              // child message (nested included) for that Agent call and carries no
+              // model, so the row keeps model NULL.
+              const subagentRecord = buildSubagentUsageRecord(
+                session.id,
+                toolCallId,
+                (event.result as { usage?: unknown } | undefined)?.usage,
+                Date.now(),
+              );
+              if (subagentRecord) {
+                try {
+                  recordUsage(getDatabase().raw, subagentRecord);
+                } catch (error) {
+                  logWarn("[AgentRunner] subagent usage record failed:", error);
+                }
+              }
 
               // Clear partial streaming output before sending final result
               this.sendToRenderer({

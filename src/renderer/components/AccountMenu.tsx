@@ -1,6 +1,14 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { LogIn, User, Settings, LogOut, Zap, Coins } from "lucide-react";
+import {
+  LogIn,
+  User,
+  Settings,
+  LogOut,
+  Zap,
+  Coins,
+  BarChart3,
+} from "lucide-react";
 import type { CloudConfig } from "../types";
 import { useAppStore } from "../store";
 import { CloudApiClient } from "../services/cloud-api";
@@ -60,6 +68,19 @@ export function AccountMenu({
           label={t("sidebar.settings")}
           onClick={() => {
             onOpenSettings();
+            onClose();
+          }}
+        />
+
+        <div className="mx-2 my-1 border-t border-border" />
+
+        {/* Local usage stats need no account: keep this entry outside the
+            logged-in branch so it is reachable while logged out. */}
+        <MenuItem
+          icon={<BarChart3 className="w-4 h-4" />}
+          label={t("accountMenu.usage")}
+          onClick={() => {
+            useAppStore.getState().setActiveView("usage");
             onClose();
           }}
         />

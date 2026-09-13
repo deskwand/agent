@@ -1537,7 +1537,11 @@ export class SessionManager {
               return null;
             }
             const title = await this.withTimeout(
-              this.generateTitleWithConfig(titlePrompt, candidate.config),
+              this.generateTitleWithConfig(
+                titlePrompt,
+                candidate.config,
+                session.id,
+              ),
               TITLE_GENERATION_TIMEOUT_MS,
               session.id,
             );
@@ -1612,6 +1616,7 @@ export class SessionManager {
   private async generateTitleWithConfig(
     titlePrompt: string,
     config?: AppConfig,
+    sessionId?: string,
   ): Promise<string | null> {
     let titleConfig = config;
     if (!titleConfig) {
@@ -1620,7 +1625,7 @@ export class SessionManager {
       titleConfig = buildUtilityAppConfig(appConfig, resolved);
     }
     return normalizeGeneratedTitle(
-      await generateTitleWithAgentSdk(titlePrompt, titleConfig),
+      await generateTitleWithAgentSdk(titlePrompt, titleConfig, sessionId),
     );
   }
 

@@ -1,0 +1,61 @@
+import { describe, expect, it } from "vitest";
+import * as fs from "fs";
+import * as path from "path";
+
+const repo = path.resolve(__dirname, "..");
+const read = (p: string) => fs.readFileSync(path.join(repo, p), "utf-8");
+
+describe("usage view wiring", () => {
+  it("adds an ActiveView member", () => {
+    expect(read("src/renderer/store/index.ts")).toContain('"usage"');
+  });
+
+  it("renders UsageView from App", () => {
+    const app = read("src/renderer/App.tsx");
+    expect(app).toContain("UsageView");
+    expect(app).toContain('activeView === "usage"');
+  });
+
+  it("puts the entry in the account menu, not in settings", () => {
+    const menu = read("src/renderer/components/AccountMenu.tsx");
+    expect(menu).toContain('t("accountMenu.usage")');
+    expect(menu).toContain('setActiveView("usage")');
+    // Assert on the settings tab definitions, not on the word "usage" anywhere
+    // in the file (unrelated comments/keys could contain it).
+    expect(read("src/renderer/components/SettingsPanel.tsx")).not.toMatch(
+      /id:\s*"usage"/,
+    );
+  });
+
+  it("keeps the entry reachable while logged out", () => {
+    const menu = read("src/renderer/components/AccountMenu.tsx");
+    const entry = menu.indexOf('t("accountMenu.usage")');
+    const loginBranch = menu.indexOf("isLoggedIn && cloudConfig ?");
+    expect(entry).toBeGreaterThan(-1);
+    expect(loginBranch).toBeGreaterThan(-1);
+    // Local stats need no account, so the item must sit above the branch that
+    // only renders for a logged-in user.
+    expect(entry).toBeLessThan(loginBranch);
+  });
+
+  it("ships both locales", () => {
+    for (const locale of ["zh", "en"]) {
+      const json = JSON.parse(
+        read(`src/renderer/i18n/locales/${locale}.json`),
+      ) as Record<string, Record<string, unknown>>;
+      expect(json.usage?.title).toBeTruthy();
+      expect(json.accountMenu?.usage).toBeTruthy();
+      expect(json.usage?.cards).toBeTruthy();
+      expect(json.usage?.colorMode).toBeTruthy();
+    }
+  });
+
+  it("keeps the heatmaps independent of the selected range", () => {
+    const view = read("src/renderer/components/UsageView.tsx");
+    expect(view).toContain("snapshot.byDay");
+    expect(view).toContain("snapshot.byHour");
+    // byDay/byHour come straight from the snapshot; only totals/byModel follow
+    // the range switch.
+    expect(view).not.toContain("byDay.filter");
+  });
+});

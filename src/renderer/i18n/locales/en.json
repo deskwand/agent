@@ -1467,7 +1467,8 @@
   "accountMenu": {
     "balance": "Balance",
     "topUpAction": "Top Up",
-    "creditsUnit": "credits"
+    "creditsUnit": "credits",
+    "usage": "Usage"
   },
   "update": {
     "title": "New Version Available",
@@ -1693,5 +1694,61 @@
   },
   "providers": {
     "deskwandCloud": "DeskWand Cloud"
+  },
+  "usage": {
+    "title": "Usage",
+    "subtitle": "Across this machine · stored locally only",
+    "range": {
+      "7d": "7 days",
+      "30d": "30 days",
+      "90d": "90 days",
+      "all": "All"
+    },
+    "cards": {
+      "input": "Input",
+      "output": "Output",
+      "cacheRead": "Cache read",
+      "cacheHitRate": "Cache hit rate",
+      "cacheWrite": "Cache write",
+      "calls": "Calls",
+      "cacheNotReported": "not reported by provider",
+      "hitRateHint": "cache read ÷ prompt tokens",
+      "avgOutput": "{{value}} output tokens/call"
+    },
+    "daily": "Daily usage",
+    "dailyHint": "each cell = output + input + cache read",
+    "hourly": "By time of day",
+    "hourlyHint": "7 × 24 · weekday × hour · output tokens",
+    "byModel": "By model",
+    "byModelHint": "selected range · sorted by output tokens",
+    "subagentRow": "Subagents (all models combined)",
+    "totalRow": "Total",
+    "columns": {
+      "model": "Model",
+      "output": "Output",
+      "input": "Input",
+      "cacheRead": "Cache read",
+      "hitRate": "Hit rate",
+      "calls": "Calls"
+    },
+    "colorMode": {
+      "usage": "Usage",
+      "hit": "Hit rate"
+    },
+    "legend": {
+      "less": "Less",
+      "more": "More"
+    },
+    "weekday": {
+      "sun": "Sun",
+      "mon": "Mon",
+      "tue": "Tue",
+      "wed": "Wed",
+      "thu": "Thu",
+      "fri": "Fri",
+      "sat": "Sat"
+    },
+    "loading": "Preparing history…",
+    "empty": "No usage recorded yet"
   }
 }

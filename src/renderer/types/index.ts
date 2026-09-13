@@ -463,6 +463,7 @@ export type ClientEvent =
       payload: { sessionId: string; beforeId: string | null; limit: number };
     }
   | { type: "session.getTraceSteps"; payload: { sessionId: string } }
+  | { type: "usage.query"; payload: { range: "7d" | "30d" | "90d" | "all" } }
   | {
       type: "permission.response";
       payload: { toolUseId: string; result: PermissionResult };

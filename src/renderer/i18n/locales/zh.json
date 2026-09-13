@@ -1463,7 +1463,8 @@
   "accountMenu": {
     "balance": "余额",
     "topUpAction": "充值",
-    "creditsUnit": "积分"
+    "creditsUnit": "积分",
+    "usage": "用量统计"
   },
   "update": {
     "title": "发现新版本",
@@ -1689,5 +1690,61 @@
   },
   "providers": {
     "deskwandCloud": "DeskWand 云"
+  },
+  "usage": {
+    "title": "用量统计",
+    "subtitle": "本机累计 · 数据只存在这台设备上",
+    "range": {
+      "7d": "7 天",
+      "30d": "30 天",
+      "90d": "90 天",
+      "all": "全部"
+    },
+    "cards": {
+      "input": "输入",
+      "output": "输出",
+      "cacheRead": "缓存读",
+      "cacheHitRate": "缓存命中率",
+      "cacheWrite": "缓存写",
+      "calls": "调用次数",
+      "cacheNotReported": "provider 未上报",
+      "hitRateHint": "缓存读 ÷ 提示词总量",
+      "avgOutput": "平均 {{value}} 输出 tokens/次"
+    },
+    "daily": "每日用量",
+    "dailyHint": "每格 = 当天输出 + 输入 + 缓存读",
+    "hourly": "时段分布",
+    "hourlyHint": "7 × 24 · 星期 × 小时 · 输出 token",
+    "byModel": "按模型",
+    "byModelHint": "所选区间 · 按输出 token 排序",
+    "subagentRow": "子代理（多模型合计）",
+    "totalRow": "合计",
+    "columns": {
+      "model": "模型",
+      "output": "输出",
+      "input": "输入",
+      "cacheRead": "缓存读",
+      "hitRate": "命中率",
+      "calls": "调用"
+    },
+    "colorMode": {
+      "usage": "用量",
+      "hit": "命中率"
+    },
+    "legend": {
+      "less": "少",
+      "more": "多"
+    },
+    "weekday": {
+      "sun": "周日",
+      "mon": "周一",
+      "tue": "周二",
+      "wed": "周三",
+      "thu": "周四",
+      "fri": "周五",
+      "sat": "周六"
+    },
+    "loading": "正在整理历史…",
+    "empty": "还没有用量记录"
   }
 }

@@ -15,7 +15,11 @@ import type {
   SharedProviderType,
   SharedCustomProtocolType,
 } from "../../../shared/api-model-presets";
-import { log, logError } from "../../utils/logger";
+import { log, logError, logWarn } from "../../utils/logger";
+import { getDatabase } from "../../db/database";
+import { buildAuxUsageRecord } from "../../usage/usage-records";
+import { normalizeTokenUsage } from "../../usage/normalize-usage";
+import { recordUsage } from "../../usage/usage-store";
 
 // ── MIME detection (portable, no dependencies) ──────────────────────
 
@@ -114,7 +118,7 @@ async function callAnthropicVision(
   mimeType: string,
   signal?: AbortSignal,
   userPrompt?: string,
-): Promise<string> {
+): Promise<{ text: string; usage?: unknown }> {
   const baseUrl = config.baseUrl || "https://api.anthropic.com";
   const url = `${baseUrl.replace(/\/$/, "")}/v1/messages`;
 
@@ -160,13 +164,14 @@ async function callAnthropicVision(
 
   const data = (await response.json()) as {
     content?: Array<{ type: string; text?: string }>;
+    usage?: unknown;
   };
-  return (
+  const text =
     data.content
       ?.filter((c) => c.type === "text")
       .map((c) => c.text || "")
-      .join("\n") || "(no description)"
-  );
+      .join("\n") || "(no description)";
+  return { text, usage: data.usage };
 }
 
 async function callOpenAIVision(
@@ -175,7 +180,7 @@ async function callOpenAIVision(
   mimeType: string,
   signal?: AbortSignal,
   userPrompt?: string,
-): Promise<string> {
+): Promise<{ text: string; usage?: unknown }> {
   const baseUrl = config.baseUrl || "https://api.openai.com/v1";
   const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
 
@@ -218,8 +223,12 @@ async function callOpenAIVision(
 
   const data = (await response.json()) as {
     choices?: Array<{ message?: { content?: string } }>;
+    usage?: unknown;
   };
-  return data.choices?.[0]?.message?.content || "(no description)";
+  return {
+    text: data.choices?.[0]?.message?.content || "(no description)",
+    usage: data.usage,
+  };
 }
 
 async function callGeminiVision(
@@ -228,7 +237,7 @@ async function callGeminiVision(
   mimeType: string,
   signal?: AbortSignal,
   userPrompt?: string,
-): Promise<string> {
+): Promise<{ text: string; usage?: unknown }> {
   const baseUrl = config.baseUrl || "https://generativelanguage.googleapis.com";
   const url = `${baseUrl.replace(/\/$/, "")}/v1beta/models/${config.model}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
 
@@ -266,11 +275,15 @@ async function callGeminiVision(
     candidates?: Array<{
       content?: { parts?: Array<{ text?: string }> };
     }>;
+    usageMetadata?: unknown;
   };
-  return (
-    data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("\n") ||
-    "(no description)"
-  );
+  return {
+    text:
+      data.candidates?.[0]?.content?.parts
+        ?.map((p) => p.text || "")
+        .join("\n") || "(no description)",
+    usage: data.usageMetadata,
+  };
 }
 
 async function callVisionModel(
@@ -279,7 +292,7 @@ async function callVisionModel(
   mimeType: string,
   signal?: AbortSignal,
   userPrompt?: string,
-): Promise<string> {
+): Promise<{ text: string; usage?: unknown }> {
   const protocol = protocolForProvider(config.provider, config.customProtocol);
 
   switch (protocol) {
@@ -312,11 +325,38 @@ async function callVisionModel(
   }
 }
 
+/** Vision calls are aux rows too: no backfill path, so a NULL dedup key. */
+function recordVisionUsage(
+  rawUsage: unknown,
+  provider: string,
+  model: string,
+  sessionId: string | undefined,
+): void {
+  const usage = normalizeTokenUsage(rawUsage, provider);
+  if (!usage) return;
+  try {
+    recordUsage(
+      getDatabase().raw,
+      buildAuxUsageRecord(
+        usage,
+        "vision",
+        model,
+        provider,
+        sessionId ?? null,
+        Date.now(),
+      ),
+    );
+  } catch (error) {
+    logWarn("[Vision] usage record failed:", error);
+  }
+}
+
 // ── Tool factory ────────────────────────────────────────────────────
 
 export function createVisionDescribeTool(
   visionConfig: VisionModelConfig,
   workspaceDir: string,
+  sessionId?: string,
 ): ToolDefinition {
   // Workaround for SDK ToolDefinition type strictness — the SDK uses opaque
   // branded types that don't match the plain TypeBox schema types at type level.
@@ -437,13 +477,20 @@ export function createVisionDescribeTool(
         log(
           `[VisionDescribe] Calling vision model (${visionConfig.provider}/${visionConfig.model}) for: ${filePath} (${(stat.size / 1024).toFixed(1)} KB, ${mimeType})`,
         );
-        const description = await callVisionModel(
+        const result = await callVisionModel(
           visionConfig,
           base64Image,
           mimeType,
           signal ?? AbortSignal.timeout(60_000),
           userPrompt,
         );
+        recordVisionUsage(
+          result.usage,
+          visionConfig.provider,
+          visionConfig.model,
+          sessionId,
+        );
+        const description = result.text;
         log(
           `[VisionDescribe] Vision model returned ${description.length} chars`,
         );
@@ -581,6 +628,8 @@ export function createDeskWandVisionTool(
             ],
           };
         }
+        // The server's /vision endpoint returns only { text } — no usage field,
+        // so this path cannot be counted (documented as a known gap).
         const data = (await res.json()) as { text?: string };
         return {
           content: [

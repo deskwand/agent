@@ -134,7 +134,13 @@ function getSession(
   return states[sessionId] ?? DEFAULT_SESSION_STATE;
 }
 
-export type ActiveView = "chat" | "apps" | "automation" | "vault" | "settings";
+export type ActiveView =
+  | "chat"
+  | "apps"
+  | "automation"
+  | "vault"
+  | "settings"
+  | "usage";
 
 interface AppState {
   // Sessions

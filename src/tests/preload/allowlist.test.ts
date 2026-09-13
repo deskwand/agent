@@ -35,6 +35,7 @@ const ALL_CLIENT_EVENT_TYPES = [
   "session.getMessages",
   "session.getMessagesPage",
   "session.getTraceSteps",
+  "usage.query",
   "permission.response",
   "sudo.password.response",
   "settings.update",

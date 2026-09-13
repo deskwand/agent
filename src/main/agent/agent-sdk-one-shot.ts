@@ -17,6 +17,11 @@ import {
   shouldAllowEmptyGeminiApiKey,
 } from "../config/auth-utils";
 import { log, logWarn } from "../utils/logger";
+import { getDatabase } from "../db/database";
+import { normalizeTokenUsage } from "../usage/normalize-usage";
+import { buildAuxUsageRecord } from "../usage/usage-records";
+import { recordUsage } from "../usage/usage-store";
+import type { TokenUsage } from "../../renderer/types";
 import { normalizeGeneratedTitle } from "../session/session-title-utils";
 import { resolveProviderApiKey } from "./shared-model-runtime";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
@@ -211,7 +216,12 @@ export async function runPiAiOneShot(
     maxTokens?: number;
     signal?: AbortSignal;
   },
-): Promise<{ text: string; hasThinking: boolean; durationMs: number }> {
+): Promise<{
+  text: string;
+  hasThinking: boolean;
+  durationMs: number;
+  usage?: TokenUsage;
+}> {
   // For OAuth providers, map to the actual pi-ai provider ID
   // (e.g. oauth:openai-codex → openai-codex) so the correct model
   // entry (with codex baseUrl + api type) is used from pi-ai's registry.
@@ -350,8 +360,45 @@ export async function runPiAiOneShot(
     "thinkingBlocks:",
     thinkingBlocks.length,
   );
-  return { text, hasThinking, durationMs: Date.now() - start };
+  return {
+    text,
+    hasThinking,
+    durationMs: Date.now() - start,
+    usage: normalizeTokenUsage(response.usage, resolvedModel.provider),
+  };
 }
+
+/**
+ * Aux calls have no backfill path, so buildAuxUsageRecord writes a NULL dedup
+ * key rather than a fabricated timestamp key. Only title generation has a
+ * session to attribute to (the pre-session title preview does not).
+ */
+function recordAuxUsage(
+  usage: TokenUsage | undefined,
+  purpose: "title" | "memory" | "probe",
+  model: string,
+  provider: string,
+  sessionId: string | null,
+): void {
+  if (!usage) return;
+  try {
+    recordUsage(
+      getDatabase().raw,
+      buildAuxUsageRecord(
+        usage,
+        purpose,
+        model,
+        provider,
+        sessionId,
+        Date.now(),
+      ),
+    );
+  } catch (error) {
+    logWarn("[OneShot] aux usage record failed:", error);
+  }
+}
+
+export { recordAuxUsage };
 
 function normalizeProbeAck(raw: string): string {
   // Strip markdown formatting and quotes around/between words, but preserve
@@ -392,6 +439,13 @@ export async function probeWithAgentSdk(
       `You are a connectivity test. Answer briefly, then include the token: ${PROBE_ACK}`,
       probeConfig,
     );
+    recordAuxUsage(
+      result.usage,
+      "probe",
+      probeConfig.model || "unknown",
+      probeConfig.provider || "unknown",
+      null,
+    );
 
     if (!result.text && !result.hasThinking) {
       return {
@@ -428,12 +482,20 @@ export async function probeWithAgentSdk(
 export async function generateTitleWithAgentSdk(
   titlePrompt: string,
   config: AppConfig,
+  sessionId?: string,
 ): Promise<string | null> {
   try {
     const result = await runPiAiOneShot(
       titlePrompt,
       "Generate a concise title. Reply with only the title text and no extra markup.",
       config,
+    );
+    recordAuxUsage(
+      result.usage,
+      "title",
+      config.model || "unknown",
+      config.provider || "unknown",
+      sessionId ?? null,
     );
     const title = normalizeGeneratedTitle(result.text);
     if (!title && result.hasThinking) {

@@ -23,6 +23,7 @@ import { Sidebar } from "./components/Sidebar";
 import { ResizeHandle } from "./components/ResizeHandle";
 import { WelcomeView } from "./components/WelcomeView";
 import { VaultView } from "./components/VaultView";
+import { UsageView } from "./components/UsageView";
 import { ScheduleView } from "./components/ScheduleView";
 import { AppsView } from "./components/AppsView";
 import { PermissionDialog } from "./components/PermissionDialog";
@@ -380,6 +381,8 @@ function App() {
               <ScheduleView />
             ) : activeView === "vault" ? (
               <VaultView />
+            ) : activeView === "usage" ? (
+              <UsageView />
             ) : activeSessionId ? (
               <PanelErrorBoundary
                 name="ChatView"

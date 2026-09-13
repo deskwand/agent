@@ -77,6 +77,7 @@ const ALLOWED_CLIENT_EVENTS = new Set([
   "session.getMessages",
   "session.getMessagesPage",
   "session.getTraceSteps",
+  "usage.query",
   "permission.response",
   "sudo.password.response",
   "settings.update",
