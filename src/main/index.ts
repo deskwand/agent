@@ -129,7 +129,7 @@ import {
 import { eventRequiresSessionManager } from "./client-event-utils";
 import { backfillUsageFromSessions } from "./usage/usage-backfill";
 import { queryUsage } from "./usage/usage-store";
-import type { UsageRange } from "../shared/usage";
+import { DEFAULT_USAGE_RANGE, type UsageRange } from "../shared/usage";
 import { getUnsupportedWorkspacePathReason } from "./workspace-path-constraints";
 import { getDefaultWorkingDirPath } from "../shared/workspace-path";
 import { DESKWAND_API_URL } from "../shared/oauth-config";
@@ -4068,7 +4068,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         requested === "90d" ||
         requested === "all"
           ? requested
-          : "30d";
+          : DEFAULT_USAGE_RANGE;
       return queryUsage(getDatabase().raw, range, Date.now());
     }
 

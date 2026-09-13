@@ -68,3 +68,6 @@ export interface UsageSnapshot {
   /** Scoped to the requested range. */
   byModel: UsageModelRow[];
 }
+
+/** 页面默认区间；也是 IPC 收到非法 range 时的回落值。 */
+export const DEFAULT_USAGE_RANGE: UsageRange = "1d";

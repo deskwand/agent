@@ -64,6 +64,20 @@ describe("usage view wiring", () => {
     }
   });
 
+  it("defines today as the default range in the shared contract", async () => {
+    const { DEFAULT_USAGE_RANGE } = await import("../src/shared/usage");
+    expect(DEFAULT_USAGE_RANGE).toBe("1d");
+  });
+
+  it("initialises the page from that constant, not a literal", () => {
+    const view = read("src/renderer/components/UsageView.tsx");
+    expect(view).toMatch(/useState<Range>\(DEFAULT_USAGE_RANGE\)/);
+    expect(view).not.toContain('useState<Range>("30d")');
+    // 默认只在初始化时生效：唯一的 setRange 调用点必须是区间按钮的点击处理。
+    // （源码级断言抓不到“挂载后被 effect 覆盖”，但能抓住新增第二个写入口。）
+    expect(view.match(/setRange\(/g) ?? []).toHaveLength(1);
+  });
+
   it("keeps the heatmaps independent of the selected range", () => {
     const view = read("src/renderer/components/UsageView.tsx");
     expect(view).toContain("snapshot.byDay");

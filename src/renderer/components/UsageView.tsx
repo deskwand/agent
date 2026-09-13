@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import type { UsageModelRow, UsageSnapshot } from "../../shared/usage";
+import {
+  DEFAULT_USAGE_RANGE,
+  type UsageModelRow,
+  type UsageSnapshot,
+} from "../../shared/usage";
 import { useAppStore } from "../store";
 import { useWindowSize } from "../hooks/useWindowSize";
 import { UsageCalendarHeatmap } from "./usage/UsageCalendarHeatmap";
@@ -19,7 +23,7 @@ export function UsageView() {
   const { t } = useTranslation();
   const setActiveView = useAppStore((s) => s.setActiveView);
   const { width } = useWindowSize();
-  const [range, setRange] = useState<Range>("30d");
+  const [range, setRange] = useState<Range>(DEFAULT_USAGE_RANGE);
   const [snapshot, setSnapshot] = useState<UsageSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
 

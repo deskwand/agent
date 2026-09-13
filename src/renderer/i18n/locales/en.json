@@ -1750,6 +1750,6 @@
       "sat": "Sat"
     },
     "loading": "Preparing history…",
-    "empty": "No usage recorded yet"
+    "empty": "No usage recorded in the selected range"
   }
 }

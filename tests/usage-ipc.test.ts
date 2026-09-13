@@ -29,7 +29,10 @@ describe("usage.query IPC contract", () => {
     expect(text).toContain('requested === "90d"');
     // Unknown ids must fall back rather than reach queryUsage, whose NaN cutoff
     // would render an all-zero page with no error.
-    expect(text).toMatch(/\?\s*requested\s*\n?\s*:\s*"30d";/);
+    // 回落值走共享常量；白名单成员 "30d" 仍是合法区间 id，保持字面量
+    expect(text).toMatch(/\?\s*requested\s*\n?\s*:\s*DEFAULT_USAGE_RANGE;/);
+    // 防未来“顺手指纹清扫”把合法区间 id 也换掉；它在改动前也通过，不是回归测试。
+    expect(text).toContain('requested === "30d"');
   });
 
   it("resolves the sessions root from userData, not a hardcoded home path", () => {
