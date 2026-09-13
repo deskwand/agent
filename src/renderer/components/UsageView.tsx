@@ -8,7 +8,7 @@ import { UsageCalendarHeatmap } from "./usage/UsageCalendarHeatmap";
 import { UsageHourHeatmap } from "./usage/UsageHourHeatmap";
 import { compactNumber, formatHitRate } from "../utils/usage-format";
 
-const RANGES = ["7d", "30d", "90d", "all"] as const;
+const RANGES = ["1d", "7d", "30d", "90d", "all"] as const;
 type Range = (typeof RANGES)[number];
 
 const WIDE_WINDOW_PX = 900;
@@ -69,7 +69,7 @@ export function UsageView() {
             </p>
           </div>
         </div>
-        <div className="flex gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
+        <div className="flex flex-wrap gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
           {RANGES.map((value) => (
             <button
               key={value}

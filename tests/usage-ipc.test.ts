@@ -25,7 +25,11 @@ describe("usage.query IPC contract", () => {
   it("validates the range payload instead of trusting the cast", () => {
     const text = read("src/main/index.ts");
     expect(text).toContain("const requested = event.payload.range as string;");
+    expect(text).toContain('requested === "1d"');
     expect(text).toContain('requested === "90d"');
+    // Unknown ids must fall back rather than reach queryUsage, whose NaN cutoff
+    // would render an all-zero page with no error.
+    expect(text).toMatch(/\?\s*requested\s*\n?\s*:\s*"30d";/);
   });
 
   it("resolves the sessions root from userData, not a hardcoded home path", () => {

@@ -4062,6 +4062,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       // back to the default range instead of producing a NaN cutoff (all-zero page).
       const requested = event.payload.range as string;
       const range: UsageRange =
+        requested === "1d" ||
         requested === "7d" ||
         requested === "30d" ||
         requested === "90d" ||

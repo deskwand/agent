@@ -58,6 +58,7 @@
     "lint": "eslint src --ext .ts,.tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "test": "vitest",
+    "test:dst": "TZ=America/New_York vitest run tests/usage-cutoff-dst.test.ts && TZ=America/Santiago vitest run tests/usage-cutoff-dst.test.ts",
     "test:coverage": "vitest run --coverage",
     "test:pi-electron": "electron scripts/pi-sdk-electron-smoke.mjs",
     "bench": "vitest bench",

@@ -50,6 +50,20 @@ describe("usage view wiring", () => {
     }
   });
 
+  it("offers the today range first and ships its labels", () => {
+    const view = read("src/renderer/components/UsageView.tsx");
+    // 只断言意图（"1d" 在最前、且在 "7d" 之前），不锁 prettier 的换行/空格
+    const ranges = view.match(/const RANGES = \[([^\]]*)\]/)?.[1] ?? "";
+    expect(ranges.indexOf('"1d"')).toBeGreaterThan(-1);
+    expect(ranges.indexOf('"1d"')).toBeLessThan(ranges.indexOf('"7d"'));
+    for (const locale of ["zh", "en"]) {
+      const json = JSON.parse(
+        read(`src/renderer/i18n/locales/${locale}.json`),
+      ) as { usage: { range: Record<string, string> } };
+      expect(json.usage.range["1d"]).toBeTruthy();
+    }
+  });
+
   it("keeps the heatmaps independent of the selected range", () => {
     const view = read("src/renderer/components/UsageView.tsx");
     expect(view).toContain("snapshot.byDay");

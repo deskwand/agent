@@ -212,3 +212,117 @@ describe("queryUsage", () => {
     }
   });
 });
+
+describe("local calendar-day ranges", () => {
+  let db: DatabaseSync;
+  /** 本地时间构造 epoch ms：月份 1-based，避免 UTC 偏移带来的歧义。 */
+  const at = (y: number, m: number, d: number, h = 0, min = 0) =>
+    new Date(y, m - 1, d, h, min, 0, 0).getTime();
+
+  beforeEach(() => {
+    db = new DatabaseSync(":memory:");
+    createUsageSchema(db);
+  });
+  afterEach(() => db.close());
+
+  it("1d includes local midnight and excludes the minute before it", () => {
+    recordUsage(
+      db,
+      base({ ts: at(2026, 9, 13, 0, 0), output: 5, dedupKey: "midnight" }),
+    );
+    recordUsage(
+      db,
+      base({ ts: at(2026, 9, 12, 23, 59), output: 100, dedupKey: "before" }),
+    );
+    expect(queryUsage(db, "1d", at(2026, 9, 13, 15)).totals.output).toBe(5);
+  });
+
+  it("7d starts at the local midnight six days back", () => {
+    recordUsage(
+      db,
+      base({ ts: at(2026, 9, 7, 0, 0), output: 1, dedupKey: "in-window" }),
+    );
+    recordUsage(
+      db,
+      base({ ts: at(2026, 9, 6, 23, 59), output: 500, dedupKey: "outside" }),
+    );
+    expect(queryUsage(db, "7d", at(2026, 9, 13, 15)).totals.output).toBe(1);
+  });
+
+  // byDay 只包含"有记录的自然日"，空白天不在里面 —— 这一点由下面的 gap 用例锁住。
+  it("7d totals equal the sum of the last 7 byDay cells", () => {
+    const now = at(2026, 9, 13, 15);
+    for (let i = 0; i < 8; i += 1) {
+      // 每天放在 23:00：这样"滚动 7×24h"会把第 8 天的那条也纳进来，
+      // 而"最后 7 个自然日"不会 —— 这条断言才能在改动前后给出不同结果。
+      // （若放在 now 之前的时刻，滚动窗口也排除了它，断言会变成恒真。）
+      recordUsage(
+        db,
+        base({
+          ts: at(2026, 9, 6 + i, 23),
+          output: i + 1,
+          dedupKey: `day-${i}`,
+        }),
+      );
+    }
+    const snap = queryUsage(db, "7d", now);
+    expect(snap.byDay).toHaveLength(8);
+    const lastSeven = snap.byDay
+      .slice(-7)
+      .reduce((sum, row) => sum + row.output, 0);
+    expect(snap.totals.output).toBe(lastSeven);
+    // 9-06 那条（output 1）必须被排除
+    expect(snap.totals.output).toBe(2 + 3 + 4 + 5 + 6 + 7 + 8);
+  });
+
+  it("1d totals equal the last byDay cell", () => {
+    const now = at(2026, 9, 13, 15);
+    // 放在 23:00：滚动 24h（起点 9-12 15:00）会把它算进来，自然日语义不会 ——
+    // 放在 now 之前的时刻这条断言在两种语义下都通过，等于没测。
+    recordUsage(
+      db,
+      base({ ts: at(2026, 9, 12, 23), output: 7, dedupKey: "yesterday" }),
+    );
+    recordUsage(
+      db,
+      base({ ts: at(2026, 9, 13, 9), output: 3, dedupKey: "today" }),
+    );
+    const snap = queryUsage(db, "1d", now);
+    expect(snap.totals.output).toBe(snap.byDay[snap.byDay.length - 1].output);
+    expect(snap.totals.output).toBe(3);
+  });
+
+  it("ignores days with no records instead of counting them as empty cells", () => {
+    const now = at(2026, 9, 13, 15);
+    // 只有 5 天有数据（9-07/09-08/09-11/09-12/09-13），中间 9-09、09-10 为空：
+    // 空白天不在 byDay 里，不应把窗口往前挤。
+    for (const [day, output] of [
+      [7, 1],
+      [8, 2],
+      [11, 4],
+      [12, 8],
+      [13, 16],
+    ] as const) {
+      recordUsage(
+        db,
+        base({ ts: at(2026, 9, day, 10), output, dedupKey: `gap-${day}` }),
+      );
+    }
+    const snap = queryUsage(db, "7d", now);
+    expect(snap.byDay).toHaveLength(5);
+    expect(snap.totals.output).toBe(1 + 2 + 4 + 8 + 16);
+  });
+
+  it("keeps the boundary on local midnight across a month boundary", () => {
+    // 2026-03-02 的 7 天窗口起点是 2026-02-24 00:00
+    recordUsage(
+      db,
+      base({ ts: at(2026, 2, 24, 0, 0), output: 2, dedupKey: "feb-in" }),
+    );
+    recordUsage(
+      db,
+      base({ ts: at(2026, 2, 23, 23, 59), output: 400, dedupKey: "feb-out" }),
+    );
+    expect(queryUsage(db, "7d", at(2026, 3, 2, 10)).totals.output).toBe(2);
+  });
+});

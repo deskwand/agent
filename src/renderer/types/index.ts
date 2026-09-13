@@ -8,6 +8,7 @@ export type {
   WebAccessErrorCode,
 } from "../../shared/web-access";
 import type { ChannelPairingEvent } from "../../shared/ipc-types";
+import type { UsageRange } from "../../shared/usage";
 import type { ChannelInstanceStatus } from "../../shared/ipc-types";
 import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
 import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
@@ -463,7 +464,7 @@ export type ClientEvent =
       payload: { sessionId: string; beforeId: string | null; limit: number };
     }
   | { type: "session.getTraceSteps"; payload: { sessionId: string } }
-  | { type: "usage.query"; payload: { range: "7d" | "30d" | "90d" | "all" } }
+  | { type: "usage.query"; payload: { range: UsageRange } }
   | {
       type: "permission.response";
       payload: { toolUseId: string; result: PermissionResult };

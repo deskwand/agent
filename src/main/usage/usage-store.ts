@@ -75,6 +75,7 @@ export function recordUsage(db: DatabaseSync, rec: UsageRecordInput): boolean {
 }
 
 const RANGE_DAYS: Record<Exclude<UsageRange, "all">, number> = {
+  "1d": 1,
   "7d": 7,
   "30d": 30,
   "90d": 90,
@@ -98,9 +99,27 @@ export function computeHitRate(
   return (cacheRead / promptTotal) * 100;
 }
 
+/**
+ * Range start: local midnight of (today − (N−1)).
+ *
+ * Deliberately not `now − N × 86_400_000`. That rolling window is timezone-blind
+ * and, across a DST transition, lands on a non-midnight local clock time —
+ * measured in America/New_York, a 7-day start drifts to 13:00 / 11:00. Keeping
+ * the boundary on local midnight is also what lets the cards reconcile with the
+ * heatmap, whose rows are grouped by local calendar date.
+ */
 function rangeCutoff(range: UsageRange, now: number): number {
   if (range === "all") return 0;
-  return now - RANGE_DAYS[range] * 86_400_000;
+  const start = new Date(now);
+  // Shift the day FIRST, then snap to midnight. Reversed (snap then shift) is
+  // wrong in zones whose DST transition happens at 00:00 (America/Santiago):
+  // today's midnight does not exist, so the snap resolves forward to 01:00 and
+  // the day shift carries that 01:00 onto a day where 00:00 DOES exist,
+  // silently dropping the first hour of real records (verified: the start
+  // became Aug 31 01:00 instead of Aug 31 00:00).
+  start.setDate(start.getDate() - (RANGE_DAYS[range] - 1));
+  start.setHours(0, 0, 0, 0);
+  return start.getTime();
 }
 
 interface RawAgg {

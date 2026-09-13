@@ -7,7 +7,7 @@
 
 export type UsageSource = "chat" | "subagent" | "aux";
 export type UsagePurpose = "title" | "memory" | "vision" | "probe";
-export type UsageRange = "7d" | "30d" | "90d" | "all";
+export type UsageRange = "1d" | "7d" | "30d" | "90d" | "all";
 
 export interface UsageTokens {
   input: number;
