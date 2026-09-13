@@ -422,7 +422,7 @@ export const ContentBlockView = memo(function ContentBlockView({
 
         if (!text) {
           return (
-            <span className="text-text-muted italic">
+            <span className={`text-text-muted italic ${isUser ? "" : "pl-1"}`}>
               {t("messageCard.emptyText")}
             </span>
           );
@@ -442,22 +442,25 @@ export const ContentBlockView = memo(function ContentBlockView({
           <PanelErrorBoundary
             name="MessageMarkdown"
             fallback={
-              <div className="prose-chat max-w-full text-text-primary whitespace-pre-wrap break-words">
+              <div className="prose-chat max-w-full pl-1 text-text-primary whitespace-pre-wrap break-words">
                 {normalizedText}
               </div>
             }
           >
             <Suspense
               fallback={
-                <div className="prose-chat max-w-full text-text-primary whitespace-pre-wrap break-words">
+                <div className="prose-chat max-w-full pl-1 text-text-primary whitespace-pre-wrap break-words">
                   {normalizedText}
                 </div>
               }
             >
-              <MessageMarkdown
-                normalizedText={normalizedText}
-                components={markdownComponents}
-              />
+              {/* Assistant reply shares the tool-call group icon's left edge. */}
+              <div className="pl-1">
+                <MessageMarkdown
+                  normalizedText={normalizedText}
+                  components={markdownComponents}
+                />
+              </div>
             </Suspense>
           </PanelErrorBoundary>
         );
