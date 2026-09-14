@@ -1,5 +1,3 @@
-export const VAULT_LOCAL_QUOTA_BYTES = 100 * 1024 * 1024;
-
 export type SyncStatus = "synced" | "pending" | "failed";
 
 export interface VaultSnapshotItem {
@@ -30,7 +28,6 @@ export interface VaultSnapshot {
   hasLocalMek: boolean;
   operationStatus: VaultOperationStatus;
   usedBytes: number;
-  quotaBytes: number;
 }
 
 export interface VaultRemoteStatus {
@@ -60,5 +57,10 @@ export type VaultErrorCode =
   | "VAULT_RESTORE_IN_PROGRESS"
   | "VAULT_KEY_REQUIRED"
   | "VAULT_KEYCHAIN_UNAVAILABLE"
-  | "VAULT_LOCAL_QUOTA_EXCEEDED"
+  | "VAULT_LOCAL_DISK_FULL"
   | "VAULT_QUOTA_EXCEEDED";
+
+export interface VaultBackupUsage {
+  usedBytes: number;
+  quotaBytes: number | null;
+}

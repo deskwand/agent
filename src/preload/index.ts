@@ -22,6 +22,7 @@ import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
 import type {
   RestoreResult,
+  VaultBackupUsage,
   VaultRemoteStatus,
   VaultResetPreparation,
   VaultResetResult,
@@ -738,6 +739,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
         "vault.checkRemoteBackup",
         token,
       ) as Promise<VaultRemoteStatus>,
+    getBackupUsage: (token: string | null) =>
+      ipcRenderer.invoke(
+        "vault.getBackupUsage",
+        token,
+      ) as Promise<VaultBackupUsage | null>,
     generateRecoveryCode: () =>
       ipcRenderer.invoke("vault.generateRecoveryCode") as Promise<string>,
     initialize: (token: string | null, recoveryCode: string) =>
@@ -1329,6 +1335,9 @@ declare global {
         deleteFile: (name: string) => Promise<VaultSnapshot>;
         sync: (token: string) => Promise<VaultSnapshot>;
         checkRemoteBackup: (token: string) => Promise<VaultRemoteStatus>;
+        getBackupUsage: (
+          token: string | null,
+        ) => Promise<VaultBackupUsage | null>;
         generateRecoveryCode: () => Promise<string>;
         initialize: (
           token: string | null,

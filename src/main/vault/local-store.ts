@@ -12,11 +12,7 @@ import {
 } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
-import {
-  VAULT_LOCAL_QUOTA_BYTES,
-  type SyncStatus,
-  type VaultOperationStatus,
-} from "../../shared/vault";
+import { type SyncStatus, type VaultOperationStatus } from "../../shared/vault";
 
 const INDEX_FILE = ".vault-index.json";
 const KEYCHAIN_FILE = "vault-mek.bin";
@@ -337,12 +333,6 @@ export class LocalVaultStore {
     if (source.size > MAX_FILE_SIZE) throw new Error("VAULT_FILE_TOO_LARGE");
 
     const index = await this.reconcile(await this.readIndex());
-    if (
-      (await this.getUsageBytes(index)) + source.size >
-      VAULT_LOCAL_QUOTA_BYTES
-    ) {
-      throw new Error("VAULT_LOCAL_QUOTA_EXCEEDED");
-    }
 
     const originalName = basename(sourcePath);
     this.validateName(originalName);
@@ -374,6 +364,7 @@ export class LocalVaultStore {
       return { name, index };
     } catch (error: unknown) {
       await rm(destination, { force: true }).catch(() => undefined);
+      if (isDiskFullError(error)) throw new Error("VAULT_LOCAL_DISK_FULL");
       throw error;
     }
   }
@@ -640,4 +631,8 @@ export class LocalVaultStore {
     await this.writeIndex(rebuilt);
     return rebuilt;
   }
+}
+
+function isDiskFullError(error: unknown): boolean {
+  return (error as NodeJS.ErrnoException | null)?.code === "ENOSPC";
 }

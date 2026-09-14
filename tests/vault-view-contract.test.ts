@@ -39,7 +39,9 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.loginHint": "Sign in to back up files to the cloud",
   "vault.recoveryCode": "Recovery code",
   "vault.pendingCount": "{{count}} pending",
-  "vault.usage": "Used {{used}} / {{quota}}",
+  "vault.localUsage": "Local · {{used}} used",
+  "vault.backupUsage": "Cloud · {{used}} / {{quota}}",
+  "vault.backupUsageNoQuota": "Cloud · {{used}} used",
   "vault.setup.configured": "Encrypted cloud backup is set up",
   "vault.setup.open": "Set up encrypted cloud backup",
   "vault.setup.title": "Save your recovery code",
@@ -58,8 +60,7 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.error.loginRequired": "Sign in to sync your Vault",
   "vault.error.setupRequired": "Set up encrypted cloud backup first",
   "vault.error.fileTooLarge": "Files must be 20 MB or smaller",
-  "vault.error.localQuotaExceeded":
-    "Your local Vault is full; delete files before importing another",
+  "vault.error.diskFull": "Not enough disk space to import this file",
   "vault.error.localOperation": "The local Vault operation failed",
   "vault.error.syncFailed": "Cloud sync failed; your local files are safe",
   "vault.error.cloudQuotaExceeded":
@@ -152,7 +153,6 @@ function snapshot(overrides: Partial<VaultSnapshot> = {}): VaultSnapshot {
     hasLocalMek: true,
     operationStatus: "idle",
     usedBytes: 0,
-    quotaBytes: 100 * 1024 * 1024,
     ...overrides,
   };
 }
@@ -185,6 +185,10 @@ describe("VaultView", () => {
     deleteFile: vi.fn(async () => snapshot({ items: [] })),
     sync: vi.fn(async () => snapshot({ items: [] })),
     checkRemoteBackup: vi.fn(async () => ({ status: "no-backup" })),
+    getBackupUsage: vi.fn(async () => ({
+      usedBytes: 0,
+      quotaBytes: 100 * 1024 * 1024,
+    })),
     generateRecoveryCode: vi.fn(
       async () => "123456789ABCDEFGHJKLMNPQRSTUVWXYZ",
     ),
@@ -388,12 +392,9 @@ describe("VaultView", () => {
     expect(api.deleteFile).toHaveBeenCalledWith("readme.md");
   });
 
-  it("renders local quota usage", async () => {
+  it("renders local usage without a quota ceiling", async () => {
     api.getSnapshot.mockResolvedValueOnce(
-      snapshot({
-        usedBytes: 12 * 1024 * 1024,
-        quotaBytes: 100 * 1024 * 1024,
-      }),
+      snapshot({ usedBytes: 12 * 1024 * 1024 }),
     );
 
     await act(async () => {
@@ -401,13 +402,11 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Used 12.0 MB / 100.0 MB");
+    expect(container.textContent).toContain("Local · 12.0 MB used");
   });
 
-  it("shows a distinct local quota error", async () => {
-    api.importFile.mockRejectedValueOnce(
-      new Error("VAULT_LOCAL_QUOTA_EXCEEDED"),
-    );
+  it("shows a distinct disk-full error", async () => {
+    api.importFile.mockRejectedValueOnce(new Error("VAULT_LOCAL_DISK_FULL"));
 
     await renderVault();
     await act(async () => {
@@ -415,7 +414,97 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
 
-    expect(screenText()).toContain("Your local Vault is full");
+    expect(screenText()).toContain("Not enough disk space to import this file");
+  });
+
+  it("renders cloud usage alongside local usage", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({ usedBytes: 12 * 1024 * 1024 }),
+    );
+    api.getBackupUsage.mockResolvedValueOnce({
+      usedBytes: 4 * 1024 * 1024,
+      quotaBytes: 100 * 1024 * 1024,
+    });
+
+    await renderVault();
+
+    expect(screenText()).toContain("Local · 12.0 MB used");
+    expect(screenText()).toContain("Cloud · 4.0 MB / 100.0 MB");
+  });
+
+  it("renders cloud usage without a quota", async () => {
+    api.getBackupUsage.mockResolvedValueOnce({
+      usedBytes: 4 * 1024 * 1024,
+      quotaBytes: null,
+    });
+
+    await renderVault();
+
+    expect(screenText()).toContain("Cloud · 4.0 MB used");
+    expect(screenText()).not.toContain("/ 100.0 MB");
+  });
+
+  it("hides the cloud row when usage is unavailable", async () => {
+    api.getBackupUsage.mockResolvedValueOnce(null);
+
+    await renderVault();
+
+    expect(screenText()).toContain("Local · 0 B used");
+    expect(screenText()).not.toContain("Cloud ·");
+  });
+
+  it("refreshes cloud usage after a sync", async () => {
+    api.getBackupUsage
+      .mockResolvedValueOnce({ usedBytes: 0, quotaBytes: 100 * 1024 * 1024 })
+      .mockResolvedValueOnce({
+        usedBytes: 4 * 1024 * 1024,
+        quotaBytes: 100 * 1024 * 1024,
+      });
+
+    await renderVault();
+    expect(screenText()).toContain("Cloud · 0 B / 100.0 MB");
+
+    await act(async () => {
+      syncButton().click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Cloud · 4.0 MB / 100.0 MB");
+  });
+
+  it("ignores a stale cloud usage response", async () => {
+    type Usage = { usedBytes: number; quotaBytes: number | null } | null;
+    const slow = deferred<Usage>();
+    const fast = deferred<Usage>();
+    api.getBackupUsage
+      .mockReturnValueOnce(slow.promise)
+      .mockReturnValueOnce(fast.promise);
+
+    await renderVault();
+
+    await act(async () => {
+      syncButton().click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The sync-triggered fetch resolves first; the older mount fetch lands late.
+    await act(async () => {
+      fast.resolve({
+        usedBytes: 4 * 1024 * 1024,
+        quotaBytes: 100 * 1024 * 1024,
+      });
+      slow.resolve({
+        usedBytes: 99 * 1024 * 1024,
+        quotaBytes: 100 * 1024 * 1024,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Cloud · 4.0 MB / 100.0 MB");
+    expect(screenText()).not.toContain("99.0 MB");
   });
 
   it("shows a distinct cloud quota error while keeping local files", async () => {

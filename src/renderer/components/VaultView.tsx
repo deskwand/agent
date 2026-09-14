@@ -17,6 +17,7 @@ import { FilePreviewModal } from "./FilePreviewModal";
 import { Tooltip } from "./Tooltip";
 import type {
   SyncStatus,
+  VaultBackupUsage,
   VaultRemoteStatus,
   VaultSnapshot,
   VaultSnapshotItem,
@@ -54,8 +55,7 @@ function errorText(error: unknown, t: (key: string) => string): string {
   if (!(error instanceof Error)) return t("vault.error.localOperation");
   const message = error.message;
   if (message === "VAULT_FILE_TOO_LARGE") return t("vault.error.fileTooLarge");
-  if (message === "VAULT_LOCAL_QUOTA_EXCEEDED")
-    return t("vault.error.localQuotaExceeded");
+  if (message === "VAULT_LOCAL_DISK_FULL") return t("vault.error.diskFull");
   if (message === "VAULT_QUOTA_EXCEEDED")
     return t("vault.error.cloudQuotaExceeded");
   if (message === "VAULT_KEY_REQUIRED") return t("vault.error.setupRequired");
@@ -123,6 +123,7 @@ export function VaultView(): JSX.Element {
   const token = useAppStore((state) => state.cloudConfig?.token ?? null);
   const setActiveView = useAppStore((state) => state.setActiveView);
   const [snapshot, setSnapshot] = useState<VaultSnapshot | null>(null);
+  const [backupUsage, setBackupUsage] = useState<VaultBackupUsage | null>(null);
   const [filter, setFilter] = useState<Filter>("files");
   const [remoteStatus, setRemoteStatus] = useState<VaultRemoteStatus | null>(
     null,
@@ -170,9 +171,22 @@ export function VaultView(): JSX.Element {
     }
   }, [t]);
 
+  const usageSeq = useRef(0);
+
+  const loadBackupUsage = useCallback(async () => {
+    const seq = (usageSeq.current += 1);
+    try {
+      const usage = await window.electronAPI.vault.getBackupUsage(token);
+      if (seq === usageSeq.current) setBackupUsage(usage);
+    } catch {
+      if (seq === usageSeq.current) setBackupUsage(null);
+    }
+  }, [token]);
+
   useEffect(() => {
     void loadSnapshot();
-  }, [loadSnapshot]);
+    void loadBackupUsage();
+  }, [loadSnapshot, loadBackupUsage]);
 
   useEffect(() => {
     if (
@@ -224,9 +238,10 @@ export function VaultView(): JSX.Element {
         setError(errorText(actionError, t));
       } finally {
         setBusy(false);
+        void loadBackupUsage();
       }
     },
-    [loadSnapshot, t],
+    [loadBackupUsage, loadSnapshot, t],
   );
 
   const handleUpload = useCallback(() => {
@@ -316,6 +331,7 @@ export function VaultView(): JSX.Element {
         syncLabelTimer.current = null;
       }
       setBusy(false);
+      void loadBackupUsage();
     }
 
     if (syncFailure || !nextSnapshot) {
@@ -701,11 +717,23 @@ export function VaultView(): JSX.Element {
                   {t("vault.fileCount", { count: visibleItems.length })}
                 </span>
                 <span>
-                  {t("vault.usage", {
+                  {t("vault.localUsage", {
                     used: formatSize(snapshot?.usedBytes ?? 0),
-                    quota: formatSize(snapshot?.quotaBytes ?? 0),
                   })}
                 </span>
+                {backupUsage && (
+                  <span>
+                    {t(
+                      backupUsage.quotaBytes === null
+                        ? "vault.backupUsageNoQuota"
+                        : "vault.backupUsage",
+                      {
+                        used: formatSize(backupUsage.usedBytes),
+                        quota: formatSize(backupUsage.quotaBytes ?? 0),
+                      },
+                    )}
+                  </span>
+                )}
               </div>
               <Tooltip label={t("vault.upload")}>
                 <button
