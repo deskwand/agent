@@ -36,7 +36,6 @@
     "summarizePapersToNotion": "Summarize papers to Notion",
     "selectWorkingFolder": "Select Working Folder (required)",
     "selectWorkingFolderFailed": "Failed to select working folder",
-    "attachFiles": "Attach Files",
     "letsGo": "Let's go",
     "starting": "Starting...",
     "chromeRequired": "Chrome",
@@ -1770,5 +1769,38 @@
     },
     "loading": "Preparing history…",
     "empty": "No usage recorded in the selected range"
+  },
+  "attachMenu": {
+    "label": "Add",
+    "localFile": "Upload local file",
+    "workspace": "Choose from workspace",
+    "vault": "Choose from Vault",
+    "disabled": {
+      "vaultNotSet": "Vault is not set up yet",
+      "vaultBusy": "Vault is being restored",
+      "noWorkspace": "Available after your first message"
+    }
+  },
+  "attachPicker": {
+    "searchPlaceholder": "Search files",
+    "back": "Back",
+    "addCount": "Add {{count}} file(s)",
+    "loading": "Loading...",
+    "added": "Added",
+    "retry": "Retry",
+    "empty": {
+      "vault": "No files in the Vault yet",
+      "workspace": "No files in the current workspace",
+      "search": "No matching files"
+    },
+    "truncated": "Scanned 2000 files; some may be missing — narrow it down with search",
+    "goToVault": "Upload files in the Vault",
+    "error": {
+      "vault": "Failed to read the Vault",
+      "workspace": "Failed to read the workspace"
+    }
+  },
+  "attachChip": {
+    "vaultSource": "Vault · {{name}}"
   }
 }

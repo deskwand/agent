@@ -15,6 +15,7 @@ import { sliceCachedPage } from "./message-paging";
 import { entriesToMessages, locateForkEntryId } from "./entries-to-messages";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { v4 as uuidv4 } from "uuid";
+import { createHash } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 import type {
@@ -1024,26 +1025,55 @@ export class SessionManager {
           if (!baseFilename) continue;
           const inlineDataBase64 = fileBlock.inlineDataBase64;
           const hasInlineData = inlineDataBase64 !== undefined;
-          const extension = path.extname(baseFilename);
-          const stem = path.basename(baseFilename, extension);
-          const destFilename = hasInlineData
-            ? `${stem}-${uuidv4()}${extension}`
-            : baseFilename;
+          const inlineBuffer = hasInlineData
+            ? Buffer.from(inlineDataBase64, "base64")
+            : null;
+
+          // Inline data is authoritative: never substitute a local file when a
+          // remote attachment also supplies a display filename/path.
+          if (!inlineBuffer && !(sourcePath && fs.existsSync(sourcePath))) {
+            logError(
+              "[SessionManager] Source file not found and inline data missing:",
+              sourcePath || "(empty path)",
+            );
+            // Skip this file attachment
+            continue;
+          }
+
+          // Content-addressed name: identical bytes reuse the same file, and a
+          // same-named attachment with different bytes can never overwrite a
+          // previously sent one.
+          const sourceSize = inlineBuffer
+            ? inlineBuffer.length
+            : fs.statSync(sourcePath).size;
+          const destFilename = attachmentDestFilename(
+            baseFilename,
+            attachmentSuffix(
+              sourceSize,
+              () => sha256Short(inlineBuffer ?? fs.readFileSync(sourcePath)),
+              uuidv4(),
+            ),
+          );
           const destPath = path.join(tmpDir, destFilename);
           let actualSize = 0;
 
-          // Inline data is authoritative. Never substitute a local file when
-          // a remote attachment also supplies a display filename/path.
-          if (hasInlineData) {
-            const buffer = Buffer.from(inlineDataBase64, "base64");
-            fs.writeFileSync(destPath, buffer);
-            actualSize = buffer.length;
+          // 同内容必然同名：已经有了就不重写（或 copying 一份相同的字节）。
+          if (fs.existsSync(destPath)) {
+            actualSize = fs.statSync(destPath).size;
+            log(
+              "[SessionManager] Attachment already present, reusing:",
+              destPath,
+              `(${actualSize} bytes)`,
+            );
+          } else if (inlineBuffer) {
+            fs.writeFileSync(destPath, inlineBuffer);
+            actualSize = inlineBuffer.length;
             log(
               "[SessionManager] Wrote file from inline data:",
               destPath,
               `(${actualSize} bytes)`,
             );
-          } else if (sourcePath && fs.existsSync(sourcePath)) {
+          } else {
             fs.copyFileSync(sourcePath, destPath);
 
             // Get actual file size
@@ -1057,13 +1087,6 @@ export class SessionManager {
               destPath,
               `(${actualSize} bytes)`,
             );
-          } else {
-            logError(
-              "[SessionManager] Source file not found and inline data missing:",
-              sourcePath || "(empty path)",
-            );
-            // Skip this file attachment
-            continue;
           }
 
           // If sandbox is already initialized, sync the file to sandbox as well
@@ -2489,4 +2512,41 @@ export class SessionManager {
 
     return candidates;
   }
+}
+
+/**
+ * 附件内容寻址的上限。超过它的文件不读内容算 hash，退化为 uuid 后缀——
+ * 附加一个 3GB 视频时，不值得为了命名先把整份内容读一遍。
+ */
+export const ATTACHMENT_HASH_MAX_BYTES = 64 * 1024 * 1024;
+
+/**
+ * 附件落盘名的后缀：内容寻址用内容 sha256 的前 8 位，超大文件用 uuid。
+ * `contentHash` 只在需要时才调用，因此大文件不会触发读取。
+ */
+export function attachmentSuffix(
+  size: number,
+  contentHash: () => string,
+  uuid: string,
+): string {
+  if (size > ATTACHMENT_HASH_MAX_BYTES) return uuid;
+  return contentHash().slice(0, 8);
+}
+
+/**
+ * 附件落盘名 `<stem>-<suffix><ext>`：同内容必然同名（天然复用、不重写），
+ * 不同内容必然不同名（不会覆盖此前消息里的同名附件）。
+ */
+export function attachmentDestFilename(
+  baseFilename: string,
+  suffix: string,
+): string {
+  const extension = path.extname(baseFilename);
+  const stem = path.basename(baseFilename, extension);
+  return `${stem}-${suffix}${extension}`;
+}
+
+/** 内容摘要前 8 位：短到能进文件名，长到实际唯一。 */
+function sha256Short(contents: Buffer): string {
+  return createHash("sha256").update(contents).digest("hex").slice(0, 8);
 }

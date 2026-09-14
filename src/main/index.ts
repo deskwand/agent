@@ -34,6 +34,7 @@ import { execFileSync } from "child_process";
 import { config } from "dotenv";
 import { initDatabase, closeDatabase, getDatabase } from "./db/database";
 import { registerVaultIpc } from "./vault/ipc";
+import { scanWorkspaceFiles } from "./workspace-file-scan";
 import { SessionManager } from "./session/session-manager";
 import { SkillsManager } from "./skills/skills-manager";
 import { MemoryService } from "./memory/memory-service";
@@ -2281,6 +2282,14 @@ ipcMain.handle("fs.listDirectory", async (_event, dirPath: string) => {
     logError("[fs.listDirectory] failed:", error);
     return [];
   }
+});
+
+// Chat input attach picker: flat workspace file scan
+ipcMain.handle("fs.scanFiles", async (_event, rootDir: string) => {
+  if (typeof rootDir !== "string" || rootDir.length === 0) {
+    return { files: [], truncated: false };
+  }
+  return scanWorkspaceFiles(rootDir);
 });
 
 // Read file content for file browser preview (text/image)

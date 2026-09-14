@@ -11,7 +11,8 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useCurrentSession } from "../store/selectors";
 import { useIPC } from "../hooks/useIPC";
-import { X, Image as ImageIcon } from "lucide-react";
+import { X, Image as ImageIcon, Lock } from "lucide-react";
+import { attachmentKey, mergeAttachedFiles } from "../utils/attached-files";
 import type { ImageSource } from "./ImageLightbox";
 import type { Skill } from "../types";
 import {
@@ -36,6 +37,10 @@ export interface ChatInputAttachedFile {
   size: number;
   type: string;
   inlineDataBase64?: string;
+  /** 来源：缺省视为本地文件（系统文件框 / 拖拽） */
+  source?: "local" | "vault" | "workspace";
+  /** 选择器给出的稳定身份（密库=文件名、工作区=相对路径）；仅用于去重与「已添加」标记 */
+  dedupeId?: string;
 }
 
 export interface ChatInputSubmitData {
@@ -51,6 +56,7 @@ export interface ChatInputHandle {
   submit: () => void;
   isEmpty: () => boolean;
   selectFiles: () => void;
+  addFiles: (files: ChatInputAttachedFile[]) => void;
 }
 
 interface ChatInputProps {
@@ -68,6 +74,8 @@ interface ChatInputProps {
   isExpanded?: boolean;
   onToggleExpand?: () => void;
   slashMenuDirection?: "up" | "down";
+  /** 附件列表变化时上报，供选择器标记「已添加」 */
+  onAttachmentsChange?: (files: ChatInputAttachedFile[]) => void;
 }
 
 /** Base Tailwind classes for slash command menu items. */
@@ -90,6 +98,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       isExpanded = false,
       onToggleExpand,
       slashMenuDirection,
+      onAttachmentsChange,
     },
     ref,
   ) {
@@ -273,7 +282,16 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       selectFiles() {
         selectFilesRef.current();
       },
+      addFiles(files: ChatInputAttachedFile[]) {
+        setAttachedFiles((prev) => mergeAttachedFiles(prev, files));
+      },
     }));
+
+    // 上报附件列表：选择器用它把已附加的文件标成「已添加」。
+    // setAttachedFiles 全部走 mergeAttachedFiles，所以重复注入不会触发这里。
+    useEffect(() => {
+      onAttachmentsChange?.(attachedFiles);
+    }, [attachedFiles, onAttachmentsChange]);
 
     // --- Image processing helpers ---
     const blobToBase64 = (blob: Blob): Promise<string> => {
@@ -368,7 +386,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             type: "application/octet-stream",
           };
         });
-        setAttachedFiles((prev) => [...prev, ...newFiles]);
+        setAttachedFiles((prev) => mergeAttachedFiles(prev, newFiles));
       } catch (error) {
         console.error("[ChatInput] Error selecting files:", error);
       }
@@ -615,7 +633,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             };
           }),
         );
-        setAttachedFiles((prev) => [...prev, ...newFiles]);
+        setAttachedFiles((prev) => mergeAttachedFiles(prev, newFiles));
       }
     };
 
@@ -812,16 +830,24 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   );
                 };
 
+                const chipTip =
+                  file.source === "vault"
+                    ? t("attachChip.vaultSource", { name: file.name })
+                    : file.path || file.name;
+
                 return (
                   <div
-                    key={file.path || `attached-file-${index}`}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group ${isImage ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
+                    key={attachmentKey(file)}
+                    className={`relative flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group ${isImage ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
                     onClick={handleAttachFileClick}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-text-primary truncate">
                         {isImage && (
                           <ImageIcon className="w-3.5 h-3.5 inline mr-1.5 text-accent" />
+                        )}
+                        {file.source === "vault" && (
+                          <Lock className="w-3 h-3 inline mr-1.5 text-text-muted" />
                         )}
                         {file.name}
                       </p>
@@ -836,6 +862,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
+                    <span className="pointer-events-none absolute bottom-full left-0 mb-2 hidden group-hover:block z-20 max-w-[28rem] break-all rounded-md border border-border bg-background px-2 py-1 text-xs text-text-primary shadow-soft">
+                      {chipTip}
+                    </span>
                   </div>
                 );
               })}

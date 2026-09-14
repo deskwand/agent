@@ -260,6 +260,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Select files using native dialog
   selectFiles: (): Promise<string[]> =>
     ipcRenderer.invoke("dialog.selectFiles"),
+  // Flat workspace file scan for the chat input attach picker
+  scanWorkspaceFiles: (
+    rootDir: string,
+  ): Promise<{
+    files: Array<{ relPath: string; size: number }>;
+    truncated: boolean;
+  }> => ipcRenderer.invoke("fs.scanFiles", rootDir),
   getVideoSourceUrl: (filePath: string): Promise<string> =>
     ipcRenderer.invoke("video.getSourceUrl", filePath),
 
@@ -795,6 +802,10 @@ declare global {
       openExternal: (url: string) => Promise<boolean>;
       showItemInFolder: (filePath: string, cwd?: string) => Promise<boolean>;
       selectFiles: () => Promise<string[]>;
+      scanWorkspaceFiles: (rootDir: string) => Promise<{
+        files: Array<{ relPath: string; size: number }>;
+        truncated: boolean;
+      }>;
       getVideoSourceUrl: (filePath: string) => Promise<string>;
       listDirectory: (
         dirPath: string,

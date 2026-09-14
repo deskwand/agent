@@ -1,8 +1,10 @@
 import { useTranslation } from "react-i18next";
 import type { ThinkingLevel, ProviderProfileKey } from "../types";
-import { Plus, ArrowUp, Square, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowUp, Square, Maximize2, Minimize2 } from "lucide-react";
 import { MergedInputChip } from "./MergedInputChip";
 import { Tooltip } from "./Tooltip";
+import { AttachMenu } from "./attach/AttachMenu";
+import type { ChatInputAttachedFile } from "./ChatInput";
 
 export interface ModelOptionGroup {
   profileKey: ProviderProfileKey;
@@ -12,7 +14,16 @@ export interface ModelOptionGroup {
 
 export interface ChatInputBottomBarProps {
   onAttach: () => void;
-  attachTitle?: string;
+  /** 当前会话工作目录，透传给 AttachMenu */
+  cwd?: string;
+  /** 选择器选出的附件 */
+  onAddFiles: (files: ChatInputAttachedFile[]) => void;
+  /** 已在输入框里的附件身份 key */
+  attachedKeys: ReadonlySet<string>;
+  /** 附件菜单展开方向；缺省向上（输入框贴底时） */
+  attachMenuDirection?: "up" | "down";
+  /** 附件菜单确认/取消后，请宿主把焦点交回输入框 */
+  onAttachMenuDismiss?: () => void;
   model: string;
   modelOptions: ModelOptionGroup[];
   activeProviderProfileKey: ProviderProfileKey;
@@ -39,7 +50,11 @@ export interface ChatInputBottomBarProps {
 
 export function ChatInputBottomBar({
   onAttach,
-  attachTitle,
+  cwd,
+  onAddFiles,
+  attachedKeys,
+  attachMenuDirection,
+  onAttachMenuDismiss,
   model,
   modelOptions,
   activeProviderProfileKey,
@@ -61,7 +76,6 @@ export function ChatInputBottomBar({
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
-  const attachTipLabel = attachTitle || t("welcome.attachFiles");
   const expandLabel = isExpanded
     ? t("chat.collapseInput")
     : t("chat.expandInput");
@@ -71,16 +85,14 @@ export function ChatInputBottomBar({
   return (
     <div className="mt-3 flex items-center justify-between gap-2">
       <div className="flex items-center gap-0.5">
-        <Tooltip label={attachTipLabel}>
-          <button
-            type="button"
-            onClick={onAttach}
-            aria-label={attachTipLabel}
-            className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </Tooltip>
+        <AttachMenu
+          cwd={cwd}
+          onPickLocalFiles={onAttach}
+          onAddFiles={onAddFiles}
+          attachedKeys={attachedKeys}
+          direction={attachMenuDirection}
+          onDismiss={onAttachMenuDismiss}
+        />
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">

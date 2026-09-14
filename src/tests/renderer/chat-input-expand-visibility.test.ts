@@ -40,6 +40,8 @@ const modelOptions: ModelOptionGroup[] = [
 /** 底栏除「随内容变化的两个 prop」之外的必填/可选 prop。 */
 const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
   onAttach: () => {},
+  onAddFiles: () => {},
+  attachedKeys: new Set<string>(),
   model: "model-1",
   modelOptions,
   activeProviderProfileKey: "profile-a" as never,

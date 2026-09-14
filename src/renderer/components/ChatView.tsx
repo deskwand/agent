@@ -18,6 +18,7 @@ import {
 } from "../store/selectors";
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
+import { attachmentKeySet } from "../utils/attached-files";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import {
   formatContextPercentage,
@@ -61,6 +62,7 @@ import {
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
   ChatInput,
+  type ChatInputAttachedFile,
   type ChatInputHandle,
   type ChatInputSubmitData,
 } from "./ChatInput";
@@ -348,6 +350,17 @@ export function ChatView() {
   >([]);
   const [showConnectorLabel, setShowConnectorLabel] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [attachedKeys, setAttachedKeys] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+
+  // 必须是稳定引用：这个回调作为 ChatInput 里 effect 的依赖，每次渲染换新引用
+  // 就会变成 effect → setState → 重渲染 → 新回调 的死循环。
+  const handleAttachmentsChange = useCallback(
+    (files: ChatInputAttachedFile[]) =>
+      setAttachedKeys((prev) => attachmentKeySet(files, prev)),
+    [],
+  );
   const [visibleMessageStartIndex, setVisibleMessageStartIndex] = useState(0);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
 
@@ -1873,13 +1886,17 @@ export function ChatView() {
             isExpanded={isInputExpanded}
             onToggleExpand={() => setIsInputExpanded((v) => !v)}
             onContentChange={setHasInputContent}
+            onAttachmentsChange={handleAttachmentsChange}
             placeholder={t("chat.typeMessage")}
             cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
             textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
             bottomSlot={
               <ChatInputBottomBar
                 onAttach={() => chatInputRef.current?.selectFiles()}
-                attachTitle={t("welcome.attachFiles")}
+                cwd={activeSessionCwd}
+                onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
+                attachedKeys={attachedKeys}
+                onAttachMenuDismiss={() => chatInputRef.current?.focus()}
                 model={activeModel}
                 modelOptions={modelOptions}
                 activeProviderProfileKey={activeProviderProfileKey}

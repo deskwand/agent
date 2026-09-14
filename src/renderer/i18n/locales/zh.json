@@ -36,7 +36,6 @@
     "summarizePapersToNotion": "将论文总结到 Notion",
     "selectWorkingFolder": "选择工作文件夹（必填）",
     "selectWorkingFolderFailed": "选择工作文件夹失败",
-    "attachFiles": "附加文件",
     "letsGo": "开始",
     "starting": "启动中...",
     "chromeRequired": "需要 Chrome",
@@ -1769,5 +1768,38 @@
     },
     "loading": "正在整理历史…",
     "empty": "所选区间还没有用量记录"
+  },
+  "attachMenu": {
+    "label": "添加",
+    "localFile": "上传本地文件",
+    "workspace": "从工作区选择",
+    "vault": "从密库选择",
+    "disabled": {
+      "vaultNotSet": "密库尚未设置",
+      "vaultBusy": "密库正在恢复中",
+      "noWorkspace": "发送首条消息后可用"
+    }
+  },
+  "attachPicker": {
+    "searchPlaceholder": "搜索文件",
+    "back": "返回",
+    "addCount": "添加 {{count}} 个文件",
+    "loading": "加载中...",
+    "added": "已添加",
+    "retry": "重试",
+    "empty": {
+      "vault": "密库还没有文件",
+      "workspace": "当前工作区没有文件",
+      "search": "没有匹配的文件"
+    },
+    "truncated": "已扫描 2000 个文件，可能未覆盖全部，请用搜索缩小范围",
+    "goToVault": "去密库上传文件",
+    "error": {
+      "vault": "读取密库失败",
+      "workspace": "读取工作区失败"
+    }
+  },
+  "attachChip": {
+    "vaultSource": "密库 · {{name}}"
   }
 }

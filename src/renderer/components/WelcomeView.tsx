@@ -1,8 +1,9 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useAppConfig } from "../store/selectors";
 import { useIPC } from "../hooks/useIPC";
+import { attachmentKeySet } from "../utils/attached-files";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import type {
   ContentBlock,
@@ -16,6 +17,7 @@ import { ArrowRight } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import {
   ChatInput,
+  type ChatInputAttachedFile,
   type ChatInputHandle,
   type ChatInputSubmitData,
 } from "./ChatInput";
@@ -53,6 +55,16 @@ export function WelcomeView() {
   const showProjectTitle =
     !!projectName && projectName !== DEFAULT_WORKDIR_DIRNAME;
   const chatInputRef = useRef<ChatInputHandle>(null);
+  const [attachedKeys, setAttachedKeys] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
+
+  // 稳定引用：它作为 ChatInput 里 effect 的依赖，每次渲染换新会导致死循环。
+  const handleAttachmentsChange = useCallback(
+    (files: ChatInputAttachedFile[]) =>
+      setAttachedKeys((prev) => attachmentKeySet(files, prev)),
+    [],
+  );
 
   // Model & thinking level — initialised from first available model, same source as ChatView
   const [initialized, setInitialized] = useState(false);
@@ -267,6 +279,7 @@ export function WelcomeView() {
           isExpanded={isInputExpanded}
           onToggleExpand={() => setIsInputExpanded((v) => !v)}
           onContentChange={setHasInputContent}
+          onAttachmentsChange={handleAttachmentsChange}
           slashMenuDirection="down"
           placeholder={t("welcome.placeholder")}
           cardClassName="rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4"
@@ -274,6 +287,10 @@ export function WelcomeView() {
           bottomSlot={
             <ChatInputBottomBar
               onAttach={() => chatInputRef.current?.selectFiles()}
+              onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
+              attachedKeys={attachedKeys}
+              onAttachMenuDismiss={() => chatInputRef.current?.focus()}
+              attachMenuDirection="down"
               model={selectedModel}
               modelOptions={modelOptions}
               activeProviderProfileKey={selectedProviderProfileKey}
