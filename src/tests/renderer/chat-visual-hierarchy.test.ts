@@ -6,16 +6,28 @@
 //   3. 侧栏层级 —— 分组的字号必须真的小于导航项、颜色必须不与辅助元素撞档
 // 圆角与字号的数值一律从 tailwind.config.js 读，颜色从 globals.css 读，不写死在断言里。
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
+  RENDERER,
+  classNameAt,
   composite,
   contrast,
   css,
+  globalToken,
+  paddingYRem,
   parseAlphaColor,
+  radiusPx,
   rgbHex,
+  rootPx,
   themeBlocks,
   tokenOf,
 } from "./theme-css-helpers";
 
+const messageCard = fs.readFileSync(
+  path.join(RENDERER, "components/MessageCard.tsx"),
+  "utf8",
+);
 /** 行内代码那条规则全文。找不到就抛错 —— 这本身就是回归信号。 */
 function inlineCodeRule(): string {
   const m = /\.prose-chat :not\(pre\) > code\s*\{[\s\S]*?\}/.exec(css);
@@ -100,5 +112,45 @@ describe("行内代码底块边界不变量", () => {
     const values = themeBlocks().map((b) => chipEdgeContrast(b, token));
     const spread = Math.max(...values) - Math.min(...values);
     expect(spread, `实测极差 ${spread.toFixed(3)}`).toBeLessThanOrEqual(0.1);
+  });
+});
+
+describe("用户气泡：形状不随消息长度漂移", () => {
+  const bubble = classNameAt(messageCard, "message-user", "`");
+
+  /**
+   * 单行气泡的最小高度 = 行盒 + 上下 padding。
+   * 高度随消息行数线性增长，而圆角是固定 px —— 两者之比才会随内容变化，
+   * 所以这里算的是比值，不是某个具体圆角档位。
+   */
+  function minHeightPx(cls: string): number {
+    const fontRem = parseFloat(globalToken("--font-size-chat"));
+    const lineHeight = parseFloat(globalToken("--line-height-chat"));
+    return fontRem * lineHeight * rootPx() + paddingYRem(cls) * rootPx() * 2;
+  }
+
+  it("气泡只声明一个圆角类（生效值不依赖层级优先级）", () => {
+    // 这个 bug 的根因就是 .message-user 声明了 rounded-2xl，却在 @layer components
+    // 被 utility 层的 rounded-5xl 覆盖。只要气泡自身恰好有一个圆角类，
+    // 下面那条比例断言算的就是真正生效的值，而不是某个被覆盖的声明。
+    // 断言"数量"而不是"存在"：0 个（回落到 .message-user）或 ≥2 个
+    // （谁生效看层级顺序）都会让生效值变得不确定。
+    const radii = bubble.match(/(?:^|\s)rounded-[\w]+(?=\s|$)/g) ?? [];
+    expect(
+      radii.length,
+      `气泡声明了 ${radii.length} 个圆角类：${JSON.stringify(radii)}`,
+    ).toBe(1);
+  });
+
+  it("单行气泡的圆角 / 最小高度 ≤ 0.40（不落入胶囊区间）", () => {
+    const ratio = radiusPx(bubble) / minHeightPx(bubble);
+    // 几何上 0.5 就是胶囊（圆角等于半高）。取 0.40 留出余量：
+    //   5xl(24px)/45px = 0.533 → 失败（这就是修复前的状态）
+    //   4xl(20px)/45px = 0.444 → 失败
+    //   3xl(16px)/45px = 0.356 / 2xl(14px)=0.311 / xl(10px)=0.222 → 通过
+    expect(
+      ratio,
+      `圆角 ${radiusPx(bubble)}px / 最小高度 ${minHeightPx(bubble)}px = ${ratio.toFixed(3)}`,
+    ).toBeLessThanOrEqual(0.4);
   });
 });

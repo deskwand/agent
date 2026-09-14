@@ -261,7 +261,7 @@ export const MessageCard = memo(function MessageCard({
         <div className="flex justify-end group">
           <div className="max-w-[80%] min-w-0 flex flex-col items-end">
             <div
-              className={`message-user px-4 py-3 rounded-5xl min-w-0 break-words ${
+              className={`message-user px-4 py-3 rounded-xl min-w-0 break-words ${
                 isQueued ? "opacity-70 border-dashed" : ""
               } ${isCancelled ? "opacity-60" : ""}`}
             >
