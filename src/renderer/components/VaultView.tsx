@@ -700,9 +700,8 @@ export function VaultView(): JSX.Element {
                   {t("vault.fileCount", { count: visibleItems.length })}
                 </span>
                 <span>
-                  {t("vault.usage", {
+                  {t("vault.localUsage", {
                     used: formatSize(snapshot?.usedBytes ?? 0),
-                    quota: formatSize(snapshot?.quotaBytes ?? 0),
                   })}
                 </span>
               </div>

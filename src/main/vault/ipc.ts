@@ -23,7 +23,6 @@ import {
   type VaultResetResult,
 } from "./sync";
 import {
-  VAULT_LOCAL_QUOTA_BYTES,
   type VaultOperationStatus,
   type VaultRemoteStatus,
   type VaultSnapshot,
@@ -280,6 +279,5 @@ async function getSnapshot(
     hasLocalMek,
     operationStatus,
     usedBytes,
-    quotaBytes: VAULT_LOCAL_QUOTA_BYTES,
   };
 }

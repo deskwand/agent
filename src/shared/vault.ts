@@ -1,5 +1,3 @@
-export const VAULT_LOCAL_QUOTA_BYTES = 100 * 1024 * 1024;
-
 export type SyncStatus = "synced" | "pending" | "failed";
 
 export interface VaultSnapshotItem {
@@ -30,7 +28,6 @@ export interface VaultSnapshot {
   hasLocalMek: boolean;
   operationStatus: VaultOperationStatus;
   usedBytes: number;
-  quotaBytes: number;
 }
 
 export interface VaultRemoteStatus {

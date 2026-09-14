@@ -1616,7 +1616,7 @@
     "dismiss": "Dismiss",
     "fileCount_one": "{{count}} file",
     "fileCount_other": "{{count}} files",
-    "usage": "Used {{used}} / {{quota}}",
+    "localUsage": "Local · {{used}} used",
     "comingSoon": "Coming soon",
     "empty": "No files in your Vault",
     "loginHint": "Sign in to back up files to the cloud",

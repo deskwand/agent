@@ -1615,7 +1615,7 @@
     "dismiss": "关闭",
     "fileCount_one": "{{count}} 个文件",
     "fileCount_other": "{{count}} 个文件",
-    "usage": "已使用 {{used}} / {{quota}}",
+    "localUsage": "本地 已使用 {{used}}",
     "comingSoon": "敬请期待",
     "empty": "密库中暂无文件",
     "loginHint": "登录后可将文件备份到云端",

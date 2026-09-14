@@ -39,7 +39,7 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.loginHint": "Sign in to back up files to the cloud",
   "vault.recoveryCode": "Recovery code",
   "vault.pendingCount": "{{count}} pending",
-  "vault.usage": "Used {{used}} / {{quota}}",
+  "vault.localUsage": "Local · {{used}} used",
   "vault.setup.configured": "Encrypted cloud backup is set up",
   "vault.setup.open": "Set up encrypted cloud backup",
   "vault.setup.title": "Save your recovery code",
@@ -151,7 +151,6 @@ function snapshot(overrides: Partial<VaultSnapshot> = {}): VaultSnapshot {
     hasLocalMek: true,
     operationStatus: "idle",
     usedBytes: 0,
-    quotaBytes: 100 * 1024 * 1024,
     ...overrides,
   };
 }
@@ -387,12 +386,9 @@ describe("VaultView", () => {
     expect(api.deleteFile).toHaveBeenCalledWith("readme.md");
   });
 
-  it("renders local quota usage", async () => {
+  it("renders local usage without a quota ceiling", async () => {
     api.getSnapshot.mockResolvedValueOnce(
-      snapshot({
-        usedBytes: 12 * 1024 * 1024,
-        quotaBytes: 100 * 1024 * 1024,
-      }),
+      snapshot({ usedBytes: 12 * 1024 * 1024 }),
     );
 
     await act(async () => {
@@ -400,7 +396,7 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("Used 12.0 MB / 100.0 MB");
+    expect(container.textContent).toContain("Local · 12.0 MB used");
   });
 
   it("shows a distinct disk-full error", async () => {
