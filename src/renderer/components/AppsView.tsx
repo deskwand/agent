@@ -57,7 +57,7 @@ export function AppsView() {
         >
           <ArrowLeft className="w-5 h-5 text-text-secondary" />
         </button>
-        <h2 className="text-base font-semibold tracking-[-0.02em] text-text-primary">
+        <h2 className="text-xl font-semibold text-text-primary">
           {t("apps.title")}
         </h2>
       </div>

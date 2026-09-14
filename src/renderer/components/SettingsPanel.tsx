@@ -263,7 +263,7 @@ export function SettingsPanel({
             <p className="text-xs uppercase tracking-[0.14em] text-text-muted">
               {t("settings.title")}
             </p>
-            <h3 className="mt-1 text-sm font-semibold tracking-[-0.02em] text-text-primary">
+            <h3 className="mt-1 text-xl font-semibold text-text-primary">
               {activeTabMeta?.label}
             </h3>
             {activeTabMeta?.description && (

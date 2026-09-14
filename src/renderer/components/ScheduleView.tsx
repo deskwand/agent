@@ -113,7 +113,7 @@ export function ScheduleView() {
         <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
           DeskWand
         </p>
-        <h2 className="mt-0.5 text-lg font-semibold text-text-primary">
+        <h2 className="mt-0.5 text-xl font-semibold text-text-primary">
           {t("sidebar.automation")}
         </h2>
         <p className="mt-0.5 text-xs leading-5 text-text-secondary">
