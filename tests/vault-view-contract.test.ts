@@ -40,6 +40,8 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.recoveryCode": "Recovery code",
   "vault.pendingCount": "{{count}} pending",
   "vault.localUsage": "Local · {{used}} used",
+  "vault.backupUsage": "Cloud · {{used}} / {{quota}}",
+  "vault.backupUsageNoQuota": "Cloud · {{used}} used",
   "vault.setup.configured": "Encrypted cloud backup is set up",
   "vault.setup.open": "Set up encrypted cloud backup",
   "vault.setup.title": "Save your recovery code",
@@ -183,6 +185,10 @@ describe("VaultView", () => {
     deleteFile: vi.fn(async () => snapshot({ items: [] })),
     sync: vi.fn(async () => snapshot({ items: [] })),
     checkRemoteBackup: vi.fn(async () => ({ status: "no-backup" })),
+    getBackupUsage: vi.fn(async () => ({
+      usedBytes: 0,
+      quotaBytes: 100 * 1024 * 1024,
+    })),
     generateRecoveryCode: vi.fn(
       async () => "123456789ABCDEFGHJKLMNPQRSTUVWXYZ",
     ),
@@ -409,6 +415,62 @@ describe("VaultView", () => {
     });
 
     expect(screenText()).toContain("Not enough disk space to import this file");
+  });
+
+  it("renders cloud usage alongside local usage", async () => {
+    api.getSnapshot.mockResolvedValueOnce(
+      snapshot({ usedBytes: 12 * 1024 * 1024 }),
+    );
+    api.getBackupUsage.mockResolvedValueOnce({
+      usedBytes: 4 * 1024 * 1024,
+      quotaBytes: 100 * 1024 * 1024,
+    });
+
+    await renderVault();
+
+    expect(screenText()).toContain("Local · 12.0 MB used");
+    expect(screenText()).toContain("Cloud · 4.0 MB / 100.0 MB");
+  });
+
+  it("renders cloud usage without a quota", async () => {
+    api.getBackupUsage.mockResolvedValueOnce({
+      usedBytes: 4 * 1024 * 1024,
+      quotaBytes: null,
+    });
+
+    await renderVault();
+
+    expect(screenText()).toContain("Cloud · 4.0 MB used");
+    expect(screenText()).not.toContain("/ 100.0 MB");
+  });
+
+  it("hides the cloud row when usage is unavailable", async () => {
+    api.getBackupUsage.mockResolvedValueOnce(null);
+
+    await renderVault();
+
+    expect(screenText()).toContain("Local · 0 B used");
+    expect(screenText()).not.toContain("Cloud ·");
+  });
+
+  it("refreshes cloud usage after a sync", async () => {
+    api.getBackupUsage
+      .mockResolvedValueOnce({ usedBytes: 0, quotaBytes: 100 * 1024 * 1024 })
+      .mockResolvedValueOnce({
+        usedBytes: 4 * 1024 * 1024,
+        quotaBytes: 100 * 1024 * 1024,
+      });
+
+    await renderVault();
+    expect(screenText()).toContain("Cloud · 0 B / 100.0 MB");
+
+    await act(async () => {
+      syncButton().click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Cloud · 4.0 MB / 100.0 MB");
   });
 
   it("shows a distinct cloud quota error while keeping local files", async () => {

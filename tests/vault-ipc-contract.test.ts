@@ -40,6 +40,7 @@ describe("Vault IPC contract", () => {
       "vault.deleteFile",
       "vault.sync",
       "vault.checkRemoteBackup",
+      "vault.getBackupUsage",
       "vault.generateRecoveryCode",
       "vault.initialize",
       "vault.restoreWithLocalMek",
@@ -160,6 +161,54 @@ describe("Vault IPC contract", () => {
       status: "error",
       errorCode: "VAULT_CLOUD_HTTP_503",
     });
+    handle.mockRestore();
+  });
+
+  it("returns null usage without a token", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), true);
+    registerVaultIpc(dependencies);
+
+    await expect(
+      handlers.get("vault.getBackupUsage")?.(null, null),
+    ).resolves.toBeNull();
+    handle.mockRestore();
+  });
+
+  it("passes cloud usage through and degrades failures to null", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), true);
+    dependencies.cloud.getUsage = async () => ({
+      usedBytes: 1536,
+      quotaBytes: 104857600,
+    });
+    registerVaultIpc(dependencies);
+
+    await expect(
+      handlers.get("vault.getBackupUsage")?.(null, "token"),
+    ).resolves.toEqual({ usedBytes: 1536, quotaBytes: 104857600 });
+
+    dependencies.cloud.getUsage = async () => {
+      throw new VaultCloudError(503);
+    };
+
+    await expect(
+      handlers.get("vault.getBackupUsage")?.(null, "token"),
+    ).resolves.toBeNull();
     handle.mockRestore();
   });
 });

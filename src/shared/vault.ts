@@ -59,3 +59,8 @@ export type VaultErrorCode =
   | "VAULT_KEYCHAIN_UNAVAILABLE"
   | "VAULT_LOCAL_DISK_FULL"
   | "VAULT_QUOTA_EXCEEDED";
+
+export interface VaultBackupUsage {
+  usedBytes: number;
+  quotaBytes: number | null;
+}

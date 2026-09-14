@@ -17,6 +17,7 @@ import { FilePreviewModal } from "./FilePreviewModal";
 import { Tooltip } from "./Tooltip";
 import type {
   SyncStatus,
+  VaultBackupUsage,
   VaultRemoteStatus,
   VaultSnapshot,
   VaultSnapshotItem,
@@ -122,6 +123,7 @@ export function VaultView(): JSX.Element {
   const token = useAppStore((state) => state.cloudConfig?.token ?? null);
   const setActiveView = useAppStore((state) => state.setActiveView);
   const [snapshot, setSnapshot] = useState<VaultSnapshot | null>(null);
+  const [backupUsage, setBackupUsage] = useState<VaultBackupUsage | null>(null);
   const [filter, setFilter] = useState<Filter>("files");
   const [remoteStatus, setRemoteStatus] = useState<VaultRemoteStatus | null>(
     null,
@@ -169,9 +171,18 @@ export function VaultView(): JSX.Element {
     }
   }, [t]);
 
+  const loadBackupUsage = useCallback(async () => {
+    try {
+      setBackupUsage(await window.electronAPI.vault.getBackupUsage(token));
+    } catch {
+      setBackupUsage(null);
+    }
+  }, [token]);
+
   useEffect(() => {
     void loadSnapshot();
-  }, [loadSnapshot]);
+    void loadBackupUsage();
+  }, [loadSnapshot, loadBackupUsage]);
 
   useEffect(() => {
     if (
@@ -223,9 +234,10 @@ export function VaultView(): JSX.Element {
         setError(errorText(actionError, t));
       } finally {
         setBusy(false);
+        void loadBackupUsage();
       }
     },
-    [loadSnapshot, t],
+    [loadBackupUsage, loadSnapshot, t],
   );
 
   const handleUpload = useCallback(() => {
@@ -323,6 +335,7 @@ export function VaultView(): JSX.Element {
       return;
     }
     setSnapshot(nextSnapshot);
+    void loadBackupUsage();
     if (nextSnapshot.pendingCount > 0) {
       setSyncFeedback("error");
       setSyncFeedbackMessage(t("vault.error.syncFailed"));
@@ -704,6 +717,19 @@ export function VaultView(): JSX.Element {
                     used: formatSize(snapshot?.usedBytes ?? 0),
                   })}
                 </span>
+                {backupUsage && (
+                  <span>
+                    {t(
+                      backupUsage.quotaBytes === null
+                        ? "vault.backupUsageNoQuota"
+                        : "vault.backupUsage",
+                      {
+                        used: formatSize(backupUsage.usedBytes),
+                        quota: formatSize(backupUsage.quotaBytes ?? 0),
+                      },
+                    )}
+                  </span>
+                )}
               </div>
               <Tooltip label={t("vault.upload")}>
                 <button

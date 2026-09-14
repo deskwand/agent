@@ -23,10 +23,12 @@ import {
   type VaultResetResult,
 } from "./sync";
 import {
+  type VaultBackupUsage,
   type VaultOperationStatus,
   type VaultRemoteStatus,
   type VaultSnapshot,
 } from "../../shared/vault";
+import { logWarn } from "../utils/logger";
 
 export interface VaultIpcDependencies {
   store: LocalVaultStore;
@@ -135,6 +137,20 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
           : { status: "has-backup" };
       } catch (error: unknown) {
         return classifyRemoteBackupError(error);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    "vault.getBackupUsage",
+    async (_event, token: string | null): Promise<VaultBackupUsage | null> => {
+      if (!token) return null;
+      try {
+        return (await cloud.getUsage?.(token)) ?? null;
+      } catch (error: unknown) {
+        // Usage is advisory: a failed lookup must never break the local snapshot.
+        logWarn("[vault] failed to read cloud usage", error);
+        return null;
       }
     },
   );

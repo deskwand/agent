@@ -1,4 +1,5 @@
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
+import type { VaultBackupUsage } from "../../shared/vault";
 
 export interface VaultCloudClient {
   putObject(token: string, objectId: string, payload: Buffer): Promise<void>;
@@ -7,6 +8,7 @@ export interface VaultCloudClient {
   getIndex(token: string): Promise<Buffer | null>;
   putIndex(token: string, payload: Buffer): Promise<void>;
   listObjectIds(token: string): Promise<string[]>;
+  getUsage?(token: string): Promise<VaultBackupUsage>;
 }
 
 export class FetchVaultCloudClient implements VaultCloudClient {
@@ -66,6 +68,13 @@ export class FetchVaultCloudClient implements VaultCloudClient {
     });
   }
 
+  async getUsage(token: string): Promise<VaultBackupUsage> {
+    const response = await this.request(token, "/api/vault/usage", {});
+    const payload: unknown = await response.json();
+    if (!isBackupUsagePayload(payload)) throw new Error("VAULT_BAD_USAGE");
+    return payload;
+  }
+
   private async request(
     token: string,
     path: string,
@@ -117,5 +126,15 @@ function isObjectIdPayload(value: unknown): value is { object_ids: string[] } {
   return (
     Array.isArray(candidate.object_ids) &&
     candidate.object_ids.every((id) => typeof id === "string")
+  );
+}
+
+function isBackupUsagePayload(value: unknown): value is VaultBackupUsage {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as { usedBytes?: unknown; quotaBytes?: unknown };
+  const quota = candidate.quotaBytes;
+  return (
+    typeof candidate.usedBytes === "number" &&
+    (quota === null || typeof quota === "number")
   );
 }

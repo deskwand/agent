@@ -42,4 +42,50 @@ describe("FetchVaultCloudClient", () => {
       new FetchVaultCloudClient().putIndex("token", Buffer.from("index")),
     ).rejects.toEqual(new VaultCloudError(503));
   });
+
+  it("parses the reported usage payload", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ usedBytes: 1536, quotaBytes: 104857600 }),
+            { status: 200 },
+          ),
+      ),
+    );
+
+    await expect(
+      new FetchVaultCloudClient().getUsage("token"),
+    ).resolves.toEqual({ usedBytes: 1536, quotaBytes: 104857600 });
+  });
+
+  it("accepts a usage payload without a quota", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ usedBytes: 10, quotaBytes: null }), {
+            status: 200,
+          }),
+      ),
+    );
+
+    await expect(
+      new FetchVaultCloudClient().getUsage("token"),
+    ).resolves.toEqual({ usedBytes: 10, quotaBytes: null });
+  });
+
+  it("rejects a malformed usage payload", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () => new Response(JSON.stringify({ used: 1 }), { status: 200 }),
+      ),
+    );
+
+    await expect(new FetchVaultCloudClient().getUsage("token")).rejects.toThrow(
+      "VAULT_BAD_USAGE",
+    );
+  });
 });
