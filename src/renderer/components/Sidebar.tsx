@@ -1163,7 +1163,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                               );
                             }
                           }}
-                          className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                          className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
                         >
                           <SidebarGroupIcon
                             kind="project"

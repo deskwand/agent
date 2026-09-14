@@ -20,6 +20,8 @@ import {
   radiusPx,
   rgbHex,
   rootPx,
+  textColorToken,
+  textSizeRem,
   themeBlocks,
   tokenOf,
 } from "./theme-css-helpers";
@@ -28,6 +30,11 @@ const messageCard = fs.readFileSync(
   path.join(RENDERER, "components/MessageCard.tsx"),
   "utf8",
 );
+const sidebar = fs.readFileSync(
+  path.join(RENDERER, "components/Sidebar.tsx"),
+  "utf8",
+);
+
 /** 行内代码那条规则全文。找不到就抛错 —— 这本身就是回归信号。 */
 function inlineCodeRule(): string {
   const m = /\.prose-chat :not\(pre\) > code\s*\{[\s\S]*?\}/.exec(css);
@@ -152,5 +159,68 @@ describe("用户气泡：形状不随消息长度漂移", () => {
       ratio,
       `圆角 ${radiusPx(bubble)}px / 最小高度 ${minHeightPx(bubble)}px = ${ratio.toFixed(3)}`,
     ).toBeLessThanOrEqual(0.4);
+  });
+});
+
+describe("侧栏：四级两两可区分", () => {
+  // 修复前四级的字号（13px）、字重（500）、行高（20px）完全相同，层级只能靠颜色，
+  // 而分组标签是 text-primary（最亮），压过了未激活的导航项（text-secondary）。
+  const group = classNameAt(
+    sidebar,
+    "min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2",
+    '"',
+  );
+  // 导航项是同构的三行（Apps / Vault / Automation），取第一个即可；
+  // marker **故意不含字号** —— 把 text-sm 写进搜索串会让右边那个操作数变成
+  // "期望值的硬编码副本"，断言就退化成 group < 常量，而不再是 group < nav。
+  // 这里只锚定不含尺寸的结构前缀，字号由 textSizeRem 从源码读出来。
+  const navMarker = "flex items-center gap-2 rounded-lg px-3 py-1 ";
+  const navStart = sidebar.indexOf(navMarker);
+  if (navStart < 0) throw new Error("找不到侧栏导航项的 className");
+  const navHead = sidebar.slice(navStart, sidebar.indexOf("${", navStart));
+  const badge = classNameAt(
+    sidebar,
+    "ml-auto text-xs font-normal text-text-muted",
+    '"',
+  );
+  const showMore = classNameAt(
+    sidebar,
+    "rounded-lg bg-transparent px-3 py-1.5 text-xs text-text-muted",
+    '"',
+  );
+
+  it("分组标签字号严格小于导航项（这条就是「层级拉平」的修复本身）", () => {
+    // 两侧都从源码读：左边是分组开关，右边是被锚定的导航行。
+    // 导航行一旦改字号，右边会跟着变（而不是像硬编码副本那样看不出来）。
+    expect(textSizeRem(group), `group=${group}`).toBeLessThan(
+      textSizeRem(navHead),
+    );
+  });
+
+  it("分组标签颜色保持 primary（与其他 toggle 行一致），且不与 12px+muted 的辅助元素撞档", () => {
+    // 保持 text-text-primary 是既有约定，由 sidebar-project-groups.test.ts:338 锁定：
+    // 侧栏的 toggle 行（Sessions 行 Sidebar.tsx:1103、项目分组行 :1166）都是 primary。
+    // 本次只动字号不动颜色 —— 层级靠「字号差」建立，不是把颜色压暗。
+    // 下面两条断言防的是：若将来有人把分组标签降到 muted，它会与会话计数徽标、
+    // "Show 5 more" 完全同字号同色（只差字重），层级又塌回去。
+    const groupColor = textColorToken(group);
+    expect(groupColor, `group=${group}`).toBe("primary");
+    expect(groupColor, `badge=${badge}`).not.toBe(textColorToken(badge));
+    expect(groupColor, `showMore=${showMore}`).not.toBe(
+      textColorToken(showMore),
+    );
+    // 两个辅助元素彼此同档 —— 这是既有事实，记录成断言以免被误当成回归。
+    expect(textColorToken(badge)).toBe(textColorToken(showMore));
+  });
+
+  it("保留 leading-5（该元素是 button，点击区高度不能被压小）", () => {
+    // py-1.5(12px) + 20px 行盒 = 32px 点击区；若用 text-xs 默认的 1rem 行盒会缩到 28px。
+    expect(group, group).toMatch(/(?:^|\s)leading-5(?:\s|$)/);
+  });
+
+  it("不对用户内容加 uppercase", () => {
+    // group.name 来自用户的项目/文件夹名（utils/sidebar-session-groups.ts:7）。
+    // Sidebar.tsx:995 的 uppercase 模式渲染的是静态 i18n 文案，不适用。
+    expect(group, group).not.toMatch(/uppercase/);
   });
 });
