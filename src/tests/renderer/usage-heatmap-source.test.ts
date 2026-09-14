@@ -43,6 +43,26 @@ describe("heatmap components", () => {
     expect(labels).toMatch(/"",\s*\n\s*t\("usage\.weekday\.mon"\)/);
   });
 
+  it("lets the grid stretch instead of hard-coding a cell size", () => {
+    const text = read("UsageCalendarHeatmap.tsx");
+    // 7 个 CELL_PX 使用点必须全部消失（含 Cell 内的未来日占位格与真实格子）
+    expect(text).not.toContain("CELL_PX");
+    // 列宽由容器分配，最小 9px（不足则外层横向滚动）
+    expect(text).toMatch(/gridAutoColumns:\s*["']minmax\(9px, 1fr\)["']/);
+    // 正方形由列宽决定；alignSelf 必须为 start，否则行高被拉伸成矩形。
+    // 断言"出现两次"（真实格子 + Cell 里的未来日占位格）——只查存在的话，
+    // 漏改其中一处（正是占位格那处）也能通过。
+    expect(text.match(/aspectRatio: "1"/g) ?? []).toHaveLength(2);
+    expect(text.match(/alignSelf: "start"/g) ?? []).toHaveLength(2);
+    // 周几标签槽固定宽度，与时段图的标签槽对齐
+    expect(text).toContain("GUTTER_PX = 26");
+    // 承载这一步的关键一行：列容器必须占据剩余宽度。它原本是 content-sized，
+    // 宽度会被月份文字撑出 —— 那会让 1fr 无处可拉、格子尺寸反而由标签文字决定。
+    // （实测：不加这两条时，1500px 卡片下网格只有 1121px，右侧仍留 319px。）
+    expect(text).toContain("flex-1");
+    expect(text).toContain("min-w-0");
+  });
+
   it("keeps the worst hit-rate band visible instead of rendering it empty", () => {
     const text = read("UsageCalendarHeatmap.tsx");
     // Level 0 is the only "no record" level, and the hit scale starts at 1.

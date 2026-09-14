@@ -11,14 +11,15 @@ type ColorMode = "usage" | "hit";
 
 interface Props {
   rows: UsageDayRow[];
-  /** Weeks to display: 26 on narrow windows, 53 on wide ones. */
+  /** Weeks to display; always 53 (the grid stretches to fill the card width). */
   weeks: number;
   /** Reference instant (epoch ms) that anchors the last column. */
   now: number;
 }
 
-const CELL_PX = 12;
 const GAP_PX = 2;
+/** 周几标签槽宽度：对齐「时段分布」那张图的标签列（2 个汉字 @9px + pr-2）。 */
+const GUTTER_PX = 26;
 
 /** Calendar-day arithmetic via the Date constructor, never ms addition: adding
  *  86_400_000ms across a DST transition repeats or skips a local date. */
@@ -97,11 +98,12 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
         </div>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex gap-0.5 overflow-x-auto pb-1">
         <div
-          className="grid shrink-0 pt-4 text-[9px] text-text-muted"
+          className="sticky left-0 z-10 grid shrink-0 items-center bg-background-secondary pt-4 text-[9px] text-text-muted"
           style={{
-            gridTemplateRows: `repeat(7, ${CELL_PX}px)`,
+            width: GUTTER_PX,
+            gridTemplateRows: "repeat(7, 1fr)",
             rowGap: GAP_PX,
           }}
         >
@@ -114,34 +116,44 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
             t("usage.weekday.fri"),
             "",
           ].map((label, index) => (
-            <span key={index} style={{ lineHeight: `${CELL_PX}px` }}>
+            <span key={index} className="leading-none">
               {label}
             </span>
           ))}
         </div>
 
-        <div className="flex flex-col gap-1">
-          <div className="flex" style={{ columnGap: GAP_PX }}>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div
+            className="grid"
+            style={{
+              gridAutoFlow: "column",
+              gridAutoColumns: "minmax(9px, 1fr)",
+              columnGap: GAP_PX,
+            }}
+          >
             {columns.map((col, index) => (
               <span
                 key={index}
-                className="text-[9px] text-text-muted"
-                style={{ width: CELL_PX }}
+                className="whitespace-nowrap text-[9px] text-text-muted"
               >
                 {monthLabel(col[0].day, columns, index, monthFormat)}
               </span>
             ))}
           </div>
 
-          <div className="flex" style={{ columnGap: GAP_PX }}>
+          <div
+            className="grid"
+            style={{
+              gridAutoFlow: "column",
+              gridAutoColumns: "minmax(9px, 1fr)",
+              columnGap: GAP_PX,
+            }}
+          >
             {columns.map((col, index) => (
               <div
                 key={index}
                 className="grid"
-                style={{
-                  gridTemplateRows: `repeat(7, ${CELL_PX}px)`,
-                  rowGap: GAP_PX,
-                }}
+                style={{ gridTemplateRows: "repeat(7, auto)", rowGap: GAP_PX }}
               >
                 {col.map(({ key, day }) => (
                   <Cell
@@ -191,14 +203,18 @@ function Cell({
   allValues: number[];
 }) {
   if (future) {
-    return <span style={{ width: CELL_PX, height: CELL_PX }} />;
+    return <span style={{ aspectRatio: "1", alignSelf: "start" }} />;
   }
   const level = resolveCellLevel(row, mode, allValues);
   const empty = !row;
   return (
     <span
       className={`block rounded-sm ${empty ? "usage-heatmap-empty" : ""}`}
-      style={{ width: CELL_PX, height: CELL_PX, ...swatchStyle(level, mode) }}
+      style={{
+        aspectRatio: "1",
+        alignSelf: "start",
+        ...swatchStyle(level, mode),
+      }}
       title={cellTitle(dateKey, row, mode)}
     />
   );

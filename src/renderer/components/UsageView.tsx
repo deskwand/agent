@@ -7,7 +7,6 @@ import {
   type UsageSnapshot,
 } from "../../shared/usage";
 import { useAppStore } from "../store";
-import { useWindowSize } from "../hooks/useWindowSize";
 import { UsageCalendarHeatmap } from "./usage/UsageCalendarHeatmap";
 import { UsageHourHeatmap } from "./usage/UsageHourHeatmap";
 import { compactNumber, formatHitRate } from "../utils/usage-format";
@@ -15,14 +14,12 @@ import { compactNumber, formatHitRate } from "../utils/usage-format";
 const RANGES = ["1d", "7d", "30d", "90d", "all"] as const;
 type Range = (typeof RANGES)[number];
 
-const WIDE_WINDOW_PX = 900;
-const WEEKS_WIDE = 53;
-const WEEKS_NARROW = 26;
+/** 热力图固定显示 53 周：格子宽度随卡片自适应，不再按窗口宽度切换周数。 */
+const WEEKS = 53;
 
 export function UsageView() {
   const { t } = useTranslation();
   const setActiveView = useAppStore((s) => s.setActiveView);
-  const { width } = useWindowSize();
   const [range, setRange] = useState<Range>(DEFAULT_USAGE_RANGE);
   const [snapshot, setSnapshot] = useState<UsageSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +44,6 @@ export function UsageView() {
     };
   }, [range]);
 
-  const weeks = width >= WIDE_WINDOW_PX ? WEEKS_WIDE : WEEKS_NARROW;
   const now = useMemo(() => Date.now(), []);
   const callCount = snapshot?.totals.calls ?? 0;
   const cacheWrite = snapshot?.totals.cacheWrite ?? 0;
@@ -146,7 +142,7 @@ export function UsageView() {
             <Box title={t("usage.daily")} hint={t("usage.dailyHint")}>
               <UsageCalendarHeatmap
                 rows={snapshot.byDay}
-                weeks={weeks}
+                weeks={WEEKS}
                 now={now}
               />
             </Box>

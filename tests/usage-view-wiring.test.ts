@@ -78,6 +78,17 @@ describe("usage view wiring", () => {
     expect(view.match(/setRange\(/g) ?? []).toHaveLength(1);
   });
 
+  it("always shows 53 weeks instead of switching on window width", () => {
+    const view = read("src/renderer/components/UsageView.tsx");
+    // 阈值删除后这个 hook 与三个常量都没有使用者了
+    expect(view).not.toContain("useWindowSize");
+    expect(view).not.toContain("WIDE_WINDOW_PX");
+    expect(view).not.toContain("WEEKS_WIDE");
+    expect(view).not.toContain("WEEKS_NARROW");
+    expect(view).toMatch(/WEEKS = 53/);
+    expect(view).toMatch(/weeks=\{WEEKS\}/);
+  });
+
   it("keeps the heatmaps independent of the selected range", () => {
     const view = read("src/renderer/components/UsageView.tsx");
     expect(view).toContain("snapshot.byDay");
