@@ -41,6 +41,7 @@ describe("initUpdater", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
 
     // checkForUpdatesAndNotify must return a thenable for .catch()
     mockAutoUpdater.checkForUpdatesAndNotify.mockReturnValue(
@@ -61,6 +62,8 @@ describe("initUpdater", () => {
   });
 
   afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -161,6 +164,53 @@ describe("initUpdater", () => {
     expect(sendToRenderer).toHaveBeenCalledTimes(1);
   });
 
+  // ── Periodic update check ──
+
+  describe("periodic update check", () => {
+    it("checks for updates every 6 hours after startup", async () => {
+      mockAutoUpdater.checkForUpdates.mockResolvedValue(undefined);
+
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(1);
+
+      // Proves the success path re-schedules (would stay at 1 if it didn't).
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries 30 minutes after a failed check, then recovers to 6 hours", async () => {
+      mockAutoUpdater.checkForUpdates.mockRejectedValueOnce(
+        new Error("network down"),
+      );
+
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(1);
+
+      // Failure → retry after 30 minutes.
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(2);
+
+      // Success → next check is 6 hours later, not another 30 minutes.
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000 - 30 * 60 * 1000);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(3);
+    });
+
+    it("stops scheduled checks after an update is downloaded", async () => {
+      mockAutoUpdater.checkForUpdates.mockResolvedValue(undefined);
+
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(1);
+
+      capturedListeners.get("update-downloaded")!({ version: "2.0.0" });
+
+      await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+      expect(mockAutoUpdater.checkForUpdates).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // ── Linux APPIMAGE detection ──
 
   describe("Linux APPIMAGE detection", () => {
@@ -203,9 +253,7 @@ describe("initUpdater", () => {
       delete process.env.APPIMAGE; // ensure not set
 
       // Simulate mountinfo not containing an AppImage
-      mockFs.readFileSync.mockReturnValue(
-        "1 2 8:1 / / rw - ext4 /dev/sda1 rw",
-      );
+      mockFs.readFileSync.mockReturnValue("1 2 8:1 / / rw - ext4 /dev/sda1 rw");
 
       try {
         initUpdater(sendToRenderer);

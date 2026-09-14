@@ -128,6 +128,10 @@ export function initUpdater(
       payload: { version: info.version },
     });
 
+    // Update is ready — stop polling the feed until the user restarts.
+    if (checkTimer) clearTimeout(checkTimer);
+    checkTimer = null;
+
     // Restart is triggered by the user via UI (SettingsAbout) → "update.install" IPC
   });
 
@@ -147,4 +151,28 @@ export function initUpdater(
   autoUpdater.checkForUpdatesAndNotify().catch((err: unknown) => {
     log("[AutoUpdater] Update check failed:", err);
   });
+
+  scheduleNextCheck(CHECK_INTERVAL_MS);
+}
+
+const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const RETRY_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
+
+let checkTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleNextCheck(delayMs: number): void {
+  if (checkTimer) clearTimeout(checkTimer);
+  checkTimer = setTimeout(() => {
+    void performScheduledCheck();
+  }, delayMs);
+}
+
+async function performScheduledCheck(): Promise<void> {
+  try {
+    await autoUpdater.checkForUpdates();
+    scheduleNextCheck(CHECK_INTERVAL_MS);
+  } catch (err) {
+    log("[AutoUpdater] Scheduled check failed:", err);
+    scheduleNextCheck(RETRY_INTERVAL_MS);
+  }
 }
