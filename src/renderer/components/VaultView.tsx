@@ -54,8 +54,7 @@ function errorText(error: unknown, t: (key: string) => string): string {
   if (!(error instanceof Error)) return t("vault.error.localOperation");
   const message = error.message;
   if (message === "VAULT_FILE_TOO_LARGE") return t("vault.error.fileTooLarge");
-  if (message === "VAULT_LOCAL_QUOTA_EXCEEDED")
-    return t("vault.error.localQuotaExceeded");
+  if (message === "VAULT_LOCAL_DISK_FULL") return t("vault.error.diskFull");
   if (message === "VAULT_QUOTA_EXCEEDED")
     return t("vault.error.cloudQuotaExceeded");
   if (message === "VAULT_KEY_REQUIRED") return t("vault.error.setupRequired");

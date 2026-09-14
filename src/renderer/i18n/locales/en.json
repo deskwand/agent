@@ -1661,7 +1661,7 @@
       "loginRequired": "Sign in to sync your Vault",
       "setupRequired": "Set up encrypted cloud backup first",
       "fileTooLarge": "Files must be 20 MB or smaller",
-      "localQuotaExceeded": "Your local Vault is full; delete files before importing another",
+      "diskFull": "Not enough disk space to import this file",
       "localOperation": "The local Vault operation failed",
       "syncFailed": "Cloud sync failed; your local files are safe",
       "cloudQuotaExceeded": "Cloud backup storage is full; your local file was kept. Delete files or upgrade storage to retry",

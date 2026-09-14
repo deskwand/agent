@@ -58,8 +58,7 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.error.loginRequired": "Sign in to sync your Vault",
   "vault.error.setupRequired": "Set up encrypted cloud backup first",
   "vault.error.fileTooLarge": "Files must be 20 MB or smaller",
-  "vault.error.localQuotaExceeded":
-    "Your local Vault is full; delete files before importing another",
+  "vault.error.diskFull": "Not enough disk space to import this file",
   "vault.error.localOperation": "The local Vault operation failed",
   "vault.error.syncFailed": "Cloud sync failed; your local files are safe",
   "vault.error.cloudQuotaExceeded":
@@ -404,10 +403,8 @@ describe("VaultView", () => {
     expect(container.textContent).toContain("Used 12.0 MB / 100.0 MB");
   });
 
-  it("shows a distinct local quota error", async () => {
-    api.importFile.mockRejectedValueOnce(
-      new Error("VAULT_LOCAL_QUOTA_EXCEEDED"),
-    );
+  it("shows a distinct disk-full error", async () => {
+    api.importFile.mockRejectedValueOnce(new Error("VAULT_LOCAL_DISK_FULL"));
 
     await renderVault();
     await act(async () => {
@@ -415,7 +412,7 @@ describe("VaultView", () => {
       await Promise.resolve();
     });
 
-    expect(screenText()).toContain("Your local Vault is full");
+    expect(screenText()).toContain("Not enough disk space to import this file");
   });
 
   it("shows a distinct cloud quota error while keeping local files", async () => {

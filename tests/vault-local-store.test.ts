@@ -90,44 +90,23 @@ describe("LocalVaultStore", () => {
     expect(await store.scanFiles()).toEqual([]);
   });
 
-  it("allows imports that reach exactly 100 MiB in total", async () => {
+  it("imports past the old 100 MiB local ceiling", async () => {
     const store = await createStore();
     await store.ensureDirectory();
+    const source = join(tmpdir(), "vault-past-ceiling.bin");
+    await writeFile(source, "");
+    await truncate(source, 20 * 1024 * 1024);
+    roots.push(source);
 
-    for (let index = 0; index < 5; index += 1) {
-      const source = join(tmpdir(), `vault-exact-quota-${index}.bin`);
-      await writeFile(source, "");
-      await truncate(source, 20 * 1024 * 1024);
-      roots.push(source);
+    for (let index = 0; index < 6; index += 1) {
       await expect(store.importFile(source)).resolves.toBeDefined();
     }
 
-    await expect(store.getUsageBytes()).resolves.toBe(100 * 1024 * 1024);
+    await expect(store.getUsageBytes()).resolves.toBe(6 * 20 * 1024 * 1024);
+    await expect(store.scanFiles()).resolves.toHaveLength(6);
   });
 
-  it("rejects an import that would exceed total local quota before copying", async () => {
-    const store = await createStore();
-    await store.ensureDirectory();
-    for (let index = 0; index < 5; index += 1) {
-      const existing = join(store.rootDir, `existing-${index}.bin`);
-      await writeFile(existing, "");
-      await truncate(existing, 20 * 1024 * 1024);
-    }
-    await store.writeIndex(await store.reconcile(await store.readIndex()));
-    const source = join(tmpdir(), "vault-over-quota.bin");
-    await writeFile(source, "");
-    await truncate(source, 2);
-    roots.push(source);
-
-    await expect(store.importFile(source)).rejects.toThrow(
-      "VAULT_LOCAL_QUOTA_EXCEEDED",
-    );
-    await expect(
-      readFile(join(store.rootDir, "vault-over-quota.bin")),
-    ).rejects.toThrow();
-  });
-
-  it("releases local quota after deleting a file", async () => {
+  it("reports zero usage after deleting a file", async () => {
     const store = await createStore();
     await store.ensureDirectory();
     const source = join(tmpdir(), "vault-release.bin");
