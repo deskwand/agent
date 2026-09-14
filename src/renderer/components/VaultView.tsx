@@ -171,11 +171,15 @@ export function VaultView(): JSX.Element {
     }
   }, [t]);
 
+  const usageSeq = useRef(0);
+
   const loadBackupUsage = useCallback(async () => {
+    const seq = (usageSeq.current += 1);
     try {
-      setBackupUsage(await window.electronAPI.vault.getBackupUsage(token));
+      const usage = await window.electronAPI.vault.getBackupUsage(token);
+      if (seq === usageSeq.current) setBackupUsage(usage);
     } catch {
-      setBackupUsage(null);
+      if (seq === usageSeq.current) setBackupUsage(null);
     }
   }, [token]);
 
@@ -327,6 +331,7 @@ export function VaultView(): JSX.Element {
         syncLabelTimer.current = null;
       }
       setBusy(false);
+      void loadBackupUsage();
     }
 
     if (syncFailure || !nextSnapshot) {
@@ -335,7 +340,6 @@ export function VaultView(): JSX.Element {
       return;
     }
     setSnapshot(nextSnapshot);
-    void loadBackupUsage();
     if (nextSnapshot.pendingCount > 0) {
       setSyncFeedback("error");
       setSyncFeedbackMessage(t("vault.error.syncFailed"));

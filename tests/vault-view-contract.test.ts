@@ -473,6 +473,40 @@ describe("VaultView", () => {
     expect(screenText()).toContain("Cloud · 4.0 MB / 100.0 MB");
   });
 
+  it("ignores a stale cloud usage response", async () => {
+    type Usage = { usedBytes: number; quotaBytes: number | null } | null;
+    const slow = deferred<Usage>();
+    const fast = deferred<Usage>();
+    api.getBackupUsage
+      .mockReturnValueOnce(slow.promise)
+      .mockReturnValueOnce(fast.promise);
+
+    await renderVault();
+
+    await act(async () => {
+      syncButton().click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // The sync-triggered fetch resolves first; the older mount fetch lands late.
+    await act(async () => {
+      fast.resolve({
+        usedBytes: 4 * 1024 * 1024,
+        quotaBytes: 100 * 1024 * 1024,
+      });
+      slow.resolve({
+        usedBytes: 99 * 1024 * 1024,
+        quotaBytes: 100 * 1024 * 1024,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Cloud · 4.0 MB / 100.0 MB");
+    expect(screenText()).not.toContain("99.0 MB");
+  });
+
   it("shows a distinct cloud quota error while keeping local files", async () => {
     api.sync.mockRejectedValueOnce(
       new VaultCloudError(413, "VAULT_QUOTA_EXCEEDED"),

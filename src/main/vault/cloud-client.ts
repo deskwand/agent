@@ -134,7 +134,11 @@ function isBackupUsagePayload(value: unknown): value is VaultBackupUsage {
   const candidate = value as { usedBytes?: unknown; quotaBytes?: unknown };
   const quota = candidate.quotaBytes;
   return (
-    typeof candidate.usedBytes === "number" &&
-    (quota === null || typeof quota === "number")
+    isNonNegativeNumber(candidate.usedBytes) &&
+    (quota === null || isNonNegativeNumber(quota))
   );
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }

@@ -182,6 +182,26 @@ describe("Vault IPC contract", () => {
     handle.mockRestore();
   });
 
+  it("returns null when the backend cannot report usage", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+
+    // makeDependencies' cloud double deliberately omits the optional getUsage.
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), true);
+    expect(dependencies.cloud.getUsage).toBeUndefined();
+    registerVaultIpc(dependencies);
+
+    await expect(
+      handlers.get("vault.getBackupUsage")?.(null, "token"),
+    ).resolves.toBeNull();
+    handle.mockRestore();
+  });
+
   it("passes cloud usage through and degrades failures to null", async () => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const handle = vi

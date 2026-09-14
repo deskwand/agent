@@ -28,7 +28,7 @@ import {
   type VaultRemoteStatus,
   type VaultSnapshot,
 } from "../../shared/vault";
-import { logWarn } from "../utils/logger";
+import { log } from "../utils/logger";
 
 export interface VaultIpcDependencies {
   store: LocalVaultStore;
@@ -149,7 +149,7 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
         return (await cloud.getUsage?.(token)) ?? null;
       } catch (error: unknown) {
         // Usage is advisory: a failed lookup must never break the local snapshot.
-        logWarn("[vault] failed to read cloud usage", error);
+        log("[vault] failed to read cloud usage", error);
         return null;
       }
     },

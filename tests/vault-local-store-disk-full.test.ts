@@ -9,7 +9,9 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs/promises")>();
   return {
     ...actual,
-    copyFile: vi.fn(async () => {
+    copyFile: vi.fn(async (_source: string, destination: string) => {
+      // Fail halfway through the copy so the destination really exists on disk.
+      await actual.writeFile(destination, "partial");
       const error = new Error(
         "no space left on device",
       ) as NodeJS.ErrnoException;
