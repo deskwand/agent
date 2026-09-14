@@ -626,7 +626,11 @@
   /* Message bubbles */
   .message-user {
     @apply bg-surface-hover rounded-2xl;
+    /* 贴内容但不超容器：fit-content 的下限是 min-content，一行里的长 token
+       （粘贴的依赖清单/单行 JSON）会把气泡撑到 1935px 再被父层裁掉。
+       100% 相对的是父级 .max-w-[80%] 提供的确定宽度。 */
     width: fit-content;
+    max-width: 100%;
     margin-left: auto;
   }
 
@@ -659,6 +663,10 @@
     line-height: var(--line-height-chat);
     letter-spacing: -0.01em;
     @apply max-w-full overflow-x-clip;
+    /* 长 token 会溢出盒宽，被 overflow-x: clip 无声裁掉（既不可见也不可滚）。
+       盒宽本来就是确定的，break-word 足够；不要用 anywhere ——
+       它会一并改动 prose 内所有内容的 min-content。 */
+    overflow-wrap: break-word;
   }
 
   .prose-chat p {
@@ -822,6 +830,11 @@
     border-radius: 10px;
     background: var(--color-surface-muted);
     overflow-x: auto;
+  }
+
+  /* 代码块自带横向滚动（overflow-x: auto），不跟着正文折行 */
+  .prose-chat pre {
+    overflow-wrap: normal;
   }
 
   .prose-chat pre code {
