@@ -279,6 +279,7 @@ export function ChatView() {
   } = useIPC();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
+  const [hasInputContent, setHasInputContent] = useState(false);
   useEffect(() => {
     if (!activeSessionId || !compactionResult) return;
     const timeoutMs = compactionResult === "success" ? 3000 : 5000;
@@ -1871,6 +1872,7 @@ export function ChatView() {
             submitDisabled={isCompacting}
             isExpanded={isInputExpanded}
             onToggleExpand={() => setIsInputExpanded((v) => !v)}
+            onContentChange={setHasInputContent}
             placeholder={t("chat.typeMessage")}
             cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
             textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
@@ -1966,6 +1968,7 @@ export function ChatView() {
                 submitDisabled={isCompacting}
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
+                hasInputContent={hasInputContent}
               />
             }
           />

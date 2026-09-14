@@ -57,7 +57,8 @@ interface ChatInputProps {
   onSubmit: (data: ChatInputSubmitData) => void;
   onCompact?: (instructions?: string) => void;
   onCommand?: (action: string) => void;
-  onInputChange?: (hasText: boolean) => void;
+  /** 草稿内容变化时上报（文本 / 贴图 / 附件任一存在即为 true）。 */
+  onContentChange?: (hasInputContent: boolean) => void;
   disabled?: boolean;
   submitDisabled?: boolean;
   placeholder: string;
@@ -79,7 +80,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onSubmit,
       onCompact,
       onCommand,
-      onInputChange,
+      onContentChange,
       disabled = false,
       submitDisabled = false,
       placeholder,
@@ -159,6 +160,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     useEffect(() => {
       adjustTextareaHeight();
     }, [prompt, adjustTextareaHeight]);
+
+    // --- 向父组件上报草稿内容（底栏据此决定展开按钮是否可见）---
+    useEffect(() => {
+      onContentChange?.(
+        hasInputContent(prompt, pastedImages.length, attachedFiles.length),
+      );
+    }, [prompt, pastedImages, attachedFiles, onContentChange]);
 
     // --- Load skills for slash menu ---
     useEffect(() => {
@@ -256,10 +264,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         handleSubmitInternal();
       },
       isEmpty() {
-        return (
-          !prompt.trim() &&
-          pastedImages.length === 0 &&
-          attachedFiles.length === 0
+        return !hasInputContent(
+          prompt,
+          pastedImages.length,
+          attachedFiles.length,
         );
       },
       selectFiles() {
@@ -615,9 +623,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const handleSubmitInternal = useCallback(() => {
       const currentPrompt = textareaRef.current?.value || prompt;
       if (
-        !currentPrompt.trim() &&
-        pastedImages.length === 0 &&
-        attachedFiles.length === 0
+        !hasInputContent(
+          currentPrompt,
+          pastedImages.length,
+          attachedFiles.length,
+        )
       )
         return;
       if (disabled || submitDisabled) return;
@@ -858,7 +868,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 value={prompt}
                 onChange={(e) => {
                   const newValue = e.target.value;
-                  onInputChange?.(newValue.trim().length > 0);
                   const textarea = textareaRef.current;
                   const isComposing = isComposingRef.current;
 
@@ -1025,3 +1034,19 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
   },
 );
+
+/**
+ * 草稿是否非空。文本（去空白）、贴图、附件任一存在即为非空。
+ *
+ * 单一来源：提交门禁、`isEmpty()` 与 `onContentChange` 上报共用它，三者必须永远一致
+ * ——「展开按钮可见」与「能否提交」不能互相矛盾。
+ * 但取值来源不完全相同：提交门禁读 `textareaRef.current?.value || prompt`（DOM 可能比 state 新一帧），
+ * 另两处只读 `prompt`。判定函数相同，不是同一个值。
+ */
+export function hasInputContent(
+  prompt: string,
+  imageCount: number,
+  fileCount: number,
+): boolean {
+  return prompt.trim() !== "" || imageCount > 0 || fileCount > 0;
+}

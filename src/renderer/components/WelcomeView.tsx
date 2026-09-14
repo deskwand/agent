@@ -38,6 +38,7 @@ export function WelcomeView() {
   const { t } = useTranslation();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
+  const [hasInputContent, setHasInputContent] = useState(false);
   const { startSession } = useIPC();
   const isConfigured = useAppStore((state) => state.isConfigured);
   const cloudConfig = useAppStore((s) => s.cloudConfig);
@@ -265,6 +266,7 @@ export function WelcomeView() {
           disabled={isSubmitting}
           isExpanded={isInputExpanded}
           onToggleExpand={() => setIsInputExpanded((v) => !v)}
+          onContentChange={setHasInputContent}
           slashMenuDirection="down"
           placeholder={t("welcome.placeholder")}
           cardClassName="rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4"
@@ -359,6 +361,7 @@ export function WelcomeView() {
               isSubmitting={isSubmitting}
               isExpanded={isInputExpanded}
               onToggleExpand={() => setIsInputExpanded((v) => !v)}
+              hasInputContent={hasInputContent}
             />
           }
         />

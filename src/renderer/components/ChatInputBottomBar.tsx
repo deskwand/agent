@@ -30,6 +30,11 @@ export interface ChatInputBottomBarProps {
   submitDisabled?: boolean;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  /**
+   * 草稿是否非空（来自 ChatInput 的 onContentChange）。
+   * 必填：漏接线要变成编译错误，而不是静默不显示按钮。
+   */
+  hasInputContent: boolean;
 }
 
 export function ChatInputBottomBar({
@@ -52,6 +57,7 @@ export function ChatInputBottomBar({
   submitDisabled = false,
   isExpanded = false,
   onToggleExpand,
+  hasInputContent,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
@@ -60,6 +66,7 @@ export function ChatInputBottomBar({
     ? t("chat.collapseInput")
     : t("chat.expandInput");
   const submitLabel = canStop ? t("chat.stop") : t("chat.sendMessage");
+  const showExpandButton = shouldShowExpandButton(isExpanded, hasInputContent);
 
   return (
     <div className="mt-3 flex items-center justify-between gap-2">
@@ -133,20 +140,31 @@ export function ChatInputBottomBar({
         </span>
 
         {onToggleExpand && (
-          <Tooltip label={expandLabel}>
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              aria-label={expandLabel}
-              className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+          <div className={showExpandButton ? undefined : "invisible"}>
+            {/*
+              隐藏时换 key 重挂载：气泡走 createPortal 挂在 body，不在 wrapper 子树内，
+              而 Chromium 不会在命中目标转为 visibility:hidden 时补发 mouseleave
+              （实测此时 button.matches(":hover") 仍为 true），已弹出的气泡会一直挂在空槽位上。
+              重挂载把 Tooltip 内部的 open 状态一并销毁；DOM 形态（span.tt-anchor + button）保持不变。
+            */}
+            <Tooltip
+              key={showExpandButton ? "shown" : "hidden"}
+              label={expandLabel}
             >
-              {isExpanded ? (
-                <Minimize2 className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
-            </button>
-          </Tooltip>
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                aria-label={expandLabel}
+                className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+              >
+                {isExpanded ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
+              </button>
+            </Tooltip>
+          </div>
         )}
 
         <Tooltip label={submitLabel}>
@@ -171,4 +189,19 @@ export function ChatInputBottomBar({
       </div>
     </div>
   );
+}
+
+/**
+ * 展开按钮是否可见。
+ *
+ * 已展开时即使草稿被清空也保持可见——否则清空后无法用按钮收起。
+ * 用 wrapper 挂 `invisible` 而不是条件渲染：底栏是 `justify-between`，右侧 cluster
+ * 内容宽度、右边缘锚定，删掉这个槽位会让模型 chip 与上下文环右移 44px
+ * （w-9 36 + gap-2 8，已实测；发送键被右边缘锚住不动）。
+ */
+export function shouldShowExpandButton(
+  isExpanded: boolean,
+  hasInputContent: boolean,
+): boolean {
+  return isExpanded || hasInputContent;
 }
