@@ -18,7 +18,7 @@ describe("AccountMenu balance row", () => {
 
   it("refreshes balance on open via getMe", () => {
     expect(source).toContain("getMe");
-    expect(source).toContain("creditsBalance");
+    expect(source).toContain("balanceMicroUsd");
     expect(source).toContain("useEffect");
   });
 

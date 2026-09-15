@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   parseAmountToCents,
-  creditsForAmountCents,
+  formatMicroUsd,
   waitForOrderConfirmation,
-  usdForCredits,
   explorerTxUrl,
   formatTopUpTime,
 } from "../src/renderer/utils/topup";
@@ -22,10 +21,30 @@ describe("parseAmountToCents", () => {
   });
 });
 
-describe("creditsForAmountCents", () => {
-  it("converts cents to credits at 1 credit = $0.001", () => {
-    expect(creditsForAmountCents(500)).toBe(5000);
-    expect(creditsForAmountCents(1234)).toBe(12340);
+describe("formatMicroUsd", () => {
+  it("formats whole dollars", () => {
+    expect(formatMicroUsd(10_000_000)).toBe("$10.00");
+    expect(formatMicroUsd(2_000_000)).toBe("$2.00");
+  });
+  it("rounds to cents (avoid the 0.015 float trap — use 17)", () => {
+    expect(formatMicroUsd(17_000)).toBe("$0.02");
+    expect(formatMicroUsd(1_234_000)).toBe("$1.23");
+  });
+  it("shows <$0.01 instead of a misleading $0.00", () => {
+    expect(formatMicroUsd(3_000)).toBe("<$0.01");
+    expect(formatMicroUsd(1_000)).toBe("<$0.01");
+    expect(formatMicroUsd(4_000)).toBe("<$0.01");
+  });
+  it("zero is exactly $0.00", () => {
+    expect(formatMicroUsd(0)).toBe("$0.00");
+  });
+  it("keeps the sign on an overdrawn balance, even below one cent", () => {
+    expect(formatMicroUsd(-2_500_000)).toBe("-$2.50");
+    expect(formatMicroUsd(-3_000)).toBe("-<$0.01");
+  });
+  it("degrades gracefully when the balance is missing or non-finite", () => {
+    expect(formatMicroUsd(Number.NaN)).toBe("—");
+    expect(formatMicroUsd(Number.POSITIVE_INFINITY)).toBe("—");
   });
 });
 
@@ -65,25 +84,6 @@ describe("waitForOrderConfirmation", () => {
     );
     expect(result).toBe("confirmed");
     expect(calls).toBe(2);
-  });
-});
-
-describe("usdForCredits", () => {
-  it("formats whole dollars", () => {
-    expect(usdForCredits(10000)).toBe("$10.00");
-    expect(usdForCredits(2000)).toBe("$2.00");
-  });
-  it("rounds to cents (avoid 0.015 float trap — use 17)", () => {
-    expect(usdForCredits(17)).toBe("$0.02"); // 0.017 → 2 分
-    expect(usdForCredits(1234)).toBe("$1.23"); // 1.234 → 1.23
-  });
-  it("shows <$0.01 instead of misleading $0.00", () => {
-    expect(usdForCredits(3)).toBe("<$0.01"); // 0.003
-    expect(usdForCredits(1)).toBe("<$0.01");
-    expect(usdForCredits(4)).toBe("<$0.01"); // 0.004（边界内）
-  });
-  it("zero credits is exactly $0.00", () => {
-    expect(usdForCredits(0)).toBe("$0.00");
   });
 });
 

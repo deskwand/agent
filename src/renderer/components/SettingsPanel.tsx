@@ -11,6 +11,7 @@ import {
   BrainCircuit,
   Archive,
   Info,
+  Receipt,
   Plug,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -21,6 +22,7 @@ import { SettingsAPI } from "./settings/SettingsAPI";
 import { SubagentSettings } from "./settings/SubagentSettings";
 import { SettingsSandbox } from "./settings/SettingsSandbox";
 import { SettingsGeneral } from "./settings/SettingsGeneral";
+import { SettingsPricing } from "./settings/SettingsPricing";
 import { SettingsLogs } from "./settings/SettingsLogs";
 import { SettingsPersonalization } from "./settings/SettingsPersonalization";
 import { SettingsArchived } from "./settings/SettingsArchived";
@@ -39,6 +41,7 @@ interface SettingsPanelProps {
     | "general"
     | "archived"
     | "about"
+    | "pricing"
     | "connectors";
 }
 
@@ -52,6 +55,7 @@ type TabId =
   | "general"
   | "archived"
   | "about"
+  | "pricing"
   | "connectors";
 
 const SHOW_SANDBOX_TAB = false;
@@ -66,6 +70,7 @@ const VALID_TABS = new Set<TabId>([
   "general",
   "archived",
   "about",
+  "pricing",
   "connectors",
 ]);
 
@@ -174,6 +179,12 @@ export function SettingsPanel({
       label: t("settings.archivedSessions"),
       icon: Archive,
       description: t("settings.archivedSessionsDesc"),
+    },
+    {
+      id: "pricing" as TabId,
+      label: t("settings.pricing"),
+      icon: Receipt,
+      description: t("settings.pricingDesc"),
     },
     {
       id: "about" as TabId,
@@ -316,6 +327,11 @@ export function SettingsPanel({
               </div>
               <div className={activeTab === "archived" ? "" : "hidden"}>
                 {viewedTabs.has("archived") && <SettingsArchived />}
+              </div>
+              <div className={activeTab === "pricing" ? "" : "hidden"}>
+                {viewedTabs.has("pricing") && (
+                  <SettingsPricing isActive={activeTab === "pricing"} />
+                )}
               </div>
               <div className={activeTab === "about" ? "" : "hidden"}>
                 {viewedTabs.has("about") && (

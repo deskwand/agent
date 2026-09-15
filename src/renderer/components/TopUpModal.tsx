@@ -4,9 +4,8 @@ import QRCode from "qrcode";
 import { useAppStore } from "../store";
 import { CloudApiClient } from "../services/cloud-api";
 import {
-  creditsForAmountCents,
+  formatMicroUsd,
   parseAmountToCents,
-  usdForCredits,
   waitForOrderConfirmation,
 } from "../utils/topup";
 import { TopUpHistory } from "./TopUpHistory";
@@ -41,12 +40,15 @@ export function TopUpModal() {
     id: string;
     deposit_address: string;
     expires_at: string;
+    amount_cents: number;
   } | null>(null);
   const [payStatus, setPayStatus] = useState<PayStatus>("idle");
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [creating, setCreating] = useState(false);
   const [tab, setTab] = useState<"topup" | "history">("topup");
+  /** 服务端记录的实际到账金额；未知时不做任何推断 */
+  const [creditedMicroUsd, setCreditedMicroUsd] = useState<number | null>(null);
 
   // 打开时重置
   useEffect(() => {
@@ -60,6 +62,7 @@ export function TopUpModal() {
       setCopied(false);
       setQrDataUrl("");
       setTab("topup");
+      setCreditedMicroUsd(null);
     }
   }, [topUpOpen]);
 
@@ -69,7 +72,19 @@ export function TopUpModal() {
     let cancelled = false;
     (async () => {
       const result = await waitForOrderConfirmation(
-        (id) => cloudApi.getTopUpOrder(id).then((o) => o.status),
+        (id) =>
+          cloudApi.getTopUpOrder(id).then((o) => {
+            const credited =
+              Number.isSafeInteger(o.credited_micro_usd) &&
+              o.credited_micro_usd >= 0
+                ? o.credited_micro_usd
+                : null;
+            // 轮询被取消时不能把上一个订单的金额写进当前会话
+            if (!cancelled && o.status === "confirmed") {
+              setCreditedMicroUsd(credited);
+            }
+            return o.status;
+          }),
         order.id,
       );
       if (cancelled) return;
@@ -80,7 +95,7 @@ export function TopUpModal() {
           if (snapshot) {
             useAppStore.getState().setCloudConfig({
               ...snapshot,
-              creditsBalance: me.credits_balance,
+              balanceMicroUsd: me.balance_micro_usd,
             });
           }
         } catch {
@@ -103,7 +118,8 @@ export function TopUpModal() {
   if (!topUpOpen || !cloudApi) return null;
 
   const parsedCents = parseAmountToCents(amountInput);
-  const displayAmount = ((amountCents ?? 0) / 100).toFixed(6); // 美分 → 美元 6 位小数（USDT 精度）
+  // 以服务端创建的订单金额为准，避免展示金额与下单金额不一致
+  const displayAmount = ((order?.amount_cents ?? amountCents ?? 0) / 100).toFixed(6);
 
   const createOrder = async () => {
     if (!cloudApi || parsedCents === null) return;
@@ -198,15 +214,6 @@ export function TopUpModal() {
                 onChange={(e) => setAmountInput(e.target.value)}
                 inputMode="decimal"
               />
-              {parsedCents !== null && (
-                <p className="text-sm text-text-muted">
-                  {t("topUp.amountEqualsCredits", {
-                    usd: `$${(parsedCents / 100).toFixed(2)}`,
-                    credits:
-                      creditsForAmountCents(parsedCents).toLocaleString(),
-                  })}
-                </p>
-              )}
               {amountInput !== "" && parsedCents === null && (
                 <p className="text-sm text-error">{t("topUp.invalidAmount")}</p>
               )}
@@ -337,18 +344,15 @@ export function TopUpModal() {
               <p className="text-sm text-text-muted">
                 {t("topUp.waitingHint")}
               </p>
-              {payStatus === "confirmed" &&
-                (() => {
-                  const granted = creditsForAmountCents(amountCents ?? 0);
-                  return (
-                    <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
-                      {t("topUp.confirmed", {
-                        credits: granted.toLocaleString(),
-                        usd: usdForCredits(granted),
+              {payStatus === "confirmed" && (
+                <p className="rounded-lg bg-success/10 px-3 py-2 text-sm text-success">
+                  {creditedMicroUsd === null
+                    ? t("topUp.confirmedAmountPending")
+                    : t("topUp.confirmed", {
+                        usd: formatMicroUsd(creditedMicroUsd),
                       })}
-                    </p>
-                  );
-                })()}
+                </p>
+              )}
               {payStatus === "orderExpired" && (
                 <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">
                   {t("topUp.orderExpired")}

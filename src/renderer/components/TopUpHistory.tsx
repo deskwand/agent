@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ExternalLink } from "lucide-react";
 import type { CloudApiClient, TopUpOrderListItem } from "../services/cloud-api";
-import { explorerTxUrl, formatTopUpTime } from "../utils/topup";
+import { explorerTxUrl, formatMicroUsd, formatTopUpTime } from "../utils/topup";
 
 const PAGE_SIZE = 20;
 
@@ -113,9 +113,12 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-text-primary">
                 ${(o.amount_cents / 100).toFixed(2)}
-                {o.credits > 0 && (
+                {o.credited_micro_usd > 0 && (
                   <span className="ml-1 text-xs text-text-muted">
-                    · {o.credits.toLocaleString()} credits
+                    ·{" "}
+                    {t("topUp.creditedAmount", {
+                      usd: formatMicroUsd(o.credited_micro_usd),
+                    })}
                   </span>
                 )}
               </span>

@@ -4022,7 +4022,7 @@ Tool routing:\n
                     timestamp: Date.now(),
                     executionTimeMs: Date.now() - runStartTime,
                     code: detectInsufficientCredits(errorText)
-                      ? "INSUFFICIENT_CREDITS"
+                      ? "INSUFFICIENT_BALANCE"
                       : undefined,
                   });
                 }
@@ -4357,7 +4357,7 @@ Tool routing:\n
               timestamp: Date.now(),
               executionTimeMs: Date.now() - runStartTime,
               code: detectInsufficientCredits(errorText)
-                ? "INSUFFICIENT_CREDITS"
+                ? "INSUFFICIENT_BALANCE"
                 : undefined,
             });
           }
@@ -4611,7 +4611,7 @@ Tool routing:\n
           timestamp: Date.now(),
           executionTimeMs: Date.now() - runStartTime,
           code: detectInsufficientCredits(errorText)
-            ? "INSUFFICIENT_CREDITS"
+            ? "INSUFFICIENT_BALANCE"
             : undefined,
         };
         this.sendMessage(session.id, errorMsg);

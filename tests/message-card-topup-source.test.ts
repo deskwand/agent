@@ -9,9 +9,9 @@ const cardPath = path.resolve(
 const storePath = path.resolve(process.cwd(), "src/renderer/store/index.ts");
 
 describe("Insufficient credits card", () => {
-  it("MessageCard renders topup card when code is INSUFFICIENT_CREDITS", () => {
+  it("MessageCard renders topup card when code is INSUFFICIENT_BALANCE", () => {
     const source = fs.readFileSync(cardPath, "utf8");
-    expect(source).toContain('message.code === "INSUFFICIENT_CREDITS"');
+    expect(source).toContain('message.code === "INSUFFICIENT_BALANCE"');
     expect(source).toContain("topUp.goTopUp");
     expect(source).toContain("setTopUpOpen(true)");
   });

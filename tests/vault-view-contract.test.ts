@@ -225,7 +225,7 @@ describe("VaultView", () => {
         isLoggedIn: true,
         email: "user@example.com",
         level: "free",
-        creditsBalance: 0,
+        balanceMicroUsd: 0,
         modes: [],
       },
     });

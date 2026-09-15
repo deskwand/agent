@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { formatMicroUsd } from "../utils/topup";
 import {
   LogIn,
   User,
@@ -43,10 +44,10 @@ export function AccountMenu({
         const snapshot = useAppStore.getState().cloudConfig;
         // 账户可能已切换/登出：token 不符则丢弃过期响应
         if (!snapshot || snapshot.token !== cloudConfig.token) return;
-        if (snapshot.creditsBalance !== me.credits_balance) {
+        if (snapshot.balanceMicroUsd !== me.balance_micro_usd) {
           useAppStore.getState().setCloudConfig({
             ...snapshot,
-            creditsBalance: me.credits_balance,
+            balanceMicroUsd: me.balance_micro_usd,
           });
         }
       })
@@ -104,8 +105,7 @@ export function AccountMenu({
               </div>
               <div className="mt-0.5 flex items-center gap-2 pl-6 text-sm">
                 <span className="text-text-primary font-medium">
-                  {cloudConfig.creditsBalance.toLocaleString()}{" "}
-                  {t("accountMenu.creditsUnit")}
+                  {formatMicroUsd(cloudConfig.balanceMicroUsd)}
                 </span>
                 <button
                   type="button"

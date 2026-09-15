@@ -75,8 +75,8 @@ export const MessageCard = memo(function MessageCard({
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
 
-  // 余额不足（402 INSUFFICIENT_CREDITS）：渲染充值引导卡片，替代原始错误文本
-  if (message.code === "INSUFFICIENT_CREDITS") {
+  // 余额不足（402 INSUFFICIENT_BALANCE）：渲染充值引导卡片，替代原始错误文本
+  if (message.code === "INSUFFICIENT_BALANCE") {
     return (
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
         <p className="text-sm text-text-primary">

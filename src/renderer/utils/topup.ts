@@ -25,10 +25,6 @@ export function parseAmountToCents(input: string): number | null {
   return cents;
 }
 
-export function creditsForAmountCents(cents: number): number {
-  return cents * 10; // 1 credit = $0.001
-}
-
 /** 轮询订单状态：confirmed/expired 立即返回；网络错误退避重试；超时返回 timeout */
 export async function waitForOrderConfirmation(
   poll: (orderId: string) => Promise<TopUpOrderStatus>,
@@ -52,16 +48,17 @@ export async function waitForOrderConfirmation(
   }
 }
 
-/** 1 credit = $0.001；与服务端充值入账公式（$1 = 1000 credits）严格一致，勿单独调整 */
-const CREDITS_PER_USD = 1000;
-
-/** credits → 美元展示串：四舍五入到分；不足 $0.005 → "<$0.01"；0 → "$0.00" */
-export function usdForCredits(credits: number): string {
-  const usd = credits / CREDITS_PER_USD;
-  if (usd <= 0) return "$0.00";
-  const cents = Math.round(usd * 100);
-  if (cents <= 0) return "<$0.01";
-  return `$${(cents / 100).toFixed(2)}`;
+/**
+ * 微美元（1e-6 USD）→ 展示串：四舍五入到分；不足 $0.005 → "<$0.01"；0 → "$0.00"。
+ * 非有限值（服务端字段缺失时为 undefined/NaN）退化成 "—"，避免把 "$NaN" 渲染到界面上。
+ */
+export function formatMicroUsd(microUsd: number): string {
+  if (!Number.isFinite(microUsd)) return "—";
+  if (microUsd === 0) return "$0.00";
+  const sign = microUsd < 0 ? "-" : "";
+  const cents = Math.round(Math.abs(microUsd) / 10_000);
+  if (cents === 0) return `${sign}<$0.01`;
+  return `${sign}$${(cents / 100).toFixed(2)}`;
 }
 
 /** 按链构造区块浏览器交易链接（bscscan / arbiscan / basescan） */

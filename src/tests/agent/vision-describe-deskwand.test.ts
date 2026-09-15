@@ -80,7 +80,7 @@ describe("createDeskWandVisionTool", () => {
       content: Array<{ type: string; text: string }>;
     };
     expect(result.content[0].text).toContain(
-      "Insufficient credits, please top up to continue.",
+      "Insufficient balance, please top up to continue.",
     );
   });
 

@@ -40,7 +40,7 @@ function GoogleIcon() {
 async function completeLogin(
   result: {
     token: string;
-    user: { email: string; level: string; credits_balance: number };
+    user: { email: string; level: string; balance_micro_usd: number };
   },
   t: (key: string, opts?: { defaultValue: string }) => string,
   onSuccess: (config: CloudConfig) => void,
@@ -52,7 +52,7 @@ async function completeLogin(
     isLoggedIn: true,
     email: result.user.email,
     level: result.user.level,
-    creditsBalance: result.user.credits_balance,
+    balanceMicroUsd: result.user.balance_micro_usd,
     modes: [],
   };
   try {

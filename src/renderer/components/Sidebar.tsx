@@ -187,7 +187,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             isLoggedIn: true,
             email: me.email,
             level: me.level,
-            creditsBalance: me.credits_balance,
+            balanceMicroUsd: me.balance_micro_usd,
             modes,
           });
         } catch (e: any) {

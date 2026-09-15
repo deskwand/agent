@@ -165,7 +165,7 @@ describe("MergedInputChip (single-panel)", () => {
       isLoggedIn: true,
       email: "a@b.com",
       level: "default",
-      creditsBalance: 100,
+      balanceMicroUsd: 100,
       modes: [],
     });
     render({
@@ -188,7 +188,7 @@ describe("MergedInputChip (single-panel)", () => {
       isLoggedIn: true,
       email: "a@b.com",
       level: "default",
-      creditsBalance: 100,
+      balanceMicroUsd: 100,
       modes: [],
     });
     render({
@@ -213,7 +213,7 @@ describe("MergedInputChip (single-panel)", () => {
       isLoggedIn: true,
       email: "a@b.com",
       level: "default",
-      creditsBalance: 100,
+      balanceMicroUsd: 100,
       modes: [],
     });
     render({
@@ -256,7 +256,7 @@ describe("MergedInputChip (single-panel)", () => {
       isLoggedIn: true,
       email: "a@b.com",
       level: "default",
-      creditsBalance: 100,
+      balanceMicroUsd: 100,
       modes: [],
     });
     render(); // activeProviderProfileKey = "profile-a"（BYOK）

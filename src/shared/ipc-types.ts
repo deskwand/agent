@@ -146,7 +146,7 @@ export interface CloudAuthLoginResult {
   user: {
     email: string;
     level: string;
-    credits_balance: number;
+    balance_micro_usd: number;
   };
 }
 

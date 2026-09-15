@@ -43,7 +43,7 @@ describe("google-auth-handler", () => {
           user: {
             email: "test@gmail.com",
             level: "default",
-            credits_balance: 0,
+            balance_micro_usd: 0,
           },
         }),
       });

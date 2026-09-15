@@ -50,7 +50,7 @@ describe("CloudApiClient topup methods", () => {
             order: {
               id: "o1",
               status: "pending",
-              credits: 0,
+              credited_micro_usd: 0,
               tx_hash: "",
               confirmed_at: null,
               expires_at: "2026-08-01 12:00:00",
@@ -68,7 +68,7 @@ describe("CloudApiClient topup methods", () => {
     expect(order.status).toBe("pending");
   });
 
-  it("getMe returns credits balance", async () => {
+  it("getMe returns the balance in micro-USD", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -77,7 +77,7 @@ describe("CloudApiClient topup methods", () => {
             JSON.stringify({
               email: "a@b.com",
               level: "default",
-              credits_balance: 100,
+              balance_micro_usd: 100,
             }),
             { status: 200, headers: { "Content-Type": "application/json" } },
           ),
@@ -87,7 +87,7 @@ describe("CloudApiClient topup methods", () => {
     const api = new CloudApiClient("tok");
     const me = await api.getMe();
 
-    expect(me.credits_balance).toBe(100);
+    expect(me.balance_micro_usd).toBe(100);
   });
 
   it("getTopUpOrders requests list without query when empty", async () => {

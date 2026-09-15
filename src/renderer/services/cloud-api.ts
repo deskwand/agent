@@ -6,12 +6,35 @@ export interface TopUpOrderListItem {
   id: string;
   chain: "bsc" | "arb" | "base";
   amount_cents: number;
-  credits: number;
+  credited_micro_usd: number;
   tx_hash: string;
   status: "pending" | "confirmed" | "expired";
   created_at: string;
   confirmed_at: string | null;
   expires_at: string;
+}
+
+export interface PricingRates {
+  input_hit: number;
+  input_miss: number;
+  output: number;
+}
+
+export interface PricingModel {
+  model_id: string;
+  official: { off_peak: PricingRates; peak: PricingRates | null };
+  charged: { off_peak: PricingRates; peak: PricingRates | null };
+}
+
+export interface PricingResponse {
+  platform_fee_rate: number;
+  peak: {
+    windows: Array<[string, string]> | null;
+    tz: string | null;
+    days: number[] | null;
+    is_peak_now: boolean;
+  };
+  models: PricingModel[];
 }
 
 export class CloudApiClient {
@@ -82,7 +105,7 @@ export class CloudApiClient {
     code: string,
   ): Promise<{
     token: string;
-    user: { email: string; level: string; credits_balance: number };
+    user: { email: string; level: string; balance_micro_usd: number };
   }> {
     return this.request("/api/auth/login", {
       method: "POST",
@@ -93,7 +116,7 @@ export class CloudApiClient {
   async getMe(): Promise<{
     email: string;
     level: string;
-    credits_balance: number;
+    balance_micro_usd: number;
   }> {
     return this.request("/api/auth/me");
   }
@@ -112,6 +135,11 @@ export class CloudApiClient {
     return res.modes;
   }
 
+  /** 官方价 / 实收价 / 峰谷窗口由服务端下发，客户端只渲染，不做任何费率运算 */
+  async getPricing(): Promise<PricingResponse> {
+    return this.request<PricingResponse>("/api/models/pricing");
+  }
+
   async logout(): Promise<void> {
     await this.request("/api/auth/logout", { method: "POST" });
   }
@@ -121,7 +149,7 @@ export class CloudApiClient {
     redirectUri: string,
   ): Promise<{
     token: string;
-    user: { email: string; level: string; credits_balance: number };
+    user: { email: string; level: string; balance_micro_usd: number };
   }> {
     return this.request("/api/auth/google-code", {
       method: "POST",
@@ -301,7 +329,7 @@ export class CloudApiClient {
   async getTopUpOrder(id: string): Promise<{
     id: string;
     status: "pending" | "confirmed" | "expired";
-    credits: number;
+    credited_micro_usd: number;
     tx_hash: string;
     confirmed_at: string | null;
     expires_at: string;
@@ -310,7 +338,7 @@ export class CloudApiClient {
       order: {
         id: string;
         status: "pending" | "confirmed" | "expired";
-        credits: number;
+        credited_micro_usd: number;
         tx_hash: string;
         confirmed_at: string | null;
         expires_at: string;

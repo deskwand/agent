@@ -616,7 +616,7 @@ export function createDeskWandVisionTool(
           };
           const msg =
             res.status === 402
-              ? "Insufficient credits, please top up to continue."
+              ? "Insufficient balance, please top up to continue."
               : (err.error?.message ??
                 `Vision failed with status ${res.status}`);
           return {
