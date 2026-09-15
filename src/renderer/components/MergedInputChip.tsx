@@ -12,6 +12,14 @@ import type { ProviderProfileKey, ThinkingLevel } from "../types";
 import type { ModelOptionGroup } from "./ChatInputBottomBar";
 import { resolveModelLabel } from "../utils/model-label";
 import { useAppStore } from "../store";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DEFAULT_CLASS,
+  MENU_ITEM_SELECTED_CLASS,
+  MENU_LABEL_CLASS,
+  MENU_PANEL_PADDED_CLASS,
+  MENU_SEPARATOR_CLASS,
+} from "./menu-styles";
 
 export interface MergedInputChipProps {
   model: string;
@@ -143,10 +151,8 @@ export function MergedInputChip({
           key={`${group.profileKey}:${item.id}`}
           type="button"
           onClick={() => onSelectModel(group.profileKey, item.id)}
-          className={`flex h-9 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-left text-sm transition-colors ${
-            selected
-              ? "bg-surface-hover text-text-primary"
-              : "text-text-primary hover:bg-surface-hover"
+          className={`${MENU_ITEM_CLASS} justify-between ${
+            selected ? MENU_ITEM_SELECTED_CLASS : MENU_ITEM_DEFAULT_CLASS
           }`}
           role="option"
           aria-selected={selected}
@@ -173,7 +179,7 @@ export function MergedInputChip({
     <button
       type="button"
       onClick={() => setPanelView(target)}
-      className="flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-sm text-text-muted transition-colors hover:bg-surface-hover"
+      className={`${MENU_ITEM_CLASS} text-text-muted hover:bg-surface-hover`}
     >
       <ChevronRight className="h-4 w-4 rotate-180" />
       {t("modelMenu.back")}
@@ -182,14 +188,14 @@ export function MergedInputChip({
 
   const renderThinkingRow = (returnView: "modes" | "custom") => (
     <>
-      <div className="my-1 border-t border-border" />
+      <div className={MENU_SEPARATOR_CLASS} />
       <button
         type="button"
         onClick={() => {
           setThinkingReturnView(returnView);
           setPanelView("thinking");
         }}
-        className="flex h-9 w-full items-center justify-between rounded-lg px-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-hover"
+        className={`${MENU_ITEM_CLASS} justify-between font-medium ${MENU_ITEM_DEFAULT_CLASS}`}
       >
         {t("modelMenu.thinkingWithValue", {
           value: t(`chat.thinkingLevel.${thinkingLevel}`),
@@ -213,9 +219,7 @@ export function MergedInputChip({
     }
     return groups.map((group) => (
       <div key={group.profileKey} className="mb-1 last:mb-0">
-        <div className="px-2.5 py-1 text-xs uppercase tracking-[0.08em] text-text-muted">
-          {group.groupLabel}
-        </div>
+        <div className={MENU_LABEL_CLASS}>{group.groupLabel}</div>
         {renderGroupItems(group)}
       </div>
     ));
@@ -269,13 +273,13 @@ export function MergedInputChip({
               ? undefined
               : { maxHeight: `${panelMaxHeight}px` }
           }
-          className={`absolute right-0 bottom-[calc(100%_+_8px)] z-30 ${
+          className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-up absolute right-0 bottom-[calc(100%_+_8px)] z-30 ${
             panelView === "thinking"
               ? "w-[12rem]"
               : panelView === "modes" && isLoggedIn && cloudGroup
                 ? "w-[15rem]"
                 : "w-[20rem]"
-          } max-h-[min(32rem,calc(100vh_+_-12rem))] overflow-y-auto rounded-xl border border-border bg-background p-1 shadow-soft`}
+          } max-h-[min(32rem,calc(100vh_+_-12rem))] overflow-y-auto`}
         >
           {panelView === "thinking" ? (
             <>
@@ -288,10 +292,10 @@ export function MergedInputChip({
                     onSelectThinkingLevel(level);
                     setPanelView(thinkingReturnView);
                   }}
-                  className={`flex h-9 w-full items-center justify-between gap-3 rounded-lg px-2.5 text-left text-sm transition-colors ${
+                  className={`${MENU_ITEM_CLASS} justify-between ${
                     level === thinkingLevel
-                      ? "bg-surface-hover text-text-primary"
-                      : "text-text-primary hover:bg-surface-hover"
+                      ? MENU_ITEM_SELECTED_CLASS
+                      : MENU_ITEM_DEFAULT_CLASS
                   }`}
                   role="option"
                   aria-selected={level === thinkingLevel}
@@ -315,11 +319,11 @@ export function MergedInputChip({
           ) : isLoggedIn && cloudGroup ? (
             <>
               {renderGroupItems(cloudGroup)}
-              <div className="my-1 border-t border-border" />
+              <div className={MENU_SEPARATOR_CLASS} />
               <button
                 type="button"
                 onClick={() => setPanelView("custom")}
-                className="flex h-9 w-full items-center justify-between rounded-lg px-2.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-hover"
+                className={`${MENU_ITEM_CLASS} justify-between font-medium ${MENU_ITEM_DEFAULT_CLASS}`}
               >
                 {t("modelMenu.custom")}
                 <ChevronRight className="h-4 w-4 shrink-0 text-text-muted" />

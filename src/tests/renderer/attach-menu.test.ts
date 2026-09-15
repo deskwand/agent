@@ -241,6 +241,15 @@ describe("AttachMenu", () => {
     expect(menu.className).toContain("flex-col");
   });
 
+  it("carries the shared panel shell tokens", async () => {
+    await openMenu();
+    const menu = container.querySelector("[role='menu']");
+    if (!menu) throw new Error("menu not rendered");
+    expect(menu.className).toContain("shadow-elevated");
+    expect(menu.className).toContain("border-border-subtle");
+    expect(menu.className).not.toContain("shadow-soft");
+  });
+
   it("lists vault files and adds them with their absolute path", async () => {
     const props = await openMenu();
     await act(async () => {

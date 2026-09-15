@@ -978,10 +978,23 @@
   }
 }
 
-@keyframes account-menu-in {
+/* Popup menu entrance — one animation per pop direction. A menu that opens
+   upward is anchored at its bottom edge, so its rise comes from +Y. */
+@keyframes menu-in-up {
   from {
     opacity: 0;
     transform: translateY(4px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes menu-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -1013,9 +1026,15 @@
   animation: toast-in-bottom var(--motion-standard) var(--ease-ui-out);
 }
 
-.animate-account-menu-in {
-  transform-origin: bottom left;
-  animation: account-menu-in var(--motion-fast) var(--ease-ui-out);
+/* No transform-origin here on purpose: origin has to follow each menu's anchor
+   side, and baking one in would flip half of them. Scaling from the centre at
+   0.97 is visually equivalent. A consumer may add a Tailwind origin-* utility. */
+.animate-menu-in-up {
+  animation: menu-in-up var(--motion-fast) var(--ease-ui-out);
+}
+
+.animate-menu-in-down {
+  animation: menu-in-down var(--motion-fast) var(--ease-ui-out);
 }
 
 /* ================================================================
@@ -1146,7 +1165,8 @@
   .animate-slide-up,
   .animate-toast-in-top,
   .animate-toast-in-bottom,
-  .animate-account-menu-in {
+  .animate-menu-in-up,
+  .animate-menu-in-down {
     animation-name: fade-in !important;
     animation-duration: var(--motion-fast) !important;
     transform: none !important;

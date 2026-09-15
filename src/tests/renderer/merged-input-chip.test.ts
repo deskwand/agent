@@ -133,6 +133,14 @@ describe("MergedInputChip (single-panel)", () => {
     expect(panel()).toBeDefined();
   });
 
+  it("carries the shared panel shell tokens", () => {
+    render();
+    click(trigger());
+    expect(panel().className).toContain("shadow-elevated");
+    expect(panel().className).toContain("border-border-subtle");
+    expect(panel().className).not.toContain("shadow-soft");
+  });
+
   it("caps the panel to the space available above the chip", () => {
     render();
     stubPanelBottom(300);

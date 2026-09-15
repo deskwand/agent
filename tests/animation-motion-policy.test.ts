@@ -171,7 +171,7 @@ describe("renderer motion policy", () => {
     ).toBe(true);
   });
 
-  it("anchors the account menu entrance to its trigger", () => {
+  it("uses the upward menu entrance for the account menu", () => {
     act(() => {
       root.render(
         createElement(AccountMenu, {
@@ -187,7 +187,7 @@ describe("renderer motion policy", () => {
       );
     });
 
-    expect(container.querySelector(".animate-account-menu-in")).not.toBeNull();
+    expect(container.querySelector(".animate-menu-in-up")).not.toBeNull();
   });
 
   it("defines scoped reduced-motion fallbacks without hover zoom", () => {
@@ -196,13 +196,14 @@ describe("renderer motion policy", () => {
     expect(globalStyles).toContain(
       "--ease-ui-out: cubic-bezier(0.23, 1, 0.32, 1);",
     );
-    expect(globalStyles).toContain("@keyframes account-menu-in");
+    expect(globalStyles).toContain("@keyframes menu-in-up");
+    expect(globalStyles).toContain("@keyframes menu-in-down");
     expect(globalStyles).not.toContain("@keyframes eff-message-in");
     expect(globalStyles).not.toContain("@keyframes eff-float");
     expect(globalStyles).not.toContain(".eff-message-enter");
     expect(globalStyles).not.toContain(".eff-float");
     expect(globalStyles).toMatch(
-      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.animate-slide-up,[\s\S]*\.animate-toast-in-top,[\s\S]*\.animate-toast-in-bottom,[\s\S]*\.animate-account-menu-in[\s\S]*animation-name: fade-in !important;/,
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.animate-slide-up,[\s\S]*\.animate-toast-in-top,[\s\S]*\.animate-toast-in-bottom,[\s\S]*\.animate-menu-in-up,[\s\S]*\.animate-menu-in-down[\s\S]*animation-name: fade-in !important;/,
     );
     expect(globalStyles).toMatch(
       /\.btn:hover\s*\{\s*box-shadow:\s*var\(--shadow-elevated\);\s*\}/,

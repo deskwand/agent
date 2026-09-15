@@ -7,9 +7,15 @@
 
 import { useEffect, useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { X, ChevronDown } from "lucide-react";
+import { X, ChevronDown, Check } from "lucide-react";
 import type { ScheduleTask } from "../types";
 import { useAppStore } from "../store";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DEFAULT_CLASS,
+  MENU_ITEM_SELECTED_CLASS,
+  MENU_PANEL_PADDED_CLASS,
+} from "./menu-styles";
 import { useScheduleForm } from "../hooks/useScheduleForm";
 import {
   renderLocalizedBannerMessage,
@@ -237,7 +243,9 @@ export function ScheduleEditModal({
                     />
                   </button>
                   {isProjectOpen && (
-                    <div className="absolute left-0 z-[200] mt-1 w-56 rounded-xl border border-border bg-background shadow-soft p-1">
+                    <div
+                      className={`${MENU_PANEL_PADDED_CLASS} absolute left-0 z-[200] mt-1 w-56 animate-menu-in-down`}
+                    >
                       {[
                         { value: "", label: t("schedule.defaultWorkspace") },
                         ...projects.map((p) => ({
@@ -250,13 +258,18 @@ export function ScheduleEditModal({
                           <button
                             key={value}
                             type="button"
-                            className={`w-full truncate rounded-lg px-2.5 py-1.5 text-left text-xs ${selected ? "bg-accent text-background" : "text-text-primary hover:bg-surface-hover"}`}
+                            className={`${MENU_ITEM_CLASS} ${
+                              selected
+                                ? MENU_ITEM_SELECTED_CLASS
+                                : MENU_ITEM_DEFAULT_CLASS
+                            }`}
                             onClick={() => {
                               setCwd(value);
                               setIsProjectOpen(false);
                             }}
                           >
-                            {label}
+                            <span className="truncate">{label}</span>
+                            {selected && <Check className="h-4 w-4 shrink-0" />}
                           </button>
                         );
                       })}

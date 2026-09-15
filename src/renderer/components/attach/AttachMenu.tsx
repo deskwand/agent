@@ -5,6 +5,12 @@ import { Tooltip } from "../Tooltip";
 import { useAppStore } from "../../store";
 import type { VaultSnapshot } from "../../../shared/vault";
 import type { ChatInputAttachedFile } from "../ChatInput";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DEFAULT_CLASS,
+  MENU_ITEM_DISABLED_CLASS,
+  MENU_PANEL_PADDED_CLASS,
+} from "../menu-styles";
 import { AttachPickerModal } from "./AttachPickerModal";
 import { AttachPickerPanel } from "./AttachPickerPanel";
 import {
@@ -199,9 +205,6 @@ export function AttachMenu({
           .filter(Boolean)
           .join(" · ");
 
-  const menuItemClass =
-    "flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm transition-colors";
-
   // 菜单层键盘路径：打开时焦点进第一项，↑/↓ 在项间移动，Esc 关闭并还给触发器。
   // 焦点在菜单项上时，Enter/Space 由按钮自身的 click 处理，不需要额外拦键盘，
   // 也不会误触触发器上的 Enter。
@@ -257,10 +260,10 @@ export function AttachMenu({
         <div
           role="menu"
           aria-label={t("attachMenu.label")}
-          className={`absolute left-0 z-30 flex max-h-[60vh] min-h-0 w-64 flex-col rounded-xl border border-border bg-background p-1 shadow-soft ${
+          className={`${MENU_PANEL_PADDED_CLASS} absolute left-0 z-30 flex max-h-[60vh] min-h-0 w-64 flex-col ${
             direction === "down"
-              ? "top-[calc(100%+8px)]"
-              : "bottom-[calc(100%+8px)]"
+              ? "top-[calc(100%+8px)] animate-menu-in-down"
+              : "bottom-[calc(100%+8px)] animate-menu-in-up"
           }`}
         >
           <>
@@ -274,7 +277,7 @@ export function AttachMenu({
                 onPickLocalFiles();
                 closeAndFocusComposer();
               }}
-              className={`${menuItemClass} text-text-primary hover:bg-surface-hover`}
+              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
             >
               <Upload className="h-4 w-4 shrink-0 text-text-muted" />
               {t("attachMenu.localFile")}
@@ -293,10 +296,10 @@ export function AttachMenu({
                 setView("workspace");
                 void loadWorkspace();
               }}
-              className={`${menuItemClass} ${
+              className={`${MENU_ITEM_CLASS} ${
                 workspaceDisabledReason
-                  ? "cursor-not-allowed text-text-muted opacity-50"
-                  : "text-text-primary hover:bg-surface-hover"
+                  ? MENU_ITEM_DISABLED_CLASS
+                  : MENU_ITEM_DEFAULT_CLASS
               }`}
             >
               <FolderOpen className="h-4 w-4 shrink-0 text-text-muted" />
@@ -322,10 +325,10 @@ export function AttachMenu({
                 if (vaultDisabledReason) return;
                 setView("vault");
               }}
-              className={`${menuItemClass} ${
+              className={`${MENU_ITEM_CLASS} ${
                 vaultDisabledReason
-                  ? "cursor-not-allowed text-text-muted opacity-50"
-                  : "text-text-primary hover:bg-surface-hover"
+                  ? MENU_ITEM_DISABLED_CLASS
+                  : MENU_ITEM_DEFAULT_CLASS
               }`}
             >
               <Lock className="h-4 w-4 shrink-0 text-text-muted" />

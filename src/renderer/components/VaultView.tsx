@@ -15,6 +15,13 @@ import { FileTypeIcon } from "./file-type-icon";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { FilePreviewModal } from "./FilePreviewModal";
 import { Tooltip } from "./Tooltip";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DANGER_CLASS,
+  MENU_ITEM_DEFAULT_CLASS,
+  MENU_LABEL_CLASS,
+  MENU_PANEL_PADDED_CLASS,
+} from "./menu-styles";
 import type {
   SyncStatus,
   VaultBackupUsage,
@@ -636,7 +643,7 @@ export function VaultView(): JSX.Element {
                   id="vault-advanced-menu"
                   role="menu"
                   aria-label={t("vault.menu.advanced")}
-                  className="absolute right-0 top-11 z-20 min-w-64 rounded-lg border border-border-subtle bg-background p-1 shadow-lg"
+                  className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-11 z-20 min-w-64 animate-menu-in-down`}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {
                       setAdvancedMenuOpen(false);
@@ -644,14 +651,14 @@ export function VaultView(): JSX.Element {
                     }
                   }}
                 >
-                  <div className="px-3 py-2 text-xs text-text-muted">
+                  <div className={MENU_LABEL_CLASS}>
                     {t("vault.menu.advanced")}
                   </div>
                   <button
                     ref={advancedResetRef}
                     type="button"
                     role="menuitem"
-                    className="block w-full rounded px-3 py-2 text-left text-sm text-error hover:bg-error/10"
+                    className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DANGER_CLASS}`}
                     onClick={handleAdvancedReset}
                   >
                     {t("vault.reset.discard")}
@@ -820,7 +827,7 @@ export function VaultView(): JSX.Element {
                         <div
                           id={`vault-menu-${item.name}`}
                           role="menu"
-                          className="absolute right-0 top-8 z-10 min-w-32 rounded-lg border border-border-subtle bg-background p-1 shadow-lg"
+                          className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-8 z-10 min-w-32 animate-menu-in-down`}
                           onKeyDown={(event) => {
                             if (event.key === "Escape") setOpenMenu(null);
                           }}
@@ -828,7 +835,7 @@ export function VaultView(): JSX.Element {
                           <button
                             type="button"
                             role="menuitem"
-                            className="block w-full rounded px-3 py-2 text-left text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                            className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
                             onClick={() => {
                               setOpenMenu(null);
                               void runAction(() =>
@@ -841,7 +848,7 @@ export function VaultView(): JSX.Element {
                           <button
                             type="button"
                             role="menuitem"
-                            className="block w-full rounded px-3 py-2 text-left text-xs text-error hover:bg-error/10"
+                            className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DANGER_CLASS}`}
                             onClick={() => {
                               setOpenMenu(null);
                               handleDelete(item);

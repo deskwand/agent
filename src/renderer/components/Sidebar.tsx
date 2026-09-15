@@ -38,6 +38,14 @@ import {
   type SidebarPins,
 } from "../utils/sidebar-session-groups";
 import { Tooltip } from "./Tooltip";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DANGER_CLASS,
+  MENU_ITEM_DEFAULT_CLASS,
+  MENU_LABEL_CLASS,
+  MENU_PANEL_PADDED_CLASS,
+  MENU_SEPARATOR_CLASS,
+} from "./menu-styles";
 
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
@@ -988,11 +996,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   {showProjectActions && (
                     <div
                       onClick={(e) => e.stopPropagation()}
-                      className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border-muted bg-background shadow-lg p-1"
+                      className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-full z-20 mt-1 w-44 animate-menu-in-down`}
                     >
                       {projectEntries.length > 0 && (
                         <>
-                          <div className="px-2.5 py-1.5 text-[10px] text-text-muted uppercase tracking-wide">
+                          <div className={MENU_LABEL_CLASS}>
                             {t("sidebar.newSessionInProject")}
                           </div>
                           {projectEntries.map(({ name, cwd }) => (
@@ -1002,24 +1010,24 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                                 setShowProjectActions(false);
                                 void handleNewSessionInProject(cwd);
                               }}
-                              className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors flex items-center gap-2"
+                              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
                             >
-                              <Folder className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
+                              <Folder className="h-4 w-4 shrink-0 text-text-muted" />
                               <span className="truncate">{name}</span>
                             </button>
                           ))}
-                          <div className="mx-1 my-1 border-t border-border-muted" />
+                          <div className={MENU_SEPARATOR_CLASS} />
                         </>
                       )}
                       <button
                         onClick={() => void handleNewProject()}
-                        className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
+                        className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
                       >
                         {t("sidebar.newProject")}
                       </button>
                       <button
                         onClick={() => void handleOpenProject()}
-                        className="w-full text-left rounded-md px-2.5 py-2 text-sm text-text-primary hover:bg-surface-hover transition-colors"
+                        className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
                       >
                         {t("sidebar.openProject")}
                       </button>
@@ -1379,7 +1387,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
           <div
             role="menu"
             onClick={(event) => event.stopPropagation()}
-            className="fixed z-50 w-36 rounded-lg border border-border-muted bg-background p-1 shadow-lg"
+            className={`${MENU_PANEL_PADDED_CLASS} fixed z-50 w-36 ${
+              window.innerHeight - sessionMenu.anchor.bottom >= 88
+                ? "animate-menu-in-down"
+                : "animate-menu-in-up"
+            }`}
             style={{
               left: Math.max(8, sessionMenu.anchor.right - 144),
               ...(window.innerHeight - sessionMenu.anchor.bottom >= 88
@@ -1394,12 +1406,12 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                 handleToggleSessionPin(event, sessionMenuSession.id);
                 setSessionMenu(null);
               }}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-text-primary transition-colors hover:bg-surface-hover"
+              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
             >
               {pinnedSessionIds.has(sessionMenuSession.id) ? (
-                <PinOff className="h-3.5 w-3.5 text-text-muted" />
+                <PinOff className="h-4 w-4 text-text-muted" />
               ) : (
-                <Pin className="h-3.5 w-3.5 text-text-muted" />
+                <Pin className="h-4 w-4 text-text-muted" />
               )}
               <span>
                 {t(
@@ -1413,14 +1425,14 @@ export function Sidebar({ width = 280 }: { width?: number }) {
               type="button"
               role="menuitem"
               onClick={() => beginRenameSession(sessionMenuSession)}
-              className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-text-primary transition-colors hover:bg-surface-hover"
+              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
             >
-              <SquarePen className="h-3.5 w-3.5 text-text-muted" />
+              <SquarePen className="h-4 w-4 text-text-muted" />
               <span>{t("sidebar.rename")}</span>
             </button>
             {sessionMenuSession.status !== "running" && (
               <>
-                <div className="mx-1 my-1 border-t border-border-muted" />
+                <div className={MENU_SEPARATOR_CLASS} />
                 <button
                   type="button"
                   role="menuitem"
@@ -1428,9 +1440,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                     setSessionMenu(null);
                     handleDeleteSession(event, sessionMenuSession);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm text-error transition-colors hover:bg-surface-hover"
+                  className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DANGER_CLASS}`}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-4 w-4" />
                   <span>{t("common.delete")}</span>
                 </button>
               </>

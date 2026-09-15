@@ -3,6 +3,12 @@ import { useTranslation } from "react-i18next";
 import { Bot, List, Package, Pencil, Plug, Sparkles, Zap } from "lucide-react";
 import type { Skill } from "../types";
 import type { SlashCommand, SlashItem } from "../slash-commands";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DEFAULT_CLASS,
+  MENU_ITEM_SELECTED_CLASS,
+  MENU_PANEL_CLASS,
+} from "./menu-styles";
 
 export type SlashTab = "all" | "commands" | "skills";
 
@@ -52,8 +58,7 @@ function SkillTypeBadge({ type }: { type: Skill["type"] }) {
   );
 }
 
-export const SLASH_MENU_CONTAINER_CLASS =
-  "absolute left-0 right-0 z-30 rounded-xl border border-border bg-background shadow-soft flex flex-col h-[28rem] max-h-[60vh]";
+export const SLASH_MENU_CONTAINER_CLASS = `${MENU_PANEL_CLASS} absolute left-0 right-0 z-30 flex flex-col h-[28rem] max-h-[60vh]`;
 
 export function SlashMenu({
   commands,
@@ -106,8 +111,8 @@ export function SlashMenu({
     <div
       className={`${SLASH_MENU_CONTAINER_CLASS} ${
         direction === "down"
-          ? "top-[calc(100%+6px)]"
-          : "bottom-[calc(100%+6px)]"
+          ? "top-[calc(100%+6px)] animate-menu-in-down"
+          : "bottom-[calc(100%+6px)] animate-menu-in-up"
       }`}
     >
       {/* Top tab bar */}
@@ -230,8 +235,8 @@ export function SlashMenu({
 
 /* ─── Tiny internal: a single menu item row ─── */
 
-const ITEM_BASE_CLASS =
-  "w-full text-left px-2.5 py-2 rounded-lg text-sm transition-colors flex items-center gap-2";
+/** 统一到共享 token；保留本地别名，调用点不必逐个改。 */
+const ITEM_BASE_CLASS = MENU_ITEM_CLASS;
 
 function MenuItem({
   index,
@@ -259,8 +264,8 @@ function MenuItem({
       }}
       className={`${ITEM_BASE_CLASS} ${
         index === selectedIndex
-          ? "bg-accent/10 text-accent"
-          : "text-text-primary hover:bg-surface-hover"
+          ? MENU_ITEM_SELECTED_CLASS
+          : MENU_ITEM_DEFAULT_CLASS
       }`}
     >
       {icon}

@@ -13,6 +13,13 @@ import {
 import type { CloudConfig } from "../types";
 import { useAppStore } from "../store";
 import { CloudApiClient } from "../services/cloud-api";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DEFAULT_CLASS,
+  MENU_ITEM_DISABLED_CLASS,
+  MENU_PANEL_PADDED_CLASS,
+  MENU_SEPARATOR_CLASS,
+} from "./menu-styles";
 
 interface AccountMenuProps {
   isOpen: boolean;
@@ -63,7 +70,9 @@ export function AccountMenu({
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute bottom-full left-0 mb-2 w-64 rounded-xl border border-border bg-background shadow-soft p-1.5 z-50 animate-account-menu-in">
+      <div
+        className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-up absolute bottom-full left-0 z-50 mb-2 w-64`}
+      >
         <MenuItem
           icon={<Settings className="w-4 h-4" />}
           label={t("sidebar.settings")}
@@ -73,7 +82,7 @@ export function AccountMenu({
           }}
         />
 
-        <div className="mx-2 my-1 border-t border-border" />
+        <div className={MENU_SEPARATOR_CLASS} />
 
         {/* Local usage stats need no account: keep this entry outside the
             logged-in branch so it is reachable while logged out. */}
@@ -86,7 +95,7 @@ export function AccountMenu({
           }}
         />
 
-        <div className="mx-2 my-1 border-t border-border" />
+        <div className={MENU_SEPARATOR_CLASS} />
 
         {cloudRestoring ? (
           <div className="flex items-center gap-2 px-2.5 py-2 text-sm text-text-muted">
@@ -120,7 +129,7 @@ export function AccountMenu({
                 </button>
               </div>
             </div>
-            <div className="mx-2 my-1 border-t border-border" />
+            <div className={MENU_SEPARATOR_CLASS} />
             <MenuItem
               icon={<LogOut className="w-4 h-4" />}
               label={t("auth.logout")}
@@ -160,10 +169,12 @@ function MenuItem({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm hover:bg-surface-hover transition-colors disabled:opacity-50 disabled:cursor-default"
+      className={`${MENU_ITEM_CLASS} ${
+        disabled ? MENU_ITEM_DISABLED_CLASS : MENU_ITEM_DEFAULT_CLASS
+      }`}
     >
-      <span className="text-text-muted flex-shrink-0">{icon}</span>
-      <span className="text-text-primary truncate">{label}</span>
+      <span className="shrink-0 text-text-muted">{icon}</span>
+      <span className="truncate">{label}</span>
     </button>
   );
 }
