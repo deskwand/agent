@@ -14,8 +14,8 @@ vi.mock("react-i18next", () => ({
 }));
 
 const items: AttachPickerItem[] = [
-  { id: "alpha.pdf", label: "alpha.pdf", size: 10 },
-  { id: "beta.csv", label: "beta.csv", size: 20 },
+  { id: "alpha.pdf", name: "alpha.pdf", label: "alpha.pdf", size: 10 },
+  { id: "beta.csv", name: "beta.csv", label: "beta.csv", size: 20 },
 ];
 
 const baseProps: AttachPickerPanelProps = {
@@ -25,9 +25,10 @@ const baseProps: AttachPickerPanelProps = {
   emptyLabel: "empty",
   onRetry: () => {},
   addedKeys: new Set<string>(),
-  onConfirm: () => {},
-  onBack: () => {},
+  selectedIds: [],
+  onSelectionChange: () => {},
   onClose: () => {},
+  onConfirm: () => {},
 };
 
 let container: HTMLDivElement;
@@ -85,12 +86,6 @@ function rows(): HTMLButtonElement[] {
   return Array.from(container.querySelectorAll("[role='option']"));
 }
 
-function confirmButton(): HTMLButtonElement {
-  const button = container.querySelector("button[data-confirm]");
-  if (!button) throw new Error("confirm button not rendered");
-  return button as HTMLButtonElement;
-}
-
 describe("AttachPickerPanel", () => {
   it("autofocuses the search input", () => {
     render();
@@ -103,24 +98,25 @@ describe("AttachPickerPanel", () => {
     expect(rows()).toHaveLength(1);
   });
 
-  it("keeps the confirm button disabled until something is selected", () => {
-    render();
-    expect(confirmButton().disabled).toBe(true);
+  it("reports the selected ids upward when a row is toggled", () => {
+    const onSelectionChange = vi.fn();
+    render({ onSelectionChange });
 
     act(() => rows()[0].click());
-    expect(confirmButton().disabled).toBe(false);
+
+    expect(onSelectionChange).toHaveBeenCalledWith(["alpha.pdf"]);
   });
 
-  it("confirms the selected ids", () => {
-    const onConfirm = vi.fn();
-    render({ onConfirm });
+  it("removes an id again when a selected row is toggled off", () => {
+    const onSelectionChange = vi.fn();
+    render({ selectedIds: ["alpha.pdf"], onSelectionChange });
+
     act(() => rows()[0].click());
-    act(() => rows()[1].click());
-    act(() => confirmButton().click());
-    expect(onConfirm).toHaveBeenCalledWith(["alpha.pdf", "beta.csv"]);
+
+    expect(onSelectionChange).toHaveBeenCalledWith([]);
   });
 
-  it("adds a single row on double click and closes", () => {
+  it("adds a single row on double click", () => {
     const onConfirm = vi.fn();
     render({ onConfirm });
     act(() => {
@@ -129,14 +125,13 @@ describe("AttachPickerPanel", () => {
     expect(onConfirm).toHaveBeenCalledWith(["beta.csv"]);
   });
 
-  it("marks already attached items as added and does not select them", () => {
-    const onConfirm = vi.fn();
-    render({ addedKeys: new Set(["vault:alpha.pdf"]), onConfirm });
+  it("does not select an already attached row", () => {
+    const onSelectionChange = vi.fn();
+    render({ addedKeys: new Set(["vault:alpha.pdf"]), onSelectionChange });
     expect(rows()[0].disabled).toBe(true);
 
     act(() => rows()[0].click());
-    act(() => confirmButton().click());
-    expect(onConfirm).not.toHaveBeenCalled();
+    expect(onSelectionChange).not.toHaveBeenCalled();
   });
 
   it("clears the query on the first Escape, closes on the second", () => {
@@ -154,28 +149,28 @@ describe("AttachPickerPanel", () => {
 
   it("toggles the highlighted row with Enter and confirms when nothing is highlighted", () => {
     const onConfirm = vi.fn();
-    render({ onConfirm });
+    const onSelectionChange = vi.fn();
+    render({ onConfirm, onSelectionChange });
     const input = searchInput();
 
     keyDown(input, "Enter"); // 无高亮 → 无选中 → 什么都不做
     expect(onConfirm).not.toHaveBeenCalled();
+    expect(onSelectionChange).not.toHaveBeenCalled();
 
     keyDown(input, "ArrowDown"); // 高亮第 1 行
-    keyDown(input, "Enter"); // 切换勾选
-    keyDown(input, "Enter"); // 再次切换 → 取消勾选
-
-    keyDown(input, "Escape"); // 查询为空 → 关闭
-    expect(onConfirm).not.toHaveBeenCalled();
+    keyDown(input, "Enter"); // 切换勾选 → 选中
+    expect(onSelectionChange).toHaveBeenCalledWith(["alpha.pdf"]);
   });
 
   it("uses Space to toggle the highlighted row only while the query is empty", () => {
-    render();
+    const onSelectionChange = vi.fn();
+    render({ onSelectionChange });
     const input = searchInput();
 
     keyDown(input, "ArrowDown");
     keyDown(input, " ");
 
-    expect(confirmButton().disabled).toBe(false);
+    expect(onSelectionChange).toHaveBeenCalledWith(["alpha.pdf"]);
   });
 
   it("shows the empty label when there is nothing to list", () => {
@@ -214,14 +209,49 @@ describe("AttachPickerPanel", () => {
     expect(onRetry).toHaveBeenCalled();
   });
 
-  it("returns to the menu through the back button", () => {
-    const onBack = vi.fn();
-    render({ onBack });
-    act(() =>
-      (
-        container.querySelector("button[data-back]") as HTMLButtonElement
-      ).click(),
-    );
-    expect(onBack).toHaveBeenCalled();
+  it("renders name and dir in separate columns for a workspace row", () => {
+    render({
+      source: "workspace",
+      items: [
+        {
+          id: "src/a.ts",
+          name: "a.ts",
+          dir: "src",
+          size: 5,
+          label: "src/a.ts",
+        },
+      ],
+    });
+
+    expect(container.textContent).toContain("a.ts");
+    expect(container.textContent).toContain("src");
+    expect(container.textContent).toContain("attachPicker.columnPath");
+    expect(rows()[0].textContent).toContain("a.ts");
+    expect(rows()[0].textContent).toContain("src");
+  });
+
+  it("omits the path column for the vault source", () => {
+    render();
+    expect(container.textContent).not.toContain("attachPicker.columnPath");
+    expect(container.textContent).toContain("attachPicker.columnName");
+  });
+
+  it("keeps rows out of the Tab order so Enter cannot hijack a focused row", () => {
+    render();
+    for (const row of rows()) {
+      expect(row.getAttribute("tabindex")).toBe("-1");
+    }
+  });
+
+  it("leaves the search field's focus ring to the global rule only", () => {
+    render();
+    expect(searchInput().className).not.toContain("focus:border-accent");
+  });
+
+  it("keeps a stable minimum height so the modal does not jump while filtering", () => {
+    render();
+    const list = container.querySelector("[data-attach-list]");
+    if (!list) throw new Error("list container not rendered");
+    expect(list.className).toContain("min-h-[280px]");
   });
 });

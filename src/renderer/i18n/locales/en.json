@@ -1477,8 +1477,8 @@
     "copied": "Copied",
     "amountToSend": "Amount to Send",
     "qrHint": "Or scan the QR code (some wallets have limited support for custom networks; copying the address is recommended)",
-      "confirmedAmountPending": "Order confirmed. The credited amount is unavailable; please check top-up history later.",
-      "creditedAmount": "Credited {{usd}}",
+    "confirmedAmountPending": "Order confirmed. The credited amount is unavailable; please check top-up history later.",
+    "creditedAmount": "Credited {{usd}}",
     "waitingTitle": "Waiting for Confirmation",
     "waitingHint": "The amount is credited automatically (about 1-2 minutes). Please keep this page open.",
     "confirmed": "Top up successful! {{usd}} added",
@@ -1803,7 +1803,6 @@
   },
   "attachPicker": {
     "searchPlaceholder": "Search files",
-    "back": "Back",
     "addCount": "Add {{count}} file(s)",
     "loading": "Loading...",
     "added": "Added",
@@ -1818,7 +1817,17 @@
     "error": {
       "vault": "Failed to read the Vault",
       "workspace": "Failed to read the workspace"
-    }
+    },
+    "eyebrow": "ATTACH",
+    "selectedCount_one": "{{count}} item selected",
+    "selectedCount_other": "{{count}} items selected",
+    "selectedNone": "Nothing selected yet",
+    "fileCount_one": "{{count}} file",
+    "fileCount_other": "{{count}} files",
+    "columnName": "Name",
+    "columnPath": "Path",
+    "columnSize": "Size",
+    "searchPathPlaceholder": "Search file names or paths"
   },
   "attachChip": {
     "vaultSource": "Vault · {{name}}"

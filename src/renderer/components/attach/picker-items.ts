@@ -6,8 +6,27 @@ import type { VaultSnapshotItem } from "../../../shared/vault";
  */
 export interface AttachPickerItem {
   id: string;
-  label: string;
+  /** 文件名：列表第一列，也是 FileTypeIcon 的判据 */
+  name: string;
+  /** 目录前缀：列表第二列，仅工作区有 */
+  dir?: string;
   size: number;
+  /** 搜索匹配用的完整展示串（工作区=相对路径，密库=文件名） */
+  label: string;
+}
+
+/** 把工作区相对路径切成目录 + 文件名。渲染层不引 path 模块。 */
+export function splitRelPath(relPath: string): {
+  dir?: string;
+  name: string;
+} {
+  const normalized = relPath.replace(/\\/g, "/").replace(/\/+$/, "");
+  const lastSlash = normalized.lastIndexOf("/");
+  if (lastSlash < 0) return { dir: undefined, name: normalized };
+  return {
+    dir: normalized.slice(0, lastSlash) || undefined,
+    name: normalized.slice(lastSlash + 1),
+  };
 }
 
 export function mapVaultSnapshotItems(
@@ -15,19 +34,26 @@ export function mapVaultSnapshotItems(
 ): AttachPickerItem[] {
   return items.map((item) => ({
     id: item.name,
-    label: item.name,
+    name: item.name,
+    dir: undefined,
     size: item.size,
+    label: item.name,
   }));
 }
 
 export function mapWorkspaceScan(
   files: Array<{ relPath: string; size: number }>,
 ): AttachPickerItem[] {
-  return files.map((file) => ({
-    id: file.relPath,
-    label: file.relPath,
-    size: file.size,
-  }));
+  return files.map((file) => {
+    const { dir, name } = splitRelPath(file.relPath);
+    return {
+      id: file.relPath,
+      name,
+      dir,
+      size: file.size,
+      label: file.relPath,
+    };
+  });
 }
 
 /** 大小写不敏感的子串匹配；空查询返回全量（保持入参引用，避免无谓重渲染）。 */

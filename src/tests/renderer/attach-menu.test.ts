@@ -97,16 +97,27 @@ function item(label: string): HTMLButtonElement {
   return found as HTMLButtonElement;
 }
 
+/** 选择器内容在 portal 到 document.body 的弹窗里，不能从 container 里找。 */
+function dialog(): HTMLElement {
+  const el = document.body.querySelector("[role='dialog']");
+  if (!el) throw new Error("dialog not rendered");
+  return el as HTMLElement;
+}
+
 function firstOption(): HTMLButtonElement {
-  const option = container.querySelector("[role='option']");
+  const option = document.querySelector("[role='option']");
   if (!option) throw new Error("picker option not rendered");
   return option as HTMLButtonElement;
 }
 
-function confirmButton(): HTMLButtonElement {
-  const button = container.querySelector("button[data-confirm]");
-  if (!button) throw new Error("picker confirm button not rendered");
-  return button as HTMLButtonElement;
+function modalButton(key: string): HTMLButtonElement {
+  const found = Array.from(dialog().querySelectorAll("button")).find(
+    (button) =>
+      button.textContent?.includes(key) ||
+      button.getAttribute("aria-label") === key,
+  );
+  if (!found) throw new Error(`modal button not found: ${key}`);
+  return found as HTMLButtonElement;
 }
 
 function keyDown(el: Element, key: string) {
@@ -118,6 +129,31 @@ function keyDown(el: Element, key: string) {
 }
 
 describe("AttachMenu", () => {
+  it("renders no dialog until a picker source is chosen", async () => {
+    await openMenu();
+    expect(document.querySelector("[role='dialog']")).toBeNull();
+
+    await act(async () => {
+      item("attachMenu.vault").click();
+    });
+    expect(document.querySelector("[role='dialog']")).not.toBeNull();
+  });
+
+  it("keeps the dialog open when the user clicks inside it", async () => {
+    // 回归：菜单的「点空白关闭」监听绑定在 document 上，而弹窗是 portal 到
+    // body 的——不加 view 守卫的话，在弹窗里点第一下就会把它关掉。
+    await openMenu();
+    await act(async () => {
+      item("attachMenu.vault").click();
+    });
+
+    await act(async () => {
+      firstOption().click();
+    });
+
+    expect(document.querySelector("[role='dialog']")).not.toBeNull();
+  });
+
   it("renders the three items on open", async () => {
     await openMenu();
     expect(item("attachMenu.localFile")).toBeDefined();
@@ -214,7 +250,7 @@ describe("AttachMenu", () => {
       firstOption().click();
     });
     await act(async () => {
-      confirmButton().click();
+      modalButton("attachPicker.addCount").click();
     });
 
     expect(vaultGetFilePath).toHaveBeenCalledWith("secret.pdf");
@@ -239,7 +275,7 @@ describe("AttachMenu", () => {
       firstOption().click();
     });
     await act(async () => {
-      confirmButton().click();
+      modalButton("attachPicker.addCount").click();
     });
 
     expect(scanWorkspaceFiles).toHaveBeenCalledWith("/repo");
@@ -255,6 +291,18 @@ describe("AttachMenu", () => {
     ]);
   });
 
+  it("does not show a file count next to an error", async () => {
+    vaultGetSnapshot.mockRejectedValue(new Error("boom"));
+    await openMenu();
+    await act(async () => {
+      item("attachMenu.vault").click();
+    });
+
+    const subtitle = dialog().textContent ?? "";
+    expect(subtitle).toContain("attachPicker.error.vault");
+    expect(subtitle).not.toContain("attachPicker.fileCount");
+  });
+
   it("shows the scan notice when the workspace scan was truncated", async () => {
     scanWorkspaceFiles.mockResolvedValue({
       files: [{ relPath: "src/a.ts", size: 5 }],
@@ -264,21 +312,6 @@ describe("AttachMenu", () => {
     await act(async () => {
       item("attachMenu.workspace").click();
     });
-    expect(container.textContent).toContain("attachPicker.truncated");
-  });
-
-  it("returns to the menu from the picker", async () => {
-    await openMenu();
-    await act(async () => {
-      item("attachMenu.vault").click();
-    });
-    expect(container.querySelector("input")).not.toBeNull();
-
-    await act(async () => {
-      (
-        container.querySelector("button[data-back]") as HTMLButtonElement
-      ).click();
-    });
-    expect(item("attachMenu.localFile")).toBeDefined();
+    expect(dialog().textContent).toContain("attachPicker.truncated");
   });
 });

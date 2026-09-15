@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronRight, Loader2, Search } from "lucide-react";
+import { Check, Loader2, Search } from "lucide-react";
 import { FileTypeIcon } from "../file-type-icon";
 import { getFileKind } from "../../utils/file-types";
 import { filterPickerItems, type AttachPickerItem } from "./picker-items";
@@ -21,9 +21,13 @@ export interface AttachPickerPanelProps {
   onRetry: () => void;
   /** `${source}:${item.id}` 集合 */
   addedKeys: ReadonlySet<string>;
-  onConfirm: (ids: string[]) => void;
-  onBack: () => void;
+  /** 受控选择：由 AttachMenu 持有，弹窗 footer 要用同一个数 */
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
+  /** 两段式 Esc 的第二段：查询已空时触发 */
   onClose: () => void;
+  /** 双击某行「即选即走」 */
+  onConfirm: (ids: string[]) => void;
 }
 
 function formatSize(bytes: number): string {
@@ -46,13 +50,13 @@ export function AttachPickerPanel({
   errorLabel,
   onRetry,
   addedKeys,
-  onConfirm,
-  onBack,
+  selectedIds,
+  onSelectionChange,
   onClose,
+  onConfirm,
 }: AttachPickerPanelProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [highlight, setHighlight] = useState(-1);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -60,13 +64,18 @@ export function AttachPickerPanel({
     searchRef.current?.focus();
   }, []);
 
-  const visible = useMemo(() => filterPickerItems(items, query), [items, query]);
+  const visible = useMemo(
+    () => filterPickerItems(items, query),
+    [items, query],
+  );
   const isAdded = (id: string) => addedKeys.has(`${source}:${id}`);
 
   const toggle = (id: string) => {
     if (isAdded(id)) return;
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    onSelectionChange(
+      selectedIds.includes(id)
+        ? selectedIds.filter((x) => x !== id)
+        : [...selectedIds, id],
     );
   };
 
@@ -118,39 +127,55 @@ export function AttachPickerPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={handleKeyDown}>
-      <div className="flex items-center gap-1 px-1.5 pt-1.5">
-        <button
-          type="button"
-          data-back
-          aria-label={t("attachPicker.back")}
-          onClick={onBack}
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
-        >
-          <ChevronRight className="h-4 w-4 rotate-180" />
-        </button>
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
-          <input
-            ref={searchRef}
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              setHighlight(-1);
-            }}
-            placeholder={t("attachPicker.searchPlaceholder")}
-            aria-label={t("attachPicker.searchPlaceholder")}
-            className="h-8 w-full rounded-lg border border-border bg-transparent pl-7 pr-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent"
-          />
-        </div>
+      {/* 搜索行 */}
+      <div className="relative px-6 pt-3.5 pb-2.5">
+        <Search className="pointer-events-none absolute left-[34px] top-[25px] h-3.5 w-3.5 text-text-muted" />
+        <input
+          ref={searchRef}
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setHighlight(-1);
+          }}
+          placeholder={t(
+            source === "workspace"
+              ? "attachPicker.searchPathPlaceholder"
+              : "attachPicker.searchPlaceholder",
+          )}
+          aria-label={t("attachPicker.searchPlaceholder")}
+          className="h-9 w-full rounded-lg border border-border bg-surface-muted pl-8 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted"
+        />
       </div>
 
       {noticeLabel && (
-        <p className="px-3 pb-1 pt-2 text-xs leading-relaxed text-text-muted">
+        <p className="px-6 pb-1.5 text-xs leading-relaxed text-text-muted">
           {noticeLabel}
         </p>
       )}
 
-      <div className="mt-1 min-h-0 flex-1 overflow-y-auto p-1.5">
+      {/* 列头 */}
+      <div className="flex items-center gap-2 px-6 pb-1.5 text-[11px] text-text-muted">
+        <span className="w-4 shrink-0" />
+        <span className="flex-1">{t("attachPicker.columnName")}</span>
+        {source === "workspace" && (
+          <span className="w-[200px] shrink-0">
+            {t("attachPicker.columnPath")}
+          </span>
+        )}
+        <span className="w-16 shrink-0 text-right">
+          {t("attachPicker.columnSize")}
+        </span>
+        <span className="w-4 shrink-0" />
+      </div>
+
+      {/* 列表 */}
+      <div
+        data-attach-list
+        role="listbox"
+        aria-multiselectable="true"
+        aria-label={t("attachPicker.columnName")}
+        className="min-h-[280px] flex-1 overflow-y-auto px-4 pb-2"
+      >
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-8 text-sm text-text-muted">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -194,13 +219,16 @@ export function AttachPickerPanel({
                 type="button"
                 role="option"
                 aria-selected={selected}
+                // 列表由方向键驱动（spec §3.3）：行不进 Tab 序列，否则 Tab 到某行
+                // 再按 Enter 会被容器的 Enter 分支拦掉，反而去切换鼠标悬停的那一行。
+                tabIndex={-1}
                 disabled={added}
                 onDoubleClick={() => {
                   if (!added) onConfirm([item.id]);
                 }}
                 onClick={() => toggle(item.id)}
                 onMouseEnter={() => setHighlight(index)}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors ${
+                className={`flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left transition-colors ${
                   added
                     ? "cursor-default opacity-50"
                     : index === highlight
@@ -208,34 +236,29 @@ export function AttachPickerPanel({
                       : "hover:bg-surface-hover"
                 }`}
               >
-                <FileTypeIcon kind={getFileKind(item.label)} size={16} />
-                <span className="min-w-0 flex-1 truncate text-xs text-text-primary">
-                  {item.label}
+                <span className="w-4 shrink-0">
+                  <FileTypeIcon kind={getFileKind(item.name)} size={16} />
                 </span>
-                <span className="shrink-0 text-xs text-text-muted">
+                <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                  {item.name}
+                </span>
+                {source === "workspace" && (
+                  <span className="w-[200px] shrink-0 truncate text-xs text-text-muted">
+                    {item.dir ?? ""}
+                  </span>
+                )}
+                <span className="w-16 shrink-0 text-right text-xs text-text-muted">
                   {added ? t("attachPicker.added") : formatSize(item.size)}
                 </span>
-                <Check
-                  className={`h-3.5 w-3.5 shrink-0 ${
-                    selected ? "text-accent" : "text-transparent"
-                  }`}
-                />
+                <span className="w-4 shrink-0">
+                  <Check
+                    className={`h-4 w-4 ${selected ? "text-accent" : "text-transparent"}`}
+                  />
+                </span>
               </button>
             );
           })
         )}
-      </div>
-
-      <div className="border-t border-border p-1.5">
-        <button
-          type="button"
-          data-confirm
-          disabled={selectedIds.length === 0}
-          onClick={() => onConfirm(selectedIds)}
-          className="h-8 w-full rounded-lg bg-accent text-sm font-medium text-background transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {t("attachPicker.addCount", { count: selectedIds.length })}
-        </button>
       </div>
     </div>
   );

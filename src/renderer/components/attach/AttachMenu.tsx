@@ -5,11 +5,13 @@ import { Tooltip } from "../Tooltip";
 import { useAppStore } from "../../store";
 import type { VaultSnapshot } from "../../../shared/vault";
 import type { ChatInputAttachedFile } from "../ChatInput";
+import { AttachPickerModal } from "./AttachPickerModal";
 import { AttachPickerPanel } from "./AttachPickerPanel";
 import {
   mapVaultSnapshotItems,
   mapWorkspaceScan,
   pickerItemMimeType,
+  splitRelPath,
   type AttachPickerItem,
 } from "./picker-items";
 
@@ -30,12 +32,6 @@ export interface AttachMenuProps {
   onDismiss?: () => void;
 }
 
-/** 相对路径取 basename。渲染层不引 path 模块，按 `/` 与 `\` 切。 */
-function basename(relPath: string): string {
-  const parts = relPath.split(/[/\\]/);
-  return parts[parts.length - 1] || relPath;
-}
-
 export function AttachMenu({
   cwd,
   onPickLocalFiles,
@@ -53,6 +49,9 @@ export function AttachMenu({
   const [workspaceTruncated, setWorkspaceTruncated] = useState(false);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState(false);
+  // 弹窗的选择状态：弹窗外壳要用它渲染计数与「添加」的禁用态，
+  // 所以由这里（数据和确认动作的拥有者）持有，面板只是受控渲染。
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -86,6 +85,8 @@ export function AttachMenu({
   const openMenu = () => {
     setOpen(true);
     setView("menu");
+    // 唯一的重置点：弹窗没有「返回菜单」，换来源必然走「关掉 → 再点 +」。
+    setSelectedIds([]);
     void loadVaultSnapshot();
   };
 
@@ -102,7 +103,9 @@ export function AttachMenu({
   }, [close, onDismiss]);
 
   useEffect(() => {
-    if (!open) return;
+    // 只在菜单层生效：选择器弹窗是 portal 到 document.body 的，天然在 rootRef
+    // 之外，不加这道守卫的话「在弹窗里点第一下」就会把 open 置回 false。
+    if (!open || view !== "menu") return;
     function handleClick(event: MouseEvent) {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         close();
@@ -110,7 +113,7 @@ export function AttachMenu({
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open, close]);
+  }, [open, view, close]);
 
   // 菜单项可访问名：置灰时说明原因，可用时就是动作名。
   const vaultDisabledReason = vaultError
@@ -155,18 +158,46 @@ export function AttachMenu({
   };
 
   const addWorkspaceFiles = (ids: string[]) => {
-    const files: ChatInputAttachedFile[] = ids.map((relPath) => ({
-      name: basename(relPath),
-      // 工作区附件与本地文件一样按绝对路径复制到 .tmp（零拷贝引用是阶段 2）。
-      path: `${cwd?.replace(/[/\\]+$/, "")}/${relPath}`,
-      size: workspaceItems.find((item) => item.id === relPath)?.size ?? 0,
-      type: pickerItemMimeType(relPath),
-      source: "workspace",
-      dedupeId: relPath,
-    }));
+    const files: ChatInputAttachedFile[] = ids.map((relPath) => {
+      const { name } = splitRelPath(relPath);
+      return {
+        name,
+        // 工作区附件与本地文件一样按绝对路径复制到 .tmp（零拷贝引用是阶段 2）。
+        path: `${cwd?.replace(/[/\\]+$/, "")}/${relPath}`,
+        size: workspaceItems.find((item) => item.id === relPath)?.size ?? 0,
+        type: pickerItemMimeType(name),
+        source: "workspace",
+        dedupeId: relPath,
+      };
+    });
     if (files.length > 0) onAddFiles(files);
     closeAndFocusComposer();
   };
+
+  const pickerCount =
+    view === "vault" ? vaultItems.length : workspaceItems.length;
+  const pickerLoading =
+    view === "vault" ? snapshot === null && !vaultError : workspaceLoading;
+  const pickerFailed = view === "vault" ? vaultError : workspaceError;
+  // 计数只在「已加载、没出错、也没被截断」时显示：否则会出现「0 个文件」
+  // 配着「读取失败」或「可能未覆盖全部」，两处说法互相矛盾。
+  const showPickerCount =
+    !pickerLoading &&
+    !pickerFailed &&
+    !(view === "workspace" && workspaceTruncated);
+  const pickerSubtitle =
+    view === "vault"
+      ? showPickerCount
+        ? t("attachPicker.fileCount", { count: pickerCount })
+        : ""
+      : [
+          showPickerCount
+            ? t("attachPicker.fileCount", { count: pickerCount })
+            : null,
+          cwd,
+        ]
+          .filter(Boolean)
+          .join(" · ");
 
   const menuItemClass =
     "flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm transition-colors";
@@ -222,7 +253,7 @@ export function AttachMenu({
         </button>
       </Tooltip>
 
-      {open && (
+      {open && view === "menu" && (
         <div
           role="menu"
           aria-label={t("attachMenu.label")}
@@ -232,127 +263,143 @@ export function AttachMenu({
               : "bottom-[calc(100%+8px)]"
           }`}
         >
-          {view === "menu" && (
-            <>
-              <button
-                type="button"
-                role="menuitem"
-                ref={(element) => {
-                  itemRefs.current[0] = element;
-                }}
-                onClick={() => {
-                  onPickLocalFiles();
-                  closeAndFocusComposer();
-                }}
-                className={`${menuItemClass} text-text-primary hover:bg-surface-hover`}
-              >
-                <Upload className="h-4 w-4 shrink-0 text-text-muted" />
-                {t("attachMenu.localFile")}
-              </button>
-
-              <button
-                type="button"
-                role="menuitem"
-                ref={(element) => {
-                  itemRefs.current[1] = element;
-                }}
-                aria-disabled={Boolean(workspaceDisabledReason)}
-                aria-label={
-                  workspaceDisabledReason ?? t("attachMenu.workspace")
-                }
-                onClick={() => {
-                  if (workspaceDisabledReason) return;
-                  setView("workspace");
-                  void loadWorkspace();
-                }}
-                className={`${menuItemClass} ${
-                  workspaceDisabledReason
-                    ? "cursor-not-allowed text-text-muted opacity-50"
-                    : "text-text-primary hover:bg-surface-hover"
-                }`}
-              >
-                <FolderOpen className="h-4 w-4 shrink-0 text-text-muted" />
-                <span className="min-w-0 flex-1 truncate">
-                  {t("attachMenu.workspace")}
-                </span>
-                {workspaceDisabledReason && (
-                  <span className="shrink-0 text-xs">
-                    {workspaceDisabledReason}
-                  </span>
-                )}
-              </button>
-
-              <button
-                type="button"
-                role="menuitem"
-                ref={(element) => {
-                  itemRefs.current[2] = element;
-                }}
-                aria-disabled={Boolean(vaultDisabledReason)}
-                aria-label={vaultDisabledReason ?? t("attachMenu.vault")}
-                onClick={() => {
-                  if (vaultDisabledReason) return;
-                  setView("vault");
-                }}
-                className={`${menuItemClass} ${
-                  vaultDisabledReason
-                    ? "cursor-not-allowed text-text-muted opacity-50"
-                    : "text-text-primary hover:bg-surface-hover"
-                }`}
-              >
-                <Lock className="h-4 w-4 shrink-0 text-text-muted" />
-                <span className="min-w-0 flex-1 truncate">
-                  {t("attachMenu.vault")}
-                </span>
-                {vaultDisabledReason && (
-                  <span className="shrink-0 text-xs">{vaultDisabledReason}</span>
-                )}
-              </button>
-            </>
-          )}
-
-          {view === "vault" && (
-            <AttachPickerPanel
-              source="vault"
-              items={vaultItems}
-              loading={snapshot === null && !vaultError}
-              emptyLabel={t("attachPicker.empty.vault")}
-              emptyAction={{
-                label: t("attachPicker.goToVault"),
-                onClick: () => {
-                  useAppStore.getState().setActiveView("vault");
-                  closeAndFocusComposer();
-                },
+          <>
+            <button
+              type="button"
+              role="menuitem"
+              ref={(element) => {
+                itemRefs.current[0] = element;
               }}
-              errorLabel={vaultError ? t("attachPicker.error.vault") : undefined}
-              onRetry={() => void loadVaultSnapshot()}
-              addedKeys={attachedKeys}
-              onConfirm={(ids) => void addVaultFiles(ids)}
-              onBack={() => setView("menu")}
-              onClose={closeAndFocusComposer}
-            />
-          )}
+              onClick={() => {
+                onPickLocalFiles();
+                closeAndFocusComposer();
+              }}
+              className={`${menuItemClass} text-text-primary hover:bg-surface-hover`}
+            >
+              <Upload className="h-4 w-4 shrink-0 text-text-muted" />
+              {t("attachMenu.localFile")}
+            </button>
 
-          {view === "workspace" && (
-            <AttachPickerPanel
-              source="workspace"
-              items={workspaceItems}
-              loading={workspaceLoading}
-              emptyLabel={t("attachPicker.empty.workspace")}
-              noticeLabel={
-                workspaceTruncated ? t("attachPicker.truncated") : undefined
-              }
-              errorLabel={
-                workspaceError ? t("attachPicker.error.workspace") : undefined
-              }
-              onRetry={() => void loadWorkspace()}
-              addedKeys={attachedKeys}
-              onConfirm={addWorkspaceFiles}
-              onBack={() => setView("menu")}
-              onClose={closeAndFocusComposer}
-            />
-          )}
+            <button
+              type="button"
+              role="menuitem"
+              ref={(element) => {
+                itemRefs.current[1] = element;
+              }}
+              aria-disabled={Boolean(workspaceDisabledReason)}
+              aria-label={workspaceDisabledReason ?? t("attachMenu.workspace")}
+              onClick={() => {
+                if (workspaceDisabledReason) return;
+                setView("workspace");
+                void loadWorkspace();
+              }}
+              className={`${menuItemClass} ${
+                workspaceDisabledReason
+                  ? "cursor-not-allowed text-text-muted opacity-50"
+                  : "text-text-primary hover:bg-surface-hover"
+              }`}
+            >
+              <FolderOpen className="h-4 w-4 shrink-0 text-text-muted" />
+              <span className="min-w-0 flex-1 truncate">
+                {t("attachMenu.workspace")}
+              </span>
+              {workspaceDisabledReason && (
+                <span className="shrink-0 text-xs">
+                  {workspaceDisabledReason}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
+              role="menuitem"
+              ref={(element) => {
+                itemRefs.current[2] = element;
+              }}
+              aria-disabled={Boolean(vaultDisabledReason)}
+              aria-label={vaultDisabledReason ?? t("attachMenu.vault")}
+              onClick={() => {
+                if (vaultDisabledReason) return;
+                setView("vault");
+              }}
+              className={`${menuItemClass} ${
+                vaultDisabledReason
+                  ? "cursor-not-allowed text-text-muted opacity-50"
+                  : "text-text-primary hover:bg-surface-hover"
+              }`}
+            >
+              <Lock className="h-4 w-4 shrink-0 text-text-muted" />
+              <span className="min-w-0 flex-1 truncate">
+                {t("attachMenu.vault")}
+              </span>
+              {vaultDisabledReason && (
+                <span className="shrink-0 text-xs">{vaultDisabledReason}</span>
+              )}
+            </button>
+          </>
         </div>
+      )}
+
+      {open && (view === "vault" || view === "workspace") && (
+        <AttachPickerModal
+          source={view}
+          subtitle={pickerSubtitle}
+          selectedCount={selectedIds.length}
+          onClose={closeAndFocusComposer}
+          onConfirm={() => {
+            // 不要在这里再 close 一次：addVaultFiles / addWorkspaceFiles
+            // 内部已经调了 closeAndFocusComposer()。
+            if (view === "vault") void addVaultFiles(selectedIds);
+            else addWorkspaceFiles(selectedIds);
+          }}
+        >
+          <AttachPickerPanel
+            source={view}
+            items={view === "vault" ? vaultItems : workspaceItems}
+            loading={pickerLoading}
+            emptyLabel={
+              view === "vault"
+                ? t("attachPicker.empty.vault")
+                : t("attachPicker.empty.workspace")
+            }
+            emptyAction={
+              view === "vault"
+                ? {
+                    label: t("attachPicker.goToVault"),
+                    onClick: () => {
+                      useAppStore.getState().setActiveView("vault");
+                      closeAndFocusComposer();
+                    },
+                  }
+                : undefined
+            }
+            noticeLabel={
+              view === "workspace" && workspaceTruncated
+                ? t("attachPicker.truncated")
+                : undefined
+            }
+            errorLabel={
+              view === "vault"
+                ? vaultError
+                  ? t("attachPicker.error.vault")
+                  : undefined
+                : workspaceError
+                  ? t("attachPicker.error.workspace")
+                  : undefined
+            }
+            onRetry={() =>
+              void (view === "vault" ? loadVaultSnapshot() : loadWorkspace())
+            }
+            addedKeys={attachedKeys}
+            selectedIds={selectedIds}
+            onSelectionChange={setSelectedIds}
+            onClose={closeAndFocusComposer}
+            onConfirm={(ids) => {
+              if (view === "vault") void addVaultFiles(ids);
+              else addWorkspaceFiles(ids);
+            }}
+          />
+        </AttachPickerModal>
       )}
     </div>
   );

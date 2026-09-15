@@ -4,29 +4,71 @@ import {
   mapVaultSnapshotItems,
   mapWorkspaceScan,
   pickerItemMimeType,
+  splitRelPath,
   type AttachPickerItem,
 } from "../../renderer/components/attach/picker-items";
 
 const items: AttachPickerItem[] = [
-  { id: "report.pdf", label: "report.pdf", size: 1024 },
-  { id: "src/Data/sales.csv", label: "src/Data/sales.csv", size: 2048 },
+  { id: "report.pdf", name: "report.pdf", label: "report.pdf", size: 1024 },
+  {
+    id: "src/Data/sales.csv",
+    name: "sales.csv",
+    dir: "src/Data",
+    label: "src/Data/sales.csv",
+    size: 2048,
+  },
 ];
 
 describe("mapVaultSnapshotItems", () => {
-  it("uses the vault file name as id and label", () => {
+  it("uses the vault file name as id, name and label, with no dir", () => {
     expect(
       mapVaultSnapshotItems([
         { name: "a.png", ext: ".png", size: 3, mtime: 1, syncStatus: "synced" },
       ]),
-    ).toEqual([{ id: "a.png", label: "a.png", size: 3 }]);
+    ).toEqual([
+      { id: "a.png", name: "a.png", dir: undefined, size: 3, label: "a.png" },
+    ]);
   });
 });
 
 describe("mapWorkspaceScan", () => {
-  it("uses the relative path as id and label", () => {
-    expect(mapWorkspaceScan([{ relPath: "src/a.ts", size: 7 }])).toEqual([
-      { id: "src/a.ts", label: "src/a.ts", size: 7 },
+  it("splits the relative path into dir and file name", () => {
+    expect(
+      mapWorkspaceScan([{ relPath: "src/data/report.csv", size: 7 }]),
+    ).toEqual([
+      {
+        id: "src/data/report.csv",
+        name: "report.csv",
+        dir: "src/data",
+        size: 7,
+        label: "src/data/report.csv",
+      },
     ]);
+  });
+
+  it("leaves dir undefined for a top-level file", () => {
+    expect(mapWorkspaceScan([{ relPath: "README.md", size: 9 }])[0]).toEqual({
+      id: "README.md",
+      name: "README.md",
+      dir: undefined,
+      size: 9,
+      label: "README.md",
+    });
+  });
+});
+
+describe("splitRelPath", () => {
+  it("splits on the last slash", () => {
+    expect(splitRelPath("a/b/c.txt")).toEqual({ dir: "a/b", name: "c.txt" });
+  });
+
+  it("returns no dir for a bare name", () => {
+    expect(splitRelPath("c.txt")).toEqual({ dir: undefined, name: "c.txt" });
+  });
+
+  it("handles backslashes and trailing separators", () => {
+    expect(splitRelPath("a\\b\\c.txt")).toEqual({ dir: "a/b", name: "c.txt" });
+    expect(splitRelPath("a/b/")).toEqual({ dir: "a", name: "b" });
   });
 });
 

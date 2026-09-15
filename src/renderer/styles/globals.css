@@ -475,18 +475,25 @@
     color-scheme: light dark;
   }
 
-  /* Consistent focus ring for native form elements — overrides browser's default outline */
+  /* 焦点环：宽度 1px，颜色用主题强调色。
+     不要写成 `ring-accent/30`，也不要加 `ring-opacity-30` —— accent 在
+     tailwind.config.js 里是 `var(--color-accent)` 形式的整值，没有
+     <alpha-value> 插槽，透明度修饰符与 ring-opacity 都不会生效。
+     这两种写法都不会「什么都不做」：透明度被忽略、环照画不误，因此
+     `focus:ring-2 focus:ring-accent/30` 的元素会画出一圈 2px 的 accent 环；
+     而同时带 ring-2 的非表单元素（例如开关的 track div）拿不到本规则的
+     颜色，会退回 Tailwind 预置的 rgb(59 130 246 / 0.5) 蓝色环。 */
   select,
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
       [type="file"]
     ):not([type="color"]),
   textarea {
-    @apply focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-30;
+    @apply focus:outline-none focus:ring-1 focus:ring-accent;
   }
 
   /* Buttons: suppress browser default outline; keep a subtle ring for keyboard focus only */
   button {
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-opacity-30;
+    @apply focus:outline-none focus-visible:ring-1 focus-visible:ring-accent;
   }
 
   /* Native checkboxes/radios follow the theme accent instead of OS defaults */
@@ -557,7 +564,7 @@
 
   /* Button styles */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-accent focus:ring-opacity-30;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium focus:outline-none focus:ring-1 focus:ring-accent;
     transition:
       transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1),
       box-shadow 150ms ease,
@@ -589,7 +596,7 @@
   .input {
     @apply w-full px-4 py-3 rounded-xl bg-surface border border-border;
     @apply text-text-primary placeholder:text-text-muted;
-    @apply focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent focus:ring-opacity-30;
+    @apply focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent;
     @apply transition-[border-color,box-shadow,background-color,color] duration-150;
   }
 
