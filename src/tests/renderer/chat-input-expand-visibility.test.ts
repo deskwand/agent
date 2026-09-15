@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+//
+// 注意：jsdom 没有布局引擎，本文件只能验证「行为」（有内容才渲染、展开态保留、
+// 渲染在左 cluster、ChatInput → 底栏整链路出现/消失）。「显隐不产生位移」这类像素
+// 结论由 design-docs/2026-09-14-expand-button-visibility-probe*.html 的 Chromium 实测覆盖。
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -114,12 +118,9 @@ function expandButton(): HTMLButtonElement | null {
   );
 }
 
-/** 展开按钮的外层槽位：button → span.tt-anchor → div。展开态下按钮换了 aria-label。 */
-function expandSlot(label = "chat.expandInput"): HTMLElement {
-  const button = container.querySelector<HTMLButtonElement>(
-    `button[aria-label="${label}"]`,
-  );
-  return button!.closest("div")!;
+/** 附件菜单的触发按钮（左 cluster 里那个 +）。用的就是它自己的 data 属性。 */
+function attachButton(): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>("[data-attach-trigger]");
 }
 
 describe("hasInputContent", () => {
@@ -236,46 +237,35 @@ describe("ChatInputBottomBar expand button", () => {
     });
   }
 
-  it("keeps the slot reserved but hidden when there is no content", async () => {
+  it("renders no expand button when there is no content", async () => {
     await renderBar({ hasInputContent: false });
 
-    expect(expandButton()).not.toBeNull();
-    expect(expandSlot().className).toContain("invisible");
+    expect(expandButton()).toBeNull();
+    // 附件按钮仍在。jsdom 没有布局引擎，这里证明不了「没有空档」——
+    // 空档的有无由 §4.1 的 Chromium 探针负责（条件渲染本身不会留占位）。
+    expect(attachButton()).not.toBeNull();
   });
 
-  it("reuses the same slot node when the content appears, so nothing moves", async () => {
-    await renderBar({ hasInputContent: false });
-    const slot = expandSlot();
-    expect(slot.className).toContain("invisible");
-
+  it("renders the expand button in the left cluster once there is content", async () => {
     await renderBar({ hasInputContent: true });
 
-    expect(expandSlot()).toBe(slot);
-    expect(slot.className).not.toContain("invisible");
+    const button = expandButton();
+    expect(button).not.toBeNull();
+    // 与附件触发按钮同处一个 div，且不在含发送键的那个 cluster 里。
+    // 不写死 class 字符串：左 cluster 加 shrink-0 / min-w-0 之类仍应通过。
+    const group = button!.closest("div")!;
+    expect(group.contains(attachButton())).toBe(true);
+    expect(
+      group.contains(container.querySelector('button[type="submit"]')),
+    ).toBe(false);
   });
 
-  it("keeps the button visible while expanded without content", async () => {
+  it("keeps the button while expanded without content", async () => {
     await renderBar({ hasInputContent: false, isExpanded: true });
 
     expect(
       container.querySelector('button[aria-label="chat.collapseInput"]'),
     ).not.toBeNull();
-    expect(expandSlot("chat.collapseInput").className).not.toContain(
-      "invisible",
-    );
-  });
-
-  it("remounts the tooltip subtree when hidden, so a stale bubble cannot linger", async () => {
-    await renderBar({ hasInputContent: true });
-    // 展开按钮的 tt-anchor（不要用 container.querySelector(".tt-anchor")，那是附件 + 按钮的）
-    const anchorBefore = expandButton()!.parentElement;
-    expect(anchorBefore!.className).toContain("tt-anchor");
-
-    await renderBar({ hasInputContent: false });
-
-    // 槽位（wrapper）保持同一节点 → 布局不动；Tooltip 子树重挂载 → 它内部的 open 状态被销毁
-    expect(expandSlot().className).toContain("invisible");
-    expect(expandButton()!.parentElement).not.toBe(anchorBefore);
   });
 
   it("renders no expand button when onToggleExpand is absent", async () => {
@@ -302,22 +292,20 @@ describe("有内容才显示展开按钮（ChatInput → 底栏 整链路）", (
     });
   }
 
-  it("reveals the reserved slot in place when the first character is typed", async () => {
+  it("adds the expand button when the first character is typed", async () => {
     await act(async () => {
       root.render(React.createElement(Harness));
     });
-    const slot = expandSlot();
-    expect(slot.className).toContain("invisible");
+    expect(expandButton()).toBeNull();
 
     await act(async () => {
       typeInto(container.querySelector<HTMLTextAreaElement>("textarea")!, "x");
     });
 
-    expect(expandSlot()).toBe(slot);
-    expect(slot.className).not.toContain("invisible");
+    expect(expandButton()).not.toBeNull();
   });
 
-  it("hides the reserved slot in place again when the text is deleted", async () => {
+  it("removes the expand button again when the text is deleted", async () => {
     await act(async () => {
       root.render(React.createElement(Harness));
     });
@@ -326,15 +314,13 @@ describe("有内容才显示展开按钮（ChatInput → 底栏 整链路）", (
     await act(async () => {
       typeInto(textarea, "x");
     });
-    const slot = expandSlot();
-    expect(slot.className).not.toContain("invisible");
+    expect(expandButton()).not.toBeNull();
 
     await act(async () => {
       typeInto(textarea, "");
     });
 
-    expect(expandSlot()).toBe(slot);
-    expect(slot.className).toContain("invisible");
+    expect(expandButton()).toBeNull();
   });
 });
 

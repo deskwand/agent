@@ -84,7 +84,7 @@ export function ChatInputBottomBar({
 
   return (
     <div className="mt-3 flex items-center justify-between gap-2">
-      <div className="flex items-center gap-0.5">
+      <div className="flex shrink-0 items-center gap-0.5">
         <AttachMenu
           cwd={cwd}
           onPickLocalFiles={onAttach}
@@ -93,9 +93,26 @@ export function ChatInputBottomBar({
           direction={attachMenuDirection}
           onDismiss={onAttachMenuDismiss}
         />
+
+        {onToggleExpand && showExpandButton && (
+          <Tooltip label={expandLabel}>
+            <button
+              type="button"
+              onClick={onToggleExpand}
+              aria-label={expandLabel}
+              className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+            >
+              {isExpanded ? (
+                <Minimize2 className="w-4 h-4" />
+              ) : (
+                <Maximize2 className="w-4 h-4" />
+              )}
+            </button>
+          </Tooltip>
+        )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex min-w-0 items-center justify-end gap-2">
         {/* Merged model + thinking chip */}
         <MergedInputChip
           model={model}
@@ -151,41 +168,13 @@ export function ChatInputBottomBar({
           </span>
         </span>
 
-        {onToggleExpand && (
-          <div className={showExpandButton ? undefined : "invisible"}>
-            {/*
-              隐藏时换 key 重挂载：气泡走 createPortal 挂在 body，不在 wrapper 子树内，
-              而 Chromium 不会在命中目标转为 visibility:hidden 时补发 mouseleave
-              （实测此时 button.matches(":hover") 仍为 true），已弹出的气泡会一直挂在空槽位上。
-              重挂载把 Tooltip 内部的 open 状态一并销毁；DOM 形态（span.tt-anchor + button）保持不变。
-            */}
-            <Tooltip
-              key={showExpandButton ? "shown" : "hidden"}
-              label={expandLabel}
-            >
-              <button
-                type="button"
-                onClick={onToggleExpand}
-                aria-label={expandLabel}
-                className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-              >
-                {isExpanded ? (
-                  <Minimize2 className="w-4 h-4" />
-                ) : (
-                  <Maximize2 className="w-4 h-4" />
-                )}
-              </button>
-            </Tooltip>
-          </div>
-        )}
-
         <Tooltip label={submitLabel}>
           <button
             type={canStop ? "button" : "submit"}
             onClick={canStop ? onStop : undefined}
             disabled={!canStop && (isSubmitting || submitDisabled)}
             aria-label={submitLabel}
-            className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-all duration-150 ${
+            className={`w-9 h-9 shrink-0 rounded-2xl flex items-center justify-center transition-all duration-150 ${
               canStop
                 ? "bg-accent text-background hover:bg-accent-hover animate-pulse"
                 : "bg-accent text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent-hover active:scale-95 active:translate-y-px"
@@ -207,9 +196,13 @@ export function ChatInputBottomBar({
  * 展开按钮是否可见。
  *
  * 已展开时即使草稿被清空也保持可见——否则清空后无法用按钮收起。
- * 用 wrapper 挂 `invisible` 而不是条件渲染：底栏是 `justify-between`，右侧 cluster
- * 内容宽度、右边缘锚定，删掉这个槽位会让模型 chip 与上下文环右移 44px
- * （w-9 36 + gap-2 8，已实测；发送键被右边缘锚住不动）。
+ * 按钮放在**左 cluster**（附件菜单右侧）并直接条件渲染：左 cluster 左锚定，
+ * 显隐只改它自己的宽度，附件按钮与右侧 cluster（模型 chip / 上下文环 / 发送键）都不动。
+ * 实测（真实 Tailwind CSS，全场宽 300–920px）：底栏行高恒 36px，显隐高度差为 0，无重叠无溢出。
+ * 为此右 cluster 不换行（`min-w-0` + chip 可截断），左 cluster 与发送键 `shrink-0`。
+ * 残留：底栏宽 < 400px 时显隐会让模型 chip 左边缘最多移动 38px（宽度让给 chip 截断）。
+ * 放在右 cluster 就不能这么做：右 cluster 是右边缘锚定的，删掉中间一个槽位会把它左边
+ * 的 chip 与上下文环右推 44px；而且保留槽位会留下一个很难看的空档。
  */
 export function shouldShowExpandButton(
   isExpanded: boolean,
