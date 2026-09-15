@@ -314,14 +314,48 @@ describe("VaultView", () => {
     expect(document.body.querySelector('[role="tooltip"]')?.textContent).toBe(
       "Upload",
     );
+
+    // ⋯ 去掉描边、与同步同形后，两者只能靠位置和 tooltip 区分 ——
+    // 所以它也必须有自己的 tooltip，否则这一对按钮无法被区分。
+    await act(async () => upload.blur());
+    await act(async () => vaultMenuButton().focus());
+    expect(document.body.querySelector('[role="tooltip"]')?.textContent).toBe(
+      "More Vault actions",
+    );
   });
 
-  function statusSlot(): HTMLElement {
-    const slot = container.querySelector('[aria-live="polite"]');
-    if (!(slot instanceof HTMLElement)) {
-      throw new Error("Sync status slot missing");
+  it("uses the shared compact icon button geometry for sync, menu and upload", async () => {
+    await renderVault();
+
+    for (const button of [syncButton(), uploadButton(), vaultMenuButton()]) {
+      expect(button.className).toContain("h-9 w-9");
+      expect(button.className).toContain("rounded-2xl");
+      expect(button.className).not.toContain("h-10 w-10");
     }
-    return slot;
+
+    // 同步降为 ghost 后，它与 ⋯ 必须完全同形（拍板 1a 的原话）。
+    // 一行 toBe 胜过一堆 toContain：两个按钮可以同时满足全部 toContain 却依然长得不一样。
+    const sync = syncButton();
+    const menu = vaultMenuButton();
+    expect(menu.className).toBe(sync.className);
+    expect(sync.className).not.toContain("bg-accent");
+
+    // 上传保持本页唯一主按钮
+    const upload = uploadButton();
+    expect(upload.className).toContain("bg-accent");
+    expect(upload.className).toContain("text-accent-foreground");
+    expect(upload.className).toContain("disabled:bg-accent/40");
+    // 1bb3c48 的回归护栏：禁用的实心按钮不得把文字刷成 text-primary。
+    // 这条原先挂在同步按钮上，同步降为 ghost 后跟着谁还能用就挂给谁 —— 上传。
+    expect(upload.className).not.toContain("disabled:text-text-primary");
+  });
+
+  function liveRegion(): HTMLElement {
+    const region = container.querySelector('[aria-live="polite"]');
+    if (!(region instanceof HTMLElement)) {
+      throw new Error("Sync live region missing");
+    }
+    return region;
   }
 
   function screenText(): string {
@@ -1307,8 +1341,9 @@ describe("VaultView", () => {
     expect(sync.disabled).toBe(true);
     expect(sync.getAttribute("aria-label")).toBe("Sync");
     expect(screenText()).not.toContain("Syncing…");
-    expect(sync.className).toContain("text-accent-foreground");
-    expect(sync.className).not.toContain("disabled:text-text-primary");
+    expect(sync.className).toContain("hover:bg-surface-hover");
+    expect(sync.className).not.toContain("bg-accent");
+    expect(sync.className).toContain("disabled:opacity-50");
 
     await act(async () => {
       vi.advanceTimersByTime(249);
@@ -1364,14 +1399,15 @@ describe("VaultView", () => {
     expect(screenText()).toContain("Sync complete");
   });
 
-  it("keeps the sync status slot mounted across idle, syncing and success", async () => {
+  it("keeps the live region mounted across idle, syncing and success", async () => {
     vi.useFakeTimers();
     const pending = deferred<VaultSnapshot>();
     api.sync.mockReturnValueOnce(pending.promise);
 
     await renderVault();
-    expect(statusSlot().className).toContain("w-[7rem]");
-    expect(statusSlot().textContent).toBe("");
+    // 状态槽已降级为屏幕阅读器专用：常驻 DOM 但不再占用任何宽度
+    expect(liveRegion().className).toContain("sr-only");
+    expect(liveRegion().textContent).toBe("");
 
     await act(async () => {
       syncButton().click();
@@ -1381,14 +1417,152 @@ describe("VaultView", () => {
     });
     expect(screenText()).toContain("Syncing…");
     // 进行中状态只写给屏幕阅读器（sr-only），视觉上槽位仍为空
-    expect(statusSlot().textContent).toBe("Syncing…");
+    expect(liveRegion().textContent).toBe("Syncing…");
 
     await act(async () => {
       pending.resolve(snapshot({ items: [] }));
       for (let index = 0; index < 5; index += 1) await Promise.resolve();
     });
-    expect(statusSlot().textContent).toBe("Sync complete");
+    expect(liveRegion().textContent).toBe("Sync complete");
     expect(container.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it("renders the sync state in the button icon instead of the status slot", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<VaultSnapshot>();
+    api.sync.mockReturnValueOnce(pending.promise);
+
+    await renderVault();
+    const sync = syncButton();
+
+    // idle：灰色刷新图标，不转
+    const idleIcon = sync.querySelector("svg.lucide-refresh-cw");
+    expect(idleIcon).not.toBeNull();
+    expect(idleIcon?.getAttribute("class")).not.toContain("animate-spin");
+
+    // syncing：同一个图标开始转
+    await act(async () => {
+      sync.click();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+    const spinning = sync.querySelector("svg.lucide-refresh-cw");
+    expect(spinning).not.toBeNull();
+    expect(spinning?.getAttribute("class")).toContain("animate-spin");
+
+    // success：换成绿色对勾，刷新图标消失
+    await act(async () => {
+      pending.resolve(snapshot({ items: [] }));
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    });
+    const check = sync.querySelector("svg.lucide-check");
+    expect(check).not.toBeNull();
+    expect(check?.getAttribute("class")).toContain("text-success");
+    expect(sync.querySelector("svg.lucide-refresh-cw")).toBeNull();
+
+    // 3s 后收回，回到 idle
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(sync.querySelector("svg.lucide-refresh-cw")).not.toBeNull();
+    expect(sync.querySelector("svg.lucide-check")).toBeNull();
+  });
+
+  it("renders the error state in the button icon", async () => {
+    api.sync.mockRejectedValueOnce(new Error("NETWORK_DOWN"));
+
+    await renderVault();
+    const sync = syncButton();
+    await act(async () => {
+      sync.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // 注意：AlertTriangle 在 lucide-react v1.8 里是 triangle-alert 的别名，
+    // 渲染出的类名是 lucide-triangle-alert，不是 lucide-alert-triangle。
+    const alert = sync.querySelector("svg.lucide-triangle-alert");
+    expect(alert).not.toBeNull();
+    expect(alert?.getAttribute("class")).toContain("text-error");
+    // 失败横幅仍在，且图标状态与横幅由同一个 syncFeedback 驱动
+    expect(container.querySelector('[role="status"]')?.textContent).toContain(
+      "Cloud sync failed",
+    );
+  });
+
+  it("keeps the sync button geometry identical across idle, syncing and success", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<VaultSnapshot>();
+    api.sync.mockReturnValueOnce(pending.promise);
+
+    await renderVault();
+    const sync = syncButton();
+    const idleClassName = sync.className;
+
+    // 真正的不位移不变式：外层按钮 class 恒定，且内部图标尺寸恒定（h-4 w-4）。
+    // 只断言 className 会漏掉「某个状态的图标换成另一个尺寸」这种回归。
+    const iconClass = (): string =>
+      sync.querySelector("svg")?.getAttribute("class") ?? "";
+    expect(iconClass()).toContain("h-4 w-4");
+
+    await act(async () => {
+      sync.click();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(sync.className).toBe(idleClassName);
+    expect(iconClass()).toContain("h-4 w-4");
+
+    await act(async () => {
+      pending.resolve(snapshot({ items: [] }));
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    });
+    expect(sync.className).toBe(idleClassName);
+    expect(iconClass()).toContain("h-4 w-4");
+
+    // 状态槽已降级为屏幕阅读器专用，不再占用任何宽度
+    expect(liveRegion().className).toContain("sr-only");
+    expect(liveRegion().className).not.toContain("w-");
+  });
+
+  it("keeps the accessible name on the action while the tooltip carries the result", async () => {
+    api.sync.mockResolvedValueOnce(snapshot({ items: [] }));
+
+    await renderVault();
+    const sync = syncButton();
+
+    // 先 blur 再 focus：点击时按钮本来就处于聚焦态，直接 focus() 是 no-op，
+    // 不会再触发 focus 事件 —— 同步期间按钮变 disabled 可能已经把气泡关掉了。
+    // 另外把「气泡必须存在」单独断言，否则失败信息会是
+    // `expected undefined to be "Sync complete"`，指向不了真正的原因。
+    async function openTooltip(): Promise<string> {
+      await act(async () => {
+        sync.blur();
+      });
+      await act(async () => {
+        sync.focus();
+      });
+      const bubble = document.body.querySelector('[role="tooltip"]');
+      expect(bubble).not.toBeNull();
+      return bubble?.textContent ?? "";
+    }
+
+    // idle：tooltip 是动作文案
+    expect(sync.getAttribute("aria-label")).toBe("Sync");
+    expect(await openTooltip()).toBe("Sync");
+
+    await act(async () => {
+      sync.click();
+      for (let index = 0; index < 5; index += 1) await Promise.resolve();
+    });
+
+    // 结果不污染可访问名：按钮依然叫「Sync」，可访问性上它还是个动作
+    expect(sync.getAttribute("aria-label")).toBe("Sync");
+
+    // 结果出现在 tooltip 里
+    expect(await openTooltip()).toBe("Sync complete");
   });
 
   it("keeps the sync status slot empty when the sync fails", async () => {
@@ -1401,7 +1575,7 @@ describe("VaultView", () => {
     });
     await flush();
 
-    expect(statusSlot().textContent).toBe("");
+    expect(liveRegion().textContent).toBe("");
     const banner = container.querySelector('[role="status"]');
     expect(banner?.textContent).toContain("Cloud sync failed");
   });

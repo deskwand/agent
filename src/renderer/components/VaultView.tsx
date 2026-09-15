@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertTriangle,
   ArrowLeft,
+  Check,
   Download,
   MoreHorizontal,
   RefreshCw,
@@ -544,6 +546,11 @@ export function VaultView(): JSX.Element {
   const showFiles = mode === "normal" || mode === "local-files";
   const syncActionLabel =
     syncFeedback === "syncing" ? t("vault.syncing") : t("vault.sync");
+  // 状态槽删除后，「已是最新 / 同步完成」唯一的可见出口
+  const syncTooltipLabel =
+    syncFeedback === "success" && syncFeedbackMessage
+      ? syncFeedbackMessage
+      : syncActionLabel;
 
   return (
     <section
@@ -578,31 +585,32 @@ export function VaultView(): JSX.Element {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            aria-live="polite"
-            className="w-[7rem] truncate text-right text-xs text-success"
-          >
-            {syncFeedback === "syncing" ? (
-              <span className="sr-only">{t("vault.syncing")}</span>
-            ) : syncFeedback === "success" ? (
-              (syncFeedbackMessage ?? "")
-            ) : (
-              ""
-            )}
+          <span aria-live="polite" className="sr-only">
+            {syncFeedback === "syncing"
+              ? t("vault.syncing")
+              : syncFeedback === "success"
+                ? (syncFeedbackMessage ?? "")
+                : ""}
           </span>
-          <Tooltip label={syncActionLabel}>
+          <Tooltip label={syncTooltipLabel}>
             <button
               type="button"
               aria-label={syncActionLabel}
-              className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => void handleSync()}
               disabled={syncDisabled}
             >
-              <RefreshCw
-                className={`h-4 w-4 ${
-                  syncFeedback === "syncing" ? "animate-spin" : ""
-                }`}
-              />
+              {syncFeedback === "success" ? (
+                <Check className="h-4 w-4 text-success" />
+              ) : syncFeedback === "error" ? (
+                <AlertTriangle className="h-4 w-4 text-error" />
+              ) : (
+                <RefreshCw
+                  className={`h-4 w-4 ${
+                    syncFeedback === "syncing" ? "animate-spin" : ""
+                  }`}
+                />
+              )}
             </button>
           </Tooltip>
           {advancedResetAvailable && (
@@ -619,31 +627,33 @@ export function VaultView(): JSX.Element {
                 }
               }}
             >
-              <button
-                ref={advancedMenuTriggerRef}
-                type="button"
-                aria-label={t("vault.menu.more")}
-                aria-haspopup="menu"
-                aria-expanded={advancedMenuOpen}
-                aria-controls="vault-advanced-menu"
-                disabled={busy}
-                className="flex h-10 w-10 items-center justify-center rounded-lg border border-border-subtle text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                onClick={() => setAdvancedMenuOpen((open) => !open)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    setAdvancedMenuOpen(false);
-                    event.currentTarget.focus();
-                  }
-                }}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
+              <Tooltip label={t("vault.menu.more")}>
+                <button
+                  ref={advancedMenuTriggerRef}
+                  type="button"
+                  aria-label={t("vault.menu.more")}
+                  aria-haspopup="menu"
+                  aria-expanded={advancedMenuOpen}
+                  aria-controls="vault-advanced-menu"
+                  disabled={busy}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => setAdvancedMenuOpen((open) => !open)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      setAdvancedMenuOpen(false);
+                      event.currentTarget.focus();
+                    }
+                  }}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </Tooltip>
               {advancedMenuOpen && (
                 <div
                   id="vault-advanced-menu"
                   role="menu"
                   aria-label={t("vault.menu.advanced")}
-                  className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-11 z-20 min-w-64 animate-menu-in-down`}
+                  className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-10 z-20 min-w-64 animate-menu-in-down`}
                   onKeyDown={(event) => {
                     if (event.key === "Escape") {
                       setAdvancedMenuOpen(false);
@@ -746,7 +756,7 @@ export function VaultView(): JSX.Element {
                 <button
                   type="button"
                   aria-label={t("vault.upload")}
-                  className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
                   onClick={handleUpload}
                   disabled={uploadDisabled}
                 >
