@@ -1725,11 +1725,6 @@
     "back": "Back",
     "thinkingWithValue": "Thinking: {{value}}"
   },
-  "modes": {
-    "standard": "Standard",
-    "coding": "Coding",
-    "expert": "Expert"
-  },
   "providers": {
     "deskwandCloud": "DeskWand Cloud"
   },

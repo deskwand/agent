@@ -19,13 +19,21 @@ const settingsApi = fs.readFileSync(
 );
 
 describe("cloud provider lifecycle wiring", () => {
-  it("injects the provider after login with modes", () => {
+  it("injects the provider after login using pricing, not modes", () => {
     expect(loginModal).toContain("buildDeskwandProviderPayload(");
-    expect(loginModal).toContain("config.modes");
+    expect(loginModal).toContain("getPricing()");
+    expect(loginModal).not.toContain("getModes");
     expect(loginModal).toContain("result.token");
     expect(loginModal).toContain(
       "window.electronAPI.config.saveProvider(payload)",
     );
+  });
+
+  it("rebuilds the provider on startup restore so existing users get real model names", () => {
+    expect(sidebar).toContain("buildDeskwandProviderPayload(");
+    expect(sidebar).toContain("config.saveProvider(payload)");
+    expect(sidebar).toContain("getPricing()");
+    expect(sidebar).not.toContain("getModes");
   });
 
   it("removes the provider on logout and on startup 401 restore", () => {

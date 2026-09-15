@@ -12,21 +12,21 @@ function group(
 describe("resolveModelLabel", () => {
   const options: ModelOptionGroup[] = [
     group("custom:deskwand", [
-      { id: "deepseek-v4-flash", name: "标准" },
-      { id: "deepseek-v4-pro", name: "编程" },
+      { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
+      { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
     ]),
     group("custom:openai", [
       { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
     ]),
   ];
 
-  it("returns the mode label for deskwand cloud models", () => {
+  it("returns the real model id for deskwand cloud models", () => {
     expect(
       resolveModelLabel(options, "custom:deskwand", "deepseek-v4-flash"),
-    ).toBe("标准");
+    ).toBe("deepseek-v4-flash");
     expect(
       resolveModelLabel(options, "custom:deskwand", "deepseek-v4-pro"),
-    ).toBe("编程");
+    ).toBe("deepseek-v4-pro");
   });
 
   it("does not leak labels across providers with the same model id", () => {

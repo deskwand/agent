@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { AccountMenu } from "./AccountMenu";
 import { LoginModal } from "./LoginModal";
+import { buildDeskwandProviderPayload } from "../utils/cloud-provider";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { UpdateConfirmDialog } from "./UpdateConfirmDialog";
 import {
@@ -177,18 +178,6 @@ export function Sidebar({ width = 280 }: { width?: number }) {
       (async () => {
         try {
           const me = await new CloudApiClient(c.token).getMe();
-          let modes: Array<{
-            id: string;
-            name: string;
-            model: string;
-            thinkingLevel: string;
-          }> = [];
-          try {
-            const res = await new CloudApiClient(c.token).getModes();
-            modes = res;
-          } catch {
-            /* modes optional, keep empty */
-          }
           setCloudConfig({
             serverUrl: DESKWAND_API_URL,
             token: c.token,
@@ -196,8 +185,27 @@ export function Sidebar({ width = 280 }: { width?: number }) {
             email: me.email,
             level: me.level,
             balanceMicroUsd: me.balance_micro_usd,
-            modes,
           });
+          // 已登录用户升级后仍持有带模式名的旧 payload：启动时按当前定价重建。
+          // 列表为空（如接口异常）时保留已保存的 payload，不能把云模型清空。
+          try {
+            const pricing = await new CloudApiClient(c.token).getPricing();
+            // 用户在全局路径选过的默认模型不能被启动重建静默改回第一个
+            const previousDefault =
+              useAppStore.getState().appConfig?.providers?.["custom:deskwand"]
+                ?.defaultModel;
+            const payload = buildDeskwandProviderPayload(
+              pricing.models,
+              c.token,
+              t,
+              previousDefault,
+            );
+            if (payload.config.models.length > 0) {
+              await window.electronAPI.config.saveProvider(payload);
+            }
+          } catch {
+            /* 保留已保存的 provider 配置 */
+          }
         } catch (e: any) {
           if (e?.status === 401) {
             localStorage.removeItem("deskwand.cloud");

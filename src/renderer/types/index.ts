@@ -1023,12 +1023,6 @@ export interface CloudConfig {
   email: string;
   level: string;
   balanceMicroUsd: number;
-  modes: Array<{
-    id: string;
-    name: string;
-    model: string;
-    thinkingLevel: string;
-  }>;
 }
 
 export interface CloudSkill {

@@ -520,7 +520,6 @@ export function ChatView() {
         : "--",
     cacheHitRate,
   });
-  const cloudConfig = useAppStore((s) => s.cloudConfig);
   const thinkingLevel = (activeSession?.thinkingLevel ||
     "medium") as ThinkingLevel;
   const thinkingLevelOptions: ThinkingLevel[] = [
@@ -1912,26 +1911,6 @@ export function ChatView() {
                     profileKey,
                     modelId,
                   );
-                  // 云模式：思考程度由模式锁定，同步 session thinking
-                  let effectiveThinkingLevel: ThinkingLevel | undefined;
-                  if (profileKey === "custom:deskwand") {
-                    const mode = cloudConfig?.modes?.find(
-                      (m) => m.model === modelId,
-                    );
-                    if (
-                      mode?.thinkingLevel &&
-                      thinkingLevelOptions.includes(
-                        mode.thinkingLevel as ThinkingLevel,
-                      )
-                    ) {
-                      effectiveThinkingLevel =
-                        mode.thinkingLevel as ThinkingLevel;
-                      setSessionThinkingLevel(
-                        activeSession.id,
-                        effectiveThinkingLevel,
-                      );
-                    }
-                  }
                   // ponytail: project → localStorage only, global → electron-store
                   if (activeSessionCwd) {
                     try {
@@ -1940,7 +1919,7 @@ export function ChatView() {
                         JSON.stringify({
                           p: profileKey,
                           m: modelId,
-                          t: effectiveThinkingLevel ?? thinkingLevel,
+                          t: thinkingLevel,
                         }),
                       );
                     } catch {

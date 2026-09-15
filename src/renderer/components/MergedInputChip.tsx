@@ -49,7 +49,6 @@ export function MergedInputChip({
   const { t } = useTranslation();
   const cloudConfig = useAppStore((s) => s.cloudConfig);
   const isLoggedIn = cloudConfig?.isLoggedIn ?? false;
-  const isCloudMode = activeProviderProfileKey === "custom:deskwand";
   const currentModelLabel = resolveModelLabel(
     modelOptions,
     activeProviderProfileKey,
@@ -253,9 +252,7 @@ export function MergedInputChip({
         <span className="max-w-[11rem] truncate">
           {currentModelLabel || t("chat.noModel")}
         </span>
-        {!isCloudMode && (
-          <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
-        )}
+        <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
         <ChevronDown
           className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${
             menuOpen ? "rotate-180" : ""

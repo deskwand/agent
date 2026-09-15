@@ -1724,11 +1724,6 @@
     "back": "返回",
     "thinkingWithValue": "思考：{{value}}"
   },
-  "modes": {
-    "standard": "标准",
-    "coding": "编程",
-    "expert": "专家"
-  },
   "providers": {
     "deskwandCloud": "DeskWand 云"
   },

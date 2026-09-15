@@ -53,25 +53,15 @@ async function completeLogin(
     email: result.user.email,
     level: result.user.level,
     balanceMicroUsd: result.user.balance_micro_usd,
-    modes: [],
   };
   try {
-    config.modes = await cloudApi.getModes();
-    console.log(
-      "[cloud] modes fetched:",
-      config.modes.length,
-      config.modes.map((m) => m.id),
+    const pricing = await cloudApi.getPricing();
+    const payload = buildDeskwandProviderPayload(
+      pricing.models,
+      result.token,
+      t,
     );
-  } catch (e) {
-    console.error("[cloud] getModes failed:", e);
-  }
-  if (config.modes.length > 0) {
-    try {
-      const payload = buildDeskwandProviderPayload(
-        config.modes,
-        result.token,
-        t,
-      );
+    if (payload.config.models.length > 0) {
       const saved = await window.electronAPI.config.saveProvider(payload);
       console.log(
         "[cloud] provider injected:",
@@ -79,13 +69,13 @@ async function completeLogin(
         "success:",
         saved?.success,
         "models:",
-        config.modes.length,
+        payload.config.models.length,
       );
-    } catch (e) {
-      console.error("[cloud] saveProvider failed:", e);
+    } else {
+      console.warn("[cloud] pricing returned no models — skipping provider injection");
     }
-  } else {
-    console.warn("[cloud] modes empty — skipping provider injection");
+  } catch (e) {
+    console.error("[cloud] provider injection failed:", e);
   }
   onSuccess(config);
 }

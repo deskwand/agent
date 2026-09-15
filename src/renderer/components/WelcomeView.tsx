@@ -43,7 +43,6 @@ export function WelcomeView() {
   const [hasInputContent, setHasInputContent] = useState(false);
   const { startSession } = useIPC();
   const isConfigured = useAppStore((state) => state.isConfigured);
-  const cloudConfig = useAppStore((s) => s.cloudConfig);
   const workingDir = useAppStore((state) => state.workingDir);
   const setShowSettings = useAppStore((state) => state.setShowSettings);
   const setSettingsTab = useAppStore((state) => state.setSettingsTab);
@@ -302,23 +301,6 @@ export function WelcomeView() {
                 if (!group?.items.some((i) => i.id === modelId)) return;
                 setSelectedModel(modelId);
                 setSelectedProviderProfileKey(profileKey);
-                // 云模式：思考程度由模式锁定，同步欢迎页思考状态
-                let effectiveThinkingLevel: ThinkingLevel | undefined;
-                if (profileKey === "custom:deskwand") {
-                  const mode = cloudConfig?.modes?.find(
-                    (m) => m.model === modelId,
-                  );
-                  if (
-                    mode?.thinkingLevel &&
-                    thinkingLevelOptions.includes(
-                      mode.thinkingLevel as ThinkingLevel,
-                    )
-                  ) {
-                    effectiveThinkingLevel =
-                      mode.thinkingLevel as ThinkingLevel;
-                    setSelectedThinkingLevel(effectiveThinkingLevel);
-                  }
-                }
                 // ponytail: project → localStorage only, global → electron-store
                 if (workingDir) {
                   try {
@@ -327,7 +309,7 @@ export function WelcomeView() {
                       JSON.stringify({
                         p: profileKey,
                         m: modelId,
-                        t: effectiveThinkingLevel ?? selectedThinkingLevel,
+                        t: selectedThinkingLevel,
                       }),
                     );
                   } catch {

@@ -16,8 +16,8 @@ const modelOptions: ModelOptionGroup[] = [
     profileKey: "custom:deskwand" as never,
     groupLabel: "DeskWand 云",
     items: [
-      { id: "deepseek-v4-flash", name: "标准" },
-      { id: "deepseek-v4-pro", name: "编程" },
+      { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
+      { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
     ],
   },
   {
@@ -174,17 +174,17 @@ describe("MergedInputChip (single-panel)", () => {
       email: "a@b.com",
       level: "default",
       balanceMicroUsd: 100,
-      modes: [],
     });
     render({
       model: "deepseek-v4-flash",
       activeProviderProfileKey: "custom:deskwand",
     });
-    expect(trigger().textContent).not.toContain("chat.thinkingLevel");
+    // 思考档不再由模式锁定，折叠态也要显示用户当前档位
+    expect(trigger().textContent).toContain("chat.thinkingLevel");
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).toContain("标准");
-    expect(text).toContain("编程");
+    expect(text).toContain("deepseek-v4-flash");
+    expect(text).toContain("deepseek-v4-pro");
     expect(text).toContain("modelMenu.custom");
     expect(text).not.toContain("Provider A");
   });
@@ -197,7 +197,6 @@ describe("MergedInputChip (single-panel)", () => {
       email: "a@b.com",
       level: "default",
       balanceMicroUsd: 100,
-      modes: [],
     });
     render({
       model: "deepseek-v4-flash",
@@ -222,7 +221,6 @@ describe("MergedInputChip (single-panel)", () => {
       email: "a@b.com",
       level: "default",
       balanceMicroUsd: 100,
-      modes: [],
     });
     render({
       model: "deepseek-v4-flash",
@@ -265,13 +263,12 @@ describe("MergedInputChip (single-panel)", () => {
       email: "a@b.com",
       level: "default",
       balanceMicroUsd: 100,
-      modes: [],
     });
     render(); // activeProviderProfileKey = "profile-a"（BYOK）
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).toContain("标准");
-    expect(text).toContain("编程");
+    expect(text).toContain("deepseek-v4-flash");
+    expect(text).toContain("deepseek-v4-pro");
     expect(text).toContain("modelMenu.custom");
     expect(text).not.toContain("Provider A"); // BYOK 分组在「自定义」视图
   });
@@ -280,7 +277,7 @@ describe("MergedInputChip (single-panel)", () => {
     render(); // cloudConfig 默认 null
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).not.toContain("标准");
+    expect(text).not.toContain("deepseek-v4-flash");
     expect(text).toContain("Provider A");
   });
 

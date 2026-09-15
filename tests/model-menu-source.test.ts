@@ -34,22 +34,23 @@ describe("Model menu single-panel layout", () => {
   });
 });
 
-describe("Mode selection syncs session thinking", () => {
-  it("ChatView syncs thinking from mode config", () => {
+describe("Thinking level is user-controlled, not mode-locked", () => {
+  it("ChatView keeps the user's thinking level when switching models", () => {
     const source = fs.readFileSync(
       path.resolve(process.cwd(), "src/renderer/components/ChatView.tsx"),
       "utf8",
     );
     expect(source).toContain("thinkingLevel");
-    expect(source).toContain('"custom:deskwand"');
+    // 选模型不再按预设模式改写思考档：cloudConfig 在该组件已不再使用
+    expect(source).not.toContain("cloudConfig");
   });
 
-  it("WelcomeView syncs thinking from mode config", () => {
+  it("WelcomeView keeps the user's thinking level when switching models", () => {
     const source = fs.readFileSync(
       path.resolve(process.cwd(), "src/renderer/components/WelcomeView.tsx"),
       "utf8",
     );
     expect(source).toContain("thinkingLevel");
-    expect(source).toContain('"custom:deskwand"');
+    expect(source).not.toContain("cloudConfig");
   });
 });

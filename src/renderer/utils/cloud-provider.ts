@@ -1,24 +1,20 @@
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import type { ApiProviderModel, SaveProviderPayload } from "../types";
 
-export interface CloudMode {
-  id: string;
-  name: string;
-  model: string;
-}
-
 /**
  * 构造 custom:deskwand provider 的保存 payload。
- * custom 分支在 config-store 中天然保留 baseUrl/models/defaultModel/apiKey，
- * deleteProvider 对 custom key 彻底删除——配置存储层无需改动。
+ * 模型名直接用服务端下发的真实模型 id（保留原始模型名称，不再有模式名）。
+ * pricing 按 model_id 升序返回，因此首个模型即兜底默认模型。
+ *
+ * preferredDefaultModel 用于启动时重建 payload：用户之前选的默认模型如果仍在列表里
+ * 就沿用，否则回落到首个模型；不传则直接用首个模型。
  */
 export function buildDeskwandProviderPayload(
-  modes: CloudMode[],
+  models: Array<{ model_id: string }>,
   token: string,
   t?: (key: string, opts?: { defaultValue: string }) => string,
+  preferredDefaultModel?: string,
 ): SaveProviderPayload {
-  const labelOf = (m: CloudMode) =>
-    t ? t(`modes.${m.id}`, { defaultValue: m.name }) : m.name;
   return {
     profileKey: "custom:deskwand",
     config: {
@@ -30,14 +26,17 @@ export function buildDeskwandProviderPayload(
       baseUrl: `${DESKWAND_API_URL}/api/models`,
       apiKey: token,
       defaultModel:
-        modes.find((m) => m.id === "standard")?.model ?? modes[0]?.model ?? "",
+        preferredDefaultModel &&
+        models.some((m) => m.model_id === preferredDefaultModel)
+          ? preferredDefaultModel
+          : (models[0]?.model_id ?? ""),
       // config-store 的 normalizeProviderModel 会把缺失的 source 默认成 "preset"，
       // 这里保持 payload 只含 id/label（与纯函数测试契约一致）。
-      models: modes.map(
+      models: models.map(
         (m) =>
           ({
-            id: m.model,
-            label: labelOf(m),
+            id: m.model_id,
+            label: m.model_id,
           }) as ApiProviderModel,
       ),
       updatedAt: new Date().toISOString(),
