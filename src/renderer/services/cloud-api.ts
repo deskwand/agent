@@ -121,7 +121,7 @@ export class CloudApiClient {
     return this.request("/api/auth/me");
   }
 
-  /** 官方价 / 实收价 / 峰谷窗口由服务端下发，客户端只渲染，不做任何费率运算 */
+  /** 官方价 / 实收价 / 峰谷窗口由服务端下发；客户端只用 models[].model_id 发现模型，不做任何费率运算 */
   async getPricing(): Promise<PricingResponse> {
     return this.request<PricingResponse>("/api/models/pricing");
   }

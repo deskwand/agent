@@ -1,23 +1,4 @@
 {
-  "pricing": {
-    "title": "Pricing",
-    "subtitle": "Billed at the model's official rates plus a {{fee}} platform fee",
-    "legend": "Official → charged (incl. {{fee}} platform fee)",
-    "weekdays": "Monday to Friday",
-    "peakNow": "Peak hours right now",
-    "offPeakNow": "Off-peak right now",
-    "everyDay": "every day",
-    "peakWindows": "Peak hours: {{windows}} ({{tz}}, {{days}})",
-    "offPeak": "Off-peak (50% of peak)",
-    "peak": "Peak",
-    "cacheHit": "Input (cache hit)",
-    "cacheMiss": "Input (cache miss)",
-    "output": "Output",
-    "unit": "USD per 1M tokens",
-    "loginRequired": "Log in to see pricing",
-    "loading": "Loading…",
-    "loadFailed": "Failed to load"
-  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -93,8 +74,6 @@
     "generalDesc": "Appearance, language & preferences",
     "archivedSessions": "Archived",
     "archivedSessionsDesc": "Browse, restore or permanently delete archived sessions",
-    "pricing": "Pricing",
-    "pricingDesc": "Official rates and platform fee",
     "about": "About",
     "aboutDesc": "Version & updates",
     "tools": "Tools",

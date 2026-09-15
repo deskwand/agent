@@ -1,23 +1,4 @@
 {
-  "pricing": {
-    "title": "价格",
-    "subtitle": "按模型官方价格计费，另收 {{fee}} 平台费",
-    "legend": "官方价 → 实收价（含 {{fee}} 平台费）",
-    "weekdays": "周一至周五",
-    "peakNow": "当前为高峰时段",
-    "offPeakNow": "当前为闲时时段",
-    "everyDay": "每天",
-    "peakWindows": "高峰时段：{{windows}}（{{tz}}，{{days}}）",
-    "offPeak": "闲时（高峰 5 折）",
-    "peak": "高峰",
-    "cacheHit": "输入（缓存命中）",
-    "cacheMiss": "输入（缓存未命中）",
-    "output": "输出",
-    "unit": "单位：美元 / 100 万 tokens",
-    "loginRequired": "登录后查看价格",
-    "loading": "加载中…",
-    "loadFailed": "加载失败"
-  },
   "common": {
     "save": "保存",
     "cancel": "取消",
@@ -93,8 +74,6 @@
     "generalDesc": "外观、语言等通用偏好",
     "archivedSessions": "已归档",
     "archivedSessionsDesc": "浏览、恢复或彻底删除已归档会话",
-    "pricing": "价格",
-    "pricingDesc": "官方价与平台费",
     "about": "关于",
     "aboutDesc": "版本与更新",
     "tools": "工具",
