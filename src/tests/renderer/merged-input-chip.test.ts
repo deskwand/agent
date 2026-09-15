@@ -55,6 +55,17 @@ const baseProps = {
   onSelectThinkingLevel: vi.fn(),
 };
 
+function loginCloud() {
+  useAppStore.getState().setCloudConfig({
+    serverUrl: "",
+    token: "",
+    isLoggedIn: true,
+    email: "a@b.com",
+    level: "default",
+    balanceMicroUsd: 100,
+  });
+}
+
 describe("MergedInputChip (single-panel)", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -156,7 +167,7 @@ describe("MergedInputChip (single-panel)", () => {
     expect(panel().style.maxHeight).toBe("512px");
   });
 
-  it("shows non-cloud groups plus thinking row in non-cloud mode", () => {
+  it("shows every group plus thinking row when logged out", () => {
     render();
     click(trigger());
     const text = panel().textContent ?? "";
@@ -166,71 +177,60 @@ describe("MergedInputChip (single-panel)", () => {
     expect(text).toContain("modelMenu.thinkingWithValue");
   });
 
-  it("shows cloud modes and custom entry when in cloud mode", () => {
-    useAppStore.getState().setCloudConfig({
-      serverUrl: "",
-      token: "",
-      isLoggedIn: true,
-      email: "a@b.com",
-      level: "default",
-      balanceMicroUsd: 100,
-    });
+  it("shows the cloud group and user providers in the same panel", () => {
+    loginCloud();
     render({
       model: "deepseek-flash",
       activeProviderProfileKey: "custom:deskwand",
+      thinkingLevel: "xhigh",
     });
-    // 思考档不再由模式锁定，折叠态也要显示用户当前档位
-    expect(trigger().textContent).toContain("chat.thinkingLevel");
+    // 思考档不再由模式锁定，折叠态要显示用户当前档位（非默认档）
+    expect(trigger().textContent).toContain("chat.thinkingLevel.xhigh");
     click(trigger());
     const text = panel().textContent ?? "";
+    expect(text).toContain("DeskWand 云");
     expect(text).toContain("deepseek-flash");
     expect(text).toContain("deepseek-v4-pro");
-    expect(text).toContain("modelMenu.custom");
-    expect(text).not.toContain("Provider A");
-  });
-
-  it("switches to custom view on custom entry click", () => {
-    useAppStore.getState().setCloudConfig({
-      serverUrl: "",
-      token: "",
-      isLoggedIn: true,
-      email: "a@b.com",
-      level: "default",
-      balanceMicroUsd: 100,
-    });
-    render({
-      model: "deepseek-flash",
-      activeProviderProfileKey: "custom:deskwand",
-    });
-    click(trigger());
-    const customButton = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent?.includes("modelMenu.custom"),
-    );
-    click(customButton);
-    const text = panel().textContent ?? "";
     expect(text).toContain("Provider A");
-    expect(text).toContain("modelMenu.back");
-    expect(text).toContain("modelMenu.thinkingWithValue");
+    // 思考行就是列表层的最后一行：没有任何中间层入口排在它后面
+    expect(text.endsWith("modelMenu.thinkingWithValue")).toBe(true);
   });
 
-  it("selects a thinking level and returns to the entry view", () => {
-    useAppStore.getState().setCloudConfig({
-      serverUrl: "",
-      token: "",
-      isLoggedIn: true,
-      email: "a@b.com",
-      level: "default",
-      balanceMicroUsd: 100,
-    });
+  it("shows the cloud group for BYOK providers too", () => {
+    loginCloud();
+    render(); // activeProviderProfileKey = "profile-a"（BYOK）
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(text).toContain("DeskWand 云");
+    expect(text).toContain("deepseek-flash");
+    expect(text).toContain("deepseek-v4-pro");
+    expect(text).toContain("Provider A");
+  });
+
+  it("puts the cloud group first regardless of config order", () => {
+    loginCloud();
+    const cloudLast: ModelOptionGroup[] = [
+      ...modelOptions.filter((g) => g.profileKey !== "custom:deskwand"),
+      modelOptions.find((g) => g.profileKey === "custom:deskwand")!,
+    ];
+    render({ modelOptions: cloudLast });
+    click(trigger());
+    const text = panel().textContent ?? "";
+    // 分组标题按 DOM 顺序出现在 textContent 里，用下标比较断言顺序
+    expect(text.indexOf("DeskWand 云")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("DeskWand 云")).toBeLessThan(
+      text.indexOf("Provider A"),
+    );
+  });
+
+  it("selects a thinking level and returns to the list view", () => {
+    loginCloud();
     render({
       model: "deepseek-flash",
       activeProviderProfileKey: "custom:deskwand",
     });
     click(trigger());
-    const customButton = Array.from(container.querySelectorAll("button")).find(
-      (b) => b.textContent?.includes("modelMenu.custom"),
-    );
-    click(customButton);
+    // 列表层直接可见思考行，不需要先钻进「自定义」视图
     const thinkingRow = Array.from(container.querySelectorAll("button")).find(
       (b) => b.textContent?.includes("modelMenu.thinkingWithValue"),
     );
@@ -241,7 +241,7 @@ describe("MergedInputChip (single-panel)", () => {
     );
     click(highButton);
     expect(baseProps.onSelectThinkingLevel).toHaveBeenCalledWith("high");
-    // 自动回进入前视图（custom）
+    // 自动回列表层，仍看得到分组
     expect(panel().textContent).toContain("Provider A");
   });
 
@@ -255,30 +255,25 @@ describe("MergedInputChip (single-panel)", () => {
     expect(trigger().getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("shows cloud modes and custom entry regardless of current provider", () => {
-    useAppStore.getState().setCloudConfig({
-      serverUrl: "",
-      token: "",
-      isLoggedIn: true,
-      email: "a@b.com",
-      level: "default",
-      balanceMicroUsd: 100,
-    });
-    render(); // activeProviderProfileKey = "profile-a"（BYOK）
-    click(trigger());
-    const text = panel().textContent ?? "";
-    expect(text).toContain("deepseek-flash");
-    expect(text).toContain("deepseek-v4-pro");
-    expect(text).toContain("modelMenu.custom");
-    expect(text).not.toContain("Provider A"); // BYOK 分组在「自定义」视图
-  });
-
-  it("hides cloud modes when not logged in", () => {
+  it("hides the cloud group when not logged in", () => {
     render(); // cloudConfig 默认 null
     click(trigger());
     const text = panel().textContent ?? "";
     expect(text).not.toContain("deepseek-flash");
     expect(text).toContain("Provider A");
+  });
+
+  it("shows the no-match row when every group is hidden", () => {
+    // 未登录时云分组被过滤掉；列表为空也要给出空态行，且思考行仍在（设计文档已记录的行为偏差）
+    render({
+      modelOptions: modelOptions.filter(
+        (g) => g.profileKey === "custom:deskwand",
+      ),
+    });
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(text).toContain("chat.noModelMatch");
+    expect(text).toContain("modelMenu.thinkingWithValue");
   });
 
   it("shows no-match row when search filters everything out", () => {

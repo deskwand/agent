@@ -56,12 +56,7 @@ export function MergedInputChip({
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
-  const [panelView, setPanelView] = useState<"modes" | "custom" | "thinking">(
-    "modes",
-  );
-  const [thinkingReturnView, setThinkingReturnView] = useState<
-    "modes" | "custom"
-  >("modes");
+  const [panelView, setPanelView] = useState<"list" | "thinking">("list");
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
@@ -86,11 +81,27 @@ export function MergedInputChip({
     return () => window.removeEventListener("resize", updatePanelMaxHeight);
   }, [menuOpen, updatePanelMaxHeight]);
 
+  // 云分组只在登录时进入列表：未登录时残留的 custom:deskwand 用的是失效 token。
+  // 顺序上云分组排最前：provider 顺序来自配置写入顺序（config-store.saveProvider 追加新
+  // key），云端 provider 是登录时才写入的，不能假设它天然第一；其余分组的两两比较返回 0，
+  // 靠 Array.prototype.sort 的稳定性保持原顺序。
+  const visibleModelOptions = useMemo(() => {
+    // filter 已返回新数组，就地 sort 不会改到 props
+    const visible = modelOptions.filter(
+      (group) => isLoggedIn || group.profileKey !== "custom:deskwand",
+    );
+    return visible.sort(
+      (a, b) =>
+        Number(b.profileKey === "custom:deskwand") -
+        Number(a.profileKey === "custom:deskwand"),
+    );
+  }, [modelOptions, isLoggedIn]);
+
   const filteredModelOptions = useMemo(() => {
     const query = modelSearch.trim().toLowerCase();
-    if (!query) return modelOptions;
+    if (!query) return visibleModelOptions;
 
-    return modelOptions
+    return visibleModelOptions
       .map((group) => ({
         ...group,
         items: group.items.filter(
@@ -100,11 +111,11 @@ export function MergedInputChip({
         ),
       }))
       .filter((group) => group.items.length > 0);
-  }, [modelOptions, modelSearch]);
+  }, [visibleModelOptions, modelSearch]);
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
-    setPanelView("modes");
+    setPanelView("list");
     setModelSearch("");
   }, []);
 
@@ -133,13 +144,6 @@ export function MergedInputChip({
 
   const disabled = modelMenuDisabled || modelOptions.length === 0;
   const combinedLabel = `${t("chat.model")}, ${t("chat.thinkingLevel")}`;
-
-  const cloudGroup = modelOptions.find(
-    (g) => g.profileKey === "custom:deskwand",
-  );
-  const customGroups = modelOptions.filter(
-    (g) => g.profileKey !== "custom:deskwand",
-  );
 
   const renderGroupItems = (group: ModelOptionGroup) =>
     group.items.map((item) => {
@@ -174,10 +178,10 @@ export function MergedInputChip({
     />
   );
 
-  const renderBackRow = (target: "modes" | "custom") => (
+  const renderBackRow = () => (
     <button
       type="button"
-      onClick={() => setPanelView(target)}
+      onClick={() => setPanelView("list")}
       className={`${MENU_ITEM_CLASS} text-text-muted hover:bg-surface-hover`}
     >
       <ChevronRight className="h-4 w-4 rotate-180" />
@@ -185,15 +189,12 @@ export function MergedInputChip({
     </button>
   );
 
-  const renderThinkingRow = (returnView: "modes" | "custom") => (
+  const renderThinkingRow = () => (
     <>
       <div className={MENU_SEPARATOR_CLASS} />
       <button
         type="button"
-        onClick={() => {
-          setThinkingReturnView(returnView);
-          setPanelView("thinking");
-        }}
+        onClick={() => setPanelView("thinking")}
         className={`${MENU_ITEM_CLASS} justify-between font-medium ${MENU_ITEM_DEFAULT_CLASS}`}
       >
         {t("modelMenu.thinkingWithValue", {
@@ -204,19 +205,15 @@ export function MergedInputChip({
     </>
   );
 
-  const renderNonCloudGroups = () => {
-    const searching = modelSearch.trim() !== "";
-    const groups = searching
-      ? filteredModelOptions.filter((g) => g.profileKey !== "custom:deskwand")
-      : customGroups;
-    if (groups.length === 0 && searching) {
+  const renderGroupList = () => {
+    if (filteredModelOptions.length === 0) {
       return (
         <div className="px-2.5 py-3 text-center text-xs text-text-muted">
           {t("chat.noModelMatch")}
         </div>
       );
     }
-    return groups.map((group) => (
+    return filteredModelOptions.map((group) => (
       <div key={group.profileKey} className="mb-1 last:mb-0">
         <div className={MENU_LABEL_CLASS}>{group.groupLabel}</div>
         {renderGroupItems(group)}
@@ -232,11 +229,11 @@ export function MergedInputChip({
           if (disabled) return;
           setMenuOpen((open) => {
             if (open) {
-              setPanelView("modes");
+              setPanelView("list");
               setModelSearch("");
               return false;
             }
-            setPanelView("modes");
+            setPanelView("list");
             return true;
           });
         }}
@@ -271,23 +268,19 @@ export function MergedInputChip({
               : { maxHeight: `${panelMaxHeight}px` }
           }
           className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-up absolute right-0 bottom-[calc(100%_+_8px)] z-30 ${
-            panelView === "thinking"
-              ? "w-[12rem]"
-              : panelView === "modes" && isLoggedIn && cloudGroup
-                ? "w-[15rem]"
-                : "w-[20rem]"
+            panelView === "thinking" ? "w-[12rem]" : "w-[20rem]"
           } max-h-[min(32rem,calc(100vh_+_-12rem))] overflow-y-auto`}
         >
           {panelView === "thinking" ? (
             <>
-              {renderBackRow(thinkingReturnView)}
+              {renderBackRow()}
               {thinkingLevelOptions.map((level) => (
                 <button
                   key={level}
                   type="button"
                   onClick={() => {
                     onSelectThinkingLevel(level);
-                    setPanelView(thinkingReturnView);
+                    setPanelView("list");
                   }}
                   className={`${MENU_ITEM_CLASS} justify-between ${
                     level === thinkingLevel
@@ -306,31 +299,11 @@ export function MergedInputChip({
                 </button>
               ))}
             </>
-          ) : panelView === "custom" ? (
-            <>
-              {renderBackRow("modes")}
-              {renderSearchInput()}
-              {renderNonCloudGroups()}
-              {renderThinkingRow("custom")}
-            </>
-          ) : isLoggedIn && cloudGroup ? (
-            <>
-              {renderGroupItems(cloudGroup)}
-              <div className={MENU_SEPARATOR_CLASS} />
-              <button
-                type="button"
-                onClick={() => setPanelView("custom")}
-                className={`${MENU_ITEM_CLASS} justify-between font-medium ${MENU_ITEM_DEFAULT_CLASS}`}
-              >
-                {t("modelMenu.custom")}
-                <ChevronRight className="h-4 w-4 shrink-0 text-text-muted" />
-              </button>
-            </>
           ) : (
             <>
               {renderSearchInput()}
-              {renderNonCloudGroups()}
-              {renderThinkingRow("modes")}
+              {renderGroupList()}
+              {renderThinkingRow()}
             </>
           )}
         </div>

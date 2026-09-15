@@ -1700,7 +1700,6 @@
     }
   },
   "modelMenu": {
-    "custom": "Custom",
     "back": "Back",
     "thinkingWithValue": "Thinking: {{value}}"
   },

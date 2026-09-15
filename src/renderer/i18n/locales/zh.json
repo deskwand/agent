@@ -1699,7 +1699,6 @@
     }
   },
   "modelMenu": {
-    "custom": "自定义",
     "back": "返回",
     "thinkingWithValue": "思考：{{value}}"
   },
