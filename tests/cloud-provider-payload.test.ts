@@ -3,7 +3,7 @@ import { buildDeskwandProviderPayload } from "../src/renderer/utils/cloud-provid
 
 // pricing 接口按 model_id 升序返回，第一个即默认模型
 const MODELS = [
-  { model_id: "deepseek-v4-flash" },
+  { model_id: "deepseek-flash" },
   { model_id: "deepseek-v4-pro" },
 ];
 
@@ -20,7 +20,7 @@ describe("buildDeskwandProviderPayload", () => {
 
   it("uses the real model ids as both id and label", () => {
     expect(payload.config.models).toEqual([
-      { id: "deepseek-v4-flash", label: "deepseek-v4-flash" },
+      { id: "deepseek-flash", label: "deepseek-flash" },
       { id: "deepseek-v4-pro", label: "deepseek-v4-pro" },
     ]);
   });
@@ -30,14 +30,14 @@ describe("buildDeskwandProviderPayload", () => {
       key === "providers.deskwandCloud" ? "DeskWand 云" : (opts?.defaultValue ?? key);
     const withT = buildDeskwandProviderPayload(MODELS, "tok123", t);
     expect(withT.config.models.map((m) => m.label)).toEqual([
-      "deepseek-v4-flash",
+      "deepseek-flash",
       "deepseek-v4-pro",
     ]);
     expect(withT.config.name).toBe("DeskWand 云");
   });
 
   it("defaults to the first model and carries the token as apiKey", () => {
-    expect(payload.config.defaultModel).toBe("deepseek-v4-flash");
+    expect(payload.config.defaultModel).toBe("deepseek-flash");
     expect(payload.config.apiKey).toBe("tok123");
   });
 
@@ -57,7 +57,7 @@ describe("buildDeskwandProviderPayload", () => {
     expect(
       buildDeskwandProviderPayload(MODELS, "tok123", undefined, "retired-model")
         .config.defaultModel,
-    ).toBe("deepseek-v4-flash");
+    ).toBe("deepseek-flash");
   });
 
   it("produces an empty model list for an empty response (caller must not overwrite)", () => {

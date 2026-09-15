@@ -16,7 +16,7 @@ const modelOptions: ModelOptionGroup[] = [
     profileKey: "custom:deskwand" as never,
     groupLabel: "DeskWand 云",
     items: [
-      { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
+      { id: "deepseek-flash", name: "deepseek-flash" },
       { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
     ],
   },
@@ -176,14 +176,14 @@ describe("MergedInputChip (single-panel)", () => {
       balanceMicroUsd: 100,
     });
     render({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       activeProviderProfileKey: "custom:deskwand",
     });
     // 思考档不再由模式锁定，折叠态也要显示用户当前档位
     expect(trigger().textContent).toContain("chat.thinkingLevel");
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).toContain("deepseek-v4-flash");
+    expect(text).toContain("deepseek-flash");
     expect(text).toContain("deepseek-v4-pro");
     expect(text).toContain("modelMenu.custom");
     expect(text).not.toContain("Provider A");
@@ -199,7 +199,7 @@ describe("MergedInputChip (single-panel)", () => {
       balanceMicroUsd: 100,
     });
     render({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       activeProviderProfileKey: "custom:deskwand",
     });
     click(trigger());
@@ -223,7 +223,7 @@ describe("MergedInputChip (single-panel)", () => {
       balanceMicroUsd: 100,
     });
     render({
-      model: "deepseek-v4-flash",
+      model: "deepseek-flash",
       activeProviderProfileKey: "custom:deskwand",
     });
     click(trigger());
@@ -267,7 +267,7 @@ describe("MergedInputChip (single-panel)", () => {
     render(); // activeProviderProfileKey = "profile-a"（BYOK）
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).toContain("deepseek-v4-flash");
+    expect(text).toContain("deepseek-flash");
     expect(text).toContain("deepseek-v4-pro");
     expect(text).toContain("modelMenu.custom");
     expect(text).not.toContain("Provider A"); // BYOK 分组在「自定义」视图
@@ -277,7 +277,7 @@ describe("MergedInputChip (single-panel)", () => {
     render(); // cloudConfig 默认 null
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).not.toContain("deepseek-v4-flash");
+    expect(text).not.toContain("deepseek-flash");
     expect(text).toContain("Provider A");
   });
 

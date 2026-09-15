@@ -7,6 +7,7 @@ import {
 } from "@earendil-works/pi-ai/compat";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { isOfficialOpenAIBaseUrl } from "../config/auth-utils";
+import { DESKWAND_API_URL } from "../../shared/oauth-config";
 
 const COMMON_FALLBACK_PROVIDERS = ["openai", "anthropic", "google"] as const;
 const INVALID_REGISTRY_PROVIDERS = new Set(["", "custom"]);
@@ -372,6 +373,35 @@ export function applyPiModelRuntimeOverrides(
           ...currentReasoningEffortMap,
           off: "none",
         },
+      },
+    } as typeof nextModel;
+  }
+
+  // 我们的云端点背后是 DeepSeek，而 pi 打包的模型目录还没有官方名 deepseek-flash
+  // （目录由 models.dev 生成、deepseek provider 无 refreshModels）。缺 compat 时 pi 会按
+  // "custom provider + 非 deepseek 域名" 推断：max tokens 用 max_completion_tokens、
+  // 完全不发 thinking（思考档因此关不掉）、assistant 消息不带 reasoning_content
+  // （官方文档：带 tools 的多轮缺它会 400）。developer 角色与 store 已由上面的
+  // shouldDisableDeveloperRoleForEndpoint 处理，这里只补真正缺失的三个字段，
+  // 取值与 pi 注册表的 deepseek 条目一致。pi 之后带上 deepseek-flash 条目后本分支即冗余，可删。
+  // 用带斜杠的前缀比较，避免 "api.deskwand.com.evil.com" 这类同前缀域名被误判为我们的端点。
+  // 不额外判 api：自定义 provider 的协议由 inferPiApi 收敛，未知协议也一律是 openai-completions。
+  const cloudEndpoint = options.customBaseUrl || nextModel.baseUrl || "";
+  const cloudCompat = (nextModel.compat || {}) as Record<string, unknown>;
+  if (
+    isCustomProvider &&
+    cloudEndpoint.startsWith(`${DESKWAND_API_URL}/`) &&
+    nextModel.id.startsWith("deepseek-")
+  ) {
+    nextModel = {
+      ...nextModel,
+      compat: {
+        ...cloudCompat,
+        // 只在缺失时补齐：pi 注册表将来若已提供取值（官方名进目录后），以注册表为准
+        maxTokensField: cloudCompat.maxTokensField ?? "max_tokens",
+        requiresReasoningContentOnAssistantMessages:
+          cloudCompat.requiresReasoningContentOnAssistantMessages ?? true,
+        thinkingFormat: cloudCompat.thinkingFormat ?? "deepseek",
       },
     } as typeof nextModel;
   }

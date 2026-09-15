@@ -12,18 +12,18 @@ function group(
 describe("resolveModelLabel", () => {
   const options: ModelOptionGroup[] = [
     group("custom:deskwand", [
-      { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
+      { id: "deepseek-flash", name: "deepseek-flash" },
       { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
     ]),
     group("custom:openai", [
-      { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
+      { id: "deepseek-flash", name: "deepseek-flash" },
     ]),
   ];
 
   it("returns the real model id for deskwand cloud models", () => {
     expect(
-      resolveModelLabel(options, "custom:deskwand", "deepseek-v4-flash"),
-    ).toBe("deepseek-v4-flash");
+      resolveModelLabel(options, "custom:deskwand", "deepseek-flash"),
+    ).toBe("deepseek-flash");
     expect(
       resolveModelLabel(options, "custom:deskwand", "deepseek-v4-pro"),
     ).toBe("deepseek-v4-pro");
@@ -32,16 +32,16 @@ describe("resolveModelLabel", () => {
   it("does not leak labels across providers with the same model id", () => {
     // custom:openai 分组的同名模型 label 是 id 本身
     expect(
-      resolveModelLabel(options, "custom:openai", "deepseek-v4-flash"),
-    ).toBe("deepseek-v4-flash");
+      resolveModelLabel(options, "custom:openai", "deepseek-flash"),
+    ).toBe("deepseek-flash");
   });
 
   it("falls back to model id when not found", () => {
     expect(resolveModelLabel(options, "custom:deskwand", "unknown-model")).toBe(
       "unknown-model",
     );
-    expect(resolveModelLabel(options, "nonexistent", "deepseek-v4-flash")).toBe(
-      "deepseek-v4-flash",
+    expect(resolveModelLabel(options, "nonexistent", "deepseek-flash")).toBe(
+      "deepseek-flash",
     );
   });
 
