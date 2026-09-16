@@ -85,6 +85,7 @@ export function SubagentSettings() {
                   : modelDisplay(
                       agent.markdownModel,
                       appConfig?.providers ?? {},
+                      t,
                     )}
               </span>
               <Tooltip label={t("subagent.editModel") ?? "Edit model"}>

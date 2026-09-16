@@ -44,6 +44,7 @@ import {
   type WebAccessConfig,
 } from "../../../shared/web-access";
 import { ProviderBrandIcon, resolveProviderBrand } from "./provider-icons";
+import { resolveProviderDisplayName } from "../../utils/model-label";
 import { SettingsContentSection } from "./shared";
 
 type ProviderChoice = ProviderType;
@@ -1483,7 +1484,11 @@ export function SettingsAPI({
                                 provider,
                               ).map((profile) => (
                                 <option key={profile.key} value={profile.key}>
-                                  {profile.name}
+                                  {resolveProviderDisplayName(
+                                    profile.key,
+                                    profile.name,
+                                    t,
+                                  ) || profile.key}
                                 </option>
                               ))}
                             </select>
@@ -1717,7 +1722,8 @@ export function SettingsAPI({
                         ([key, cfg]) =>
                           cfg ? (
                             <option key={key} value={key}>
-                              {cfg.name || key}
+                              {resolveProviderDisplayName(key, cfg.name, t) ||
+                                key}
                             </option>
                           ) : null,
                       )}
