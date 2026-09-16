@@ -60,6 +60,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
+import { resolveProviderDisplayName } from "../utils/model-label";
 import {
   ChatInput,
   type ChatInputAttachedFile,
@@ -546,7 +547,7 @@ export function ChatView() {
       if (!hasUsableProviderConfig(typedKey, providerConfig)) continue;
       const meta = profileKeyToProvider(typedKey);
       const presetLabel =
-        providerConfig.name ||
+        resolveProviderDisplayName(typedKey, providerConfig.name, t) ||
         (meta.provider === "custom"
           ? `${t("api.moreModels")} / ${providerConfig.customProtocol}`
           : (

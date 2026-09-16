@@ -15,3 +15,22 @@ export function resolveModelLabel(
       ?.items.find((item) => item.id === model)?.name ?? model
   );
 }
+
+/**
+ * provider 的显示名（模型菜单分组标题、subagent 的 provider 选择器共用）。
+ *
+ * 云 provider 的 name 是登录/启动时按当时语言写进配置的普通字符串
+ * （见 buildDeskwandProviderPayload），切语言不会重建它，所以这里按 profileKey
+ * 实时取 i18n 文案覆盖；其余 provider 沿用配置里的名字——用户自己填的名字必须原样保留。
+ * 返回 undefined 时由调用方走各自的兜底文案。
+ */
+export function resolveProviderDisplayName(
+  profileKey: string,
+  storedName: string | undefined,
+  t: (key: string, opts?: { defaultValue: string }) => string,
+): string | undefined {
+  if (profileKey === "custom:deskwand") {
+    return t("providers.deskwandCloud", { defaultValue: "DeskWand 云" });
+  }
+  return storedName;
+}

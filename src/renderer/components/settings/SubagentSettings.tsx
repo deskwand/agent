@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { AppConfig, ApiProviderConfig } from "../../types";
 import { modelDisplay } from "../../utils/subagent-model-display";
+import { resolveProviderDisplayName } from "../../utils/model-label";
 import { DESKWAND_PROVIDER_PREFIX } from "../../../shared/deskwand-provider";
 import { Tooltip } from "../Tooltip";
 
@@ -183,7 +184,11 @@ export function SubagentSettings() {
                     <option value="">{t("subagent.selectProvider")}</option>
                     {providerKeys.map((k) => (
                       <option key={k} value={k}>
-                        {appConfig?.providers[k]?.name || k}
+                        {resolveProviderDisplayName(
+                          k,
+                          appConfig?.providers[k]?.name,
+                          t,
+                        ) || k}
                       </option>
                     ))}
                   </select>
