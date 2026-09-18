@@ -68,6 +68,7 @@ describe("browser visibility decision", () => {
   it.each([
     ["browser", true, false],
     ["browser", false, true],
+    ["preview", false, false],
     ["files", false, false],
     [null, false, false],
   ] as const)(

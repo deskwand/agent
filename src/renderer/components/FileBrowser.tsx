@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { ChevronRight, ChevronDown, Home, Loader2 } from "lucide-react";
-import { createPortal } from "react-dom";
-import { FilePreviewModal } from "./FilePreviewModal";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
 import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
@@ -145,15 +143,12 @@ export function FileBrowser({ width }: { width: number }) {
       : undefined,
   );
   const effectiveDir = fileBrowserRoot || activeSession?.cwd || workingDir;
+  const openPreview = useAppStore((s) => s.openPreview);
 
   const [rootPath, setRootPath] = useState<string>("");
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [previewFile, setPreviewFile] = useState<{
-    path: string;
-    name: string;
-  } | null>(null);
 
   const loadDirectory = useCallback(async (dirPath: string) => {
     setLoading(true);
@@ -189,19 +184,22 @@ export function FileBrowser({ width }: { width: number }) {
     [loadDirectory],
   );
 
-  const handleFileOpen = useCallback((fullPath: string, fileName: string) => {
-    const iDot = fileName.lastIndexOf(".");
-    const ext = iDot > 0 ? fileName.slice(iDot).toLowerCase() : "";
-    if (isBrowserOpenableExt(ext)) {
-      openFilePathInBrowser(fullPath);
-      return;
-    }
-    if (isPreviewableExt(ext)) {
-      setPreviewFile({ path: fullPath, name: fileName });
-    } else {
-      window.electronAPI?.openPath?.(fullPath);
-    }
-  }, []);
+  const handleFileOpen = useCallback(
+    (fullPath: string, fileName: string) => {
+      const iDot = fileName.lastIndexOf(".");
+      const ext = iDot > 0 ? fileName.slice(iDot).toLowerCase() : "";
+      if (isBrowserOpenableExt(ext)) {
+        openFilePathInBrowser(fullPath);
+        return;
+      }
+      if (isPreviewableExt(ext)) {
+        openPreview({ path: fullPath, name: fileName });
+      } else {
+        window.electronAPI?.openPath?.(fullPath);
+      }
+    },
+    [openPreview],
+  );
 
   const goToWorkspace = useCallback(() => {
     const ws = effectiveDir;
@@ -304,17 +302,6 @@ export function FileBrowser({ width }: { width: number }) {
           ))
         )}
       </div>
-
-      {previewFile &&
-        createPortal(
-          <FilePreviewModal
-            isOpen={true}
-            filePath={previewFile.path}
-            fileName={previewFile.name}
-            onClose={() => setPreviewFile(null)}
-          />,
-          document.body,
-        )}
     </div>
   );
 }

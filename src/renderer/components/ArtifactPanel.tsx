@@ -1,5 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
-import { createPortal } from "react-dom";
+import { useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { resolveArtifactPath } from "../utils/artifact-path";
@@ -9,7 +8,6 @@ import {
 } from "../utils/tool-output-path";
 import { getArtifactLabel, getArtifactSteps } from "../utils/artifact-steps";
 import { Layers } from "lucide-react";
-import { FilePreviewModal } from "./FilePreviewModal";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
 import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
@@ -25,11 +23,7 @@ export function ArtifactPanel() {
   const sessionStates = useAppStore((s) => s.sessionStates);
   const workingDir = useAppStore((s) => s.workingDir);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
-
-  const [previewFile, setPreviewFile] = useState<{
-    path: string;
-    name: string;
-  } | null>(null);
+  const openPreview = useAppStore((s) => s.openPreview);
 
   const ss = activeSessionId ? sessionStates[activeSessionId] : undefined;
   const steps = ss?.traceSteps ?? EMPTY_STEPS;
@@ -50,7 +44,7 @@ export function ArtifactPanel() {
         return;
       }
       if (isPreviewableExt(ext)) {
-        setPreviewFile({ path: artifactPath, name: label });
+        openPreview({ path: artifactPath, name: label });
       } else if (canOpenPath) {
         const result = await window.electronAPI.openPath(artifactPath);
         if (result.error) {
@@ -62,7 +56,7 @@ export function ArtifactPanel() {
         }
       }
     },
-    [canOpenPath, setGlobalNotice, t],
+    [canOpenPath, openPreview, setGlobalNotice, t],
   );
 
   const displayArtifacts = useMemo(() => {
@@ -144,17 +138,6 @@ export function ArtifactPanel() {
           )}
         </div>
       </div>
-      {/* File Preview Modal — portal to body so it renders full-screen */}
-      {previewFile &&
-        createPortal(
-          <FilePreviewModal
-            isOpen={true}
-            filePath={previewFile.path}
-            fileName={previewFile.name}
-            onClose={() => setPreviewFile(null)}
-          />,
-          document.body,
-        )}
     </>
   );
 }

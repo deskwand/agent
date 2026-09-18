@@ -140,7 +140,7 @@ describe("ArtifactCard edited-file routing", () => {
     expect(getDiffFiles).toHaveBeenCalledWith("C:\\repo");
     expect(useAppStore.getState().reviewTargetFile).toBe("src/example.ts");
     expect(useAppStore.getState().isReviewOpen).toBe(true);
-    expect(readFile).not.toHaveBeenCalled();
+    expect(useAppStore.getState().previewTabs).toEqual([]);
   });
 
   it("previews the edited file when it no longer has a diff", async () => {
@@ -149,10 +149,12 @@ describe("ArtifactCard edited-file routing", () => {
 
     await renderAndClick();
 
-    expect(readFile).toHaveBeenCalledWith("/repo/src/example.ts");
+    expect(useAppStore.getState().previewTabs).toEqual([
+      { path: "/repo/src/example.ts", name: "example.ts" },
+    ]);
     expect(useAppStore.getState().isReviewOpen).toBe(false);
     expect(navigate).not.toHaveBeenCalled();
-    expect(useAppStore.getState().rightPanelMode).not.toBe("browser");
+    expect(useAppStore.getState().rightPanelMode).toBe("preview");
   });
 
   it("ignores a diff for a different file with the same basename", async () => {
@@ -163,7 +165,9 @@ describe("ArtifactCard edited-file routing", () => {
 
     await renderAndClick();
 
-    expect(readFile).toHaveBeenCalledWith("/repo/src/example.ts");
+    expect(useAppStore.getState().previewTabs).toEqual([
+      { path: "/repo/src/example.ts", name: "example.ts" },
+    ]);
     expect(useAppStore.getState().isReviewOpen).toBe(false);
   });
 
@@ -173,7 +177,9 @@ describe("ArtifactCard edited-file routing", () => {
 
     await renderAndClick();
 
-    expect(readFile).toHaveBeenCalledWith("/repo/src/example.ts");
+    expect(useAppStore.getState().previewTabs).toEqual([
+      { path: "/repo/src/example.ts", name: "example.ts" },
+    ]);
     expect(useAppStore.getState().isReviewOpen).toBe(false);
   });
 
@@ -185,7 +191,7 @@ describe("ArtifactCard edited-file routing", () => {
 
     expect(navigate).toHaveBeenCalledWith("file:///repo/src/page.html");
     expect(useAppStore.getState().rightPanelMode).toBe("browser");
-    expect(readFile).not.toHaveBeenCalled();
+    expect(useAppStore.getState().previewTabs).toEqual([]);
   });
 
   it("keeps the diff review for a browser-openable file that still has a diff", async () => {

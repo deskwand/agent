@@ -21,6 +21,7 @@ import type {
   FileAttachmentContent,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
+import { initialPreviewWidth } from "../utils/panel-width";
 import type { ImageSource } from "../components/ImageLightbox";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
@@ -162,7 +163,11 @@ interface AppState {
   activeView: ActiveView;
   settingsTab: string | null;
 
-  rightPanelMode: "files" | "browser" | null;
+  rightPanelMode: "files" | "browser" | "preview" | null;
+  previewTabs: PreviewTab[];
+  activePreviewTab: string | null;
+  rightPanelPreviousMode: "files" | "browser" | null;
+  previewWidth: number | null;
   isReviewOpen: boolean;
   reviewTargetFile: string | null;
   isArtifactPanelOpen: boolean;
@@ -337,6 +342,10 @@ interface AppState {
   setSettingsTab: (tab: string | null) => void;
 
   setRightPanelMode: (mode: "files" | "browser" | null) => void;
+  openPreview: (tab: PreviewTab) => void;
+  closePreviewTab: (path: string) => void;
+  closePreviewPanel: () => void;
+  setPreviewWidth: (width: number) => void;
   setReviewOpen: (open: boolean) => void;
   setReviewTargetFile: (path: string | null) => void;
   toggleArtifactPanel: () => void;
@@ -460,7 +469,11 @@ export const useAppStore = create<AppState>((set) => ({
   browserWidthManual: false,
   activeView: "chat",
   settingsTab: null,
-  rightPanelMode: null as "files" | "browser" | null,
+  rightPanelMode: null as "files" | "browser" | "preview" | null,
+  previewTabs: [] as PreviewTab[],
+  activePreviewTab: null as string | null,
+  rightPanelPreviousMode: null as "files" | "browser" | null,
+  previewWidth: null as number | null,
   isReviewOpen: false,
   reviewTargetFile: null,
   isArtifactPanelOpen: false,
@@ -554,7 +567,19 @@ export const useAppStore = create<AppState>((set) => ({
     } catch {
       /* ignore */
     }
-    set({ activeSessionId: sessionId });
+    set((state) => {
+      if (sessionId === state.activeSessionId) {
+        return { activeSessionId: sessionId };
+      }
+      if (state.rightPanelMode !== "preview") {
+        return { activeSessionId: sessionId };
+      }
+      return {
+        ...clearedPreview(),
+        rightPanelMode: state.rightPanelPreviousMode,
+        activeSessionId: sessionId,
+      };
+    });
   },
 
   // Message actions
@@ -985,37 +1010,99 @@ export const useAppStore = create<AppState>((set) => ({
   setShowSchedule: (show) => set({ activeView: show ? "automation" : "chat" }),
   setShowApps: (show) => set({ activeView: show ? "apps" : "chat" }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
-  setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
+  setRightPanelMode: (mode) =>
+    set({ ...clearedPreview(), rightPanelMode: mode }),
   setReviewOpen: (open) => set({ isReviewOpen: open }),
   setReviewTargetFile: (path) => set({ reviewTargetFile: path }),
   toggleArtifactPanel: () =>
     set((state) => ({ isArtifactPanelOpen: !state.isArtifactPanelOpen })),
   setArtifactPanelOpen: (open) => set({ isArtifactPanelOpen: open }),
   toggleFileBrowser: () =>
-    set((state) => {
-      if (state.rightPanelMode === "files") {
-        return { rightPanelMode: null };
-      }
-      return { rightPanelMode: "files" };
-    }),
+    set((state) => ({
+      ...clearedPreview(),
+      rightPanelMode: state.rightPanelMode === "files" ? null : "files",
+    })),
   toggleReviewPanel: () =>
     set((state) => ({ isReviewOpen: !state.isReviewOpen })),
   toggleBrowserPanel: () =>
     set((state) => {
       if (state.rightPanelMode === "browser") {
         return {
+          ...clearedPreview(),
           rightPanelMode: null,
           sidebarCollapsed: state.sidebarCollapsedBeforeBrowser,
         };
       }
       return {
+        ...clearedPreview(),
         rightPanelMode: "browser",
-        sidebarCollapsedBeforeBrowser: state.sidebarCollapsed,
+        // 从预览切过来时侧栏已经是收起状态，此时不能把它当成「打开浏览器前的状态」
+        sidebarCollapsedBeforeBrowser:
+          state.rightPanelMode === "preview"
+            ? state.sidebarCollapsedBeforeBrowser
+            : state.sidebarCollapsed,
         sidebarCollapsed: true,
         browserWidthManual: false,
       };
     }),
   setBrowserWidthManual: (manual) => set({ browserWidthManual: manual }),
+
+  openPreview: (tab) =>
+    set((state) => {
+      const existing = state.previewTabs.find((item) => item.path === tab.path);
+      return {
+        // 已在标签里的文件只聚焦，不改写标签文案；但「播放」这类请求要生效。
+        previewTabs: existing
+          ? state.previewTabs.map((item) =>
+              item.path === tab.path && tab.autoPlay
+                ? { ...item, autoPlay: true }
+                : item,
+            )
+          : [...state.previewTabs, tab],
+        activePreviewTab: tab.path,
+        rightPanelMode: "preview" as const,
+        rightPanelPreviousMode:
+          state.rightPanelMode === "preview"
+            ? state.rightPanelPreviousMode
+            : state.rightPanelMode,
+        previewWidth:
+          state.previewWidth ??
+          initialPreviewWidth(
+            window.innerWidth,
+            state.sidebarCollapsed,
+            state.sidebarWidth,
+          ),
+      };
+    }),
+
+  closePreviewTab: (path) =>
+    set((state) => {
+      const index = state.previewTabs.findIndex((item) => item.path === path);
+      if (index === -1) return {};
+      const remaining = state.previewTabs.filter((item) => item.path !== path);
+      if (remaining.length === 0) {
+        return {
+          ...clearedPreview(),
+          rightPanelMode: state.rightPanelPreviousMode,
+        };
+      }
+      if (state.activePreviewTab !== path) {
+        return { previewTabs: remaining };
+      }
+      const nextIndex = Math.min(index, remaining.length - 1);
+      return {
+        previewTabs: remaining,
+        activePreviewTab: remaining[nextIndex].path,
+      };
+    }),
+
+  closePreviewPanel: () =>
+    set((state) => ({
+      ...clearedPreview(),
+      rightPanelMode: state.rightPanelPreviousMode,
+    })),
+
+  setPreviewWidth: (width) => set({ previewWidth: width }),
 
   // Permission actions
   setPendingPermission: (permission) => set({ pendingPermission: permission }),
@@ -1260,10 +1347,12 @@ export const useAppStore = create<AppState>((set) => ({
   enterBrowserFullscreen: () =>
     set((state) => ({
       browserFullscreenSnapshot: {
-        rightPanelMode: state.rightPanelMode,
+        rightPanelMode:
+          state.rightPanelMode === "preview" ? null : state.rightPanelMode,
         contextPanelWidth: state.contextPanelWidth,
       },
       isBrowserFullscreen: true,
+      ...clearedPreview(),
     })),
 
   exitBrowserFullscreen: () =>
@@ -1349,3 +1438,18 @@ if (typeof window !== "undefined") {
     return true;
   };
 }
+
+// 预览面板：右侧槽位的第三种模式。
+/** 预览标签，`path` 同时作为标签 id。 */
+export interface PreviewTab {
+  path: string;
+  name: string;
+  autoPlay?: boolean;
+}
+
+/** 所有「离开预览」的路径共用；少清一个字段就会留下幽灵标签。 */
+const clearedPreview = () => ({
+  previewTabs: [] as PreviewTab[],
+  activePreviewTab: null as string | null,
+  rightPanelPreviousMode: null as "files" | "browser" | null,
+});

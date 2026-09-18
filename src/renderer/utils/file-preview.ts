@@ -43,7 +43,7 @@ export function getLangFromExt(ext: string): string {
 
 import { PREVIEW_EXTS } from "./file-types";
 
-/** Check if a filename extension is one that FilePreviewModal can preview. */
+/** Check if a filename extension is one that FilePreviewPanel can preview. */
 export function isPreviewableExt(ext: string): boolean {
   return Boolean(ext && (PREVIEW_EXTS as readonly string[]).includes(ext));
 }

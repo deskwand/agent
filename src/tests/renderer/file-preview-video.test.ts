@@ -2,7 +2,8 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { FilePreviewModal } from "../../renderer/components/FilePreviewModal";
+import { FilePreviewPanel } from "../../renderer/components/FilePreviewPanel";
+import { useAppStore } from "../../renderer/store";
 
 const { translate } = vi.hoisted(() => ({
   translate: (key: string) => key,
@@ -10,10 +11,6 @@ const { translate } = vi.hoisted(() => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: translate }),
-}));
-
-vi.mock("../../renderer/hooks/useBrowserOcclusion", () => ({
-  useBrowserOcclusion: vi.fn(),
 }));
 
 vi.mock("react-window", () => ({
@@ -35,7 +32,7 @@ vi.mock("../../renderer/components/VideoPlayer", () => ({
     ),
 }));
 
-describe("FilePreviewModal video routing", () => {
+describe("FilePreviewPanel video routing", () => {
   let container: HTMLDivElement;
   let root: Root;
   const readFile = vi.fn(async () => ({
@@ -51,6 +48,7 @@ describe("FilePreviewModal video routing", () => {
       unobserve() {}
       disconnect() {}
     };
+    useAppStore.setState(useAppStore.getInitialState());
     window.electronAPI = {
       readFile,
       openPath: vi.fn(async () => ({ error: null })),
@@ -66,17 +64,25 @@ describe("FilePreviewModal video routing", () => {
     vi.clearAllMocks();
   });
 
-  it("renders video without reading the complete file", async () => {
-    await act(async () => {
-      root.render(
-        React.createElement(FilePreviewModal, {
-          isOpen: true,
-          filePath: "/tmp/clip.mp4",
-          fileName: "clip.mp4",
-          onClose: vi.fn(),
-        }),
-      );
+  async function renderPanel(
+    path: string,
+    name: string,
+    autoPlay?: boolean,
+  ): Promise<void> {
+    useAppStore.setState({
+      previewTabs: [{ path, name, autoPlay }],
+      activePreviewTab: path,
+      rightPanelMode: "preview",
     });
+    await act(async () => {
+      root.render(React.createElement(FilePreviewPanel));
+      await Promise.resolve();
+    });
+  }
+
+  it("renders video without reading the complete file", async () => {
+    await renderPanel("/tmp/clip.mp4", "clip.mp4");
+
     expect(
       container.querySelector('[data-testid="video-player"]'),
     ).not.toBeNull();
@@ -84,17 +90,8 @@ describe("FilePreviewModal video routing", () => {
   });
 
   it("forwards explicit autoplay to the video player", async () => {
-    await act(async () => {
-      root.render(
-        React.createElement(FilePreviewModal, {
-          isOpen: true,
-          filePath: "/tmp/clip.mp4",
-          fileName: "clip.mp4",
-          autoPlay: true,
-          onClose: vi.fn(),
-        }),
-      );
-    });
+    await renderPanel("/tmp/clip.mp4", "clip.mp4", true);
+
     expect(
       container
         .querySelector('[data-testid="video-player"]')
@@ -103,17 +100,8 @@ describe("FilePreviewModal video routing", () => {
   });
 
   it("keeps existing text preview loading", async () => {
-    await act(async () => {
-      root.render(
-        React.createElement(FilePreviewModal, {
-          isOpen: true,
-          filePath: "/tmp/notes.md",
-          fileName: "notes.md",
-          onClose: vi.fn(),
-        }),
-      );
-      await Promise.resolve();
-    });
+    await renderPanel("/tmp/notes.md", "notes.md");
+
     expect(readFile).toHaveBeenCalledWith("/tmp/notes.md");
   });
 });

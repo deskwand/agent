@@ -9,13 +9,6 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-// 把预览弹窗换成轻量 stub：既能直接断言「有没有进预览」，
-// 也避免在 jsdom 里挂载真实的 FilePreviewModal（它会拖住 act 不收敛）。
-vi.mock("../../renderer/components/FilePreviewModal", () => ({
-  FilePreviewModal: ({ fileName }: { fileName: string }) =>
-    React.createElement("div", { "data-testid": "preview-modal" }, fileName),
-}));
-
 const ENTRIES = [
   { name: "index.html", isDir: false, size: 120, ext: "html" },
   { name: "notes.md", isDir: false, size: 30, ext: "md" },
@@ -65,7 +58,6 @@ describe("FileBrowser open routing", () => {
 
     // 双击名称 span（事件冒泡到行的 onDoubleClick）；行内还有 size 文本，
     // 所以不能用「行 textContent 完全相等」来定位行。
-    // 弹窗走 createPortal 挂到 document.body，因此断言时要查 body。
     const label = Array.from(
       container.querySelectorAll<HTMLElement>("span"),
     ).find((element) => element.textContent === name);
@@ -84,9 +76,7 @@ describe("FileBrowser open routing", () => {
 
     expect(navigate).toHaveBeenCalledWith("file:///repo/index.html");
     expect(useAppStore.getState().rightPanelMode).toBe("browser");
-    expect(
-      document.body.querySelector('[data-testid="preview-modal"]'),
-    ).toBeNull();
+    expect(useAppStore.getState().previewTabs).toEqual([]);
     expect(openPath).not.toHaveBeenCalled();
   });
 
@@ -95,17 +85,16 @@ describe("FileBrowser open routing", () => {
 
     expect(openPath).toHaveBeenCalledWith("/repo/bundle.zip");
     expect(navigate).not.toHaveBeenCalled();
-    expect(
-      document.body.querySelector('[data-testid="preview-modal"]'),
-    ).toBeNull();
+    expect(useAppStore.getState().previewTabs).toEqual([]);
   });
 
-  it("keeps previewable rows on the in-app preview", async () => {
+  it("routes previewable rows into the preview panel", async () => {
     await doubleClickRow("notes.md");
 
-    expect(
-      document.body.querySelector('[data-testid="preview-modal"]'),
-    ).not.toBeNull();
+    expect(useAppStore.getState().rightPanelMode).toBe("preview");
+    expect(useAppStore.getState().previewTabs).toEqual([
+      { path: "/repo/notes.md", name: "notes.md" },
+    ]);
     expect(navigate).not.toHaveBeenCalled();
     expect(openPath).not.toHaveBeenCalled();
   });

@@ -787,7 +787,10 @@ describe("VaultView", () => {
 
     expect(api.getFilePath).toHaveBeenCalledWith("readme.md");
     expect(api.openFile).not.toHaveBeenCalled();
-    expect(document.body.textContent).toContain("/vault/readme.md");
+    expect(useAppStore.getState().rightPanelMode).toBe("preview");
+    expect(useAppStore.getState().previewTabs).toEqual([
+      { path: "/vault/readme.md", name: "readme.md" },
+    ]);
   });
 
   it("reveals a vault file from the more-actions menu", async () => {

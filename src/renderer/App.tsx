@@ -21,6 +21,12 @@ import { useIPC } from "./hooks/useIPC";
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
 import { ResizeHandle } from "./components/ResizeHandle";
+import {
+  availablePanelWidth,
+  clampPreviewWidth,
+  initialPreviewWidth,
+  resolvePanelWidth,
+} from "./utils/panel-width";
 import { WelcomeView } from "./components/WelcomeView";
 import { VaultView } from "./components/VaultView";
 import { UsageView } from "./components/UsageView";
@@ -70,6 +76,11 @@ const ArtifactPanel = lazy(() =>
     default: module.ArtifactPanel,
   })),
 );
+const FilePreviewPanel = lazy(() =>
+  import("./components/FilePreviewPanel").then((module) => ({
+    default: module.FilePreviewPanel,
+  })),
+);
 const ConfigModal = lazy(() =>
   import("./components/ConfigModal").then((module) => ({
     default: module.ConfigModal,
@@ -112,6 +123,10 @@ function App() {
   const setActiveView = useAppStore((s) => s.setActiveView);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
+  const rightPanelPreviousMode = useAppStore((s) => s.rightPanelPreviousMode);
+  const previewWidth = useAppStore((s) => s.previewWidth);
+  const activePreviewTab = useAppStore((s) => s.activePreviewTab);
+  const setPreviewWidth = useAppStore((s) => s.setPreviewWidth);
   const hasBrowserOcclusion = useAppStore(
     (state) => state.browserOcclusionIds.size > 0,
   );
@@ -224,6 +239,29 @@ function App() {
   const isFullScreenView =
     activeView !== "chat" || isReviewOpen || showConfigModal;
 
+  // 预览面板在 vault 视图里也要能显示（vault 有自己的预览入口）；
+  // 其余整页视图（设置 / 应用 / 日程）保持原来的「右侧槽位压成 0」。
+  const previewPanelVisible =
+    rightPanelMode === "preview" &&
+    (activeView === "chat" || activeView === "vault");
+
+  const rightPanelVisible =
+    rightPanelMode === "preview"
+      ? previewPanelVisible
+      : !isFullScreenView && rightPanelMode !== null;
+
+  const panelAvailableWidth = availablePanelWidth(
+    window.innerWidth,
+    sidebarCollapsed,
+    sidebarWidth,
+  );
+  const panelWidth = resolvePanelWidth(
+    rightPanelMode,
+    contextPanelWidth,
+    previewWidth,
+    panelAvailableWidth,
+  );
+
   useLayoutEffect(() => {
     if (
       shouldShowBrowserView(
@@ -277,7 +315,7 @@ function App() {
   // Keep browser at 50% on window resize when in auto mode.
   // Uses refs to avoid re-binding the listener on every sidebar change.
   const resizeGuardRef = useRef<{
-    rightPanelMode: "files" | "browser" | null;
+    rightPanelMode: "files" | "browser" | "preview" | null;
     browserWidthManual: boolean;
     calcHalfWidth: typeof calcHalfWidth;
   }>(null!);
@@ -404,10 +442,16 @@ function App() {
             )}
           </main>
 
-          {/* Right Panel: File Browser or Browser */}
-          {!isFullScreenView && rightPanelMode !== null && (
+          {/* Right Panel: File Browser / Browser / File Preview */}
+          {rightPanelVisible && (
             <ResizeHandle
               onResize={(delta) => {
+                if (rightPanelMode === "preview") {
+                  setPreviewWidth(
+                    clampPreviewWidth(panelWidth - delta, panelAvailableWidth),
+                  );
+                  return;
+                }
                 setBrowserWidthManual(true);
                 setContextPanelWidth(
                   Math.max(
@@ -419,6 +463,16 @@ function App() {
                 );
               }}
               onDoubleClick={() => {
+                if (rightPanelMode === "preview") {
+                  setPreviewWidth(
+                    initialPreviewWidth(
+                      window.innerWidth,
+                      sidebarCollapsed,
+                      sidebarWidth,
+                    ),
+                  );
+                  return;
+                }
                 setBrowserWidthManual(false);
                 setContextPanelWidth(calcHalfWidth());
               }}
@@ -427,16 +481,10 @@ function App() {
             />
           )}
           <div
-            className={`overflow-hidden flex-shrink-0 flex transition-[width] duration-300 ease-in-out ${!isFullScreenView && rightPanelMode !== null ? "" : "w-0"}`}
-            style={{
-              width:
-                !isFullScreenView && rightPanelMode !== null
-                  ? `${contextPanelWidth}px`
-                  : 0,
-            }}
+            className={`overflow-hidden flex-shrink-0 flex transition-[width] duration-300 ease-in-out ${rightPanelVisible ? "" : "w-0"}`}
+            style={{ width: rightPanelVisible ? `${panelWidth}px` : 0 }}
           >
-            {!isFullScreenView &&
-              rightPanelMode !== null &&
+            {rightPanelVisible &&
               (rightPanelMode === "browser" ? (
                 <PanelErrorBoundary
                   name="BrowserPanel"
@@ -453,20 +501,50 @@ function App() {
                   </Suspense>
                 </PanelErrorBoundary>
               ) : (
-                <PanelErrorBoundary
-                  name="FileBrowser"
-                  fallback={
-                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                  }
-                >
-                  <Suspense
-                    fallback={
-                      <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                    }
-                  >
-                    <FileBrowser width={contextPanelWidth} />
-                  </Suspense>
-                </PanelErrorBoundary>
+                <>
+                  {rightPanelMode === "preview" && (
+                    <PanelErrorBoundary
+                      name="FilePreviewPanel"
+                      resetKey={activePreviewTab ?? undefined}
+                      fallback={
+                        <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                      }
+                    >
+                      <Suspense
+                        fallback={
+                          <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                        }
+                      >
+                        <FilePreviewPanel />
+                      </Suspense>
+                    </PanelErrorBoundary>
+                  )}
+                  {(rightPanelMode === "files" ||
+                    rightPanelPreviousMode === "files") && (
+                    <div
+                      className={
+                        rightPanelMode === "preview"
+                          ? "hidden"
+                          : "flex flex-1 min-w-0"
+                      }
+                    >
+                      <PanelErrorBoundary
+                        name="FileBrowser"
+                        fallback={
+                          <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                        }
+                      >
+                        <Suspense
+                          fallback={
+                            <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                          }
+                        >
+                          <FileBrowser width={panelWidth} />
+                        </Suspense>
+                      </PanelErrorBoundary>
+                    </div>
+                  )}
+                </>
               ))}
           </div>
         </div>

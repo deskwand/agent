@@ -12,20 +12,6 @@ import type { VideoReference } from "../../renderer/utils/video-reference";
 vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => ({ isElectron: true }),
 }));
-vi.mock("../../renderer/components/FilePreviewModal", () => ({
-  FilePreviewModal: ({
-    fileName,
-    autoPlay,
-  }: {
-    fileName: string;
-    autoPlay?: boolean;
-  }) =>
-    React.createElement(
-      "div",
-      { "data-testid": "preview-modal", "data-autoplay": String(autoPlay) },
-      fileName,
-    ),
-}));
 
 const videoReference: VideoReference = {
   path: "/repo/output/clip.mp4",
@@ -133,12 +119,14 @@ describe("ArtifactCard video references", () => {
     ]);
   });
 
-  it("opens FilePreviewModal directly from a video thumbnail", async () => {
+  it("routes a video thumbnail into the preview panel with autoplay", async () => {
     await renderCard([], [videoReference]);
     await act(async () => findVideoButton(container).click());
-    const modal = document.body.querySelector('[data-testid="preview-modal"]');
-    expect(modal).not.toBeNull();
-    expect(modal?.getAttribute("data-autoplay")).toBe("true");
+
+    expect(useAppStore.getState().previewTabs).toEqual([
+      { path: "/repo/output/clip.mp4", name: "clip.mp4", autoPlay: true },
+    ]);
+    expect(useAppStore.getState().rightPanelMode).toBe("preview");
     expect(getDiffFiles).not.toHaveBeenCalled();
   });
 

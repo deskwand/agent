@@ -15,7 +15,6 @@ import { openFilePathInBrowser } from "../utils/open-in-browser";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { FilePreviewModal } from "./FilePreviewModal";
 import { Tooltip } from "./Tooltip";
 import {
   MENU_ITEM_CLASS,
@@ -131,6 +130,7 @@ export function VaultView(): JSX.Element {
   const { t } = useTranslation();
   const token = useAppStore((state) => state.cloudConfig?.token ?? null);
   const setActiveView = useAppStore((state) => state.setActiveView);
+  const openPreview = useAppStore((state) => state.openPreview);
   const [snapshot, setSnapshot] = useState<VaultSnapshot | null>(null);
   const [backupUsage, setBackupUsage] = useState<VaultBackupUsage | null>(null);
   const [filter, setFilter] = useState<Filter>("files");
@@ -152,10 +152,6 @@ export function VaultView(): JSX.Element {
     null,
   );
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [previewFile, setPreviewFile] = useState<{
-    path: string;
-    name: string;
-  } | null>(null);
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const syncFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncLabelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -477,7 +473,7 @@ export function VaultView(): JSX.Element {
     void (async () => {
       try {
         const path = await window.electronAPI.vault.getFilePath(item.name);
-        setPreviewFile({ path, name: item.name });
+        openPreview({ path, name: item.name });
       } catch (openError: unknown) {
         setError(errorText(openError, t));
       }
@@ -1003,13 +999,6 @@ export function VaultView(): JSX.Element {
         }
         onConfirm={handleConfirm}
         onCancel={() => setPendingConfirmation(null)}
-      />
-
-      <FilePreviewModal
-        isOpen={previewFile !== null}
-        filePath={previewFile?.path ?? ""}
-        fileName={previewFile?.name ?? ""}
-        onClose={() => setPreviewFile(null)}
       />
     </section>
   );

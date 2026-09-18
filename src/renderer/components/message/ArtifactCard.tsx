@@ -1,5 +1,4 @@
 import { memo, useState, useCallback, useEffect } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Check, Copy, CirclePlay, Video } from "lucide-react";
 import { useAppStore } from "../../store";
@@ -12,7 +11,6 @@ import {
 } from "../../utils/video-reference";
 import { shortenPath } from "./toolHelpers";
 import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
-import { FilePreviewModal } from "../FilePreviewModal";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { isBrowserOpenableExt } from "../../utils/file-preview";
 import { openFilePathInBrowser } from "../../utils/open-in-browser";
@@ -115,11 +113,8 @@ export const ArtifactCard = memo(function ArtifactCard({
   });
   const setReviewOpen = useAppStore((s) => s.setReviewOpen);
   const setReviewTargetFile = useAppStore((s) => s.setReviewTargetFile);
+  const openPreview = useAppStore((s) => s.openPreview);
 
-  const [previewFile, setPreviewFile] = useState<{
-    path: string;
-    autoPlay?: boolean;
-  } | null>(null);
   const [revertedFiles, setRevertedFiles] = useState<Set<string>>(new Set());
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
   const [revertConfirm, setRevertConfirm] = useState<ResultFileEntry | null>(
@@ -253,24 +248,27 @@ export const ArtifactCard = memo(function ArtifactCard({
     async (file: ResultFileEntry) => {
       if (revertedFiles.has(file.path)) return;
       const resolvedPath = resolvePath(file.path);
-      const openPreview = () => {
+      const handleOpenFileRow = () => {
         const iDot = resolvedPath.lastIndexOf(".");
         const ext = iDot > 0 ? resolvedPath.slice(iDot).toLowerCase() : "";
         if (isBrowserOpenableExt(ext)) {
           openFilePathInBrowser(resolvedPath);
           return;
         }
-        setPreviewFile({ ...file, path: resolvedPath });
+        openPreview({
+          path: resolvedPath,
+          name: resolvedPath.split(/[/\\]/).pop() || resolvedPath,
+        });
       };
 
       if (isNew(file) || !isGitRepo || !activeSessionCwd) {
-        openPreview();
+        handleOpenFileRow();
         return;
       }
 
       const getDiffFiles = window.electronAPI?.review?.getDiffFiles;
       if (!getDiffFiles) {
-        openPreview();
+        handleOpenFileRow();
         return;
       }
 
@@ -297,19 +295,20 @@ export const ArtifactCard = memo(function ArtifactCard({
         });
 
         if (!matchingDiffFile) {
-          openPreview();
+          handleOpenFileRow();
           return;
         }
 
         setReviewTargetFile(matchingDiffFile.path);
         setReviewOpen(true);
       } catch {
-        openPreview();
+        handleOpenFileRow();
       }
     },
     [
       activeSessionCwd,
       isGitRepo,
+      openPreview,
       resolvePath,
       revertedFiles,
       setReviewTargetFile,
@@ -317,9 +316,16 @@ export const ArtifactCard = memo(function ArtifactCard({
     ],
   );
 
-  const handleClickVideo = useCallback((reference: VideoReference) => {
-    setPreviewFile({ path: reference.path, autoPlay: true });
-  }, []);
+  const handleClickVideo = useCallback(
+    (reference: VideoReference) => {
+      openPreview({
+        path: reference.path,
+        name: reference.name,
+        autoPlay: true,
+      });
+    },
+    [openPreview],
+  );
 
   if (allItems.length === 0) return null;
 
@@ -501,18 +507,6 @@ export const ArtifactCard = memo(function ArtifactCard({
         onConfirm={confirmRevert}
         onCancel={() => setRevertConfirm(null)}
       />
-
-      {previewFile &&
-        createPortal(
-          <FilePreviewModal
-            isOpen
-            filePath={previewFile.path}
-            fileName={previewFile.path.split(/[/\\]/).pop() || previewFile.path}
-            autoPlay={previewFile.autoPlay}
-            onClose={() => setPreviewFile(null)}
-          />,
-          document.body,
-        )}
     </>
   );
 });

@@ -7,10 +7,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { AccountMenu } from "../src/renderer/components/AccountMenu";
 import { ChatInputStatusBar } from "../src/renderer/components/ChatInputStatusBar";
-import { FilePreviewModal } from "../src/renderer/components/FilePreviewModal";
+import { FilePreviewPanel } from "../src/renderer/components/FilePreviewPanel";
 import { GlobalNoticeToast } from "../src/renderer/components/GlobalNoticeToast";
 import { LoginModal } from "../src/renderer/components/LoginModal";
 import { SandboxSyncToast } from "../src/renderer/components/SandboxSyncToast";
+import { useAppStore } from "../src/renderer/store";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -62,23 +63,25 @@ describe("renderer motion policy", () => {
   });
 
   it("keeps heavy file previews free of full-screen blur and entrance transforms", () => {
+    useAppStore.setState({
+      previewTabs: [{ path: "/tmp/example.txt", name: "example.txt" }],
+      activePreviewTab: "/tmp/example.txt",
+      rightPanelMode: "preview",
+    });
     act(() => {
-      root.render(
-        createElement(FilePreviewModal, {
-          isOpen: true,
-          filePath: "/tmp/example.txt",
-          fileName: "example.txt",
-          onClose: () => undefined,
-        }),
-      );
+      root.render(createElement(FilePreviewPanel));
     });
 
-    const overlay = container.firstElementChild;
-    const card = overlay?.firstElementChild;
-    expect(overlay?.classList.contains("bg-black/40")).toBe(true);
-    expect(overlay?.classList.contains("modal-overlay")).toBe(false);
-    expect(overlay?.classList.contains("animate-fade-in")).toBe(false);
-    expect(card?.classList.contains("animate-slide-up")).toBe(false);
+    const panel = container.firstElementChild;
+    expect(panel).not.toBeNull();
+    expect(panel?.querySelector('[data-testid="preview-tab"]')).not.toBeNull();
+    expect(panel?.classList.contains("bg-black/40")).toBe(false);
+    expect(panel?.classList.contains("modal-overlay")).toBe(false);
+    expect(panel?.classList.contains("animate-fade-in")).toBe(false);
+    expect(panel?.classList.contains("backdrop-blur-sm")).toBe(false);
+    expect(
+      panel?.firstElementChild?.classList.contains("animate-slide-up"),
+    ).toBe(false);
   });
 
   it("renders directional toast entrance classes on the final DOM", () => {

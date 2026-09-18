@@ -30,6 +30,7 @@ function buttonTitleCount(relPath: string): number {
 /** 刻意保留 title 的按钮（截断文本 / 路径 / 标签看全文，不是操作提示）。
  *  见设计文档 §6.1。数量是该文件允许残留的 button title 数。 */
 const ALLOWED_BUTTON_TITLES: Record<string, number> = {
+  "components/FilePreviewPanel.tsx": 1,
   "components/MergedInputChip.tsx": 2,
   "components/message/ContentBlockView.tsx": 4,
   "components/settings/SettingsLogs.tsx": 1,

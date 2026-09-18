@@ -6,10 +6,8 @@ import {
   cloneElement,
   memo,
   useMemo,
-  useState,
   useCallback,
 } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import { PanelErrorBoundary } from "../PanelErrorBoundary";
@@ -36,7 +34,6 @@ import { ThinkingBlock } from "./ThinkingBlock";
 import { UserTextWithTokens } from "./UserTextWithTokens";
 import { ToolUseBlock } from "./ToolUseBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
-import { FilePreviewModal } from "../FilePreviewModal";
 import type { ImageSource } from "../ImageLightbox";
 import {
   isBrowserOpenableExt,
@@ -88,11 +85,7 @@ export const ContentBlockView = memo(function ContentBlockView({
   const currentWorkingDir = activeSession?.cwd || workingDir;
 
   const openLightbox = useAppStore((s) => s.openLightbox);
-
-  const [previewFile, setPreviewFile] = useState<{
-    path: string;
-    name: string;
-  } | null>(null);
+  const openPreview = useAppStore((s) => s.openPreview);
 
   const resolveFilePath = (value: string) =>
     resolvePathAgainstWorkspace(value, currentWorkingDir);
@@ -108,7 +101,7 @@ export const ContentBlockView = memo(function ContentBlockView({
       }
       if (isPreviewableExt(ext)) {
         const fileName = value.split(/[/\\]/).pop() || value;
-        setPreviewFile({ path: resolvedPath, name: fileName });
+        openPreview({ path: resolvedPath, name: fileName });
         return;
       }
       if (
@@ -140,7 +133,7 @@ export const ContentBlockView = memo(function ContentBlockView({
         });
       }
     },
-    [currentWorkingDir, resolveFilePath, setGlobalNotice, t],
+    [currentWorkingDir, openPreview, resolveFilePath, setGlobalNotice, t],
   );
 
   const renderFileButton = (value: string, key?: string) => (
@@ -211,7 +204,7 @@ export const ContentBlockView = memo(function ContentBlockView({
                 onClick={() => {
                   const fileName =
                     localFilePath.split(/[/\\]/).pop() || localFilePath;
-                  setPreviewFile({ path: localFilePath, name: fileName });
+                  openPreview({ path: localFilePath, name: fileName });
                 }}
                 className={getFileLinkButtonClassName()}
                 title={localFilePath}
@@ -548,7 +541,7 @@ export const ContentBlockView = memo(function ContentBlockView({
                 openFilePathInBrowser(attachmentPath);
                 return;
               }
-              setPreviewFile({
+              openPreview({
                 path: attachmentPath,
                 name: fileBlock.filename,
               });
@@ -594,19 +587,5 @@ export const ContentBlockView = memo(function ContentBlockView({
     }
   })();
 
-  return (
-    <>
-      {content}
-      {previewFile &&
-        createPortal(
-          <FilePreviewModal
-            isOpen={true}
-            filePath={previewFile.path}
-            fileName={previewFile.name}
-            onClose={() => setPreviewFile(null)}
-          />,
-          document.body,
-        )}
-    </>
-  );
+  return <>{content}</>;
 });
