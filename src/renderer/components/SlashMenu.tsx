@@ -187,7 +187,7 @@ export function SlashMenu({
                   index={idx}
                   selectedIndex={selectedIndex}
                   onSelect={() => onSelect(item)}
-                  label={`/${item.command.name}`}
+                  label={item.command.name}
                   description={item.command.description}
                   icon={
                     isExtension ? (
@@ -218,7 +218,7 @@ export function SlashMenu({
                 index={idx}
                 selectedIndex={selectedIndex}
                 onSelect={() => onSelect(item)}
-                label={`/skill:${item.skill.name}`}
+                label={item.skill.name}
                 description={item.skill.description}
                 icon={
                   <Sparkles className="w-4 h-4 text-text-muted flex-shrink-0" />

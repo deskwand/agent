@@ -77,16 +77,19 @@ describe("SlashMenu skill source badges", () => {
  * 共享 token 含 gap-2，无论图标多大都绿 —— 等于没守。）
  */
 describe("SlashMenu menu rows", () => {
+  const SKILL_NAMES = SKILL_TYPES.map((type) => `${type}-skill`);
+
+  /** 行 = 文本以某个已知技能名开头（菜单里不以名字开头的只有 tab 按钮与徽章）。 */
   function skillRows(): Element[] {
     const document = renderMenu("all");
     return [...document.querySelectorAll("button")].filter((element) =>
-      element.textContent?.trim().startsWith("/skill:"),
+      SKILL_NAMES.some((name) => element.textContent?.trim().startsWith(name)),
     );
   }
 
   it("carries the shared row tokens", () => {
     const rows = skillRows();
-    expect(rows.length).toBeGreaterThan(0);
+    expect(rows).toHaveLength(SKILL_TYPES.length);
     for (const row of rows) {
       for (const cls of ["h-9", "rounded-lg", "text-sm", "items-center"]) {
         expect(row.classList).toContain(cls);

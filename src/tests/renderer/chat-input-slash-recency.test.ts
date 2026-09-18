@@ -34,6 +34,12 @@ const SKILLS: Skill[] = [
   },
 ];
 
+/**
+ * 菜单里会出现的全部行名：技能 alpha / beta、内置命令 compact / goal、扩展命令 plan。
+ * 行识别与存在性断言共用它 —— 别在两处各写一份（顺序不一致就会漂移）。
+ */
+const MENU_ROW_NAMES = ["alpha", "beta", "compact", "goal", "plan"];
+
 function mockElectronApi() {
   (window as unknown as { electronAPI?: unknown }).electronAPI = {
     skills: { getAll: () => Promise.resolve(SKILLS) },
@@ -116,10 +122,10 @@ describe("slash menu recency", () => {
     mockElectronApi();
     root = await renderChatInput(container);
     await openSlashMenu(container);
-    await waitForRow(container, "/plan");
+    await waitForRow(container, "plan");
 
     const planRow = [...container.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("/plan"),
+      b.textContent?.includes("plan"),
     )!;
     await act(async () => {
       planRow.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
@@ -137,15 +143,14 @@ describe("slash menu recency", () => {
     );
     root = await renderChatInput(container);
     await openSlashMenu(container);
-    await waitForRow(container, "/skill:beta"); // wait for skills to load
+    await waitForRow(container, "beta"); // wait for skills to load
 
+    // 行 = 文本以某个已知名字开头（tab 按钮是 chat.*，空态是 chat.slashNoMatch）
     const rows = [...container.querySelectorAll("button")]
-      .map((b) => b.textContent ?? "")
-      .filter((t) => t.startsWith("/"));
-    expect(rows[0]).toContain("/skill:alpha");
-    // toContain on an array is strict-equality; rows are full textContent
-    // strings ("label — desc badge"), so join before substring matching.
-    expect(rows.join("\n")).toContain("/compact");
+      .map((b) => (b.textContent ?? "").trim())
+      .filter((text) => MENU_ROW_NAMES.some((name) => text.startsWith(name)));
+    expect(rows[0].startsWith("alpha")).toBe(true);
+    expect(rows.some((text) => text.startsWith("compact"))).toBe(true);
   });
 
   it("selects the recency-first item via keyboard Enter in the all tab", async () => {
@@ -156,7 +161,7 @@ describe("slash menu recency", () => {
     );
     root = await renderChatInput(container);
     await openSlashMenu(container);
-    await waitForRow(container, "/skill:beta"); // wait for skills to load
+    await waitForRow(container, "beta"); // wait for skills to load
 
     const editor = editorEl(container);
     await act(async () => {
@@ -172,7 +177,7 @@ describe("slash menu recency", () => {
     mockElectronApi();
     root = await renderChatInput(container);
     await openSlashMenu(container);
-    await waitForRow(container, "/plan"); // wait for plugin command to load
+    await waitForRow(container, "plan"); // wait for plugin command to load
 
     const editor = editorEl(container);
     // Separate act blocks: React batches two synthetic events dispatched in
@@ -190,6 +195,35 @@ describe("slash menu recency", () => {
     });
     // no recency preset: row 0 = /compact, row 1 = /goal
     expect(serializeEditor(editor)).toBe("/goal ");
+  });
+
+  it("菜单行只显示裸名，没有 / 与 /skill: 前缀", async () => {
+    mockElectronApi();
+    root = await renderChatInput(container);
+    await openSlashMenu(container);
+    // 技能与扩展命令都是异步到的，等最晚的一批
+    await waitForRow(container, "plan");
+    await waitForRow(container, "beta");
+
+    const rows = [...container.querySelectorAll("button")]
+      .map((b) => (b.textContent ?? "").trim())
+      // 行 = 以某个已知名字开头；tab 按钮文案是 chat.*、空态是 chat.slashNoMatch，都不会命中
+      .filter((text) => MENU_ROW_NAMES.some((name) => text.startsWith(name)));
+
+    // 存在性：每个已知名字都必须有一行以它开头
+    for (const name of MENU_ROW_NAMES) {
+      expect(
+        rows.some((text) => text.startsWith(name)),
+        name,
+      ).toBe(true);
+    }
+
+    // 不存在性：前缀必须真的没了。断言对象是**整个菜单文本**，不是上面的 rows ——
+    // rows 已被"以裸名开头"筛过，带前缀的行根本进不来，对它断言恒真（等于没守）。
+    expect(container.textContent).not.toContain("/skill:");
+    for (const command of ["compact", "goal", "plan"]) {
+      expect(container.textContent, command).not.toContain(`/${command}`);
+    }
   });
 });
 

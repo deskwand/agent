@@ -81,7 +81,7 @@ async function renderAndOpenMenu() {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
     });
-    if (container.textContent?.includes("/skill:alpha")) return;
+    if (container.textContent?.includes("alpha")) return;
   }
   throw new Error(
     `技能行没出现。容器内容：${container.textContent?.slice(0, 300)}`,
@@ -92,7 +92,7 @@ describe("斜杠选中插入 token", () => {
   it("选中技能后编辑器里是一个原子 token，序列化回 /skill: 原文", async () => {
     await renderAndOpenMenu();
     const row = [...container.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("/skill:alpha"),
+      b.textContent?.includes("alpha"),
     )!;
     await act(async () => {
       row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
@@ -113,12 +113,12 @@ describe("斜杠选中插入 token", () => {
         await new Promise((r) => setTimeout(r, 0));
       });
       const found = [...container.querySelectorAll("button")].some((b) =>
-        b.textContent?.includes("/plan"),
+        b.textContent?.includes("plan"),
       );
       if (found) break;
     }
     const row = [...container.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("/plan"),
+      b.textContent?.includes("plan"),
     )!;
     await act(async () => {
       row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
@@ -133,7 +133,7 @@ describe("斜杠选中插入 token", () => {
   it("插入后菜单关闭", async () => {
     await renderAndOpenMenu();
     const row = [...container.querySelectorAll("button")].find((b) =>
-      b.textContent?.includes("/skill:alpha"),
+      b.textContent?.includes("alpha"),
     )!;
     await act(async () => {
       row.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
