@@ -142,6 +142,22 @@ export function Titlebar() {
     </div>
   );
 
+  const sidebarToggle = (
+    <TitlebarButton
+      label={
+        sidebarCollapsed ? t("context.expandPanel") : t("context.collapsePanel")
+      }
+      tone="secondary"
+      onClick={toggleSidebar}
+    >
+      {sidebarCollapsed ? (
+        <PanelLeft className="w-3.5 h-3.5" />
+      ) : (
+        <Columns2 className="w-3.5 h-3.5" />
+      )}
+    </TitlebarButton>
+  );
+
   return (
     <div className="h-10 bg-background-secondary border-b border-border flex items-center titlebar-drag shrink-0">
       {/* macOS: Traffic lights are positioned by trafficLightPosition, we just need left padding */}
@@ -151,30 +167,17 @@ export function Titlebar() {
       >
         {showSessionHeader ? (
           <div className="h-full grid grid-cols-[17.5rem_1fr_18rem] items-center">
-            <div className="titlebar-no-drag px-2">
-              <TitlebarButton
-                label={
-                  sidebarCollapsed
-                    ? t("context.expandPanel")
-                    : t("context.collapsePanel")
-                }
-                tone="secondary"
-                onClick={toggleSidebar}
-              >
-                {sidebarCollapsed ? (
-                  <PanelLeft className="w-3.5 h-3.5" />
-                ) : (
-                  <Columns2 className="w-3.5 h-3.5" />
-                )}
-              </TitlebarButton>
-            </div>
+            <div className="titlebar-no-drag px-2">{sidebarToggle}</div>
             <div className="text-sm font-medium text-text-primary text-center truncate px-4">
               {activeSessionTitle}
             </div>
             {rightToolbar}
           </div>
         ) : !showSettings ? (
-          <div className="h-full flex items-center justify-end titlebar-no-drag">
+          // 没有会话时也不能只剩右侧工具条：侧栏会被预览/浏览器自动收起，
+          // 少了这个按钮就再也展不开。
+          <div className="h-full flex items-center justify-between titlebar-no-drag">
+            <div className="px-2">{sidebarToggle}</div>
             {rightToolbar}
           </div>
         ) : null}

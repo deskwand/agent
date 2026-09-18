@@ -9,6 +9,7 @@ function resetStore() {
     contextPanelWidth: 340,
     sidebarCollapsed: false,
     sidebarWidth: 280,
+    sidebarCollapsedBeforePanels: null,
   });
 }
 

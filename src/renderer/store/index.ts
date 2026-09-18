@@ -22,6 +22,7 @@ import type {
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
 import { initialPreviewWidth } from "../utils/panel-width";
+import type { RightPanelMode } from "../utils/browser-visibility";
 import type { ImageSource } from "../components/ImageLightbox";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
@@ -156,7 +157,8 @@ interface AppState {
   /** Pi 扩展 setEditorText 待写入聊天输入框的内容（写入后清空）。 */
   pendingEditorText: string | null;
   sidebarCollapsed: boolean;
-  sidebarCollapsedBeforeBrowser: boolean;
+  /** 自动折叠前侧栏是否收起；null = 当前没有生效中的自动折叠 */
+  sidebarCollapsedBeforePanels: boolean | null;
   sidebarWidth: number;
   contextPanelWidth: number;
   browserWidthManual: boolean;
@@ -168,6 +170,8 @@ interface AppState {
   activePreviewTab: string | null;
   rightPanelPreviousMode: "files" | "browser" | null;
   previewWidth: number | null;
+  /** 预览宽度是否已被用户手动拖拽过；false 时随布局自动重算 */
+  previewWidthManual: boolean;
   isReviewOpen: boolean;
   reviewTargetFile: string | null;
   isArtifactPanelOpen: boolean;
@@ -346,6 +350,7 @@ interface AppState {
   closePreviewTab: (path: string) => void;
   closePreviewPanel: () => void;
   setPreviewWidth: (width: number) => void;
+  setPreviewWidthManual: (manual: boolean) => void;
   setReviewOpen: (open: boolean) => void;
   setReviewTargetFile: (path: string | null) => void;
   toggleArtifactPanel: () => void;
@@ -463,7 +468,7 @@ export const useAppStore = create<AppState>((set) => ({
   isLoading: false,
   pendingEditorText: null,
   sidebarCollapsed: false,
-  sidebarCollapsedBeforeBrowser: false,
+  sidebarCollapsedBeforePanels: null,
   sidebarWidth: 280,
   contextPanelWidth: 288,
   browserWidthManual: false,
@@ -474,6 +479,7 @@ export const useAppStore = create<AppState>((set) => ({
   activePreviewTab: null as string | null,
   rightPanelPreviousMode: null as "files" | "browser" | null,
   previewWidth: null as number | null,
+  previewWidthManual: false,
   isReviewOpen: false,
   reviewTargetFile: null,
   isArtifactPanelOpen: false,
@@ -576,6 +582,7 @@ export const useAppStore = create<AppState>((set) => ({
       }
       return {
         ...clearedPreview(),
+        ...sidebarSyncForMode(state, state.rightPanelPreviousMode),
         rightPanelMode: state.rightPanelPreviousMode,
         activeSessionId: sessionId,
       };
@@ -1001,8 +1008,12 @@ export const useAppStore = create<AppState>((set) => ({
   // UI actions
   setLoading: (loading) => set({ isLoading: loading }),
   toggleSidebar: () =>
-    set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
-  setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+    set((state) => ({
+      sidebarCollapsed: !state.sidebarCollapsed,
+      sidebarCollapsedBeforePanels: null,
+    })),
+  setSidebarCollapsed: (collapsed) =>
+    set({ sidebarCollapsed: collapsed, sidebarCollapsedBeforePanels: null }),
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   setContextPanelWidth: (width) => set({ contextPanelWidth: width }),
   setActiveView: (activeView) => set({ activeView }),
@@ -1011,17 +1022,25 @@ export const useAppStore = create<AppState>((set) => ({
   setShowApps: (show) => set({ activeView: show ? "apps" : "chat" }),
   setSettingsTab: (tab) => set({ settingsTab: tab }),
   setRightPanelMode: (mode) =>
-    set({ ...clearedPreview(), rightPanelMode: mode }),
+    set((state) => ({
+      ...clearedPreview(),
+      ...sidebarSyncForMode(state, mode),
+      rightPanelMode: mode,
+    })),
   setReviewOpen: (open) => set({ isReviewOpen: open }),
   setReviewTargetFile: (path) => set({ reviewTargetFile: path }),
   toggleArtifactPanel: () =>
     set((state) => ({ isArtifactPanelOpen: !state.isArtifactPanelOpen })),
   setArtifactPanelOpen: (open) => set({ isArtifactPanelOpen: open }),
   toggleFileBrowser: () =>
-    set((state) => ({
-      ...clearedPreview(),
-      rightPanelMode: state.rightPanelMode === "files" ? null : "files",
-    })),
+    set((state) => {
+      const next = state.rightPanelMode === "files" ? null : "files";
+      return {
+        ...clearedPreview(),
+        ...sidebarSyncForMode(state, next),
+        rightPanelMode: next,
+      };
+    }),
   toggleReviewPanel: () =>
     set((state) => ({ isReviewOpen: !state.isReviewOpen })),
   toggleBrowserPanel: () =>
@@ -1029,19 +1048,14 @@ export const useAppStore = create<AppState>((set) => ({
       if (state.rightPanelMode === "browser") {
         return {
           ...clearedPreview(),
+          ...sidebarSyncForMode(state, null),
           rightPanelMode: null,
-          sidebarCollapsed: state.sidebarCollapsedBeforeBrowser,
         };
       }
       return {
         ...clearedPreview(),
+        ...sidebarSyncForMode(state, "browser"),
         rightPanelMode: "browser",
-        // 从预览切过来时侧栏已经是收起状态，此时不能把它当成「打开浏览器前的状态」
-        sidebarCollapsedBeforeBrowser:
-          state.rightPanelMode === "preview"
-            ? state.sidebarCollapsedBeforeBrowser
-            : state.sidebarCollapsed,
-        sidebarCollapsed: true,
         browserWidthManual: false,
       };
     }),
@@ -1050,7 +1064,11 @@ export const useAppStore = create<AppState>((set) => ({
   openPreview: (tab) =>
     set((state) => {
       const existing = state.previewTabs.find((item) => item.path === tab.path);
+      const sidebarPatch = sidebarSyncForMode(state, "preview");
+      const collapsedAfterPatch =
+        sidebarPatch.sidebarCollapsed ?? state.sidebarCollapsed;
       return {
+        ...sidebarPatch,
         // 已在标签里的文件只聚焦，不改写标签文案；但「播放」这类请求要生效。
         previewTabs: existing
           ? state.previewTabs.map((item) =>
@@ -1066,12 +1084,13 @@ export const useAppStore = create<AppState>((set) => ({
             ? state.rightPanelPreviousMode
             : state.rightPanelMode,
         previewWidth:
-          state.previewWidth ??
-          initialPreviewWidth(
-            window.innerWidth,
-            state.sidebarCollapsed,
-            state.sidebarWidth,
-          ),
+          state.previewWidthManual && state.previewWidth !== null
+            ? state.previewWidth
+            : initialPreviewWidth(
+                window.innerWidth,
+                collapsedAfterPatch,
+                state.sidebarWidth,
+              ),
       };
     }),
 
@@ -1083,6 +1102,7 @@ export const useAppStore = create<AppState>((set) => ({
       if (remaining.length === 0) {
         return {
           ...clearedPreview(),
+          ...sidebarSyncForMode(state, state.rightPanelPreviousMode),
           rightPanelMode: state.rightPanelPreviousMode,
         };
       }
@@ -1099,10 +1119,12 @@ export const useAppStore = create<AppState>((set) => ({
   closePreviewPanel: () =>
     set((state) => ({
       ...clearedPreview(),
+      ...sidebarSyncForMode(state, state.rightPanelPreviousMode),
       rightPanelMode: state.rightPanelPreviousMode,
     })),
 
   setPreviewWidth: (width) => set({ previewWidth: width }),
+  setPreviewWidthManual: (manual) => set({ previewWidthManual: manual }),
 
   // Permission actions
   setPendingPermission: (permission) => set({ pendingPermission: permission }),
@@ -1358,15 +1380,15 @@ export const useAppStore = create<AppState>((set) => ({
   exitBrowserFullscreen: () =>
     set((state) => {
       const snapshot = state.browserFullscreenSnapshot;
+      if (!snapshot) {
+        return { isBrowserFullscreen: false, browserFullscreenSnapshot: null };
+      }
       return {
         isBrowserFullscreen: false,
         browserFullscreenSnapshot: null,
-        ...(snapshot
-          ? {
-              rightPanelMode: snapshot.rightPanelMode,
-              contextPanelWidth: snapshot.contextPanelWidth,
-            }
-          : {}),
+        ...sidebarSyncForMode(state, snapshot.rightPanelMode),
+        rightPanelMode: snapshot.rightPanelMode,
+        contextPanelWidth: snapshot.contextPanelWidth,
       };
     }),
 }));
@@ -1453,3 +1475,41 @@ const clearedPreview = () => ({
   activePreviewTab: null as string | null,
   rightPanelPreviousMode: null as "files" | "browser" | null,
 });
+
+const PANEL_MODES: readonly RightPanelMode[] = ["preview", "browser"];
+const isPanelMode = (mode: RightPanelMode) => PANEL_MODES.includes(mode);
+
+/** 侧栏同步补丁：只可能写这两个字段。 */
+type SidebarSyncPatch = Partial<
+  Pick<AppState, "sidebarCollapsed" | "sidebarCollapsedBeforePanels">
+>;
+
+/**
+ * 右侧槽位模式变化时同步侧栏：
+ * - 从「非面板」进入 preview/browser：自动收起并记快照
+ * - 从 preview/browser 离开到「非面板」：若快照非空则还原
+ * - 面板家族内部切换（preview↔browser）与「非面板 ↔ 非面板」：一律不动
+ */
+const sidebarSyncForMode = (
+  state: Pick<
+    AppState,
+    "rightPanelMode" | "sidebarCollapsed" | "sidebarCollapsedBeforePanels"
+  >,
+  nextMode: RightPanelMode,
+): SidebarSyncPatch => {
+  const fromPanel = isPanelMode(state.rightPanelMode);
+  const toPanel = isPanelMode(nextMode);
+  if (!fromPanel && toPanel) {
+    return {
+      sidebarCollapsed: true,
+      sidebarCollapsedBeforePanels: state.sidebarCollapsed,
+    };
+  }
+  if (fromPanel && !toPanel && state.sidebarCollapsedBeforePanels !== null) {
+    return {
+      sidebarCollapsed: state.sidebarCollapsedBeforePanels,
+      sidebarCollapsedBeforePanels: null,
+    };
+  }
+  return {};
+};

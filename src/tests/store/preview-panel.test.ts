@@ -8,7 +8,7 @@ const TAB_C = { path: "/repo/c.ts", name: "c.ts" };
 
 function resetStore(): void {
   useAppStore.setState(useAppStore.getInitialState());
-  // jsdom 的 window.innerWidth 是 1024 → 可用宽 744 → 默认预览宽 372
+  // jsdom 的 window.innerWidth 是 1024 → 预览打开时侧栏自动收起 → 默认预览宽 512
   useAppStore.setState({ sidebarCollapsed: false, sidebarWidth: 280 });
 }
 
@@ -62,18 +62,6 @@ describe("preview panel store", () => {
     expect(useAppStore.getState().previewTabs).toEqual([
       { path: TAB_A.path, name: "a.ts", autoPlay: true },
     ]);
-  });
-
-  it("keeps the sidebar snapshot when the browser panel reopens from a preview", () => {
-    useAppStore.getState().toggleBrowserPanel();
-    expect(useAppStore.getState().sidebarCollapsedBeforeBrowser).toBe(false);
-
-    useAppStore.getState().openPreview(TAB_A);
-    useAppStore.getState().toggleBrowserPanel();
-    expect(useAppStore.getState().sidebarCollapsedBeforeBrowser).toBe(false);
-
-    useAppStore.getState().toggleBrowserPanel();
-    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
   });
 
   it("activates the right neighbour when the active tab closes", () => {
@@ -194,7 +182,7 @@ describe("preview panel store", () => {
     useAppStore.setState({ contextPanelWidth: 288 });
 
     useAppStore.getState().openPreview(TAB_A);
-    expect(useAppStore.getState().previewWidth).toBe(372);
+    expect(useAppStore.getState().previewWidth).toBe(512);
     expect(useAppStore.getState().contextPanelWidth).toBe(288);
 
     useAppStore.getState().closePreviewTab(TAB_A.path);
@@ -204,10 +192,34 @@ describe("preview panel store", () => {
   it("keeps the width the user dragged across previews", () => {
     useAppStore.getState().openPreview(TAB_A);
     useAppStore.getState().setPreviewWidth(720);
+    useAppStore.getState().setPreviewWidthManual(true);
     useAppStore.getState().closePreviewTab(TAB_A.path);
 
     useAppStore.getState().openPreview(TAB_B);
 
     expect(useAppStore.getState().previewWidth).toBe(720);
+  });
+
+  it("recomputes the preview width for a fresh preview", () => {
+    useAppStore.getState().openPreview(TAB_A);
+    expect(useAppStore.getState().previewWidth).toBe(512);
+
+    useAppStore.getState().setPreviewWidth(400);
+    useAppStore.getState().openPreview(TAB_B);
+
+    // 没手动拖过（previewWidthManual 仍为 false）→ 跟随布局重算
+    expect(useAppStore.getState().previewWidth).toBe(512);
+  });
+
+  it("returns to the layout width after the handle is double clicked", () => {
+    useAppStore.getState().openPreview(TAB_A);
+    useAppStore.getState().setPreviewWidth(900);
+    useAppStore.getState().setPreviewWidthManual(true);
+
+    useAppStore.getState().setPreviewWidthManual(false);
+    useAppStore.getState().closePreviewTab(TAB_A.path);
+    useAppStore.getState().openPreview(TAB_B);
+
+    expect(useAppStore.getState().previewWidth).toBe(512);
   });
 });

@@ -19,6 +19,9 @@ describe("openFilePathInBrowser", () => {
 
     expect(useAppStore.getState().rightPanelMode).toBe("browser");
     expect(navigate).toHaveBeenCalledWith("file:///repo/index.html");
+    // 进入面板家族 → 侧栏自动收起并记快照
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    expect(useAppStore.getState().sidebarCollapsedBeforePanels).toBe(false);
   });
 
   it("keeps an already-open browser panel open", () => {

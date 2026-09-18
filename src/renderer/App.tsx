@@ -127,6 +127,7 @@ function App() {
   const previewWidth = useAppStore((s) => s.previewWidth);
   const activePreviewTab = useAppStore((s) => s.activePreviewTab);
   const setPreviewWidth = useAppStore((s) => s.setPreviewWidth);
+  const setPreviewWidthManual = useAppStore((s) => s.setPreviewWidthManual);
   const hasBrowserOcclusion = useAppStore(
     (state) => state.browserOcclusionIds.size > 0,
   );
@@ -450,6 +451,7 @@ function App() {
                   setPreviewWidth(
                     clampPreviewWidth(panelWidth - delta, panelAvailableWidth),
                   );
+                  setPreviewWidthManual(true);
                   return;
                 }
                 setBrowserWidthManual(true);
@@ -464,6 +466,7 @@ function App() {
               }}
               onDoubleClick={() => {
                 if (rightPanelMode === "preview") {
+                  setPreviewWidthManual(false);
                   setPreviewWidth(
                     initialPreviewWidth(
                       window.innerWidth,
