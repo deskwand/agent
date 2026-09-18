@@ -347,15 +347,11 @@ export function WelcomeView() {
               }}
               contextUsagePercentage={0}
               contextRingColorClass="text-accent"
-              contextUsageTooltip={t("chat.contextUsageTooltip", {
-                percentage: 0,
-                used: "0",
-                total: contextWindowTotal,
-                promptNonCache: "--",
-                output: "--",
-                cacheRead: "--",
+              contextStatusDetails={{
+                usedLabel: "0",
+                totalLabel: contextWindowTotal,
                 cacheHitRate: "--",
-              })}
+              }}
               canStop={false}
               onStop={() => {}}
               isSubmitting={isSubmitting}

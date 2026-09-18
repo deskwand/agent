@@ -19,6 +19,9 @@ import {
 } from "../../renderer/components/ChatInputBottomBar";
 
 vi.mock("react-i18next", () => ({
+  // 底栏现在会经 StatusPopover → utils/i18n-format → i18n/config 间接引用这个插件，
+  // 整模块 mock 必须补上占位，否则配置模块在 import 期就抛错。
+  initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
@@ -55,7 +58,11 @@ const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
   onSelectThinkingLevel: () => {},
   contextUsagePercentage: 0,
   contextRingColorClass: "",
-  contextUsageTooltip: "",
+  contextStatusDetails: {
+    usedLabel: "0",
+    totalLabel: "0",
+    cacheHitRate: "--",
+  },
   canStop: false,
   onStop: () => {},
   isSubmitting: false,

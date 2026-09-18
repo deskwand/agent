@@ -150,6 +150,7 @@ import { getLocale, setLocale, t } from "./i18n";
 import { autoUpdater } from "electron-updater";
 import { initUpdater } from "./updater";
 import { initOAuthService } from "./auth/oauth-service";
+import { initQuotaIpc } from "./quota";
 import { startGoogleAuth } from "./oauth/google-auth-handler";
 import { openRouterPkceService } from "./auth/openrouter-pkce-service";
 import { fetchOpenRouterModels } from "./config/openrouter-models";
@@ -1441,6 +1442,8 @@ ipcMain.on("client-event", async (_event, data: ClientEvent) => {
 
 // ── OAuth IPC handlers ──
 initOAuthService();
+// ── Quota IPC handler ──
+initQuotaIpc();
 registerVaultIpc();
 ipcMain.handle("openrouterAuth.login", async () => {
   return openRouterPkceService.login();

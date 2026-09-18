@@ -916,7 +916,6 @@
     "thinkingLevel.medium": "Medium",
     "thinkingLevel.high": "High",
     "thinkingLevel.xhigh": "X-High",
-    "contextUsageTooltip": "Context: {{used}} / {{total}}  ({{percentage}})\nPrompt  {{promptNonCache}}\nCache hit rate  {{cacheHitRate}}\nCache hit  {{cacheRead}}\nOutput  {{output}}",
     "approximateValue": "~{{value}}",
     "connectorCount_one": "{{count}} connector",
     "connectorCount_other": "{{count}} connectors",
@@ -1807,5 +1806,13 @@
   },
   "attachTile": {
     "remove": "Remove attachment"
+  },
+  "statusPopover": {
+    "ringTooltip": "Context & usage",
+    "context": "Context",
+    "cacheHitRate": "Cache hit rate {{rate}}",
+    "windowSession": "5h window",
+    "windowWeekly": "7d window",
+    "resetAt": "Resets {{time}}"
   }
 }

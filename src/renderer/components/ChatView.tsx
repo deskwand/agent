@@ -20,10 +20,7 @@ import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { attachmentKeySet } from "../utils/attached-files";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
-import {
-  formatContextPercentage,
-  resolveDisplayedContextUsage,
-} from "../utils/context-usage";
+import { resolveDisplayedContextUsage } from "../utils/context-usage";
 import { MessageCard } from "./MessageCard";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import type {
@@ -491,36 +488,14 @@ export function ChatView() {
     displayedContextTokens === null
       ? "--"
       : formatTokenCount(displayedContextTokens);
-  const contextUsageTooltip = t("chat.contextUsageTooltip", {
-    percentage: formatContextPercentage(
-      displayedContextTokens === null
-        ? null
-        : displayedContextUsage.isEstimated
-          ? t("chat.approximateValue", {
-              value: Math.round(contextUsagePercentage),
-            })
-          : Math.round(contextUsagePercentage),
-    ),
-    used:
+  const contextStatusDetails = {
+    usedLabel:
       displayedContextUsage.isEstimated && displayedContextTokens !== null
         ? t("chat.approximateValue", { value: formattedUsed })
         : formattedUsed,
-    total: formatTokenCount(contextWindow || 0),
-    output:
-      showExactUsageDetails && typeof latestAssistantUsage?.output === "number"
-        ? formatTokenCount(latestAssistantUsage.output)
-        : "--",
-    cacheRead:
-      showExactUsageDetails &&
-      typeof latestAssistantUsage?.cacheRead === "number"
-        ? formatTokenCount(latestAssistantUsage.cacheRead)
-        : "--",
-    promptNonCache:
-      showExactUsageDetails && typeof latestAssistantUsage?.input === "number"
-        ? formatTokenCount(latestAssistantUsage.input)
-        : "--",
+    totalLabel: formatTokenCount(contextWindow || 0),
     cacheHitRate,
-  });
+  };
   const thinkingLevel = (activeSession?.thinkingLevel ||
     "medium") as ThinkingLevel;
   const thinkingLevelOptions: ThinkingLevel[] = [
@@ -1958,7 +1933,7 @@ export function ChatView() {
                 }}
                 contextUsagePercentage={contextUsagePercentage}
                 contextRingColorClass={contextRingColorClass}
-                contextUsageTooltip={contextUsageTooltip}
+                contextStatusDetails={contextStatusDetails}
                 canStop={canStop}
                 onStop={handleStop}
                 isSubmitting={isSubmitting}

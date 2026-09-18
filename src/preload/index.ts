@@ -20,6 +20,7 @@ import type {
 } from "../renderer/types";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
+import type { QuotaSnapshot } from "../shared/quota";
 import type {
   RestoreResult,
   VaultBackupUsage,
@@ -658,6 +659,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("auth.status", providerId),
   },
 
+  quota: {
+    get: (providerId: string): Promise<QuotaSnapshot | null> =>
+      ipcRenderer.invoke("quota.get", providerId),
+  },
+
   openrouterAuth: {
     // eslint-disable-next-line @typescript-eslint/consistent-type-imports
     login: (): Promise<import("../shared/ipc-types").OpenRouterLoginResult> =>
@@ -1100,6 +1106,9 @@ declare global {
         status: (
           providerId: string,
         ) => Promise<import("../shared/ipc-types").OAuthStatusResult>; // eslint-disable-line @typescript-eslint/consistent-type-imports
+      };
+      quota: {
+        get: (providerId: string) => Promise<QuotaSnapshot | null>;
       };
       openrouterAuth: {
         // eslint-disable-next-line @typescript-eslint/consistent-type-imports

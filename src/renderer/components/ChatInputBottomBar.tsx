@@ -4,12 +4,21 @@ import { ArrowUp, Square, Maximize2, Minimize2 } from "lucide-react";
 import { MergedInputChip } from "./MergedInputChip";
 import { Tooltip } from "./Tooltip";
 import { AttachMenu } from "./attach/AttachMenu";
+import { StatusPopover } from "./StatusPopover";
+import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import type { ChatInputAttachedFile } from "./ChatInput";
 
 export interface ModelOptionGroup {
   profileKey: ProviderProfileKey;
   groupLabel: string;
   items: Array<{ id: string; name: string }>;
+}
+
+/** 面板里「上下文」块的展示文本。格式化（含估算态「约」）在 ChatView 里完成。 */
+export interface ContextStatusDetails {
+  usedLabel: string;
+  totalLabel: string;
+  cacheHitRate: string;
 }
 
 export interface ChatInputBottomBarProps {
@@ -34,7 +43,7 @@ export interface ChatInputBottomBarProps {
   onSelectThinkingLevel: (level: ThinkingLevel) => void;
   contextUsagePercentage: number;
   contextRingColorClass: string;
-  contextUsageTooltip: string;
+  contextStatusDetails: ContextStatusDetails;
   canStop: boolean;
   onStop: () => void;
   isSubmitting: boolean;
@@ -65,7 +74,7 @@ export function ChatInputBottomBar({
   onSelectThinkingLevel,
   contextUsagePercentage,
   contextRingColorClass,
-  contextUsageTooltip,
+  contextStatusDetails,
   canStop,
   onStop,
   isSubmitting,
@@ -75,6 +84,10 @@ export function ChatInputBottomBar({
   hasInputContent,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
+
+  // 会话拿到的 profile key 是 "oauth:openai-codex"，适配器表的键是 "openai-codex"。
+  // 直接透传 profile key 会永远查表 miss，静默降级成「Codex 会话也没有额度块」。
+  const quotaProviderId = extractOAuthProviderId(activeProviderProfileKey);
 
   const expandLabel = isExpanded
     ? t("chat.collapseInput")
@@ -125,48 +138,12 @@ export function ChatInputBottomBar({
           onSelectThinkingLevel={onSelectThinkingLevel}
         />
 
-        {/* Context ring */}
-        <span className="relative inline-flex items-center justify-center group">
-          <svg
-            className="w-6 h-6 -rotate-90 text-text-muted"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1"
-              className="opacity-20"
-            />
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeDasharray="1.5 5.5686"
-              className="opacity-25"
-            />
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              className={contextRingColorClass}
-              strokeDasharray={`${(contextUsagePercentage / 100) * (2 * Math.PI * 9)} ${2 * Math.PI * 9}`}
-            />
-          </svg>
-          <span className="pointer-events-none absolute bottom-full right-0 mb-2 hidden group-hover:block group-focus-within:block z-20 min-w-max rounded-md border border-border bg-background px-2 py-1 text-xs leading-relaxed text-text-primary shadow-soft whitespace-pre-line">
-            {contextUsageTooltip}
-          </span>
-        </span>
+        <StatusPopover
+          contextUsagePercentage={contextUsagePercentage}
+          contextRingColorClass={contextRingColorClass}
+          contextStatusDetails={contextStatusDetails}
+          providerId={quotaProviderId}
+        />
 
         <Tooltip label={submitLabel}>
           <button
