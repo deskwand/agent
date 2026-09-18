@@ -660,8 +660,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   },
 
   quota: {
-    get: (providerId: string): Promise<QuotaSnapshot | null> =>
-      ipcRenderer.invoke("quota.get", providerId),
+    list: (): Promise<QuotaSnapshot[]> => ipcRenderer.invoke("quota.list"),
   },
 
   openrouterAuth: {
@@ -1108,7 +1107,7 @@ declare global {
         ) => Promise<import("../shared/ipc-types").OAuthStatusResult>; // eslint-disable-line @typescript-eslint/consistent-type-imports
       };
       quota: {
-        get: (providerId: string) => Promise<QuotaSnapshot | null>;
+        list: () => Promise<QuotaSnapshot[]>;
       };
       openrouterAuth: {
         // eslint-disable-next-line @typescript-eslint/consistent-type-imports

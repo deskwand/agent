@@ -5,7 +5,6 @@ import { MergedInputChip } from "./MergedInputChip";
 import { Tooltip } from "./Tooltip";
 import { AttachMenu } from "./attach/AttachMenu";
 import { StatusPopover } from "./StatusPopover";
-import { extractOAuthProviderId } from "../../shared/oauth-utils";
 import type { ChatInputAttachedFile } from "./ChatInput";
 
 export interface ModelOptionGroup {
@@ -85,10 +84,6 @@ export function ChatInputBottomBar({
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
-  // 会话拿到的 profile key 是 "oauth:openai-codex"，适配器表的键是 "openai-codex"。
-  // 直接透传 profile key 会永远查表 miss，静默降级成「Codex 会话也没有额度块」。
-  const quotaProviderId = extractOAuthProviderId(activeProviderProfileKey);
-
   const expandLabel = isExpanded
     ? t("chat.collapseInput")
     : t("chat.expandInput");
@@ -142,7 +137,6 @@ export function ChatInputBottomBar({
           contextUsagePercentage={contextUsagePercentage}
           contextRingColorClass={contextRingColorClass}
           contextStatusDetails={contextStatusDetails}
-          providerId={quotaProviderId}
         />
 
         <Tooltip label={submitLabel}>

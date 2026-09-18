@@ -3,14 +3,11 @@ import { useTranslation } from "react-i18next";
 import type { QuotaSnapshot } from "../../shared/quota";
 import type { ContextStatusDetails } from "./ChatInputBottomBar";
 import { formatResetTime } from "../utils/i18n-format";
-import { Tooltip } from "./Tooltip";
 
 export interface StatusPopoverProps {
   contextUsagePercentage: number;
   contextRingColorClass: string;
   contextStatusDetails: ContextStatusDetails;
-  /** 当前会话通道的 OAuth provider id；非 OAuth 通道为 undefined（不查、不显示额度） */
-  providerId?: string;
 }
 
 const RING_RADIUS = 9;
@@ -25,32 +22,37 @@ export function StatusPopover({
   contextUsagePercentage,
   contextRingColorClass,
   contextStatusDetails,
-  providerId,
 }: StatusPopoverProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [quota, setQuota] = useState<QuotaSnapshot | null>(null);
+  const [quota, setQuota] = useState<QuotaSnapshot[]>([]);
   const containerRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    // 无条件先清空：关闭、切通道、重新打开三种情况都不该闪出上一个通道的过期快照
-    // （硬约束 #1：绝不把 A 通道的额度显示在 B 通道会话上）。
-    setQuota(null);
-    if (!open || !providerId) return;
+    // 无条件先清空：关闭、重新打开都不该闪出上一次抓取的结果。
+    // ⚠️ 这里清空是「不要闪现旧数据」，**不是**按通道过滤。
+    // 历史上曾有 `if (!open || !providerId) return;` 这道闸门，它会让
+    // 已登录的订阅在非该通道的会话（如 deepseek）里完全不显示——不要加回来。
+    setQuota([]);
+
+    // 这里**不能**再按通道 id 做条件：非 OAuth 会话（如 deepseek）也必须查，
+    // 否则已登录的订阅额度不会显示——这正是本次要修的观感问题。
+    if (!open) return;
+
     let cancelled = false;
     void (async () => {
       try {
-        const snapshot = await window.electronAPI.quota.get(providerId);
-        if (!cancelled) setQuota(snapshot);
+        const snapshots = await window.electronAPI.quota.list();
+        if (!cancelled) setQuota(snapshots);
       } catch {
         // handler 缺失 / 序列化失败都会 reject：按「这次没有额度数据」处理
-        if (!cancelled) setQuota(null);
+        if (!cancelled) setQuota([]);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, providerId]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -73,47 +75,43 @@ export function StatusPopover({
       ref={containerRef}
       className="relative inline-flex items-center justify-center"
     >
-      <Tooltip label={t("statusPopover.ringTooltip")}>
-        <button
-          type="button"
-          onClick={() => setOpen((value) => !value)}
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          aria-label={t("statusPopover.ringTooltip")}
-          className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-2xl border border-border-subtle transition-colors ${
-            open
-              ? "bg-surface-hover"
-              : "bg-background/60 hover:bg-surface-hover"
-          }`}
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={t("statusPopover.ringTooltip")}
+        className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-2xl border border-border-subtle transition-colors ${
+          open ? "bg-surface-hover" : "bg-background/60 hover:bg-surface-hover"
+        }`}
+      >
+        <svg
+          className="w-5 h-5 -rotate-90 text-text-muted"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
         >
-          <svg
-            className="w-5 h-5 -rotate-90 text-text-muted"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <circle
-              cx="12"
-              cy="12"
-              r={RING_RADIUS}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1"
-              className="opacity-20"
-            />
-            <circle
-              cx="12"
-              cy="12"
-              r={RING_RADIUS}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              className={contextRingColorClass}
-              strokeDasharray={`${(contextUsagePercentage / 100) * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
-            />
-          </svg>
-        </button>
-      </Tooltip>
+          <circle
+            cx="12"
+            cy="12"
+            r={RING_RADIUS}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1"
+            className="opacity-20"
+          />
+          <circle
+            cx="12"
+            cy="12"
+            r={RING_RADIUS}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            className={contextRingColorClass}
+            strokeDasharray={`${(contextUsagePercentage / 100) * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
+          />
+        </svg>
+      </button>
 
       {open && (
         <div
@@ -139,46 +137,51 @@ export function StatusPopover({
             {contextStatusDetails.usedLabel} / {contextStatusDetails.totalLabel}
           </div>
 
-          {quota && quota.windows.length > 0 && (
-            <div className="mt-2 border-t border-border pt-2">
-              <div className="flex items-baseline gap-1.5 pb-1 text-[11px] font-semibold text-text-secondary">
-                <span>{quota.providerName}</span>
-                {quota.planName && (
-                  <span className="font-normal text-text-muted">
-                    {quota.planName}
-                  </span>
-                )}
-              </div>
-              <div className="border-l-2 border-border pl-2">
-                {quota.windows.map((window) => (
-                  <div key={window.kind}>
-                    <div className="flex items-center gap-2">
-                      <span className="w-[60px] shrink-0 text-text-secondary">
-                        {window.kind === "session"
-                          ? t("statusPopover.windowSession")
-                          : t("statusPopover.windowWeekly")}
-                      </span>
-                      <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-surface-hover">
-                        <span
-                          className="absolute inset-y-0 left-0 rounded-sm bg-accent"
-                          style={{ width: `${window.usedPercent}%` }}
-                        />
-                      </span>
-                      <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-text-primary">
-                        {Math.round(window.usedPercent)}%
-                      </span>
-                    </div>
-                    {window.resetsAt !== undefined && (
-                      <div className="pl-[70px] pt-0.5 text-[11px] tabular-nums text-text-muted">
-                        {t("statusPopover.resetAt", {
-                          time: formatResetTime(window.resetsAt),
-                        })}
+          {quota.map((snapshot) =>
+            snapshot.windows.length > 0 ? (
+              <div
+                key={snapshot.providerId}
+                className="mt-2 border-t border-border pt-2"
+              >
+                <div className="flex items-baseline gap-1.5 pb-1 text-[11px] font-semibold text-text-secondary">
+                  <span>{snapshot.providerName}</span>
+                  {snapshot.planName && (
+                    <span className="font-normal text-text-muted">
+                      {snapshot.planName}
+                    </span>
+                  )}
+                </div>
+                <div className="border-l-2 border-border pl-2">
+                  {snapshot.windows.map((window) => (
+                    <div key={window.kind}>
+                      <div className="flex items-center gap-2">
+                        <span className="w-[60px] shrink-0 text-text-secondary">
+                          {window.kind === "session"
+                            ? t("statusPopover.windowSession")
+                            : t("statusPopover.windowWeekly")}
+                        </span>
+                        <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-surface-hover">
+                          <span
+                            className="absolute inset-y-0 left-0 rounded-sm bg-accent"
+                            style={{ width: `${window.usedPercent}%` }}
+                          />
+                        </span>
+                        <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-text-primary">
+                          {Math.round(window.usedPercent)}%
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {window.resetsAt !== undefined && (
+                        <div className="pl-[70px] pt-0.5 text-[11px] tabular-nums text-text-muted">
+                          {t("statusPopover.resetAt", {
+                            time: formatResetTime(window.resetsAt),
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : null,
           )}
 
           {contextStatusDetails.cacheHitRate !== "--" && (

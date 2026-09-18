@@ -65,8 +65,26 @@ export async function fetchQuotaSnapshot(
   return tracked;
 }
 
+/**
+ * 取所有「有适配器」通道的额度快照，用于面板并列展示。
+ *
+ * 不枚举凭据、不筛凭据类型：`fetchQuotaSnapshot` 内部已用 resolveProviderApiKey
+ * 处理「没有凭据 → null」，两者在用户可见行为上零差别，
+ * 却省掉 getSharedModelRuntime 与一层筛选（以及它在整模块 mock 下静默失效的风险）。
+ */
+export async function listQuotaSnapshots(): Promise<QuotaSnapshot[]> {
+  // 适配器表的键就是「谁会显示」的唯一真相来源，顺序即展示顺序。
+  // 不另立 DISPLAY_ORDER 常量：那会把同一份知识复制到第二处。
+  // JS 对象的字符串键保序，可靠。
+  const ids = Object.keys(ADAPTERS);
+
+  // fetchQuotaSnapshot 内部已 catch，**永不 reject**（设计文档 §3.3），
+  // 所以这里用 all 而非 allSettled；结果顺序与 ids 一致。
+  const snapshots = await Promise.all(ids.map((id) => fetchQuotaSnapshot(id)));
+
+  return snapshots.filter((s): s is QuotaSnapshot => s !== null);
+}
+
 export function initQuotaIpc(): void {
-  ipcMain.handle("quota.get", (_event, providerId: string) =>
-    fetchQuotaSnapshot(providerId),
-  );
+  ipcMain.handle("quota.list", () => listQuotaSnapshots());
 }

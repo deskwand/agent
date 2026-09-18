@@ -135,21 +135,21 @@ describe("StatusPopover", () => {
     ],
   };
 
-  function stubQuota(result: unknown, reject = false) {
-    const get = reject
+  function stubQuotaList(result: unknown, reject = false) {
+    const list = reject
       ? vi.fn(async () => {
           throw new Error("ipc down");
         })
       : vi.fn(async () => result);
     // jsdom 里 window === globalThis，stubGlobal 就等价于挂到 window 上；
     // 回收靠本文件 afterEach 里的 vi.unstubAllGlobals()。
-    vi.stubGlobal("electronAPI", { quota: { get } });
-    return get;
+    vi.stubGlobal("electronAPI", { quota: { list } });
+    return list;
   }
 
   it("有快照时渲染 provider 标签行、两条窗口与重置行", async () => {
-    stubQuota(quota);
-    render({ providerId: "openai-codex" });
+    stubQuotaList([quota]);
+    render();
     act(() => trigger().click());
 
     await act(async () => {});
@@ -164,8 +164,8 @@ describe("StatusPopover", () => {
   });
 
   it("只有一条窗口时只渲染一条", async () => {
-    stubQuota({ ...quota, windows: [quota.windows[0]] });
-    render({ providerId: "openai-codex" });
+    stubQuotaList([{ ...quota, windows: [quota.windows[0]] }]);
+    render();
     act(() => trigger().click());
     await act(async () => {});
 
@@ -175,8 +175,8 @@ describe("StatusPopover", () => {
   });
 
   it("没有 planName 时标签行只显示 provider 名", async () => {
-    stubQuota({ ...quota, planName: undefined });
-    render({ providerId: "openai-codex" });
+    stubQuotaList([{ ...quota, planName: undefined }]);
+    render();
     act(() => trigger().click());
     await act(async () => {});
 
@@ -185,9 +185,67 @@ describe("StatusPopover", () => {
     expect(text).not.toContain("undefined");
   });
 
-  it("快照为 null 时不渲染额度块，也不报错", async () => {
-    stubQuota(null);
-    render({ providerId: "openai-codex" });
+  it("空数组时不渲染额度块，而请求确实发出去了", async () => {
+    const list = stubQuotaList([]);
+    render();
+    act(() => trigger().click());
+    await act(async () => {});
+
+    const text = dialog()!.textContent!;
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(text).not.toContain("OpenAI Codex");
+    expect(text).toContain("statusPopover.context");
+  });
+
+  it("IPC reject 时静默降级", async () => {
+    stubQuotaList([], true);
+    render();
+    act(() => trigger().click());
+
+    await act(async () => {});
+
+    expect(dialog()!.textContent).not.toContain("OpenAI Codex");
+  });
+
+  it("打开面板即请求，不依赖任何 prop（非 OAuth 会话也必须查）", async () => {
+    const list = stubQuotaList([quota]);
+    // helper 会注入三个必填 prop，但不注入任何通道信息：
+    // 面板不该因为「当前通道不是 OAuth」而不请求。
+    render();
+    act(() => trigger().click());
+    await act(async () => {});
+
+    expect(list).toHaveBeenCalledTimes(1);
+  });
+
+  it("两条快照时渲染两个 provider 标签行", async () => {
+    stubQuotaList([
+      quota,
+      {
+        providerId: "anthropic",
+        providerName: "Anthropic",
+        planName: "max",
+        windows: [
+          {
+            kind: "session" as const,
+            usedPercent: 12,
+            resetsAt: 1789761912000,
+          },
+        ],
+      },
+    ]);
+    render();
+    act(() => trigger().click());
+    await act(async () => {});
+
+    const text = dialog()!.textContent!;
+    expect(text).toContain("OpenAI Codex");
+    expect(text).toContain("Anthropic");
+  });
+
+  it("windows 为空数组的快照不渲染该块", async () => {
+    stubQuotaList([{ ...quota, windows: [] }]);
+    render();
     act(() => trigger().click());
     await act(async () => {});
 
@@ -196,23 +254,16 @@ describe("StatusPopover", () => {
     expect(text).toContain("statusPopover.context");
   });
 
-  it("IPC reject 时静默降级", async () => {
-    stubQuota(null, true);
-    render({ providerId: "openai-codex" });
-    act(() => trigger().click());
-
-    await act(async () => {});
-
-    expect(dialog()!.textContent).not.toContain("OpenAI Codex");
-  });
-
-  it("providerId 为空时不发 IPC 请求", async () => {
-    const get = stubQuota(quota);
+  it("不再有可见气泡：focus 按钮后仍无 role=tooltip", async () => {
     render();
-    act(() => trigger().click());
-    await act(async () => {});
 
-    expect(get).not.toHaveBeenCalled();
+    await act(async () => trigger().focus());
+
+    expect(document.body.querySelector('[role="tooltip"]')).toBeNull();
+    // 可访问名称不能跟着气泡一起丢
+    expect(trigger().getAttribute("aria-label")).toBe(
+      "statusPopover.ringTooltip",
+    );
   });
 
   it("只保留轨道与进度弧两层，刻度层已删除", () => {

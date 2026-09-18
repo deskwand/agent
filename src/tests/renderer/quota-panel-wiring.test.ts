@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 //
-// 这个文件只守一个点：底栏必须把会话的 profile key（"oauth:openai-codex"）
-// 换算成适配器表的键（"openai-codex"）之后再查额度。
+// 这个文件守的是**接线层**，不是面板内部：从底栏真实入口点圆环，确认额度块会出现。
 //
-// 设计文档 §7.2.1 点名的静默失效：直接透传 profile key → 适配器表永远 miss →
-// 降级成「Codex 会话也没有额度块」，且没有任何报错线索。组件测试如果只直接注入
-// providerId，这条回归会完全静默，所以这里从底栏真实入口点进去。
+// 为什么需要它：本次修的 bug（已登录的 Codex 额度在 deepseek 会话里不显示）根因就在
+// 底栏/面板这一层的一道条件闸门（曾经的 `if (!open || !providerId) return;`）。
+// `status-popover.test.ts` 直接渲染 StatusPopover，绕过了底栏——若有人在
+// `ChatInputBottomBar` 处重新加条件渲染（或另一类闸门），那里的用例**全都不会红**。
+// 之前唯一驱动这条链路的 `quota-provider-id.test.ts` 随「profile key → 适配器 id」
+// 推导一起被删除，所以这里补回接线层的护栏。
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -35,7 +37,7 @@ const baseProps: ChatInputBottomBarProps = {
   attachedKeys: new Set<string>(),
   model: "gpt-5.6-luna",
   modelOptions,
-  activeProviderProfileKey: "oauth:openai-codex" as never,
+  activeProviderProfileKey: "openrouter" as never,
   onSelectModel: () => {},
   thinkingLevel: "medium",
   thinkingLevelOptions: ["off", "medium"],
@@ -53,16 +55,18 @@ const baseProps: ChatInputBottomBarProps = {
   hasInputContent: false,
 };
 
-const quota = {
-  providerId: "openai-codex",
-  providerName: "OpenAI Codex",
-  planName: "team",
-  windows: [
-    { kind: "session" as const, usedPercent: 10, resetsAt: 1789761912000 },
-  ],
-};
+const quota = [
+  {
+    providerId: "openai-codex",
+    providerName: "OpenAI Codex",
+    planName: "team",
+    windows: [
+      { kind: "session" as const, usedPercent: 10, resetsAt: 1789761912000 },
+    ],
+  },
+];
 
-describe("底栏的 providerId 推导", () => {
+describe("底栏到额度块的接线", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -78,13 +82,10 @@ describe("底栏的 providerId 推导", () => {
     vi.unstubAllGlobals();
   });
 
-  /** 模拟 main 侧适配器表：只有 openai-codex 有数据，其余通道返回 null。 */
-  function stubQuota() {
-    const get = vi.fn(async (providerId: string) =>
-      providerId === "openai-codex" ? quota : null,
-    );
-    vi.stubGlobal("electronAPI", { quota: { get } });
-    return get;
+  function stubQuotaList(result: unknown) {
+    const list = vi.fn(async () => result);
+    vi.stubGlobal("electronAPI", { quota: { list } });
+    return list;
   }
 
   function render(props: Partial<ChatInputBottomBarProps> = {}) {
@@ -100,36 +101,23 @@ describe("底栏的 providerId 推导", () => {
     return container.querySelector('button[aria-haspopup="dialog"]')!;
   }
 
-  it("oauth:openai-codex → 用裸 providerId 查额度并渲染额度块", async () => {
-    const get = stubQuota();
-    render();
-    act(() => trigger().click());
-    await act(async () => {});
-
-    expect(get).toHaveBeenCalledWith("openai-codex");
-    expect(container.textContent).toContain("OpenAI Codex");
-  });
-
-  it("非 OAuth profile 不查额度，面板只剩上下文", async () => {
-    const get = stubQuota();
+  it("非 OAuth 会话（openrouter）里打开面板，仍能查到并显示已登录订阅的额度", async () => {
+    const list = stubQuotaList(quota);
     render({ activeProviderProfileKey: "openrouter" as never });
     act(() => trigger().click());
     await act(async () => {});
 
-    expect(get).not.toHaveBeenCalled();
-    expect(container.textContent).not.toContain("OpenAI Codex");
-    expect(container.textContent).toContain("statusPopover.context");
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("OpenAI Codex");
   });
 
-  it("OAuth 但无适配器的通道不查额度（v1 的 Claude / Copilot）", async () => {
-    const get = stubQuota();
-    render({ activeProviderProfileKey: "oauth:anthropic" as never });
+  it("OAuth 会话里同样可以（防止另一个方向的回归）", async () => {
+    const list = stubQuotaList(quota);
+    render({ activeProviderProfileKey: "oauth:openai-codex" as never });
     act(() => trigger().click());
     await act(async () => {});
 
-    // providerId 会带上去（"anthropic"），但 main 侧适配器表没有它 → 返回 null →
-    // 渲染层静默不显示额度块。这里断言的是「不会把 Codex 的数据错配到它头上」。
-    expect(get).toHaveBeenCalledWith("anthropic");
-    expect(container.textContent).not.toContain("OpenAI Codex");
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(container.textContent).toContain("OpenAI Codex");
   });
 });

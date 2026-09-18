@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type ExposedElectronApi = {
-  quota: { get: (providerId: string) => Promise<unknown> };
+  quota: { list: () => Promise<unknown> };
 };
 
 describe("preload quota API", () => {
@@ -33,11 +33,11 @@ describe("preload quota API", () => {
     await import("../../preload/index");
   });
 
-  it("把 quota.get 暴露到渲染进程并转发到同名 channel", async () => {
-    expect(typeof exposedApi?.quota?.get).toBe("function");
+  it("把 quota.list 暴露到渲染进程并转发到同名 channel（无参数）", async () => {
+    expect(typeof exposedApi?.quota?.list).toBe("function");
 
-    await exposedApi?.quota.get("openai-codex");
+    await exposedApi?.quota.list();
 
-    expect(ipcInvoke).toHaveBeenCalledWith("quota.get", "openai-codex");
+    expect(ipcInvoke).toHaveBeenCalledWith("quota.list");
   });
 });

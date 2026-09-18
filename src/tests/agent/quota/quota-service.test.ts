@@ -15,6 +15,7 @@ import {
   QUOTA_CACHE_TTL_MS,
   fetchQuotaSnapshot,
   initQuotaIpc,
+  listQuotaSnapshots,
 } from "../../../main/quota";
 
 function token(accountId = "acct-1"): string {
@@ -141,7 +142,7 @@ describe("fetchQuotaSnapshot", () => {
 });
 
 describe("initQuotaIpc", () => {
-  it("注册 quota.get 并把它接到 fetchQuotaSnapshot", async () => {
+  it("注册 quota.list，handler 无参数并返回快照数组", async () => {
     stubFetch(() => Response.json(usageBody()));
 
     initQuotaIpc();
@@ -149,11 +150,38 @@ describe("initQuotaIpc", () => {
     expect(ipcHandleMock).toHaveBeenCalledTimes(1);
     const [channel, handler] = ipcHandleMock.mock.calls[0] as unknown as [
       string,
-      (event: unknown, providerId: string) => Promise<unknown>,
+      (event: unknown) => Promise<unknown>,
     ];
-    expect(channel).toBe("quota.get");
-    await expect(handler({}, "openai-codex")).resolves.toMatchObject({
+    expect(channel).toBe("quota.list");
+    await expect(handler({})).resolves.toHaveLength(1);
+  });
+});
+
+describe("listQuotaSnapshots", () => {
+  it("没有任何可用凭据时返回空数组，且不打网络", async () => {
+    const fetchMock = stubFetch(() => Response.json(usageBody()));
+    resolveProviderApiKeyMock.mockResolvedValue(undefined);
+
+    await expect(listQuotaSnapshots()).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("有凭据时返回一条快照（适配器表的键就是展示项）", async () => {
+    stubFetch(() => Response.json(usageBody()));
+
+    const snapshots = await listQuotaSnapshots();
+
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({
       providerId: "openai-codex",
+      planName: "team",
+      windows: [{ kind: "session", usedPercent: 11 }],
     });
+  });
+
+  it("唯一通道请求失败时返回空数组，且不抛", async () => {
+    stubFetch(() => new Response("boom", { status: 500 }));
+
+    await expect(listQuotaSnapshots()).resolves.toEqual([]);
   });
 });
