@@ -39,13 +39,21 @@ function mapUsage(usage: unknown): TokenUsage | undefined {
       }
     | undefined;
   if (!u) return undefined;
-  // totalPromptInput 在 pi Usage 无对应，用 input 近似（provider-normalized 字段退化，接受）。
+  // pi 归一化后的 Usage 各分量**互斥**：input 已排除缓存命中/写入
+  // （openai-completions: input = prompt_tokens - cacheRead - cacheWrite；
+  //   anthropic-messages: input = input_tokens，缓存单独上报）。
+  // 因此「完整提示词」= input + cacheRead + cacheWrite ——
+  // 与 usage/normalize-usage.ts 对 totalPromptInput 的定义一致，
+  // 它同时是缓存命中率与上下文占用百分比的分母。
+  const input = u.input ?? 0;
+  const cacheRead = u.cacheRead ?? 0;
+  const cacheWrite = u.cacheWrite ?? 0;
   return {
-    input: u.input ?? 0,
+    input,
     output: u.output ?? 0,
-    cacheRead: u.cacheRead ?? 0,
-    cacheWrite: u.cacheWrite ?? 0,
-    totalPromptInput: u.input ?? 0,
+    cacheRead,
+    cacheWrite,
+    totalPromptInput: input + cacheRead + cacheWrite,
   };
 }
 

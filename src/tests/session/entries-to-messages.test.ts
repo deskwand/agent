@@ -210,3 +210,63 @@ describe("locateForkEntryId", () => {
     }
   });
 });
+
+describe("entriesToMessages 的 usage 口径", () => {
+  it("totalPromptInput 是完整提示词（含缓存命中），不是未命中部分", () => {
+    // 真实数据形态：deepseek-flash 一轮 input=295 / cacheRead=16000。
+    //
+    // pi 归一化后的 Usage 各分量**互斥**：
+    //   - openai-completions: input = prompt_tokens - cacheRead - cacheWrite（openai-completions.js:1193）
+    //   - anthropic-messages: input = input_tokens（Anthropic 本就分开上报缓存）
+    // 所以完整提示词 = input + cacheRead + cacheWrite。
+    //
+    // 这与 usage/normalize-usage.ts 对 totalPromptInput 的定义一致：
+    // “the full prompt tokens sent (what counts against the context window)”。
+    // 若这里退化成 input，面板的缓存命中率会算成 cacheRead / input：
+    // 实测本机 151,370 条 usage 记录里有 122,229 条（81%）满足 cacheRead > input，
+    // 于是命中率会显示成几千 %（如 16000 / 295 = 5423%）。
+    const entries = [
+      {
+        type: "message",
+        id: "a1",
+        parentId: null,
+        timestamp: "2026-09-18T00:00:00.000Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "ok" }],
+          timestamp: 1,
+          usage: { input: 295, output: 10, cacheRead: 16000, cacheWrite: 0 },
+        },
+      },
+    ] as SessionEntry[];
+
+    const messages = entriesToMessages(entries, "s1");
+
+    expect(messages[0].tokenUsage?.totalPromptInput).toBe(16295);
+    // 三个分量仍是原值（互斥），只有「完整提示词」这一个派生字段需要相加
+    expect(messages[0].tokenUsage?.input).toBe(295);
+    expect(messages[0].tokenUsage?.cacheRead).toBe(16000);
+  });
+
+  it("没有缓存时 totalPromptInput 等于 input", () => {
+    const entries = [
+      {
+        type: "message",
+        id: "a1",
+        parentId: null,
+        timestamp: "2026-09-18T00:00:00.000Z",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "ok" }],
+          timestamp: 1,
+          usage: { input: 1234, output: 56 },
+        },
+      },
+    ] as SessionEntry[];
+
+    const messages = entriesToMessages(entries, "s1");
+
+    expect(messages[0].tokenUsage?.totalPromptInput).toBe(1234);
+    expect(messages[0].tokenUsage?.cacheRead).toBe(0);
+  });
+});
