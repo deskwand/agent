@@ -869,8 +869,9 @@
   },
   "titlebar": {
     "builtInBrowser": "Built-in Browser",
-    "fileBrowser": "File Browser",
-    "switchToContext": "Switch to context panel"
+    "closeBuiltInBrowser": "Close built-in browser",
+    "closeFileBrowser": "Close file browser",
+    "fileBrowser": "File Browser"
   },
   "chat": {
     "sendMessage": "Send message",

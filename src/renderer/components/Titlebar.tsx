@@ -113,7 +113,7 @@ export function Titlebar() {
       <TitlebarButton
         label={
           rightPanelMode === "files"
-            ? t("titlebar.switchToContext")
+            ? t("titlebar.closeFileBrowser")
             : t("titlebar.fileBrowser")
         }
         isOn={rightPanelMode === "files"}
@@ -124,7 +124,7 @@ export function Titlebar() {
       <TitlebarButton
         label={
           rightPanelMode === "browser"
-            ? t("titlebar.switchToContext")
+            ? t("titlebar.closeBuiltInBrowser")
             : t("titlebar.builtInBrowser")
         }
         isOn={rightPanelMode === "browser"}

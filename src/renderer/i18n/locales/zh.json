@@ -869,8 +869,9 @@
   },
   "titlebar": {
     "builtInBrowser": "内置浏览器",
-    "fileBrowser": "文件浏览器",
-    "switchToContext": "切回上下文面板"
+    "closeBuiltInBrowser": "关闭内置浏览器",
+    "closeFileBrowser": "关闭文件浏览器",
+    "fileBrowser": "文件浏览器"
   },
   "chat": {
     "sendMessage": "发送消息",
