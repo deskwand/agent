@@ -153,6 +153,7 @@ import { initOAuthService } from "./auth/oauth-service";
 import { initQuotaIpc } from "./quota";
 import { startGoogleAuth } from "./oauth/google-auth-handler";
 import { openRouterPkceService } from "./auth/openrouter-pkce-service";
+import { shouldDisableHardwareAcceleration } from "./gpu-policy";
 import { fetchOpenRouterModels } from "./config/openrouter-models";
 import {
   countChangedFilesFromPorcelain,
@@ -196,8 +197,23 @@ if (configStore.isConfigured()) {
   );
 }
 
-// Disable hardware acceleration for better compatibility
-app.disableHardwareAcceleration();
+const hardwareAccelerationDisabled = shouldDisableHardwareAcceleration(
+  process.platform,
+  process.env,
+);
+
+if (hardwareAccelerationDisabled) {
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch("disable-gpu");
+  log(
+    "[App] Hardware acceleration disabled",
+    process.env.DESKWAND_DISABLE_GPU === "1"
+      ? "by DESKWAND_DISABLE_GPU=1"
+      : "by Linux compatibility policy",
+  );
+} else {
+  log("[App] Hardware acceleration enabled");
+}
 
 let mainWindow: BrowserWindow | null = null;
 let browserViewManager: BrowserViewManager | null = null;
@@ -287,15 +303,11 @@ app.commandLine.appendSwitch(
   `http://localhost:${ELECTRON_DEVTOOLS_DEBUG_PORT}`,
 );
 
-// Linux sandbox / GPU workarounds.
+// Linux sandbox workaround.
 //
-// Sandbox: AppImage mounts are nosuid → SUID chrome-sandbox helper cannot work.
+// AppImage mounts are nosuid → SUID chrome-sandbox helper cannot work.
 // deb installs have chrome-sandbox with root:root 4755 (set by postinst script).
 // Detect at runtime: only add --no-sandbox when SUID sandbox is not available.
-//
-// GPU: Vulkan/ANGLE init often fails on headless, SSH, or misconfigured
-// X11/Wayland sessions, leaving a blank white window. --disable-gpu falls back
-// to software rasterizer (slower but reliable).
 if (process.platform === "linux") {
   // Check whether SUID sandbox is properly configured.
   let suidSandboxOk = false;
@@ -313,13 +325,6 @@ if (process.platform === "linux") {
     log("[App] Linux — SUID sandbox not available, --no-sandbox");
   } else {
     log("[App] Linux — SUID sandbox properly configured, keeping sandbox");
-  }
-
-  if (process.env.DESKWAND_ENABLE_GPU === "1") {
-    log("[App] Linux — GPU acceleration enabled via DESKWAND_ENABLE_GPU=1");
-  } else {
-    app.commandLine.appendSwitch("disable-gpu");
-    log("[App] Linux — --disable-gpu (set DESKWAND_ENABLE_GPU=1 to override)");
   }
 }
 
