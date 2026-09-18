@@ -315,5 +315,65 @@ describe("ModelResolutionService", () => {
     expect(result.baseUrl).toContain("api.deepseek.com");
     expect(result.contextWindow).toBe(1_000_000);
     expect(result.piModel.reasoning).toBe(true);
+    // 官方 DeepSeek profile 同样走合成回退（注册表无该 id），能力位必须是纯文本
+    expect(result.piModel.input).toEqual(["text"]);
+  });
+
+  function withDeskWandCloudProfile(config: AppConfig): AppConfig {
+    config.providers["custom:deskwand"] = {
+      provider: "custom",
+      customProtocol: "openai",
+      apiKey: "cloud-token",
+      baseUrl: "https://api.deskwand.com/api/models",
+      defaultModel: "deepseek-flash",
+      models: [
+        { id: "deepseek-flash", label: "deepseek-flash", source: "custom" },
+        {
+          id: "deepseek-v4-flash-vision-exp",
+          label: "deepseek-v4-flash-vision-exp",
+          source: "custom",
+        },
+      ],
+      updatedAt: "2026-09-19T00:00:00.000Z",
+    };
+    return config;
+  }
+
+  it("pins the catalog-less cloud text model to text-only", async () => {
+    const result = await service.resolve({
+      sessionProviderProfileKey: "custom:deskwand",
+      sessionModel: "deepseek-flash",
+      appConfig: withDeskWandCloudProfile(buildAppConfig()),
+    });
+
+    expect(result.trace.piModelSource).toBe("synthetic");
+    expect(result.trace.notes).toContain("registry_model_not_found");
+    expect(result.piModel.input).toEqual(["text"]);
+  });
+
+  it("resolves the cloud vision model from the registry", async () => {
+    const result = await service.resolve({
+      sessionProviderProfileKey: "custom:deskwand",
+      sessionModel: "deepseek-v4-flash-vision-exp",
+      appConfig: withDeskWandCloudProfile(buildAppConfig()),
+    });
+
+    // 能力位（["text","image"]）由 dialect 文件那条用例钉住，这里只验证走的是注册表分支
+    expect(result.trace.piModelSource).toBe("registry");
+  });
+
+  it("lets an explicitly declared image capability win over the text-only table", async () => {
+    // 逃生通道仅对「自定义 provider + 用户自己加的模型」成立：preset / 云端模型归一化时
+    // 会丢掉 input（config-store.ts:484）
+    const appConfig = withDeskWandCloudProfile(buildAppConfig());
+    appConfig.providers["custom:deskwand"]!.models[0].input = ["text", "image"];
+
+    const result = await service.resolve({
+      sessionProviderProfileKey: "custom:deskwand",
+      sessionModel: "deepseek-flash",
+      appConfig,
+    });
+
+    expect(result.piModel.input).toEqual(["text", "image"]);
   });
 });

@@ -108,6 +108,84 @@ describe("registerDeskWandProviders", () => {
     );
   });
 
+  it("resolves image capability per model instead of copying the default model's", async () => {
+    const cloudAppConfig = {
+      providers: {
+        "custom:deskwand": {
+          provider: "custom",
+          customProtocol: "openai",
+          apiKey: "cloud-token",
+          baseUrl: "https://api.deskwand.com/api/models",
+          defaultModel: "deepseek-flash",
+          models: [
+            { id: "deepseek-flash", label: "deepseek-flash", source: "custom" },
+            {
+              id: "deepseek-v4-flash-vision-exp",
+              label: "deepseek-v4-flash-vision-exp",
+              source: "custom",
+            },
+            {
+              id: "glm-5",
+              label: "glm-5",
+              source: "custom",
+              input: ["text", "image"],
+            },
+            // 注册表无此 id、也没声明：必须与主会话一致地落到乐观默认，而不是继承默认模型的能力
+            {
+              id: "deepseek-v5-unknown",
+              label: "deepseek-v5-unknown",
+              source: "custom",
+            },
+          ],
+          updatedAt: "2026-09-19T00:00:00.000Z",
+        },
+      },
+    } as unknown as AppConfig;
+
+    resolveMock.mockResolvedValue({
+      providerProfileKey: "custom:deskwand",
+      providerType: "custom",
+      customProtocol: "openai",
+      protocol: "openai",
+      modelId: "deepseek-flash",
+      apiKey: "cloud-token",
+      baseUrl: "https://api.deskwand.com/api/models",
+      contextWindow: 1_000_000,
+      maxTokens: 384_000,
+      piModel: {
+        ...model,
+        id: "deepseek-flash",
+        provider: "custom",
+        baseUrl: "https://api.deskwand.com/api/models",
+        input: ["text"],
+      },
+      trace: {
+        providerSource: "session",
+        modelSource: "provider.defaultModel",
+        piModelSource: "synthetic",
+        notes: ["registry_model_not_found"],
+      },
+    });
+
+    await registerDeskWandProviders(runtime, cloudAppConfig);
+
+    const registerCall = runtimeMock.registerProvider.mock.calls.at(-1);
+    const registered = registerCall?.[1] as
+      | { models: Array<{ id: string; input: string[] }> }
+      | undefined;
+    const inputById = Object.fromEntries(
+      (registered?.models ?? []).map((m) => [m.id, m.input]),
+    );
+
+    expect(inputById["deepseek-flash"]).toEqual(["text"]);
+    expect(inputById["deepseek-v4-flash-vision-exp"]).toEqual([
+      "text",
+      "image",
+    ]);
+    expect(inputById["glm-5"]).toEqual(["text", "image"]);
+    expect(inputById["deepseek-v5-unknown"]).toEqual(["text", "image"]);
+  });
+
   it("serializes concurrent synchronization", async () => {
     let release: (() => void) | undefined;
     const gate = new Promise<undefined>((resolve) => {

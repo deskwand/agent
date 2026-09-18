@@ -178,7 +178,7 @@ export function buildSyntheticPiModel(
     provider,
     baseUrl: baseUrl || "",
     reasoning: autoReasoning,
-    input: resolveInputFromRegistry(modelId) ?? ["text", "image"],
+    input: resolveModelInput(modelId),
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: contextWindow ?? knownSpecs?.contextWindow ?? 128000,
     maxTokens: maxTokens ?? knownSpecs?.maxTokens ?? 16384,
@@ -459,4 +459,27 @@ export function resolveModelContextWindow(modelName: string): number {
   }
   const model = resolvePiRegistryModel(modelName);
   return model?.contextWindow ?? 0;
+}
+
+/**
+ * pi 注册表没有官方名条目、但确认为纯文本的模型 id：`deepseek-flash` 至今未收录（同族只有
+ * v4-flash / v4-pro / v4-flash-vision-exp），缺条目时合成回退会乐观地标成 ["text","image"]
+ * → 用户贴的图片以原生 image_url 直传 DeepSeek 方言端点，上游 400。
+ * 失效条件：注册表收录该 id（本函数先返回注册表取值），或上游把该模型转为多模态（删掉该 id）。
+ */
+const KNOWN_TEXT_ONLY_MODEL_IDS: ReadonlySet<string> = new Set([
+  "deepseek-flash",
+]);
+
+/**
+ * 单模型输入能力：注册表 > 已知纯文本表 > 乐观默认 ["text","image"]。
+ *
+ * 主会话（buildSyntheticPiModel）与子代理 provider 注册（provider-bridge）必须走同一个函数：
+ * 同一个 id 在两处得出不同能力，会出现「主会话能看图、子代理只拿到占位符」这种无从排查的差异。
+ */
+export function resolveModelInput(modelId: string): ("text" | "image")[] {
+  const registryInput = resolveInputFromRegistry(modelId);
+  if (registryInput) return registryInput;
+  if (KNOWN_TEXT_ONLY_MODEL_IDS.has(modelId)) return ["text"];
+  return ["text", "image"];
 }

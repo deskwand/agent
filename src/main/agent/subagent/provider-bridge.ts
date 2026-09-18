@@ -7,6 +7,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { DESKWAND_PROVIDER_PREFIX } from "../../../shared/deskwand-provider";
 import { modelResolutionService } from "../../model/model-resolution-service";
+import { resolveModelInput } from "../pi-model-resolution";
 import { configStore, type AppConfig } from "../../config/config-store";
 import { log, logWarn } from "../../utils/logger";
 
@@ -108,7 +109,9 @@ async function resolveProfileEntry(
       api: resolved.piModel.api,
       baseUrl: effectiveBaseUrl,
       reasoning: false,
-      input: resolved.piModel.input as ("text" | "image")[],
+      // 逐个判能力：显式声明 > 注册表 / 已知纯文本表 > 乐观默认（与 buildSyntheticPiModel 同源，
+      // 此前是默认模型的能力套全表）
+      input: m.input?.length ? m.input : resolveModelInput(m.id),
       cost: resolved.piModel.cost,
       contextWindow: m.contextWindow || resolved.contextWindow,
       maxTokens: m.maxTokens || resolved.maxTokens,

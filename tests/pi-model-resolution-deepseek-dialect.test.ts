@@ -148,3 +148,32 @@ describe("cloud deepseek models speak the DeepSeek dialect", () => {
     expect(body.max_tokens).toBe(16384);
   });
 });
+
+describe("cloud deepseek image capability", () => {
+  it("pins the catalog-less text id to text-only", () => {
+    expect(resolveCloudModel("deepseek-flash").input).toEqual(["text"]);
+  });
+
+  it("keeps the registry image capability for the vision id", () => {
+    expect(resolveCloudModel("deepseek-v4-flash-vision-exp").input).toEqual(["text", "image"]);
+  });
+
+  it("downgrades a pasted image to the pi placeholder instead of sending image_url", async () => {
+    const body = await captureBody(resolveCloudModel("deepseek-flash"), { maxTokens: 16384 }, {
+      systemPrompt: "sys",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "这是什么" },
+            { type: "image", data: "aGVsbG8=", mimeType: "image/png" },
+          ],
+        },
+      ],
+    });
+    const user = (body.messages as Array<{ role: string; content: unknown }>).find((m) => m.role === "user");
+    const serialized = JSON.stringify(user?.content);
+    expect(serialized).toContain("image omitted");
+    expect(serialized).not.toContain("image_url");
+  });
+});
