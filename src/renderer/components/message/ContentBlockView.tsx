@@ -153,7 +153,11 @@ export const ContentBlockView = memo(function ContentBlockView({
     keyPrefix: string,
   ) =>
     parts.map((part, partIndex) => {
-      const key = `${keyPrefix}-${partIndex}`;
+      // react-markdown keys element children as `<tagName>-<n>` (see
+      // hast-util-to-jsx-runtime passKeys). Generated keys must live in a
+      // different namespace, otherwise a preserved nested-element key (e.g.
+      // `strong-0` from `**a **b** c**`) collides with a generated sibling key.
+      const key = `file-mention-${keyPrefix}-${partIndex}`;
       if (part.type === "file") {
         return renderFileButton(part.value, key);
       }
