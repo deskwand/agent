@@ -7,6 +7,7 @@
     "add": "Add",
     "prompt": "Prompt",
     "close": "Close",
+    "copy": "Copy",
     "loading": "Loading...",
     "error": "Error",
     "success": "Success",
@@ -511,6 +512,7 @@
         "model_loading": "The endpoint is reachable, but the model may still be loading into memory."
       },
       "latency": "{{ms}}ms",
+      "skipped": "Diagnostics skipped: another run is already in progress.",
       "fix": {
         "dns_resolve_failed": "Cannot resolve hostname {{host}}. Please check if the URL is correct.",
         "tcp_connect_failed": "Cannot connect to {{host}}. Please check your network or firewall settings.",
@@ -663,6 +665,7 @@
     "toolsAvailable_plural": "{{count}} tools available",
     "connected": "Connected",
     "notConnected": "Not connected",
+    "disabled": "Disabled",
     "connecting": "Connecting...",
     "failed": "Connection failed",
     "chromeHint": "A new Chrome debug window will open automatically if port is unavailable",
@@ -866,6 +869,7 @@
   },
   "titlebar": {
     "builtInBrowser": "Built-in Browser",
+    "fileBrowser": "File Browser",
     "switchToContext": "Switch to context panel"
   },
   "chat": {
@@ -877,6 +881,7 @@
     "loadingConversation": "Loading chat...",
     "startConversation": "Start chat",
     "startFailed": "Failed to start session. Please try again.",
+    "imageProcessFailed": "Failed to process the image",
     "noModel": "No model",
     "model": "Model",
     "switchModel": "Switch model",
@@ -1507,6 +1512,7 @@
   },
   "reviewPanel": {
     "title": "Code Review",
+    "close": "Close code review",
     "fileCount": "{{count}} files",
     "refresh": "Refresh",
     "switchToSideBySide": "Side-by-side view",

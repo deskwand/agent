@@ -22,6 +22,14 @@ i18n
     interpolation: {
       escapeValue: false, // React 已经处理了 XSS
     },
+    // 运行时兜底：两边语言都查不到的 key 会原样渲染到界面上（tooltip 里出现
+    // titlebar.fileBrowser 这种原始 key），静态扫描覆盖不到的动态 key 只剩这里能留线索。
+    // 必须回传 defaultValue：i18next 在 usedDefault 分支也会调用本 handler，返回值
+    // 会替换掉已解析出的 defaultValue，而有些调用点拿它当哨兵/兜底文案。
+    parseMissingKeyHandler: (key: string, defaultValue?: string) => {
+      console.warn(`[i18n] missing key: ${key}`);
+      return defaultValue ?? key;
+    },
     pluralSeparator: "_", // 复数分隔符
     contextSeparator: "_", // 上下文分隔符
     detection: {

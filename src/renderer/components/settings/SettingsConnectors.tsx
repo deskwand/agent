@@ -544,7 +544,7 @@ function ServerCard({
                     ? t("mcp.failed", { defaultValue: "Connection failed" })
                     : serverStatus === "connecting"
                       ? `⏳ ${t("mcp.connecting")}`
-                      : t("mcp.disabled", { defaultValue: "Disabled" })}
+                      : t("mcp.disabled")}
               </div>
               <div className="flex items-center gap-4 mt-2">
                 <button

@@ -7,6 +7,7 @@
     "add": "添加",
     "prompt": "指令",
     "close": "关闭",
+    "copy": "复制",
     "loading": "加载中...",
     "error": "错误",
     "success": "成功",
@@ -511,6 +512,7 @@
         "model_loading": "端点可达，但模型可能仍在加载到内存中。"
       },
       "latency": "{{ms}}ms",
+      "skipped": "已有诊断正在进行，本次已跳过。",
       "fix": {
         "dns_resolve_failed": "无法解析域名 {{host}}，请检查 URL 是否正确",
         "tcp_connect_failed": "无法连接到 {{host}}，请检查网络或防火墙设置",
@@ -663,6 +665,7 @@
     "toolsAvailable_plural": "有 {{count}} 个可用工具",
     "connected": "已连接",
     "notConnected": "未连接",
+    "disabled": "已禁用",
     "connecting": "连接中...",
     "failed": "连接失败",
     "chromeHint": "如果端口不可用，将自动打开新的 Chrome 调试窗口",
@@ -866,6 +869,7 @@
   },
   "titlebar": {
     "builtInBrowser": "内置浏览器",
+    "fileBrowser": "文件浏览器",
     "switchToContext": "切回上下文面板"
   },
   "chat": {
@@ -877,6 +881,7 @@
     "loadingConversation": "加载聊天中...",
     "startConversation": "开始聊天",
     "startFailed": "启动会话失败，请稍后重试。",
+    "imageProcessFailed": "图片处理失败",
     "noModel": "无模型",
     "model": "模型",
     "switchModel": "切换模型",
@@ -1506,6 +1511,7 @@
   },
   "reviewPanel": {
     "title": "代码审查",
+    "close": "关闭代码审查",
     "fileCount": "{{count}} 个文件",
     "refresh": "刷新",
     "switchToSideBySide": "切换到双栏",
