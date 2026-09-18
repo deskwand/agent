@@ -11,8 +11,15 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useCurrentSession } from "../store/selectors";
 import { useIPC } from "../hooks/useIPC";
-import { X, Image as ImageIcon, Lock } from "lucide-react";
 import { attachmentKey, mergeAttachedFiles } from "../utils/attached-files";
+import {
+  degradeNonLeadingTokens,
+  getCaretOffset,
+  placeCaretAtEnd,
+  serializeEditor,
+  setEditorFromText,
+} from "../utils/editor-content";
+import { AttachmentTiles, type AttachmentTile } from "./attach/AttachmentTiles";
 import type { ImageSource } from "./ImageLightbox";
 import type { Skill } from "../types";
 import {
@@ -79,6 +86,13 @@ interface ChatInputProps {
 }
 
 /** Base Tailwind classes for slash command menu items. */
+/**
+ * 编辑器自有样式：这些必须贴在编辑器元素上，不能依赖调用方传的 class。
+ * `whitespace-pre-wrap` 让 insertLineBreak 插入的 <br> 与文本换行都生效。
+ */
+const EDITOR_BASE_CLASS =
+  "whitespace-pre-wrap break-words outline-none focus:ring-0";
+
 export const SLASH_MENU_ITEM_BASE_CLASS =
   "w-full text-left px-2.5 py-2 rounded-lg text-sm transition-colors flex items-center gap-2";
 
@@ -115,6 +129,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
     const [isDragging, setIsDragging] = useState(false);
     const openLightbox = useAppStore((s) => s.openLightbox);
+    /** 扩展命令名集合：判断行首的 /word 要不要渲染成命令 token（内置命令由解析器自带）。 */
+    const knownCommandNames = useAppStore((s) => s.knownCommandNames);
     const closeLightbox = useAppStore((s) => s.closeLightbox);
     const lightboxSource = useAppStore((s) => s.lightboxSource);
 
@@ -142,7 +158,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [recencyVersion, setRecencyVersion] = useState(0);
     const slashMenuRef = useRef<HTMLDivElement>(null);
 
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    /**
+     * 输入框编辑器。非受控：React 只在挂载与显式写入路径上碰它的 DOM，
+     * 编辑期间一个字节都不碰 —— 这是输入法、原生撤销、原生选区活着的前提。
+     */
+    const editorRef = useRef<HTMLDivElement>(null);
     const slashTriggerRef = useRef(false);
     const selectFilesRef = useRef<() => void>(() => {});
     /** Tracks whether an IME (e.g. Chinese Pinyin) composition is in progress. */
@@ -150,32 +170,54 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     /** Token to cancel stale async attaches when user clicks another image. */
     const attachLoadTokenRef = useRef(0);
 
-    // --- Auto-resize textarea ---
-    const adjustTextareaHeight = useCallback(() => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-      textarea.style.height = "auto";
-      const computedStyle = window.getComputedStyle(textarea);
+    // --- Auto-resize editor ---
+    const adjustEditorHeight = useCallback(() => {
+      const el = editorRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      const computedStyle = window.getComputedStyle(el);
       const lineHeight = Number.parseFloat(computedStyle.lineHeight) || 24;
       const maxHeight = lineHeight * (isExpanded ? 15 : 6);
       const minHeight = isExpanded ? lineHeight * 5 : 0;
-      const rawHeight = Math.min(textarea.scrollHeight, maxHeight);
+      const rawHeight = Math.min(el.scrollHeight, maxHeight);
       const nextHeight = Math.max(rawHeight, minHeight);
-      textarea.style.height = `${nextHeight}px`;
-      textarea.style.overflowY =
-        textarea.scrollHeight > maxHeight ? "auto" : "hidden";
+      el.style.height = `${nextHeight}px`;
+      el.style.overflowY = el.scrollHeight > maxHeight ? "auto" : "hidden";
     }, [isExpanded]);
 
+    const getPlainText = useCallback(
+      () => serializeEditor(editorRef.current),
+      [],
+    );
+
+    /**
+     * 编辑器内容的统一写入口：清空、斜杠插入、外部 setPrompt、扩展 setEditorText 全走它。
+     *
+     * 这样"行首的 /命令 要不要渲染成 token"只有一处判断 —— 否则会出现输入框里是
+     * 纯文本、气泡里却是 chip 的分裂（扩展命令尤其容易踩）。
+     */
+    const writeEditorText = useCallback(
+      (text: string) => {
+        setEditorFromText(editorRef.current, text, knownCommandNames);
+        setPrompt(text);
+      },
+      [knownCommandNames],
+    );
+
     useEffect(() => {
-      adjustTextareaHeight();
-    }, [prompt, adjustTextareaHeight]);
+      adjustEditorHeight();
+    }, [prompt, adjustEditorHeight]);
 
     // --- 向父组件上报草稿内容（底栏据此决定展开按钮是否可见）---
     useEffect(() => {
       onContentChange?.(
-        hasInputContent(prompt, pastedImages.length, attachedFiles.length),
+        hasInputContent(
+          getPlainText(),
+          pastedImages.length,
+          attachedFiles.length,
+        ),
       );
-    }, [prompt, pastedImages, attachedFiles, onContentChange]);
+    }, [getPlainText, prompt, pastedImages, attachedFiles, onContentChange]);
 
     // --- Load skills for slash menu ---
     useEffect(() => {
@@ -199,6 +241,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           .then((dto) => {
             if (!disposed) {
               setExtensionCommands(toSlashCommands(dto.commands));
+              useAppStore
+                .getState()
+                .setKnownCommandNames(new Set(dto.commands.map((c) => c.name)));
             }
           })
           .catch(() => {});
@@ -226,9 +271,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const pendingEditorText = useAppStore((s) => s.pendingEditorText);
     useEffect(() => {
       if (pendingEditorText === null) return;
-      setPrompt(pendingEditorText);
+      writeEditorText(pendingEditorText);
+      adjustEditorHeight();
       useAppStore.getState().setPendingEditorText(null);
-    }, [pendingEditorText]);
+    }, [pendingEditorText, writeEditorText, adjustEditorHeight]);
 
     useEffect(() => {
       if (!showSlashMenu) return;
@@ -247,26 +293,24 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     // --- Imperative handle ---
     useImperativeHandle(ref, () => ({
       clear() {
-        setPrompt("");
-        if (textareaRef.current) {
-          textareaRef.current.value = "";
-          textareaRef.current.style.height = "auto";
-          textareaRef.current.style.overflowY = "hidden";
-        }
+        // DOM 是权威来源，所以清空要同时落两处：编辑器内容与 state。
+        writeEditorText("");
         pastedImages.forEach((img) => URL.revokeObjectURL(img.url));
         setPastedImages([]);
         setAttachedFiles([]);
+        adjustEditorHeight();
       },
       focus() {
-        textareaRef.current?.focus();
+        editorRef.current?.focus();
       },
       setPrompt(text: string) {
-        setPrompt(text);
-        if (textareaRef.current) {
-          textareaRef.current.value = text;
-        }
-        // Trigger height adjustment on next tick
-        setTimeout(() => adjustTextareaHeight(), 0);
+        // 外部写入也要 parse：不 parse 的话，写进来的 /skill:x 不会渲染成 token，
+        // 与手动选择技能的表现不一致（设计文档 §5.2）。
+        writeEditorText(text);
+        requestAnimationFrame(() => {
+          editorRef.current?.focus();
+          placeCaretAtEnd(editorRef.current);
+        });
       },
       submit() {
         // Trigger form submit programmatically
@@ -274,7 +318,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       },
       isEmpty() {
         return !hasInputContent(
-          prompt,
+          getPlainText(),
           pastedImages.length,
           attachedFiles.length,
         );
@@ -318,7 +362,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       const imageItems = Array.from(items).filter((item) =>
         item.type.startsWith("image/"),
       );
-      if (imageItems.length === 0) return;
+      if (imageItems.length === 0) {
+        // 纯文本粘贴：只取 text/plain。不拦的话 contenteditable 会把对方的字体、
+        // 颜色、嵌套标签一起粘进来。execCommand 虽已 deprecated，但在 Chromium 下
+        // 是唯一保留原生撤销栈的插入方式；insertText 会触发 input 事件走到同步逻辑。
+        const text = e.clipboardData?.getData("text/plain");
+        if (text) {
+          e.preventDefault();
+          document.execCommand("insertText", false, text);
+        }
+        return;
+      }
       e.preventDefault();
 
       const newImages: Array<{
@@ -370,6 +424,137 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       // Close lightbox only if removing an image file while showing attached images
       if (lightboxSource === "attached" && isImage) closeLightbox();
     };
+
+    /**
+     * 点开图片型附件的大图。从附件列表的 map 回调里提出来：磁贴组件需要一个
+     * 稳定的处理函数，而它原本靠闭包拿 index。
+     */
+    const handleAttachImageClick = async (index: number) => {
+      const clicked = attachedFiles[index];
+      // 原来靠 map 回调闭包拿到的 isImage —— 现在按 index 现算，语义不变：只有图片型附件才开大图。
+      const isImage =
+        !!clicked &&
+        (clicked.type.startsWith("image/") ||
+          /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(clicked.name || ""));
+      if (!isImage) return;
+      const token = ++attachLoadTokenRef.current;
+      const imageFiles = attachedFiles
+        .map<{ file: ChatInputAttachedFile; idx: number } | null>((f, i) => {
+          const img =
+            f.type.startsWith("image/") ||
+            /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(f.name || "");
+          return img ? { file: f, idx: i } : null;
+        })
+        .filter((x): x is NonNullable<typeof x> => x !== null);
+      if (imageFiles.length === 0) return;
+
+      const startIdx = imageFiles.findIndex((x) => x.idx === index);
+
+      const initialImages: ImageSource[] = imageFiles.map((f) => ({
+        src: "",
+        name: f.file.name,
+        filePath: f.file.path || undefined,
+      }));
+      openLightbox(
+        initialImages,
+        startIdx >= 0 ? startIdx : 0,
+        true,
+        "attached",
+      );
+
+      const loadedImages = await Promise.all(
+        imageFiles.map(async (f) => {
+          try {
+            if (f.file.inlineDataBase64) {
+              return {
+                src: `data:${f.file.type};base64,${f.file.inlineDataBase64}`,
+                name: f.file.name,
+                filePath: f.file.path || undefined,
+              };
+            }
+            if (f.file.path && window.electronAPI?.readFile) {
+              const result = await window.electronAPI.readFile(f.file.path);
+              if (result) {
+                const ext = f.file.name.split(".").pop()?.toLowerCase();
+                const mime =
+                  f.file.type ||
+                  (ext && `image/${ext === "jpg" ? "jpeg" : ext}`) ||
+                  "image/png";
+                return {
+                  src: `data:${mime};base64,${result}`,
+                  name: f.file.name,
+                  filePath: f.file.path || undefined,
+                };
+              }
+            }
+            return {
+              src: "",
+              name: f.file.name,
+              filePath: f.file.path || undefined,
+              error: true,
+            };
+          } catch {
+            return {
+              src: "",
+              name: f.file.name,
+              filePath: f.file.path || undefined,
+              error: true,
+            };
+          }
+        }),
+      );
+
+      // Discard results if a newer click started loading
+      if (token !== attachLoadTokenRef.current) return;
+      openLightbox(
+        loadedImages,
+        startIdx >= 0 ? startIdx : 0,
+        false,
+        "attached",
+      );
+    };
+
+    /**
+     * 把粘贴的图片与已附加的文件归一成同一种磁贴列表（设计文档 §4.3）。
+     * 不用 useMemo：它引用的 removeImage / removeFile 每次渲染都是新函数，
+     * 缓存不会命中，反而多一层需要维护的依赖数组。
+     */
+    const attachmentTiles: AttachmentTile[] = [
+      ...pastedImages.map<AttachmentTile>((image, index) => ({
+        kind: "image",
+        key: image.url || `pasted-image-${index}`,
+        url: image.url,
+        alt: t("common.pastedImageAlt", { index: index + 1 }),
+        onOpen: () =>
+          openLightbox(
+            pastedImages.map((item) => ({ src: item.url })),
+            index,
+            false,
+            "pasted",
+          ),
+        onRemove: () => removeImage(index),
+      })),
+      ...attachedFiles.map<AttachmentTile>((file, index) => {
+        const isImage =
+          file.type.startsWith("image/") ||
+          /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(file.name || "");
+        return {
+          kind: "file",
+          key: attachmentKey(file),
+          name: file.name,
+          hint:
+            file.source === "vault"
+              ? t("attachChip.vaultSource", { name: file.name })
+              : file.path || file.name,
+          onOpen: isImage
+            ? () => {
+                void handleAttachImageClick(index);
+              }
+            : undefined,
+          onRemove: () => removeFile(index),
+        };
+      }),
+    ];
 
     // --- File selection ---
     const handleFileSelect = async () => {
@@ -498,20 +683,42 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     }, []);
 
     const clearSlashText = useCallback(() => {
-      const textarea = textareaRef.current;
-      if (!textarea || slashStartIndex < 0) return;
-      const currentValue = textarea.value;
-      const cursorPos = textarea.selectionStart;
-      const before = currentValue.slice(0, slashStartIndex);
-      const after = currentValue.slice(cursorPos);
-      const newValue = before + after;
-      setPrompt(newValue);
-      textarea.value = newValue;
+      const el = editorRef.current;
+      if (!el || slashStartIndex < 0) return;
+      // 同上：拿不到光标就整段丢弃斜杠过滤串。
+      const cursorPos = getCaretOffset(el);
+      const after = cursorPos > 0 ? serializeEditor(el).slice(cursorPos) : "";
+      writeEditorText(after);
       requestAnimationFrame(() => {
-        textarea.focus();
-        textarea.setSelectionRange(slashStartIndex, slashStartIndex);
+        el.focus();
+        placeCaretAtEnd(el);
       });
-    }, [slashStartIndex]);
+    }, [slashStartIndex, writeEditorText]);
+
+    /**
+     * 把引用原文插到编辑器开头。
+     *
+     * 斜杠菜单只在文本开头触发，所以不需要任何光标偏移计算：用「原文 + 光标之后的
+     * 剩余文本」重建内容即可。setEditorFromText 会把行首的引用渲染成原子 token。
+     */
+    const insertReferenceText = useCallback(
+      (replacement: string) => {
+        const el = editorRef.current;
+        // 菜单只在文本开头打开，所以光标位置至少是 1（斜杠本身）。
+        // getCaretOffset 返回 0 表示拿不到编辑器内的光标（例如焦点已经移走），
+        // 此时斜杠过滤串整段丢弃 —— 留在正文里就是垃圾。
+        const cursorPos = getCaretOffset(el);
+        const after = cursorPos > 0 ? getPlainText().slice(cursorPos) : "";
+        writeEditorText(`${replacement}${after}`);
+        closeSlashMenu();
+        adjustEditorHeight();
+        requestAnimationFrame(() => {
+          el?.focus();
+          placeCaretAtEnd(el);
+        });
+      },
+      [adjustEditorHeight, closeSlashMenu, getPlainText, writeEditorText],
+    );
 
     const selectSlashItem = useCallback(
       (item: SlashItem) => {
@@ -531,44 +738,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             return;
           }
           // For other commands (goal, extension commands), insert text
-          const textarea = textareaRef.current;
-          if (!textarea || slashStartIndex < 0) return;
-          const currentValue = textarea.value;
-          const cursorPos = textarea.selectionStart;
-          const before = currentValue.slice(0, slashStartIndex);
-          const after = currentValue.slice(cursorPos);
-          const replacement = `/${item.command.name} `;
-          const newValue = before + replacement + after;
-          setPrompt(newValue);
-          textarea.value = newValue;
-          closeSlashMenu();
-          const newCursorPos = slashStartIndex + replacement.length;
-          requestAnimationFrame(() => {
-            textarea.focus();
-            textarea.setSelectionRange(newCursorPos, newCursorPos);
-          });
+          insertReferenceText(`/${item.command.name} `);
           return;
         }
-        // skill: insert text
-        const textarea = textareaRef.current;
-        if (!textarea || slashStartIndex < 0) return;
-        const currentValue = textarea.value;
-        const cursorPos = textarea.selectionStart;
-        const before = currentValue.slice(0, slashStartIndex);
-        const after = currentValue.slice(cursorPos);
-        // category === "skill" — all skills use /skill:name syntax
-        const replacement = `/skill:${item.skill.name} `;
-        const newValue = before + replacement + after;
-        setPrompt(newValue);
-        textarea.value = newValue;
-        closeSlashMenu();
-        const newCursorPos = slashStartIndex + replacement.length;
-        requestAnimationFrame(() => {
-          textarea.focus();
-          textarea.setSelectionRange(newCursorPos, newCursorPos);
-        });
+        // skill: insert text — all skills use /skill:name syntax
+        insertReferenceText(`/skill:${item.skill.name} `);
       },
-      [slashStartIndex, closeSlashMenu, clearSlashText, onCommand],
+      [closeSlashMenu, clearSlashText, insertReferenceText, onCommand],
     );
 
     // --- Drag and drop ---
@@ -639,7 +815,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     // --- Submit ---
     const handleSubmitInternal = useCallback(() => {
-      const currentPrompt = textareaRef.current?.value || prompt;
+      // DOM 是权威来源；state 只是镜像（可能比 DOM 旧一帧）。
+      const currentPrompt = getPlainText() || prompt;
       if (
         !hasInputContent(
           currentPrompt,
@@ -655,11 +832,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const instructions =
           currentPrompt.slice("/compact".length).trim() || undefined;
         onCompact?.(instructions);
-        setPrompt("");
-        if (textareaRef.current) {
-          textareaRef.current.value = "";
-          textareaRef.current.style.height = "auto";
-        }
+        writeEditorText("");
+        adjustEditorHeight();
         return;
       }
       // --- end /compact ---
@@ -675,6 +849,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         files: attachedFiles,
       });
     }, [
+      getPlainText,
+      writeEditorText,
+      adjustEditorHeight,
       prompt,
       pastedImages,
       attachedFiles,
@@ -700,177 +877,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           onDrop={handleDrop}
           className="relative w-full"
         >
-          {/* Image previews */}
-          {pastedImages.length > 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 mb-3">
-              {pastedImages.map((img, index) => (
-                <div
-                  key={img.url || `pasted-image-${index}`}
-                  className="relative group"
-                >
-                  <img
-                    src={img.url}
-                    alt={t("common.pastedImageAlt", { index: index + 1 })}
-                    className="w-full aspect-square object-cover rounded-lg border border-border block cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() =>
-                      openLightbox(
-                        pastedImages.map((img) => ({ src: img.url })),
-                        index,
-                        false,
-                        "pasted",
-                      )
-                    }
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-error text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* File attachments */}
-          {attachedFiles.length > 0 && (
-            <div className="space-y-2 mb-3">
-              {attachedFiles.map((file, index) => {
-                const isImage =
-                  file.type.startsWith("image/") ||
-                  /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(file.name || "");
-
-                const handleAttachFileClick = async () => {
-                  if (!isImage) return;
-                  const token = ++attachLoadTokenRef.current;
-                  const imageFiles = attachedFiles
-                    .map<{ file: ChatInputAttachedFile; idx: number } | null>(
-                      (f, i) => {
-                        const img =
-                          f.type.startsWith("image/") ||
-                          /\.(png|jpg|jpeg|gif|webp|bmp|svg)$/i.test(
-                            f.name || "",
-                          );
-                        return img ? { file: f, idx: i } : null;
-                      },
-                    )
-                    .filter((x): x is NonNullable<typeof x> => x !== null);
-                  if (imageFiles.length === 0) return;
-
-                  const startIdx = imageFiles.findIndex((x) => x.idx === index);
-
-                  const initialImages: ImageSource[] = imageFiles.map((f) => ({
-                    src: "",
-                    name: f.file.name,
-                    filePath: f.file.path || undefined,
-                  }));
-                  openLightbox(
-                    initialImages,
-                    startIdx >= 0 ? startIdx : 0,
-                    true,
-                    "attached",
-                  );
-
-                  const loadedImages = await Promise.all(
-                    imageFiles.map(async (f) => {
-                      try {
-                        if (f.file.inlineDataBase64) {
-                          return {
-                            src: `data:${f.file.type};base64,${f.file.inlineDataBase64}`,
-                            name: f.file.name,
-                            filePath: f.file.path || undefined,
-                          };
-                        }
-                        if (f.file.path && window.electronAPI?.readFile) {
-                          const result = await window.electronAPI.readFile(
-                            f.file.path,
-                          );
-                          if (result) {
-                            const ext = f.file.name
-                              .split(".")
-                              .pop()
-                              ?.toLowerCase();
-                            const mime =
-                              f.file.type ||
-                              (ext &&
-                                `image/${ext === "jpg" ? "jpeg" : ext}`) ||
-                              "image/png";
-                            return {
-                              src: `data:${mime};base64,${result}`,
-                              name: f.file.name,
-                              filePath: f.file.path || undefined,
-                            };
-                          }
-                        }
-                        return {
-                          src: "",
-                          name: f.file.name,
-                          filePath: f.file.path || undefined,
-                          error: true,
-                        };
-                      } catch {
-                        return {
-                          src: "",
-                          name: f.file.name,
-                          filePath: f.file.path || undefined,
-                          error: true,
-                        };
-                      }
-                    }),
-                  );
-
-                  // Discard results if a newer click started loading
-                  if (token !== attachLoadTokenRef.current) return;
-                  openLightbox(
-                    loadedImages,
-                    startIdx >= 0 ? startIdx : 0,
-                    false,
-                    "attached",
-                  );
-                };
-
-                const chipTip =
-                  file.source === "vault"
-                    ? t("attachChip.vaultSource", { name: file.name })
-                    : file.path || file.name;
-
-                return (
-                  <div
-                    key={attachmentKey(file)}
-                    className={`relative flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border group ${isImage ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
-                    onClick={handleAttachFileClick}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-text-primary truncate">
-                        {isImage && (
-                          <ImageIcon className="w-3.5 h-3.5 inline mr-1.5 text-accent" />
-                        )}
-                        {file.source === "vault" && (
-                          <Lock className="w-3 h-3 inline mr-1.5 text-text-muted" />
-                        )}
-                        {file.name}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeFile(index);
-                      }}
-                      className="w-6 h-6 rounded-full bg-error/10 hover:bg-error/20 text-error flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="pointer-events-none absolute bottom-full left-0 mb-2 hidden group-hover:block z-20 max-w-[28rem] break-all rounded-md border border-border bg-background px-2 py-1 text-xs text-text-primary shadow-soft">
-                      {chipTip}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
           {/* Input card wrapper — keeps slash menu outside card div so space-y-* doesn't add margin to textarea */}
           <div className="relative">
             {/* Slash command menu */}
@@ -892,28 +898,38 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             <div
               className={`transition-colors ${isDragging ? "ring-2 ring-accent bg-accent/5" : ""} ${cardClassName}`}
             >
-              <textarea
-                ref={textareaRef}
-                value={prompt}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  const textarea = textareaRef.current;
+              <AttachmentTiles tiles={attachmentTiles} />
+              <div
+                ref={editorRef}
+                contentEditable={!disabled}
+                suppressContentEditableWarning
+                role="textbox"
+                aria-multiline="true"
+                aria-label={placeholder}
+                data-placeholder={placeholder}
+                spellCheck={false}
+                className={`chat-editor ${EDITOR_BASE_CLASS} ${textareaClassName}`}
+                onInput={() => {
+                  const el = editorRef.current;
+                  if (!el) return;
+                  // 编辑期间 DOM 是权威来源，state 只是它的镜像。
+                  // token 只存在于行首：一旦行首插入了别的字，它立即退回纯文本
+                  // —— 与气泡渲染同一条规则。组合期间不碰 DOM（设计文档 §5.5）。
+                  if (!isComposingRef.current) degradeNonLeadingTokens(el);
+                  const newValue = serializeEditor(el);
                   const isComposing = isComposingRef.current;
 
                   // Slash menu trigger: onKeyDown sets slashTriggerRef when '/' is pressed
                   if (slashTriggerRef.current) {
                     slashTriggerRef.current = false;
-                    if (textarea) {
-                      const cursorPos = textarea.selectionStart;
-                      const charBefore =
-                        cursorPos > 1 ? newValue[cursorPos - 2] : "";
-                      // Trigger only at start of input or after space, and not after another /
-                      if (
-                        (cursorPos <= 1 ||
-                          charBefore === " " ||
-                          charBefore === "\n") &&
-                        charBefore !== "/"
-                      ) {
+                    if (el) {
+                      const cursorPos = getCaretOffset(el);
+                      // 只在文本开头触发：`/skill:x` 与 `/命令` 只在消息开头生效
+                      // （pi 用 startsWith 判定），句中插入会静默失效。
+                      // 不变量：菜单能打开的位置，必须正好是 token 能生效的位置。
+                      // 用 <= 1 而不是 === 1：拿不到光标时 getCaretOffset 也返回 0，
+                      // 那个情形与"斜杠在开头"一样应该开菜单，不该因为读不到选区就没反应。
+                      if (cursorPos <= 1) {
                         setSlashStartIndex(cursorPos - 1);
                         setSlashFilter("");
                         setSlashSelectedIndex(0);
@@ -923,13 +939,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   }
 
                   // Filter while slash menu is open.
-                  // During IME composition, selectionStart is locked to the
-                  // composition-range start; use selectionEnd to include the
-                  // composed (pinyin) text so filtering works in real time.
-                  if (showSlashMenu && textarea) {
-                    const endPos = isComposing
-                      ? textarea.selectionEnd
-                      : textarea.selectionStart;
+                  // 原文案：textarea 在组合期间会把 selectionStart 锁在组合起点，所以要取
+                  // selectionEnd。contenteditable 下 DOM 里已包含正在组合的文本、光标就在它
+                  // 之后，两者不再需要区分（依赖浏览器行为，由真机手验确认）。
+                  if (showSlashMenu && el) {
+                    const endPos = getCaretOffset(el);
                     const query = newValue.slice(slashStartIndex + 1, endPos);
                     if (
                       !isComposing &&
@@ -943,10 +957,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   }
 
                   // Detect if / was deleted → close menu.
-                  // Skip this check during composition — selectionStart is
-                  // locked to the composition start and may falsely trigger.
-                  if (showSlashMenu && textarea && !isComposing) {
-                    if (textarea.selectionStart <= slashStartIndex) {
+                  // 组合期间跳过：选区在组合区间内移动，会误判成"斜杠被删"。
+                  if (showSlashMenu && el && !isComposing) {
+                    if (getCaretOffset(el) <= slashStartIndex) {
                       closeSlashMenu();
                     }
                   }
@@ -954,23 +967,19 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   setPrompt(newValue);
                 }}
                 onPaste={handlePaste}
-                placeholder={placeholder}
-                disabled={disabled}
-                spellCheck={false}
-                rows={1}
-                className={textareaClassName}
                 onCompositionStart={() => {
                   isComposingRef.current = true;
                 }}
                 onCompositionEnd={() => {
                   isComposingRef.current = false;
-                  // onChange fires after compositionend with correct
-                  // selectionStart, so no explicit re-filter needed here.
+                  // input 事件在 compositionend 之后触发，会用正确的选区重新过滤，
+                  // 所以这里不需要额外处理。
                 }}
                 onKeyDown={(e) => {
                   // Detect '/' key for slash menu trigger (before any state check)
                   if (
                     e.key === "/" &&
+                    !disabled &&
                     !isComposingRef.current &&
                     !e.ctrlKey &&
                     !e.metaKey &&
@@ -1044,14 +1053,20 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     // Block Enter during IME composition (e.g. pinyin → Chinese).
                     if (isComposingRef.current || e.keyCode === 229) return;
                     // Expanded mode: Enter = newline, only submit on Cmd/Ctrl+Enter
-                    if (isExpanded) {
-                      if (!e.metaKey && !e.ctrlKey) return;
+                    if (isExpanded && !e.metaKey && !e.ctrlKey) {
                       e.preventDefault();
-                      handleSubmitInternal();
+                      document.execCommand("insertLineBreak");
                       return;
                     }
                     e.preventDefault();
                     handleSubmitInternal();
+                    return;
+                  }
+                  // Shift+Enter 换行。div 上不拦会插入块级 <div>，破坏单行流，
+                  // 所以显式插入 <br>（序列化时换算成 \n）。
+                  if (e.key === "Enter" && e.shiftKey && !isExpanded) {
+                    e.preventDefault();
+                    document.execCommand("insertLineBreak");
                   }
                 }}
               />
@@ -1069,8 +1084,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
  *
  * 单一来源：提交门禁、`isEmpty()` 与 `onContentChange` 上报共用它，三者必须永远一致
  * ——「展开按钮可见」与「能否提交」不能互相矛盾。
- * 但取值来源不完全相同：提交门禁读 `textareaRef.current?.value || prompt`（DOM 可能比 state 新一帧），
- * 另两处只读 `prompt`。判定函数相同，不是同一个值。
+ * 但取值来源不完全相同：提交门禁与 `isEmpty()` 读 `getPlainText()`（DOM 是权威来源，
+ * state 可能比它旧一帧），`onContentChange` 走 effect 读同一份。判定函数相同，不是同一个值。
  */
 export function hasInputContent(
   prompt: string,

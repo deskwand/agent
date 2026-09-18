@@ -81,7 +81,7 @@ describe("ChatInput attachments", () => {
     });
   });
 
-  it("shows the full path hint on a non-vault chip", () => {
+  it("shows the full path hint on a non-vault attachment tile", () => {
     renderInput();
     act(() =>
       ref.current?.addFiles([
@@ -94,7 +94,10 @@ describe("ChatInput attachments", () => {
       ]),
     );
 
-    expect(container.textContent).toContain("/repo/docs/notes.md");
+    // 磁贴把路径放进 title 属性（原来是渲染在隐藏的 tooltip span 里）
+    expect(container.querySelector("[title]")?.getAttribute("title")).toBe(
+      "/repo/docs/notes.md",
+    );
   });
 
   it("ignores a duplicate injection", () => {

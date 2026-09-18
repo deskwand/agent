@@ -1,0 +1,106 @@
+// @vitest-environment jsdom
+import React, { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ChatInput,
+  type ChatInputHandle,
+} from "../../renderer/components/ChatInput";
+import {
+  serializeEditor,
+  TOKEN_RAW_ATTR,
+} from "../../renderer/utils/editor-content";
+import { useAppStore } from "../../renderer/store";
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+vi.mock("../../renderer/hooks/useIPC", () => ({
+  useIPC: () => ({ isElectron: false }),
+}));
+
+let container: HTMLDivElement;
+let root: Root;
+let ref: React.RefObject<ChatInputHandle>;
+
+beforeEach(() => {
+  globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+  container = document.createElement("div");
+  document.body.appendChild(container);
+  root = createRoot(container);
+  ref = React.createRef<ChatInputHandle>();
+});
+
+afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+  vi.restoreAllMocks();
+});
+
+function editorEl(): HTMLElement {
+  return container.querySelector<HTMLElement>("[data-placeholder]")!;
+}
+
+async function renderInput() {
+  await act(async () => {
+    root.render(
+      React.createElement(ChatInput, {
+        ref,
+        onSubmit: () => {},
+        placeholder: "p",
+        cardClassName: "",
+        textareaClassName: "",
+        bottomSlot: null,
+      }),
+    );
+  });
+}
+
+describe("显式写入路径", () => {
+  it("setPrompt 写入含引用的文本时会渲染成 token（外部写进来的也要 parse）", async () => {
+    await renderInput();
+    await act(async () => {
+      ref.current?.setPrompt("/skill:alpha 你好");
+    });
+    const token = editorEl().querySelector(`[${TOKEN_RAW_ATTR}]`);
+    expect(token).not.toBeNull();
+    expect(token!.getAttribute(TOKEN_RAW_ATTR)).toBe("/skill:alpha");
+    expect(serializeEditor(editorEl())).toBe("/skill:alpha 你好");
+  });
+
+  it("clear 清空编辑器", async () => {
+    await renderInput();
+    await act(async () => {
+      ref.current?.setPrompt("/skill:alpha 你好");
+    });
+    await act(async () => {
+      ref.current?.clear();
+    });
+    expect(serializeEditor(editorEl())).toBe("");
+    expect(ref.current?.isEmpty()).toBe(true);
+  });
+
+  it("pendingEditorText 写入后渲染 token 且被消费掉", async () => {
+    await renderInput();
+    await act(async () => {
+      useAppStore.getState().setPendingEditorText("/skill:alpha 收到");
+    });
+    expect(editorEl().querySelector(`[${TOKEN_RAW_ATTR}]`)).not.toBeNull();
+    expect(useAppStore.getState().pendingEditorText).toBeNull();
+  });
+
+  it("在 token 之前粘贴文字后，token 退化为纯文本", async () => {
+    await renderInput();
+    await act(async () => {
+      ref.current?.setPrompt("/skill:alpha 你好");
+    });
+    const el = editorEl();
+    await act(async () => {
+      el.insertBefore(document.createTextNode("注意 "), el.firstChild);
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    expect(el.querySelector(`[${TOKEN_RAW_ATTR}]`)).toBeNull();
+    expect(serializeEditor(el)).toBe("注意 /skill:alpha 你好");
+  });
+});

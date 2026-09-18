@@ -30,6 +30,7 @@ module.exports = {
           muted: 'var(--color-accent-muted)',
           foreground: 'var(--color-accent-foreground)',
         },
+        mention: 'var(--color-mention)',
         mcp: {
           DEFAULT: 'var(--color-mcp)',
         },

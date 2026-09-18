@@ -200,6 +200,12 @@ interface AppState {
   incrementSkillRefreshKey: () => void;
   hasSeenInitialConfigStatus: boolean;
   globalNotice: GlobalNotice | null;
+  /**
+   * 扩展命令（插件命令）的名字集合，供渲染层判断行首的 `/word` 是不是命令。
+   * 只存扩展命令 —— 内置命令由 utils/reference-tokens.ts 的 BUILTIN_COMMAND_NAMES 自带。
+   * 为空时行首的未知 `/word` 退化为纯文本，不会误判。
+   */
+  knownCommandNames: ReadonlySet<string>;
 
   // Working directory
   workingDir: string | null;
@@ -352,6 +358,7 @@ interface AppState {
   setIsConfigured: (configured: boolean) => void;
   setShowConfigModal: (show: boolean) => void;
   markInitialConfigStatusSeen: () => void;
+  setKnownCommandNames: (names: ReadonlySet<string>) => void;
   setGlobalNotice: (notice: GlobalNotice | null) => void;
   clearGlobalNotice: () => void;
 
@@ -472,6 +479,7 @@ export const useAppStore = create<AppState>((set) => ({
   showConfigModal: false,
   hasSeenInitialConfigStatus: false,
   globalNotice: null,
+  knownCommandNames: new Set<string>(),
   workingDir: null,
   sandboxSetupProgress: null,
   isSandboxSetupComplete: false,
@@ -1056,6 +1064,7 @@ export const useAppStore = create<AppState>((set) => ({
   setShowLoginModal: (show) => set({ showLoginModal: show }),
   setShowConfigModal: (show) => set({ showConfigModal: show }),
   markInitialConfigStatusSeen: () => set({ hasSeenInitialConfigStatus: true }),
+  setKnownCommandNames: (names) => set({ knownCommandNames: names }),
   setGlobalNotice: (notice) => set({ globalNotice: notice }),
   clearGlobalNotice: () => set({ globalNotice: null }),
 

@@ -33,6 +33,7 @@ import type {
 import { FileText } from "lucide-react";
 import { CodeBlock } from "./CodeBlock";
 import { ThinkingBlock } from "./ThinkingBlock";
+import { UserTextWithTokens } from "./UserTextWithTokens";
 import { ToolUseBlock } from "./ToolUseBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
 import { FilePreviewModal } from "../FilePreviewModal";
@@ -432,7 +433,11 @@ export const ContentBlockView = memo(function ContentBlockView({
         if (isUser) {
           return (
             <p className="message-user-text text-text-primary whitespace-pre-wrap break-words text-left">
-              {text}
+              <UserTextWithTokens
+                text={text}
+                resolveFilePath={resolveFilePath}
+                onFileClick={handleFilePathClick}
+              />
               {isStreaming && <span className="eff-cursor" />}
             </p>
           );

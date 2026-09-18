@@ -4,6 +4,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatInput } from "../../renderer/components/ChatInput";
+import { serializeEditor } from "../../renderer/utils/editor-content";
 import type { Skill } from "../../renderer/types";
 
 vi.mock("react-i18next", () => ({
@@ -63,20 +64,20 @@ async function renderChatInput(container: HTMLElement): Promise<Root> {
   return root;
 }
 
+function editorEl(container: HTMLElement): HTMLElement {
+  return container.querySelector<HTMLElement>("[data-placeholder]")!;
+}
+
 /** Open the slash menu by typing "/" (keydown sets the trigger, input opens it). */
 async function openSlashMenu(container: HTMLElement) {
-  const textarea = container.querySelector("textarea")!;
+  const editor = editorEl(container);
   await act(async () => {
-    textarea.focus();
-    textarea.dispatchEvent(
+    editor.focus();
+    editor.dispatchEvent(
       new KeyboardEvent("keydown", { key: "/", bubbles: true }),
     );
-    // jsdom/React value tracker: bypass instance setter so onChange fires
-    Object.getOwnPropertyDescriptor(
-      HTMLTextAreaElement.prototype,
-      "value",
-    )!.set!.call(textarea, "/");
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    editor.textContent = "/";
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
 
@@ -157,14 +158,14 @@ describe("slash menu recency", () => {
     await openSlashMenu(container);
     await waitForRow(container, "/skill:beta"); // wait for skills to load
 
-    const textarea = container.querySelector("textarea")!;
+    const editor = editorEl(container);
     await act(async () => {
-      textarea.dispatchEvent(
+      editor.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
       );
     });
     // row 0 is the recently used skill; Enter inserts it like a mouse pick
-    expect(textarea.value).toBe("/skill:alpha ");
+    expect(serializeEditor(editor)).toBe("/skill:alpha ");
   });
 
   it("selects a command row via ArrowDown + Enter in the all tab", async () => {
@@ -173,22 +174,22 @@ describe("slash menu recency", () => {
     await openSlashMenu(container);
     await waitForRow(container, "/plan"); // wait for plugin command to load
 
-    const textarea = container.querySelector("textarea")!;
+    const editor = editorEl(container);
     // Separate act blocks: React batches two synthetic events dispatched in
     // one act, so Enter would read the stale selectedIndex (real keypresses
     // flush between events).
     await act(async () => {
-      textarea.dispatchEvent(
+      editor.dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
       );
     });
     await act(async () => {
-      textarea.dispatchEvent(
+      editor.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
       );
     });
     // no recency preset: row 0 = /compact, row 1 = /goal
-    expect(textarea.value).toBe("/goal ");
+    expect(serializeEditor(editor)).toBe("/goal ");
   });
 });
 

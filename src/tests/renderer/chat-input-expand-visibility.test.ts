@@ -62,19 +62,18 @@ const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
 };
 
 /**
- * 往 textarea 里「打字」。
+ * 往编辑器里「打字」。
  *
- * 不能用 `textarea.value = x` 直接赋值：React 的 value tracker 会同步记住这个值，
- * 随后派发的原生 input 事件会被判定为「没变化」，onChange 不触发。
- * 走原型上的原生 setter 写入，tracker 仍停在旧值，React 才会正常派发 onChange。
+ * 编辑器是非受控 contenteditable：直接写 DOM 再派发 input 就是它真实的输入路径。
+ * （改之前那套「绕 React value tracker」是受控 textarea 特有的麻烦，现在不需要了。）
  */
-function typeInto(textarea: HTMLTextAreaElement, value: string) {
-  const nativeSetter = Object.getOwnPropertyDescriptor(
-    HTMLTextAreaElement.prototype,
-    "value",
-  )!.set!;
-  nativeSetter.call(textarea, value);
-  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+function typeInto(editor: HTMLElement, value: string) {
+  editor.textContent = value;
+  editor.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function editorEl(): HTMLElement {
+  return container.querySelector<HTMLElement>("[data-placeholder]")!;
 }
 
 let container: HTMLDivElement;
@@ -154,17 +153,17 @@ describe("ChatInput content reporting", () => {
   it("reports true once text is entered and false again after clearing", async () => {
     const onContentChange = vi.fn();
     await renderInput(onContentChange);
-    const textarea = container.querySelector<HTMLTextAreaElement>("textarea")!;
+    const editor = editorEl();
 
     await act(async () => {
-      typeInto(textarea, "draft");
+      typeInto(editor, "draft");
     });
-    expect(textarea.value).toBe("draft");
+    expect(editor.textContent).toBe("draft");
     expect(onContentChange).toHaveBeenCalledTimes(2);
     expect(onContentChange).toHaveBeenLastCalledWith(true);
 
     await act(async () => {
-      typeInto(textarea, "");
+      typeInto(editor, "");
     });
     expect(onContentChange).toHaveBeenCalledTimes(3);
     expect(onContentChange).toHaveBeenLastCalledWith(false);
@@ -299,7 +298,7 @@ describe("有内容才显示展开按钮（ChatInput → 底栏 整链路）", (
     expect(expandButton()).toBeNull();
 
     await act(async () => {
-      typeInto(container.querySelector<HTMLTextAreaElement>("textarea")!, "x");
+      typeInto(editorEl(), "x");
     });
 
     expect(expandButton()).not.toBeNull();
@@ -309,15 +308,15 @@ describe("有内容才显示展开按钮（ChatInput → 底栏 整链路）", (
     await act(async () => {
       root.render(React.createElement(Harness));
     });
-    const textarea = container.querySelector<HTMLTextAreaElement>("textarea")!;
+    const editor = editorEl();
 
     await act(async () => {
-      typeInto(textarea, "x");
+      typeInto(editor, "x");
     });
     expect(expandButton()).not.toBeNull();
 
     await act(async () => {
-      typeInto(textarea, "");
+      typeInto(editor, "");
     });
 
     expect(expandButton()).toBeNull();

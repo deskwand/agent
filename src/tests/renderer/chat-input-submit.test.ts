@@ -30,6 +30,26 @@ describe("ChatInput submit blocking", () => {
     vi.clearAllMocks();
   });
 
+  function editorEl(): HTMLElement {
+    return container.querySelector<HTMLElement>("[data-placeholder]")!;
+  }
+
+  async function typeText(text: string) {
+    const el = editorEl();
+    await act(async () => {
+      el.textContent = text;
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  async function pressEnter() {
+    await act(async () => {
+      editorEl().dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+    });
+  }
+
   it("keeps the editor enabled but blocks submit when submitDisabled", async () => {
     const onSubmit = vi.fn();
     await act(async () => {
@@ -45,12 +65,10 @@ describe("ChatInput submit blocking", () => {
       );
     });
 
-    const textarea = container.querySelector("textarea")!;
-    expect(textarea.disabled).toBe(false);
+    expect(editorEl().getAttribute("contenteditable")).toBe("true");
 
+    await typeText("draft");
     await act(async () => {
-      textarea.value = "draft";
-      textarea.dispatchEvent(new Event("input", { bubbles: true }));
       container
         .querySelector("form")!
         .dispatchEvent(
@@ -59,7 +77,29 @@ describe("ChatInput submit blocking", () => {
     });
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(textarea.value).toBe("draft");
+  });
+
+  it("内容为 /compact 时走 compact 回调，不提交", async () => {
+    const onSubmit = vi.fn();
+    const onCompact = vi.fn();
+    await act(async () => {
+      root.render(
+        React.createElement(ChatInput, {
+          onSubmit,
+          onCompact,
+          placeholder: "Message",
+          cardClassName: "",
+          textareaClassName: "",
+          bottomSlot: null,
+        }),
+      );
+    });
+
+    await typeText("/compact 把上下文收一下");
+    await pressEnter();
+
+    expect(onCompact).toHaveBeenCalledWith("把上下文收一下");
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });
 

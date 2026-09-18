@@ -33,6 +33,7 @@
     --color-accent-hover: #e4e4e7;
     --color-accent-muted: rgba(212, 212, 216, 0.1);
     --color-accent-foreground: #09090b;
+    --color-mention: #6ea8fe;
     --color-text-primary: #f4f4f5;
     --color-text-secondary: #a1a1aa;
     --color-text-muted: #71717a;
@@ -73,6 +74,7 @@
     --color-accent-hover: #09090b;
     --color-accent-muted: #f4f4f5;
     --color-accent-foreground: #ffffff;
+    --color-mention: #1d4ed8;
     --color-text-primary: #09090b;
     --color-text-secondary: #52525b;
     --color-text-muted: #a1a1aa;
@@ -117,6 +119,7 @@
     --color-accent-hover: #d4bd98;
     --color-accent-muted: rgba(196, 169, 125, 0.12);
     --color-accent-foreground: #1a1410;
+    --color-mention: #7fa8e8;
     --color-text-primary: #ede4d5;
     --color-text-secondary: #b8a997;
     --color-text-muted: #8c8272;
@@ -142,6 +145,7 @@
     --color-accent-hover: #4d3f2d;
     --color-accent-muted: #f5efe0;
     --color-accent-foreground: #ffffff;
+    --color-mention: #1e40af;
     --color-text-primary: #3d3225;
     --color-text-secondary: #6b5d48;
     --color-text-muted: #a0947e;
@@ -172,6 +176,7 @@
     --color-accent-hover: #ffffff;
     --color-accent-muted: rgba(229, 229, 229, 0.1);
     --color-accent-foreground: #0a0a0a;
+    --color-mention: #4c9aff;
     --color-text-primary: #fafafa;
     --color-text-secondary: #a3a3a3;
     --color-text-muted: #737373;
@@ -197,6 +202,7 @@
     --color-accent-hover: #000000;
     --color-accent-muted: #f5f5f5;
     --color-accent-foreground: #ffffff;
+    --color-mention: #1d4ed8;
     --color-text-primary: #000000;
     --color-text-secondary: #525252;
     --color-text-muted: #a3a3a3;
@@ -226,6 +232,7 @@
     --color-accent-hover: #5eead4;
     --color-accent-muted: rgba(45, 212, 191, 0.12);
     --color-accent-foreground: #042f2e;
+    --color-mention: #60a5fa;
     --color-text-primary: #e2e8f0;
     --color-text-secondary: #94a3b8;
     --color-text-muted: #64748b;
@@ -251,6 +258,7 @@
     --color-accent-hover: #0f766e;
     --color-accent-muted: #ccfbf1;
     --color-accent-foreground: #ffffff;
+    --color-mention: #1d4ed8;
     --color-text-primary: #0f172a;
     --color-text-secondary: #475569;
     --color-text-muted: #94a3b8;
@@ -280,6 +288,7 @@
     --color-accent-hover: #6ee7b7;
     --color-accent-muted: rgba(52, 211, 153, 0.12);
     --color-accent-foreground: #022c22;
+    --color-mention: #7dd3fc;
     --color-text-primary: #e6ede3;
     --color-text-secondary: #9aab93;
     --color-text-muted: #6b7c5e;
@@ -305,6 +314,7 @@
     --color-accent-hover: #047857;
     --color-accent-muted: #d1fae5;
     --color-accent-foreground: #ffffff;
+    --color-mention: #0369a1;
     --color-text-primary: #1a2415;
     --color-text-secondary: #4a5a40;
     --color-text-muted: #8a9a80;
@@ -334,6 +344,7 @@
     --color-accent-hover: #fdba74;
     --color-accent-muted: rgba(251, 146, 60, 0.12);
     --color-accent-foreground: #2d1600;
+    --color-mention: #93c5fd;
     --color-text-primary: #f0e6dc;
     --color-text-secondary: #bfaa95;
     --color-text-muted: #8c755e;
@@ -359,6 +370,7 @@
     --color-accent-hover: #c2410c;
     --color-accent-muted: #ffedd5;
     --color-accent-foreground: #ffffff;
+    --color-mention: #1d4ed8;
     --color-text-primary: #3d2e1f;
     --color-text-secondary: #6b5640;
     --color-text-muted: #a08a70;
@@ -388,6 +400,7 @@
     --color-accent-hover: #c4b5fd;
     --color-accent-muted: rgba(167, 139, 250, 0.12);
     --color-accent-foreground: #1a1030;
+    --color-mention: #67e8f9;
     --color-text-primary: #e8e4f2;
     --color-text-secondary: #a399c2;
     --color-text-muted: #7e6da8;
@@ -413,6 +426,7 @@
     --color-accent-hover: #6d28d9;
     --color-accent-muted: #ede9fe;
     --color-accent-foreground: #ffffff;
+    --color-mention: #0e7490;
     --color-text-primary: #1e1640;
     --color-text-secondary: #5a4e80;
     --color-text-muted: #9088b0;
@@ -654,6 +668,29 @@
     font-size: var(--font-size-chat);
     line-height: var(--line-height-chat);
     letter-spacing: -0.01em;
+  }
+
+  /* contenteditable 没有原生 placeholder，用 :empty 伪元素补。 */
+  .chat-editor:empty::before {
+    content: attr(data-placeholder);
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+
+  /*
+   * 行内引用 token 的图标。
+   *
+   * 两个坑叠在一起，改之前 token 整体比正文高约 2px：
+   *   1. preflight 给 svg 设了 display: block —— 没有 flex 容器时图标会独占一行；
+   *   2. 用 inline-flex + items-center 兜住它，容器的基线就变成「首个 flex item 的底边」
+   *      （CSS Flexbox §8.5：items 非 baseline 对齐时按首个 item 的边框盒合成基线），
+   *      于是整个 token 被抬起。实测输入框 -2.06px、气泡 -2px。
+   * 解法：图标回到行内流，用 em 为单位的 vertical-align 做光学居中（跟着字号缩放）。
+   * 实测桌面 13px / 14px 两种字号下图标与文字中心的偏差 ≤ 0.2px，基线完全对齐。
+   */
+  .reference-token-icon {
+    display: inline;
+    vertical-align: -0.14em;
   }
 
   /* Prose styling for assistant messages - system font stack */

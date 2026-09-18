@@ -1804,5 +1804,8 @@
   },
   "attachChip": {
     "vaultSource": "Vault · {{name}}"
+  },
+  "attachTile": {
+    "remove": "Remove attachment"
   }
 }
