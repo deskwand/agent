@@ -134,20 +134,26 @@ describe("sidebar auto collapse", () => {
     expect(snapshot()).toBeNull();
   });
 
-  it("restores the sidebar when browser fullscreen exits", () => {
+  it("keeps the sidebar collapsed while a family panel is still visible after fullscreen", () => {
     useAppStore.getState().openPreview(TAB_A);
     useAppStore.getState().enterBrowserFullscreen();
 
     useAppStore.getState().exitBrowserFullscreen();
 
-    expect(useAppStore.getState().rightPanelMode).toBeNull();
+    // 快照现在存当时的可见模式（不再把 preview 归一化成 null），
+    // 退出后仍在面板家族里，所以侧栏保持收起
+    expect(useAppStore.getState().rightPanelMode).toBe("preview");
+    expect(sidebar()).toBe(true);
+
+    // 真正离开家族（关掉预览）时才还原
+    useAppStore.getState().closePreviewTab(TAB_A.path);
     expect(sidebar()).toBe(false);
     expect(snapshot()).toBeNull();
   });
 
-  it("restores the sidebar through setRightPanelMode", () => {
+  it("restores the sidebar when the file panel replaces the preview", () => {
     useAppStore.getState().openPreview(TAB_A);
-    useAppStore.getState().setRightPanelMode("files");
+    useAppStore.getState().toggleFileBrowser();
 
     expect(sidebar()).toBe(false);
     expect(snapshot()).toBeNull();

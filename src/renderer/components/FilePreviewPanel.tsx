@@ -160,7 +160,7 @@ const CodePreview = memo(function CodePreview({
 
 // ── Panel component ─────────────────────────────────────────────
 // 无 props：标签、激活标签都由 store 决定；本组件只在 preview 模式下挂载。
-export function FilePreviewPanel() {
+export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
   const { t } = useTranslation();
   const previewTabs = useAppStore((s) => s.previewTabs);
   const activePreviewTab = useAppStore((s) => s.activePreviewTab);
@@ -303,6 +303,7 @@ export function FilePreviewPanel() {
             fileName={fileName}
             showOpenExternal={false}
             autoPlay={tab.autoPlay ?? false}
+            visible={visible}
           />
         ) : loading ? (
           <div className="flex items-center justify-center py-16">

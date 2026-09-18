@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ExternalLink, Loader2, Video } from "lucide-react";
 import { getVideoPlaybackKind } from "../../shared/video-file";
@@ -9,6 +9,8 @@ export interface VideoPlayerProps {
   compact?: boolean;
   showOpenExternal?: boolean;
   autoPlay?: boolean;
+  /** 面板不可见时传 false：display:none 不会自动暂停媒体，必须显式暂停 */
+  visible?: boolean;
 }
 
 export function VideoPlayer({
@@ -17,8 +19,15 @@ export function VideoPlayer({
   compact = false,
   showOpenExternal = true,
   autoPlay = false,
+  visible = true,
 }: VideoPlayerProps) {
   const { t } = useTranslation();
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // 隐藏（display:none）不会自动暂停媒体，面板切走时要显式暂停
+  useLayoutEffect(() => {
+    if (!visible) videoRef.current?.pause();
+  }, [visible]);
   const kind = getVideoPlaybackKind(fileName);
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
     "loading",
@@ -87,6 +96,7 @@ export function VideoPlayer({
       >
         {src && (
           <video
+            ref={videoRef}
             src={src}
             controls
             autoPlay={autoPlay}

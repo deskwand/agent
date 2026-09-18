@@ -24,13 +24,13 @@ describe("preview panel store", () => {
     expect(state.activePreviewTab).toBe(TAB_A.path);
   });
 
-  it("records the previous mode only when entering preview from another panel", () => {
+  it("records the family entry origin only when entering preview from outside the family", () => {
     useAppStore.getState().toggleFileBrowser();
     useAppStore.getState().openPreview(TAB_A);
-    expect(useAppStore.getState().rightPanelPreviousMode).toBe("files");
+    expect(useAppStore.getState().familyEntryOrigin).toBe("files");
 
     useAppStore.getState().openPreview(TAB_B);
-    expect(useAppStore.getState().rightPanelPreviousMode).toBe("files");
+    expect(useAppStore.getState().familyEntryOrigin).toBe("files");
   });
 
   it("focuses an already open file instead of adding a second tab", () => {
@@ -109,7 +109,7 @@ describe("preview panel store", () => {
     expect(state.rightPanelMode).toBe("files");
     expect(state.previewTabs).toEqual([]);
     expect(state.activePreviewTab).toBeNull();
-    expect(state.rightPanelPreviousMode).toBeNull();
+    expect(state.lastVisibleContext).toBeNull();
   });
 
   it("closes the panel through closePreviewPanel", () => {
@@ -123,30 +123,33 @@ describe("preview panel store", () => {
     expect(state.activePreviewTab).toBeNull();
   });
 
+  // C 语义：家族内/家族间切换都保留标签，只有关掉预览本身与切换会话才清
   it.each([
-    [
-      "setRightPanelMode",
-      () => useAppStore.getState().setRightPanelMode("files"),
-    ],
     ["toggleFileBrowser", () => useAppStore.getState().toggleFileBrowser()],
     ["toggleBrowserPanel", () => useAppStore.getState().toggleBrowserPanel()],
-    [
-      "setActiveSession",
-      () => useAppStore.getState().setActiveSession("other-session"),
-    ],
     [
       "enterBrowserFullscreen",
       () => useAppStore.getState().enterBrowserFullscreen(),
     ],
-  ] as const)("clears the preview state via %s", (_name, exitPreview) => {
+  ] as const)("keeps the preview tabs via %s", (_name, switchPanel) => {
     useAppStore.getState().openPreview(TAB_A);
 
-    exitPreview();
+    switchPanel();
+
+    const state = useAppStore.getState();
+    expect(state.previewTabs).toEqual([TAB_A]);
+  });
+
+  it("clears the preview state when the session changes", () => {
+    useAppStore.setState({ activeSessionId: "session-1" });
+    useAppStore.getState().openPreview(TAB_A);
+
+    useAppStore.getState().setActiveSession("other-session");
 
     const state = useAppStore.getState();
     expect(state.previewTabs).toEqual([]);
     expect(state.activePreviewTab).toBeNull();
-    expect(state.rightPanelPreviousMode).toBeNull();
+    expect(state.lastVisibleContext).toBeNull();
   });
 
   it("keeps preview tabs when the active session does not change", () => {
@@ -167,13 +170,14 @@ describe("preview panel store", () => {
     expect(useAppStore.getState().rightPanelMode).toBe("files");
   });
 
-  it("normalises the preview mode when entering browser fullscreen", () => {
+  it("keeps the preview mode in the browser fullscreen snapshot", () => {
     useAppStore.getState().openPreview(TAB_A);
 
     useAppStore.getState().enterBrowserFullscreen();
 
+    // 不再把 preview 归一化成 null：快照就是当时的可见模式
     expect(useAppStore.getState().browserFullscreenSnapshot).toEqual({
-      rightPanelMode: null,
+      rightPanelMode: "preview",
       contextPanelWidth: 288,
     });
   });

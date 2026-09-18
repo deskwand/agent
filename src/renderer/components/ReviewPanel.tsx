@@ -147,10 +147,10 @@ function toSideBySide(
 
 // ── Component ──
 
-export function ReviewPanel() {
+export function ReviewPanel({ visible = true }: { visible?: boolean }) {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((s) => s.activeSessionId);
-  const setReviewOpen = useAppStore((s) => s.setReviewOpen);
+  const closeReview = useAppStore((s) => s.closeReview);
   const reviewTargetFile = useAppStore((s) => s.reviewTargetFile);
   const setReviewTargetFile = useAppStore((s) => s.setReviewTargetFile);
 
@@ -196,6 +196,14 @@ export function ReviewPanel() {
   useEffect(() => {
     loadDiffFiles();
   }, [loadDiffFiles]);
+
+  // keep-alive 之后「挂载即加载」不再等于「每次打开都加载」，
+  // 重新可见时静默刷新一次，否则会看到过期 diff。
+  const wasVisible = useRef(visible);
+  useEffect(() => {
+    if (visible && !wasVisible.current) loadDiffFiles();
+    wasVisible.current = visible;
+  }, [visible, loadDiffFiles]);
 
   const cwdRef = useRef(activeSessionCwd);
   cwdRef.current = activeSessionCwd;
@@ -255,22 +263,28 @@ export function ReviewPanel() {
     }
   }, [selectedFile, reviewTargetFile, setReviewTargetFile]);
 
-  // When reviewTargetFile is set while panel is already open, reset selection
+  // reviewTargetFile 变化（例如已打开时又点了一次「Review Changes」）：
+  // 清空选中并刷新一次 diff 列表，否则自动选中会对着过期的 diffFiles 跑，
+  // 可能显示成另一个文件的 diff。
   useEffect(() => {
     if (reviewTargetFile) {
       setSelectedFile(null);
+      loadDiffFiles();
     }
-  }, [reviewTargetFile]);
+  }, [reviewTargetFile, loadDiffFiles]);
 
   const handleClose = useCallback(() => {
-    setReviewOpen(false);
+    closeReview();
     setSelectedFile(null);
     setFileDiff("");
     setDiffFiles([]);
-  }, [setReviewOpen]);
+  }, [closeReview]);
 
   // ESC to close
   useEffect(() => {
+    // 保活之后面板在隐藏状态下仍然挂载：全局监听必须跟着可见性收口，
+    // 否则在别处按 ESC 会把隐藏 review 的选中文件与 diff 悄悄清掉。
+    if (!visible) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -279,7 +293,7 @@ export function ReviewPanel() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [handleClose]);
+  }, [handleClose, visible]);
 
   const fileName = selectedFile
     ? selectedFile.split("/").pop() || selectedFile
@@ -385,25 +399,19 @@ export function ReviewPanel() {
     </div>
   );
 
-  // ── Fullscreen mode ──
-  if (isFullscreen) {
-    return (
-      <div className="fixed inset-0 z-50 bg-background flex flex-col">
-        {toolbar}
-        {body}
-      </div>
-    );
-  }
-
-  // ── Normal (centered card) mode ──
-  // Backdrop is a sibling (not parent) so card layout changes don't re-composite the backdrop.
+  // 面板形态：占满右侧槽位。全屏是同一个根节点的另一个 class，
+  // 因此它天然落在 App 的保活包装层内部（position:fixed 逃不出祖先的 display:none），
+  // 切到别的面板时全屏层不会继续盖住整窗。
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div aria-hidden className="absolute inset-0 bg-black/40" />
-      <div className="relative mx-4 flex flex-col overflow-hidden rounded-6xl border border-border-subtle bg-background shadow-2xl w-[1200px] max-w-[95vw] h-[85vh] max-h-[90vh]">
-        {toolbar}
-        {body}
-      </div>
+    <div
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-50 bg-background flex flex-col"
+          : "flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border-subtle bg-background"
+      }
+    >
+      {toolbar}
+      {body}
     </div>
   );
 }

@@ -74,7 +74,7 @@ export function Titlebar() {
   const sessions = useAppStore((s) => s.sessions);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
-  const isReviewOpen = useAppStore((s) => s.isReviewOpen);
+  const isReviewOpen = useAppStore((s) => s.rightPanelMode === "review");
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleFileBrowser = useAppStore((s) => s.toggleFileBrowser);
   const toggleReviewPanel = useAppStore((s) => s.toggleReviewPanel);

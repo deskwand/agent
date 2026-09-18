@@ -74,7 +74,7 @@ describe("ArtifactCard edited-file routing", () => {
     useAppStore.setState({
       activeSessionId: "session-1",
       sessions: [makeSession("C:\\repo")],
-      isReviewOpen: false,
+      rightPanelMode: null,
       reviewTargetFile: null,
     });
 
@@ -139,7 +139,7 @@ describe("ArtifactCard edited-file routing", () => {
 
     expect(getDiffFiles).toHaveBeenCalledWith("C:\\repo");
     expect(useAppStore.getState().reviewTargetFile).toBe("src/example.ts");
-    expect(useAppStore.getState().isReviewOpen).toBe(true);
+    expect(useAppStore.getState().rightPanelMode).toBe("review");
     expect(useAppStore.getState().previewTabs).toEqual([]);
   });
 
@@ -152,7 +152,7 @@ describe("ArtifactCard edited-file routing", () => {
     expect(useAppStore.getState().previewTabs).toEqual([
       { path: "/repo/src/example.ts", name: "example.ts" },
     ]);
-    expect(useAppStore.getState().isReviewOpen).toBe(false);
+    expect(useAppStore.getState().rightPanelMode).not.toBe("review");
     expect(navigate).not.toHaveBeenCalled();
     expect(useAppStore.getState().rightPanelMode).toBe("preview");
   });
@@ -168,7 +168,7 @@ describe("ArtifactCard edited-file routing", () => {
     expect(useAppStore.getState().previewTabs).toEqual([
       { path: "/repo/src/example.ts", name: "example.ts" },
     ]);
-    expect(useAppStore.getState().isReviewOpen).toBe(false);
+    expect(useAppStore.getState().rightPanelMode).not.toBe("review");
   });
 
   it("previews the edited file when the diff query fails", async () => {
@@ -180,7 +180,7 @@ describe("ArtifactCard edited-file routing", () => {
     expect(useAppStore.getState().previewTabs).toEqual([
       { path: "/repo/src/example.ts", name: "example.ts" },
     ]);
-    expect(useAppStore.getState().isReviewOpen).toBe(false);
+    expect(useAppStore.getState().rightPanelMode).not.toBe("review");
   });
 
   it("opens a browser-openable edited file in the internal browser", async () => {
@@ -202,7 +202,7 @@ describe("ArtifactCard edited-file routing", () => {
 
     await renderAndClick([editedHtmlFile], "src/page.html");
 
-    expect(useAppStore.getState().isReviewOpen).toBe(true);
+    expect(useAppStore.getState().rightPanelMode).toBe("review");
     expect(useAppStore.getState().reviewTargetFile).toBe("src/page.html");
     expect(navigate).not.toHaveBeenCalled();
   });

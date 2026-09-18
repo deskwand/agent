@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useRef,
   useCallback,
+  useState,
 } from "react";
 import { useAppStore } from "./store";
 import {
@@ -24,7 +25,9 @@ import { ResizeHandle } from "./components/ResizeHandle";
 import {
   availablePanelWidth,
   clampPreviewWidth,
+  clampReviewWidth,
   initialPreviewWidth,
+  initialReviewWidth,
   resolvePanelWidth,
 } from "./utils/panel-width";
 import { WelcomeView } from "./components/WelcomeView";
@@ -123,15 +126,16 @@ function App() {
   const setActiveView = useAppStore((s) => s.setActiveView);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
-  const rightPanelPreviousMode = useAppStore((s) => s.rightPanelPreviousMode);
   const previewWidth = useAppStore((s) => s.previewWidth);
+  const reviewWidth = useAppStore((s) => s.reviewWidth);
   const activePreviewTab = useAppStore((s) => s.activePreviewTab);
   const setPreviewWidth = useAppStore((s) => s.setPreviewWidth);
   const setPreviewWidthManual = useAppStore((s) => s.setPreviewWidthManual);
+  const setReviewWidth = useAppStore((s) => s.setReviewWidth);
+  const setReviewWidthManual = useAppStore((s) => s.setReviewWidthManual);
   const hasBrowserOcclusion = useAppStore(
     (state) => state.browserOcclusionIds.size > 0,
   );
-  const isReviewOpen = useAppStore((s) => s.isReviewOpen);
   const isArtifactPanelOpen = useAppStore((s) => s.isArtifactPanelOpen);
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
   const contextPanelWidth = useAppStore((s) => s.contextPanelWidth);
@@ -237,19 +241,32 @@ function App() {
   // Sync browser WebContentsView visibility with panel state.
   // WebContentsView is a native Electron layer — any full-screen React view
   // (settings, apps, schedule, review, config modal) must hide it.
-  const isFullScreenView =
-    activeView !== "chat" || isReviewOpen || showConfigModal;
+  const isFullScreenView = activeView !== "chat" || showConfigModal;
 
-  // 预览面板在 vault 视图里也要能显示（vault 有自己的预览入口）；
-  // 其余整页视图（设置 / 应用 / 日程）保持原来的「右侧槽位压成 0」。
-  const previewPanelVisible =
-    rightPanelMode === "preview" &&
-    (activeView === "chat" || activeView === "vault");
-
+  // 面板家族（预览 / review）在 chat 与 vault 放行；
+  // 文件 / 浏览器沿用「非整页视图才显示」的旧规则（行为不变）。
   const rightPanelVisible =
-    rightPanelMode === "preview"
-      ? previewPanelVisible
+    rightPanelMode === "preview" || rightPanelMode === "review"
+      ? (activeView === "chat" || activeView === "vault") && !showConfigModal
       : !isFullScreenView && rightPanelMode !== null;
+
+  // 「这块面板此刻真的可见吗」：槽位收起（w-0）不等于隐藏，
+  // 所以 visible 必须带上 rightPanelVisible，否则隐藏面板的副作用会继续跑
+  // （ESC 监听、<video> 播放、review 的全屏覆盖层甚至固定定位漏到整窗）。
+  const previewPanelActive = rightPanelVisible && rightPanelMode === "preview";
+  const reviewPanelActive = rightPanelVisible && rightPanelMode === "review";
+
+  // 访问过的面板：首次打开后一直挂载，之后只切可见性（React 18 没有 <Activity>，
+  // 用 hidden 实现「隐藏但保活」；每块面板的状态因此不会在切换时丢失）
+  const [visitedPanels, setVisitedPanels] = useState<Set<string>>(
+    () => new Set(),
+  );
+  useEffect(() => {
+    if (!rightPanelMode || rightPanelMode === "browser") return;
+    setVisitedPanels((prev) =>
+      prev.has(rightPanelMode) ? prev : new Set(prev).add(rightPanelMode),
+    );
+  }, [rightPanelMode]);
 
   const panelAvailableWidth = availablePanelWidth(
     window.innerWidth,
@@ -258,8 +275,7 @@ function App() {
   );
   const panelWidth = resolvePanelWidth(
     rightPanelMode,
-    contextPanelWidth,
-    previewWidth,
+    { contextPanelWidth, previewWidth, reviewWidth },
     panelAvailableWidth,
   );
 
@@ -316,7 +332,7 @@ function App() {
   // Keep browser at 50% on window resize when in auto mode.
   // Uses refs to avoid re-binding the listener on every sidebar change.
   const resizeGuardRef = useRef<{
-    rightPanelMode: "files" | "browser" | "preview" | null;
+    rightPanelMode: "files" | "browser" | "preview" | "review" | null;
     browserWidthManual: boolean;
     calcHalfWidth: typeof calcHalfWidth;
   }>(null!);
@@ -454,6 +470,13 @@ function App() {
                   setPreviewWidthManual(true);
                   return;
                 }
+                if (rightPanelMode === "review") {
+                  setReviewWidth(
+                    clampReviewWidth(panelWidth - delta, panelAvailableWidth),
+                  );
+                  setReviewWidthManual(true);
+                  return;
+                }
                 setBrowserWidthManual(true);
                 setContextPanelWidth(
                   Math.max(
@@ -476,6 +499,17 @@ function App() {
                   );
                   return;
                 }
+                if (rightPanelMode === "review") {
+                  setReviewWidthManual(false);
+                  setReviewWidth(
+                    initialReviewWidth(
+                      window.innerWidth,
+                      sidebarCollapsed,
+                      sidebarWidth,
+                    ),
+                  );
+                  return;
+                }
                 setBrowserWidthManual(false);
                 setContextPanelWidth(calcHalfWidth());
               }}
@@ -487,10 +521,34 @@ function App() {
             className={`overflow-hidden flex-shrink-0 flex transition-[width] duration-300 ease-in-out ${rightPanelVisible ? "" : "w-0"}`}
             style={{ width: rightPanelVisible ? `${panelWidth}px` : 0 }}
           >
-            {rightPanelVisible &&
-              (rightPanelMode === "browser" ? (
+            {rightPanelMode === "browser" && (
+              <PanelErrorBoundary
+                name="BrowserPanel"
+                fallback={
+                  <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                }
+              >
+                <Suspense
+                  fallback={
+                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                  }
+                >
+                  <BrowserPanel width={contextPanelWidth} />
+                </Suspense>
+              </PanelErrorBoundary>
+            )}
+
+            {visitedPanels.has("preview") && (
+              <div
+                className={
+                  rightPanelMode === "preview"
+                    ? "flex flex-1 min-w-0"
+                    : "hidden"
+                }
+              >
                 <PanelErrorBoundary
-                  name="BrowserPanel"
+                  name="FilePreviewPanel"
+                  resetKey={activePreviewTab ?? undefined}
                   fallback={
                     <div className="flex-1 border-l border-border-subtle bg-background/60" />
                   }
@@ -500,55 +558,61 @@ function App() {
                       <div className="flex-1 border-l border-border-subtle bg-background/60" />
                     }
                   >
-                    <BrowserPanel width={contextPanelWidth} />
+                    <FilePreviewPanel visible={previewPanelActive} />
                   </Suspense>
                 </PanelErrorBoundary>
-              ) : (
-                <>
-                  {rightPanelMode === "preview" && (
-                    <PanelErrorBoundary
-                      name="FilePreviewPanel"
-                      resetKey={activePreviewTab ?? undefined}
-                      fallback={
-                        <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                      }
-                    >
-                      <Suspense
-                        fallback={
-                          <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                        }
-                      >
-                        <FilePreviewPanel />
-                      </Suspense>
-                    </PanelErrorBoundary>
-                  )}
-                  {(rightPanelMode === "files" ||
-                    rightPanelPreviousMode === "files") && (
-                    <div
-                      className={
-                        rightPanelMode === "preview"
-                          ? "hidden"
-                          : "flex flex-1 min-w-0"
-                      }
-                    >
-                      <PanelErrorBoundary
-                        name="FileBrowser"
-                        fallback={
-                          <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                        }
-                      >
-                        <Suspense
-                          fallback={
-                            <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                          }
-                        >
-                          <FileBrowser width={panelWidth} />
-                        </Suspense>
-                      </PanelErrorBoundary>
-                    </div>
-                  )}
-                </>
-              ))}
+              </div>
+            )}
+
+            {visitedPanels.has("review") && (
+              <div
+                className={reviewPanelActive ? "flex flex-1 min-w-0" : "hidden"}
+              >
+                <PanelErrorBoundary
+                  name="ReviewPanel"
+                  resetKey={activeSessionId ?? undefined}
+                  fallback={
+                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                  }
+                >
+                  <Suspense
+                    fallback={
+                      <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                    }
+                  >
+                    <ReviewPanel
+                      key={activeSessionId ?? "none"}
+                      visible={reviewPanelActive}
+                    />
+                  </Suspense>
+                </PanelErrorBoundary>
+              </div>
+            )}
+
+            {visitedPanels.has("files") && (
+              <div
+                className={
+                  rightPanelVisible && rightPanelMode === "files"
+                    ? "flex flex-1 min-w-0"
+                    : "hidden"
+                }
+              >
+                <PanelErrorBoundary
+                  name="FileBrowser"
+                  fallback={
+                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                  }
+                >
+                  <Suspense
+                    fallback={
+                      <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                    }
+                  >
+                    <FileBrowser width={panelWidth} />
+                  </Suspense>
+                </PanelErrorBoundary>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -582,13 +646,6 @@ function App() {
           />
         </Suspense>
       </PanelErrorBoundary>
-
-      {/* Review Modal */}
-      {isReviewOpen && (
-        <Suspense fallback={null}>
-          <ReviewPanel />
-        </Suspense>
-      )}
 
       {/* Sandbox Setup Dialog */}
       {showSandboxSetup && (

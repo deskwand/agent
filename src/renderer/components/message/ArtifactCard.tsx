@@ -111,7 +111,7 @@ export const ArtifactCard = memo(function ArtifactCard({
     const session = (s.sessions as Session[]).find((ses) => ses.id === sid);
     return session?.cwd || undefined;
   });
-  const setReviewOpen = useAppStore((s) => s.setReviewOpen);
+  const openReview = useAppStore((s) => s.openReview);
   const setReviewTargetFile = useAppStore((s) => s.setReviewTargetFile);
   const openPreview = useAppStore((s) => s.openPreview);
 
@@ -300,7 +300,7 @@ export const ArtifactCard = memo(function ArtifactCard({
         }
 
         setReviewTargetFile(matchingDiffFile.path);
-        setReviewOpen(true);
+        openReview();
       } catch {
         handleOpenFileRow();
       }
@@ -309,10 +309,10 @@ export const ArtifactCard = memo(function ArtifactCard({
       activeSessionCwd,
       isGitRepo,
       openPreview,
+      openReview,
       resolvePath,
       revertedFiles,
       setReviewTargetFile,
-      setReviewOpen,
     ],
   );
 

@@ -56,7 +56,7 @@ describe("标题栏操作按钮", () => {
     // store 初始值下的实际文案 key：
     //   sidebarCollapsed=false    → context.collapsePanel
     //   rightPanelMode=null       → titlebar.fileBrowser / titlebar.builtInBrowser
-    //   isReviewOpen=false        → reviewPanel.title
+    //   rightPanelMode!=="review"        → reviewPanel.title
     //   isArtifactPanelOpen=false → artifactPanel.toggle
     for (const key of [
       "artifactPanel.toggle",

@@ -1,4 +1,4 @@
-export type RightPanelMode = "files" | "browser" | "preview" | null;
+export type RightPanelMode = "files" | "browser" | "preview" | "review" | null;
 
 export function shouldSuppressVisibleBrowser(
   isFullScreenView: boolean,
