@@ -1259,7 +1259,9 @@ export function ChatView() {
     }
 
     prevMessageCountRef.current = messages.length;
-  }, [messages.length, partialMessage.length]);
+    // Clearing the active turn swaps the synthetic streaming card for the
+    // committed message cards, which can change the rendered height.
+  }, [activeTurn?.turnId, messages.length, partialMessage.length]);
 
   // Additional scroll trigger for content height changes (e.g., TodoWrite expand/collapse)
   useEffect(() => {

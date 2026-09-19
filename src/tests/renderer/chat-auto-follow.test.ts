@@ -459,9 +459,9 @@ describe("ChatView auto-follow", () => {
     });
 
     // Next token must pin to the new bottom. Use a different-length token
-    // so the layout effect re-runs (its deps are [messages.length,
-    // partialMessage.length]). jsdom does not clamp direct scrollTop
-    // assignments, so assert distance (same style as test 1).
+    // so the layout effect observes the partialMessage length change. jsdom
+    // does not clamp direct scrollTop assignments, so assert distance (same
+    // style as test 1).
     scrollHeight = 1300;
     await act(async () => {
       useAppStore.setState((state) => ({
@@ -897,6 +897,123 @@ describe("ChatView auto-follow", () => {
       }));
     });
 
+    expect(scrollContainer!.scrollTop).toBe(300);
+  });
+
+  it("keeps the final assistant message pinned when the active turn clears", async () => {
+    useAppStore.setState((state) => ({
+      sessionStates: {
+        ...state.sessionStates,
+        s1: {
+          ...state.sessionStates.s1!,
+          messages: [
+            {
+              ...makeMessage("u1", "user"),
+              turnId: "turn-1",
+            },
+          ],
+          activeTurn: {
+            turnId: "turn-1",
+            userMessageId: "u1",
+            startedAt: Date.now(),
+          },
+          partialMessage: "streaming answer",
+        },
+      },
+    }));
+
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    expect(container.textContent).toContain("streaming answer");
+
+    await act(async () => {
+      useAppStore.getState().addMessage("s1", {
+        ...makeMessage("final-a1", "assistant"),
+        turnId: "turn-1",
+        content: [{ type: "text", text: "final assistant answer" }],
+      });
+    });
+
+    scrollHeight = 1120;
+    await act(async () => {
+      useAppStore.getState().clearActiveTurn("s1");
+    });
+
+    expect(container.textContent).toContain("final assistant answer");
+    expect(useAppStore.getState().sessionStates.s1!.activeTurn).toBeNull();
+    expect(scrollContainer!.scrollTop).toBe(1120);
+  });
+
+  it("does not pin the final assistant message after the user scrolls up", async () => {
+    useAppStore.setState((state) => ({
+      sessionStates: {
+        ...state.sessionStates,
+        s1: {
+          ...state.sessionStates.s1!,
+          messages: [
+            {
+              ...makeMessage("u1", "user"),
+              turnId: "turn-1",
+            },
+          ],
+          activeTurn: {
+            turnId: "turn-1",
+            userMessageId: "u1",
+            startedAt: Date.now(),
+          },
+          partialMessage: "streaming answer",
+        },
+      },
+    }));
+
+    await act(async () => root.render(React.createElement(ChatView)));
+
+    const scrollContainer =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto");
+    expect(scrollContainer).not.toBeNull();
+
+    let scrollHeight = 1000;
+    Object.defineProperties(scrollContainer!, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    scrollContainer!.scrollTop = 500;
+    scrollContainer!.dispatchEvent(new Event("scroll"));
+
+    await act(async () => {
+      scrollContainer!.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -20 }),
+      );
+      scrollContainer!.scrollTop = 300;
+      scrollContainer!.dispatchEvent(new Event("scroll"));
+    });
+
+    await act(async () => {
+      useAppStore.getState().addMessage("s1", {
+        ...makeMessage("final-a1", "assistant"),
+        turnId: "turn-1",
+        content: [{ type: "text", text: "final assistant answer" }],
+      });
+    });
+
+    scrollHeight = 1120;
+    await act(async () => {
+      useAppStore.getState().clearActiveTurn("s1");
+    });
+
+    expect(container.textContent).toContain("final assistant answer");
     expect(scrollContainer!.scrollTop).toBe(300);
   });
 });
