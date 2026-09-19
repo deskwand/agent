@@ -511,9 +511,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const openVault = useCallback(() => {
     setAccountMenuOpen(false);
-    setActiveSession(null);
+    // 不要清空 activeSessionId：Vault 是平级视图，返回聊天时应回到原会话
+    // （清空还会一并抹掉 localStorage 里记录的 lastSessionId）。
     setActiveView("vault");
-  }, [setActiveSession, setActiveView]);
+  }, [setActiveView]);
 
   const handleDeleteSession = useCallback(
     (e: React.MouseEvent, session: Session) => {
@@ -727,7 +728,10 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive =
-      activeSessionId === session.id && !showApps && !showSchedule;
+      activeSessionId === session.id &&
+      !showApps &&
+      !showSchedule &&
+      !showVault;
     const hasStatusIndicator = isSessionBusy(
       session,
       sessionStates[session.id]?.backgroundAgents,

@@ -76,6 +76,32 @@ describe("Sidebar top nav entries", () => {
     expect(sidebarContent).toContain("setShowSchedule(true)");
   });
 
+  it("keeps the active session when entering the vault view", () => {
+    // 回归：openVault 曾调用 setActiveSession(null)，导致从 Vault 返回聊天时
+    // 落到 WelcomeView（apps / automation 都不会清空当前会话）。
+    // 切片右边界依赖紧随其后的 handleDeleteSession，改名时需同步。
+    const openVaultBody = sidebarContent.slice(
+      sidebarContent.indexOf("const openVault = useCallback("),
+      sidebarContent.indexOf("const handleDeleteSession = useCallback("),
+    );
+    expect(openVaultBody).toContain('setActiveView("vault")');
+    expect(openVaultBody).not.toContain("setActiveSession(");
+    // 会话行高亮同样要在 Vault 下让位（与 apps / automation 一致）；
+    // 按表达式切片而非整行，避免被 prettier 换行破坏
+    const isActiveExpr = sidebarContent.slice(
+      sidebarContent.indexOf("const isActive ="),
+      sidebarContent.indexOf("const hasStatusIndicator"),
+    );
+    for (const flag of [
+      "activeSessionId === session.id",
+      "!showApps",
+      "!showSchedule",
+      "!showVault",
+    ]) {
+      expect(isActiveExpr).toContain(flag);
+    }
+  });
+
   it("no longer exposes separate skills cloud and plugins entries", () => {
     expect(sidebarContent).not.toContain('t("sidebar.skillsCloud")');
     expect(sidebarContent).not.toContain('t("sidebar.plugins")');
