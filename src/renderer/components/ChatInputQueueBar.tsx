@@ -7,6 +7,7 @@ import {
   FileText,
 } from "lucide-react";
 import type { QueuedInput } from "../types";
+import { resolveLeadingToken } from "../utils/reference-tokens";
 
 interface ChatInputQueueBarProps {
   items: QueuedInput[];
@@ -23,6 +24,23 @@ export function ChatInputQueueBar({
 }: ChatInputQueueBarProps) {
   const { t } = useTranslation();
   if (items.length === 0) return null;
+
+  /**
+   * 行首引用的显示文本 —— 与「发出的气泡」同一条规则：
+   * 技能的 `/skill:` 是纯写入噪音，显示时去掉（`/skill:alpha 帮我…` → `alpha 帮我…`）；
+   * 命令的斜杠有语义，保留（`/plan 做一遍` 原样），所以那种情况整串与入参一致。
+   * 规则出处见 components/ReferenceToken.tsx 的 kind 说明，两侧分别由
+   * tests/renderer/{chat-input-queue-bar,user-message-tokens}.test.ts 锁着。
+   *
+   * 只改显示。item.text 本身必须原样保留：sendQueuedItem（ChatView.tsx）把它当 text block
+   * 发给 SDK，而 pi 只在消息**以 `/skill:` 开头**时才展开技能（见 reference-tokens.ts）。
+   * 完整原文仍通过 title 悬停可见。
+   */
+  const displayText = (text: string): string => {
+    const token = resolveLeadingToken(text);
+    if (token?.kind !== "skill") return text;
+    return `${token.name}${text.slice(token.raw.length)}`;
+  };
   return (
     <ul className="space-y-1 px-1 pb-1">
       {items.map((item) => (
@@ -35,7 +53,7 @@ export function ChatInputQueueBar({
             className="min-w-0 flex-1 truncate text-text-primary"
             title={item.text}
           >
-            {item.text}
+            {displayText(item.text)}
           </span>
           <span className="flex flex-shrink-0 items-center gap-1 overflow-hidden">
             {(item.images ?? []).map((_, index) => (

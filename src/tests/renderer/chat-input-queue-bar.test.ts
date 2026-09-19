@@ -91,6 +91,74 @@ describe("ChatInputQueueBar", () => {
     expect(container.innerHTML).toBe("");
   });
 
+  it("行首技能按裸名显示：去掉纯写入噪音 /skill:", async () => {
+    await renderBar({
+      items: [{ id: "q1", text: "/skill:alpha 帮我把间距统一一下", ts: 1 }],
+      onSteer: vi.fn(),
+      onRemove: vi.fn(),
+    });
+    const row = container.querySelector("li")!;
+    expect(row.textContent).toContain("alpha 帮我把间距统一一下");
+    expect(row.textContent).not.toContain("/skill:");
+  });
+
+  it("命令保留斜杠 —— 与发出的气泡同一条显示规则", async () => {
+    // 必须用**内置**命令：扩展命令 /plan 不读 store 就不会被解析，
+    // 那种情况下新旧实现都是原样透传，用例会变成空转（实测踩过）。
+    await renderBar({
+      items: [{ id: "q1", text: "/compact 收一下上下文", ts: 1 }],
+      onSteer: vi.fn(),
+      onRemove: vi.fn(),
+    });
+    // 气泡对命令渲染 token.raw（保留 /），排队行必须一致，否则同一条消息前后两个样
+    expect(container.querySelector("li")!.textContent).toContain(
+      "/compact 收一下上下文",
+    );
+  });
+
+  it("未解析的行首 /word 原样透传（不读 store，故扩展命令不动）", async () => {
+    await renderBar({
+      items: [{ id: "q1", text: "/plan 做一遍", ts: 1 }],
+      onSteer: vi.fn(),
+      onRemove: vi.fn(),
+    });
+    expect(container.querySelector("li")!.textContent).toContain(
+      "/plan 做一遍",
+    );
+  });
+
+  it("句中的 /skill: 原样保留（只处理行首那一处）", async () => {
+    await renderBar({
+      items: [{ id: "q1", text: "帮我看看 /skill:alpha 这段", ts: 1 }],
+      onSteer: vi.fn(),
+      onRemove: vi.fn(),
+    });
+    expect(container.querySelector("li")!.textContent).toContain(
+      "帮我看看 /skill:alpha 这段",
+    );
+  });
+
+  it("行首引用后面没有正文时也能正确显示", async () => {
+    await renderBar({
+      items: [{ id: "q1", text: "/skill:alpha", ts: 1 }],
+      onSteer: vi.fn(),
+      onRemove: vi.fn(),
+    });
+    const row = container.querySelector("li")!;
+    expect(row.textContent).toContain("alpha");
+    expect(row.textContent).not.toContain("/skill:");
+  });
+
+  it("title 仍是完整原文，悬停能看到写入格式", async () => {
+    const raw = "/skill:alpha 帮我把间距统一一下";
+    await renderBar({
+      items: [{ id: "q1", text: raw, ts: 1 }],
+      onSteer: vi.fn(),
+      onRemove: vi.fn(),
+    });
+    expect(container.querySelector("[title]")?.getAttribute("title")).toBe(raw);
+  });
+
   it("renders attachment chips with filenames", async () => {
     const withAttachments: QueuedInput[] = [
       {
@@ -119,7 +187,11 @@ describe("ChatInputQueueBar", () => {
         ],
       },
     ];
-    await renderBar({ items: withAttachments, onSteer: vi.fn(), onRemove: vi.fn() });
+    await renderBar({
+      items: withAttachments,
+      onSteer: vi.fn(),
+      onRemove: vi.fn(),
+    });
     const row = container.querySelector("li")!;
     expect(row.textContent).toContain("report.pdf");
   });
