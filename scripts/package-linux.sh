@@ -154,6 +154,10 @@ for target in "$@"; do
         exit 1
       fi
       build_deb
+      # electron-builder hashed its own deb into latest-linux.yml before this
+      # script replaced it at the same path, so the manifest still describes the
+      # old file. Re-hash the listed entries against what is actually on disk.
+      node "$PROJECT_DIR/scripts/sync-linux-manifest.js"
       ;;
     *)
       echo "❌ Unknown target: $target (use deb)"
