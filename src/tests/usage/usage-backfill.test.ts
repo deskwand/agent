@@ -346,3 +346,45 @@ describe("backfill yields to the event loop", () => {
     expect(c).toBe(perFile * fileCount);
   });
 });
+
+/**
+ * `readScanRows` reads the whole table on every pass and permanent session
+ * deletion is a real feature, so fingerprint rows must not outlive their files.
+ */
+describe("fingerprint rows are pruned", () => {
+  it("forgets the rows of files that no longer exist", async () => {
+    writeSession("s-1", [assistant(1_760_000_000_000, 10, 5)]);
+    writeSession("s-2", [assistant(1_760_000_001_000, 10, 5)]);
+    await backfillUsageFromSessions(db, root);
+
+    fs.rmSync(path.join(root, "s-2"), { recursive: true, force: true });
+    const second = await backfillUsageFromSessions(db, root);
+
+    // Deleting a session changes no surviving file's fingerprint...
+    expect(second).toMatchObject({ filesChanged: 0 });
+    // ...only its own row goes away...
+    const rows = db
+      .prepare("SELECT path FROM usage_scan_files ORDER BY path")
+      .all() as Array<{ path: string }>;
+    expect(rows.map((row) => row.path)).toEqual([
+      "s-1/2026-09-12T00-00-00-000Z_abc.jsonl",
+    ]);
+    // ...and its already-imported usage rows stay: usage_records is history, not
+    // a mirror of the corpus.
+    expect(queryUsage(db, "all", 1_800_000_000_000).totals.calls).toBe(2);
+  });
+
+  it("leaves the fingerprint table alone when the root cannot be read", async () => {
+    writeSession("s-1", [assistant(1_760_000_000_000, 10, 5)]);
+    await backfillUsageFromSessions(db, root);
+
+    await backfillUsageFromSessions(db, path.join(root, "nope"));
+
+    // An unreadable root must not be mistaken for "every session was deleted",
+    // or one transient failure would force a full re-import on the next launch.
+    const { c } = db
+      .prepare("SELECT COUNT(*) AS c FROM usage_scan_files")
+      .get() as { c: number };
+    expect(c).toBe(1);
+  });
+});

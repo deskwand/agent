@@ -204,6 +204,44 @@ function flushChunk(
   state.pending.length = 0;
 }
 
+/**
+ * Drop fingerprint rows for files that no longer exist.
+ *
+ * Not a correctness requirement: a stale row only lies if a vanished path
+ * reappears with an identical mtime and size, and the path carries a session id
+ * plus an ISO timestamp. It is a size requirement — `readScanRows` reads the
+ * whole table on every pass, so the table must not grow with every session the
+ * user has ever permanently deleted.
+ *
+ * Accepted limitation: a session directory that fails to walk (transient
+ * `readdirSync`/`statSync` error) contributes no paths, so its rows are pruned
+ * and the next pass re-reads that session. Bounded, once, and never wrong — the
+ * rows were already imported and the dedup keys make the re-read a no-op. Only
+ * the root case returns early (see `walkCorpus`); per-directory failures
+ * deliberately do not, because that would mean threading a partial-failure flag
+ * through the whole pass for a rare event.
+ */
+function pruneScanRows(
+  db: DatabaseSync,
+  livePaths: Set<string>,
+  stored: Map<string, ScanRow>,
+): void {
+  const stale = [...stored.keys()].filter((path) => !livePaths.has(path));
+  if (stale.length === 0) return;
+
+  // One statement per path rather than an IN (?, ?, …) list: no placeholder
+  // ceiling to reason about, and the primary key makes each delete an index hit.
+  const remove = db.prepare("DELETE FROM usage_scan_files WHERE path = ?");
+  db.exec("BEGIN");
+  try {
+    for (const path of stale) remove.run(path);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve));
 }
@@ -285,6 +323,10 @@ export async function backfillUsageFromSessions(
     flushChunk(db, state, result);
     markScanned(db, file);
   }
+
+  // Only reachable when the walk succeeded — an unreadable root returned early,
+  // so it can never be mistaken for "every session was deleted".
+  pruneScanRows(db, new Set(files.map((file) => file.relPath)), stored);
 
   return result;
 }
