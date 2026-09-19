@@ -66,6 +66,7 @@ dist*
 resources/node
 resources/tools
 resources/python
+resources/bin
 docs/
 design-docs/
 /.mcp.json

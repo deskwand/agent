@@ -952,16 +952,25 @@ async function resolveCliclickPath(): Promise<string | null> {
   }
 
   // 2) 内置随应用打包(推荐)
-  // 打包布局:Resources/tools/darwin-{arch}/bin/cliclick
-  // 旧版布局:Resources/tools/bin/cliclick
+  // 当前布局:Resources/bin/cliclick
+  // 打包态旧布局:Resources/tools/darwin-{arch}/bin/cliclick
+  // 更旧布局:Resources/tools/bin/cliclick
+  // dev 态: <projectRoot>/resources/bin/darwin-{arch}/cliclick
+  //   （dev 下目录名带 arch；打包后被展平到 Resources/bin，所以两种形状都要试）
   const arch = process.arch === "arm64" ? "arm64" : "x64";
+  const currentBundled = await resolveBundledExecutable(
+    path.join("bin", "cliclick"),
+  );
+  const devBundled = await resolveBundledExecutable(
+    path.join("bin", `darwin-${arch}`, "cliclick"),
+  );
   const archBundled = await resolveBundledExecutable(
     path.join("tools", `darwin-${arch}`, "bin", "cliclick"),
   );
   const legacyBundled = await resolveBundledExecutable(
     path.join("tools", "bin", "cliclick"),
   );
-  const bundled = archBundled || legacyBundled;
+  const bundled = currentBundled || devBundled || archBundled || legacyBundled;
   if (bundled) {
     cachedCliclickPath = bundled;
     return bundled;
@@ -2058,13 +2067,17 @@ async function executeCliclick(
 
   const cliclickPath = await resolveCliclickPath();
   if (!cliclickPath) {
+    const arch = process.arch === "arm64" ? "arm64" : "x64";
     throw new Error(
       "cliclick is required for GUI automation on macOS but was not found.\n" +
-        `- Recommended: bundle it inside the app at Resources/tools/darwin-${process.arch === "arm64" ? "arm64" : "x64"}/bin/cliclick\n` +
-        "- Or legacy path: Resources/tools/bin/cliclick\n" +
+        "- Recommended: bundle it inside the app at Resources/bin/cliclick\n" +
+        `- Or in a dev checkout at resources/bin/darwin-${arch}/cliclick\n` +
+        "- Or legacy layouts: Resources/tools/darwin-{arch}/bin/cliclick, Resources/tools/bin/cliclick\n" +
         "- Or install it on this machine: brew install cliclick\n" +
-        `Searched: bundled Resources/tools/darwin-${process.arch === "arm64" ? "arm64" : "x64"}/bin/cliclick, ` +
-        "Resources/tools/bin/cliclick, /opt/homebrew/bin/cliclick, /usr/local/bin/cliclick, and PATH.",
+        "Searched: bundled Resources/bin/cliclick, " +
+        `resources/bin/darwin-${arch}/cliclick, ` +
+        `Resources/tools/darwin-${arch}/bin/cliclick, Resources/tools/bin/cliclick, ` +
+        "/opt/homebrew/bin/cliclick, /usr/local/bin/cliclick, and PATH.",
     );
   }
 

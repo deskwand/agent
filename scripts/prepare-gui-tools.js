@@ -4,7 +4,7 @@
  * Prepare/bundle GUI helper tools for packaging.
  *
  * Currently:
- * - macOS: bundles `cliclick` into `resources/tools/darwin-{arch}/bin/cliclick`
+ * - macOS: bundles `cliclick` into `resources/bin/darwin-{arch}/cliclick`
  *
  * This makes packaged apps work without requiring end users to install Homebrew tools.
  */
@@ -63,10 +63,10 @@ function main() {
   }
 
   const projectRoot = path.join(__dirname, '..');
-  const toolsRoot = path.join(projectRoot, 'resources', 'tools');
+  const binRoot = path.join(projectRoot, 'resources', 'bin');
   const outDirs = {
-    arm64: path.join(toolsRoot, 'darwin-arm64', 'bin'),
-    x64: path.join(toolsRoot, 'darwin-x64', 'bin'),
+    arm64: path.join(binRoot, 'darwin-arm64'),
+    x64: path.join(binRoot, 'darwin-x64'),
   };
 
   ensureDir(outDirs.arm64);

@@ -75,6 +75,8 @@ win:
       to: wsl-agent
     - from: resources/msys2/win32-x64
       to: msys2
+    - from: resources/bin/win32-x64
+      to: bin
     - from: .deskwand/skills
       to: skills
 mac:
@@ -96,9 +98,10 @@ mac:
       to: mcp
     - from: resources/node/darwin-${arch}
       to: node
-    # Bundled GUI helper tools (e.g. cliclick) to avoid relying on user-installed Homebrew tools
-    - from: resources/tools/darwin-${arch}
-      to: tools
+    # Bundled single-file helper binaries (officecli, cliclick) so packaged apps
+    # work without user-installed tools
+    - from: resources/bin/darwin-${arch}
+      to: bin
     - from: dist-lima-agent
       to: lima-agent
     - from: .deskwand/skills
@@ -119,6 +122,8 @@ linux:
       to: mcp
     - from: resources/node/linux-x64
       to: node
+    - from: resources/bin/linux-x64
+      to: bin
     - from: .deskwand/skills
       to: skills
 

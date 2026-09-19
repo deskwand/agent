@@ -25,6 +25,58 @@ const RESET = '\x1b[0m';
  */
 
 /**
+ * Note the argument shape: --platform takes a bare platform here, because this
+ * script validates per-platform. prepare-bin's --target takes a
+ * `<platform>-<arch>` key, because it stages per-arch assets.
+ */
+const PLATFORM_USAGE =
+  'Usage: node scripts/pre-build-check.js [--platform <darwin|win32|linux>]\n' +
+  'Defaults to the host platform; pass --platform to validate a cross-build target.\n';
+
+/**
+ * Resolve which platform's resources to validate.
+ *
+ * Defaults to the host platform, but the release flow cross-builds Windows and
+ * Linux from macOS, and electron-builder only logs a warning when an
+ * extraResources source is missing (app-builder-lib/out/fileMatcher.js).
+ * Without an explicit target, a cross-build would validate the host's
+ * resources, pass, and silently ship an installer with no bundled binaries.
+ *
+ * @param {string[]} argv - process.argv.slice(2)
+ * @param {string} fallback - usually process.platform
+ * @returns {string} one of 'darwin' | 'win32' | 'linux'
+ */
+function resolveTargetPlatform(argv, fallback) {
+  const SUPPORTED = ['darwin', 'win32', 'linux'];
+  let target = fallback;
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--platform') {
+      const value = argv[i + 1];
+      if (!value) throw new Error(`--platform requires a value\n\n${PLATFORM_USAGE}`);
+      target = value;
+      i += 1;
+    } else {
+      throw new Error(`Unknown argument: ${arg}\n\n${PLATFORM_USAGE}`);
+    }
+  }
+
+  if (!SUPPORTED.includes(target)) {
+    // Point at the difference rather than making the caller guess: these two
+    // scripts take differently shaped values for the same-looking flag.
+    const hint = target.includes('-')
+      ? `\nDid you mean --platform ${target.split('-')[0]}? ` +
+        '(the -<arch> form belongs to prepare-bin --target)'
+      : '';
+    throw new Error(
+      `Unsupported platform: ${target}. Expected one of ${SUPPORTED.join(', ')}.${hint}\n\n${PLATFORM_USAGE}`,
+    );
+  }
+  return target;
+}
+
+/**
  * Build the list of checks for the given platform and arch.
  *
  * @param {string} platform - Node.js process.platform value
@@ -88,10 +140,16 @@ function buildCheckList(platform, arch) {
         severity: 'warn',
       },
       {
-        label: `CLI tools for macOS ${arch} (cliclick)`,
-        relPath: `resources/tools/darwin-${arch}`,
-        type: 'dir',
-        severity: 'warn',
+        label: `Bundled officecli for macOS ${arch}`,
+        relPath: `resources/bin/darwin-${arch}/officecli`,
+        type: 'file',
+        severity: 'fatal',
+      },
+      {
+        label: `Bundled cliclick for macOS ${arch}`,
+        relPath: `resources/bin/darwin-${arch}/cliclick`,
+        type: 'file',
+        severity: 'fatal',
       }
     );
   } else if (platform === 'win32') {
@@ -105,6 +163,12 @@ function buildCheckList(platform, arch) {
       {
         label: 'WSL sandbox agent bundle (dist-wsl-agent/index.js)',
         relPath: 'dist-wsl-agent/index.js',
+        type: 'file',
+        severity: 'fatal',
+      },
+      {
+        label: 'Bundled officecli for Windows x64',
+        relPath: 'resources/bin/win32-x64/officecli.exe',
         type: 'file',
         severity: 'fatal',
       }
@@ -121,6 +185,12 @@ function buildCheckList(platform, arch) {
       relPath: `resources/python/linux-${arch}`,
       type: 'dir',
       severity: 'warn',
+    });
+    checks.push({
+      label: 'Bundled officecli for Linux x64',
+      relPath: 'resources/bin/linux-x64/officecli',
+      type: 'file',
+      severity: 'fatal',
     });
   }
 
@@ -189,15 +259,56 @@ function runChecks(rootDir, platform, arch) {
 function main() {
   const PROJECT_ROOT = path.join(__dirname, '..');
 
+  if (process.argv.includes('-h') || process.argv.includes('--help')) {
+    console.log(PLATFORM_USAGE.trimEnd());
+    process.exit(0);
+  }
+
+  let targetPlatform;
+  try {
+    targetPlatform = resolveTargetPlatform(process.argv.slice(2), process.platform);
+  } catch (err) {
+    console.error(`\n${RED}${err.message}${RESET}\n`);
+    process.exit(1);
+    return;
+  }
+
   console.log('\nRunning pre-build checks...\n');
 
-  const { passed, warnings, failed, hasFatal } = runChecks(PROJECT_ROOT, process.platform);
+  if (targetPlatform !== process.platform) {
+    console.log(`Cross-build target: ${targetPlatform} (host is ${process.platform})\n`);
+  }
+
+  // The arch to validate is the arch electron-builder will PACKAGE, not the
+  // host arch. macOS is arm64-only (electron-builder.yml mac.target.arch), so an
+  // Intel build host must still find resources/bin/darwin-arm64. win/linux
+  // targets are x64, which equals process.arch on the machines that build them.
+  const targetArch = targetPlatform === 'darwin' ? 'arm64' : 'x64';
+
+  const { results, passed, warnings, failed, hasFatal } = runChecks(
+    PROJECT_ROOT,
+    targetPlatform,
+    targetArch,
+  );
 
   console.log(
     `\nPre-build check: ${passed} passed, ${warnings} warnings, ${failed} failed`
   );
 
   if (hasFatal) {
+    // Naming the exact remedy matters here: a missing bundled binary is the one
+    // failure a fresh checkout hits, and "Bundled officecli for Windows x64"
+    // does not tell you which command produces it.
+    const missingBundled = results.some(
+      (r) => !r.passed && r.relPath.startsWith('resources/bin/')
+    );
+    if (missingBundled) {
+      console.log(
+        `${YELLOW}Bundled helper binaries are missing. Prepare them with:${RESET}\n` +
+          `  npm run prepare:bin -- --target ${targetPlatform}-${targetArch}\n` +
+          `  (or 'npm run prepare:bin' for every shipped platform)\n`
+      );
+    }
     console.log(
       `\n${RED}Build aborted. Fix the above issues before running electron-builder.${RESET}\n`
     );
@@ -208,7 +319,7 @@ function main() {
   process.exit(0);
 }
 
-module.exports = { runChecks, buildCheckList };
+module.exports = { runChecks, buildCheckList, resolveTargetPlatform };
 
 if (require.main === module) {
   main();

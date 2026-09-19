@@ -81,6 +81,17 @@ import {
   type PiReplacedContext,
 } from "../extensions/pi-session-bridge";
 import { configStore } from "../config/config-store";
+import {
+  cleanupRetiredSkillLinks,
+  RETIRED_SKILL_NAMES,
+} from "../skills/retired-skills";
+import {
+  resolveBundledBinDir,
+  resolveBundledBinDirs,
+  resolveBundledNodePaths,
+  resolveBundledPythonBinDir,
+  type BundleContext,
+} from "./bundled-paths";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
 import {
@@ -147,98 +158,6 @@ function estimateCharsPerToken(sampleText: string): number {
   return 4 - cjkRatio * 2.5; // Range: 1.5 (pure CJK) ~ 4 (pure English)
 }
 
-// Bundled node/npx paths never change at runtime — resolve once.
-let cachedBundledNodePaths: { node: string; npx: string } | null | undefined =
-  undefined;
-
-function getBundledNodePaths(): { node: string; npx: string } | null {
-  if (cachedBundledNodePaths !== undefined) {
-    return cachedBundledNodePaths;
-  }
-  const platform = process.platform;
-  const arch = process.arch;
-  let resourcesPath: string;
-  if (!app.isPackaged) {
-    const projectRoot = path.join(__dirname, "..", "..");
-    resourcesPath = path.join(
-      projectRoot,
-      "resources",
-      "node",
-      `${platform}-${arch}`,
-    );
-  } else {
-    resourcesPath = path.join(process.resourcesPath, "node");
-  }
-  const binDir =
-    platform === "win32" ? resourcesPath : path.join(resourcesPath, "bin");
-  const nodePath = path.join(
-    binDir,
-    platform === "win32" ? "node.exe" : "node",
-  );
-  const npxPath = path.join(binDir, platform === "win32" ? "npx.cmd" : "npx");
-  cachedBundledNodePaths =
-    fs.existsSync(nodePath) && fs.existsSync(npxPath)
-      ? { node: nodePath, npx: npxPath }
-      : null;
-  return cachedBundledNodePaths;
-}
-
-/**
- * Resolve bundled Python bin directory path (if available).
- * Checks packaged and dev layouts, returns the bin dir containing python3.
- */
-function resolveBundledPythonBinDir(): string | null {
-  const platform = process.platform;
-  const arch = process.arch === "arm64" ? "arm64" : "x64";
-
-  const candidates: string[] = [];
-  if (!app.isPackaged) {
-    const projectRoot = path.join(__dirname, "..", "..");
-    if (platform === "darwin") {
-      candidates.push(
-        path.join(projectRoot, "resources", "python", `darwin-${arch}`, "bin"),
-      );
-    }
-    candidates.push(path.join(projectRoot, "resources", "python", "bin"));
-  } else {
-    // Packaged layout: Resources/python/bin/python3
-    candidates.push(path.join(process.resourcesPath, "python", "bin"));
-  }
-
-  const pythonExe = platform === "win32" ? "python.exe" : "python3";
-  for (const binDir of candidates) {
-    if (fs.existsSync(path.join(binDir, pythonExe))) return binDir;
-  }
-  return null;
-}
-
-/**
- * Resolve bundled tools directory (cliclick etc., macOS only).
- */
-function resolveBundledToolsBinDir(): string | null {
-  if (process.platform !== "darwin") return null;
-  const arch = process.arch === "arm64" ? "arm64" : "x64";
-
-  const candidates: string[] = [];
-  if (!app.isPackaged) {
-    const projectRoot = path.join(__dirname, "..", "..");
-    candidates.push(
-      path.join(projectRoot, "resources", "tools", `darwin-${arch}`, "bin"),
-    );
-    candidates.push(path.join(projectRoot, "resources", "tools", "bin"));
-  } else {
-    candidates.push(
-      path.join(process.resourcesPath, "tools", `darwin-${arch}`, "bin"),
-    );
-    candidates.push(path.join(process.resourcesPath, "tools", "bin"));
-  }
-
-  for (const binDir of candidates) {
-    if (fs.existsSync(binDir)) return binDir;
-  }
-  return null;
-}
-
 /**
  * One-time enrichment of process.env.PATH for build (production) mode.
  *
@@ -247,8 +166,8 @@ function resolveBundledToolsBinDir(): string | null {
  * minimal (often just `/usr/bin:/bin`).
  *
  * This function:
- * 1. Restores the user's login-shell PATH (safe: uses execFileSync, not execSync)
- * 2. Prepends bundled Node, Python, and tools bin dirs (highest priority)
+ * 1. Prepends bundled bin dirs (highest priority) — in dev mode too
+ * 2. Restores the user's login-shell PATH (safe: uses execFileSync, not execSync)
  * 3. Deduplicates all entries
  * 4. Writes the result back to `process.env.PATH`
  *
@@ -256,17 +175,71 @@ function resolveBundledToolsBinDir(): string | null {
  */
 let pathEnriched = false;
 
+/**
+ * Merge path lists with bundled entries taking priority, preserving order and
+ * dropping duplicates. On Windows comparison is case-insensitive.
+ */
+function mergePaths(
+  bundledDirs: string[],
+  shellPaths: string[],
+  currentPaths: string[],
+  delimiter: string,
+  platform: NodeJS.Platform,
+): string {
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  for (const p of [...bundledDirs, ...shellPaths, ...currentPaths]) {
+    if (!p.trim()) continue;
+    const normalized = platform === "win32" ? p.toLowerCase() : p;
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    merged.push(p);
+  }
+
+  return merged.join(delimiter);
+}
+
 async function enrichProcessPathForBuild(): Promise<void> {
   if (pathEnriched) return;
   pathEnriched = true;
 
+  const platform = process.platform;
+  const delimiter = platform === "win32" ? ";" : ":";
+
+  // Bundled binaries to put on PATH. In dev mode only the helper-bin directory
+  // is prepended: most dev machines do not have officecli, but they do have
+  // their own node/python, and prepending our copies over them (as an earlier
+  // revision of this change did) would silently shadow the developer's
+  // toolchain for every command the model runs.
+  const bundledDirs: string[] = app.isPackaged
+    ? resolveBundledBinDirs(bundleContext())
+    : [resolveBundledBinDir(bundleContext())].filter(
+        (dir): dir is string => dir !== null,
+      );
+
+  // officecli checks for updates in the background by default. Measured
+  // behaviour on a clean HOME: without this, the first run creates
+  // ~/.officecli/config.json with autoUpdate=true and performs a network update
+  // check; with it, no config file is written and no request is made.
+  // Process-level on purpose — Skills invoke officecli through the bash tool,
+  // never through our own tool layer.
+  process.env.OFFICECLI_SKIP_UPDATE = "1";
+
   if (!app.isPackaged) {
-    log("[AgentRunner] Dev mode — skipping PATH enrichment");
+    process.env.PATH = mergePaths(
+      bundledDirs,
+      [],
+      (process.env.PATH || "").split(delimiter),
+      delimiter,
+      platform,
+    );
+    log(
+      `[AgentRunner] Dev mode — prepended ${bundledDirs.length} bundled dirs to PATH`,
+    );
     return;
   }
 
-  const platform = process.platform;
-  const delimiter = platform === "win32" ? ";" : ":";
   const currentPaths = (process.env.PATH || "")
     .split(delimiter)
     .filter((p: string) => p.trim());
@@ -318,39 +291,19 @@ async function enrichProcessPathForBuild(): Promise<void> {
     }
   }
 
-  // 2. Collect bundled bin directories (highest priority)
-  const bundledDirs: string[] = [];
-
-  const nodePaths = getBundledNodePaths();
-  if (nodePaths) {
-    bundledDirs.push(path.dirname(nodePaths.node));
-  }
-
-  const pythonBinDir = resolveBundledPythonBinDir();
-  if (pythonBinDir) {
-    bundledDirs.push(pythonBinDir);
-  }
-
-  const toolsBinDir = resolveBundledToolsBinDir();
-  if (toolsBinDir) {
-    bundledDirs.push(toolsBinDir);
-  }
+  // 2. bundledDirs was already computed at the top of this function (it is
+  // needed in dev mode too).
 
   // 3. Merge: bundled (highest) → shell → current process, deduplicate
-  const seen = new Set<string>();
-  const merged: string[] = [];
-
-  for (const p of [...bundledDirs, ...shellPaths, ...currentPaths]) {
-    const normalized = platform === "win32" ? p.toLowerCase() : p;
-    if (!seen.has(normalized)) {
-      seen.add(normalized);
-      merged.push(p);
-    }
-  }
-
-  process.env.PATH = merged.join(delimiter);
+  process.env.PATH = mergePaths(
+    bundledDirs,
+    shellPaths,
+    currentPaths,
+    delimiter,
+    platform,
+  );
   log(
-    `[AgentRunner] Enriched process.env.PATH for build mode: ${bundledDirs.length} bundled + ${shellPaths.length} shell + ${currentPaths.length} process → ${merged.length} total`,
+    `[AgentRunner] Enriched process.env.PATH: ${bundledDirs.length} bundled + ${shellPaths.length} shell + ${currentPaths.length} process`,
   );
 }
 
@@ -782,29 +735,56 @@ export class AgentRunner {
   // method was removed to eliminate credential leakage risk.
 
   /**
-   * Generate bundled executable path hints for production mode system prompt.
-   * In dev mode returns empty string (user PATH already works).
+   * Generate bundled executable path hints for the system prompt.
+   * Runs in dev mode too — bundled helpers such as officecli are not on the
+   * developer's own PATH, so both the hint and the PATH injection are needed.
    * This is a defense-in-depth layer — even if PATH enrichment works, explicit
    * paths help the model avoid ambiguity when Skills reference bare commands.
    */
   private getBundledPathHints(): string {
-    if (!app.isPackaged) return "";
-
     const hints: string[] = [];
 
-    const nodePaths = getBundledNodePaths();
+    const nodePaths = resolveBundledNodePaths(bundleContext());
     if (nodePaths) {
       hints.push(`- node: ${nodePaths.node}`);
       hints.push(`- npx: ${nodePaths.npx}`);
     }
 
-    const pythonBinDir = resolveBundledPythonBinDir();
+    const pythonBinDir = resolveBundledPythonBinDir(bundleContext());
     if (pythonBinDir) {
       const pythonExe = process.platform === "win32" ? "python.exe" : "python3";
       const pipExe = process.platform === "win32" ? "pip.exe" : "pip3";
       hints.push(`- python3: ${path.join(pythonBinDir, pythonExe)}`);
       if (fs.existsSync(path.join(pythonBinDir, pipExe))) {
         hints.push(`- pip3: ${path.join(pythonBinDir, pipExe)}`);
+      }
+    }
+
+    // Enumerate rather than hardcode: adding a helper binary to
+    // resources/bin/<platform>-<arch>/ makes it appear here automatically.
+    const binDir = resolveBundledBinDir(bundleContext());
+    if (binDir) {
+      try {
+        // withFileTypes + a per-entry guard: one bad entry (dangling symlink,
+        // permission error) must not abandon the rest of the listing.
+        for (const entry of fs
+          .readdirSync(binDir, { withFileTypes: true })
+          .sort((a, b) => a.name.localeCompare(b.name))) {
+          // Only plain names go into the prompt verbatim — a local process could
+          // otherwise plant a filename containing a newline or a closing tag.
+          if (!/^[A-Za-z0-9._-]+$/.test(entry.name)) continue;
+          // Dotfiles (.DS_Store, .gitkeep, ...) are not executables.
+          if (entry.name.startsWith(".")) continue;
+          // `foo.part` is a half-written download, not a usable binary.
+          if (entry.name.endsWith(".part")) continue;
+          if (!entry.isFile()) continue;
+          hints.push(`- ${entry.name}: ${path.join(binDir, entry.name)}`);
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        logWarn(
+          `[AgentRunner] Could not enumerate bundled bin dir: ${message}`,
+        );
       }
     }
 
@@ -2576,6 +2556,33 @@ ${hints.join("\n")}
 
           // Copy built-in skills to app DeskWand skills directory if they don't exist
           const builtinSkillsPath = this.getBuiltinSkillsPath();
+
+          // Retire skills that earlier releases shipped. Runs before the sync
+          // loop below so a stale link never reaches skills-manager. Needs the
+          // built-in dir to tell our own symlinks from the user's.
+          if (builtinSkillsPath && fs.existsSync(builtinSkillsPath)) {
+            try {
+              const report = cleanupRetiredSkillLinks({
+                skillsDir: appSkillsDir,
+                builtinSkillsDir: builtinSkillsPath,
+                retiredNames: RETIRED_SKILL_NAMES,
+              });
+              if (report.removed.length > 0) {
+                log(
+                  `[AgentRunner] Removed retired built-in skills: ${report.removed.join(", ")}`,
+                );
+              }
+              for (const kept of report.kept) {
+                logWarn(
+                  `[AgentRunner] Retired skill not removed (user-owned, left alone): ${kept}`,
+                );
+              }
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              logWarn(`[AgentRunner] Retired skill cleanup failed: ${message}`);
+            }
+          }
+
           if (builtinSkillsPath && fs.existsSync(builtinSkillsPath)) {
             // Symlinks into .asar archives don't work at the OS level (ENOTDIR),
             // so always copy when the source is inside an asar archive.
@@ -2971,8 +2978,8 @@ ${hints.join("\n")}
           Object.assign(mcpServers, this._mcpServersCache.servers);
           log("[AgentRunner] MCP servers config reused from cache");
         } else {
-          // Use the module-level memoized helper — no more per-query fs.existsSync calls.
-          const bundledNodePaths = getBundledNodePaths();
+          // Resolve bundled Node for MCP servers spawned from this config.
+          const bundledNodePaths = resolveBundledNodePaths(bundleContext());
           const bundledNpx = bundledNodePaths?.npx ?? null;
 
           for (const config of allConfigs) {
@@ -5173,5 +5180,21 @@ export function resolveCompactionLifecyclePayload(
     typeof event.result?.estimatedTokensAfter === "number"
       ? { estimatedTokens: event.result.estimatedTokensAfter }
       : {}),
+  };
+}
+
+/**
+ * Build the environment context that bundled-paths.ts needs.
+ *
+ * Kept as a function so it can pick up `process.resourcesPath` lazily — that
+ * value is only meaningful once Electron has finished bootstrapping.
+ */
+function bundleContext(): BundleContext {
+  return {
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath ?? "",
+    projectRoot: path.join(__dirname, "..", ".."),
+    platform: process.platform,
+    arch: process.arch,
   };
 }

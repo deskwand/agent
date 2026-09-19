@@ -1,2 +1,3 @@
 This project includes code from OpenCoworkAI/open-cowork (https://github.com/OpenCoworkAI/open-cowork), which is licensed under the MIT License.
 This project includes code from obra/superpowers (https://github.com/obra/superpowers), which is licensed under the MIT License. Copyright (c) 2025 Jesse Vincent.
+This project redistributes the OfficeCLI binary and its agent skill definitions from iOfficeAI/OfficeCLI (https://github.com/iOfficeAI/OfficeCLI), which is licensed under the Apache License, Version 2.0. The full license text is available at https://www.apache.org/licenses/LICENSE-2.0. The bundled binary is redistributed unmodified as `officecli`/`officecli.exe` under `resources/bin/`, and the skill files are vendored under `.deskwand/skills/officecli*/`.
