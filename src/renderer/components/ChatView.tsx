@@ -1874,6 +1874,14 @@ export function ChatView() {
                 onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
                 attachedKeys={attachedKeys}
                 onAttachMenuDismiss={() => chatInputRef.current?.focus()}
+                onCommandEntry={(command) => {
+                  if (command === "compact") {
+                    // 复用既有压缩路径（handleCompact 内部已守无会话/压缩中/有活跃回合）
+                    handleCommand("compact");
+                    return;
+                  }
+                  chatInputRef.current?.insertCommandChip("goal");
+                }}
                 model={activeModel}
                 modelOptions={modelOptions}
                 activeProviderProfileKey={activeProviderProfileKey}

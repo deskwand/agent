@@ -323,4 +323,51 @@ describe("AttachMenu", () => {
     });
     expect(dialog().textContent).toContain("attachPicker.truncated");
   });
+
+  it("renders the command group when the host can run commands", async () => {
+    await openMenu({ onCommandEntry: vi.fn() });
+    expect(container.querySelectorAll("[role='menuitem']").length).toBe(5);
+    expect(item("slash.compact")).toBeDefined();
+    expect(item("slash.goal")).toBeDefined();
+    expect(container.querySelector("[role='menu']")?.textContent).toContain(
+      "chat.slashCommands",
+    );
+  });
+
+  it("hides the command group when the host cannot run commands", async () => {
+    // 欢迎页（WelcomeView）不传 onCommandEntry：命令组整组不渲染，
+    // 不留一个看得见却没反应的「压缩会话」。
+    await openMenu();
+    expect(container.querySelectorAll("[role='menuitem']").length).toBe(3);
+    expect(container.querySelector("[role='menu']")?.textContent).not.toContain(
+      "slash.compact",
+    );
+  });
+
+  it("walks into the command group with arrow keys", async () => {
+    await openMenu({ onCommandEntry: vi.fn() });
+    keyDown(item("attachMenu.localFile"), "ArrowDown");
+    keyDown(item("attachMenu.workspace"), "ArrowDown");
+    keyDown(item("attachMenu.vault"), "ArrowDown");
+    expect(document.activeElement).toBe(item("slash.compact"));
+    keyDown(item("slash.compact"), "ArrowDown");
+    expect(document.activeElement).toBe(item("slash.goal"));
+  });
+
+  it("runs compact immediately from the command group", async () => {
+    const onCommandEntry = vi.fn();
+    await openMenu({ onCommandEntry });
+    act(() => item("slash.compact").click());
+    expect(onCommandEntry).toHaveBeenCalledWith("compact");
+  });
+
+  it("asks the host for the goal command and closes the menu", async () => {
+    const onCommandEntry = vi.fn();
+    const onDismiss = vi.fn();
+    await openMenu({ onCommandEntry, onDismiss });
+    act(() => item("slash.goal").click());
+    expect(onCommandEntry).toHaveBeenCalledWith("goal");
+    expect(container.querySelector("[role='menu']")).toBeNull();
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
 });

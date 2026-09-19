@@ -64,6 +64,11 @@ export interface ChatInputHandle {
   isEmpty: () => boolean;
   selectFiles: () => void;
   addFiles: (files: ChatInputAttachedFile[]) => void;
+  /**
+   * 行首插入命令 chip，原草稿整体保留在其后（当作参数），光标落文末。
+   * 供「+」菜单的命令入口使用 —— 那条路径没有斜杠菜单的光标位置可依赖。
+   */
+  insertCommandChip: (name: string) => void;
 }
 
 interface ChatInputProps {
@@ -307,6 +312,21 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         // 外部写入也要 parse：不 parse 的话，写进来的 /skill:x 不会渲染成 token，
         // 与手动选择技能的表现不一致（设计文档 §5.2）。
         writeEditorText(text);
+        requestAnimationFrame(() => {
+          editorRef.current?.focus();
+          placeCaretAtEnd(editorRef.current);
+        });
+      },
+      insertCommandChip(name: string) {
+        const raw = `/${name} `; // 尾部空格把 chip 与后面的文本分开
+        const draft = getPlainText();
+        // 行首已经是同一条命令（后面是空白或结尾）就不再叠加：再叠一层会得到
+        // `/goal /goal x`，会被 goal-extension 当成目标描述启动循环。
+        // 命中时也必须走下面的聚焦 + 光标归位 —— 第二次点击同样要把焦点交回输入框，
+        // 否则焦点会留在刚卸载的菜单按钮上。
+        if (!new RegExp(`^/${name}(\\s|$)`).test(draft)) {
+          writeEditorText(`${raw}${draft}`);
+        }
         requestAnimationFrame(() => {
           editorRef.current?.focus();
           placeCaretAtEnd(editorRef.current);

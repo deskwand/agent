@@ -7,6 +7,7 @@ import {
   type ChatInputHandle,
 } from "../../renderer/components/ChatInput";
 import {
+  getCaretOffset,
   serializeEditor,
   TOKEN_RAW_ATTR,
 } from "../../renderer/utils/editor-content";
@@ -102,5 +103,83 @@ describe("显式写入路径", () => {
     });
     expect(el.querySelector(`[${TOKEN_RAW_ATTR}]`)).toBeNull();
     expect(serializeEditor(el)).toBe("注意 /skill:alpha 你好");
+  });
+});
+
+/** 等一帧：insertCommandChip 的文末光标落在 requestAnimationFrame 里。 */
+async function flushFrame() {
+  await act(async () => {
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+  });
+}
+
+describe("insertCommandChip", () => {
+  it("空草稿时插入命令 chip，光标落文末", async () => {
+    await renderInput();
+    await act(async () => {
+      ref.current?.insertCommandChip("goal");
+    });
+    await flushFrame();
+
+    const token = editorEl().querySelector(`[${TOKEN_RAW_ATTR}]`);
+    expect(token).not.toBeNull();
+    expect(token!.getAttribute(TOKEN_RAW_ATTR)).toBe("/goal");
+    expect(serializeEditor(editorEl())).toBe("/goal ");
+    expect(getCaretOffset(editorEl())).toBe("/goal ".length);
+  });
+
+  it("草稿非空时整体留在 chip 之后当目标描述", async () => {
+    await renderInput();
+    await act(async () => {
+      ref.current?.setPrompt("重构登录模块");
+    });
+    await act(async () => {
+      ref.current?.insertCommandChip("goal");
+    });
+    await flushFrame();
+
+    expect(
+      editorEl()
+        .querySelector(`[${TOKEN_RAW_ATTR}]`)!
+        .getAttribute(TOKEN_RAW_ATTR),
+    ).toBe("/goal");
+    expect(serializeEditor(editorEl())).toBe("/goal 重构登录模块");
+    expect(getCaretOffset(editorEl())).toBe("/goal 重构登录模块".length);
+  });
+
+  it("行首已是同一条命令时不再叠加", async () => {
+    await renderInput();
+    await act(async () => {
+      ref.current?.setPrompt("/goal 已经设好的目标");
+    });
+    await act(async () => {
+      ref.current?.insertCommandChip("goal");
+    });
+    expect(serializeEditor(editorEl())).toBe("/goal 已经设好的目标");
+  });
+
+  it("命令后面直接换行时也不叠加", async () => {
+    await renderInput();
+    await act(async () => {
+      ref.current?.setPrompt("/goal\n继续做别的事");
+    });
+    await act(async () => {
+      ref.current?.insertCommandChip("goal");
+    });
+    expect(serializeEditor(editorEl())).toBe("/goal\n继续做别的事");
+  });
+
+  it("不叠加的那次点击仍把焦点与光标交回输入框", async () => {
+    await renderInput();
+    await act(async () => {
+      ref.current?.setPrompt("/goal 已经设好的目标");
+    });
+    await act(async () => {
+      ref.current?.insertCommandChip("goal");
+    });
+    await flushFrame();
+
+    expect(document.activeElement).toBe(editorEl());
+    expect(getCaretOffset(editorEl())).toBe("/goal 已经设好的目标".length);
   });
 });

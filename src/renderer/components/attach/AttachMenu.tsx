@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FolderOpen, Lock, Plus, Upload } from "lucide-react";
+import { Archive, FolderOpen, Lock, Plus, Target, Upload } from "lucide-react";
 import { Tooltip } from "../Tooltip";
 import { useAppStore } from "../../store";
 import type { VaultSnapshot } from "../../../shared/vault";
@@ -9,7 +9,9 @@ import {
   MENU_ITEM_CLASS,
   MENU_ITEM_DEFAULT_CLASS,
   MENU_ITEM_DISABLED_CLASS,
+  MENU_LABEL_CLASS,
   MENU_PANEL_PADDED_CLASS,
+  MENU_SEPARATOR_CLASS,
 } from "../menu-styles";
 import { AttachPickerModal } from "./AttachPickerModal";
 import { AttachPickerPanel } from "./AttachPickerPanel";
@@ -36,6 +38,11 @@ export interface AttachMenuProps {
   direction?: "up" | "down";
   /** 确认/取消后回调：宿主在这里把焦点交回输入框 */
   onDismiss?: () => void;
+  /**
+   * 命令入口：compact 立即执行；goal 插入命令 chip（落点由宿主决定）。
+   * 缺省 = 本宿主没有命令能力（欢迎页），整组命令不渲染。
+   */
+  onCommandEntry?: (command: "compact" | "goal") => void;
 }
 
 export function AttachMenu({
@@ -45,6 +52,7 @@ export function AttachMenu({
   attachedKeys,
   direction = "up",
   onDismiss,
+  onCommandEntry,
 }: AttachMenuProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -107,6 +115,13 @@ export function AttachMenu({
     close();
     onDismiss?.();
   }, [close, onDismiss]);
+
+  const runCommandEntry = (command: "compact" | "goal") => {
+    // 顺序不变量：先执行命令，再关菜单交回焦点。insertCommandChip 的文末光标落在
+    // requestAnimationFrame 里，反过来的话会被 onDismiss 的 focus() 覆盖掉。
+    onCommandEntry?.(command);
+    closeAndFocusComposer();
+  };
 
   useEffect(() => {
     // 只在菜单层生效：选择器弹窗是 portal 到 document.body 的，天然在 rootRef
@@ -339,6 +354,41 @@ export function AttachMenu({
                 <span className="shrink-0 text-xs">{vaultDisabledReason}</span>
               )}
             </button>
+
+            {onCommandEntry && (
+              <>
+                <div className={MENU_SEPARATOR_CLASS} />
+                <div className={MENU_LABEL_CLASS}>
+                  {t("chat.slashCommands")}
+                </div>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  ref={(element) => {
+                    itemRefs.current[3] = element;
+                  }}
+                  onClick={() => runCommandEntry("compact")}
+                  className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
+                >
+                  <Archive className="h-4 w-4 shrink-0 text-text-muted" />
+                  {t("slash.compact")}
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  ref={(element) => {
+                    itemRefs.current[4] = element;
+                  }}
+                  onClick={() => runCommandEntry("goal")}
+                  className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
+                >
+                  <Target className="h-4 w-4 shrink-0 text-text-muted" />
+                  {t("slash.goal")}
+                </button>
+              </>
+            )}
           </>
         </div>
       )}

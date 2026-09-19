@@ -32,6 +32,8 @@ export interface ChatInputBottomBarProps {
   attachMenuDirection?: "up" | "down";
   /** 附件菜单确认/取消后，请宿主把焦点交回输入框 */
   onAttachMenuDismiss?: () => void;
+  /** 命令入口：原样透传给 AttachMenu；缺省 = 本宿主没有命令能力（欢迎页） */
+  onCommandEntry?: (command: "compact" | "goal") => void;
   model: string;
   modelOptions: ModelOptionGroup[];
   activeProviderProfileKey: ProviderProfileKey;
@@ -63,6 +65,7 @@ export function ChatInputBottomBar({
   attachedKeys,
   attachMenuDirection,
   onAttachMenuDismiss,
+  onCommandEntry,
   model,
   modelOptions,
   activeProviderProfileKey,
@@ -100,6 +103,7 @@ export function ChatInputBottomBar({
           attachedKeys={attachedKeys}
           direction={attachMenuDirection}
           onDismiss={onAttachMenuDismiss}
+          onCommandEntry={onCommandEntry}
         />
 
         {onToggleExpand && showExpandButton && (
