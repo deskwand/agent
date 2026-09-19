@@ -7,10 +7,10 @@
  * 没有「描述」字段：它只在斜杠菜单那行灰字里用，pi 会自动用正文首行兜底 ——
  * 这一格对用户是纯额外成本（见设计文档 §4.5）。
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Lock, Plus, X } from "lucide-react";
+import { Lock, Plus, Search, X } from "lucide-react";
 import { useBrowserOcclusion } from "../../hooks/useBrowserOcclusion";
 import type { PromptCommandSaveError } from "../../../shared/ipc-types";
 import type { Skill } from "../../types";
@@ -64,8 +64,10 @@ export function PromptCommandFormModal({
   const [value, setValue] = useState<PromptCommandFormValue>(initial);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillListOpen, setSkillListOpen] = useState(false);
+  const [skillQuery, setSkillQuery] = useState("");
   const [skillLoadFailed, setSkillLoadFailed] = useState(false);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const skillSearchRef = useRef<HTMLInputElement>(null);
   /** 光标位置。点「引用技能」按钮会让 textarea 失焦，那时读 selectionStart 可能已是末尾。 */
   const lastCaretRef = useRef<number | null>(null);
 
@@ -73,11 +75,19 @@ export function PromptCommandFormModal({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      // 两段：搜索框里有东西先清空，再按一次才关表单。
+      // 不走「容器 onKeyDown + stopPropagation」那种靠事件顺序压制的写法 ——
+      // 本组件的 Esc 本来就是 document 级的（弹窗体是 portal 到 body）。
+      if (skillQuery) {
+        setSkillQuery("");
+        return;
+      }
+      onClose();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
+  }, [onClose, skillQuery]);
 
   const canSave = !saving && value.name.trim() !== "" && value.content.trim() !== "";
   const nameErrorKey = nameError ? NAME_ERROR_KEY[nameError] : undefined;
@@ -93,6 +103,7 @@ export function PromptCommandFormModal({
   /** 技能清单与斜杠菜单同源，只列启用中的。点开时才拉（不打开就不花 IPC），失败可重点重试。 */
   const openSkillList = async () => {
     rememberCaret();
+    setSkillQuery("");
     setSkillListOpen((open) => !open);
     if (skills.length > 0) return;
     try {
@@ -103,6 +114,25 @@ export function PromptCommandFormModal({
       setSkillLoadFailed(true);
     }
   };
+
+  /**
+   * 技能名或描述的大小写不敏感子串匹配 —— 与斜杠菜单的技能过滤同口径
+   *（那边也是 name/description 两处 includes）。
+   */
+  const visibleSkills = useMemo(() => {
+    const needle = skillQuery.trim().toLowerCase();
+    if (!needle) return skills;
+    return skills.filter(
+      (s) =>
+        s.name.toLowerCase().includes(needle) ||
+        (s.description ?? "").toLowerCase().includes(needle),
+    );
+  }, [skills, skillQuery]);
+
+  // 展开时聚焦搜索框（照 AttachPickerPanel 的做法）
+  useEffect(() => {
+    if (skillListOpen) skillSearchRef.current?.focus();
+  }, [skillListOpen]);
 
   /**
    * 往正文的光标处插入一行技能引用 —— 插进去就是普通文本，用户能改能删。
@@ -118,6 +148,7 @@ export function PromptCommandFormModal({
     const suffix = after.startsWith("\n") || after === "" ? "" : "\n";
     const next = `${before}${prefix}${line}${suffix}${after}`;
     update({ content: next });
+    setSkillQuery("");
     setSkillListOpen(false);
     // 焦点与光标还给正文，位置落在这句之后
     const caretAfter = before.length + prefix.length + line.length;
@@ -215,38 +246,55 @@ export function PromptCommandFormModal({
             {skillListOpen && (
               <div
                 data-skill-list
-                className="mb-1.5 max-h-56 overflow-y-auto rounded-xl border border-border bg-background p-1 shadow-elevated"
+                className="mb-1.5 rounded-xl border border-border bg-background shadow-elevated"
               >
-                {skills.map((skill) => (
-                  <button
-                    key={skill.id}
-                    type="button"
-                    data-skill-option={skill.name}
-                    onClick={() => insertSkillReference(skill.name)}
-                    className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-hover"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] text-text-primary">
-                        {skill.name}
-                      </span>
-                      {skill.description && (
-                        <span className="block truncate text-xs text-text-muted">
-                          {skill.description}
+                {/* 搜索行固定在滚动区之外 —— 否则列表一滚就把搜索框卷走了 */}
+                <div className="relative border-b border-border-muted px-1.5 py-1.5">
+                  <Search className="pointer-events-none absolute left-[17px] top-[17px] h-3.5 w-3.5 text-text-muted" />
+                  <input
+                    ref={skillSearchRef}
+                    data-skill-search
+                    value={skillQuery}
+                    onChange={(e) => setSkillQuery(e.target.value)}
+                    placeholder={t("chat.commandSkillSearchPlaceholder")}
+                    aria-label={t("chat.commandSkillSearchPlaceholder")}
+                    className="h-8 w-full rounded-lg bg-surface-muted pl-7 pr-2.5 text-[13px] text-text-primary outline-none placeholder:text-text-muted"
+                  />
+                </div>
+                <div data-skill-scroll className="max-h-48 overflow-y-auto p-1">
+                  {visibleSkills.map((skill) => (
+                    <button
+                      key={skill.id}
+                      type="button"
+                      data-skill-option={skill.name}
+                      onClick={() => insertSkillReference(skill.name)}
+                      className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-hover"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] text-text-primary">
+                          {skill.name}
                         </span>
-                      )}
-                    </span>
-                    <span className="shrink-0 text-[10px] text-text-secondary">
-                      {t(SKILL_TYPE_BADGE_KEY[skill.type])}
-                    </span>
-                  </button>
-                ))}
-                {skills.length === 0 && (
-                  <p className="px-2.5 py-2 text-xs text-text-muted">
-                    {skillLoadFailed
-                      ? t("chat.commandSkillLoadFailed")
-                      : t("chat.commandSkillEmpty")}
-                  </p>
-                )}
+                        {skill.description && (
+                          <span className="block truncate text-xs text-text-muted">
+                            {skill.description}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-[10px] text-text-secondary">
+                        {t(SKILL_TYPE_BADGE_KEY[skill.type])}
+                      </span>
+                    </button>
+                  ))}
+                  {visibleSkills.length === 0 && (
+                    <p className="px-2.5 py-2 text-xs text-text-muted">
+                      {skillLoadFailed
+                        ? t("chat.commandSkillLoadFailed")
+                        : skillQuery.trim()
+                          ? t("chat.commandSkillNoMatch")
+                          : t("chat.commandSkillEmpty")}
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 

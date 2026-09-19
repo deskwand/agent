@@ -908,6 +908,8 @@
     "commandInsertSkill": "Cite skill",
     "commandInsertSkillHint": "Insert a skill reference at the cursor",
     "commandSkillReference": "Please use the \"{{name}}\" skill.",
+    "commandSkillSearchPlaceholder": "Search skills",
+    "commandSkillNoMatch": "No matching skills",
     "commandSkillEmpty": "No skills available",
     "commandSkillLoadFailed": "Failed to load skills",
     "commandDisplayName": "Display name",

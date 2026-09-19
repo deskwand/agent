@@ -908,6 +908,8 @@
     "commandInsertSkill": "引用技能",
     "commandInsertSkillHint": "在光标处插入一句技能引用",
     "commandSkillReference": "请引用「{{name}}」技能。",
+    "commandSkillSearchPlaceholder": "搜索技能",
+    "commandSkillNoMatch": "没有匹配的技能",
     "commandSkillEmpty": "没有可用的技能",
     "commandSkillLoadFailed": "技能列表加载失败",
     "commandDisplayName": "显示名称",

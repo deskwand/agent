@@ -222,6 +222,104 @@ describe("PromptCommandFormModal · 引用技能", () => {
     expect(value.startsWith("AAAAA\n")).toBe(true);
   });
 
+  it("搜索按技能名过滤", async () => {
+    render();
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+    });
+    act(() => {
+      typeInto(
+        document.querySelector<HTMLInputElement>("[data-skill-search]")!,
+        "brain",
+      );
+    });
+    const names = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-skill-option]"),
+    ).map((el) => el.getAttribute("data-skill-option"));
+    expect(names).toEqual(["brainstorming"]);
+  });
+
+  it("搜索也匹配描述（与斜杠菜单的技能过滤同口径）", async () => {
+    render();
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+    });
+    act(() => {
+      // humanizer 的 description 是「去 AI 味」。「味」只在描述里出现，
+      // 用它才能确定命中的是描述而不是名字（搜 "AI" 会因 br`ai`nstorming 撞上名字）。
+      typeInto(document.querySelector<HTMLInputElement>("[data-skill-search]")!, "味");
+    });
+    const names = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-skill-option]"),
+    ).map((el) => el.getAttribute("data-skill-option"));
+    expect(names).toEqual(["humanizer"]);
+  });
+
+  it("无命中时给「没有匹配的技能」，而不是「没有可用的技能」", async () => {
+    render();
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+    });
+    act(() => {
+      typeInto(
+        document.querySelector<HTMLInputElement>("[data-skill-search]")!,
+        "zzz-nothing",
+      );
+    });
+    expect(document.querySelectorAll("[data-skill-option]").length).toBe(0);
+    expect(document.body.textContent).toContain("chat.commandSkillNoMatch");
+    expect(document.body.textContent).not.toContain("chat.commandSkillEmpty");
+  });
+
+  it("无查询且无技能时仍是「没有可用的技能」（改动的另一半分支）", async () => {
+    getSkills.mockResolvedValueOnce([]);
+    render();
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+    });
+    expect(document.body.textContent).toContain("chat.commandSkillEmpty");
+    expect(document.body.textContent).not.toContain("chat.commandSkillNoMatch");
+  });
+
+  it("搜索框在滚动容器之外（列表滚动时不会被卷走）", async () => {
+    render();
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+    });
+    const scroller = document.querySelector("[data-skill-scroll]")!;
+    expect(scroller).not.toBeNull();
+    expect(scroller.querySelector("[data-skill-search]")).toBeNull();
+    // 反向：选项确实在滚动容器里
+    expect(scroller.querySelector("[data-skill-option]")).not.toBeNull();
+  });
+
+  it("搜索框自动获焦；Esc 两段：先清空查询，再按一次才关表单", async () => {
+    const onClose = vi.fn();
+    render({ onClose });
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+    });
+    const search = document.querySelector<HTMLInputElement>("[data-skill-search]")!;
+    expect(document.activeElement).toBe(search);
+
+    act(() => {
+      typeInto(search, "brain");
+    });
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    // 第一段：查询清空，表单还在
+    expect(
+      document.querySelector<HTMLInputElement>("[data-skill-search]")!.value,
+    ).toBe("");
+    expect(onClose).not.toHaveBeenCalled();
+
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("技能接口失败时给一行提示，不崩", async () => {
     getSkills.mockRejectedValueOnce(new Error("boom"));
     render();
