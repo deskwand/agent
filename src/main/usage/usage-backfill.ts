@@ -11,8 +11,12 @@ export interface BackfillResult {
   scanned: number;
   inserted: number;
   skipped: number;
-  /** True when the corpus fingerprint matched and the scan was skipped entirely. */
-  corpusUnchanged: boolean;
+  /**
+   * Files this pass actually read: the ones whose stored `(mtime, size,
+   * parser_version)` no longer matched. 0 means nothing needed re-reading. A
+   * regression to a whole-corpus rescan shows up here.
+   */
+  filesChanged: number;
 }
 
 interface ParsedEntry {
@@ -25,19 +29,18 @@ interface ParsedEntry {
   };
 }
 
-const CORPUS_KEY = "backfill_corpus_signature";
-
 /**
  * Bump whenever the parsing or normalization of session entries changes.
  *
- * The corpus fingerprint below only notices *new or changed session files*. A
- * stored fingerprint therefore pins whatever the importer did at that time: fix
- * a parsing bug (dedup key, provider field mapping, …) without bumping this and
- * existing installs never re-import their history — silently, because nothing
- * about the corpus changed.
+ * The per-file fingerprint only notices *new or changed session files*, so a
+ * stored fingerprint pins whatever the importer did at that time: fix a parsing
+ * bug (dedup key, provider field mapping, …) without bumping this and existing
+ * installs never re-import their history — silently, because nothing about the
+ * corpus changed.
  *
- * Bumping it invalidates every stored signature, so the next launch performs one
- * full rescan (rows stay deduped, so that is wasteful but never wrong).
+ * The version is stored on every fingerprint row, so bumping it invalidates all
+ * of them at once and the next launch performs one full rescan (rows stay
+ * deduped, so that is wasteful but never wrong).
  */
 export const BACKFILL_PARSER_VERSION = 1;
 
@@ -51,84 +54,121 @@ export const BACKFILL_PARSER_VERSION = 1;
  */
 const LINE_BUDGET = 1000;
 
-interface CorpusScan {
-  /** session id → absolute .jsonl paths */
-  filesBySession: Array<{ sessionId: string; files: string[] }>;
-  /** Cheap fingerprint: file count, total bytes and newest mtime. */
-  signature: string;
+interface CorpusFile {
+  /**
+   * `<sessionId>/<fileName>`, relative to the sessions root. The forward slash
+   * is deliberate: this string is the primary key of the fingerprint table, so
+   * it must not change shape between platforms.
+   */
+  relPath: string;
+  absPath: string;
+  sessionId: string;
+  /** Floored, to match exactly what gets written back to the table. */
+  mtime: number;
+  size: number;
 }
 
 /**
- * Walk the corpus and fingerprint it. Measured at ~36ms for 687 files / 478MB,
- * versus ~2.1s to actually parse it — this is what makes an unchanged corpus
- * cheap to recognise.
+ * Walk the corpus and stat every session file.
  *
- * Byte total (not just mtime) is part of the fingerprint: a session file can
- * grow within the same mtime tick, and mtime granularity alone would miss it.
+ * Measured at ~36ms for 687 files / 478MB. That is the price of never
+ * re-parsing them: a directory's mtime is useless here, because appending to a
+ * file does not touch its directory's mtime, so every file must be stat'ed.
+ *
+ * Returns null when the root itself cannot be read. That is deliberately
+ * distinct from an empty corpus: "unreadable" must never be read as "every
+ * session was deleted", or a transient failure would let the caller wipe the
+ * whole fingerprint table and force a full re-import.
  */
-function scanCorpus(sessionsRoot: string): CorpusScan {
-  const filesBySession: Array<{ sessionId: string; files: string[] }> = [];
-  let fileCount = 0;
-  let totalBytes = 0;
-  let newestMtimeMs = 0;
-
+function walkCorpus(sessionsRoot: string): CorpusFile[] | null {
   let sessionDirs: string[];
   try {
     sessionDirs = readdirSync(sessionsRoot);
   } catch {
-    return { filesBySession, signature: `v${BACKFILL_PARSER_VERSION}:0:0:0` };
+    return null;
   }
 
+  const files: CorpusFile[] = [];
   for (const sessionId of sessionDirs) {
     const dir = join(sessionsRoot, sessionId);
-    let files: string[];
+    let names: string[];
     try {
       if (!statSync(dir).isDirectory()) continue;
-      files = readdirSync(dir)
-        .filter((name) => name.endsWith(".jsonl"))
-        .map((name) => join(dir, name));
+      names = readdirSync(dir).filter((name) => name.endsWith(".jsonl"));
     } catch {
       continue;
     }
-    for (const file of files) {
+    for (const name of names) {
+      const absPath = join(dir, name);
       try {
-        const stat = statSync(file);
-        fileCount += 1;
-        totalBytes += stat.size;
-        newestMtimeMs = Math.max(newestMtimeMs, Math.floor(stat.mtimeMs));
+        const stat = statSync(absPath);
+        files.push({
+          relPath: `${sessionId}/${name}`,
+          absPath,
+          sessionId,
+          mtime: Math.floor(stat.mtimeMs),
+          size: stat.size,
+        });
       } catch {
-        // Unreadable mid-walk: leave it out of the fingerprint so the next run
-        // revisits the corpus.
+        // Unreadable mid-walk: leave the file out entirely. An absent
+        // fingerprint only costs a re-read next run; a stale one skips it
+        // forever.
       }
     }
-    filesBySession.push({ sessionId, files });
   }
 
-  return {
-    filesBySession,
-    signature: `v${BACKFILL_PARSER_VERSION}:${fileCount}:${totalBytes}:${newestMtimeMs}`,
-  };
+  return files;
 }
 
-function readStoredSignature(db: DatabaseSync): string | null {
+interface ScanRow {
+  mtime: number;
+  size: number;
+  parserVersion: number;
+}
+
+/** Fingerprint rows, keyed by `relPath`. */
+function readScanRows(db: DatabaseSync): Map<string, ScanRow> {
+  const rows = db
+    .prepare("SELECT path, mtime, size, parser_version FROM usage_scan_files")
+    .all() as unknown as Array<{
+    path: string;
+    mtime: number;
+    size: number;
+    parser_version: number;
+  }>;
+  return new Map(
+    rows.map((row) => [
+      row.path,
+      { mtime: row.mtime, size: row.size, parserVersion: row.parser_version },
+    ]),
+  );
+}
+
+/**
+ * Record that a file's usage rows are fully imported.
+ *
+ * Ordering matters: this commits *after* the file's chunks did. A crash in
+ * between leaves rows with no fingerprint, so the next run re-reads the file and
+ * every row is deduped — wasteful but never wrong. The reverse order would mark
+ * a file scanned without importing it, losing those rows silently.
+ */
+function markScanned(db: DatabaseSync, file: CorpusFile): void {
+  db.exec("BEGIN");
   try {
-    const row = db
-      .prepare("SELECT value FROM usage_meta WHERE key = ?")
-      .get(CORPUS_KEY) as { value?: string } | undefined;
-    return row?.value ?? null;
-  } catch {
-    return null;
+    db.prepare(
+      `INSERT OR REPLACE INTO usage_scan_files (path, mtime, size, parser_version)
+       VALUES (?, ?, ?, ?)`,
+    ).run(file.relPath, file.mtime, file.size, BACKFILL_PARSER_VERSION);
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
   }
-}
-
-function writeStoredSignature(db: DatabaseSync, signature: string): void {
-  db.prepare(
-    "INSERT OR REPLACE INTO usage_meta (key, value) VALUES (?, ?)",
-  ).run(CORPUS_KEY, signature);
 }
 
 interface PassState {
   pending: UsageRecordInput[];
+  /** Lines parsed since the last yield, NOT since the last flush. */
   lines: number;
 }
 
@@ -139,16 +179,17 @@ interface PassState {
  * between chunks, and holding a write transaction open across a yield would let
  * unrelated main-process writes join it — a later rollback would then discard
  * them too. Short transactions plus idempotent keys keep retries safe.
+ *
+ * Deliberately does not touch `state.lines`: that counter measures distance to
+ * the next yield. Resetting it here too would let a run of small files (each
+ * flushed at its own boundary) block the event loop for the whole pass.
  */
 function flushChunk(
   db: DatabaseSync,
   state: PassState,
   result: BackfillResult,
 ): void {
-  if (state.pending.length === 0) {
-    state.lines = 0;
-    return;
-  }
+  if (state.pending.length === 0) return;
   db.exec("BEGIN");
   try {
     for (const record of state.pending) {
@@ -161,7 +202,6 @@ function flushChunk(
     throw error;
   }
   state.pending.length = 0;
-  state.lines = 0;
 }
 
 function yieldToEventLoop(): Promise<void> {
@@ -175,12 +215,14 @@ function yieldToEventLoop(): Promise<void> {
  * path, so both produce identical dedup keys — replaying the backfill, or racing
  * with live writes, cannot double count.
  *
- * Two properties keep this off the UI's critical path:
- *  1. an unchanged corpus short-circuits after the ~36ms fingerprint walk,
- *     instead of re-parsing 478MB on every app launch;
- *  2. the pass yields to the event loop every `LINE_BUDGET` lines, so the
- *     Electron main thread keeps serving IPC (measured: the same scan used to
- *     block the loop for its entire ~2.2s duration).
+ * Three properties keep this off the UI's critical path:
+ *  1. the fingerprint is per file, so a pass reads only the sessions that
+ *     actually changed since the last one (the old whole-corpus fingerprint was
+ *     invalidated by any append anywhere, i.e. by every message the user sent);
+ *  2. the walk that decides this is ~36ms for 734 files / 537MB, versus
+ *     ~2.5–3.9s to parse the corpus;
+ *  3. the pass yields to the event loop every `LINE_BUDGET` lines, so the
+ *     Electron main thread keeps serving IPC.
  *
  * Only `~/.deskwand/pi-sessions` is scanned. Subagent and aux calls were never
  * persisted anywhere, so they have no history to import.
@@ -193,54 +235,55 @@ export async function backfillUsageFromSessions(
     scanned: 0,
     inserted: 0,
     skipped: 0,
-    corpusUnchanged: false,
+    filesChanged: 0,
   };
 
-  const corpus = scanCorpus(sessionsRoot);
-  if (readStoredSignature(db) === corpus.signature) {
-    result.corpusUnchanged = true;
-    return result;
-  }
+  const files = walkCorpus(sessionsRoot);
+  if (files === null) return result;
+
+  const stored = readScanRows(db);
+  const changed = files.filter((file) => {
+    const row = stored.get(file.relPath);
+    return (
+      !row ||
+      row.mtime !== file.mtime ||
+      row.size !== file.size ||
+      row.parserVersion !== BACKFILL_PARSER_VERSION
+    );
+  });
+  result.filesChanged = changed.length;
 
   const state: PassState = { pending: [], lines: 0 };
 
-  for (const { sessionId, files } of corpus.filesBySession) {
-    for (const file of files) {
-      let content: string;
-      try {
-        content = readFileSync(file, "utf-8");
-      } catch {
-        continue;
-      }
+  for (const file of changed) {
+    let content: string;
+    try {
+      content = readFileSync(file.absPath, "utf-8");
+    } catch {
+      continue;
+    }
 
-      for (const line of content.split("\n")) {
-        if (!line.trim()) continue;
-        state.lines += 1;
-        const record = parseLine(line, sessionId);
-        if (record) {
-          result.scanned += 1;
-          state.pending.push(record);
-        }
-        if (state.lines >= LINE_BUDGET) {
-          flushChunk(db, state, result);
-          await yieldToEventLoop();
-        }
+    for (const line of content.split("\n")) {
+      if (!line.trim()) continue;
+      state.lines += 1;
+      const record = parseLine(line, file.sessionId);
+      if (record) {
+        result.scanned += 1;
+        state.pending.push(record);
+      }
+      if (state.lines >= LINE_BUDGET) {
+        flushChunk(db, state, result);
+        await yieldToEventLoop();
+        // Only a yield resets the budget, so a run of small files cannot
+        // stretch one uninterrupted block across the whole pass.
+        state.lines = 0;
       }
     }
-  }
 
-  flushChunk(db, state, result);
-
-  // Separate transaction: the fingerprint only lands once every chunk did. If
-  // this write fails, the next run simply re-scans (the rows are already
-  // deduped, so that is wasteful but never wrong).
-  db.exec("BEGIN");
-  try {
-    writeStoredSignature(db, corpus.signature);
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
+    // Flush this file's tail, then mark it: the fingerprint row commits after
+    // the rows it describes, and the write never spans the yield above.
+    flushChunk(db, state, result);
+    markScanned(db, file);
   }
 
   return result;

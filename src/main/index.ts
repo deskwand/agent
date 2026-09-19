@@ -1491,7 +1491,7 @@ function ensureUsageBackfilled(): Promise<void> {
     )
       .then((result) => {
         log(
-          `[Usage] backfill scanned=${result.scanned} inserted=${result.inserted} skipped=${result.skipped} corpusUnchanged=${result.corpusUnchanged}`,
+          `[Usage] backfill files=${result.filesChanged} scanned=${result.scanned} inserted=${result.inserted} skipped=${result.skipped}`,
         );
       })
       .catch((error) => {

@@ -34,11 +34,14 @@ export function createUsageSchema(db: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS idx_usage_ts ON usage_records(ts);
     CREATE INDEX IF NOT EXISTS idx_usage_model_ts ON usage_records(model, ts);
-    -- Internal bookkeeping (currently the backfill corpus fingerprint). Lives in
-    -- the same database as the rows it describes so both commit together.
-    CREATE TABLE IF NOT EXISTS usage_meta (
-      key   TEXT PRIMARY KEY,
-      value TEXT NOT NULL
+    -- One row per session file whose usage rows have been fully imported. Keyed
+    -- by a path relative to the sessions root so the fingerprint survives a
+    -- userData move.
+    CREATE TABLE IF NOT EXISTS usage_scan_files (
+      path           TEXT PRIMARY KEY,
+      mtime          INTEGER NOT NULL,
+      size           INTEGER NOT NULL,
+      parser_version INTEGER NOT NULL
     );
   `);
 }

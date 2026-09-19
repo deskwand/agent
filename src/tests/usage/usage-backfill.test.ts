@@ -70,27 +70,44 @@ describe("backfillUsageFromSessions", () => {
     await backfillUsageFromSessions(db, root);
     const second = await backfillUsageFromSessions(db, root);
     expect(second.inserted).toBe(0);
-    // Unchanged corpus: the run short-circuits instead of re-parsing everything.
+    // Unchanged corpus: no file is read at all.
     // (The dedup path itself is covered by the change-detection and fork cases.)
-    expect(second).toMatchObject({ scanned: 0, corpusUnchanged: true });
+    expect(second).toMatchObject({ scanned: 0, filesChanged: 0 });
     const { c } = db
       .prepare("SELECT COUNT(*) AS c FROM usage_records")
       .get() as { c: number };
     expect(c).toBe(1);
   });
 
-  it("still dedups old rows when a changed corpus forces a rescan", async () => {
+  it("reads only the file whose fingerprint changed", async () => {
     writeSession("s-1", [assistant(1_760_000_000_000, 10, 5)]);
-    await backfillUsageFromSessions(db, root);
-    writeSession("s-2", [assistant(1_760_000_001_000, 7, 3)]);
+    writeSession("s-2", [assistant(1_760_000_001_000, 10, 5)]);
+    writeSession("s-3", [assistant(1_760_000_002_000, 10, 5)]);
+    expect(await backfillUsageFromSessions(db, root)).toMatchObject({
+      filesChanged: 3,
+      inserted: 3,
+    });
 
-    const third = await backfillUsageFromSessions(db, root);
-    // s-1's row is re-examined and ignored, s-2's is inserted.
-    expect(third).toMatchObject({ inserted: 1, skipped: 1 });
+    fs.appendFileSync(
+      path.join(root, "s-2", "2026-09-12T00-00-00-000Z_abc.jsonl"),
+      "\n" + JSON.stringify(assistant(1_760_000_003_000, 4, 4)),
+      "utf-8",
+    );
+
+    const second = await backfillUsageFromSessions(db, root);
+    // s-2 is re-read in full (both records: one new, one deduped); s-1 and s-3
+    // are not read at all. A regression to a whole-corpus rescan makes
+    // `filesChanged` 3 and `scanned` 4.
+    expect(second).toMatchObject({
+      filesChanged: 1,
+      scanned: 2,
+      inserted: 1,
+      skipped: 1,
+    });
     const { c } = db
       .prepare("SELECT COUNT(*) AS c FROM usage_records")
       .get() as { c: number };
-    expect(c).toBe(2);
+    expect(c).toBe(4);
   });
 
   it("does not double count a row already written live with the same key", async () => {
@@ -115,6 +132,23 @@ describe("backfillUsageFromSessions", () => {
     );
     const result = await backfillUsageFromSessions(db, root);
     expect(result.inserted).toBe(0);
+    expect(queryUsage(db, "all", 1_800_000_000_000).totals.calls).toBe(1);
+  });
+
+  it("re-reads a file that was imported but never marked as scanned", async () => {
+    writeSession("s-1", [assistant(1_760_000_000_000, 10, 5)]);
+    await backfillUsageFromSessions(db, root);
+
+    // What a crash between "rows inserted" and "file marked" leaves behind.
+    db.exec("DELETE FROM usage_scan_files");
+
+    const second = await backfillUsageFromSessions(db, root);
+    expect(second).toMatchObject({
+      filesChanged: 1,
+      scanned: 1,
+      inserted: 0,
+      skipped: 1,
+    });
     expect(queryUsage(db, "all", 1_800_000_000_000).totals.calls).toBe(1);
   });
 
@@ -176,54 +210,72 @@ describe("backfillUsageFromSessions", () => {
     expect(flushBody).not.toContain("await");
   });
 
-  it("bakes the parser version into the stored corpus signature", async () => {
+  it("re-reads a file whose fingerprint was written by an older parser version", async () => {
     writeSession("s-1", [assistant(1_760_000_000_000, 10, 5)]);
     await backfillUsageFromSessions(db, root);
-    const row = db
-      .prepare("SELECT value FROM usage_meta WHERE key = ?")
-      .get("backfill_corpus_signature") as { value: string };
-    // Removing the version prefix would silently pin old parsing results forever.
-    expect(row.value.startsWith(`v${BACKFILL_PARSER_VERSION}:`)).toBe(true);
+
+    // Simulate an upgrade that bumped BACKFILL_PARSER_VERSION. Trusting the
+    // stored row would pin old parsing results forever.
+    db.prepare(
+      "UPDATE usage_scan_files SET parser_version = ? WHERE path = ?",
+    ).run(
+      BACKFILL_PARSER_VERSION - 1,
+      "s-1/2026-09-12T00-00-00-000Z_abc.jsonl",
+    );
+
+    const second = await backfillUsageFromSessions(db, root);
+    expect(second).toMatchObject({
+      filesChanged: 1,
+      scanned: 1,
+      inserted: 0,
+      skipped: 1,
+    });
   });
 
   it("returns an empty result for a missing root", async () => {
     expect(
       await backfillUsageFromSessions(db, path.join(root, "nope")),
-    ).toMatchObject({ scanned: 0, inserted: 0, skipped: 0 });
+    ).toMatchObject({ scanned: 0, inserted: 0, skipped: 0, filesChanged: 0 });
   });
 });
 
 /**
  * A backfill that re-reads 478MB on every app launch only to find every row
- * already present is the reason the usage page hangs on first open. The corpus
- * signature must let an unchanged corpus short-circuit, without ever turning
- * into a permanent skip.
+ * already present is the reason the usage page hangs on first open. The
+ * per-file fingerprint must let an unchanged file be skipped, without ever
+ * turning into a permanent skip.
  */
-describe("backfill skips an unchanged corpus", () => {
+describe("backfill skips an unchanged file", () => {
   it("does not rescan when nothing changed", async () => {
     writeSession("s-1", [assistant(1_760_000_000_000, 10, 5)]);
     const first = await backfillUsageFromSessions(db, root);
     expect(first).toMatchObject({
       scanned: 1,
       inserted: 1,
-      corpusUnchanged: false,
+      filesChanged: 1,
     });
 
     const second = await backfillUsageFromSessions(db, root);
     expect(second).toMatchObject({
       scanned: 0,
       inserted: 0,
-      corpusUnchanged: true,
+      filesChanged: 0,
     });
   });
 
-  it("rescans and imports only the new rows once the corpus changes", async () => {
+  it("imports a new session file without touching the existing ones", async () => {
     writeSession("s-1", [assistant(1_760_000_000_000, 10, 5)]);
     await backfillUsageFromSessions(db, root);
 
     writeSession("s-2", [assistant(1_760_000_001_000, 7, 3)]);
     const third = await backfillUsageFromSessions(db, root);
-    expect(third).toMatchObject({ inserted: 1, corpusUnchanged: false });
+    // Only the new file is read; s-1 is left alone rather than re-examined.
+    expect(third).toMatchObject({
+      filesChanged: 1,
+      scanned: 1,
+      inserted: 1,
+      skipped: 0,
+    });
     // The old row is still deduped, not duplicated.
     expect(queryUsage(db, "all", 1_800_000_000_000).totals.calls).toBe(2);
   });
@@ -244,7 +296,13 @@ describe("backfill skips an unchanged corpus", () => {
     fs.utimesSync(file, before.atime, before.mtime);
 
     const third = await backfillUsageFromSessions(db, root);
-    expect(third).toMatchObject({ inserted: 1, corpusUnchanged: false });
+    // `size` is what catches this: the mtime was restored to its old value.
+    expect(third).toMatchObject({
+      filesChanged: 1,
+      scanned: 2,
+      inserted: 1,
+      skipped: 1,
+    });
   });
 });
 
