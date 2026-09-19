@@ -181,7 +181,6 @@ interface AppState {
   reviewWidthManual: boolean;
   reviewTargetFile: string | null;
   isArtifactPanelOpen: boolean;
-  fileBrowserRoot: string | null;
 
   // Permission
   pendingPermission: PermissionRequest | null;
@@ -494,7 +493,6 @@ export const useAppStore = create<AppState>((set) => ({
   reviewWidthManual: false,
   reviewTargetFile: null,
   isArtifactPanelOpen: false,
-  fileBrowserRoot: null,
   pendingPermission: null,
   pendingSudoPassword: null,
   settings: defaultSettings,

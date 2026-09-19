@@ -1,125 +1,52 @@
+import {
+  Archive,
+  Code,
+  File,
+  FileText,
+  Folder,
+  FolderOpen,
+  Image,
+  Music,
+  Table,
+  Video,
+  type LucideIcon,
+} from "lucide-react";
 import type { FileKind } from "../utils/file-types";
 
-interface TilePath {
-  /** 24×24 网格上的 path 数据 */
-  d: string;
-  /** true = 在色块上画白色实心；false = 白色描边（1.85px，圆头圆角） */
-  filled?: boolean;
-  /**
-   * 实心形的填充不透明度，用于做 Finder 式文件夹的前后层次。
-   * 注意：这个 0.78 是绕过 token 的「派生色」——白字叠在 `--color-file-folder`
-   * 上得出前板色，所以以后调 `--color-file-folder` 时必须重新确认前/后板的明度差，
-   * 并把 `tests/file-icon-colors.test.ts` 的白字对比下限一起重算。
-   */
-  fillOpacity?: number;
-}
-
-/** 关闭态文件夹：后板 + 与之齐平的前板，靠明度差做出前后层次 */
-const FOLDER_CLOSED: TilePath[] = [
-  {
-    d: "M2.6 12.8V6.5A1.7 1.7 0 0 1 4.3 4.8h4.2a1.7 1.7 0 0 1 1.36.68l1.3 1.72h8.14a1.7 1.7 0 0 1 1.7 1.7v3.9z",
-    filled: true,
-  },
-  {
-    d: "M2.6 12.8h18.4v6.1a1.7 1.7 0 0 1-1.7 1.7H4.3a1.7 1.7 0 0 1-1.7-1.7z",
-    filled: true,
-    fillOpacity: 0.78,
-  },
-];
-
-/** 展开态文件夹：后板缩短，前板向下前方倾斜，露出后板内腔 */
-const FOLDER_OPEN: TilePath[] = [
-  {
-    d: "M2.6 11.4V6.5A1.7 1.7 0 0 1 4.3 4.8h4.2a1.7 1.7 0 0 1 1.36.68l1.3 1.72h8.14a1.7 1.7 0 0 1 1.7 1.7v2.5z",
-    filled: true,
-  },
-  {
-    d: "M7.4 11.4H21l-2.4 9.2H3.4z",
-    filled: true,
-    fillOpacity: 0.78,
-  },
-];
-
-const TILE_GLYPHS: Record<FileKind, TilePath[]> = {
-  // 注意：folder 的取值由 FileTypeIcon 在关闭/展开之间切换，不走这张表。
-  folder: FOLDER_CLOSED,
-  image: [
-    { d: "M9 6.2a2.4 2.4 0 1 1 0 4.8 2.4 2.4 0 0 1 0-4.8z", filled: true },
-    {
-      d: "M2.4 19 8 13.6a2 2 0 0 1 2.8 0l2.4 2.4 1.5-1.5a2 2 0 0 1 2.8 0l4.1 4.5z",
-      filled: true,
-    },
-  ],
-  video: [{ d: "M9.8 7.6 17 12l-7.2 4.4z", filled: true }],
-  audio: [
-    { d: "M9.6 17.4V8.2l6.6-1.6v9.2" },
-    { d: "M9.6 17.4a2 2 0 1 1-4 0 2 2 0 0 1 4 0z", filled: true },
-    { d: "M16.2 15.8a2 2 0 1 1-4 0 2 2 0 0 1 4 0z", filled: true },
-  ],
-  doc: [
-    { d: "M6.6 5.6h6.6l4.2 4.2v8.6H6.6z" },
-    { d: "M13.2 5.6v4.2h4.2" },
-    { d: "M9.4 13.4h5.2" },
-    { d: "M9.4 16h3.4" },
-  ],
-  sheet: [
-    { d: "M4.6 6.4h14.8v11.2H4.6z" },
-    { d: "M4.6 10.2h14.8" },
-    { d: "M4.6 13.9h14.8" },
-    { d: "M10.4 6.4v11.2" },
-    { d: "M14.9 6.4v11.2" },
-  ],
-  code: [
-    { d: "m8.4 8.6-3.6 3.4 3.6 3.4" },
-    { d: "m15.6 8.6 3.6 3.4-3.6 3.4" },
-    { d: "m13.4 6.4-2.8 11.2" },
-  ],
-  archive: [
-    { d: "M5 6.6h14v11H5z" },
-    { d: "M11.2 6.6v2.6M12.8 9.2v2.6M11.2 11.8v2.6" },
-    { d: "M10.6 14.4h2.8v3.2h-2.8z" },
-  ],
-  file: [{ d: "M6.8 5.4h6.4l4.2 4.2v9H6.8z" }, { d: "M13.2 5.4v4.2h4.2" }],
+/**
+ * kind → lucide 图标。
+ *
+ * 这套字形是 lucide 现成的，不是自绘：色块版（2026-09-12）之所以自绘，
+ * 是因为「字形要顶满色块 + 白填充/白描边两种画法」这个约束，而 lucide 是
+ * 固定 fill=none 的单色描边，做不了色块。现在没有色块了，约束消失，
+ * 于是文件图标与 app 其余图标（含列表里的 chevron）回到同一个实现。
+ */
+const KIND_ICON: Record<FileKind, LucideIcon> = {
+  folder: Folder,
+  image: Image,
+  video: Video,
+  audio: Music,
+  doc: FileText,
+  sheet: Table,
+  code: Code,
+  archive: Archive,
+  file: File,
 };
 
 /**
- * 文件夹字形按 94% 缩放并向色块中心对齐。
- * 依据：原字形在 16px 下左右各只留 0.80px 蓝边，整个色块平均色是
- * rgb(165,209,255) 淡蓝——看起来像「白文件夹镶蓝边」而不是蓝文件夹。
- * 图标集其余图标的边距都在 1.5–3.5px，文件夹原来是最挤的一个。
- * 缩放同时也修正了 0.47px 的垂直偏心（原中心 y=12.7，色块中心 12）。
- * 导出供测试把同一次变换应用到几何边界断言上。
+ * kind → 颜色 class。
+ * 文件夹走主题文字 token（跟着 14 档主题自己变），只有文件带类型色。
  */
-export const FOLDER_GLYPH_FIT = {
-  scale: 0.94,
-  fromX: 11.8,
-  fromY: 12.7,
-  toX: 12,
-  toY: 12,
-} as const;
-
-const FOLDER_GLYPH_TRANSFORM =
-  `translate(${FOLDER_GLYPH_FIT.toX} ${FOLDER_GLYPH_FIT.toY}) ` +
-  `scale(${FOLDER_GLYPH_FIT.scale}) ` +
-  `translate(${-FOLDER_GLYPH_FIT.fromX} ${-FOLDER_GLYPH_FIT.fromY})`;
-
-/** kind → 色块颜色。② 决策：按家族收色，字形负责精确类型。 */
-const KIND_TILE_CLASS: Record<FileKind, string> = {
-  folder: "fill-file-folder",
-  image: "fill-file-media",
-  video: "fill-file-media",
-  doc: "fill-file-doc",
-  sheet: "fill-file-doc",
-  code: "fill-file-code",
-  audio: "fill-file-audio",
-  archive: "fill-file-neutral",
-  file: "fill-file-neutral",
-};
-
-const STROKE_PROPS = {
-  strokeWidth: 1.85,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
+const KIND_CLASS: Record<FileKind, string> = {
+  folder: "text-text-secondary",
+  image: "text-file-media",
+  video: "text-file-media",
+  doc: "text-file-doc",
+  sheet: "text-file-doc",
+  code: "text-file-code",
+  audio: "text-file-audio",
+  archive: "text-file-neutral",
+  file: "text-file-neutral",
 };
 
 export function FileTypeIcon({
@@ -131,49 +58,13 @@ export function FileTypeIcon({
   expanded?: boolean;
   size?: number;
 }) {
-  const glyphs =
-    kind === "folder" && expanded ? FOLDER_OPEN : TILE_GLYPHS[kind];
-  const radius = size <= 16 ? 4.6 : 6;
-  // 只有 16（文件管理器、产出面板）与 24（密库）两档在用；其余尺寸一律落到 6。
-  const glyphNodes = glyphs.map((glyph) =>
-    glyph.filled ? (
-      <path
-        key={glyph.d}
-        d={glyph.d}
-        fillOpacity={glyph.fillOpacity}
-        className="fill-white"
-      />
-    ) : (
-      <path
-        key={glyph.d}
-        d={glyph.d}
-        className="fill-none stroke-white"
-        {...STROKE_PROPS}
-      />
-    ),
-  );
+  const Icon = kind === "folder" && expanded ? FolderOpen : KIND_ICON[kind];
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
+    <Icon
+      size={size}
+      className={`shrink-0 ${KIND_CLASS[kind]}`}
       role="presentation"
       aria-hidden="true"
-      className="shrink-0"
-    >
-      <rect
-        x="1.4"
-        y="1.4"
-        width="21.2"
-        height="21.2"
-        rx={radius}
-        className={KIND_TILE_CLASS[kind]}
-      />
-      {kind === "folder" ? (
-        <g transform={FOLDER_GLYPH_TRANSFORM}>{glyphNodes}</g>
-      ) : (
-        glyphNodes
-      )}
-    </svg>
+    />
   );
 }

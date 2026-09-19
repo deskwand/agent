@@ -35,7 +35,6 @@ module.exports = {
           DEFAULT: 'var(--color-mcp)',
         },
         file: {
-          folder: 'var(--color-file-folder)',
           media: 'var(--color-file-media)',
           doc: 'var(--color-file-doc)',
           code: 'var(--color-file-code)',

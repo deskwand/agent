@@ -159,7 +159,7 @@ export function getFileKind(nameOrExt: string): FileKind {
   // 必须用 typeof 而非 `?? "file"`：EXT_KIND_MAP 是普通对象字面量，
   // "constructor" / "toString" / "__proto__" / "valueOf" 等扩展名会命中
   // Object.prototype 的成员，`??` 拦不住（它们不是 null/undefined），
-  // 会返回一个函数或对象，导致 TILE_GLYPHS[kind] 为 undefined、
-  // glyphs.map 抛 TypeError——文件名为 a.constructor 即可触发。
+  // 会返回一个函数或对象，于是 KIND_ICON[kind] 取到 undefined，
+  // React 会以 "Element type is invalid" 抛错——文件名为 a.constructor 即可触发。
   return typeof kind === "string" ? kind : "file";
 }

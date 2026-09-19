@@ -1029,8 +1029,7 @@
     "copyPath": "复制路径",
     "openInFileManager": "在文件管理器中打开",
     "contextUsage": "上下文用量",
-    "contextUsageLabel": "{{used}} / {{total}}",
-    "backToWorkspace": "回到工作区"
+    "contextUsageLabel": "{{used}} / {{total}}"
   },
   "artifactPanel": {
     "title": "产物",
@@ -1280,7 +1279,12 @@
   },
   "fileBrowser": {
     "noWorkdir": "未设置工作目录",
-    "emptyDir": "空目录"
+    "emptyDir": "空目录",
+    "filterPlaceholder": "筛选文件…",
+    "filterNoMatch": "没有匹配的文件",
+    "filterCapped": "只显示前 {{count}} 个匹配，继续输入缩小范围",
+    "filterIncomplete": "工作区文件过多，结果可能不完整",
+    "clearFilter": "清除筛选"
   },
   "filePreview": {
     "openExternal": "用系统应用打开",

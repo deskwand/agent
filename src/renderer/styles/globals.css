@@ -48,8 +48,7 @@
     --color-terminal-error: #f85149;
     --color-terminal-dim: #8b949e;
     --shadow-sidebar-sep: rgba(0, 0, 0, 0.3);
-    /* File type icon tiles — fixed semantic colours, independent of presets */
-    --color-file-folder: #2b86e0;
+    /* File type icon colours — fixed semantic colours, independent of presets */
     --color-file-media: #f0a63c;
     --color-file-doc: #34d399;
     --color-file-code: #a855f7;
@@ -89,8 +88,7 @@
     --color-terminal-error: #dc2626;
     --color-terminal-dim: #9ca3af;
     --shadow-sidebar-sep: rgba(0, 0, 0, 0.06);
-    /* File type icon tiles — fixed semantic colours, independent of presets */
-    --color-file-folder: #0b6bcb;
+    /* File type icon colours — fixed semantic colours, independent of presets */
     --color-file-media: #b26a00;
     --color-file-doc: #059669;
     --color-file-code: #7c3aed;

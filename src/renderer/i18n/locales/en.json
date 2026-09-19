@@ -1030,8 +1030,7 @@
     "copyPath": "Copy path",
     "openInFileManager": "Open in file manager",
     "contextUsage": "Context Usage",
-    "contextUsageLabel": "{{used}} / {{total}}",
-    "backToWorkspace": "Back to workspace"
+    "contextUsageLabel": "{{used}} / {{total}}"
   },
   "artifactPanel": {
     "title": "Artifacts",
@@ -1281,7 +1280,12 @@
   },
   "fileBrowser": {
     "noWorkdir": "No working directory set",
-    "emptyDir": "Empty directory"
+    "emptyDir": "Empty directory",
+    "filterPlaceholder": "Filter files…",
+    "filterNoMatch": "No matching files",
+    "filterCapped": "Showing the first {{count}} matches — keep typing to narrow",
+    "filterIncomplete": "Too many files in this workspace — results may be incomplete",
+    "clearFilter": "Clear filter"
   },
   "filePreview": {
     "openExternal": "Open with system app",
