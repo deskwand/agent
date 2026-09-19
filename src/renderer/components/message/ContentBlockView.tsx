@@ -516,8 +516,7 @@ export const ContentBlockView = memo(function ContentBlockView({
             <img
               src={imageSrc}
               alt={t("messageCard.pastedContentAlt")}
-              className="w-full max-w-full rounded-lg border border-border cursor-pointer hover:opacity-90 transition-opacity"
-              style={{ maxHeight: "600px", objectFit: "contain" }}
+              className="h-auto max-h-[240px] w-auto max-w-[240px] rounded-lg border border-border cursor-pointer hover:opacity-90 transition-opacity"
               onClick={handleImageClick}
             />
           </div>

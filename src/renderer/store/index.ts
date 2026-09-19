@@ -24,6 +24,7 @@ import { applySessionUpdate } from "../utils/session-update";
 import { initialPreviewWidth, initialReviewWidth } from "../utils/panel-width";
 import type { RightPanelMode } from "../utils/browser-visibility";
 import type { ImageSource } from "../components/ImageLightbox";
+import { restoreUserMessage } from "../utils/prompt-decorations";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
@@ -762,7 +763,7 @@ export const useAppStore = create<AppState>((set) => ({
   setMessages: (sessionId, messages) =>
     set((state) => ({
       sessionStates: patchSession(state.sessionStates, sessionId, {
-        messages,
+        messages: messages.map(restoreUserMessage),
         historyHydrated: true,
       }),
     })),
@@ -770,7 +771,7 @@ export const useAppStore = create<AppState>((set) => ({
   setMessagesTail: (sessionId, messages, hasMore) =>
     set((state) => ({
       sessionStates: patchSession(state.sessionStates, sessionId, {
-        messages,
+        messages: messages.map(restoreUserMessage),
         hasMoreOlder: hasMore,
         oldestMessageId: messages[0]?.id ?? null,
         historyHydrated: true,
@@ -781,7 +782,7 @@ export const useAppStore = create<AppState>((set) => ({
     let trimmedCount = 0;
     set((state) => {
       const ss = getSession(state.sessionStates, sessionId);
-      const merged = [...older, ...ss.messages];
+      const merged = [...older.map(restoreUserMessage), ...ss.messages];
       let messages = merged;
       const cap = MAX_MEMORY_WINDOW_MESSAGES + MESSAGE_PAGE_SIZE;
       if (merged.length > cap) {
