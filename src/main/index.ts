@@ -1490,7 +1490,8 @@ const USAGE_SESSIONS_ROOT = join(app.getPath("userData"), "pi-sessions");
 let usageBackfillPromise: Promise<void> | null = null;
 
 /**
- * Runs the idempotent backfill once per app run, on the first usage query.
+ * Runs the idempotent backfill once per app run: warmed at startup, and still
+ * awaited by the first usage query so opening the page never shows partial data.
  * The promise is the guard so concurrent queries share one pass; a failure
  * clears it so the next query retries instead of caching the error.
  */
@@ -1504,6 +1505,11 @@ function ensureUsageBackfilled(): Promise<void> {
         log(
           `[Usage] backfill files=${result.filesChanged} scanned=${result.scanned} inserted=${result.inserted} skipped=${result.skipped}`,
         );
+        // A pass that never reached the corpus is not a completed pass. Warming
+        // at startup makes this reachable (the root may not exist yet, or a
+        // transient readdir failure may hit the busiest moment of the process),
+        // and caching it would silently disable the backfill for the whole run.
+        if (result.rootUnreadable) usageBackfillPromise = null;
       })
       .catch((error) => {
         logWarn("[Usage] backfill failed:", error);

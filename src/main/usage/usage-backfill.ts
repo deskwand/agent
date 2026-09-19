@@ -17,6 +17,15 @@ export interface BackfillResult {
    * regression to a whole-corpus rescan shows up here.
    */
   filesChanged: number;
+  /**
+   * The sessions root itself could not be read, so the pass did nothing at all.
+   *
+   * Callers that cache a completed pass must not cache this one: the root not
+   * existing yet (first ever launch) and a transient `readdirSync` failure
+   * (EMFILE, a synced home dir) are indistinguishable here, and treating either
+   * as "done" would silently disable the backfill for the rest of the run.
+   */
+  rootUnreadable: boolean;
 }
 
 interface ParsedEntry {
@@ -71,7 +80,7 @@ interface CorpusFile {
 /**
  * Walk the corpus and stat every session file.
  *
- * Measured at ~36ms for 687 files / 478MB. That is the price of never
+ * Measured at ~43ms for 734 files / 537MB. That is the price of never
  * re-parsing them: a directory's mtime is useless here, because appending to a
  * file does not touch its directory's mtime, so every file must be stat'ed.
  *
@@ -274,10 +283,14 @@ export async function backfillUsageFromSessions(
     inserted: 0,
     skipped: 0,
     filesChanged: 0,
+    rootUnreadable: false,
   };
 
   const files = walkCorpus(sessionsRoot);
-  if (files === null) return result;
+  if (files === null) {
+    result.rootUnreadable = true;
+    return result;
+  }
 
   const stored = readScanRows(db);
   const changed = files.filter((file) => {

@@ -235,7 +235,41 @@ describe("backfillUsageFromSessions", () => {
   it("returns an empty result for a missing root", async () => {
     expect(
       await backfillUsageFromSessions(db, path.join(root, "nope")),
-    ).toMatchObject({ scanned: 0, inserted: 0, skipped: 0, filesChanged: 0 });
+    ).toMatchObject({
+      scanned: 0,
+      inserted: 0,
+      skipped: 0,
+      filesChanged: 0,
+      // The caller must be able to tell this apart from "corpus unchanged", or
+      // it would cache an empty pass as a completed one.
+      rootUnreadable: true,
+    });
+  });
+
+  it("does not mark a file it could not read, and imports it on a later pass", async () => {
+    writeSession("s-1", [assistant(1_760_000_000_000, 10, 5)]);
+    const file = path.join(root, "s-1", "2026-09-12T00-00-00-000Z_abc.jsonl");
+    fs.chmodSync(file, 0o000);
+    try {
+      const first = await backfillUsageFromSessions(db, root);
+      // The file was selected but could not be read: no rows, and crucially no
+      // fingerprint — writing one here would skip it forever.
+      expect(first).toMatchObject({
+        filesChanged: 1,
+        scanned: 0,
+        inserted: 0,
+        rootUnreadable: false,
+      });
+      const { c } = db
+        .prepare("SELECT COUNT(*) AS c FROM usage_scan_files")
+        .get() as { c: number };
+      expect(c).toBe(0);
+    } finally {
+      fs.chmodSync(file, 0o600);
+    }
+
+    const second = await backfillUsageFromSessions(db, root);
+    expect(second).toMatchObject({ filesChanged: 1, scanned: 1, inserted: 1 });
   });
 });
 
