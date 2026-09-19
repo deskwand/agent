@@ -159,6 +159,7 @@
     "sourceMyCloud": "我的云端",
     "sourceTeam": "团队",
     "sourceBuiltin": "内置",
+    "sourceMcp": "MCP",
     "loginPrompt": "登录即可使用云端技能市场，与团队分享技能",
     "search": "搜索技能...",
     "noSkills": "暂无技能",

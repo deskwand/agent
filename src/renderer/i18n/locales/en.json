@@ -159,6 +159,7 @@
     "sourceMyCloud": "My Cloud",
     "sourceTeam": "Team",
     "sourceBuiltin": "Built-in",
+    "sourceMcp": "MCP",
     "loginPrompt": "Log in to use the cloud skill marketplace and share skills with your team",
     "search": "Search skills...",
     "noSkills": "No skills yet",
