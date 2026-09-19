@@ -1051,6 +1051,17 @@ app
     // Show window after core managers are ready so first-load actions can be handled.
     createWindow();
 
+    // Warm the usage backfill off the first usage-page open. The pass is
+    // incremental, so this is ~50ms — except once per install, right after an
+    // upgrade adds the per-file fingerprint table, when it re-imports the whole
+    // corpus. `usage.query` still awaits this same promise, so opening the page
+    // shows complete numbers either way; only the start time moves.
+    //
+    // Must stay inside this ready callback: `ensureUsageBackfilled` reads the
+    // module-level `USAGE_SESSIONS_ROOT` const, which is in its TDZ until module
+    // evaluation finishes.
+    void ensureUsageBackfilled();
+
     // Initialize internal browser panel (WebContentsView embedded in main window)
     if (mainWindow) {
       browserViewManager = new BrowserViewManager();
