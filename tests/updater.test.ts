@@ -129,7 +129,38 @@ describe("initUpdater", () => {
     handler!({ version: "2.0.0" });
     expect(sendToRenderer).toHaveBeenCalledWith({
       type: "update.downloaded",
-      payload: { version: "2.0.0" },
+      payload: { version: "2.0.0", releaseNotes: null },
+    } as ServerEvent);
+  });
+
+  it("forwards release notes when the manifest carries them", () => {
+    const handler = capturedListeners.get("update-downloaded");
+    handler!({
+      version: "2.0.0",
+      releaseNotes: '{"zh":"中文","en":"english"}',
+    });
+    expect(sendToRenderer).toHaveBeenCalledWith({
+      type: "update.downloaded",
+      payload: {
+        version: "2.0.0",
+        releaseNotes: '{"zh":"中文","en":"english"}',
+      },
+    } as ServerEvent);
+  });
+
+  it("treats a non-string or blank releaseNotes as absent", () => {
+    const handler = capturedListeners.get("update-downloaded");
+    handler!({ version: "2.0.0", releaseNotes: ["a", "b"] });
+    expect(sendToRenderer).toHaveBeenCalledWith({
+      type: "update.downloaded",
+      payload: { version: "2.0.0", releaseNotes: null },
+    } as ServerEvent);
+
+    sendToRenderer.mockClear();
+    handler!({ version: "2.0.0", releaseNotes: "   " });
+    expect(sendToRenderer).toHaveBeenCalledWith({
+      type: "update.downloaded",
+      payload: { version: "2.0.0", releaseNotes: null },
     } as ServerEvent);
   });
 

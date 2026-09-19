@@ -82,6 +82,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
 
   const updateReady = useAppStore((s) => s.updateReady);
   const updateVersion = useAppStore((s) => s.updateVersion);
+  const updateNotes = useAppStore((s) => s.updateNotes);
 
   const {
     invoke,
@@ -1497,6 +1498,7 @@ export function Sidebar({ width = 280 }: { width?: number }) {
         isOpen={showUpdateDialog}
         currentVersion={currentAppVersion}
         newVersion={updateVersion}
+        releaseNotes={updateNotes}
         onConfirm={() => {
           setShowUpdateDialog(false);
           // Send IPC to install the update (quitAndInstall)

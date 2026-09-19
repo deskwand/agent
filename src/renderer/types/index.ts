@@ -671,7 +671,10 @@ export type ServerEvent =
         total: number;
       };
     }
-  | { type: "update.downloaded"; payload: { version: string } }
+  | {
+      type: "update.downloaded";
+      payload: { version: string; releaseNotes: string | null };
+    }
   | { type: "update.error"; payload: { message: string } }
   | { type: "update.not-available"; payload: Record<string, never> }
   | {

@@ -125,7 +125,10 @@ export function initUpdater(
     log("[AutoUpdater] Update downloaded:", info.version);
     sendToRenderer({
       type: "update.downloaded",
-      payload: { version: info.version },
+      payload: {
+        version: info.version,
+        releaseNotes: readReleaseNotes(info),
+      },
     });
 
     // Update is ready — stop polling the feed until the user restarts.
@@ -175,4 +178,15 @@ async function performScheduledCheck(): Promise<void> {
     log("[AutoUpdater] Scheduled check failed:", err);
     scheduleNextCheck(RETRY_INTERVAL_MS);
   }
+}
+
+/**
+ * The manifest's `releaseNotes` is whatever the release process injected —
+ * a JSON string of { zh, en } — or absent for versions published before the
+ * feature existed. Anything that is not a usable string becomes null, so the
+ * renderer has exactly one "no notes" shape to handle.
+ */
+function readReleaseNotes(info: { releaseNotes?: unknown }): string | null {
+  const notes = info.releaseNotes;
+  return typeof notes === "string" && notes.trim() !== "" ? notes : null;
 }

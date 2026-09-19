@@ -1525,7 +1525,8 @@
     "title": "New Version Available",
     "description": "DeskWand v{{version}} has been downloaded. Restart to complete the update.",
     "later": "Later",
-    "restart": "Restart Now"
+    "restart": "Restart Now",
+    "notesLabel": "What's new"
   },
   "artifactCard": {
     "revert": "Revert",

@@ -515,11 +515,14 @@ function registerSharedIpcListener(): () => void {
           break;
 
         case "update.downloaded":
-          store.setUpdateReady(event.payload.version || null);
+          store.setUpdateReady(
+            event.payload.version || null,
+            event.payload.releaseNotes ?? null,
+          );
           break;
 
         case "update.not-available":
-          store.setUpdateReady(null);
+          store.setUpdateReady(null, null);
           break;
 
         case "session.contextInfo":

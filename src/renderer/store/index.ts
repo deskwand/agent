@@ -238,6 +238,7 @@ interface AppState {
   // Update
   updateReady: boolean;
   updateVersion: string;
+  updateNotes: string | null;
 
   // Image lightbox
   lightboxImages: ImageSource[];
@@ -434,7 +435,7 @@ interface AppState {
   setSystemDarkMode: (dark: boolean) => void;
 
   // Update actions
-  setUpdateReady: (version: string | null) => void;
+  setUpdateReady: (version: string | null, notes: string | null) => void;
 }
 
 const defaultSettings: Settings = {
@@ -515,6 +516,7 @@ export const useAppStore = create<AppState>((set) => ({
   systemDarkMode: false,
   updateReady: false,
   updateVersion: "",
+  updateNotes: null,
   lightboxImages: [] as ImageSource[],
   lightboxIndex: 0,
   lightboxLoading: false,
@@ -1389,10 +1391,11 @@ export const useAppStore = create<AppState>((set) => ({
   setSystemDarkMode: (dark) => set({ systemDarkMode: dark }),
 
   // Update actions
-  setUpdateReady: (version) =>
+  setUpdateReady: (version, notes) =>
     set({
       updateReady: version !== null,
       updateVersion: version || "",
+      updateNotes: notes,
     }),
 
   // Image lightbox actions

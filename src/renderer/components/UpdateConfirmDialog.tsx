@@ -1,11 +1,19 @@
 import { useTranslation } from "react-i18next";
 import { RefreshCw } from "lucide-react";
 import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
+import { MessageMarkdown } from "./MessageMarkdown";
+import { pickReleaseNotes } from "../utils/release-notes";
+
+// Notes are plain prose. rehype-sanitize's default schema allows remote images,
+// which would turn opening the dialog into a request to whoever wrote the URL —
+// and a broken-image icon when it is blocked.
+const MARKDOWN_COMPONENTS = { img: () => null };
 
 interface UpdateConfirmDialogProps {
   isOpen: boolean;
   currentVersion: string;
   newVersion: string;
+  releaseNotes?: string | null;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -14,13 +22,16 @@ export function UpdateConfirmDialog({
   isOpen,
   currentVersion,
   newVersion,
+  releaseNotes,
   onConfirm,
   onCancel,
 }: UpdateConfirmDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   useBrowserOcclusion(isOpen);
 
   if (!isOpen) return null;
+
+  const notes = pickReleaseNotes(releaseNotes, i18n.language);
 
   return (
     <div
@@ -54,6 +65,21 @@ export function UpdateConfirmDialog({
             </div>
           )}
         </div>
+
+        {/* Release notes — omitted entirely when the manifest has none */}
+        {notes && (
+          <div
+            role="region"
+            aria-label={t("update.notesLabel")}
+            tabIndex={0}
+            className="mt-4 max-h-[40vh] overflow-y-auto border-t border-border-muted px-5 pt-3.5 pb-1"
+          >
+            <MessageMarkdown
+              normalizedText={notes}
+              components={MARKDOWN_COMPONENTS}
+            />
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-2 border-t border-border-muted px-5 py-4 mt-4">
