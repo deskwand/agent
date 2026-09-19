@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { QuotaSnapshot } from "../../shared/quota";
 import type { ContextStatusDetails } from "./ChatInputBottomBar";
 import { formatResetTime } from "../utils/i18n-format";
+import { MENU_PANEL_CLASS } from "./menu-styles";
 
 export interface StatusPopoverProps {
   contextUsagePercentage: number;
@@ -117,7 +118,7 @@ export function StatusPopover({
         <div
           role="dialog"
           aria-label={t("statusPopover.ringTooltip")}
-          className="absolute bottom-full right-0 z-20 mb-2 w-[340px] rounded-xl border border-border bg-background p-3 text-xs shadow-soft"
+          className={`${MENU_PANEL_CLASS} animate-menu-in-up absolute bottom-full right-0 z-30 mb-2 w-[340px] p-3 text-xs`}
         >
           <div className="flex items-center gap-2">
             <span className="w-[60px] shrink-0 text-text-secondary">
@@ -141,7 +142,7 @@ export function StatusPopover({
             snapshot.windows.length > 0 ? (
               <div
                 key={snapshot.providerId}
-                className="mt-2 border-t border-border pt-2"
+                className="mt-2 border-t border-border-subtle pt-2"
               >
                 <div className="flex items-baseline gap-1.5 pb-1 text-[11px] font-semibold text-text-secondary">
                   <span>{snapshot.providerName}</span>
@@ -151,7 +152,7 @@ export function StatusPopover({
                     </span>
                   )}
                 </div>
-                <div className="border-l-2 border-border pl-2">
+                <div className="border-l-2 border-border-subtle pl-2">
                   {snapshot.windows.map((window) => (
                     <div key={window.kind}>
                       <div className="flex items-center gap-2">
@@ -185,7 +186,7 @@ export function StatusPopover({
           )}
 
           {contextStatusDetails.cacheHitRate !== "--" && (
-            <div className="mt-2 border-t border-border pt-2 text-[11px] text-text-muted">
+            <div className="mt-2 border-t border-border-subtle pt-2 text-[11px] text-text-muted">
               {t("statusPopover.cacheHitRate", {
                 rate: contextStatusDetails.cacheHitRate,
               })}

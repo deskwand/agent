@@ -290,4 +290,33 @@ describe("StatusPopover", () => {
     // `hover:bg-surface-hover` 也会让 toContain 通过，那条断言永远不会失败。
     expect(trigger().className.split(/\s+/)).toContain("bg-surface-hover");
   });
+
+  it("面板外壳复用浮层共享 token，并带入场动画", () => {
+    render();
+    act(() => trigger().click());
+
+    const panel = dialog()!;
+    // 逐 token 用 classList 断言，不用字符串 includes ——
+    // `hover:bg-surface-hover` 那类子串会让 toContain 变成恒真。
+    expect(panel.classList.contains("animate-menu-in-up")).toBe(true);
+    expect(panel.classList.contains("border-border-subtle")).toBe(true);
+    expect(panel.classList.contains("shadow-elevated")).toBe(true);
+    expect(panel.classList.contains("z-30")).toBe(true);
+
+    // 旧内联外壳的两个特征必须消失
+    expect(panel.classList.contains("shadow-soft")).toBe(false);
+    expect(panel.classList.contains("border-border")).toBe(false);
+
+    // 「丢能力」那一侧：外壳常量不含内边距（`menu-styles.ts:11` 的注释），
+    // 本面板靠自己的 `p-3`。若将来被换成 `MENU_PANEL_PADDED_CLASS`（`p-1`），
+    // 上面 6 条会全绿而内边距无声消失，且 `p-3`/`p-1` 谁生效取决于 Tailwind 输出顺序。
+    expect(panel.classList.contains("p-3")).toBe(true);
+    expect(panel.classList.contains("p-1")).toBe(false);
+
+    // 面板内部 3 处分隔线也必须用 `border-border-subtle`（本次一并对齐的部分）。
+    // 属性选择器 `[class~="..."]` 匹配完整 token，不会误伤 `border-border-subtle`。
+    // 面板是只读状态面板、内部没有表单类元素，所以不存在需要 `border-border` 的子元素；
+    // 将来若真需要，改成更精确的选择器，而不是放宽这一条。
+    expect(panel.querySelectorAll('[class~="border-border"]')).toHaveLength(0);
+  });
 });
