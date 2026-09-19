@@ -8,7 +8,11 @@
 export interface PiCommandEntry {
   name: string;
   description?: string;
-  source: "builtin" | "extension";
+  source: "builtin" | "extension" | "prompt";
+  /** 提示词模板的显示名（frontmatter display_name），仅 source === "prompt" 可能有 */
+  displayName?: string;
+  /** 提示词模板位于全局 ~/.pi/agent/prompts —— 可在「+」菜单里编辑/删除 */
+  editable?: boolean;
 }
 
 /** Builtin slash commands (compact/goal are intercepted elsewhere; listed for discovery/UI). */
@@ -18,12 +22,16 @@ export const BUILTIN_COMMANDS: PiCommandEntry[] = [
 ];
 
 /**
- * Merge builtin + cached + host extension commands into a single list.
- * Builtin commands always win: an extension registering a duplicate name is dropped.
+ * Merge builtin + cached + host extension + prompt template commands into a single list.
+ * 优先级严格按 pi 的执行顺序（agent-session.prompt）：
+ *   扩展命令拦截 → /skill: → 模板展开
+ * 同名时前者赢，模板永远不会展开 —— 所以 prompt 必须排最后，否则菜单会展示
+ * 一条「点了没反应」的命令。Builtin 永远最高（输入框先拦截 compact/goal）。
  */
 export function mergeCommandEntries(
   cached: PiCommandEntry[] | undefined,
   hostExt: PiCommandEntry[] | undefined,
+  prompts?: PiCommandEntry[],
 ): PiCommandEntry[] {
   const merged = new Map<string, PiCommandEntry>();
   for (const cmd of BUILTIN_COMMANDS) merged.set(cmd.name, cmd);
@@ -31,6 +39,9 @@ export function mergeCommandEntries(
     if (!merged.has(cmd.name)) merged.set(cmd.name, cmd);
   }
   for (const cmd of hostExt ?? []) {
+    if (!merged.has(cmd.name)) merged.set(cmd.name, cmd);
+  }
+  for (const cmd of prompts ?? []) {
     if (!merged.has(cmd.name)) merged.set(cmd.name, cmd);
   }
   return [...merged.values()];

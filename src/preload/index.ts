@@ -42,6 +42,9 @@ import type {
   PiMarketSearchResultDto,
   PiMarketDetailDto,
   PiCommandListDto,
+  PromptCommandDto,
+  PromptCommandSaveInput,
+  PromptCommandSaveResult,
 } from "../shared/ipc-types";
 
 // Fan out one IPC listener to all active renderer subscribers.
@@ -227,6 +230,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
   piCommands: {
     list: (cwd?: string) =>
       ipcRenderer.invoke("commands.list", cwd) as Promise<PiCommandListDto>,
+  },
+
+  // ── 自定义命令（pi 提示词模板）─────────────────────────────────
+  promptCommands: {
+    get: (name: string) =>
+      ipcRenderer.invoke("prompts.get", name) as Promise<PromptCommandDto | null>,
+    save: (input: PromptCommandSaveInput, isCreate: boolean) =>
+      ipcRenderer.invoke(
+        "prompts.save",
+        input,
+        isCreate,
+      ) as Promise<PromptCommandSaveResult>,
+    delete: (name: string) =>
+      ipcRenderer.invoke("prompts.delete", name) as Promise<PromptCommandSaveResult>,
   },
 
   // Platform info
@@ -1337,9 +1354,19 @@ declare global {
           commands: Array<{
             name: string;
             description?: string;
-            source: "builtin" | "extension";
+            source: "builtin" | "extension" | "prompt";
+            displayName?: string;
+            editable?: boolean;
           }>;
         }>;
+      };
+      promptCommands: {
+        get: (name: string) => Promise<PromptCommandDto | null>;
+        save: (
+          input: PromptCommandSaveInput,
+          isCreate: boolean,
+        ) => Promise<PromptCommandSaveResult>;
+        delete: (name: string) => Promise<PromptCommandSaveResult>;
       };
       vault: {
         getSnapshot: () => Promise<VaultSnapshot>;

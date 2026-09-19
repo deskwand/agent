@@ -48,6 +48,14 @@ import {
 import { AgentRuntimeExtensionManager } from "./extensions/agent-runtime-extension-manager";
 import { PiExtensionHost } from "./extensions/pi-extension-host";
 import { mergeCommandEntries } from "./extensions/pi-command-registry";
+import {
+  deletePromptCommand,
+  promptCommandFilePath,
+  readPromptCommand,
+  savePromptCommand,
+  toPromptCommandEntries,
+} from "./prompts/prompt-command-store";
+import { validatePromptCommandName } from "../shared/prompt-command-name";
 import { PiTrustResolver } from "./extensions/pi-trust-resolver";
 import { ensureSubagentUsageReporting } from "./usage/subagent-usage-setting";
 import {
@@ -108,6 +116,7 @@ import type {
   ChannelInstanceConfig,
   ChannelInstanceLog,
   ChannelInstanceStatus,
+  PromptCommandSaveInput,
 } from "../shared/ipc-types";
 import { startNavServer, stopNavServer } from "./nav-server";
 import {
@@ -1585,14 +1594,100 @@ ipcMain.handle("commands.list", async (_e, cwd?: string) => {
       logWarn("[IPC] commands.list reload failed:", error);
     }
   }
+  const prompts = toPromptCommandEntries(
+    host
+      .getResourceLoader()
+      .getPrompts()
+      .prompts.map((tpl) => ({
+        name: tpl.name,
+        description: tpl.description,
+        filePath: tpl.filePath,
+        scope: tpl.sourceInfo.scope,
+      })),
+  );
   return {
     commands: mergeCommandEntries(
       undefined,
       host
         .getRegisteredCommands()
         .map((c) => ({ ...c, source: "extension" as const })),
+      prompts,
     ),
   };
+});
+
+/**
+ * 提示词模板写入后要重载**所有** host。
+ *
+ * `~/.pi/agent/prompts` 是全局目录，但 PiExtensionHost 按 `cwd|agentDir` 缓存，
+ * `getPrompts()` 读的是各 host 自己 loader 的缓存 —— 只 reload getPiHostForCwd()
+ * 的后果是「换个项目，刚建的命令在斜杠菜单里不出现」。
+ *
+ * 全量重载不会弄丢项目级资源：SDK 的 resource-loader.reload() 里明确写着
+ * `reload() preserves SettingsManager.projectTrusted and reloads settings for that trust state`，
+ * 且随后的 packageManager.resolve() 用这个信任状态门控项目级 extensions/skills/prompts。
+ * （即 pi-ext.install 的 reloadResources() 走的是同一条路径。）
+ */
+async function reloadAllPiHostsForPrompts(): Promise<void> {
+  for (const host of [...PiExtensionHost.registry.values()]) {
+    try {
+      await host.reloadResources();
+    } catch (error) {
+      logWarn("[IPC] prompts reload failed:", error);
+    }
+  }
+}
+
+/** 按各 host 自己的 cwd 广播；renderer 的 handler 按 payload.cwd === activeSessionCwd 过滤。 */
+function broadcastPromptsChanged(): void {
+  const cwds = new Set<string>();
+  for (const host of PiExtensionHost.registry.values()) cwds.add(host.cwd);
+  cwds.add(getPiHostForCwd().cwd);
+  for (const cwd of cwds) sendPiServerEvent("commands.changed", { cwd });
+}
+
+ipcMain.handle("prompts.get", (_event, name: string) => {
+  try {
+    // name 来自 renderer，先过名字校验再接路径 —— 否则 `../../x` 能穿越出 prompts 目录
+    // （save/delete 在 store 内部已经校验，这里是唯一漏掉的读路径）。
+    if (validatePromptCommandName(name)) return null;
+    return readPromptCommand(promptCommandFilePath(piAgentDir, name));
+  } catch (error) {
+    logError("[IPC] prompts.get failed:", error);
+    return null;
+  }
+});
+
+ipcMain.handle(
+  "prompts.save",
+  async (_event, input: PromptCommandSaveInput, isCreate: boolean) => {
+    try {
+      const result = savePromptCommand(piAgentDir, input, { isCreate });
+      if (!result.ok) return { ok: false, error: result.error };
+      await reloadAllPiHostsForPrompts();
+      // 使已缓存会话失效：下条消息重建 runner 与模板快照（同 pi-ext.install）
+      sessionManager?.invalidatePiPluginSessions();
+      broadcastPromptsChanged();
+      return { ok: true };
+    } catch (error) {
+      logError("[IPC] prompts.save failed:", error);
+      return { ok: false, error: "io" };
+    }
+  },
+);
+
+ipcMain.handle("prompts.delete", async (_event, name: string) => {
+  try {
+    const removed = deletePromptCommand(piAgentDir, name);
+    if (!removed) return { ok: false, error: "notFound" };
+    await reloadAllPiHostsForPrompts();
+    sessionManager?.invalidatePiPluginSessions();
+    broadcastPromptsChanged();
+    return { ok: true };
+  } catch (error) {
+    logError("[IPC] prompts.delete failed:", error);
+    return { ok: false, error: "io" };
+  }
 });
 
 // ── Pi Extension UI Bridge + TUI Modal（进程级单例）─────────────────

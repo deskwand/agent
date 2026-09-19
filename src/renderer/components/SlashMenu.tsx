@@ -1,9 +1,10 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { List, Package, Sparkles, Zap } from "lucide-react";
+import { FileText, List, Package, Sparkles, Zap } from "lucide-react";
 import type { Skill } from "../types";
 import type { SlashCommand, SlashItem } from "../slash-commands";
 import {
+  MENU_BADGE_CLASS,
   MENU_ITEM_CLASS,
   MENU_ITEM_DEFAULT_CLASS,
   MENU_ITEM_SELECTED_CLASS,
@@ -153,30 +154,36 @@ export function SlashMenu({
         ) : (
           displayItems.map((item, idx) => {
             if (item.category === "command") {
-              const isExtension = item.command.source === "extension";
+              const source = item.command.source;
               return (
                 <MenuItem
                   key={`cmd:${item.command.name}`}
                   index={idx}
                   selectedIndex={selectedIndex}
                   onSelect={() => onSelect(item)}
-                  label={item.command.name}
+                  label={item.command.displayName || item.command.name}
                   description={item.command.description}
                   icon={
-                    isExtension ? (
+                    source === "extension" ? (
                       <Package className="w-4 h-4 text-text-muted flex-shrink-0" />
+                    ) : source === "prompt" ? (
+                      <FileText className="w-4 h-4 text-text-muted flex-shrink-0" />
                     ) : (
                       <Zap className="w-4 h-4 text-accent flex-shrink-0" />
                     )
                   }
                   badge={
-                    isExtension ? (
+                    source === "extension" ? (
                       <span className={MENU_BADGE_CLASS}>
                         {t("slash.pluginCommand")}
                       </span>
+                    ) : source === "prompt" ? (
+                      <span className={MENU_BADGE_CLASS}>
+                        {t("skillMarket.sourceCustom")}
+                      </span>
                     ) : activeTab === "all" ? (
                       <span className={MENU_BADGE_CLASS}>
-                        {t("chat.slashTabCommands")}
+                        {t("skillMarket.sourceBuiltin")}
                       </span>
                     ) : undefined
                   }
@@ -261,27 +268,6 @@ function MenuItem({
     </button>
   );
 }
-
-/**
- * 菜单徽章：中性灰字，不带上色、不带给色底、不带图标。
- *
- * 三类徽章（内置命令「命令」/ 扩展「插件命令」/ 技能类型 builtin·mcp·custom·agent）
- * 必须是同一个元素形态：只有文字。来源分类（命令 / 插件命令 / 技能）由同一行的
- * 行图标承载（`zap` / `package` / `sparkles`）；技能类型只由这段文字承载。
- * 徽章里再塞一个类型图标会让三类徽章结构不一致 —— 那是上一次改动漏掉的另一半。
- *
- * 10px 字号下多色相的 `/10` 底在浅色主题里几乎不可辨，且 `warning`/`accent`
- * 在本项目别处另有「警告 / 主色」语义，继续上色会让同一个颜色表示两件事。
- * 原 `px-1.5 py-0.5 rounded` 里 `py-0.5` 与 `rounded` 在无底色时是空操作；
- * `gap-1` 只服务于已删除的类型图标 —— 一并去掉。`inline-flex items-center`
- * **保留**：本次只改"有没有子元素"，不动盒模型，避免把"统一"变成"重排"。
- *
- * 用 `text-text-secondary` 而不是 `text-text-muted`：后者在本仓 14 套主题变量下
- * 实测对比度只有 2.45–4.59:1，10px 小字达不到 AA 4.5:1；secondary 是 6.19–8.33:1。
- * 常量放在文件尾部是为了遵守 `AGENTS.md` §5 的提示词缓存约定（只在尾部追加）。
- */
-const MENU_BADGE_CLASS =
-  "inline-flex items-center text-[10px] text-text-secondary px-1.5";
 
 /**
  * 技能类型的展示文案。

@@ -135,7 +135,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isDragging, setIsDragging] = useState(false);
     const openLightbox = useAppStore((s) => s.openLightbox);
     /** 扩展命令名集合：判断行首的 /word 要不要渲染成命令 token（内置命令由解析器自带）。 */
-    const knownCommandNames = useAppStore((s) => s.knownCommandNames);
+    const commandLabels = useAppStore((s) => s.commandLabels);
     const closeLightbox = useAppStore((s) => s.closeLightbox);
     const lightboxSource = useAppStore((s) => s.lightboxSource);
 
@@ -203,10 +203,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
      */
     const writeEditorText = useCallback(
       (text: string) => {
-        setEditorFromText(editorRef.current, text, knownCommandNames);
+        setEditorFromText(editorRef.current, text, commandLabels);
         setPrompt(text);
       },
-      [knownCommandNames],
+      [commandLabels],
     );
 
     useEffect(() => {
@@ -246,9 +246,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           .then((dto) => {
             if (!disposed) {
               setExtensionCommands(toSlashCommands(dto.commands));
-              useAppStore
-                .getState()
-                .setKnownCommandNames(new Set(dto.commands.map((c) => c.name)));
+              useAppStore.getState().setCommandLabels(
+                new Map(
+                  dto.commands.map((c) => [c.name, c.displayName || `/${c.name}`]),
+                ),
+              );
             }
           })
           .catch(() => {});

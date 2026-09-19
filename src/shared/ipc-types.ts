@@ -8,6 +8,8 @@
  *    the originating module lives in `main/` (not importable from renderer/preload).
  */
 
+import type { PromptCommandNameError } from "./prompt-command-name";
+
 // ---------------------------------------------------------------------------
 // MCP
 // ---------------------------------------------------------------------------
@@ -278,12 +280,45 @@ export interface PiTuiFrameEvent {
   chunk: string;
 }
 
-/** 统一命令注册表条目（内置或扩展来源，镜像 PiCommandEntry）。 */
+/** 统一命令注册表条目（内置 / 扩展 / 提示词模板，镜像 PiCommandEntry）。 */
 export interface PiCommandDto {
   name: string;
   description?: string;
-  source: "builtin" | "extension";
+  source: "builtin" | "extension" | "prompt";
+  /** 提示词模板的显示名（frontmatter display_name）；仅 source === "prompt" 可能有 */
+  displayName?: string;
+  /** 提示词模板位于全局 ~/.pi/agent/prompts —— 可在「+」菜单里编辑/删除 */
+  editable?: boolean;
 }
+
+/** 自定义命令的完整内容（编辑表单回填）。 */
+export interface PromptCommandDto {
+  name: string;
+  displayName?: string;
+  content: string;
+}
+
+/** `prompts.save` 的入参。没有任何「描述」字段 —— 表单不管它（见设计文档 §4.5）。 */
+export interface PromptCommandSaveInput {
+  name: string;
+  displayName?: string;
+  content: string;
+}
+
+/**
+ * `prompts.save` / `prompts.delete` 的返回。
+ * error 是校验失败原因或 "io" / "notFound"，renderer 侧映射成文案。
+ * 联合类型放这里（而不是在 renderer 里 as 回去）—— main 的 handler、renderer 的表单共用同一份。
+ */
+export type PromptCommandSaveError =
+  | PromptCommandNameError
+  | "exists"
+  | "io"
+  | "notFound";
+
+export type PromptCommandSaveResult =
+  | { ok: true }
+  | { ok: false; error: PromptCommandSaveError };
 
 /** `commands.list` 的返回结构。 */
 export interface PiCommandListDto {

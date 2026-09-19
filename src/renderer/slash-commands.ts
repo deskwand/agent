@@ -5,8 +5,10 @@ export interface SlashCommand {
   name: string;
   label: string;
   description: string;
-  action: "compact" | "goal" | "extension";
-  source: "builtin" | "extension";
+  action: "compact" | "goal" | "extension" | "prompt";
+  source: "builtin" | "extension" | "prompt";
+  /** 自定义命令的显示名（frontmatter display_name）；菜单行与 chip 优先用它 */
+  displayName?: string;
 }
 
 export type SlashItem =
@@ -33,32 +35,43 @@ export function getBuiltinCommands(t: (key: string) => string): SlashCommand[] {
 }
 
 /**
- * Filter commands by exact name prefix. Commands are matched on the command
- * name only — unlike skills (substring match), a command must start with the
- * filter so a plugin command like `/plan` wins over a skill that merely
- * contains "plan" later in its name.
+ * Filter commands by exact name prefix, or by a substring of the display name.
+ *
+ * slug 仍走前缀匹配（插件命令 `/plan` 要赢过名字里带 plan 的技能）；
+ * 显示名只在有 displayName 时参与**子串**匹配 —— 中文显示名不可能用前缀打出来。
  */
 export function filterCommands(
   commands: SlashCommand[],
   filter: string,
 ): SlashCommand[] {
-  const normalized = filter.toLowerCase();
-  return commands.filter((c) => c.name.toLowerCase().startsWith(normalized));
+  const normalized = filter.trim().toLowerCase();
+  if (!normalized) return commands;
+  return commands.filter(
+    (c) =>
+      c.name.toLowerCase().startsWith(normalized) ||
+      (c.displayName ?? "").toLowerCase().includes(normalized),
+  );
 }
 
 /** Map unified command registry entries (PiCommandDto) to slash commands. */
 export function toSlashCommands(piCommands: PiCommandDto[]): SlashCommand[] {
   return piCommands.map((c) => ({
     name: c.name,
+    // `label` 全仓没有任何消费者（SlashMenu 渲染的是 displayName || name，
+    // 而 getBuiltinCommands 里那个 label 也一直是死数据）。这里保持原样，
+    // 不顺手改成显示名 —— 那是一个运行时零效果的改动。
     label: c.name,
     description: c.description ?? "",
     action:
       c.source === "extension"
         ? "extension"
-        : c.name === "compact"
-          ? "compact"
-          : "goal",
+        : c.source === "prompt"
+          ? "prompt"
+          : c.name === "compact"
+            ? "compact"
+            : "goal",
     source: c.source,
+    displayName: c.displayName,
   }));
 }
 

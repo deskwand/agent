@@ -18,8 +18,8 @@ export function UserTextWithTokens({
   resolveFilePath,
   onFileClick,
 }: UserTextWithTokensProps) {
-  const knownCommands = useAppStore((s) => s.knownCommandNames);
-  const token = resolveLeadingToken(text, knownCommands);
+  const commandLabels = useAppStore((s) => s.commandLabels);
+  const token = resolveLeadingToken(text, commandLabels);
   const rest = token ? text.slice(token.raw.length) : text;
   const parts = splitTextByFileMentions(rest);
 
@@ -28,7 +28,8 @@ export function UserTextWithTokens({
       {token ? (
         <ReferenceToken
           kind={token.kind}
-          label={token.kind === "skill" ? token.name : token.raw}
+          label={token.label}
+          tooltip={token.kind === "command" ? token.raw : undefined}
         />
       ) : null}
       {parts.map((part, index) =>

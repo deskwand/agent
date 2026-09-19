@@ -34,6 +34,8 @@ export interface ChatInputBottomBarProps {
   onAttachMenuDismiss?: () => void;
   /** 命令入口：原样透传给 AttachMenu；缺省 = 本宿主没有命令能力（欢迎页） */
   onCommandEntry?: (command: "compact" | "goal") => void;
+  /** 自定义命令入口：宿主把 chip 插进输入框。缺省 = 本宿主不支持自定义命令 */
+  onInsertPromptCommand?: (name: string) => void;
   model: string;
   modelOptions: ModelOptionGroup[];
   activeProviderProfileKey: ProviderProfileKey;
@@ -66,6 +68,7 @@ export function ChatInputBottomBar({
   attachMenuDirection,
   onAttachMenuDismiss,
   onCommandEntry,
+  onInsertPromptCommand,
   model,
   modelOptions,
   activeProviderProfileKey,
@@ -104,6 +107,7 @@ export function ChatInputBottomBar({
           direction={attachMenuDirection}
           onDismiss={onAttachMenuDismiss}
           onCommandEntry={onCommandEntry}
+          onInsertPromptCommand={onInsertPromptCommand}
         />
 
         {onToggleExpand && showExpandButton && (

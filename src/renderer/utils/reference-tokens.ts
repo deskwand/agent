@@ -14,9 +14,15 @@ export type ReferenceTokenSegment = {
   name: string;
   /** 原文片段，用于序列化回纯文本与计算剩余文本 */
   raw: string;
+  /**
+   * 显示文本。技能 = 纯名字；命令 = 显示名（frontmatter display_name），
+   * 没有显示名时**回退到 raw**（含斜杠）—— 回退成 name 会让所有内置/扩展命令的
+   * chip 从 `/compact` 变成 `compact`，那是回归。
+   */
+  label: string;
 };
 
-/** 内置命令。扩展命令（插件命令）由调用方通过 extraCommands 传入。 */
+/** 内置命令。扩展命令与自定义命令由调用方通过 commandLabels 传入。 */
 export const BUILTIN_COMMAND_NAMES: ReadonlySet<string> = new Set([
   "compact",
   "goal",
@@ -33,22 +39,23 @@ const COMMAND_PATTERN = /^\/(\S+)/;
  */
 export function resolveLeadingToken(
   text: string,
-  extraCommands: ReadonlySet<string> = new Set<string>(),
+  commandLabels: ReadonlyMap<string, string> = new Map<string, string>(),
 ): ReferenceTokenSegment | null {
   if (text.startsWith("/skill:")) {
     const match = SKILL_PATTERN.exec(text);
     if (!match) return null;
-    return { kind: "skill", name: match[1], raw: match[0] };
+    return { kind: "skill", name: match[1], raw: match[0], label: match[1] };
   }
 
   if (text.startsWith("/")) {
     const match = COMMAND_PATTERN.exec(text);
     if (!match) return null;
     const name = match[1];
-    if (!BUILTIN_COMMAND_NAMES.has(name) && !extraCommands.has(name)) {
+    const label = commandLabels.get(name);
+    if (!BUILTIN_COMMAND_NAMES.has(name) && label === undefined) {
       return null;
     }
-    return { kind: "command", name, raw: match[0] };
+    return { kind: "command", name, raw: match[0], label: label ?? match[0] };
   }
 
   return null;

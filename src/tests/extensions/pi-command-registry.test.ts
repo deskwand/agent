@@ -48,6 +48,34 @@ describe("mergeCommandEntries", () => {
   it("BUILTIN_COMMANDS is compact/goal", () => {
     expect(BUILTIN_COMMANDS.map((c) => c.name)).toEqual(["compact", "goal"]);
   });
+
+  it("prompts 排在 extension 之后（同名时扩展命令赢，与 pi 的执行顺序一致）", () => {
+    const hostExt: PiCommandEntry[] = [{ name: "plan", source: "extension" }];
+    const prompts: PiCommandEntry[] = [
+      { name: "plan", source: "prompt", displayName: "计划" },
+      { name: "translate", source: "prompt", displayName: "翻译成英文", editable: true },
+    ];
+    const merged = mergeCommandEntries(undefined, hostExt, prompts);
+    expect(merged.map((c) => c.name)).toEqual(["compact", "goal", "plan", "translate"]);
+    // 同名的那条必须还是扩展命令 —— 若 prompt 排在前面，菜单会展示一条
+    // 「点了没反应」的命令（pi 先跑扩展命令拦截，模板永远不会被展开）
+    expect(merged.find((c) => c.name === "plan")?.source).toBe("extension");
+    expect(merged.find((c) => c.name === "translate")?.displayName).toBe("翻译成英文");
+  });
+
+  it("prompts 与 builtin 同名时 builtin 赢", () => {
+    const prompts: PiCommandEntry[] = [{ name: "compact", source: "prompt" }];
+    const merged = mergeCommandEntries(undefined, undefined, prompts);
+    expect(merged.find((c) => c.name === "compact")?.source).toBe("builtin");
+    expect(merged).toHaveLength(2);
+  });
+
+  it("不传 prompts 时行为与从前一致", () => {
+    const merged = mergeCommandEntries(undefined, [
+      { name: "plan", source: "extension" },
+    ]);
+    expect(merged.map((c) => c.name)).toEqual(["compact", "goal", "plan"]);
+  });
 });
 
 describe("isExtensionCommand", () => {

@@ -1882,6 +1882,9 @@ export function ChatView() {
                   }
                   chatInputRef.current?.insertCommandChip("goal");
                 }}
+                onInsertPromptCommand={(name) =>
+                  chatInputRef.current?.insertCommandChip(name)
+                }
                 model={activeModel}
                 modelOptions={modelOptions}
                 activeProviderProfileKey={activeProviderProfileKey}

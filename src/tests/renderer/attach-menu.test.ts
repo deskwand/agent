@@ -326,7 +326,9 @@ describe("AttachMenu", () => {
 
   it("renders the command group when the host can run commands", async () => {
     await openMenu({ onCommandEntry: vi.fn() });
-    expect(container.querySelectorAll("[role='menuitem']").length).toBe(5);
+    // 3 个附件项 + 组标题的「＋」+ 压缩会话 + 目标执行 = 6
+    // （这个文件没 stub promptCommands，所以不会有自定义命令行）
+    expect(container.querySelectorAll("[role='menuitem']").length).toBe(6);
     expect(item("slash.compact")).toBeDefined();
     expect(item("slash.goal")).toBeDefined();
     expect(container.querySelector("[role='menu']")?.textContent).toContain(
@@ -349,6 +351,14 @@ describe("AttachMenu", () => {
     keyDown(item("attachMenu.localFile"), "ArrowDown");
     keyDown(item("attachMenu.workspace"), "ArrowDown");
     keyDown(item("attachMenu.vault"), "ArrowDown");
+    // 组标题的「＋」也在焦点环里，是密库之后的第一站
+    expect(document.activeElement).toBe(
+      container.querySelector("[data-command-create]"),
+    );
+    keyDown(
+      container.querySelector("[data-command-create]") as HTMLElement,
+      "ArrowDown",
+    );
     expect(document.activeElement).toBe(item("slash.compact"));
     keyDown(item("slash.compact"), "ArrowDown");
     expect(document.activeElement).toBe(item("slash.goal"));

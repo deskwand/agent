@@ -43,3 +43,19 @@ export const MENU_LABEL_CLASS = "px-2.5 py-1 text-xs text-text-muted";
 
 /** 分隔线 */
 export const MENU_SEPARATOR_CLASS = "mx-2 my-1 border-t border-border-subtle";
+
+/**
+ * 菜单徽章：中性灰字，不带上色、不带给色底、不带图标。
+ *
+ * 四类徽章（内置命令「内置」/ 扩展「插件」/ 提示词模板「自定义」/ 技能类型
+ * builtin·mcp·custom·agent）必须是同一个元素形态：只有文字。来源分类由同一行的
+ * 行图标承载（`zap` / `package` / `file-text` / `sparkles`）；技能类型只由这段文字承载。
+ * 徽章里再塞一个类型图标会让各类徽章结构不一致 —— 那是上一次改动漏掉的另一半。
+ *
+ * 10px 字号下多色相的 `/10` 底在浅色主题里几乎不可辨，且 `warning`/`accent`
+ * 在本项目别处另有「警告 / 主色」语义，继续上色会让同一个颜色表示两件事。
+ * 用 `text-text-secondary` 而不是 `text-text-muted`：后者在本仓 14 套主题变量下
+ * 实测对比度只有 2.45–4.59:1，10px 小字达不到 AA 4.5:1；secondary 是 6.19–8.33:1。
+ */
+export const MENU_BADGE_CLASS =
+  "inline-flex items-center text-[10px] text-text-secondary px-1.5";

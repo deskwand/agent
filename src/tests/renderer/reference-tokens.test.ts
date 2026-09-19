@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { resolveLeadingToken } from "../../renderer/utils/reference-tokens";
 
-const NO_COMMANDS = new Set<string>();
-const WITH_PLAN = new Set(["plan"]);
+const NO_COMMANDS = new Map<string, string>();
+const WITH_PLAN = new Map([["plan", "/plan"]]);
 
 describe("resolveLeadingToken", () => {
   it("行首技能命中，name 不含 /skill: 前缀", () => {
@@ -15,6 +15,7 @@ describe("resolveLeadingToken", () => {
       kind: "skill",
       name: "apple-design",
       raw: "/skill:apple-design",
+      label: "apple-design",
     });
   });
 
@@ -32,6 +33,7 @@ describe("resolveLeadingToken", () => {
       kind: "skill",
       name: "apple-design",
       raw: "/skill:apple-design",
+      label: "apple-design",
     });
   });
 
@@ -49,15 +51,18 @@ describe("resolveLeadingToken", () => {
   });
 
   it("命令必须命中集合：内置与扩展命令名都算", () => {
+    // 内置命令：没有显示名时 label 回退成含斜杠的原文
     expect(resolveLeadingToken("/compact", NO_COMMANDS)).toEqual({
       kind: "command",
       name: "compact",
       raw: "/compact",
+      label: "/compact",
     });
     expect(resolveLeadingToken("/plan 做一遍", WITH_PLAN)).toEqual({
       kind: "command",
       name: "plan",
       raw: "/plan",
+      label: "/plan",
     });
     // 集合里没有就不是命令 —— 退化为纯文本，不误判
     expect(resolveLeadingToken("/plan 做一遍", NO_COMMANDS)).toBeNull();
@@ -65,7 +70,7 @@ describe("resolveLeadingToken", () => {
 
   it("技能前缀优先于命令分支", () => {
     expect(
-      resolveLeadingToken("/skill:foo", new Set(["skill:foo"]))?.kind,
+      resolveLeadingToken("/skill:foo", new Map([["skill:foo", "/skill:foo"]]))?.kind,
     ).toBe("skill");
   });
 
@@ -79,5 +84,14 @@ describe("resolveLeadingToken", () => {
     expect(resolveLeadingToken("", NO_COMMANDS)).toBeNull();
     expect(resolveLeadingToken("/skill:", NO_COMMANDS)).toBeNull();
     expect(resolveLeadingToken("/", NO_COMMANDS)).toBeNull();
+  });
+});
+
+describe("resolveLeadingToken · 显示名", () => {
+  it("有显示名时 label 用显示名，raw 保持 /slug", () => {
+    const labels = new Map([["translate", "翻译成英文"]]);
+    const token = resolveLeadingToken("/translate 这段话", labels);
+    expect(token?.label).toBe("翻译成英文");
+    expect(token?.raw).toBe("/translate");
   });
 });

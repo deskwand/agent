@@ -107,9 +107,30 @@ describe("底栏到命令入口的接线", () => {
     await act(async () => {
       attachTrigger().click();
     });
-    expect(container.querySelectorAll("[role='menuitem']").length).toBe(5);
+    // 3 个附件项 + 「＋」+ 2 个内置命令（本文件没 stub promptCommands）
+    expect(container.querySelectorAll("[role='menuitem']").length).toBe(6);
 
     act(() => menuItem("slash.goal").click());
     expect(onCommandEntry).toHaveBeenCalledWith("goal");
+  });
+
+  it("透传 onInsertPromptCommand：欢迎页也能建命令", async () => {
+    const onInsertPromptCommand = vi.fn();
+    render({ onInsertPromptCommand });
+    await act(async () => {
+      attachTrigger().click();
+    });
+    // 没有 onCommandEntry（欢迎页形态）时命令组也要出现，因为「＋」在里面；
+    // 内置两项不渲染，所以 menuitem = 3 个附件项 + 「＋」= 4。
+    expect(container.querySelector("[data-command-create]")).not.toBeNull();
+    expect(container.querySelectorAll("[role='menuitem']").length).toBe(4);
+  });
+
+  it("两个能力都不传时命令组不渲染（守住欢迎页旧行为）", async () => {
+    render();
+    await act(async () => {
+      attachTrigger().click();
+    });
+    expect(container.querySelector("[data-command-create]")).toBeNull();
   });
 });

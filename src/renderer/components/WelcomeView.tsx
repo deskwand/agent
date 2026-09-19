@@ -290,6 +290,9 @@ export function WelcomeView() {
               onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
               attachedKeys={attachedKeys}
               onAttachMenuDismiss={() => chatInputRef.current?.focus()}
+              onInsertPromptCommand={(name) =>
+                chatInputRef.current?.insertCommandChip(name)
+              }
               attachMenuDirection="down"
               model={selectedModel}
               modelOptions={modelOptions}

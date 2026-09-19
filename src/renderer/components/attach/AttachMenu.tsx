@@ -1,11 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Archive, FolderOpen, Lock, Plus, Target, Upload } from "lucide-react";
+import {
+  Archive,
+  FileText,
+  FolderOpen,
+  Lock,
+  Pencil,
+  Plus,
+  Target,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { Tooltip } from "../Tooltip";
 import { useAppStore } from "../../store";
 import type { VaultSnapshot } from "../../../shared/vault";
+import type { PromptCommandSaveError } from "../../../shared/ipc-types";
 import type { ChatInputAttachedFile } from "../ChatInput";
 import {
+  MENU_BADGE_CLASS,
   MENU_ITEM_CLASS,
   MENU_ITEM_DEFAULT_CLASS,
   MENU_ITEM_DISABLED_CLASS,
@@ -13,8 +25,13 @@ import {
   MENU_PANEL_PADDED_CLASS,
   MENU_SEPARATOR_CLASS,
 } from "../menu-styles";
+import { ConfirmDialog } from "../ConfirmDialog";
 import { AttachPickerModal } from "./AttachPickerModal";
 import { AttachPickerPanel } from "./AttachPickerPanel";
+import {
+  PromptCommandFormModal,
+  type PromptCommandFormValue,
+} from "./PromptCommandFormModal";
 import {
   mapVaultSnapshotItems,
   mapWorkspaceScan,
@@ -40,10 +57,28 @@ export interface AttachMenuProps {
   onDismiss?: () => void;
   /**
    * 命令入口：compact 立即执行；goal 插入命令 chip（落点由宿主决定）。
-   * 缺省 = 本宿主没有命令能力（欢迎页），整组命令不渲染。
+   * 缺省 = 本宿主没有命令能力（欢迎页），内置两项不渲染。
    */
   onCommandEntry?: (command: "compact" | "goal") => void;
+  /**
+   * 自定义命令入口：宿主把 /名字 chip 插进输入框。
+   * 它与 onCommandEntry 共同决定「本宿主有没有命令能力」—— 两个都不传时
+   * 「命令」组整组不渲染（欢迎页旧行为由 attach-menu.test.ts 锁着）。
+   */
+  onInsertPromptCommand?: (name: string) => void;
 }
+
+/**
+ * 「命令」组里的一行。显示名来自模板 frontmatter 的 display_name；
+ * 列表只收 source === "prompt" && editable（自己写的）那些。
+ */
+interface PromptRow {
+  name: string;
+  displayName?: string;
+}
+
+/** 自定义命令行：行内按钮与整行按钮之间的间距（整行按钮自带 px-2.5）。 */
+const PROMPT_ROW_GAP_CLASS = "gap-0.5";
 
 export function AttachMenu({
   cwd,
@@ -53,6 +88,7 @@ export function AttachMenu({
   direction = "up",
   onDismiss,
   onCommandEntry,
+  onInsertPromptCommand,
 }: AttachMenuProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -66,6 +102,15 @@ export function AttachMenu({
   // 弹窗的选择状态：弹窗外壳要用它渲染计数与「添加」的禁用态，
   // 所以由这里（数据和确认动作的拥有者）持有，面板只是受控渲染。
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [promptRows, setPromptRows] = useState<PromptRow[]>([]);
+  const [promptRowsFailed, setPromptRowsFailed] = useState(false);
+  const [formInitial, setFormInitial] = useState<PromptCommandFormValue | null>(null);
+  const [formIsCreate, setFormIsCreate] = useState(true);
+  const [formSaving, setFormSaving] = useState(false);
+  const [formNameError, setFormNameError] = useState<PromptCommandSaveError | null>(
+    null,
+  );
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
@@ -95,6 +140,30 @@ export function AttachMenu({
     }
   }, [cwd]);
 
+  /**
+   * 命令列表与斜杠菜单同源（commands.list）。这里只取自己写的那些：
+   * source === "prompt" && editable —— 项目级 / 插件包带来的模板不在「+」里出现，
+   * 因为那不是「我的命令」，也不该从这里删。
+   */
+  const loadPromptCommands = useCallback(async () => {
+    if (!onInsertPromptCommand || !window.electronAPI?.piCommands?.list) {
+      setPromptRows([]);
+      return;
+    }
+    try {
+      const dto = await window.electronAPI.piCommands.list(cwd);
+      setPromptRows(
+        dto.commands
+          .filter((cmd) => cmd.source === "prompt" && cmd.editable)
+          .map((cmd) => ({ name: cmd.name, displayName: cmd.displayName })),
+      );
+      setPromptRowsFailed(false);
+    } catch {
+      setPromptRows([]);
+      setPromptRowsFailed(true);
+    }
+  }, [cwd, onInsertPromptCommand]);
+
   // 快照只在菜单打开时拉一次：输入框常驻挂载时不做任何密库请求。
   const openMenu = () => {
     setOpen(true);
@@ -102,6 +171,7 @@ export function AttachMenu({
     // 唯一的重置点：弹窗没有「返回菜单」，换来源必然走「关掉 → 再点 +」。
     setSelectedIds([]);
     void loadVaultSnapshot();
+    void loadPromptCommands();
   };
 
   const close = useCallback(() => {
@@ -123,10 +193,84 @@ export function AttachMenu({
     closeAndFocusComposer();
   };
 
+  const runPromptEntry = (name: string) => {
+    // 顺序不变量同上：先插 chip，再关菜单交回焦点。
+    onInsertPromptCommand?.(name);
+    closeAndFocusComposer();
+  };
+
+  const openCreateForm = () => {
+    setFormNameError(null);
+    setFormIsCreate(true);
+    setFormInitial({ name: "", displayName: "", content: "" });
+  };
+
+  /**
+   * 编辑要读正文，所以走 prompts.get（列表里不带 content）。
+   * 读不到（文件在别处被删了）就不开表单 —— 开个空表单再保存等于新建，
+   * 那是用户没要求的行为。
+   */
+  const openEditForm = async (name: string) => {
+    const dto = await window.electronAPI?.promptCommands?.get(name);
+    if (!dto) {
+      setPromptRowsFailed(true);
+      return;
+    }
+    setFormNameError(null);
+    setFormIsCreate(false);
+    setFormInitial({
+      name: dto.name,
+      displayName: dto.displayName ?? "",
+      content: dto.content ?? "",
+    });
+  };
+
+  const submitForm = async (value: PromptCommandFormValue) => {
+    setFormSaving(true);
+    try {
+      const result = await window.electronAPI?.promptCommands?.save(
+        {
+          name: value.name.trim(),
+          displayName: value.displayName.trim() || undefined,
+          content: value.content,
+        },
+        formIsCreate,
+      );
+      if (result && !result.ok) {
+        setFormNameError(result.error);
+        return;
+      }
+      setFormInitial(null);
+      await loadPromptCommands();
+      // 斜杠菜单与 chip 由 main 写盘后广播的 commands.changed 刷新
+    } finally {
+      setFormSaving(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    const name = pendingDelete;
+    setPendingDelete(null);
+    if (!name) return;
+    const result = await window.electronAPI?.promptCommands?.delete(name);
+    if (result && !result.ok) {
+      useAppStore.getState().setGlobalNotice({
+        id: `prompt-delete-failed-${Date.now()}`,
+        type: "warning",
+        message: t("chat.commandDeleteFailed"),
+      });
+      return;
+    }
+    await loadPromptCommands();
+  };
+
   useEffect(() => {
-    // 只在菜单层生效：选择器弹窗是 portal 到 document.body 的，天然在 rootRef
-    // 之外，不加这道守卫的话「在弹窗里点第一下」就会把 open 置回 false。
-    if (!open || view !== "menu") return;
+    // 只在菜单层生效：选择器弹窗与表单弹窗都是 portal 到 document.body 的，
+    // 天然在 rootRef 之外，不加这道守卫的话「在弹窗里点第一下」就会把 open 置回 false。
+    // 表单弹窗的 view 仍是 "menu"，所以还得额外看 formInitial —— 否则在表单里
+    // 敲字/点输入框都会把「+」菜单关掉，保存后就回不到命令组（设计文档 §4.5
+    // 要求保存后菜单不关，方便连续建几条）。
+    if (!open || view !== "menu" || formInitial !== null) return;
     function handleClick(event: MouseEvent) {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
         close();
@@ -134,7 +278,7 @@ export function AttachMenu({
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, [open, view, close]);
+  }, [open, view, close, formInitial]);
 
   // 菜单项可访问名：置灰时说明原因，可用时就是动作名。
   const vaultDisabledReason = vaultError
@@ -355,38 +499,126 @@ export function AttachMenu({
               )}
             </button>
 
-            {onCommandEntry && (
+            {(onCommandEntry || onInsertPromptCommand) && (
               <>
                 <div className={MENU_SEPARATOR_CLASS} />
-                <div className={MENU_LABEL_CLASS}>
-                  {t("chat.slashCommands")}
+                <div className="flex items-center justify-between pr-1">
+                  <div className={MENU_LABEL_CLASS}>
+                    {t("chat.slashCommands")}
+                  </div>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-command-create
+                    aria-label={t("chat.newCommand")}
+                    ref={(element) => {
+                      itemRefs.current[3] = element;
+                    }}
+                    onClick={openCreateForm}
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
                 </div>
 
-                <button
-                  type="button"
-                  role="menuitem"
-                  ref={(element) => {
-                    itemRefs.current[3] = element;
-                  }}
-                  onClick={() => runCommandEntry("compact")}
-                  className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-                >
-                  <Archive className="h-4 w-4 shrink-0 text-text-muted" />
-                  {t("slash.compact")}
-                </button>
+                {onCommandEntry && (
+                  <>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      ref={(element) => {
+                        itemRefs.current[4] = element;
+                      }}
+                      onClick={() => runCommandEntry("compact")}
+                      className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
+                    >
+                      <Archive className="h-4 w-4 shrink-0 text-text-muted" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {t("slash.compact")}
+                      </span>
+                      <span className={MENU_BADGE_CLASS}>
+                        {t("skillMarket.sourceBuiltin")}
+                      </span>
+                    </button>
 
-                <button
-                  type="button"
-                  role="menuitem"
-                  ref={(element) => {
-                    itemRefs.current[4] = element;
-                  }}
-                  onClick={() => runCommandEntry("goal")}
-                  className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-                >
-                  <Target className="h-4 w-4 shrink-0 text-text-muted" />
-                  {t("slash.goal")}
-                </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      ref={(element) => {
+                        itemRefs.current[5] = element;
+                      }}
+                      onClick={() => runCommandEntry("goal")}
+                      className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
+                    >
+                      <Target className="h-4 w-4 shrink-0 text-text-muted" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {t("slash.goal")}
+                      </span>
+                      <span className={MENU_BADGE_CLASS}>
+                        {t("skillMarket.sourceBuiltin")}
+                      </span>
+                    </button>
+                  </>
+                )}
+
+                {promptRows.map((row, index) => (
+                  <div
+                    key={row.name}
+                    className={`group flex items-center ${PROMPT_ROW_GAP_CLASS}`}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      ref={(element) => {
+                        itemRefs.current[6 + index] = element;
+                      }}
+                      onClick={() => runPromptEntry(row.name)}
+                      className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS} min-w-0 flex-1`}
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-text-muted" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {row.displayName || row.name}
+                      </span>
+                      <span className={`${MENU_BADGE_CLASS} group-hover:hidden`}>
+                        {t("skillMarket.sourceCustom")}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      data-command-edit={row.name}
+                      aria-label={t("common.edit")}
+                      onClick={() => void openEditForm(row.name)}
+                      className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-primary group-hover:flex group-focus-within:flex"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      data-command-delete={row.name}
+                      aria-label={t("common.delete")}
+                      onClick={() => setPendingDelete(row.name)}
+                      className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex group-focus-within:flex"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+
+                {promptRowsFailed && (
+                  <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-text-muted">
+                    <span className="min-w-0 flex-1 truncate">
+                      {t("chat.commandLoadFailed")}
+                    </span>
+                    <button
+                      type="button"
+                      data-command-retry
+                      onClick={() => void loadPromptCommands()}
+                      className="shrink-0 underline"
+                    >
+                      {t("chat.commandRetry")}
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </>
@@ -454,6 +686,24 @@ export function AttachMenu({
           />
         </AttachPickerModal>
       )}
+
+      {formInitial && (
+        <PromptCommandFormModal
+          mode={formIsCreate ? "create" : "edit"}
+          initial={formInitial}
+          nameError={formNameError}
+          saving={formSaving}
+          onSave={(value) => void submitForm(value)}
+          onClose={() => setFormInitial(null)}
+        />
+      )}
+
+      <ConfirmDialog
+        isOpen={pendingDelete !== null}
+        title={t("chat.commandDeleteConfirm", { name: pendingDelete ?? "" })}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

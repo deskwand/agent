@@ -41,15 +41,16 @@ export function createReferenceTokenElement(
   segment: ReferenceTokenSegment,
 ): HTMLElement {
   const kind: ReferenceTokenKind = segment.kind;
-  const label = segment.kind === "skill" ? segment.name : segment.raw;
   const el = document.createElement("span");
   el.setAttribute("contenteditable", "false");
   el.setAttribute(TOKEN_RAW_ATTR, segment.raw);
+  // 命令的 chip 可能显示的是 display_name（「翻译成英文」），悬停给回要输入的原样
+  if (segment.kind === "command") el.setAttribute("title", segment.raw);
   el.setAttribute("class", TOKEN_CLASS);
   el.innerHTML =
     `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ` +
     `stroke-linecap="round" stroke-linejoin="round" class="reference-token-icon mr-1 h-3.5 w-3.5" aria-hidden="true">` +
-    `${REFERENCE_TOKEN_ICON_MARKUP[kind]}</svg><span>${escapeHtml(label)}</span>`;
+    `${REFERENCE_TOKEN_ICON_MARKUP[kind]}</svg><span>${escapeHtml(segment.label)}</span>`;
   return el;
 }
 
@@ -77,13 +78,13 @@ export function serializeEditor(root: HTMLElement | null): string {
 export function setEditorFromText(
   root: HTMLElement | null,
   text: string,
-  extraCommands: ReadonlySet<string> = new Set<string>(),
+  commandLabels: ReadonlyMap<string, string> = new Map<string, string>(),
 ): void {
   if (!root) return;
   root.textContent = "";
   if (!text) return;
 
-  const token = resolveLeadingToken(text, extraCommands);
+  const token = resolveLeadingToken(text, commandLabels);
   if (!token) {
     root.appendChild(document.createTextNode(text));
     return;

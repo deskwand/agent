@@ -17,7 +17,7 @@ let root: Root;
 
 beforeEach(() => {
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-  useAppStore.getState().setKnownCommandNames(new Set(["plan"]));
+  useAppStore.getState().setCommandLabels(new Map([["plan", "/plan"]]));
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -26,7 +26,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
-  useAppStore.getState().setKnownCommandNames(new Set());
+  useAppStore.getState().setCommandLabels(new Map());
 });
 
 function render(text: string) {

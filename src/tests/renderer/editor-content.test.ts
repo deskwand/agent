@@ -30,6 +30,7 @@ describe("createReferenceTokenElement", () => {
       kind: "skill",
       name: "apple-design",
       raw: "/skill:apple-design",
+      label: "apple-design",
     });
     expect(el.getAttribute("contenteditable")).toBe("false");
     expect(el.getAttribute(TOKEN_RAW_ATTR)).toBe("/skill:apple-design");
@@ -43,8 +44,21 @@ describe("createReferenceTokenElement", () => {
       kind: "command",
       name: "compact",
       raw: "/compact",
+      label: "/compact",
     });
     expect(el.textContent).toBe("/compact");
+  });
+
+  it("命令 token 有显示名时显示显示名，data-raw 仍是 /slug", () => {
+    const el = createReferenceTokenElement({
+      kind: "command",
+      name: "translate",
+      raw: "/translate",
+      label: "翻译成英文",
+    });
+    expect(el.textContent).toBe("翻译成英文");
+    expect(el.getAttribute(TOKEN_RAW_ATTR)).toBe("/translate");
+    expect(el.getAttribute("title")).toBe("/translate");
   });
 
   it("名字里的尖括号被转义，不会注入标签", () => {
@@ -52,6 +66,7 @@ describe("createReferenceTokenElement", () => {
       kind: "skill",
       name: "<img src=x>",
       raw: "/skill:<img src=x>",
+      label: "<img src=x>",
     });
     expect(el.querySelector("img")).toBeNull();
     expect(el.textContent).toBe("<img src=x>");
@@ -66,6 +81,7 @@ describe("serializeEditor", () => {
         kind: "skill",
         name: "apple-design",
         raw: "/skill:apple-design",
+        label: "apple-design",
       }),
     );
     root.appendChild(document.createTextNode(" 帮我把间距统一一下"));
@@ -112,9 +128,28 @@ describe("setEditorFromText + serializeEditor 往返", () => {
 
   it("扩展命令需要 extraCommands 才认", () => {
     const root = editor();
-    setEditorFromText(root, "/plan 做一遍", new Set(["plan"]));
+    setEditorFromText(root, "/plan 做一遍", new Map([["plan", "/plan"]]));
     expect(serializeEditor(root)).toBe("/plan 做一遍");
     expect(root.querySelector(`[${TOKEN_RAW_ATTR}]`)).not.toBeNull();
+  });
+
+  it("chip 显示显示名，序列化仍回 /slug", () => {
+    const root = editor();
+    setEditorFromText(
+      root,
+      "/translate 这段话",
+      new Map([["translate", "翻译成英文"]]),
+    );
+    expect(root.textContent).toContain("翻译成英文");
+    expect(root.textContent).not.toContain("/translate");
+    expect(serializeEditor(root)).toBe("/translate 这段话");
+    expect(root.querySelector("[title]")?.getAttribute("title")).toBe("/translate");
+  });
+
+  it("没有显示名的命令 chip 仍是 /slug（回退不能吞择斜杠）", () => {
+    const root = editor();
+    setEditorFromText(root, "/compact 收一下", new Map());
+    expect(root.textContent).toContain("/compact");
   });
 
   it("空串清空编辑器", () => {
