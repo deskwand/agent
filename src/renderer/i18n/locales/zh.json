@@ -907,7 +907,7 @@
     "commandBodyPlaceholder": "例：把下面的内容翻译成地道的英文，术语保留原文。",
     "commandInsertSkill": "引用技能",
     "commandInsertSkillHint": "在光标处插入一句技能引用",
-    "commandSkillReference": "先读取「{{name}}」技能的 SKILL.md，再按它的做法来。",
+    "commandSkillReference": "请引用「{{name}}」技能。",
     "commandSkillEmpty": "没有可用的技能",
     "commandSkillLoadFailed": "技能列表加载失败",
     "commandDisplayName": "显示名称",

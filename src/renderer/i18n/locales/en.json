@@ -907,7 +907,7 @@
     "commandBodyPlaceholder": "e.g. Translate the following into idiomatic English and keep the terminology.",
     "commandInsertSkill": "Cite skill",
     "commandInsertSkillHint": "Insert a skill reference at the cursor",
-    "commandSkillReference": "Read the \"{{name}}\" skill's SKILL.md first, then follow it.",
+    "commandSkillReference": "Please use the \"{{name}}\" skill.",
     "commandSkillEmpty": "No skills available",
     "commandSkillLoadFailed": "Failed to load skills",
     "commandDisplayName": "Display name",
