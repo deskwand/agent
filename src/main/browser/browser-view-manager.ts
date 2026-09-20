@@ -30,6 +30,8 @@ export class BrowserViewManager {
   private _blankPageBgColor = "#ffffff";
   private _isOnBlankPage = false;
   private _statusPageDataUrl: string | null = null;
+  /** 最近一次确认"用户真的在看"的页面（既不是空白页也不是我们的状态页）。 */
+  private _lastRealPageUrl: string | null = null;
   private _loadError: string | undefined;
 
   // ---- lifecycle ----
@@ -76,6 +78,11 @@ export class BrowserViewManager {
       if (url !== this._blankPageUrl()) {
         this._isOnBlankPage = false;
       }
+      // 记住"用户真的在看"的那一页：空白页与我们的状态页都不算。
+      // 跨调用保留——恢复要用的正是"上一条真实页面"，而它在被状态页顶掉之后就问不到了。
+      if (url !== this._blankPageUrl() && url !== this._statusPageDataUrl) {
+        this._lastRealPageUrl = url;
+      }
       this._pushStatus();
     });
     wc.on("did-navigate-in-page", () => this._pushStatus());
@@ -87,6 +94,7 @@ export class BrowserViewManager {
     wc.loadURL(this._blankPageUrl());
     this._isOnBlankPage = true;
     this._statusPageDataUrl = null;
+    this._lastRealPageUrl = null;
     this.view.setVisible(false);
   }
 
@@ -95,6 +103,7 @@ export class BrowserViewManager {
     this.view?.webContents.close();
     this.view = null;
     this._statusPageDataUrl = null;
+    this._lastRealPageUrl = null;
     this.parentWindow = null;
     this.visible = false;
     this.viewDestroyed = true;
@@ -187,6 +196,8 @@ export class BrowserViewManager {
     this.visible = false;
     // 关面板时若还停在我们自己写的状态页上，就换回空白页：视图与已加载的页面是留着的，
     // 不换的话下次打开面板会看到一屏永远转下去的 spinner（没有任何事件能结束它）。
+    // 面板关掉之后"用户原本在看哪一页"就不再是上下文了，别让下次失败把它拉回来。
+    this._lastRealPageUrl = null;
     if (
       this._statusPageDataUrl &&
       this.view.webContents.getURL() === this._statusPageDataUrl
@@ -219,6 +230,32 @@ export class BrowserViewManager {
   /** App window URL (renderer), used to filter it out from CDP targets. */
   getAppWindowUrl(): string {
     return this.parentWindow?.webContents.getURL() ?? "";
+  }
+
+  /**
+   * 预览失败后的收尾。三态返回值让调用方能区分"已经还原了"、"当前就是真实页面、
+   * 什么都不该动"和"没有可还原的页面（应显示错误页）"。
+   *
+   * 只做导航，**不碰可见性**（与 showStatusPage 同一条约束）；面板不可见时直接判定
+   * 为没有可还原的页面，避免把已经隐藏的视图重新挂回来。
+   */
+  restorePreviousPage(): BrowserRecoveryAction {
+    const wc = this.view?.webContents;
+    if (!wc || !this.visible) return "no-previous";
+
+    const action = browserRecoveryAction(
+      wc.getURL(),
+      this._statusPageDataUrl,
+      this._lastRealPageUrl,
+    );
+    if (action === "restored" && this._lastRealPageUrl) {
+      const target = this._lastRealPageUrl;
+      this._statusPageDataUrl = null;
+      void wc.loadURL(target).catch((error: unknown) => {
+        logError("[Browser] restore previous page failed:", error);
+      });
+    }
+    return action;
   }
 
   /** Update the blank-page theme. Reloads the page if currently on blank. */
@@ -390,4 +427,29 @@ export function displayUrlFor(
   if (isOnBlankPage) return "about:blank";
   if (statusPageUrl && rawUrl === statusPageUrl) return "about:blank";
   return rawUrl;
+}
+
+export type BrowserRecoveryAction =
+  | "restored"
+  | "nothing-to-restore"
+  | "no-previous";
+
+/**
+ * 预览失败后面板该怎么收尾（纯函数，便于单测）。
+ *
+ * - 当前页正是我们的状态页 且 记得上一页 → `restored`（把它还原回去）
+ * - 当前页是真实页面（例如渲染很快、我们压根没动过页面）→ `nothing-to-restore`
+ *   （什么都不该动，尤其不能往上写错误页）
+ * - 其余（空白页/状态页但没有上一页）→ `no-previous`，由调用方显示错误页
+ */
+export function browserRecoveryAction(
+  currentUrl: string,
+  statusPageUrl: string | null,
+  lastRealPageUrl: string | null,
+): BrowserRecoveryAction {
+  const onStatusPage = !!statusPageUrl && currentUrl === statusPageUrl;
+  if (onStatusPage) {
+    return lastRealPageUrl ? "restored" : "no-previous";
+  }
+  return "nothing-to-restore";
 }

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { displayUrlFor } from "../main/browser/browser-view-manager";
+import {
+  browserRecoveryAction,
+  displayUrlFor,
+} from "../main/browser/browser-view-manager";
 
 /**
  * 状态页（"正在生成预览…" / 错误页）是主进程构造的 `data:text/html;base64,…`。
@@ -76,5 +79,47 @@ describe("showStatusPage 的静态约束", () => {
     const i = text.indexOf("  navigate(url: string): void {");
     expect(i).toBeGreaterThan(-1);
     expect(text.slice(i, i + 900)).toContain("this._statusPageDataUrl = null");
+  });
+});
+
+describe("browserRecoveryAction", () => {
+  const STATUS = "data:text/html;base64,STATUS";
+
+  it("restores when the status page is on screen and a previous page is known", () => {
+    expect(browserRecoveryAction(STATUS, STATUS, "file:///tmp/p.pdf")).toBe(
+      "restored",
+    );
+  });
+
+  it("reports no-previous when the status page is on screen but nothing was remembered", () => {
+    expect(browserRecoveryAction(STATUS, STATUS, null)).toBe("no-previous");
+  });
+
+  it("leaves a real page alone", () => {
+    // 热态失败：我们没写过等待页，屏幕上就是用户原本那一页 → 什么都别动
+    expect(
+      browserRecoveryAction("file:///tmp/p.pdf", STATUS, "file:///tmp/p.pdf"),
+    ).toBe("nothing-to-restore");
+  });
+
+  it("leaves the blank page alone (no status page involved)", () => {
+    expect(
+      browserRecoveryAction(
+        "data:text/html;base64,BLANK",
+        STATUS,
+        "file:///tmp/p.pdf",
+      ),
+    ).toBe("nothing-to-restore");
+  });
+
+  it("does not mistake the blank page for the status page", () => {
+    // statusPageUrl 为 null（没有状态页）时，空白页不能触发还原
+    expect(
+      browserRecoveryAction(
+        "data:text/html;base64,BLANK",
+        null,
+        "file:///tmp/p.pdf",
+      ),
+    ).toBe("nothing-to-restore");
   });
 });

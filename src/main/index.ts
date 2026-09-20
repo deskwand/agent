@@ -4007,6 +4007,13 @@ ipcMain.handle(
     }, null),
 );
 
+ipcMain.handle("browser.restorePreviousPage", () =>
+  safeBrowserCall(
+    () => browserViewManager?.restorePreviousPage() ?? "no-previous",
+    "no-previous" as const,
+  ),
+);
+
 ipcMain.handle("browser.goBack", () =>
   safeBrowserCall(() => {
     browserViewManager?.goBack();

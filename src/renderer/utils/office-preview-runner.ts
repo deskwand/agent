@@ -46,91 +46,69 @@ export async function openOfficePreview(
   // 立刻清掉上一个 busy：否则连点时会短暂显示前一个文件的 spinner。
   useAppStore.getState().setOfficePreviewBusyPath(null);
 
-  let waitingShown = false;
-  let waitingToastId: string | null = null;
-
-  const clearWaitingToast = () => {
-    const store = useAppStore.getState();
-    // 按 id 比对：盲目 clearGlobalNotice 会清掉别的功能刚设置的提示
-    if (waitingToastId && store.globalNotice?.id === waitingToastId) {
-      store.clearGlobalNotice();
-    }
-    waitingToastId = null;
-  };
-
   /**
-   * 本次调用是否已经有结果了。
+   * 本次调用是否已经有结果了。两个作用：
+   * 1. **幂等**：`finishSuccess`/`finishFailure` 在 try 体与 catch 里都可能被调到，
+   *    置位后重入直接返回，避免重复回调 / 重复收尾。
+   * 2. 定时器回调入口的"已经晚了"检查（正常路径下 `finally` 里已经 `clearTimeout`，
+   *    这是极小窗口的兜底）。
    *
-   * 光看 `activeToken !== token` 不够：`activeToken` 只在调用开始时被赋值、从不被清空，
-   * 所以"渲染在等待 getStatus 的那几毫秒里完成了"这种情况它察觉不到——那时定时器回调
-   * 会继续往下写等待页，把刚 navigate 出来的真预览**覆盖成一个永远转下去的 spinner**。
+   * 注意：定时器回调体是**同步**的（不 await 任何东西），所以"回调跑到一半渲染完成了"
+   * 这种交错在结构上不存在——早先那版曾 await `getStatus`，才有了那个竞态。
    */
   let settled = false;
 
   const finishSuccess = (outPath: string) => {
+    if (settled) return;
     settled = true;
-    clearWaitingToast();
     callbacks.onSuccess(outPath);
   };
 
   const finishFailure = () => {
+    if (settled) return;
     settled = true;
-    // 只在面板**仍处于浏览器模式**时才写错误页：关闭面板只 hide()，视图与页面还留着，
-    // 写了它就会变成用户下次打开面板时的第一眼内容。
-    if (waitingShown && useAppStore.getState().rightPanelMode === "browser") {
-      void window.electronAPI?.browser?.showStatusPage?.(
-        callbacks.t("filePreview.officeRenderFailedRevealed"),
-        "error",
-      );
-    } else {
-      clearWaitingToast();
+    // 收尾交给主进程：只有它知道"上一条真实页面"是什么（跨调用存活），
+    // 也只有它能判断此刻屏幕上是不是我们自己写的等待页——所以连"本次是否显示过
+    // 等待页"都不用在渲染层记（连点场景里，正在显示的可能是**上一次**点击的等待页）。
+    if (useAppStore.getState().rightPanelMode === "browser") {
+      void (async () => {
+        try {
+          const api = window.electronAPI?.browser?.restorePreviousPage;
+          const action = api ? await api() : "no-previous";
+          if (action === "no-previous") {
+            void window.electronAPI?.browser?.showStatusPage?.(
+              callbacks.t("filePreview.officeRenderFailedRevealed"),
+              "error",
+            );
+          }
+        } catch {
+          // 收尾失败就什么都不做：notice 与回退仍会发生
+        }
+      })();
     }
     callbacks.onFailure();
   };
 
   const busyTimer = setTimeout(() => {
+    // 回调体是**同步**的：从下面这次检查到真正写页之间没有 await，所以不存在
+    // "检查通过了、写之前渲染完成了"的交错（早先那版 await 过 getStatus，才有那个竞态）。
+    // 因此这里只需检查一次——写两遍是死代码。
     void (async () => {
-      if (activeToken !== token) return;
+      if (settled || activeToken !== token) return;
+
       // 原有的行内 busy（文件树 / 产物面板）
       useAppStore.getState().setOfficePreviewBusyPath(filePath);
 
-      const store = useAppStore.getState();
-      const panelOpen = store.rightPanelMode === "browser";
-      let statusUrl: string | undefined;
-      try {
-        statusUrl = (await window.electronAPI?.browser?.getStatus?.())?.url;
-      } catch {
-        statusUrl = undefined; // 取不到 → 面板开着时按"占用"处理
-      }
-
-      // await 之后必须重新校验两件事：
-      // - 已被更新的点击取代（activeToken 变了）
-      // - 本次已经出结果了（settled）——否则会把真预览覆盖成永久 spinner
-      if (settled || activeToken !== token) return;
-
-      const idle = !panelOpen || statusUrl === "about:blank";
-      if (idle) {
-        // 顺序有讲究：先切面板状态（App.tsx 的 effect 会据此调 browser.show()），
-        // 再把等待页放进那个已存在的 webContents。两者竞态，但 showStatusPage
-        // 不依赖可见性，所以哪个先到都行。
-        openBrowserPanel();
-        void window.electronAPI?.browser?.showStatusPage?.(
-          callbacks.t("filePreview.officePreviewLoading"),
-          "loading",
-        );
-        waitingShown = true;
-      } else {
-        waitingToastId = `office-preview-waiting-${Date.now()}`;
-        store.setGlobalNotice({
-          id: waitingToastId,
-          type: "info",
-          // message 是**必填**字段（`GlobalNotice.message: string`），messageKey 只是
-          // 让 Toast 能随语言切换重译。仓库既有写法两者都给（见 useIPC.ts:592）。
-          message: callbacks.t("filePreview.officePreviewLoading"),
-          messageKey: "filePreview.officePreviewLoading",
-        });
-      }
-    })();
+      // 只有一条等待路径：一律在面板里显示等待页（原 P2 的 toast 分支已删除）。
+      // "用户原本在看哪一页"由主进程记录，不在这里存（它必须跨调用存活）。
+      openBrowserPanel();
+      void window.electronAPI?.browser?.showStatusPage?.(
+        callbacks.t("filePreview.officePreviewLoading"),
+        "loading",
+      );
+    })().catch(() => {
+      // 定时器回调里的异常不能变成 unhandled rejection
+    });
   }, OFFICE_PREVIEW_BUSY_DELAY_MS);
 
   try {

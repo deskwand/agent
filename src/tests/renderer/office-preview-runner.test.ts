@@ -22,6 +22,8 @@ describe("openOfficePreview", () => {
   let render: ReturnType<typeof vi.fn>;
   let getStatus: ReturnType<typeof vi.fn>;
   let showStatusPage: ReturnType<typeof vi.fn>;
+  let navigate: ReturnType<typeof vi.fn>;
+  let restorePreviousPage: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -29,11 +31,16 @@ describe("openOfficePreview", () => {
     render = vi.fn();
     getStatus = vi.fn(async () => ({ visible: false, url: "about:blank" }));
     showStatusPage = vi.fn(async () => ({}));
+    navigate = vi.fn(async () => ({}));
+    restorePreviousPage = vi.fn(
+      async (): Promise<"restored" | "nothing-to-restore" | "no-previous"> =>
+        "no-previous",
+    );
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
       value: {
         file: { renderOfficePreview: render },
-        browser: { getStatus, showStatusPage },
+        browser: { getStatus, showStatusPage, navigate, restorePreviousPage },
       },
     });
   });
@@ -184,7 +191,7 @@ describe("openOfficePreview", () => {
     await done;
   });
 
-  it("only toasts when the panel is open on a real page", async () => {
+  it("shows the waiting page even when the panel is on another document", async () => {
     useAppStore.setState({ rightPanelMode: "browser" });
     getStatus.mockResolvedValue({
       visible: true,
@@ -200,18 +207,18 @@ describe("openOfficePreview", () => {
     });
     await vi.advanceTimersByTimeAsync(OFFICE_PREVIEW_BUSY_DELAY_MS);
 
-    expect(showStatusPage).not.toHaveBeenCalled();
-    expect(useAppStore.getState().globalNotice?.messageKey).toBe(
+    // P3：只有一条等待路径，不再有 toast
+    expect(showStatusPage).toHaveBeenCalledWith(
       "filePreview.officePreviewLoading",
+      "loading",
     );
+    expect(useAppStore.getState().globalNotice).toBeNull();
 
     gate.resolve({ ok: true, outPath: "/tmp/a.html" });
     await done;
-    // 成功后自己那条 toast 要被撤下
-    expect(useAppStore.getState().globalNotice).toBeNull();
   });
 
-  it("treats a failing getStatus as 'panel busy'", async () => {
+  it("still shows the waiting page when getStatus throws", async () => {
     useAppStore.setState({ rightPanelMode: "browser" });
     getStatus.mockRejectedValue(new Error("ipc down"));
     const gate = deferred<{ ok: boolean; outPath?: string }>();
@@ -224,120 +231,124 @@ describe("openOfficePreview", () => {
     });
     await vi.advanceTimersByTimeAsync(OFFICE_PREVIEW_BUSY_DELAY_MS);
 
-    expect(showStatusPage).not.toHaveBeenCalled();
-    expect(useAppStore.getState().globalNotice?.messageKey).toBe(
+    // 取不到原页面只是"不能还原"，不影响给出等待反馈
+    expect(showStatusPage).toHaveBeenCalledWith(
       "filePreview.officePreviewLoading",
+      "loading",
     );
 
     gate.resolve({ ok: true, outPath: "/tmp/a.html" });
     await done;
   });
 
-  it("replaces the waiting page with an error page when the panel is still open", async () => {
+  it("restores the previous page when the main process can", async () => {
+    useAppStore.setState({ rightPanelMode: "browser" });
+    restorePreviousPage.mockResolvedValue("restored");
     const gate = deferred<{ ok: boolean; outPath?: string }>();
     render.mockReturnValue(gate.promise);
-    const onFailure = vi.fn();
 
     const done = openOfficePreview("/repo/a.docx", {
       t,
       onSuccess: vi.fn(),
-      onFailure,
+      onFailure: vi.fn(),
     });
     await vi.advanceTimersByTimeAsync(OFFICE_PREVIEW_BUSY_DELAY_MS);
 
     gate.resolve({ ok: false });
     await done;
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(restorePreviousPage).toHaveBeenCalledTimes(1);
+    // 已还原 → 不再写错误页
+    expect(showStatusPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes the error page only when there was nothing to restore", async () => {
+    useAppStore.setState({ rightPanelMode: "browser" });
+    restorePreviousPage.mockResolvedValue("no-previous");
+    const gate = deferred<{ ok: boolean; outPath?: string }>();
+    render.mockReturnValue(gate.promise);
+
+    const done = openOfficePreview("/repo/a.docx", {
+      t,
+      onSuccess: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    await vi.advanceTimersByTimeAsync(OFFICE_PREVIEW_BUSY_DELAY_MS);
+
+    gate.resolve({ ok: false });
+    await done;
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(showStatusPage).toHaveBeenLastCalledWith(
       "filePreview.officeRenderFailedRevealed",
       "error",
     );
-    expect(onFailure).toHaveBeenCalledTimes(1);
   });
 
-  it("does not write an error page when the panel was closed meanwhile", async () => {
-    const gate = deferred<{ ok: boolean; outPath?: string }>();
-    render.mockReturnValue(gate.promise);
+  it("leaves a page it never replaced alone", async () => {
+    useAppStore.setState({ rightPanelMode: "browser" });
+    // 热态失败：我们压根没写过等待页，主进程会说"当前是真实页面，别动"
+    restorePreviousPage.mockResolvedValue("nothing-to-restore");
+    render.mockResolvedValue({ ok: false });
 
-    const done = openOfficePreview("/repo/a.docx", {
+    await openOfficePreview("/repo/a.docx", {
+      t,
+      onSuccess: vi.fn(),
+      onFailure: vi.fn(),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(showStatusPage).not.toHaveBeenCalled();
+  });
+
+  it("cleans up after a superseded click whose waiting page is still on screen", async () => {
+    // 评审复现的连点场景：A（慢）已经把等待页写进面板，B（快，失败）接手。
+    // B 自己没有显示过等待页，但屏幕上那一个是 A 留下的——收尾必须由主进程判断，
+    // 否则 A 的 spinner 会永久留在面板上。
+    useAppStore.setState({ rightPanelMode: "browser" });
+    restorePreviousPage.mockResolvedValue("restored");
+    const slow = deferred<{ ok: boolean; outPath?: string }>();
+    render.mockReturnValueOnce(slow.promise); // A：慢
+    render.mockResolvedValueOnce({ ok: false }); // B：快且失败
+
+    const first = openOfficePreview("/repo/a.docx", {
       t,
       onSuccess: vi.fn(),
       onFailure: vi.fn(),
     });
     await vi.advanceTimersByTimeAsync(OFFICE_PREVIEW_BUSY_DELAY_MS);
-    expect(showStatusPage).toHaveBeenCalledTimes(1);
+    expect(showStatusPage).toHaveBeenCalledTimes(1); // A 的等待页
 
-    // 用户把面板关掉了
-    useAppStore.setState({ rightPanelMode: null });
-    gate.resolve({ ok: false });
-    await done;
-
-    // 只有第一次（等待页），没有错误页
-    expect(showStatusPage).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps the tree/artifact busy path working", async () => {
-    const gate = deferred<{ ok: boolean; outPath?: string }>();
-    render.mockReturnValue(gate.promise);
-
-    const done = openOfficePreview("/repo/a.docx", {
+    const second = openOfficePreview("/repo/b.docx", {
       t,
       onSuccess: vi.fn(),
       onFailure: vi.fn(),
     });
-    await vi.advanceTimersByTimeAsync(OFFICE_PREVIEW_BUSY_DELAY_MS);
-    expect(useAppStore.getState().officePreviewBusyPath).toBe("/repo/a.docx");
+    await second;
+    await vi.advanceTimersByTimeAsync(0);
 
-    gate.resolve({ ok: true, outPath: "/tmp/a.html" });
-    await done;
-    expect(useAppStore.getState().officePreviewBusyPath).toBeNull();
+    // B 的收尾把 A 的等待页也清掉了
+    expect(restorePreviousPage).toHaveBeenCalledTimes(1);
+
+    slow.resolve({ ok: true, outPath: "/tmp/a.html" });
+    await first;
   });
 
-  it("does not strand the panel when the render finishes during the getStatus await", async () => {
-    // 评审复现的竞态：门限到 → 定时器回调 park 在 getStatus 的 await 上 →
-    // 渲染**在这期间**完成（navigate 已发出）→ 回调恢复执行。
-    // 若不检查"已出结果"，等待页会在真预览之后写进去，面板就永久停在 spinner 上。
-    //
-    // 顺序很关键：渲染必须是**待定**的，否则主路径在 150ms 前就结束、finally 里会
-    // clearTimeout，回调根本不触发（那就成了一场不存在的竞态的测试）。
-    let releaseGetStatus: (v: {
-      visible: boolean;
-      url: string;
-    }) => void = () => {};
-    getStatus.mockImplementation(
-      () =>
-        new Promise<{ visible: boolean; url: string }>((resolve) => {
-          releaseGetStatus = resolve;
-        }),
-    );
-    const gate = deferred<{ ok: boolean; outPath?: string }>();
-    render.mockReturnValue(gate.promise);
-    const onSuccess = vi.fn();
+  it("does not write the waiting page when the render settles before the timer fires", async () => {
+    // 早先那版定时器回调里 await getStatus，于是存在"回调跑到一半渲染完成"的竞态。
+    // 现在回调体是同步的、且 finally 会 clearTimeout，这个交错在结构上不存在。
+    // 这里守住那条用户可见的性质：快速渲染不写等待页。
+    useAppStore.setState({ rightPanelMode: "browser" });
+    render.mockResolvedValue({ ok: true, outPath: "/tmp/a.html" });
 
-    const done = openOfficePreview("/repo/a.docx", {
+    await openOfficePreview("/repo/a.docx", {
       t,
-      onSuccess,
+      onSuccess: vi.fn(),
       onFailure: vi.fn(),
     });
+    await vi.advanceTimersByTimeAsync(OFFICE_PREVIEW_BUSY_DELAY_MS * 2);
 
-    // 门限到 → 回调进入 getStatus 并停在那里
-    await vi.advanceTimersByTimeAsync(OFFICE_PREVIEW_BUSY_DELAY_MS);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(getStatus).toHaveBeenCalledTimes(1);
-    expect(onSuccess).not.toHaveBeenCalled();
-
-    // 渲染就在这段 await 期间完成
-    gate.resolve({ ok: true, outPath: "/tmp/a.html" });
-    await vi.advanceTimersByTimeAsync(0);
-    expect(onSuccess).toHaveBeenCalledTimes(1);
-
-    // 放行 getStatus，并让被 park 住的回调真正恢复执行
-    // （`await done` 在住路径完成时就返回，它不等这个回调）
-    releaseGetStatus({ visible: false, url: "about:blank" });
-    await vi.advanceTimersByTimeAsync(0);
-    await done;
-
-    // 真预览已在屏幕上，绝不能再写等待页去覆盖它
     expect(showStatusPage).not.toHaveBeenCalled();
   });
 
