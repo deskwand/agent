@@ -271,8 +271,9 @@ function yieldToEventLoop(): Promise<void> {
  *  3. the pass yields to the event loop every `LINE_BUDGET` lines, so the
  *     Electron main thread keeps serving IPC.
  *
- * Only `~/.deskwand/pi-sessions` is scanned. Subagent and aux calls were never
- * persisted anywhere, so they have no history to import.
+ * Only `~/.deskwand/pi-sessions` is scanned. Aux calls were never persisted
+ * anywhere, so they have no history to import. Subagent usage IS persisted (in
+ * pi's own session root) and has its own pass — see usage-subagent-backfill.ts.
  */
 export async function backfillUsageFromSessions(
   db: DatabaseSync,

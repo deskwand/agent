@@ -141,6 +141,8 @@ import {
 } from "../shared/local-file-path";
 import { eventRequiresSessionManager } from "./client-event-utils";
 import { backfillUsageFromSessions } from "./usage/usage-backfill";
+import { backfillSubagentUsageFromSessions } from "./usage/usage-subagent-backfill";
+import { removePooledSubagentRows } from "./usage/usage-store";
 import { queryUsage } from "./usage/usage-store";
 import { DEFAULT_USAGE_RANGE, type UsageRange } from "../shared/usage";
 import { getUnsupportedWorkspacePathReason } from "./workspace-path-constraints";
@@ -1491,36 +1493,68 @@ ensureSubagentUsageReporting(getAgentDir());
 // Usage history lives in deskwand's own pi session files. userData is
 // redirected to ~/.deskwand by setup-userdata.ts.
 const USAGE_SESSIONS_ROOT = join(app.getPath("userData"), "pi-sessions");
+/**
+ * pi 的子会话根：pi-subagents 把子代理会话落在这里，每个 projectSlug 一个目录。
+ * 它们的头部带 `parentSession` 指回上面那个根里的父会话文件 —— 子代理用量按它筛选。
+ */
+const SUBAGENT_SESSIONS_ROOT = join(getAgentDir(), "sessions");
 let usageBackfillPromise: Promise<void> | null = null;
 
 /**
- * Runs the idempotent backfill once per app run: warmed at startup, and still
+ * Runs the idempotent chat backfill once per app run: warmed at startup, and still
  * awaited by the first usage query so opening the page never shows partial data.
+ * (Subagent usage is refreshed per query instead — see refreshSubagentUsage.)
  * The promise is the guard so concurrent queries share one pass; a failure
  * clears it so the next query retries instead of caching the error.
  */
 function ensureUsageBackfilled(): Promise<void> {
   if (!usageBackfillPromise) {
-    usageBackfillPromise = backfillUsageFromSessions(
-      getDatabase().raw,
-      USAGE_SESSIONS_ROOT,
-    )
-      .then((result) => {
-        log(
-          `[Usage] backfill files=${result.filesChanged} scanned=${result.scanned} inserted=${result.inserted} skipped=${result.skipped}`,
-        );
-        // A pass that never reached the corpus is not a completed pass. Warming
-        // at startup makes this reachable (the root may not exist yet, or a
-        // transient readdir failure may hit the busiest moment of the process),
-        // and caching it would silently disable the backfill for the whole run.
-        if (result.rootUnreadable) usageBackfillPromise = null;
-      })
-      .catch((error) => {
-        logWarn("[Usage] backfill failed:", error);
+    const db = getDatabase().raw;
+    usageBackfillPromise = (async () => {
+      // 旧的池化子代理行先清掉：它和新的 submsg: 行是同一笔花费的两种记法
+      const removed = removePooledSubagentRows(db);
+      if (removed > 0) log(`[Usage] removed ${removed} pooled subagent rows`);
+
+      const chat = await backfillUsageFromSessions(db, USAGE_SESSIONS_ROOT);
+      log(
+        `[Usage] backfill files=${chat.filesChanged} scanned=${chat.scanned} inserted=${chat.inserted} skipped=${chat.skipped}`,
+      );
+
+      const sub = await refreshSubagentUsage();
+
+      // A pass that never reached the corpus is not a completed pass. Warming
+      // at startup makes this reachable (the root may not exist yet, or a
+      // transient readdir failure may hit the busiest moment of the process),
+      // and caching it would silently disable the backfill for the whole run.
+      if (chat.rootUnreadable || sub.rootUnreadable)
         usageBackfillPromise = null;
-      });
+    })().catch((error) => {
+      logWarn("[Usage] backfill failed:", error);
+      usageBackfillPromise = null;
+    });
   }
   return usageBackfillPromise;
+}
+
+/**
+ * 子代理用量没有实时写入点（池化那条路已删），所以**每次查询都要重跑这个 pass**：
+ * 指纹命中时它只 walk + 读指纹（实测 ~2ms）。把它塞进"每次 app 运行只跑一次"的缓存里，
+ * 会让本次运行新产生的子代理花费一直等到下次启动才出现 —— 静默少报。
+ */
+function refreshSubagentUsage() {
+  return backfillSubagentUsageFromSessions(
+    getDatabase().raw,
+    SUBAGENT_SESSIONS_ROOT,
+    USAGE_SESSIONS_ROOT,
+  ).then((sub) => {
+    // 无变化的轮次不刷日志：这个 pass 每次查询都跑
+    if (sub.filesChanged > 0 || sub.malformed > 0) {
+      log(
+        `[Usage] subagent backfill files=${sub.filesChanged} unchanged=${sub.filesUnchanged} scanned=${sub.scanned} inserted=${sub.inserted} skipped=${sub.skipped} malformed=${sub.malformed}`,
+      );
+    }
+    return sub;
+  });
 }
 const piTrustPending = new Map<string, (decision: boolean | null) => void>();
 
@@ -4201,6 +4235,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
 
     case "usage.query": {
       await ensureUsageBackfilled();
+      // 子代理没有实时写入点：每次查询重扫一次，指纹命中时是毫秒级
+      await refreshSubagentUsage();
       // The renderer sends a widened string over IPC; anything unexpected falls
       // back to the default range instead of producing a NaN cutoff (all-zero page).
       const requested = event.payload.range as string;

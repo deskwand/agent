@@ -10,9 +10,9 @@ describe("chat usage write point", () => {
     const text = src();
     expect(text).toContain("buildChatUsageRecord(");
     expect(text).toMatch(/recordUsage\(\s*getDatabase\(\)\.raw,/);
-    expect(text).toContain(
-      'import {\n  buildChatUsageRecord,\n  buildSubagentUsageRecord,\n} from "../usage/usage-records";',
-    );
+    expect(text).toContain("buildChatUsageRecord(");
+    // 池化子代理构造器已删（改由子会话文件回填），不得再被 import
+    expect(text).not.toContain("buildSubagentUsageRecord");
   });
 
   it("passes the SDK message plus the session model/provider as fallback", () => {

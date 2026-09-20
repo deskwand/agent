@@ -5,6 +5,7 @@ import {
   createUsageSchema,
   queryUsage,
   recordUsage,
+  removePooledSubagentRows,
 } from "../../main/usage/usage-store";
 import type { UsageRecordInput } from "../../shared/usage";
 import { buildPriceIndex, type PriceIndex } from "../../main/usage/usage-cost";
@@ -406,5 +407,48 @@ describe("queryUsage cost fields", () => {
     const sum = span.byModel.reduce((n, r) => n + (r.cost ?? 0), 0);
     expect(span.totals.cost).toBeCloseTo(sum, 10);
     expect(span.byModel.some((r) => r.cost === null)).toBe(true);
+  });
+});
+
+describe("removePooledSubagentRows", () => {
+  let db: DatabaseSync;
+  beforeEach(() => {
+    db = new DatabaseSync(":memory:");
+    createUsageSchema(db);
+  });
+  afterEach(() => db.close());
+
+  it("deletes only the old pooled subagent rows", () => {
+    // 旧池化键
+    recordUsage(
+      db,
+      base({
+        source: "subagent",
+        model: null,
+        provider: null,
+        dedupKey: "sub:p:t1",
+      }),
+    );
+    // 新键（子会话文件来源）不得被删
+    recordUsage(db, base({ source: "subagent", dedupKey: "submsg:child:e1" }));
+    // 其它来源不得被删
+    recordUsage(db, base({ source: "chat", dedupKey: "chat:1:1:1:1:1" }));
+    recordUsage(db, base({ source: "aux", purpose: "title", dedupKey: null }));
+
+    expect(removePooledSubagentRows(db)).toBe(1);
+    const keys = (
+      db
+        .prepare("SELECT dedup_key FROM usage_records ORDER BY id")
+        .all() as unknown as Array<{
+        dedup_key: string | null;
+      }>
+    ).map((r) => r.dedup_key);
+    expect(keys).toEqual(["submsg:child:e1", "chat:1:1:1:1:1", null]);
+  });
+
+  it("is a no-op the second time", () => {
+    recordUsage(db, base({ source: "subagent", dedupKey: "sub:p:t1" }));
+    removePooledSubagentRows(db);
+    expect(removePooledSubagentRows(db)).toBe(0);
   });
 });

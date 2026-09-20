@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildAuxUsageRecord,
   buildChatUsageRecord,
-  buildSubagentUsageRecord,
+  buildSubagentMessageRecord,
 } from "../../main/usage/usage-records";
 
 const tokens = {
@@ -80,46 +80,6 @@ describe("buildChatUsageRecord", () => {
   });
 });
 
-describe("buildSubagentUsageRecord", () => {
-  it("keys by tool call id and leaves model/provider null", () => {
-    const rec = buildSubagentUsageRecord(
-      "s1",
-      "call-1",
-      { input: 10, output: 20, cacheRead: 30, cacheWrite: 0 },
-      42,
-    );
-    expect(rec).toMatchObject({
-      ts: 42,
-      source: "subagent",
-      dedupKey: "sub:s1:call-1",
-      model: null,
-      provider: null,
-      input: 10,
-      output: 20,
-      cacheRead: 30,
-    });
-  });
-
-  it("returns null when the tool result carries no usage", () => {
-    expect(buildSubagentUsageRecord("s1", "call-1", undefined, 42)).toBeNull();
-  });
-
-  it("treats missing numeric fields as 0 and ignores garbage", () => {
-    const rec = buildSubagentUsageRecord(
-      "s1",
-      "c",
-      { input: "nope" as unknown, output: 5 },
-      1,
-    );
-    expect(rec).toMatchObject({
-      input: 0,
-      output: 5,
-      cacheRead: 0,
-      cacheWrite: 0,
-    });
-  });
-});
-
 describe("buildAuxUsageRecord", () => {
   it("carries a null dedup key and the purpose", () => {
     const rec = buildAuxUsageRecord(tokens, "title", "m1", "deepseek", "s1", 7);
@@ -137,5 +97,82 @@ describe("buildAuxUsageRecord", () => {
       buildAuxUsageRecord(tokens, "memory", "m1", "deepseek", null, 7)
         .sessionId,
     ).toBeNull();
+  });
+});
+
+describe("buildSubagentMessageRecord", () => {
+  const subUsage = {
+    input: 100,
+    output: 20,
+    cacheRead: 3000,
+    cacheWrite: 0,
+    totalPromptInput: 3100,
+  };
+
+  it("stores the parent session as session_id and the child only in the key", () => {
+    const record = buildSubagentMessageRecord(
+      "parent-session",
+      "01a0a59a-15c0-7325-928f-fd929599a5e8",
+      "254bd435",
+      {
+        timestamp: 1_760_000_000_000,
+        provider: "deskwand:deepseek",
+        model: "deepseek-flash",
+      },
+      subUsage,
+      999,
+    );
+    expect(record).toMatchObject({
+      ts: 1_760_000_000_000,
+      sessionId: "parent-session",
+      provider: "deskwand:deepseek",
+      model: "deepseek-flash",
+      source: "subagent",
+      purpose: null,
+      dedupKey: "submsg:01a0a59a-15c0-7325-928f-fd929599a5e8:254bd435",
+      input: 100,
+      output: 20,
+      cacheRead: 3000,
+      cacheWrite: 0,
+    });
+  });
+
+  it("keeps the same key for a replayed import", () => {
+    const args = [
+      "p",
+      "c",
+      "e1",
+      { timestamp: 1, provider: "x", model: "y" },
+      subUsage,
+      0,
+    ] as const;
+    expect(buildSubagentMessageRecord(...args).dedupKey).toBe(
+      buildSubagentMessageRecord(...args).dedupKey,
+    );
+  });
+
+  it("falls back to now when the message carries no timestamp", () => {
+    const record = buildSubagentMessageRecord(
+      "p",
+      "c",
+      "e1",
+      {},
+      subUsage,
+      1234,
+    );
+    expect(record.ts).toBe(1234);
+  });
+
+  it("leaves provider/model null rather than inventing one", () => {
+    const record = buildSubagentMessageRecord(
+      "p",
+      "c",
+      "e1",
+      { timestamp: 1 },
+      subUsage,
+      0,
+    );
+    expect(record.provider).toBeNull();
+    expect(record.model).toBeNull();
   });
 });

@@ -111,10 +111,7 @@ import type { VisionModelConfig } from "../../shared/api-model-presets";
 import type { WebAccessErrorCode } from "../../shared/web-access";
 import { getDatabase } from "../db/database";
 import { normalizeTokenUsage } from "../usage/normalize-usage";
-import {
-  buildChatUsageRecord,
-  buildSubagentUsageRecord,
-} from "../usage/usage-records";
+import { buildChatUsageRecord } from "../usage/usage-records";
 import { recordUsage } from "../usage/usage-store";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import type { BrowserViewManager } from "../browser/browser-view-manager";
@@ -4200,23 +4197,11 @@ Tool routing:\n
                   : undefined;
               const isError = event.isError || Boolean(errorCode);
 
-              // Subagent usage only reaches us when pi-subagents' reportUsage is
-              // on (see ensureSubagentUsageReporting). It is the aggregate of every
-              // child message (nested included) for that Agent call and carries no
-              // model, so the row keeps model NULL.
-              const subagentRecord = buildSubagentUsageRecord(
-                session.id,
-                toolCallId,
-                (event.result as { usage?: unknown } | undefined)?.usage,
-                Date.now(),
-              );
-              if (subagentRecord) {
-                try {
-                  recordUsage(getDatabase().raw, subagentRecord);
-                } catch (error) {
-                  logWarn("[AgentRunner] subagent usage record failed:", error);
-                }
-              }
+              // Subagent usage is NOT recorded here any more. pi-subagents'
+              // tool_result.usage is a pooled, model-less aggregate drained by
+              // whichever wrapped tool finishes first; it is now imported per
+              // assistant message from the child session file instead — see
+              // src/main/usage/usage-subagent-backfill.ts.
 
               // Clear partial streaming output before sending final result
               this.sendToRenderer({

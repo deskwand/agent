@@ -48,44 +48,6 @@ export function buildChatUsageRecord(
   };
 }
 
-/**
- * Subagent: key = sub:<sessionId>:<toolCallId>.
- *
- * model stays NULL — pi-subagents' LifetimeUsage carries no model, so a
- * multi-model subagent run collapses into one number; the query layer shows it
- * as a separate "subagents (all models combined)" row instead of polluting the
- * per-model breakdown.
- */
-export function buildSubagentUsageRecord(
-  sessionId: string,
-  toolCallId: string,
-  rawUsage: unknown,
-  ts: number,
-): UsageRecordInput | null {
-  if (!rawUsage || typeof rawUsage !== "object") return null;
-  const raw = rawUsage as {
-    input?: unknown;
-    output?: unknown;
-    cacheRead?: unknown;
-    cacheWrite?: unknown;
-  };
-  const num = (value: unknown): number =>
-    typeof value === "number" && value >= 0 ? Math.floor(value) : 0;
-  return {
-    ts,
-    sessionId,
-    model: null,
-    provider: null,
-    source: "subagent",
-    purpose: null,
-    dedupKey: `sub:${sessionId}:${toolCallId}`,
-    input: num(raw.input),
-    output: num(raw.output),
-    cacheRead: num(raw.cacheRead),
-    cacheWrite: num(raw.cacheWrite),
-  };
-}
-
 /** Aux calls have no backfill path, so dedupKey stays NULL. */
 export function buildAuxUsageRecord(
   usage: TokenUsage,
@@ -103,6 +65,38 @@ export function buildAuxUsageRecord(
     source: "aux",
     purpose,
     dedupKey: null,
+    input: usage.input,
+    output: usage.output,
+    cacheRead: usage.cacheRead ?? 0,
+    cacheWrite: usage.cacheWrite ?? 0,
+  };
+}
+
+/**
+ * 子代理：一条 assistant 消息一行，身份取自**子会话文件**。
+ *
+ * 与旧的池化记录（`tool_result.usage`，只有 token 合计、按设计无 model）不同，
+ * 子会话 JSONL 里每条 assistant 消息都带 provider/model，所以这里能填上模型。
+ * `sessionId` 存**父会话**（与主对话行同一维度，便于按会话追溯），子会话 id 只进
+ * dedup key；键前缀 `submsg:` 与旧池化键 `sub:` 分开，避免迁移清理误删新行。
+ */
+export function buildSubagentMessageRecord(
+  parentSessionId: string,
+  childSessionId: string,
+  entryId: string,
+  message: { timestamp?: unknown; provider?: unknown; model?: unknown },
+  usage: TokenUsage,
+  now: number,
+): UsageRecordInput {
+  const ts = typeof message.timestamp === "number" ? message.timestamp : now;
+  return {
+    ts,
+    sessionId: parentSessionId,
+    model: typeof message.model === "string" ? message.model : null,
+    provider: typeof message.provider === "string" ? message.provider : null,
+    source: "subagent",
+    purpose: null,
+    dedupKey: `submsg:${childSessionId}:${entryId}`,
     input: usage.input,
     output: usage.output,
     cacheRead: usage.cacheRead ?? 0,

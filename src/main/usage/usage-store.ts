@@ -53,6 +53,15 @@ export function createUsageSchema(db: DatabaseSync): void {
       size           INTEGER NOT NULL,
       parser_version INTEGER NOT NULL
     );
+    -- 子代理回填的指纹表。**不共用 usage_scan_files**：主回填的 pruneScanRows()
+    -- 会把不在它自己遍历结果里的行删掉，共用就会让子代理扫描每轮重读全部文件，
+    -- 静默地把指纹短路废掉（design §8：2.1s → 35ms）。
+    CREATE TABLE IF NOT EXISTS usage_scan_subagent_files (
+      path           TEXT PRIMARY KEY,
+      mtime          INTEGER NOT NULL,
+      size           INTEGER NOT NULL,
+      parser_version INTEGER NOT NULL
+    );
   `);
 }
 
@@ -275,4 +284,19 @@ export function loadUsageRows(db: DatabaseSync): UsageCostRow[] {
          FROM usage_records`,
     )
     .all() as unknown as UsageCostRow[];
+}
+
+/**
+ * 一次性迁移：删掉旧的池化子代理行（`dedup_key LIKE 'sub:%'`）。
+ *
+ * 旧行的身份是"承载这次 drain 的那次工具调用"，池是全局的，所以归属粒度与模型都拿不到；
+ * 新的子会话文件来源用 `submsg:` 前缀，两者不会互相覆盖 —— 不删就是同一笔花费被记两次。
+ *
+ * 每次 app 启动跑一次即可：删完就永远是 0 行，无新状态、无 schema 变更。
+ */
+export function removePooledSubagentRows(db: DatabaseSync): number {
+  const result = db
+    .prepare("DELETE FROM usage_records WHERE dedup_key LIKE 'sub:%'")
+    .run();
+  return Number(result.changes);
 }
