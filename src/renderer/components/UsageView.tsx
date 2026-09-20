@@ -3,6 +3,9 @@ import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   DEFAULT_USAGE_RANGE,
+  USAGE_CURRENCIES,
+  type CurrencyCode,
+  type ExchangeRates,
   type UsageModelRow,
   type UsageSnapshot,
 } from "../../shared/usage";
@@ -23,8 +26,13 @@ type Range = (typeof RANGES)[number];
 const WEEKS = 53;
 
 export function UsageView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const currency = useAppStore((s) => s.currency);
+  const currencyRate = useAppStore((s) => s.currencyRate);
+  const setCurrency = useAppStore((s) => s.setCurrency);
+  const setCurrencyRate = useAppStore((s) => s.setCurrencyRate);
+  const lang = i18n.resolvedLanguage ?? "en";
   const [range, setRange] = useState<Range>(DEFAULT_USAGE_RANGE);
   const [snapshot, setSnapshot] = useState<UsageSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +56,25 @@ export function UsageView() {
       cancelled = true;
     };
   }, [range]);
+
+  useEffect(() => {
+    if (currency === "USD") return;
+    let cancelled = false;
+    window.electronAPI
+      .invoke<{ rates: ExchangeRates | null }>({
+        type: "usage.exchange-rate",
+        payload: {},
+      })
+      .then(({ rates }) => {
+        if (!cancelled) setCurrencyRate(rates?.[currency] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setCurrencyRate(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currency, setCurrencyRate]);
 
   const now = useMemo(() => Date.now(), []);
   const callCount = snapshot?.totals.calls ?? 0;
@@ -91,6 +118,23 @@ export function UsageView() {
             </button>
           ))}
         </div>
+        <label className="flex items-center gap-1.5 text-xs text-text-muted">
+          <span>{t("usage.currency")}</span>
+          <select
+            value={currency}
+            onChange={(event) =>
+              setCurrency(event.target.value as CurrencyCode)
+            }
+            aria-label={t("usage.currency")}
+            className="rounded-md border border-border bg-background-secondary px-1.5 py-1 text-xs text-text-primary"
+          >
+            {USAGE_CURRENCIES.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+        </label>
       </header>
 
       <div className="mt-5 flex-1 space-y-4 overflow-y-auto pb-4">
@@ -145,7 +189,12 @@ export function UsageView() {
               />
               <Card
                 label={t("usage.cards.cost")}
-                value={formatCost(snapshot.totals.cost)}
+                value={formatCost(
+                  snapshot.totals.cost,
+                  currency,
+                  currencyRate,
+                  lang,
+                )}
                 hint={
                   unpricedCalls > 0
                     ? t("usage.cards.costUnpriced", {
@@ -231,7 +280,10 @@ function ModelTable({
   totalRow: string;
   totalCost: number;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currency = useAppStore((s) => s.currency);
+  const currencyRate = useAppStore((s) => s.currencyRate);
+  const lang = i18n.resolvedLanguage ?? "en";
   if (rows.length === 0) {
     return <p className="text-sm text-text-muted">{t("usage.empty")}</p>;
   }
@@ -283,7 +335,7 @@ function ModelTable({
             <td
               className={`${cellClass} ${row.cost === null ? "text-text-muted" : ""}`}
             >
-              {formatCost(row.cost)}
+              {formatCost(row.cost, currency, currencyRate, lang)}
             </td>
             <td
               className={`${cellClass} ${
@@ -317,7 +369,7 @@ function ModelTable({
             {compactNumber(total.cacheRead)}
           </td>
           <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">
-            {formatCost(totalCost)}
+            {formatCost(totalCost, currency, currencyRate, lang)}
           </td>
           <td className="px-2 py-1.5" />
           <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">

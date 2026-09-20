@@ -141,6 +141,7 @@ import {
 } from "../shared/local-file-path";
 import { eventRequiresSessionManager } from "./client-event-utils";
 import { backfillUsageFromSessions } from "./usage/usage-backfill";
+import { getExchangeRates, warmExchangeRateCache } from "./usage/exchange-rate";
 import { backfillSubagentUsageFromSessions } from "./usage/usage-subagent-backfill";
 import { removePooledSubagentRows } from "./usage/usage-store";
 import { queryUsage } from "./usage/usage-store";
@@ -1025,6 +1026,7 @@ app
     log("===========================");
 
     startTelemetryHeartbeat();
+    warmExchangeRateCache(EXCHANGE_RATE_CACHE_PATH);
 
     // Initialize default working directory
     initializeDefaultWorkingDir();
@@ -1498,6 +1500,11 @@ const USAGE_SESSIONS_ROOT = join(app.getPath("userData"), "pi-sessions");
  * 它们的头部带 `parentSession` 指回上面那个根里的父会话文件 —— 子代理用量按它筛选。
  */
 const SUBAGENT_SESSIONS_ROOT = join(getAgentDir(), "sessions");
+/** 汇率缓存文件。frankfurter 每天发布一次，24h TTL 见 exchange-rate.ts。 */
+const EXCHANGE_RATE_CACHE_PATH = join(
+  app.getPath("userData"),
+  "exchange-rate.json",
+);
 let usageBackfillPromise: Promise<void> | null = null;
 
 /**
@@ -4232,6 +4239,12 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
 
     case "session.getTraceSteps":
       return sm.getTraceSteps(event.payload.sessionId);
+
+    case "usage.exchange-rate":
+      // 静默：null = 取不到，渲染层回退美元显示，无任何提示
+      return {
+        rates: await getExchangeRates(EXCHANGE_RATE_CACHE_PATH, Date.now()),
+      };
 
     case "usage.query": {
       await ensureUsageBackfilled();

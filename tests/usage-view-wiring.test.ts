@@ -127,3 +127,53 @@ describe("usage view wiring", () => {
     expect(view).not.toContain("byDay.filter");
   });
 });
+
+describe("usage currency wiring", () => {
+  it("renders a currency selector bound to the shared code list", () => {
+    const view = read("src/renderer/components/UsageView.tsx");
+    expect(view).toContain("<select");
+    expect(view).toContain("USAGE_CURRENCIES.map");
+    expect(view).toContain('t("usage.currency")');
+    expect(view).toContain('type: "usage.exchange-rate"');
+  });
+
+  it("keeps currency in the zustand store and persists it under a fixed key", () => {
+    const store = read("src/renderer/store/index.ts");
+    expect(store).toContain("currency: CurrencyCode");
+    expect(store).toContain("currencyRate: number | null");
+    expect(store).toContain('localStorage.setItem("deskwand.usageCurrency"');
+    expect(store).toContain("i18nextLng");
+  });
+
+  it("defaults to CNY for a Chinese UI and USD otherwise", () => {
+    const store = read("src/renderer/store/index.ts");
+    expect(store).toContain('startsWith("zh")');
+    expect(store).toContain('return "CNY"');
+    expect(store).toContain('return "USD"');
+  });
+
+  it("converts every amount surface, including the heatmap tooltip", () => {
+    const view = read("src/renderer/components/UsageView.tsx");
+    // 分开断言，不锁定整行：prettier（printWidth 80）会把 `value={formatCost(...)}`
+    // 这类长行折成多行，连在一起的子串会断
+    // 断言格式免疫：prettier 会把长行折成多行（如 value={formatCost(\n …)}），
+    // 所以只锁"调用点存在 + 参数出现"，不锁整行
+    expect(view).toContain("snapshot.totals.cost,");
+    expect(view).toContain("formatCost(row.cost");
+    expect(view).toContain("formatCost(totalCost");
+    expect(view).toContain("currencyRate, lang");
+    const heat = read("src/renderer/components/usage/UsageCalendarHeatmap.tsx");
+    expect(heat).toContain("formatCost(totalCostOf(rows)");
+    expect(heat).toContain("formatCost(row.cost");
+    expect(heat).toContain("currencyRate");
+  });
+
+  it("ships the label in both locales", () => {
+    for (const locale of ["zh", "en"]) {
+      const json = JSON.parse(
+        read(`src/renderer/i18n/locales/${locale}.json`),
+      ) as Record<string, Record<string, unknown>>;
+      expect(json.usage?.currency).toBeTruthy();
+    }
+  });
+});

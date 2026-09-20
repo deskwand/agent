@@ -77,3 +77,23 @@ export interface UsageSnapshot {
 
 /** 页面默认区间；也是 IPC 收到非法 range 时的回落值。 */
 export const DEFAULT_USAGE_RANGE: UsageRange = "1d";
+
+/**
+ * 用量页可选显示货币（ISO 4217）。金额本位永远是 USD，折算只发生在显示前最后一刻；
+ * 价目表、覆盖表与数据库里的数字不受任何影响。
+ */
+export const USAGE_CURRENCIES = [
+  "USD",
+  "CNY",
+  "EUR",
+  "JPY",
+  "GBP",
+  "HKD",
+] as const;
+
+export type CurrencyCode = (typeof USAGE_CURRENCIES)[number];
+
+/** 各显示货币对 USD 的汇率；缺的币种没有键（渲染层对该币种回退美元）。 */
+export type ExchangeRates = Partial<
+  Record<Exclude<CurrencyCode, "USD">, number>
+>;

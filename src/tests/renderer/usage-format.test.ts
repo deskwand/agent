@@ -197,3 +197,43 @@ describe("resolveCellLevel in cost mode", () => {
     expect(resolveCellLevel(poor, "usage", values)).toBe(4);
   });
 });
+
+describe("formatCost with currency", () => {
+  it("converts USD to CNY with yuan tiers", () => {
+    expect(formatCost(null, "CNY", 7.1, "zh-CN")).toBe("—");
+    expect(formatCost(0, "CNY", 7.1, "zh-CN")).toBe("¥0");
+    // 0.00284 元 < 最小单位 0.01：不能显示成 ¥0.00（静默归零）
+    expect(formatCost(0.0004, "CNY", 7.1, "zh-CN")).toBe("<¥0.01");
+    expect(formatCost(0.01, "CNY", 7.1, "zh-CN")).toBe("¥0.0710");
+    expect(formatCost(1, "CNY", 7.1, "zh-CN")).toBe("¥7.10");
+    expect(formatCost(1000, "CNY", 7.1, "zh-CN")).toBe("¥7,100");
+  });
+
+  it("JPY has no decimals and its underflow marker is one yen", () => {
+    // $0.0004 → ¥0.06：JPY 0 位小数会显示成 ¥0，看着像免费，必须用 <¥1
+    expect(formatCost(0.0004, "JPY", 157, "en-US")).toBe("<¥1");
+    // $0.008 → ¥1.256 → 0 位小数 → ¥1
+    expect(formatCost(0.008, "JPY", 157, "en-US")).toBe("¥1");
+    expect(formatCost(1, "JPY", 157, "en-US")).toBe("¥157");
+    expect(formatCost(1000, "JPY", 157, "en-US")).toBe("¥157,000");
+    // zh 下符号变 JP¥（Intl 自带），合法且更清晰，不锁死它
+    expect(formatCost(157, "JPY", 1, "zh-CN")).toBe("JP¥157");
+  });
+
+  it("uses the locale's symbol and placement", () => {
+    expect(formatCost(1000, "CNY", 7.1, "en-US")).toBe("CN¥7,100");
+    expect(formatCost(1000, "EUR", 0.92, "en-US")).toBe("€920.00");
+    expect(formatCost(1000, "EUR", 0.92, "zh-CN")).toBe("€920.00");
+  });
+
+  it("falls back to dollars when the rate is missing or unusable", () => {
+    expect(formatCost(1, "CNY", null)).toBe("$1.00");
+    expect(formatCost(1, "CNY", 0)).toBe("$1.00");
+    expect(formatCost(1, "CNY", Number.NaN)).toBe("$1.00");
+  });
+
+  it("keeps USD identical to the legacy path regardless of extras", () => {
+    expect(formatCost(0.0004, "USD", 7.1)).toBe("<$0.001");
+    expect(formatCost(1000, "USD", 7.1)).toBe("$1,000");
+  });
+});

@@ -51,3 +51,24 @@ describe("usage.query IPC contract", () => {
     );
   });
 });
+
+describe("usage.exchange-rate IPC contract", () => {
+  it("is declared on the ClientEvent union", () => {
+    expect(read("src/renderer/types/index.ts")).toContain(
+      'type: "usage.exchange-rate"',
+    );
+  });
+
+  it("is allowlisted in preload", () => {
+    expect(read("src/preload/index.ts")).toContain('"usage.exchange-rate"');
+  });
+
+  it("is handled in the main process via the cache-backed module", () => {
+    const text = read("src/main/index.ts");
+    expect(text).toContain('case "usage.exchange-rate"');
+    // 分开断言：prettier（printWidth 80）会把长行折行，连在一起的子串会断
+    expect(text).toContain("getExchangeRates(");
+    expect(text).toContain("EXCHANGE_RATE_CACHE_PATH");
+    expect(text).toContain("warmExchangeRateCache(");
+  });
+});

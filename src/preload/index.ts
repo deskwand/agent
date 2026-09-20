@@ -83,6 +83,7 @@ const ALLOWED_CLIENT_EVENTS = new Set([
   "session.getMessagesPage",
   "session.getTraceSteps",
   "usage.query",
+  "usage.exchange-rate",
   "permission.response",
   "sudo.password.response",
   "settings.update",

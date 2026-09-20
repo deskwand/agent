@@ -1,4 +1,8 @@
-import type { UsageDayRow, UsageModelRow } from "../../shared/usage";
+import type {
+  CurrencyCode,
+  UsageDayRow,
+  UsageModelRow,
+} from "../../shared/usage";
 
 /** Pure formatting / bucketing helpers for the usage view (no React, no state). */
 
@@ -79,19 +83,63 @@ export function resolveCellLevel(
  * 参考金额。六档，专门防止"小于 1 分的真实成本被显示成 $0.00"这种静默归零。
  * null = 无价目（`—`）；负数 = 上游脏数据，同样按不可用处理。
  *
- * 分组阈值按**四舍五入后**的值判：否则 999.996 会走 toFixed(2) 分支输出 `$1000.00`，
- * 而 1000 输出 `$1,000` —— 同一个表里两个数看着像 bug。
+ * 非 USD：金额 = cost × rate，阈值按**目标货币的最小单位**重定（JPY 无小数，最小
+ * 单位是 1），符号/位置/分组/小数交给 Intl。rate 缺失或不可用（<= 0 / NaN / null）
+ * 一律回退美元 —— 汇率失败是静默的，界面不加任何说明。
+ *
+ * USD 分支是历史行为，一行不改（20 个既有用例锁定了语义）；分组阈值按**四舍五入后**
+ * 的值判：否则 999.996 会走 toFixed(2) 分支输出 `$1000.00`，而 1000 输出 `$1,000`。
  */
-export function formatCost(cost: number | null): string {
+export function formatCost(
+  cost: number | null,
+  currency: CurrencyCode = "USD",
+  rate: number | null = null,
+  locale?: string,
+): string {
+  if (
+    currency === "USD" ||
+    rate === null ||
+    !Number.isFinite(rate) ||
+    rate <= 0
+  ) {
+    // 金额一律美元，分组符号固定用 en-US；跟随 UI 语言会让 zh 下变成 `US$1,235`，
+    // 与同一函数里的 `$` 前缀自相矛盾
+    if (cost === null || !Number.isFinite(cost) || cost < 0) return "—";
+    if (cost === 0) return "$0";
+    if (cost < 0.001) return "<$0.001";
+    if (cost < 1) return `$${cost.toFixed(4)}`;
+    const cents = Math.round(cost * 100) / 100;
+    if (cents < 1000) return `$${cents.toFixed(2)}`;
+    return `$${Math.round(cents).toLocaleString("en-US")}`;
+  }
   if (cost === null || !Number.isFinite(cost) || cost < 0) return "—";
-  if (cost === 0) return "$0";
-  if (cost < 0.001) return "<$0.001";
-  if (cost < 1) return `$${cost.toFixed(4)}`;
-  const cents = Math.round(cost * 100) / 100;
-  if (cents < 1000) return `$${cents.toFixed(2)}`;
-  // 金额一律美元，分组符号固定用 en-US；跟随 UI 语言会让 zh 下变成 `US$1,235`，
-  // 与同一函数里的 `$` 前缀自相矛盾
-  return `$${Math.round(cents).toLocaleString("en-US")}`;
+  const amount = cost * rate;
+  if (amount === 0) return currencyAmount(amount, currency, 0, locale);
+  const minUnit = currency === "JPY" ? 1 : 0.01;
+  if (amount < minUnit) {
+    return `<${currencyAmount(minUnit, currency, currency === "JPY" ? 0 : 2, locale)}`;
+  }
+  if (amount < 1) return currencyAmount(amount, currency, 4, locale);
+  const cents = Math.round(amount * 100) / 100;
+  if (cents < 1000) {
+    return currencyAmount(cents, currency, currency === "JPY" ? 0 : 2, locale);
+  }
+  return currencyAmount(Math.round(cents), currency, 0, locale);
+}
+
+/** 小数位显式给定（Intl 默认 2 位会让 <¥0.01 显示成 <¥0.00）。 */
+function currencyAmount(
+  amount: number,
+  currency: CurrencyCode,
+  fractionDigits: number,
+  locale?: string,
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(amount);
 }
 
 /**

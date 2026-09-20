@@ -1766,6 +1766,7 @@
   "usage": {
     "title": "Usage",
     "subtitle": "Across this machine · stored locally only",
+    "currency": "Currency",
     "range": {
       "1d": "Today",
       "7d": "7 days",

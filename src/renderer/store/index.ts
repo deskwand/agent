@@ -24,6 +24,7 @@ import { applySessionUpdate } from "../utils/session-update";
 import { initialPreviewWidth, initialReviewWidth } from "../utils/panel-width";
 import type { RightPanelMode } from "../utils/browser-visibility";
 import type { ImageSource } from "../components/ImageLightbox";
+import { USAGE_CURRENCIES, type CurrencyCode } from "../../shared/usage";
 import { restoreUserMessage } from "../utils/prompt-decorations";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
@@ -164,6 +165,10 @@ interface AppState {
   contextPanelWidth: number;
   browserWidthManual: boolean;
   activeView: ActiveView;
+  /** 用量页显示货币（ISO 4217）；金额本位永远是 USD。 */
+  currency: CurrencyCode;
+  /** 当前货币对 USD 的汇率；null = 未取到，界面静默回退美元显示。 */
+  currencyRate: number | null;
   settingsTab: string | null;
 
   rightPanelMode: "files" | "browser" | "preview" | "review" | null;
@@ -347,6 +352,8 @@ interface AppState {
   setSidebarWidth: (width: number) => void;
   setContextPanelWidth: (width: number) => void;
   setActiveView: (view: ActiveView) => void;
+  setCurrency: (currency: CurrencyCode) => void;
+  setCurrencyRate: (currencyRate: number | null) => void;
   setShowSettings: (show: boolean) => void;
   setShowSchedule: (show: boolean) => void;
   setShowApps: (show: boolean) => void;
@@ -472,6 +479,30 @@ const defaultSettings: Settings = {
   telemetryEnabled: true,
 };
 
+/**
+ * 用量页显示货币的初始值：先读用户选择，再跟随界面语言（zh → CNY，其余 → USD）。
+ *
+ * 语言不 import i18n：`i18n/config` 顶层会 `i18n.use(initReactI18next)`，而不少
+ * 组件测试只 mock 了 react-i18next 的 `useTranslation`——顶层 import 会让那些文件
+ * 在模块加载阶段就炸（见 office-preview-runner.ts 的实测注释）。LanguageDetector
+ * 自己会把解析结果缓存进 localStorage 的 `i18nextLng`，直接读它即可。
+ */
+function readStoredCurrency(): CurrencyCode {
+  try {
+    const stored = localStorage.getItem("deskwand.usageCurrency");
+    if (stored && (USAGE_CURRENCIES as readonly string[]).includes(stored)) {
+      return stored as CurrencyCode;
+    }
+    // 首次启动时 store 模块比 i18n.init 先求值（main.tsx 先 import App），
+    // i18nextLng 还不存在 —— 兜底读平台语言，否则中文用户第一次打开是 USD
+    const detected = localStorage.getItem("i18nextLng") ?? navigator.language;
+    if (detected?.startsWith("zh")) return "CNY";
+  } catch {
+    /* localStorage unavailable */
+  }
+  return "USD";
+}
+
 export const useAppStore = create<AppState>((set) => ({
   // Initial state
   sessions: [],
@@ -485,6 +516,8 @@ export const useAppStore = create<AppState>((set) => ({
   contextPanelWidth: 288,
   browserWidthManual: false,
   activeView: "chat",
+  currency: readStoredCurrency(),
+  currencyRate: null,
   settingsTab: null,
   rightPanelMode: null as "files" | "browser" | "preview" | "review" | null,
   previewTabs: [] as PreviewTab[],
@@ -1034,6 +1067,16 @@ export const useAppStore = create<AppState>((set) => ({
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   setContextPanelWidth: (width) => set({ contextPanelWidth: width }),
   setActiveView: (activeView) => set({ activeView }),
+  setCurrency: (currency) => {
+    try {
+      localStorage.setItem("deskwand.usageCurrency", currency);
+    } catch {
+      /* localStorage unavailable */
+    }
+    // 切换货币必须清汇率：留着旧币种的 rate 会把新币种换算错
+    set({ currency, currencyRate: null });
+  },
+  setCurrencyRate: (currencyRate) => set({ currencyRate }),
   setShowSettings: (show) => set({ activeView: show ? "settings" : "chat" }),
   setShowSchedule: (show) => set({ activeView: show ? "automation" : "chat" }),
   setShowApps: (show) => set({ activeView: show ? "apps" : "chat" }),

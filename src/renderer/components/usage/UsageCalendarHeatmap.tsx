@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
+import { useAppStore } from "../../store";
 import { useTranslation } from "react-i18next";
-import type { UsageDayRow } from "../../../shared/usage";
+import type { CurrencyCode, UsageDayRow } from "../../../shared/usage";
 import {
   compactNumber,
   formatCost,
@@ -44,6 +45,9 @@ const HIT_TOKEN = [
 export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
   const { t, i18n } = useTranslation();
   const [mode, setMode] = useState<ColorMode>("usage");
+  const currency = useAppStore((s) => s.currency);
+  const currencyRate = useAppStore((s) => s.currencyRate);
+  const lang = i18n.resolvedLanguage ?? "en";
   const monthFormat = useMemo(
     () => new Intl.DateTimeFormat(i18n.language, { month: "short" }),
     [i18n.language],
@@ -167,6 +171,9 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
                     row={byDate.get(key)}
                     mode={mode}
                     allValues={allValues}
+                    currency={currency}
+                    currencyRate={currencyRate}
+                    lang={lang}
                   />
                 ))}
               </div>
@@ -188,7 +195,7 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
         <span className="ml-auto font-mono">
           {weeks} · {t("usage.allTime")} ·{" "}
           {mode === "cost"
-            ? formatCost(totalCostOf(rows))
+            ? formatCost(totalCostOf(rows), currency, currencyRate, lang)
             : formatHitRate(hitRateOf(rows))}
         </span>
       </div>
@@ -202,12 +209,18 @@ function Cell({
   row,
   mode,
   allValues,
+  currency,
+  currencyRate,
+  lang,
 }: {
   dateKey: string;
   future: boolean;
   row: UsageDayRow | undefined;
   mode: ColorMode;
   allValues: number[];
+  currency: CurrencyCode;
+  currencyRate: number | null;
+  lang: string;
 }) {
   if (future) {
     return <span style={{ aspectRatio: "1", alignSelf: "start" }} />;
@@ -222,7 +235,7 @@ function Cell({
         alignSelf: "start",
         ...swatchStyle(level, mode),
       }}
-      title={cellTitle(dateKey, row, mode)}
+      title={cellTitle(dateKey, row, mode, currency, currencyRate, lang)}
     />
   );
 }
@@ -249,10 +262,13 @@ function cellTitle(
   dateKey: string,
   row: UsageDayRow | undefined,
   mode: ColorMode,
+  currency: CurrencyCode,
+  currencyRate: number | null,
+  lang: string,
 ): string {
   if (!row) return dateKey;
   if (mode === "cost") {
-    return `${dateKey} · ${formatCost(row.cost)} · ${row.calls} calls`;
+    return `${dateKey} · ${formatCost(row.cost, currency, currencyRate, lang)} · ${row.calls} calls`;
   }
   if (mode === "hit") {
     return `${dateKey} · ${formatHitRate(row.hitRate)} · in ${compactNumber(row.input)} / cache ${compactNumber(row.cacheRead)}`;

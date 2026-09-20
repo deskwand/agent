@@ -465,6 +465,7 @@ export type ClientEvent =
     }
   | { type: "session.getTraceSteps"; payload: { sessionId: string } }
   | { type: "usage.query"; payload: { range: UsageRange } }
+  | { type: "usage.exchange-rate"; payload: Record<string, never> }
   | {
       type: "permission.response";
       payload: { toolUseId: string; result: PermissionResult };
