@@ -81,6 +81,7 @@ import {
   type PiReplacedContext,
 } from "../extensions/pi-session-bridge";
 import { configStore } from "../config/config-store";
+import { bundleContext } from "./bundle-context";
 import {
   cleanupRetiredSkillLinks,
   RETIRED_SKILL_NAMES,
@@ -90,7 +91,6 @@ import {
   resolveBundledBinDirs,
   resolveBundledNodePaths,
   resolveBundledPythonBinDir,
-  type BundleContext,
 } from "./bundled-paths";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
@@ -5180,21 +5180,5 @@ export function resolveCompactionLifecyclePayload(
     typeof event.result?.estimatedTokensAfter === "number"
       ? { estimatedTokens: event.result.estimatedTokensAfter }
       : {}),
-  };
-}
-
-/**
- * Build the environment context that bundled-paths.ts needs.
- *
- * Kept as a function so it can pick up `process.resourcesPath` lazily — that
- * value is only meaningful once Electron has finished bootstrapping.
- */
-function bundleContext(): BundleContext {
-  return {
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath ?? "",
-    projectRoot: path.join(__dirname, "..", ".."),
-    platform: process.platform,
-    arch: process.arch,
   };
 }

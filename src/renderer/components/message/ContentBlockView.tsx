@@ -35,11 +35,9 @@ import { UserTextWithTokens } from "./UserTextWithTokens";
 import { ToolUseBlock } from "./ToolUseBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
 import type { ImageSource } from "../ImageLightbox";
-import {
-  isBrowserOpenableExt,
-  isPreviewableExt,
-} from "../../utils/file-preview";
 import { openFilePathInBrowser } from "../../utils/open-in-browser";
+import { extOf, resolveOpenAction } from "../../utils/open-file-by-ext";
+import { openOfficePreview } from "../../utils/office-preview-runner";
 import type { ContentBlockViewProps } from "./types";
 
 const MessageMarkdown = lazy(() =>
@@ -90,20 +88,10 @@ export const ContentBlockView = memo(function ContentBlockView({
   const resolveFilePath = (value: string) =>
     resolvePathAgainstWorkspace(value, currentWorkingDir);
 
-  const handleFilePathClick = useCallback(
-    async (value: string) => {
-      const resolvedPath = resolveFilePath(value);
-      const iDot = value.lastIndexOf(".");
-      const ext = iDot > 0 ? value.slice(iDot).toLowerCase() : "";
-      if (isBrowserOpenableExt(ext)) {
-        openFilePathInBrowser(resolvedPath);
-        return;
-      }
-      if (isPreviewableExt(ext)) {
-        const fileName = value.split(/[/\\]/).pop() || value;
-        openPreview({ path: resolvedPath, name: fileName });
-        return;
-      }
+  // 该文件原本有两处一模一样的"在文件夹中显示"实现；抽成一个局部函数供两处复用
+  // （路由兜底 + chip 上那个独立按钮）。
+  const revealInFolder = useCallback(
+    async (resolvedPath: string) => {
       if (
         typeof window === "undefined" ||
         !window.electronAPI?.showItemInFolder
@@ -133,7 +121,33 @@ export const ContentBlockView = memo(function ContentBlockView({
         });
       }
     },
-    [currentWorkingDir, openPreview, resolveFilePath, setGlobalNotice, t],
+    [currentWorkingDir, setGlobalNotice, t],
+  );
+
+  const handleFilePathClick = useCallback(
+    async (value: string) => {
+      const resolvedPath = resolveFilePath(value);
+      const action = resolveOpenAction(extOf(value));
+      if (action === "browser") {
+        openFilePathInBrowser(resolvedPath);
+        return;
+      }
+      if (action === "preview") {
+        const fileName = value.split(/[/\\]/).pop() || value;
+        openPreview({ path: resolvedPath, name: fileName });
+        return;
+      }
+      if (action === "office") {
+        void openOfficePreview(resolvedPath, {
+          onSuccess: (outPath) => openFilePathInBrowser(outPath),
+          // 本入口的既有兜底是"在文件夹中显示"，保持不动。
+          onFailure: () => void revealInFolder(resolvedPath),
+        });
+        return;
+      }
+      await revealInFolder(resolvedPath);
+    },
+    [openPreview, resolveFilePath, revealInFolder],
   );
 
   const renderFileButton = (value: string, key?: string) => (
@@ -187,69 +201,33 @@ export const ContentBlockView = memo(function ContentBlockView({
           currentWorkingDir,
         );
         if (localFilePath) {
-          const iDot = localFilePath.lastIndexOf(".");
-          const ext = iDot > 0 ? localFilePath.slice(iDot).toLowerCase() : "";
-          if (isBrowserOpenableExt(ext)) {
-            return (
-              <button
-                type="button"
-                onClick={() => openFilePathInBrowser(localFilePath)}
-                className={getFileLinkButtonClassName()}
-                title={localFilePath}
-              >
-                {children}
-              </button>
-            );
-          }
-          if (isPreviewableExt(ext)) {
-            return (
-              <button
-                type="button"
-                onClick={() => {
-                  const fileName =
-                    localFilePath.split(/[/\\]/).pop() || localFilePath;
-                  openPreview({ path: localFilePath, name: fileName });
-                }}
-                className={getFileLinkButtonClassName()}
-                title={localFilePath}
-              >
-                {children}
-              </button>
-            );
-          }
+          const action = resolveOpenAction(extOf(localFilePath));
+          const openLocalFile = () => {
+            if (action === "browser") {
+              openFilePathInBrowser(localFilePath);
+              return;
+            }
+            if (action === "preview") {
+              const fileName =
+                localFilePath.split(/[/\\]/).pop() || localFilePath;
+              openPreview({ path: localFilePath, name: fileName });
+              return;
+            }
+            if (action === "office") {
+              void openOfficePreview(localFilePath, {
+                onSuccess: (outPath) => openFilePathInBrowser(outPath),
+                onFailure: () => void revealInFolder(localFilePath),
+              });
+              return;
+            }
+            void revealInFolder(localFilePath);
+          };
+          // 四种分流共用同一个按钮外壳：原先四个几乎相同的 <button> 只差 onClick，
+          // 合并后少掉 ~40 行重复，也让分流集中在一处。
           return (
             <button
               type="button"
-              onClick={async () => {
-                if (
-                  typeof window === "undefined" ||
-                  !window.electronAPI?.showItemInFolder
-                ) {
-                  return;
-                }
-                try {
-                  const revealed = await window.electronAPI.showItemInFolder(
-                    localFilePath,
-                    currentWorkingDir ?? undefined,
-                  );
-                  if (!revealed) {
-                    setGlobalNotice({
-                      id: `message-card-reveal-failed-${Date.now()}`,
-                      type: "warning",
-                      message: t("context.revealFailed"),
-                    });
-                  }
-                } catch (error) {
-                  setGlobalNotice({
-                    id: `message-card-reveal-failed-${Date.now()}`,
-                    type: "warning",
-                    message:
-                      error instanceof Error && error.message
-                        ? error.message
-                        : t("context.revealFailed"),
-                  });
-                }
-              }}
+              onClick={openLocalFile}
               className={getFileLinkButtonClassName()}
               title={localFilePath}
             >
@@ -531,22 +509,30 @@ export const ContentBlockView = memo(function ContentBlockView({
         const iDot = fileBlock.filename.lastIndexOf(".");
         const attExt =
           iDot > 0 ? fileBlock.filename.slice(iDot).toLowerCase() : "";
-        const canPreview = attachmentPath && isPreviewableExt(attExt);
-        const opensInBrowser = attachmentPath && isBrowserOpenableExt(attExt);
-        const isInteractive = Boolean(canPreview || opensInBrowser);
+        // 与其它三个入口用同一个判定，避免这里把 office 排在 preview 之前而与
+        // resolveOpenAction 的顺序（browser → preview → office）分叉。
+        const attachmentAction =
+          attachmentPath && attExt ? resolveOpenAction(attExt) : "fallback";
+        const isInteractive = Boolean(
+          attachmentPath && attachmentAction !== "fallback",
+        );
 
         return (
           <div
             className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden ${isInteractive ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
             onClick={() => {
               if (!attachmentPath || !isInteractive) return;
-              if (opensInBrowser) {
+              if (attachmentAction === "browser") {
                 openFilePathInBrowser(attachmentPath);
                 return;
               }
-              openPreview({
-                path: attachmentPath,
-                name: fileBlock.filename,
+              if (attachmentAction === "preview") {
+                openPreview({ path: attachmentPath, name: fileBlock.filename });
+                return;
+              }
+              void openOfficePreview(attachmentPath, {
+                onSuccess: (outPath) => openFilePathInBrowser(outPath),
+                onFailure: () => void revealInFolder(attachmentPath),
               });
             }}
           >

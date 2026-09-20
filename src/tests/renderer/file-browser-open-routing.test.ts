@@ -13,6 +13,8 @@ const ENTRIES = [
   { name: "index.html", isDir: false, size: 120, ext: "html" },
   { name: "notes.md", isDir: false, size: 30, ext: "md" },
   { name: "bundle.zip", isDir: false, size: 4000, ext: "zip" },
+  { name: "report.docx", isDir: false, size: 900, ext: "docx" },
+  { name: "legacy.doc", isDir: false, size: 700, ext: "doc" },
 ];
 
 describe("FileBrowser open routing", () => {
@@ -20,6 +22,7 @@ describe("FileBrowser open routing", () => {
   let root: Root;
   let navigate: ReturnType<typeof vi.fn>;
   let openPath: ReturnType<typeof vi.fn>;
+  let renderOfficePreview: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     useAppStore.setState(useAppStore.getInitialState());
@@ -27,12 +30,17 @@ describe("FileBrowser open routing", () => {
 
     navigate = vi.fn();
     openPath = vi.fn(async () => ({ error: null }));
+    renderOfficePreview = vi.fn(async () => ({
+      ok: true,
+      outPath: "/tmp/deskwand-office-preview/deadbeef.html",
+    }));
     Object.defineProperty(window, "electronAPI", {
       configurable: true,
       value: {
         listDirectory: vi.fn(async () => ENTRIES),
         browser: { navigate },
         openPath,
+        file: { renderOfficePreview },
       },
     });
 
@@ -97,5 +105,37 @@ describe("FileBrowser open routing", () => {
     ]);
     expect(navigate).not.toHaveBeenCalled();
     expect(openPath).not.toHaveBeenCalled();
+  });
+
+  it("renders an office row and opens the generated html in the built-in browser", async () => {
+    await doubleClickRow("report.docx");
+
+    expect(renderOfficePreview).toHaveBeenCalledWith("/repo/report.docx");
+    expect(navigate).toHaveBeenCalledWith(
+      "file:///tmp/deskwand-office-preview/deadbeef.html",
+    );
+    expect(openPath).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the system opener when office rendering fails", async () => {
+    renderOfficePreview.mockResolvedValueOnce({
+      ok: false,
+      reason: "binary-missing",
+    });
+
+    await doubleClickRow("report.docx");
+
+    expect(openPath).toHaveBeenCalledWith("/repo/report.docx");
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("keeps legacy office formats on the system opener", async () => {
+    // .doc 不是 OOXML，officecli 渲染不了 → 必须留在系统程序那条路。
+    // （拿 .zip 测是测不到这件事的。）
+    await doubleClickRow("legacy.doc");
+
+    expect(renderOfficePreview).not.toHaveBeenCalled();
+    expect(openPath).toHaveBeenCalledWith("/repo/legacy.doc");
+    expect(navigate).not.toHaveBeenCalled();
   });
 });

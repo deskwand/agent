@@ -13,6 +13,7 @@
  *               skills-manager, scheduled-task-manager, nav-server, remote-manager
  */
 import "./setup-userdata";
+import { renderOfficePreview } from "./office/office-preview";
 import {
   app,
   BrowserWindow,
@@ -3130,6 +3131,18 @@ ipcMain.handle("file.removeTemp", async (_event, tempPath: string) => {
     await rm(tempPath, { recursive: true, force: true });
   } catch (error) {
     // best effort — path may already be gone
+  }
+});
+
+ipcMain.handle("file.renderOfficePreview", async (_event, filePath: string) => {
+  if (typeof filePath !== "string" || filePath.length === 0) {
+    return { ok: false, reason: "render-failed" as const };
+  }
+  try {
+    return await renderOfficePreview(filePath);
+  } catch (err: unknown) {
+    logError("[App] renderOfficePreview failed:", err);
+    return { ok: false, reason: "render-failed" as const };
   }
 });
 

@@ -4,8 +4,10 @@ import { useAppStore } from "../store";
 import { ChevronDown, ChevronRight, Loader2, Search, X } from "lucide-react";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
-import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
 import { openFilePathInBrowser } from "../utils/open-in-browser";
+import { extOf, resolveOpenAction } from "../utils/open-file-by-ext";
+import { openOfficePreview } from "../utils/office-preview-runner";
+import { OpenWithSystemAppButton } from "./OpenWithSystemAppButton";
 import { splitRelPath } from "./attach/picker-items";
 import {
   FILTER_RESULT_CAP,
@@ -23,6 +25,7 @@ function FileTreeRow({
   row,
   loading,
   selected,
+  busy,
   onToggle,
   onSelect,
   onOpen,
@@ -30,13 +33,14 @@ function FileTreeRow({
   row: TreeRow;
   loading: boolean;
   selected: boolean;
+  busy: boolean;
   onToggle: (path: string) => void;
   onSelect: (path: string) => void;
   onOpen: (row: TreeRow) => void;
 }) {
   return (
     <div
-      className={`flex items-center gap-1 py-0.5 px-2 hover:bg-surface-hover rounded cursor-pointer text-xs select-none ${
+      className={`group flex items-center gap-1 py-0.5 px-2 hover:bg-surface-hover rounded cursor-pointer text-xs select-none ${
         selected ? "bg-accent/10 ring-1 ring-accent/20" : ""
       }`}
       style={{ paddingLeft: `${row.depth * 16 + 8}px` }}
@@ -66,6 +70,22 @@ function FileTreeRow({
       {!row.isDir && row.size > 0 && (
         <span className="ml-auto text-xs text-text-muted shrink-0">
           {formatSize(row.size)}
+        </span>
+      )}
+      {!row.isDir && (
+        // 固定宽度槽：图标 / spinner / 空 三种状态共用同一个位置。
+        // 不预留宽度的话，hover 时 size 文本会被向左顶走（行宽跳）。
+        <span className="flex w-5 shrink-0 items-center justify-center">
+          {busy ? (
+            <Loader2
+              className="h-3 w-3 animate-spin text-accent"
+              data-testid="office-preview-busy"
+            />
+          ) : (
+            <span className="opacity-0 group-hover:opacity-100">
+              <OpenWithSystemAppButton filePath={row.path} />
+            </span>
+          )}
         </span>
       )}
     </div>
@@ -100,21 +120,38 @@ export function FileBrowser({ width }: { width: number }) {
   const activeScan = scan && scan.dir === effectiveDir ? scan : null;
   const tree = useFileTree(effectiveDir ?? "");
 
+  const officePreviewBusyPath = useAppStore((s) => s.officePreviewBusyPath);
+  const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
+
   const handleFileOpen = useCallback(
     (fullPath: string, fileName: string) => {
-      const iDot = fileName.lastIndexOf(".");
-      const ext = iDot > 0 ? fileName.slice(iDot).toLowerCase() : "";
-      if (isBrowserOpenableExt(ext)) {
+      const action = resolveOpenAction(extOf(fileName));
+      if (action === "browser") {
         openFilePathInBrowser(fullPath);
         return;
       }
-      if (isPreviewableExt(ext)) {
+      if (action === "preview") {
         openPreview({ path: fullPath, name: fileName });
-      } else {
-        window.electronAPI?.openPath?.(fullPath);
+        return;
       }
+      if (action === "office") {
+        void openOfficePreview(fullPath, {
+          // 传的是路径：openFilePathInBrowser 内部会做 toFileUrl 转换。
+          onSuccess: (outPath) => openFilePathInBrowser(outPath),
+          onFailure: () => {
+            void window.electronAPI?.openPath?.(fullPath);
+            setGlobalNotice({
+              id: `office-preview-failed-${Date.now()}`,
+              type: "warning",
+              message: t("filePreview.officeRenderFailed"),
+            });
+          },
+        });
+        return;
+      }
+      window.electronAPI?.openPath?.(fullPath);
     },
-    [openPreview],
+    [openPreview, setGlobalNotice, t],
   );
 
   const handleToggle = useCallback(
@@ -234,6 +271,7 @@ export function FileBrowser({ width }: { width: number }) {
                 row={row}
                 loading={tree.isLoading(row.path)}
                 selected={selectedPath === row.path}
+                busy={officePreviewBusyPath === row.path}
                 onToggle={handleToggle}
                 onSelect={setSelectedPath}
                 onOpen={handleOpen}
@@ -279,11 +317,21 @@ export function FileBrowser({ width }: { width: number }) {
                     ? `${effectiveDir}/${dir}/${name}`
                     : `${effectiveDir}/${name}`;
                   return (
-                    <button
+                    <div
                       key={match.relPath}
-                      type="button"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => handleFileOpen(fullPath, name)}
-                      className="w-full flex items-center gap-2 px-2 py-0.5 hover:bg-surface-hover rounded text-xs text-left"
+                      onKeyDown={(event) => {
+                        // 行内还有 ⧉ 按钮：它的 Enter/Space 会冒泡到这里，
+                        // 不拦住的话键盘用户按 ⧉ 会变成"预览"（甚至两者都触发）。
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleFileOpen(fullPath, name);
+                        }
+                      }}
+                      className="group w-full flex items-center gap-2 px-2 py-0.5 hover:bg-surface-hover rounded text-xs text-left cursor-pointer"
                     >
                       <FileTypeIcon kind={getFileKind(name)} size={16} />
                       <span className="truncate text-text-primary">{name}</span>
@@ -293,7 +341,19 @@ export function FileBrowser({ width }: { width: number }) {
                       <span className="ml-auto text-xs text-text-muted shrink-0">
                         {formatSize(match.size)}
                       </span>
-                    </button>
+                      <span className="flex w-5 shrink-0 items-center justify-center">
+                        {officePreviewBusyPath === fullPath ? (
+                          <Loader2
+                            className="h-3 w-3 animate-spin text-accent"
+                            data-testid="office-preview-busy"
+                          />
+                        ) : (
+                          <span className="opacity-0 group-hover:opacity-100">
+                            <OpenWithSystemAppButton filePath={fullPath} />
+                          </span>
+                        )}
+                      </span>
+                    </div>
                   );
                 })}
                 {filterResult.total > filterResult.matches.length && (

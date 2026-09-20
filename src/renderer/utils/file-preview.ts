@@ -72,3 +72,15 @@ export function isBrowserOpenableExt(ext: string): boolean {
     ext && (BROWSER_OPENABLE_EXTS as readonly string[]).includes(ext),
   );
 }
+
+/**
+ * Office 文档走 officecli 渲染成 HTML 后进内置浏览器（见
+ * design-docs/2026-09-20-office-html-preview-design.md）。
+ * 只收 OOXML：officecli 不认 .doc/.xls/.ppt 这些旧的二进制格式。
+ */
+export const OFFICE_EXTS = [".docx", ".xlsx", ".pptx"] as const;
+
+/** 命中即走 officecli 渲染预览；契约同 isPreviewableExt。 */
+export function isOfficePreviewExt(ext: string): boolean {
+  return Boolean(ext && (OFFICE_EXTS as readonly string[]).includes(ext));
+}

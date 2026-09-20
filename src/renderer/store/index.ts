@@ -352,6 +352,9 @@ interface AppState {
   setShowApps: (show: boolean) => void;
   setSettingsTab: (tab: string | null) => void;
 
+  officePreviewBusyPath: string | null;
+  setOfficePreviewBusyPath: (path: string | null) => void;
+
   openPreview: (tab: PreviewTab) => void;
   closePreviewTab: (path: string) => void;
   closePreviewPanel: () => void;
@@ -485,6 +488,7 @@ export const useAppStore = create<AppState>((set) => ({
   settingsTab: null,
   rightPanelMode: null as "files" | "browser" | "preview" | "review" | null,
   previewTabs: [] as PreviewTab[],
+  officePreviewBusyPath: null as string | null,
   activePreviewTab: null as string | null,
   familyEntryOrigin: null as "files" | "browser" | null,
   lastVisibleContext: null as "preview" | "review" | null,
@@ -1122,6 +1126,8 @@ export const useAppStore = create<AppState>((set) => ({
     }),
   setBrowserWidthManual: (manual) => set({ browserWidthManual: manual }),
 
+  setOfficePreviewBusyPath: (path) => set({ officePreviewBusyPath: path }),
+
   openPreview: (tab) =>
     set((state) => {
       const existing = state.previewTabs.find((item) => item.path === tab.path);
@@ -1535,6 +1541,7 @@ export interface PreviewTab {
 /** 预览的内容状态；家族内切换不动它，只在关闭预览与切换会话时清。 */
 const clearedPreview = () => ({
   previewTabs: [] as PreviewTab[],
+  officePreviewBusyPath: null as string | null,
   activePreviewTab: null as string | null,
 });
 

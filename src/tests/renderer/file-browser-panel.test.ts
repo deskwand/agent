@@ -104,8 +104,11 @@ describe("FileBrowser panel", () => {
 
   /** 筛选结果行是 <button>；树行是 <div>。清空筛选的 X 按钮不算结果行。 */
   function resultRows(): string[] {
-    return Array.from(container.querySelectorAll("button"))
-      .map((button) => button.textContent ?? "")
+    // 筛选结果行是 `<div role="button">` 而不是 `<button>`：行内要放
+    // "用系统程序打开" 的按钮，而嵌套 <button> 是非法 HTML。
+    // 图标按钮的 textContent 为空，会被下面的长度过滤掉，不会造成噪声。
+    return Array.from(container.querySelectorAll('button, [role="button"]'))
+      .map((row) => row.textContent ?? "")
       .filter((text) => text.length > 0 && text !== "fileBrowser.clearFilter");
   }
 

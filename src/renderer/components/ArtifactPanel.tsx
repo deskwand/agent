@@ -7,11 +7,13 @@ import {
   extractFilePathFromToolOutput,
 } from "../utils/tool-output-path";
 import { getArtifactLabel, getArtifactSteps } from "../utils/artifact-steps";
-import { Layers } from "lucide-react";
+import { Layers, Loader2 } from "lucide-react";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
-import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
 import { openFilePathInBrowser } from "../utils/open-in-browser";
+import { extOf, resolveOpenAction } from "../utils/open-file-by-ext";
+import { openOfficePreview } from "../utils/office-preview-runner";
+import { OpenWithSystemAppButton } from "./OpenWithSystemAppButton";
 import type { TraceStep } from "../types";
 
 const EMPTY_STEPS: TraceStep[] = [];
@@ -23,6 +25,7 @@ export function ArtifactPanel() {
   const sessionStates = useAppStore((s) => s.sessionStates);
   const workingDir = useAppStore((s) => s.workingDir);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
+  const officePreviewBusyPath = useAppStore((s) => s.officePreviewBusyPath);
   const openPreview = useAppStore((s) => s.openPreview);
 
   const ss = activeSessionId ? sessionStates[activeSessionId] : undefined;
@@ -37,14 +40,25 @@ export function ArtifactPanel() {
 
   const handleClick = useCallback(
     async (artifactPath: string, label: string) => {
-      const dotIdx = artifactPath.lastIndexOf(".");
-      const ext = dotIdx > 0 ? artifactPath.slice(dotIdx).toLowerCase() : "";
-      if (isBrowserOpenableExt(ext)) {
+      const action = resolveOpenAction(extOf(artifactPath));
+      if (action === "browser") {
         openFilePathInBrowser(artifactPath);
         return;
       }
-      if (isPreviewableExt(ext)) {
+      if (action === "preview") {
         openPreview({ path: artifactPath, name: label });
+      } else if (action === "office") {
+        void openOfficePreview(artifactPath, {
+          onSuccess: (outPath) => openFilePathInBrowser(outPath),
+          onFailure: () => {
+            void window.electronAPI?.openPath?.(artifactPath);
+            setGlobalNotice({
+              id: `office-preview-failed-${Date.now()}`,
+              type: "warning",
+              message: t("filePreview.officeRenderFailed"),
+            });
+          },
+        });
       } else if (canOpenPath) {
         const result = await window.electronAPI.openPath(artifactPath);
         if (result.error) {
@@ -119,7 +133,7 @@ export function ArtifactPanel() {
               return (
                 <div
                   key={artifact.path || artifact.label || `artifact-${index}`}
-                  className={`flex items-center gap-2.5 px-4 py-2 transition-colors ${
+                  className={`group flex items-center gap-2.5 px-4 py-2 transition-colors ${
                     canClick ? "cursor-pointer hover:bg-surface-hover" : ""
                   }`}
                   onClick={() => {
@@ -132,6 +146,20 @@ export function ArtifactPanel() {
                   <span className="text-sm text-text-primary truncate flex-1">
                     {label}
                   </span>
+                  {artifactPath && (
+                    <span className="flex w-5 shrink-0 items-center justify-center">
+                      {officePreviewBusyPath === artifactPath ? (
+                        <Loader2
+                          className="h-3.5 w-3.5 animate-spin text-accent"
+                          data-testid="office-preview-busy"
+                        />
+                      ) : (
+                        <span className="opacity-0 group-hover:opacity-100">
+                          <OpenWithSystemAppButton filePath={artifactPath} />
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </div>
               );
             })

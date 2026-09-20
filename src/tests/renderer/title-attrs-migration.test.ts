@@ -32,7 +32,10 @@ function buttonTitleCount(relPath: string): number {
 const ALLOWED_BUTTON_TITLES: Record<string, number> = {
   "components/FilePreviewPanel.tsx": 1,
   "components/MergedInputChip.tsx": 2,
-  "components/message/ContentBlockView.tsx": 4,
+  // 4 → 2：markdown 本地文件链接原本有三个几乎相同的 <button>（只差 onClick），
+  // 合并成一个后，那三处刻意保留的 title={localFilePath} 只剩一处；文件里
+  // 另一处（文件 chip 按钮）不变，所以总数 4 → 2。
+  "components/message/ContentBlockView.tsx": 2,
   "components/settings/SettingsLogs.tsx": 1,
   "components/settings/SettingsSkills.tsx": 1,
   "components/SettingsPanel.tsx": 1,

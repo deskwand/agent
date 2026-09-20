@@ -235,7 +235,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // ── 自定义命令（pi 提示词模板）─────────────────────────────────
   promptCommands: {
     get: (name: string) =>
-      ipcRenderer.invoke("prompts.get", name) as Promise<PromptCommandDto | null>,
+      ipcRenderer.invoke(
+        "prompts.get",
+        name,
+      ) as Promise<PromptCommandDto | null>,
     save: (input: PromptCommandSaveInput, isCreate: boolean) =>
       ipcRenderer.invoke(
         "prompts.save",
@@ -243,7 +246,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
         isCreate,
       ) as Promise<PromptCommandSaveResult>,
     delete: (name: string) =>
-      ipcRenderer.invoke("prompts.delete", name) as Promise<PromptCommandSaveResult>,
+      ipcRenderer.invoke(
+        "prompts.delete",
+        name,
+      ) as Promise<PromptCommandSaveResult>,
   },
 
   // Platform info
@@ -477,6 +483,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("file.extractArchive", archivePath),
     removeTemp: (tempPath: string): Promise<void> =>
       ipcRenderer.invoke("file.removeTemp", tempPath),
+    renderOfficePreview: (filePath: string) =>
+      ipcRenderer.invoke("file.renderOfficePreview", filePath),
   },
 
   // Sandbox methods
@@ -969,6 +977,15 @@ declare global {
         saveToTemp: (buffer: ArrayBuffer, filename: string) => Promise<string>;
         extractArchive: (archivePath: string) => Promise<string>;
         removeTemp: (tempPath: string) => Promise<void>;
+        renderOfficePreview: (filePath: string) => Promise<{
+          ok: boolean;
+          outPath?: string;
+          reason?:
+            | "binary-missing"
+            | "render-failed"
+            | "timeout"
+            | "empty-output";
+        }>;
       };
       sandbox: {
         getStatus: () => Promise<{

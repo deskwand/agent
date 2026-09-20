@@ -117,3 +117,6 @@ website/.vitepress/cache/
 # codegraph
 .codegraph/
 tsconfig.node.tsbuildinfo
+
+# officecli 的用户配置（在仓库目录里跑该工具时生成）
+.officecli/
