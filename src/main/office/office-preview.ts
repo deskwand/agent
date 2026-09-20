@@ -5,6 +5,7 @@ import * as os from "os";
 import * as path from "path";
 import { resolveBundledBinDir } from "../agent/bundled-paths";
 import { bundleContext } from "../agent/bundle-context";
+import { logWarn } from "../utils/logger";
 
 /** 渲染超时。实测最坏（冷启大文档）约 1s，留 5× 余量。 */
 const DEFAULT_TIMEOUT_MS = 10_000;
@@ -107,7 +108,10 @@ export async function renderOfficePreview(
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   const binDir = findBinDir();
-  if (!binDir) return { ok: false, reason: "binary-missing" };
+  if (!binDir) {
+    logWarn("[office-preview] bundled officecli not found:", { binDir });
+    return { ok: false, reason: "binary-missing" };
+  }
 
   const binName = process.platform === "win32" ? "officecli.exe" : "officecli";
   const outPath = previewOutPath(sourcePath, deps.outDir);
@@ -116,7 +120,11 @@ export async function renderOfficePreview(
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     // 上一次失败的残留会让 empty-output 判定失真。
     fs.rmSync(outPath, { force: true });
-  } catch {
+  } catch (err: unknown) {
+    logWarn("[office-preview] could not prepare the output file:", {
+      outPath,
+      err,
+    });
     return { ok: false, reason: "render-failed" };
   }
 
@@ -127,18 +135,32 @@ export async function renderOfficePreview(
       ["view", sourcePath, "html", "-o", outPath],
       timeoutMs,
     );
-  } catch {
+  } catch (err: unknown) {
     // runner 本身抛错（注入的实现、或 spawn 失败）——按渲染失败处理。
+    logWarn("[office-preview] runner threw:", { sourcePath, err });
     return { ok: false, reason: "render-failed" };
   }
 
-  if (result.timedOut) return { ok: false, reason: "timeout" };
-  if (result.code !== 0) return { ok: false, reason: "render-failed" };
+  if (result.timedOut) {
+    logWarn("[office-preview] render timed out:", { sourcePath, timeoutMs });
+    return { ok: false, reason: "timeout" };
+  }
+  if (result.code !== 0) {
+    logWarn("[office-preview] render failed:", {
+      sourcePath,
+      code: result.code,
+      stderr: result.stderr.slice(0, 500),
+    });
+    return { ok: false, reason: "render-failed" };
+  }
 
   try {
-    if (fs.statSync(outPath).size === 0)
+    if (fs.statSync(outPath).size === 0) {
+      logWarn("[office-preview] render produced an empty file:", { outPath });
       return { ok: false, reason: "empty-output" };
+    }
   } catch {
+    logWarn("[office-preview] render produced no file:", { outPath });
     return { ok: false, reason: "empty-output" };
   }
 

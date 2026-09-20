@@ -1,3 +1,4 @@
+import { resolvePathAgainstWorkspace } from "../../shared/workspace-path";
 import {
   isBrowserOpenableExt,
   isOfficePreviewExt,
@@ -29,4 +30,27 @@ export function resolveOpenAction(ext: string): OpenAction {
   if (isPreviewableExt(ext)) return "preview";
   if (isOfficePreviewExt(ext)) return "office";
   return "fallback";
+}
+
+/**
+ * 把一个文件**引用**解析成真实路径。
+ *
+ * 消息里常见"正文写了目录、表格里只给裸名"，此时按工作区拼出的路径并不存在；
+ * 主进程会再按文件名在工作区里找一次（见 design 文档 §1、§5）。
+ * 拿到正确路径后再进 `resolveOpenAction` 分支，下游就不必知道兜底的存在。
+ */
+export async function resolveFileReferencePath(
+  token: string,
+  workingDir: string | null | undefined,
+): Promise<string> {
+  try {
+    const resolveReference = window.electronAPI?.file?.resolveReference;
+    if (resolveReference) {
+      const resolved = await resolveReference(token, workingDir ?? undefined);
+      if (resolved) return resolved;
+    }
+  } catch {
+    // 落到本地解析；生产不会走到（preload 一定在），这是为了 helper 可单测
+  }
+  return resolvePathAgainstWorkspace(token, workingDir);
 }

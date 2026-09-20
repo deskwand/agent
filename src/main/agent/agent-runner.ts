@@ -3153,6 +3153,9 @@ Tool routing:\n
 - web_search and fetch_content: Use for quick research and readable content retrieval when interactive browsing is unnecessary. Use get_search_content when a result was truncated.\n
 \u003c/tool_behavior\u003e`,
         this.getBundledPathHints(),
+        `<file_references>
+引用工作区内的文件时，给出相对工作区的路径或完整路径，不要只给文件名（例如写 \u0060test_docs/report.docx\u0060 而不是 \u0060report.docx\u0060）。这条对表格单元格、代码块、列表里的文件名同样适用——最容易漏的正是表格：上文已经写了目录、表格里却只填裸名，用户点不到。
+</file_references>`,
       ].filter((section): section is string =>
         Boolean(section && section.trim()),
       );

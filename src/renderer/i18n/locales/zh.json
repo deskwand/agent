@@ -1310,7 +1310,8 @@
     "loadFailed": "加载失败",
     "fileTooLarge": "文件过大（最大 10MB）",
     "unsupportedType": "不支持预览此文件类型",
-    "officeRenderFailed": "无法预览该文档，已用系统程序打开"
+    "officeRenderFailed": "无法预览该文档，已用系统程序打开",
+    "officeRenderFailedRevealed": "无法预览该文档，已在文件夹中显示"
   },
   "videoPlayer": {
     "loading": "正在加载视频…",

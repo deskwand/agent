@@ -1311,7 +1311,8 @@
     "loadFailed": "Load failed",
     "fileTooLarge": "File too large (max 10MB)",
     "unsupportedType": "Cannot preview this file type",
-    "officeRenderFailed": "Could not render a preview — opened with the system app instead"
+    "officeRenderFailed": "Could not render a preview — opened with the system app instead",
+    "officeRenderFailedRevealed": "Could not render a preview — revealed it in the file manager instead"
   },
   "videoPlayer": {
     "loading": "Loading video…",

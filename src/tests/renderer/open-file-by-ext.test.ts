@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   extOf,
+  resolveFileReferencePath,
   resolveOpenAction,
 } from "../../renderer/utils/open-file-by-ext";
 
@@ -53,5 +55,56 @@ describe("resolveOpenAction", () => {
     // pre-existing behaviour must not shift.
     expect(resolveOpenAction(".pdf")).toBe("browser");
     expect(resolveOpenAction(".csv")).toBe("preview");
+  });
+});
+
+describe("resolveFileReferencePath", () => {
+  afterEach(() => {
+    Reflect.deleteProperty(
+      window as unknown as Record<string, unknown>,
+      "electronAPI",
+    );
+  });
+
+  it("uses the main-process result when the IPC is available", async () => {
+    const resolveReference = vi.fn(async () => "/ws/test_docs/report.docx");
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: { file: { resolveReference } },
+    });
+
+    await expect(resolveFileReferencePath("report.docx", "/ws")).resolves.toBe(
+      "/ws/test_docs/report.docx",
+    );
+    expect(resolveReference).toHaveBeenCalledWith("report.docx", "/ws");
+  });
+
+  it("falls back to local workspace resolution when the IPC is missing", async () => {
+    // 生产环境不会走到：preload 一定在。这是为了让 helper 能脱离 IPC 单测。
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: {},
+    });
+
+    await expect(resolveFileReferencePath("report.docx", "/ws")).resolves.toBe(
+      "/ws/report.docx",
+    );
+  });
+
+  it("falls back to local resolution when the IPC throws", async () => {
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: {
+        file: {
+          resolveReference: vi.fn(async () => {
+            throw new Error("ipc down");
+          }),
+        },
+      },
+    });
+
+    await expect(resolveFileReferencePath("report.docx", "/ws")).resolves.toBe(
+      "/ws/report.docx",
+    );
   });
 });

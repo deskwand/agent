@@ -11,7 +11,11 @@ import { Layers, Loader2 } from "lucide-react";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
 import { openFilePathInBrowser } from "../utils/open-in-browser";
-import { extOf, resolveOpenAction } from "../utils/open-file-by-ext";
+import {
+  extOf,
+  resolveFileReferencePath,
+  resolveOpenAction,
+} from "../utils/open-file-by-ext";
 import { openOfficePreview } from "../utils/office-preview-runner";
 import { OpenWithSystemAppButton } from "./OpenWithSystemAppButton";
 import type { TraceStep } from "../types";
@@ -40,18 +44,22 @@ export function ArtifactPanel() {
 
   const handleClick = useCallback(
     async (artifactPath: string, label: string) => {
-      const action = resolveOpenAction(extOf(artifactPath));
+      const resolvedArtifact = await resolveFileReferencePath(
+        artifactPath,
+        currentWorkingDir,
+      );
+      const action = resolveOpenAction(extOf(resolvedArtifact));
       if (action === "browser") {
-        openFilePathInBrowser(artifactPath);
+        openFilePathInBrowser(resolvedArtifact);
         return;
       }
       if (action === "preview") {
-        openPreview({ path: artifactPath, name: label });
+        openPreview({ path: resolvedArtifact, name: label });
       } else if (action === "office") {
-        void openOfficePreview(artifactPath, {
+        void openOfficePreview(resolvedArtifact, {
           onSuccess: (outPath) => openFilePathInBrowser(outPath),
           onFailure: () => {
-            void window.electronAPI?.openPath?.(artifactPath);
+            void window.electronAPI?.openPath?.(resolvedArtifact);
             setGlobalNotice({
               id: `office-preview-failed-${Date.now()}`,
               type: "warning",
@@ -60,7 +68,7 @@ export function ArtifactPanel() {
           },
         });
       } else if (canOpenPath) {
-        const result = await window.electronAPI.openPath(artifactPath);
+        const result = await window.electronAPI.openPath(resolvedArtifact);
         if (result.error) {
           setGlobalNotice({
             id: `artifact-open-failed-${Date.now()}`,
@@ -70,7 +78,7 @@ export function ArtifactPanel() {
         }
       }
     },
-    [canOpenPath, openPreview, setGlobalNotice, t],
+    [canOpenPath, currentWorkingDir, openPreview, setGlobalNotice, t],
   );
 
   const displayArtifacts = useMemo(() => {

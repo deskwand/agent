@@ -12,7 +12,12 @@ import {
 import { shortenPath } from "./toolHelpers";
 import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import { ConfirmDialog } from "../ConfirmDialog";
-import { isBrowserOpenableExt } from "../../utils/file-preview";
+import {
+  extOf,
+  resolveFileReferencePath,
+  resolveOpenAction,
+} from "../../utils/open-file-by-ext";
+import { openOfficePreview } from "../../utils/office-preview-runner";
 import { openFilePathInBrowser } from "../../utils/open-in-browser";
 import { Tooltip } from "../Tooltip";
 
@@ -103,6 +108,7 @@ export const ArtifactCard = memo(function ArtifactCard({
   isLatestRound,
 }: ArtifactCardProps) {
   const { t } = useTranslation();
+  const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
   const { isElectron } = useIPC();
 
   const activeSessionCwd = useAppStore((s) => {
@@ -247,14 +253,34 @@ export const ArtifactCard = memo(function ArtifactCard({
   const handleClickFile = useCallback(
     async (file: ResultFileEntry) => {
       if (revertedFiles.has(file.path)) return;
-      const resolvedPath = resolvePath(file.path);
+      const resolvedPath = await resolveFileReferencePath(
+        file.path,
+        activeSessionCwd ?? null,
+      );
       const handleOpenFileRow = () => {
-        const iDot = resolvedPath.lastIndexOf(".");
-        const ext = iDot > 0 ? resolvedPath.slice(iDot).toLowerCase() : "";
-        if (isBrowserOpenableExt(ext)) {
+        const action = resolveOpenAction(extOf(resolvedPath));
+        if (action === "browser") {
           openFilePathInBrowser(resolvedPath);
           return;
         }
+        if (action === "office") {
+          void openOfficePreview(resolvedPath, {
+            onSuccess: (outPath) => openFilePathInBrowser(outPath),
+            onFailure: () => {
+              void window.electronAPI?.showItemInFolder?.(
+                resolvedPath,
+                activeSessionCwd ?? undefined,
+              );
+              setGlobalNotice({
+                id: `office-preview-failed-${Date.now()}`,
+                type: "warning",
+                message: t("filePreview.officeRenderFailedRevealed"),
+              });
+            },
+          });
+          return;
+        }
+        // preview 与 fallback 都保持本文件原有的行为：进预览面板。
         openPreview({
           path: resolvedPath,
           name: resolvedPath.split(/[/\\]/).pop() || resolvedPath,
@@ -310,21 +336,22 @@ export const ArtifactCard = memo(function ArtifactCard({
       isGitRepo,
       openPreview,
       openReview,
-      resolvePath,
       revertedFiles,
+      setGlobalNotice,
       setReviewTargetFile,
+      t,
     ],
   );
 
   const handleClickVideo = useCallback(
-    (reference: VideoReference) => {
-      openPreview({
-        path: reference.path,
-        name: reference.name,
-        autoPlay: true,
-      });
+    async (reference: VideoReference) => {
+      const resolved = await resolveFileReferencePath(
+        reference.path,
+        activeSessionCwd ?? null,
+      );
+      openPreview({ path: resolved, name: reference.name, autoPlay: true });
     },
-    [openPreview],
+    [activeSessionCwd, openPreview],
   );
 
   if (allItems.length === 0) return null;
@@ -340,13 +367,13 @@ export const ArtifactCard = memo(function ArtifactCard({
               <div
                 key={key}
                 className="flex cursor-pointer items-center justify-between rounded-xl border border-border-subtle px-4 py-3.5 transition-colors hover:bg-surface-hover/50"
-                onClick={() => handleClickVideo(ref)}
+                onClick={() => void handleClickVideo(ref)}
                 role="button"
                 tabIndex={0}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    handleClickVideo(ref);
+                    void handleClickVideo(ref);
                   }
                 }}
               >
@@ -364,7 +391,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                     className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-accent hover:bg-accent/5"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleClickVideo(ref);
+                      void handleClickVideo(ref);
                     }}
                   >
                     {t("artifactCard.play")}

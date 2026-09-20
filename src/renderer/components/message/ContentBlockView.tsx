@@ -36,7 +36,11 @@ import { ToolUseBlock } from "./ToolUseBlock";
 import { ToolResultBlock } from "./ToolResultBlock";
 import type { ImageSource } from "../ImageLightbox";
 import { openFilePathInBrowser } from "../../utils/open-in-browser";
-import { extOf, resolveOpenAction } from "../../utils/open-file-by-ext";
+import {
+  extOf,
+  resolveFileReferencePath,
+  resolveOpenAction,
+} from "../../utils/open-file-by-ext";
 import { openOfficePreview } from "../../utils/office-preview-runner";
 import type { ContentBlockViewProps } from "./types";
 
@@ -126,8 +130,11 @@ export const ContentBlockView = memo(function ContentBlockView({
 
   const handleFilePathClick = useCallback(
     async (value: string) => {
-      const resolvedPath = resolveFilePath(value);
-      const action = resolveOpenAction(extOf(value));
+      const resolvedPath = await resolveFileReferencePath(
+        value,
+        currentWorkingDir,
+      );
+      const action = resolveOpenAction(extOf(resolvedPath));
       if (action === "browser") {
         openFilePathInBrowser(resolvedPath);
         return;
@@ -141,13 +148,20 @@ export const ContentBlockView = memo(function ContentBlockView({
         void openOfficePreview(resolvedPath, {
           onSuccess: (outPath) => openFilePathInBrowser(outPath),
           // 本入口的既有兜底是"在文件夹中显示"，保持不动。
-          onFailure: () => void revealInFolder(resolvedPath),
+          onFailure: () => {
+            void revealInFolder(resolvedPath);
+            setGlobalNotice({
+              id: `office-preview-failed-${Date.now()}`,
+              type: "warning",
+              message: t("filePreview.officeRenderFailedRevealed"),
+            });
+          },
         });
         return;
       }
       await revealInFolder(resolvedPath);
     },
-    [openPreview, resolveFilePath, revealInFolder],
+    [currentWorkingDir, openPreview, revealInFolder, setGlobalNotice, t],
   );
 
   const renderFileButton = (value: string, key?: string) => (
@@ -201,33 +215,45 @@ export const ContentBlockView = memo(function ContentBlockView({
           currentWorkingDir,
         );
         if (localFilePath) {
-          const action = resolveOpenAction(extOf(localFilePath));
-          const openLocalFile = () => {
+          const openLocalFile = async () => {
+            // 先解析成真实路径，再算分流：消息里常只给裸名，按工作区拼出的
+            // 路径可能不存在（见 design 文档 §1）。
+            const target = await resolveFileReferencePath(
+              localFilePath,
+              currentWorkingDir,
+            );
+            const action = resolveOpenAction(extOf(target));
             if (action === "browser") {
-              openFilePathInBrowser(localFilePath);
+              openFilePathInBrowser(target);
               return;
             }
             if (action === "preview") {
-              const fileName =
-                localFilePath.split(/[/\\]/).pop() || localFilePath;
-              openPreview({ path: localFilePath, name: fileName });
+              const fileName = target.split(/[/\\]/).pop() || target;
+              openPreview({ path: target, name: fileName });
               return;
             }
             if (action === "office") {
-              void openOfficePreview(localFilePath, {
+              void openOfficePreview(target, {
                 onSuccess: (outPath) => openFilePathInBrowser(outPath),
-                onFailure: () => void revealInFolder(localFilePath),
+                onFailure: () => {
+                  void revealInFolder(target);
+                  setGlobalNotice({
+                    id: `office-preview-failed-${Date.now()}`,
+                    type: "warning",
+                    message: t("filePreview.officeRenderFailedRevealed"),
+                  });
+                },
               });
               return;
             }
-            void revealInFolder(localFilePath);
+            void revealInFolder(target);
           };
           // 四种分流共用同一个按钮外壳：原先四个几乎相同的 <button> 只差 onClick，
           // 合并后少掉 ~40 行重复，也让分流集中在一处。
           return (
             <button
               type="button"
-              onClick={openLocalFile}
+              onClick={() => void openLocalFile()}
               className={getFileLinkButtonClassName()}
               title={localFilePath}
             >
@@ -521,19 +547,32 @@ export const ContentBlockView = memo(function ContentBlockView({
           <div
             className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden ${isInteractive ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
             onClick={() => {
-              if (!attachmentPath || !isInteractive) return;
-              if (attachmentAction === "browser") {
-                openFilePathInBrowser(attachmentPath);
-                return;
-              }
-              if (attachmentAction === "preview") {
-                openPreview({ path: attachmentPath, name: fileBlock.filename });
-                return;
-              }
-              void openOfficePreview(attachmentPath, {
-                onSuccess: (outPath) => openFilePathInBrowser(outPath),
-                onFailure: () => void revealInFolder(attachmentPath),
-              });
+              void (async () => {
+                if (!attachmentPath || !isInteractive) return;
+                const target = await resolveFileReferencePath(
+                  attachmentPath,
+                  currentWorkingDir,
+                );
+                if (attachmentAction === "browser") {
+                  openFilePathInBrowser(target);
+                  return;
+                }
+                if (attachmentAction === "preview") {
+                  openPreview({ path: target, name: fileBlock.filename });
+                  return;
+                }
+                void openOfficePreview(target, {
+                  onSuccess: (outPath) => openFilePathInBrowser(outPath),
+                  onFailure: () => {
+                    void revealInFolder(target);
+                    setGlobalNotice({
+                      id: `office-preview-failed-${Date.now()}`,
+                      type: "warning",
+                      message: t("filePreview.officeRenderFailedRevealed"),
+                    });
+                  },
+                });
+              })();
             }}
           >
             <FileText className="w-4 h-4 text-accent flex-shrink-0" />

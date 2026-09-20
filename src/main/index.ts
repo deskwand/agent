@@ -14,6 +14,8 @@
  */
 import "./setup-userdata";
 import { renderOfficePreview } from "./office/office-preview";
+import { findFileByName } from "./utils/find-file-by-name";
+import { resolveFileReference } from "./files/resolve-reference";
 import {
   app,
   BrowserWindow,
@@ -769,6 +771,21 @@ function initializeDefaultWorkingDir(): string {
  */
 function getWorkingDir(): string | null {
   return currentWorkingDir;
+}
+
+/**
+ * 按文件名兜底搜索的根目录。`showItemInFolder` 与 `file.resolveReference` 共用，
+ * 避免两处漂移。
+ *
+ * 第一个根是渲染层传来的会话工作区，**不是 `process.cwd()`** —— 打包后
+ * `process.cwd()` 往往是 "/" 或应用目录，拿它当搜索根既无用又有害。
+ */
+function fileSearchRoots(workingDirFromRenderer?: string | null): string[] {
+  return [
+    workingDirFromRenderer ?? "",
+    getWorkingDir() || "",
+    getDefaultWorkingDirPath(app.getPath("userData")),
+  ];
 }
 
 function createProjectDirectory(name: string): {
@@ -1970,51 +1987,6 @@ async function revealFileInFolder(
     resolved: normalizedPath,
   });
 
-  const findFileByName = (fileName: string, roots: string[]): string | null => {
-    if (!fileName) {
-      return null;
-    }
-
-    const visited = new Set<string>();
-    const queue = roots
-      .map((root) => resolve(root))
-      .filter(
-        (root) =>
-          !!root && fs.existsSync(root) && fs.statSync(root).isDirectory(),
-      );
-
-    let scannedDirs = 0;
-    const MAX_DIRS = 2000;
-
-    while (queue.length > 0 && scannedDirs < MAX_DIRS) {
-      const dir = queue.shift()!;
-      if (visited.has(dir)) {
-        continue;
-      }
-      visited.add(dir);
-      scannedDirs += 1;
-
-      let entries: fs.Dirent[] = [];
-      try {
-        entries = fs.readdirSync(dir, { withFileTypes: true });
-      } catch {
-        continue;
-      }
-
-      for (const entry of entries) {
-        const fullPath = join(dir, entry.name);
-        if (entry.isFile() && entry.name === fileName) {
-          return fullPath;
-        }
-        if (entry.isDirectory()) {
-          queue.push(fullPath);
-        }
-      }
-    }
-
-    return null;
-  };
-
   try {
     if (fs.existsSync(normalizedPath)) {
       const stat = fs.statSync(normalizedPath);
@@ -2045,12 +2017,7 @@ async function revealFileInFolder(
     }
 
     const fileName = basename(normalizedPath);
-    const defaultWorkingDir = getWorkingDir() || "";
-    const discoveredPath = findFileByName(fileName, [
-      cwd || "",
-      defaultWorkingDir,
-      join(app.getPath("userData"), "default_working_dir"),
-    ]);
+    const discoveredPath = findFileByName(fileName, fileSearchRoots(cwd));
 
     if (discoveredPath) {
       logWarn(
@@ -3133,6 +3100,30 @@ ipcMain.handle("file.removeTemp", async (_event, tempPath: string) => {
     // best effort — path may already be gone
   }
 });
+
+ipcMain.handle(
+  "file.resolveReference",
+  async (_event, token: string, workingDir?: string) => {
+    if (typeof token !== "string" || token.length === 0) return "";
+    try {
+      const resolved = resolveFileReference(
+        token,
+        workingDir ?? null,
+        fileSearchRoots(workingDir),
+      );
+      if (resolved.via === "by-name") {
+        logWarn("[file.resolveReference] resolved by filename:", {
+          token,
+          path: resolved.path,
+        });
+      }
+      return resolved.path;
+    } catch (err: unknown) {
+      logError("[file.resolveReference] failed:", err);
+      return "";
+    }
+  },
+);
 
 ipcMain.handle("file.renderOfficePreview", async (_event, filePath: string) => {
   if (typeof filePath !== "string" || filePath.length === 0) {

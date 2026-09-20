@@ -485,6 +485,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("file.removeTemp", tempPath),
     renderOfficePreview: (filePath: string) =>
       ipcRenderer.invoke("file.renderOfficePreview", filePath),
+    resolveReference: (token: string, workingDir?: string): Promise<string> =>
+      ipcRenderer.invoke("file.resolveReference", token, workingDir),
   },
 
   // Sandbox methods
@@ -977,6 +979,10 @@ declare global {
         saveToTemp: (buffer: ArrayBuffer, filename: string) => Promise<string>;
         extractArchive: (archivePath: string) => Promise<string>;
         removeTemp: (tempPath: string) => Promise<void>;
+        resolveReference: (
+          token: string,
+          workingDir?: string,
+        ) => Promise<string>;
         renderOfficePreview: (filePath: string) => Promise<{
           ok: boolean;
           outPath?: string;
