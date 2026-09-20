@@ -29,6 +29,22 @@
     "title": "今天我能为您做些什么？",
     "titleWithProject": "在项目「{{projectName}}」中，今天我能为您做些什么？",
     "placeholder": "描述你想做的事情，按 / 使用快捷命令...",
+    "quick": {
+      "brainstorm": "加个功能",
+      "debug": "修个 bug",
+      "review": "审一遍代码",
+      "git": "提交并发 PR",
+      "office": "做文档",
+      "pdf": "处理 PDF",
+      "vision": "看图",
+      "notes": "会议纪要",
+      "web": "联网搜索",
+      "browser": "操作浏览器"
+    },
+    "quickPrompt": {
+      "vision": "我会附上一张图片，请描述里面的内容；如果是截图，把其中的文字和报错信息一起提取出来。如果这条消息里还没带图片，先提醒我把图片拖进输入框。",
+      "browser": "用内置浏览器打开 https://news.ycombinator.com ，把首页截图，并总结前 5 条标题。"
+    },
     "createFile": "创建文件",
     "crunchData": "处理数据",
     "organizeFiles": "整理文件",

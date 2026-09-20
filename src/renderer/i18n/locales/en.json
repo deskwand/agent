@@ -29,6 +29,22 @@
     "title": "How can I help you today?",
     "titleWithProject": "How can I help you today in project \"{{projectName}}\"?",
     "placeholder": "Describe what you'd like to do, press / for shortcuts...",
+    "quick": {
+      "brainstorm": "Add a feature",
+      "debug": "Fix a bug",
+      "review": "Review the code",
+      "git": "Commit and open a PR",
+      "office": "Create a document",
+      "pdf": "Work with a PDF",
+      "vision": "Read an image",
+      "notes": "Meeting notes",
+      "web": "Search the web",
+      "browser": "Drive a browser"
+    },
+    "quickPrompt": {
+      "vision": "I'll attach an image. Describe what's in it, and if it's a screenshot, extract the visible text and any error messages. If this message has no image attached yet, remind me to drop one into the input box first.",
+      "browser": "Use the built-in browser to open https://news.ycombinator.com, screenshot the page, and summarize the top 5 titles."
+    },
     "createFile": "Create a file",
     "crunchData": "Crunch data",
     "organizeFiles": "Organize files",

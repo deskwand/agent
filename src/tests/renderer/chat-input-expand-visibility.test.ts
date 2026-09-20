@@ -146,6 +146,25 @@ describe("hasInputContent", () => {
   it("treats an attached file as content even without text", () => {
     expect(hasInputContent("", 0, 1)).toBe(true);
   });
+
+  it("只有技能令牌不算内容 —— 没有需求就不该能发", () => {
+    expect(hasInputContent("/skill:pdf", 0, 0)).toBe(false);
+    expect(hasInputContent("/skill:pdf   ", 0, 0)).toBe(false);
+  });
+
+  it("技能令牌之后有正文就算内容", () => {
+    expect(hasInputContent("/skill:pdf 读一下这份", 0, 0)).toBe(true);
+  });
+
+  it("技能令牌 + 附件算内容 —— 门禁不得过度拦截", () => {
+    expect(hasInputContent("/skill:pdf", 1, 0)).toBe(true);
+    expect(hasInputContent("/skill:pdf", 0, 1)).toBe(true);
+  });
+
+  it("命令令牌单独发仍然合法", () => {
+    expect(hasInputContent("/goal", 0, 0)).toBe(true);
+    expect(hasInputContent("/compact", 0, 0)).toBe(true);
+  });
 });
 
 describe("ChatInput content reporting", () => {

@@ -60,3 +60,24 @@ export function resolveLeadingToken(
 
   return null;
 }
+
+/**
+ * 剥掉行首的技能令牌，返回剩余正文。
+ *
+ * 行首技能令牌属于「修饰」而不是「内容」：一条只有 `/skill:x` 的消息没有任何
+ * 需求，不该允许发送。判断落在本文件而不是调用方，是因为「什么算行首令牌」的
+ * 规则已经在这里（见文件头：pi 的展开是 startsWith 判定，所以只有行首才算）。
+ *
+ * 命令**不在**此列：`/goal` 单独发是合法的（goal 扩展靠它启动循环），
+ * `/compact` 单独触发动作。两者都必须继续被当成内容。
+ *
+ * 注意技能名**不被校验**（与 `resolveLeadingToken` 一致：pi 的展开也不查名单）。
+ * 手敲 `/skill:不存在的名字` 依旧算内容，也依旧会渲染成令牌 —— 这是既有契约，
+ * 不是本函数引入的；chip 那侧靠 `visibleQuickEntries` 只列已启用技能来避开它。
+ */
+export function stripLeadingSkillToken(text: string): string {
+  if (!text.startsWith("/skill:")) return text;
+  const match = SKILL_PATTERN.exec(text);
+  if (!match) return text;
+  return text.slice(match[0].length);
+}

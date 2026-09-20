@@ -18,4 +18,13 @@ describe('WelcomeView Agent-style layout', () => {
     expect(source).toContain('setSettingsTab("api");');
     expect(source).toContain('setShowSettings(true);');
   });
+
+  // 只守「接线存在」，不守逻辑对错 —— 过滤逻辑由 tests/welcome-quick-entries.test.ts
+  // 对 visibleQuickEntries 做行为断言。不要用本用例冒充行为守门。
+  it('wires the quick-entry chips to skill selection', () => {
+    const source = fs.readFileSync(welcomeViewPath, 'utf8');
+    expect(source).toContain('visibleQuickEntries(');
+    expect(source).toContain('insertSkillChip');
+    expect(source).toContain('appendPromptExample');
+  });
 });

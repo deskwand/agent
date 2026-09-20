@@ -26,7 +26,7 @@ metadata:
 ## 搜索
 
 1. 按优先级依次搜索：skills.sh → skillhub.cn → ClawHub → GitHub topics
-2. SSR 源直接 web_fetch / curl；SPA 源用内置浏览器打开 → snapshot 提取结果
+2. SSR 源直接 fetch_content / curl；SPA 源用内置浏览器打开 → snapshot 提取结果
 3. 返回候选列表（名称 + 简短描述），让用户选择，不要自作主张安装
 
 ## 安装
@@ -88,7 +88,7 @@ rm -rf /tmp/skill-*
 
 ```
 用户："装飞书文档 skill"
-  → web_fetch skills.sh 搜 lark → 找到 larksuite/cli
+  → fetch_content skills.sh 搜 lark → 找到 larksuite/cli
   → 确认用户要装 larksuite/cli
   → curl tarball → tar 提取 → 写到 ~/.deskwand/skills/lark-cli/
   → 验证 SKILL.md 完整

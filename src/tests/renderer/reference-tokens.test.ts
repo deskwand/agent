@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { resolveLeadingToken } from "../../renderer/utils/reference-tokens";
+import {
+  resolveLeadingToken,
+  stripLeadingSkillToken,
+} from "../../renderer/utils/reference-tokens";
 
 const NO_COMMANDS = new Map<string, string>();
 const WITH_PLAN = new Map([["plan", "/plan"]]);
@@ -93,5 +96,36 @@ describe("resolveLeadingToken · 显示名", () => {
     const token = resolveLeadingToken("/translate 这段话", labels);
     expect(token?.label).toBe("翻译成英文");
     expect(token?.raw).toBe("/translate");
+  });
+});
+
+describe("stripLeadingSkillToken", () => {
+  it("剥掉行首技能令牌", () => {
+    expect(stripLeadingSkillToken("/skill:pdf")).toBe("");
+    expect(stripLeadingSkillToken("/skill:pdf 读一下这份")).toBe(" 读一下这份");
+    expect(stripLeadingSkillToken("/skill:pdf\n读一下")).toBe("\n读一下");
+  });
+
+  it("命令令牌原样保留 —— /goal 单独发是合法的", () => {
+    expect(stripLeadingSkillToken("/goal")).toBe("/goal");
+    expect(stripLeadingSkillToken("/compact")).toBe("/compact");
+  });
+
+  it("句中出现的 /skill: 不动 —— 只有行首才是令牌", () => {
+    expect(stripLeadingSkillToken("帮我用 /skill:pdf 改")).toBe(
+      "帮我用 /skill:pdf 改",
+    );
+    expect(stripLeadingSkillToken("第一行\n/skill:pdf")).toBe(
+      "第一行\n/skill:pdf",
+    );
+  });
+
+  it("没有技能名的 /skill: 是普通文本，不动", () => {
+    expect(stripLeadingSkillToken("/skill:")).toBe("/skill:");
+  });
+
+  it("空串与空白原样返回", () => {
+    expect(stripLeadingSkillToken("")).toBe("");
+    expect(stripLeadingSkillToken("   ")).toBe("   ");
   });
 });

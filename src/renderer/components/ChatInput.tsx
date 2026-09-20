@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { useCurrentSession } from "../store/selectors";
 import { useIPC } from "../hooks/useIPC";
+import { stripLeadingSkillToken } from "../utils/reference-tokens";
 import { attachmentKey, mergeAttachedFiles } from "../utils/attached-files";
 import {
   degradeNonLeadingTokens,
@@ -69,6 +70,13 @@ export interface ChatInputHandle {
    * 供「+」菜单的命令入口使用 —— 那条路径没有斜杠菜单的光标位置可依赖。
    */
   insertCommandChip: (name: string) => void;
+  /** 行首插入技能 chip；语义与 insertCommandChip 一致，前缀是 /skill:。 */
+  insertSkillChip: (name: string) => void;
+  /**
+   * 把一段示例正文放进编辑器。草稿为空（或仅空白）时填入，否则追加到末尾 ——
+   * 绝不覆盖已有文字；仅空白草稿被替换，是与 hasInputContent 同一套「空白不算内容」的定义。
+   */
+  appendPromptExample: (text: string) => void;
 }
 
 interface ChatInputProps {
@@ -329,6 +337,32 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         if (!new RegExp(`^/${name}(\\s|$)`).test(draft)) {
           writeEditorText(`${raw}${draft}`);
         }
+        requestAnimationFrame(() => {
+          editorRef.current?.focus();
+          placeCaretAtEnd(editorRef.current);
+        });
+      },
+      insertSkillChip(name: string) {
+        const raw = `/skill:${name} `;
+        const draft = getPlainText();
+        // 判重必须针对 /skill:<name> 而不是 /<name>：insertCommandChip 的正则
+        // `^/${name}(\s|$)` 匹配不到这种形式，照搬会让重复点击叠成
+        // `/skill:pdf /skill:pdf`，渲染出两个令牌。
+        //
+        // 技能名要转义再拼进正则：当前数据表里全是 [a-z-]，但这是 public handle
+        // 接口，带 `.` 的名字会误匹配、带 `[` 的名字会直接抛 SyntaxError。
+        const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (!new RegExp(`^/skill:${escaped}(\\s|$)`).test(draft)) {
+          writeEditorText(`${raw}${draft}`);
+        }
+        requestAnimationFrame(() => {
+          editorRef.current?.focus();
+          placeCaretAtEnd(editorRef.current);
+        });
+      },
+      appendPromptExample(text: string) {
+        const draft = getPlainText();
+        writeEditorText(draft.trim() === "" ? text : `${draft} ${text}`);
         requestAnimationFrame(() => {
           editorRef.current?.focus();
           placeCaretAtEnd(editorRef.current);
@@ -1104,8 +1138,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 /**
  * 草稿是否非空。文本（去空白）、贴图、附件任一存在即为非空。
  *
+ * 行首技能令牌是修饰不是内容：只有 `/skill:x` 而没有正文时，这条消息没有需求，
+ * 不该允许发送（否则白费一个回合，模型只会问「你想要什么」）。命令不受此限 ——
+ * `/goal` 单独发是合法的。
+ *
  * 单一来源：提交门禁、`isEmpty()` 与 `onContentChange` 上报共用它，三者必须永远一致
- * ——「展开按钮可见」与「能否提交」不能互相矛盾。
+ * ——「展开按钮可见」与「能否提交」不能互相矛盾。改动此函数即同时改动三者，
+ * 这是刻意的：三处对「有没有内容」必须是同一个答案。
  * 但取值来源不完全相同：提交门禁与 `isEmpty()` 读 `getPlainText()`（DOM 是权威来源，
  * state 可能比它旧一帧），`onContentChange` 走 effect 读同一份。判定函数相同，不是同一个值。
  */
@@ -1114,5 +1153,9 @@ export function hasInputContent(
   imageCount: number,
   fileCount: number,
 ): boolean {
-  return prompt.trim() !== "" || imageCount > 0 || fileCount > 0;
+  return (
+    stripLeadingSkillToken(prompt).trim() !== "" ||
+    imageCount > 0 ||
+    fileCount > 0
+  );
 }

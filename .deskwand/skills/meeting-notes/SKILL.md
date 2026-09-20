@@ -7,7 +7,7 @@ license: MIT
 metadata:
   source: adapted from Hermes Agent teams-meeting-pipeline v1.1.0
   tags: [Meetings, Notes, Minutes, Productivity, Summarization]
-allowed-tools: "read,write,shell,web_fetch"
+allowed-tools: "read,write,shell,fetch_content"
 ---
 
 # Meeting Notes
@@ -29,7 +29,7 @@ Generate structured, actionable meeting minutes from any input format.
 |--------|------|
 | Raw text / notes | Parse directly |
 | Transcript file | `read` the file |
-| Meeting URL / recording | `web_fetch` if available |
+| Meeting URL / recording | `fetch_content` if available |
 | Audio file | Use transcription service first, then process |
 
 ---
