@@ -199,6 +199,18 @@ describe("renderer motion policy", () => {
     expect(globalStyles).toContain(
       "--ease-ui-out: cubic-bezier(0.23, 1, 0.32, 1);",
     );
+    // 动效时序只有一个来源（设计文档 §8）。
+    // 不直接匹配若干已知名字，而是把已声明的自定义属性全找出来再过滤——
+    // 这样未来无论用 --dur-x / --duration-x / --time-x 引入第二套，都会被抓到。
+    const declared = [...globalStyles.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map(
+      (m) => m[1],
+    );
+    expect(
+      [...new Set(declared.filter((n) => /^--ease-/.test(n)))].sort(),
+    ).toEqual(["--ease-ui-out"]);
+    expect([
+      ...new Set(declared.filter((n) => /^--(?:dur|duration|time)-/.test(n))),
+    ]).toEqual([]);
     expect(globalStyles).toContain("@keyframes menu-in-up");
     expect(globalStyles).toContain("@keyframes menu-in-down");
     expect(globalStyles).not.toContain("@keyframes eff-message-in");
@@ -208,14 +220,15 @@ describe("renderer motion policy", () => {
     expect(globalStyles).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.animate-slide-up,[\s\S]*\.animate-toast-in-top,[\s\S]*\.animate-toast-in-bottom,[\s\S]*\.animate-menu-in-up,[\s\S]*\.animate-menu-in-down[\s\S]*animation-name: fade-in !important;/,
     );
-    expect(globalStyles).toMatch(
-      /\.btn:hover\s*\{\s*box-shadow:\s*var\(--shadow-elevated\);\s*\}/,
-    );
+    // 按钮状态不再靠阴影：暗色下阴影不可见，hover 由各自的 hover:bg-* 承担（设计文档 §4.3 规则 C）
+    expect(globalStyles).not.toMatch(/\.btn:hover\s*\{/);
+    // 用 [^}]* 限定在同一规则内，避免跨过大括号误捕到后面规则的 box-shadow
+    expect(globalStyles).not.toMatch(/\.btn:active\s*\{[^}]*box-shadow/);
     expect(globalStyles).toContain(
       "@apply transition-[border-color,box-shadow,background-color,color] duration-150;",
     );
     expect(globalStyles).toContain(
-      "transition-[background-color,box-shadow,color] duration-150",
+      "transition-[background-color,color] duration-150",
     );
     // transition-all is allowed exactly once, scoped to the toggle-knob
     // switch animation (left-position slide needs it); everything else

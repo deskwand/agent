@@ -1,114 +1,132 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: 'class',
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  darkMode: "class",
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
       colors: {
         // Use CSS variables for theme-aware colors
         background: {
-          DEFAULT: 'var(--color-background)',
-          secondary: 'var(--color-background-secondary)',
+          DEFAULT: "var(--color-background)",
+          secondary: "var(--color-background-secondary)",
         },
         surface: {
-          DEFAULT: 'var(--color-surface)',
-          hover: 'var(--color-surface-hover)',
-          active: 'var(--color-surface-active)',
-          muted: 'var(--color-surface-muted)',
+          DEFAULT: "var(--color-surface)",
+          hover: "var(--color-surface-hover)",
+          active: "var(--color-surface-active)",
+          muted: "var(--color-surface-muted)",
         },
         border: {
-          DEFAULT: 'var(--color-border)',
-          muted: 'var(--color-border-muted)',
-          subtle: 'var(--color-border-subtle)',
+          DEFAULT: "var(--color-border)",
+          muted: "var(--color-border-muted)",
+          subtle: "var(--color-border-subtle)",
         },
         accent: {
-          DEFAULT: 'var(--color-accent)',
-          hover: 'var(--color-accent-hover)',
-          muted: 'var(--color-accent-muted)',
-          foreground: 'var(--color-accent-foreground)',
+          DEFAULT: "var(--color-accent)",
+          hover: "var(--color-accent-hover)",
+          muted: "var(--color-accent-muted)",
+          foreground: "var(--color-accent-foreground)",
         },
-        mention: 'var(--color-mention)',
+        mention: "var(--color-mention)",
         mcp: {
-          DEFAULT: 'var(--color-mcp)',
+          DEFAULT: "var(--color-mcp)",
         },
         file: {
-          media: 'var(--color-file-media)',
-          doc: 'var(--color-file-doc)',
-          code: 'var(--color-file-code)',
-          audio: 'var(--color-file-audio)',
-          neutral: 'var(--color-file-neutral)',
+          media: "var(--color-file-media)",
+          doc: "var(--color-file-doc)",
+          code: "var(--color-file-code)",
+          audio: "var(--color-file-audio)",
+          neutral: "var(--color-file-neutral)",
         },
         text: {
-          primary: 'var(--color-text-primary)',
-          secondary: 'var(--color-text-secondary)',
-          muted: 'var(--color-text-muted)',
+          primary: "var(--color-text-primary)",
+          secondary: "var(--color-text-secondary)",
+          muted: "var(--color-text-muted)",
         },
-        success: 'var(--color-success)',
-        'success-foreground': 'var(--color-success-foreground)',
-        warning: 'var(--color-warning)',
-        'warning-foreground': 'var(--color-warning-foreground)',
-        error: 'var(--color-error)',
+        success: "var(--color-success)",
+        "success-foreground": "var(--color-success-foreground)",
+        warning: "var(--color-warning)",
+        "warning-foreground": "var(--color-warning-foreground)",
+        error: "var(--color-error)",
         overlay: {
-          hover: 'var(--color-overlay-hover)',
-          press: 'var(--color-overlay-press)',
-          on: 'var(--color-overlay-on)',
+          hover: "var(--color-overlay-hover)",
+          press: "var(--color-overlay-press)",
+          on: "var(--color-overlay-on)",
         },
-        'window-close-hover': 'var(--color-window-close-hover)',
+        "window-close-hover": "var(--color-window-close-hover)",
       },
       fontFamily: {
-        sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
-        mono: ['JetBrains Mono', 'SF Mono', 'Menlo', 'Consolas', 'monospace'],
+        sans: [
+          "Geist Variable",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "PingFang SC",
+          "Microsoft YaHei",
+          "Noto Sans CJK SC",
+          "Noto Sans SC",
+          "Source Han Sans SC",
+          "WenQuanYi Micro Hei",
+          "system-ui",
+          "sans-serif",
+        ],
+        mono: [
+          "Geist Mono Variable",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "Consolas",
+          "monospace",
+        ],
       },
       fontSize: {
-        xs:   ['0.75rem',  { lineHeight: '1rem',     fontWeight: '400' }], // 12px — chrome/meta
-        sm:   ['0.8125rem',{ lineHeight: '1.25rem',  fontWeight: '400' }], // 13px — compact body
-        base: ['0.875rem', { lineHeight: '1.5rem',   fontWeight: '400' }], // 14px — body / chat prose
-        lg:   ['0.9375rem',{ lineHeight: '1.5rem',   fontWeight: '600' }], // 15px — subtle heading
-        xl:   ['1rem',     { lineHeight: '1.5rem',   fontWeight: '600' }], // 16px — section heading
-        '2xl':['1.125rem', { lineHeight: '1.5rem',   fontWeight: '600' }], // 18px — stat / major heading
+        xs: ["0.75rem", { lineHeight: "1rem", fontWeight: "400" }], // 12px — chrome/meta
+        sm: ["0.8125rem", { lineHeight: "1.25rem", fontWeight: "400" }], // 13px — compact body
+        base: ["0.875rem", { lineHeight: "1.5rem", fontWeight: "400" }], // 14px — body / chat prose
+        lg: ["0.9375rem", { lineHeight: "1.5rem", fontWeight: "600" }], // 15px — subtle heading
+        xl: ["1rem", { lineHeight: "1.5rem", fontWeight: "600" }], // 16px — section heading
+        "2xl": ["1.125rem", { lineHeight: "1.5rem", fontWeight: "600" }], // 18px — stat / major heading
       },
       boxShadow: {
-        'soft': 'var(--shadow-soft)',
-        'card': 'var(--shadow-card)',
-        'elevated': 'var(--shadow-elevated)',
+        soft: "var(--shadow-soft)",
+        card: "var(--shadow-card)",
+        elevated: "var(--shadow-elevated)",
       },
       borderRadius: {
-        control: '5px',
-        'lg': '8px',
-        'xl': '10px',
-        '2xl': '14px',
-        '3xl': '16px',
-        '4xl': '20px',
-        '5xl': '24px',
-        '6xl': '28px',
+        control: "5px",
+        container: "12px",
+        lg: "8px",
+        xl: "10px",
+        "2xl": "14px",
+        "3xl": "16px",
+        "4xl": "20px",
+        "5xl": "24px",
+        "6xl": "28px",
       },
       backgroundImage: {
-        'grid-pattern': `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4d2cc' fill-opacity='0.4'%3E%3Cpath d='M0 0h1v40H0V0zm39 0h1v40h-1V0z'/%3E%3Cpath d='M0 0h40v1H0V0zm0 39h40v1H0v-1z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        "grid-pattern": `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4d2cc' fill-opacity='0.4'%3E%3Cpath d='M0 0h1v40H0V0zm39 0h1v40h-1V0z'/%3E%3Cpath d='M0 0h40v1H0V0zm0 39h40v1H0v-1z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
       },
       animation: {
-        'fade-in': 'fadeIn 0.2s ease-out',
-        'slide-up': 'slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-        'spin-slow': 'spin 2s linear infinite',
-        'expand': 'expand 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        "fade-in": "fadeIn 0.2s ease-out",
+        "slide-up": "slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        "spin-slow": "spin 2s linear infinite",
+        expand: "expand 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
       },
       keyframes: {
         fadeIn: {
-          '0%': { opacity: '0' },
-          '100%': { opacity: '1' },
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
         },
         slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(8px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
         },
         expand: {
-          '0%': { opacity: '0', maxHeight: '0' },
-          '100%': { opacity: '1', maxHeight: '500px' },
+          "0%": { opacity: "0", maxHeight: "0" },
+          "100%": { opacity: "1", maxHeight: "500px" },
         },
       },
     },
   },
   plugins: [],
-}
+};

@@ -20,23 +20,38 @@
     --color-surface-hover: #323237;
     --color-surface-active: #3f3f46;
     --color-surface-muted: #1b1b1f;
-    --color-border: #2e2e33;
+    /* 由 text-primary 与 surface 派生：同一条描边要同时服务最深到最亮的
+       所有表面，硬编码值做不到（见设计文档 §4.2.1）。 */
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 18%,
+      var(--color-surface)
+    );
     --color-border-muted: #242428;
     --color-border-subtle: rgba(255, 255, 255, 0.06);
     --color-mcp: #71717a;
+    /* --shadow-soft 目前零引用（14 个主题块各声明一次、无使用点），
+       因为暗色下它合成后对比只有 1.24，看不见。层次改由描边承担（设计文档 §4.3 规则 C），
+       按钮/卡片的阴影用法已删除。保留 token 不删，留给以后的悬浮层。
+       --shadow-card 还有 3 处内联用法在 TSX 里（SettingsAPI.tsx:1114/1290、
+       SettingsConnectors.tsx:489）——那三个卡片属于另一轮清理。 */
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
     --shadow-card:
       0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
     --shadow-elevated:
       0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #d4d4d8;
-    --color-accent-hover: #e4e4e7;
-    --color-accent-muted: rgba(212, 212, 216, 0.1);
-    --color-accent-foreground: #09090b;
+    --color-accent: #5b8cff;
+    --color-accent-hover: #7ba3ff;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 16%,
+      transparent
+    );
+    --color-accent-foreground: #0b1220;
     --color-mention: #6ea8fe;
     --color-text-primary: #f4f4f5;
     --color-text-secondary: #a1a1aa;
-    --color-text-muted: #71717a;
+    --color-text-muted: #8d8d95;
     --color-success: #22c55e;
     --color-warning: #eab308;
     --color-error: #ef4444;
@@ -62,21 +77,29 @@
     --color-surface-hover: #f4f4f5;
     --color-surface-active: #e4e4e7;
     --color-surface-muted: #fafafa;
-    --color-border: #e4e4e7;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 22%,
+      var(--color-surface)
+    );
     --color-border-muted: #eaeaed;
     --color-border-subtle: rgba(0, 0, 0, 0.06);
     --color-mcp: #71717a;
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #18181b;
-    --color-accent-hover: #09090b;
-    --color-accent-muted: #f4f4f5;
+    --color-accent: #2563eb;
+    --color-accent-hover: #1d4ed8;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 12%,
+      transparent
+    );
     --color-accent-foreground: #ffffff;
     --color-mention: #1d4ed8;
     --color-text-primary: #09090b;
     --color-text-secondary: #52525b;
-    --color-text-muted: #a1a1aa;
+    --color-text-muted: #76767d;
     --color-success: #16a34a;
     --color-warning: #ca8a04;
     --color-error: #dc2626;
@@ -104,7 +127,11 @@
     --color-surface-hover: #363129;
     --color-surface-active: #453e34;
     --color-surface-muted: #1f1c18;
-    --color-border: #322d25;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 18%,
+      var(--color-surface)
+    );
     --color-border-muted: #28241e;
     --color-border-subtle: rgba(255, 255, 255, 0.06);
     --color-mcp: #8c8272;
@@ -120,7 +147,7 @@
     --color-mention: #7fa8e8;
     --color-text-primary: #ede4d5;
     --color-text-secondary: #b8a997;
-    --color-text-muted: #8c8272;
+    --color-text-muted: #988e80;
     --color-success: #22c55e;
     --color-warning: #eab308;
     --color-error: #ef4444;
@@ -132,7 +159,11 @@
     --color-surface-hover: #f5efe0;
     --color-surface-active: #ede3cd;
     --color-surface-muted: #faf7ef;
-    --color-border: #e5dcc8;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 22%,
+      var(--color-surface)
+    );
     --color-border-muted: #ebe3d2;
     --color-border-subtle: rgba(0, 0, 0, 0.06);
     --color-mcp: #8c8272;
@@ -141,12 +172,16 @@
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
     --color-accent: #6b5a40;
     --color-accent-hover: #4d3f2d;
-    --color-accent-muted: #f5efe0;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 12%,
+      transparent
+    );
     --color-accent-foreground: #ffffff;
     --color-mention: #1e40af;
     --color-text-primary: #3d3225;
     --color-text-secondary: #6b5d48;
-    --color-text-muted: #a0947e;
+    --color-text-muted: #7d7463;
     --color-success: #16a34a;
     --color-warning: #ca8a04;
     --color-error: #dc2626;
@@ -161,7 +196,11 @@
     --color-surface-hover: #1a1a1a;
     --color-surface-active: #262626;
     --color-surface-muted: #050505;
-    --color-border: #1f1f1f;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 18%,
+      var(--color-surface)
+    );
     --color-border-muted: #171717;
     --color-border-subtle: rgba(255, 255, 255, 0.06);
     --color-mcp: #737373;
@@ -170,14 +209,18 @@
       0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
     --shadow-elevated:
       0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #e5e5e5;
-    --color-accent-hover: #ffffff;
-    --color-accent-muted: rgba(229, 229, 229, 0.1);
-    --color-accent-foreground: #0a0a0a;
+    --color-accent: #f0b429;
+    --color-accent-hover: #ffc857;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 16%,
+      transparent
+    );
+    --color-accent-foreground: #1a1200;
     --color-mention: #4c9aff;
     --color-text-primary: #fafafa;
     --color-text-secondary: #a3a3a3;
-    --color-text-muted: #737373;
+    --color-text-muted: #7c7c7c;
     --color-success: #22c55e;
     --color-warning: #eab308;
     --color-error: #ef4444;
@@ -189,21 +232,29 @@
     --color-surface-hover: #f5f5f5;
     --color-surface-active: #ebebeb;
     --color-surface-muted: #f8f8f8;
-    --color-border: #e8e8e8;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 22%,
+      var(--color-surface)
+    );
     --color-border-muted: #efefef;
     --color-border-subtle: rgba(0, 0, 0, 0.06);
     --color-mcp: #737373;
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #0a0a0a;
-    --color-accent-hover: #000000;
-    --color-accent-muted: #f5f5f5;
+    --color-accent: #b45309;
+    --color-accent-hover: #92400e;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 12%,
+      transparent
+    );
     --color-accent-foreground: #ffffff;
     --color-mention: #1d4ed8;
     --color-text-primary: #000000;
     --color-text-secondary: #525252;
-    --color-text-muted: #a3a3a3;
+    --color-text-muted: #757575;
     --color-success: #16a34a;
     --color-warning: #ca8a04;
     --color-error: #dc2626;
@@ -217,7 +268,11 @@
     --color-surface-hover: #212d40;
     --color-surface-active: #2a3a54;
     --color-surface-muted: #0e1526;
-    --color-border: #1e2d45;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 18%,
+      var(--color-surface)
+    );
     --color-border-muted: #172436;
     --color-border-subtle: rgba(255, 255, 255, 0.06);
     --color-mcp: #5b7a9e;
@@ -233,7 +288,7 @@
     --color-mention: #60a5fa;
     --color-text-primary: #e2e8f0;
     --color-text-secondary: #94a3b8;
-    --color-text-muted: #64748b;
+    --color-text-muted: #7e8b9e;
     --color-success: #34d399;
     --color-warning: #f59e0b;
     --color-error: #f87171;
@@ -245,21 +300,29 @@
     --color-surface-hover: #eef2f7;
     --color-surface-active: #e2e8f0;
     --color-surface-muted: #f4f7fb;
-    --color-border: #d9e2ec;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 22%,
+      var(--color-surface)
+    );
     --color-border-muted: #e2e8f0;
     --color-border-subtle: rgba(0, 0, 0, 0.06);
     --color-mcp: #64748b;
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #0d9488;
+    --color-accent: #0c857a;
     --color-accent-hover: #0f766e;
-    --color-accent-muted: #ccfbf1;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 12%,
+      transparent
+    );
     --color-accent-foreground: #ffffff;
     --color-mention: #1d4ed8;
     --color-text-primary: #0f172a;
     --color-text-secondary: #475569;
-    --color-text-muted: #94a3b8;
+    --color-text-muted: #6a7584;
     --color-success: #059669;
     --color-warning: #d97706;
     --color-error: #dc2626;
@@ -273,7 +336,11 @@
     --color-surface-hover: #253220;
     --color-surface-active: #304128;
     --color-surface-muted: #131a11;
-    --color-border: #25301f;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 18%,
+      var(--color-surface)
+    );
     --color-border-muted: #1c2518;
     --color-border-subtle: rgba(255, 255, 255, 0.06);
     --color-mcp: #6b7c5e;
@@ -289,7 +356,7 @@
     --color-mention: #7dd3fc;
     --color-text-primary: #e6ede3;
     --color-text-secondary: #9aab93;
-    --color-text-muted: #6b7c5e;
+    --color-text-muted: #819076;
     --color-success: #4ade80;
     --color-warning: #d97706;
     --color-error: #ef4444;
@@ -301,21 +368,29 @@
     --color-surface-hover: #eef4ea;
     --color-surface-active: #e2ebdb;
     --color-surface-muted: #f5f8f3;
-    --color-border: #d8e3cf;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 22%,
+      var(--color-surface)
+    );
     --color-border-muted: #e2ebdb;
     --color-border-subtle: rgba(0, 0, 0, 0.06);
     --color-mcp: #6b7c5e;
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #059669;
+    --color-accent: #04875e;
     --color-accent-hover: #047857;
-    --color-accent-muted: #d1fae5;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 12%,
+      transparent
+    );
     --color-accent-foreground: #ffffff;
     --color-mention: #0369a1;
     --color-text-primary: #1a2415;
     --color-text-secondary: #4a5a40;
-    --color-text-muted: #8a9a80;
+    --color-text-muted: #6c7964;
     --color-success: #16a34a;
     --color-warning: #b45309;
     --color-error: #dc2626;
@@ -329,7 +404,11 @@
     --color-surface-hover: #362d25;
     --color-surface-active: #45392f;
     --color-surface-muted: #1c1714;
-    --color-border: #322921;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 18%,
+      var(--color-surface)
+    );
     --color-border-muted: #25201a;
     --color-border-subtle: rgba(255, 255, 255, 0.06);
     --color-mcp: #8c755e;
@@ -345,7 +424,7 @@
     --color-mention: #93c5fd;
     --color-text-primary: #f0e6dc;
     --color-text-secondary: #bfaa95;
-    --color-text-muted: #8c755e;
+    --color-text-muted: #9d8a76;
     --color-success: #4ade80;
     --color-warning: #fbbf24;
     --color-error: #ef4444;
@@ -357,21 +436,29 @@
     --color-surface-hover: #f5efe6;
     --color-surface-active: #ede3d5;
     --color-surface-muted: #faf7f2;
-    --color-border: #e5d9c8;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 22%,
+      var(--color-surface)
+    );
     --color-border-muted: #ebe1d2;
     --color-border-subtle: rgba(0, 0, 0, 0.06);
     --color-mcp: #8c755e;
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #ea580c;
+    --color-accent: #cb4c0a;
     --color-accent-hover: #c2410c;
-    --color-accent-muted: #ffedd5;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 12%,
+      transparent
+    );
     --color-accent-foreground: #ffffff;
     --color-mention: #1d4ed8;
     --color-text-primary: #3d2e1f;
     --color-text-secondary: #6b5640;
-    --color-text-muted: #a08a70;
+    --color-text-muted: #85735d;
     --color-success: #16a34a;
     --color-warning: #d97706;
     --color-error: #dc2626;
@@ -385,7 +472,11 @@
     --color-surface-hover: #2b2442;
     --color-surface-active: #383055;
     --color-surface-muted: #14111d;
-    --color-border: #282241;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 18%,
+      var(--color-surface)
+    );
     --color-border-muted: #1e1933;
     --color-border-subtle: rgba(255, 255, 255, 0.06);
     --color-mcp: #7e6da8;
@@ -401,7 +492,7 @@
     --color-mention: #67e8f9;
     --color-text-primary: #e8e4f2;
     --color-text-secondary: #a399c2;
-    --color-text-muted: #7e6da8;
+    --color-text-muted: #9182b6;
     --color-success: #2dd4bf;
     --color-warning: #f59e0b;
     --color-error: #f87171;
@@ -413,7 +504,11 @@
     --color-surface-hover: #efecf7;
     --color-surface-active: #e4e0f2;
     --color-surface-muted: #f6f4fb;
-    --color-border: #dcd6ed;
+    --color-border: color-mix(
+      in srgb,
+      var(--color-text-primary) 22%,
+      var(--color-surface)
+    );
     --color-border-muted: #e5e0f2;
     --color-border-subtle: rgba(0, 0, 0, 0.06);
     --color-mcp: #7e6da8;
@@ -422,12 +517,16 @@
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
     --color-accent: #7c3aed;
     --color-accent-hover: #6d28d9;
-    --color-accent-muted: #ede9fe;
+    --color-accent-muted: color-mix(
+      in srgb,
+      var(--color-accent) 12%,
+      transparent
+    );
     --color-accent-foreground: #ffffff;
     --color-mention: #0e7490;
     --color-text-primary: #1e1640;
     --color-text-secondary: #5a4e80;
-    --color-text-muted: #9088b0;
+    --color-text-muted: #787193;
     --color-success: #0d9488;
     --color-warning: #d97706;
     --color-error: #dc2626;
@@ -472,8 +571,18 @@
     background-color: var(--color-background);
     color: var(--color-text-primary);
     font-family:
-      -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", "PingFang SC",
-      "Microsoft YaHei", sans-serif;
+      "Geist Variable",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      "PingFang SC",
+      "Microsoft YaHei",
+      "Noto Sans CJK SC",
+      "Noto Sans SC",
+      "Source Han Sans SC",
+      "WenQuanYi Micro Hei",
+      system-ui,
+      sans-serif;
     font-size: var(--font-size-body);
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
@@ -571,29 +680,35 @@
 
   /* Heading font — for titles and headings */
   .heading-sans {
-    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    font-family:
+      "Geist Variable",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      "PingFang SC",
+      "Microsoft YaHei",
+      "Noto Sans CJK SC",
+      "Noto Sans SC",
+      "Source Han Sans SC",
+      "WenQuanYi Micro Hei",
+      system-ui,
+      sans-serif;
   }
 
   /* Button styles */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-medium focus:outline-none focus:ring-1 focus:ring-accent;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium focus:outline-none focus:ring-1 focus:ring-accent;
     transition:
       transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1),
-      box-shadow 150ms ease,
       background-color 150ms ease,
       color 150ms ease;
   }
-  .btn:hover {
-    box-shadow: var(--shadow-elevated);
-  }
   .btn:active {
     transform: scale(0.97);
-    box-shadow: var(--shadow-soft);
   }
 
   .btn-primary {
     @apply bg-accent text-accent-foreground hover:bg-accent-hover;
-    @apply shadow-soft;
   }
 
   .btn-secondary {
@@ -606,7 +721,7 @@
 
   /* Input styles */
   .input {
-    @apply w-full px-4 py-3 rounded-xl bg-surface border border-border;
+    @apply w-full px-4 py-3 rounded-lg bg-surface border border-border;
     @apply text-text-primary placeholder:text-text-muted;
     @apply focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent;
     @apply transition-[border-color,box-shadow,background-color,color] duration-150;
@@ -614,14 +729,16 @@
 
   /* Card styles */
   .card {
-    @apply bg-surface rounded-2xl shadow-card;
+    @apply bg-surface rounded-container;
+    border: 1px solid var(--color-border);
+    box-shadow: inset 0 1px 0 var(--color-surface-highlight);
   }
 
   /* Tag/Chip styles - like the quick action buttons */
   .tag {
-    @apply inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-surface;
+    @apply inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-surface;
     @apply text-sm font-medium text-text-primary;
-    @apply hover:bg-surface-hover hover:shadow-soft cursor-pointer transition-[background-color,box-shadow,color] duration-150;
+    @apply hover:bg-surface-hover cursor-pointer transition-[background-color,color] duration-150;
   }
 
   /* Badge styles */
@@ -880,7 +997,9 @@
   }
 
   .prose-chat pre code {
-    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-family:
+      "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas,
+      monospace;
     font-size: 0.75rem;
     line-height: 1.5;
     background: transparent;
@@ -888,7 +1007,9 @@
   }
 
   .prose-chat :not(pre) > code {
-    font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    font-family:
+      "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas,
+      monospace;
     font-size: 0.8125rem;
     padding: 0.125rem 0.25rem;
     border-radius: 4px;
@@ -931,6 +1052,10 @@
 /* Settings panel overlay animations */
 
 :root {
+  /* 动效时序的唯一来源。新动效必须复用这三个变量——
+     不得新增第二套时长或曲线变量（如 --dur-* / --ease-*），
+     否则两套动效会各自漂移，且下面 prefers-reduced-motion 的覆盖会漏掉新的那套。
+     约定由 tests/animation-motion-policy.test.ts 里的 ease/duration 断言守住。 */
   --motion-fast: 150ms;
   --motion-standard: 200ms;
   --ease-ui-out: cubic-bezier(0.23, 1, 0.32, 1);
@@ -1287,8 +1412,19 @@
     transparent
   );
   --color-overlay-on: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  /* 抬升面的顶部内高光：暗色下 inset 0 1px 0 合成后对比 1.28（可辨识）。 */
+  --color-surface-highlight: rgba(255, 255, 255, 0.08);
   /* Windows 原生关闭键悬停红，镜像系统配色，不随应用主题变化 */
   --color-window-close-hover: #c42b1c;
+}
+
+/* 亮色下白色内高光的合成对比只有 1.06–1.11（等于没有），置空。
+   必须写成 :root.light 而不是 @layer base 里的 .light：
+   上面那个顶层 :root 在产物里位于 @layer base 之后，与 .light 特异性相同（0,1,0），
+   因此源码顺序会让顶层 :root 胜出，.light 里的声明会静默变成死代码。
+   :root.light 是 (0,2,0)，不依赖顺序。 */
+:root.light {
+  --color-surface-highlight: transparent;
 }
 
 /* Tooltip 气泡。定位与可见性都由 @floating-ui/react 驱动（见 Tooltip.tsx）：

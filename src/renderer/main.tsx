@@ -2,6 +2,8 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./styles/globals.css";
+import "@fontsource-variable/geist";
+import "@fontsource-variable/geist-mono";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/github-dark-dimmed.min.css";
 import "./i18n/config"; // Initialize i18n

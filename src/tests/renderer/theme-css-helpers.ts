@@ -192,3 +192,26 @@ export function rootPx(): number {
   }
   return parseFloat(m[1]);
 }
+
+/**
+ * CIE Lab 彩度 C = √(a²+b²)。
+ *
+ * 用来判断 accent 与正文是否"靠色相就能分开"——亮度比在这里是错的工具：
+ * #6ea8fe 对 #f4f4f5 的亮度比只有 2.20，但一眼就能分开，分的是色相不是亮度。
+ *
+ * sRGB → 线性 → XYZ(D65) → Lab，与 relativeLuminance 用同一个 0.03928 阈值。
+ */
+export function chroma(hex: string): number {
+  const [r, g, b] = parseHex(hex).map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  }) as [number, number, number];
+  let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+  let y = r * 0.2126 + g * 0.7152 + b * 0.0722;
+  let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  [x, y, z] = [f(x), f(y), f(z)];
+  const a = 500 * (x - y);
+  const bStar = 200 * (y - z);
+  return Math.sqrt(a * a + bStar * bStar);
+}

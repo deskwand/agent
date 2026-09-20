@@ -48,6 +48,48 @@ describe("overlay token 的承重前提", () => {
     expect(appTsx).toMatch(/document\.documentElement\.classList/);
     expect(appTsx).toMatch(/document\.documentElement\.setAttribute/);
   });
+
+  it("顶层 :root 声明的 token 不会被 @layer base 里的主题块重复声明", () => {
+    // 产物里顶层 :root 位于 @layer base 之后，与 .light 特异性相同（0,1,0），
+    // 因此源码顺序会让顶层 :root 胜出——在 @layer base 的 .light 里声明的同名 token
+    // 会静默变成死代码，亮色模式实际拿到暗色的值。
+    //
+    // --color-surface-highlight 就踩过这个坑：它在 .light 里写了 transparent，
+    // 但被后面的顶层 :root 的 rgba(255,255,255,.08) 盖掉（已在 Chrome 里实测确认）。
+    // 所以它的亮色覆盖改成了 :root.light，并且由这条断言拦住回归。
+    // 定位到含 --color-overlay-hover 的**那个**顶层 :root：
+    // 不能写成 /^:root\s*\{[\s\S]*?--color-overlay-hover/——非贪婪仍然会从文件开头
+    // 那个小 :root 起步，把中间的主题块一并圈进来，造成假红。
+    const anchor = css.indexOf("--color-overlay-hover");
+    expect(
+      anchor,
+      "globals.css 里找不到 --color-overlay-hover",
+    ).toBeGreaterThan(-1);
+    const start = css.lastIndexOf("\n:root {", anchor);
+    const end = css.indexOf("\n}", anchor);
+    expect(
+      start,
+      "找不到含 --color-overlay-hover 的顶层 :root",
+    ).toBeGreaterThan(-1);
+    const overlayRoot = css.slice(start, end);
+    const declared = [...overlayRoot.matchAll(/^\s*(--[\w-]+)\s*:/gm)].map(
+      (m) => m[1],
+    );
+    expect(declared.length).toBeGreaterThan(0);
+
+    const baseLayer = css.slice(
+      css.indexOf("@layer base"),
+      css.indexOf("@layer components"),
+    );
+    expect(baseLayer.length).toBeGreaterThan(0);
+
+    for (const token of declared) {
+      expect(
+        baseLayer.includes(`${token}:`),
+        `${token} 既在顶层 :root 声明，又在 @layer base 的主题块里声明——后者是死代码，改写成 :root.light 或 :root[data-theme-preset]`,
+      ).toBe(false);
+    }
+  });
 });
 
 // ── 叠层强度：把设计文档 §3.4 的实测结论锁成不变量 ──
