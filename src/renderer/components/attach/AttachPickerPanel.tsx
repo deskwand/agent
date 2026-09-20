@@ -228,7 +228,7 @@ export function AttachPickerPanel({
                 }}
                 onClick={() => toggle(item.id)}
                 onMouseEnter={() => setHighlight(index)}
-                className={`flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left transition-colors ${
+                className={`flex h-7 w-full items-center gap-2 rounded-lg px-2 text-left transition-colors ${
                   added
                     ? "cursor-default opacity-50"
                     : index === highlight

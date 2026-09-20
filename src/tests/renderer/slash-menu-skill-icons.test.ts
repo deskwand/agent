@@ -99,7 +99,7 @@ describe("SlashMenu menu rows", () => {
     const rows = skillRows();
     expect(rows).toHaveLength(SKILL_TYPES.length);
     for (const row of rows) {
-      for (const cls of ["h-9", "rounded-lg", "text-sm", "items-center"]) {
+      for (const cls of ["h-7", "rounded-lg", "text-sm", "items-center"]) {
         expect(row.classList).toContain(cls);
       }
     }

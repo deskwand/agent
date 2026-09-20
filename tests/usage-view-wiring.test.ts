@@ -30,12 +30,14 @@ describe("usage view wiring", () => {
   it("keeps the entry reachable while logged out", () => {
     const menu = read("src/renderer/components/AccountMenu.tsx");
     const entry = menu.indexOf('t("accountMenu.usage")');
-    const loginBranch = menu.indexOf("isLoggedIn && cloudConfig ?");
+    const loginOnly = menu.indexOf('t("auth.logout")');
     expect(entry).toBeGreaterThan(-1);
-    expect(loginBranch).toBeGreaterThan(-1);
-    // Local stats need no account, so the item must sit above the branch that
-    // only renders for a logged-in user.
-    expect(entry).toBeLessThan(loginBranch);
+    expect(loginOnly).toBeGreaterThan(-1);
+    // 标记已从「首个 isLoggedIn 分支」改为「登录专属的退出登录行」：身份区
+    // 作为新的登录分支出现在用量统计之前，旧的 indexOf 标记不再可区分。
+    // 真正的守卫是 jsdom 渲染测试 account-menu-structure.test.ts 的未登录用例
+    // （渲染后仍有 usage 且无登录专属内容）；这里只保留一条源码级兑底。
+    expect(entry).toBeLessThan(loginOnly);
   });
 
   it("ships both locales", () => {

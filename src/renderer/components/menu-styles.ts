@@ -22,7 +22,7 @@ export const MENU_PANEL_PADDED_CLASS = `${MENU_PANEL_CLASS} p-1`;
  * 不由 className 书写顺序决定 —— 覆盖结果不可判定。
  */
 export const MENU_ITEM_CLASS =
-  "flex h-9 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm transition-colors";
+  "flex h-7 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm transition-colors";
 
 /** 普通态 */
 export const MENU_ITEM_DEFAULT_CLASS =

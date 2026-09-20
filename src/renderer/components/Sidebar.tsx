@@ -22,6 +22,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { AccountMenu } from "./AccountMenu";
+import { avatarInitials } from "../utils/identity";
 import { LoginModal } from "./LoginModal";
 import { buildDeskwandProviderPayload } from "../utils/cloud-provider";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -110,6 +111,11 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
   const [cloudRestoring, setCloudRestoring] = useState(false);
+  // 触发行身份化：登录恢复期/空邮箱保持「设置」胶囊，避免身份行闪变或空内容
+  const identityEmail =
+    !cloudRestoring && cloudConfig?.isLoggedIn && cloudConfig.email
+      ? cloudConfig.email
+      : null;
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
   const [sessionMenu, setSessionMenu] = useState<SessionMenuState | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -1271,12 +1277,25 @@ export function Sidebar({ width = 280 }: { width?: number }) {
                   onClick={() => setAccountMenuOpen((v) => !v)}
                   className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
                 >
-                  <Settings className="w-4 h-4 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-text-primary">
-                      {t("sidebar.settings")}
-                    </div>
-                  </div>
+                  {identityEmail ? (
+                    <>
+                      <span className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full bg-accent/15 text-[9px] font-semibold text-accent">
+                        {avatarInitials(identityEmail)}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
+                        {identityEmail}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Settings className="w-4 h-4 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-text-primary">
+                          {t("sidebar.settings")}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </button>
                 {updateReady && updateVersion && (
                   <button

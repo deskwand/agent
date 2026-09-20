@@ -9,10 +9,12 @@ import {
   Zap,
   Coins,
   BarChart3,
+  ChevronRight,
 } from "lucide-react";
 import type { CloudConfig } from "../types";
 import { useAppStore } from "../store";
 import { CloudApiClient } from "../services/cloud-api";
+import { avatarInitials } from "../utils/identity";
 import {
   MENU_ITEM_CLASS,
   MENU_ITEM_DEFAULT_CLASS,
@@ -73,6 +75,23 @@ export function AccountMenu({
       <div
         className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-up absolute bottom-full left-0 z-50 mb-2 w-64`}
       >
+        {isLoggedIn && cloudConfig ? (
+          <>
+            {/* 身份区：首字母头像 + 完整邮箱。触发行截断长邮箱，这里是完整版。 */}
+            <div className="flex items-center gap-2 px-2.5 py-2">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
+                {avatarInitials(cloudConfig.email ?? "") || (
+                  <User className="h-4 w-4" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                {cloudConfig.email}
+              </span>
+            </div>
+            <div className={MENU_SEPARATOR_CLASS} />
+          </>
+        ) : null}
+
         <MenuItem
           icon={<Settings className="w-4 h-4" />}
           label={t("sidebar.settings")}
@@ -82,18 +101,43 @@ export function AccountMenu({
           }}
         />
 
-        <div className={MENU_SEPARATOR_CLASS} />
-
         {/* Local usage stats need no account: keep this entry outside the
             logged-in branch so it is reachable while logged out. */}
         <MenuItem
           icon={<BarChart3 className="w-4 h-4" />}
           label={t("accountMenu.usage")}
+          trailing={<ChevronRight className="w-4 h-4" />}
           onClick={() => {
             useAppStore.getState().setActiveView("usage");
             onClose();
           }}
         />
+
+        {isLoggedIn && cloudConfig ? (
+          /* 余额行是 div 而非 button（内含充值按钮，避免按钮嵌套）；
+             不用 MENU_ITEM_DEFAULT_CLASS——整行不可点，不应有 hover 底色 */
+          <div className={`${MENU_ITEM_CLASS} text-text-primary`}>
+            <span className="shrink-0 text-text-muted">
+              <Coins className="w-4 h-4" />
+            </span>
+            <span className="text-text-muted">{t("accountMenu.balance")}</span>
+            <span className="min-w-0 truncate font-medium">
+              {formatMicroUsd(cloudConfig.balanceMicroUsd)}
+            </span>
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={() => {
+                useAppStore.getState().setTopUpOpen(true);
+                onClose();
+              }}
+              className="flex flex-shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover"
+            >
+              <Zap className="h-3.5 w-3.5" />
+              {t("accountMenu.topUpAction")}
+            </button>
+          </div>
+        ) : null}
 
         <div className={MENU_SEPARATOR_CLASS} />
 
@@ -102,43 +146,14 @@ export function AccountMenu({
             <span className="truncate">...</span>
           </div>
         ) : isLoggedIn && cloudConfig ? (
-          <>
-            <div className="flex items-center gap-2 px-2.5 py-2 text-sm text-text-primary">
-              <User className="w-4 h-4 text-text-muted flex-shrink-0" />
-              <span className="truncate">{cloudConfig.email}</span>
-            </div>
-            <div className="px-2.5 py-2">
-              <div className="flex items-center gap-2 text-xs text-text-muted">
-                <Coins className="w-4 h-4 flex-shrink-0" />
-                <span>{t("accountMenu.balance")}</span>
-              </div>
-              <div className="mt-0.5 flex items-center gap-2 pl-6 text-sm">
-                <span className="text-text-primary font-medium">
-                  {formatMicroUsd(cloudConfig.balanceMicroUsd)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    useAppStore.getState().setTopUpOpen(true);
-                    onClose();
-                  }}
-                  className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover"
-                >
-                  <Zap className="w-3.5 h-3.5" />
-                  {t("accountMenu.topUpAction")}
-                </button>
-              </div>
-            </div>
-            <div className={MENU_SEPARATOR_CLASS} />
-            <MenuItem
-              icon={<LogOut className="w-4 h-4" />}
-              label={t("auth.logout")}
-              onClick={() => {
-                onLogout();
-                onClose();
-              }}
-            />
-          </>
+          <MenuItem
+            icon={<LogOut className="w-4 h-4" />}
+            label={t("auth.logout")}
+            onClick={() => {
+              onLogout();
+              onClose();
+            }}
+          />
         ) : (
           <MenuItem
             icon={<LogIn className="w-4 h-4" />}
@@ -157,11 +172,13 @@ export function AccountMenu({
 function MenuItem({
   icon,
   label,
+  trailing,
   onClick,
   disabled,
 }: {
   icon: React.ReactNode;
   label: string;
+  trailing?: React.ReactNode;
   onClick: () => void;
   disabled?: boolean;
 }) {
@@ -175,6 +192,11 @@ function MenuItem({
     >
       <span className="shrink-0 text-text-muted">{icon}</span>
       <span className="truncate">{label}</span>
+      {trailing ? (
+        <span className="ml-auto flex-shrink-0 text-text-muted">
+          {trailing}
+        </span>
+      ) : null}
     </button>
   );
 }

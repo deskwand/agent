@@ -61,7 +61,7 @@ describe("MENU_ITEM_CLASS", () => {
   it("只带结构与排版", () => {
     for (const cls of [
       "flex",
-      "h-9",
+      "h-7",
       "w-full",
       "items-center",
       "gap-2",
