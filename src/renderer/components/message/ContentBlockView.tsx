@@ -146,6 +146,7 @@ export const ContentBlockView = memo(function ContentBlockView({
       }
       if (action === "office") {
         void openOfficePreview(resolvedPath, {
+          t,
           onSuccess: (outPath) => openFilePathInBrowser(outPath),
           // 本入口的既有兜底是"在文件夹中显示"，保持不动。
           onFailure: () => {
@@ -234,6 +235,7 @@ export const ContentBlockView = memo(function ContentBlockView({
             }
             if (action === "office") {
               void openOfficePreview(target, {
+                t,
                 onSuccess: (outPath) => openFilePathInBrowser(outPath),
                 onFailure: () => {
                   void revealInFolder(target);
@@ -562,6 +564,7 @@ export const ContentBlockView = memo(function ContentBlockView({
                   return;
                 }
                 void openOfficePreview(target, {
+                  t,
                   onSuccess: (outPath) => openFilePathInBrowser(outPath),
                   onFailure: () => {
                     void revealInFolder(target);

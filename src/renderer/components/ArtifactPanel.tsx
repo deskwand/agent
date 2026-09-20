@@ -57,6 +57,7 @@ export function ArtifactPanel() {
         openPreview({ path: resolvedArtifact, name: label });
       } else if (action === "office") {
         void openOfficePreview(resolvedArtifact, {
+          t,
           onSuccess: (outPath) => openFilePathInBrowser(outPath),
           onFailure: () => {
             void window.electronAPI?.openPath?.(resolvedArtifact);

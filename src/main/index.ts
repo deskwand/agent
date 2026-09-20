@@ -3993,6 +3993,20 @@ ipcMain.handle("browser.getStatus", () =>
   safeBrowserCall(() => browserViewManager?.getStatus() ?? null, null),
 );
 
+ipcMain.handle(
+  "browser.showStatusPage",
+  (_event, text: string, kind?: "loading" | "error") =>
+    safeBrowserCall(() => {
+      if (typeof text === "string" && text.length > 0) {
+        browserViewManager?.showStatusPage(
+          text.slice(0, 300),
+          kind === "error" ? "error" : "loading",
+        );
+      }
+      return browserViewManager?.getStatus() ?? null;
+    }, null),
+);
+
 ipcMain.handle("browser.goBack", () =>
   safeBrowserCall(() => {
     browserViewManager?.goBack();

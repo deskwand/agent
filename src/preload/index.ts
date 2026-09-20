@@ -723,6 +723,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     hide: () => ipcRenderer.invoke("browser.hide"),
     navigate: (url: string) => ipcRenderer.invoke("browser.navigate", url),
     getStatus: () => ipcRenderer.invoke("browser.getStatus"),
+    showStatusPage: (
+      text: string,
+      kind?: "loading" | "error",
+    ): Promise<unknown> =>
+      ipcRenderer.invoke("browser.showStatusPage", text, kind),
     goBack: () => ipcRenderer.invoke("browser.goBack"),
     goForward: () => ipcRenderer.invoke("browser.goForward"),
     reload: () => ipcRenderer.invoke("browser.reload"),
@@ -1207,6 +1212,10 @@ declare global {
           canGoBack: boolean;
           canGoForward: boolean;
         } | null>;
+        showStatusPage: (
+          text: string,
+          kind?: "loading" | "error",
+        ) => Promise<unknown>;
         goBack: () => Promise<{
           visible: boolean;
           url: string;

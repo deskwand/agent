@@ -29,6 +29,7 @@ export class BrowserViewManager {
   private _blankPageTheme: "dark" | "light" = "light";
   private _blankPageBgColor = "#ffffff";
   private _isOnBlankPage = false;
+  private _statusPageDataUrl: string | null = null;
   private _loadError: string | undefined;
 
   // ---- lifecycle ----
@@ -85,6 +86,7 @@ export class BrowserViewManager {
 
     wc.loadURL(this._blankPageUrl());
     this._isOnBlankPage = true;
+    this._statusPageDataUrl = null;
     this.view.setVisible(false);
   }
 
@@ -92,6 +94,7 @@ export class BrowserViewManager {
     if (this.visible) this._removeFromWindow();
     this.view?.webContents.close();
     this.view = null;
+    this._statusPageDataUrl = null;
     this.parentWindow = null;
     this.visible = false;
     this.viewDestroyed = true;
@@ -108,6 +111,66 @@ export class BrowserViewManager {
 
   // ---- visibility (layout controlled by React via setBounds) ----
 
+  /**
+   * 在浏览器视图里显示一个状态页（"正在生成预览…" / 错误页）。
+   *
+   * **故意不碰可见性**：面板显示与否由渲染层单向驱动
+   * （`App.tsx` 的 useLayoutEffect 按 rightPanelMode 调 `browser.show()/hide()`），
+   * 而本方法与那次 show() 是竞态的。因此这里只把页面加载进**已存在的** webContents：
+   * 若以 `visible` 为前提，冷启（面板从未打开过）时就会静默什么都不显示。
+   * 同文件 navigate() 里的 `if (!this.visible) this.show();` **不要照抄到这里**。
+   */
+  showStatusPage(text: string, kind: "loading" | "error" = "loading"): void {
+    if (!this.isViewAlive()) return;
+    const dataUrl = this._buildStatusPageUrl(text, kind);
+    this._statusPageDataUrl = dataUrl;
+    void this.view!.webContents.loadURL(dataUrl).catch((error: unknown) => {
+      logError("[Browser] status page load failed:", error);
+    });
+  }
+
+  /** 自包含状态页；配色沿用空白页那一套。 */
+  private _buildStatusPageUrl(text: string, kind: "loading" | "error"): string {
+    const rawBg =
+      this._blankPageBgColor ||
+      (this._blankPageTheme === "dark" ? "#18181b" : "#ffffff");
+    // 与 _blankPageUrl 同一条约束（有意保持逐字一致）：只允许 hex/rgb。
+    // 注意 `^rgb` 这个分支没有锚定结尾，理论上 `rgb(1,1,1);background-image:url(…)`
+    // 能过——但值来自 browser.setTheme（渲染层自己的值），且既有 _blankPageUrl 是
+    // 同一个弱点。要收紧应当两处一起改，属独立改动。
+    const bg = /^#[0-9a-fA-F]{3,8}$|^rgb/.test(rawBg) ? rawBg : "#ffffff";
+    const fg = this._blankPageTheme === "dark" ? "#e4e4e7" : "#3f3f46";
+    // text 来自我们自己的 i18n 文案，仍做最小转义，免得把 HTML 拼坏。
+    const safeText = text.replace(
+      /[&<>]/g,
+      (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c] as string,
+    );
+    const spinner =
+      kind === "loading"
+        ? '<div style="width:22px;height:22px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:spin .8s linear infinite;opacity:.5"></div>'
+        : "";
+    const html =
+      "<!DOCTYPE html>" +
+      '<html><head><meta charset="utf-8"><meta name="color-scheme" content="' +
+      this._blankPageTheme +
+      '"><style>' +
+      "html,body{margin:0;height:100%;background:" +
+      bg +
+      ";color:" +
+      fg +
+      ';font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}' +
+      ".wrap{height:100%;display:flex;flex-direction:column;align-items:center;" +
+      "justify-content:center;gap:12px;padding:0 24px;text-align:center}" +
+      "@keyframes spin{to{transform:rotate(360deg)}}" +
+      "@media (prefers-reduced-motion: reduce){.wrap div{animation:none!important}}" +
+      '</style></head><body><div class="wrap">' +
+      spinner +
+      "<div>" +
+      safeText +
+      "</div></div></body></html>";
+    return `data:text/html;base64,${Buffer.from(html).toString("base64")}`;
+  }
+
   show(): void {
     if (!this.isViewAlive() || !this.parentWindow || this.visible) return;
     this.parentWindow.contentView.addChildView(this.view!);
@@ -122,6 +185,20 @@ export class BrowserViewManager {
     this.view.setVisible(false);
     this._removeFromWindow();
     this.visible = false;
+    // 关面板时若还停在我们自己写的状态页上，就换回空白页：视图与已加载的页面是留着的，
+    // 不换的话下次打开面板会看到一屏永远转下去的 spinner（没有任何事件能结束它）。
+    if (
+      this._statusPageDataUrl &&
+      this.view.webContents.getURL() === this._statusPageDataUrl
+    ) {
+      this._statusPageDataUrl = null;
+      this._isOnBlankPage = true;
+      void this.view.webContents
+        .loadURL(this._blankPageUrl())
+        .catch((error: unknown) => {
+          logError("[Browser] blank page load failed:", error);
+        });
+    }
     this._pushStatus();
   }
 
@@ -166,9 +243,11 @@ export class BrowserViewManager {
     if (!this.visible) this.show();
     if (url === "about:blank") {
       this._isOnBlankPage = true;
+      this._statusPageDataUrl = null;
       this.view!.webContents.loadURL(this._blankPageUrl());
     } else {
       this._isOnBlankPage = false;
+      this._statusPageDataUrl = null;
       void this.view!.webContents.loadURL(url).catch((error: unknown) => {
         logError("[Browser] loadURL failed:", url, error);
       });
@@ -201,7 +280,11 @@ export class BrowserViewManager {
     const wc = this.view?.webContents;
     const rawUrl = wc?.getURL() ?? "about:blank";
     // Normalise the internal data: blank page back to about:blank
-    const url = this._isOnBlankPage ? "about:blank" : rawUrl;
+    const url = displayUrlFor(
+      rawUrl,
+      this._isOnBlankPage,
+      this._statusPageDataUrl,
+    );
     return {
       visible: this.visible,
       url,
@@ -292,4 +375,19 @@ export function installFileDownloadFallback(): void {
       );
     });
   });
+}
+
+/**
+ * 状态页与空白页都不该把内部 URL 暴露给渲染层：前者是主进程构造的
+ * `data:text/html;base64,…`（地址栏会显示一大串 base64，还会点亮"用外部浏览器打开"），
+ * 后者是既有的空白页。两者统一归一化成 `about:blank`。
+ */
+export function displayUrlFor(
+  rawUrl: string,
+  isOnBlankPage: boolean,
+  statusPageUrl: string | null,
+): string {
+  if (isOnBlankPage) return "about:blank";
+  if (statusPageUrl && rawUrl === statusPageUrl) return "about:blank";
+  return rawUrl;
 }

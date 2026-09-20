@@ -265,6 +265,7 @@ export const ArtifactCard = memo(function ArtifactCard({
         }
         if (action === "office") {
           void openOfficePreview(resolvedPath, {
+            t,
             onSuccess: (outPath) => openFilePathInBrowser(outPath),
             onFailure: () => {
               void window.electronAPI?.showItemInFolder?.(

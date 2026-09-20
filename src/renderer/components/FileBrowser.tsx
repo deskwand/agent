@@ -136,6 +136,7 @@ export function FileBrowser({ width }: { width: number }) {
       }
       if (action === "office") {
         void openOfficePreview(fullPath, {
+          t,
           // 传的是路径：openFilePathInBrowser 内部会做 toFileUrl 转换。
           onSuccess: (outPath) => openFilePathInBrowser(outPath),
           onFailure: () => {
