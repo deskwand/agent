@@ -145,7 +145,7 @@ import { queryUsage } from "./usage/usage-store";
 import { DEFAULT_USAGE_RANGE, type UsageRange } from "../shared/usage";
 import { getUnsupportedWorkspacePathReason } from "./workspace-path-constraints";
 import { getDefaultWorkingDirPath } from "../shared/workspace-path";
-import { DESKWAND_API_URL } from "../shared/oauth-config";
+import { startTelemetryHeartbeat } from "./telemetry";
 import {
   log,
   logWarn,
@@ -1022,30 +1022,7 @@ app
 
     log("===========================");
 
-    // --- Telemetry ping (anonymous install counting) ---
-    try {
-      if (configStore.get("telemetryEnabled")) {
-        const deviceIdPath = join(app.getPath("userData"), "device-id.json");
-        let deviceId: string;
-        try {
-          deviceId = JSON.parse(fs.readFileSync(deviceIdPath, "utf-8")).id;
-        } catch {
-          deviceId = crypto.randomUUID();
-          fs.writeFileSync(deviceIdPath, JSON.stringify({ id: deviceId }));
-        }
-        fetch(`${DESKWAND_API_URL}/v1/telemetry/ping`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            deviceId,
-            version: app.getVersion(),
-            platform: process.platform,
-          }),
-        }).catch(() => {});
-      }
-    } catch {
-      // Never block startup on telemetry failure
-    }
+    startTelemetryHeartbeat();
 
     // Initialize default working directory
     initializeDefaultWorkingDir();
