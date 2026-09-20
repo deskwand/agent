@@ -1782,8 +1782,12 @@
       "calls": "Calls",
       "cacheNotReported": "not reported by provider",
       "hitRateHint": "cache read ÷ prompt tokens",
-      "avgOutput": "{{value}} output tokens/call"
+      "avgOutput": "{{value}} output tokens/call",
+      "cost": "Est. cost",
+      "costHint": "Converted from the pi price table",
+      "costUnpriced": "{{count}} calls unpriced · excluded"
     },
+    "allTime": "all time",
     "daily": "Daily usage",
     "dailyHint": "each cell = output + input + cache read",
     "hourly": "By time of day",
@@ -1797,12 +1801,14 @@
       "output": "Output",
       "input": "Input",
       "cacheRead": "Cache read",
+      "cost": "Cost",
       "hitRate": "Hit rate",
       "calls": "Calls"
     },
     "colorMode": {
       "usage": "Usage",
-      "hit": "Hit rate"
+      "hit": "Hit rate",
+      "cost": "Cost"
     },
     "legend": {
       "less": "Less",

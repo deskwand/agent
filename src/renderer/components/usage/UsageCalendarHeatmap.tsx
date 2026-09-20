@@ -3,11 +3,12 @@ import { useTranslation } from "react-i18next";
 import type { UsageDayRow } from "../../../shared/usage";
 import {
   compactNumber,
+  formatCost,
   formatHitRate,
   resolveCellLevel,
 } from "../../utils/usage-format";
 
-type ColorMode = "usage" | "hit";
+type ColorMode = "usage" | "hit" | "cost";
 
 interface Props {
   rows: UsageDayRow[];
@@ -55,8 +56,11 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
   }, [rows]);
 
   const allValues = useMemo(
-    () => rows.map((r) => r.input + r.output + r.cacheRead),
-    [rows],
+    () =>
+      mode === "cost"
+        ? rows.map((r) => r.cost)
+        : rows.map((r) => r.input + r.output + r.cacheRead),
+    [rows, mode],
   );
 
   const columns = useMemo(() => {
@@ -81,7 +85,7 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-end">
         <div className="flex gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
-          {(["usage", "hit"] as ColorMode[]).map((value) => (
+          {(["usage", "hit", "cost"] as ColorMode[]).map((value) => (
             <button
               key={value}
               type="button"
@@ -182,7 +186,10 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
         ))}
         <span>{t("usage.legend.more")}</span>
         <span className="ml-auto font-mono">
-          {weeks} · {formatHitRate(hitRateOf(rows))}
+          {weeks} · {t("usage.allTime")} ·{" "}
+          {mode === "cost"
+            ? formatCost(totalCostOf(rows))
+            : formatHitRate(hitRateOf(rows))}
         </span>
       </div>
     </div>
@@ -224,7 +231,7 @@ function swatchStyle(level: number, mode: ColorMode): React.CSSProperties {
   // Level 0 means "no record": the usage-heatmap-empty class paints the cell,
   // keeping it visually distinct from a recorded-but-tiny day (level 1).
   if (level === 0) return {};
-  if (mode === "usage") {
+  if (mode === "usage" || mode === "cost") {
     return {
       background: `color-mix(in srgb, var(--color-success) ${
         Number(VOLUME_ALPHA[level]) * 100
@@ -244,6 +251,9 @@ function cellTitle(
   mode: ColorMode,
 ): string {
   if (!row) return dateKey;
+  if (mode === "cost") {
+    return `${dateKey} · ${formatCost(row.cost)} · ${row.calls} calls`;
+  }
   if (mode === "hit") {
     return `${dateKey} · ${formatHitRate(row.hitRate)} · in ${compactNumber(row.input)} / cache ${compactNumber(row.cacheRead)}`;
   }
@@ -256,6 +266,10 @@ function hitRateOf(rows: UsageDayRow[]): number | null {
   if (cacheRead === 0) return null;
   const total = input + cacheRead;
   return total > 0 ? (cacheRead / total) * 100 : null;
+}
+
+function totalCostOf(rows: UsageDayRow[]): number {
+  return rows.reduce((sum, row) => sum + row.cost, 0);
 }
 
 function localDateKey(day: Date): string {

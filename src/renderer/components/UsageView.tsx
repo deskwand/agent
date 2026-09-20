@@ -9,7 +9,12 @@ import {
 import { useAppStore } from "../store";
 import { UsageCalendarHeatmap } from "./usage/UsageCalendarHeatmap";
 import { UsageHourHeatmap } from "./usage/UsageHourHeatmap";
-import { compactNumber, formatHitRate } from "../utils/usage-format";
+import {
+  compactNumber,
+  formatCost,
+  formatHitRate,
+  sumUnpricedCalls,
+} from "../utils/usage-format";
 
 const RANGES = ["1d", "7d", "30d", "90d", "all"] as const;
 type Range = (typeof RANGES)[number];
@@ -47,6 +52,7 @@ export function UsageView() {
   const now = useMemo(() => Date.now(), []);
   const callCount = snapshot?.totals.calls ?? 0;
   const cacheWrite = snapshot?.totals.cacheWrite ?? 0;
+  const unpricedCalls = sumUnpricedCalls(snapshot?.byModel ?? []);
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-6 py-5">
@@ -94,7 +100,7 @@ export function UsageView() {
           <p className="text-sm text-text-muted">{t("usage.loading")}</p>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-6">
+            <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 xl:grid-cols-7">
               <Card
                 label={t("usage.cards.input")}
                 value={compactNumber(snapshot.totals.input)}
@@ -137,6 +143,17 @@ export function UsageView() {
                     : ""
                 }
               />
+              <Card
+                label={t("usage.cards.cost")}
+                value={formatCost(snapshot.totals.cost)}
+                hint={
+                  unpricedCalls > 0
+                    ? t("usage.cards.costUnpriced", {
+                        count: unpricedCalls.toLocaleString(),
+                      })
+                    : t("usage.cards.costHint")
+                }
+              />
             </div>
 
             <Box title={t("usage.daily")} hint={t("usage.dailyHint")}>
@@ -155,6 +172,7 @@ export function UsageView() {
               <ModelTable
                 rows={snapshot.byModel}
                 totalRow={t("usage.totalRow")}
+                totalCost={snapshot.totals.cost}
               />
             </Box>
           </>
@@ -207,9 +225,11 @@ function Box({
 function ModelTable({
   rows,
   totalRow,
+  totalCost,
 }: {
   rows: UsageModelRow[];
   totalRow: string;
+  totalCost: number;
 }) {
   const { t } = useTranslation();
   if (rows.length === 0) {
@@ -240,6 +260,7 @@ function ModelTable({
           <th className={headClass}>{t("usage.columns.output")}</th>
           <th className={headClass}>{t("usage.columns.input")}</th>
           <th className={headClass}>{t("usage.columns.cacheRead")}</th>
+          <th className={headClass}>{t("usage.columns.cost")}</th>
           <th className={headClass}>{t("usage.columns.hitRate")}</th>
           <th className={headClass}>{t("usage.columns.calls")}</th>
           <th className={headClass} />
@@ -259,6 +280,11 @@ function ModelTable({
             <td className={cellClass}>{compactNumber(row.output)}</td>
             <td className={cellClass}>{compactNumber(row.input)}</td>
             <td className={cellClass}>{compactNumber(row.cacheRead)}</td>
+            <td
+              className={`${cellClass} ${row.cost === null ? "text-text-muted" : ""}`}
+            >
+              {formatCost(row.cost)}
+            </td>
             <td
               className={`${cellClass} ${
                 row.hitRate !== null && row.hitRate < 90 ? "text-warning" : ""
@@ -289,6 +315,9 @@ function ModelTable({
           </td>
           <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">
             {compactNumber(total.cacheRead)}
+          </td>
+          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">
+            {formatCost(totalCost)}
           </td>
           <td className="px-2 py-1.5" />
           <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">

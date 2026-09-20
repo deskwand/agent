@@ -51,12 +51,14 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
     name: "OpenRouter",
     baseUrl: "https://openrouter.ai/api/v1",
     models: [
-      { id: "anthropic/claude-opus-4-6", name: "anthropic/claude-opus-4-6" },
+      // OpenRouter 的模型 slug 用小节号（claude-opus-4.6），不是连字符。
+      // 2026-09-20 拿 https://openrouter.ai/api/v1/models 的 446 个 id 验过：连字符形式全部不存在。
+      { id: "anthropic/claude-opus-4.6", name: "anthropic/claude-opus-4.6" },
       {
-        id: "anthropic/claude-sonnet-4-6",
-        name: "anthropic/claude-sonnet-4-6",
+        id: "anthropic/claude-sonnet-4.6",
+        name: "anthropic/claude-sonnet-4.6",
       },
-      { id: "anthropic/claude-haiku-4-5", name: "anthropic/claude-haiku-4-5" },
+      { id: "anthropic/claude-haiku-4.5", name: "anthropic/claude-haiku-4.5" },
       { id: "openai/gpt-5.4", name: "openai/gpt-5.4" },
       { id: "openai/gpt-5.3-codex", name: "openai/gpt-5.3-codex" },
       {

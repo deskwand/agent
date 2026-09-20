@@ -7,6 +7,7 @@ import {
   recordUsage,
 } from "../../main/usage/usage-store";
 import type { UsageRecordInput } from "../../shared/usage";
+import { buildPriceIndex, type PriceIndex } from "../../main/usage/usage-cost";
 
 const base = (over: Partial<UsageRecordInput> = {}): UsageRecordInput => ({
   ts: 1_760_000_000_000,
@@ -324,5 +325,86 @@ describe("local calendar-day ranges", () => {
       base({ ts: at(2026, 2, 23, 23, 59), output: 400, dedupKey: "feb-out" }),
     );
     expect(queryUsage(db, "7d", at(2026, 3, 2, 10)).totals.output).toBe(2);
+  });
+});
+
+describe("queryUsage cost fields", () => {
+  let db: DatabaseSync;
+  beforeEach(() => {
+    db = new DatabaseSync(":memory:");
+    createUsageSchema(db);
+  });
+  afterEach(() => db.close());
+
+  /** 1M input @0.435 + 1M output @0.87 = 1.305 */
+  const priceIndex: PriceIndex = buildPriceIndex(
+    [
+      {
+        provider: "deepseek",
+        id: "deepseek-v4-pro",
+        cost: {
+          input: 0.435,
+          output: 0.87,
+          cacheRead: 0.003625,
+          cacheWrite: 0,
+        },
+      },
+    ],
+    {},
+  );
+
+  it("fills totals.cost, byDay.cost and byModel.cost", () => {
+    const row = (over: Partial<UsageRecordInput> = {}) =>
+      base({
+        // 用 NOW 本身而不是 NOW-1000ms：区间起点是本地午夜，NOW 永远在区间内，
+        // 而任何毫秒级的回退在极西时区都会掉到前一天
+        ts: NOW,
+        provider: "deepseek",
+        model: "deepseek-v4-pro",
+        input: 1_000_000,
+        output: 1_000_000,
+        cacheRead: 0,
+        dedupKey: null,
+        ...over,
+      });
+    recordUsage(db, row({ dedupKey: "a" }));
+    recordUsage(db, row({ ts: NOW - 90 * DAY, dedupKey: "b" }));
+
+    const span = queryUsage(db, "1d", NOW, priceIndex);
+    // 只有区间内的那一行进合计
+    expect(span.totals.cost).toBeCloseTo(1.305, 10);
+    // byDay 恒为全部区间，所以两行都在
+    expect(span.byDay.reduce((sum, r) => sum + r.cost, 0)).toBeCloseTo(
+      2.61,
+      10,
+    );
+    const models = span.byModel.filter((r) => r.model === "deepseek-v4-pro");
+    expect(models).toHaveLength(1);
+    expect(models[0].cost).toBeCloseTo(1.305, 10);
+  });
+
+  it("keeps totals.cost equal to the sum of the range-scoped model rows", () => {
+    recordUsage(
+      db,
+      base({
+        ts: NOW,
+        provider: "deepseek",
+        model: "deepseek-v4-pro",
+        dedupKey: "a",
+      }),
+    );
+    recordUsage(
+      db,
+      base({
+        ts: NOW - 2000,
+        provider: "deepseek",
+        model: "no-price",
+        dedupKey: "b",
+      }),
+    );
+    const span = queryUsage(db, "1d", NOW, priceIndex);
+    const sum = span.byModel.reduce((n, r) => n + (r.cost ?? 0), 0);
+    expect(span.totals.cost).toBeCloseTo(sum, 10);
+    expect(span.byModel.some((r) => r.cost === null)).toBe(true);
   });
 });

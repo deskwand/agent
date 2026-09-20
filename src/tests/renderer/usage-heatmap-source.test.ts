@@ -18,6 +18,23 @@ describe("heatmap components", () => {
     expect(text).toContain("resolveCellLevel");
   });
 
+  it("offers a cost colour mode alongside usage and hit rate", () => {
+    const text = read("UsageCalendarHeatmap.tsx");
+    // 第三个档位：模式名走 t(`usage.colorMode.${value}`)，所以断言数组而不是拼好的键
+    expect(text).toContain('"usage", "hit", "cost"');
+    expect(text).toContain("formatCost");
+    // 两语言都必须有这一档的文案，否则按钮会渲染出原始 key
+    for (const locale of ["zh", "en"]) {
+      const json = JSON.parse(
+        fs.readFileSync(
+          path.join(__dirname, `../../renderer/i18n/locales/${locale}.json`),
+          "utf-8",
+        ),
+      ) as { usage: { colorMode: Record<string, string> } };
+      expect(json.usage.colorMode.cost).toBeTruthy();
+    }
+  });
+
   it("uses semantic colour tokens, never raw hex", () => {
     for (const f of ["UsageCalendarHeatmap.tsx", "UsageHourHeatmap.tsx"]) {
       const text = read(f);

@@ -3,10 +3,12 @@ import {
   bucketHitRate,
   bucketVolume,
   compactNumber,
+  formatCost,
   formatHitRate,
   resolveCellLevel,
+  sumUnpricedCalls,
 } from "../../renderer/utils/usage-format";
-import type { UsageDayRow } from "../../shared/usage";
+import type { UsageDayRow, UsageModelRow } from "../../shared/usage";
 
 describe("compactNumber", () => {
   it("scales to K/M/B with one decimal", () => {
@@ -75,6 +77,7 @@ describe("resolveCellLevel", () => {
     cacheRead,
     calls: 1,
     hitRate,
+    cost: 0,
   });
 
   it("treats a missing day as empty", () => {
@@ -93,5 +96,104 @@ describe("resolveCellLevel", () => {
   it("scales usage days by volume", () => {
     const level = resolveCellLevel(row(0, 0, 500, 99), "usage", [10, 100, 500]);
     expect(level).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("formatCost", () => {
+  it("renders an em dash when there is no price for the model", () => {
+    expect(formatCost(null)).toBe("—");
+  });
+
+  it("renders a plain zero for a free model", () => {
+    expect(formatCost(0)).toBe("$0");
+  });
+
+  it("never rounds a real cost down to $0.00", () => {
+    expect(formatCost(0.0004)).toBe("<$0.001");
+    expect(formatCost(0.0009)).toBe("<$0.001");
+  });
+
+  it("uses four decimals below a dollar", () => {
+    expect(formatCost(0.001)).toBe("$0.0010");
+    expect(formatCost(0.5123)).toBe("$0.5123");
+  });
+
+  it("uses two decimals at or above a dollar", () => {
+    expect(formatCost(1)).toBe("$1.00");
+    expect(formatCost(12.3456)).toBe("$12.35");
+    expect(formatCost(999.99)).toBe("$999.99");
+  });
+
+  it("thousands-groups at or above a thousand", () => {
+    expect(formatCost(1000)).toBe("$1,000");
+    expect(formatCost(2155.56)).toBe("$2,156");
+  });
+
+  it("keys the grouping branch on the rounded value, not the raw one", () => {
+    // 否则 999.996 会输出 $1000.00，与 1000 的 $1,000 在同一张表里不一致
+    expect(formatCost(999.994)).toBe("$999.99");
+    expect(formatCost(999.996)).toBe("$1,000");
+    expect(formatCost(999.999)).toBe("$1,000");
+    expect(formatCost(999.995)).toBe("$1,000");
+  });
+
+  it("treats a negative or non-finite value as unusable", () => {
+    expect(formatCost(-1)).toBe("—");
+    expect(formatCost(Number.NaN)).toBe("—");
+  });
+});
+
+describe("sumUnpricedCalls", () => {
+  const row = (over: Partial<UsageModelRow>): UsageModelRow => ({
+    model: "m",
+    provider: "p",
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    calls: 1,
+    hitRate: null,
+    cost: 1,
+    ...over,
+  });
+
+  it("counts only the rows without a price", () => {
+    expect(
+      sumUnpricedCalls([
+        row({ cost: null, calls: 7 }),
+        row({ calls: 3 }),
+        row({ model: null, cost: null, calls: 2 }),
+      ]),
+    ).toBe(9);
+  });
+
+  it("is zero when everything is priced", () => {
+    expect(sumUnpricedCalls([row({})])).toBe(0);
+  });
+});
+
+describe("resolveCellLevel in cost mode", () => {
+  const day = (over: Partial<UsageDayRow>): UsageDayRow => ({
+    date: "2026-09-20",
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    calls: 1,
+    hitRate: null,
+    cost: 0,
+    ...over,
+  });
+
+  it("returns 0 for a day with no record", () => {
+    expect(resolveCellLevel(undefined, "cost", [1])).toBe(0);
+  });
+
+  it("buckets by the day's cost, not by its token volume", () => {
+    const values = [0.01, 0.5, 1, 5, 20];
+    const rich = day({ cost: 20, input: 1 });
+    const poor = day({ cost: 0.01, input: 10_000_000 });
+    expect(resolveCellLevel(rich, "cost", values)).toBe(4);
+    // 同一张图上 token 量巨大的那天可能最便宜 —— 这正是要有金额模式的原因
+    expect(resolveCellLevel(poor, "cost", values)).toBe(1);
+    expect(resolveCellLevel(poor, "usage", values)).toBe(4);
   });
 });

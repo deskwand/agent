@@ -89,6 +89,35 @@ describe("usage view wiring", () => {
     expect(view).toMatch(/weeks=\{WEEKS\}/);
   });
 
+  it("shows estimated cost on the card, in the table and in the total row", () => {
+    const view = read("src/renderer/components/UsageView.tsx");
+    expect(view).toContain("formatCost");
+    expect(view).toContain("sumUnpricedCalls");
+    expect(view).toContain('t("usage.cards.cost")');
+    expect(view).toContain('t("usage.columns.cost")');
+    // 合计行用的是 totals.cost（= 卡片上那个数），不是手工把有价行加起来；
+    // ModelTable 拿不到 snapshot，所以必须显式传 totalCost prop
+    expect(view).toContain("totalCost={snapshot.totals.cost}");
+    expect(view).toContain("unpricedCalls");
+  });
+
+  it("ships the cost labels in both locales", () => {
+    for (const locale of ["zh", "en"]) {
+      const json = JSON.parse(
+        read(`src/renderer/i18n/locales/${locale}.json`),
+      ) as {
+        usage: {
+          cards: Record<string, string>;
+          columns: Record<string, string>;
+        };
+      };
+      expect(json.usage.cards.cost).toBeTruthy();
+      expect(json.usage.cards.costHint).toBeTruthy();
+      expect(json.usage.cards.costUnpriced).toContain("{{count}}");
+      expect(json.usage.columns.cost).toBeTruthy();
+    }
+  });
+
   it("keeps the heatmaps independent of the selected range", () => {
     const view = read("src/renderer/components/UsageView.tsx");
     expect(view).toContain("snapshot.byDay");

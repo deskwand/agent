@@ -3,9 +3,19 @@
  *
  * Only depends on node:sqlite's DatabaseSync (no Electron), so every unit test
  * runs against `new DatabaseSync(":memory:")`.
+ *
+ * Cost is priced per record via `usage-cost.ts` (pi-ai price table), never from
+ * a provider-reported `Usage.cost` — see design-docs/2026-09-20-usage-cost-design.md.
  */
 
 import type { DatabaseSync } from "node:sqlite";
+import {
+  aggregateCosts,
+  loadPriceIndex,
+  providerModelKey,
+  type PriceIndex,
+  type UsageCostRow,
+} from "./usage-cost";
 import type {
   UsageDayRow,
   UsageHourRow,
@@ -143,13 +153,21 @@ function toHitRate(row: RawAgg): number | null {
  * totals / byModel follow the requested range; byDay and byHour are always
  * all-time, because the heatmaps are the long view — scoping them to "7 days"
  * would blank out a 26-week grid and hide the pattern they exist to show.
+ *
+ * Cost is priced per record by `usage-cost.ts` and merged in here; the SQL
+ * aggregation above is untouched.
  */
 export function queryUsage(
   db: DatabaseSync,
   range: UsageRange,
   now: number,
+  priceIndex: PriceIndex = loadPriceIndex(),
 ): UsageSnapshot {
   const cutoff = rangeCutoff(range, now);
+
+  // 一次全量扫描逐条定价：byDay 是全部区间，所以这里不能加 WHERE，也不能按
+  // (model, provider) 先聚合再套价（分档按单次请求判定，聚合套价实测偏差 +64%）。
+  const costs = aggregateCosts(loadUsageRows(db), cutoff, priceIndex);
 
   const totalsRow = db
     .prepare(
@@ -184,6 +202,7 @@ export function queryUsage(
     cacheRead: row.cacheRead,
     calls: row.calls,
     hitRate: toHitRate(row),
+    cost: costs.byDay.get(row.date) ?? 0,
   }));
 
   const byHour = db
@@ -223,6 +242,7 @@ export function queryUsage(
     cacheRead: row.cacheRead,
     calls: row.calls,
     hitRate: toHitRate(row),
+    cost: costs.byModel.get(providerModelKey(row.provider, row.model)) ?? null,
   }));
 
   const totals: UsageTotals = {
@@ -232,7 +252,27 @@ export function queryUsage(
     cacheWrite: totalsRow.cacheWrite,
     calls: totalsRow.calls,
     hitRate: toHitRate(totalsRow),
+    cost: costs.total,
   };
 
   return { totals, byDay, byHour, byModel };
+}
+
+/**
+ * 一次全量取数，供热力图与成本归集。没有 WHERE：`byDay` 恒为全部区间。
+ * 实测 75.6k 行 = 152ms 取数 + 35ms 定价，而同一函数里的 SQL 聚合只有毫秒级。
+ */
+export function loadUsageRows(db: DatabaseSync): UsageCostRow[] {
+  return db
+    .prepare(
+      `SELECT ts,
+              provider,
+              model,
+              input,
+              output,
+              cache_read AS cacheRead,
+              cache_write AS cacheWrite
+         FROM usage_records`,
+    )
+    .all() as unknown as UsageCostRow[];
 }

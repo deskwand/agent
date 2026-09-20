@@ -35,6 +35,15 @@ describe("usage.query IPC contract", () => {
     expect(text).toContain('requested === "30d"');
   });
 
+  it("logs unpriced models as the signal to extend the override table", () => {
+    const text = read("src/main/index.ts");
+    // 页面只显示未定价的计数，明细只有日志能告诉我们该补哪一条（沿用 log(...) 惯例）
+    expect(text).toContain("[Usage] unpriced models:");
+    expect(text).toMatch(/row\.cost === null && row\.model !== null/);
+    // 子代理桶（model IS NULL）永远无法通过覆盖表定价，不该进这行日志
+    expect(text).not.toMatch(/row\.model \?\? "\?"/);
+  });
+
   it("resolves the sessions root from userData, not a hardcoded home path", () => {
     const text = read("src/main/index.ts");
     expect(text).toContain(

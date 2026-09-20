@@ -32,6 +32,8 @@ export interface UsageRecordInput extends UsageTokens {
 export interface UsageTotals extends UsageTokens {
   calls: number;
   hitRate: number | null;
+  /** 区间内折算金额（USD），按 pi-ai 价目表算，是参考值不是账单。 */
+  cost: number;
 }
 
 export interface UsageDayRow {
@@ -41,6 +43,8 @@ export interface UsageDayRow {
   cacheRead: number;
   calls: number;
   hitRate: number | null;
+  /** 该日折算金额；恒为全部区间（热力图不随区间变）。 */
+  cost: number;
 }
 
 export interface UsageHourRow {
@@ -58,6 +62,8 @@ export interface UsageModelRow {
   cacheRead: number;
   calls: number;
   hitRate: number | null;
+  /** null = 该模型没有价目（含子代理行 model IS NULL）。 */
+  cost: number | null;
 }
 
 export interface UsageSnapshot {

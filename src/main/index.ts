@@ -4212,7 +4212,20 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         requested === "all"
           ? requested
           : DEFAULT_USAGE_RANGE;
-      return queryUsage(getDatabase().raw, range, Date.now());
+      const snapshot = queryUsage(getDatabase().raw, range, Date.now());
+      // 未定价的模型：页面只展示计数，明细只有日志能告诉我们该往覆盖表补哪一条
+      // （src/main/usage/model-price-overrides.ts）。
+      // 故意不做去重缓存：切一次区间就重打一遍同一批模型。噪声可接受，
+      // 而去重要引入模块级状态，不值得（这些行只在排查“要不要补表”时被看）。
+      // 只列 model 非空的行：子代理桶（model IS NULL）永远无法通过覆盖表定价，
+      // 列出来只会稀释这行日志的可操作性
+      const unpriced = snapshot.byModel
+        .filter((row) => row.cost === null && row.model !== null)
+        .map((row) => `${row.provider ?? "?"}/${row.model}`);
+      if (unpriced.length > 0) {
+        log("[Usage] unpriced models:", unpriced.join(", "));
+      }
+      return snapshot;
     }
 
     case "permission.response":

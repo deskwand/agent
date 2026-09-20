@@ -1781,8 +1781,12 @@
       "calls": "调用次数",
       "cacheNotReported": "provider 未上报",
       "hitRateHint": "缓存读 ÷ 提示词总量",
-      "avgOutput": "平均 {{value}} 输出 tokens/次"
+      "avgOutput": "平均 {{value}} 输出 tokens/次",
+      "cost": "参考成本",
+      "costHint": "按 pi 价目表折算",
+      "costUnpriced": "{{count}} 次调用无价目 · 未计入"
     },
+    "allTime": "全部区间",
     "daily": "每日用量",
     "dailyHint": "每格 = 当天输出 + 输入 + 缓存读",
     "hourly": "时段分布",
@@ -1796,12 +1800,14 @@
       "output": "输出",
       "input": "输入",
       "cacheRead": "缓存读",
+      "cost": "成本",
       "hitRate": "命中率",
       "calls": "调用"
     },
     "colorMode": {
       "usage": "用量",
-      "hit": "命中率"
+      "hit": "命中率",
+      "cost": "金额"
     },
     "legend": {
       "less": "少",
