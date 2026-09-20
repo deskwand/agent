@@ -131,12 +131,29 @@ describe("usage view wiring", () => {
 });
 
 describe("usage currency wiring", () => {
-  it("renders a currency selector bound to the shared code list", () => {
+  it("renders a menu built from the shared menu tokens", () => {
+    // 自绘菜单而不是原生 select：原生展开菜单由 OS 绘制、跟系统外观走，
+    // 不跟 app 主题走（浅色主题 + 深色系统会弹出系统深色菜单）
+    const menu = read("src/renderer/components/usage/CurrencySelect.tsx");
+    // 注释里若出现带尖括号的 select 字样会误伤这条；组件注释写的是「原生 select」
+    expect(menu).not.toMatch(/<select[\s>]/);
+    expect(menu).toContain("MENU_PANEL_PADDED_CLASS");
+    expect(menu).toContain("MENU_ITEM_SELECTED_CLASS");
+    expect(menu).toContain("USAGE_CURRENCIES.map");
+    expect(menu).toContain('t("usage.currency")');
+    // 触发按钮照抄输入框模型菜单的形态，不自己发明一套
+    expect(menu).toContain(
+      "rounded-2xl border border-border-subtle bg-background/60",
+    );
+  });
+
+  it("uses the themed menu in the usage header instead of a native select", () => {
     const view = read("src/renderer/components/UsageView.tsx");
-    expect(view).toContain("<select");
-    expect(view).toContain("USAGE_CURRENCIES.map");
-    expect(view).toContain('t("usage.currency")');
+    // 拆开断言：加一个 prop 就会被 prettier 折行，连在一起的子串会断
+    expect(view).toContain("<CurrencySelect");
+    expect(view).toContain("onChange={setCurrency}");
     expect(view).toContain('type: "usage.exchange-rate"');
+    expect(view).not.toMatch(/<select[\s>]/);
   });
 
   it("keeps currency in the zustand store and persists it under a fixed key", () => {

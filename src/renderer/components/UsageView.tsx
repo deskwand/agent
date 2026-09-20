@@ -3,12 +3,11 @@ import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import {
   DEFAULT_USAGE_RANGE,
-  USAGE_CURRENCIES,
-  type CurrencyCode,
   type ExchangeRates,
   type UsageModelRow,
   type UsageSnapshot,
 } from "../../shared/usage";
+import { CurrencySelect } from "./usage/CurrencySelect";
 import { useAppStore } from "../store";
 import { UsageCalendarHeatmap } from "./usage/UsageCalendarHeatmap";
 import { UsageHourHeatmap } from "./usage/UsageHourHeatmap";
@@ -118,23 +117,7 @@ export function UsageView() {
             </button>
           ))}
         </div>
-        <label className="flex items-center gap-1.5 text-xs text-text-muted">
-          <span>{t("usage.currency")}</span>
-          <select
-            value={currency}
-            onChange={(event) =>
-              setCurrency(event.target.value as CurrencyCode)
-            }
-            aria-label={t("usage.currency")}
-            className="rounded-md border border-border bg-background-secondary px-1.5 py-1 text-xs text-text-primary"
-          >
-            {USAGE_CURRENCIES.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </select>
-        </label>
+        <CurrencySelect value={currency} onChange={setCurrency} />
       </header>
 
       <div className="mt-5 flex-1 space-y-4 overflow-y-auto pb-4">

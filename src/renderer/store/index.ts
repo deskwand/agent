@@ -503,7 +503,7 @@ function readStoredCurrency(): CurrencyCode {
   return "USD";
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
   sessions: [],
   activeSessionId: null,
@@ -1068,6 +1068,9 @@ export const useAppStore = create<AppState>((set) => ({
   setContextPanelWidth: (width) => set({ contextPanelWidth: width }),
   setActiveView: (activeView) => set({ activeView }),
   setCurrency: (currency) => {
+    // 同一货币早退：setCurrency 会清汇率，而汇率只按 currency 变化重新拉取，
+    // 重复设置同一货币会清掉汇率却不再取回来（金额退回美元显示）
+    if (get().currency === currency) return;
     try {
       localStorage.setItem("deskwand.usageCurrency", currency);
     } catch {

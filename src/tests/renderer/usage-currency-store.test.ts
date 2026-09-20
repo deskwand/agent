@@ -51,6 +51,17 @@ describe("usage currency store slice", () => {
     expect(useAppStore.getState().currency).toBe("USD");
   });
 
+  it("keeps the rate when the same currency is selected again", async () => {
+    // 重选同项会清汇率却不会再取回来（effect 依赖 currency 不变）→ 金额退回美元
+    const useAppStore = await freshUseAppStore();
+    useAppStore.getState().setCurrency("CNY");
+    useAppStore.getState().setCurrencyRate(7.1);
+
+    useAppStore.getState().setCurrency("CNY");
+
+    expect(useAppStore.getState().currencyRate).toBe(7.1);
+  });
+
   it("persists the choice and clears the previous currency's rate", async () => {
     const useAppStore = await freshUseAppStore();
     useAppStore.getState().setCurrencyRate(7.1);
