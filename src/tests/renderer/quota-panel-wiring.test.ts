@@ -107,7 +107,8 @@ describe("底栏到额度块的接线", () => {
     act(() => trigger().click());
     await act(async () => {});
 
-    expect(list).toHaveBeenCalledTimes(1);
+    // 挂载预取 1 次 + 打开刷新 1 次
+    expect(list).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("OpenAI Codex");
   });
 
@@ -117,7 +118,8 @@ describe("底栏到额度块的接线", () => {
     act(() => trigger().click());
     await act(async () => {});
 
-    expect(list).toHaveBeenCalledTimes(1);
+    // 挂载预取 1 次 + 打开刷新 1 次
+    expect(list).toHaveBeenCalledTimes(2);
     expect(container.textContent).toContain("OpenAI Codex");
   });
 });

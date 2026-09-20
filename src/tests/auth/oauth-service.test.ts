@@ -11,6 +11,7 @@ const modelRuntimeMock = vi.hoisted(() => ({
   logout: vi.fn(),
   removeRuntimeApiKey: vi.fn(),
 }));
+const clearQuotaCacheMock = vi.hoisted(() => vi.fn());
 
 vi.mock("electron", () => ({
   app: { getLocale: vi.fn(() => "en") },
@@ -33,6 +34,10 @@ vi.mock("../../main/agent/shared-model-runtime", () => ({
 
 vi.mock("../../main/agent/subagent/provider-bridge", () => ({
   buildDeskWandProviderId: (profileKey: string) => `deskwand:${profileKey}`,
+}));
+
+vi.mock("../../main/quota", () => ({
+  clearQuotaCache: clearQuotaCacheMock,
 }));
 
 vi.mock("../../main/config/config-store", () => ({
@@ -85,12 +90,17 @@ describe("oauth-service", () => {
     await handler("auth.login")({}, "anthropic", false);
 
     expect(modelRuntimeMock.login).not.toHaveBeenCalled();
+    // 这次什么都没改，不该清缓存（也钉住 clearQuotaCache 在 early return 之后）
+    expect(clearQuotaCacheMock).not.toHaveBeenCalled();
   });
 
   it("forces OAuth login through ModelRuntime", async () => {
     readStoredCredentialMock.mockReturnValue({ type: "oauth" });
 
     await handler("auth.login")({}, "anthropic", true);
+
+    // 换了账号（或新登录）后，旧账号的额度快照必须失效
+    expect(clearQuotaCacheMock).toHaveBeenCalled();
 
     expect(modelRuntimeMock.login).toHaveBeenCalledWith(
       "anthropic",
@@ -154,6 +164,20 @@ describe("oauth-service", () => {
     expect(invalidateSessionRuntimeApiKeys).toHaveBeenCalledWith(
       "deskwand:oauth:openai-codex",
     );
+    // 登出后旧账号的额度快照必须失效，否则 TTL 窗口内还会被读到
+    expect(clearQuotaCacheMock).toHaveBeenCalled();
+  });
+
+  it("登出中途抛错时同样清空额度缓存（否则回落会把旧账号数字一直端出来）", async () => {
+    modelRuntimeMock.removeRuntimeApiKey.mockRejectedValue(
+      new Error("runtime key removal failed"),
+    );
+
+    await expect(handler("auth.logout")({}, "openai-codex")).rejects.toThrow();
+
+    // clearQuotaCache 放在 finally：这一步失败时凭据可能已经没了，
+    // 而失败回落会把还留在缓存里的旧快照当成有效数据一直返回。
+    expect(clearQuotaCacheMock).toHaveBeenCalled();
   });
 });
 

@@ -20,6 +20,7 @@ import {
   invalidateSessionRuntimeApiKeys,
 } from "../agent/shared-model-runtime";
 import { buildDeskWandProviderId } from "../agent/subagent/provider-bridge";
+import { clearQuotaCache } from "../quota";
 import { configStore } from "../config/config-store";
 import { log } from "../utils/logger";
 
@@ -243,28 +244,45 @@ async function handleLogin(
 ): Promise<void> {
   if (!force && readStoredCredential(providerId, getAuthPath())) return;
 
-  const runtime = await getSharedModelRuntime();
-  const providerName =
-    SUPPORTED_OAUTH_PROVIDERS.find((provider) => provider.id === providerId)
-      ?.name ?? providerId;
-  await runtime.login(providerId, "oauth", createAuthInteraction(providerName));
+  try {
+    const runtime = await getSharedModelRuntime();
+    const providerName =
+      SUPPORTED_OAUTH_PROVIDERS.find((provider) => provider.id === providerId)
+        ?.name ?? providerId;
+    await runtime.login(
+      providerId,
+      "oauth",
+      createAuthInteraction(providerName),
+    );
+  } finally {
+    // 换了账号（或新登录）后，旧账号的额度快照必须失效。
+    // 放 finally：登录即使中途抛错也可能已经动过凭据，漏清会让旧账号的数字继续被读到。
+    clearQuotaCache();
+  }
 }
 
 async function handleLogout(
   _event: Electron.IpcMainInvokeEvent,
   providerId: string,
 ): Promise<void> {
-  const runtime = await getSharedModelRuntime();
-  await runtime.logout(providerId);
-  await runtime.removeRuntimeApiKey(providerId);
-  await invalidateSessionRuntimeApiKeys(providerId);
+  try {
+    const runtime = await getSharedModelRuntime();
+    await runtime.logout(providerId);
+    await runtime.removeRuntimeApiKey(providerId);
+    await invalidateSessionRuntimeApiKeys(providerId);
 
-  for (const profileKey of Object.keys(configStore.getAll().providers)) {
-    if (extractOAuthProviderId(profileKey) === providerId) {
-      const deskwandProviderId = buildDeskWandProviderId(profileKey);
-      await runtime.removeRuntimeApiKey(deskwandProviderId);
-      await invalidateSessionRuntimeApiKeys(deskwandProviderId);
+    for (const profileKey of Object.keys(configStore.getAll().providers)) {
+      if (extractOAuthProviderId(profileKey) === providerId) {
+        const deskwandProviderId = buildDeskWandProviderId(profileKey);
+        await runtime.removeRuntimeApiKey(deskwandProviderId);
+        await invalidateSessionRuntimeApiKeys(deskwandProviderId);
+      }
     }
+  } finally {
+    // 登出后旧账号的额度快照必须失效，否则失败回落会把它的数字**无期限**端出来。
+    // 必须放 finally：上面任一 await 抛错时也要清——那时凭据可能已经没了，
+    // 回落会把还留在缓存里的旧快照当成有效数据一直返回。
+    clearQuotaCache();
   }
 }
 

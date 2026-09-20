@@ -192,30 +192,40 @@ describe("StatusPopover", () => {
     await act(async () => {});
 
     const text = dialog()!.textContent!;
-    expect(list).toHaveBeenCalledTimes(1);
+    // 挂载预取 1 次 + 打开刷新 1 次
+    expect(list).toHaveBeenCalledTimes(2);
     expect(text).not.toContain("OpenAI Codex");
     expect(text).toContain("statusPopover.context");
   });
 
-  it("IPC reject 时静默降级", async () => {
+  it("首次就 IPC reject：不崩、不显示额度块（只证明这一类失败）", async () => {
+    // ⚠️ 业务级失败（500 / 超时 / 非 JSON）不走 reject：它们在主进程被吞成空数组，
+    // 由聚合层的失败回落（D）处理，见 quota-service.test.ts 的「失败回落」那组用例。
+    // 也注意这里 `not.toContain` 是**弱**断言：挂载预取同样 reject，quota 从未被填过，
+    // 所以它实际证明的是「不崩 + 不出现假数据」。保留值：首次失败 → 不渲染额度块。
     stubQuotaList([], true);
     render();
     act(() => trigger().click());
 
     await act(async () => {});
 
-    expect(dialog()!.textContent).not.toContain("OpenAI Codex");
+    const text = dialog()!.textContent!;
+    expect(text).toContain("statusPopover.context"); // 上下文块仍在（面板没崩）
+    expect(text).not.toContain("OpenAI Codex");
   });
 
-  it("打开面板即请求，不依赖任何 prop（非 OAuth 会话也必须查）", async () => {
+  it("挂载即预取，打开时再刷新一次（不依赖任何 prop）", async () => {
     const list = stubQuotaList([quota]);
     // helper 会注入三个必填 prop，但不注入任何通道信息：
     // 面板不该因为「当前通道不是 OAuth」而不请求。
     render();
+    // 挂载的那一次就是预取：实测冷请求 ~1s，必须提前到用户点击之前
+    await act(async () => {});
+    expect(list).toHaveBeenCalledTimes(1);
+
     act(() => trigger().click());
     await act(async () => {});
-
-    expect(list).toHaveBeenCalledTimes(1);
+    expect(list).toHaveBeenCalledTimes(2);
   });
 
   it("两条快照时渲染两个 provider 标签行", async () => {
@@ -252,6 +262,57 @@ describe("StatusPopover", () => {
     const text = dialog()!.textContent!;
     expect(text).not.toContain("OpenAI Codex");
     expect(text).toContain("statusPopover.context");
+  });
+
+  it("关闭不触发刷新", async () => {
+    const list = stubQuotaList([quota]);
+    render();
+    await act(async () => {});
+
+    act(() => trigger().click()); // 打开
+    await act(async () => {});
+    act(() => trigger().click()); // 关闭
+    await act(async () => {});
+
+    expect(list).toHaveBeenCalledTimes(2); // 挂载 1 + 打开 1，关闭不增加
+  });
+
+  it("保留上次结果：第二次打开的首帧就有额度块（不先空再出现）", async () => {
+    stubQuotaList([quota]);
+    render();
+    // 先冲刷挂载预取：不冲刷的话「首帧」在正确实现下也是空的，断言就没有区分力
+    await act(async () => {});
+
+    act(() => trigger().click());
+    await act(async () => {});
+    expect(dialog()!.textContent).toContain("OpenAI Codex");
+
+    act(() => trigger().click()); // 关闭
+    await act(async () => {});
+    act(() => trigger().click()); // 再打开：这一帧就应含额度块
+    expect(dialog()!.textContent).toContain("OpenAI Codex");
+  });
+
+  it("IPC reject 时保留已有额度块（渲染层真正可观察的那一半）", async () => {
+    let shouldReject = false;
+    const list = vi.fn(async () => {
+      if (shouldReject) throw new Error("ipc down");
+      return [quota];
+    });
+    vi.stubGlobal("electronAPI", { quota: { list } });
+
+    render();
+    act(() => trigger().click());
+    await act(async () => {});
+    expect(dialog()!.textContent).toContain("OpenAI Codex");
+
+    shouldReject = true;
+    act(() => trigger().click()); // 关闭
+    await act(async () => {});
+    act(() => trigger().click()); // 再打开
+    await act(async () => {});
+
+    expect(dialog()!.textContent).toContain("OpenAI Codex"); // 保留，而不是清空
   });
 
   it("不再有可见气泡：focus 按钮后仍无 role=tooltip", async () => {

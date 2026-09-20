@@ -27,27 +27,35 @@ export function StatusPopover({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [quota, setQuota] = useState<QuotaSnapshot[]>([]);
+  /** 预取只做一次：靠它区分「首次挂载」与「关闭后重开」。 */
+  const prefetchedRef = useRef(false);
   const containerRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    // 无条件先清空：关闭、重新打开都不该闪出上一次抓取的结果。
-    // ⚠️ 这里清空是「不要闪现旧数据」，**不是**按通道过滤。
-    // 历史上曾有 `if (!open || !providerId) return;` 这道闸门，它会让
-    // 已登录的订阅在非该通道的会话（如 deepseek）里完全不显示——不要加回来。
-    setQuota([]);
-
-    // 这里**不能**再按通道 id 做条件：非 OAuth 会话（如 deepseek）也必须查，
-    // 否则已登录的订阅额度不会显示——这正是本次要修的观感问题。
-    if (!open) return;
+    // 需要刷新的两种情况：首次挂载预取（把实测 ~1s 的冷请求挪到用户点击之前），
+    // 或面板被打开。关闭时不刷新——否则每次关闭都会多打一次请求。
+    //
+    // ⚠️ 这个 ref 与 React StrictMode 的 setup→cleanup→setup 相冲：第二次 setup 会被它
+    // 拦住，而第一次的结果已被 cleanup 置 cancelled 丢弃 → 预取在 dev 下失效（打开面板时
+    // 仍会正常刷新，所以只是退化成旧行为）。renderer/main.tsx:80 已移除 StrictMode（有注释），
+    // 故现在不触发；若要包回 StrictMode，先改这里。
+    if (!open && prefetchedRef.current) return;
+    prefetchedRef.current = true;
 
     let cancelled = false;
     void (async () => {
       try {
         const snapshots = await window.electronAPI.quota.list();
+        // **不清空**：保留上次结果（stale-while-revalidate，与 AccountMenu 一致），
+        // 否则每次打开都会先空一下再出现，面板高度跟着跳。
         if (!cancelled) setQuota(snapshots);
       } catch {
-        // handler 缺失 / 序列化失败都会 reject：按「这次没有额度数据」处理
-        if (!cancelled) setQuota([]);
+        // IPC 级失败（handler 缺失 / 序列化失败）保持静默、保留上次结果——
+        // 不再 setQuota([])。业务级失败（500/超时/非 JSON）不走这里，
+        // 它们在主进程被吞成空数组、由聚合层的失败回落处理。
+        //
+        // 另：不要加回 `if (open && !providerId) return;` 那类通道闸门——它会让已登录的
+        // 订阅在非该通道的会话（如 deepseek）里完全不显示。
       }
     })();
     return () => {
