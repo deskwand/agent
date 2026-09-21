@@ -215,35 +215,23 @@ export const BashToolBlock = memo(function BashToolBlock({
 
       {expanded && !isRunning && (
         <div className="animate-fade-in mx-3 mb-3 rounded-lg overflow-hidden border border-surface-muted">
-          {/* Terminal title bar */}
-          <div
-            className="flex items-center gap-2 px-3 py-1.5"
-            style={{ backgroundColor: "var(--color-terminal-titlebar-bg)" }}
-          >
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
-            <span
-              className="ml-2 text-[11px] font-medium"
-              style={{ color: "var(--color-terminal-titlebar-text)" }}
-            >
-              bash
-            </span>
-            {durationText && (
-              <span
-                className="ml-auto text-[11px]"
-                style={{ color: "var(--color-terminal-titlebar-text)" }}
-              >
-                {durationText}
-              </span>
-            )}
-          </div>
-
           {/* Command + output */}
           <div
             className="px-3 py-2 font-mono text-xs leading-snug"
             style={{ backgroundColor: "var(--color-terminal-bg)" }}
           >
+            {/* Shell + duration meta line (no macOS traffic lights) */}
+            <div
+              className="mb-2 flex items-center gap-2 border-b pb-2 text-[11px]"
+              style={{
+                color: "var(--color-terminal-titlebar-text)",
+                borderColor: "var(--color-terminal-divider)",
+              }}
+            >
+              <span className="font-medium">bash</span>
+              {durationText && <span className="ml-auto">{durationText}</span>}
+            </div>
+
             {/* Command line: $ cmd (green for success, red for error) */}
             <div
               className="mb-1.5"
