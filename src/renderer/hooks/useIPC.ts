@@ -154,6 +154,9 @@ function registerSharedIpcListener(): () => void {
     store.setSettings({
       autoSkillLearning: config.autoSkillLearning ?? false,
     });
+    store.setSettings({
+      telemetryEnabled: config.telemetryEnabled ?? true,
+    });
     if (isInitialConfigStatus) {
       store.markInitialConfigStatusSeen();
     }

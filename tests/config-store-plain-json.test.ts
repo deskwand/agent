@@ -200,4 +200,19 @@ describe('ConfigStore plain JSON behavior', () => {
     expect(store.get('webAccess').braveApiKey).toBe('brave-key');
     expect(store.get('webAccess').openai.source).toBe('dedicated');
   });
+
+  it('persists the telemetryEnabled opt-out toggle', async () => {
+    const { ConfigStore } = await import('../src/main/config/config-store');
+    const store = new ConfigStore();
+
+    store.update({ telemetryEnabled: false });
+    expect(store.get('telemetryEnabled')).toBe(false);
+
+    // A fresh instance must read the persisted file, not just the in-memory cache.
+    const reloaded = new ConfigStore();
+    expect(reloaded.get('telemetryEnabled')).toBe(false);
+
+    store.update({ telemetryEnabled: true });
+    expect(store.get('telemetryEnabled')).toBe(true);
+  });
 });

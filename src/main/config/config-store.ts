@@ -1024,6 +1024,8 @@ export class ConfigStore {
       stored.thinkingLevel = updates.thinkingLevel;
     if (updates.autoSkillLearning !== undefined)
       stored.autoSkillLearning = updates.autoSkillLearning;
+    if (updates.telemetryEnabled !== undefined)
+      stored.telemetryEnabled = updates.telemetryEnabled;
     if (updates.uiFontSize !== undefined)
       stored.uiFontSize = clampUiFontSize(updates.uiFontSize);
     if (updates.visionModel !== undefined)

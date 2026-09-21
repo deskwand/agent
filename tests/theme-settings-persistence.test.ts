@@ -31,6 +31,14 @@ describe('theme settings persistence', () => {
     expect(source).toContain('window.electronAPI.getSystemTheme()');
   });
 
+  it('hydrates the telemetry opt-out from config bootstrap', () => {
+    const source = fs.readFileSync(useIPCPath, 'utf8');
+
+    // Without this the renderer slice defaults to `true` on every startup, so a
+    // user who disabled telemetry would still see the toggle highlighted as ON.
+    expect(source).toContain('telemetryEnabled: config.telemetryEnabled ?? true,');
+  });
+
   it('sends user-initiated settings updates back to the main process', () => {
     const source = fs.readFileSync(storePath, 'utf8');
 

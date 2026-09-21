@@ -880,6 +880,7 @@ export interface AppConfig {
   enableThinking?: boolean;
   thinkingLevel?: string;
   autoSkillLearning?: boolean;
+  telemetryEnabled?: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
