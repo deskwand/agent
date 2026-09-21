@@ -5,7 +5,9 @@ import {
   compactNumber,
   formatCost,
   formatHitRate,
+  modelBarValue,
   resolveCellLevel,
+  sortModelRows,
   sumUnpricedCalls,
 } from "../../renderer/utils/usage-format";
 import type { UsageDayRow, UsageModelRow } from "../../shared/usage";
@@ -235,5 +237,115 @@ describe("formatCost with currency", () => {
   it("keeps USD identical to the legacy path regardless of extras", () => {
     expect(formatCost(0.0004, "USD", 7.1)).toBe("<$0.001");
     expect(formatCost(1000, "USD", 7.1)).toBe("$1,000");
+  });
+});
+
+describe("sortModelRows", () => {
+  const row = (
+    model: string,
+    output: number,
+    cost: number | null,
+  ): UsageModelRow => ({
+    model,
+    provider: "p",
+    input: 0,
+    output,
+    cacheRead: 0,
+    calls: 1,
+    hitRate: null,
+    cost,
+  });
+
+  it("sorts by output descending, matching the backend's ORDER BY", () => {
+    const rows = [row("a", 10, 1), row("b", 30, 0.5), row("c", 20, 2)];
+    expect(sortModelRows(rows, "output").map((r) => r.model)).toEqual([
+      "b",
+      "c",
+      "a",
+    ]);
+  });
+
+  it("sorts by cost descending", () => {
+    const rows = [row("a", 10, 1), row("b", 30, 0.5), row("c", 20, 2)];
+    expect(sortModelRows(rows, "cost").map((r) => r.model)).toEqual([
+      "c",
+      "a",
+      "b",
+    ]);
+  });
+
+  it("puts unpriced rows last, keeping their relative order", () => {
+    const rows = [
+      row("free", 0, null),
+      row("big", 1, 5),
+      row("also-free", 0, null),
+      row("small", 1, 0.1),
+    ];
+    expect(sortModelRows(rows, "cost").map((r) => r.model)).toEqual([
+      "big",
+      "small",
+      "free",
+      "also-free",
+    ]);
+  });
+
+  it("keeps a fully unpriced table in the incoming order", () => {
+    const rows = [row("a", 1, null), row("b", 2, null)];
+    expect(sortModelRows(rows, "cost").map((r) => r.model)).toEqual(["a", "b"]);
+  });
+
+  it("keeps the incoming order for equal values", () => {
+    const rows = [row("a", 5, 1), row("b", 5, 1)];
+    expect(sortModelRows(rows, "output").map((r) => r.model)).toEqual([
+      "a",
+      "b",
+    ]);
+    expect(sortModelRows(rows, "cost").map((r) => r.model)).toEqual(["a", "b"]);
+  });
+
+  it("handles an empty table", () => {
+    expect(sortModelRows([], "cost")).toEqual([]);
+  });
+
+  it("returns a new array", () => {
+    const rows = [row("a", 1, 1)];
+    expect(sortModelRows(rows, "output")).not.toBe(rows);
+    expect(sortModelRows(rows, "cost")).not.toBe(rows);
+  });
+
+  it("never mutates the input", () => {
+    const rows = [row("a", 1, 1), row("b", 2, 2)];
+    sortModelRows(rows, "cost");
+    sortModelRows(rows, "output");
+    expect(rows.map((r) => r.model)).toEqual(["a", "b"]);
+  });
+});
+
+describe("modelBarValue", () => {
+  const row = (output: number, cost: number | null): UsageModelRow => ({
+    model: "m",
+    provider: "p",
+    input: 0,
+    output,
+    cacheRead: 0,
+    calls: 1,
+    hitRate: null,
+    cost,
+  });
+
+  it("follows the active key", () => {
+    expect(modelBarValue(row(30, 2), "output")).toBe(30);
+    expect(modelBarValue(row(30, 2), "cost")).toBe(2);
+  });
+
+  it("treats an unpriced row as zero", () => {
+    expect(modelBarValue(row(30, null), "cost")).toBe(0);
+  });
+
+  it("clamps negatives and non-finite values to zero", () => {
+    // 负百分比对 CSS width 无效 → 声明被丢弃 → 条形退回满格，意思正好相反
+    expect(modelBarValue(row(30, -5), "cost")).toBe(0);
+    expect(modelBarValue(row(-30, 2), "output")).toBe(0);
+    expect(modelBarValue(row(30, Number.NaN), "cost")).toBe(0);
   });
 });

@@ -1793,7 +1793,11 @@
     "hourly": "时段分布",
     "hourlyHint": "7 × 24 · 星期 × 小时 · 输出 token",
     "byModel": "按模型",
-    "byModelHint": "所选区间 · 按输出 token 排序",
+    "byModelHint": "所选区间",
+    "sort": {
+      "output": "输出",
+      "cost": "成本"
+    },
     "subagentRow": "子代理（多模型合计）",
     "totalRow": "合计",
     "columns": {

@@ -15,7 +15,10 @@ import {
   compactNumber,
   formatCost,
   formatHitRate,
+  modelBarValue,
+  sortModelRows,
   sumUnpricedCalls,
+  type UsageSortKey,
 } from "../utils/usage-format";
 
 const RANGES = ["1d", "7d", "30d", "90d", "all"] as const;
@@ -33,6 +36,7 @@ export function UsageView() {
   const setCurrencyRate = useAppStore((s) => s.setCurrencyRate);
   const lang = i18n.resolvedLanguage ?? "en";
   const [range, setRange] = useState<Range>(DEFAULT_USAGE_RANGE);
+  const [sortKey, setSortKey] = useState<UsageSortKey>("output");
   const [snapshot, setSnapshot] = useState<UsageSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -200,9 +204,31 @@ export function UsageView() {
               <UsageHourHeatmap records={snapshot.byHour} />
             </Box>
 
-            <Box title={t("usage.byModel")} hint={t("usage.byModelHint")}>
+            <Box
+              title={t("usage.byModel")}
+              hint={t("usage.byModelHint")}
+              action={
+                <div className="flex gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
+                  {(["output", "cost"] as UsageSortKey[]).map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setSortKey(value)}
+                      className={`rounded-md px-2 py-0.5 text-xs transition-colors ${
+                        sortKey === value
+                          ? "bg-surface text-text-primary"
+                          : "text-text-muted hover:text-text-primary"
+                      }`}
+                    >
+                      {t(`usage.sort.${value}`)}
+                    </button>
+                  ))}
+                </div>
+              }
+            >
               <ModelTable
                 rows={snapshot.byModel}
+                sortKey={sortKey}
                 totalRow={t("usage.totalRow")}
                 totalCost={snapshot.totals.cost}
               />
@@ -235,10 +261,12 @@ function Card({
 function Box({
   title,
   hint,
+  action,
   children,
 }: {
   title: string;
   hint: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -248,6 +276,7 @@ function Box({
         <span className="ml-auto font-mono text-[10px] text-text-muted">
           {hint}
         </span>
+        {action}
       </div>
       {children}
     </div>
@@ -256,10 +285,12 @@ function Box({
 
 function ModelTable({
   rows,
+  sortKey,
   totalRow,
   totalCost,
 }: {
   rows: UsageModelRow[];
+  sortKey: UsageSortKey;
   totalRow: string;
   totalCost: number;
 }) {
@@ -279,7 +310,10 @@ function ModelTable({
     }),
     { output: 0, input: 0, cacheRead: 0, calls: 0 },
   );
-  const max = Math.max(...rows.map((row) => row.output), 1);
+  const sorted = sortModelRows(rows, sortKey);
+  // 条形与排序同一口径（key 决定看输出还是成本），逐行取值统一走 modelBarValue
+  // （它会把负数/非有限值夹到 0，否则 width 声明失效、条形反而满格）
+  const max = Math.max(...rows.map((row) => modelBarValue(row, sortKey)), 1);
   const headClass =
     "border-b border-border px-2 py-1.5 text-right text-[11px] font-normal text-text-muted";
   const cellClass =
@@ -302,7 +336,7 @@ function ModelTable({
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
+        {sorted.map((row) => (
           <tr key={`${row.model ?? "subagent"}-${row.provider ?? ""}`}>
             <td className="border-b border-border-muted px-2 py-1.5 text-xs text-text-primary">
               {row.model ?? t("usage.subagentRow")}
@@ -332,7 +366,9 @@ function ModelTable({
               <span className="block h-2 w-14 overflow-hidden rounded-sm bg-surface">
                 <span
                   className="block h-full bg-success opacity-70"
-                  style={{ width: `${(row.output / max) * 100}%` }}
+                  style={{
+                    width: `${(modelBarValue(row, sortKey) / max) * 100}%`,
+                  }}
                 />
               </span>
             </td>

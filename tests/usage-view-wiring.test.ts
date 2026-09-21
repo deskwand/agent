@@ -196,3 +196,42 @@ describe("usage currency wiring", () => {
     }
   });
 });
+
+describe("by-model sort wiring", () => {
+  it("lets the by-model table switch between output and cost", () => {
+    const view = read("src/renderer/components/UsageView.tsx");
+    // 折行免疫：只断言短片段
+    expect(view).toContain('useState<UsageSortKey>("output")');
+    expect(view).toContain("usage.sort.");
+    expect(view).toContain("sortKey={sortKey}");
+    expect(read("src/renderer/utils/usage-format.ts")).toContain(
+      "export function sortModelRows",
+    );
+  });
+
+  it("drives the bar from the same key as the sort", () => {
+    // 条形与排序同一口径（key 决定），且取值统一走会夹负数/非有限值的 modelBarValue
+    const view = read("src/renderer/components/UsageView.tsx");
+    expect(view).toContain("modelBarValue(row, sortKey)");
+    expect(view).toContain("modelBarValue(row, sortKey)), 1)");
+    expect(read("src/renderer/utils/usage-format.ts")).toContain(
+      "export function modelBarValue",
+    );
+  });
+
+  it("ships the sort labels and drops the stale sort clause from the hint", () => {
+    for (const locale of ["zh", "en"]) {
+      const json = JSON.parse(
+        read(`src/renderer/i18n/locales/${locale}.json`),
+      ) as { usage: Record<string, unknown> };
+      // 精确锁两个叶子：模板字面量 key（t(`usage.sort.${value}`)）是
+      // renderer-i18n-keys 的静态盲区，locale-parity 又只比 zh/en 的 key 集合，
+      // 两边同时写错时全绿、界面却渲染出裸 key
+      const sort = json.usage["sort"] as Record<string, string>;
+      expect(Object.keys(sort).sort()).toEqual(["cost", "output"]);
+      expect(sort.output.length).toBeGreaterThan(0);
+      expect(sort.cost.length).toBeGreaterThan(0);
+      expect(json.usage.byModelHint).not.toMatch(/token/i);
+    }
+  });
+});

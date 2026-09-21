@@ -152,3 +152,41 @@ export function sumUnpricedCalls(rows: UsageModelRow[]): number {
     0,
   );
 }
+
+/** 按模型表的排序口径：「输出」单列 token 数，或折算后的成本。 */
+export type UsageSortKey = "output" | "cost";
+
+/**
+ * 按模型表的行序。
+ *
+ * 「输出」与后端 SQL 的 `ORDER BY output DESC` 同口径 —— 渲染层**仍然自己排**，
+ * 不依赖后端给回来的顺序，这样切回「输出」时的观感与改动前逐行一致。
+ * 「金额」按 cost 倒序，`cost === null`（无价目）恒排最后：null 是"不知道多少钱"，
+ * 不是 0 元，排在前面会看着像花得最多（本页一贯用 `—` 表达无价目，同理）。
+ *
+ * 返回新数组：rows 来自 store 快照，就地排等于改别人的数据。
+ */
+export function sortModelRows(
+  rows: UsageModelRow[],
+  key: UsageSortKey,
+): UsageModelRow[] {
+  if (key === "output") return [...rows].sort((a, b) => b.output - a.output);
+  return [...rows].sort((a, b) => {
+    if (a.cost === null && b.cost === null) return 0;
+    if (a.cost === null) return 1;
+    if (b.cost === null) return -1;
+    return b.cost - a.cost;
+  });
+}
+
+/**
+ * 条形用的行值：与排序同一口径（key 决定看输出还是成本），但**夹到合法范围**。
+ *
+ * 负值/非有限值必须当 0：`width: -30%` 对 CSS 无效、声明会被丢弃，display:block 的
+ * 元素于是退回 `width: auto` = 满格 —— 恰好与「这行是脏数据/无价目」想表达的意思相反。
+ * null（无价目）本就按 0 处理。
+ */
+export function modelBarValue(row: UsageModelRow, key: UsageSortKey): number {
+  const value = key === "cost" ? (row.cost ?? 0) : row.output;
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}

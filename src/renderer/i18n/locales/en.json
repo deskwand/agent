@@ -1794,7 +1794,11 @@
     "hourly": "By time of day",
     "hourlyHint": "7 × 24 · weekday × hour · output tokens",
     "byModel": "By model",
-    "byModelHint": "selected range · sorted by output tokens",
+    "byModelHint": "selected range",
+    "sort": {
+      "output": "Output",
+      "cost": "Cost"
+    },
     "subagentRow": "Subagents (all models combined)",
     "totalRow": "Total",
     "columns": {
