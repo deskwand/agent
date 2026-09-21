@@ -158,7 +158,7 @@ export function BrowserPanel({ width }: { width: number }) {
 
   return (
     <div
-      className="h-full flex flex-col bg-surface/96 border-l border-border-subtle"
+      className="h-full flex flex-col bg-surface/96 border-l border-border"
       style={{ width }}
     >
       {/* Header */}

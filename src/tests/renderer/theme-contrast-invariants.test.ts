@@ -59,16 +59,48 @@ describe("主题对比度不变量", () => {
     expect(blocks.length).toBe(14);
   });
 
-  it("§9-1 次要文字对所在表面 ≥ 4.5", () => {
+  /**
+   * 会被当**文字色**用的 token。
+   *
+   * success / warning / error 故意不在列表里——它们目前是按填充色/状态点调值的，
+   * 纳入会让这条判据立刻红 30+ 项。那是单独一项工作（要决定压暗 3 个值还是拆
+   * fill / on-surface 两组，后者要动 66 处调用点），不属于本轮。
+   * **不要因为这里红了就放宽门槛。**
+   */
+  const TEXT_ROLE_TOKENS = [
+    "--color-text-primary",
+    "--color-text-secondary",
+    "--color-text-muted",
+    "--color-mention",
+    "--color-accent",
+  ] as const;
+
+  it("§9-1 文本类 token 对 background 与 surface 都 ≥ 4.5", () => {
+    // 上一轮只查了 text-muted × surface 一组，于是漏掉了这两批：
+    //   - text-muted 在 5 个亮色预设的 background 上（4.37–4.47）
+    //   - accent 在 ocean / forest / ember 亮色的 background 上（4.31–4.44）
+    // 亮色预设的 background 比 surface 略深，"只查 surface"必然漏掉这一侧。
+    //
+    // 共 14 × 5 × 2 = 140 个组合，收集全部违规再断言，一次报全。
+    const violations: string[] = [];
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const surface = tokenOf(block, "--color-surface");
-      const value = contrast(tokenOf(block, "--color-text-muted"), surface);
-      expect(
-        value,
-        `${head} muted/surface=${value.toFixed(2)}`,
-      ).toBeGreaterThanOrEqual(4.5);
+      for (const token of TEXT_ROLE_TOKENS) {
+        const value = tokenOf(block, token);
+        for (const surface of [
+          "--color-background",
+          "--color-surface",
+        ] as const) {
+          const r = contrast(value, tokenOf(block, surface));
+          if (r < 4.5) {
+            violations.push(`${r.toFixed(2)}  ${head}  ${token} / ${surface}`);
+          }
+        }
+      }
     }
+    expect(violations, `以下组合低于 4.5：\n${violations.join("\n")}`).toEqual(
+      [],
+    );
   });
 
   it("§9-2 描边在各方表面上都看得见，且不会发白", () => {
@@ -125,6 +157,17 @@ describe("主题对比度不变量", () => {
         vsBg,
         `${head} border/background=${vsBg.toFixed(2)}`,
       ).toBeLessThanOrEqual(2.2);
+
+      // 侧栏的填充色是 background-secondary（Task 2 把它的分隔从阴影改成 border），
+      // 所以描边在它上面也必须看得见。这是上一轮漏掉的一组。
+      const vsBgSecondary = contrast(
+        border,
+        tokenOf(block, "--color-background-secondary"),
+      );
+      expect(
+        vsBgSecondary,
+        `${head} border/background-secondary=${vsBgSecondary.toFixed(2)}`,
+      ).toBeGreaterThanOrEqual(1.3);
     }
   });
 

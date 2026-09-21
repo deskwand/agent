@@ -19,7 +19,7 @@ describe("圆角尺度", () => {
     expect(tailwind.theme.extend.borderRadius.container).toBe("12px");
   });
 
-  it("四个 component 类的圆角属于 {8, 12, 16} 且落在指定档位", () => {
+  it("§9-7 四个 component 类的圆角属于 {8, 12, 16} 且落在指定档位", () => {
     const expected: Record<string, number> = {
       btn: 8,
       input: 8,

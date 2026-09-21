@@ -62,7 +62,6 @@
     --color-terminal-success: #3fb950;
     --color-terminal-error: #f85149;
     --color-terminal-dim: #8b949e;
-    --shadow-sidebar-sep: rgba(0, 0, 0, 0.3);
     /* File type icon colours — fixed semantic colours, independent of presets */
     --color-file-media: #f0a63c;
     --color-file-doc: #34d399;
@@ -110,7 +109,6 @@
     --color-terminal-success: #16a34a;
     --color-terminal-error: #dc2626;
     --color-terminal-dim: #9ca3af;
-    --shadow-sidebar-sep: rgba(0, 0, 0, 0.06);
     /* File type icon colours — fixed semantic colours, independent of presets */
     --color-file-media: #b26a00;
     --color-file-doc: #059669;
@@ -181,7 +179,7 @@
     --color-mention: #1e40af;
     --color-text-primary: #3d3225;
     --color-text-secondary: #6b5d48;
-    --color-text-muted: #7d7463;
+    --color-text-muted: #7c7363;
     --color-success: #16a34a;
     --color-warning: #ca8a04;
     --color-error: #dc2626;
@@ -191,7 +189,6 @@
   :root[data-theme-preset="void"] {
     --color-background: #000000;
     --color-background-secondary: #080808;
-    --shadow-sidebar-sep: rgba(255, 255, 255, 0.04);
     --color-surface: #111111;
     --color-surface-hover: #1a1a1a;
     --color-surface-active: #262626;
@@ -311,7 +308,7 @@
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #0c857a;
+    --color-accent: #0c8176;
     --color-accent-hover: #0f766e;
     --color-accent-muted: color-mix(
       in srgb,
@@ -322,7 +319,7 @@
     --color-mention: #1d4ed8;
     --color-text-primary: #0f172a;
     --color-text-secondary: #475569;
-    --color-text-muted: #6a7584;
+    --color-text-muted: #697483;
     --color-success: #059669;
     --color-warning: #d97706;
     --color-error: #dc2626;
@@ -379,7 +376,7 @@
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #04875e;
+    --color-accent: #04845c;
     --color-accent-hover: #047857;
     --color-accent-muted: color-mix(
       in srgb,
@@ -390,7 +387,7 @@
     --color-mention: #0369a1;
     --color-text-primary: #1a2415;
     --color-text-secondary: #4a5a40;
-    --color-text-muted: #6c7964;
+    --color-text-muted: #6a7763;
     --color-success: #16a34a;
     --color-warning: #b45309;
     --color-error: #dc2626;
@@ -447,7 +444,7 @@
     --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
     --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
     --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #cb4c0a;
+    --color-accent: #c94b0a;
     --color-accent-hover: #c2410c;
     --color-accent-muted: color-mix(
       in srgb,
@@ -458,7 +455,7 @@
     --color-mention: #1d4ed8;
     --color-text-primary: #3d2e1f;
     --color-text-secondary: #6b5640;
-    --color-text-muted: #85735d;
+    --color-text-muted: #83715c;
     --color-success: #16a34a;
     --color-warning: #d97706;
     --color-error: #dc2626;
@@ -526,7 +523,7 @@
     --color-mention: #0e7490;
     --color-text-primary: #1e1640;
     --color-text-secondary: #5a4e80;
-    --color-text-muted: #787193;
+    --color-text-muted: #766f90;
     --color-success: #0d9488;
     --color-warning: #d97706;
     --color-error: #dc2626;
@@ -773,12 +770,17 @@
   /* User message text matches assistant prose sizing and font stack */
   .message-user-text {
     font-family:
-      system-ui,
+      "Geist Variable",
       -apple-system,
       BlinkMacSystemFont,
       "Segoe UI",
       "PingFang SC",
       "Microsoft YaHei",
+      "Noto Sans CJK SC",
+      "Noto Sans SC",
+      "Source Han Sans SC",
+      "WenQuanYi Micro Hei",
+      system-ui,
       sans-serif;
     font-size: var(--font-size-chat);
     line-height: var(--line-height-chat);
@@ -808,15 +810,21 @@
     vertical-align: -0.14em;
   }
 
-  /* Prose styling for assistant messages - system font stack */
+  /* Prose styling for assistant messages —— 与 body 同一套字体栈。
+     不要退回 system-ui：那会让聊天正文既拿不到 Geist，也丢掉 Linux CJK 兜底。 */
   .prose-chat {
     font-family:
-      system-ui,
+      "Geist Variable",
       -apple-system,
       BlinkMacSystemFont,
       "Segoe UI",
       "PingFang SC",
       "Microsoft YaHei",
+      "Noto Sans CJK SC",
+      "Noto Sans SC",
+      "Source Han Sans SC",
+      "WenQuanYi Micro Hei",
+      system-ui,
       sans-serif;
     font-size: var(--font-size-chat);
     line-height: var(--line-height-chat);
@@ -894,12 +902,17 @@
   .prose-chat h3,
   .prose-chat h4 {
     font-family:
-      system-ui,
+      "Geist Variable",
       -apple-system,
       BlinkMacSystemFont,
       "Segoe UI",
       "PingFang SC",
       "Microsoft YaHei",
+      "Noto Sans CJK SC",
+      "Noto Sans SC",
+      "Source Han Sans SC",
+      "WenQuanYi Micro Hei",
+      system-ui,
       sans-serif;
     font-size: var(--font-size-body);
     margin-top: 1.25rem;
@@ -999,6 +1012,7 @@
   .prose-chat pre code {
     font-family:
       "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas,
+      "Noto Sans Mono CJK SC", "Sarasa Mono SC", "WenQuanYi Micro Hei Mono",
       monospace;
     font-size: 0.75rem;
     line-height: 1.5;
@@ -1009,6 +1023,7 @@
   .prose-chat :not(pre) > code {
     font-family:
       "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas,
+      "Noto Sans Mono CJK SC", "Sarasa Mono SC", "WenQuanYi Micro Hei Mono",
       monospace;
     font-size: 0.8125rem;
     padding: 0.125rem 0.25rem;

@@ -233,7 +233,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
   const isMarkdown = [".md", ".mdx", ".markdown"].includes(ext);
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden border-l border-border-subtle bg-background">
+    <div className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden border-l border-border bg-background">
       {/* Tab strip */}
       <div className="flex h-9 shrink-0 items-stretch gap-0.5 overflow-x-auto border-b border-border-muted bg-background px-2">
         {previewTabs.map((item) => {

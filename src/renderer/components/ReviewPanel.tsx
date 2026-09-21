@@ -407,7 +407,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
       className={
         isFullscreen
           ? "fixed inset-0 z-50 bg-background flex flex-col"
-          : "flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border-subtle bg-background"
+          : "flex h-full w-full min-w-0 flex-col overflow-hidden border-l border-border bg-background"
       }
     >
       {toolbar}
