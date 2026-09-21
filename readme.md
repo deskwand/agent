@@ -40,9 +40,13 @@ Unlike a chatbot, DeskWand understands goals, plans tasks, uses tools, delegates
 
 **Desktop native.** Work with your local files, projects, and environment.
 
+**Agent-native Office.** Ask for a report, a spreadsheet, or a deck — the agent writes the real Word, Excel, or PowerPoint file.
+
 **Self-improving skills.** Successful tasks can become reusable skills.
 
 **Multi-model support.** Use the AI models that work best for you.
+
+**Usage and estimated cost.** Just this machine, priced from a public price table — by model, day, and currency.
 
 **Standalone vision model.** Set a separate vision model so non-multimodal models like DeepSeek can read images too.
 
