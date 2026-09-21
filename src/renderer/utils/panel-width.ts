@@ -104,3 +104,15 @@ export function resolvePanelWidth(
   }
   return widths.contextPanelWidth;
 }
+
+/**
+ * 面板宽度的过渡类名。拖动分隔条期间必须返回空串：这条过渡会把每一帧的宽度变化
+ * 再延迟 300ms，让面板永远追不上光标 —— 折叠/展开仍然要靠它，所以只按拖动状态
+ * 开关，不删过渡本身。
+ *
+ * 唯一声明处：Sidebar 与 App 的右侧面板共用，避免同一个时序字面量在多处各自漂移
+ * （AGENTS.md「动效时序只有一个来源」）。
+ */
+export function panelWidthTransitionClass(dragging: boolean): string {
+  return dragging ? "" : "transition-[width] duration-300 ease-in-out";
+}

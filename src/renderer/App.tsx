@@ -28,6 +28,7 @@ import {
   clampReviewWidth,
   initialPreviewWidth,
   initialReviewWidth,
+  panelWidthTransitionClass,
   resolvePanelWidth,
 } from "./utils/panel-width";
 import { WelcomeView } from "./components/WelcomeView";
@@ -268,6 +269,11 @@ function App() {
     );
   }, [rightPanelMode]);
 
+  // 拖动分隔条期间必须去掉面板的宽度过渡：过渡会把每一帧的宽度变化再延迟 300ms，
+  // 面板永远追不上光标，松手后还要自己滑一段。折叠/展开仍然需要这条过渡，
+  // 所以只由拖动状态开关，不删除过渡本身。
+  const [isPanelDragging, setIsPanelDragging] = useState(false);
+
   const panelAvailableWidth = availablePanelWidth(
     window.innerWidth,
     sidebarCollapsed,
@@ -408,7 +414,7 @@ function App() {
               name="Sidebar"
               fallback={<div className="w-0" />}
             >
-              <Sidebar width={sidebarWidth} />
+              <Sidebar width={sidebarWidth} dragging={isPanelDragging} />
             </PanelErrorBoundary>
 
             {/* Sidebar resize handle */}
@@ -420,6 +426,7 @@ function App() {
                   )
                 }
                 onDoubleClick={() => setSidebarWidth(280)}
+                onDraggingChange={setIsPanelDragging}
               />
             )}
           </>
@@ -513,12 +520,15 @@ function App() {
                 setBrowserWidthManual(false);
                 setContextPanelWidth(calcHalfWidth());
               }}
+              onDraggingChange={setIsPanelDragging}
               position="left"
               className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
             />
           )}
           <div
-            className={`overflow-hidden flex-shrink-0 flex transition-[width] duration-300 ease-in-out ${rightPanelVisible ? "" : "w-0"}`}
+            className={`overflow-hidden flex-shrink-0 flex ${panelWidthTransitionClass(
+              isPanelDragging,
+            )} ${rightPanelVisible ? "" : "w-0"}`}
             style={{ width: rightPanelVisible ? `${panelWidth}px` : 0 }}
           >
             {rightPanelMode === "browser" && (

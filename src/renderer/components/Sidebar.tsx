@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { AccountMenu } from "./AccountMenu";
 import { avatarInitials } from "../utils/identity";
+import { panelWidthTransitionClass } from "../utils/panel-width";
 import { LoginModal } from "./LoginModal";
 import { buildDeskwandProviderPayload } from "../utils/cloud-provider";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -57,7 +58,17 @@ const SIDEBAR_GROUP_EXPANSION_STORAGE_KEY = "deskwand.sidebarGroupExpansion";
 const SESSION_OVERFLOW_BUTTON_CLASS =
   "rounded-lg bg-transparent px-3 py-1.5 text-xs text-text-muted hover:bg-transparent hover:text-text-secondary focus-visible:bg-transparent focus-visible:text-text-secondary transition-colors";
 
-export function Sidebar({ width = 280 }: { width?: number }) {
+export function Sidebar({
+  width = 280,
+  dragging = false,
+}: {
+  width?: number;
+  /**
+   * 拖动分隔条期间为 true。此时必须去掉宽度过渡，否则面板会滞后 300ms，
+   * 松手后还要自己滑一段才停 —— 折叠/展开仍然要保留过渡。
+   */
+  dragging?: boolean;
+}) {
   const { t, i18n } = useTranslation();
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
@@ -973,7 +984,9 @@ export function Sidebar({ width = 280 }: { width?: number }) {
   return (
     <>
       <aside
-        className={`group bg-background-secondary flex flex-col overflow-hidden flex-shrink-0 transition-[width] duration-300 ease-in-out ${sidebarCollapsed ? "w-0" : "border-r border-border"}`}
+        className={`group bg-background-secondary flex flex-col overflow-hidden flex-shrink-0 ${panelWidthTransitionClass(
+          dragging,
+        )} ${sidebarCollapsed ? "w-0" : "border-r border-border"}`}
         style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
       >
         {!sidebarCollapsed && (
