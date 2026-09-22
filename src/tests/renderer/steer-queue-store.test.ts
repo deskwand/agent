@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { useAppStore } from "../../renderer/store";
+import { selectedButton } from "../fixtures/element-selection";
 
 describe("inputQueue", () => {
   beforeEach(() => {
@@ -37,6 +38,14 @@ describe("inputQueue", () => {
     expect(queue.map((q) => q.text)).toEqual(["first", "second"]);
     expect(id1).not.toEqual(id2);
     expect(queue[0].ts).toBeGreaterThan(0);
+  });
+
+  it("元素快照随队列保存，clear 输入框不会丢失", () => {
+    const selections = [selectedButton];
+    useAppStore.getState().enqueueInput("s1", "改圆角", [], [], selections);
+    expect(
+      useAppStore.getState().sessionStates.s1!.inputQueue[0].elSelections,
+    ).toEqual(selections);
   });
 
   it("removeInput deletes by id", () => {

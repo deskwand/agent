@@ -117,4 +117,63 @@ describe("MessageCard action bar", () => {
     renderCard(makeMessage({ localStatus: "cancelled" }), true, vi.fn());
     expect(container.querySelector('[aria-label="Fork from here"]')).toBeNull();
   });
+
+  it("用户消息带元素引用时，把 chip 渲染进气泡", () => {
+    renderCard(
+      makeMessage({
+        role: "user",
+        content: [{ type: "text", text: "改圆角" }],
+        elSelections: [
+          {
+            pageUrl: "http://fixture/",
+            tag: "button",
+            classes: ["primary"],
+            text: "开始使用",
+            selector: "button.primary",
+            selectorUnique: true,
+            width: 132,
+            height: 40,
+          },
+        ],
+      }),
+      true,
+    );
+    expect(container.textContent).toContain("button.primary");
+    expect(container.textContent).toContain("改圆角");
+  });
+
+  it("只有元素没有文字时不显示「空消息」占位符", () => {
+    renderCard(
+      makeMessage({
+        role: "user",
+        content: [],
+        elSelections: [
+          {
+            pageUrl: "http://fixture/",
+            tag: "button",
+            classes: ["primary"],
+            text: "开始使用",
+            selector: "button.primary",
+            selectorUnique: true,
+            width: 132,
+            height: 40,
+          },
+        ],
+      }),
+      true,
+    );
+    expect(container.textContent).toContain("button.primary");
+    expect(container.textContent).not.toContain("messageCard.emptyMessage");
+  });
+
+  it("用户消息没有元素引用时不渲染 chip", () => {
+    renderCard(
+      makeMessage({
+        role: "user",
+        content: [{ type: "text", text: "改圆角" }],
+      }),
+      true,
+    );
+    expect(container.querySelector('[title="button.primary"]')).toBeNull();
+  });
 });

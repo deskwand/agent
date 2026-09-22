@@ -18,6 +18,8 @@ import {
   type RenameSessionResult,
 } from "../../shared/session-title";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
+import type { ElementSelection } from "../../shared/ipc-types";
+import { toElementSelectionRefs } from "../../shared/element-selection-ref";
 
 // Check if running in Electron
 const isElectron =
@@ -571,9 +573,9 @@ function registerSharedIpcListener(): () => void {
             // 此时不再翻绿——否则用户会看到 failed → 回填输入框 → 又变绿。
             const latest = useAppStore
               .getState()
-              .sessionStates[event.payload.sessionId]?.steerRecords.find(
-                (r) => r.id === event.payload.requestId,
-              );
+              .sessionStates[
+                event.payload.sessionId
+              ]?.steerRecords.find((r) => r.id === event.payload.requestId);
             if (latest?.status === "failed") return;
             store.updateSteerRecord(
               event.payload.sessionId,
@@ -726,6 +728,7 @@ export function useIPC() {
       thinkingLevel?: ThinkingLevel,
       providerProfileKey?: ProviderProfileKey,
       model?: string,
+      elSelections?: ElementSelection[],
     ) => {
       setLoading(true);
       console.log("[useIPC] Starting session:", title);
@@ -822,6 +825,7 @@ export function useIPC() {
             providerProfileKey,
             model,
             turnId,
+            elSelections: elSelections?.length ? elSelections : undefined,
           },
         });
         if (session) {
@@ -836,6 +840,11 @@ export function useIPC() {
             content,
             timestamp: Date.now(),
             turnId,
+            // 元素引用只给气泡回显用：乐观消息的 content 里没有合成块
+            // （<selected-element> 是主进程才追加的），所以必须从这里带上。
+            elSelections: elSelections?.length
+              ? toElementSelectionRefs(elSelections)
+              : undefined,
           };
           addMessage(session.id, userMessage);
           startExecutionClock(session.id, userMessage.timestamp);
@@ -946,6 +955,7 @@ export function useIPC() {
       promptOrContent: string | ContentBlock[],
       providerProfileKey?: ProviderProfileKey,
       model?: string,
+      elSelections?: ElementSelection[],
     ) => {
       setLoading(true);
       console.log("[useIPC] Continuing session:", sessionId);
@@ -979,6 +989,10 @@ export function useIPC() {
         timestamp: Date.now(),
         turnId,
         localStatus: shouldQueue ? "queued" : undefined,
+        // 元素引用只给气泡回显用（乐观消息的 content 里没有合成块）
+        elSelections: elSelections?.length
+          ? toElementSelectionRefs(elSelections)
+          : undefined,
       };
       addMessage(sessionId, userMessage);
       startExecutionClock(sessionId, userMessage.timestamp);
@@ -1029,6 +1043,7 @@ export function useIPC() {
             providerProfileKey,
             model,
             turnId,
+            elSelections: elSelections?.length ? elSelections : undefined,
           },
         });
         // Loading will be reset when we receive session.status event
@@ -1220,11 +1235,10 @@ export function useIPC() {
       // 编程式切换绕过了 Sidebar 的 historyHydrated 预载，不预载则新会话显示空欢迎页。
       // 预载失败不阻塞切换——historyHydrated 仍为 false，点侧栏该会话会重新预载。
       try {
-        const page =
-          (await getSessionMessagesPage(session.id, null, 1000)) || {
-            messages: [],
-            hasMore: false,
-          };
+        const page = (await getSessionMessagesPage(session.id, null, 1000)) || {
+          messages: [],
+          hasMore: false,
+        };
         useAppStore
           .getState()
           .setMessagesTail(session.id, page.messages, page.hasMore);

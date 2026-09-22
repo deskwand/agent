@@ -882,7 +882,12 @@
     "openExternal": "在外部浏览器中打开",
     "enterFullscreen": "全屏",
     "exitFullscreen": "退出全屏",
-    "loadFailed": "页面加载失败"
+    "loadFailed": "页面加载失败",
+    "picker": {
+      "toggle": "选择元素",
+      "active": "拾取中，点击页面元素",
+      "waitForNextTurn": "元素附件将在下一回合发送，暂不支持即时引导"
+    }
   },
   "titlebar": {
     "builtInBrowser": "内置浏览器",
@@ -1871,7 +1876,11 @@
     "vaultSource": "密库 · {{name}}"
   },
   "attachTile": {
-    "remove": "移除附件"
+    "remove": "移除附件",
+    "notUnique": "未唯一定位"
+  },
+  "elementRef": {
+    "reveal": "在页面中定位这个元素"
   },
   "statusPopover": {
     "ringTooltip": "上下文与额度",

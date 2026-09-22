@@ -354,3 +354,88 @@ export interface PiMarketDetailDto extends PiMarketPackageDto {
   repository?: string;
   homepage?: string;
 }
+
+// ---------------------------------------------------------------------------
+// 浏览器元素拾取（Design Mode v1）
+// ---------------------------------------------------------------------------
+
+export interface ElementRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface MatchedCssRule {
+  selector: string;
+  /**
+   * CDP 没有「构造样式表」这个概念（StyleSheetOrigin 只有 regular / user-agent /
+   * injected / inspector），所以没有 constructed —— 无 URL 的规则仍按 regular 处理，
+   * 不伪造本地文件来源。user-agent 规则在映射阶段即被丢弃，不会出现在这里。
+   */
+  origin: "regular" | "inline" | "attribute";
+  /** 由 CSS.styleSheetAdded 的 header 解析而来；inline / attribute 可能为空 */
+  sourceUrl?: string;
+  /** 去掉 origin 与 query 的 site-root 相对路径，如 /src/styles/button.css */
+  siteRelativePath?: string;
+  /** 0-based（CDP 口径）；渲染进 prompt 时 +1 */
+  line?: number;
+  /** 原声明顺序；important 标志序列化到值中，不代表完整级联的获胜结果 */
+  declarations: string[];
+}
+
+export interface ElementSelection {
+  pageUrl: string;
+  pageTitle: string;
+  tag: string;
+  classes: string[];
+  text: string;
+  outerHTML: string;
+  role: string | null;
+  accessibleName: string;
+  selector: string;
+  selectorUnique: boolean;
+  domPath: string;
+  matchedCss: MatchedCssRule[];
+  computed: Record<string, string>;
+  rect: ElementRect;
+  parent: {
+    selector: string;
+    tag: string;
+    display: string;
+    gap?: string;
+    rect: ElementRect;
+  } | null;
+  siblings: Array<{ tag: string; classes: string[]; rect: ElementRect }>;
+  viewport: { width: number; height: number; dpr: number };
+  scroll: { x: number; y: number };
+}
+
+/**
+ * 元素拾取的启动结果。三条契约：`stop → void`、`highlight → boolean`。
+ *
+ * UI 必须**静默**处理 `{ ok: false }`（只把 toggle 回弹到未激活，不弹 toast、
+ * 不按 reason 分支提示）：`"not-available"` 既表示"当前页不可拾取"、也表示
+ * "启动途中被取消"，用户主动取消不是错误，按错误报就是假报错。
+ */
+export type PickerStartResult =
+  | { ok: true }
+  | { ok: false; reason: "not-available" | "attach-failed" };
+
+/**
+ * 元素引用的**展示投影**：气泡里回显一个元素引用只需要这些。
+ *
+ * 为什么不直接存整个 `ElementSelection`：那会把 `outerHTML` / `computed` /
+ * `matchedCss` 在 JSONL 里再存一份（模型可见文本里已经有了），而展示用不到。
+ * 这份投影同时用作宿主/渲染层消息字段与 SDK custom message 的 `details`。
+ */
+export interface ElementSelectionRef {
+  pageUrl: string;
+  tag: string;
+  classes: string[];
+  text: string;
+  selector: string;
+  selectorUnique: boolean;
+  width: number;
+  height: number;
+}

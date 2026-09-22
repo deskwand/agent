@@ -48,6 +48,11 @@ import {
   BROWSER_CDP_PORT,
   installFileDownloadFallback,
 } from "./browser/browser-view-manager";
+import { renderElementSelectionBlocks } from "./browser/element-selection-block";
+import {
+  toElementSelectionRefs,
+  type ElementSelectionRef,
+} from "../shared/element-selection-ref";
 import { AgentRuntimeExtensionManager } from "./extensions/agent-runtime-extension-manager";
 import { PiExtensionHost } from "./extensions/pi-extension-host";
 import { mergeCommandEntries } from "./extensions/pi-command-registry";
@@ -110,7 +115,9 @@ import type {
   ApiTestResult,
   DiagnosticInput,
   ProviderModelInfo,
+  ContentBlock,
 } from "../renderer/types";
+import type { ElementSelection } from "../shared/ipc-types";
 import { remoteManager, type AgentExecutor } from "./remote/remote-manager";
 import { remoteRuntimeBootstrap } from "./remote/runtime/remote-runtime-bootstrap";
 import { routeRuntimeAssistantEvent } from "./remote/runtime/runtime-session-event-router";
@@ -1078,6 +1085,21 @@ app
       // Push browser state changes to renderer
       browserViewManager.setStatusChangeHandler((status) => {
         mainWindow?.webContents.send("browser.state-changed", status);
+      });
+
+      // 元素拾取（Design Mode v1）：状态与选中结果走通用 server-event 总线，
+      // 因为这两个事件不属于 browser.state-changed 的那套面板状态。
+      browserViewManager.setPickerHandlers({
+        onStateChange: (active) =>
+          sendToRenderer({
+            type: "browser.picker.state-changed",
+            payload: { active },
+          }),
+        onSelected: (selection) =>
+          sendToRenderer({
+            type: "browser.picker.selected",
+            payload: selection,
+          }),
       });
 
       // Inject into session manager so AgentRunner can build internal browser tools
@@ -3968,6 +3990,44 @@ ipcMain.handle("sandbox.retrySetup", async () => {
   }
 });
 
+/**
+ * 展示投影（可能没有）：没有选中元素时必须给 `undefined` 而不是 `[]`。
+ * `toElementSelectionRefs` 永远返回数组，而 `[]` 会被原样写进宿主消息与 SDK `details`，
+ * 等于给每条普通消息都添一个空字段。
+ */
+function elementRefsOf(
+  elSelections: ElementSelection[] | undefined,
+): ElementSelectionRef[] | undefined {
+  const refs = toElementSelectionRefs(elSelections ?? []);
+  return refs.length > 0 ? refs : undefined;
+}
+
+/**
+ * 把元素上下文作为合成块附到 content 尾部（宿主内存通道，仅负责传输）。
+ *
+ * **content 缺省时必须先补回用户正文**：`session-manager.ts` 的 fallback 是
+ * `content.length > 0 ? content : [{type:"text", text: prompt}]`，只塞一个合成块
+ * 会让 content 变成非空，从而**抑制**那个 fallback——用户那句话就永远不进 content；
+ * 而展示层又会过滤合成块，气泡就成了空的。没有元素时原样返回，不碰既有行为。
+ */
+function withElementContext(
+  content: ContentBlock[] | undefined,
+  prompt: string,
+  elSelections: ElementSelection[] | undefined,
+): ContentBlock[] | undefined {
+  const elementBlock = renderElementSelectionBlocks(elSelections ?? []);
+  if (!elementBlock) return content;
+  const base = content?.length
+    ? content
+    : prompt
+      ? [{ type: "text" as const, text: prompt }]
+      : (content ?? []);
+  return [
+    ...base,
+    { type: "text" as const, text: elementBlock, synthetic: true },
+  ];
+}
+
 // --- Browser IPC handlers ---
 
 function safeBrowserCall<T>(action: () => T, fallback: T): T {
@@ -4076,6 +4136,47 @@ ipcMain.handle(
     }, undefined),
 );
 
+// 元素拾取（Design Mode v1）。异步方法必须把 Promise 返回给渲染层，
+// 不能 fire-and-forget：toggle 要靠 start 的结果决定回不回弹。
+ipcMain.handle("browser.picker.start", () =>
+  safeBrowserCall(
+    () =>
+      browserViewManager?.startPicker() ??
+      Promise.resolve({ ok: false as const, reason: "not-available" as const }),
+    Promise.resolve({ ok: false as const, reason: "not-available" as const }),
+  ),
+);
+
+ipcMain.handle("browser.picker.stop", () =>
+  safeBrowserCall(
+    () => browserViewManager?.stopPicker() ?? Promise.resolve(),
+    Promise.resolve(),
+  ),
+);
+
+ipcMain.handle("browser.picker.highlight", (_event, selector: string) =>
+  safeBrowserCall(
+    () => browserViewManager?.highlight(selector) ?? Promise.resolve(false),
+    Promise.resolve(false),
+  ),
+);
+
+// 渲染层用它把自己的按钮状态与主进程对齐：事件可能错过（面板重挂、订阅晚于
+// 第一次状态变化），而"按钮显示关、页面其实还开着"这种各说各话必须能自愈。
+ipcMain.handle("browser.picker.getState", () =>
+  safeBrowserCall(
+    () => ({ active: browserViewManager?.isPickerActive() ?? false }),
+    { active: false },
+  ),
+);
+
+ipcMain.handle("browser.picker.clearHighlight", () =>
+  safeBrowserCall(
+    () => browserViewManager?.clearHighlight() ?? Promise.resolve(),
+    Promise.resolve(),
+  ),
+);
+
 // ---
 
 async function handleClientEvent(event: ClientEvent): Promise<unknown> {
@@ -4108,7 +4209,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
   const sm = sessionManager!;
 
   switch (event.type) {
-    case "session.start":
+    case "session.start": {
       if (getWorkspacePathUnsupportedReason(event.payload.cwd)) {
         sendToRenderer({
           type: "error",
@@ -4118,28 +4219,42 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         });
         return null;
       }
+      const startContent = withElementContext(
+        event.payload.content,
+        event.payload.prompt,
+        event.payload.elSelections,
+      );
       return sm.startSession(
         event.payload.title,
         event.payload.prompt,
         event.payload.cwd,
         event.payload.allowedTools,
-        event.payload.content,
+        startContent,
         event.payload.memoryEnabled,
         event.payload.thinkingLevel,
         event.payload.providerProfileKey,
         event.payload.model,
         event.payload.turnId,
+        elementRefsOf(event.payload.elSelections),
       );
+    }
 
-    case "session.continue":
+    case "session.continue": {
+      const continueContent = withElementContext(
+        event.payload.content,
+        event.payload.prompt,
+        event.payload.elSelections,
+      );
       return sm.continueSession(
         event.payload.sessionId,
         event.payload.prompt,
-        event.payload.content,
+        continueContent,
         event.payload.providerProfileKey,
         event.payload.model,
         event.payload.turnId,
+        elementRefsOf(event.payload.elSelections),
       );
+    }
 
     case "session.fork":
       return sm.forkSession(

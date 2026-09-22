@@ -3,7 +3,13 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ChatInput } from "../../renderer/components/ChatInput";
+import {
+  ChatInput,
+  hasInputContent,
+} from "../../renderer/components/ChatInput";
+import type { ChatInputHandle } from "../../renderer/components/ChatInput";
+import type { ElementSelection } from "../../shared/ipc-types";
+import { selectedButton } from "../fixtures/element-selection";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
@@ -77,6 +83,68 @@ describe("ChatInput submit blocking", () => {
     });
 
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("纯元素也是非空草稿", () => {
+    expect(hasInputContent("", 0, 0, 1)).toBe(true);
+    expect(hasInputContent("", 0, 0, 0)).toBe(false);
+  });
+
+  it("拾取结果进入提交数据，clear 后移除磁贴并退订", async () => {
+    const original = Object.getOwnPropertyDescriptor(window, "electronAPI");
+    let picked!: (selection: ElementSelection) => void;
+    const unsubscribe = vi.fn();
+    Object.defineProperty(window, "electronAPI", {
+      configurable: true,
+      value: {
+        browser: {
+          picker: {
+            onSelected: (callback: typeof picked) => {
+              picked = callback;
+              return unsubscribe;
+            },
+          },
+        },
+      },
+    });
+    const ref = React.createRef<ChatInputHandle>();
+    const onSubmit = vi.fn();
+    try {
+      await act(async () => {
+        root.render(
+          React.createElement(ChatInput, {
+            ref,
+            onSubmit,
+            placeholder: "Message",
+            cardClassName: "",
+            textareaClassName: "",
+            bottomSlot: null,
+          }),
+        );
+      });
+      await act(async () => {
+        picked(selectedButton);
+      });
+      expect(ref.current!.isEmpty()).toBe(false);
+      await act(async () => {
+        ref.current!.submit();
+      });
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ elSelections: [selectedButton] }),
+      );
+      await act(async () => {
+        ref.current!.clear();
+      });
+      expect(ref.current!.isEmpty()).toBe(true);
+      expect(container.textContent).not.toContain("button.primary");
+      await act(async () => {
+        root.render(null);
+      });
+      expect(unsubscribe).toHaveBeenCalledTimes(1);
+    } finally {
+      if (original) Object.defineProperty(window, "electronAPI", original);
+      else Reflect.deleteProperty(window, "electronAPI");
+    }
   });
 
   it("内容为 /compact 时走 compact 回调，不提交", async () => {

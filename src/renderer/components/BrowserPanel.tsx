@@ -9,6 +9,7 @@ import {
   Globe,
   Maximize2,
   Minimize2,
+  MousePointerSquareDashed,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
@@ -44,7 +45,43 @@ export function BrowserPanel({ width }: { width: number }) {
     canGoForward: false,
   });
   const [urlInput, setUrlInput] = useState("");
+  const [pickerActive, setPickerActive] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // 空白页 / 状态页 / 加载失败时没有可拾取的元素
+  const pickerUnavailable =
+    !status.url || status.url === "about:blank" || Boolean(status.loadError);
+
+  // 拾取态以主进程为准：事件可能错过（面板重挂、订阅晚于状态变化），
+  // 而“按钮显示关、页面其实还开着”这种各说各话必须能自愈。
+  const syncPickerState = useCallback(async () => {
+    const state = await window.electronAPI?.browser?.picker?.getState();
+    if (state) setPickerActive(state.active);
+  }, []);
+
+  useEffect(() => {
+    const unsub = window.electronAPI?.browser?.picker?.onStateChanged((state) =>
+      setPickerActive(state.active),
+    );
+    void syncPickerState();
+    return unsub;
+  }, [syncPickerState]);
+
+  const handleTogglePicker = useCallback(async () => {
+    const picker = window.electronAPI?.browser?.picker;
+    if (!picker) return;
+    if (pickerActive) {
+      await picker.stop();
+    } else {
+      const result = await picker.start();
+      // 失败一律静默：不弹 toast、不按 reason 分支提示。
+      // 用户启动后立即取消也会走到这里（reason 回落为 not-available），
+      // 那是主动取消不是错误，报出来就是假报错。
+      if (!result.ok) setPickerActive(false);
+    }
+    // 以主进程为准收口：不管事件是否到了，按钮都必须反映真实状态
+    await syncPickerState();
+  }, [pickerActive, syncPickerState]);
 
   // Sync WebContentsView bounds to match the content area below the header
   const syncBounds = useCallback(() => {
@@ -219,6 +256,33 @@ export function BrowserPanel({ width }: { width: number }) {
             spellCheck={false}
           />
         </div>
+
+        {/* Element picker (Design Mode v1) */}
+        <Tooltip
+          label={
+            pickerActive
+              ? t("browser.picker.active")
+              : t("browser.picker.toggle")
+          }
+        >
+          <button
+            onClick={() => void handleTogglePicker()}
+            disabled={pickerUnavailable}
+            aria-pressed={pickerActive}
+            aria-label={
+              pickerActive
+                ? t("browser.picker.active")
+                : t("browser.picker.toggle")
+            }
+            className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+              pickerActive
+                ? "bg-accent/15 text-accent"
+                : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+            }`}
+          >
+            <MousePointerSquareDashed className="w-3.5 h-3.5" />
+          </button>
+        </Tooltip>
 
         {/* External open */}
         <Tooltip label={t("browser.openExternal")}>

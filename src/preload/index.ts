@@ -20,6 +20,7 @@ import type {
 } from "../renderer/types";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
+import type { ElementSelection, PickerStartResult } from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
 import type {
   RestoreResult,
@@ -757,6 +758,43 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.on("browser.state-changed", handler);
       return () => ipcRenderer.removeListener("browser.state-changed", handler);
     },
+
+    picker: {
+      start: (): Promise<PickerStartResult> =>
+        ipcRenderer.invoke("browser.picker.start"),
+      stop: (): Promise<void> => ipcRenderer.invoke("browser.picker.stop"),
+      highlight: (selector: string): Promise<boolean> =>
+        ipcRenderer.invoke("browser.picker.highlight", selector),
+      clearHighlight: (): Promise<void> =>
+        ipcRenderer.invoke("browser.picker.clearHighlight"),
+      getState: (): Promise<{ active: boolean }> =>
+        ipcRenderer.invoke("browser.picker.getState"),
+      // 两条事件都走通用 server-event 总线，所以必须先判 event.type ——
+      // 不过滤就会把每一条服务器事件都当成自己的事件。
+      onStateChanged: (callback: (state: { active: boolean }) => void) => {
+        const handler = (_event: Electron.IpcRendererEvent, data: unknown) => {
+          const event = data as {
+            type?: string;
+            payload?: { active: boolean };
+          };
+          if (event.type === "browser.picker.state-changed" && event.payload) {
+            callback(event.payload);
+          }
+        };
+        ipcRenderer.on("server-event", handler);
+        return () => ipcRenderer.removeListener("server-event", handler);
+      },
+      onSelected: (callback: (selection: ElementSelection) => void) => {
+        const handler = (_event: Electron.IpcRendererEvent, data: unknown) => {
+          const event = data as { type?: string; payload?: unknown };
+          if (event.type === "browser.picker.selected" && event.payload) {
+            callback(event.payload as ElementSelection);
+          }
+        };
+        ipcRenderer.on("server-event", handler);
+        return () => ipcRenderer.removeListener("server-event", handler);
+      },
+    },
   },
 
   // Vault (local-first plaintext files with encrypted cloud backup)
@@ -1274,6 +1312,20 @@ declare global {
             canGoForward: boolean;
           }) => void,
         ) => () => void;
+        // 独立类型声明，不由实现对象自动推导（新方法必须两处都加）
+        picker: {
+          start: () => Promise<PickerStartResult>;
+          stop: () => Promise<void>;
+          highlight: (selector: string) => Promise<boolean>;
+          clearHighlight: () => Promise<void>;
+          getState: () => Promise<{ active: boolean }>;
+          onStateChanged: (
+            callback: (state: { active: boolean }) => void,
+          ) => () => void;
+          onSelected: (
+            callback: (selection: ElementSelection) => void,
+          ) => () => void;
+        };
       };
       subagent: {
         listAgents: () => Promise<

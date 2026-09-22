@@ -38,6 +38,12 @@ import {
   sortByRecency,
 } from "../slash-recency";
 import { compressImageForLLM } from "../utils/image-compress";
+import type { ElementSelection } from "../../shared/ipc-types";
+import {
+  addElementSelection,
+  removeElementSelection,
+  selectionKey,
+} from "../utils/element-selections";
 
 export interface ChatInputAttachedFile {
   name: string;
@@ -55,6 +61,8 @@ export interface ChatInputSubmitData {
   text: string;
   images: Array<{ url: string; base64: string; mediaType: string }>;
   files: ChatInputAttachedFile[];
+  /** 浏览器元素拾取的磁贴快照；带元素的消息允许文本为空 */
+  elSelections?: ElementSelection[];
 }
 
 export interface ChatInputHandle {
@@ -140,6 +148,20 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [attachedFiles, setAttachedFiles] = useState<ChatInputAttachedFile[]>(
       [],
     );
+    const [elementSelections, setElementSelections] = useState<
+      ElementSelection[]
+    >([]);
+
+    // 拾取器推送选中元素。仅挂载期间生效，unmount 必须退订。
+    useEffect(() => {
+      const unsub = window.electronAPI?.browser?.picker?.onSelected(
+        (selection) => {
+          // 同一元素重复 pick 不产生第二张磁贴（element-selections 有单测）
+          setElementSelections((prev) => addElementSelection(prev, selection));
+        },
+      );
+      return unsub;
+    }, []);
     const [isDragging, setIsDragging] = useState(false);
     const openLightbox = useAppStore((s) => s.openLightbox);
     /** 扩展命令名集合：判断行首的 /word 要不要渲染成命令 token（内置命令由解析器自带）。 */
@@ -228,9 +250,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           getPlainText(),
           pastedImages.length,
           attachedFiles.length,
+          elementSelections.length,
         ),
       );
-    }, [getPlainText, prompt, pastedImages, attachedFiles, onContentChange]);
+    }, [
+      getPlainText,
+      prompt,
+      pastedImages,
+      attachedFiles,
+      elementSelections,
+      onContentChange,
+    ]);
 
     // --- Load skills for slash menu ---
     useEffect(() => {
@@ -254,11 +284,16 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           .then((dto) => {
             if (!disposed) {
               setExtensionCommands(toSlashCommands(dto.commands));
-              useAppStore.getState().setCommandLabels(
-                new Map(
-                  dto.commands.map((c) => [c.name, c.displayName || `/${c.name}`]),
-                ),
-              );
+              useAppStore
+                .getState()
+                .setCommandLabels(
+                  new Map(
+                    dto.commands.map((c) => [
+                      c.name,
+                      c.displayName || `/${c.name}`,
+                    ]),
+                  ),
+                );
             }
           })
           .catch(() => {});
@@ -313,6 +348,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         pastedImages.forEach((img) => URL.revokeObjectURL(img.url));
         setPastedImages([]);
         setAttachedFiles([]);
+        setElementSelections([]);
         adjustEditorHeight();
       },
       focus() {
@@ -377,6 +413,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           getPlainText(),
           pastedImages.length,
           attachedFiles.length,
+          elementSelections.length,
         );
       },
       selectFiles() {
@@ -610,6 +647,28 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           onRemove: () => removeFile(index),
         };
       }),
+      ...elementSelections.map<AttachmentTile>((selection) => ({
+        kind: "element",
+        key: selectionKey(selection),
+        title: `${selection.tag}${selection.classes.length ? `.${selection.classes[0]}` : ""}`,
+        summary: `"${selection.text}" ${selection.rect.width}×${selection.rect.height}`,
+        hint: `${selection.tag}${selection.classes.length ? `.${selection.classes[0]}` : ""} "${selection.text}" ${selection.rect.width}×${selection.rect.height} · ${selection.selector}`,
+        badge: selection.selectorUnique ? undefined : "attachTile.notUnique",
+        onOpen: () => {
+          // 磁贴的用处是「回到真实页面里定位它」。面板没开的话高亮看不见，
+          // 用户会以为点了没反应，所以先把它显示出来再高亮。
+          const store = useAppStore.getState();
+          if (store.rightPanelMode !== "browser") store.toggleBrowserPanel();
+          void window.electronAPI?.browser?.picker?.highlight(
+            selection.selector,
+          );
+        },
+        onRemove: () => {
+          setElementSelections((prev) =>
+            removeElementSelection(prev, selectionKey(selection)),
+          );
+        },
+      })),
     ];
 
     // --- File selection ---
@@ -878,6 +937,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           currentPrompt,
           pastedImages.length,
           attachedFiles.length,
+          elementSelections.length,
         )
       )
         return;
@@ -903,6 +963,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         text: currentPrompt.trim(),
         images: pastedImages,
         files: attachedFiles,
+        // 不在 onSubmit 后立即清空：由父组件既有的成功/入队路径调 clear()
+        ...(elementSelections.length
+          ? { elSelections: elementSelections }
+          : {}),
       });
     }, [
       getPlainText,
@@ -911,6 +975,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       prompt,
       pastedImages,
       attachedFiles,
+      elementSelections,
       disabled,
       submitDisabled,
       onSubmit,
@@ -1152,10 +1217,12 @@ export function hasInputContent(
   prompt: string,
   imageCount: number,
   fileCount: number,
+  elementCount = 0,
 ): boolean {
   return (
     stripLeadingSkillToken(prompt).trim() !== "" ||
     imageCount > 0 ||
-    fileCount > 0
+    fileCount > 0 ||
+    elementCount > 0
   );
 }

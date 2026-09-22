@@ -107,3 +107,47 @@ describe("AttachmentTiles", () => {
     expect(tile.className).not.toContain("cursor-pointer");
   });
 });
+
+const elementTile: AttachmentTile = {
+  kind: "element",
+  key: "http://localhost:5173|main > button",
+  title: "button.btn-primary",
+  summary: '"开始使用" 132×40',
+  hint: 'button.btn-primary "开始使用" 132×40',
+  onOpen: () => {},
+  onRemove: () => {},
+};
+
+describe("AttachmentTiles / element", () => {
+  it("渲染标题与悬浮提示", () => {
+    render([elementTile]);
+    const button = container.querySelector("button");
+    expect(button?.textContent).toContain("button.btn-primary");
+    expect(container.textContent).toContain("开始使用");
+    // 悬浮提示挂在包裹 div 的 title 上（<button title> 被全仓不变量禁止）
+    const hint = container.querySelector("[title]");
+    expect(hint?.getAttribute("title")).toBe(elementTile.hint);
+    expect(hint?.tagName).toBe("DIV");
+    expect(button?.getAttribute("title")).toBeNull();
+  });
+
+  it("有 badge 时渲染 badge", () => {
+    render([{ ...elementTile, badge: "attachTile.notUnique" }]);
+    expect(container.textContent).toContain("attachTile.notUnique");
+  });
+
+  it("点击磁贴触发 onOpen，点删除不触发 onOpen", () => {
+    const onOpen = vi.fn();
+    const onRemove = vi.fn();
+    render([{ ...elementTile, onOpen, onRemove }]);
+    act(() => {
+      container.querySelector("button")?.click();
+    });
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    act(() => {
+      container.querySelectorAll("button")[1]?.click();
+    });
+    expect(onRemove).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+});

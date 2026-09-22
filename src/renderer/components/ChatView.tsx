@@ -1368,13 +1368,19 @@ export function ChatView() {
     if (!activeSessionId || isSubmitting || isCompacting) return;
 
     const rawText = data.text.trim();
-    if (!rawText && data.images.length === 0 && data.files.length === 0) return;
+    if (
+      !rawText &&
+      data.images.length === 0 &&
+      data.files.length === 0 &&
+      !data.elSelections?.length
+    )
+      return;
 
     // Non-idle send (text and/or attachments): route into the queue area
     // (replaces the old queued message-card path).
     if (canStop) {
       const { images, files } = buildAttachmentBlocks(data);
-      enqueueInput(activeSessionId, rawText, images, files);
+      enqueueInput(activeSessionId, rawText, images, files, data.elSelections);
       chatInputRef.current?.clear();
       setTimeout(() => chatInputRef.current?.focus(), 0);
       return;
@@ -1399,6 +1405,7 @@ export function ChatView() {
         contentBlocks,
         activeSession?.providerProfileKey,
         activeSession?.model,
+        data.elSelections,
       );
       chatInputRef.current?.clear();
     } finally {
@@ -1564,6 +1571,7 @@ export function ChatView() {
         contentBlocks,
         activeSession?.providerProfileKey,
         activeSession?.model,
+        item.elSelections,
       ).catch(() => {
         autoDrainRef.current = false;
       });
@@ -1592,6 +1600,9 @@ export function ChatView() {
         sendQueuedItem(item);
         return;
       }
+      // v1 不把元素附件降级成纯文本即时 steer；等待正常出队完整发送。
+      // 队列条目的按钮已被禁用，这里是路由层的兜底（防止其它入口绕过 UI）。
+      if (item.elSelections?.length) return;
       removeInput(activeSessionId, inputId);
       // 引导注入：图片随注入（SDK steer 支持 images）；
       // 文件 SDK 不支持 → 降级为文本说明（自动执行/普通发送时完整支持）。
@@ -1839,6 +1850,7 @@ export function ChatView() {
           <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
             <ChatInputQueueBar
               items={inputQueue}
+              isRunning={canStop}
               onSteer={handleQueueSteer}
               onRemove={(id) =>
                 activeSessionId && removeInput(activeSessionId, id)

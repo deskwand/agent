@@ -293,6 +293,7 @@ export function WelcomeView() {
         selectedThinkingLevel,
         selectedProviderProfileKey,
         selectedModel,
+        data.elSelections,
       );
       if (session) {
         chatInputRef.current?.clear();

@@ -16,6 +16,8 @@ import {
 import type { ResultFileEntry } from "../utils/tool-display-blocks";
 import type { VideoReference } from "../utils/video-reference";
 import { ContentBlockView } from "./message/ContentBlockView";
+import { ElementRefChips } from "./message/ElementRefChips";
+import { stripSyntheticBlocks } from "../utils/synthetic-blocks";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
 import { ArtifactCard } from "./message/ArtifactCard";
@@ -103,7 +105,7 @@ export const MessageCard = memo(function MessageCard({
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
     : [{ type: "text", text: String(rawContent ?? "") } as ContentBlock];
-  const visibleBlocks = contentBlocks;
+  const visibleBlocks = stripSyntheticBlocks(contentBlocks);
   const lastTextBlockIndex = useMemo(() => {
     let idx = -1;
     visibleBlocks.forEach((b, i) => {
@@ -277,7 +279,11 @@ export const MessageCard = memo(function MessageCard({
                   <span>{t("messageCard.cancelled")}</span>
                 </div>
               )}
-              {visibleBlocks.length === 0 ? (
+              {isUser && message.elSelections?.length ? (
+                <ElementRefChips selections={message.elSelections} />
+              ) : null}
+              {visibleBlocks.length === 0 &&
+              !(isUser && message.elSelections?.length) ? (
                 <span className="text-text-muted italic">
                   {t("messageCard.emptyMessage")}
                 </span>

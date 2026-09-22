@@ -7,12 +7,15 @@ import {
   FileText,
 } from "lucide-react";
 import type { QueuedInput } from "../types";
+import { Tooltip } from "./Tooltip";
 import { resolveLeadingToken } from "../utils/reference-tokens";
 
 interface ChatInputQueueBarProps {
   items: QueuedInput[];
   onSteer: (id: string) => void;
   onRemove: (id: string) => void;
+  /** 会话运行中：带元素附件的条目不允许即时引导 */
+  isRunning?: boolean;
 }
 
 /** 输入框上方排队区：非 idle 发送的消息按时序一行一条，行末引导/删除。
@@ -21,6 +24,7 @@ export function ChatInputQueueBar({
   items,
   onSteer,
   onRemove,
+  isRunning = false,
 }: ChatInputQueueBarProps) {
   const { t } = useTranslation();
   if (items.length === 0) return null;
@@ -78,15 +82,34 @@ export function ChatInputQueueBar({
                 <span className="max-w-[5rem] truncate">{file.filename}</span>
               </span>
             ))}
+            {(item.elSelections ?? []).map((selection) => (
+              <span
+                key={`${selection.pageUrl}|${selection.selector}`}
+                title={selection.selector}
+                className="max-w-[8rem] truncate rounded bg-background/60 px-1.5 py-0.5 text-text-muted"
+              >
+                {selection.tag}
+                {selection.classes[0] ? `.${selection.classes[0]}` : ""}
+              </span>
+            ))}
           </span>
-          <button
-            type="button"
-            className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-[background-color] active:scale-[0.97]"
-            onClick={() => onSteer(item.id)}
+          <Tooltip
+            label={
+              isRunning && item.elSelections?.length
+                ? t("browser.picker.waitForNextTurn")
+                : ""
+            }
           >
-            <Navigation className="h-3 w-3" />
-            {t("steer.label")}
-          </button>
+            <button
+              type="button"
+              disabled={isRunning && Boolean(item.elSelections?.length)}
+              className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-[background-color] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+              onClick={() => onSteer(item.id)}
+            >
+              <Navigation className="h-3 w-3" />
+              {t("steer.label")}
+            </button>
+          </Tooltip>
           <button
             type="button"
             aria-label={t("steer.remove")}

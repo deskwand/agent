@@ -882,7 +882,12 @@
     "openExternal": "Open in external browser",
     "enterFullscreen": "Fullscreen",
     "exitFullscreen": "Exit fullscreen",
-    "loadFailed": "Failed to load page"
+    "loadFailed": "Failed to load page",
+    "picker": {
+      "toggle": "Select element",
+      "active": "Picking — click an element",
+      "waitForNextTurn": "Element attachments will be sent next turn; live steering is not supported"
+    }
   },
   "titlebar": {
     "builtInBrowser": "Built-in Browser",
@@ -1874,7 +1879,11 @@
     "vaultSource": "Vault · {{name}}"
   },
   "attachTile": {
-    "remove": "Remove attachment"
+    "remove": "Remove attachment",
+    "notUnique": "not uniquely located"
+  },
+  "elementRef": {
+    "reveal": "Locate this element in the page"
   },
   "statusPopover": {
     "ringTooltip": "Context & usage",

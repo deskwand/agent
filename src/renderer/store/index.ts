@@ -26,6 +26,7 @@ import type { RightPanelMode } from "../utils/browser-visibility";
 import type { ImageSource } from "../components/ImageLightbox";
 import { USAGE_CURRENCIES, type CurrencyCode } from "../../shared/usage";
 import { restoreUserMessage } from "../utils/prompt-decorations";
+import type { ElementSelection } from "../../shared/ipc-types";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
@@ -418,6 +419,7 @@ interface AppState {
     text: string,
     images?: ImageContent[],
     files?: FileAttachmentContent[],
+    elSelections?: ElementSelection[],
   ) => string;
   removeInput: (sessionId: string, id: string) => void;
   addSteerRecord: (
@@ -1340,14 +1342,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
-  enqueueInput: (sessionId, text, images, files) => {
+  enqueueInput: (sessionId, text, images, files, elSelections) => {
     const id = `queue-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const ts = Date.now();
     set((state) => {
       const ss = getSession(state.sessionStates, sessionId);
       return {
         sessionStates: patchSession(state.sessionStates, sessionId, {
-          inputQueue: [...ss.inputQueue, { id, text, ts, images, files }],
+          inputQueue: [
+            ...ss.inputQueue,
+            { id, text, ts, images, files, elSelections },
+          ],
         }),
       };
     });

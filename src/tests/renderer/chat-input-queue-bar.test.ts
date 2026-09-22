@@ -5,6 +5,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatInputQueueBar } from "../../renderer/components/ChatInputQueueBar";
 import type { QueuedInput } from "../../renderer/types";
+import { selectedButton } from "../fixtures/element-selection";
 
 vi.mock("react-i18next", () => {
   const tMap: Record<string, string> = {
@@ -44,6 +45,7 @@ describe("ChatInputQueueBar", () => {
     items: QueuedInput[];
     onSteer: (id: string) => void;
     onRemove: (id: string) => void;
+    isRunning?: boolean;
   }) {
     return act(async () => {
       root.render(React.createElement(ChatInputQueueBar, props));
@@ -157,6 +159,30 @@ describe("ChatInputQueueBar", () => {
       onRemove: vi.fn(),
     });
     expect(container.querySelector("[title]")?.getAttribute("title")).toBe(raw);
+  });
+
+  it("运行中元素队列显示附件并禁用 steer，idle 恢复", async () => {
+    const props = {
+      items: [
+        {
+          id: "element",
+          text: "改圆角",
+          ts: 1,
+          elSelections: [selectedButton],
+        },
+      ],
+      onSteer: vi.fn(),
+      onRemove: vi.fn(),
+    };
+    await renderBar({ ...props, isRunning: true });
+    expect(container.textContent).toContain("button.primary");
+    expect(container.querySelector<HTMLButtonElement>("button")!.disabled).toBe(
+      true,
+    );
+    await renderBar({ ...props, isRunning: false });
+    expect(container.querySelector<HTMLButtonElement>("button")!.disabled).toBe(
+      false,
+    );
   });
 
   it("renders attachment chips with filenames", async () => {
