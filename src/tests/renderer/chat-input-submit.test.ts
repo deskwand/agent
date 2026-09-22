@@ -24,6 +24,7 @@ describe("ChatInput submit blocking", () => {
   let root: Root;
 
   beforeEach(() => {
+    localStorage.clear();
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -61,6 +62,7 @@ describe("ChatInput submit blocking", () => {
     await act(async () => {
       root.render(
         React.createElement(ChatInput, {
+          draftKey: "test-session",
           onSubmit,
           submitDisabled: true,
           placeholder: "Message",
@@ -113,6 +115,7 @@ describe("ChatInput submit blocking", () => {
       await act(async () => {
         root.render(
           React.createElement(ChatInput, {
+            draftKey: "test-session",
             ref,
             onSubmit,
             placeholder: "Message",
@@ -153,6 +156,7 @@ describe("ChatInput submit blocking", () => {
     await act(async () => {
       root.render(
         React.createElement(ChatInput, {
+          draftKey: "test-session",
           onSubmit,
           onCompact,
           placeholder: "Message",

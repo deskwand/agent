@@ -27,6 +27,7 @@ import {
   type ChatInputHandle,
   type ChatInputSubmitData,
 } from "./ChatInput";
+import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 
 function hasUsableProviderConfig(
@@ -296,7 +297,12 @@ export function WelcomeView() {
         data.elSelections,
       );
       if (session) {
-        chatInputRef.current?.clear();
+        chatInputRef.current?.clear(NEW_SESSION_DRAFT_KEY);
+        // 兜底：startSession 里 setActiveSession 会让 App 把 WelcomeView 换掉，
+        // 若卸载发生在这一行之前，clear() 因 ref 为 null 没跑，卸载 flush 会把
+        // 刚发出去的文本写回 __new__ 槽位 —— 下次进欢迎页它就“复活”了。
+        // removeDraft 不依赖组件还活着，所以这行能把保证从"靠时序"变成"结构性"。
+        removeDraft(NEW_SESSION_DRAFT_KEY);
       }
     } finally {
       setIsSubmitting(false);
@@ -358,6 +364,7 @@ export function WelcomeView() {
         {/* Chat Input — same as ChatView */}
         <ChatInput
           ref={chatInputRef}
+          draftKey={NEW_SESSION_DRAFT_KEY}
           onSubmit={handleSubmit}
           disabled={isSubmitting}
           isExpanded={isInputExpanded}

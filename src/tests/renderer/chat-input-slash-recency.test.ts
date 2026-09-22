@@ -58,6 +58,7 @@ async function renderChatInput(container: HTMLElement): Promise<Root> {
   await act(async () => {
     root.render(
       React.createElement(ChatInput, {
+        draftKey: "test-session",
         onSubmit: () => {},
         submitDisabled: false,
         placeholder: "Message",

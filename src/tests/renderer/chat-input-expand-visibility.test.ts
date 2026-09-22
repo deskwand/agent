@@ -87,6 +87,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  localStorage.clear();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   useIPCMock.mockReturnValue({ isElectron: false });
   container = document.createElement("div");
@@ -105,6 +106,7 @@ async function renderInput(onContentChange: (hasContent: boolean) => void) {
   await act(async () => {
     root.render(
       React.createElement(ChatInput, {
+        draftKey: "test-session",
         ref,
         onSubmit: () => {},
         onContentChange,
@@ -304,6 +306,7 @@ describe("有内容才显示展开按钮（ChatInput → 底栏 整链路）", (
   function Harness() {
     const [hasInputContent, setHasInputContent] = React.useState(false);
     return React.createElement(ChatInput, {
+      draftKey: "test-session",
       onSubmit: () => {},
       onContentChange: setHasInputContent,
       placeholder: "Message",

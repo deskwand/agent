@@ -44,6 +44,14 @@ import {
   removeElementSelection,
   selectionKey,
 } from "../utils/element-selections";
+import {
+  DRAFT_SCHEMA_VERSION,
+  EMPTY_DRAFT,
+  readDraft,
+  removeDraft,
+  writeDraft,
+  type ChatDraft,
+} from "../utils/chat-draft-store";
 
 export interface ChatInputAttachedFile {
   name: string;
@@ -66,7 +74,14 @@ export interface ChatInputSubmitData {
 }
 
 export interface ChatInputHandle {
-  clear: () => void;
+  /**
+   * 清空输入框。
+   *
+   * `expectedDraftKey` 是提交时那个槽位：调用方通常先 await 发送、成功后再清，
+   * 这段时间里用户可能已经切到别的会话。传进来的槽位与当前槽位不一致时，
+   * 只清掉递交那个槽位的草稿，**不碰**编辑器——它现在属于另一个会话。
+   */
+  clear: (expectedDraftKey?: string) => void;
   focus: () => void;
   setPrompt: (text: string) => void;
   submit: () => void;
@@ -104,6 +119,12 @@ interface ChatInputProps {
   slashMenuDirection?: "up" | "down";
   /** 附件列表变化时上报，供选择器标记「已添加」 */
   onAttachmentsChange?: (files: ChatInputAttachedFile[]) => void;
+  /**
+   * 每会话草稿槽位：通常是 sessionId；欢迎页用 NEW_SESSION_DRAFT_KEY。
+   * 必填而非可选 —— 目前只有 ChatView / WelcomeView 两个调用点，
+   * 「不传就不落盘」是一条没被要求的分支。
+   */
+  draftKey: string;
 }
 
 /** Base Tailwind classes for slash command menu items. */
@@ -113,6 +134,9 @@ interface ChatInputProps {
  */
 const EDITOR_BASE_CLASS =
   "whitespace-pre-wrap break-words outline-none focus:ring-0";
+
+/** 草稿落盘的静默延迟：避开按键路径，也不至于丢太多输入。 */
+const DRAFT_SAVE_DEBOUNCE_MS = 500;
 
 export const SLASH_MENU_ITEM_BASE_CLASS =
   "w-full text-left px-2.5 py-2 rounded-lg text-sm transition-colors flex items-center gap-2";
@@ -134,6 +158,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onToggleExpand,
       slashMenuDirection,
       onAttachmentsChange,
+      draftKey,
     },
     ref,
   ) {
@@ -262,6 +287,145 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onContentChange,
     ]);
 
+    // --- 每会话草稿：挂载恢复 / 切槽位时先 flush 旧再 load 新 / 变更后 debounce 落盘 ---
+    const latestDraftRef = useRef<ChatDraft>(EMPTY_DRAFT);
+    const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
+    const draftKeyRef = useRef(draftKey);
+    const draftRestoredRef = useRef(false);
+
+    /**
+     * 把编辑器与附件状态拍成一份草稿快照。
+     * 文本必须以 DOM 为权威来源（serializeEditor），不能读 `prompt` state ——
+     * 编辑器是非受控的，state 可能比 DOM 旧一帧。
+     *
+     * 依赖里的 `prompt` 不参与计算，只用来让 identity 变化：它是编辑器每次 input
+     * 都会 setPrompt 的镜像，而 debounce effect 唯一的依赖就是这个函数。不把
+     * `prompt` 放进来的后果是「纯文字输入永远不重排定时器」—— 敲完字直接退出
+     * 应用就丢草稿，正好弄掉本功能最核心的那个承诺。
+     */
+    const captureDraft = useCallback(
+      (): ChatDraft => ({
+        v: DRAFT_SCHEMA_VERSION,
+        text: serializeEditor(editorRef.current),
+        // 只存 base64：`url` 是 object URL，per-document，落盘再恢复就是死链。
+        images: pastedImages.map(({ base64, mediaType }) => ({
+          base64,
+          mediaType,
+        })),
+        files: [...attachedFiles],
+        elSelections: [...elementSelections],
+      }),
+      // prompt 必须留着，不是给函数体用的 —— 见上面的注释。
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [prompt, pastedImages, attachedFiles, elementSelections],
+    );
+
+    /**
+     * 把一份草稿整块写回输入框。
+     *
+     * 图片用 `data:` URL 而不是重建 object URL：`atob` + `Uint8Array` + `createObjectURL`
+     * 虽然也是同步 API，但实测 540K 字符要 15.9 ms、5M 字符要 143.3 ms，
+     * 切一次会话带几张图就会卡住主线程。data URL 只是字符串拼接，零 CPU。
+     * 代价是被恢复的图片会同时持有 base64 与 data URL 两份等长字符串（清空即释放）。
+     *
+     * data URL 上调用 `revokeObjectURL` 是 no-op，所以既有的 removeImage / clear()
+     * 对恢复出来的图片照样安全。
+     */
+    const applyDraft = useCallback(
+      (draft: ChatDraft) => {
+        writeEditorText(draft.text);
+        setPastedImages((prev) => {
+          prev.forEach((image) => URL.revokeObjectURL(image.url));
+          return draft.images.map((image) => ({
+            ...image,
+            url: `data:${image.mediaType};base64,${image.base64}`,
+          }));
+        });
+        setAttachedFiles([...draft.files]);
+        setElementSelections([...draft.elSelections]);
+        adjustEditorHeight();
+      },
+      [writeEditorText, adjustEditorHeight],
+    );
+
+    /**
+     * 每次 commit 刷新快照引用。
+     *
+     * **声明顺序是承重的**：必须排在下面两个 effect 之前。切会话那一帧先跑它，
+     * 此时组件 state 仍属于旧会话，`writeDraft(previousKey, ...)` 才会写对槽位。
+     *
+     * 刻意**不给依赖数组**：它要做的是「把此刻编辑器与 state 的现状抓下来」，
+     * 而 `captureDraft` 的 identity 只跟四个 state 走；一旦用 `[captureDraft]`，
+     * 正确性就挂在一条隐式不变量上（“DOM 变更必定伴随 setPrompt”）。
+     * 今天是成立的（onInput 末尾无条件 setPrompt），但将来任何一次"只改 DOM 不改 state"
+     * 的写入（新增的命令式 handle、就地改写令牌的格式化）都会静默让快照发霉，
+     * 代价是卸载时丢掉草稿尾部。这个 serializeEditor 只走编辑器顶层子节点，
+     * 相对于 React 自己每次 commit 的工作量可以忽略。
+     */
+    useEffect(() => {
+      latestDraftRef.current = captureDraft();
+    });
+
+    // 挂载：恢复本槽位的草稿。App 带着 lastSessionId 启动时，这里是唯一的首次恢复点。
+    // 用 ref 保证「只跑一次」—— 若依赖 applyDraft，commandLabels 从 IPC 回来时会
+    // 再跑一次，把用户这期间敲的字覆盖掉。
+    useEffect(() => {
+      if (draftRestoredRef.current) return;
+      draftRestoredRef.current = true;
+      const draft = readDraft(draftKeyRef.current);
+      if (draft) applyDraft(draft);
+    }, [applyDraft]);
+
+    // 切槽位：**先 flush 旧槽位，再 load 新槽位**。顺序颠倒就是把新内容写进旧槽位。
+    useEffect(() => {
+      const previousKey = draftKeyRef.current;
+      if (previousKey === draftKey) return;
+
+      if (draftSaveTimerRef.current !== null) {
+        clearTimeout(draftSaveTimerRef.current);
+        draftSaveTimerRef.current = null;
+      }
+      writeDraft(previousKey, latestDraftRef.current);
+      applyDraft(readDraft(draftKey) ?? EMPTY_DRAFT);
+      draftKeyRef.current = draftKey;
+    }, [draftKey, applyDraft]);
+
+    // 内容变化 → debounce 落盘。
+    // 这里读 `draftKeyRef`（发火时刻的真实槽位）而不是把 `draftKey` 放进依赖：
+    // 槽位切换由上面的 effect 负责 flush + 取消待写，两处各管一段，才不会串槽位。
+    useEffect(() => {
+      if (draftSaveTimerRef.current !== null) {
+        clearTimeout(draftSaveTimerRef.current);
+      }
+      draftSaveTimerRef.current = setTimeout(() => {
+        draftSaveTimerRef.current = null;
+        writeDraft(draftKeyRef.current, latestDraftRef.current);
+      }, DRAFT_SAVE_DEBOUNCE_MS);
+      return () => {
+        if (draftSaveTimerRef.current !== null) {
+          clearTimeout(draftSaveTimerRef.current);
+          draftSaveTimerRef.current = null;
+        }
+      };
+    }, [captureDraft]);
+
+    // 卸载：把最后一次快照落盘。
+    // main.tsx 已移除 StrictMode（注释写明是为了避免 IPC 双调用），所以不存在
+    // 开发期「模拟卸载」把草稿写空的风险。这里必须是值快照：serializeEditor(null)
+    // 返回空串，重新调 captureDraft() 会把草稿当成「空草稿」删掉。
+    useEffect(
+      () => () => {
+        if (draftSaveTimerRef.current !== null) {
+          clearTimeout(draftSaveTimerRef.current);
+          draftSaveTimerRef.current = null;
+        }
+        writeDraft(draftKeyRef.current, latestDraftRef.current);
+      },
+      [],
+    );
+
     // --- Load skills for slash menu ---
     useEffect(() => {
       if (!isElectron || !window.electronAPI?.skills || !showSlashMenu) return;
@@ -342,7 +506,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     // --- Imperative handle ---
     useImperativeHandle(ref, () => ({
-      clear() {
+      clear(expectedDraftKey?: string) {
+        const submittedKey = expectedDraftKey ?? draftKeyRef.current;
+        if (submittedKey !== draftKeyRef.current) {
+          // 提交之后用户已经切走：编辑器现在属于另一个会话，一个字都不能碰，
+          // 只把"刚发出去"的那份草稿清掉。
+          removeDraft(submittedKey);
+          return;
+        }
         // DOM 是权威来源，所以清空要同时落两处：编辑器内容与 state。
         writeEditorText("");
         pastedImages.forEach((img) => URL.revokeObjectURL(img.url));
@@ -350,6 +521,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         setAttachedFiles([]);
         setElementSelections([]);
         adjustEditorHeight();
+        // 槽位草稿立即删除，不等 debounce：「发送成功 → 父组件 clear() → 立刻卸载」
+        // 全在同一个 React 批次里，卸载 flush 若读到 clear 之前的快照，
+        // 已发出的文本会在下次打开时"复活"（WelcomeView 的 __new__ 槽位最明显）。
+        if (draftSaveTimerRef.current !== null) {
+          clearTimeout(draftSaveTimerRef.current);
+          draftSaveTimerRef.current = null;
+        }
+        latestDraftRef.current = EMPTY_DRAFT;
+        removeDraft(draftKeyRef.current);
       },
       focus() {
         editorRef.current?.focus();

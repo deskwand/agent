@@ -32,6 +32,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  localStorage.clear();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   (window as unknown as { electronAPI?: unknown }).electronAPI = {
     skills: { getAll: () => Promise.resolve(SKILLS) },
@@ -62,6 +63,7 @@ async function renderAndOpenMenu() {
   await act(async () => {
     root.render(
       React.createElement(ChatInput, {
+        draftKey: "test-session",
         onSubmit: () => {},
         placeholder: "p",
         cardClassName: "",

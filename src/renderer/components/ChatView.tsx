@@ -65,6 +65,7 @@ import {
   type ChatInputHandle,
   type ChatInputSubmitData,
 } from "./ChatInput";
+import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { ChatInputQueueBar } from "./ChatInputQueueBar";
 import {
@@ -1378,12 +1379,25 @@ export function ChatView() {
     )
       return;
 
+    // 提交时钉住槽位：发送期间用户可能切到别的会话，成功回来时不能去动那个会话。
+    const submittedSessionId = activeSessionId;
+
     // Non-idle send (text and/or attachments): route into the queue area
     // (replaces the old queued message-card path).
     if (canStop) {
       const { images, files } = buildAttachmentBlocks(data);
-      enqueueInput(activeSessionId, rawText, images, files, data.elSelections);
-      chatInputRef.current?.clear();
+      enqueueInput(
+        submittedSessionId,
+        rawText,
+        images,
+        files,
+        data.elSelections,
+      );
+      chatInputRef.current?.clear(submittedSessionId);
+      // 兜底：发送期间父组件可能已把 ChatInput 卸载（startSession/continueSession
+      // 里 setActiveSession 会让 App 换掉子树），那时 clear() 因为 ref 为 null 根本
+      // 没跑，卸载 flush 会把刚发出去的文本写回槽位。这一行让"发出即清"不再依赖时序。
+      removeDraft(submittedSessionId);
       setTimeout(() => chatInputRef.current?.focus(), 0);
       return;
     }
@@ -1403,13 +1417,14 @@ export function ChatView() {
       }
 
       await continueSession(
-        activeSessionId,
+        submittedSessionId,
         contentBlocks,
         activeSession?.providerProfileKey,
         activeSession?.model,
         data.elSelections,
       );
-      chatInputRef.current?.clear();
+      chatInputRef.current?.clear(submittedSessionId);
+      removeDraft(submittedSessionId);
     } finally {
       setIsSubmitting(false);
       setTimeout(() => chatInputRef.current?.focus(), 0);
@@ -1871,6 +1886,9 @@ export function ChatView() {
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">
           <ChatInput
             ref={chatInputRef}
+            // activeSessionId 在 ChatView 里必定非空（App 只在有会话时渲染它），
+            // `??` 只是为了满足类型，不构成真实分支。
+            draftKey={activeSessionId ?? NEW_SESSION_DRAFT_KEY}
             onSubmit={handleSubmit}
             onCompact={handleCompact}
             onCommand={handleCommand}

@@ -29,6 +29,7 @@ let root: Root;
 let onSubmit: Mock<(data: ChatInputSubmitData) => void>;
 
 beforeEach(() => {
+  localStorage.clear();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   onSubmit = vi.fn<(data: ChatInputSubmitData) => void>();
   // jsdom 定义了 document.execCommand 但一调用就抛 "Not implemented"。
@@ -51,6 +52,7 @@ async function renderInput(props: Record<string, unknown> = {}) {
   await act(async () => {
     root.render(
       React.createElement(ChatInput, {
+        draftKey: "test-session",
         onSubmit,
         placeholder: "写点什么",
         cardClassName: "",

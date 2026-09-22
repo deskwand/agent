@@ -24,6 +24,7 @@ let root: Root;
 let inputRef: React.RefObject<ChatInputHandle>;
 
 beforeEach(() => {
+  localStorage.clear();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   (window as unknown as { electronAPI?: unknown }).electronAPI = {
     skills: { getAll: () => Promise.resolve([]) },
@@ -50,6 +51,7 @@ async function renderInput() {
   await act(async () => {
     root.render(
       React.createElement(ChatInput, {
+        draftKey: "test-session",
         ref: inputRef,
         onSubmit: () => {},
         placeholder: "p",

@@ -34,6 +34,7 @@ let root: Root;
 let ref: React.RefObject<ChatInputHandle>;
 
 beforeEach(() => {
+  localStorage.clear();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -53,6 +54,7 @@ function renderInput(
   act(() => {
     root.render(
       React.createElement(ChatInput, {
+        draftKey: "test-session",
         ref,
         onSubmit: () => {},
         placeholder: "p",
@@ -141,6 +143,7 @@ describe("ChatInput attachments", () => {
       );
       renders += 1;
       return React.createElement(ChatInput, {
+        draftKey: "test-session",
         onSubmit: () => {},
         placeholder: "p",
         cardClassName: "",

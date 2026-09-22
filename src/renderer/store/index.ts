@@ -28,6 +28,7 @@ import type { ImageSource } from "../components/ImageLightbox";
 import { USAGE_CURRENCIES, type CurrencyCode } from "../../shared/usage";
 import { restoreUserMessage } from "../utils/prompt-decorations";
 import type { ElementSelection } from "../../shared/ipc-types";
+import { pruneDrafts, removeDraft } from "../utils/chat-draft-store";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
@@ -572,7 +573,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   } | null,
 
   // Session actions
-  setSessions: (sessions) => set({ sessions }),
+  setSessions: (sessions) => {
+    // 会话全量列表只在启动时经 session.list 进来，所以这一行就是"启动剪枝"，
+    // 清掉已被删会话残留的草稿 key。
+    pruneDrafts(sessions.map((session) => session.id));
+    set({ sessions });
+  },
 
   setPendingEditorText: (text) => set({ pendingEditorText: text }),
 
@@ -590,7 +596,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessions: applySessionUpdate(state.sessions, sessionId, updates),
     })),
 
-  removeSession: (sessionId) =>
+  removeSession: (sessionId) => {
     set((state) => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { [sessionId]: _, ...restSessionStates } = state.sessionStates;
@@ -600,9 +606,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         activeSessionId:
           state.activeSessionId === sessionId ? null : state.activeSessionId,
       };
-    }),
+    });
+    // 会话没了，它的草稿也没意义 —— 死草稿会挤占配额，让活草稿静默丢图。
+    removeDraft(sessionId);
+  },
 
-  removeSessions: (sessionIds) =>
+  removeSessions: (sessionIds) => {
     set((state) => {
       const idSet = new Set(sessionIds);
       const newSessionStates: Record<string, SessionState> = {};
@@ -618,7 +627,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             ? null
             : state.activeSessionId,
       };
-    }),
+    });
+    for (const sessionId of sessionIds) removeDraft(sessionId);
+  },
 
   setActiveSession: (sessionId) => {
     try {

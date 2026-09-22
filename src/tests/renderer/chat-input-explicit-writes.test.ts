@@ -26,6 +26,7 @@ let root: Root;
 let ref: React.RefObject<ChatInputHandle>;
 
 beforeEach(() => {
+  localStorage.clear();
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -47,6 +48,7 @@ async function renderInput() {
   await act(async () => {
     root.render(
       React.createElement(ChatInput, {
+        draftKey: "test-session",
         ref,
         onSubmit: () => {},
         placeholder: "p",

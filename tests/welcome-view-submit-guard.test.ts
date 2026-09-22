@@ -18,7 +18,9 @@ describe('WelcomeView submit guards', () => {
     expect(source).toContain('const session = await startSession(');
     expect(source).toContain('workingDir || undefined,');
     expect(source).toContain('if (session) {');
-    expect(source).toContain('chatInputRef.current?.clear();');
+    expect(source).toContain('chatInputRef.current?.clear(NEW_SESSION_DRAFT_KEY);');
+    // 欢迎页草稿的删除必须在同一个守卫里：会话没建成时删掉它会丢掉用户还没发出去的内容。
+    expect(source).toContain('removeDraft(NEW_SESSION_DRAFT_KEY);');
   });
 
   it('surfaces working-directory picker failures to the global notice toast', () => {
