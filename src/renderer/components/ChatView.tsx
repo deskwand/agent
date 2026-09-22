@@ -23,6 +23,7 @@ import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { resolveDisplayedContextUsage } from "../utils/context-usage";
 import { MessageCard } from "./MessageCard";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
+import { RetryStatusRow } from "./message/RetryStatusRow";
 import type {
   Message,
   ContentBlock,
@@ -242,6 +243,7 @@ export function ChatView() {
     activeSessionId ? s.sessionStates[activeSessionId] : undefined,
   );
   const compaction = sessionState?.compaction ?? { status: "idle" as const };
+  const retry = sessionState?.retry ?? { active: false, attempt: 0 };
   const backgroundAgents = sessionState?.backgroundAgents ?? [];
   const hasMoreOlder = sessionState?.hasMoreOlder ?? false;
   const oldestMessageId = sessionState?.oldestMessageId ?? null;
@@ -1825,6 +1827,8 @@ export function ChatView() {
                 ),
               )
             )}
+
+            {retry.active && <RetryStatusRow attempt={retry.attempt} />}
 
             <div ref={messagesEndRef} />
           </div>

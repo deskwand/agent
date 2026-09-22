@@ -93,6 +93,7 @@ function setInitialState(): void {
         traceSteps: [],
         contextWindow: 0,
         compaction: { status: "idle" },
+        retry: { active: false, attempt: 0 },
         inputQueue: [],
         steerRecords: [],
         partialToolResults: {},

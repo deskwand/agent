@@ -1060,6 +1060,8 @@
   },
   "messageCard": {
     "request": "请求",
+    "retrying": "连接异常，正在重试…",
+    "retryAttempt": "第 {{count}} 次",
     "queued": "排队中",
     "cancelled": "已取消",
     "emptyMessage": "空消息",

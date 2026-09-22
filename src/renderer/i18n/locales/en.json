@@ -1061,6 +1061,8 @@
   },
   "messageCard": {
     "request": "Request",
+    "retrying": "Connection issue, retrying…",
+    "retryAttempt": "attempt {{count}}",
     "queued": "Queued",
     "cancelled": "Cancelled",
     "emptyMessage": "Empty message",

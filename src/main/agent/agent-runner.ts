@@ -3600,7 +3600,16 @@ Tool routing:\n
             sessionManager: piSessionManager,
             settingsManager: PiSettingsManager.inMemory({
               compaction: compactionSettings,
-              retry: { enabled: true, maxRetries: 2 },
+              retry: {
+                enabled: true,
+                // 压缩 / 分支摘要仍用 2 次预算（见 design-docs/2026-09-22-network-retry-policy.md §4.3）
+                maxRetries: 2,
+                baseDelayMs: 2000,
+                // 退避封顶 60s：不封顶时 2^n 会在第 15 次退化成"再也不重试"
+                agentLoopMaxDelayMs: 60000,
+                // 只有 agent 回合循环无视次数预算
+                unbounded: true,
+              },
             }),
             resourceLoader,
             cwd: effectiveCwd,
@@ -3773,6 +3782,9 @@ Tool routing:\n
       let compactionStepId: string | undefined;
       let hasEmittedError = false;
       let terminalErrorText: string | undefined;
+      // 重试行是否正在显示：用于 finally 只在真的挂过行时才发清理事件，
+      // 避免每个正常回合都多一次 store 写入与重渲染。
+      let retryRowActive = false;
       const thinkParser = new ThinkTagStreamParser();
       const promptStartedAt = Date.now();
       const streamEventCounts = new Map<string, number>();
@@ -4017,29 +4029,15 @@ Tool routing:\n
               if (resolvedPayload.errorText) {
                 const errorText = resolvedPayload.errorText;
                 terminalErrorText = errorText;
-                if (!hasEmittedError) {
-                  hasEmittedError = true;
-                  this.sendMessage(session.id, {
-                    id: uuidv4(),
-                    sessionId: session.id,
-                    role: "assistant",
-                    turnId,
-                    content: [
-                      {
-                        type: "text",
-                        text: `**Error**: ${errorText}\n\n${getErrorSuffix(errorText)}`,
-                      },
-                    ],
-                    timestamp: Date.now(),
-                    executionTimeMs: Date.now() - runStartTime,
-                    code: detectInsufficientCredits(errorText)
-                      ? "INSUFFICIENT_BALANCE"
-                      : undefined,
-                  });
-                }
+                // 落不落错误气泡推迟到 agent_end：只有 willRetry === false 才是终局。
+                // 重试期间落红气泡会让“其实已经自愈”的回合看起来像失败了。
                 break;
               }
               if (resolvedPayload.shouldEmitMessage) {
+                // 本回合已经恢复：之前那次失败的 errorText 不再是终局错误，
+                // 否则 agent_end 会为一次自愈的回合补落红色 Error 气泡、
+                // trace 标成 Request failed，并跳过 turn finalizer。
+                terminalErrorText = undefined;
                 const contentBlocks: ContentBlock[] = [];
                 for (const block of resolvedPayload.effectiveContent) {
                   if (block.type === "text") {
@@ -4265,6 +4263,31 @@ Tool routing:\n
                 "willRetry:",
                 event.willRetry,
               );
+              if (event.willRetry) {
+                // SDK 会重跑本回合：不落错误气泡，等 auto_retry_start 出重试行。
+                break;
+              }
+              if (!hasEmittedError && terminalErrorText) {
+                hasEmittedError = true;
+                const errorText = terminalErrorText;
+                this.sendMessage(session.id, {
+                  id: uuidv4(),
+                  sessionId: session.id,
+                  role: "assistant",
+                  turnId,
+                  content: [
+                    {
+                      type: "text",
+                      text: `**Error**: ${errorText}\n\n${getErrorSuffix(errorText)}`,
+                    },
+                  ],
+                  timestamp: Date.now(),
+                  executionTimeMs: Date.now() - runStartTime,
+                  code: detectInsufficientCredits(errorText)
+                    ? "INSUFFICIENT_BALANCE"
+                    : undefined,
+                });
+              }
               // 回合自然结束且无重试：flush 未送达的 steer（failed(session-stopped)
               // 标红 + 回填输入框），并清掉 harness 残留队列，防下个回合 runLoop
               // drain 旧 steer 造成双注入。willRetry 存在时不清——重试时 runLoop
@@ -4272,6 +4295,16 @@ Tool routing:\n
               if (!event.willRetry) {
                 this.flushUndeliveredSteers(session.id);
               }
+              break;
+            }
+
+            case "auto_retry_start":
+            case "auto_retry_end": {
+              retryRowActive = event.type === "auto_retry_start";
+              this.sendToRenderer({
+                type: "session.retry",
+                payload: resolveRetryLifecyclePayload(session.id, event),
+              });
               break;
             }
 
@@ -4604,6 +4637,13 @@ Tool routing:\n
           unsubscribe();
         } catch (e) {
           logWarn("[AgentRunner] unsubscribe error:", e);
+        }
+        // 重试行是临时状态，任何异常路径都不能让它卡在界面上。
+        if (retryRowActive) {
+          this.sendToRenderer({
+            type: "session.retry",
+            payload: { sessionId: session.id, active: false, attempt: 0 },
+          });
         }
         if (ollamaColdStartTimerId) clearTimeout(ollamaColdStartTimerId);
       }
@@ -5091,7 +5131,14 @@ Tool routing:\n
         sessionManager: PiSessionManager.open(restoreFile),
         settingsManager: PiSettingsManager.inMemory({
           compaction: compactionSettings,
-          retry: { enabled: true, maxRetries: 2 },
+          retry: {
+            enabled: true,
+            // 见 design-docs/2026-09-22-network-retry-policy.md §4.2 / §4.3
+            maxRetries: 2,
+            baseDelayMs: 2000,
+            agentLoopMaxDelayMs: 60000,
+            unbounded: true,
+          },
         }),
         cwd: effectiveCwd,
         noTools: "all",
@@ -5200,5 +5247,31 @@ export function resolveCompactionLifecyclePayload(
     typeof event.result?.estimatedTokensAfter === "number"
       ? { estimatedTokens: event.result.estimatedTokensAfter }
       : {}),
+  };
+}
+
+export type RetryLifecycleEvent =
+  | { type: "auto_retry_start"; attempt: number }
+  | { type: "auto_retry_end"; attempt: number };
+
+export interface RetryLifecyclePayload {
+  sessionId: string;
+  active: boolean;
+  attempt: number;
+}
+
+/**
+ * 把 SDK 的重试生命周期事件归一化成渲染层的临时状态。
+ * 刻意不区分错误类型（网络 / 上游 / 限流）：多一个映射就多一处会漂移的真相，
+ * 而用户只需要知道“它还在试、这是第几次”。
+ */
+export function resolveRetryLifecyclePayload(
+  sessionId: string,
+  event: RetryLifecycleEvent,
+): RetryLifecyclePayload {
+  return {
+    sessionId,
+    active: event.type === "auto_retry_start",
+    attempt: event.attempt,
   };
 }

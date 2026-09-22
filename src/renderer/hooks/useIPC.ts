@@ -545,6 +545,13 @@ function registerSharedIpcListener(): () => void {
           );
           break;
 
+        case "session.retry":
+          store.setSessionRetry(event.payload.sessionId, {
+            active: event.payload.active,
+            attempt: event.payload.attempt,
+          });
+          break;
+
         case "session.steer.result":
           if (event.payload.status === "failed") {
             store.updateSteerRecord(

@@ -74,7 +74,9 @@ export function toUserFacingErrorText(errorText: string): string {
     lower.includes("other side closed") ||
     lower.includes("reset before headers") ||
     lower.includes("upstream connect") ||
-    lower.includes("retry delay")
+    lower.includes("retry delay") ||
+    lower.includes("timeout") ||
+    lower.includes("timed out")
   ) {
     return t("errors.networkInterrupted");
   }
@@ -86,7 +88,9 @@ export function getErrorSuffix(errorText: string): string {
   if (/\b4\d{2}\b/.test(errorText)) {
     return t("errors.checkConfig");
   }
-  return t("errors.retrying");
+  // 非 4xx 的错误要么已经由重试行表达"正在重试"，要么就是终局失败。
+  // 这里再说一次"正在自动重试"会与重试行同屏矛盾。
+  return "";
 }
 
 export function resolveMessageEndPayload(

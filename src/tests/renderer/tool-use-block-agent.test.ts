@@ -41,6 +41,7 @@ function runningSessionState(): SessionState {
     traceSteps: [],
     contextWindow: 0,
     compaction: { status: "idle" },
+    retry: { active: false, attempt: 0 },
     inputQueue: [],
     steerRecords: [],
     partialToolResults: {},

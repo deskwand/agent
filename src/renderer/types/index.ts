@@ -165,6 +165,12 @@ export interface CompactionState {
   estimatedTokens?: number | null;
 }
 
+/** 会话级的临时重试状态：成功即清空，不落进消息历史。 */
+export interface RetryState {
+  active: boolean;
+  attempt: number;
+}
+
 /** 输入框上方排队区条目（非 idle 发送时产生，含附件）。 */
 export interface QueuedInput {
   id: string;
@@ -640,6 +646,10 @@ export type ServerEvent =
         status: Exclude<CompactionStatus, "idle">;
         estimatedTokens?: number;
       };
+    }
+  | {
+      type: "session.retry";
+      payload: { sessionId: string; active: boolean; attempt: number };
     }
   | {
       type: "session.steer.result";

@@ -224,11 +224,10 @@ describe('getErrorSuffix', () => {
     expect(suffix).toContain('check your configuration');
   });
 
-  it('returns auto retry suffix for non-4xx errors (en)', () => {
+  it('returns no suffix for non-4xx errors (en)', () => {
     const suffix = getErrorSuffix('connection error');
-    expect(suffix).toContain('Retrying automatically');
+    expect(suffix).toBe('');
   });
-
   it('returns config retry suffix for 4xx errors (zh)', () => {
     setLocale('zh');
     const suffix = getErrorSuffix('HTTP 400: bad request');
@@ -236,10 +235,25 @@ describe('getErrorSuffix', () => {
     setLocale(undefined);
   });
 
-  it('returns auto retry suffix for non-4xx errors (zh)', () => {
+  it('returns no suffix for non-4xx errors (zh)', () => {
     setLocale('zh');
     const suffix = getErrorSuffix('connection error');
-    expect(suffix).toContain('Agent 正在自动重试');
+    expect(suffix).toBe('');
     setLocale(undefined);
+  });
+});
+
+// ── timeout classification ──────────────────────────────────────────
+
+describe('toUserFacingErrorText timeouts (en)', () => {
+  beforeEach(() => {
+    setLocale(undefined);
+  });
+
+  it('treats a timed-out request as a network interruption', () => {
+    expect(toUserFacingErrorText('Request timed out.')).toContain(
+      'Network interrupted',
+    );
+    expect(toUserFacingErrorText('timeout')).toContain('Network interrupted');
   });
 });

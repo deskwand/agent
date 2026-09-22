@@ -14,6 +14,7 @@ import type {
   PartialToolResult,
   CompactionState,
   CompactionStatus,
+  RetryState,
   QueuedInput,
   SteerRecord,
   SteerFailReason,
@@ -63,6 +64,7 @@ export interface SessionState {
   traceSteps: TraceStep[];
   contextWindow: number;
   compaction: CompactionState;
+  retry: RetryState;
   inputQueue: QueuedInput[];
   steerRecords: SteerRecord[];
   partialToolResults: Record<string, PartialToolResult>;
@@ -112,6 +114,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   traceSteps: [],
   contextWindow: 0,
   compaction: { status: "idle" },
+  retry: { active: false, attempt: 0 },
   inputQueue: [],
   steerRecords: [],
   partialToolResults: {},
@@ -414,6 +417,7 @@ interface AppState {
     estimatedTokens?: number,
   ) => void;
   dismissSessionCompaction: (sessionId: string) => void;
+  setSessionRetry: (sessionId: string, retry: RetryState) => void;
   enqueueInput: (
     sessionId: string,
     text: string,
@@ -1331,6 +1335,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         }),
       };
     }),
+
+  setSessionRetry: (sessionId, retry) =>
+    set((state) => ({
+      sessionStates: patchSession(state.sessionStates, sessionId, { retry }),
+    })),
 
   dismissSessionCompaction: (sessionId) =>
     set((state) => {
