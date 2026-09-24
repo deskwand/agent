@@ -36,6 +36,8 @@ export interface ChatInputBottomBarProps {
   onCommandEntry?: (command: "compact" | "goal") => void;
   /** 自定义命令入口：宿主把 chip 插进输入框。缺省 = 本宿主不支持自定义命令 */
   onInsertPromptCommand?: (name: string) => void;
+  /** 技能入口：宿主把 /skill:<name> 插进输入框。缺省 = 本宿主不支持技能引用 */
+  onInsertSkill?: (name: string) => void;
   model: string;
   modelOptions: ModelOptionGroup[];
   activeProviderProfileKey: ProviderProfileKey;
@@ -69,6 +71,7 @@ export function ChatInputBottomBar({
   onAttachMenuDismiss,
   onCommandEntry,
   onInsertPromptCommand,
+  onInsertSkill,
   model,
   modelOptions,
   activeProviderProfileKey,
@@ -108,6 +111,7 @@ export function ChatInputBottomBar({
           onDismiss={onAttachMenuDismiss}
           onCommandEntry={onCommandEntry}
           onInsertPromptCommand={onInsertPromptCommand}
+          onInsertSkill={onInsertSkill}
         />
 
         {onToggleExpand && showExpandButton && (

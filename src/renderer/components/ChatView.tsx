@@ -1919,6 +1919,9 @@ export function ChatView() {
                 onInsertPromptCommand={(name) =>
                   chatInputRef.current?.insertCommandChip(name)
                 }
+                onInsertSkill={(name) =>
+                  chatInputRef.current?.insertSkillChip(name)
+                }
                 model={activeModel}
                 modelOptions={modelOptions}
                 activeProviderProfileKey={activeProviderProfileKey}

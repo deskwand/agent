@@ -37,6 +37,7 @@ import {
   saveSlashRecency,
   sortByRecency,
 } from "../slash-recency";
+import { loadPinnedSkills, togglePinnedSkill } from "../pinned-skills";
 import { compressImageForLLM } from "../utils/image-compress";
 import type { ElementSelection } from "../../shared/ipc-types";
 import {
@@ -198,6 +199,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     // --- Slash command menu ---
     const [slashSkills, setSlashSkills] = useState<Skill[]>([]);
+    // 星标是本机 localStorage 数据，斜杠菜单与「+」菜单各读各的；这里持有状态
+    // 只是为了点星后本行立刻重渲染。
+    const [pinnedSkills, setPinnedSkills] = useState<string[]>(() =>
+      loadPinnedSkills(),
+    );
+
+    const toggleSkillPin = useCallback((name: string) => {
+      setPinnedSkills(togglePinnedSkill(name));
+    }, []);
     const [extensionCommands, setExtensionCommands] = useState<SlashCommand[]>(
       [],
     );
@@ -437,6 +447,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         .catch(() => {});
     }, [isElectron, showSlashMenu]);
 
+    // 斜杠菜单每次打开都重读星标：星标可能在「+」菜单里被改过，而两个菜单不共享
+    // state（各自只在打开时读存储）。少了这一段，用户在「+」菜单里取消掉的星标
+    // 在斜杠菜单里仍是实心星，点一下反而把它重新固定。
+    useEffect(() => {
+      if (showSlashMenu) setPinnedSkills(loadPinnedSkills());
+    }, [showSlashMenu]);
+
     // --- Load extension commands for slash menu (per active session cwd) ---
     const activeSessionCwd = useCurrentSession()?.cwd;
     useEffect(() => {
@@ -561,6 +578,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       insertSkillChip(name: string) {
         const raw = `/skill:${name} `;
         const draft = getPlainText();
+        // 斜杠菜单之外的插入路径（欢迎页 chip、+ 菜单技能行）也要记一次"用过"：
+        // 不记的话「+」菜单的"最近调用"补齐永远是空的。
+        saveSlashRecency(`skill:${name}`);
         // 判重必须针对 /skill:<name> 而不是 /<name>：insertCommandChip 的正则
         // `^/${name}(\s|$)` 匹配不到这种形式，照搬会让重复点击叠成
         // `/skill:pdf /skill:pdf`，渲染出两个令牌。
@@ -1191,6 +1211,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                   selectedIndex={slashSelectedIndex}
                   onSelect={selectSlashItem}
                   onTabChange={handleTabChange}
+                  pinnedSkills={pinnedSkills}
+                  onToggleSkillPin={toggleSkillPin}
                   direction={slashMenuDirection}
                 />
               </div>

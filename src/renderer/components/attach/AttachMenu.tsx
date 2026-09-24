@@ -7,6 +7,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  Star,
   Target,
   Trash2,
   Upload,
@@ -18,6 +19,7 @@ import type { PromptCommandSaveError } from "../../../shared/ipc-types";
 import type { ChatInputAttachedFile } from "../ChatInput";
 import {
   MENU_BADGE_CLASS,
+  MENU_ITEM_AFTER_SLOT_CLASS,
   MENU_ITEM_CLASS,
   MENU_ITEM_DEFAULT_CLASS,
   MENU_ITEM_DISABLED_CLASS,
@@ -25,6 +27,13 @@ import {
   MENU_PANEL_PADDED_CLASS,
   MENU_SEPARATOR_CLASS,
 } from "../menu-styles";
+import {
+  MAX_VISIBLE_SKILLS,
+  composeSkillShortcuts,
+  loadPinnedSkills,
+  togglePinnedSkill,
+} from "../../pinned-skills";
+import { loadSlashRecency } from "../../slash-recency";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { AttachPickerModal } from "./AttachPickerModal";
 import { AttachPickerPanel } from "./AttachPickerPanel";
@@ -66,6 +75,11 @@ export interface AttachMenuProps {
    * 「命令」组整组不渲染（欢迎页旧行为由 attach-menu.test.ts 锁着）。
    */
   onInsertPromptCommand?: (name: string) => void;
+  /**
+   * 技能入口：宿主把 /skill:<name> 插进输入框。缺省 = 本宿主没有技能能力，
+   * 「技能」组整组不渲染、一次 IPC 都不发（与 onCommandEntry 对命令组的作用相同）。
+   */
+  onInsertSkill?: (name: string) => void;
 }
 
 /**
@@ -89,6 +103,7 @@ export function AttachMenu({
   onDismiss,
   onCommandEntry,
   onInsertPromptCommand,
+  onInsertSkill,
 }: AttachMenuProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -104,6 +119,12 @@ export function AttachMenu({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [promptRows, setPromptRows] = useState<PromptRow[]>([]);
   const [promptRowsFailed, setPromptRowsFailed] = useState(false);
+  const [skillRows, setSkillRows] = useState<string[]>([]);
+  const [pinnedNames, setPinnedNames] = useState<string[]>([]);
+  const [skillPinnedAvailable, setSkillPinnedAvailable] = useState(0);
+  const [skillRowsFailed, setSkillRowsFailed] = useState(false);
+  /** 上一次拉到的"可用技能集合"。点星在本地重算，就必须记住它。 */
+  const skillEnabledNames = useRef<ReadonlySet<string>>(new Set());
   const [formInitial, setFormInitial] = useState<PromptCommandFormValue | null>(null);
   const [formIsCreate, setFormIsCreate] = useState(true);
   const [formSaving, setFormSaving] = useState(false);
@@ -164,6 +185,51 @@ export function AttachMenu({
     }
   }, [cwd, onInsertPromptCommand]);
 
+  /**
+   * 用给定星标 + 已加载的技能集合重算技能组。点星走这条**纯本地**路径：
+   * 一个本地标记动作不该因为一次 IPC 失败把整组换成错误行，也不该留下两次在飞的
+   * `getAll()` 互相覆盖（先发的响应后到 → 行内容回退）。
+   */
+  const rebuildSkillRows = useCallback((pinned: string[]) => {
+    const { names, pinnedAvailable } = composeSkillShortcuts({
+      pinned,
+      enabledNames: skillEnabledNames.current,
+      recency: loadSlashRecency(),
+    });
+    setSkillRows(names);
+    setPinnedNames(pinned);
+    setSkillPinnedAvailable(pinnedAvailable);
+  }, []);
+
+  /**
+   * 「技能」组的内容 = 星标（固定序）+ 最近调用补齐，规则全在 pinned-skills 里。
+   * 与命令组一样只在菜单打开时拉（也是"保鲜"的来源：星标可能在斜杠菜单里被改过）；
+   * 宿主没有技能能力时一次 IPC 都不发。
+   */
+  const loadSkillShortcuts = useCallback(async () => {
+    if (!onInsertSkill || !window.electronAPI?.skills?.getAll) {
+      skillEnabledNames.current = new Set();
+      setSkillRows([]);
+      setPinnedNames([]);
+      setSkillPinnedAvailable(0);
+      return;
+    }
+    try {
+      const all = await window.electronAPI.skills.getAll();
+      skillEnabledNames.current = new Set(
+        all.filter((s) => s.enabled).map((s) => s.name),
+      );
+      rebuildSkillRows(loadPinnedSkills());
+      setSkillRowsFailed(false);
+    } catch {
+      skillEnabledNames.current = new Set();
+      setSkillRows([]);
+      setPinnedNames([]);
+      setSkillPinnedAvailable(0);
+      setSkillRowsFailed(true);
+    }
+  }, [onInsertSkill, rebuildSkillRows]);
+
   // 快照只在菜单打开时拉一次：输入框常驻挂载时不做任何密库请求。
   const openMenu = () => {
     setOpen(true);
@@ -172,6 +238,7 @@ export function AttachMenu({
     setSelectedIds([]);
     void loadVaultSnapshot();
     void loadPromptCommands();
+    void loadSkillShortcuts();
   };
 
   const close = useCallback(() => {
@@ -196,6 +263,12 @@ export function AttachMenu({
   const runPromptEntry = (name: string) => {
     // 顺序不变量同上：先插 chip，再关菜单交回焦点。
     onInsertPromptCommand?.(name);
+    closeAndFocusComposer();
+  };
+
+  const runSkillEntry = (name: string) => {
+    // 顺序不变量同 runPromptEntry：先插 chip，再关菜单交回焦点。
+    onInsertSkill?.(name);
     closeAndFocusComposer();
   };
 
@@ -371,6 +444,10 @@ export function AttachMenu({
     if (open && view === "menu") itemRefs.current[0]?.focus();
   }, [open, view]);
 
+  // 焦点环 = 渲染顺序。技能组插在附件与命令之间后，它下面各行的下标必须跟着
+  // 技能行数量走：继续写死 3/4/5/6 会让「＋」与命令行在技能行变动时错位。
+  const commandGroupBase = 3 + skillRows.length;
+
   const moveMenuFocus = (delta: number) => {
     const items = itemRefs.current.filter(
       (element): element is HTMLButtonElement => element !== null,
@@ -499,6 +576,87 @@ export function AttachMenu({
               )}
             </button>
 
+            {onInsertSkill && (skillRows.length > 0 || skillRowsFailed) && (
+              <>
+                <div className={MENU_SEPARATOR_CLASS} />
+                <div className="flex items-center justify-between pr-1">
+                  <div className={MENU_LABEL_CLASS}>
+                    {t("chat.slashSkills")}
+                  </div>
+                  {skillPinnedAvailable > MAX_VISIBLE_SKILLS && (
+                    <span className="pr-1 text-[11px] text-text-muted">
+                      {t("chat.skillOverflow", {
+                        shown: MAX_VISIBLE_SKILLS,
+                        total: skillPinnedAvailable,
+                      })}
+                    </span>
+                  )}
+                </div>
+
+                {skillRows.map((name, index) => {
+                  const pinned = pinnedNames.includes(name);
+                  const pinLabel = pinned
+                    ? t("chat.skillPinRemove")
+                    : t("chat.skillPinAdd");
+                  return (
+                    <div key={name} className="flex items-center pl-1.5">
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        data-skill-pin={name}
+                        aria-label={pinLabel}
+                        // 星标刻意不在焦点环里：鼠标按下不抢焦点，否则点完方向键
+                        // 会从第一项重新开始（moveMenuFocus 找不到当前项）。
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          // 纯本地：写存储 → 用已加载的集合重算，不重拉 IPC
+                          rebuildSkillRows(togglePinnedSkill(name));
+                          // 取消固定会把这一行甚至整组从 DOM 里拿掉：焦点若正好在
+                          // 被删的节点上会掉到 body，而 ↑/↓ 与 Esc 绑在菜单容器上，
+                          // 菜单键从此全失效。重建后把焦点交回环内（优先原位置）。
+                          requestAnimationFrame(() => {
+                            const stillInside = rootRef.current?.contains(
+                              document.activeElement,
+                            );
+                            if (stillInside) return;
+                            (
+                              itemRefs.current[3 + index] ?? itemRefs.current[0]
+                            )?.focus();
+                          });
+                        }}
+                        className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
+                          pinned ? "text-accent" : "text-text-muted"
+                        }`}
+                      >
+                        <Star
+                          className="w-4 h-4"
+                          fill={pinned ? "currentColor" : "none"}
+                        />
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        data-skill-row={name}
+                        ref={(element) => {
+                          itemRefs.current[3 + index] = element;
+                        }}
+                        onClick={() => runSkillEntry(name)}
+                        className={`${MENU_ITEM_AFTER_SLOT_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
+                      >
+                        <span className="min-w-0 flex-1 truncate">{name}</span>
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {skillRowsFailed && (
+                  <div className="px-2.5 py-1 text-xs text-text-muted">
+                    {t("chat.commandSkillLoadFailed")}
+                  </div>
+                )}
+              </>
+            )}
+
             {(onCommandEntry || onInsertPromptCommand) && (
               <>
                 <div className={MENU_SEPARATOR_CLASS} />
@@ -512,7 +670,7 @@ export function AttachMenu({
                     data-command-create
                     aria-label={t("chat.newCommand")}
                     ref={(element) => {
-                      itemRefs.current[3] = element;
+                      itemRefs.current[commandGroupBase] = element;
                     }}
                     onClick={openCreateForm}
                     className="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
@@ -527,7 +685,7 @@ export function AttachMenu({
                       type="button"
                       role="menuitem"
                       ref={(element) => {
-                        itemRefs.current[4] = element;
+                        itemRefs.current[commandGroupBase + 1] = element;
                       }}
                       onClick={() => runCommandEntry("compact")}
                       className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
@@ -545,7 +703,7 @@ export function AttachMenu({
                       type="button"
                       role="menuitem"
                       ref={(element) => {
-                        itemRefs.current[5] = element;
+                        itemRefs.current[commandGroupBase + 2] = element;
                       }}
                       onClick={() => runCommandEntry("goal")}
                       className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
@@ -570,7 +728,8 @@ export function AttachMenu({
                       type="button"
                       role="menuitem"
                       ref={(element) => {
-                        itemRefs.current[6 + index] = element;
+                        itemRefs.current[commandGroupBase + 3 + index] =
+                          element;
                       }}
                       onClick={() => runPromptEntry(row.name)}
                       className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS} min-w-0 flex-1`}

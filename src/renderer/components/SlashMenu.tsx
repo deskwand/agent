@@ -1,10 +1,11 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { FileText, List, Package, Sparkles, Zap } from "lucide-react";
+import { FileText, List, Package, Sparkles, Star, Zap } from "lucide-react";
 import type { Skill } from "../types";
 import type { SlashCommand, SlashItem } from "../slash-commands";
 import {
   MENU_BADGE_CLASS,
+  MENU_ITEM_AFTER_SLOT_CLASS,
   MENU_ITEM_CLASS,
   MENU_ITEM_DEFAULT_CLASS,
   MENU_ITEM_SELECTED_CLASS,
@@ -19,6 +20,10 @@ interface SlashMenuProps {
   // Optional: merged "all" list. Defaults to commands+skills when absent
   // (kept optional so direct-render callers/tests without the prop keep working).
   allItems?: SlashItem[];
+  /** 已固定的技能名（本机 localStorage 数据，由 ChatInput 持有）。 */
+  pinnedSkills: readonly string[];
+  /** 切换某个技能的固定状态。 */
+  onToggleSkillPin: (name: string) => void;
   activeTab: SlashTab;
   selectedIndex: number;
   onSelect: (item: SlashItem) => void;
@@ -42,9 +47,12 @@ export function SlashMenu({
   selectedIndex,
   onSelect,
   onTabChange,
+  pinnedSkills,
+  onToggleSkillPin,
   direction = "up",
 }: SlashMenuProps) {
   const { t } = useTranslation();
+  const pinnedSet = new Set(pinnedSkills);
 
   // Build flat item list per tab for keyboard nav index mapping
   const commandItems: SlashItem[] = commands.map((c) => ({
@@ -192,6 +200,10 @@ export function SlashMenu({
             }
             const skill = skills.find((s) => s.name === item.skill.name);
             const type = skill?.type ?? "builtin";
+            const pinned = pinnedSet.has(item.skill.name);
+            const pinLabel = pinned
+              ? t("chat.skillPinRemove")
+              : t("chat.skillPinAdd");
             return (
               <MenuItem
                 key={`skill:${item.skill.name}`}
@@ -200,8 +212,28 @@ export function SlashMenu({
                 onSelect={() => onSelect(item)}
                 label={item.skill.name}
                 description={item.skill.description}
-                icon={
-                  <Sparkles className="w-4 h-4 text-text-muted flex-shrink-0" />
+                leading={
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    data-skill-pin={item.skill.name}
+                    aria-label={pinLabel}
+                    // 行的选中是 mousedown 即触发：星标必须在 mousedown 阶段就
+                    // 阻断，否则点星会连带把技能插进输入框。
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onToggleSkillPin(item.skill.name);
+                    }}
+                    className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
+                      pinned ? "text-accent" : "text-text-muted"
+                    }`}
+                  >
+                    <Star
+                      className="w-4 h-4"
+                      fill={pinned ? "currentColor" : "none"}
+                    />
+                  </button>
                 }
                 badge={
                   <span className={MENU_BADGE_CLASS}>
@@ -229,6 +261,7 @@ function MenuItem({
   label,
   description,
   icon,
+  leading,
   badge,
 }: {
   index: number;
@@ -236,23 +269,26 @@ function MenuItem({
   onSelect: () => void;
   label: string;
   description?: string;
-  icon: React.ReactNode;
+  /** 行首行内图标（命令行的 zap / package / file-text）；技能行改用 leading */
+  icon?: React.ReactNode;
+  /** 行首独立按钮（技能行的星标）；给了它，行按钮改用无左内边距的结构类 */
+  leading?: React.ReactNode;
   badge?: React.ReactNode;
 }) {
-  return (
+  const row = (
     <button
       type="button"
       onMouseDown={(e) => {
         e.preventDefault();
         onSelect();
       }}
-      className={`${ITEM_BASE_CLASS} ${
+      className={`${leading ? MENU_ITEM_AFTER_SLOT_CLASS : ITEM_BASE_CLASS} ${
         index === selectedIndex
           ? MENU_ITEM_SELECTED_CLASS
           : MENU_ITEM_DEFAULT_CLASS
       }`}
     >
-      {icon}
+      {leading ? null : icon}
       <span className="flex-1 truncate">
         {label}
         {description ? (
@@ -266,6 +302,15 @@ function MenuItem({
       </span>
       {badge}
     </button>
+  );
+
+  if (!leading) return row;
+
+  return (
+    <div className="flex items-center pl-1.5">
+      {leading}
+      {row}
+    </div>
   );
 }
 

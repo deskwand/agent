@@ -384,6 +384,9 @@ export function WelcomeView() {
               onInsertPromptCommand={(name) =>
                 chatInputRef.current?.insertCommandChip(name)
               }
+              onInsertSkill={(name) =>
+                chatInputRef.current?.insertSkillChip(name)
+              }
               attachMenuDirection="down"
               model={selectedModel}
               modelOptions={modelOptions}

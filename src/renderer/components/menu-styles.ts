@@ -59,3 +59,16 @@ export const MENU_SEPARATOR_CLASS = "mx-2 my-1 border-t border-border-subtle";
  */
 export const MENU_BADGE_CLASS =
   "inline-flex items-center text-[10px] text-text-secondary px-1.5";
+
+/**
+ * 行首另有一个独立按钮（技能行的星标）时的行按钮。
+ *
+ * 结构与 MENU_ITEM_CLASS 相同，但**不含左侧内边距**：左边距交给外层容器，让星标
+ * 按钮正好落在其它菜单行放行图标的位置上，名字起始 x 与别的行一致
+ * （6px 容器 + 24px 星标槽 + 4px = 34px，等于 px-2.5 + 16px 图标 + gap-2）。
+ *
+ * 不并进 MENU_ITEM_CLASS 的原因同那里的注释：px-2.5 与 pl-1 是同一属性冲突，
+ * Tailwind 的胜出顺序由生成 CSS 决定，不由 className 书写顺序决定。
+ */
+export const MENU_ITEM_AFTER_SLOT_CLASS =
+  "flex h-7 w-full min-w-0 flex-1 items-center gap-2 rounded-lg pl-1 pr-2.5 text-left text-sm transition-colors";

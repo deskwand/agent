@@ -43,6 +43,8 @@ function renderMenu(activeTab: SlashTab): Document {
       selectedIndex: 0,
       onSelect: () => undefined,
       onTabChange: () => undefined,
+      pinnedSkills: [],
+      onToggleSkillPin: () => undefined,
     }),
   );
 
@@ -107,13 +109,17 @@ describe("SlashMenu menu rows", () => {
   });
 
   it("uses 16px icons, not the old 14px", () => {
-    for (const row of skillRows()) {
-      const icon = row.querySelector("svg");
-      expect(icon).not.toBeNull();
-      expect(icon?.classList).toContain("w-4");
-      expect(icon?.classList).toContain("h-4");
-      expect(icon?.classList).not.toContain("w-3.5");
-      expect(icon?.classList).not.toContain("h-3.5");
+    // 行首图标现在住在星标按钮里（技能行不再自己渲染 Sparkles），所以瞄准点跟着走：
+    // 仍然是"在渲染出的 DOM 上量尺寸"，也仍然带"不是 14px"的反向条款。
+    const pins = [
+      ...renderMenu("all").querySelectorAll("[data-skill-pin] svg"),
+    ];
+    expect(pins).toHaveLength(SKILL_TYPES.length);
+    for (const icon of pins) {
+      expect(icon.classList).toContain("w-4");
+      expect(icon.classList).toContain("h-4");
+      expect(icon.classList).not.toContain("w-3.5");
+      expect(icon.classList).not.toContain("h-3.5");
     }
   });
 
@@ -178,6 +184,8 @@ describe("SlashMenu badges carry no colour", () => {
         selectedIndex: 0,
         onSelect: () => undefined,
         onTabChange: () => undefined,
+        pinnedSkills: [],
+        onToggleSkillPin: () => undefined,
       }),
     );
 

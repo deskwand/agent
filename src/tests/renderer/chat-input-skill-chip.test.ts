@@ -81,6 +81,14 @@ describe("insertSkillChip", () => {
     expect(serializeEditor(editorEl())).toBe("/skill:pdf 读一下这份");
   });
 
+  it("插入技能时记一条 slashRecency，+ 菜单的「最近调用」靠它", async () => {
+    await renderInput();
+    await act(async () => inputRef.current!.insertSkillChip("pdf"));
+
+    const recency = JSON.parse(localStorage.getItem("slashRecency") ?? "{}");
+    expect(typeof recency["skill:pdf"]).toBe("number");
+  });
+
   it("连点两次不叠加 —— 叠加会渲染出两个令牌", async () => {
     await renderInput();
     await act(async () => inputRef.current!.insertSkillChip("pdf"));
