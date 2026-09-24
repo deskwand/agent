@@ -1,4 +1,11 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+  useRef,
+  useMemo,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 import {
@@ -65,6 +72,11 @@ export function ImageLightbox({
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const activePointerIdRef = useRef<number | null>(null);
+  const dragSurfaceRef = useRef<HTMLDivElement>(null);
+  const [toolbarAnchor, setToolbarAnchor] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
 
   // Reset zoom/offset when switching images
   useEffect(() => {
@@ -85,6 +97,41 @@ export function ImageLightbox({
 
   const currentImage = images[currentIndex];
   const isSingle = images.length <= 1;
+  const imageSrc = currentImage?.src ?? "";
+  const imageName = currentImage?.name ?? "";
+  const hasFilePath = Boolean(currentImage?.filePath);
+
+  // 工具条锚在图片「未变换」的布局盒右上角：transform 只挂在 img 上，不改变父级
+  // 布局盒，所以拖拽面的盒子就是图片在 zoom === 1 时的可见边界，缩放与平移时不动。
+  // 盒子还没尺寸（图片未解码）时给 null，让工具条退回预览区右上角。
+  const measureToolbarAnchor = useCallback(() => {
+    const box = dragSurfaceRef.current?.getBoundingClientRect();
+    setToolbarAnchor(
+      box && box.width > 0 && box.height > 0
+        ? { left: box.right, top: box.top }
+        : null,
+    );
+  }, []);
+
+  // 重算时机：打开、loading 翻假、换图、窗口缩放。换图不另外依赖 currentIndex ——
+  // 新图片的 onLoad 会再补一次测量。
+  // 不用 ResizeObserver：jsdom 没实现它，会抛 ReferenceError 打挂既有测试。
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+    measureToolbarAnchor();
+    window.addEventListener("resize", measureToolbarAnchor);
+    return () => window.removeEventListener("resize", measureToolbarAnchor);
+  }, [isOpen, loading, imageSrc, measureToolbarAnchor]);
+
+  const canActOnImage = !loading && Boolean(imageSrc);
+  // 图片已就绪但还没量到盒子（正在解码）时先不画工具条：否则它会先出现在预览区
+  // 右上角 —— 正是用户嫌「太远」的那个位置 —— 再跳到图片角上。
+  // 图片真的加载失败时 img 会走 alt 文本框（有尺寸），量到盒子后照常出现。
+  const toolbarPendingMeasure = canActOnImage && !toolbarAnchor;
+  // 工具条靠右锚定、向左生长，所以可用宽度由锚点的 x 决定；没有锚点时用视口宽度兜底。
+  const toolbarMaxWidth = toolbarAnchor
+    ? Math.max(160, toolbarAnchor.left - 12)
+    : "calc(100vw - 1.5rem)";
 
   const goNext = useCallback(() => {
     setCurrentIndex((prev) => Math.min(prev + 1, images.length - 1));
@@ -290,9 +337,6 @@ export function ImageLightbox({
   const displayPercent = useMemo(() => Math.round(zoom * 100), [zoom]);
 
   if (!isOpen || images.length === 0) return null;
-  const imageSrc = currentImage?.src ?? "";
-  const imageName = currentImage?.name ?? "";
-  const hasFilePath = Boolean(currentImage?.filePath);
 
   return (
     <div
@@ -301,37 +345,14 @@ export function ImageLightbox({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      {/* ── Top bar ── */}
-      <div className="flex items-center justify-between px-4 py-2 bg-black/60 dark:bg-black/70 backdrop-blur-md text-white select-none shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-sm font-medium truncate">{imageName}</span>
-          {!isSingle && (
-            <span className="text-xs text-white/60 dark:text-white/50">
-              {t("imageLightbox.imageCount", {
-                current: currentIndex + 1,
-                total: images.length,
-              })}
-            </span>
-          )}
-          {zoom !== 1 && (
-            <span className="text-xs text-white/40">{displayPercent}%</span>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="p-1.5 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors"
-          aria-label={t("imageLightbox.close")}
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
       {/* ── Image area ── */}
       <div
         ref={containerRef}
         className="flex-1 flex items-center justify-center relative overflow-hidden"
         onWheel={handleWheel}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
       >
         {/* Loading */}
         {loading && (
@@ -354,6 +375,7 @@ export function ImageLightbox({
         {/* Image */}
         {!loading && imageSrc && (
           <div
+            ref={dragSurfaceRef}
             className="relative select-none"
             style={{
               touchAction: zoom > 1 ? "none" : "auto",
@@ -381,6 +403,7 @@ export function ImageLightbox({
               }
               className="max-w-[90vw] max-h-[80vh] object-contain"
               draggable={false}
+              onLoad={measureToolbarAnchor}
               style={{
                 transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
                 transformOrigin: "center center",
@@ -423,46 +446,87 @@ export function ImageLightbox({
             )}
           </>
         )}
-
-        {/* Overlay click to close hint (bottom area) */}
-        <div
-          className="absolute inset-x-0 bottom-0 h-16"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-        />
       </div>
 
-      {/* ── Bottom bar ── */}
-      {!loading && imageSrc && (
-        <div className="flex items-center justify-center gap-2 px-4 py-2 bg-black/60 dark:bg-black/70 backdrop-blur-md text-white select-none shrink-0">
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
-            aria-label={t("imageLightbox.copy")}
-          >
-            <Copy className="w-4 h-4" />
-            <span>
-              {copyFeedback
-                ? t("imageLightbox.copied")
-                : t("imageLightbox.copy")}
+      {/* ── Floating toolbar ── */}
+      {/* 必须排在图片区**后面**：锚点和图片区都是 positioned、z-index:auto 的兄弟，
+          CSS 按树序绘制，后面那个在上面。图片区铺满整个视口，工具条一旦排在它前面
+          就会被盖住 —— 按钮点不到，点下去命中的是图片区，而图片区自己的 onClick
+          会直接把弹层关掉。额外给一个 z-10 兜底，别让以后「清理无用类名」把这条
+          隐形契约删掉。 */}
+      {/* 放在图片区外面（不是图片区的后代）：滚轮、点击、拖拽就不会经过图片区的
+          onWheel / onClick / onPointerDown，不需要任何 stopPropagation，也不会
+          被图片区的 overflow-hidden 裁掉。 */}
+      {/* 有图：锚在图片右上角上方 8px；没图（加载中 / 加载失败 / 图未解码）：
+          退回预览区右上角内缩 12px。两种情况的水平关系都是「右边缘对齐锚点」。 */}
+      <div
+        className="absolute w-0 h-0"
+        style={toolbarAnchor ?? { right: 12, top: 0 }}
+      >
+        <div
+          data-testid="image-lightbox-toolbar"
+          className={`${toolbarPendingMeasure ? "invisible " : ""}absolute right-0 ${
+            toolbarAnchor ? "bottom-0 mb-2" : "top-0 mt-3"
+          } z-10 flex items-center gap-1 p-1 rounded-lg bg-black/60 dark:bg-black/70 backdrop-blur-md border border-white/10 shadow-lg text-white select-none`}
+          style={{ maxWidth: toolbarMaxWidth }}
+        >
+          {imageName && (
+            <span className="min-w-0 truncate px-1.5 text-sm font-medium">
+              {imageName}
             </span>
-          </button>
-          {hasFilePath && (
+          )}
+          {!isSingle && (
+            <span className="shrink-0 text-xs text-white/60 dark:text-white/50">
+              {t("imageLightbox.imageCount", {
+                current: currentIndex + 1,
+                total: images.length,
+              })}
+            </span>
+          )}
+          {zoom !== 1 && (
+            <span className="shrink-0 text-xs text-white/40">
+              {displayPercent}%
+            </span>
+          )}
+          {canActOnImage && (Boolean(imageName) || !isSingle || zoom !== 1) && (
+            <span className="shrink-0 w-px h-4 bg-white/20 mx-0.5" />
+          )}
+          {canActOnImage && (
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
+              aria-label={t("imageLightbox.copy")}
+            >
+              <Copy className="w-4 h-4" />
+              <span>
+                {copyFeedback
+                  ? t("imageLightbox.copied")
+                  : t("imageLightbox.copy")}
+              </span>
+            </button>
+          )}
+          {canActOnImage && hasFilePath && (
             <button
               type="button"
               onClick={handleOpenExternal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
+              className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
               aria-label={t("imageLightbox.openExternal")}
             >
               <ExternalLink className="w-4 h-4" />
               <span>{t("imageLightbox.openExternal")}</span>
             </button>
           )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors"
+            aria-label={t("imageLightbox.close")}
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
