@@ -116,6 +116,28 @@ export function removeManifestEntry(
 }
 
 /**
+ * Remove several skills in one pass (one read + one write).
+ *
+ * 批量搬移技能到密库时用：逐个调用 removeManifestEntry 会把整份 manifest
+ * 读/写 n 次，而它是同步 I/O。
+ */
+export function removeManifestEntries(
+  globalSkillsPath: string,
+  skillNames: string[],
+): void {
+  const manifest = readManifest(globalSkillsPath);
+  let changed = false;
+  for (const skillName of skillNames) {
+    if (!manifest[skillName]) continue;
+    delete manifest[skillName];
+    changed = true;
+  }
+  if (!changed) return;
+  writeManifest(globalSkillsPath, manifest);
+  log(`[AgentManifest] Removed ${skillNames.length} skill(s) from manifest`);
+}
+
+/**
  * Check whether a skill was created by the agent.
  */
 export function isAgentCreated(

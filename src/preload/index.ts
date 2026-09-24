@@ -28,7 +28,7 @@ import type {
   VaultRemoteStatus,
   VaultResetPreparation,
   VaultResetResult,
-  VaultSkillPreflight,
+  AddSkillsResult,
   VaultSnapshot,
 } from "../shared/vault";
 import type {
@@ -831,22 +831,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
         "vault.getBackupUsage",
         token,
       ) as Promise<VaultBackupUsage | null>,
-    getSkillUploadCandidates: () =>
-      ipcRenderer.invoke("vault.getSkillUploadCandidates") as Promise<string[]>,
-    preflightSkillUpload: (
-      skillName: string,
-      availableBytes: number | null = null,
-    ) =>
+    addSkillsToVault: (names: string[], confirmSkippedLinks = false) =>
       ipcRenderer.invoke(
-        "vault.preflightSkillUpload",
-        skillName,
-        availableBytes,
-      ) as Promise<VaultSkillPreflight>,
-    uploadSkill: (skillName: string) =>
-      ipcRenderer.invoke(
-        "vault.uploadSkill",
-        skillName,
-      ) as Promise<VaultSnapshot>,
+        "vault.addSkillsToVault",
+        names,
+        confirmSkippedLinks,
+      ) as Promise<AddSkillsResult>,
     deleteSkillFromVault: (skillName: string) =>
       ipcRenderer.invoke(
         "vault.deleteSkillFromVault",
@@ -1497,12 +1487,10 @@ declare global {
         getBackupUsage: (
           token: string | null,
         ) => Promise<VaultBackupUsage | null>;
-        getSkillUploadCandidates: () => Promise<string[]>;
-        preflightSkillUpload: (
-          skillName: string,
-          availableBytes?: number | null,
-        ) => Promise<VaultSkillPreflight>;
-        uploadSkill: (skillName: string) => Promise<VaultSnapshot>;
+        addSkillsToVault: (
+          names: string[],
+          confirmSkippedLinks?: boolean,
+        ) => Promise<AddSkillsResult>;
         deleteSkillFromVault: (skillName: string) => Promise<VaultSnapshot>;
         generateRecoveryCode: () => Promise<string>;
         initialize: (

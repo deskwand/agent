@@ -28,7 +28,6 @@ import type {
   SyncStatus,
   VaultBackupUsage,
   VaultRemoteStatus,
-  VaultSkillPreflight,
   VaultSnapshot,
   VaultSnapshotItem,
 } from "../../shared/vault";
@@ -60,6 +59,27 @@ function statusText(status: SyncStatus, t: (key: string) => string): string {
   if (status === "synced") return t("vault.status.synced");
   if (status === "failed") return t("vault.status.failed");
   return t("vault.status.pending");
+}
+
+/**
+ * 批量加入密库的失败原因。已知码复用 errorText 的分支；其余（EACCES / ENOSPC 一类
+ * 本地错误）落到「加入失败」—— errorText 的兜底是「云端同步失败，本地文件未受影响」，
+ * 而这次操作根本没碰云端，用它会误导。
+ */
+function skillAddErrorText(
+  reason: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const known = [
+    "VAULT_SKILL_NAME_TAKEN",
+    "VAULT_INVALID_SKILL_NAME",
+    "VAULT_SKILL_UPLOAD_FAILED",
+    "VAULT_UNSUPPORTED_PATH",
+  ];
+  if (known.some((prefix) => reason.startsWith(prefix))) {
+    return errorText(new Error(reason), t);
+  }
+  return t("vault.skills.error.addFailed");
 }
 
 function errorText(
@@ -175,10 +195,15 @@ export function VaultView(): JSX.Element {
     null,
   );
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [uploadCandidates, setUploadCandidates] = useState<string[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [preflight, setPreflight] = useState<VaultSkillPreflight | null>(null);
-  const [preflightTarget, setPreflightTarget] = useState<string | null>(null);
+  const [selectedSkills, setSelectedSkills] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [skillQuery, setSkillQuery] = useState("");
+  const [skillAddResult, setSkillAddResult] = useState<string | null>(null);
+  const [pendingLinkConfirm, setPendingLinkConfirm] = useState<Array<{
+    name: string;
+    symlinkedEntries: string[];
+  }> | null>(null);
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const syncFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncLabelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -254,21 +279,6 @@ export function VaultView(): JSX.Element {
     if (filter !== "files") return [];
     return snapshot?.items ?? [];
   }, [filter, snapshot?.items]);
-
-  const loadUploadCandidates = useCallback(async () => {
-    try {
-      setUploadCandidates(
-        await window.electronAPI.vault.getSkillUploadCandidates(),
-      );
-    } catch {
-      setUploadCandidates([]);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (filter !== "skills") return;
-    void loadUploadCandidates();
-  }, [filter, loadUploadCandidates, snapshot?.skills]);
 
   const runAction = useCallback(
     async (action: () => Promise<VaultSnapshot | unknown>) => {
@@ -535,48 +545,69 @@ export function VaultView(): JSX.Element {
 
   // 上传失败由 runAction 统一报错（顶部横幅）；本地原件在失败时不会被删，
   // 因此候选列表里仍然有它 —— 用户可以直接重试。
-  // 云端剩余可用字节：配额未知（null）时不做判断，预检会跳过差额计算。
-  const availableBytes =
-    backupUsage?.quotaBytes != null
-      ? Math.max(backupUsage.quotaBytes - backupUsage.usedBytes, 0)
-      : null;
-
-  const handleSkillUpload = useCallback(
-    async (skillName: string) => {
-      setPickerOpen(false);
-      let report: VaultSkillPreflight;
+  // 加入密库是本地搬移：先问一次（仅当所选技能里有内容不会被同步），再整批执行。
+  const runAddSkills = useCallback(
+    async (names: string[], confirmSkippedLinks: boolean) => {
+      setPendingLinkConfirm(null);
+      setBusy(true);
+      setError(null);
       try {
-        report = await window.electronAPI.vault.preflightSkillUpload(
-          skillName,
-          availableBytes,
+        const result = await window.electronAPI.vault.addSkillsToVault(
+          names,
+          confirmSkippedLinks,
         );
-      } catch (preflightError: unknown) {
-        setError(errorText(preflightError, t));
-        return;
+        if (result.needsConfirmation && result.needsConfirmation.length > 0) {
+          setPendingLinkConfirm(result.needsConfirmation);
+          return;
+        }
+        setSelectedSkills(new Set());
+        const parts: string[] = [];
+        if (result.added.length > 0) {
+          parts.push(
+            t("vault.skills.addResult", { count: result.added.length }),
+          );
+        }
+        if (result.indexError) {
+          // 文件已搬进密库、索引没写成（下一次 reconcile 会补上）—— 必须说出来
+          parts.push(skillAddErrorText(result.indexError, t));
+        }
+        for (const failure of result.failed) {
+          parts.push(
+            `${failure.name} · ${skillAddErrorText(failure.reason, t)}`,
+          );
+        }
+        setSkillAddResult(parts.join(" · "));
+        await loadSnapshot();
+      } catch (addError: unknown) {
+        setError(errorText(addError, t));
+      } finally {
+        setBusy(false);
+        void loadBackupUsage();
       }
-      const blocking =
-        report.oversizedFiles.length > 0 ||
-        report.symlinkedEntries.length > 0 ||
-        report.quotaShortfallBytes !== null;
-      if (blocking) {
-        setPreflight(report);
-        setPreflightTarget(skillName);
-        return;
-      }
-      await runAction(() => window.electronAPI.vault.uploadSkill(skillName));
-      await loadUploadCandidates();
     },
-    [availableBytes, loadUploadCandidates, runAction, t],
+    [loadBackupUsage, loadSnapshot, t],
   );
 
-  const confirmPreflightUpload = useCallback(async () => {
-    const target = preflightTarget;
-    setPreflight(null);
-    setPreflightTarget(null);
-    if (!target) return;
-    await runAction(() => window.electronAPI.vault.uploadSkill(target));
-    await loadUploadCandidates();
-  }, [preflightTarget, loadUploadCandidates, runAction]);
+  const toggleSkillSelection = useCallback((name: string) => {
+    setSelectedSkills((current) => {
+      const next = new Set(current);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }, []);
+
+  const skillQueryLower = skillQuery.trim().toLowerCase();
+  const matchesSkill = (name: string, description: string) =>
+    !skillQueryLower ||
+    name.toLowerCase().includes(skillQueryLower) ||
+    description.toLowerCase().includes(skillQueryLower);
+  const vaultSkillRows = (snapshot?.skills ?? []).filter((skill) =>
+    matchesSkill(skill.name, ""),
+  );
+  const addableRows = (snapshot?.addableSkills ?? []).filter((skill) =>
+    matchesSkill(skill.name, skill.description),
+  );
 
   const handleConfirm = () => {
     const pending = pendingConfirmation;
@@ -823,145 +854,94 @@ export function VaultView(): JSX.Element {
             ))}
           </div>
 
-          {filter === "skills" && (
-            <div className="flex flex-col gap-2 py-3">
-              <div className="flex items-center justify-between">
-                <span
-                  className="text-xs text-text-muted"
-                  aria-label={t("vault.filter.skills")}
+          {showFiles && filter === "skills" && selectedSkills.size > 0 && (
+            <div
+              data-testid="skills-action-bar"
+              className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl border border-accent bg-accent-muted px-3 py-2"
+            >
+              <span className="text-xs font-medium text-text-primary">
+                {t("vault.skills.selectedCount", {
+                  count: selectedSkills.size,
+                })}
+              </span>
+              <span className="flex-1" />
+              <button
+                type="button"
+                className="rounded-lg border border-border-subtle px-3 py-1 text-xs text-text-primary hover:bg-surface-hover"
+                onClick={() => setSelectedSkills(new Set())}
+              >
+                {t("vault.skills.clearSelection")}
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+                disabled={busy}
+                onClick={() => void runAddSkills([...selectedSkills], false)}
+              >
+                {t("vault.skills.addSelected", { count: selectedSkills.size })}
+              </button>
+            </div>
+          )}
+
+          {pendingLinkConfirm && (
+            <div className="mt-3 rounded-xl border border-warning bg-warning/10 p-3">
+              <p className="text-sm font-medium text-text-primary">
+                {t("vault.skills.addNeedsConfirm")}
+              </p>
+              <p className="mt-1 text-xs text-text-secondary">
+                {t("vault.skills.addNeedsConfirmHint", {
+                  count: pendingLinkConfirm.reduce(
+                    (total, entry) => total + entry.symlinkedEntries.length,
+                    0,
+                  ),
+                })}
+              </p>
+              <p className="mt-2 text-xs text-text-muted">
+                {t("vault.skills.symlinked")}
+              </p>
+              <ul className="mb-2 list-inside list-disc text-xs text-text-muted">
+                {pendingLinkConfirm.map((entry) => (
+                  <li key={entry.name}>
+                    {entry.name} · {entry.symlinkedEntries.length}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="rounded-lg border border-border-subtle px-3 py-1 text-xs text-text-primary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => setPendingLinkConfirm(null)}
                 >
-                  {t("vault.skills.count", {
-                    count: snapshot?.skills?.length ?? 0,
-                  })}
-                </span>
-                <Tooltip label={t("vault.skills.upload")}>
-                  <button
-                    type="button"
-                    aria-label={t("vault.skills.upload")}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
-                    onClick={() => setPickerOpen(true)}
-                    disabled={busy || uploadCandidates.length === 0}
-                  >
-                    <Upload className="h-4 w-4" />
-                  </button>
-                </Tooltip>
+                  {t("vault.skills.cancelAdd")}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+                  onClick={() =>
+                    void runAddSkills(
+                      pendingLinkConfirm.map((entry) => entry.name),
+                      true,
+                    )
+                  }
+                >
+                  {t("vault.skills.addConfirm")}
+                </button>
               </div>
-              {pickerOpen && (
-                <div className="rounded-xl border border-border-subtle p-3">
-                  <p className="mb-2 text-xs font-medium text-text-secondary">
-                    {t("vault.skills.pickerTitle")}
-                  </p>
-                  {uploadCandidates.length === 0 ? (
-                    <p className="text-xs text-text-muted">
-                      {t("vault.skills.pickerEmpty")}
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {uploadCandidates.map((name) => (
-                        <button
-                          key={name}
-                          type="button"
-                          className="rounded-lg border border-border-subtle px-2 py-1 text-xs text-text-primary hover:bg-surface-hover"
-                          onClick={() => void handleSkillUpload(name)}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              {preflight && (
-                <div className="rounded-xl border border-border-subtle p-3">
-                  <p className="mb-2 text-xs font-medium text-text-secondary">
-                    {t("vault.skills.preflightTitle")}
-                  </p>
-                  {preflight.oversizedFiles.length > 0 && (
-                    <>
-                      <p className="text-xs text-text-muted">
-                        {t("vault.skills.oversized")}
-                      </p>
-                      <ul className="mb-2 list-inside list-disc text-xs text-text-muted">
-                        {preflight.oversizedFiles.map((file) => (
-                          <li key={file.relativePath}>
-                            {file.relativePath} · {formatSize(file.size)}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                  {preflight.symlinkedEntries.length > 0 && (
-                    <>
-                      <p className="text-xs text-text-muted">
-                        {t("vault.skills.symlinked")}
-                      </p>
-                      <ul className="mb-2 list-inside list-disc text-xs text-text-muted">
-                        {preflight.symlinkedEntries.map((entry) => (
-                          <li key={entry}>{entry}</li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                  {preflight.quotaShortfallBytes !== null && (
-                    <p className="mb-2 text-xs text-text-muted">
-                      {t("vault.skills.quotaShortfall", {
-                        size: formatSize(preflight.quotaShortfallBytes),
-                      })}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90"
-                    onClick={() => void confirmPreflightUpload()}
-                  >
-                    {t("vault.skills.confirmUpload")}
-                  </button>
-                </div>
-              )}
-              {(snapshot?.skills?.length ?? 0) === 0 && (
-                <p className="py-8 text-center text-sm text-text-muted">
-                  {t("vault.skills.empty")}
-                </p>
-              )}
-              {snapshot?.skills?.map((skill) => (
-                <article
-                  key={skill.name}
-                  className="flex select-none items-center gap-4 rounded-xl border border-border-subtle px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-text-primary">
-                      {skill.name}
-                    </p>
-                    <p className="mt-1 text-xs text-text-muted">
-                      {t("vault.skills.summary", {
-                        count: skill.fileCount,
-                        size: formatSize(skill.totalBytes),
-                      })}{" "}
-                      · {statusText(skill.syncStatus, t)}
-                    </p>
-                    {skill.syncStatus === "pending" && (
-                      <p className="mt-0.5 text-xs text-text-muted">
-                        {t("vault.skills.pendingHint")}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    aria-label={t("vault.skills.delete", {
-                      name: skill.name,
-                    })}
-                    className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-error"
-                    onClick={() =>
-                      setPendingConfirmation({
-                        kind: "delete-skill",
-                        name: skill.name,
-                      })
-                    }
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </article>
-              ))}
+            </div>
+          )}
+
+          {filter === "skills" && skillAddResult && (
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-border-subtle px-3 py-2 text-xs text-text-secondary">
+              <span>{skillAddResult}</span>
+              <button
+                type="button"
+                className="ml-3 text-xs hover:underline"
+                onClick={() => setSkillAddResult(null)}
+              >
+                {t("vault.dismiss")}
+              </button>
             </div>
           )}
 
@@ -1005,112 +985,233 @@ export function VaultView(): JSX.Element {
           )}
 
           <div className="min-h-0 flex-1 overflow-y-auto py-3">
-            {filter === "skills" ? null : filter !== "files" ? (
+            {filter === "skills" && (
+              <div className="flex flex-col gap-2 py-3">
+                <input
+                  type="search"
+                  value={skillQuery}
+                  onChange={(event) => setSkillQuery(event.target.value)}
+                  placeholder={t("vault.skills.searchPlaceholder")}
+                  className="w-full rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-text-primary"
+                />
+
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-medium text-text-muted">
+                    {t("vault.skills.groupVault", {
+                      count: vaultSkillRows.length,
+                    })}
+                  </p>
+                  {vaultSkillRows.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-text-muted">
+                      {t("vault.skills.empty")}
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+                      {vaultSkillRows.map((skill) => (
+                        <article
+                          key={skill.name}
+                          className="flex select-none items-center gap-4 px-4 py-3"
+                        >
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-accent" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium text-text-primary">
+                              {skill.name}
+                            </p>
+                            <p className="mt-1 text-xs text-text-muted">
+                              {t("vault.skills.summary", {
+                                count: skill.fileCount,
+                                size: formatSize(skill.totalBytes),
+                              })}{" "}
+                              · {statusText(skill.syncStatus, t)}
+                            </p>
+                            {skill.syncStatus === "pending" && (
+                              <p className="mt-0.5 text-xs text-text-muted">
+                                {t("vault.skills.pendingHint")}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            aria-label={t("vault.skills.delete", {
+                              name: skill.name,
+                            })}
+                            className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() =>
+                              setPendingConfirmation({
+                                kind: "delete-skill",
+                                name: skill.name,
+                              })
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <p className="text-xs font-medium text-text-muted">
+                    {t("vault.skills.groupAddable", {
+                      count: addableRows.length,
+                    })}
+                  </p>
+                  {addableRows.length === 0 ? (
+                    <p className="py-6 text-center text-sm text-text-muted">
+                      {skillQuery
+                        ? t("vault.skills.noMatch")
+                        : t("vault.skills.noAddable")}
+                    </p>
+                  ) : (
+                    <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+                      {addableRows.map((skill) => {
+                        const isSelected = selectedSkills.has(skill.name);
+                        return (
+                          <label
+                            key={skill.name}
+                            className={`flex cursor-pointer select-none items-center gap-3 px-4 py-3 ${
+                              isSelected ? "bg-accent-muted" : ""
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleSkillSelection(skill.name)}
+                              className="h-4 w-4 shrink-0 accent-accent"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium text-text-primary">
+                                {skill.name}
+                              </p>
+                              <p className="mt-0.5 truncate text-xs text-text-muted">
+                                {skill.description ||
+                                  t("vault.skills.missingDescription")}
+                              </p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {filter === "sessions" && (
               <p className="py-12 text-center text-sm text-text-muted">
                 {t("vault.comingSoon")}
               </p>
-            ) : visibleItems.length === 0 ? (
-              <p className="py-12 text-center text-sm text-text-muted">
-                {t("vault.empty")}
-              </p>
-            ) : (
-              <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
-                {visibleItems.map((item) => (
-                  <article
-                    key={item.name}
-                    className="flex select-none items-center gap-4 px-4 py-3"
-                    onDoubleClick={() => handleOpen(item)}
-                  >
-                    <FileTypeIcon kind={getFileKind(item.name)} size={24} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-text-primary">
-                        {item.name}
-                      </p>
-                      <p className="mt-1 text-xs text-text-muted">
-                        {formatSize(item.size)} ·{" "}
-                        {statusText(item.syncStatus, t)}
-                      </p>
-                    </div>
-                    <div
-                      className="relative flex shrink-0 items-center gap-1"
-                      onDoubleClick={(event) => event.stopPropagation()}
+            )}
+
+            {filter === "files" &&
+              (visibleItems.length === 0 ? (
+                <p className="py-12 text-center text-sm text-text-muted">
+                  {t("vault.empty")}
+                </p>
+              ) : (
+                <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+                  {visibleItems.map((item) => (
+                    <article
+                      key={item.name}
+                      className="flex select-none items-center gap-4 px-4 py-3"
+                      onDoubleClick={() => handleOpen(item)}
                     >
-                      <button
-                        type="button"
-                        aria-label={t("vault.action.export", {
-                          name: item.name,
-                        })}
-                        className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
-                        onClick={(event) => {
-                          if (event.detail > 1) return;
-                          void runAction(() =>
-                            window.electronAPI.vault.exportFile(item.name),
-                          );
-                        }}
+                      <FileTypeIcon kind={getFileKind(item.name)} size={24} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-text-primary">
+                          {item.name}
+                        </p>
+                        <p className="mt-1 text-xs text-text-muted">
+                          {formatSize(item.size)} ·{" "}
+                          {statusText(item.syncStatus, t)}
+                        </p>
+                      </div>
+                      <div
+                        className="relative flex shrink-0 items-center gap-1"
+                        onDoubleClick={(event) => event.stopPropagation()}
                       >
-                        <Download className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={t("vault.action.more", { name: item.name })}
-                        aria-haspopup="menu"
-                        aria-expanded={openMenu === item.name}
-                        aria-controls={`vault-menu-${item.name}`}
-                        className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
-                        onClick={() =>
-                          setOpenMenu((current) =>
-                            current === item.name ? null : item.name,
-                          )
-                        }
-                        onKeyDown={(event) => {
-                          if (event.key === "Escape") {
-                            setOpenMenu(null);
-                            event.currentTarget.focus();
-                          }
-                        }}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                      {openMenu === item.name && (
-                        <div
-                          id={`vault-menu-${item.name}`}
-                          role="menu"
-                          className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-8 z-10 min-w-32 animate-menu-in-down`}
-                          onKeyDown={(event) => {
-                            if (event.key === "Escape") setOpenMenu(null);
+                        <button
+                          type="button"
+                          aria-label={t("vault.action.export", {
+                            name: item.name,
+                          })}
+                          className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                          onClick={(event) => {
+                            if (event.detail > 1) return;
+                            void runAction(() =>
+                              window.electronAPI.vault.exportFile(item.name),
+                            );
                           }}
                         >
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-                            onClick={() => {
+                          <Download className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={t("vault.action.more", {
+                            name: item.name,
+                          })}
+                          aria-haspopup="menu"
+                          aria-expanded={openMenu === item.name}
+                          aria-controls={`vault-menu-${item.name}`}
+                          className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                          onClick={() =>
+                            setOpenMenu((current) =>
+                              current === item.name ? null : item.name,
+                            )
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
                               setOpenMenu(null);
-                              void runAction(() =>
-                                window.electronAPI.vault.revealFile(item.name),
-                              );
+                              event.currentTarget.focus();
+                            }
+                          }}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                        {openMenu === item.name && (
+                          <div
+                            id={`vault-menu-${item.name}`}
+                            role="menu"
+                            className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-8 z-10 min-w-32 animate-menu-in-down`}
+                            onKeyDown={(event) => {
+                              if (event.key === "Escape") setOpenMenu(null);
                             }}
                           >
-                            {t("vault.action.reveal")}
-                          </button>
-                          <button
-                            type="button"
-                            role="menuitem"
-                            className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DANGER_CLASS}`}
-                            onClick={() => {
-                              setOpenMenu(null);
-                              handleDelete(item);
-                            }}
-                          >
-                            {t("vault.action.delete")}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
+                              onClick={() => {
+                                setOpenMenu(null);
+                                void runAction(() =>
+                                  window.electronAPI.vault.revealFile(
+                                    item.name,
+                                  ),
+                                );
+                              }}
+                            >
+                              {t("vault.action.reveal")}
+                            </button>
+                            <button
+                              type="button"
+                              role="menuitem"
+                              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DANGER_CLASS}`}
+                              onClick={() => {
+                                setOpenMenu(null);
+                                handleDelete(item);
+                              }}
+                            >
+                              {t("vault.action.delete")}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ))}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border-subtle pt-4">

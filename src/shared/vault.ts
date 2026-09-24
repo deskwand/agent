@@ -27,6 +27,25 @@ export interface VaultSkillEntry {
   syncStatus: SyncStatus;
 }
 
+/** 「可加入密库」的本地技能：主进程算好放进快照，渲染层直接用。 */
+export interface VaultAddableSkill {
+  name: string;
+  description: string;
+}
+
+/** 批量加入密库的结果。 */
+export interface AddSkillsResult {
+  /** 未确认且所选技能里含符号链接时返回；此时 added/failed 均为空、磁盘不动。 */
+  needsConfirmation?: Array<{ name: string; symlinkedEntries: string[] }>;
+  added: string[];
+  failed: Array<{ name: string; reason: string }>;
+  /**
+   * 搬移成功但索引写入失败时的错误。文件已经在密库里，索引是派生视图（下一次
+   * reconcile 会补上），所以这不算整批失败 —— 但也不能当成没发生。
+   */
+  indexError?: string;
+}
+
 export interface VaultSnapshot {
   items: VaultSnapshotItem[];
   /**
@@ -34,6 +53,8 @@ export interface VaultSnapshot {
    * 可选：只有 `vault.getSnapshot` 会填充它，测试替身仍可省。
    */
   skills?: VaultSkillEntry[];
+  /** 可加入密库的本地技能（真目录、有 SKILL.md、kebab 名、尚未在密库）。 */
+  addableSkills?: VaultAddableSkill[];
   pendingCount: number;
   hasLocalIndex: boolean;
   hasLocalFiles: boolean;
@@ -45,16 +66,6 @@ export interface VaultSnapshot {
 }
 
 /** 单个 scope 的远端备份状态。 */
-/** 上传技能前的体检结果：只报告不拦截。 */
-export interface VaultSkillPreflight {
-  skillName: string;
-  fileCount: number;
-  totalBytes: number;
-  oversizedFiles: Array<{ relativePath: string; size: number }>;
-  symlinkedEntries: string[];
-  quotaShortfallBytes: number | null;
-}
-
 export interface VaultScopeBackup {
   hasBackup: boolean;
   errorCode?: string;

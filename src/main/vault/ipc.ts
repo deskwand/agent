@@ -11,6 +11,7 @@ import {
 import { encodeRemoteIndex } from "./vault-index";
 import { LocalVaultStore } from "./local-store";
 import { VaultSkillsStore } from "./skills-vault";
+import type { AddSkillsResult } from "../../shared/vault";
 import { getGlobalSkillsRoot } from "./paths";
 import {
   FetchVaultCloudClient,
@@ -87,7 +88,7 @@ export function registerVaultIpc(
 
   ipcMain.handle("vault.getSnapshot", async (): Promise<VaultSnapshot> => {
     await store.recoverPendingRestore();
-    return getSnapshot(store, skillsVault, getLocalMek);
+    return getSnapshot(store, skillsVault, getLocalMek, globalSkillsPath());
   });
 
   ipcMain.handle("vault.importFile", async (): Promise<VaultSnapshot> => {
@@ -96,9 +97,9 @@ export function registerVaultIpc(
       properties: ["openFile"],
     });
     if (result.canceled || !result.filePaths[0])
-      return getSnapshot(store, skillsVault, getLocalMek);
+      return getSnapshot(store, skillsVault, getLocalMek, globalSkillsPath());
     await store.importFile(result.filePaths[0]);
-    return getSnapshot(store, skillsVault, getLocalMek);
+    return getSnapshot(store, skillsVault, getLocalMek, globalSkillsPath());
   });
 
   ipcMain.handle("vault.openFile", async (_event, name: string) => {
@@ -127,7 +128,7 @@ export function registerVaultIpc(
 
   ipcMain.handle("vault.deleteFile", async (_event, name: string) => {
     await store.deleteFile(name);
-    return getSnapshot(store, skillsVault, getLocalMek);
+    return getSnapshot(store, skillsVault, getLocalMek, globalSkillsPath());
   });
 
   ipcMain.handle("vault.sync", async (_event, token: string) => {
@@ -145,7 +146,12 @@ export function registerVaultIpc(
       syncError =
         error instanceof Error ? error.message : "VAULT_SKILL_SYNC_FAILED";
     }
-    const snapshot = await getSnapshot(store, skillsVault, getLocalMek);
+    const snapshot = await getSnapshot(
+      store,
+      skillsVault,
+      getLocalMek,
+      globalSkillsPath(),
+    );
     return { ...snapshot, syncError };
   });
 
@@ -197,29 +203,29 @@ export function registerVaultIpc(
   );
 
   ipcMain.handle(
-    "vault.getSkillUploadCandidates",
-    async (): Promise<string[]> =>
-      skillsVault.listUploadCandidates(globalSkillsPath()),
+    "vault.addSkillsToVault",
+    async (
+      _event,
+      names: string[],
+      confirmSkippedLinks = false,
+    ): Promise<AddSkillsResult> => {
+      const result = await skillsVault.addSkills(
+        names,
+        globalSkillsPath(),
+        confirmSkippedLinks,
+      );
+      // 只有真的搬动了才失效会话：它会清掉所有缓存的 SDK 会话。
+      if (result.added.length > 0) onSkillsChanged?.();
+      return result;
+    },
   );
-
-  ipcMain.handle(
-    "vault.preflightSkillUpload",
-    async (_event, skillName: string, availableBytes: number | null = null) =>
-      skillsVault.preflight(skillName, globalSkillsPath(), availableBytes),
-  );
-
-  ipcMain.handle("vault.uploadSkill", async (_event, skillName: string) => {
-    await skillsVault.upload(skillName, globalSkillsPath());
-    onSkillsChanged?.();
-    return getSnapshot(store, skillsVault, getLocalMek);
-  });
 
   ipcMain.handle(
     "vault.deleteSkillFromVault",
     async (_event, skillName: string) => {
       await skillsVault.remove(skillName);
       onSkillsChanged?.();
-      return getSnapshot(store, skillsVault, getLocalMek);
+      return getSnapshot(store, skillsVault, getLocalMek, globalSkillsPath());
     },
   );
 
@@ -384,16 +390,20 @@ async function getSnapshot(
   store: LocalVaultStore,
   skillsVault: VaultSkillsStore,
   getLocalMek: () => Buffer | null,
+  globalSkillsPath: string,
 ): Promise<VaultSnapshot> {
   const base = await getFileSnapshot(store, getLocalMek);
   await skillsVault.removeStaleStaging();
   const skills = await skillsVault.listVaultSkills();
+  const addableSkills =
+    await skillsVault.listUploadCandidates(globalSkillsPath);
   const skillsPending = skills.filter(
     (skill) => skill.syncStatus !== "synced",
   ).length;
   return {
     ...base,
     skills,
+    addableSkills,
     // 「待同步」必须把技能 scope 算进来：否则只上传过技能的用户点同步会看到
     // 「已是最新」，而技能其实一份都没到云端。
     pendingCount: base.pendingCount + skillsPending,

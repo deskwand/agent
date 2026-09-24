@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   mkdir,
   mkdtemp,
@@ -155,34 +155,35 @@ describe("VaultSkillsStore", () => {
     return globalSkills;
   }
 
-  it("reports oversized files without refusing the upload", async () => {
+  it("moves a skill whose file exceeds the old import limit", async () => {
+    // 20 MiB 只是「手动导入文件」的护栏；技能路径不按体积拦截。
     const globalSkills = await createGlobalSkills([
       ["big/SKILL.md", Buffer.from("# big")],
       ["big/model.bin", Buffer.alloc(21 * 1024 * 1024)],
     ]);
     const vault = await createVault();
 
-    const report = await vault.preflight("big", globalSkills);
-
-    expect(report.skillName).toBe("big");
-    expect(report.fileCount).toBe(2);
-    expect(report.oversizedFiles).toEqual([
-      { relativePath: "big/model.bin", size: 21 * 1024 * 1024 },
-    ]);
-    expect(report.symlinkedEntries).toEqual([]);
+    await expect(vault.upload("big", globalSkills)).resolves.toMatchObject({
+      name: "big",
+      fileCount: 2,
+    });
   });
 
-  it("reports symlinked entries as not synced", async () => {
+  it("reports symlinked entries and keeps them out of the index", async () => {
     const globalSkills = await createGlobalSkills([
       ["linked/SKILL.md", Buffer.from("# linked")],
     ]);
     await symlink("missing", join(globalSkills, "linked", "dangling"));
     const vault = await createVault();
 
-    const report = await vault.preflight("linked", globalSkills);
+    await expect(
+      vault.findSymlinkedEntries("linked", globalSkills),
+    ).resolves.toEqual(["dangling"]);
 
-    expect(report.symlinkedEntries).toEqual(["linked/dangling"]);
-    expect(report.oversizedFiles).toEqual([]);
+    await vault.upload("linked", globalSkills);
+    const index = await vault.store.readIndex();
+    // 符号链接的内容不会被加密同步：扫描器必须跳过它
+    expect(Object.keys(index.files)).toEqual(["linked/SKILL.md"]);
   });
 
   it("moves a skill into the vault and removes the local copy", async () => {
@@ -286,14 +287,14 @@ describe("VaultSkillsStore", () => {
     ]);
     const vault = await createVault();
 
-    const names = await vault.listUploadCandidates(globalSkills);
+    const candidates = await vault.listUploadCandidates(globalSkills);
 
-    expect(names).toEqual(["good-name"]);
+    expect(candidates).toEqual([{ name: "good-name", description: "" }]);
     // 每个候选都必须能真正上传成功（名字规则一致）
-    for (const name of names) {
-      await expect(vault.upload(name, globalSkills)).resolves.toMatchObject({
-        name,
-      });
+    for (const candidate of candidates) {
+      await expect(
+        vault.upload(candidate.name, globalSkills),
+      ).resolves.toMatchObject({ name: candidate.name });
     }
   });
 
@@ -309,26 +310,165 @@ describe("VaultSkillsStore", () => {
     await expect(vault.listVaultSkills()).resolves.toHaveLength(1);
   });
 
-  it("reports the quota shortfall when the cloud has less room than the skill", async () => {
+  it("moves a skill with rename so the source directory is gone", async () => {
     const globalSkills = await createGlobalSkills([
-      ["big/SKILL.md", Buffer.alloc(1024)],
+      ["foo/SKILL.md", Buffer.from("# foo")],
     ]);
     const vault = await createVault();
 
-    const report = await vault.preflight("big", globalSkills, 100);
+    await vault.upload("foo", globalSkills);
 
-    expect(report.totalBytes).toBe(1024);
-    expect(report.quotaShortfallBytes).toBe(924);
+    await expect(stat(join(globalSkills, "foo"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+    await expect(
+      stat(join(vault.store.rootDir, "foo", "SKILL.md")),
+    ).resolves.toBeTruthy();
   });
 
-  it("reports no shortfall when the quota is unknown", async () => {
+  it("lists candidates with best-effort descriptions", async () => {
     const globalSkills = await createGlobalSkills([
-      ["small/SKILL.md", Buffer.alloc(10)],
+      [
+        "with-desc/SKILL.md",
+        Buffer.from("---\nname: with-desc\ndescription: 有描述\n---\n# x\n"),
+      ],
+      // 没有 description：必须仍然列出（今天只要求 SKILL.md 存在）
+      ["no-desc/SKILL.md", Buffer.from("# x\n")],
     ]);
     const vault = await createVault();
 
-    const report = await vault.preflight("small", globalSkills, null);
+    const candidates = await vault.listUploadCandidates(globalSkills);
 
-    expect(report.quotaShortfallBytes).toBeNull();
+    expect(candidates).toEqual([
+      { name: "no-desc", description: "" },
+      { name: "with-desc", description: "有描述" },
+    ]);
+  });
+
+  it("returns nothing for a name outside the vault layout", async () => {
+    const globalSkills = await createGlobalSkills([
+      ["ok/SKILL.md", Buffer.from("# ok")],
+    ]);
+    const vault = await createVault();
+
+    // 守卫生效时不该去读技能目录之外的东西
+    await expect(
+      vault.findSymlinkedEntries("../..", globalSkills),
+    ).resolves.toEqual([]);
+  });
+
+  it("reports symlinked entries of a skill", async () => {
+    const globalSkills = await createGlobalSkills([
+      ["linked/SKILL.md", Buffer.from("# linked")],
+    ]);
+    await symlink("missing", join(globalSkills, "linked", "dangling"));
+    const vault = await createVault();
+
+    await expect(
+      vault.findSymlinkedEntries("linked", globalSkills),
+    ).resolves.toEqual(["dangling"]);
+  });
+
+  it("asks for confirmation when a selected skill contains symlinks", async () => {
+    const globalSkills = await createGlobalSkills([
+      ["plain/SKILL.md", Buffer.from("# plain")],
+      ["linked/SKILL.md", Buffer.from("# linked")],
+    ]);
+    await symlink("missing", join(globalSkills, "linked", "dangling"));
+    const vault = await createVault();
+
+    const result = await vault.addSkills(["plain", "linked"], globalSkills);
+
+    expect(result.needsConfirmation).toEqual([
+      { name: "linked", symlinkedEntries: ["dangling"] },
+    ]);
+    expect(result.added).toEqual([]);
+    // 未确认时磁盘不动
+    await expect(stat(join(globalSkills, "plain"))).resolves.toBeTruthy();
+    await expect(stat(join(globalSkills, "linked"))).resolves.toBeTruthy();
+  });
+
+  it("moves every selected skill once the links are confirmed", async () => {
+    const globalSkills = await createGlobalSkills([
+      ["plain/SKILL.md", Buffer.from("# plain")],
+      ["linked/SKILL.md", Buffer.from("# linked")],
+    ]);
+    await symlink("missing", join(globalSkills, "linked", "dangling"));
+    const vault = await createVault();
+
+    const result = await vault.addSkills(
+      ["plain", "linked"],
+      globalSkills,
+      true,
+    );
+
+    expect(result.needsConfirmation).toBeUndefined();
+    // added 按输入顺序累积（界面传的是勾选顺序）
+    expect(result.added).toEqual(["plain", "linked"]);
+    expect(result.failed).toEqual([]);
+  });
+
+  it("keeps going when one skill fails to move", async () => {
+    const globalSkills = await createGlobalSkills([
+      ["already/SKILL.md", Buffer.from("# already")],
+      ["fresh/SKILL.md", Buffer.from("# fresh")],
+    ]);
+    const vault = await createVault();
+    // 密库里先放一个同名技能 → 该技能必然失败
+    await mkdir(join(vault.store.rootDir, "already"), { recursive: true });
+    await writeFile(
+      join(vault.store.rootDir, "already", "SKILL.md"),
+      "# existing",
+    );
+
+    const result = await vault.addSkills(
+      ["already", "fresh"],
+      globalSkills,
+      true,
+    );
+
+    expect(result.added).toEqual(["fresh"]);
+    expect(result.failed).toHaveLength(1);
+    expect(result.failed[0].name).toBe("already");
+    expect(result.failed[0].reason).toContain("VAULT_SKILL_NAME_TAKEN");
+    // 失败者的本地原件必须还在
+    await expect(stat(join(globalSkills, "already"))).resolves.toBeTruthy();
+  });
+
+  it("keeps reporting the moved skills when the index write fails", async () => {
+    const globalSkills = await createGlobalSkills([
+      ["golden/SKILL.md", Buffer.from("# golden")],
+    ]);
+    const vault = await createVault();
+    const spy = vi
+      .spyOn(vault.store, "writeIndex")
+      .mockRejectedValueOnce(new Error("VAULT_UNSUPPORTED_PATH:golden/bad."));
+
+    const result = await vault.addSkills(["golden"], globalSkills, true);
+
+    // 文件已经搬进密库：不能报成整批失败，但要把索引错误带出来
+    expect(result.added).toEqual(["golden"]);
+    expect(result.failed).toEqual([]);
+    expect(result.indexError).toContain("VAULT_UNSUPPORTED_PATH");
+    await expect(stat(join(vault.store.rootDir, "golden"))).resolves.toBeTruthy();
+    spy.mockRestore();
+  });
+
+  it("rejects names that are not skill directories before scanning", async () => {
+    const globalSkills = await createGlobalSkills([
+      ["ok/SKILL.md", Buffer.from("# ok")],
+    ]);
+    const vault = await createVault();
+
+    const result = await vault.addSkills(
+      ["../escape", "ok"],
+      globalSkills,
+      true,
+    );
+
+    expect(result.added).toEqual(["ok"]);
+    expect(result.failed).toEqual([
+      { name: "../escape", reason: "VAULT_INVALID_SKILL_NAME:../escape" },
+    ]);
   });
 });

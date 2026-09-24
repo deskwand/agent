@@ -33,24 +33,25 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.confirm.delete": "Delete {{name}} from your Vault?",
   "vault.confirm.deleteAction": "Delete",
   "vault.comingSoon": "Coming soon",
-  "vault.skills.count": "{{count}} skill(s)",
-  "vault.skills.upload": "Upload skill",
   "vault.skills.empty": "No skills in the vault yet",
   "vault.skills.summary": "{{count}} file(s) · {{size}}",
   "vault.skills.delete": "Delete {{name}} from the vault",
   "vault.skills.confirmDelete":
     "Delete skill {{name}} from the vault? Its cloud backup is removed as well.",
-  "vault.skills.pickerTitle": "Choose a skill to upload",
-  "vault.skills.pickerEmpty": "No local skill available to upload",
-  "vault.skills.preflightTitle": "Before uploading",
-  "vault.skills.oversized":
-    "These files exceed 20 MB and may not restore on other devices:",
-  "vault.skills.symlinked":
-    "These entries are symlinks and will not be synced:",
-  "vault.skills.quotaShortfall": "Not enough cloud space: {{size}} short",
-  "vault.skills.confirmUpload": "Upload anyway",
-  "vault.skills.uploadFailedLocalKept":
-    "Skill was not uploaded and is still local",
+  "vault.skills.groupVault": "Vault ({{count}})",
+  "vault.skills.groupAddable": "Addable ({{count}})",
+  "vault.skills.searchPlaceholder": "Search skills…",
+  "vault.skills.selectedCount": "{{count}} selected",
+  "vault.skills.addSelected": "Add selected ({{count}})",
+  "vault.skills.clearSelection": "Clear",
+  "vault.skills.addNeedsConfirm": "Some content will not be synced",
+  "vault.skills.addNeedsConfirmHint": "{{count}} entries will not be synced",
+  "vault.skills.addConfirm": "Add anyway",
+  "vault.skills.cancelAdd": "Cancel add",
+  "vault.skills.addResult": "Added {{count}} skill(s)",
+  "vault.skills.noAddable": "No skills available to add",
+  "vault.skills.noMatch": "No matching skills",
+  "vault.skills.missingDescription": "Missing description",
   "vault.fileCount_one": "{{count}} file",
   "vault.fileCount_other": "{{count}} files",
   "vault.empty": "No files in your Vault",
@@ -81,6 +82,8 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.error.diskFull": "Not enough disk space to import this file",
   "vault.error.localOperation": "The local Vault operation failed",
   "vault.error.syncFailed": "Cloud sync failed; your local files are safe",
+  "vault.skills.error.addFailed": "Could not add",
+  "vault.skills.error.unsupportedPath": "Cannot sync {{name}}",
   "vault.error.cloudQuotaExceeded":
     "Cloud backup storage is full; your local file was kept. Delete files or upgrade storage to retry",
   "vault.error.invalidRecoveryCode": "The recovery code is invalid",
@@ -225,16 +228,7 @@ describe("VaultView", () => {
       deletedObjects: 0,
       preservedLocalFiles: 0,
     })),
-    getSkillUploadCandidates: vi.fn(async () => [] as string[]),
-    preflightSkillUpload: vi.fn(async (skillName: string) => ({
-      skillName,
-      fileCount: 0,
-      totalBytes: 0,
-      oversizedFiles: [] as Array<{ relativePath: string; size: number }>,
-      symlinkedEntries: [] as string[],
-      quotaShortfallBytes: null,
-    })),
-    uploadSkill: vi.fn(async () => snapshot({ items: [] })),
+    addSkillsToVault: vi.fn(async () => ({ added: [], failed: [] })),
     deleteSkillFromVault: vi.fn(async () => snapshot({ items: [] })),
   };
 
@@ -389,6 +383,25 @@ describe("VaultView", () => {
 
   function screenText(): string {
     return container.textContent ?? "";
+  }
+
+  function findButton(label: string): HTMLButtonElement | undefined {
+    return Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === label,
+    );
+  }
+
+  // 受控 input 不能直接赋值：React 的 value tracker 会同步记住，onChange 不触发。
+  function typeIntoSearch(value: string): void {
+    const input = container.querySelector(
+      'input[type="search"]',
+    ) as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    setter.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   async function clickFileAction(name: string, label: string): Promise<void> {
@@ -779,119 +792,328 @@ describe("VaultView", () => {
     });
   }
 
-  it("lists vault skills in the skills tab", async () => {
+  it("renders two groups and keeps vault rows unselectable", async () => {
     api.getSnapshot.mockResolvedValue(
       snapshot({
         items: [],
         skills: [
           {
-            name: "foo",
-            fileCount: 2,
+            name: "claude-api",
+            fileCount: 12,
             totalBytes: 2048,
             syncStatus: "synced" as const,
           },
         ],
+        addableSkills: [{ name: "lark-sheets", description: "Spreadsheets" }],
       }),
     );
 
     await openSkillsTab();
 
-    expect(screenText()).toContain("foo");
-    expect(screenText()).toContain("1 skill(s)");
-    expect(screenText()).toContain("Synced");
-  });
-
-  it("keeps the upload button disabled without local candidates", async () => {
-    await openSkillsTab();
-
-    const upload = container.querySelector(
-      'button[aria-label="Upload skill"]',
-    ) as HTMLButtonElement | null;
-    expect(upload).not.toBeNull();
-    expect(upload?.disabled).toBe(true);
-  });
-
-  it("offers the local candidates when uploading", async () => {
-    api.getSkillUploadCandidates.mockResolvedValue(["bar"]);
-
-    await openSkillsTab();
-
-    const upload = container.querySelector(
-      'button[aria-label="Upload skill"]',
-    ) as HTMLButtonElement;
-    expect(upload.disabled).toBe(false);
-    await act(async () => {
-      upload.click();
-      await Promise.resolve();
-    });
-
-    expect(screenText()).toContain("Choose a skill to upload");
-    expect(screenText()).toContain("bar");
-  });
-
-  it("warns about oversized and symlinked content before uploading", async () => {
-    api.getSkillUploadCandidates.mockResolvedValue(["big"]);
-    api.preflightSkillUpload.mockResolvedValue({
-      skillName: "big",
-      fileCount: 2,
-      totalBytes: 22020096,
-      oversizedFiles: [{ relativePath: "big/model.bin", size: 22020096 }],
-      symlinkedEntries: ["big/dangling"],
-      quotaShortfallBytes: null,
-    });
-
-    await openSkillsTab();
-    const upload = container.querySelector(
-      'button[aria-label="Upload skill"]',
-    ) as HTMLButtonElement;
-    await act(async () => {
-      upload.click();
-      await Promise.resolve();
-    });
-    const candidate = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "big",
+    expect(screenText()).toContain("Vault (1)");
+    expect(screenText()).toContain("Addable (1)");
+    expect(screenText()).toContain("lark-sheets");
+    expect(
+      container.querySelector(
+        'button[aria-label="Delete claude-api from the vault"]',
+      ),
+    ).not.toBeNull();
+    // 复选框只出现在可加入行上
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(
+      1,
     );
-    await act(async () => {
-      candidate?.click();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    expect(screenText()).toContain("big/model.bin");
-    expect(screenText()).toContain("big/dangling");
-    expect(api.uploadSkill).not.toHaveBeenCalled();
   });
 
-  it("keeps the local skill and reports the failure when the upload fails", async () => {
-    api.getSkillUploadCandidates.mockResolvedValue(["bar"]);
-    api.uploadSkill.mockRejectedValue(new Error("VAULT_QUOTA_EXCEEDED"));
+  it("shows the action bar only after selecting a skill", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        addableSkills: [{ name: "lark-sheets", description: "Spreadsheets" }],
+      }),
+    );
+    await openSkillsTab();
+
+    expect(screenText()).not.toContain("Add selected (1)");
+
+    await act(async () => {
+      (
+        container.querySelector('input[type="checkbox"]') as HTMLInputElement
+      ).click();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("1 selected");
+    expect(screenText()).toContain("Add selected (1)");
+    // 两组清单必须落在滚动容器内（否则 62 行会被 overflow-hidden 裁掉），
+    // 动作条则必须在滚动容器之外，长列表下不会滑出视野。
+    const addableRow = container
+      .querySelector('input[type="checkbox"]')
+      ?.closest("label");
+    expect(addableRow).not.toBeNull();
+    expect(addableRow?.closest(".overflow-y-auto")).not.toBeNull();
+    const bar = container.querySelector('[data-testid="skills-action-bar"]');
+    expect(bar).not.toBeNull();
+    expect(bar?.closest(".overflow-y-auto")).toBeNull();
+  });
+
+  it("asks before moving skills that contain symlinks", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        addableSkills: [{ name: "linked", description: "" }],
+      }),
+    );
+    api.addSkillsToVault.mockResolvedValueOnce({
+      needsConfirmation: [
+        { name: "linked", symlinkedEntries: ["dangling", "bin/python"] },
+      ],
+      added: [],
+      failed: [],
+    });
+    await openSkillsTab();
+    await act(async () => {
+      (
+        container.querySelector('input[type="checkbox"]') as HTMLInputElement
+      ).click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      findButton("Add selected (1)")?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(api.addSkillsToVault).toHaveBeenCalledWith(["linked"], false);
+    expect(screenText()).toContain("2 entries will not be synced");
+    expect(screenText()).toContain("linked");
+
+    // 确认后才带着 true 再发一次
+    await act(async () => {
+      findButton("Add anyway")?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(api.addSkillsToVault).toHaveBeenLastCalledWith(["linked"], true);
+  });
+
+  it("moves the selected skills without confirmation when nothing is skipped", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        addableSkills: [{ name: "plain", description: "A plain skill" }],
+      }),
+    );
+    api.addSkillsToVault.mockResolvedValueOnce({
+      added: ["plain"],
+      failed: [],
+    });
+    await openSkillsTab();
+    await act(async () => {
+      (
+        container.querySelector('input[type="checkbox"]') as HTMLInputElement
+      ).click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      findButton("Add selected (1)")?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(api.addSkillsToVault).toHaveBeenCalledTimes(1);
+    expect(api.addSkillsToVault).toHaveBeenCalledWith(["plain"], false);
+    expect(screenText()).toContain("Added 1 skill(s)");
+  });
+
+  it("flags an addable skill without a description", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        addableSkills: [{ name: "no-desc", description: "" }],
+      }),
+    );
 
     await openSkillsTab();
-    const upload = container.querySelector(
-      'button[aria-label="Upload skill"]',
-    ) as HTMLButtonElement;
+
+    expect(screenText()).toContain("Missing description");
+  });
+
+  it("keeps the selection across searches and says how many are hidden", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        addableSkills: [
+          { name: "lark-sheets", description: "Spreadsheets" },
+          { name: "summarize", description: "Summaries" },
+        ],
+      }),
+    );
+    await openSkillsTab();
     await act(async () => {
-      upload.click();
+      (
+        container.querySelector('input[type="checkbox"]') as HTMLInputElement
+      ).click();
       await Promise.resolve();
     });
-    const candidate = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "bar",
-    );
+
     await act(async () => {
-      candidate?.click();
+      typeIntoSearch("summarize");
+      await Promise.resolve();
+    });
+
+    // 选择按技能名保留：筛选不改变「已选 1」，也不该丢掉它
+    expect(screenText()).toContain("1 selected");
+    expect(screenText()).toContain("Add selected (1)");
+  });
+
+  it("disables the confirm actions while a move is running", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        addableSkills: [{ name: "linked", description: "" }],
+      }),
+    );
+    let release: (() => void) | undefined;
+    api.addSkillsToVault.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({
+              needsConfirmation: [
+                { name: "linked", symlinkedEntries: ["dangling"] },
+              ],
+              added: [],
+              failed: [],
+            });
+        }),
+    );
+    await openSkillsTab();
+    await act(async () => {
+      (
+        container.querySelector('input[type="checkbox"]') as HTMLInputElement
+      ).click();
+      await Promise.resolve();
+    });
+    await act(async () => {
+      findButton("Add selected (1)")?.click();
+      await Promise.resolve();
+    });
+
+    // 请求还没回来：动作条与主按钮都该禁用，防重复提交
+    const addButton = findButton("Add selected (1)") as HTMLButtonElement;
+    expect(addButton.disabled).toBe(true);
+
+    await act(async () => {
+      release?.();
       await Promise.resolve();
       await Promise.resolve();
     });
 
-    // 失败要让用户看得见（顶部横幅），且技能仍在本地候选里 —— 说明没被删。
-    expect(screenText()).toContain(
-      "Cloud backup storage is full; your local file was kept",
+    // 确认面板的两个按钮此时可点
+    expect((findButton("Add anyway") as HTMLButtonElement).disabled).toBe(
+      false,
     );
+    expect((findButton("Cancel add") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("shows an index error even when the skills were moved", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        addableSkills: [{ name: "plain", description: "" }],
+      }),
+    );
+    api.addSkillsToVault.mockResolvedValueOnce({
+      added: ["plain"],
+      failed: [],
+      indexError: "VAULT_UNSUPPORTED_PATH:plain/bad.",
+    });
+    await openSkillsTab();
     await act(async () => {
-      upload.click();
+      (
+        container.querySelector('input[type="checkbox"]') as HTMLInputElement
+      ).click();
       await Promise.resolve();
     });
-    expect(screenText()).toContain("bar");
+
+    await act(async () => {
+      findButton("Add selected (1)")?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Added 1 skill(s)");
+    expect(screenText()).toContain("Cannot sync plain");
+  });
+
+  it("blames the local move, not the cloud, when adding fails", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        addableSkills: [{ name: "plain", description: "" }],
+      }),
+    );
+    api.addSkillsToVault.mockResolvedValueOnce({
+      added: [],
+      failed: [{ name: "plain", reason: "EACCES: permission denied" }],
+    });
+    await openSkillsTab();
+    await act(async () => {
+      (
+        container.querySelector('input[type="checkbox"]') as HTMLInputElement
+      ).click();
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      findButton("Add selected (1)")?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Could not add");
+    // errorText 的兜底是「云端同步失败，本地文件未受影响」—— 这次根本没碰云端
+    expect(screenText()).not.toContain("Cloud sync failed");
+  });
+
+  it("filters both groups by the search box", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        skills: [
+          {
+            name: "claude-api",
+            fileCount: 1,
+            totalBytes: 1,
+            syncStatus: "synced" as const,
+          },
+        ],
+        addableSkills: [
+          { name: "lark-sheets", description: "Spreadsheets" },
+          { name: "summarize", description: "Summaries" },
+        ],
+      }),
+    );
+    await openSkillsTab();
+
+    await act(async () => {
+      typeIntoSearch("lark");
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("lark-sheets");
+    expect(screenText()).not.toContain("summarize");
+    expect(screenText()).not.toContain("claude-api");
+
+    await act(async () => {
+      typeIntoSearch("zzz");
+      await Promise.resolve();
+    });
+    expect(screenText()).toContain("No matching skills");
   });
 
   it("shows export in the row and keeps the rest inside the more-actions menu", async () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { app, ipcMain } from "electron";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { VaultIpcDependencies } from "../src/main/vault/ipc";
@@ -45,9 +45,7 @@ describe("Vault IPC contract", () => {
       "vault.sync",
       "vault.checkRemoteBackup",
       "vault.getBackupUsage",
-      "vault.getSkillUploadCandidates",
-      "vault.preflightSkillUpload",
-      "vault.uploadSkill",
+      "vault.addSkillsToVault",
       "vault.deleteSkillFromVault",
       "vault.generateRecoveryCode",
       "vault.initialize",
@@ -301,7 +299,7 @@ describe("Vault IPC contract", () => {
     handle.mockRestore();
   });
 
-  it("rejects uploading a skill that is already in the vault", async () => {
+  it("reports a name clash instead of moving the skill", async () => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const handle = vi
       .spyOn(ipcMain, "handle")
@@ -322,9 +320,16 @@ describe("Vault IPC contract", () => {
     );
     registerVaultIpc(dependencies);
 
-    await expect(
-      handlers.get("vault.uploadSkill")?.(null, "foo"),
-    ).rejects.toThrow("VAULT_SKILL_NAME_TAKEN");
+    const result = (await handlers.get("vault.addSkillsToVault")?.(
+      null,
+      ["foo"],
+      true,
+    )) as { added: string[]; failed: Array<{ reason: string }> };
+
+    expect(result.added).toEqual([]);
+    expect(result.failed[0].reason).toContain("VAULT_SKILL_NAME_TAKEN");
+    // 失败者的本地原件不动
+    await expect(stat(join(globalSkills, "foo"))).resolves.toBeTruthy();
     handle.mockRestore();
   });
   it("syncs the skills scope as well", async () => {
@@ -469,7 +474,7 @@ describe("Vault IPC contract", () => {
     const onSkillsChanged = vi.fn();
     registerVaultIpc({ ...dependencies, onSkillsChanged });
 
-    await handlers.get("vault.uploadSkill")?.(null, "foo");
+    await handlers.get("vault.addSkillsToVault")?.(null, ["foo"], true);
 
     expect(onSkillsChanged).toHaveBeenCalledTimes(1);
     handle.mockRestore();
@@ -498,9 +503,7 @@ describe("Vault IPC contract", () => {
     const onSkillsChanged = vi.fn();
     registerVaultIpc({ ...dependencies, onSkillsChanged });
 
-    await expect(
-      handlers.get("vault.uploadSkill")?.(null, "foo"),
-    ).rejects.toThrow("VAULT_SKILL_NAME_TAKEN");
+    await handlers.get("vault.addSkillsToVault")?.(null, ["foo"], true);
     expect(onSkillsChanged).not.toHaveBeenCalled();
     handle.mockRestore();
   });
@@ -579,18 +582,140 @@ describe("Vault IPC contract", () => {
     // 事先在那个目录放一个技能并断言它被列出来 —— 这同时证明了「回落到了默认
     // skillsVault + 默认 globalSkillsPath」而不是读了别处。
     const defaultSkillsDir = join(app.getPath("home"), ".deskwand", "skills");
+    const defaultVaultDir = join(
+      app.getPath("home"),
+      ".deskwand",
+      "vault-skills",
+    );
+    // 两个默认目录都要清：上次运行搬进去的同名技能会让这次变成 NAME_TAKEN
     await rm(defaultSkillsDir, { recursive: true, force: true });
+    await rm(defaultVaultDir, { recursive: true, force: true });
     await mkdir(join(defaultSkillsDir, "from-defaults"), { recursive: true });
     await writeFile(
       join(defaultSkillsDir, "from-defaults", "SKILL.md"),
       "# from defaults",
     );
 
-    await expect(
-      handlers.get("vault.getSkillUploadCandidates")?.(null),
-    ).resolves.toEqual(["from-defaults"]);
+    const result = (await handlers.get("vault.addSkillsToVault")?.(
+      null,
+      ["from-defaults"],
+      true,
+    )) as { added: string[] };
+
+    expect(result.added).toEqual(["from-defaults"]);
 
     await rm(defaultSkillsDir, { recursive: true, force: true });
+    await rm(defaultVaultDir, { recursive: true, force: true });
+    handle.mockRestore();
+  });
+  it("moves the selected skills and notifies once", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    const globalSkills = dependencies.globalSkillsPath();
+    for (const name of ["one", "two"]) {
+      await mkdir(join(globalSkills, name), { recursive: true });
+      await writeFile(join(globalSkills, name, "SKILL.md"), `# ${name}`);
+    }
+    const onSkillsChanged = vi.fn();
+    registerVaultIpc({ ...dependencies, onSkillsChanged });
+
+    const result = (await handlers.get("vault.addSkillsToVault")?.(
+      null,
+      ["one", "two"],
+      true,
+    )) as { added: string[] };
+
+    expect(result.added).toEqual(["one", "two"]);
+    expect(onSkillsChanged).toHaveBeenCalledTimes(1);
+    handle.mockRestore();
+  });
+
+  it("does not notify when nothing was moved", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    // 所选技能都不存在 → 全部失败 → 不该失效会话
+    const onSkillsChanged = vi.fn();
+    registerVaultIpc({ ...dependencies, onSkillsChanged });
+
+    const result = (await handlers.get("vault.addSkillsToVault")?.(
+      null,
+      ["missing"],
+      true,
+    )) as { added: string[]; failed: unknown[] };
+
+    expect(result.added).toEqual([]);
+    expect(result.failed).toHaveLength(1);
+    expect(onSkillsChanged).not.toHaveBeenCalled();
+    handle.mockRestore();
+  });
+
+  it("returns the pending confirmation without touching disk", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    const globalSkills = dependencies.globalSkillsPath();
+    // globalSkills 是跨用例共享的固定目录，先清掉上次运行留下的链接（否则 EEXIST）
+    await rm(join(globalSkills, "linked"), { recursive: true, force: true });
+    await mkdir(join(globalSkills, "linked"), { recursive: true });
+    await writeFile(join(globalSkills, "linked", "SKILL.md"), "# linked");
+    await symlink("missing", join(globalSkills, "linked", "dangling"));
+    registerVaultIpc(dependencies);
+
+    const result = (await handlers.get("vault.addSkillsToVault")?.(null, [
+      "linked",
+    ])) as { needsConfirmation?: Array<{ name: string }>; added: string[] };
+
+    expect(result.needsConfirmation).toEqual([
+      { name: "linked", symlinkedEntries: ["dangling"] },
+    ]);
+    expect(result.added).toEqual([]);
+    await expect(stat(join(globalSkills, "linked"))).resolves.toBeTruthy();
+    handle.mockRestore();
+  });
+
+  it("includes the addable skills in the snapshot", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    const globalSkills = dependencies.globalSkillsPath();
+    // 断言的是完整列表：先清空共享目录，避免别的用例留下的技能混进来
+    await rm(globalSkills, { recursive: true, force: true });
+    await mkdir(join(globalSkills, "addable"), { recursive: true });
+    await writeFile(
+      join(globalSkills, "addable", "SKILL.md"),
+      "---\nname: addable\ndescription: 可加入\n---\n# x\n",
+    );
+    registerVaultIpc(dependencies);
+
+    const snapshot = (await handlers.get("vault.getSnapshot")?.(null)) as {
+      addableSkills?: Array<{ name: string; description: string }>;
+    };
+
+    expect(snapshot.addableSkills).toEqual([
+      { name: "addable", description: "可加入" },
+    ]);
     handle.mockRestore();
   });
 });
