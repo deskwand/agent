@@ -23,8 +23,11 @@ import { isAgentCreated, removeManifestEntry } from "./agent-manifest";
 /**
  * Validate that a skill name is safe for use as a directory name.
  * Rejects names containing path separators or parent directory references.
+ *
+ * Exported because the `skills.*` IPC handlers in main/index.ts receive the
+ * name from the renderer and must apply the same fence before joining paths.
  */
-function validateSkillName(name: string): void {
+export function validateSkillName(name: string): void {
   if (!name || /[/\\]|\.\./.test(name)) {
     throw new Error(`Invalid skill name: ${name}`);
   }

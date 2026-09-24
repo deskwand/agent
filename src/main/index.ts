@@ -39,7 +39,7 @@ import { initDatabase, closeDatabase, getDatabase } from "./db/database";
 import { registerVaultIpc } from "./vault/ipc";
 import { scanWorkspaceFiles } from "./workspace-file-scan";
 import { SessionManager } from "./session/session-manager";
-import { SkillsManager } from "./skills/skills-manager";
+import { SkillsManager, validateSkillName } from "./skills/skills-manager";
 import { MemoryService } from "./memory/memory-service";
 import { MemoryExtension } from "./memory/memory-extension";
 import { GoalExtension } from "./extensions/goal-extension";
@@ -2930,6 +2930,7 @@ ipcMain.handle("skills.packageToZip", async (_event, skillName: string) => {
   if (!skillsManager) {
     throw new Error("SkillsManager not initialized");
   }
+  validateSkillName(skillName);
   const skillsPath = skillsManager.getGlobalSkillsPath();
   const skillDir = join(skillsPath, skillName);
   if (!fs.existsSync(skillDir)) {
@@ -2947,6 +2948,7 @@ ipcMain.handle(
     if (!skillsManager) {
       throw new Error("SkillsManager not initialized");
     }
+    validateSkillName(skillName);
     const skillsPath = skillsManager.getGlobalSkillsPath();
     const skillDir = join(skillsPath, skillName);
     if (!fs.existsSync(skillDir)) {
@@ -2982,6 +2984,7 @@ ipcMain.handle(
   "skills.writeFingerprint",
   async (_event, skillName: string, fingerprint: string) => {
     if (!skillsManager) throw new Error("SkillsManager not initialized");
+    validateSkillName(skillName);
     const p = join(
       skillsManager.getGlobalSkillsPath(),
       skillName,
@@ -2993,6 +2996,7 @@ ipcMain.handle(
 
 ipcMain.handle("skills.readSkillMd", async (_event, skillName: string) => {
   if (!skillsManager) throw new Error("SkillsManager not initialized");
+  validateSkillName(skillName);
   const p = join(skillsManager.getGlobalSkillsPath(), skillName, "SKILL.md");
   try {
     return await readFile(p, "utf-8");
@@ -3009,6 +3013,7 @@ ipcMain.handle(
     meta: { skillId: string; version: number },
   ) => {
     if (!skillsManager) throw new Error("SkillsManager not initialized");
+    validateSkillName(skillName);
     const p = join(
       skillsManager.getGlobalSkillsPath(),
       skillName,
@@ -3022,6 +3027,7 @@ ipcMain.handle(
   "skills.readInstalledMeta",
   async (_event, skillName: string) => {
     if (!skillsManager) throw new Error("SkillsManager not initialized");
+    validateSkillName(skillName);
     const p = join(
       skillsManager.getGlobalSkillsPath(),
       skillName,
@@ -3039,6 +3045,7 @@ ipcMain.handle(
   "skills.deleteFingerprint",
   async (_event, skillName: string) => {
     if (!skillsManager) throw new Error("SkillsManager not initialized");
+    validateSkillName(skillName);
     const p = join(
       skillsManager.getGlobalSkillsPath(),
       skillName,
@@ -3054,6 +3061,7 @@ ipcMain.handle(
 
 ipcMain.handle("skills.readFingerprint", async (_event, skillName: string) => {
   if (!skillsManager) throw new Error("SkillsManager not initialized");
+  validateSkillName(skillName);
   const p = join(
     skillsManager.getGlobalSkillsPath(),
     skillName,
