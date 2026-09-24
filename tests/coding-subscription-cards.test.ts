@@ -16,6 +16,39 @@ describe("coding subscription cards", () => {
     container.replaceChildren();
   });
 
+  it("renders distinct, decorative icons beside readable plan names", async () => {
+    root = createRoot(container);
+    await act(async () =>
+      root.render(
+        createElement(CodingSubscriptionCards, {
+          profiles: {},
+          onSave: vi.fn(),
+          onDelete: vi.fn(),
+        }),
+      ),
+    );
+    const bailian = container.querySelector(
+      '[data-testid="custom:subscription-bailian-coding-card"]',
+    )!;
+    const ark = container.querySelector(
+      '[data-testid="custom:subscription-ark-coding-card"]',
+    )!;
+    const cloud = bailian.querySelector("svg");
+    const mountain = ark.querySelector("svg");
+    expect(cloud).not.toBeNull();
+    expect(mountain).not.toBeNull();
+    expect(cloud!.getAttribute("aria-hidden")).toBe("true");
+    expect(mountain!.getAttribute("aria-hidden")).toBe("true");
+    expect(cloud!.querySelectorAll("path")).toHaveLength(1);
+    expect(mountain!.querySelectorAll("path")).toHaveLength(2);
+    expect(bailian.querySelector(".min-w-0 .truncate")?.textContent).toBe(
+      "百炼 Coding Plan",
+    );
+    expect(ark.querySelector(".min-w-0 .truncate")?.textContent).toBe(
+      "火山方舟 Coding Plan",
+    );
+  });
+
   it("configures a key without using the OAuth login flow or displaying the saved key", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     const onDelete = vi.fn().mockResolvedValue(undefined);
@@ -29,7 +62,6 @@ describe("coding subscription cards", () => {
         }),
       ),
     );
-    expect(container.textContent).toContain("百炼 Coding Plan");
     const card = container.querySelector(
       '[data-testid="custom:subscription-bailian-coding-card"]',
     )!;

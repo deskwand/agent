@@ -70,9 +70,26 @@ function SubscriptionCard({
       className="rounded-xl border border-border-muted bg-surface px-4 py-3"
     >
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm font-medium text-text-primary">
-            {plan.name}
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-primary">
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className="h-5 w-5 shrink-0 fill-none stroke-current text-text-secondary"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {plan.profileKey === "custom:subscription-bailian-coding" ? (
+                <path d="M6.3 18h10.5a4 4 0 0 0 .2-8 6 6 0 0 0-11.2-.7A4.5 4.5 0 0 0 6.3 18Z" />
+              ) : plan.profileKey === "custom:subscription-ark-coding" ? (
+                <>
+                  <path d="M3 19h18l-5.2-8h-7.6L3 19Z" />
+                  <path d="m9 11 3-6 3 6" />
+                </>
+              ) : null}
+            </svg>
+            <span className="truncate">{plan.name}</span>
           </div>
           <div className="text-xs text-text-muted">
             {configured ? t("api.subscriptionConfigured") : t(plan.noteKey)}
