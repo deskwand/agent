@@ -131,7 +131,7 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
     "vault.checkRemoteBackup",
     async (_event, token: string): Promise<VaultRemoteStatus> => {
       try {
-        const index = await cloud.getIndex(token);
+        const index = await cloud.getIndex(token, "files");
         return index === null
           ? { status: "no-backup" }
           : { status: "has-backup" };
@@ -182,6 +182,7 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
         if (token) {
           await cloud.putIndex(
             token,
+            "files",
             encodeRemoteIndex({ version: 1, files: {} }, mek),
           );
         }
@@ -192,9 +193,9 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
 
       const hasLocalFiles = (await store.scanFiles()).length > 0;
       const remoteIndex =
-        token && !hasLocalFiles ? await cloud.getIndex(token) : null;
+        token && !hasLocalFiles ? await cloud.getIndex(token, "files") : null;
       if (hasLocalFiles && token) {
-        const existingRemoteIndex = await cloud.getIndex(token);
+        const existingRemoteIndex = await cloud.getIndex(token, "files");
         if (existingRemoteIndex) {
           throw new Error("VAULT_REMOTE_BACKUP_EXISTS");
         }

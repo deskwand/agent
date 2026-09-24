@@ -12,6 +12,7 @@ import {
   type VaultCloudClient,
 } from "../src/main/vault/sync";
 import { packFile } from "../src/main/vault/objects";
+import type { VaultIndexScope } from "../src/main/vault/cloud-client";
 
 const code = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const mek = deriveMek(code);
@@ -36,11 +37,18 @@ class FakeCloud implements VaultCloudClient {
     this.objects.delete(id);
   }
 
-  async getIndex(): Promise<Buffer | null> {
+  async getIndex(
+    _token: string,
+    _scope: VaultIndexScope,
+  ): Promise<Buffer | null> {
     return this.index;
   }
 
-  async putIndex(_token: string, payload: Buffer): Promise<void> {
+  async putIndex(
+    _token: string,
+    _scope: VaultIndexScope,
+    payload: Buffer,
+  ): Promise<void> {
     this.index = Buffer.from(payload);
   }
 

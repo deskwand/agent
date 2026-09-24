@@ -1,10 +1,12 @@
 import { describe, expect, it, afterEach } from "vitest";
 import { existsSync } from "node:fs";
 import {
+  mkdir,
   mkdtemp,
   readFile,
   rename,
   rm,
+  symlink,
   truncate,
   writeFile,
 } from "node:fs/promises";
@@ -25,6 +27,12 @@ describe("LocalVaultStore", () => {
     const root = await mkdtemp(join(tmpdir(), "deskwand-vault-store-"));
     roots.push(root);
     return new LocalVaultStore(join(root, "vault"));
+  }
+
+  async function createSkillStore(): Promise<LocalVaultStore> {
+    const root = await mkdtemp(join(tmpdir(), "deskwand-vault-skills-"));
+    roots.push(root);
+    return new LocalVaultStore(join(root, "vault-skills"), "skills");
   }
 
   it("creates the directory and distinguishes a missing index", async () => {
@@ -324,5 +332,174 @@ describe("LocalVaultStore", () => {
     expect(existsSync(store.filePath("a.txt"))).toBe(false);
     expect(existsSync(transaction.stagedDirectory)).toBe(false);
     expect(await store.readOperationMarker()).toBeNull();
+  });
+
+  it("rejects names that escape the vault root", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+
+    expect(() => store.filePath("../outside.md")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("foo/../../outside.md")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+    expect(() => store.filePath("/abs/path.md")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("foo//bar.md")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("foo/")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("foo\\bar.md")).toThrow("VAULT_INVALID_NAME");
+  });
+
+  it("still rejects reserved names at the root of a skills store", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+
+    expect(() => store.filePath(".vault-index.json")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+    expect(() => store.filePath("vault-mek.bin.")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+  });
+
+  it("rejects traversal keys when rereading a skills index", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+    await writeFile(
+      store.indexPath,
+      JSON.stringify({
+        version: 1,
+        files: {
+          "../escape.md": {
+            objectId: "obj-escape",
+            hash: "h",
+            size: 1,
+            mtime: 1,
+            syncStatus: "synced",
+          },
+        },
+        pendingDeletes: [],
+      }),
+    );
+
+    expect((await store.readIndex()).files).toEqual({});
+  });
+
+  it("rereads nested index entries without rebuilding", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+    await mkdir(join(store.rootDir, "foo"));
+    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
+    const index = await store.reconcile(await store.readIndex());
+    index.files["foo/SKILL.md"].objectId = "remote-object";
+    index.files["foo/SKILL.md"].syncStatus = "synced";
+    await store.writeIndex(index);
+
+    const reread = await store.readIndex();
+    expect(reread.files["foo/SKILL.md"].objectId).toBe("remote-object");
+    expect(reread.files["foo/SKILL.md"].syncStatus).toBe("synced");
+  });
+
+  it("scans nested skill trees recursively and skips symlinks and reserved names", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+    await mkdir(join(store.rootDir, "foo", "references"), { recursive: true });
+    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
+    await writeFile(
+      join(store.rootDir, "foo", "references", "note.md"),
+      "note",
+    );
+    await symlink(
+      join(store.rootDir, "foo", "SKILL.md"),
+      join(store.rootDir, "foo", "link.md"),
+    );
+
+    const files = await store.scanFiles();
+
+    // scanFiles 用 localeCompare 排序（顺序在 locale 间不稳定），这里只关心集合。
+    expect(files.map((file) => file.name).sort()).toEqual([
+      "foo/SKILL.md",
+      "foo/references/note.md",
+    ]);
+    expect(files.find((file) => file.name === "foo/SKILL.md")?.size).toBe(
+      Buffer.byteLength("# foo"),
+    );
+  });
+
+  it("restores nested paths by creating parent directories", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+    const transaction = await store.beginRestore([
+      "foo/SKILL.md",
+      "foo/references/note.md",
+    ]);
+    await store.stageRestoreFile(
+      transaction,
+      "foo/SKILL.md",
+      Buffer.from("# foo"),
+    );
+    await store.stageRestoreFile(
+      transaction,
+      "foo/references/note.md",
+      Buffer.from("note"),
+    );
+    await store.commitRestore(transaction, {
+      "foo/SKILL.md": {
+        objectId: "obj-skill",
+        hash: "h1",
+        size: 5,
+        mtime: 1,
+        syncStatus: "synced",
+      },
+      "foo/references/note.md": {
+        objectId: "obj-note",
+        hash: "h2",
+        size: 4,
+        mtime: 1,
+        syncStatus: "synced",
+      },
+    });
+
+    await expect(
+      readFile(join(store.rootDir, "foo", "references", "note.md"), "utf8"),
+    ).resolves.toBe("note");
+    expect((await store.scanFiles()).map((file) => file.name).sort()).toEqual([
+      "foo/SKILL.md",
+      "foo/references/note.md",
+    ]);
+  });
+
+  it("rejects scanFile outside the skills scope", async () => {
+    const store = await createStore();
+    await store.ensureDirectory();
+
+    await expect(store.scanFile("a.md")).rejects.toThrow("VAULT_INVALID_SCOPE");
+  });
+
+  it("skips symlinked files inside a skill tree", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+    await mkdir(join(store.rootDir, "foo", "assets"), { recursive: true });
+    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
+    await symlink(
+      "missing-target",
+      join(store.rootDir, "foo", "assets", "gone.bin"),
+    );
+
+    const files = await store.scanFiles();
+
+    expect(files.map((file) => file.name)).toEqual(["foo/SKILL.md"]);
+  });
+
+  it("refuses names that cannot sync instead of dropping them", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+    await mkdir(join(store.rootDir, "foo"), { recursive: true });
+    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
+    // Win32 会把 "con.md" 当保留设备名、"notes." 归一化成 "notes"：这类名字
+    // 一旦被扫描器静默跳过，reconcile 会把它判为已删除并删掉云端对象。
+    await writeFile(join(store.rootDir, "foo", "con.md"), "reserved");
+
+    await expect(store.scanFiles()).rejects.toThrow(
+      "VAULT_UNSUPPORTED_PATH:foo/con.md",
+    );
   });
 });

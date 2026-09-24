@@ -8,7 +8,10 @@ import {
   classifyRemoteBackupError,
   registerVaultIpc,
 } from "../src/main/vault/ipc";
-import { VaultCloudError } from "../src/main/vault/cloud-client";
+import {
+  VaultCloudError,
+  type VaultIndexScope,
+} from "../src/main/vault/cloud-client";
 import { LocalVaultStore } from "../src/main/vault/local-store";
 import type { VaultSnapshot } from "../src/shared/vault";
 
@@ -244,11 +247,12 @@ async function makeDependencies(
     await writeFile(join(store.rootDir, "readme.md"), "hello");
   }
   const cloud: VaultIpcDependencies["cloud"] = {
-    getIndex: async () => Buffer.alloc(10),
+    getIndex: async (_token: string, _scope: VaultIndexScope) =>
+      Buffer.alloc(10),
     putObject: async () => {},
     getObject: async () => Buffer.alloc(10),
     deleteObject: async () => {},
-    putIndex: async () => {},
+    putIndex: async (_token: string, _scope: VaultIndexScope) => {},
     listObjectIds: async () => [],
   };
   const syncService: VaultIpcDependencies["syncService"] = {

@@ -25,7 +25,11 @@ describe("FetchVaultCloudClient", () => {
     );
 
     await expect(
-      new FetchVaultCloudClient().putIndex("token", Buffer.from("index")),
+      new FetchVaultCloudClient().putIndex(
+        "token",
+        "files",
+        Buffer.from("index"),
+      ),
     ).rejects.toMatchObject({
       status: 413,
       code: "VAULT_QUOTA_EXCEEDED",
@@ -39,7 +43,11 @@ describe("FetchVaultCloudClient", () => {
     );
 
     await expect(
-      new FetchVaultCloudClient().putIndex("token", Buffer.from("index")),
+      new FetchVaultCloudClient().putIndex(
+        "token",
+        "files",
+        Buffer.from("index"),
+      ),
     ).rejects.toEqual(new VaultCloudError(503));
   });
 
@@ -87,5 +95,31 @@ describe("FetchVaultCloudClient", () => {
     await expect(new FetchVaultCloudClient().getUsage("token")).rejects.toThrow(
       "VAULT_BAD_USAGE",
     );
+  });
+
+  it("putIndex writes the scoped index key", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new FetchVaultCloudClient().putIndex(
+      "token",
+      "skills",
+      Buffer.from("index"),
+    );
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/vault/index/skills");
+  });
+
+  it("getIndex reads the scoped index key", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 404 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      new FetchVaultCloudClient().getIndex("token", "files"),
+    ).resolves.toBeNull();
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/vault/index/files");
   });
 });
