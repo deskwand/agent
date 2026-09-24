@@ -13,6 +13,7 @@ import {
   Check,
   Loader2,
   Download,
+  ShieldCheck,
 } from "lucide-react";
 import type { Skill, CloudSkill, SkillType } from "../../types";
 import { Tooltip } from "../Tooltip";
@@ -60,9 +61,10 @@ export type SkillSource =
   | "mycloud"
   | "team"
   | "builtin"
-  | "marketplace";
+  | "marketplace"
+  | "vault";
 
-const SKILL_ICON_MAP: Record<
+export const SKILL_ICON_MAP: Record<
   SkillSource,
   { icon: typeof Bot; bgClass: string; iconClass: string; strokeWidth: number }
 > = {
@@ -98,6 +100,12 @@ const SKILL_ICON_MAP: Record<
   },
   marketplace: {
     icon: Package,
+    bgClass: "bg-accent",
+    iconClass: "text-accent-foreground",
+    strokeWidth: 2,
+  },
+  vault: {
+    icon: ShieldCheck,
     bgClass: "bg-accent",
     iconClass: "text-accent-foreground",
     strokeWidth: 2,

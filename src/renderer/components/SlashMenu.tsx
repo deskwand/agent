@@ -291,5 +291,7 @@ function skillTypeLabel(
       return t("skillMarket.sourceCustom");
     case "agent":
       return t("skillMarket.sourceAI");
+    case "vault":
+      return t("skillMarket.sourceVault");
   }
 }

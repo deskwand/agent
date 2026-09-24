@@ -32,8 +32,12 @@ class FakeCloudClient implements VaultCloudClient {
   onObjectUpload: (() => Promise<void> | void) | null = null;
   indexUploads = 0;
 
+  /** 按 scope 分桶：列表接口是 scope 级的，替身必须能区分，否则测不出隔离。 */
+  readonly objectsByScope = new Map<VaultIndexScope, Map<string, Buffer>>();
+
   async putObject(
     _token: string,
+    scope: VaultIndexScope,
     objectId: string,
     payload: Buffer,
   ): Promise<void> {
@@ -41,7 +45,9 @@ class FakeCloudClient implements VaultCloudClient {
       throw new VaultCloudError(413, this.failObjectUploadCode);
     }
     if (this.failObjectUpload) throw new Error("NETWORK_DOWN");
-    this.objects.set(objectId, Buffer.from(payload));
+    const bucket = this.objectsByScope.get(scope) ?? new Map<string, Buffer>();
+    bucket.set(objectId, Buffer.from(payload));
+    this.objectsByScope.set(scope, bucket);
     await this.onObjectUpload?.();
   }
 
@@ -74,8 +80,13 @@ class FakeCloudClient implements VaultCloudClient {
     this.indexUploads += 1;
   }
 
-  async listObjectIds(): Promise<string[]> {
+  async listObjectIds(
+    _token: string,
+    scope: VaultIndexScope,
+  ): Promise<string[]> {
     if (this.failList) throw new Error("NETWORK_DOWN");
+    const bucket = this.objectsByScope.get(scope);
+    if (bucket) return [...bucket.keys()];
     return [...this.objects.keys()];
   }
 }
@@ -583,6 +594,30 @@ describe("VaultSyncService", () => {
       ).rejects.toThrow("VAULT_RECOVERY_MISMATCH");
       expect(storedMek).toEqual(oldMek);
       await cleanup();
+    });
+
+    it("deletes only the objects of its own scope on a keyless discard", async () => {
+      const store = await createStore();
+      await store.ensureDirectory();
+      const cloud = new FakeCloudClient();
+      await cloud.putObject("token", "files", "files-object", Buffer.from("f"));
+      await cloud.putObject(
+        "token",
+        "skills",
+        "skills-object",
+        Buffer.from("s"),
+      );
+      const resetService = new VaultResetService(
+        store,
+        cloud,
+        () => null,
+        () => {},
+      );
+
+      await resetService.discardWithoutLocalKey("token");
+
+      expect(cloud.deletedObjectIds).toContain("files-object");
+      expect(cloud.deletedObjectIds).not.toContain("skills-object");
     });
 
     it("keeps a no-key reset retryable when object listing fails", async () => {

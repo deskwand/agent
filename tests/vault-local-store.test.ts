@@ -502,4 +502,22 @@ describe("LocalVaultStore", () => {
       "VAULT_UNSUPPORTED_PATH:foo/con.md",
     );
   });
+
+  it("skips hidden directories at the root of a skills tree", async () => {
+    const store = await createSkillStore();
+    await store.ensureDirectory();
+    await mkdir(join(store.rootDir, "foo"), { recursive: true });
+    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
+    await mkdir(join(store.rootDir, ".vault-upload-staging", "bar"), {
+      recursive: true,
+    });
+    await writeFile(
+      join(store.rootDir, ".vault-upload-staging", "bar", "SKILL.md"),
+      "# half-copied",
+    );
+
+    const files = await store.scanFiles();
+
+    expect(files.map((file) => file.name)).toEqual(["foo/SKILL.md"]);
+  });
 });

@@ -50,6 +50,7 @@ const SKILL_TYPE_BADGE_KEY: Record<Skill["type"], string> = {
   mcp: "skillMarket.sourceMcp",
   custom: "skillMarket.sourceCustom",
   agent: "skillMarket.sourceAI",
+  vault: "skillMarket.sourceVault",
 };
 
 export function PromptCommandFormModal({
@@ -89,7 +90,8 @@ export function PromptCommandFormModal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose, skillQuery]);
 
-  const canSave = !saving && value.name.trim() !== "" && value.content.trim() !== "";
+  const canSave =
+    !saving && value.name.trim() !== "" && value.content.trim() !== "";
   const nameErrorKey = nameError ? NAME_ERROR_KEY[nameError] : undefined;
 
   const update = (patch: Partial<PromptCommandFormValue>) =>
@@ -166,13 +168,17 @@ export function PromptCommandFormModal({
         role="dialog"
         aria-modal="true"
         aria-label={
-          mode === "create" ? t("chat.newCommandTitle") : t("chat.editCommandTitle")
+          mode === "create"
+            ? t("chat.newCommandTitle")
+            : t("chat.editCommandTitle")
         }
         className="mx-4 flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden rounded-6xl border border-border-subtle bg-background shadow-elevated animate-slide-up"
       >
         <div className="flex items-center gap-3 border-b border-border-muted px-5 py-[14px]">
           <h2 className="min-w-0 flex-1 text-sm font-semibold text-text-primary">
-            {mode === "create" ? t("chat.newCommandTitle") : t("chat.editCommandTitle")}
+            {mode === "create"
+              ? t("chat.newCommandTitle")
+              : t("chat.editCommandTitle")}
           </h2>
           <button
             type="button"
@@ -209,10 +215,14 @@ export function PromptCommandFormModal({
                 placeholder={t("chat.commandNamePlaceholder")}
                 className="min-w-0 flex-1 bg-transparent font-mono text-sm text-text-primary outline-none"
               />
-              {mode === "edit" && <Lock className="h-3.5 w-3.5 shrink-0 text-text-muted" />}
+              {mode === "edit" && (
+                <Lock className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+              )}
             </div>
             {mode === "edit" && (
-              <p className="mt-1.5 text-xs text-text-muted">{t("chat.commandNameHint")}</p>
+              <p className="mt-1.5 text-xs text-text-muted">
+                {t("chat.commandNameHint")}
+              </p>
             )}
             {nameErrorKey && (
               <p className="mt-1 text-xs text-error">

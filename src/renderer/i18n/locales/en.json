@@ -175,6 +175,8 @@
     "sourceMyCloud": "My Cloud",
     "sourceTeam": "Team",
     "sourceBuiltin": "Built-in",
+    "sourceVault": "Vault",
+    "filterVault": "Vault",
     "sourceMcp": "MCP",
     "loginPrompt": "Log in to use the cloud skill marketplace and share skills with your team",
     "search": "Search skills...",
@@ -1674,6 +1676,7 @@
     "sync": "Sync",
     "syncing": "Syncing…",
     "syncComplete": "Sync complete",
+    "syncFailedSkills": "Skills could not be synced to the cloud; please retry",
     "alreadyLatest": "Already up to date",
     "dismiss": "Dismiss",
     "fileCount_one": "{{count}} file",
@@ -1757,6 +1760,29 @@
       "localFilesConflict": "An existing cloud backup must be discarded before these local files can start a new backup.",
       "retry": "Retry reset",
       "inProgress": "Resetting and reconfiguring your cloud backup…"
+    },
+    "skills": {
+      "error": {
+        "invalidName": "Invalid skill name (lowercase letters, digits and hyphens)",
+        "nameTaken": "A skill with this name is already in the vault; delete it there first",
+        "notSynced": "This skill is not synced to the cloud yet; deleting it would lose the only copy",
+        "uploadFailed": "Upload failed; the skill is still local",
+        "unsupportedPath": "{{name}} inside the skill cannot sync across devices (trailing dot or reserved name)"
+      },
+      "count": "{{count}} skill(s)",
+      "upload": "Upload skill",
+      "empty": "No skills in the vault yet",
+      "summary": "{{count}} file(s) · {{size}}",
+      "delete": "Delete {{name}} from the vault",
+      "confirmDelete": "Delete skill {{name}} from the vault? Its cloud backup is removed as well.",
+      "pickerTitle": "Choose a skill to upload",
+      "pickerEmpty": "No local skill available to upload",
+      "preflightTitle": "Before uploading",
+      "oversized": "These files exceed 20 MB and may not restore on other devices:",
+      "symlinked": "These entries are symlinks and will not be synced:",
+      "quotaShortfall": "Not enough cloud space: {{size}} short",
+      "confirmUpload": "Upload anyway",
+      "pendingHint": "Encrypted on this device only; not uploaded to the cloud yet"
     },
     "menu": {
       "more": "More Vault actions",

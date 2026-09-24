@@ -122,4 +122,33 @@ describe("FetchVaultCloudClient", () => {
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/api/vault/index/files");
   });
+
+  it("scopes object uploads and listings", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new FetchVaultCloudClient().putObject(
+      "token",
+      "skills",
+      "obj-1",
+      Buffer.from("x"),
+    );
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("/api/vault/objects/obj-1");
+    expect(url).toContain("scope=skills");
+  });
+
+  it("lists objects for one scope only", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ object_ids: [] }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new FetchVaultCloudClient().listObjectIds("token", "files");
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("scope=files");
+  });
 });

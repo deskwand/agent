@@ -294,7 +294,7 @@ export interface Skill {
   createdAt: number;
 }
 
-export type SkillType = "builtin" | "mcp" | "custom" | "agent";
+export type SkillType = "builtin" | "mcp" | "custom" | "agent" | "vault";
 
 export interface PluginInstallResult {
   pluginName: string;

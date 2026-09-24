@@ -19,12 +19,22 @@ const mek = deriveMek(code);
 
 class FakeCloud implements VaultCloudClient {
   readonly objects = new Map<string, Buffer>();
+  /** 按 scope 分桶：列表接口是 scope 级的，替身必须能区分。 */
+  readonly objectsByScope = new Map<VaultIndexScope, Map<string, Buffer>>();
   index: Buffer | null = null;
   failUploads = false;
 
-  async putObject(_token: string, id: string, payload: Buffer): Promise<void> {
+  async putObject(
+    _token: string,
+    scope: VaultIndexScope,
+    id: string,
+    payload: Buffer,
+  ): Promise<void> {
     if (this.failUploads) throw new Error("NETWORK_DOWN");
     this.objects.set(id, Buffer.from(payload));
+    const bucket = this.objectsByScope.get(scope) ?? new Map<string, Buffer>();
+    bucket.set(id, Buffer.from(payload));
+    this.objectsByScope.set(scope, bucket);
   }
 
   async getObject(_token: string, id: string): Promise<Buffer> {
@@ -52,8 +62,12 @@ class FakeCloud implements VaultCloudClient {
     this.index = Buffer.from(payload);
   }
 
-  async listObjectIds(): Promise<string[]> {
-    return [...this.objects.keys()];
+  async listObjectIds(
+    _token: string,
+    scope: VaultIndexScope,
+  ): Promise<string[]> {
+    const bucket = this.objectsByScope.get(scope);
+    return bucket ? [...bucket.keys()] : [];
   }
 }
 
@@ -151,7 +165,9 @@ describe("Vault local-first acceptance flow", () => {
     const store = new LocalVaultStore(join(sourceRoot, "vault"));
     await store.ensureDirectory();
     const cloud = new FakeCloud();
-    cloud.objects.set("old-1", Buffer.from("cipher"));
+    // 走真实上传路径播种：列表接口按 scope 分仓，直接塞 objects 不会进分桶，
+    // 那样测的就不是服务端的行为。
+    await cloud.putObject("token", "files", "old-1", Buffer.from("cipher"));
 
     const resetService = new VaultResetService(
       store,

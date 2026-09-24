@@ -262,7 +262,12 @@ export class VaultSyncService {
         const oldObjectId = entry.objectId;
         previousObjectIds.set(name, oldObjectId);
         const packed = await packFile(this.store.filePath(name), mek);
-        await this.cloud.putObject(token, packed.id, packed.payload);
+        await this.cloud.putObject(
+          token,
+          this.store.scope,
+          packed.id,
+          packed.payload,
+        );
         uploadedObjectId = packed.id;
         const after =
           this.store.scope === "skills"
@@ -538,14 +543,12 @@ export class VaultResetService {
       });
     }
 
-    // NOTE(阶段 2): `listObjectIds` 是账号级列表，与 scope 无关。等技能 scope 真正
-    // 接入后，技能密库的 reset 会把文件密库的对象一并删掉（反之亦然），必须改成
-    // 「按 scope 列出对象」——例如给 /api/vault/objects 加 scope，或改为删除远端
-    // 索引引用到的对象。这里没有 MEK，拿不到远端索引的内容，所以本阶段无法在
-    // 客户端修；阶段 1 只有 files scope 在用，行为与改动前一致。
+    // 列表按 scope 过滤（服务端 `GET /api/vault/objects?scope=`）：这条路径上没有
+    // MEK，拿不到远端索引的内容，只能靠服务端分仓，否则技能密库的 reset 会把文件
+    // 密库的对象一并删掉。
     let objectIds: string[];
     try {
-      objectIds = await this.cloud.listObjectIds(token);
+      objectIds = await this.cloud.listObjectIds(token, this.store.scope);
     } catch (error: unknown) {
       throw new Error("VAULT_RESET_FAILED");
     }

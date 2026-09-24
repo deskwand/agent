@@ -19,6 +19,7 @@ import type { DatabaseInstance } from "../db/database";
 import { log, logError, logWarn } from "../utils/logger";
 import { isPathWithinRoot } from "../tools/path-containment";
 import { isAgentCreated, removeManifestEntry } from "./agent-manifest";
+import { getVaultSkillsRoot } from "../vault/paths";
 
 /**
  * Validate that a skill name is safe for use as a directory name.
@@ -224,7 +225,7 @@ export class SkillsManager {
     return skillsPath;
   }
 
-  private clearSkillsBySource(source: "project" | "global"): void {
+  private clearSkillsBySource(source: "project" | "global" | "vault"): void {
     const prefix = `${source}-`;
     for (const key of Array.from(this.loadedSkills.keys())) {
       if (key.startsWith(prefix)) {
@@ -320,6 +321,24 @@ export class SkillsManager {
     }
   }
 
+  getVaultSkillsPath(): string {
+    return getVaultSkillsRoot();
+  }
+
+  /**
+   * 从技能密库加载技能（只读来源）。密库副本不由应用写入 —— 改动走密库页
+   * 「删除后重新上传」，因此不需要 manifest/链接逻辑。
+   */
+  async loadVaultSkillsFrom(vaultSkillsPath: string): Promise<Skill[]> {
+    this.clearSkillsBySource("vault");
+    if (!fs.existsSync(vaultSkillsPath)) return [];
+    return this.loadSkillsFromDirectory(vaultSkillsPath, "vault");
+  }
+
+  async loadVaultSkills(): Promise<Skill[]> {
+    return this.loadVaultSkillsFrom(this.getVaultSkillsPath());
+  }
+
   /**
    * Load skills from a project directory
    */
@@ -377,7 +396,7 @@ export class SkillsManager {
    */
   private async loadSkillsFromDirectory(
     dir: string,
-    source: "project" | "global",
+    source: "project" | "global" | "vault",
   ): Promise<Skill[]> {
     const skills: Skill[] = [];
 
@@ -438,9 +457,11 @@ export class SkillsManager {
               name: metadata.name,
               description: metadata.description,
               type:
-                source === "global" && isAgentCreated(dir, entry)
-                  ? "agent"
-                  : "custom",
+                source === "vault"
+                  ? "vault"
+                  : source === "global" && isAgentCreated(dir, entry)
+                    ? "agent"
+                    : "custom",
               enabled: persistedEnabled,
               createdAt: Date.now(),
             };
@@ -1066,6 +1087,12 @@ export class SkillsManager {
     // Can't delete built-in skills
     if (skill.type === "builtin") {
       throw new Error("Cannot delete built-in skills");
+    }
+
+    // 密库技能由密库管理：这里的删除只作用于 ~/.deskwand/skills/<name>，
+    // 直接放行会留下「记录删了、密库副本还在」的幽灵。
+    if (skill.type === "vault") {
+      throw new Error("Cannot delete vault skills here");
     }
 
     // Stop MCP server if running

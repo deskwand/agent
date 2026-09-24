@@ -1057,6 +1057,14 @@ app
     // Recover goals that were active before last shutdown
     sessionManager.recoverGoals();
     skillsManager = new SkillsManager(db);
+    // 技能密库是一个独立的只读技能来源：目录不存在时 loadVaultSkills 直接返回 []，
+    // 因此这里不必判断存在性。加载失败也不该拦住启动 —— 但要留下线索。
+    try {
+      await skillsManager.loadVaultSkills();
+      sessionManager.invalidateSkillsSetup();
+    } catch (error: unknown) {
+      logError("[Vault] failed to load vault skills:", error);
+    }
     // pi-ai handles model routing natively — no proxy warmup needed
 
     // macOS: application menu, dock menu, tray icon

@@ -14,7 +14,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-const SKILL_TYPES: SkillType[] = ["builtin", "mcp", "custom", "agent"];
+const SKILL_TYPES: SkillType[] = ["builtin", "mcp", "custom", "agent", "vault"];
 
 /** 徽章文案走 i18n：枚举值只用于数据层，界面显示的是这些 key 的译文。 */
 const SKILL_TYPE_LABEL_KEY: Record<SkillType, string> = {
@@ -22,6 +22,7 @@ const SKILL_TYPE_LABEL_KEY: Record<SkillType, string> = {
   mcp: "skillMarket.sourceMcp",
   custom: "skillMarket.sourceCustom",
   agent: "skillMarket.sourceAI",
+  vault: "skillMarket.sourceVault",
 };
 
 const skills: Skill[] = SKILL_TYPES.map((type, index) => ({
@@ -246,12 +247,19 @@ describe("SlashMenu skill type labels are localized", () => {
   const BUNDLES: Record<"zh" | "en", unknown> = { zh, en };
 
   const EXPECTED: Record<"zh" | "en", Record<SkillType, string>> = {
-    zh: { builtin: "内置", mcp: "MCP", custom: "自定义", agent: "AI 生成" },
+    zh: {
+      builtin: "内置",
+      mcp: "MCP",
+      custom: "自定义",
+      agent: "AI 生成",
+      vault: "密库",
+    },
     en: {
       builtin: "Built-in",
       mcp: "MCP",
       custom: "Custom",
       agent: "AI Generated",
+      vault: "Vault",
     },
   };
 
@@ -260,12 +268,9 @@ describe("SlashMenu skill type labels are localized", () => {
       badge.textContent?.trim(),
     );
 
-    expect(texts).toEqual([
-      SKILL_TYPE_LABEL_KEY.builtin,
-      SKILL_TYPE_LABEL_KEY.mcp,
-      SKILL_TYPE_LABEL_KEY.custom,
-      SKILL_TYPE_LABEL_KEY.agent,
-    ]);
+    expect(texts).toEqual(
+      SKILL_TYPES.map((type) => SKILL_TYPE_LABEL_KEY[type]),
+    );
     for (const type of SKILL_TYPES) {
       expect(texts).not.toContain(type);
     }

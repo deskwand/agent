@@ -6,6 +6,7 @@ import {
   Download,
   MoreHorizontal,
   RefreshCw,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -27,6 +28,7 @@ import type {
   SyncStatus,
   VaultBackupUsage,
   VaultRemoteStatus,
+  VaultSkillPreflight,
   VaultSnapshot,
   VaultSnapshotItem,
 } from "../../shared/vault";
@@ -35,6 +37,7 @@ type Filter = "files" | "skills" | "sessions";
 type SyncFeedback = "idle" | "syncing" | "success" | "error";
 type PendingConfirmation =
   | { kind: "delete"; item: VaultSnapshotItem }
+  | { kind: "delete-skill"; name: string }
   | { kind: "discard-new-device" }
   | { kind: "reset-existing" };
 type EmptyVaultMode =
@@ -59,10 +62,30 @@ function statusText(status: SyncStatus, t: (key: string) => string): string {
   return t("vault.status.pending");
 }
 
-function errorText(error: unknown, t: (key: string) => string): string {
+function errorText(
+  error: unknown,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
   if (!(error instanceof Error)) return t("vault.error.localOperation");
   const message = error.message;
   if (message === "VAULT_FILE_TOO_LARGE") return t("vault.error.fileTooLarge");
+  if (message.startsWith("VAULT_INVALID_SKILL_NAME")) {
+    return t("vault.skills.error.invalidName");
+  }
+  if (message.startsWith("VAULT_SKILL_NAME_TAKEN")) {
+    return t("vault.skills.error.nameTaken");
+  }
+  if (message.startsWith("VAULT_SKILL_NOT_SYNCED")) {
+    return t("vault.skills.error.notSynced");
+  }
+  if (message.startsWith("VAULT_SKILL_UPLOAD_FAILED")) {
+    return t("vault.skills.error.uploadFailed");
+  }
+  if (message.startsWith("VAULT_UNSUPPORTED_PATH")) {
+    return t("vault.skills.error.unsupportedPath", {
+      name: message.slice("VAULT_UNSUPPORTED_PATH:".length),
+    });
+  }
   if (message === "VAULT_LOCAL_DISK_FULL") return t("vault.error.diskFull");
   if (message === "VAULT_QUOTA_EXCEEDED")
     return t("vault.error.cloudQuotaExceeded");
@@ -152,6 +175,10 @@ export function VaultView(): JSX.Element {
     null,
   );
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [uploadCandidates, setUploadCandidates] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [preflight, setPreflight] = useState<VaultSkillPreflight | null>(null);
+  const [preflightTarget, setPreflightTarget] = useState<string | null>(null);
   const [advancedMenuOpen, setAdvancedMenuOpen] = useState(false);
   const syncFeedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const syncLabelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -227,6 +254,21 @@ export function VaultView(): JSX.Element {
     if (filter !== "files") return [];
     return snapshot?.items ?? [];
   }, [filter, snapshot?.items]);
+
+  const loadUploadCandidates = useCallback(async () => {
+    try {
+      setUploadCandidates(
+        await window.electronAPI.vault.getSkillUploadCandidates(),
+      );
+    } catch {
+      setUploadCandidates([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (filter !== "skills") return;
+    void loadUploadCandidates();
+  }, [filter, loadUploadCandidates, snapshot?.skills]);
 
   const runAction = useCallback(
     async (action: () => Promise<VaultSnapshot | unknown>) => {
@@ -345,6 +387,13 @@ export function VaultView(): JSX.Element {
       return;
     }
     setSnapshot(nextSnapshot);
+    // 技能 scope 失败时 files 可能已经同步成功：说清是哪一半没上去，
+    // 否则用户看到「同步失败」会以为文件也没备份。
+    if (nextSnapshot.syncError) {
+      setSyncFeedback("error");
+      setSyncFeedbackMessage(t("vault.syncFailedSkills"));
+      return;
+    }
     if (nextSnapshot.pendingCount > 0) {
       setSyncFeedback("error");
       setSyncFeedbackMessage(t("vault.error.syncFailed"));
@@ -484,6 +533,51 @@ export function VaultView(): JSX.Element {
     setPendingConfirmation({ kind: "delete", item });
   };
 
+  // 上传失败由 runAction 统一报错（顶部横幅）；本地原件在失败时不会被删，
+  // 因此候选列表里仍然有它 —— 用户可以直接重试。
+  // 云端剩余可用字节：配额未知（null）时不做判断，预检会跳过差额计算。
+  const availableBytes =
+    backupUsage?.quotaBytes != null
+      ? Math.max(backupUsage.quotaBytes - backupUsage.usedBytes, 0)
+      : null;
+
+  const handleSkillUpload = useCallback(
+    async (skillName: string) => {
+      setPickerOpen(false);
+      let report: VaultSkillPreflight;
+      try {
+        report = await window.electronAPI.vault.preflightSkillUpload(
+          skillName,
+          availableBytes,
+        );
+      } catch (preflightError: unknown) {
+        setError(errorText(preflightError, t));
+        return;
+      }
+      const blocking =
+        report.oversizedFiles.length > 0 ||
+        report.symlinkedEntries.length > 0 ||
+        report.quotaShortfallBytes !== null;
+      if (blocking) {
+        setPreflight(report);
+        setPreflightTarget(skillName);
+        return;
+      }
+      await runAction(() => window.electronAPI.vault.uploadSkill(skillName));
+      await loadUploadCandidates();
+    },
+    [availableBytes, loadUploadCandidates, runAction, t],
+  );
+
+  const confirmPreflightUpload = useCallback(async () => {
+    const target = preflightTarget;
+    setPreflight(null);
+    setPreflightTarget(null);
+    if (!target) return;
+    await runAction(() => window.electronAPI.vault.uploadSkill(target));
+    await loadUploadCandidates();
+  }, [preflightTarget, loadUploadCandidates, runAction]);
+
   const handleConfirm = () => {
     const pending = pendingConfirmation;
     setPendingConfirmation(null);
@@ -492,6 +586,12 @@ export function VaultView(): JSX.Element {
     if (pending.kind === "delete") {
       void runAction(() =>
         window.electronAPI.vault.deleteFile(pending.item.name),
+      );
+      return;
+    }
+    if (pending.kind === "delete-skill") {
+      void runAction(() =>
+        window.electronAPI.vault.deleteSkillFromVault(pending.name),
       );
       return;
     }
@@ -723,6 +823,148 @@ export function VaultView(): JSX.Element {
             ))}
           </div>
 
+          {filter === "skills" && (
+            <div className="flex flex-col gap-2 py-3">
+              <div className="flex items-center justify-between">
+                <span
+                  className="text-xs text-text-muted"
+                  aria-label={t("vault.filter.skills")}
+                >
+                  {t("vault.skills.count", {
+                    count: snapshot?.skills?.length ?? 0,
+                  })}
+                </span>
+                <Tooltip label={t("vault.skills.upload")}>
+                  <button
+                    type="button"
+                    aria-label={t("vault.skills.upload")}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+                    onClick={() => setPickerOpen(true)}
+                    disabled={busy || uploadCandidates.length === 0}
+                  >
+                    <Upload className="h-4 w-4" />
+                  </button>
+                </Tooltip>
+              </div>
+              {pickerOpen && (
+                <div className="rounded-xl border border-border-subtle p-3">
+                  <p className="mb-2 text-xs font-medium text-text-secondary">
+                    {t("vault.skills.pickerTitle")}
+                  </p>
+                  {uploadCandidates.length === 0 ? (
+                    <p className="text-xs text-text-muted">
+                      {t("vault.skills.pickerEmpty")}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {uploadCandidates.map((name) => (
+                        <button
+                          key={name}
+                          type="button"
+                          className="rounded-lg border border-border-subtle px-2 py-1 text-xs text-text-primary hover:bg-surface-hover"
+                          onClick={() => void handleSkillUpload(name)}
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {preflight && (
+                <div className="rounded-xl border border-border-subtle p-3">
+                  <p className="mb-2 text-xs font-medium text-text-secondary">
+                    {t("vault.skills.preflightTitle")}
+                  </p>
+                  {preflight.oversizedFiles.length > 0 && (
+                    <>
+                      <p className="text-xs text-text-muted">
+                        {t("vault.skills.oversized")}
+                      </p>
+                      <ul className="mb-2 list-inside list-disc text-xs text-text-muted">
+                        {preflight.oversizedFiles.map((file) => (
+                          <li key={file.relativePath}>
+                            {file.relativePath} · {formatSize(file.size)}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {preflight.symlinkedEntries.length > 0 && (
+                    <>
+                      <p className="text-xs text-text-muted">
+                        {t("vault.skills.symlinked")}
+                      </p>
+                      <ul className="mb-2 list-inside list-disc text-xs text-text-muted">
+                        {preflight.symlinkedEntries.map((entry) => (
+                          <li key={entry}>{entry}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {preflight.quotaShortfallBytes !== null && (
+                    <p className="mb-2 text-xs text-text-muted">
+                      {t("vault.skills.quotaShortfall", {
+                        size: formatSize(preflight.quotaShortfallBytes),
+                      })}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90"
+                    onClick={() => void confirmPreflightUpload()}
+                  >
+                    {t("vault.skills.confirmUpload")}
+                  </button>
+                </div>
+              )}
+              {(snapshot?.skills?.length ?? 0) === 0 && (
+                <p className="py-8 text-center text-sm text-text-muted">
+                  {t("vault.skills.empty")}
+                </p>
+              )}
+              {snapshot?.skills?.map((skill) => (
+                <article
+                  key={skill.name}
+                  className="flex select-none items-center gap-4 rounded-xl border border-border-subtle px-4 py-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-text-primary">
+                      {skill.name}
+                    </p>
+                    <p className="mt-1 text-xs text-text-muted">
+                      {t("vault.skills.summary", {
+                        count: skill.fileCount,
+                        size: formatSize(skill.totalBytes),
+                      })}{" "}
+                      · {statusText(skill.syncStatus, t)}
+                    </p>
+                    {skill.syncStatus === "pending" && (
+                      <p className="mt-0.5 text-xs text-text-muted">
+                        {t("vault.skills.pendingHint")}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={t("vault.skills.delete", {
+                      name: skill.name,
+                    })}
+                    className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-error"
+                    onClick={() =>
+                      setPendingConfirmation({
+                        kind: "delete-skill",
+                        name: skill.name,
+                      })
+                    }
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
+
           {filter === "files" && (
             <div className="flex items-center justify-between py-3">
               <div className="flex flex-col gap-0.5 text-xs text-text-muted">
@@ -763,7 +1005,7 @@ export function VaultView(): JSX.Element {
           )}
 
           <div className="min-h-0 flex-1 overflow-y-auto py-3">
-            {filter !== "files" ? (
+            {filter === "skills" ? null : filter !== "files" ? (
               <p className="py-12 text-center text-sm text-text-muted">
                 {t("vault.comingSoon")}
               </p>
@@ -986,12 +1228,17 @@ export function VaultView(): JSX.Element {
             ? t("vault.confirm.delete", {
                 name: pendingConfirmation.item.name,
               })
-            : pendingConfirmation?.kind === "discard-new-device"
-              ? t("vault.reset.confirmNewDevice")
-              : t("vault.reset.confirmExisting")
+            : pendingConfirmation?.kind === "delete-skill"
+              ? t("vault.skills.confirmDelete", {
+                  name: pendingConfirmation.name,
+                })
+              : pendingConfirmation?.kind === "discard-new-device"
+                ? t("vault.reset.confirmNewDevice")
+                : t("vault.reset.confirmExisting")
         }
         confirmLabel={
-          pendingConfirmation?.kind === "delete"
+          pendingConfirmation?.kind === "delete" ||
+          pendingConfirmation?.kind === "delete-skill"
             ? t("vault.confirm.deleteAction")
             : pendingConfirmation?.kind === "discard-new-device"
               ? t("vault.reset.discardAction")

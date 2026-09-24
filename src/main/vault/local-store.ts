@@ -276,6 +276,15 @@ export class LocalVaultStore {
     }
   }
 
+  /** 删除根层的一个内部目录（例如上传暂存区）。仅用于内部清理，不写索引。 */
+  async removeStaging(relativeDir: string): Promise<void> {
+    this.validateName(relativeDir);
+    await rm(join(this.rootDir, relativeDir), {
+      recursive: true,
+      force: true,
+    });
+  }
+
   async readIndex(): Promise<LocalVaultIndex> {
     await this.ensureDirectory();
     try {
@@ -376,7 +385,13 @@ export class LocalVaultStore {
       if (entry.isSymbolicLink()) continue;
       const name = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
-        if (!prefix && isReservedVaultName(entry.name)) continue;
+        // 根层的隐藏目录（如上传暂存区 `.vault-upload-staging`）不是技能内容。
+        if (
+          !prefix &&
+          (entry.name.startsWith(".") || isReservedVaultName(entry.name))
+        ) {
+          continue;
+        }
         const nested = await this.scanTree(name);
         files.push(...nested);
         continue;

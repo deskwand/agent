@@ -222,7 +222,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     | "team"
     | "builtin"
     | "marketplace"
-    | "installed";
+    | "installed"
+    | "vault";
   const [filterKey, setFilterKey] = useState<FilterKey>("marketplace");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -381,6 +382,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       let source: DisplaySkill["source"];
       if (s.type === "builtin") source = "builtin";
       else if (s.type === "agent") source = "ai";
+      else if (s.type === "vault") source = "vault";
       else source = "custom";
 
       let cloudMembership: "mycloud" | "team" | undefined;
@@ -479,6 +481,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       list = list.filter((s) => myCloudSkillNames.has(s.name.toLowerCase()));
     else if (filterKey === "team")
       list = list.filter((s) => teamCloudSkillNames.has(s.name.toLowerCase()));
+    else if (filterKey === "vault")
+      list = list.filter((s) => s.source === "vault");
     else if (filterKey === "builtin")
       list = list.filter((s) => s.source === "builtin");
     else if (filterKey === "marketplace") list = [];
@@ -980,6 +984,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     }
     chips.push({ key: "ai", label: t("skillMarket.filterAI") });
     chips.push({ key: "builtin", label: t("skillMarket.filterBuiltin") });
+    chips.push({ key: "vault", label: t("skillMarket.filterVault") });
     chips.push({ key: "installed", label: t("skillMarket.filterInstalled") });
     return chips;
   }, [t, activeTeamId]);
@@ -990,6 +995,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     switch (ds.source) {
       case "ai":
         label = t("skillMarket.sourceAI");
+        break;
+      case "vault":
+        label = t("skillMarket.sourceVault");
         break;
       case "custom":
         label = t("skillMarket.sourceCustom");

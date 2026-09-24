@@ -175,6 +175,8 @@
     "sourceMyCloud": "我的云端",
     "sourceTeam": "团队",
     "sourceBuiltin": "内置",
+    "sourceVault": "密库",
+    "filterVault": "密库",
     "sourceMcp": "MCP",
     "loginPrompt": "登录即可使用云端技能市场，与团队分享技能",
     "search": "搜索技能...",
@@ -1673,6 +1675,7 @@
     "sync": "同步",
     "syncing": "同步中…",
     "syncComplete": "同步完成",
+    "syncFailedSkills": "技能未能同步到云端，请稍后重试",
     "alreadyLatest": "已是最新",
     "dismiss": "关闭",
     "fileCount_one": "{{count}} 个文件",
@@ -1756,6 +1759,29 @@
       "localFilesConflict": "已有云端备份。要为这些本地文件建立新备份，必须先丢弃旧备份。",
       "retry": "重试重置",
       "inProgress": "正在重置并重新设置云端备份…"
+    },
+    "skills": {
+      "error": {
+        "invalidName": "技能名不合规范（需为小写字母、数字与连字符）",
+        "nameTaken": "密库已有同名技能，请先在密库页删除它",
+        "notSynced": "该技能尚未同步到云端，删除会丢失唯一副本，请先同步",
+        "uploadFailed": "上传失败，技能仍在本地",
+        "unsupportedPath": "技能内的 {{name}} 无法跨设备同步（文件名含尾点或使用了保留名）"
+      },
+      "count": "{{count}} 个技能",
+      "upload": "上传技能",
+      "empty": "密库中暂无技能",
+      "summary": "{{count}} 个文件 · {{size}}",
+      "delete": "从密库删除 {{name}}",
+      "confirmDelete": "确定从密库中删除技能 {{name}}？云端备份也会一并清除。",
+      "pickerTitle": "选择要上传的技能",
+      "pickerEmpty": "没有可上传的本地技能",
+      "preflightTitle": "上传前确认",
+      "oversized": "以下文件超过 20 MB，可能无法在其它设备恢复：",
+      "symlinked": "以下内容是符号链接，不会被同步：",
+      "quotaShortfall": "云端剩余空间不足 {{size}}",
+      "confirmUpload": "继续上传",
+      "pendingHint": "已在本机加密保存，尚未上传到云端"
     },
     "menu": {
       "more": "更多 Vault 操作",

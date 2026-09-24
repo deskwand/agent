@@ -33,6 +33,24 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.confirm.delete": "Delete {{name}} from your Vault?",
   "vault.confirm.deleteAction": "Delete",
   "vault.comingSoon": "Coming soon",
+  "vault.skills.count": "{{count}} skill(s)",
+  "vault.skills.upload": "Upload skill",
+  "vault.skills.empty": "No skills in the vault yet",
+  "vault.skills.summary": "{{count}} file(s) · {{size}}",
+  "vault.skills.delete": "Delete {{name}} from the vault",
+  "vault.skills.confirmDelete":
+    "Delete skill {{name}} from the vault? Its cloud backup is removed as well.",
+  "vault.skills.pickerTitle": "Choose a skill to upload",
+  "vault.skills.pickerEmpty": "No local skill available to upload",
+  "vault.skills.preflightTitle": "Before uploading",
+  "vault.skills.oversized":
+    "These files exceed 20 MB and may not restore on other devices:",
+  "vault.skills.symlinked":
+    "These entries are symlinks and will not be synced:",
+  "vault.skills.quotaShortfall": "Not enough cloud space: {{size}} short",
+  "vault.skills.confirmUpload": "Upload anyway",
+  "vault.skills.uploadFailedLocalKept":
+    "Skill was not uploaded and is still local",
   "vault.fileCount_one": "{{count}} file",
   "vault.fileCount_other": "{{count}} files",
   "vault.empty": "No files in your Vault",
@@ -207,6 +225,17 @@ describe("VaultView", () => {
       deletedObjects: 0,
       preservedLocalFiles: 0,
     })),
+    getSkillUploadCandidates: vi.fn(async () => [] as string[]),
+    preflightSkillUpload: vi.fn(async (skillName: string) => ({
+      skillName,
+      fileCount: 0,
+      totalBytes: 0,
+      oversizedFiles: [] as Array<{ relativePath: string; size: number }>,
+      symlinkedEntries: [] as string[],
+      quotaShortfallBytes: null,
+    })),
+    uploadSkill: vi.fn(async () => snapshot({ items: [] })),
+    deleteSkillFromVault: vi.fn(async () => snapshot({ items: [] })),
   };
 
   beforeEach(() => {
@@ -723,23 +752,147 @@ describe("VaultView", () => {
     expect(upload.closest("header")).toBeNull();
   });
 
-  it.each(["Skills", "Sessions"])(
-    "%s shows the coming-soon state without file actions",
-    async (label) => {
-      await renderVault();
-      const tab = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent === label,
-      );
+  it("Sessions shows the coming-soon state without file actions", async () => {
+    await renderVault();
+    const tab = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Sessions",
+    );
 
-      await act(async () => {
-        tab?.click();
-      });
+    await act(async () => {
+      tab?.click();
+    });
 
-      expect(screenText()).toContain("Coming soon");
-      expect(screenText()).not.toContain("readme.md");
-      expect(screenText()).not.toContain("Upload");
-    },
-  );
+    expect(screenText()).toContain("Coming soon");
+    expect(screenText()).not.toContain("readme.md");
+    expect(screenText()).not.toContain("Upload");
+  });
+
+  async function openSkillsTab(): Promise<void> {
+    await renderVault();
+    const tab = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "Skills",
+    );
+    await act(async () => {
+      tab?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+  }
+
+  it("lists vault skills in the skills tab", async () => {
+    api.getSnapshot.mockResolvedValue(
+      snapshot({
+        items: [],
+        skills: [
+          {
+            name: "foo",
+            fileCount: 2,
+            totalBytes: 2048,
+            syncStatus: "synced" as const,
+          },
+        ],
+      }),
+    );
+
+    await openSkillsTab();
+
+    expect(screenText()).toContain("foo");
+    expect(screenText()).toContain("1 skill(s)");
+    expect(screenText()).toContain("Synced");
+  });
+
+  it("keeps the upload button disabled without local candidates", async () => {
+    await openSkillsTab();
+
+    const upload = container.querySelector(
+      'button[aria-label="Upload skill"]',
+    ) as HTMLButtonElement | null;
+    expect(upload).not.toBeNull();
+    expect(upload?.disabled).toBe(true);
+  });
+
+  it("offers the local candidates when uploading", async () => {
+    api.getSkillUploadCandidates.mockResolvedValue(["bar"]);
+
+    await openSkillsTab();
+
+    const upload = container.querySelector(
+      'button[aria-label="Upload skill"]',
+    ) as HTMLButtonElement;
+    expect(upload.disabled).toBe(false);
+    await act(async () => {
+      upload.click();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("Choose a skill to upload");
+    expect(screenText()).toContain("bar");
+  });
+
+  it("warns about oversized and symlinked content before uploading", async () => {
+    api.getSkillUploadCandidates.mockResolvedValue(["big"]);
+    api.preflightSkillUpload.mockResolvedValue({
+      skillName: "big",
+      fileCount: 2,
+      totalBytes: 22020096,
+      oversizedFiles: [{ relativePath: "big/model.bin", size: 22020096 }],
+      symlinkedEntries: ["big/dangling"],
+      quotaShortfallBytes: null,
+    });
+
+    await openSkillsTab();
+    const upload = container.querySelector(
+      'button[aria-label="Upload skill"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      upload.click();
+      await Promise.resolve();
+    });
+    const candidate = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "big",
+    );
+    await act(async () => {
+      candidate?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screenText()).toContain("big/model.bin");
+    expect(screenText()).toContain("big/dangling");
+    expect(api.uploadSkill).not.toHaveBeenCalled();
+  });
+
+  it("keeps the local skill and reports the failure when the upload fails", async () => {
+    api.getSkillUploadCandidates.mockResolvedValue(["bar"]);
+    api.uploadSkill.mockRejectedValue(new Error("VAULT_QUOTA_EXCEEDED"));
+
+    await openSkillsTab();
+    const upload = container.querySelector(
+      'button[aria-label="Upload skill"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      upload.click();
+      await Promise.resolve();
+    });
+    const candidate = Array.from(container.querySelectorAll("button")).find(
+      (button) => button.textContent === "bar",
+    );
+    await act(async () => {
+      candidate?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    // 失败要让用户看得见（顶部横幅），且技能仍在本地候选里 —— 说明没被删。
+    expect(screenText()).toContain(
+      "Cloud backup storage is full; your local file was kept",
+    );
+    await act(async () => {
+      upload.click();
+      await Promise.resolve();
+    });
+    expect(screenText()).toContain("bar");
+  });
 
   it("shows export in the row and keeps the rest inside the more-actions menu", async () => {
     await renderVault();

@@ -20,8 +20,18 @@ class FakeCloud implements VaultCloudClient {
   readonly objects = new Map<string, Buffer>();
   readonly indexes = new Map<VaultIndexScope, Buffer>();
 
-  async putObject(_token: string, id: string, payload: Buffer): Promise<void> {
+  readonly objectsByScope = new Map<VaultIndexScope, Map<string, Buffer>>();
+
+  async putObject(
+    _token: string,
+    scope: VaultIndexScope,
+    id: string,
+    payload: Buffer,
+  ): Promise<void> {
     this.objects.set(id, Buffer.from(payload));
+    const bucket = this.objectsByScope.get(scope) ?? new Map<string, Buffer>();
+    bucket.set(id, Buffer.from(payload));
+    this.objectsByScope.set(scope, bucket);
   }
 
   async getObject(_token: string, id: string): Promise<Buffer> {
@@ -49,8 +59,12 @@ class FakeCloud implements VaultCloudClient {
     this.indexes.set(scope, Buffer.from(payload));
   }
 
-  async listObjectIds(): Promise<string[]> {
-    return [...this.objects.keys()];
+  async listObjectIds(
+    _token: string,
+    scope: VaultIndexScope,
+  ): Promise<string[]> {
+    const bucket = this.objectsByScope.get(scope);
+    return bucket ? [...bucket.keys()] : [];
   }
 }
 

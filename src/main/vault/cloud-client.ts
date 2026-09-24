@@ -4,7 +4,12 @@ import type { VaultBackupUsage } from "../../shared/vault";
 export type VaultIndexScope = "files" | "skills";
 
 export interface VaultCloudClient {
-  putObject(token: string, objectId: string, payload: Buffer): Promise<void>;
+  putObject(
+    token: string,
+    scope: VaultIndexScope,
+    objectId: string,
+    payload: Buffer,
+  ): Promise<void>;
   getObject(token: string, objectId: string): Promise<Buffer>;
   deleteObject(token: string, objectId: string): Promise<void>;
   getIndex(token: string, scope: VaultIndexScope): Promise<Buffer | null>;
@@ -13,19 +18,20 @@ export interface VaultCloudClient {
     scope: VaultIndexScope,
     payload: Buffer,
   ): Promise<void>;
-  listObjectIds(token: string): Promise<string[]>;
+  listObjectIds(token: string, scope: VaultIndexScope): Promise<string[]>;
   getUsage?(token: string): Promise<VaultBackupUsage>;
 }
 
 export class FetchVaultCloudClient implements VaultCloudClient {
   async putObject(
     token: string,
+    scope: VaultIndexScope,
     objectId: string,
     payload: Buffer,
   ): Promise<void> {
     await this.request(
       token,
-      `/api/vault/objects/${encodeURIComponent(objectId)}`,
+      `/api/vault/objects/${encodeURIComponent(objectId)}?scope=${scope}`,
       {
         method: "PUT",
         body: payload as unknown as BodyInit,
@@ -67,8 +73,15 @@ export class FetchVaultCloudClient implements VaultCloudClient {
     }
   }
 
-  async listObjectIds(token: string): Promise<string[]> {
-    const response = await this.request(token, "/api/vault/objects", {});
+  async listObjectIds(
+    token: string,
+    scope: VaultIndexScope,
+  ): Promise<string[]> {
+    const response = await this.request(
+      token,
+      `/api/vault/objects?scope=${scope}`,
+      {},
+    );
     const payload: unknown = await response.json();
     if (!isObjectIdPayload(payload)) throw new Error("VAULT_BAD_OBJECT_LIST");
     return payload.object_ids;

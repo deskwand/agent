@@ -90,6 +90,7 @@ import {
   cleanupRetiredSkillLinks,
   RETIRED_SKILL_NAMES,
 } from "../skills/retired-skills";
+import { getVaultSkillsRoot } from "../vault/paths";
 import {
   resolveBundledBinDir,
   resolveBundledBinDirs,
@@ -804,6 +805,9 @@ ${hints.join("\n")}
     if (builtin && fs.existsSync(builtin)) paths.push(builtin);
     const global = this.getRuntimeSkillsDir();
     if (global && fs.existsSync(global)) paths.push(global);
+    // 技能密库：Agent 从解密后的目录树读取，目录不存在时跳过。
+    const vaultSkills = getVaultSkillsRoot();
+    if (fs.existsSync(vaultSkills)) paths.push(vaultSkills);
     return paths;
   }
 
