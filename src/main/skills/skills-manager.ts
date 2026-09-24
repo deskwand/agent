@@ -19,7 +19,7 @@ import type { DatabaseInstance } from "../db/database";
 import { log, logError, logWarn } from "../utils/logger";
 import { isPathWithinRoot } from "../tools/path-containment";
 import { isAgentCreated, removeManifestEntry } from "./agent-manifest";
-import { getVaultSkillsRoot } from "../vault/paths";
+import { getGlobalSkillsRoot, getVaultSkillsRoot } from "../vault/paths";
 
 /**
  * Validate that a skill name is safe for use as a directory name.
@@ -214,7 +214,9 @@ export class SkillsManager {
   }
 
   private getDefaultGlobalSkillsPath(): string {
-    return path.join(app.getPath("home"), ".deskwand", "skills");
+    // 走共享的 paths.getGlobalSkillsRoot()：密库侧「可上传候选」按同一个基准列目录，
+    // 两处各写一份会漂。
+    return getGlobalSkillsRoot();
   }
 
   getGlobalSkillsPath(): string {
@@ -666,6 +668,9 @@ export class SkillsManager {
   }): Promise<Skill[]> {
     // Load global skills first to ensure they're in loadedSkills
     await this.loadGlobalSkills();
+    // 密库是第三个来源，同样「读取即刷新」：上传/删除/恢复之后不必依赖启动时那次加载
+    //（那次目录可能还不存在）。目录不存在时只是一次 existsSync。
+    await this.loadVaultSkills();
 
     let skills = this.deduplicateSkills(Array.from(this.loadedSkills.values()));
 
@@ -943,6 +948,13 @@ export class SkillsManager {
       const existing = byName.get(key);
 
       if (!existing) {
+        byName.set(key, skill);
+        continue;
+      }
+
+      // 密库技能让位于本机技能：同名时以本机那份为准（密库副本是只读来源，
+      // 要改只能在密库页操作）。规则写成显式的，不依赖 loadedSkills 的插入顺序。
+      if (existing.id.startsWith("vault-") && !skill.id.startsWith("vault-")) {
         byName.set(key, skill);
         continue;
       }

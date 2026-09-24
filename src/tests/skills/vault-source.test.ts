@@ -50,8 +50,13 @@ describe("SkillsManager vault source", () => {
     fs.rmSync(testRoot, { recursive: true, force: true });
   });
 
+  /** 技能密库的默认位置，与 SkillsManager.getVaultSkillsPath() 解析出的路径一致。 */
+  function defaultVaultSkillsDir(): string {
+    return path.join(testRoot, "home", ".deskwand", "vault-skills");
+  }
+
   function createVaultSkill(name: string, description: string): string {
-    const vaultSkills = path.join(testRoot, "vault-skills");
+    const vaultSkills = defaultVaultSkillsDir();
     fs.mkdirSync(path.join(vaultSkills, name), { recursive: true });
     fs.writeFileSync(
       path.join(vaultSkills, name, "SKILL.md"),
@@ -92,5 +97,47 @@ describe("SkillsManager vault source", () => {
     );
     // 关键：密库副本必须原封不动
     expect(fs.existsSync(path.join(vaultSkills, "foo", "SKILL.md"))).toBe(true);
+  });
+
+  it("lists a vault skill without any explicit load (regression)", async () => {
+    createVaultSkill("foo", "from the vault");
+    const manager = new SkillsManager(createDbMock());
+
+    // 不调用 loadVaultSkills / loadVaultSkillsFrom —— 模拟「用户刚上传完」的场景，
+    // 此时只有启动时那次（空目录）加载发生过。
+    const skills = await manager.listSkills();
+
+    expect(skills.map((s) => s.id)).toContain("vault-foo");
+  });
+
+  // 特征化测试（characterization）：改动之前它就会通过 —— loadedSkills 的插入顺序
+  // 天然是 global 在前。它锁住的是「本地胜出」这个结果，防止以后有人调整加载顺序
+  // 时静默改变优先级；`deduplicateSkills` 从隐式顺序改成显式规则这件事本身无法用
+  // 「先失败后通过」验证。
+  it("prefers the local skill when a name exists in both sources", async () => {
+    createVaultSkill("foo", "from the vault");
+    // 同名技能也放在全局目录里
+    const globalDir = path.join(testRoot, "home", ".deskwand", "skills");
+    fs.mkdirSync(path.join(globalDir, "foo"), { recursive: true });
+    fs.writeFileSync(
+      path.join(globalDir, "foo", "SKILL.md"),
+      "---\nname: foo\ndescription: local\n---\n# foo\n",
+    );
+    const manager = new SkillsManager(createDbMock());
+
+    const skills = await manager.listSkills();
+    const foo = skills.filter((s) => s.name === "foo");
+
+    expect(foo).toHaveLength(1);
+    expect(foo[0].id).toBe("global-foo");
+  });
+
+  it("keeps listing when the vault directory does not exist", async () => {
+    const manager = new SkillsManager(createDbMock());
+
+    const skills = await manager.listSkills();
+
+    expect(Array.isArray(skills)).toBe(true);
+    expect(skills.some((s) => s.id.startsWith("vault-"))).toBe(false);
   });
 });

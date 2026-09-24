@@ -1498,7 +1498,11 @@ ipcMain.on("client-event", async (_event, data: ClientEvent) => {
 initOAuthService();
 // ── Quota IPC handler ──
 initQuotaIpc();
-registerVaultIpc();
+registerVaultIpc({
+  // 密库技能变更后让会话重新装配技能路径：agent-runner 的路径列表按会话缓存，
+  // 且以 existsSync(密库目录) 过滤 —— 启动时目录可能还不存在。
+  onSkillsChanged: () => sessionManager?.invalidateSkillsSetup(),
+});
 ipcMain.handle("openrouterAuth.login", async () => {
   return openRouterPkceService.login();
 });

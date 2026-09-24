@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ipcMain } from "electron";
+import { app, ipcMain } from "electron";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -452,6 +452,145 @@ describe("Vault IPC contract", () => {
     // 技能未同步 → pendingCount 必须 > 0，否则点同步会显示「已是最新」
     expect(snapshot.skills).toHaveLength(1);
     expect(snapshot.pendingCount).toBeGreaterThan(0);
+    handle.mockRestore();
+  });
+  it("notifies on a successful skill upload", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    const globalSkills = dependencies.globalSkillsPath();
+    await mkdir(join(globalSkills, "foo"), { recursive: true });
+    await writeFile(join(globalSkills, "foo", "SKILL.md"), "# foo");
+    const onSkillsChanged = vi.fn();
+    registerVaultIpc({ ...dependencies, onSkillsChanged });
+
+    await handlers.get("vault.uploadSkill")?.(null, "foo");
+
+    expect(onSkillsChanged).toHaveBeenCalledTimes(1);
+    handle.mockRestore();
+  });
+
+  it("does not notify when the upload fails", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    // 密库里已经同名 → 上传必然抛 VAULT_SKILL_NAME_TAKEN
+    await mkdir(join(dependencies.skillsVault.store.rootDir, "foo"), {
+      recursive: true,
+    });
+    await writeFile(
+      join(dependencies.skillsVault.store.rootDir, "foo", "SKILL.md"),
+      "# existing",
+    );
+    const globalSkills = dependencies.globalSkillsPath();
+    await mkdir(join(globalSkills, "foo"), { recursive: true });
+    await writeFile(join(globalSkills, "foo", "SKILL.md"), "# foo");
+    const onSkillsChanged = vi.fn();
+    registerVaultIpc({ ...dependencies, onSkillsChanged });
+
+    await expect(
+      handlers.get("vault.uploadSkill")?.(null, "foo"),
+    ).rejects.toThrow("VAULT_SKILL_NAME_TAKEN");
+    expect(onSkillsChanged).not.toHaveBeenCalled();
+    handle.mockRestore();
+  });
+
+  it("notifies once when both scopes are restored", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    dependencies.restoreService.restoreWithLocalMek = async () => ({
+      restored: 1,
+      renamed: 0,
+    });
+    dependencies.skillsVault.restoreService.restoreWithLocalMek = async () => ({
+      restored: 2,
+      renamed: 0,
+    });
+    const onSkillsChanged = vi.fn();
+    registerVaultIpc({ ...dependencies, onSkillsChanged });
+
+    await handlers.get("vault.restoreWithLocalMek")?.(null, "token");
+
+    // 两个 scope 都恢复了，但通知只发一次（避免无谓的重复失效）
+    expect(onSkillsChanged).toHaveBeenCalledTimes(1);
+    handle.mockRestore();
+  });
+
+  it("does not notify when a restore had nothing to restore", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    // 两个 scope 都跳过（无远端备份）→ restored 为 0 → 不该失效所有 SDK 会话
+    dependencies.restoreService.restoreWithLocalMek = async () => {
+      throw new Error("VAULT_NO_REMOTE_BACKUP");
+    };
+    dependencies.skillsVault.restoreService.restoreWithLocalMek = async () => {
+      throw new Error("VAULT_NO_REMOTE_BACKUP");
+    };
+    const onSkillsChanged = vi.fn();
+    registerVaultIpc({ ...dependencies, onSkillsChanged });
+
+    await handlers.get("vault.restoreWithLocalMek")?.(null, "token");
+
+    expect(onSkillsChanged).not.toHaveBeenCalled();
+    handle.mockRestore();
+  });
+
+  it("keeps defaults when only some dependencies are injected", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const onSkillsChanged = vi.fn();
+
+    // 只传一个回调：其余依赖必须回落到默认值，而不是变成 undefined
+    registerVaultIpc({ onSkillsChanged });
+
+    // 必须真的执行一次依赖默认值的通道 —— 只断言「通道已注册」证明不了合并语义：
+    // 注册只是登记闭包，不触碰依赖。合并语义缺失时这里会因为 skillsVault 为
+    // undefined 抛 TypeError。
+    //
+    // 断言用确定值（而不是 expect.any(Array)）：默认全局技能目录由
+    // app.getPath("home") 决定，测试替身把它指向 /tmp/deskwand-test，所以可以
+    // 事先在那个目录放一个技能并断言它被列出来 —— 这同时证明了「回落到了默认
+    // skillsVault + 默认 globalSkillsPath」而不是读了别处。
+    const defaultSkillsDir = join(app.getPath("home"), ".deskwand", "skills");
+    await rm(defaultSkillsDir, { recursive: true, force: true });
+    await mkdir(join(defaultSkillsDir, "from-defaults"), { recursive: true });
+    await writeFile(
+      join(defaultSkillsDir, "from-defaults", "SKILL.md"),
+      "# from defaults",
+    );
+
+    await expect(
+      handlers.get("vault.getSkillUploadCandidates")?.(null),
+    ).resolves.toEqual(["from-defaults"]);
+
+    await rm(defaultSkillsDir, { recursive: true, force: true });
     handle.mockRestore();
   });
 });

@@ -1,7 +1,6 @@
 import { dialog, ipcMain, shell } from "electron";
 import { copyFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { basename, extname } from "node:path";
 import { generateRecoveryCode } from "./recovery";
 import {
   initializeNewMek,
@@ -12,6 +11,7 @@ import {
 import { encodeRemoteIndex } from "./vault-index";
 import { LocalVaultStore } from "./local-store";
 import { VaultSkillsStore } from "./skills-vault";
+import { getGlobalSkillsRoot } from "./paths";
 import {
   FetchVaultCloudClient,
   VaultCloudError,
@@ -43,6 +43,8 @@ export interface VaultIpcDependencies {
   getLocalMek: () => Buffer | null;
   skillsVault: VaultSkillsStore;
   globalSkillsPath: () => string;
+  /** 密库技能集合发生变化（上传/删除/恢复成功）时调用，用于让会话重建技能路径。 */
+  onSkillsChanged?: () => void;
 }
 
 export function classifyRemoteBackupError(error: unknown): VaultRemoteStatus {
@@ -64,29 +66,24 @@ const defaultRestoreService = new VaultRestoreService(
 );
 const defaultResetService = new VaultResetService(defaultStore, defaultCloud);
 const defaultSkillsVault = new VaultSkillsStore();
-const defaultGlobalSkillsPath = (): string =>
-  join(homedir(), ".deskwand", "skills");
+const defaultGlobalSkillsPath = getGlobalSkillsRoot;
 
-export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
-  const {
-    store,
-    cloud,
-    syncService,
-    restoreService,
-    resetService,
-    getLocalMek,
-    skillsVault,
-    globalSkillsPath,
-  } = dependencies ?? {
-    store: defaultStore,
-    cloud: defaultCloud,
-    syncService: defaultSyncService,
-    restoreService: defaultRestoreService,
-    resetService: defaultResetService,
-    getLocalMek: loadMek,
-    skillsVault: defaultSkillsVault,
-    globalSkillsPath: defaultGlobalSkillsPath,
-  };
+export function registerVaultIpc(
+  overrides: Partial<VaultIpcDependencies> = {},
+): void {
+  // 逐字段回落到默认实例（而不是「传了依赖就整体替换」）：注入方可以只覆盖关心的
+  // 字段，例如只传 onSkillsChanged。用 ?? 而不是对象展开，是为了让下面的变量保持
+  // 非可选类型 —— 展开 Partial 会把每个字段推成 T | undefined。
+  const store = overrides.store ?? defaultStore;
+  const cloud = overrides.cloud ?? defaultCloud;
+  const syncService = overrides.syncService ?? defaultSyncService;
+  const restoreService = overrides.restoreService ?? defaultRestoreService;
+  const resetService = overrides.resetService ?? defaultResetService;
+  const getLocalMek = overrides.getLocalMek ?? loadMek;
+  const skillsVault = overrides.skillsVault ?? defaultSkillsVault;
+  const globalSkillsPath =
+    overrides.globalSkillsPath ?? defaultGlobalSkillsPath;
+  const onSkillsChanged = overrides.onSkillsChanged;
 
   ipcMain.handle("vault.getSnapshot", async (): Promise<VaultSnapshot> => {
     await store.recoverPendingRestore();
@@ -213,6 +210,7 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
 
   ipcMain.handle("vault.uploadSkill", async (_event, skillName: string) => {
     await skillsVault.upload(skillName, globalSkillsPath());
+    onSkillsChanged?.();
     return getSnapshot(store, skillsVault, getLocalMek);
   });
 
@@ -220,6 +218,7 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
     "vault.deleteSkillFromVault",
     async (_event, skillName: string) => {
       await skillsVault.remove(skillName);
+      onSkillsChanged?.();
       return getSnapshot(store, skillsVault, getLocalMek);
     },
   );
@@ -318,9 +317,14 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
 
   ipcMain.handle("vault.restoreWithLocalMek", async (_event, token: string) => {
     await assertNoBlockingOperation(store);
-    return restoreAllScopes((_target, service) =>
+    const result = await restoreAllScopes((_target, service) =>
       service.restoreWithLocalMek(token),
     );
+    // 通知放在这里而不是 restoreAllScopes 内部：逐 scope 调用会通知两次。
+    // 只有真的恢复了东西才通知 —— invalidateSkillsSetup() 会清掉所有缓存的 SDK
+    // 会话，两个 scope 都被跳过时执行它是白清。
+    if (result.restored > 0) onSkillsChanged?.();
+    return result;
   });
 
   ipcMain.handle(
@@ -329,9 +333,11 @@ export function registerVaultIpc(dependencies?: VaultIpcDependencies): void {
       await assertNoBlockingOperation(store);
       // 恢复码只用于派生 MEK：两个 scope 共用同一把，VaultRestoreService 在
       // MEK 已存在时会跳过落盘，因此重复调用是安全的。
-      return restoreAllScopes((_target, service) =>
+      const result = await restoreAllScopes((_target, service) =>
         service.restoreWithRecoveryCode(token, recoveryCode),
       );
+      if (result.restored > 0) onSkillsChanged?.();
+      return result;
     },
   );
 

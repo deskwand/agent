@@ -23,6 +23,7 @@ import { SkillCard, CloudOnlySkillCard } from "./SkillCard";
 import type { DisplaySkill } from "./SkillCard";
 import { MarketplaceSkillCard } from "./MarketplaceSkillCard";
 import type { MarketplaceInstallState } from "./MarketplaceSkillCard";
+import { supportsLocalFileActions } from "./skill-actions";
 import { MarketplaceCategorySidebar } from "./MarketplaceCategorySidebar";
 import { MarketplaceSkeleton } from "./MarketplaceSkeleton";
 import { Tooltip } from "../Tooltip";
@@ -1359,13 +1360,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                       }
                       t={t}
                       onDelete={
-                        ds.type !== "builtin"
+                        supportsLocalFileActions(ds.type)
                           ? () => handleDelete(skill.id, skill.name)
                           : undefined
                       }
                       onPublish={
                         cloudConfig &&
-                        ds.type !== "builtin" &&
+                        supportsLocalFileActions(ds.type) &&
                         status !== "has_update"
                           ? () => handlePublish(skill.name)
                           : undefined
