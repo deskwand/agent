@@ -41,3 +41,19 @@ describe("element context ordering (browser element picking)", () => {
     expect(src).not.toContain("finalPrompt = syntheticContextText");
   });
 });
+
+describe("image passthrough wiring (multimodal images)", () => {
+  it("detects images through the prompt-image-extract helpers", () => {
+    const src = readSrc();
+    expect(src).toContain("messageHasImages(");
+    expect(src).toContain("collectImageAttachmentPaths(");
+    expect(src).toContain('from "./prompt-image-extract"');
+  });
+
+  it("routes the capability check through messageHasImages", () => {
+    const src = readSrc();
+    // 只钉主会话的能力位入口：injectHistoryPreamble 里按 inline 块过滤历史前言的
+    // textOnlyMessages 是另一个关注点，不要顺手改它。
+    expect(src).toContain("const hasImages = messageHasImages(");
+  });
+});

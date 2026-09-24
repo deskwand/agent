@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import electron from "vite-plugin-electron";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { resolve } from "path";
 import { builtinModules } from "module";
 
@@ -142,6 +143,42 @@ function transformRadius(code: string): string {
   );
 }
 
+/**
+ * pi SDK 会把 @silvia-odwyer/photon-node 的 Emscripten glue 内联进主进程 bundle
+ * （dist-electron/main/photon_rs-<hash>.js），而那段 glue 读的是
+ * `path.join(__dirname, "photon_rs_bg.wasm")` —— Rollup 看不见这种运行期拼出来的路径，
+ * 所以没人把 wasm 拷进产物目录（SDK 自己的兜底只看 dirname(process.execPath) / cwd，
+ * 打包后都不存在）。结果 loadPhoton() 返回 null，任何图片（贴图 / 附图 / read 图片文件）
+ * 都会退化成 "[Image omitted: could not be resized …]"。
+ * 把 wasm 放到 chunk 同目录，即 glue 的第一顺位查找位置。
+ */
+function photonWasmPlugin(): Plugin {
+  const candidates = [
+    resolve(
+      process.cwd(),
+      "node_modules/@earendil-works/pi-coding-agent/node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm",
+    ),
+    resolve(
+      process.cwd(),
+      "node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm",
+    ),
+  ];
+  return {
+    name: "photon-wasm",
+    closeBundle() {
+      const source = candidates.find((candidate) => existsSync(candidate));
+      if (!source) {
+        throw new Error(
+          `[photon-wasm] photon_rs_bg.wasm not found. Looked in:\n  ${candidates.join("\n  ")}`,
+        );
+      }
+      const outDir = resolve(process.cwd(), "dist-electron/main");
+      mkdirSync(outDir, { recursive: true });
+      copyFileSync(source, resolve(outDir, "photon_rs_bg.wasm"));
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     react(),
@@ -152,7 +189,7 @@ export default defineConfig({
           args.startup();
         },
         vite: {
-          plugins: [piOAuthElectronPlugin()],
+          plugins: [piOAuthElectronPlugin(), photonWasmPlugin()],
           build: {
             outDir: "dist-electron/main",
             emptyOutDir: true,

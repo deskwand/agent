@@ -315,8 +315,9 @@ describe("ModelResolutionService", () => {
     expect(result.baseUrl).toContain("api.deepseek.com");
     expect(result.contextWindow).toBe(1_000_000);
     expect(result.piModel.reasoning).toBe(true);
-    // 官方 DeepSeek profile 同样走合成回退（注册表无该 id），能力位必须是纯文本
-    expect(result.piModel.input).toEqual(["text"]);
+    // 官方端点已实测接受 image_url（design-docs/2026-09-24-multimodal-image-pipeline-plan.md），
+    // 因此官方 profile 上必须保留收图能力
+    expect(result.piModel.input).toEqual(["text", "image"]);
   });
 
   function withDeskWandCloudProfile(config: AppConfig): AppConfig {

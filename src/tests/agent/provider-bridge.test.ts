@@ -186,6 +186,61 @@ describe("registerDeskWandProviders", () => {
     expect(inputById["deepseek-v5-unknown"]).toEqual(["text", "image"]);
   });
 
+  it("grants image capability to deepseek-flash on the official DeepSeek endpoint", async () => {
+    const officialAppConfig = {
+      providers: {
+        deepseek: {
+          provider: "deepseek",
+          customProtocol: "openai",
+          apiKey: "ds-key",
+          baseUrl: "https://api.deepseek.com/v1",
+          defaultModel: "deepseek-flash",
+          models: [
+            { id: "deepseek-flash", label: "deepseek-flash", source: "preset" },
+          ],
+          updatedAt: "2026-09-24T00:00:00.000Z",
+        },
+      },
+    } as unknown as AppConfig;
+
+    resolveMock.mockResolvedValue({
+      providerProfileKey: "deepseek",
+      providerType: "deepseek",
+      customProtocol: "openai",
+      protocol: "openai",
+      modelId: "deepseek-flash",
+      apiKey: "ds-key",
+      baseUrl: "https://api.deepseek.com/v1",
+      contextWindow: 1_000_000,
+      maxTokens: 384_000,
+      piModel: {
+        ...model,
+        id: "deepseek-flash",
+        provider: "deepseek",
+        baseUrl: "https://api.deepseek.com/v1",
+        input: ["text"],
+      },
+      trace: {
+        providerSource: "session",
+        modelSource: "provider.defaultModel",
+        piModelSource: "registry",
+        notes: [],
+      },
+    });
+
+    await registerDeskWandProviders(runtime, officialAppConfig);
+
+    const registerCall = runtimeMock.registerProvider.mock.calls.at(-1);
+    const registered = registerCall?.[1] as
+      | { models: Array<{ id: string; input: string[] }> }
+      | undefined;
+    const inputById = Object.fromEntries(
+      (registered?.models ?? []).map((m) => [m.id, m.input]),
+    );
+
+    expect(inputById["deepseek-flash"]).toEqual(["text", "image"]);
+  });
+
   it("serializes concurrent synchronization", async () => {
     let release: (() => void) | undefined;
     const gate = new Promise<undefined>((resolve) => {

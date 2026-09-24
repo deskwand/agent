@@ -103,3 +103,70 @@ function normalizeInlineMime(mimeType: string | undefined): string | null {
   if (!mimeType) return null;
   return SUPPORTED_IMAGE_MIMES.has(mimeType) ? mimeType : null;
 }
+
+/**
+ * 单个 file_attachment 是否是一张可直传/可交给 vision_describe 的图片。
+ * 内联数据按 mime 判定；落盘文件按内容嗅探，并用 SUPPORTED_IMAGE_MIMES 挡掉
+ * BMP/SVG 这类 provider 不接受作为 image_url 的格式。
+ *
+ * 刻意**不**套 DEFAULT_MAX_IMAGE_BYTES：超过直传上限的图进不了模型，但仍应该拿到
+ * vision_describe 提示（按体积截断只发生在 collectPromptImagesFromBlocks 的直传链路）。
+ */
+function isSupportedImageAttachment(
+  block: ContentBlock,
+  workingDir: string,
+): boolean {
+  const attachment = block as {
+    inlineDataBase64?: string;
+    mimeType?: string;
+    relativePath: string;
+  };
+  if (attachment.inlineDataBase64) {
+    return normalizeInlineMime(attachment.mimeType) !== null;
+  }
+  const filePath = path.resolve(workingDir, attachment.relativePath || "");
+  const mimeType = detectImageMimeType(filePath);
+  return mimeType !== null && SUPPORTED_IMAGE_MIMES.has(mimeType);
+}
+
+/**
+ * 消息里是否有「模型可能直接看到的图片」：内联 `image` 块，或受支持格式的
+ * `file_attachment`。主会话的能力判定用它替代「只数内联块」的旧逻辑——旧逻辑会让
+ * 纯文本模型下的附图无声消失（连 vision_describe 提示都没有）。
+ *
+ * 与 collectPromptImagesFromBlocks 的唯一差异是体积上限（见 isSupportedImageAttachment）。
+ */
+export function messageHasImages(
+  blocks: ContentBlock[],
+  workingDir: string,
+): boolean {
+  return blocks.some((block) => {
+    if (block.type === "image") return true;
+    if (block.type !== "file_attachment") return false;
+    return isSupportedImageAttachment(block, workingDir);
+  });
+}
+
+/**
+ * 附图在磁盘上的绝对路径，供 vision_describe 使用。
+ * 附件文件本来就由 SessionManager 落到 <cwd>/.tmp，这里不复制、不读取内容。
+ */
+export function collectImageAttachmentPaths(
+  blocks: ContentBlock[],
+  workingDir: string,
+): string[] {
+  const paths: string[] = [];
+  for (const block of blocks) {
+    if (block.type !== "file_attachment") continue;
+    if (!isSupportedImageAttachment(block, workingDir)) continue;
+    const attachment = block as {
+      inlineDataBase64?: string;
+      relativePath: string;
+    };
+    // 只有内联数据、磁盘上没有对应文件的附件没有可指向的路径。
+    if (attachment.inlineDataBase64) continue;
+    const filePath = path.resolve(workingDir, attachment.relativePath || "");
+    if (fs.existsSync(filePath)) paths.push(filePath);
+  }
+  return paths;
+}

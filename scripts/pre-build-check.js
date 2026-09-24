@@ -106,6 +106,15 @@ function buildCheckList(platform, arch) {
       severity: 'fatal',
     },
     {
+      // pi SDK 把 photon 的 Emscripten glue 打进主进程 bundle，glue 只从
+      // path.join(__dirname, "photon_rs_bg.wasm") 读 wasm。少了它 loadPhoton() 返回 null，
+      // 所有图片会被替换成 "[Image omitted: could not be resized …]"。
+      label: 'Photon WASM for image resize (dist-electron/main/photon_rs_bg.wasm)',
+      relPath: 'dist-electron/main/photon_rs_bg.wasm',
+      type: 'file',
+      severity: 'fatal',
+    },
+    {
       label: 'Renderer output (dist/)',
       relPath: 'dist',
       type: 'dir',

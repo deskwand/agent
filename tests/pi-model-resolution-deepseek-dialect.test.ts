@@ -243,6 +243,76 @@ describe("cloud deepseek models speak the DeepSeek dialect", () => {
 });
 
 describe("cloud deepseek image capability", () => {
+  it("keeps the image capability on the verified official DeepSeek endpoint", () => {
+    // 2026-09-24 实测：api.deepseek.com + deepseek-flash + image_url → 200，
+    // 探针图里的随机码被正确读出（见 design-docs/2026-09-24-multimodal-image-pipeline-plan.md）。
+    const model = resolvePiRegistryModel("deepseek/deepseek-flash", {
+      configProvider: "openai",
+      rawProvider: "deepseek",
+      customProtocol: "openai",
+      customBaseUrl: "https://api.deepseek.com/v1",
+    } as never);
+    expect(model?.input).toEqual(["text", "image"]);
+  });
+
+  it("decides the capability from the endpoint the request will actually use", () => {
+    // rawProvider 不是 custom/openai 时 applyPiModelRuntimeOverrides 不会采纳
+    // customBaseUrl（注册表自带 baseUrl 优先），请求仍走模型自己的端点 ——
+    // 能力位必须按实际端点判定，否则一个「看起来像官方域名」的配置位就能把
+    // 未验证路由上的 deepseek-flash 解锁成收图。
+    const overridden = applyPiModelRuntimeOverrides(
+      {
+        id: "deepseek-flash",
+        name: "deepseek-flash",
+        api: "openai-completions",
+        provider: "openrouter",
+        baseUrl: "https://openrouter.ai/api/v1",
+        reasoning: false,
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 128000,
+        maxTokens: 16384,
+      } as never,
+      {
+        configProvider: "anthropic",
+        rawProvider: "openrouter",
+        customProtocol: "anthropic",
+        customBaseUrl: "https://api.deepseek.com/v1",
+      } as never,
+    );
+
+    expect(overridden.baseUrl).toBe("https://openrouter.ai/api/v1");
+    expect(overridden.input).toEqual(["text"]);
+  });
+
+  it("treats an unparseable endpoint as unverified (stays text-only)", () => {
+    // 用户把 baseUrl 写成不带协议的 "api.deepseek.com/v1" 是现实里会发生的误配置；
+    // new URL() 会抛，按未验证处理 —— 保守方向与旧行为一致。
+    const overridden = applyPiModelRuntimeOverrides(
+      {
+        id: "deepseek-flash",
+        name: "deepseek-flash",
+        api: "openai-completions",
+        provider: "custom",
+        baseUrl: "",
+        reasoning: false,
+        input: ["text", "image"],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 128000,
+        maxTokens: 16384,
+      } as never,
+      {
+        configProvider: "openai",
+        rawProvider: "custom",
+        customProtocol: "openai",
+        customBaseUrl: "api.deepseek.com/v1",
+      } as never,
+    );
+
+    expect(overridden.baseUrl).toBe("api.deepseek.com/v1");
+    expect(overridden.input).toEqual(["text"]);
+  });
+
   it("keeps the cloud text id text-only even though the upstream catalog now advertises images", () => {
     // pi-ai 0.87.1 的 deepseek 目录新增了 deepseek-flash 并标为 ["text","image"]，
     // 同一模型在 radius / opencode / fireworks / openrouter 目录里仍是 ["text"]。

@@ -109,9 +109,11 @@ async function resolveProfileEntry(
       api: resolved.piModel.api,
       baseUrl: effectiveBaseUrl,
       reasoning: false,
-      // 逐个判能力：显式声明 > 注册表 / 已知纯文本表 > 乐观默认（与 buildSyntheticPiModel 同源，
-      // 此前是默认模型的能力套全表）
-      input: m.input?.length ? m.input : resolveModelInput(m.id),
+      // 逐个判能力：显式声明 > 注册表 / 已验证端点上的纯文本表 > 乐观默认（与
+      // applyPiModelRuntimeOverrides 同源，此前是默认模型的能力套全表）
+      input: m.input?.length
+        ? m.input
+        : resolveModelInput(m.id, effectiveBaseUrl),
       cost: resolved.piModel.cost,
       contextWindow: m.contextWindow || resolved.contextWindow,
       maxTokens: m.maxTokens || resolved.maxTokens,

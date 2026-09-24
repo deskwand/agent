@@ -38,6 +38,7 @@ function populateDarwinArtifacts(root: string, arch: string = "arm64"): void {
     path.join(root, ".bundle-resources/mcp/software-dev-server-example.js"),
   );
   makeDir(path.join(root, "dist-electron"));
+  makeFile(path.join(root, "dist-electron/main/photon_rs_bg.wasm"));
   makeDir(path.join(root, "dist"));
   makeDir(path.join(root, ".deskwand/skills"));
 
@@ -58,6 +59,7 @@ function populateWin32Artifacts(root: string): void {
     path.join(root, ".bundle-resources/mcp/software-dev-server-example.js"),
   );
   makeDir(path.join(root, "dist-electron"));
+  makeFile(path.join(root, "dist-electron/main/photon_rs_bg.wasm"));
   makeDir(path.join(root, "dist"));
   makeDir(path.join(root, ".deskwand/skills"));
   makeFile(path.join(root, "resources/node/win32-x64/node.exe"));
@@ -92,7 +94,7 @@ describe("pre-build-check: runChecks", () => {
 
     expect(result.failed).toBe(0);
     expect(result.hasFatal).toBe(false);
-    // 5 common + 2 darwin FATAL = 7 FATAL checks should pass
+    // 6 common + 2 darwin FATAL = 8 FATAL checks should pass
     expect(result.passed).toBeGreaterThanOrEqual(7);
   });
 
@@ -147,6 +149,16 @@ describe("pre-build-check: runChecks", () => {
   it("reports hasFatal when dist-electron directory is missing", () => {
     populateDarwinArtifacts(tmpDir, "arm64");
     fs.rmSync(path.join(tmpDir, "dist-electron"), { recursive: true });
+
+    const result = runChecks(tmpDir, "darwin", "arm64");
+
+    expect(result.failed).toBeGreaterThan(0);
+    expect(result.hasFatal).toBe(true);
+  });
+
+  it("reports hasFatal when the photon wasm is missing from the main bundle", () => {
+    populateDarwinArtifacts(tmpDir, "arm64");
+    fs.rmSync(path.join(tmpDir, "dist-electron/main/photon_rs_bg.wasm"));
 
     const result = runChecks(tmpDir, "darwin", "arm64");
 

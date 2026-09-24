@@ -47,7 +47,11 @@ import { v4 as uuidv4 } from "uuid";
 import type { PathResolver } from "../sandbox/path-resolver";
 import type { MCPManager } from "../mcp/mcp-manager";
 import { mcpConfigStore } from "../mcp/mcp-config-store";
-import { collectPromptImagesFromBlocks } from "./prompt-image-extract";
+import {
+  collectImageAttachmentPaths,
+  collectPromptImagesFromBlocks,
+  messageHasImages,
+} from "./prompt-image-extract";
 import {
   appendElementContext,
   collectSyntheticContextText,
@@ -2423,10 +2427,10 @@ ${hints.join("\n")}
 
       logCtx("[AgentRunner] Total messages:", existingMessages.length);
 
-      const hasImages =
-        lastUserMessage?.content.some(
-          (c) => (c as { type?: string }).type === "image",
-        ) || false;
+      const hasImages = messageHasImages(
+        lastUserMessage?.content ?? [],
+        session.cwd || app.getPath("userData"),
+      );
       if (hasImages) {
         log("[AgentRunner] User message contains images");
       }
@@ -4455,40 +4459,59 @@ Tool routing:\n
         // vision_describe tool can access them. Files persist across rounds.
         let imageGuidancePrefix = "";
         if (!modelSupportsImages && hasImages && lastUserMsg?.role === "user") {
-          const userImages = (lastUserMsg.content as ContentBlock[]).filter(
+          const userBlocks = lastUserMsg.content as ContentBlock[];
+          const workingDir = session.cwd || app.getPath("userData");
+          const userImages = userBlocks.filter(
             (c) => c.type === "image",
           ) as Array<{
             type: "image";
             source: { data: string; media_type: string };
           }>;
+          const attachmentPaths = collectImageAttachmentPaths(
+            userBlocks,
+            workingDir,
+          );
 
-          if (userImages.length > 0) {
+          if (userImages.length > 0 || attachmentPaths.length > 0) {
             const visionConfigured =
               visionModelConfig?.enabled &&
               Boolean(visionModelConfig.model?.trim());
+            const imageCount = userImages.length + attachmentPaths.length;
 
             if (visionConfigured) {
               try {
                 const imagesDir = this.getUserVisionImagesDir();
-                fs.mkdirSync(imagesDir, { recursive: true });
-                const paths: string[] = [];
+                const paths: string[] = [...attachmentPaths];
 
-                for (let i = 0; i < userImages.length; i++) {
-                  const mimeParts = userImages[i].source.media_type.split("/");
-                  const ext =
-                    mimeParts[1] === "jpeg" ? "jpg" : mimeParts[1] || "jpg";
-                  const hash = crypto
-                    .createHash("sha256")
-                    .update(userImages[i].source.data)
-                    .digest("hex")
-                    .slice(0, 12);
-                  const filename = `user_image_${hash}.${ext}`;
-                  const absPath = path.join(imagesDir, filename);
-                  fs.writeFileSync(
-                    absPath,
-                    Buffer.from(userImages[i].source.data, "base64"),
+                if (attachmentPaths.length > 0) {
+                  log(
+                    `[AgentRunner] ${attachmentPaths.length} attached image(s) kept in place for vision_describe`,
                   );
-                  paths.push(absPath);
+                }
+
+                if (userImages.length > 0) {
+                  fs.mkdirSync(imagesDir, { recursive: true });
+                  for (let i = 0; i < userImages.length; i++) {
+                    const mimeParts =
+                      userImages[i].source.media_type.split("/");
+                    const ext =
+                      mimeParts[1] === "jpeg" ? "jpg" : mimeParts[1] || "jpg";
+                    const hash = crypto
+                      .createHash("sha256")
+                      .update(userImages[i].source.data)
+                      .digest("hex")
+                      .slice(0, 12);
+                    const filename = `user_image_${hash}.${ext}`;
+                    const absPath = path.join(imagesDir, filename);
+                    fs.writeFileSync(
+                      absPath,
+                      Buffer.from(userImages[i].source.data, "base64"),
+                    );
+                    paths.push(absPath);
+                  }
+                  log(
+                    `[AgentRunner] Saved ${userImages.length} image(s) to ${imagesDir}`,
+                  );
                 }
 
                 const samples =
@@ -4499,25 +4522,21 @@ Tool routing:\n
                     : `  vision_describe(path="${paths[0]}")\n  ... and ${paths.length - 1} more`;
 
                 imageGuidancePrefix =
-                  `[User sent ${userImages.length} image(s). ` +
+                  `[User sent ${imageCount} image(s). ` +
                   `This model cannot view images directly. ` +
                   `Call vision_describe to examine each one:\n${samples}]\n\n`;
-
-                log(
-                  `[AgentRunner] Saved ${userImages.length} image(s) to ${imagesDir}`,
-                );
               } catch (err) {
                 logError(
                   `[AgentRunner] Failed to save user images to disk:`,
                   err,
                 );
                 imageGuidancePrefix =
-                  `[User sent ${userImages.length} image(s). ` +
+                  `[User sent ${imageCount} image(s). ` +
                   `Failed to save them for viewing: ${err instanceof Error ? err.message : String(err)}]\n\n`;
               }
             } else {
               imageGuidancePrefix =
-                `[User sent ${userImages.length} image(s), but this model cannot ` +
+                `[User sent ${imageCount} image(s), but this model cannot ` +
                 `view images and no vision model is configured. ` +
                 `Suggest the user configure one in Settings > Vision Model.]\n\n`;
             }

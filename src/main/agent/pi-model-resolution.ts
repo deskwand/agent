@@ -311,12 +311,6 @@ export function applyPiModelRuntimeOverrides(
 ): Model<Api> {
   let nextModel = model;
 
-  // 输入能力按 id 钉住：注册表路径（resolvePiRegistryModel）不经过 resolveModelInput，
-  // 而 pi-ai 0.87.1 的 DeepSeek 目录已把 deepseek-flash 标成收图。升级 SDK 不改变
-  // 用户可见能力，因此两条链路都在这里收敛（见 KNOWN_TEXT_ONLY_MODEL_IDS 的说明）。
-  if (KNOWN_TEXT_ONLY_MODEL_IDS.has(nextModel.id)) {
-    nextModel = { ...nextModel, input: ["text"] } as typeof nextModel;
-  }
   const isCustomProvider =
     options.rawProvider === "custom" || options.configProvider === "custom";
   const shouldHonorConfiguredBaseUrl =
@@ -331,6 +325,13 @@ export function applyPiModelRuntimeOverrides(
       ...nextModel,
       baseUrl: options.customBaseUrl,
     } as typeof nextModel;
+  }
+
+  // 输入能力按 id + 端点钉住（主会话两条解析分支都在这里收敛，见 isKnownTextOnlyModel）。
+  // 端点取覆盖之后的 baseUrl：customBaseUrl 只在被采纳时才算数，否则能力位会按一个
+  // 请求根本不会走的地址放行图片。
+  if (isKnownTextOnlyModel(nextModel.id, nextModel.baseUrl)) {
+    nextModel = { ...nextModel, input: ["text"] } as typeof nextModel;
   }
 
   const effectiveProvider = options.rawProvider || options.configProvider;
@@ -492,6 +493,43 @@ const KNOWN_TEXT_ONLY_MODEL_IDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * 该模型 + 该端点是否必须按纯文本处理。
+ *
+ * `KNOWN_TEXT_ONLY_MODEL_IDS` 的原始理由是「贴图直传 DeepSeek 方言端点，上游 400」。
+ * 2026-09-24 实测官方端点已接受 image_url，因此只在**未经实测**的路由上继续降级：
+ * 官方 api.deepseek.com 放行，云端与未知中转（含端点缺失）维持纯文本。
+ *
+ * 回滚：若官方端点日后又拒图，删掉 isOfficialDeepSeekEndpoint 分支即可回到
+ * 「一律纯文本」，一行改动，无需动调用方。
+ *
+ * 主会话（applyPiModelRuntimeOverrides）与子代理注册（provider-bridge）必须共用本函数：
+ * 同一个 id 在两处得出不同能力，会出现「主会话能看图、子代理只拿到占位符」这种无从排查的差异。
+ */
+export function isKnownTextOnlyModel(
+  modelId: string,
+  endpoint?: string,
+): boolean {
+  if (!KNOWN_TEXT_ONLY_MODEL_IDS.has(modelId)) return false;
+  return !isOfficialDeepSeekEndpoint(endpoint);
+}
+
+/**
+ * 目前唯一一条已验证接受 image_url 的路由：
+ * 2026-09-24 `https://api.deepseek.com/v1/chat/completions` + `deepseek-flash` +
+ * `image_url` → 200，探针图里的随机码被正确读出。
+ * `https://api.deskwand.com` 未能验证（连接被重置），不算已验证。
+ * 若日后云端也验证通过，把这里扩展成 host 集合即可（仍然只此一处判断）。
+ */
+function isOfficialDeepSeekEndpoint(endpoint: string | undefined): boolean {
+  if (!endpoint) return false;
+  try {
+    return new URL(endpoint).host.toLowerCase() === "api.deepseek.com";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 上游改名的模型 id：profile 里存着旧 id 时，先把候选映射到新 id 再查注册表。
  *
  * pi-ai 0.87.1 起 `deepseek` provider 只留 `deepseek-flash`（DeepSeek 官方已把
@@ -532,16 +570,20 @@ function expandRenamedCandidates(
 }
 
 /**
- * 单模型输入能力：已知纯文本表 > 注册表 > 乐观默认 ["text","image"]。
+ * 单模型输入能力：未验证端点上的已知纯文本表 > 注册表 > 乐观默认 ["text","image"]。
  *
- * 主会话（buildSyntheticPiModel）与子代理 provider 注册（provider-bridge）必须走同一个函数：
+ * 主会话与子代理 provider 注册（provider-bridge）必须走同一个函数：
  * 同一个 id 在两处得出不同能力，会出现「主会话能看图、子代理只拿到占位符」这种无从排查的差异。
  *
- * 纯文本表刻意排在注册表之前：pi-ai 0.87.1 的 DeepSeek 目录开始把 `deepseek-flash`
- * 标成收图，但云端与官方两条链路都未验证过真的接受 image_url（见该表的注释）。
+ * `endpoint` 只由子代理注册传入：主会话的注册表/合成分支都还会再经
+ * applyPiModelRuntimeOverrides 收敛一次，那里用的是 profile 的 baseUrl。
+ * 端点缺省（undefined）按未验证处理，维持纯文本。
  */
-export function resolveModelInput(modelId: string): ("text" | "image")[] {
-  if (KNOWN_TEXT_ONLY_MODEL_IDS.has(modelId)) return ["text"];
+export function resolveModelInput(
+  modelId: string,
+  endpoint?: string,
+): ("text" | "image")[] {
+  if (isKnownTextOnlyModel(modelId, endpoint)) return ["text"];
   const registryInput = resolveInputFromRegistry(modelId);
   if (registryInput) return registryInput;
   return ["text", "image"];

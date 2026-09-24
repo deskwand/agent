@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { collectPromptImagesFromBlocks } from "../../main/agent/prompt-image-extract";
+import {
+  collectImageAttachmentPaths,
+  collectPromptImagesFromBlocks,
+  messageHasImages,
+} from "../../main/agent/prompt-image-extract";
 import type { ContentBlock } from "../../renderer/types";
 
 function makeTempDir(): string {
@@ -14,7 +18,7 @@ const PNG_BYTES = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
 ]);
 const JPEG_BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
-const SVG_TEXT = "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>";
+const SVG_TEXT = '<svg xmlns="http://www.w3.org/2000/svg"></svg>';
 const BMP_BYTES = Buffer.from([0x42, 0x4d, 0x36, 0x00, 0x00, 0x00]);
 const TEXT_BYTES = Buffer.from("hello world, not an image");
 
@@ -177,5 +181,163 @@ describe("collectPromptImagesFromBlocks", () => {
       },
     ];
     expect(collectPromptImagesFromBlocks(blocks, "/tmp")).toEqual([]);
+  });
+});
+
+describe("messageHasImages", () => {
+  it("counts inline image blocks", () => {
+    const blocks: ContentBlock[] = [
+      {
+        type: "image",
+        source: {
+          type: "base64",
+          media_type: "image/png",
+          data: "aGVsbG8=",
+        },
+      },
+    ];
+    expect(messageHasImages(blocks, "/tmp")).toBe(true);
+  });
+
+  it("counts an on-disk image attachment", () => {
+    const dir = makeTempDir();
+    try {
+      const relPath = path.join(".tmp", "shot.png");
+      const absPath = path.join(dir, relPath);
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, PNG_BYTES);
+      const blocks: ContentBlock[] = [
+        {
+          type: "file_attachment",
+          filename: "shot.png",
+          relativePath: relPath,
+          size: PNG_BYTES.length,
+        },
+      ];
+      expect(messageHasImages(blocks, dir)).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("counts an inline-data image attachment", () => {
+    const blocks: ContentBlock[] = [
+      {
+        type: "file_attachment",
+        filename: "remote.png",
+        relativePath: "remote.png",
+        size: 6,
+        mimeType: "image/png",
+        inlineDataBase64: "aGVsbG8=",
+      },
+    ];
+    expect(messageHasImages(blocks, "/tmp")).toBe(true);
+  });
+
+  it("ignores an on-disk attachment with an unsupported image mime", () => {
+    const dir = makeTempDir();
+    try {
+      const relPath = path.join(".tmp", "vector.svg");
+      const absPath = path.join(dir, relPath);
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, SVG_TEXT);
+      const blocks: ContentBlock[] = [
+        {
+          type: "file_attachment",
+          filename: "vector.svg",
+          relativePath: relPath,
+          size: SVG_TEXT.length,
+        },
+      ];
+      expect(messageHasImages(blocks, dir)).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("counts an attachment addressed by an absolute path", () => {
+    const dir = makeTempDir();
+    try {
+      const absPath = path.join(dir, "shot.png");
+      fs.writeFileSync(absPath, PNG_BYTES);
+      const blocks: ContentBlock[] = [
+        {
+          type: "file_attachment",
+          filename: "shot.png",
+          relativePath: absPath,
+          size: PNG_BYTES.length,
+        },
+      ];
+      expect(messageHasImages(blocks, "/nonexistent-working-dir")).toBe(true);
+      expect(
+        collectImageAttachmentPaths(blocks, "/nonexistent-working-dir"),
+      ).toEqual([absPath]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("ignores text-only messages and non-image attachments", () => {
+    const dir = makeTempDir();
+    try {
+      const relPath = path.join(".tmp", "notes.txt");
+      fs.mkdirSync(path.dirname(path.join(dir, relPath)), { recursive: true });
+      fs.writeFileSync(path.join(dir, relPath), TEXT_BYTES);
+      const blocks: ContentBlock[] = [
+        { type: "text", text: "hi" },
+        {
+          type: "file_attachment",
+          filename: "notes.txt",
+          relativePath: relPath,
+          size: TEXT_BYTES.length,
+        },
+      ];
+      expect(messageHasImages(blocks, dir)).toBe(false);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("collectImageAttachmentPaths", () => {
+  it("returns absolute paths for on-disk image attachments", () => {
+    const dir = makeTempDir();
+    try {
+      const relPath = path.join(".tmp", "shot.png");
+      const absPath = path.join(dir, relPath);
+      fs.mkdirSync(path.dirname(absPath), { recursive: true });
+      fs.writeFileSync(absPath, PNG_BYTES);
+      const blocks: ContentBlock[] = [
+        {
+          type: "file_attachment",
+          filename: "shot.png",
+          relativePath: relPath,
+          size: PNG_BYTES.length,
+        },
+      ];
+      expect(collectImageAttachmentPaths(blocks, dir)).toEqual([absPath]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("skips inline-only attachments and missing files", () => {
+    const blocks: ContentBlock[] = [
+      {
+        type: "file_attachment",
+        filename: "remote.png",
+        relativePath: "",
+        size: 10,
+        mimeType: "image/png",
+        inlineDataBase64: "aGVsbG8=",
+      },
+      {
+        type: "file_attachment",
+        filename: "gone.png",
+        relativePath: path.join(".tmp", "gone.png"),
+        size: 10,
+      },
+    ];
+    expect(collectImageAttachmentPaths(blocks, "/tmp")).toEqual([]);
   });
 });
