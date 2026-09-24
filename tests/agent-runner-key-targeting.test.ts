@@ -81,8 +81,10 @@ describe("agent-runner key write targeting for custom profiles", () => {
     const setRuntimeApiKey = vi.spyOn(runtime, "setRuntimeApiKey");
     const apiKey = "sk-test-deepseek-key-1234567890abcdef";
     const provider = "deepseek";
-    // 原生 deepseek 无需注册（builtin）
-    const piModel = runtime.getModel("deepseek", "deepseek-v4-flash");
+    // 原生 deepseek 无需注册（builtin）。
+    // 用 deepseek-v4-pro：pi-ai 0.87.1 起 deepseek provider 里的 deepseek-v4-flash
+    // 已改名为 deepseek-flash，旧 id 不再存在于该 provider 目录。
+    const piModel = runtime.getModel("deepseek", "deepseek-v4-pro");
     if (!piModel) throw new Error("native deepseek model missing");
 
     const piProvider = provider === "custom" ? piModel.provider : provider;

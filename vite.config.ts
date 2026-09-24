@@ -54,6 +54,7 @@ function transformLoadJs(code: string): string {
     'import { githubCopilotOAuth } from "./github-copilot.js";',
     'import { openRouterOAuth } from "./openrouter.js";',
     'import { kimiCodingOAuth } from "./kimi-coding.js";',
+    'import { metaOAuth } from "./meta.js";',
     'import { xaiOAuth } from "./xai.js";',
     'import { createRadiusOAuth } from "./radius.js";',
   ].join("\n");
@@ -74,6 +75,9 @@ function transformLoadJs(code: string): string {
       "return openRouterOAuth;",
     'return (await importOAuthModule("./kimi-coding.ts")).kimiCodingOAuth;':
       "return kimiCodingOAuth;",
+    // pi-ai 0.86.1 起新增的 Meta Muse flow（loadMetaOAuth）。
+    'return (await importOAuthModule("./meta.ts")).metaOAuth;':
+      "return metaOAuth;",
     'return (await importOAuthModule("./xai.ts")).xaiOAuth;':
       "return xaiOAuth;",
     'return (await importOAuthModule("./radius.ts")).createRadiusOAuth(options);':

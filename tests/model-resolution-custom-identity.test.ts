@@ -61,4 +61,25 @@ describe("modelResolutionService custom profile identity", () => {
 
     expect(resolved.piModel.provider).toBe("deepseek");
   });
+
+  it("resolves the retired deepseek flash ids to the surviving native entry", async () => {
+    // pi-ai 0.87.1 的 deepseek 目录用 deepseek-flash 取代了 deepseek-v4-flash 与
+    // deepseek-v4-flash-vision-exp。不做重定向时这两个 id 会落到跨 provider 回退、
+    // 命中 opencode 的条目 —— provider 与 baseUrl 双双变成 opencode，
+    // DeepSeek 的 key 与请求会被发到用户从未配置过的 opencode.ai。
+    for (const sessionModel of [
+      "deepseek-v4-flash",
+      "deepseek-v4-flash-vision-exp",
+    ]) {
+      const resolved = await modelResolutionService.resolve({
+        sessionProviderProfileKey: "deepseek",
+        sessionModel,
+        appConfig,
+      });
+
+      expect(resolved.piModel.provider).toBe("deepseek");
+      expect(resolved.piModel.id).toBe("deepseek-flash");
+      expect(resolved.piModel.baseUrl).toContain("api.deepseek.com");
+    }
+  });
 });

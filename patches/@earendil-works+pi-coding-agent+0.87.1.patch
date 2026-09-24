@@ -1,10 +1,10 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index 66e874e..6b42aa9 100644
+index 36fdb31..2832c6c 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -428,7 +428,10 @@ export class AgentSession {
-     };
-     _willRetryAfterAgentEnd(event) {
+@@ -629,7 +629,10 @@ export class AgentSession {
+         if (this._agentRunAbortRequested)
+             return false;
          const settings = this.settingsManager.getRetrySettings();
 -        if (!settings.enabled || this._retryAttempt >= settings.maxRetries) {
 +        if (!settings.enabled) {
@@ -14,7 +14,7 @@ index 66e874e..6b42aa9 100644
              return false;
          }
          for (let i = event.messages.length - 1; i >= 0; i--) {
-@@ -2289,12 +2292,16 @@ export class AgentSession {
+@@ -2687,7 +2690,7 @@ export class AgentSession {
              return false;
          }
          this._retryAttempt++;
@@ -23,21 +23,11 @@ index 66e874e..6b42aa9 100644
              // Preserve the completed attempt count so post-run handling can emit the final failure.
              this._retryAttempt--;
              return false;
-         }
--        const delayMs = settings.baseDelayMs * 2 ** (this._retryAttempt - 1);
-+        const rawDelayMs = settings.baseDelayMs * 2 ** (this._retryAttempt - 1);
-+        const delayMs =
-+            settings.agentLoopMaxDelayMs === undefined
-+                ? rawDelayMs
-+                : Math.min(rawDelayMs, settings.agentLoopMaxDelayMs);
-         this._emit({
-             type: "auto_retry_start",
-             attempt: this._retryAttempt,
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-index e8e8859..ba9ac2f 100644
+index be748bf..7d3a836 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-@@ -68,16 +68,186 @@ function getAliases() {
+@@ -38,16 +38,186 @@ function getAliases() {
          return _aliases;
      const __dirname = path.dirname(fileURLToPath(import.meta.url));
      const packageIndex = path.resolve(__dirname, "../..", "index.js");
@@ -231,7 +221,7 @@ index e8e8859..ba9ac2f 100644
      };
      const piCodingAgentEntry = packageIndex;
      const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
-@@ -110,6 +280,7 @@ function getAliases() {
+@@ -80,6 +250,7 @@ function getAliases() {
          "@sinclair/typebox/compile": typeboxCompileEntry,
          "@sinclair/typebox/value": typeboxValueEntry,
      };
@@ -240,47 +230,34 @@ index e8e8859..ba9ac2f 100644
  }
  let extensionCacheCwd;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
-index f93ac1a..6450c0d 100644
+index 53d2865..6b071d4 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
-@@ -17,8 +17,19 @@ export interface ProviderRetrySettings {
- }
- export interface RetrySettings {
-     enabled?: boolean;
-+    /** Maximum number of retries. Ignored by the agent turn loop when `unbounded` is true. */
+@@ -25,6 +25,8 @@ export interface RetrySettings {
      maxRetries?: number;
      baseDelayMs?: number;
-+    /**
-+     * Upper bound applied to the exponential backoff delay of the agent turn loop.
-+     *
-+     * Deliberately NOT named `maxDelayMs`: the SDK migrates `retry.maxDelayMs` into
-+     * `retry.provider.maxRetryDelayMs` and deletes the original key before
-+     * `getRetrySettings()` ever runs, which would silently disable the cap.
-+     */
-+    agentLoopMaxDelayMs?: number;
+     maxAgentDelayMs?: number;
 +    /** Let the agent turn loop retry without consuming the `maxRetries` budget. */
 +    unbounded?: boolean;
      provider?: ProviderRetrySettings;
  }
  export type TuiMode = RendererTuiMode;
-@@ -236,6 +247,8 @@ export declare class SettingsManager {
-         enabled: boolean;
+@@ -249,6 +251,7 @@ export declare class SettingsManager {
          maxRetries: number;
          baseDelayMs: number;
-+        agentLoopMaxDelayMs: number | undefined;
+         maxAgentDelayMs: number;
 +        unbounded: boolean;
      };
      getHttpIdleTimeoutMs(): number;
      setHttpIdleTimeoutMs(timeoutMs: number): void;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
-index f0f936e..ea7fb39 100644
+index ed9d8d2..7d6205b 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
-@@ -594,6 +594,8 @@ export class SettingsManager {
-             enabled: this.getRetryEnabled(),
+@@ -620,6 +620,7 @@ export class SettingsManager {
              maxRetries: this.settings.retry?.maxRetries ?? 3,
              baseDelayMs: this.settings.retry?.baseDelayMs ?? 2000,
-+            agentLoopMaxDelayMs: this.settings.retry?.agentLoopMaxDelayMs,
+             maxAgentDelayMs: this.settings.retry?.maxAgentDelayMs ?? DEFAULT_MAX_AGENT_RETRY_DELAY_MS,
 +            unbounded: this.settings.retry?.unbounded ?? false,
          };
      }

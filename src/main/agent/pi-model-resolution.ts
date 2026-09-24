@@ -310,6 +310,13 @@ export function applyPiModelRuntimeOverrides(
   options: PiModelLookupOptions = {},
 ): Model<Api> {
   let nextModel = model;
+
+  // 输入能力按 id 钉住：注册表路径（resolvePiRegistryModel）不经过 resolveModelInput，
+  // 而 pi-ai 0.87.1 的 DeepSeek 目录已把 deepseek-flash 标成收图。升级 SDK 不改变
+  // 用户可见能力，因此两条链路都在这里收敛（见 KNOWN_TEXT_ONLY_MODEL_IDS 的说明）。
+  if (KNOWN_TEXT_ONLY_MODEL_IDS.has(nextModel.id)) {
+    nextModel = { ...nextModel, input: ["text"] } as typeof nextModel;
+  }
   const isCustomProvider =
     options.rawProvider === "custom" || options.configProvider === "custom";
   const shouldHonorConfiguredBaseUrl =
@@ -421,7 +428,9 @@ export function resolvePiRegistryModel(
   modelString: string,
   options: PiModelLookupOptions = {},
 ): Model<Api> | undefined {
-  for (const candidate of buildPiModelLookupCandidates(modelString, options)) {
+  for (const candidate of expandRenamedCandidates(
+    buildPiModelLookupCandidates(modelString, options),
+  )) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model = (getModel as (...args: unknown[]) => Model<Api> | undefined)(
       candidate.provider as PiRegistryProvider,
@@ -462,24 +471,78 @@ export function resolveModelContextWindow(modelName: string): number {
 }
 
 /**
- * pi 注册表没有官方名条目、但确认为纯文本的模型 id：`deepseek-flash` 至今未收录（同族只有
- * v4-flash / v4-pro / v4-flash-vision-exp），缺条目时合成回退会乐观地标成 ["text","image"]
+ * pi 注册表没有官方名条目、但确认为纯文本的模型 id。
+ *
+ * 历史：`deepseek-flash` 长期未被注册表收录（同族只有 v4-flash / v4-pro /
+ * v4-flash-vision-exp），缺条目时合成回退会乐观地标成 ["text","image"]
  * → 用户贴的图片以原生 image_url 直传 DeepSeek 方言端点，上游 400。
- * 失效条件：注册表收录该 id（本函数先返回注册表取值），或上游把该模型转为多模态（删掉该 id）。
+ *
+ * 现状（pi-ai 0.87.1）：上游 DeepSeek 目录**已收录** `deepseek-flash`（DeepSeek V4.1
+ * Flash）并标为 ["text","image"]，且 resolvePiRegistryModel 的跨 provider 回退会把它当成
+ * 云端 `custom/deepseek-flash` 的结果。但同一模型在 radius / opencode / fireworks /
+ * openrouter 等同族目录里仍是 ["text"]，而原先记录的上游 400 没有新证据说明已修复。
+ *
+ * 因此保留本表，并在 applyPiModelRuntimeOverrides 里对云端端点再镇一次
+ * （注册表路径不经过 resolveModelInput，只靠本函数守不住）。
+ * 回退条件：云端端点实测接受 image_url —— 那时删掉本表，并把 resolveInputFromRegistry
+ * 改成按 provider + id 匹配，而不是仅按 id。
  */
 const KNOWN_TEXT_ONLY_MODEL_IDS: ReadonlySet<string> = new Set([
   "deepseek-flash",
 ]);
 
 /**
- * 单模型输入能力：注册表 > 已知纯文本表 > 乐观默认 ["text","image"]。
+ * 上游改名的模型 id：profile 里存着旧 id 时，先把候选映射到新 id 再查注册表。
+ *
+ * pi-ai 0.87.1 起 `deepseek` provider 只留 `deepseek-flash`（DeepSeek 官方已把
+ * deepseek-v4-flash 改名为 deepseek-flash，旧名仍被上游接受 —— 见
+ * src/main/usage/model-price-overrides.ts 的计价说明）。不做重定向时，原生 deepseek
+ * profile 选到旧 id 会落到下面的跨 provider 回退、命中 opencode 的条目，
+ * 使 provider 身份从 deepseek 漂成 opencode（API key 随之按错误的命名空间解析）。
+ *
+ * 键是候选里的 provider，值是旧 id → 新 id。
+ */
+const PI_MODEL_ID_RENAMES: Readonly<
+  Record<string, Readonly<Record<string, string>>>
+> = {
+  deepseek: {
+    "deepseek-v4-flash": "deepseek-flash",
+    // 同族实验性视觉条目也一并退役（0.85.1 的 deepseek 目录里有，0.87.1 只剩
+    // deepseek-flash + deepseek-v4-pro）。不重定向则落到只收录该 id 的 opencode。
+    "deepseek-v4-flash-vision-exp": "deepseek-flash",
+  },
+};
+
+/**
+ * 把每个候选原地展开为「原名 + 新名」，让重定向先于跨 provider 回退生效
+ * （回退只看 id、不看 provider，因此晚一步就会命中外部的同名条目）。
+ */
+function expandRenamedCandidates(
+  candidates: readonly PiModelLookupCandidate[],
+): PiModelLookupCandidate[] {
+  const expanded: PiModelLookupCandidate[] = [];
+  for (const candidate of candidates) {
+    expanded.push(candidate);
+    const renamed = PI_MODEL_ID_RENAMES[candidate.provider]?.[candidate.model];
+    if (renamed) {
+      expanded.push({ provider: candidate.provider, model: renamed });
+    }
+  }
+  return expanded;
+}
+
+/**
+ * 单模型输入能力：已知纯文本表 > 注册表 > 乐观默认 ["text","image"]。
  *
  * 主会话（buildSyntheticPiModel）与子代理 provider 注册（provider-bridge）必须走同一个函数：
  * 同一个 id 在两处得出不同能力，会出现「主会话能看图、子代理只拿到占位符」这种无从排查的差异。
+ *
+ * 纯文本表刻意排在注册表之前：pi-ai 0.87.1 的 DeepSeek 目录开始把 `deepseek-flash`
+ * 标成收图，但云端与官方两条链路都未验证过真的接受 image_url（见该表的注释）。
  */
 export function resolveModelInput(modelId: string): ("text" | "image")[] {
+  if (KNOWN_TEXT_ONLY_MODEL_IDS.has(modelId)) return ["text"];
   const registryInput = resolveInputFromRegistry(modelId);
   if (registryInput) return registryInput;
-  if (KNOWN_TEXT_ONLY_MODEL_IDS.has(modelId)) return ["text"];
   return ["text", "image"];
 }

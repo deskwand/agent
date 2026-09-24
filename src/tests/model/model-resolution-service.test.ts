@@ -339,15 +339,16 @@ describe("ModelResolutionService", () => {
     return config;
   }
 
-  it("pins the catalog-less cloud text model to text-only", async () => {
+  it("pins the registry-resolved cloud text model to text-only", async () => {
     const result = await service.resolve({
       sessionProviderProfileKey: "custom:deskwand",
       sessionModel: "deepseek-flash",
       appConfig: withDeskWandCloudProfile(buildAppConfig()),
     });
 
-    expect(result.trace.piModelSource).toBe("synthetic");
-    expect(result.trace.notes).toContain("registry_model_not_found");
+    // pi-ai 0.87.1 的 deepseek 目录收录了 deepseek-flash，因此不再走合成回退；
+    // 但输入能力仍由 KNOWN_TEXT_ONLY_MODEL_IDS 钉住（上游标的是 ["text","image"]）。
+    expect(result.trace.piModelSource).toBe("registry");
     expect(result.piModel.input).toEqual(["text"]);
   });
 

@@ -35,13 +35,16 @@ describe("OpenCode presets", () => {
 });
 
 describe("DeepSeek presets", () => {
-  it("includes the vision model in the DeepSeek provider preset", () => {
+  it("no longer offers the vision model deprecated by pi-ai 0.87.1", () => {
+    // 0.85.1 的 deepseek 目录含 deepseek-v4-flash-vision-exp，0.87.1 只剩
+    // deepseek-flash + deepseek-v4-pro。继续在原生 DeepSeek 预设里提供这个 id，
+    // 会让选中它的人落到 opencode 条目（provider 与 baseUrl 一并变成 opencode）。
     const ids = API_PROVIDER_PRESETS.deepseek.models.map((m) => m.id);
-    expect(ids).toContain("deepseek-v4-flash-vision-exp");
+    expect(ids).not.toContain("deepseek-v4-flash-vision-exp");
   });
 
-  it("mentions the vision model in deepseek guidance placeholder", () => {
-    expect(getModelInputGuidance("deepseek").placeholder).toContain(
+  it("does not mention the deprecated vision model in deepseek guidance", () => {
+    expect(getModelInputGuidance("deepseek").placeholder).not.toContain(
       "deepseek-v4-flash-vision-exp",
     );
   });

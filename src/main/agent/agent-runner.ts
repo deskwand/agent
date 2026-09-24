@@ -3605,8 +3605,8 @@ Tool routing:\n
                 // 压缩 / 分支摘要仍用 2 次预算（见 design-docs/2026-09-22-network-retry-policy.md §4.3）
                 maxRetries: 2,
                 baseDelayMs: 2000,
-                // 退避封顶 60s：不封顶时 2^n 会在第 15 次退化成"再也不重试"
-                agentLoopMaxDelayMs: 60000,
+                // 退避封顶 60s：0.86.0 起由 pi-ai 的 retryDelayMs() 原生承担
+                maxAgentDelayMs: 60000,
                 // 只有 agent 回合循环无视次数预算
                 unbounded: true,
               },
@@ -5136,7 +5136,7 @@ Tool routing:\n
             // 见 design-docs/2026-09-22-network-retry-policy.md §4.2 / §4.3
             maxRetries: 2,
             baseDelayMs: 2000,
-            agentLoopMaxDelayMs: 60000,
+            maxAgentDelayMs: 60000,
             unbounded: true,
           },
         }),

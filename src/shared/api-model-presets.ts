@@ -92,11 +92,10 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
     baseUrl: "https://api.deepseek.com/v1",
     models: [
       { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
+      // deepseek-v4-flash 是官方退役的旧名（仍被上游接受），选它会由
+      // src/main/agent/pi-model-resolution.ts 的 PI_MODEL_ID_RENAMES 重定向到 deepseek-flash。
+      // deepseek-v4-flash-vision-exp 已于 pi-ai 0.87.1 从 DeepSeek 目录移除，不再提供。
       { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
-      {
-        id: "deepseek-v4-flash-vision-exp",
-        name: "deepseek-v4-flash-vision-exp",
-      },
       { id: "deepseek-flash", name: "deepseek-flash" },
     ],
     keyPlaceholder: "sk-...",
@@ -291,7 +290,7 @@ export function getModelInputGuidance(
   if (provider === "deepseek") {
     return {
       placeholder:
-        "deepseek-flash, deepseek-v4-pro, deepseek-v4-flash, deepseek-v4-flash-vision-exp, deepseek-chat",
+        "deepseek-flash, deepseek-v4-pro, deepseek-v4-flash, deepseek-chat",
       hint: "Use the exact model ID for the selected protocol or endpoint.",
     };
   }
