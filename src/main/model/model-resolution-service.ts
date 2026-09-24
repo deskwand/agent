@@ -1,5 +1,7 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import { normalizeOpenAICompatibleBaseUrl } from "../config/auth-utils";
+import { getCodingSubscription } from "../../shared/coding-subscriptions";
+import { t } from "../i18n";
 import type {
   AppConfig,
   ApiProviderConfig,
@@ -77,6 +79,12 @@ function getProviderConfig(
   }
 
   if (requestedProvider) {
+    const disconnected = getCodingSubscription(requestedProvider);
+    if (disconnected) {
+      throw new Error(
+        t("errors.subscriptionDisconnected", { name: disconnected.name }),
+      );
+    }
     notes.push("session_provider_missing_fell_back_to_active");
   }
 
@@ -290,6 +298,25 @@ export class ModelResolutionService {
         ...piModel,
         provider: `${DESKWAND_PROVIDER_PREFIX}${providerSelection.providerProfileKey}`,
       } as Model<Api>;
+    }
+
+    const subscription = getCodingSubscription(
+      providerSelection.providerProfileKey,
+    );
+    if (
+      subscription &&
+      (providerConfig.provider !== "custom" ||
+        providerConfig.customProtocol !== "openai" ||
+        baseUrl !== subscription.baseUrl ||
+        piModel.baseUrl !== subscription.baseUrl ||
+        piModel.api !== "openai-completions" ||
+        piModel.provider !==
+          `${DESKWAND_PROVIDER_PREFIX}${subscription.profileKey}` ||
+        !subscription.modelIds.includes(piModel.id))
+    ) {
+      throw new Error(
+        t("errors.subscriptionInvalid", { name: subscription.name }),
+      );
     }
 
     return {

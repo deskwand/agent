@@ -25,6 +25,10 @@ import {
   profileKeyToProvider,
 } from "../../hooks/useApiConfigState";
 import { oauthProfileKey } from "../../../shared/oauth-utils";
+import {
+  getCodingSubscription,
+  isCodingSubscriptionProfileKey,
+} from "../../../shared/coding-subscriptions";
 import type {
   ApiProviderConfig,
   ApiProviderModel,
@@ -46,6 +50,7 @@ import {
 import { ProviderBrandIcon, resolveProviderBrand } from "./provider-icons";
 import { resolveProviderDisplayName } from "../../utils/model-label";
 import { SettingsContentSection } from "./shared";
+import { CodingSubscriptionCards } from "./coding-subscription-cards";
 
 type ProviderChoice = ProviderType;
 
@@ -538,6 +543,7 @@ export function SettingsAPI({
       Object.entries(providers).filter(
         ([profileKey, config]) =>
           profileKey !== "custom:deskwand" &&
+          !isCodingSubscriptionProfileKey(profileKey) &&
           config &&
           hasUsableCredentials(profileKey as ProviderProfileKey, config),
       ) as Array<[string, ApiProviderConfig]>
@@ -954,6 +960,45 @@ export function SettingsAPI({
     setPendingOAuthLogoutProviderId(null);
   };
 
+  const handleSubscriptionSave = async (profileKey: string, apiKey: string) => {
+    const plan = getCodingSubscription(profileKey);
+    if (!plan) throw new Error(t("api.subscriptionInvalidPlan"));
+    if (
+      profileKey === "custom:subscription-bailian-coding" &&
+      !apiKey.startsWith("sk-sp-")
+    ) {
+      throw new Error(t("api.subscriptionInvalidKey"));
+    }
+    const saved = await window.electronAPI.config.saveProvider({
+      profileKey,
+      config: {
+        provider: "custom",
+        customProtocol: "openai",
+        name: plan.name,
+        apiKey,
+        baseUrl: plan.baseUrl,
+        defaultModel:
+          appConfig?.providers[profileKey]?.defaultModel || plan.defaultModel,
+        models: plan.modelIds.map((id) => ({
+          id,
+          label: id,
+          source: "preset",
+        })),
+        updatedAt: new Date().toISOString(),
+      },
+    });
+    applyConfig(saved.config);
+    onSaved?.();
+  };
+
+  const handleSubscriptionDelete = async (profileKey: string) => {
+    const deleted = await window.electronAPI.config.deleteProvider({
+      profileKey,
+    });
+    applyConfig(deleted.config);
+    onSaved?.();
+  };
+
   const updateDraft = (patch: Partial<ProviderDraft>) => {
     setDraft((current) => {
       if (!current) return current;
@@ -1258,6 +1303,13 @@ export function SettingsAPI({
                   </div>
                 );
               })}
+            </div>
+            <div className="mt-3">
+              <CodingSubscriptionCards
+                profiles={appConfig?.providers || {}}
+                onSave={handleSubscriptionSave}
+                onDelete={handleSubscriptionDelete}
+              />
             </div>
           </div>
         </div>

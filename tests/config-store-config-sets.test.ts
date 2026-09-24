@@ -141,6 +141,78 @@ describe('ConfigStore provider configs', () => {
     expect(switched.maxTokens).toBe(4096);
   });
 
+  it.each([
+    [
+      "custom:subscription-bailian-coding",
+      "https://coding.dashscope.aliyuncs.com/v1",
+      "qwen3.7-plus",
+    ],
+    [
+      "custom:subscription-ark-coding",
+      "https://ark.cn-beijing.volces.com/api/coding/v3",
+      "ark-code-latest",
+    ],
+  ])(
+    "pins %s to its subscription endpoint and model list",
+    (profileKey, baseUrl, defaultModel) => {
+      const store = new ConfigStore();
+      const saved = store.saveProvider({
+        profileKey,
+        config: {
+          provider: "custom",
+          customProtocol: "anthropic",
+          name: "Forged",
+          apiKey: " subscribed-key ",
+          baseUrl: "https://api.openai.com/v1",
+          defaultModel: "unauthorized-model",
+          models: [
+            { id: "unauthorized-model", label: "bad", source: "custom" },
+          ],
+          updatedAt: "",
+        },
+      });
+      const profile = saved.providers[profileKey]!;
+      expect(profile.provider).toBe("custom");
+      expect(profile.customProtocol).toBe("openai");
+      expect(profile.baseUrl).toBe(baseUrl);
+      expect(profile.defaultModel).toBe(defaultModel);
+      expect(profile.models.map((m) => m.id)).toContain(defaultModel);
+      expect(profile.models.map((m) => m.id)).not.toContain(
+        "unauthorized-model",
+      );
+      expect(profile.apiKey).toBe("subscribed-key");
+      expect(
+        store.deleteProvider({ profileKey }).providers[profileKey],
+      ).toBeUndefined();
+    },
+  );
+
+  it("canonicalizes tampered stored subscription configuration on projection", () => {
+    const profileKey = "custom:subscription-bailian-coding";
+    const store = new ConfigStore();
+    store.saveProvider({
+      profileKey,
+      config: {
+        provider: "custom",
+        customProtocol: "openai",
+        apiKey: "sk-sp-key",
+        baseUrl: "https://coding.dashscope.aliyuncs.com/v1",
+        defaultModel: "kimi-k2.5",
+        models: [{ id: "kimi-k2.5", label: "kimi-k2.5", source: "preset" }],
+        updatedAt: "",
+      },
+    });
+    const stored = (
+      store as unknown as {
+        store: { store: { providers: Record<string, { baseUrl: string }> } };
+      }
+    ).store.store;
+    stored.providers[profileKey].baseUrl = "https://api.openai.com/v1";
+    const projected = store.getAll().providers[profileKey]!;
+    expect(projected.baseUrl).toBe("https://coding.dashscope.aliyuncs.com/v1");
+    expect(projected.defaultModel).toBe("kimi-k2.5");
+  });
+
   it('keeps theme preference across provider mutations', () => {
     mocks.seed = { theme: 'dark' };
     const store = new ConfigStore();

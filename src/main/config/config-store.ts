@@ -7,6 +7,7 @@ import type {
   SharedProviderPreset,
   VisionModelConfig,
 } from "../../shared/api-model-presets";
+import { getCodingSubscription } from "../../shared/coding-subscriptions";
 import { VALID_THEME_PRESETS } from "../../shared/theme";
 import type { ThemePreset } from "../../shared/theme";
 import {
@@ -551,6 +552,26 @@ export function normalizeProviderConfig(
       ? defaultModelCandidate
       : models[0]?.id || fallbackProfile.model
     : defaultModelCandidate;
+  const subscription = getCodingSubscription(profileKey);
+  if (subscription) {
+    return {
+      provider: "custom",
+      customProtocol: "openai",
+      name: subscription.name,
+      apiKey: typeof raw?.apiKey === "string" ? raw.apiKey.trim() : "",
+      baseUrl: subscription.baseUrl,
+      defaultModel:
+        dm && subscription.modelIds.includes(dm)
+          ? dm
+          : subscription.defaultModel,
+      models: subscription.modelIds.map((id) => ({
+        id,
+        label: id,
+        source: "preset",
+      })),
+      updatedAt: toNonEmptyString(raw?.updatedAt) || nowISO(),
+    };
+  }
   return {
     provider: meta.provider,
     customProtocol: normalizeCustomProtocol(

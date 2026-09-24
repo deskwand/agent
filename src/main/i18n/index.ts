@@ -61,6 +61,9 @@ const MSG: Record<Locale, MessageTable> = {
       "上游服务异常，正在自动重试，请稍候...\n原始错误: {{error}}",
     "errors.networkInterrupted": "网络连接中断，正在自动重试，请稍候...",
     "errors.checkConfig": "_请检查配置后重试。_",
+    "errors.subscriptionDisconnected": "{{name}} 已断开，请重新选择模型。",
+    "errors.subscriptionInvalid":
+      "{{name}} 的端点、协议或模型与订阅配置不符，请重新配置。",
     "errors.retrying": "_Agent 正在自动重试，请稍候..._",
     "errors.requestTimeout": "请求超时，请检查网络连接后重试",
     "errors.bundledNodeMissing":
@@ -151,6 +154,10 @@ const MSG: Record<Locale, MessageTable> = {
     "errors.networkInterrupted":
       "Network interrupted. Retrying, please wait...",
     "errors.checkConfig": "_Please check your configuration and retry._",
+    "errors.subscriptionDisconnected":
+      "{{name}} is disconnected. Select another model.",
+    "errors.subscriptionInvalid":
+      "{{name}} has an invalid subscription endpoint, protocol or model. Reconfigure it.",
     "errors.retrying": "_Retrying automatically, please wait..._",
     "errors.requestTimeout":
       "Request timed out. Check your network connection and retry.",
