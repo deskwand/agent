@@ -70,29 +70,53 @@ function SubscriptionCard({
       className="rounded-xl border border-border-muted bg-surface px-4 py-3"
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-primary">
-            <svg
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-              className="h-5 w-5 shrink-0 fill-none stroke-current text-text-secondary"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {plan.profileKey === "custom:subscription-bailian-coding" ? (
-                <path d="M6.3 18h10.5a4 4 0 0 0 .2-8 6 6 0 0 0-11.2-.7A4.5 4.5 0 0 0 6.3 18Z" />
-              ) : plan.profileKey === "custom:subscription-ark-coding" ? (
-                <>
-                  <path d="M3 19h18l-5.2-8h-7.6L3 19Z" />
-                  <path d="m9 11 3-6 3 6" />
-                </>
-              ) : null}
-            </svg>
-            <span className="truncate">{plan.name}</span>
-          </div>
-          <div className="text-xs text-text-muted">
-            {configured ? t("api.subscriptionConfigured") : t(plan.noteKey)}
+        <div className="flex min-w-0 items-start gap-3">
+          <svg
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+            className="mt-px h-5 w-5 shrink-0 fill-none stroke-current text-text-secondary"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            {plan.profileKey === "custom:subscription-bailian-coding" ? (
+              <path d="M6.3 18h10.5a4 4 0 0 0 .2-8 6 6 0 0 0-11.2-.7A4.5 4.5 0 0 0 6.3 18Z" />
+            ) : plan.profileKey === "custom:subscription-ark-coding" ? (
+              <>
+                <path d="M3 19h18l-5.2-8h-7.6L3 19Z" />
+                <path d="m9 11 3-6 3 6" />
+              </>
+            ) : null}
+          </svg>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
+              <span className="truncate">{plan.name}</span>
+            </div>
+            <div className="text-xs text-text-muted">
+              {configured ? t("api.subscriptionConfigured") : t(plan.noteKey)}
+            </div>
+            {configured && (
+              <div className="mt-1 text-xs text-warning">{t(plan.noteKey)}</div>
+            )}
+            <div className="mt-1 text-xs text-text-muted">
+              <a
+                href={plan.keyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
+                {t("api.subscriptionGetKey")}
+              </a>
+              {" · "}
+              <a
+                href={plan.termsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+              >
+                {t("api.subscriptionTerms")}
+              </a>
+            </div>
           </div>
         </div>
         <button
@@ -104,7 +128,11 @@ function SubscriptionCard({
             setError("");
             setKey("");
           }}
-          className="rounded-lg border border-border-muted px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover"
+          className={`shrink-0 rounded-lg px-3 py-1.5 text-xs ${
+            configured
+              ? "border border-border-muted text-text-secondary hover:bg-surface-hover"
+              : "bg-accent font-medium text-accent-foreground hover:bg-accent-hover"
+          }`}
         >
           {t(
             configured
@@ -113,39 +141,19 @@ function SubscriptionCard({
           )}
         </button>
       </div>
-      {configured && (
-        <div className="mt-1 text-xs text-warning">{t(plan.noteKey)}</div>
-      )}
-      <div className="mt-1 text-xs text-text-muted">
-        <a
-          href={plan.keyUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent hover:underline"
-        >
-          {t("api.subscriptionGetKey")}
-        </a>
-        {" · "}
-        <a
-          href={plan.termsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:underline"
-        >
-          {t("api.subscriptionTerms")}
-        </a>
-      </div>
       {editing && (
-        <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {/* 与上方图标同宽的占位：让输入框左边缘对齐文字列（16 + 20 + 12 = 48px） */}
+          <span className="w-5 shrink-0" />
           <input
             type="password"
             autoComplete="new-password"
             autoCorrect="off"
             spellCheck={false}
-            aria-label={t("api.subscriptionConfigureKey")}
+            aria-label={t("api.subscriptionKeyLabel")}
             value={key}
             onChange={(event) => setKey(event.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-border-muted bg-surface px-2 py-1.5 text-sm text-text-primary"
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-text-primary"
           />
           <button
             type="button"
