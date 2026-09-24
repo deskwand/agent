@@ -8,10 +8,7 @@ import {
   classifyRemoteBackupError,
   registerVaultIpc,
 } from "../src/main/vault/ipc";
-import {
-  VaultCloudError,
-  type VaultIndexScope,
-} from "../src/main/vault/cloud-client";
+import { VaultCloudError } from "../src/main/vault/cloud-client";
 import { LocalVaultStore } from "../src/main/vault/local-store";
 import { VaultSkillsStore } from "../src/main/vault/skills-vault";
 import type { VaultSnapshot } from "../src/shared/vault";
@@ -81,12 +78,12 @@ describe("Vault IPC contract", () => {
 
     await expect(
       handlers.get("vault.getFilePath")?.(null, "readme.md"),
-    ).resolves.toBe(join(store.rootDir, "readme.md"));
+    ).resolves.toBe(join(store.rootDir, "files", "readme.md"));
+    await expect(
+      handlers.get("vault.getFilePath")?.(null, "项目/笔记.md"),
+    ).resolves.toBe(join(store.rootDir, "files", "项目", "笔记.md"));
     await expect(
       handlers.get("vault.getFilePath")?.(null, "../secret"),
-    ).rejects.toThrow("VAULT_INVALID_NAME");
-    await expect(
-      handlers.get("vault.getFilePath")?.(null, "nested/readme.md"),
     ).rejects.toThrow("VAULT_INVALID_NAME");
     await expect(
       handlers.get("vault.getFilePath")?.(null, "vault-mek.bin."),
@@ -123,7 +120,34 @@ describe("Vault IPC contract", () => {
     )?.()) as VaultSnapshot;
     expect(snapshot.hasLocalFiles).toBe(true);
     expect(snapshot.hasLocalMek).toBe(true);
-    expect(snapshot.items.map((item) => item.name)).toEqual(["readme.md"]);
+    expect(snapshot.items.map((item) => item.path)).toEqual(["readme.md"]);
+    handle.mockRestore();
+  });
+
+  it("lists nested file paths relative to the files module", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+
+    const { store, dependencies } = await makeDependencies(
+      Buffer.from("mek"),
+      false,
+    );
+    await mkdir(join(store.moduleRoot("files"), "项目"), { recursive: true });
+    await writeFile(
+      join(store.moduleRoot("files"), "项目", "笔记.md"),
+      "note",
+    );
+    registerVaultIpc(dependencies);
+
+    const snapshot = (await handlers.get(
+      "vault.getSnapshot",
+    )?.()) as VaultSnapshot;
+    expect(snapshot.items.map((item) => item.path)).toContain("项目/笔记.md");
     handle.mockRestore();
   });
 
@@ -140,16 +164,12 @@ describe("Vault IPC contract", () => {
     dependencies.cloud.getIndex = async () => null;
     registerVaultIpc(dependencies);
 
-    const fromHandler = (await handlers.get("vault.checkRemoteBackup")?.(
+    const fromHandler = (await handlers.get("vault.checkRemoteBackup")(
       null,
       "token",
-    )) as { status: string; scopes: Record<string, { hasBackup: boolean }> };
-    // scopes 是统一入口新增的能力：两个 scope 都没有备份时 status 仍是 no-backup
-    expect(fromHandler.status).toBe("no-backup");
-    expect(fromHandler.scopes).toEqual({
-      files: { hasBackup: false },
-      skills: { hasBackup: false },
-    });
+    )) as { status: string };
+    // 单一远端索引槽没有备份时 status 是 no-backup，而不是错误
+    expect(fromHandler).toEqual({ status: "no-backup" });
     handle.mockRestore();
   });
 
@@ -244,7 +264,7 @@ describe("Vault IPC contract", () => {
     ).resolves.toBeNull();
     handle.mockRestore();
   });
-  it("reports backup scopes for both vaults", async () => {
+  it("reports a single remote backup status", async () => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const handle = vi
       .spyOn(ipcMain, "handle")
@@ -253,22 +273,30 @@ describe("Vault IPC contract", () => {
         return undefined as never;
       });
     const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
-    dependencies.cloud.getIndex = async (_token, scope) =>
-      scope === "skills" ? Buffer.alloc(5) : null;
+    const tokens: string[] = [];
+    dependencies.cloud.getIndex = async (token: string) => {
+      tokens.push(token);
+      return Buffer.alloc(5);
+    };
     registerVaultIpc(dependencies);
 
-    const status = (await handlers.get("vault.checkRemoteBackup")?.(
+    const status = await handlers.get("vault.checkRemoteBackup")?.(
       null,
       "token",
-    )) as { status: string; scopes: Record<string, { hasBackup: boolean }> };
+    );
 
-    expect(status.status).toBe("has-backup");
-    expect(status.scopes.skills.hasBackup).toBe(true);
-    expect(status.scopes.files.hasBackup).toBe(false);
+    expect(status).toEqual({ status: "has-backup" });
+    // 单一远端索引槽：只查一次，查询不再带 scope
+    expect(tokens).toEqual(["token"]);
+
+    dependencies.cloud.getIndex = async () => null;
+    await expect(
+      handlers.get("vault.checkRemoteBackup")?.(null, "token"),
+    ).resolves.toEqual({ status: "no-backup" });
     handle.mockRestore();
   });
 
-  it("restores only the scopes that still need it", async () => {
+  it("skips the restore when the vault already has local content", async () => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const handle = vi
       .spyOn(ipcMain, "handle")
@@ -280,22 +308,19 @@ describe("Vault IPC contract", () => {
       Buffer.from("mek"),
       false,
     );
-    // files scope 已有本地索引 → 必须跳过；skills scope 为空 → 需要恢复
-    await store.writeIndex({ version: 1, files: {}, pendingDeletes: [] });
-    const restoredScopes: string[] = [];
-    dependencies.restoreService.restoreWithLocalMek = async () => {
-      restoredScopes.push("files");
-      return { restored: 0, renamed: 0 };
-    };
-    dependencies.skillsVault.restoreService.restoreWithLocalMek = async () => {
-      restoredScopes.push("skills");
-      return { restored: 0, renamed: 0 };
-    };
+    // 本地已有索引 → 跳过，不覆盖用户在本机已有的内容
+    await store.writeIndex({ version: 2, files: {}, pendingDeletes: [] });
+    const restore = vi.fn(dependencies.restoreService.restoreWithLocalMek);
+    dependencies.restoreService.restoreWithLocalMek = restore;
     registerVaultIpc(dependencies);
 
-    await handlers.get("vault.restoreWithLocalMek")?.(null, "token");
+    const result = await handlers.get("vault.restoreWithLocalMek")?.(
+      null,
+      "token",
+    );
 
-    expect(restoredScopes).toEqual(["skills"]);
+    expect(result).toEqual({ restored: 0, renamed: 0 });
+    expect(restore).not.toHaveBeenCalled();
     handle.mockRestore();
   });
 
@@ -311,13 +336,11 @@ describe("Vault IPC contract", () => {
     const globalSkills = dependencies.globalSkillsPath();
     await mkdir(join(globalSkills, "foo"), { recursive: true });
     await writeFile(join(globalSkills, "foo", "SKILL.md"), "# foo");
-    await mkdir(join(dependencies.skillsVault.store.rootDir, "foo"), {
+    const skillsRoot = dependencies.store.moduleRoot("skills");
+    await mkdir(join(skillsRoot, "foo"), {
       recursive: true,
     });
-    await writeFile(
-      join(dependencies.skillsVault.store.rootDir, "foo", "SKILL.md"),
-      "# existing",
-    );
+    await writeFile(join(skillsRoot, "foo", "SKILL.md"), "# existing");
     registerVaultIpc(dependencies);
 
     const result = (await handlers.get("vault.addSkillsToVault")?.(
@@ -332,7 +355,7 @@ describe("Vault IPC contract", () => {
     await expect(stat(join(globalSkills, "foo"))).resolves.toBeTruthy();
     handle.mockRestore();
   });
-  it("syncs the skills scope as well", async () => {
+  it("syncs the whole vault with a single call", async () => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const handle = vi
       .spyOn(ipcMain, "handle")
@@ -340,74 +363,84 @@ describe("Vault IPC contract", () => {
         handlers.set(channel, listener);
         return undefined as never;
       });
-    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
-    const syncedScopes: string[] = [];
-    dependencies.syncService.sync = async () => {
-      syncedScopes.push("files");
-      return { uploaded: 0, deleted: 0, pending: 0, failed: 0 };
-    };
-    dependencies.skillsVault.syncService.sync = async () => {
-      syncedScopes.push("skills");
-      return { uploaded: 0, deleted: 0, pending: 0, failed: 0 };
-    };
+    const { store, dependencies } = await makeDependencies(
+      Buffer.from("mek"),
+      false,
+    );
+    // 一次同步覆盖整个密库：files 条目与 skills 聚合都在同一份索引里
+    const filesRoot = store.moduleRoot("files");
+    await mkdir(filesRoot, { recursive: true });
+    await writeFile(join(filesRoot, "note.md"), "note");
+    const skillsRoot = store.moduleRoot("skills");
+    await mkdir(join(skillsRoot, "foo"), { recursive: true });
+    await writeFile(join(skillsRoot, "foo", "SKILL.md"), "# foo");
+    const sync = vi.fn(async () => ({
+      uploaded: 0,
+      deleted: 0,
+      pending: 0,
+      failed: 0,
+    }));
+    dependencies.syncService.sync = sync;
     registerVaultIpc(dependencies);
 
-    await handlers.get("vault.sync")?.(null, "token");
-
-    expect(syncedScopes).toEqual(["files", "skills"]);
-    handle.mockRestore();
-  });
-
-  it("reports a skills sync failure without failing the whole sync", async () => {
-    const handlers = new Map<string, (...args: unknown[]) => unknown>();
-    const handle = vi
-      .spyOn(ipcMain, "handle")
-      .mockImplementation((channel, listener) => {
-        handlers.set(channel, listener);
-        return undefined as never;
-      });
-    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
-    dependencies.skillsVault.syncService.sync = async () => {
-      throw new Error("VAULT_QUOTA_EXCEEDED");
-    };
-    registerVaultIpc(dependencies);
-
-    const snapshot = (await handlers.get("vault.sync")?.(null, "token")) as {
-      syncError?: string;
-    };
-
-    expect(snapshot.syncError).toBe("VAULT_QUOTA_EXCEEDED");
-    handle.mockRestore();
-  });
-
-  it("still restores skills when the files scope has no remote backup", async () => {
-    const handlers = new Map<string, (...args: unknown[]) => unknown>();
-    const handle = vi
-      .spyOn(ipcMain, "handle")
-      .mockImplementation((channel, listener) => {
-        handlers.set(channel, listener);
-        return undefined as never;
-      });
-    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
-    const restoredScopes: string[] = [];
-    dependencies.restoreService.restoreWithLocalMek = async () => {
-      restoredScopes.push("files");
-      throw new Error("VAULT_NO_REMOTE_BACKUP");
-    };
-    dependencies.skillsVault.restoreService.restoreWithLocalMek = async () => {
-      restoredScopes.push("skills");
-      return { restored: 2, renamed: 0 };
-    };
-    registerVaultIpc(dependencies);
-
-    const result = (await handlers.get("vault.restoreWithLocalMek")?.(
+    const snapshot = (await handlers.get("vault.sync")?.(
       null,
       "token",
-    )) as { restored: number };
+    )) as VaultSnapshot;
 
-    // 「没有远端备份」不是失败：不能拖垮另一个 scope
-    expect(restoredScopes).toEqual(["files", "skills"]);
-    expect(result.restored).toBe(2);
+    expect(sync).toHaveBeenCalledTimes(1);
+    expect(snapshot.items.map((item) => item.path)).toContain("note.md");
+    expect(snapshot.skills?.map((skill) => skill.name)).toContain("foo");
+    handle.mockRestore();
+  });
+
+  it("throws when the sync reports an error code", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    dependencies.syncService.sync = async () => ({
+      uploaded: 1,
+      deleted: 0,
+      pending: 1,
+      failed: 1,
+      errorCode: "VAULT_QUOTA_EXCEEDED",
+    });
+    registerVaultIpc(dependencies);
+
+    await expect(
+      handlers.get("vault.sync")?.(null, "token"),
+    ).rejects.toThrow("VAULT_QUOTA_EXCEEDED");
+    handle.mockRestore();
+  });
+
+  it("skips the restore when the remote has no backup", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const handle = vi
+      .spyOn(ipcMain, "handle")
+      .mockImplementation((channel, listener) => {
+        handlers.set(channel, listener);
+        return undefined as never;
+      });
+    const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
+    const restore = vi.fn(async () => {
+      throw new Error("VAULT_NO_REMOTE_BACKUP");
+    });
+    dependencies.restoreService.restoreWithLocalMek = restore;
+    registerVaultIpc(dependencies);
+
+    const result = await handlers.get("vault.restoreWithLocalMek")?.(
+      null,
+      "token",
+    );
+
+    // 「没有远端备份」不是失败：返回 0/0 而不是抛错
+    expect(result).toEqual({ restored: 0, renamed: 0 });
+    expect(restore).toHaveBeenCalledTimes(1);
     handle.mockRestore();
   });
 
@@ -440,13 +473,11 @@ describe("Vault IPC contract", () => {
         return undefined as never;
       });
     const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
-    await mkdir(join(dependencies.skillsVault.store.rootDir, "foo"), {
+    const skillsRoot = dependencies.store.moduleRoot("skills");
+    await mkdir(join(skillsRoot, "foo"), {
       recursive: true,
     });
-    await writeFile(
-      join(dependencies.skillsVault.store.rootDir, "foo", "SKILL.md"),
-      "# foo",
-    );
+    await writeFile(join(skillsRoot, "foo", "SKILL.md"), "# foo");
     registerVaultIpc(dependencies);
 
     const snapshot = (await handlers.get("vault.getSnapshot")?.()) as {
@@ -490,13 +521,11 @@ describe("Vault IPC contract", () => {
       });
     const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
     // 密库里已经同名 → 上传必然抛 VAULT_SKILL_NAME_TAKEN
-    await mkdir(join(dependencies.skillsVault.store.rootDir, "foo"), {
+    const skillsRoot = dependencies.store.moduleRoot("skills");
+    await mkdir(join(skillsRoot, "foo"), {
       recursive: true,
     });
-    await writeFile(
-      join(dependencies.skillsVault.store.rootDir, "foo", "SKILL.md"),
-      "# existing",
-    );
+    await writeFile(join(skillsRoot, "foo", "SKILL.md"), "# existing");
     const globalSkills = dependencies.globalSkillsPath();
     await mkdir(join(globalSkills, "foo"), { recursive: true });
     await writeFile(join(globalSkills, "foo", "SKILL.md"), "# foo");
@@ -508,7 +537,7 @@ describe("Vault IPC contract", () => {
     handle.mockRestore();
   });
 
-  it("notifies once when both scopes are restored", async () => {
+  it("notifies once when a restore recovered content", async () => {
     const handlers = new Map<string, (...args: unknown[]) => unknown>();
     const handle = vi
       .spyOn(ipcMain, "handle")
@@ -518,10 +547,6 @@ describe("Vault IPC contract", () => {
       });
     const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
     dependencies.restoreService.restoreWithLocalMek = async () => ({
-      restored: 1,
-      renamed: 0,
-    });
-    dependencies.skillsVault.restoreService.restoreWithLocalMek = async () => ({
       restored: 2,
       renamed: 0,
     });
@@ -530,7 +555,7 @@ describe("Vault IPC contract", () => {
 
     await handlers.get("vault.restoreWithLocalMek")?.(null, "token");
 
-    // 两个 scope 都恢复了，但通知只发一次（避免无谓的重复失效）
+    // 恢复是单入口的：一次恢复只发一次通知
     expect(onSkillsChanged).toHaveBeenCalledTimes(1);
     handle.mockRestore();
   });
@@ -544,11 +569,8 @@ describe("Vault IPC contract", () => {
         return undefined as never;
       });
     const { dependencies } = await makeDependencies(Buffer.from("mek"), false);
-    // 两个 scope 都跳过（无远端备份）→ restored 为 0 → 不该失效所有 SDK 会话
+    // 单入口恢复被跳过（无远端备份）→ restored 为 0 → 不该失效所有 SDK 会话
     dependencies.restoreService.restoreWithLocalMek = async () => {
-      throw new Error("VAULT_NO_REMOTE_BACKUP");
-    };
-    dependencies.skillsVault.restoreService.restoreWithLocalMek = async () => {
       throw new Error("VAULT_NO_REMOTE_BACKUP");
     };
     const onSkillsChanged = vi.fn();
@@ -585,7 +607,7 @@ describe("Vault IPC contract", () => {
     const defaultVaultDir = join(
       app.getPath("home"),
       ".deskwand",
-      "vault-skills",
+      "vault",
     );
     // 两个默认目录都要清：上次运行搬进去的同名技能会让这次变成 NAME_TAKEN
     await rm(defaultSkillsDir, { recursive: true, force: true });
@@ -728,15 +750,15 @@ async function makeDependencies(
   const store = new LocalVaultStore(join(root, "vault"));
   await store.ensureDirectory();
   if (withLocalFile) {
-    await writeFile(join(store.rootDir, "readme.md"), "hello");
+    await mkdir(store.moduleRoot("files"), { recursive: true });
+    await writeFile(join(store.moduleRoot("files"), "readme.md"), "hello");
   }
   const cloud: VaultIpcDependencies["cloud"] = {
-    getIndex: async (_token: string, _scope: VaultIndexScope) =>
-      Buffer.alloc(10),
+    getIndex: async () => Buffer.alloc(10),
     putObject: async () => {},
     getObject: async () => Buffer.alloc(10),
     deleteObject: async () => {},
-    putIndex: async (_token: string, _scope: VaultIndexScope) => {},
+    putIndex: async () => {},
     listObjectIds: async () => [],
   };
   const syncService: VaultIpcDependencies["syncService"] = {
@@ -760,10 +782,8 @@ async function makeDependencies(
       preservedLocalFiles: 0,
     }),
   };
-  const skillsRoot = await mkdtemp(join(tmpdir(), "deskwand-vault-skills-"));
-  const skillsVault = new VaultSkillsStore(skillsRoot);
-  await skillsVault.store.ensureDirectory();
-  const globalSkills = join(skillsRoot, "..", "global-skills");
+  const skillsVault = new VaultSkillsStore(store);
+  const globalSkills = join(root, "global-skills");
   await mkdir(globalSkills, { recursive: true });
   return {
     store,

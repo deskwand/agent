@@ -21,7 +21,6 @@ import {
   VaultRestoreService,
   type VaultCloudClient,
 } from "../src/main/vault/sync";
-import type { VaultIndexScope } from "../src/main/vault/cloud-client";
 
 describe("vault recovery", () => {
   const mekPath = "/tmp/deskwand-test/vault/vault-mek.bin";
@@ -56,9 +55,9 @@ describe("vault recovery", () => {
     const wrongCode = "abcdefghijkmnopqrstuvwxyz123456789";
     const payload = encodeRemoteIndex(
       {
-        version: 1,
+        version: 2,
         files: {
-          "readme.md": {
+          "files/readme.md": {
             objectId: "remote-1",
             hash: "hash",
             size: 5,
@@ -108,7 +107,7 @@ describe("vault recovery", () => {
     const secondCode = "abcdefghijkmnopqrstuvwxyz123456789";
     initializeNewMek(firstCode);
     const payload = encodeRemoteIndex(
-      { version: 1, files: {} },
+      { version: 2, files: {} },
       deriveMek(secondCode),
     );
 
@@ -136,12 +135,12 @@ describe("vault recovery", () => {
       async listObjectIds(): Promise<string[]> {
         return [];
       }
-      async getIndex(_token: string, _scope: VaultIndexScope): Promise<Buffer> {
+      async getIndex(): Promise<Buffer> {
         return encodeRemoteIndex(
           {
-            version: 1,
+            version: 2,
             files: {
-              "readme.md": {
+              "files/readme.md": {
                 objectId: id,
                 hash: "remote-hash",
                 size: 6,
@@ -171,7 +170,7 @@ describe("vault recovery", () => {
     expect(
       persisted?.equals(deriveMek("123456789ABCDEFGHJKLMNPQRSTUVWXYZ")),
     ).toBe(true);
-    expect(await readFile(store.filePath("readme.md"), "utf8")).toBe("remote");
+    expect(await readFile(store.filePath("files/readme.md"), "utf8")).toBe("remote");
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -185,15 +184,15 @@ describe("vault recovery", () => {
     const { id, payload } = await packFile(source, deriveMek(code));
     const cloud: VaultCloudClient = {
       putObject: async () => {},
-      putIndex: async (_token: string, _scope: VaultIndexScope) => {},
+      putIndex: async () => {},
       deleteObject: async () => {},
       listObjectIds: async () => [],
-      getIndex: async (_token: string, _scope: VaultIndexScope) =>
+      getIndex: async () =>
         encodeRemoteIndex(
           {
-            version: 1,
+            version: 2,
             files: {
-              "readme.md": {
+              "files/readme.md": {
                 objectId: id,
                 hash: "hash",
                 size: 5,
@@ -215,7 +214,7 @@ describe("vault recovery", () => {
     const result = await service.restoreWithLocalMek("token");
 
     expect(result.restored).toBe(1);
-    expect(await readFile(store.filePath("readme.md"), "utf8")).toBe("hello");
+    expect(await readFile(store.filePath("files/readme.md"), "utf8")).toBe("hello");
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -230,15 +229,15 @@ describe("vault recovery", () => {
     let downloaded = false;
     const cloud: VaultCloudClient = {
       putObject: async () => {},
-      putIndex: async (_token: string, _scope: VaultIndexScope) => {},
+      putIndex: async () => {},
       deleteObject: async () => {},
       listObjectIds: async () => [],
-      getIndex: async (_token: string, _scope: VaultIndexScope) =>
+      getIndex: async () =>
         encodeRemoteIndex(
           {
-            version: 1,
+            version: 2,
             files: {
-              "readme.md": {
+              "files/readme.md": {
                 objectId: "remote-readme",
                 hash: "hash",
                 size: 5,
@@ -286,30 +285,24 @@ describe("vault recovery", () => {
     ]);
     const cloud: VaultCloudClient = {
       putObject: async () => {},
-      putIndex: async (_token: string, _scope: VaultIndexScope) => {},
+      putIndex: async () => {},
       deleteObject: async () => {},
       listObjectIds: async () => [],
-      getIndex: async (_token: string, _scope: VaultIndexScope) =>
+      getIndex: async () =>
         encodeRemoteIndex(
           {
-            version: 1,
+            version: 2,
             files: {
-              "report.md": {
+              "files/report.md": {
                 objectId: first.id,
                 hash: "first-hash",
                 size: 5,
                 mtime: 1,
               },
-              "report (1).md": {
+              "files/report (1).md": {
                 objectId: second.id,
                 hash: "second-hash",
                 size: 6,
-                mtime: 1,
-              },
-              "vault-mek.bin": {
-                objectId: first.id,
-                hash: "first-hash",
-                size: 5,
                 mtime: 1,
               },
             },
@@ -332,9 +325,8 @@ describe("vault recovery", () => {
 
     expect(result.restored).toBe(2);
     const index = await store.readIndex();
-    expect(index.files["report.md"]).toBeDefined();
-    expect(index.files["report (1).md"]).toBeDefined();
-    expect(index.files["vault-mek.bin"]).toBeUndefined();
+    expect(index.files["files/report.md"]).toBeDefined();
+    expect(index.files["files/report (1).md"]).toBeDefined();
     rmSync(root, { recursive: true, force: true });
   });
 
@@ -346,15 +338,15 @@ describe("vault recovery", () => {
     let storedMek: Buffer | null = null;
     const cloud: VaultCloudClient = {
       putObject: async () => {},
-      putIndex: async (_token: string, _scope: VaultIndexScope) => {},
+      putIndex: async () => {},
       deleteObject: async () => {},
       listObjectIds: async () => [],
-      getIndex: async (_token: string, _scope: VaultIndexScope) =>
+      getIndex: async () =>
         encodeRemoteIndex(
           {
-            version: 1,
+            version: 2,
             files: {
-              "missing.txt": {
+              "files/missing.txt": {
                 objectId: "missing-object",
                 hash: "hash",
                 size: 1,

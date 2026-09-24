@@ -20,12 +20,26 @@ const items: AttachPickerItem[] = [
 ];
 
 describe("mapVaultSnapshotItems", () => {
-  it("uses the vault file name as id, name and label, with no dir", () => {
+  it("uses the vault relative path as id and label, splitting the file name", () => {
     expect(
       mapVaultSnapshotItems([
-        { name: "a.png", ext: ".png", size: 3, mtime: 1, syncStatus: "synced" },
+        {
+          path: "项目/笔记.md",
+          ext: "md",
+          size: 3,
+          mtime: 1,
+          syncStatus: "synced",
+        },
+        { path: "a.png", ext: "png", size: 3, mtime: 1, syncStatus: "synced" },
       ]),
     ).toEqual([
+      {
+        id: "项目/笔记.md",
+        name: "笔记.md",
+        dir: "项目",
+        size: 3,
+        label: "项目/笔记.md",
+      },
       { id: "a.png", name: "a.png", dir: undefined, size: 3, label: "a.png" },
     ]);
   });

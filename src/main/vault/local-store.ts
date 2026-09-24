@@ -11,22 +11,33 @@ import {
   stat,
   writeFile,
 } from "node:fs/promises";
-import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { type SyncStatus, type VaultOperationStatus } from "../../shared/vault";
-import type { VaultIndexScope } from "./cloud-client";
-
-export type { VaultIndexScope };
+import { getVaultRoot } from "./paths";
 
 const INDEX_FILE = ".vault-index.json";
 const KEYCHAIN_FILE = "vault-mek.bin";
 const OPERATION_FILE = ".vault-operation.json";
-const RESTORE_DIR = ".vault-restore";
+const STAGING_DIR = ".vault-staging";
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
+/** 顶层目录即模块：索引键、文件的根相对路径都以模块名开头。 */
+export type VaultModule = "files" | "skills";
+export const VAULT_MODULES = ["files", "skills"] as const;
+const ROOT_INTERNAL = new Set<string>([
+  INDEX_FILE,
+  KEYCHAIN_FILE,
+  OPERATION_FILE,
+  STAGING_DIR,
+]);
+
+export function isVaultModule(value: string): value is VaultModule {
+  return (VAULT_MODULES as readonly string[]).includes(value);
+}
 
 export interface LocalVaultEntry {
   objectId: string | null;
-  hash: string;
+  hash: string | null;
   size: number;
   mtime: number;
   syncStatus: SyncStatus;
@@ -34,17 +45,18 @@ export interface LocalVaultEntry {
 }
 
 export interface LocalVaultIndex {
-  version: 1;
+  version: 2;
   files: Record<string, LocalVaultEntry>;
   pendingDeletes: string[];
 }
 
 export interface LocalVaultFile {
+  /** 根相对路径，如 `files/项目/笔记.md`。 */
   name: string;
   path: string;
   size: number;
   mtime: number;
-  hash: string;
+  hash: string | null;
 }
 
 export type VaultOperationState = Exclude<VaultOperationStatus, "idle">;
@@ -74,57 +86,7 @@ export interface LocalVaultState {
 }
 
 function emptyIndex(): LocalVaultIndex {
-  return { version: 1, files: {}, pendingDeletes: [] };
-}
-
-export function isReservedVaultName(name: string): boolean {
-  // Win32 strips trailing dots and spaces when resolving a path, so
-  // "vault-mek.bin." would alias the key file (and "restore." the staging
-  // directory) on Windows. Normalize before comparing.
-  const normalized = name.toLowerCase().replace(/[. ]+$/, "");
-  const keychainFile = KEYCHAIN_FILE.toLowerCase();
-  const indexFile = INDEX_FILE.toLowerCase();
-  const operationFile = OPERATION_FILE.toLowerCase();
-  const restoreDir = RESTORE_DIR.toLowerCase();
-  return (
-    normalized === keychainFile ||
-    normalized === indexFile ||
-    normalized.startsWith(`${indexFile}.`) ||
-    normalized === operationFile ||
-    normalized.startsWith(`${operationFile}.`) ||
-    normalized === restoreDir ||
-    normalized.startsWith(`${restoreDir}/`) ||
-    normalized.startsWith(`${restoreDir}${sep}`)
-  );
-}
-
-function isVaultName(name: string): boolean {
-  return (
-    !!name &&
-    name !== "." &&
-    name !== ".." &&
-    !name.includes("/") &&
-    !name.includes("\\")
-  );
-}
-
-/**
- * skills 索引键能否安全存在于索引里：既不能逃出根目录，也不能占住根层的保留名
- * （`.vault-index.json` / `vault-mek.bin` / `.vault-operation.json` / `.vault-restore`）。
- * 注意与 files scope 的区别：files 的 `isVaultName` 是为写入把关的，索引读取必须
- * 容忍历史残留（例如泄漏的 `vault-mek.bin` 条目），由 `reconcile` 回收；skills 的
- * 扫描器永远不会写入保留名，所以这里直接拒。
- */
-function isEscapingScopePath(name: string): boolean {
-  if (!name || name.includes("\\") || name.includes("\0")) return true;
-  if (name.startsWith("/") || name.endsWith("/")) return true;
-  const segments = name.split("/");
-  if (
-    segments.some((segment) => !segment || segment === "." || segment === "..")
-  ) {
-    return true;
-  }
-  return isReservedVaultName(segments[0]);
+  return { version: 2, files: {}, pendingDeletes: [] };
 }
 
 /**
@@ -141,23 +103,32 @@ function isUnsupportedScopeSegment(segment: string): boolean {
 }
 
 /**
- * 相对路径是否既安全又能被索引读取器接受。
- *
- * 这个函数是扫描器与索引读取器的**共同**判据：两边各写一份必然漂移，而一旦
- * 扫描器接受了读取器拒绝的键，`readIndex` 就会把索引判为损坏并重建（objectId
- * 全部丢失，每轮重启重传全树）。所以这里导出，`vault-index.ts` 的远端校验
- * 用同样的对外契约（见那边的 `isUnsupportedRemoteSegment`）。
+ * 根相对路径（如 `files/项目/笔记.md`）能否安全存放：首段必须是模块，其余段
+ * 沿用今天 skills scope 的路径规则（拒绝对路径、`..`、`\`，拒绝 Win32 会归一
+ * 化的尾点/尾空格与保留设备名）。模块内部不保留任何名字：`.cache` 与
+ * `vault-mek.bin` 都只在根层具有保留含义。
  */
-export function isValidScopeRelativePath(name: string): boolean {
+function isVaultRelativePath(name: string): boolean {
   if (!name || name.includes("\\") || name.includes("\0")) return false;
   if (name.startsWith("/") || name.endsWith("/")) return false;
   const segments = name.split("/");
-  return segments.every(
-    (segment, index) =>
-      !isUnsupportedScopeSegment(segment) &&
-      // Internal files only reserve their names at the vault root; a skill may
-      // legitimately contain `.cache` or `vault-mek.bin` deeper in its tree.
-      !(index === 0 && isReservedVaultName(segment)),
+  if (segments.length < 2 || !isVaultModule(segments[0])) return false;
+  return segments.every((segment) => !isUnsupportedScopeSegment(segment));
+}
+
+/**
+ * 索引键能否被索引读取器接受：只拒「逃出根目录」的形状。命名规则（尾点、
+ * 设备名）不在这里判 —— 若读取器拒了扫描器接受的键，`readIndex` 会把整份索引
+ * 判为损坏并重建，objectId 全丢、每轮重启重传全树。命名规则由扫描器在同步前
+ * 用 `isVaultRelativePath` 拦下（`assertSyncableName`）。
+ */
+function isEscapingVaultPath(name: string): boolean {
+  if (!name || name.includes("\\") || name.includes("\0")) return true;
+  if (name.startsWith("/") || name.endsWith("/")) return true;
+  const segments = name.split("/");
+  if (segments.length < 2 || !isVaultModule(segments[0])) return true;
+  return segments.some(
+    (segment) => !segment || segment === "." || segment === "..",
   );
 }
 
@@ -184,10 +155,7 @@ function isVaultOperationMarker(value: unknown): value is VaultOperationMarker {
   );
 }
 
-function isLocalIndex(
-  value: unknown,
-  scope: VaultIndexScope,
-): value is LocalVaultIndex {
+function isLocalIndex(value: unknown): value is LocalVaultIndex {
   if (!value || typeof value !== "object") return false;
   const candidate = value as {
     version?: unknown;
@@ -195,7 +163,7 @@ function isLocalIndex(
     pendingDeletes?: unknown;
   };
   if (
-    candidate.version !== 1 ||
+    candidate.version !== 2 ||
     !candidate.files ||
     typeof candidate.files !== "object"
   ) {
@@ -208,30 +176,14 @@ function isLocalIndex(
     return false;
   }
   return Object.entries(candidate.files).every(([name, entry]) => {
-    // Internal/reserved names (e.g. a leaked legacy vault-mek.bin entry) are
-    // valid index entries — they are reconciled out later, not treated as
-    // corruption. Only reject path-traversal names.
-    //
-    // 只拒「逃出根目录」的键。命名规则（尾点、设备名）不在这里判：若这里拒了
-    // 而扫描器收了一条，readIndex 会把整份索引判为损坏并重建，objectId 全丢、
-    // 每轮重启重传全树 —— 代价远大于一个不可同步的条目。命名规则由扫描器在
-    // 同步前用 `isValidScopeRelativePath` 拦下（`assertSyncableName`）。
-    // files scope 必须容忍历史残留（例如泄漏的 `vault-mek.bin` 条目），它由
-    // `reconcile` 回收 —— 这是既有行为且有测试覆盖，所以这里不用 `isVaultName`
-    // （那个函数会连保留名一起拒），只拒穿越形状。skills scope 走
-    // `isEscapingScopePath`：既拒穿越，也拒占住根层保留名的键。
-    if (
-      !name ||
-      (!isVaultName(name) &&
-        (scope === "files" ? false : isEscapingScopePath(name)))
-    ) {
-      return false;
-    }
+    // 索引键只拒「逃出根目录」的形状，命名规则交给扫描器
+    // （见 isEscapingVaultPath 的注释）。
+    if (isEscapingVaultPath(name)) return false;
     if (!entry || typeof entry !== "object") return false;
     const item = entry as Partial<LocalVaultEntry>;
     return (
       (typeof item.objectId === "string" || item.objectId === null) &&
-      typeof item.hash === "string" &&
+      (typeof item.hash === "string" || item.hash === null) &&
       typeof item.size === "number" &&
       item.size >= 0 &&
       typeof item.mtime === "number" &&
@@ -252,15 +204,15 @@ async function fileHash(filePath: string): Promise<string> {
 export class LocalVaultStore {
   readonly rootDir: string;
   readonly indexPath: string;
-  readonly scope: VaultIndexScope;
 
-  constructor(
-    rootDir = resolve(homedir(), ".deskwand", "vault"),
-    scope: VaultIndexScope = "files",
-  ) {
+  constructor(rootDir: string = getVaultRoot()) {
     this.rootDir = resolve(rootDir);
-    this.scope = scope;
     this.indexPath = join(this.rootDir, INDEX_FILE);
+  }
+
+  /** 模块目录（`<root>/files`、`<root>/skills`）的绝对路径。 */
+  moduleRoot(module: VaultModule): string {
+    return join(this.rootDir, module);
   }
 
   async ensureDirectory(): Promise<void> {
@@ -276,9 +228,15 @@ export class LocalVaultStore {
     }
   }
 
-  /** 删除根层的一个内部目录（例如上传暂存区）。仅用于内部清理，不写索引。 */
+  /** 删除根层的一个内部目录（例如上传/恢复暂存区）。仅用于内部清理，不写索引。 */
   async removeStaging(relativeDir: string): Promise<void> {
-    this.validateName(relativeDir);
+    const segments = relativeDir.split("/");
+    const insideStaging =
+      segments[0] === STAGING_DIR &&
+      segments.every(
+        (segment) => segment !== "" && segment !== "." && segment !== "..",
+      );
+    if (!insideStaging) throw new Error("VAULT_INVALID_NAME");
     await rm(join(this.rootDir, relativeDir), {
       recursive: true,
       force: true,
@@ -290,8 +248,7 @@ export class LocalVaultStore {
     try {
       const raw = await readFile(this.indexPath, "utf8");
       const parsed: unknown = JSON.parse(raw);
-      if (!isLocalIndex(parsed, this.scope))
-        throw new Error("VAULT_INDEX_INVALID");
+      if (!isLocalIndex(parsed)) throw new Error("VAULT_INDEX_INVALID");
       return parsed;
     } catch (error: unknown) {
       if (error instanceof Error && error.message === "VAULT_INDEX_INVALID") {
@@ -343,71 +300,79 @@ export class LocalVaultStore {
 
   async scanFiles(index?: LocalVaultIndex): Promise<LocalVaultFile[]> {
     await this.ensureDirectory();
-    const files =
-      this.scope === "skills"
-        ? await this.scanTree("")
-        : await this.scanFlat(index);
+    const files: LocalVaultFile[] = [];
+    const entries = await readdir(this.rootDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (ROOT_INTERNAL.has(entry.name)) continue;
+      if (!isVaultModule(entry.name) || !entry.isDirectory()) {
+        throw new Error(`VAULT_UNSUPPORTED_PATH:${entry.name}`);
+      }
+      files.push(...(await this.scanModule(entry.name, "", index)));
+    }
     return files.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  /** Flat scan for the file vault: only regular files at the root. */
-  private async scanFlat(index?: LocalVaultIndex): Promise<LocalVaultFile[]> {
-    const entries = await readdir(this.rootDir, { withFileTypes: true });
-    const files: LocalVaultFile[] = [];
-    for (const entry of entries) {
-      if (!entry.isFile() || isReservedVaultName(entry.name)) continue;
-      const path = join(this.rootDir, entry.name);
-      const metadata = await stat(path);
-      const previous = index?.files[entry.name];
-      const hash =
-        previous &&
-        previous.size === metadata.size &&
-        previous.mtime === metadata.mtimeMs
-          ? previous.hash
-          : await fileHash(path);
-      files.push({
-        name: entry.name,
-        path,
-        size: metadata.size,
-        mtime: metadata.mtimeMs,
-        hash,
-      });
-    }
-    return files;
-  }
-
-  /** Depth-first walk for directory-shaped vaults (scope: "skills"). */
-  private async scanTree(prefix: string): Promise<LocalVaultFile[]> {
-    const directory = prefix ? join(this.rootDir, prefix) : this.rootDir;
+  /** 递归扫描一个模块目录；索引快路径命中时沿用已记录的 hash。 */
+  private async scanModule(
+    module: VaultModule,
+    prefix: string,
+    index?: LocalVaultIndex,
+  ): Promise<LocalVaultFile[]> {
+    const directory = prefix
+      ? join(this.moduleRoot(module), prefix)
+      : this.moduleRoot(module);
     const entries = await readdir(directory, { withFileTypes: true });
     const files: LocalVaultFile[] = [];
     for (const entry of entries) {
       if (entry.isSymbolicLink()) continue;
-      const name = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory()) {
-        // 根层的隐藏目录（如上传暂存区 `.vault-upload-staging`）不是技能内容。
-        if (
-          !prefix &&
-          (entry.name.startsWith(".") || isReservedVaultName(entry.name))
-        ) {
-          continue;
-        }
-        const nested = await this.scanTree(name);
-        files.push(...nested);
+        // 模块内的隐藏目录（如 `files/.cache/`）也是用户内容，照扫。
+        files.push(...(await this.scanModule(module, relative, index)));
         continue;
       }
       if (!entry.isFile()) continue;
-      if (!prefix && isReservedVaultName(entry.name)) continue;
+      const name = `${module}/${relative}`;
       this.assertSyncableName(name);
-      const file = await this.scanFile(name);
+      const file = await this.scanModuleFile(name, index);
       if (file) files.push(file);
     }
     return files;
   }
 
-  /** Only the skills scope uses this targeted check during sync. */
+  private async scanModuleFile(
+    name: string,
+    index?: LocalVaultIndex,
+  ): Promise<LocalVaultFile> {
+    const path = this.filePath(name);
+    const metadata = await lstat(path);
+    const previous = index?.files[name];
+    const hash =
+      previous &&
+      previous.size === metadata.size &&
+      previous.mtime === metadata.mtimeMs
+        ? previous.hash
+        : null;
+    return { name, path, size: metadata.size, mtime: metadata.mtimeMs, hash };
+  }
+
+  /**
+   * 只读元数据的定向检查：上传前后的「文件有没有被改」全靠它，不读内容。
+   */
+  async statFile(
+    name: string,
+  ): Promise<{ size: number; mtime: number } | null> {
+    this.assertSyncableName(name);
+    try {
+      const metadata = await lstat(this.filePath(name));
+      if (!metadata.isFile()) return null;
+      return { size: metadata.size, mtime: metadata.mtimeMs };
+    } catch {
+      return null;
+    }
+  }
+
   async scanFile(name: string): Promise<LocalVaultFile | null> {
-    if (this.scope !== "skills") throw new Error("VAULT_INVALID_SCOPE");
     this.assertSyncableName(name);
     const path = this.filePath(name);
     // lstat does not follow symlinks, including dangling links. A missing file
@@ -420,19 +385,19 @@ export class LocalVaultStore {
   }
 
   /**
-   * 技能树里出现了无法跨设备同步的名字（尾点/尾空格、Windows 保留设备名）。
+   * 模块树里出现了无法跨设备同步的名字（尾点/尾空格、Windows 保留设备名）。
    * 必须抛错而不是跳过 —— 跳过会让 `reconcile` 把它判为「已删除」，同步时
    * 删掉云端对象。错误信息带上具体名字，让用户能重命名或删除它。
    */
   private assertSyncableName(name: string): void {
-    if (isValidScopeRelativePath(name)) return;
+    if (isVaultRelativePath(name)) return;
     throw new Error(`VAULT_UNSUPPORTED_PATH:${name}`);
   }
 
   async reconcile(index: LocalVaultIndex): Promise<LocalVaultIndex> {
     const scanned = await this.scanFiles(index);
     const next: LocalVaultIndex = {
-      version: 1,
+      version: 2,
       files: { ...index.files },
       pendingDeletes: [...index.pendingDeletes],
     };
@@ -456,10 +421,11 @@ export class LocalVaultStore {
       ) {
         next.files[file.name] = {
           objectId: previous?.objectId ?? null,
-          hash: file.hash,
+          hash: null,
           size: file.size,
           mtime: file.mtime,
           syncStatus: "pending",
+          objectHash: previous?.objectHash ?? null,
         };
       } else {
         next.files[file.name] = { ...previous, mtime: file.mtime };
@@ -480,6 +446,7 @@ export class LocalVaultStore {
     sourcePath: string,
   ): Promise<{ name: string; index: LocalVaultIndex }> {
     await this.ensureDirectory();
+    await mkdir(this.moduleRoot("files"), { recursive: true });
     const source = await stat(sourcePath);
     if (!source.isFile()) throw new Error("VAULT_SOURCE_NOT_FILE");
     if (source.size > MAX_FILE_SIZE) throw new Error("VAULT_FILE_TOO_LARGE");
@@ -487,16 +454,16 @@ export class LocalVaultStore {
     const index = await this.reconcile(await this.readIndex());
 
     const originalName = basename(sourcePath);
-    this.validateName(originalName);
-    let name = originalName;
+    let name = `files/${originalName}`;
+    this.validateName(name);
     let suffix = 1;
-    while (isReservedVaultName(name) || (await this.exists(name))) {
+    while (await this.exists(name)) {
       const extension = extname(originalName);
       const stem = originalName.slice(
         0,
         originalName.length - extension.length,
       );
-      name = `${stem} (${suffix})${extension}`;
+      name = `files/${stem} (${suffix})${extension}`;
       suffix += 1;
     }
 
@@ -506,7 +473,7 @@ export class LocalVaultStore {
       const metadata = await stat(destination);
       index.files[name] = {
         objectId: null,
-        hash: await fileHash(destination),
+        hash: null,
         size: metadata.size,
         mtime: metadata.mtimeMs,
         syncStatus: "pending",
@@ -607,7 +574,7 @@ export class LocalVaultStore {
   async beginRestore(targetNames: string[]): Promise<VaultRestoreTransaction> {
     await this.ensureDirectory();
     const id = randomUUID();
-    const stagedDirectory = join(this.rootDir, RESTORE_DIR, id);
+    const stagedDirectory = join(this.rootDir, STAGING_DIR, id);
     const marker: VaultOperationMarker = {
       version: 1,
       id,
@@ -742,20 +709,13 @@ export class LocalVaultStore {
     }
   }
 
+  /**
+   * 根相对路径能否作为存储路径使用：首段必须是模块，且整条路径符合跨设备命名
+   * 规则（拒穿越、绝对路径、`\`，拒绝 Win32 会归一化的尾点/尾空格与保留设备名）。
+   * 调用方（IPC / 同步 / 技能聚合）拿到的名字不合法时统一报 `VAULT_INVALID_NAME`。
+   */
   private validateName(name: string): void {
-    if (this.scope === "files") {
-      if (
-        !name ||
-        name === "." ||
-        name === ".." ||
-        isReservedVaultName(name) ||
-        name.includes("/") ||
-        name.includes("\\") ||
-        basename(name) !== name
-      ) {
-        throw new Error("VAULT_INVALID_NAME");
-      }
-    } else if (!isValidScopeRelativePath(name)) {
+    if (isEscapingVaultPath(name) || !isVaultRelativePath(name)) {
       throw new Error("VAULT_INVALID_NAME");
     }
     const resolved = resolve(this.rootDir, name);
@@ -765,8 +725,13 @@ export class LocalVaultStore {
   }
 
   private async rebuildCorruptIndex(): Promise<LocalVaultIndex> {
-    const corruptPath = `${this.indexPath}.corrupt-${Date.now()}`;
+    const corruptPath = join(
+      this.rootDir,
+      STAGING_DIR,
+      `${INDEX_FILE}.corrupt-${Date.now()}`,
+    );
     try {
+      await mkdir(dirname(corruptPath), { recursive: true });
       await rename(this.indexPath, corruptPath);
     } catch {
       // The index may have disappeared between read and rename.

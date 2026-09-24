@@ -7,11 +7,7 @@ import {
   removeManifestEntry,
 } from "../skills/agent-manifest";
 import { logWarn } from "../utils/logger";
-import { loadMek } from "./keychain";
-import { FetchVaultCloudClient, type VaultCloudClient } from "./cloud-client";
-import { LocalVaultStore } from "./local-store";
-import { getVaultSkillsRoot } from "./paths";
-import { VaultRestoreService, VaultSyncService } from "./sync";
+import type { LocalVaultStore } from "./local-store";
 import type {
   AddSkillsResult,
   VaultAddableSkill,
@@ -21,7 +17,7 @@ import type {
 export type { AddSkillsResult, VaultAddableSkill, VaultSkillEntry };
 
 /** 上传时先落到这个隐藏目录，复制完整后再原子 rename 进最终位置。 */
-const STAGING_DIR = ".vault-upload-staging";
+const STAGING_DIR = ".vault-staging/upload";
 
 /** 技能名即目录名，与 skills-manager 的 kebab-case 约定一致。 */
 const SKILL_NAME_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
@@ -43,32 +39,20 @@ async function copyTree(source: string, destination: string): Promise<void> {
 }
 
 /**
- * 技能密库：一个 `scope: "skills"` 的 store 及其同步/恢复服务。
+ * 技能密库：`skills/` 模块前缀上的聚合视图。
  *
- * 根目录独立于 `~/.deskwand/skills`（见 `paths.ts`）；本类只负责把 store 与
- * 服务装配起来，并提供「按技能聚合」的列表视图。
+ * 存储与同步已经统一到唯一的 `LocalVaultStore`（见设计文档
+ * `design-docs/2026-09-24-vault-modules-design.md`），本类只负责把
+ * 「按技能聚合的列表」「搬进/搬出 `skills/`」「候选与链接扫描」做出来。
  */
 export class VaultSkillsStore {
   readonly store: LocalVaultStore;
-  readonly syncService: VaultSyncService;
-  readonly restoreService: VaultRestoreService;
 
-  /** cloud 与 mekProvider 可注入：端到端往返测试要用替身，不能写死。 */
-  constructor(
-    rootDir: string = getVaultSkillsRoot(),
-    cloud: VaultCloudClient = new FetchVaultCloudClient(),
-    mekProvider: () => Buffer | null = loadMek,
-  ) {
-    this.store = new LocalVaultStore(rootDir, "skills");
-    this.syncService = new VaultSyncService(this.store, cloud, mekProvider);
-    this.restoreService = new VaultRestoreService(
-      this.store,
-      cloud,
-      mekProvider,
-    );
+  constructor(store: LocalVaultStore) {
+    this.store = store;
   }
 
-  /** 清理上次中断留下的暂存目录。读索引之前调用，否则它会被当成一个技能。 */
+  /** 清理上次中断留下的上传暂存（`.vault-staging/upload`）。 */
   async removeStaleStaging(): Promise<void> {
     await this.store.removeStaging(STAGING_DIR);
   }
@@ -107,13 +91,16 @@ export class VaultSkillsStore {
       throw new Error(`VAULT_INVALID_SKILL_NAME:${skillName}`);
     }
     const source = join(globalSkillsPath, skillName);
-    const destination = join(this.store.rootDir, skillName);
+    const destination = join(this.store.moduleRoot("skills"), skillName);
     if (existsSync(destination)) {
       throw new Error(`VAULT_SKILL_NAME_TAKEN:${skillName}`);
     }
     // rename 需要目标父目录已存在；旧实现靠「先建暂存目录」顺带建出了密库根，
-    // rename-first 必须显式建。
-    await this.store.ensureDirectory();
+    // rename-first 必须显式建。一个技能都没有时 `skills/` 还不存在。
+    await mkdir(this.store.moduleRoot("skills"), {
+      recursive: true,
+      mode: 0o700,
+    });
 
     try {
       await rename(source, destination);
@@ -230,7 +217,7 @@ export class VaultSkillsStore {
     if (skill && skill.syncStatus !== "synced") {
       throw new Error(`VAULT_SKILL_NOT_SYNCED:${skillName}`);
     }
-    await rm(join(this.store.rootDir, skillName), {
+    await rm(join(this.store.moduleRoot("skills"), skillName), {
       recursive: true,
       force: true,
     });
@@ -306,8 +293,9 @@ export class VaultSkillsStore {
     const index = await this.store.reconcile(await this.store.readIndex());
     const bySkill = new Map<string, VaultSkillEntry>();
     for (const [path, entry] of Object.entries(index.files)) {
-      const name = path.includes("/") ? path.slice(0, path.indexOf("/")) : "";
-      if (!name) continue;
+      const match = /^skills\/([^/]+)(\/|$)/.exec(path);
+      if (!match) continue;
+      const name = match[1];
       const current = bySkill.get(name) ?? {
         name,
         fileCount: 0,

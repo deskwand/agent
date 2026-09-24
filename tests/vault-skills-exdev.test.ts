@@ -10,7 +10,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { deriveMek } from "../src/main/vault/crypto";
+import { LocalVaultStore } from "../src/main/vault/local-store";
 import { VaultSkillsStore } from "../src/main/vault/skills-vault";
 
 /**
@@ -19,7 +19,7 @@ import { VaultSkillsStore } from "../src/main/vault/skills-vault";
  *
  * 判据是「源路径不在密库根之下」—— 索引写入的 rename 源是
  * `<密库根>/.vault-index.json.tmp-…`，暂存 → 最终位置的 rename 源是
- * `<密库根>/.vault-upload-staging/<name>`，两者都在密库根下面，不会被拦。
+ * `<密库根>/.vault-staging/upload/<name>`，两者都在密库根下面，不会被拦。
  */
 let vaultRootForMock = "";
 
@@ -69,19 +69,21 @@ describe("VaultSkillsStore cross-filesystem fallback", () => {
     await writeFile(join(nested, "data.bin"), binary);
 
     vaultRootForMock = vaultRoot;
-    const store = new VaultSkillsStore(vaultRoot, undefined, () =>
-      deriveMek("recovery-code"),
-    );
+    const store = new LocalVaultStore(vaultRoot);
+    const skillsVault = new VaultSkillsStore(store);
 
-    await expect(store.upload("foo", globalSkills)).resolves.toMatchObject({
+    await expect(skillsVault.upload("foo", globalSkills)).resolves.toMatchObject({
       name: "foo",
       fileCount: 2,
     });
 
     // 内容逐字节一致（含嵌套目录与二进制）
-    const copiedMd = await readFile(join(vaultRoot, "foo", "SKILL.md"), "utf8");
+    const copiedMd = await readFile(
+      join(vaultRoot, "skills", "foo", "SKILL.md"),
+      "utf8",
+    );
     const copiedBin = await readFile(
-      join(vaultRoot, "foo", "references", "data.bin"),
+      join(vaultRoot, "skills", "foo", "references", "data.bin"),
     );
     expect(copiedMd).toBe(skillMd);
     expect(copiedBin.equals(binary)).toBe(true);
@@ -93,7 +95,7 @@ describe("VaultSkillsStore cross-filesystem fallback", () => {
     await expect(readdir(globalSkills)).resolves.toEqual([]);
     // 暂存目录空着（由 removeStaleStaging 清理），不留半成品
     await expect(
-      readdir(join(vaultRoot, ".vault-upload-staging")),
+      readdir(join(vaultRoot, ".vault-staging", "upload")),
     ).resolves.toEqual([]);
   });
 });

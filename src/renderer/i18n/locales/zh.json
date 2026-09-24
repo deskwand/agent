@@ -1689,7 +1689,6 @@
     "sync": "同步",
     "syncing": "同步中…",
     "syncComplete": "同步完成",
-    "syncFailedSkills": "技能未能同步到云端，请稍后重试",
     "alreadyLatest": "已是最新",
     "dismiss": "关闭",
     "fileCount_one": "{{count}} 个文件",
@@ -1746,6 +1745,7 @@
       "syncFailed": "云端同步失败，本地文件未受影响",
       "cloudQuotaExceeded": "云端备份空间不足，本地文件已保留；删除文件或升级空间后可重试",
       "invalidRecoveryCode": "恢复码无效",
+      "unsupportedPath": "路径 {{name}} 无法跨设备同步（含尾点、使用了保留设备名，或不在 files / skills 模块内）",
       "alreadyInitialized": "加密云备份已经设置",
       "keychainUnavailable": "此设备无法使用安全密钥存储",
       "recoveryMismatch": "恢复码与此备份不匹配",
@@ -1780,7 +1780,6 @@
         "nameTaken": "密库已有同名技能，请先在密库页删除它",
         "notSynced": "该技能尚未同步到云端，删除会丢失唯一副本，请先同步",
         "uploadFailed": "上传失败，技能仍在本地",
-        "unsupportedPath": "技能内的 {{name}} 无法跨设备同步（文件名含尾点或使用了保留名）",
         "addFailed": "加入失败"
       },
       "empty": "密库中暂无技能",

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { deriveMek } from "../src/main/vault/crypto";
 import { decodeRemoteIndex } from "../src/main/vault/vault-index";
 import {
@@ -14,9 +14,17 @@ import {
   type VaultCloudClient,
 } from "../src/main/vault/sync";
 import {
+  FetchVaultCloudClient,
   VaultCloudError,
-  type VaultIndexScope,
 } from "../src/main/vault/cloud-client";
+import { DESKWAND_API_URL } from "../src/shared/oauth-config";
+
+// 计数「同步到底读了几次文件内容」：local-store 用的是 ESM 具名导入，
+// `vi.spyOn(fsPromises, "readFile")` 拦不住。
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, readFile: vi.fn(actual.readFile) };
+});
 
 const mek = deriveMek("123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
 
@@ -32,12 +40,8 @@ class FakeCloudClient implements VaultCloudClient {
   onObjectUpload: (() => Promise<void> | void) | null = null;
   indexUploads = 0;
 
-  /** 按 scope 分桶：列表接口是 scope 级的，替身必须能区分，否则测不出隔离。 */
-  readonly objectsByScope = new Map<VaultIndexScope, Map<string, Buffer>>();
-
   async putObject(
     _token: string,
-    scope: VaultIndexScope,
     objectId: string,
     payload: Buffer,
   ): Promise<void> {
@@ -45,9 +49,7 @@ class FakeCloudClient implements VaultCloudClient {
       throw new VaultCloudError(413, this.failObjectUploadCode);
     }
     if (this.failObjectUpload) throw new Error("NETWORK_DOWN");
-    const bucket = this.objectsByScope.get(scope) ?? new Map<string, Buffer>();
-    bucket.set(objectId, Buffer.from(payload));
-    this.objectsByScope.set(scope, bucket);
+    this.objects.set(objectId, Buffer.from(payload));
     await this.onObjectUpload?.();
   }
 
@@ -63,30 +65,18 @@ class FakeCloudClient implements VaultCloudClient {
     this.deletedObjectIds.push(objectId);
   }
 
-  async getIndex(
-    _token: string,
-    _scope: VaultIndexScope,
-  ): Promise<Buffer | null> {
+  async getIndex(_token: string): Promise<Buffer | null> {
     return this.indexPayload;
   }
 
-  async putIndex(
-    _token: string,
-    _scope: VaultIndexScope,
-    payload: Buffer,
-  ): Promise<void> {
+  async putIndex(_token: string, payload: Buffer): Promise<void> {
     if (this.failIndex) throw new Error("NETWORK_DOWN");
     this.indexPayload = Buffer.from(payload);
     this.indexUploads += 1;
   }
 
-  async listObjectIds(
-    _token: string,
-    scope: VaultIndexScope,
-  ): Promise<string[]> {
+  async listObjectIds(_token: string): Promise<string[]> {
     if (this.failList) throw new Error("NETWORK_DOWN");
-    const bucket = this.objectsByScope.get(scope);
-    if (bucket) return [...bucket.keys()];
     return [...this.objects.keys()];
   }
 }
@@ -102,6 +92,16 @@ describe("VaultSyncService", () => {
     return store;
   }
 
+  /** 按根相对路径（`files/x`、`skills/x`）把夹具写进对应模块。 */
+  async function seedFile(
+    store: LocalVaultStore,
+    name: string,
+    contents: string,
+  ): Promise<void> {
+    await mkdir(dirname(store.filePath(name)), { recursive: true });
+    await writeFile(store.filePath(name), contents);
+  }
+
   async function cleanup(): Promise<void> {
     await Promise.all(
       roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
@@ -111,10 +111,10 @@ describe("VaultSyncService", () => {
   it("scans a skills tree only once while syncing multiple files", async () => {
     const root = await mkdtemp(join(tmpdir(), "deskwand-vault-tree-scan-"));
     roots.push(root);
-    const store = new LocalVaultStore(join(root, "vault-skills"), "skills");
-    await mkdir(join(store.rootDir, "foo"), { recursive: true });
-    await writeFile(join(store.rootDir, "foo", "A.md"), "a");
-    await writeFile(join(store.rootDir, "foo", "B.md"), "b");
+    const store = new LocalVaultStore(join(root, "vault"));
+    await mkdir(join(store.rootDir, "skills", "foo"), { recursive: true });
+    await writeFile(join(store.rootDir, "skills", "foo", "A.md"), "a");
+    await writeFile(join(store.rootDir, "skills", "foo", "B.md"), "b");
     const scan = vi.spyOn(store, "scanFiles");
     const cloud = new FakeCloudClient();
     const result = await new VaultSyncService(store, cloud, () => mek).sync(
@@ -126,26 +126,31 @@ describe("VaultSyncService", () => {
     await cleanup();
   });
 
-  it("addresses the index slot of its store scope", async () => {
-    const root = await mkdtemp(join(tmpdir(), "deskwand-vault-scope-"));
-    roots.push(root);
-    const store = new LocalVaultStore(join(root, "vault-skills"), "skills");
-    await store.ensureDirectory();
-    await writeFile(join(store.rootDir, "SKILL.md"), "# skill");
-    const cloud = new FakeCloudClient();
-    const seen: VaultIndexScope[] = [];
-    const original = cloud.putIndex.bind(cloud);
-    // 用 Parameters<> 取原签名，避免手写参数退化成隐式 any。
-    cloud.putIndex = async (
-      ...args: Parameters<VaultCloudClient["putIndex"]>
-    ): Promise<void> => {
-      seen.push(args[1]);
-      return original(...args);
-    };
+  it("targets the single index slot and uploads objects without a scope", async () => {
+    const store = await createStore();
+    await seedFile(store, "files/readme.md", "hello");
+    const fetchMock = vi.fn(
+      async (_url: string, _init?: RequestInit) =>
+        new Response(null, { status: 204 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const result = await new VaultSyncService(
+        store,
+        new FetchVaultCloudClient(),
+        () => mek,
+      ).sync("token");
+      expect(result.uploaded).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
 
-    await new VaultSyncService(store, cloud, () => mek).sync("token");
-
-    expect(seen).toEqual(["skills"]);
+    const urls = fetchMock.mock.calls.map(([url]) => String(url));
+    // 远端只有 /api/vault/index 一个索引槽，对象接口按 id 寻址、无 scope。
+    expect(urls).toContain(`${DESKWAND_API_URL}/api/vault/index`);
+    expect(urls.some((url) => url.includes("/api/vault/objects/"))).toBe(true);
+    expect(urls.every((url) => !url.includes("scope="))).toBe(true);
+    await cleanup();
   });
 
   it("blocks sync while a destructive reset marker exists", async () => {
@@ -170,7 +175,7 @@ describe("VaultSyncService", () => {
 
   it("backs up a pending local file and marks it synced", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "readme.md"), "hello");
+    await seedFile(store, "files/readme.md", "hello");
     await store.reconcile(await store.readIndex());
     const index = await store.reconcile(await store.readIndex());
     await store.writeIndex(index);
@@ -181,18 +186,20 @@ describe("VaultSyncService", () => {
 
     const synced = await store.readIndex();
     expect(result.uploaded).toBe(1);
-    expect(synced.files["readme.md"].syncStatus).toBe("synced");
-    expect(synced.files["readme.md"].objectId).toEqual(expect.any(String));
+    expect(synced.files["files/readme.md"].syncStatus).toBe("synced");
+    expect(synced.files["files/readme.md"].objectId).toEqual(
+      expect.any(String),
+    );
     expect(cloud.indexPayload).not.toBeNull();
     expect(
-      decodeRemoteIndex(cloud.indexPayload!, mek).files["readme.md"],
+      decodeRemoteIndex(cloud.indexPayload!, mek).files["files/readme.md"],
     ).toBeDefined();
     await cleanup();
   });
 
   it("keeps local data failed and retries after a cloud failure", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "retry.txt"), "retry");
+    await seedFile(store, "files/retry.txt", "retry");
     await store.writeIndex(await store.reconcile(await store.readIndex()));
     const cloud = new FakeCloudClient();
     cloud.failObjectUpload = true;
@@ -200,17 +207,17 @@ describe("VaultSyncService", () => {
 
     const failed = await service.sync("token");
     expect(failed.failed).toBe(1);
-    expect(await readFile(join(store.rootDir, "retry.txt"), "utf8")).toBe(
+    expect(await readFile(store.filePath("files/retry.txt"), "utf8")).toBe(
       "retry",
     );
-    expect((await store.readIndex()).files["retry.txt"].syncStatus).toBe(
+    expect((await store.readIndex()).files["files/retry.txt"].syncStatus).toBe(
       "failed",
     );
 
     cloud.failObjectUpload = false;
     const retried = await service.sync("token");
     expect(retried.uploaded).toBe(1);
-    expect((await store.readIndex()).files["retry.txt"].syncStatus).toBe(
+    expect((await store.readIndex()).files["files/retry.txt"].syncStatus).toBe(
       "synced",
     );
     await cleanup();
@@ -218,11 +225,11 @@ describe("VaultSyncService", () => {
 
   it("publishes a new object before deleting the old one", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "change.txt"), "old");
+    await seedFile(store, "files/change.txt", "old");
     const oldIndex: LocalVaultIndex = {
-      version: 1,
+      version: 2,
       files: {
-        "change.txt": {
+        "files/change.txt": {
           objectId: "old-object",
           hash: "old-hash",
           size: 3,
@@ -235,14 +242,14 @@ describe("VaultSyncService", () => {
     await store.writeIndex(oldIndex);
     const cloud = new FakeCloudClient();
     cloud.objects.set("old-object", Buffer.from("old-ciphertext"));
-    await writeFile(join(store.rootDir, "change.txt"), "new");
+    await seedFile(store, "files/change.txt", "new");
     const service = new VaultSyncService(store, cloud, () => mek);
 
     const result = await service.sync("token");
 
     const next = await store.readIndex();
     expect(result.deleted).toBe(1);
-    expect(next.files["change.txt"].objectId).not.toBe("old-object");
+    expect(next.files["files/change.txt"].objectId).not.toBe("old-object");
     expect(cloud.objects.has("old-object")).toBe(false);
     expect(next.pendingDeletes).toEqual([]);
     await cleanup();
@@ -250,11 +257,11 @@ describe("VaultSyncService", () => {
 
   it("does not delete the old object when the new index upload fails", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "change.txt"), "old");
+    await seedFile(store, "files/change.txt", "old");
     await store.writeIndex({
-      version: 1,
+      version: 2,
       files: {
-        "change.txt": {
+        "files/change.txt": {
           objectId: "old-object",
           hash: "old-hash",
           size: 3,
@@ -264,7 +271,7 @@ describe("VaultSyncService", () => {
       },
       pendingDeletes: [],
     });
-    await writeFile(join(store.rootDir, "change.txt"), "new");
+    await seedFile(store, "files/change.txt", "new");
     const cloud = new FakeCloudClient();
     cloud.objects.set("old-object", Buffer.from("old-ciphertext"));
     cloud.failIndex = true;
@@ -274,7 +281,7 @@ describe("VaultSyncService", () => {
 
     expect(cloud.objects.has("old-object")).toBe(true);
     expect(cloud.objects.size).toBe(1);
-    expect((await store.readIndex()).files["change.txt"].objectId).toBe(
+    expect((await store.readIndex()).files["files/change.txt"].objectId).toBe(
       "old-object",
     );
     expect((await store.readIndex()).pendingDeletes).toEqual(["old-object"]);
@@ -283,7 +290,7 @@ describe("VaultSyncService", () => {
 
   it("surfaces a cloud quota error while keeping the local entry pending", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "quota.txt"), "local");
+    await seedFile(store, "files/quota.txt", "local");
     await store.writeIndex(await store.reconcile(await store.readIndex()));
     const cloud = new FakeCloudClient();
     cloud.failObjectUploadCode = "VAULT_QUOTA_EXCEEDED";
@@ -292,7 +299,7 @@ describe("VaultSyncService", () => {
     const result = await service.sync("token");
 
     expect(result.errorCode).toBe("VAULT_QUOTA_EXCEEDED");
-    expect((await store.readIndex()).files["quota.txt"].syncStatus).toBe(
+    expect((await store.readIndex()).files["files/quota.txt"].syncStatus).toBe(
       "failed",
     );
     await cleanup();
@@ -300,11 +307,11 @@ describe("VaultSyncService", () => {
 
   it("retains a failed old-object deletion for retry", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "change.txt"), "old");
+    await seedFile(store, "files/change.txt", "old");
     await store.writeIndex({
-      version: 1,
+      version: 2,
       files: {
-        "change.txt": {
+        "files/change.txt": {
           objectId: "old-object",
           hash: "old-hash",
           size: 3,
@@ -314,7 +321,7 @@ describe("VaultSyncService", () => {
       },
       pendingDeletes: [],
     });
-    await writeFile(join(store.rootDir, "change.txt"), "new");
+    await seedFile(store, "files/change.txt", "new");
     const cloud = new FakeCloudClient();
     cloud.objects.set("old-object", Buffer.from("old-ciphertext"));
     cloud.failObjectDelete = true;
@@ -328,11 +335,10 @@ describe("VaultSyncService", () => {
 
   it("does not mark an upload synced when the file changes during upload", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "race.txt"), "before");
+    await seedFile(store, "files/race.txt", "before");
     await store.writeIndex(await store.reconcile(await store.readIndex()));
     const cloud = new FakeCloudClient();
-    cloud.onObjectUpload = () =>
-      writeFile(join(store.rootDir, "race.txt"), "after");
+    cloud.onObjectUpload = () => seedFile(store, "files/race.txt", "after");
     const service = new VaultSyncService(store, cloud, () => mek);
 
     const result = await service.sync("token");
@@ -340,7 +346,7 @@ describe("VaultSyncService", () => {
     expect(result.pending).toBe(1);
     expect(result.deleted).toBe(1);
     expect(cloud.objects.size).toBe(0);
-    expect((await store.readIndex()).files["race.txt"].syncStatus).toBe(
+    expect((await store.readIndex()).files["files/race.txt"].syncStatus).toBe(
       "pending",
     );
     await cleanup();
@@ -348,7 +354,7 @@ describe("VaultSyncService", () => {
 
   it("queues a second sync call behind an active sync", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "queued.txt"), "before");
+    await seedFile(store, "files/queued.txt", "before");
     await store.writeIndex(await store.reconcile(await store.readIndex()));
     const cloud = new FakeCloudClient();
     let releaseUpload!: () => void;
@@ -363,7 +369,7 @@ describe("VaultSyncService", () => {
     cloud.onObjectUpload = async () => {
       uploadCalls += 1;
       if (uploadCalls === 1) {
-        await writeFile(join(store.rootDir, "queued.txt"), "after");
+        await seedFile(store, "files/queued.txt", "after");
         startedUpload();
         await uploadBlocked;
       }
@@ -384,13 +390,13 @@ describe("VaultSyncService", () => {
 
   it("does not change local files when MEK is unavailable", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "offline.txt"), "local");
+    await seedFile(store, "files/offline.txt", "local");
     await store.writeIndex(await store.reconcile(await store.readIndex()));
     const cloud = new FakeCloudClient();
     const service = new VaultSyncService(store, cloud, () => null);
 
     await expect(service.sync("token")).rejects.toThrow("VAULT_KEY_REQUIRED");
-    expect(await readFile(join(store.rootDir, "offline.txt"), "utf8")).toBe(
+    expect(await readFile(store.filePath("files/offline.txt"), "utf8")).toBe(
       "local",
     );
     await cleanup();
@@ -398,7 +404,7 @@ describe("VaultSyncService", () => {
 
   it("keeps local files pending when the remote index request fails", async () => {
     const store = await createStore();
-    await writeFile(join(store.rootDir, "keep.txt"), "depends");
+    await seedFile(store, "files/keep.txt", "depends");
     await store.writeIndex(await store.reconcile(await store.readIndex()));
     const cloud = new FakeCloudClient();
     cloud.failIndex = true;
@@ -407,7 +413,7 @@ describe("VaultSyncService", () => {
     const result = await service.sync("token");
 
     expect(result.pending).toBeGreaterThan(0);
-    expect((await store.readIndex()).files["keep.txt"].syncStatus).toBe(
+    expect((await store.readIndex()).files["files/keep.txt"].syncStatus).toBe(
       "failed",
     );
     await cleanup();
@@ -416,12 +422,12 @@ describe("VaultSyncService", () => {
   describe("VaultResetService", () => {
     it("preserves local files while preparing a new remote backup", async () => {
       const store = await createStore();
-      await writeFile(store.filePath("keep.txt"), "local");
-      await writeFile(store.filePath("notes.txt"), "notes");
+      await seedFile(store, "files/keep.txt", "local");
+      await seedFile(store, "files/notes.txt", "notes");
       await store.writeIndex({
-        version: 1,
+        version: 2,
         files: {
-          "keep.txt": {
+          "files/keep.txt": {
             objectId: "old-1",
             hash: "h1",
             size: 5,
@@ -429,7 +435,7 @@ describe("VaultSyncService", () => {
             syncStatus: "synced",
             objectHash: "h1",
           },
-          "notes.txt": {
+          "files/notes.txt": {
             objectId: "old-2",
             hash: "h2",
             size: 5,
@@ -454,7 +460,9 @@ describe("VaultSyncService", () => {
         await resetService.beginDiscardAndReinitialize("token");
       expect(preparation.recoveryCode).toMatch(/^[1-9A-HJ-NP-Za-km-z]+$/);
       expect(preparation.preservedLocalFiles).toBe(2);
-      expect(await readFile(store.filePath("keep.txt"), "utf8")).toBe("local");
+      expect(await readFile(store.filePath("files/keep.txt"), "utf8")).toBe(
+        "local",
+      );
       expect(cloud.deletedObjectIds).toEqual(["old-1", "old-2"]);
 
       const result = await resetService.completeDiscardAndReinitialize(
@@ -469,7 +477,7 @@ describe("VaultSyncService", () => {
           deriveMek(preparation.recoveryCode),
         ).files,
       ).toEqual({});
-      expect((await store.readIndex()).files["keep.txt"].syncStatus).toBe(
+      expect((await store.readIndex()).files["files/keep.txt"].syncStatus).toBe(
         "pending",
       );
       await cleanup();
@@ -477,11 +485,11 @@ describe("VaultSyncService", () => {
 
     it("resumes an interrupted reset instead of treating its marker as permanent", async () => {
       const store = await createStore();
-      await writeFile(store.filePath("keep.txt"), "local");
+      await seedFile(store, "files/keep.txt", "local");
       await store.writeIndex({
-        version: 1,
+        version: 2,
         files: {
-          "keep.txt": {
+          "files/keep.txt": {
             objectId: "old-1",
             hash: "h",
             size: 5,
@@ -520,11 +528,11 @@ describe("VaultSyncService", () => {
 
     it("does not switch MEK when old-object cleanup fails", async () => {
       const store = await createStore();
-      await writeFile(store.filePath("keep.txt"), "local");
+      await seedFile(store, "files/keep.txt", "local");
       await store.writeIndex({
-        version: 1,
+        version: 2,
         files: {
-          "keep.txt": {
+          "files/keep.txt": {
             objectId: "old-1",
             hash: "h",
             size: 5,
@@ -553,17 +561,19 @@ describe("VaultSyncService", () => {
         resetService.beginDiscardAndReinitialize("token"),
       ).rejects.toThrow("VAULT_RESET_FAILED");
       expect(storedMek).toEqual(oldMek);
-      expect(await readFile(store.filePath("keep.txt"), "utf8")).toBe("local");
+      expect(await readFile(store.filePath("files/keep.txt"), "utf8")).toBe(
+        "local",
+      );
       await cleanup();
     });
 
     it("does not persist a new MEK when the recovery code mismatches", async () => {
       const store = await createStore();
-      await writeFile(store.filePath("keep.txt"), "local");
+      await seedFile(store, "files/keep.txt", "local");
       await store.writeIndex({
-        version: 1,
+        version: 2,
         files: {
-          "keep.txt": {
+          "files/keep.txt": {
             objectId: "old-1",
             hash: "h",
             size: 5,
@@ -596,17 +606,12 @@ describe("VaultSyncService", () => {
       await cleanup();
     });
 
-    it("deletes only the objects of its own scope on a keyless discard", async () => {
+    it("deletes every listed object on a keyless discard", async () => {
       const store = await createStore();
-      await store.ensureDirectory();
       const cloud = new FakeCloudClient();
-      await cloud.putObject("token", "files", "files-object", Buffer.from("f"));
-      await cloud.putObject(
-        "token",
-        "skills",
-        "skills-object",
-        Buffer.from("s"),
-      );
+      await cloud.putObject("token", "files-object", Buffer.from("f"));
+      await cloud.putObject("token", "skills-object", Buffer.from("s"));
+      const listSpy = vi.spyOn(cloud, "listObjectIds");
       const resetService = new VaultResetService(
         store,
         cloud,
@@ -616,8 +621,13 @@ describe("VaultSyncService", () => {
 
       await resetService.discardWithoutLocalKey("token");
 
-      expect(cloud.deletedObjectIds).toContain("files-object");
-      expect(cloud.deletedObjectIds).not.toContain("skills-object");
+      // 单槽现实：无 key 的丢弃列出整个账户的对象，调用不带 scope 过滤。
+      expect(listSpy).toHaveBeenCalledWith("token");
+      expect([...cloud.deletedObjectIds].sort()).toEqual([
+        "files-object",
+        "skills-object",
+      ]);
+      expect(cloud.objects.size).toBe(0);
     });
 
     it("keeps a no-key reset retryable when object listing fails", async () => {
@@ -671,5 +681,78 @@ describe("VaultSyncService", () => {
       expect(marker?.state).toBe("awaiting-recovery-code");
       await cleanup();
     });
+  });
+
+  it("reads a changed file exactly once per sync run", async () => {
+    const store = await createStore();
+    await seedFile(store, "files/changed.md", "v1");
+    const cloud = new FakeCloudClient();
+    const sync = new VaultSyncService(store, cloud, () => mek);
+    await sync.sync("token");
+
+    await writeFile(store.filePath("files/changed.md"), "v2 changed");
+    const { readFile: mockedReadFile } = await import("node:fs/promises");
+    vi.mocked(mockedReadFile).mockClear();
+
+    const result = await sync.sync("token");
+
+    expect(result.uploaded).toBe(1);
+    const contentReads = vi
+      .mocked(mockedReadFile)
+      .mock.calls.map(([target]) => String(target))
+      .filter((target) => target.endsWith("changed.md"));
+    expect(contentReads).toHaveLength(1);
+    await cleanup();
+  });
+
+  it("skips the upload when the object is already indexed", async () => {
+    const store = await createStore();
+    await seedFile(store, "files/keep.md", "content");
+    const cloud = new FakeCloudClient();
+    const sync = new VaultSyncService(store, cloud, () => mek);
+    await sync.sync("token");
+    const before = await store.readIndex();
+    const objectId = before.files["files/keep.md"].objectId;
+
+    // 模拟「对象已传、本地索引已写、进程在写远端索引前崩溃」：内容与元数据未变，
+    // 只有 syncStatus 退回 pending。
+    before.files["files/keep.md"].syncStatus = "pending";
+    await store.writeIndex(before);
+    const objectsBefore = cloud.objects.size;
+    const indexUploadsBefore = cloud.indexUploads;
+
+    const result = await sync.sync("token");
+
+    expect(result.uploaded).toBe(0);
+    expect(cloud.objects.size).toBe(objectsBefore);
+    expect(cloud.indexUploads).toBe(indexUploadsBefore + 1);
+    const after = await store.readIndex();
+    expect(after.files["files/keep.md"].syncStatus).toBe("synced");
+    expect(after.files["files/keep.md"].objectId).toBe(objectId);
+    await cleanup();
+  });
+
+  it("keeps the indexed object when the index upload still fails", async () => {
+    const store = await createStore();
+    await seedFile(store, "files/keep.md", "content");
+    const cloud = new FakeCloudClient();
+    const sync = new VaultSyncService(store, cloud, () => mek);
+    await sync.sync("token");
+    const before = await store.readIndex();
+    const objectId = before.files["files/keep.md"].objectId;
+    before.files["files/keep.md"].syncStatus = "pending";
+    await store.writeIndex(before);
+    const objectsBefore = cloud.objects.size;
+    cloud.failIndex = true;
+
+    await sync.sync("token");
+
+    // 捷径条目本轮没有上传任何东西：索引写失败不该把它已传好的对象删掉或清空。
+    expect(cloud.objects.size).toBe(objectsBefore);
+    expect(cloud.deletedObjectIds).toEqual([]);
+    const after = await store.readIndex();
+    expect(after.files["files/keep.md"].objectId).toBe(objectId);
+    expect(after.files["files/keep.md"].syncStatus).toBe("pending");
+    await cleanup();
   });
 });

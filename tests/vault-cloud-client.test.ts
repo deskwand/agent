@@ -97,58 +97,54 @@ describe("FetchVaultCloudClient", () => {
     );
   });
 
-  it("putIndex writes the scoped index key", async () => {
+  it("putIndex writes the single index key", async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await new FetchVaultCloudClient().putIndex(
-      "token",
-      "skills",
-      Buffer.from("index"),
-    );
+    await new FetchVaultCloudClient().putIndex("token", Buffer.from("index"));
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/vault/index/skills");
+    expect(url).toContain("/api/vault/index");
+    expect(url).not.toContain("scope=");
   });
 
-  it("getIndex reads the scoped index key", async () => {
+  it("getIndex reads the single index key", async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 404 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(
-      new FetchVaultCloudClient().getIndex("token", "files"),
-    ).resolves.toBeNull();
+    await expect(new FetchVaultCloudClient().getIndex("token")).resolves.toBeNull();
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("/api/vault/index/files");
+    expect(url).toContain("/api/vault/index");
+    expect(url).not.toContain("scope=");
   });
 
-  it("scopes object uploads and listings", async () => {
+  it("uploads objects without a scope query", async () => {
     const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await new FetchVaultCloudClient().putObject(
       "token",
-      "skills",
       "obj-1",
       Buffer.from("x"),
     );
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain("/api/vault/objects/obj-1");
-    expect(url).toContain("scope=skills");
+    expect(url).not.toContain("scope=");
   });
 
-  it("lists objects for one scope only", async () => {
+  it("lists every object of the account", async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response(JSON.stringify({ object_ids: [] }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await new FetchVaultCloudClient().listObjectIds("token", "files");
+    await new FetchVaultCloudClient().listObjectIds("token");
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toContain("scope=files");
+    expect(url).toContain("/api/vault/objects");
+    expect(url).not.toContain("scope=");
   });
 });

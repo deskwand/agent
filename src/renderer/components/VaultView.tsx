@@ -15,6 +15,7 @@ import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
 import { openFilePathInBrowser } from "../utils/open-in-browser";
 import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
+import { splitRelPath } from "./attach/picker-items";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Tooltip } from "./Tooltip";
 import {
@@ -62,6 +63,20 @@ function statusText(status: SyncStatus, t: (key: string) => string): string {
 }
 
 /**
+ * 密库文件路径是相对 `files/` 模块根的（快照 `items[].path`），
+ * 列表里把目录前缀弱化显示、叶子名保持主色。
+ */
+function VaultPathLabel({ path }: { path: string }): JSX.Element {
+  const { dir, name } = splitRelPath(path);
+  return (
+    <>
+      {dir ? <span className="text-text-muted">{`${dir}/`}</span> : null}
+      {name}
+    </>
+  );
+}
+
+/**
  * 批量加入密库的失败原因。已知码复用 errorText 的分支；其余（EACCES / ENOSPC 一类
  * 本地错误）落到「加入失败」—— errorText 的兜底是「云端同步失败，本地文件未受影响」，
  * 而这次操作根本没碰云端，用它会误导。
@@ -102,7 +117,7 @@ function errorText(
     return t("vault.skills.error.uploadFailed");
   }
   if (message.startsWith("VAULT_UNSUPPORTED_PATH")) {
-    return t("vault.skills.error.unsupportedPath", {
+    return t("vault.error.unsupportedPath", {
       name: message.slice("VAULT_UNSUPPORTED_PATH:".length),
     });
   }
@@ -397,13 +412,6 @@ export function VaultView(): JSX.Element {
       return;
     }
     setSnapshot(nextSnapshot);
-    // 技能 scope 失败时 files 可能已经同步成功：说清是哪一半没上去，
-    // 否则用户看到「同步失败」会以为文件也没备份。
-    if (nextSnapshot.syncError) {
-      setSyncFeedback("error");
-      setSyncFeedbackMessage(t("vault.syncFailedSkills"));
-      return;
-    }
     if (nextSnapshot.pendingCount > 0) {
       setSyncFeedback("error");
       setSyncFeedbackMessage(t("vault.error.syncFailed"));
@@ -508,12 +516,12 @@ export function VaultView(): JSX.Element {
   }, [canOpenAdvancedReset]);
 
   const handleOpen = (item: VaultSnapshotItem) => {
-    const dotIndex = item.name.lastIndexOf(".");
-    const ext = dotIndex > 0 ? item.name.slice(dotIndex).toLowerCase() : "";
+    const dotIndex = item.path.lastIndexOf(".");
+    const ext = dotIndex > 0 ? item.path.slice(dotIndex).toLowerCase() : "";
     if (isBrowserOpenableExt(ext)) {
       void (async () => {
         try {
-          const path = await window.electronAPI.vault.getFilePath(item.name);
+          const path = await window.electronAPI.vault.getFilePath(item.path);
           openFilePathInBrowser(path);
         } catch (openError: unknown) {
           setError(errorText(openError, t));
@@ -523,7 +531,7 @@ export function VaultView(): JSX.Element {
     }
     if (!isPreviewableExt(ext)) {
       void runAction(async () => {
-        const result = await window.electronAPI.vault.openFile(item.name);
+        const result = await window.electronAPI.vault.openFile(item.path);
         if (result.error) throw new Error(result.error);
         return window.electronAPI.vault.getSnapshot();
       });
@@ -531,8 +539,8 @@ export function VaultView(): JSX.Element {
     }
     void (async () => {
       try {
-        const path = await window.electronAPI.vault.getFilePath(item.name);
-        openPreview({ path, name: item.name });
+        const path = await window.electronAPI.vault.getFilePath(item.path);
+        openPreview({ path, name: item.path });
       } catch (openError: unknown) {
         setError(errorText(openError, t));
       }
@@ -616,7 +624,7 @@ export function VaultView(): JSX.Element {
 
     if (pending.kind === "delete") {
       void runAction(() =>
-        window.electronAPI.vault.deleteFile(pending.item.name),
+        window.electronAPI.vault.deleteFile(pending.item.path),
       );
       return;
     }
@@ -1114,14 +1122,14 @@ export function VaultView(): JSX.Element {
                 <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
                   {visibleItems.map((item) => (
                     <article
-                      key={item.name}
+                      key={item.path}
                       className="flex select-none items-center gap-4 px-4 py-3"
                       onDoubleClick={() => handleOpen(item)}
                     >
-                      <FileTypeIcon kind={getFileKind(item.name)} size={24} />
+                      <FileTypeIcon kind={getFileKind(item.path)} size={24} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-text-primary">
-                          {item.name}
+                          <VaultPathLabel path={item.path} />
                         </p>
                         <p className="mt-1 text-xs text-text-muted">
                           {formatSize(item.size)} ·{" "}
@@ -1135,13 +1143,13 @@ export function VaultView(): JSX.Element {
                         <button
                           type="button"
                           aria-label={t("vault.action.export", {
-                            name: item.name,
+                            name: item.path,
                           })}
                           className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
                           onClick={(event) => {
                             if (event.detail > 1) return;
                             void runAction(() =>
-                              window.electronAPI.vault.exportFile(item.name),
+                              window.electronAPI.vault.exportFile(item.path),
                             );
                           }}
                         >
@@ -1150,15 +1158,15 @@ export function VaultView(): JSX.Element {
                         <button
                           type="button"
                           aria-label={t("vault.action.more", {
-                            name: item.name,
+                            name: item.path,
                           })}
                           aria-haspopup="menu"
-                          aria-expanded={openMenu === item.name}
-                          aria-controls={`vault-menu-${item.name}`}
+                          aria-expanded={openMenu === item.path}
+                          aria-controls={`vault-menu-${item.path}`}
                           className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
                           onClick={() =>
                             setOpenMenu((current) =>
-                              current === item.name ? null : item.name,
+                              current === item.path ? null : item.path,
                             )
                           }
                           onKeyDown={(event) => {
@@ -1170,9 +1178,9 @@ export function VaultView(): JSX.Element {
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </button>
-                        {openMenu === item.name && (
+                        {openMenu === item.path && (
                           <div
-                            id={`vault-menu-${item.name}`}
+                            id={`vault-menu-${item.path}`}
                             role="menu"
                             className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-8 z-10 min-w-32 animate-menu-in-down`}
                             onKeyDown={(event) => {
@@ -1187,7 +1195,7 @@ export function VaultView(): JSX.Element {
                                 setOpenMenu(null);
                                 void runAction(() =>
                                   window.electronAPI.vault.revealFile(
-                                    item.name,
+                                    item.path,
                                   ),
                                 );
                               }}
@@ -1327,7 +1335,7 @@ export function VaultView(): JSX.Element {
         title={
           pendingConfirmation?.kind === "delete"
             ? t("vault.confirm.delete", {
-                name: pendingConfirmation.item.name,
+                name: pendingConfirmation.item.path,
               })
             : pendingConfirmation?.kind === "delete-skill"
               ? t("vault.skills.confirmDelete", {

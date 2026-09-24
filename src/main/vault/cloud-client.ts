@@ -1,37 +1,25 @@
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import type { VaultBackupUsage } from "../../shared/vault";
 
-export type VaultIndexScope = "files" | "skills";
-
 export interface VaultCloudClient {
-  putObject(
-    token: string,
-    scope: VaultIndexScope,
-    objectId: string,
-    payload: Buffer,
-  ): Promise<void>;
+  putObject(token: string, objectId: string, payload: Buffer): Promise<void>;
   getObject(token: string, objectId: string): Promise<Buffer>;
   deleteObject(token: string, objectId: string): Promise<void>;
-  getIndex(token: string, scope: VaultIndexScope): Promise<Buffer | null>;
-  putIndex(
-    token: string,
-    scope: VaultIndexScope,
-    payload: Buffer,
-  ): Promise<void>;
-  listObjectIds(token: string, scope: VaultIndexScope): Promise<string[]>;
+  getIndex(token: string): Promise<Buffer | null>;
+  putIndex(token: string, payload: Buffer): Promise<void>;
+  listObjectIds(token: string): Promise<string[]>;
   getUsage?(token: string): Promise<VaultBackupUsage>;
 }
 
 export class FetchVaultCloudClient implements VaultCloudClient {
   async putObject(
     token: string,
-    scope: VaultIndexScope,
     objectId: string,
     payload: Buffer,
   ): Promise<void> {
     await this.request(
       token,
-      `/api/vault/objects/${encodeURIComponent(objectId)}?scope=${scope}`,
+      `/api/vault/objects/${encodeURIComponent(objectId)}`,
       {
         method: "PUT",
         body: payload as unknown as BodyInit,
@@ -56,16 +44,9 @@ export class FetchVaultCloudClient implements VaultCloudClient {
     );
   }
 
-  async getIndex(
-    token: string,
-    scope: VaultIndexScope,
-  ): Promise<Buffer | null> {
+  async getIndex(token: string): Promise<Buffer | null> {
     try {
-      const response = await this.request(
-        token,
-        `/api/vault/index/${scope}`,
-        {},
-      );
+      const response = await this.request(token, "/api/vault/index", {});
       return Buffer.from(await response.arrayBuffer());
     } catch (error: unknown) {
       if (error instanceof VaultCloudError && error.status === 404) return null;
@@ -73,26 +54,15 @@ export class FetchVaultCloudClient implements VaultCloudClient {
     }
   }
 
-  async listObjectIds(
-    token: string,
-    scope: VaultIndexScope,
-  ): Promise<string[]> {
-    const response = await this.request(
-      token,
-      `/api/vault/objects?scope=${scope}`,
-      {},
-    );
+  async listObjectIds(token: string): Promise<string[]> {
+    const response = await this.request(token, "/api/vault/objects", {});
     const payload: unknown = await response.json();
     if (!isObjectIdPayload(payload)) throw new Error("VAULT_BAD_OBJECT_LIST");
     return payload.object_ids;
   }
 
-  async putIndex(
-    token: string,
-    scope: VaultIndexScope,
-    payload: Buffer,
-  ): Promise<void> {
-    await this.request(token, `/api/vault/index/${scope}`, {
+  async putIndex(token: string, payload: Buffer): Promise<void> {
+    await this.request(token, "/api/vault/index", {
       method: "PUT",
       body: payload as unknown as BodyInit,
     });

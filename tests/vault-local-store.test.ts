@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { existsSync } from "node:fs";
 import {
   mkdir,
@@ -13,6 +13,11 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LocalVaultStore } from "../src/main/vault/local-store";
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return { ...actual, readFile: vi.fn(actual.readFile) };
+});
 
 describe("LocalVaultStore", () => {
   const roots: string[] = [];
@@ -29,12 +34,6 @@ describe("LocalVaultStore", () => {
     return new LocalVaultStore(join(root, "vault"));
   }
 
-  async function createSkillStore(): Promise<LocalVaultStore> {
-    const root = await mkdtemp(join(tmpdir(), "deskwand-vault-skills-"));
-    roots.push(root);
-    return new LocalVaultStore(join(root, "vault-skills"), "skills");
-  }
-
   it("creates the directory and distinguishes a missing index", async () => {
     const store = await createStore();
 
@@ -42,34 +41,108 @@ describe("LocalVaultStore", () => {
 
     expect(await store.hasIndex()).toBe(false);
     expect(await store.readIndex()).toEqual({
-      version: 1,
+      version: 2,
       files: {},
       pendingDeletes: [],
     });
   });
 
-  it("scans regular files and excludes the local index", async () => {
+  it("exposes module roots under the vault root", async () => {
     const store = await createStore();
-    await store.ensureDirectory();
-    await writeFile(join(store.rootDir, ".vault-index.json"), "{}");
-    await writeFile(join(store.rootDir, ".vault-index.json.tmp-stale"), "{}");
-    await writeFile(join(store.rootDir, ".vault-index.json.corrupt-old"), "{}");
-    await writeFile(join(store.rootDir, "vault-mek.bin"), "internal key");
-    await writeFile(join(store.rootDir, "readme.md"), "hello");
-    await writeFile(join(store.rootDir, ".hidden.txt"), "hidden");
 
-    const files = await store.scanFiles();
+    expect(store.moduleRoot("files")).toBe(join(store.rootDir, "files"));
+    expect(store.moduleRoot("skills")).toBe(join(store.rootDir, "skills"));
+  });
 
-    expect(files.map((file) => file.name)).toEqual([
-      ".hidden.txt",
-      "readme.md",
-    ]);
-    expect(files.find((file) => file.name === "readme.md")?.hash).toBe(
-      "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+  it("scans modules recursively and rejects unknown root entries", async () => {
+    const store = await createStore();
+    const root = store.rootDir;
+    await mkdir(join(root, "files", "项目"), { recursive: true });
+    await mkdir(join(root, "skills", "demo"), { recursive: true });
+    await writeFile(join(root, "files", "项目", "笔记.md"), "a");
+    await writeFile(join(root, "skills", "demo", "SKILL.md"), "b");
+    await writeFile(join(root, ".vault-index.json"), "{}");
+    await writeFile(join(root, "vault-mek.bin"), "key");
+
+    const names = (await store.scanFiles()).map((file) => file.name);
+    expect(names).toEqual(
+      expect.arrayContaining(["files/项目/笔记.md", "skills/demo/SKILL.md"]),
+    );
+
+    await writeFile(join(root, "stray.md"), "x");
+    await expect(store.scanFiles()).rejects.toThrow(
+      "VAULT_UNSUPPORTED_PATH:stray.md",
     );
   });
 
-  it("copies one file into the Vault and adds a suffix on collision", async () => {
+  it("scans hidden directories inside modules", async () => {
+    const store = await createStore();
+    await mkdir(join(store.rootDir, "files", ".cache"), { recursive: true });
+    await writeFile(join(store.rootDir, "files", ".cache", "state.json"), "{}");
+
+    const names = (await store.scanFiles()).map((file) => file.name);
+    expect(names).toContain("files/.cache/state.json");
+  });
+
+  it("puts restore staging under the root .vault-staging directory", async () => {
+    const store = await createStore();
+    const transaction = await store.beginRestore(["files/a.md"]);
+
+    expect(transaction.stagedDirectory).toContain(".vault-staging");
+
+    await store.rollbackRestore(transaction);
+  });
+
+  it("never reads file contents while scanning or reconciling", async () => {
+    const store = await createStore();
+    await mkdir(join(store.rootDir, "files"), { recursive: true });
+    await writeFile(join(store.rootDir, "files", "fresh.md"), "fresh");
+    const { readFile: mockedReadFile } = await import("node:fs/promises");
+    vi.mocked(mockedReadFile).mockClear();
+
+    const reconciled = await store.reconcile(await store.readIndex());
+
+    const contentReads = vi
+      .mocked(mockedReadFile)
+      .mock.calls.map(([target]) => String(target))
+      .filter((target) => !target.endsWith(".vault-index.json"));
+    expect(contentReads).toHaveLength(0);
+    expect(reconciled.files["files/fresh.md"].hash).toBeNull();
+  });
+
+  it("never scans or targets internal root entries", async () => {
+    const store = await createStore();
+    const root = store.rootDir;
+    await mkdir(join(root, "files"), { recursive: true });
+    await writeFile(join(root, "files", "keep.md"), "keep");
+    await writeFile(join(root, ".vault-index.json"), "{}");
+    await writeFile(join(root, "vault-mek.bin"), "encrypted key");
+    await writeFile(join(root, ".vault-operation.json"), "{}");
+    await mkdir(join(root, ".vault-staging", "tx"), { recursive: true });
+    await writeFile(join(root, ".vault-staging", "tx", "a.md"), "half");
+
+    expect((await store.scanFiles()).map((file) => file.name)).toEqual([
+      "files/keep.md",
+    ]);
+
+    expect(() => store.filePath("vault-mek.bin")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath(".vault-index.json")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+    expect(() => store.filePath(".vault-operation.json")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+    expect(() => store.filePath(".vault-staging/a.md")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+    // Win32 strips trailing dots/spaces, so a module-internal name that could
+    // alias another file is rejected as well.
+    expect(() => store.filePath("files/vault-mek.bin.")).toThrow(
+      "VAULT_INVALID_NAME",
+    );
+  });
+
+  it("copies one file into the files module and adds a suffix on collision", async () => {
     const store = await createStore();
     await store.ensureDirectory();
     const source = join(tmpdir(), "deskwand-vault-source.txt");
@@ -79,8 +152,8 @@ describe("LocalVaultStore", () => {
     const first = await store.importFile(source);
     const second = await store.importFile(source);
 
-    expect(first.name).toBe("deskwand-vault-source.txt");
-    expect(second.name).toBe("deskwand-vault-source (1).txt");
+    expect(first.name).toBe("files/deskwand-vault-source.txt");
+    expect(second.name).toBe("files/deskwand-vault-source (1).txt");
     expect(await readFile(store.filePath(first.name), "utf8")).toBe("source");
     expect(await readFile(source, "utf8")).toBe("source");
   });
@@ -128,47 +201,23 @@ describe("LocalVaultStore", () => {
     await expect(store.getUsageBytes()).resolves.toBe(0);
   });
 
-  it("reconciles a leaked internal key entry without deleting the key file", async () => {
-    const store = await createStore();
-    await store.ensureDirectory();
-    const keyPath = join(store.rootDir, "vault-mek.bin");
-    await writeFile(keyPath, "encrypted key");
-
-    const reconciled = await store.reconcile({
-      version: 1,
-      files: {
-        "vault-mek.bin": {
-          objectId: "leaked-object",
-          hash: "hash",
-          size: 12,
-          mtime: 1,
-          syncStatus: "synced",
-        },
-      },
-      pendingDeletes: [],
-    });
-
-    expect(reconciled.files["vault-mek.bin"]).toBeUndefined();
-    expect(reconciled.pendingDeletes).toEqual(["leaked-object"]);
-    expect(await readFile(keyPath, "utf8")).toBe("encrypted key");
-  });
-
   it("reconciles new, modified, and deleted local files", async () => {
     const store = await createStore();
-    await store.ensureDirectory();
-    await writeFile(join(store.rootDir, "same.txt"), "old");
-    await writeFile(join(store.rootDir, "deleted.txt"), "gone");
+    const root = store.rootDir;
+    await mkdir(join(root, "files"), { recursive: true });
+    await writeFile(join(root, "files", "same.txt"), "old");
+    await writeFile(join(root, "files", "deleted.txt"), "gone");
     const index = await store.reconcile({
-      version: 1,
+      version: 2,
       files: {
-        "same.txt": {
+        "files/same.txt": {
           objectId: "old-object",
           hash: "old-hash",
           size: 3,
           mtime: 1,
           syncStatus: "synced",
         },
-        "deleted.txt": {
+        "files/deleted.txt": {
           objectId: "deleted-object",
           hash: "deleted-hash",
           size: 4,
@@ -179,103 +228,50 @@ describe("LocalVaultStore", () => {
       pendingDeletes: [],
     });
 
-    await writeFile(join(store.rootDir, "same.txt"), "new");
-    await writeFile(join(store.rootDir, "new.txt"), "new file");
-    await rm(join(store.rootDir, "deleted.txt"));
+    await writeFile(join(root, "files", "same.txt"), "new");
+    await writeFile(join(root, "files", "new.txt"), "new file");
+    await rm(join(root, "files", "deleted.txt"));
     const reconciled = await store.reconcile(index);
 
-    expect(reconciled.files["same.txt"].objectId).toBe("old-object");
-    expect(reconciled.files["same.txt"].syncStatus).toBe("pending");
-    expect(reconciled.files["new.txt"].objectId).toBeNull();
-    expect(reconciled.files["new.txt"].syncStatus).toBe("pending");
-    expect(reconciled.files["deleted.txt"]).toBeUndefined();
+    expect(reconciled.files["files/same.txt"].objectId).toBe("old-object");
+    expect(reconciled.files["files/same.txt"].syncStatus).toBe("pending");
+    expect(reconciled.files["files/new.txt"].objectId).toBeNull();
+    expect(reconciled.files["files/new.txt"].syncStatus).toBe("pending");
+    expect(reconciled.files["files/deleted.txt"]).toBeUndefined();
     expect(reconciled.pendingDeletes).toEqual(["deleted-object"]);
-  });
-
-  it("never scans or targets internal Vault files", async () => {
-    const store = await createStore();
-    await store.ensureDirectory();
-    await writeFile(join(store.rootDir, "vault-mek.bin"), "encrypted key");
-    await writeFile(join(store.rootDir, ".vault-index.json.tmp-stale"), "{}");
-    await writeFile(
-      join(store.rootDir, ".vault-operation.json.tmp-stale"),
-      "{}",
-    );
-    expect((await store.scanFiles()).map((file) => file.name)).not.toContain(
-      "vault-mek.bin",
-    );
-    expect((await store.scanFiles()).map((file) => file.name)).not.toContain(
-      ".vault-operation.json.tmp-stale",
-    );
-    expect(() => store.filePath("vault-mek.bin")).toThrow("VAULT_INVALID_NAME");
-    expect(() => store.filePath("Vault-MEK.BIN")).toThrow("VAULT_INVALID_NAME");
-    expect(() => store.filePath(".VAULT-INDEX.JSON.tmp")).toThrow(
-      "VAULT_INVALID_NAME",
-    );
-    expect(() => store.filePath(".VAULT-OPERATION.JSON.tmp")).toThrow(
-      "VAULT_INVALID_NAME",
-    );
-    // Win32 resolves these to the reserved files (trailing dots/spaces are
-    // stripped), so they must be rejected as well.
-    expect(() => store.filePath("vault-mek.bin.")).toThrow(
-      "VAULT_INVALID_NAME",
-    );
-    expect(() => store.filePath("vault-mek.bin ")).toThrow(
-      "VAULT_INVALID_NAME",
-    );
-    expect(() => store.filePath(".vault-restore.")).toThrow(
-      "VAULT_INVALID_NAME",
-    );
-  });
-
-  it("removes a legacy internal key entry without deleting the key file", async () => {
-    const store = await createStore();
-    await store.ensureDirectory();
-    const keyPath = join(store.rootDir, "vault-mek.bin");
-    await writeFile(keyPath, "encrypted key");
-    await store.writeIndex({
-      version: 1,
-      files: {
-        "vault-mek.bin": {
-          objectId: "legacy-object",
-          hash: "hash",
-          size: 12,
-          mtime: 1,
-          syncStatus: "synced",
-        },
-      },
-      pendingDeletes: [],
-    });
-
-    const reconciled = await store.reconcile(await store.readIndex());
-    expect(reconciled.files["vault-mek.bin"]).toBeUndefined();
-    expect(reconciled.pendingDeletes).toEqual(["legacy-object"]);
-    await expect(readFile(keyPath, "utf8")).resolves.toBeTruthy();
   });
 
   it("recovers an interrupted staging restore on restart", async () => {
     const store = await createStore();
+    const root = store.rootDir;
     await store.ensureDirectory();
-    const transaction = await store.beginRestore(["a.txt"]);
-    await store.stageRestoreFile(transaction, "a.txt", Buffer.from("restored"));
-    expect(existsSync(join(store.rootDir, ".vault-operation.json"))).toBe(true);
+    const transaction = await store.beginRestore(["files/a.txt"]);
+    await store.stageRestoreFile(
+      transaction,
+      "files/a.txt",
+      Buffer.from("restored"),
+    );
+    expect(existsSync(join(root, ".vault-operation.json"))).toBe(true);
 
     const restarted = new LocalVaultStore(store.rootDir);
     await restarted.ensureDirectory();
     await restarted.recoverPendingRestore();
 
-    expect(existsSync(join(store.rootDir, ".vault-operation.json"))).toBe(
-      false,
-    );
+    expect(existsSync(join(root, ".vault-operation.json"))).toBe(false);
     expect(existsSync(transaction.stagedDirectory)).toBe(false);
-    expect(existsSync(join(store.rootDir, "a.txt"))).toBe(false);
+    expect(existsSync(join(root, "files", "a.txt"))).toBe(false);
   });
 
   it("keeps a fully committed restore after a crash before marker cleanup", async () => {
     const store = await createStore();
+    const root = store.rootDir;
     await store.ensureDirectory();
-    const transaction = await store.beginRestore(["a.txt"]);
-    await store.stageRestoreFile(transaction, "a.txt", Buffer.from("restored"));
+    const transaction = await store.beginRestore(["files/a.txt"]);
+    await store.stageRestoreFile(
+      transaction,
+      "files/a.txt",
+      Buffer.from("restored"),
+    );
     await store.writeOperationMarker({
       version: 1,
       id: transaction.id,
@@ -284,14 +280,15 @@ describe("LocalVaultStore", () => {
       stagedDirectory: transaction.stagedDirectory,
       targetNames: transaction.targetNames,
     });
+    await mkdir(join(root, "files"), { recursive: true });
     await rename(
-      join(transaction.stagedDirectory, "a.txt"),
-      store.filePath("a.txt"),
+      join(transaction.stagedDirectory, "files", "a.txt"),
+      store.filePath("files/a.txt"),
     );
     await store.writeIndex({
-      version: 1,
+      version: 2,
       files: {
-        "a.txt": {
+        "files/a.txt": {
           objectId: "remote-a",
           hash: "hash",
           size: 8,
@@ -305,68 +302,70 @@ describe("LocalVaultStore", () => {
     const restarted = new LocalVaultStore(store.rootDir);
     await restarted.recoverPendingRestore();
 
-    expect(await readFile(store.filePath("a.txt"), "utf8")).toBe("restored");
-    expect((await store.readIndex()).files["a.txt"]).toBeDefined();
+    expect(await readFile(store.filePath("files/a.txt"), "utf8")).toBe(
+      "restored",
+    );
+    expect((await store.readIndex()).files["files/a.txt"]).toBeDefined();
     expect(await store.readOperationMarker()).toBeNull();
+    // 只断言「文件还在」会空地通过：标记版本不合法时 readOperationMarker 会
+    // 直接删掉它、recoverPendingRestore 根本不跑。暂存目录是否被清理才是恢复
+    // 路径真的执行过的证据。
+    expect(existsSync(transaction.stagedDirectory)).toBe(false);
   });
 
   it("cleans half-committed target files on restart", async () => {
     const store = await createStore();
+    const root = store.rootDir;
     await store.ensureDirectory();
-    const transaction = await store.beginRestore(["a.txt"]);
-    await store.stageRestoreFile(transaction, "a.txt", Buffer.from("restored"));
+    const transaction = await store.beginRestore(["files/a.txt"]);
+    await store.stageRestoreFile(
+      transaction,
+      "files/a.txt",
+      Buffer.from("restored"),
+    );
     const marker = await store.readOperationMarker();
     await store.writeOperationMarker({
       ...marker!,
       state: "committing",
     });
+    await mkdir(join(root, "files"), { recursive: true });
     await rename(
-      join(transaction.stagedDirectory, "a.txt"),
-      store.filePath("a.txt"),
+      join(transaction.stagedDirectory, "files", "a.txt"),
+      store.filePath("files/a.txt"),
     );
 
     const restarted = new LocalVaultStore(store.rootDir);
     await restarted.ensureDirectory();
     await restarted.recoverPendingRestore();
 
-    expect(existsSync(store.filePath("a.txt"))).toBe(false);
+    expect(existsSync(store.filePath("files/a.txt"))).toBe(false);
     expect(existsSync(transaction.stagedDirectory)).toBe(false);
     expect(await store.readOperationMarker()).toBeNull();
   });
 
-  it("rejects names that escape the vault root", async () => {
-    const store = await createSkillStore();
+  it("rejects names that escape the vault root or skip the module prefix", async () => {
+    const store = await createStore();
     await store.ensureDirectory();
 
     expect(() => store.filePath("../outside.md")).toThrow("VAULT_INVALID_NAME");
-    expect(() => store.filePath("foo/../../outside.md")).toThrow(
+    expect(() => store.filePath("files/../../outside.md")).toThrow(
       "VAULT_INVALID_NAME",
     );
     expect(() => store.filePath("/abs/path.md")).toThrow("VAULT_INVALID_NAME");
-    expect(() => store.filePath("foo//bar.md")).toThrow("VAULT_INVALID_NAME");
-    expect(() => store.filePath("foo/")).toThrow("VAULT_INVALID_NAME");
-    expect(() => store.filePath("foo\\bar.md")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("files//bar.md")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("files/")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("files\\bar.md")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("readme.md")).toThrow("VAULT_INVALID_NAME");
+    expect(() => store.filePath("files")).toThrow("VAULT_INVALID_NAME");
   });
 
-  it("still rejects reserved names at the root of a skills store", async () => {
-    const store = await createSkillStore();
-    await store.ensureDirectory();
-
-    expect(() => store.filePath(".vault-index.json")).toThrow(
-      "VAULT_INVALID_NAME",
-    );
-    expect(() => store.filePath("vault-mek.bin.")).toThrow(
-      "VAULT_INVALID_NAME",
-    );
-  });
-
-  it("rejects traversal keys when rereading a skills index", async () => {
-    const store = await createSkillStore();
+  it("rejects traversal keys when rereading the index", async () => {
+    const store = await createStore();
     await store.ensureDirectory();
     await writeFile(
       store.indexPath,
       JSON.stringify({
-        version: 1,
+        version: 2,
         files: {
           "../escape.md": {
             objectId: "obj-escape",
@@ -384,72 +383,118 @@ describe("LocalVaultStore", () => {
   });
 
   it("rereads nested index entries without rebuilding", async () => {
-    const store = await createSkillStore();
+    const store = await createStore();
+    const root = store.rootDir;
     await store.ensureDirectory();
-    await mkdir(join(store.rootDir, "foo"));
-    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
+    await mkdir(join(root, "files", "foo"), { recursive: true });
+    await writeFile(join(root, "files", "foo", "SKILL.md"), "# foo");
     const index = await store.reconcile(await store.readIndex());
-    index.files["foo/SKILL.md"].objectId = "remote-object";
-    index.files["foo/SKILL.md"].syncStatus = "synced";
+    index.files["files/foo/SKILL.md"].objectId = "remote-object";
+    index.files["files/foo/SKILL.md"].syncStatus = "synced";
     await store.writeIndex(index);
 
     const reread = await store.readIndex();
-    expect(reread.files["foo/SKILL.md"].objectId).toBe("remote-object");
-    expect(reread.files["foo/SKILL.md"].syncStatus).toBe("synced");
+    expect(reread.files["files/foo/SKILL.md"].objectId).toBe("remote-object");
+    expect(reread.files["files/foo/SKILL.md"].syncStatus).toBe("synced");
   });
 
-  it("scans nested skill trees recursively and skips symlinks and reserved names", async () => {
-    const store = await createSkillStore();
-    await store.ensureDirectory();
-    await mkdir(join(store.rootDir, "foo", "references"), { recursive: true });
-    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
-    await writeFile(
-      join(store.rootDir, "foo", "references", "note.md"),
-      "note",
-    );
+  it("scans trees recursively and skips symlinks", async () => {
+    const store = await createStore();
+    const root = store.rootDir;
+    await mkdir(join(root, "skills", "foo", "references"), { recursive: true });
+    await writeFile(join(root, "skills", "foo", "SKILL.md"), "# foo");
+    await writeFile(join(root, "skills", "foo", "references", "note.md"), "note");
     await symlink(
-      join(store.rootDir, "foo", "SKILL.md"),
-      join(store.rootDir, "foo", "link.md"),
+      join(root, "skills", "foo", "SKILL.md"),
+      join(root, "skills", "foo", "link.md"),
     );
 
     const files = await store.scanFiles();
 
     // scanFiles 用 localeCompare 排序（顺序在 locale 间不稳定），这里只关心集合。
     expect(files.map((file) => file.name).sort()).toEqual([
-      "foo/SKILL.md",
-      "foo/references/note.md",
+      "skills/foo/SKILL.md",
+      "skills/foo/references/note.md",
     ]);
-    expect(files.find((file) => file.name === "foo/SKILL.md")?.size).toBe(
+    expect(files.find((file) => file.name === "skills/foo/SKILL.md")?.size).toBe(
       Buffer.byteLength("# foo"),
     );
   });
 
+  it("skips symlinked files inside a module tree", async () => {
+    const store = await createStore();
+    const root = store.rootDir;
+    await store.ensureDirectory();
+    await mkdir(join(root, "skills", "foo", "assets"), { recursive: true });
+    await writeFile(join(root, "skills", "foo", "SKILL.md"), "# foo");
+    await symlink(
+      "missing-target",
+      join(root, "skills", "foo", "assets", "gone.bin"),
+    );
+
+    const files = await store.scanFiles();
+
+    expect(files.map((file) => file.name)).toEqual(["skills/foo/SKILL.md"]);
+  });
+
+  it("scans a single module file and returns null for directories", async () => {
+    const store = await createStore();
+    const root = store.rootDir;
+    await mkdir(join(root, "files", "sub"), { recursive: true });
+    await writeFile(join(root, "files", "a.md"), "a");
+
+    const file = await store.scanFile("files/a.md");
+    expect(file?.hash).toBe(
+      "ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb",
+    );
+    await expect(store.scanFile("files/sub")).resolves.toBeNull();
+    await expect(store.scanFile("readme.md")).rejects.toThrow(
+      "VAULT_UNSUPPORTED_PATH:readme.md",
+    );
+  });
+
+  it("refuses names that cannot sync instead of dropping them", async () => {
+    const store = await createStore();
+    const root = store.rootDir;
+    await store.ensureDirectory();
+    await mkdir(join(root, "skills", "foo"), { recursive: true });
+    await writeFile(join(root, "skills", "foo", "SKILL.md"), "# foo");
+    // Win32 会把 "con.md" 当保留设备名、"notes." 归一化成 "notes"：这类名字
+    // 一旦被扫描器静默跳过，reconcile 会把它判为已删除并删掉云端对象。
+    await writeFile(join(root, "skills", "foo", "con.md"), "reserved");
+
+    await expect(store.scanFiles()).rejects.toThrow(
+      "VAULT_UNSUPPORTED_PATH:skills/foo/con.md",
+    );
+  });
+
   it("restores nested paths by creating parent directories", async () => {
-    const store = await createSkillStore();
+    const store = await createStore();
+    const root = store.rootDir;
     await store.ensureDirectory();
     const transaction = await store.beginRestore([
-      "foo/SKILL.md",
-      "foo/references/note.md",
+      "skills/foo/SKILL.md",
+      "skills/foo/references/note.md",
     ]);
     await store.stageRestoreFile(
       transaction,
-      "foo/SKILL.md",
+      "skills/foo/SKILL.md",
       Buffer.from("# foo"),
     );
     await store.stageRestoreFile(
       transaction,
-      "foo/references/note.md",
+      "skills/foo/references/note.md",
       Buffer.from("note"),
     );
     await store.commitRestore(transaction, {
-      "foo/SKILL.md": {
+      "skills/foo/SKILL.md": {
         objectId: "obj-skill",
         hash: "h1",
         size: 5,
         mtime: 1,
         syncStatus: "synced",
       },
-      "foo/references/note.md": {
+      "skills/foo/references/note.md": {
         objectId: "obj-note",
         hash: "h2",
         size: 4,
@@ -459,65 +504,11 @@ describe("LocalVaultStore", () => {
     });
 
     await expect(
-      readFile(join(store.rootDir, "foo", "references", "note.md"), "utf8"),
+      readFile(join(root, "skills", "foo", "references", "note.md"), "utf8"),
     ).resolves.toBe("note");
     expect((await store.scanFiles()).map((file) => file.name).sort()).toEqual([
-      "foo/SKILL.md",
-      "foo/references/note.md",
+      "skills/foo/SKILL.md",
+      "skills/foo/references/note.md",
     ]);
-  });
-
-  it("rejects scanFile outside the skills scope", async () => {
-    const store = await createStore();
-    await store.ensureDirectory();
-
-    await expect(store.scanFile("a.md")).rejects.toThrow("VAULT_INVALID_SCOPE");
-  });
-
-  it("skips symlinked files inside a skill tree", async () => {
-    const store = await createSkillStore();
-    await store.ensureDirectory();
-    await mkdir(join(store.rootDir, "foo", "assets"), { recursive: true });
-    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
-    await symlink(
-      "missing-target",
-      join(store.rootDir, "foo", "assets", "gone.bin"),
-    );
-
-    const files = await store.scanFiles();
-
-    expect(files.map((file) => file.name)).toEqual(["foo/SKILL.md"]);
-  });
-
-  it("refuses names that cannot sync instead of dropping them", async () => {
-    const store = await createSkillStore();
-    await store.ensureDirectory();
-    await mkdir(join(store.rootDir, "foo"), { recursive: true });
-    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
-    // Win32 会把 "con.md" 当保留设备名、"notes." 归一化成 "notes"：这类名字
-    // 一旦被扫描器静默跳过，reconcile 会把它判为已删除并删掉云端对象。
-    await writeFile(join(store.rootDir, "foo", "con.md"), "reserved");
-
-    await expect(store.scanFiles()).rejects.toThrow(
-      "VAULT_UNSUPPORTED_PATH:foo/con.md",
-    );
-  });
-
-  it("skips hidden directories at the root of a skills tree", async () => {
-    const store = await createSkillStore();
-    await store.ensureDirectory();
-    await mkdir(join(store.rootDir, "foo"), { recursive: true });
-    await writeFile(join(store.rootDir, "foo", "SKILL.md"), "# foo");
-    await mkdir(join(store.rootDir, ".vault-upload-staging", "bar"), {
-      recursive: true,
-    });
-    await writeFile(
-      join(store.rootDir, ".vault-upload-staging", "bar", "SKILL.md"),
-      "# half-copied",
-    );
-
-    const files = await store.scanFiles();
-
-    expect(files.map((file) => file.name)).toEqual(["foo/SKILL.md"]);
   });
 });

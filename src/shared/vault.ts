@@ -1,7 +1,8 @@
 export type SyncStatus = "synced" | "pending" | "failed";
 
 export interface VaultSnapshotItem {
-  name: string;
+  /** 相对 `files/` 模块根的路径，例如 `项目/笔记.md`。 */
+  path: string;
   ext: string;
   size: number;
   mtime: number;
@@ -61,24 +62,12 @@ export interface VaultSnapshot {
   hasLocalMek: boolean;
   operationStatus: VaultOperationStatus;
   usedBytes: number;
-  /** 同步时技能 scope 失败的提示（files 的失败仍抛错，不进这里）。 */
-  syncError?: string;
 }
 
-/** 单个 scope 的远端备份状态。 */
-export interface VaultScopeBackup {
-  hasBackup: boolean;
-  errorCode?: string;
-}
-
+/** 远端备份状态。 */
 export interface VaultRemoteStatus {
   status: Exclude<RemoteBackupStatus, "unknown">;
   errorCode?: string;
-  /**
-   * 逐 scope 的细节。`status` 的语义保持不变（no-backup = 两个 scope 都没有），
-   * 因此既有的模式机与测试替身不受影响。
-   */
-  scopes?: { files: VaultScopeBackup; skills: VaultScopeBackup };
 }
 
 export interface RestoreResult {

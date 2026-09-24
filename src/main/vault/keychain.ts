@@ -112,8 +112,8 @@ export function verifyAndStoreMek(
   const candidate = deriveMek(recoveryCode);
   if (encryptedRemoteIndex) {
     try {
-      // keychain 只做候选密钥的可行性判断，不承担路径校验；技能 scope 的嵌套键
-      // 由 VaultRestoreService 用 store.scope 正式解析。改这里的默认值时先看
+      // keychain 只做候选密钥的可行性判断，不承担路径校验；嵌套键由
+      // VaultRestoreService 按统一路径规则正式解析。改这里的默认值时先看
       // sync.ts 的调用链。
       decodeRemoteIndex(encryptedRemoteIndex, candidate);
     } catch (error: unknown) {

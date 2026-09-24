@@ -30,7 +30,6 @@ import {
   type VaultBackupUsage,
   type VaultOperationStatus,
   type VaultRemoteStatus,
-  type VaultScopeBackup,
   type VaultSnapshot,
 } from "../../shared/vault";
 import { log } from "../utils/logger";
@@ -66,8 +65,16 @@ const defaultRestoreService = new VaultRestoreService(
   defaultCloud,
 );
 const defaultResetService = new VaultResetService(defaultStore, defaultCloud);
-const defaultSkillsVault = new VaultSkillsStore();
+const defaultSkillsVault = new VaultSkillsStore(defaultStore);
 const defaultGlobalSkillsPath = getGlobalSkillsRoot;
+
+/**
+ * 渲染层的文件路径是相对 `files/` 模块根的（快照 `items[].path`），
+ * 存储 API 要的是根相对路径；两者只差一个模块前缀。
+ */
+function filesPath(name: string): string {
+  return `files/${name}`;
+}
 
 export function registerVaultIpc(
   overrides: Partial<VaultIpcDependencies> = {},
@@ -103,21 +110,21 @@ export function registerVaultIpc(
   });
 
   ipcMain.handle("vault.openFile", async (_event, name: string) => {
-    const error = await shell.openPath(store.filePath(name));
+    const error = await shell.openPath(store.filePath(filesPath(name)));
     return { error: error || null };
   });
 
   ipcMain.handle("vault.getFilePath", async (_event, name: string) =>
-    store.filePath(name),
+    store.filePath(filesPath(name)),
   );
 
   ipcMain.handle("vault.revealFile", async (_event, name: string) => {
-    shell.showItemInFolder(store.filePath(name));
+    shell.showItemInFolder(store.filePath(filesPath(name)));
     return true;
   });
 
   ipcMain.handle("vault.exportFile", async (_event, name: string) => {
-    const sourcePath = store.filePath(name);
+    const sourcePath = store.filePath(filesPath(name));
     const result = await dialog.showSaveDialog({
       defaultPath: basename(sourcePath),
     });
@@ -127,7 +134,7 @@ export function registerVaultIpc(
   });
 
   ipcMain.handle("vault.deleteFile", async (_event, name: string) => {
-    await store.deleteFile(name);
+    await store.deleteFile(filesPath(name));
     return getSnapshot(store, skillsVault, getLocalMek, globalSkillsPath());
   });
 
@@ -135,56 +142,18 @@ export function registerVaultIpc(
     await assertNoBlockingOperation(store);
     const result = await syncService.sync(token);
     if (result.errorCode) throw new Error(result.errorCode);
-    // 技能 scope 也一起同步。它失败不回滚 files（文件密库成功不该被技能拖垮），
-    // 但必须让用户看见 —— 通过返回值的 syncError 透出。
-    let syncError: string | undefined;
-    try {
-      const skillsResult = await skillsVault.syncService.sync(token);
-      if (skillsResult.errorCode) syncError = skillsResult.errorCode;
-      else if (skillsResult.failed > 0) syncError = "VAULT_SKILL_SYNC_FAILED";
-    } catch (error: unknown) {
-      syncError =
-        error instanceof Error ? error.message : "VAULT_SKILL_SYNC_FAILED";
-    }
-    const snapshot = await getSnapshot(
-      store,
-      skillsVault,
-      getLocalMek,
-      globalSkillsPath(),
-    );
-    return { ...snapshot, syncError };
+    return getSnapshot(store, skillsVault, getLocalMek, globalSkillsPath());
   });
 
   ipcMain.handle(
     "vault.checkRemoteBackup",
     async (_event, token: string): Promise<VaultRemoteStatus> => {
-      const read = async (
-        scope: "files" | "skills",
-      ): Promise<VaultScopeBackup> => {
-        try {
-          const index = await cloud.getIndex(token, scope);
-          return { hasBackup: index !== null };
-        } catch (error: unknown) {
-          const classified = classifyRemoteBackupError(error);
-          return {
-            hasBackup: false,
-            errorCode: classified.errorCode ?? "VAULT_CLOUD_ERROR",
-          };
-        }
-      };
-      const [files, skills] = await Promise.all([
-        read("files"),
-        read("skills"),
-      ]);
-      const errorCode = files.errorCode ?? skills.errorCode;
-      if (errorCode) {
-        return { status: "error", errorCode, scopes: { files, skills } };
+      try {
+        const index = await cloud.getIndex(token);
+        return { status: index !== null ? "has-backup" : "no-backup" };
+      } catch (error: unknown) {
+        return classifyRemoteBackupError(error);
       }
-      return {
-        status:
-          files.hasBackup || skills.hasBackup ? "has-backup" : "no-backup",
-        scopes: { files, skills },
-      };
     },
   );
 
@@ -256,8 +225,7 @@ export function registerVaultIpc(
         if (token) {
           await cloud.putIndex(
             token,
-            "files",
-            encodeRemoteIndex({ version: 1, files: {} }, mek),
+            encodeRemoteIndex({ version: 2, files: {} }, mek),
           );
         }
         await store.writeIndex(index);
@@ -267,9 +235,9 @@ export function registerVaultIpc(
 
       const hasLocalFiles = (await store.scanFiles()).length > 0;
       const remoteIndex =
-        token && !hasLocalFiles ? await cloud.getIndex(token, "files") : null;
+        token && !hasLocalFiles ? await cloud.getIndex(token) : null;
       if (hasLocalFiles && token) {
-        const existingRemoteIndex = await cloud.getIndex(token, "files");
+        const existingRemoteIndex = await cloud.getIndex(token);
         if (existingRemoteIndex) {
           throw new Error("VAULT_REMOTE_BACKUP_EXISTS");
         }
@@ -282,53 +250,35 @@ export function registerVaultIpc(
   );
 
   /**
-   * 逐 scope 恢复，两种「跳过」都要处理，否则一个 scope 会拖垮另一个：
-   * - 该 scope 已有本地数据 → 跳过（不覆盖用户在本机已有的东西）
-   * - 该 scope 没有远端备份 → 跳过（`VAULT_NO_REMOTE_BACKUP` 不是失败）
-   *
-   * 少了第二种时，「只有 files 备份」的老用户在新设备上会看到恢复失败红条，
-   * 而「只有 skills 备份」的设备则永远恢复不了。
+   * 单入口恢复。两种「跳过」都要处理：
+   * - 本地已有内容 → 跳过（不覆盖用户在本机已有的东西）
+   * - 远端没有备份 → 跳过（`VAULT_NO_REMOTE_BACKUP` 不是失败）
    */
-  const restoreAllScopes = async (
-    restoreOne: (
-      target: LocalVaultStore,
-      service: VaultRestoreService,
-    ) => Promise<RestoreResult>,
+  const restoreOnce = async (
+    restoreOne: (service: VaultRestoreService) => Promise<RestoreResult>,
   ): Promise<RestoreResult> => {
-    let restored = 0;
-    let renamed = 0;
-    const targets: Array<[LocalVaultStore, VaultRestoreService]> = [
-      [store, restoreService],
-      [skillsVault.store, skillsVault.restoreService],
-    ];
-    for (const [targetStore, targetService] of targets) {
-      const state = await targetStore.readState();
-      if (state.hasIndex || state.files.length > 0) continue;
-      try {
-        const result = await restoreOne(targetStore, targetService);
-        restored += result.restored;
-        renamed += result.renamed;
-      } catch (error: unknown) {
-        if (
-          error instanceof Error &&
-          error.message === "VAULT_NO_REMOTE_BACKUP"
-        ) {
-          continue;
-        }
-        throw error;
-      }
+    const state = await store.readState();
+    if (state.hasIndex || state.files.length > 0) {
+      return { restored: 0, renamed: 0 };
     }
-    return { restored, renamed };
+    try {
+      return await restoreOne(restoreService);
+    } catch (error: unknown) {
+      if (
+        error instanceof Error &&
+        error.message === "VAULT_NO_REMOTE_BACKUP"
+      ) {
+        return { restored: 0, renamed: 0 };
+      }
+      throw error;
+    }
   };
 
   ipcMain.handle("vault.restoreWithLocalMek", async (_event, token: string) => {
     await assertNoBlockingOperation(store);
-    const result = await restoreAllScopes((_target, service) =>
+    const result = await restoreOnce((service) =>
       service.restoreWithLocalMek(token),
     );
-    // 通知放在这里而不是 restoreAllScopes 内部：逐 scope 调用会通知两次。
-    // 只有真的恢复了东西才通知 —— invalidateSkillsSetup() 会清掉所有缓存的 SDK
-    // 会话，两个 scope 都被跳过时执行它是白清。
     if (result.restored > 0) onSkillsChanged?.();
     return result;
   });
@@ -337,9 +287,7 @@ export function registerVaultIpc(
     "vault.restoreWithRecoveryCode",
     async (_event, token: string, recoveryCode: string) => {
       await assertNoBlockingOperation(store);
-      // 恢复码只用于派生 MEK：两个 scope 共用同一把，VaultRestoreService 在
-      // MEK 已存在时会跳过落盘，因此重复调用是安全的。
-      const result = await restoreAllScopes((_target, service) =>
+      const result = await restoreOnce((service) =>
         service.restoreWithRecoveryCode(token, recoveryCode),
       );
       if (result.restored > 0) onSkillsChanged?.();
@@ -428,14 +376,18 @@ async function getFileSnapshot(
   const usedBytes = await store.getUsageBytes(index);
   return {
     items: Object.entries(index.files)
-      .map(([name, entry]) => ({
-        name,
-        ext: extname(name).replace(/^\./, "").toLowerCase(),
-        size: entry.size,
-        mtime: entry.mtime,
-        syncStatus: entry.syncStatus,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name)),
+      .filter(([name]) => name.startsWith("files/"))
+      .map(([name, entry]) => {
+        const path = name.slice("files/".length);
+        return {
+          path,
+          ext: extname(path).replace(/^\./, "").toLowerCase(),
+          size: entry.size,
+          mtime: entry.mtime,
+          syncStatus: entry.syncStatus,
+        };
+      })
+      .sort((a, b) => a.path.localeCompare(b.path)),
     pendingCount:
       Object.values(index.files).filter(
         (entry) => entry.syncStatus !== "synced",

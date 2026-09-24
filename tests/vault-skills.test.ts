@@ -12,11 +12,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { deriveMek } from "../src/main/vault/crypto";
+import { LocalVaultStore } from "../src/main/vault/local-store";
 import { VaultSkillsStore } from "../src/main/vault/skills-vault";
-import type {
-  VaultCloudClient,
-  VaultIndexScope,
-} from "../src/main/vault/cloud-client";
+import { VaultRestoreService, VaultSyncService } from "../src/main/vault/sync";
+import type { VaultCloudClient } from "../src/main/vault/cloud-client";
 
 const MEK = deriveMek("123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
 
@@ -24,21 +23,13 @@ function sha256(contents: Buffer): string {
   return createHash("sha256").update(contents).digest("hex");
 }
 
-/** 按 scope 分桶的云替身：一次上传两个 scope 的隔离性靠它验证。 */
-class FakeScopedCloud implements VaultCloudClient {
+/** 单槽云替身：上传 → 同步 → 另一台设备恢复的往返全靠它。 */
+class FakeCloud implements VaultCloudClient {
   readonly objects = new Map<string, Buffer>();
-  readonly indexes = new Map<VaultIndexScope, Buffer>();
+  index: Buffer | null = null;
 
-  async putObject(
-    _token: string,
-    scope: VaultIndexScope,
-    id: string,
-    payload: Buffer,
-  ): Promise<void> {
+  async putObject(_token: string, id: string, payload: Buffer): Promise<void> {
     this.objects.set(id, Buffer.from(payload));
-    const bucket = this.objectsByScope.get(scope) ?? new Map<string, Buffer>();
-    bucket.set(id, Buffer.from(payload));
-    this.objectsByScope.set(scope, bucket);
   }
 
   async getObject(_token: string, id: string): Promise<Buffer> {
@@ -51,29 +42,16 @@ class FakeScopedCloud implements VaultCloudClient {
     this.objects.delete(id);
   }
 
-  async getIndex(
-    _token: string,
-    scope: VaultIndexScope,
-  ): Promise<Buffer | null> {
-    return this.indexes.get(scope) ?? null;
+  async getIndex(_token: string): Promise<Buffer | null> {
+    return this.index;
   }
 
-  async putIndex(
-    _token: string,
-    scope: VaultIndexScope,
-    payload: Buffer,
-  ): Promise<void> {
-    this.indexes.set(scope, Buffer.from(payload));
+  async putIndex(_token: string, payload: Buffer): Promise<void> {
+    this.index = Buffer.from(payload);
   }
 
-  /** 按 scope 分桶 —— 之前的版本忽略 scope，会让隔离断言假通过。 */
-  readonly objectsByScope = new Map<VaultIndexScope, Map<string, Buffer>>();
-
-  async listObjectIds(
-    _token: string,
-    scope: VaultIndexScope,
-  ): Promise<string[]> {
-    return [...(this.objectsByScope.get(scope)?.keys() ?? [])];
+  async listObjectIds(_token: string): Promise<string[]> {
+    return [...this.objects.keys()];
   }
 }
 
@@ -86,60 +64,32 @@ describe("VaultSkillsStore", () => {
     );
   });
 
+  /**
+   * 技能聚合视图与整个密库共用一个 store；同步/恢复服务挂在共享 store 上，
+   * 不再是 VaultSkillsStore 的成员。
+   */
   async function createVault(
-    cloud: VaultCloudClient = new FakeScopedCloud(),
-  ): Promise<VaultSkillsStore> {
+    cloud: VaultCloudClient = new FakeCloud(),
+  ): Promise<{
+    vault: VaultSkillsStore;
+    store: LocalVaultStore;
+    sync: () => Promise<unknown>;
+    restore: () => Promise<{ restored: number; renamed: number }>;
+  }> {
     const root = await mkdtemp(join(tmpdir(), "deskwand-vault-skills-"));
     roots.push(root);
-    return new VaultSkillsStore(join(root, "vault-skills"), cloud, () => MEK);
+    const store = new LocalVaultStore(join(root, "vault"));
+    await store.ensureDirectory();
+    return {
+      vault: new VaultSkillsStore(store),
+      store,
+      sync: () => new VaultSyncService(store, cloud, () => MEK).sync("token"),
+      restore: () =>
+        new VaultRestoreService(store, cloud, () => MEK).restoreWithLocalMek(
+          "token",
+        ),
+    };
   }
-
-  it("starts empty and lists nothing", async () => {
-    const vault = await createVault();
-
-    await expect(vault.listVaultSkills()).resolves.toEqual([]);
-  });
-
-  it("lists one entry per skill directory with file counts", async () => {
-    const vault = await createVault();
-    await mkdir(join(vault.store.rootDir, "foo", "references"), {
-      recursive: true,
-    });
-    await writeFile(join(vault.store.rootDir, "foo", "SKILL.md"), "# foo");
-    await writeFile(
-      join(vault.store.rootDir, "foo", "references", "note.md"),
-      "note",
-    );
-
-    const entries = await vault.listVaultSkills();
-
-    expect(entries).toHaveLength(1);
-    expect(entries[0]).toMatchObject({ name: "foo", fileCount: 2 });
-    expect(entries[0].totalBytes).toBeGreaterThan(0);
-  });
-
-  it("uses the skills scope for every store operation", async () => {
-    const vault = await createVault();
-
-    expect(vault.store.scope).toBe("skills");
-  });
-
-  it("clears a stale staging directory", async () => {
-    const vault = await createVault();
-    await mkdir(join(vault.store.rootDir, ".vault-upload-staging", "foo"), {
-      recursive: true,
-    });
-    await writeFile(
-      join(vault.store.rootDir, ".vault-upload-staging", "foo", "SKILL.md"),
-      "# half-copied",
-    );
-
-    await vault.removeStaleStaging();
-
-    await expect(
-      stat(join(vault.store.rootDir, ".vault-upload-staging")),
-    ).rejects.toMatchObject({ code: "ENOENT" });
-  });
 
   async function createGlobalSkills(
     tree: Array<[string, Buffer]>,
@@ -155,13 +105,74 @@ describe("VaultSkillsStore", () => {
     return globalSkills;
   }
 
+  it("starts empty and lists nothing", async () => {
+    const { vault } = await createVault();
+
+    await expect(vault.listVaultSkills()).resolves.toEqual([]);
+  });
+
+  it("surfaces a file sitting directly under the skills module", async () => {
+    const { vault } = await createVault();
+    const skillsRoot = vault.store.moduleRoot("skills");
+    await mkdir(skillsRoot, { recursive: true });
+    await writeFile(join(skillsRoot, "notes.md"), "note");
+
+    // 设计上不允许「同步了但看不见」的内容：直接放在 skills/ 下的文件也得
+    // 出现在技能列表里（哪怕它不是一个正经的技能目录）。
+    await expect(vault.listVaultSkills()).resolves.toEqual([
+      { name: "notes.md", fileCount: 1, totalBytes: 4, syncStatus: "pending" },
+    ]);
+  });
+
+  it("lists one entry per skill directory with file counts", async () => {
+    const { vault } = await createVault();
+    const skillsRoot = vault.store.moduleRoot("skills");
+    await mkdir(join(skillsRoot, "foo", "references"), {
+      recursive: true,
+    });
+    await writeFile(join(skillsRoot, "foo", "SKILL.md"), "# foo");
+    await writeFile(join(skillsRoot, "foo", "references", "note.md"), "note");
+
+    const entries = await vault.listVaultSkills();
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({ name: "foo", fileCount: 2 });
+    expect(entries[0].totalBytes).toBeGreaterThan(0);
+  });
+
+  it("stores every skill under the skills module", async () => {
+    const globalSkills = await createGlobalSkills([
+      ["foo/SKILL.md", Buffer.from("# foo")],
+    ]);
+    const { vault } = await createVault();
+
+    await vault.upload("foo", globalSkills);
+
+    const index = await vault.store.readIndex();
+    expect(Object.keys(index.files)).toEqual(["skills/foo/SKILL.md"]);
+    await expect(
+      stat(join(vault.store.moduleRoot("skills"), "foo", "SKILL.md")),
+    ).resolves.toBeTruthy();
+  });
+
+  it("clears a stale staging directory", async () => {
+    const { vault } = await createVault();
+    const staging = join(vault.store.rootDir, ".vault-staging", "upload");
+    await mkdir(join(staging, "foo"), { recursive: true });
+    await writeFile(join(staging, "foo", "SKILL.md"), "# half-copied");
+
+    await vault.removeStaleStaging();
+
+    await expect(stat(staging)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("moves a skill whose file exceeds the old import limit", async () => {
     // 20 MiB 只是「手动导入文件」的护栏；技能路径不按体积拦截。
     const globalSkills = await createGlobalSkills([
       ["big/SKILL.md", Buffer.from("# big")],
       ["big/model.bin", Buffer.alloc(21 * 1024 * 1024)],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     await expect(vault.upload("big", globalSkills)).resolves.toMatchObject({
       name: "big",
@@ -174,7 +185,7 @@ describe("VaultSkillsStore", () => {
       ["linked/SKILL.md", Buffer.from("# linked")],
     ]);
     await symlink("missing", join(globalSkills, "linked", "dangling"));
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     await expect(
       vault.findSymlinkedEntries("linked", globalSkills),
@@ -183,7 +194,7 @@ describe("VaultSkillsStore", () => {
     await vault.upload("linked", globalSkills);
     const index = await vault.store.readIndex();
     // 符号链接的内容不会被加密同步：扫描器必须跳过它
-    expect(Object.keys(index.files)).toEqual(["linked/SKILL.md"]);
+    expect(Object.keys(index.files)).toEqual(["skills/linked/SKILL.md"]);
   });
 
   it("moves a skill into the vault and removes the local copy", async () => {
@@ -191,7 +202,7 @@ describe("VaultSkillsStore", () => {
       ["foo/SKILL.md", Buffer.from("# foo")],
       ["foo/references/note.md", Buffer.from("note")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     const entry = await vault.upload("foo", globalSkills);
 
@@ -200,7 +211,9 @@ describe("VaultSkillsStore", () => {
       code: "ENOENT",
     });
     await expect(
-      stat(join(vault.store.rootDir, "foo", "references", "note.md")),
+      stat(
+        join(vault.store.moduleRoot("skills"), "foo", "references", "note.md"),
+      ),
     ).resolves.toBeTruthy();
   });
 
@@ -208,7 +221,7 @@ describe("VaultSkillsStore", () => {
     const globalSkills = await createGlobalSkills([
       ["foo/SKILL.md", Buffer.from("# foo")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
     await vault.upload("foo", globalSkills);
     // 重新造一份同名本地技能（模拟用户再次上传）
     await mkdir(join(globalSkills, "foo"), { recursive: true });
@@ -226,15 +239,17 @@ describe("VaultSkillsStore", () => {
     const globalSkills = await createGlobalSkills([
       ["foo/SKILL.md", Buffer.from("# foo")],
     ]);
-    const vault = await createVault();
+    const { vault, sync } = await createVault();
     await vault.upload("foo", globalSkills);
     // 删除要求已同步：先真的同步一次（否则本机只剩密库这一份，云端还没有副本）
-    await vault.syncService.sync("token");
+    await sync();
 
     await vault.remove("foo");
 
     await expect(vault.listVaultSkills()).resolves.toEqual([]);
-    await expect(stat(join(vault.store.rootDir, "foo"))).rejects.toMatchObject({
+    await expect(
+      stat(join(vault.store.moduleRoot("skills"), "foo")),
+    ).rejects.toMatchObject({
       code: "ENOENT",
     });
   });
@@ -250,30 +265,32 @@ describe("VaultSkillsStore", () => {
     const root = await mkdtemp(join(tmpdir(), "deskwand-vault-roundtrip-"));
     roots.push(root);
     const mek = MEK;
-    const cloud = new FakeScopedCloud();
+    const cloud = new FakeCloud();
 
-    const source = new VaultSkillsStore(
-      join(root, "vault-skills-a"),
-      cloud,
-      () => mek,
-    );
+    const sourceStore = new LocalVaultStore(join(root, "vault-a"));
+    await sourceStore.ensureDirectory();
+    const source = new VaultSkillsStore(sourceStore);
     await source.upload("foo", globalSkills);
-    await source.syncService.sync("token");
+    await new VaultSyncService(sourceStore, cloud, () => mek).sync("token");
 
-    const target = new VaultSkillsStore(
-      join(root, "vault-skills-b"),
+    const targetStore = new LocalVaultStore(join(root, "vault-b"));
+    await targetStore.ensureDirectory();
+    const restored = await new VaultRestoreService(
+      targetStore,
       cloud,
       () => mek,
-    );
-    await target.store.ensureDirectory();
-    const restored = await target.restoreService.restoreWithLocalMek("token");
+    ).restoreWithLocalMek("token");
 
     expect(restored.restored).toBe(tree.length);
     for (const [name, contents] of tree) {
-      const written = await readFile(join(target.store.rootDir, name));
+      const written = await readFile(
+        join(targetStore.moduleRoot("skills"), name),
+      );
       expect(sha256(written), name).toBe(sha256(contents));
     }
-    expect((await target.listVaultSkills())[0]).toMatchObject({
+    expect(
+      (await new VaultSkillsStore(targetStore).listVaultSkills())[0],
+    ).toMatchObject({
       name: "foo",
       fileCount: 4,
     });
@@ -285,7 +302,7 @@ describe("VaultSkillsStore", () => {
       ["Bad_Name/SKILL.md", Buffer.from("# bad")],
       ["with.dot/SKILL.md", Buffer.from("# dot")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     const candidates = await vault.listUploadCandidates(globalSkills);
 
@@ -302,7 +319,7 @@ describe("VaultSkillsStore", () => {
     const globalSkills = await createGlobalSkills([
       ["foo/SKILL.md", Buffer.from("# foo")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
     await vault.upload("foo", globalSkills);
     // 上传后条目标记 pending（尚未同步到云端）
 
@@ -314,7 +331,7 @@ describe("VaultSkillsStore", () => {
     const globalSkills = await createGlobalSkills([
       ["foo/SKILL.md", Buffer.from("# foo")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     await vault.upload("foo", globalSkills);
 
@@ -322,7 +339,7 @@ describe("VaultSkillsStore", () => {
       code: "ENOENT",
     });
     await expect(
-      stat(join(vault.store.rootDir, "foo", "SKILL.md")),
+      stat(join(vault.store.moduleRoot("skills"), "foo", "SKILL.md")),
     ).resolves.toBeTruthy();
   });
 
@@ -335,7 +352,7 @@ describe("VaultSkillsStore", () => {
       // 没有 description：必须仍然列出（今天只要求 SKILL.md 存在）
       ["no-desc/SKILL.md", Buffer.from("# x\n")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     const candidates = await vault.listUploadCandidates(globalSkills);
 
@@ -349,7 +366,7 @@ describe("VaultSkillsStore", () => {
     const globalSkills = await createGlobalSkills([
       ["ok/SKILL.md", Buffer.from("# ok")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     // 守卫生效时不该去读技能目录之外的东西
     await expect(
@@ -362,7 +379,7 @@ describe("VaultSkillsStore", () => {
       ["linked/SKILL.md", Buffer.from("# linked")],
     ]);
     await symlink("missing", join(globalSkills, "linked", "dangling"));
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     await expect(
       vault.findSymlinkedEntries("linked", globalSkills),
@@ -375,7 +392,7 @@ describe("VaultSkillsStore", () => {
       ["linked/SKILL.md", Buffer.from("# linked")],
     ]);
     await symlink("missing", join(globalSkills, "linked", "dangling"));
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     const result = await vault.addSkills(["plain", "linked"], globalSkills);
 
@@ -394,7 +411,7 @@ describe("VaultSkillsStore", () => {
       ["linked/SKILL.md", Buffer.from("# linked")],
     ]);
     await symlink("missing", join(globalSkills, "linked", "dangling"));
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     const result = await vault.addSkills(
       ["plain", "linked"],
@@ -413,13 +430,11 @@ describe("VaultSkillsStore", () => {
       ["already/SKILL.md", Buffer.from("# already")],
       ["fresh/SKILL.md", Buffer.from("# fresh")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
     // 密库里先放一个同名技能 → 该技能必然失败
-    await mkdir(join(vault.store.rootDir, "already"), { recursive: true });
-    await writeFile(
-      join(vault.store.rootDir, "already", "SKILL.md"),
-      "# existing",
-    );
+    const skillsRoot = vault.store.moduleRoot("skills");
+    await mkdir(join(skillsRoot, "already"), { recursive: true });
+    await writeFile(join(skillsRoot, "already", "SKILL.md"), "# existing");
 
     const result = await vault.addSkills(
       ["already", "fresh"],
@@ -439,7 +454,7 @@ describe("VaultSkillsStore", () => {
     const globalSkills = await createGlobalSkills([
       ["golden/SKILL.md", Buffer.from("# golden")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
     const spy = vi
       .spyOn(vault.store, "writeIndex")
       .mockRejectedValueOnce(new Error("VAULT_UNSUPPORTED_PATH:golden/bad."));
@@ -450,7 +465,9 @@ describe("VaultSkillsStore", () => {
     expect(result.added).toEqual(["golden"]);
     expect(result.failed).toEqual([]);
     expect(result.indexError).toContain("VAULT_UNSUPPORTED_PATH");
-    await expect(stat(join(vault.store.rootDir, "golden"))).resolves.toBeTruthy();
+    await expect(
+      stat(join(vault.store.moduleRoot("skills"), "golden")),
+    ).resolves.toBeTruthy();
     spy.mockRestore();
   });
 
@@ -458,7 +475,7 @@ describe("VaultSkillsStore", () => {
     const globalSkills = await createGlobalSkills([
       ["ok/SKILL.md", Buffer.from("# ok")],
     ]);
-    const vault = await createVault();
+    const { vault } = await createVault();
 
     const result = await vault.addSkills(
       ["../escape", "ok"],

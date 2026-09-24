@@ -18,7 +18,7 @@ type MenuProps = React.ComponentProps<typeof AttachMenu>;
 const syncedVaultSnapshot = {
   items: [
     {
-      name: "secret.pdf",
+      path: "secret.pdf",
       ext: ".pdf",
       size: 12,
       mtime: 1,

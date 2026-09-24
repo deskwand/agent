@@ -11,27 +11,20 @@ import {
   VaultSyncService,
   type VaultCloudClient,
 } from "../src/main/vault/sync";
-import type { VaultIndexScope } from "../src/main/vault/cloud-client";
 
 const code = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const mek = deriveMek(code);
 
 class FakeCloud implements VaultCloudClient {
   readonly objects = new Map<string, Buffer>();
-  readonly indexes = new Map<VaultIndexScope, Buffer>();
-
-  readonly objectsByScope = new Map<VaultIndexScope, Map<string, Buffer>>();
+  index: Buffer | null = null;
 
   async putObject(
     _token: string,
-    scope: VaultIndexScope,
     id: string,
     payload: Buffer,
   ): Promise<void> {
     this.objects.set(id, Buffer.from(payload));
-    const bucket = this.objectsByScope.get(scope) ?? new Map<string, Buffer>();
-    bucket.set(id, Buffer.from(payload));
-    this.objectsByScope.set(scope, bucket);
   }
 
   async getObject(_token: string, id: string): Promise<Buffer> {
@@ -44,27 +37,16 @@ class FakeCloud implements VaultCloudClient {
     this.objects.delete(id);
   }
 
-  async getIndex(
-    _token: string,
-    scope: VaultIndexScope,
-  ): Promise<Buffer | null> {
-    return this.indexes.get(scope) ?? null;
+  async getIndex(_token: string): Promise<Buffer | null> {
+    return this.index;
   }
 
-  async putIndex(
-    _token: string,
-    scope: VaultIndexScope,
-    payload: Buffer,
-  ): Promise<void> {
-    this.indexes.set(scope, Buffer.from(payload));
+  async putIndex(_token: string, payload: Buffer): Promise<void> {
+    this.index = Buffer.from(payload);
   }
 
-  async listObjectIds(
-    _token: string,
-    scope: VaultIndexScope,
-  ): Promise<string[]> {
-    const bucket = this.objectsByScope.get(scope);
-    return bucket ? [...bucket.keys()] : [];
+  async listObjectIds(_token: string): Promise<string[]> {
+    return [...this.objects.keys()];
   }
 }
 
@@ -82,7 +64,7 @@ function sha256(contents: Buffer): string {
 
 async function seedTree(root: string): Promise<void> {
   for (const [name, contents] of FIXTURE) {
-    const path = join(root, name);
+    const path = join(root, "skills", name);
     await mkdir(join(path, ".."), { recursive: true });
     await writeFile(path, contents);
   }
@@ -106,21 +88,17 @@ describe("vault skills tree round trip", () => {
   it("rejects case-colliding skills instead of renaming individual files", async () => {
     const target = new LocalVaultStore(
       await createRoot("vault-tree-conflict-"),
-      "skills",
     );
     const cloud = new FakeCloud();
-    cloud.indexes.set(
-      "skills",
-      encodeRemoteIndex(
-        {
-          version: 1,
-          files: {
-            "foo/A.md": { objectId: "one", hash: "h1", size: 1, mtime: 1 },
-            "foo/a.md": { objectId: "two", hash: "h2", size: 1, mtime: 1 },
-          },
+    cloud.index = encodeRemoteIndex(
+      {
+        version: 2,
+        files: {
+          "skills/foo/A.md": { objectId: "one", hash: "h1", size: 1, mtime: 1 },
+          "skills/foo/a.md": { objectId: "two", hash: "h2", size: 1, mtime: 1 },
         },
-        mek,
-      ),
+      },
+      mek,
     );
     await expect(
       new VaultRestoreService(target, cloud, () => mek).restoreWithLocalMek(
@@ -131,10 +109,7 @@ describe("vault skills tree round trip", () => {
   });
 
   it("syncs a nested tree and restores it byte for byte into another root", async () => {
-    const source = new LocalVaultStore(
-      await createRoot("vault-tree-a-"),
-      "skills",
-    );
+    const source = new LocalVaultStore(await createRoot("vault-tree-a-"));
     await source.ensureDirectory();
     await seedTree(source.rootDir);
 
@@ -146,42 +121,35 @@ describe("vault skills tree round trip", () => {
     expect(result.failed).toBe(0);
     expect(result.uploaded).toBe(FIXTURE.length);
 
-    const target = new LocalVaultStore(
-      await createRoot("vault-tree-b-"),
-      "skills",
-    );
+    const target = new LocalVaultStore(await createRoot("vault-tree-b-"));
     await target.ensureDirectory();
     const restore = new VaultRestoreService(target, cloud, () => mek);
     const restored = await restore.restoreWithLocalMek("token");
 
     expect(restored.restored).toBe(FIXTURE.length);
     for (const [name, contents] of FIXTURE) {
-      const written = await readFile(join(target.rootDir, name));
+      const written = await readFile(join(target.rootDir, "skills", name));
       expect(sha256(written), name).toBe(sha256(contents));
     }
     expect((await target.scanFiles()).map((file) => file.name).sort()).toEqual(
-      FIXTURE.map(([name]) => name).sort(),
+      FIXTURE.map(([name]) => `skills/${name}`).sort(),
     );
   });
 
   it("treats a differently-cased directory as the same directory", async () => {
     const target = new LocalVaultStore(
       await createRoot("vault-tree-case-dir-"),
-      "skills",
     );
     const cloud = new FakeCloud();
-    cloud.indexes.set(
-      "skills",
-      encodeRemoteIndex(
-        {
-          version: 1,
-          files: {
-            "Foo/x.md": { objectId: "one", hash: "h1", size: 1, mtime: 1 },
-            "foo/y.md": { objectId: "two", hash: "h2", size: 1, mtime: 1 },
-          },
+    cloud.index = encodeRemoteIndex(
+      {
+        version: 2,
+        files: {
+          "skills/Foo/x.md": { objectId: "one", hash: "h1", size: 1, mtime: 1 },
+          "skills/foo/y.md": { objectId: "two", hash: "h2", size: 1, mtime: 1 },
         },
-        mek,
-      ),
+      },
+      mek,
     );
 
     await expect(
@@ -192,23 +160,17 @@ describe("vault skills tree round trip", () => {
   });
 
   it("keeps sibling files under one skill tree", async () => {
-    const source = new LocalVaultStore(
-      await createRoot("vault-tree-siblings-a-"),
-      "skills",
-    );
+    const source = new LocalVaultStore(await createRoot("vault-tree-siblings-a-"));
     await source.ensureDirectory();
-    await mkdir(join(source.rootDir, "foo"), { recursive: true });
-    await writeFile(join(source.rootDir, "foo", "A.md"), "a");
-    await writeFile(join(source.rootDir, "foo", "b.md"), "b");
+    await mkdir(join(source.rootDir, "skills", "foo"), { recursive: true });
+    await writeFile(join(source.rootDir, "skills", "foo", "A.md"), "a");
+    await writeFile(join(source.rootDir, "skills", "foo", "b.md"), "b");
 
     const cloud = new FakeCloud();
     await source.writeIndex(await source.reconcile(await source.readIndex()));
     await new VaultSyncService(source, cloud, () => mek).sync("token");
 
-    const target = new LocalVaultStore(
-      await createRoot("vault-tree-siblings-b-"),
-      "skills",
-    );
+    const target = new LocalVaultStore(await createRoot("vault-tree-siblings-b-"));
     const restored = await new VaultRestoreService(
       target,
       cloud,

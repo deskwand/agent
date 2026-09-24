@@ -83,7 +83,8 @@ const TRANSLATIONS: Record<string, string> = {
   "vault.error.localOperation": "The local Vault operation failed",
   "vault.error.syncFailed": "Cloud sync failed; your local files are safe",
   "vault.skills.error.addFailed": "Could not add",
-  "vault.skills.error.unsupportedPath": "Cannot sync {{name}}",
+  "vault.error.unsupportedPath":
+    "{{name}} cannot sync across devices (trailing dot, reserved device name, or outside the files / skills modules)",
   "vault.error.cloudQuotaExceeded":
     "Cloud backup storage is full; your local file was kept. Delete files or upgrade storage to retry",
   "vault.error.invalidRecoveryCode": "The recovery code is invalid",
@@ -153,10 +154,10 @@ vi.mock("react-i18next", () => {
   };
 });
 
-function item(name: string, overrides: Partial<VaultSnapshotItem> = {}) {
-  const ext = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "";
+function item(path: string, overrides: Partial<VaultSnapshotItem> = {}) {
+  const ext = path.includes(".") ? path.slice(path.lastIndexOf(".") + 1) : "";
   return {
-    name,
+    path,
     ext,
     size: 5,
     mtime: 1,
@@ -1047,7 +1048,7 @@ describe("VaultView", () => {
     });
 
     expect(screenText()).toContain("Added 1 skill(s)");
-    expect(screenText()).toContain("Cannot sync plain");
+    expect(screenText()).toContain("plain/bad. cannot sync across devices");
   });
 
   it("blames the local move, not the cloud, when adding fails", async () => {

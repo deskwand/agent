@@ -1690,7 +1690,6 @@
     "sync": "Sync",
     "syncing": "Syncing…",
     "syncComplete": "Sync complete",
-    "syncFailedSkills": "Skills could not be synced to the cloud; please retry",
     "alreadyLatest": "Already up to date",
     "dismiss": "Dismiss",
     "fileCount_one": "{{count}} file",
@@ -1747,6 +1746,7 @@
       "syncFailed": "Cloud sync failed; your local files are safe",
       "cloudQuotaExceeded": "Cloud backup storage is full; your local file was kept. Delete files or upgrade storage to retry",
       "invalidRecoveryCode": "The recovery code is invalid",
+      "unsupportedPath": "{{name}} cannot sync across devices (trailing dot, reserved device name, or outside the files / skills modules)",
       "alreadyInitialized": "Encrypted backup is already set up",
       "keychainUnavailable": "Secure key storage is unavailable on this device",
       "recoveryMismatch": "The recovery code does not match this backup",
@@ -1781,7 +1781,6 @@
         "nameTaken": "A skill with this name is already in the vault; delete it there first",
         "notSynced": "This skill is not synced to the cloud yet; deleting it would lose the only copy",
         "uploadFailed": "Upload failed; the skill is still local",
-        "unsupportedPath": "{{name}} inside the skill cannot sync across devices (trailing dot or reserved name)",
         "addFailed": "Could not add"
       },
       "empty": "No skills in the vault yet",

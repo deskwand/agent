@@ -9,11 +9,7 @@ import {
   toRemoteIndex,
   type RemoteVaultEntry,
 } from "./vault-index";
-import {
-  isReservedVaultName,
-  type LocalVaultEntry,
-  type LocalVaultStore,
-} from "./local-store";
+import type { LocalVaultEntry, LocalVaultStore } from "./local-store";
 import { VaultCloudError, type VaultCloudClient } from "./cloud-client";
 import type {
   RestoreResult,
@@ -54,7 +50,7 @@ export class VaultRestoreService {
   async restoreWithLocalMek(token: string): Promise<RestoreResult> {
     const mek = this.mekProvider();
     if (!mek) throw new Error("VAULT_KEY_REQUIRED");
-    const encryptedIndex = await this.cloud.getIndex(token, this.store.scope);
+    const encryptedIndex = await this.cloud.getIndex(token);
     if (!encryptedIndex) throw new Error("VAULT_NO_REMOTE_BACKUP");
     return this.performRestore(token, mek, encryptedIndex);
   }
@@ -63,7 +59,7 @@ export class VaultRestoreService {
     token: string,
     recoveryCode: string,
   ): Promise<RestoreResult> {
-    const encryptedIndex = await this.cloud.getIndex(token, this.store.scope);
+    const encryptedIndex = await this.cloud.getIndex(token);
     if (!encryptedIndex) throw new Error("VAULT_NO_REMOTE_BACKUP");
     const mek = deriveMek(recoveryCode);
     const current = this.mekProvider();
@@ -83,7 +79,7 @@ export class VaultRestoreService {
   ): Promise<RestoreResult> {
     let remote: ReturnType<typeof decodeRemoteIndex>;
     try {
-      remote = decodeRemoteIndex(encryptedIndex, mek, this.store.scope);
+      remote = decodeRemoteIndex(encryptedIndex, mek);
     } catch (error: unknown) {
       if (
         error instanceof Error &&
@@ -103,28 +99,19 @@ export class VaultRestoreService {
 
     const resolvedNames = new Set<string>();
     const resolved: Array<{ name: string; entry: RemoteVaultEntry }> = [];
-    let renamed = 0;
-    for (const [originalName, entry] of Object.entries(remote.files)) {
-      if (isReservedVaultName(originalName)) continue;
-      const name =
-        this.store.scope === "files"
-          ? uniqueRestoreName(originalName, resolvedNames)
-          : originalName;
-      if (this.store.scope === "skills") {
-        // 大小写不敏感卷上的冲突：两条路径如果在某个路径段上「仅大小写不同」、
-        // 且该段之前的各段完全相同，就会落在同一个文件或目录上
-        // （"Foo/x.md" vs "foo/y.md" 是同一目录；"foo/A.md" vs "foo/a.md" 是同一文件）。
-        // 只把整条路径小写化做比较是不够的：那样只能发现完全同名的冲突。
-        const collides = [...resolvedNames].some((used) =>
-          pathsCollideIgnoringCase(used, name),
-        );
-        if (collides) {
-          // 这条错误将来是要显示给用户的，必须说清是「远端索引内部」的冲突：
-          // 如果只说“名字已被占用”，用户会去本地找那个文件，永远找不到。
-          throw new Error(`VAULT_SKILL_NAME_CONFLICT:${originalName}`);
-        }
+    for (const [name, entry] of Object.entries(remote.files)) {
+      // 大小写不敏感卷上的冲突：两条路径如果在某个路径段上「仅大小写不同」、
+      // 且该段之前的各段完全相同，就会落在同一个文件或目录上
+      // （"Foo/x.md" vs "foo/y.md" 是同一目录；"foo/A.md" vs "foo/a.md" 是同一文件）。
+      // 统一命名空间后这条检测覆盖全部条目，不再按 scope 分叉。
+      const collides = [...resolvedNames].some((used) =>
+        pathsCollideIgnoringCase(used, name),
+      );
+      if (collides) {
+        // 这条错误将来是要显示给用户的，必须说清是「远端索引内部」的冲突：
+        // 如果只说“名字已被占用”，用户会去本地找那个文件，永远找不到。
+        throw new Error(`VAULT_SKILL_NAME_CONFLICT:${name}`);
       }
-      if (name !== originalName) renamed += 1;
       resolvedNames.add(name);
       resolved.push({ name, entry });
     }
@@ -156,7 +143,7 @@ export class VaultRestoreService {
       throw error;
     }
 
-    return { restored: resolved.length, renamed };
+    return { restored: resolved.length, renamed: 0 };
   }
 }
 
@@ -176,22 +163,6 @@ function pathsCollideIgnoringCase(a: string, b: string): boolean {
   }
   // 前缀完全相同：一条是另一条的前缀（文件 vs 目录）或两者同名。
   return true;
-}
-
-function uniqueRestoreName(name: string, existingNames: Set<string>): string {
-  const normalizedNames = new Set(
-    [...existingNames].map((existingName) => existingName.toLowerCase()),
-  );
-  if (!normalizedNames.has(name.toLowerCase())) return name;
-  const extension = name.includes(".") ? name.slice(name.lastIndexOf(".")) : "";
-  const stem = extension ? name.slice(0, -extension.length) : name;
-  let suffix = 1;
-  let candidate = `${stem} (${suffix})${extension}`;
-  while (normalizedNames.has(candidate.toLowerCase())) {
-    suffix += 1;
-    candidate = `${stem} (${suffix})${extension}`;
-  }
-  return candidate;
 }
 
 export class VaultSyncService {
@@ -229,6 +200,8 @@ export class VaultSyncService {
     await this.store.writeIndex(index);
 
     const changedNames: string[] = [];
+    /** 内容已上传、只差索引的条目：不参与 putIndex 失败时的对象回滚。 */
+    const retryNames: string[] = [];
     const uploadedNames: string[] = [];
     const previousObjectIds = new Map<string, string | null>();
     let uploaded = 0;
@@ -243,40 +216,47 @@ export class VaultSyncService {
 
       let uploadedObjectId: string | null = null;
       try {
-        const before =
-          this.store.scope === "skills"
-            ? await this.store.scanFile(name)
-            : (await this.store.scanFiles(index)).find(
-                (file) => file.name === name,
-              );
-        if (!before) continue;
+        // 只看元数据：扫描与守卫都不再读文件内容。
+        const before = await this.store.statFile(name);
+        if (!before) {
+          // 扫描之后文件消失：按删除处理并回收云端对象（与 reconcile 的判定一致）。
+          if (
+            entry.objectId &&
+            !index.pendingDeletes.includes(entry.objectId)
+          ) {
+            index.pendingDeletes.push(entry.objectId);
+          }
+          delete index.files[name];
+          await this.store.writeIndex(index);
+          remoteDirty = true;
+          continue;
+        }
         if (
-          entry.syncStatus === "failed" &&
-          entry.objectId &&
-          entry.objectHash === before.hash
+          entry.hash !== null &&
+          entry.hash === entry.objectHash &&
+          before.size === entry.size &&
+          before.mtime === entry.mtime
         ) {
-          changedNames.push(name);
+          // 内容就是上次成功上传的那一版，只差索引未写：补写即可，不重读不重传。
+          retryNames.push(name);
           remoteDirty = true;
           continue;
         }
         const oldObjectId = entry.objectId;
         previousObjectIds.set(name, oldObjectId);
+        // 一次读取：同一份字节同时算出内容 hash 与密文。
         const packed = await packFile(this.store.filePath(name), mek);
-        await this.cloud.putObject(
-          token,
-          this.store.scope,
-          packed.id,
-          packed.payload,
-        );
         uploadedObjectId = packed.id;
-        const after =
-          this.store.scope === "skills"
-            ? await this.store.scanFile(name)
-            : (await this.store.scanFiles(index)).find(
-                (file) => file.name === name,
-              );
-        if (!after || after.hash !== before.hash) {
+        await this.cloud.putObject(token, packed.id, packed.payload);
+        const after = await this.store.statFile(name);
+        if (
+          !after ||
+          after.size !== before.size ||
+          after.mtime !== before.mtime
+        ) {
+          // 上传途中被改：本轮作废，下一轮重来。
           entry.syncStatus = "pending";
+          entry.hash = null;
           if (!index.pendingDeletes.includes(packed.id)) {
             index.pendingDeletes.push(packed.id);
           }
@@ -286,8 +266,8 @@ export class VaultSyncService {
         }
 
         entry.objectId = packed.id;
-        entry.objectHash = after.hash;
-        entry.hash = after.hash;
+        entry.objectHash = packed.hash;
+        entry.hash = packed.hash;
         entry.size = after.size;
         entry.mtime = after.mtime;
         entry.syncStatus = "pending";
@@ -319,7 +299,6 @@ export class VaultSyncService {
       try {
         await this.cloud.putIndex(
           token,
-          this.store.scope,
           encodeRemoteIndex(toRemoteIndex(index), mek),
         );
         remoteIndexReady = true;
@@ -351,10 +330,11 @@ export class VaultSyncService {
     }
 
     if (remoteIndexReady) {
-      for (const name of changedNames) {
+      const settledNames = [...changedNames, ...retryNames];
+      for (const name of settledNames) {
         index.files[name].syncStatus = "synced";
       }
-      if (changedNames.length > 0) await this.store.writeIndex(index);
+      if (settledNames.length > 0) await this.store.writeIndex(index);
     }
 
     let deleted = 0;
@@ -422,13 +402,9 @@ export class VaultResetService {
     }
     for (const objectId of index.pendingDeletes) toDelete.add(objectId);
 
-    const remotePayload = await this.cloud.getIndex(token, this.store.scope);
+    const remotePayload = await this.cloud.getIndex(token);
     if (remotePayload) {
-      const remote = decodeRemoteIndex(
-        remotePayload,
-        current,
-        this.store.scope,
-      );
+      const remote = decodeRemoteIndex(remotePayload, current);
       for (const entry of Object.values(remote.files)) {
         toDelete.add(entry.objectId);
       }
@@ -452,8 +428,7 @@ export class VaultResetService {
 
     await this.cloud.putIndex(
       token,
-      this.store.scope,
-      encodeRemoteIndex({ version: 1, files: {} }, current),
+      encodeRemoteIndex({ version: 2, files: {} }, current),
     );
 
     const newCode = generateRecoveryCode();
@@ -499,8 +474,7 @@ export class VaultResetService {
       // local key. The reset marker remains if either operation fails.
       await this.cloud.putIndex(
         token,
-        this.store.scope,
-        encodeRemoteIndex({ version: 1, files: {} }, this.pendingMek),
+        encodeRemoteIndex({ version: 2, files: {} }, this.pendingMek),
       );
       this.persistMek(this.pendingMek);
       await this.store.writeIndex(index);
@@ -543,12 +517,11 @@ export class VaultResetService {
       });
     }
 
-    // 列表按 scope 过滤（服务端 `GET /api/vault/objects?scope=`）：这条路径上没有
-    // MEK，拿不到远端索引的内容，只能靠服务端分仓，否则技能密库的 reset 会把文件
-    // 密库的对象一并删掉。
+    // 这条路径上没有 MEK，拿不到远端索引的内容，只能列出账号下的全部对象；
+    // 统一存储后整账号只有一个密库，列出来的就是要删的。
     let objectIds: string[];
     try {
-      objectIds = await this.cloud.listObjectIds(token, this.store.scope);
+      objectIds = await this.cloud.listObjectIds(token);
     } catch (error: unknown) {
       throw new Error("VAULT_RESET_FAILED");
     }

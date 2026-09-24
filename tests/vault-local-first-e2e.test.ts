@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deriveMek } from "../src/main/vault/crypto";
@@ -12,29 +12,22 @@ import {
   type VaultCloudClient,
 } from "../src/main/vault/sync";
 import { packFile } from "../src/main/vault/objects";
-import type { VaultIndexScope } from "../src/main/vault/cloud-client";
 
 const code = "123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const mek = deriveMek(code);
 
 class FakeCloud implements VaultCloudClient {
   readonly objects = new Map<string, Buffer>();
-  /** 按 scope 分桶：列表接口是 scope 级的，替身必须能区分。 */
-  readonly objectsByScope = new Map<VaultIndexScope, Map<string, Buffer>>();
   index: Buffer | null = null;
   failUploads = false;
 
   async putObject(
     _token: string,
-    scope: VaultIndexScope,
     id: string,
     payload: Buffer,
   ): Promise<void> {
     if (this.failUploads) throw new Error("NETWORK_DOWN");
     this.objects.set(id, Buffer.from(payload));
-    const bucket = this.objectsByScope.get(scope) ?? new Map<string, Buffer>();
-    bucket.set(id, Buffer.from(payload));
-    this.objectsByScope.set(scope, bucket);
   }
 
   async getObject(_token: string, id: string): Promise<Buffer> {
@@ -47,27 +40,16 @@ class FakeCloud implements VaultCloudClient {
     this.objects.delete(id);
   }
 
-  async getIndex(
-    _token: string,
-    _scope: VaultIndexScope,
-  ): Promise<Buffer | null> {
+  async getIndex(_token: string): Promise<Buffer | null> {
     return this.index;
   }
 
-  async putIndex(
-    _token: string,
-    _scope: VaultIndexScope,
-    payload: Buffer,
-  ): Promise<void> {
+  async putIndex(_token: string, payload: Buffer): Promise<void> {
     this.index = Buffer.from(payload);
   }
 
-  async listObjectIds(
-    _token: string,
-    scope: VaultIndexScope,
-  ): Promise<string[]> {
-    const bucket = this.objectsByScope.get(scope);
-    return bucket ? [...bucket.keys()] : [];
+  async listObjectIds(_token: string): Promise<string[]> {
+    return [...this.objects.keys()];
   }
 }
 
@@ -91,24 +73,25 @@ describe("Vault local-first acceptance flow", () => {
     await writeFile(source, "v1");
 
     const imported = await store.importFile(source);
-    expect(imported.name).toBe("document.md");
-    expect((await store.readIndex()).files["document.md"].syncStatus).toBe(
+    expect(imported.name).toBe("files/document.md");
+    expect((await store.readIndex()).files["files/document.md"].syncStatus).toBe(
       "pending",
     );
 
     const service = new VaultSyncService(store, cloud, () => mek);
     await service.sync("token");
-    const firstObject = (await store.readIndex()).files["document.md"].objectId;
+    const firstObject = (await store.readIndex()).files["files/document.md"]
+      .objectId;
     expect(firstObject).not.toBeNull();
 
-    await writeFile(store.filePath("document.md"), "v2");
+    await writeFile(store.filePath("files/document.md"), "v2");
     await service.sync("token");
-    const secondObject = (await store.readIndex()).files["document.md"]
+    const secondObject = (await store.readIndex()).files["files/document.md"]
       .objectId;
     expect(secondObject).not.toBe(firstObject);
     expect(firstObject && cloud.objects.has(firstObject)).toBe(false);
 
-    await store.deleteFile("document.md");
+    await store.deleteFile("files/document.md");
     expect((await store.scanFiles()).map((file) => file.name)).toEqual([]);
     await service.sync("token");
     expect(cloud.objects.size).toBe(0);
@@ -118,7 +101,7 @@ describe("Vault local-first acceptance flow", () => {
     await store.importFile(source);
     const failed = await service.sync("token");
     expect(failed.failed).toBe(1);
-    expect(await readFile(store.filePath("document.md"), "utf8")).toBe(
+    expect(await readFile(store.filePath("files/document.md"), "utf8")).toBe(
       "offline",
     );
 
@@ -129,11 +112,11 @@ describe("Vault local-first acceptance flow", () => {
     cloud.objects.set(packed.id, packed.payload);
     cloud.index = encodeRemoteIndex(
       {
-        version: 1,
+        version: 2,
         files: {
-          "document.md": {
+          "files/document.md": {
             objectId: packed.id,
-            hash: "remote-hash",
+            hash: packed.hash,
             size: 6,
             mtime: 1,
           },
@@ -154,9 +137,9 @@ describe("Vault local-first acceptance flow", () => {
     ).restoreWithRecoveryCode("token", code);
 
     expect(restored).toEqual({ restored: 1, renamed: 0 });
-    expect(await readFile(restoredStore.filePath("document.md"), "utf8")).toBe(
-      "remote",
-    );
+    expect(
+      await readFile(restoredStore.filePath("files/document.md"), "utf8"),
+    ).toBe("remote");
   });
 
   it("discards old objects on a new device and writes a fresh empty index", async () => {
@@ -165,9 +148,8 @@ describe("Vault local-first acceptance flow", () => {
     const store = new LocalVaultStore(join(sourceRoot, "vault"));
     await store.ensureDirectory();
     const cloud = new FakeCloud();
-    // 走真实上传路径播种：列表接口按 scope 分仓，直接塞 objects 不会进分桶，
-    // 那样测的就不是服务端的行为。
-    await cloud.putObject("token", "files", "old-1", Buffer.from("cipher"));
+    // 走真实上传路径播种：列表接口列整个账户的对象，直接塞 objects 也能测。
+    await cloud.putObject("token", "old-1", Buffer.from("cipher"));
 
     const resetService = new VaultResetService(
       store,
@@ -191,11 +173,12 @@ describe("Vault local-first acceptance flow", () => {
     roots.push(sourceRoot);
     const store = new LocalVaultStore(join(sourceRoot, "vault"));
     await store.ensureDirectory();
-    await writeFile(store.filePath("keep.txt"), "local");
+    await mkdir(join(store.rootDir, "files"), { recursive: true });
+    await writeFile(store.filePath("files/keep.txt"), "local");
     await store.writeIndex({
-      version: 1,
+      version: 2,
       files: {
-        "keep.txt": {
+        "files/keep.txt": {
           objectId: "old-1",
           hash: "h",
           size: 5,
@@ -222,8 +205,10 @@ describe("Vault local-first acceptance flow", () => {
     );
 
     expect(result.preservedLocalFiles).toBe(1);
-    expect(await readFile(store.filePath("keep.txt"), "utf8")).toBe("local");
-    expect((await store.readIndex()).files["keep.txt"].syncStatus).toBe(
+    expect(await readFile(store.filePath("files/keep.txt"), "utf8")).toBe(
+      "local",
+    );
+    expect((await store.readIndex()).files["files/keep.txt"].syncStatus).toBe(
       "pending",
     );
   });

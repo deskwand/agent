@@ -2,16 +2,16 @@ import type { VaultSnapshotItem } from "../../../shared/vault";
 
 /**
  * 选择器里的一行。
- * `id` 同时是「已添加」判定与附件去重用的稳定身份：密库用文件名，工作区用相对路径。
+ * `id` 同时是「已添加」判定与附件去重用的稳定身份：密库与工作区都用相对路径。
  */
 export interface AttachPickerItem {
   id: string;
   /** 文件名：列表第一列，也是 FileTypeIcon 的判据 */
   name: string;
-  /** 目录前缀：列表第二列，仅工作区有 */
+  /** 目录前缀：列表第二列，密库嵌套路径与工作区都有 */
   dir?: string;
   size: number;
-  /** 搜索匹配用的完整展示串（工作区=相对路径，密库=文件名） */
+  /** 搜索匹配用的完整展示串（相对路径） */
   label: string;
 }
 
@@ -32,13 +32,16 @@ export function splitRelPath(relPath: string): {
 export function mapVaultSnapshotItems(
   items: VaultSnapshotItem[],
 ): AttachPickerItem[] {
-  return items.map((item) => ({
-    id: item.name,
-    name: item.name,
-    dir: undefined,
-    size: item.size,
-    label: item.name,
-  }));
+  return items.map((item) => {
+    const { dir, name } = splitRelPath(item.path);
+    return {
+      id: item.path,
+      name,
+      dir,
+      size: item.size,
+      label: item.path,
+    };
+  });
 }
 
 export function mapWorkspaceScan(

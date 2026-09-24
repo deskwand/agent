@@ -41,6 +41,6 @@ describe("LocalVaultStore disk-full handling", () => {
     await expect(store.importFile(source)).rejects.toThrow(
       "VAULT_LOCAL_DISK_FULL",
     );
-    expect(existsSync(store.filePath("source.txt"))).toBe(false);
+    expect(existsSync(store.filePath("files/source.txt"))).toBe(false);
   });
 });

@@ -52,7 +52,7 @@ describe("SkillsManager vault source", () => {
 
   /** 技能密库的默认位置，与 SkillsManager.getVaultSkillsPath() 解析出的路径一致。 */
   function defaultVaultSkillsDir(): string {
-    return path.join(testRoot, "home", ".deskwand", "vault-skills");
+    return path.join(testRoot, "home", ".deskwand", "vault", "skills");
   }
 
   function createVaultSkill(name: string, description: string): string {
