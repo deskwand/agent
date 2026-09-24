@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { describe, expect, it, vi } from "vitest";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deriveMek } from "../src/main/vault/crypto";
@@ -13,7 +13,10 @@ import {
   VaultSyncService,
   type VaultCloudClient,
 } from "../src/main/vault/sync";
-import { VaultCloudError } from "../src/main/vault/cloud-client";
+import {
+  VaultCloudError,
+  type VaultIndexScope,
+} from "../src/main/vault/cloud-client";
 
 const mek = deriveMek("123456789ABCDEFGHJKLMNPQRSTUVWXYZ");
 
@@ -54,11 +57,18 @@ class FakeCloudClient implements VaultCloudClient {
     this.deletedObjectIds.push(objectId);
   }
 
-  async getIndex(_token: string): Promise<Buffer | null> {
+  async getIndex(
+    _token: string,
+    _scope: VaultIndexScope,
+  ): Promise<Buffer | null> {
     return this.indexPayload;
   }
 
-  async putIndex(_token: string, payload: Buffer): Promise<void> {
+  async putIndex(
+    _token: string,
+    _scope: VaultIndexScope,
+    payload: Buffer,
+  ): Promise<void> {
     if (this.failIndex) throw new Error("NETWORK_DOWN");
     this.indexPayload = Buffer.from(payload);
     this.indexUploads += 1;
@@ -86,6 +96,46 @@ describe("VaultSyncService", () => {
       roots.splice(0).map((root) => rm(root, { recursive: true, force: true })),
     );
   }
+
+  it("scans a skills tree only once while syncing multiple files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "deskwand-vault-tree-scan-"));
+    roots.push(root);
+    const store = new LocalVaultStore(join(root, "vault-skills"), "skills");
+    await mkdir(join(store.rootDir, "foo"), { recursive: true });
+    await writeFile(join(store.rootDir, "foo", "A.md"), "a");
+    await writeFile(join(store.rootDir, "foo", "B.md"), "b");
+    const scan = vi.spyOn(store, "scanFiles");
+    const cloud = new FakeCloudClient();
+    const result = await new VaultSyncService(store, cloud, () => mek).sync(
+      "token",
+    );
+    expect(result.uploaded).toBe(2);
+    expect(scan).toHaveBeenCalledTimes(1);
+    scan.mockRestore();
+    await cleanup();
+  });
+
+  it("addresses the index slot of its store scope", async () => {
+    const root = await mkdtemp(join(tmpdir(), "deskwand-vault-scope-"));
+    roots.push(root);
+    const store = new LocalVaultStore(join(root, "vault-skills"), "skills");
+    await store.ensureDirectory();
+    await writeFile(join(store.rootDir, "SKILL.md"), "# skill");
+    const cloud = new FakeCloudClient();
+    const seen: VaultIndexScope[] = [];
+    const original = cloud.putIndex.bind(cloud);
+    // 用 Parameters<> 取原签名，避免手写参数退化成隐式 any。
+    cloud.putIndex = async (
+      ...args: Parameters<VaultCloudClient["putIndex"]>
+    ): Promise<void> => {
+      seen.push(args[1]);
+      return original(...args);
+    };
+
+    await new VaultSyncService(store, cloud, () => mek).sync("token");
+
+    expect(seen).toEqual(["skills"]);
+  });
 
   it("blocks sync while a destructive reset marker exists", async () => {
     const store = await createStore();

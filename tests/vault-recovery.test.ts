@@ -21,6 +21,7 @@ import {
   VaultRestoreService,
   type VaultCloudClient,
 } from "../src/main/vault/sync";
+import type { VaultIndexScope } from "../src/main/vault/cloud-client";
 
 describe("vault recovery", () => {
   const mekPath = "/tmp/deskwand-test/vault/vault-mek.bin";
@@ -135,7 +136,7 @@ describe("vault recovery", () => {
       async listObjectIds(): Promise<string[]> {
         return [];
       }
-      async getIndex(): Promise<Buffer> {
+      async getIndex(_token: string, _scope: VaultIndexScope): Promise<Buffer> {
         return encodeRemoteIndex(
           {
             version: 1,
@@ -184,10 +185,10 @@ describe("vault recovery", () => {
     const { id, payload } = await packFile(source, deriveMek(code));
     const cloud: VaultCloudClient = {
       putObject: async () => {},
-      putIndex: async () => {},
+      putIndex: async (_token: string, _scope: VaultIndexScope) => {},
       deleteObject: async () => {},
       listObjectIds: async () => [],
-      getIndex: async () =>
+      getIndex: async (_token: string, _scope: VaultIndexScope) =>
         encodeRemoteIndex(
           {
             version: 1,
@@ -229,10 +230,10 @@ describe("vault recovery", () => {
     let downloaded = false;
     const cloud: VaultCloudClient = {
       putObject: async () => {},
-      putIndex: async () => {},
+      putIndex: async (_token: string, _scope: VaultIndexScope) => {},
       deleteObject: async () => {},
       listObjectIds: async () => [],
-      getIndex: async () =>
+      getIndex: async (_token: string, _scope: VaultIndexScope) =>
         encodeRemoteIndex(
           {
             version: 1,
@@ -285,10 +286,10 @@ describe("vault recovery", () => {
     ]);
     const cloud: VaultCloudClient = {
       putObject: async () => {},
-      putIndex: async () => {},
+      putIndex: async (_token: string, _scope: VaultIndexScope) => {},
       deleteObject: async () => {},
       listObjectIds: async () => [],
-      getIndex: async () =>
+      getIndex: async (_token: string, _scope: VaultIndexScope) =>
         encodeRemoteIndex(
           {
             version: 1,
@@ -345,10 +346,10 @@ describe("vault recovery", () => {
     let storedMek: Buffer | null = null;
     const cloud: VaultCloudClient = {
       putObject: async () => {},
-      putIndex: async () => {},
+      putIndex: async (_token: string, _scope: VaultIndexScope) => {},
       deleteObject: async () => {},
       listObjectIds: async () => [],
-      getIndex: async () =>
+      getIndex: async (_token: string, _scope: VaultIndexScope) =>
         encodeRemoteIndex(
           {
             version: 1,

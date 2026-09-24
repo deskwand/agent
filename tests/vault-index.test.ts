@@ -76,4 +76,42 @@ describe("Vault remote index codec", () => {
       pendingDeletes: [],
     });
   });
+
+  const nested: RemoteVaultIndex = {
+    version: 1,
+    files: {
+      "foo/references/笔记.md": {
+        objectId: "obj-1",
+        hash: "h",
+        size: 1,
+        mtime: 1,
+      },
+    },
+  };
+
+  it("accepts nested paths only for skills", () => {
+    const payload = encodeRemoteIndex(nested, mek);
+    expect(decodeRemoteIndex(payload, mek, "skills")).toEqual(nested);
+    expect(() => decodeRemoteIndex(payload, mek)).toThrow("BAD_VAULT_INDEX");
+  });
+
+  it.each([
+    "../escape",
+    "foo/../escape",
+    "/absolute",
+    "foo//bar",
+    "foo/",
+    "foo\\bar",
+  ])("rejects unsafe skills index path %s", (name) => {
+    const payload = encodeRemoteIndex(
+      {
+        version: 1,
+        files: { [name]: nested.files["foo/references/笔记.md"] },
+      },
+      mek,
+    );
+    expect(() => decodeRemoteIndex(payload, mek, "skills")).toThrow(
+      "BAD_VAULT_INDEX",
+    );
+  });
 });

@@ -54,7 +54,7 @@ export class VaultRestoreService {
   async restoreWithLocalMek(token: string): Promise<RestoreResult> {
     const mek = this.mekProvider();
     if (!mek) throw new Error("VAULT_KEY_REQUIRED");
-    const encryptedIndex = await this.cloud.getIndex(token);
+    const encryptedIndex = await this.cloud.getIndex(token, this.store.scope);
     if (!encryptedIndex) throw new Error("VAULT_NO_REMOTE_BACKUP");
     return this.performRestore(token, mek, encryptedIndex);
   }
@@ -63,7 +63,7 @@ export class VaultRestoreService {
     token: string,
     recoveryCode: string,
   ): Promise<RestoreResult> {
-    const encryptedIndex = await this.cloud.getIndex(token);
+    const encryptedIndex = await this.cloud.getIndex(token, this.store.scope);
     if (!encryptedIndex) throw new Error("VAULT_NO_REMOTE_BACKUP");
     const mek = deriveMek(recoveryCode);
     const current = this.mekProvider();
@@ -83,7 +83,7 @@ export class VaultRestoreService {
   ): Promise<RestoreResult> {
     let remote: ReturnType<typeof decodeRemoteIndex>;
     try {
-      remote = decodeRemoteIndex(encryptedIndex, mek);
+      remote = decodeRemoteIndex(encryptedIndex, mek, this.store.scope);
     } catch (error: unknown) {
       if (
         error instanceof Error &&
@@ -101,14 +101,31 @@ export class VaultRestoreService {
       throw new Error("VAULT_LOCAL_FILES_EXIST");
     }
 
-    const existingNames = new Set<string>();
+    const resolvedNames = new Set<string>();
     const resolved: Array<{ name: string; entry: RemoteVaultEntry }> = [];
     let renamed = 0;
     for (const [originalName, entry] of Object.entries(remote.files)) {
       if (isReservedVaultName(originalName)) continue;
-      const name = uniqueRestoreName(originalName, existingNames);
+      const name =
+        this.store.scope === "files"
+          ? uniqueRestoreName(originalName, resolvedNames)
+          : originalName;
+      if (this.store.scope === "skills") {
+        // 大小写不敏感卷上的冲突：两条路径如果在某个路径段上「仅大小写不同」、
+        // 且该段之前的各段完全相同，就会落在同一个文件或目录上
+        // （"Foo/x.md" vs "foo/y.md" 是同一目录；"foo/A.md" vs "foo/a.md" 是同一文件）。
+        // 只把整条路径小写化做比较是不够的：那样只能发现完全同名的冲突。
+        const collides = [...resolvedNames].some((used) =>
+          pathsCollideIgnoringCase(used, name),
+        );
+        if (collides) {
+          // 这条错误将来是要显示给用户的，必须说清是「远端索引内部」的冲突：
+          // 如果只说“名字已被占用”，用户会去本地找那个文件，永远找不到。
+          throw new Error(`VAULT_SKILL_NAME_CONFLICT:${originalName}`);
+        }
+      }
       if (name !== originalName) renamed += 1;
-      existingNames.add(name);
+      resolvedNames.add(name);
       resolved.push({ name, entry });
     }
 
@@ -141,6 +158,24 @@ export class VaultRestoreService {
 
     return { restored: resolved.length, renamed };
   }
+}
+
+/**
+ * 两条相对路径在大小写不敏感卷上是否指向同一个文件或目录。
+ *
+ * 逐段比较：前面各段必须**完全**相同（大小写也要一致，否则它们本来就是不同的
+ * 目录），到第一处不同时，只有当两段仅大小写不同才算冲突。
+ */
+function pathsCollideIgnoringCase(a: string, b: string): boolean {
+  const left = a.split("/");
+  const right = b.split("/");
+  const shared = Math.min(left.length, right.length);
+  for (let index = 0; index < shared; index += 1) {
+    if (left[index] === right[index]) continue;
+    return left[index].toLowerCase() === right[index].toLowerCase();
+  }
+  // 前缀完全相同：一条是另一条的前缀（文件 vs 目录）或两者同名。
+  return true;
 }
 
 function uniqueRestoreName(name: string, existingNames: Set<string>): string {
@@ -208,9 +243,12 @@ export class VaultSyncService {
 
       let uploadedObjectId: string | null = null;
       try {
-        const before = (await this.store.scanFiles(index)).find(
-          (file) => file.name === name,
-        );
+        const before =
+          this.store.scope === "skills"
+            ? await this.store.scanFile(name)
+            : (await this.store.scanFiles(index)).find(
+                (file) => file.name === name,
+              );
         if (!before) continue;
         if (
           entry.syncStatus === "failed" &&
@@ -226,9 +264,12 @@ export class VaultSyncService {
         const packed = await packFile(this.store.filePath(name), mek);
         await this.cloud.putObject(token, packed.id, packed.payload);
         uploadedObjectId = packed.id;
-        const after = (await this.store.scanFiles(index)).find(
-          (file) => file.name === name,
-        );
+        const after =
+          this.store.scope === "skills"
+            ? await this.store.scanFile(name)
+            : (await this.store.scanFiles(index)).find(
+                (file) => file.name === name,
+              );
         if (!after || after.hash !== before.hash) {
           entry.syncStatus = "pending";
           if (!index.pendingDeletes.includes(packed.id)) {
@@ -273,6 +314,7 @@ export class VaultSyncService {
       try {
         await this.cloud.putIndex(
           token,
+          this.store.scope,
           encodeRemoteIndex(toRemoteIndex(index), mek),
         );
         remoteIndexReady = true;
@@ -375,9 +417,13 @@ export class VaultResetService {
     }
     for (const objectId of index.pendingDeletes) toDelete.add(objectId);
 
-    const remotePayload = await this.cloud.getIndex(token);
+    const remotePayload = await this.cloud.getIndex(token, this.store.scope);
     if (remotePayload) {
-      const remote = decodeRemoteIndex(remotePayload, current);
+      const remote = decodeRemoteIndex(
+        remotePayload,
+        current,
+        this.store.scope,
+      );
       for (const entry of Object.values(remote.files)) {
         toDelete.add(entry.objectId);
       }
@@ -401,6 +447,7 @@ export class VaultResetService {
 
     await this.cloud.putIndex(
       token,
+      this.store.scope,
       encodeRemoteIndex({ version: 1, files: {} }, current),
     );
 
@@ -447,6 +494,7 @@ export class VaultResetService {
       // local key. The reset marker remains if either operation fails.
       await this.cloud.putIndex(
         token,
+        this.store.scope,
         encodeRemoteIndex({ version: 1, files: {} }, this.pendingMek),
       );
       this.persistMek(this.pendingMek);
@@ -490,6 +538,11 @@ export class VaultResetService {
       });
     }
 
+    // NOTE(阶段 2): `listObjectIds` 是账号级列表，与 scope 无关。等技能 scope 真正
+    // 接入后，技能密库的 reset 会把文件密库的对象一并删掉（反之亦然），必须改成
+    // 「按 scope 列出对象」——例如给 /api/vault/objects 加 scope，或改为删除远端
+    // 索引引用到的对象。这里没有 MEK，拿不到远端索引的内容，所以本阶段无法在
+    // 客户端修；阶段 1 只有 files scope 在用，行为与改动前一致。
     let objectIds: string[];
     try {
       objectIds = await this.cloud.listObjectIds(token);
