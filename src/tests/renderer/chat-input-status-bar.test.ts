@@ -7,6 +7,7 @@ import {
   ChatInputStatusBar,
   type ChatInputStatus,
 } from "../../renderer/components/ChatInputStatusBar";
+import type { BackgroundAgentRow } from "../../renderer/utils/subagent-card";
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }
@@ -253,7 +254,7 @@ describe("background subagent entry", () => {
   });
 
   function renderEntry(
-    backgroundAgentRows: typeof rows,
+    backgroundAgentRows: BackgroundAgentRow[],
     onSelect = vi.fn(),
   ): void {
     act(() => {
@@ -282,7 +283,8 @@ describe("background subagent entry", () => {
     const row = Array.from(
       container.querySelectorAll("[role='dialog'] button"),
     ).find((el) => el.textContent?.includes("霍珀"));
-    expect(row?.textContent).toContain("Explore · read src/a.ts");
+    // 三行结构：名字行（带条件性类型后缀，该夹具两行类型不同）
+    expect(row?.textContent).toContain("霍珀 · Explore");
     expect(row?.textContent).toContain("3");
     expect(row?.textContent).toContain("4.2s");
 
@@ -315,6 +317,91 @@ describe("background subagent entry", () => {
     expect(container.textContent).not.toContain("subagent.statusDone");
   });
 
+  it("描述与当前动作同时可见（描述不再被动作顶掉）", () => {
+    renderEntry(rows);
+    act(() => container.querySelector("button")?.click());
+    const row = Array.from(
+      container.querySelectorAll("[role='dialog'] button"),
+    ).find((el) => el.textContent?.includes("霍珀"));
+    expect(row?.textContent).toContain("find bug"); // 描述
+    expect(row?.textContent).toContain("read src/a.ts"); // 动作
+  });
+
+  // 守卫而非本次的判别用例：base 实现（`type · (currentLabel ?? description)`）下这条也会绿，
+  // 它能挡住的是"把动作行写成 currentLabel ?? description"这类回退。
+  it("没有当前动作时不渲染动作行（不与描述重复）", () => {
+    renderEntry([{ ...rows[0], currentLabel: undefined }]);
+    act(() => container.querySelector("button")?.click());
+    const row = Array.from(
+      container.querySelectorAll("[role='dialog'] button"),
+    ).find((el) => el.textContent?.includes("霍珀"));
+    // 描述只出现一次：动作行缺席，所以不会再出现第二遍
+    expect(row?.textContent?.split("find bug")).toHaveLength(2);
+  });
+
+  // jsdom 没有布局，这里只能断言 class 与 inline 上限；"锚点上移 + max-w-full = 聊天列宽"
+  // 这条架构主张靠父链保证（ChatView.tsx:1911 的 max-w-[920px] ... px-5），不在测试里验证。
+  it("面板宽度按可用宽度限幅、并带滚动上限", () => {
+    renderEntry(rows);
+    act(() => container.querySelector("button")?.click());
+    const panel = container.querySelector("[role='dialog']");
+    expect(panel?.className).toContain("w-[32rem]");
+    expect(panel?.className).toContain("max-w-full");
+    expect(panel?.className).toContain("max-h-[min(70vh,32rem)]");
+    expect(panel?.className).toContain("overflow-y-auto");
+  });
+
+  // 不变量守卫：mousedown 是外部点击关闭的判据，行内按下不能关面板。
+  // 注意它**不**区分 panelRef 挂在哪——面板在 DOM 上既是外层容器也是 chip span 的后代，
+  // 两种挂法 contains() 都成立（实测：把 ref 挪回 span，本用例仍绿）。
+  // 它能挡的是更粗的回退：把面板移出锚点子树（例如改成 portal）却忘了同步 contains 检查。
+  it("在面板内按下鼠标不会把面板当成外部点击关掉", () => {
+    const onSelect = vi.fn();
+    renderEntry(rows, onSelect);
+    act(() => container.querySelector("button")?.click());
+    const rowButton = Array.from(
+      container.querySelectorAll("[role='dialog'] button"),
+    ).find((el) => el.textContent?.includes("霍珀"));
+
+    // mousedown 才是外部点击关闭的判据；它在行按钮上按下时不能关面板，
+    // 否则随后的 click 落不到已卸载的节点上 → 点行变成"只关面板、不跳转"。
+    act(() => {
+      rowButton?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+    });
+    expect(container.querySelector("[role='dialog']")).not.toBeNull();
+
+    act(() => {
+      rowButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(onSelect).toHaveBeenCalledWith("call-1");
+  });
+
+  it("按锚点上方实测可用高度给面板封顶（矮窗口不裁顶）", () => {
+    const realRect = HTMLElement.prototype.getBoundingClientRect;
+    // 模拟锚点距窗口顶部仅 300px：可用高度应被算成 300 - 48 = 252
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      return {
+        top: 300,
+        bottom: 320,
+        left: 0,
+        right: 0,
+        width: 0,
+        height: 20,
+        x: 0,
+        y: 300,
+        toJSON: () => ({}),
+      } as DOMRect;
+    };
+    try {
+      renderEntry(rows);
+      act(() => container.querySelector("button")?.click());
+      const panel = container.querySelector<HTMLElement>("[role='dialog']");
+      expect(panel?.style.maxHeight).toBe("252px");
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = realRect;
+    }
+  });
+
   it("Escape 关面板；rows 为空时不渲染按钮", () => {
     renderEntry(rows);
     act(() => container.querySelector("button")?.click());
@@ -329,7 +416,7 @@ describe("background subagent entry", () => {
   });
 });
 
-describe("background subagent entry row fallback", () => {
+describe("background subagent entry single row", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -344,7 +431,7 @@ describe("background subagent entry row fallback", () => {
     await act(async () => root.unmount());
   });
 
-  it("还没有任何步骤时，第二行回落显示任务描述", () => {
+  it("只有一行时类型不显示后缀，描述仍单独成行", () => {
     act(() => {
       root.render(
         React.createElement(ChatInputStatusBar, {
@@ -365,6 +452,9 @@ describe("background subagent entry row fallback", () => {
       );
     });
     act(() => container.querySelector("button")?.click());
-    expect(container.textContent).toContain("Explore · find bug");
+    // 该夹具只有一行、类型全为 Explore → showType 为 false，行内不该出现类型
+    expect(container.textContent).toContain("图灵");
+    expect(container.textContent).toContain("find bug");
+    expect(container.textContent).not.toContain("Explore");
   });
 });

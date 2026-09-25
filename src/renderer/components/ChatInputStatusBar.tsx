@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import {
   Target,
@@ -70,6 +76,11 @@ export type ChatInputStatus =
     }
   | null;
 
+/** 面板上方的安全留白；与 MergedInputChip 同一套做法与取值。 */
+const SUBAGENT_PANEL_TOP_SAFE_AREA_PX = 48;
+/** 面板高度上限；与 MergedInputChip 的 MODEL_MENU_MAX_HEIGHT_PX 同值（512px）。 */
+const SUBAGENT_PANEL_MAX_HEIGHT_PX = 512;
+
 interface ChatInputStatusBarProps {
   status: ChatInputStatus;
   onGoalCommand?: (action: string) => void;
@@ -103,7 +114,34 @@ export function ChatInputStatusBar({
   const { t } = useTranslation();
   const rows = backgroundAgentRows ?? [];
   const [panelOpen, setPanelOpen] = useState(false);
-  const panelRef = useRef<HTMLSpanElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
+
+  // 面板贴着状态栏往上长，而祖先链上有 overflow-hidden：矮窗口 / 放大字号时
+  // 70vh 会超过实际可用高度、顶部被裁且点不到。按锚点上方实测可用高度取上限
+  // （做法与取值同 MergedInputChip.tsx:64-80）。
+  const updatePanelMaxHeight = useCallback(() => {
+    const anchor = panelRef.current;
+    if (!anchor) return;
+    const { top } = anchor.getBoundingClientRect();
+    // 无布局信息（jsdom 等）时保留 className 上的默认上限
+    if (top <= 0) return;
+    setPanelMaxHeight(
+      Math.min(
+        SUBAGENT_PANEL_MAX_HEIGHT_PX,
+        Math.max(0, Math.floor(top - SUBAGENT_PANEL_TOP_SAFE_AREA_PX)),
+      ),
+    );
+  }, []);
+
+  // 打开时先量一次（layout 阶段，避免首帧闪烁），窗口尺寸变化时重量。
+  useLayoutEffect(() => {
+    if (!panelOpen) return;
+    updatePanelMaxHeight();
+    window.addEventListener("resize", updatePanelMaxHeight);
+    return () => window.removeEventListener("resize", updatePanelMaxHeight);
+  }, [panelOpen, updatePanelMaxHeight]);
 
   useEffect(() => {
     if (!panelOpen) return;
@@ -305,21 +343,24 @@ export function ChatInputStatusBar({
 
   // Always render a fixed-height container to prevent layout jump
   const isEntry = status?.type === "background-agent" && rows.length > 0;
+  // 类型只在面板内不统一时才值得占宽度（同类时逐行重复纯属噪音）
+  const showType = new Set(rows.map((row) => row.type)).size > 1;
 
   return (
-    <div className="min-h-5 px-1 pb-1">
+    // 定位锚点放在这个容器上（而不是 chip 那个 span）：面板是它的绝对定位子元素，
+    // 于是 max-w-full 就等于「聊天列可用宽度」——侧栏宽度、右侧面板、字号缩放全都自动计入。
+    // panelRef 必须跟着放这里，否则外部点击关闭会把面板内的点击当成外部点击。
+    <div ref={panelRef} className="relative min-h-5 px-1 pb-1">
       <style>{gradientStyles}</style>
       <div className={`flex items-center gap-1.5 text-xs ${toneClass}`}>
         {isEntry ? (
-          <span
-            ref={panelRef}
-            className="relative inline-flex min-w-0 items-center"
-          >
+          <span className="inline-flex min-w-0 items-center">
             {panelOpen && (
               <div
                 role="dialog"
                 aria-label={t("subagent.panelTitle")}
-                className={`${MENU_PANEL_CLASS} animate-menu-in-up absolute bottom-full left-0 z-30 mb-2 w-[22rem] p-1 text-xs`}
+                style={{ maxHeight: panelMaxHeight ?? undefined }}
+                className={`${MENU_PANEL_CLASS} animate-menu-in-up absolute bottom-full left-0 z-30 mb-2 w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs`}
               >
                 {rows.map((row) => (
                   <button
@@ -331,15 +372,29 @@ export function ChatInputStatusBar({
                     }}
                     className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60"
                   >
-                    <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      {/* ① 名字（只有面板内类型不统一时才带后缀） */}
                       <span className="truncate text-text-primary">
                         {row.name ?? row.type ?? row.toolCallId}
+                        {showType && row.name && row.type ? (
+                          <span className="text-text-muted">
+                            {" · "}
+                            {row.type}
+                          </span>
+                        ) : null}
                       </span>
-                      <span className="truncate text-text-muted">
-                        {[row.type, row.currentLabel ?? row.description]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
+                      {/* ② 任务描述：始终显示（之前只在没有步骤时才出现） */}
+                      {row.description ? (
+                        <span className="truncate text-text-secondary">
+                          {row.description}
+                        </span>
+                      ) : null}
+                      {/* ③ 当前动作 / 最后一步：没有就不渲染，避免与描述重复同一句话 */}
+                      {row.currentLabel ? (
+                        <span className="truncate font-mono text-text-muted">
+                          {row.currentLabel}
+                        </span>
+                      ) : null}
                     </span>
                     <span className="flex flex-shrink-0 items-center gap-1 text-text-muted">
                       {row.stepCount > 0 && <span>{row.stepCount}</span>}

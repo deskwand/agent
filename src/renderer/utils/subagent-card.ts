@@ -74,6 +74,9 @@ export function buildBackgroundAgentRows(
 ): BackgroundAgentRow[] {
   const rows = Object.entries(activities ?? {})
     .filter(([, activity]) => activity.background === true)
+    // 键序 = 最近更新序（store 写入时先删后插 → 最后写入的在末尾）。面板贴底向上长、
+    // 首行在最上方，所以反转一下，让刚触发的那个排在最显眼处。
+    .reverse()
     .map(([toolCallId, activity]) => {
       const lastStep =
         activity.current ?? activity.steps[activity.steps.length - 1];

@@ -154,6 +154,24 @@ describe("buildBackgroundAgentRows", () => {
     expect(rows[0].name).toBe("居里");
   });
 
+  it("组内最新的排在最前（面板贴底向上长，首行最显眼）", () => {
+    const rows = buildBackgroundAgentRows(
+      {
+        "call-old": rowActivity("call-old", {
+          background: true,
+          name: "euler",
+        }),
+        "call-new": rowActivity("call-new", {
+          background: true,
+          name: "darwin",
+        }),
+      },
+      labelFor,
+      "en",
+    );
+    expect(rows.map((row) => row.toolCallId)).toEqual(["call-new", "call-old"]);
+  });
+
   it("优先用 current 作为当前动作；没有快照时返回空数组", () => {
     const rows = buildBackgroundAgentRows(
       {
