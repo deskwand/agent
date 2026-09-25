@@ -23,6 +23,11 @@ import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { resolveDisplayedContextUsage } from "../utils/context-usage";
 import { MessageCard } from "./MessageCard";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
+import {
+  buildBackgroundAgentRows,
+  findTurnEndMessageIdForToolCall,
+} from "../utils/subagent-card";
+import { getToolLabel } from "./message/toolHelpers";
 import { RetryStatusRow } from "./message/RetryStatusRow";
 import type {
   Message,
@@ -225,7 +230,7 @@ const EMPTY_RESULT_FILES: ResultFileEntry[] = [];
 const EMPTY_VIDEO_REFERENCES: VideoReference[] = [];
 
 export function ChatView() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Scoped selectors — each subscription only re-renders when its slice changes
   const activeSessionId = useActiveSessionId();
   const activeSession = useCurrentSession();
@@ -245,7 +250,17 @@ export function ChatView() {
   );
   const compaction = sessionState?.compaction ?? { status: "idle" as const };
   const retry = sessionState?.retry ?? { active: false, attempt: 0 };
-  const backgroundAgents = sessionState?.backgroundAgents ?? [];
+  // 状态栏入口的面板行：只收后台型，运行中在前。
+  const backgroundRows = useMemo(
+    () =>
+      buildBackgroundAgentRows(
+        sessionState?.subagentActivities,
+        (step) => getToolLabel(step.toolName, step.args, t),
+        i18n.language,
+      ),
+    [sessionState?.subagentActivities, t, i18n.language],
+  );
+  const highlightToolCallId = useAppStore((s) => s.highlightToolCallId);
   const hasMoreOlder = sessionState?.hasMoreOlder ?? false;
   const oldestMessageId = sessionState?.oldestMessageId ?? null;
   const prependOlderMessages = useAppStore((s) => s.prependOlderMessages);
@@ -437,7 +452,7 @@ export function ChatView() {
             ? goalStatus
             : null
           : goalStatus,
-      backgroundAgents,
+      backgroundAgentRows: backgroundRows,
     });
   }, [
     isCompacting,
@@ -446,7 +461,7 @@ export function ChatView() {
     partialMessage,
     goalStatus,
     goalTransitionVisible,
-    backgroundAgents,
+    backgroundRows,
   ]);
 
   const lastInputTokens = useMemo(() => {
@@ -938,6 +953,21 @@ export function ChatView() {
       ?.querySelector(`[data-message-id="${messageId}"]`)
       ?.scrollIntoView({ block: "start", behavior: "smooth" });
   }, [visibleMessageStartIndex]);
+
+  const handleSelectBackgroundAgent = useCallback(
+    (toolCallId: string) => {
+      // 用整个 displayedMessages（不是渲染窗口）：目标常在窗口外，
+      // handleDockTickSelect 自己会把窗口滑过去。
+      const messageId = findTurnEndMessageIdForToolCall(
+        displayedMessages,
+        toolCallId,
+      );
+      if (!messageId) return; // 跳不到就什么都不做（也避免高亮/待展开残留）
+      highlightToolCallId(toolCallId);
+      handleDockTickSelect(messageId);
+    },
+    [displayedMessages, highlightToolCallId, handleDockTickSelect],
+  );
 
   const isHydratingHistoryState = shouldShowHydratingHistoryState(
     activeSessionId,
@@ -1881,6 +1911,8 @@ export function ChatView() {
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-1">
           <ChatInputStatusBar
             status={inputStatus}
+            backgroundAgentRows={backgroundRows}
+            onSelectBackgroundAgent={handleSelectBackgroundAgent}
             onGoalCommand={handleCommand}
           />
         </div>

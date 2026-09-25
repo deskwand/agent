@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -20,6 +20,7 @@ import {
   type ProcessSummaryFragment,
 } from "../../utils/tool-display-blocks";
 import { ToolUseBlock } from "./ToolUseBlock";
+import { useAppStore } from "../../store";
 
 const PROCESS_ICON_MAP: Record<
   ProcessSummaryFragment["iconType"],
@@ -54,13 +55,38 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
   const [expanded, setExpanded] = useState(false);
   const fragments = getProcessSummaryFragments(block.summary, t);
 
+  const highlightedToolCallId = useAppStore((s) => s.highlightedToolCallId);
+  const pendingExpandToolCallId = useAppStore((s) => s.pendingExpandToolCallId);
+  const clearPendingExpandToolCallId = useAppStore(
+    (s) => s.clearPendingExpandToolCallId,
+  );
+
+  const containsToolCall = (toolCallId: string | null) =>
+    toolCallId != null && block.items.some((item) => item.id === toolCallId);
+
+  // 跳转过来时展开这条摘要，并且只消费一次：不清掉的话，之后任何重渲染都会
+  // 把它重新展开，和用户手动收起打架。
+  useEffect(() => {
+    if (pendingExpandToolCallId == null) return;
+    // 就地判断（而不是调 containsToolCall）：函数引用放进依赖数组会触发
+    // exhaustive-deps 告警，而这里只需要这一个条件。
+    if (!block.items.some((item) => item.id === pendingExpandToolCallId))
+      return;
+    setExpanded(true);
+    clearPendingExpandToolCallId();
+  }, [pendingExpandToolCallId, clearPendingExpandToolCallId, block.items]);
+
+  const highlighted = containsToolCall(highlightedToolCallId);
+
   return (
     <div className="overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded((value) => !value)}
         aria-expanded={expanded}
-        className="group flex w-full items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] text-text-muted transition-colors hover:bg-surface-hover/40"
+        className={`group flex w-full items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] text-text-muted transition-colors hover:bg-surface-hover/40 ${
+          highlighted ? "ring-2 ring-accent/40" : ""
+        }`}
       >
         <span className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-nowrap">
           {fragments.map((frag, fi) => (

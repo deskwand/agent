@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Target,
@@ -6,7 +6,13 @@ import {
   BadgeCheck,
   Ban,
   CircleDollarSign,
+  ChevronDown,
+  Loader2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
+import { MENU_PANEL_CLASS } from "./menu-styles";
+import type { BackgroundAgentRow } from "../utils/subagent-card";
 
 export type ChatInputStatus =
   | { type: "sending" }
@@ -59,12 +65,17 @@ export type ChatInputStatus =
       count: number;
       detail?: string;
       done?: boolean;
+      /** 全部结束、但其中有失败（error/stopped/aborted）时不为"已完成"说谎。 */
+      hasError?: boolean;
     }
   | null;
 
 interface ChatInputStatusBarProps {
   status: ChatInputStatus;
   onGoalCommand?: (action: string) => void;
+  /** 面板行；为空时 chip 退回纯文本（行为与今天一致）。 */
+  backgroundAgentRows?: BackgroundAgentRow[];
+  onSelectBackgroundAgent?: (toolCallId: string) => void;
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
@@ -86,8 +97,31 @@ const gradientStyles = `
 export function ChatInputStatusBar({
   status,
   onGoalCommand,
+  backgroundAgentRows,
+  onSelectBackgroundAgent,
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
+  const rows = backgroundAgentRows ?? [];
+  const [panelOpen, setPanelOpen] = useState(false);
+  const panelRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!panelOpen) return;
+    // 与 StatusPopover（:74）保持一致的事件：mousedown
+    const onMouseDown = (event: MouseEvent) => {
+      if (!panelRef.current?.contains(event.target as Node))
+        setPanelOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPanelOpen(false);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [panelOpen]);
 
   // Live-tick the elapsed clock while the goal is actively running.
   const [now, setNow] = useState(() => Date.now());
@@ -252,8 +286,10 @@ export function ChatInputStatusBar({
         break;
       case "background-agent":
         if (status.done) {
-          text = t("subagent.statusDone", { count: status.count });
-          toneClass = "text-text-muted";
+          text = status.hasError
+            ? t("subagent.statusFinishedWithErrors", { count: status.count })
+            : t("subagent.statusDone", { count: status.count });
+          toneClass = status.hasError ? "text-error" : "text-text-muted";
         } else {
           text = t("subagent.statusRunning", {
             count: status.count,
@@ -268,15 +304,86 @@ export function ChatInputStatusBar({
   }
 
   // Always render a fixed-height container to prevent layout jump
+  const isEntry = status?.type === "background-agent" && rows.length > 0;
+
   return (
     <div className="min-h-5 px-1 pb-1">
       <style>{gradientStyles}</style>
       <div className={`flex items-center gap-1.5 text-xs ${toneClass}`}>
-        <span
-          className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}
-        >
-          {text}
-        </span>
+        {isEntry ? (
+          <span
+            ref={panelRef}
+            className="relative inline-flex min-w-0 items-center"
+          >
+            {panelOpen && (
+              <div
+                role="dialog"
+                aria-label={t("subagent.panelTitle")}
+                className={`${MENU_PANEL_CLASS} animate-menu-in-up absolute bottom-full left-0 z-30 mb-2 w-[22rem] p-1 text-xs`}
+              >
+                {rows.map((row) => (
+                  <button
+                    key={row.toolCallId}
+                    type="button"
+                    onClick={() => {
+                      setPanelOpen(false);
+                      onSelectBackgroundAgent?.(row.toolCallId);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60"
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-text-primary">
+                        {row.name ?? row.type ?? row.toolCallId}
+                      </span>
+                      <span className="truncate text-text-muted">
+                        {[row.type, row.currentLabel ?? row.description]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </span>
+                    <span className="flex flex-shrink-0 items-center gap-1 text-text-muted">
+                      {row.stepCount > 0 && <span>{row.stepCount}</span>}
+                      {row.durationMs > 0 && (
+                        <span>
+                          {row.durationMs < 1000
+                            ? `${row.durationMs}ms`
+                            : `${(row.durationMs / 1000).toFixed(1)}s`}
+                        </span>
+                      )}
+                      {row.status === "running" ? (
+                        <Loader2 className="h-3 w-3 animate-spin text-accent" />
+                      ) : row.status === "error" ? (
+                        <XCircle className="h-3 w-3 text-error" />
+                      ) : (
+                        <CheckCircle2 className="h-3 w-3" />
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={panelOpen}
+              onClick={() => setPanelOpen((value) => !value)}
+              className="flex min-w-0 items-center gap-1 text-left hover:text-text-primary"
+            >
+              <span
+                className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}
+              >
+                {text}
+              </span>
+              <ChevronDown className="h-3 w-3 flex-shrink-0 text-text-muted" />
+            </button>
+          </span>
+        ) : (
+          <span
+            className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}
+          >
+            {text}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -306,12 +413,9 @@ export function resolveInputStatus(params: {
     timeBudgetSeconds?: number;
     activePeriodStartedAt?: number;
   } | null;
-  backgroundAgents: Array<{
-    id: string;
-    type: string;
-    description: string;
-    status: "running" | "done";
-  }>;
+  /** 面板行（运行中 + 已完成）。改掉了原来的 `backgroundAgents`：那个列表完成 1 秒后
+   *  就被清空，而入口需要在跑完之后仍然可达。 */
+  backgroundAgentRows: BackgroundAgentRow[];
 }): ChatInputStatus {
   if (params.isCompacting) return { type: "compacting" };
   if (params.isSending) return { type: "sending" };
@@ -376,14 +480,27 @@ export function resolveInputStatus(params: {
   if (params.isResponding) {
     return { type: "responding" };
   }
-  if (params.backgroundAgents.length > 0) {
-    const allDone = params.backgroundAgents.every((a) => a.status === "done");
-    const count = params.backgroundAgents.length;
+  if (params.backgroundAgentRows.length > 0) {
+    const running = params.backgroundAgentRows.filter(
+      (row) => row.status === "running",
+    );
+    const allDone = running.length === 0;
+    const count = allDone ? params.backgroundAgentRows.length : running.length;
+    const first = running[0];
     const detail =
-      count === 1 && !allDone
-        ? `${params.backgroundAgents[0].type} · ${params.backgroundAgents[0].description}`
+      count === 1 && first
+        ? [first.type, first.description].filter(Boolean).join(" · ")
         : undefined;
-    return { type: "background-agent", count, detail, done: allDone };
+    const hasError =
+      allDone &&
+      params.backgroundAgentRows.some((row) => row.status === "error");
+    return {
+      type: "background-agent",
+      count,
+      detail,
+      done: allDone,
+      hasError: hasError || undefined,
+    };
   }
   return null;
 }

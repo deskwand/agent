@@ -26,6 +26,10 @@ export interface SubagentActivity {
   parentToolCallId: string;
   /** 子代理的别名（插件的 handle 命名空间），用于卡片标题的趣味名。 */
   name?: string;
+  /** 子代理类型（插件 record 的 `type`），状态栏面板行要用。 */
+  type?: string;
+  /** spawn 时的任务描述（插件 record 的 `description`）。 */
+  description?: string;
   /** true = 后台并发型；未声明（undefined）时不当作后台。 */
   background?: boolean;
   status: "running" | "completed" | "error";

@@ -1637,6 +1637,8 @@
     "addAgentTitle": "Add Subagent",
     "statusRunning": "{{count}} subagents running…{{detail}}",
     "statusDone": "{{count}} subagents completed",
+    "statusFinishedWithErrors": "{{count}} subagents finished (some failed)",
+    "panelTitle": "Background subagents",
     "stepsTitle": "Steps",
     "stepsBackground": "running in background",
     "stepFailed": "failed",

@@ -46,6 +46,9 @@ export interface SessionEventLike {
 /** record 里我们用得到的部分，避免把插件类型泄漏进逻辑。 */
 export interface AgentRecordView {
   status?: string;
+  /** 插件 record 上的子代理类型与描述（状态栏面板行要用）。 */
+  type?: string;
+  description?: string;
   /** 插件在 spawn 时写入的 spawn 语义：true = 后台并发型。 */
   isBackground?: boolean;
   toolUses?: number;
@@ -219,6 +222,8 @@ export function buildSnapshot(params: {
     agentId: params.agentId,
     parentToolCallId: params.toolCallId,
     name: record.alias ?? record.handle,
+    type: record.type,
+    description: record.description,
     // 只有插件明确标了 isBackground 才算后台；undefined（如 cross-extension spawn）不当后台。
     background: record.isBackground === true ? true : undefined,
     status: params.status ?? toSnapshotStatus(record.status),

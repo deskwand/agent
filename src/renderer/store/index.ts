@@ -210,6 +210,10 @@ interface AppState {
 
   // App Config (API settings)
   appConfig: AppConfig | null;
+  /** 跳转高亮：命中的 toolCallId 对应的摘要行/卡片会短暂带 ring。 */
+  highlightedToolCallId: string | null;
+  /** 跳转时要求展开的那条 process summary；被消费后清回 null（只生效一次）。 */
+  pendingExpandToolCallId: string | null;
   isConfigured: boolean;
   showConfigModal: boolean;
   setShowLoginModal: (show: boolean) => void;
@@ -401,6 +405,8 @@ interface AppState {
 
   // Config actions
   setAppConfig: (config: AppConfig | null) => void;
+  highlightToolCallId: (toolCallId: string) => void;
+  clearPendingExpandToolCallId: () => void;
   setIsConfigured: (configured: boolean) => void;
   setShowConfigModal: (show: boolean) => void;
   markInitialConfigStatusSeen: () => void;
@@ -518,6 +524,9 @@ function readStoredCurrency(): CurrencyCode {
   return "USD";
 }
 
+/** 高亮的自动清除句柄：连点时必须先清旧的，否则新高亮会被旧定时器提前清掉。 */
+let highlightTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
   sessions: [],
@@ -550,6 +559,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   pendingSudoPassword: null,
   settings: defaultSettings,
   appConfig: null,
+  highlightedToolCallId: null,
+  pendingExpandToolCallId: null,
   isConfigured: false,
   cloudConfig: null,
   topUpOpen: false,
@@ -1318,6 +1329,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Config actions
   setAppConfig: (config) => set({ appConfig: config }),
+
+  highlightToolCallId: (toolCallId) => {
+    if (highlightTimer) clearTimeout(highlightTimer);
+    set({
+      highlightedToolCallId: toolCallId,
+      pendingExpandToolCallId: toolCallId,
+    });
+    highlightTimer = setTimeout(() => {
+      highlightTimer = null;
+      set({ highlightedToolCallId: null });
+    }, 2000);
+  },
+
+  clearPendingExpandToolCallId: () => set({ pendingExpandToolCallId: null }),
   setIsConfigured: (configured) => set({ isConfigured: configured }),
   setActiveTeamId: (id) => set({ activeTeamId: id }),
   setActiveTeamName: (name) => set({ activeTeamName: name }),

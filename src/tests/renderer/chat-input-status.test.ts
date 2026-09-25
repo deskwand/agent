@@ -19,7 +19,7 @@ describe("resolveInputStatus", () => {
     compactionResult: null as "success" | "failed" | "aborted" | null,
     shouldShowThinkingIndicator: false,
     isResponding: false,
-    backgroundAgents: [],
+    backgroundAgentRows: [],
   };
 
   it("returns null when all inputs are inactive", () => {
@@ -101,18 +101,20 @@ describe("resolveInputStatus", () => {
     ).toEqual({ type: "compaction-success" });
   });
 
-  // ── backgroundAgents ──
+  // ── backgroundAgentRows（面板行，含已完成的）──
 
   it("returns background-agent for a single running agent", () => {
     expect(
       resolveInputStatus({
         ...base,
-        backgroundAgents: [
+        backgroundAgentRows: [
           {
-            id: "a",
+            toolCallId: "a",
             type: "Explore",
             description: "search code",
             status: "running",
+            stepCount: 1,
+            durationMs: 100,
           },
         ],
       }),
@@ -128,18 +130,22 @@ describe("resolveInputStatus", () => {
     expect(
       resolveInputStatus({
         ...base,
-        backgroundAgents: [
+        backgroundAgentRows: [
           {
-            id: "a",
+            toolCallId: "a",
             type: "Explore",
             description: "find bug",
             status: "running",
+            stepCount: 1,
+            durationMs: 100,
           },
           {
-            id: "b",
+            toolCallId: "b",
             type: "Review",
             description: "check fix",
             status: "running",
+            stepCount: 1,
+            durationMs: 100,
           },
         ],
       }),
@@ -155,8 +161,15 @@ describe("resolveInputStatus", () => {
     expect(
       resolveInputStatus({
         ...base,
-        backgroundAgents: [
-          { id: "a", type: "Explore", description: "find bug", status: "done" },
+        backgroundAgentRows: [
+          {
+            toolCallId: "a",
+            type: "Explore",
+            description: "find bug",
+            status: "completed",
+            stepCount: 1,
+            durationMs: 100,
+          },
         ],
       }),
     ).toEqual({
@@ -167,17 +180,51 @@ describe("resolveInputStatus", () => {
     });
   });
 
+  it("全部结束但有失败时带上 hasError（不把失败说成已完成）", () => {
+    expect(
+      resolveInputStatus({
+        ...base,
+        backgroundAgentRows: [
+          {
+            toolCallId: "a",
+            type: "Explore",
+            description: "find bug",
+            status: "completed",
+            stepCount: 1,
+            durationMs: 100,
+          },
+          {
+            toolCallId: "b",
+            type: "Plan",
+            description: "draft",
+            status: "error",
+            stepCount: 0,
+            durationMs: 10,
+          },
+        ],
+      }),
+    ).toEqual({
+      type: "background-agent",
+      count: 2,
+      detail: undefined,
+      done: true,
+      hasError: true,
+    });
+  });
+
   it("thinking wins over background-agent", () => {
     expect(
       resolveInputStatus({
         ...base,
         shouldShowThinkingIndicator: true,
-        backgroundAgents: [
+        backgroundAgentRows: [
           {
-            id: "a",
+            toolCallId: "a",
             type: "Explore",
             description: "search",
             status: "running",
+            stepCount: 1,
+            durationMs: 100,
           },
         ],
       }),
@@ -189,12 +236,14 @@ describe("resolveInputStatus", () => {
       resolveInputStatus({
         ...base,
         isResponding: true,
-        backgroundAgents: [
+        backgroundAgentRows: [
           {
-            id: "a",
+            toolCallId: "a",
             type: "Explore",
             description: "search",
             status: "running",
+            stepCount: 1,
+            durationMs: 100,
           },
         ],
       }),

@@ -1636,6 +1636,8 @@
     "addAgentTitle": "新增子代理",
     "statusRunning": "{{count}} 个子代理运行中…{{detail}}",
     "statusDone": "{{count}} 个子代理已完成",
+    "statusFinishedWithErrors": "{{count}} 个子代理已结束（含失败）",
+    "panelTitle": "后台子代理",
     "stepsTitle": "执行步骤",
     "stepsBackground": "后台运行中",
     "stepFailed": "失败",

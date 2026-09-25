@@ -202,6 +202,16 @@ describe("buildSnapshot", () => {
     expect(buildSnapshot({ ...base, record: {} }).background).toBeUndefined();
   });
 
+  it("带出子代理的类型与描述（面板对已完成的 agent 只能靠它）", () => {
+    const withMeta = buildSnapshot({
+      ...base,
+      record: { type: "Explore", description: "find bug" },
+    });
+    expect(withMeta.type).toBe("Explore");
+    expect(withMeta.description).toBe("find bug");
+    expect(buildSnapshot({ ...base, record: {} }).type).toBeUndefined();
+  });
+
   it("终止状态映射成 completed / error", () => {
     expect(
       buildSnapshot({ ...base, record: { status: "completed" } }).status,
