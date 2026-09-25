@@ -14,6 +14,9 @@ import {
   Table,
   Presentation,
   FileScan,
+  Bot,
+  Inbox,
+  Send,
 } from "lucide-react";
 
 /** Map a tool name to a small icon element */
@@ -50,6 +53,9 @@ export function getToolIcon(name: string) {
   if (n === "office_read_pdf") return <FileScan className="w-3.5 h-3.5" />;
   if (n === "get_goal" || n === "update_goal" || n === "goal_complete")
     return <Target className="w-3.5 h-3.5" />;
+  if (n === "agent") return <Bot className="w-3.5 h-3.5" />;
+  if (n === "get_subagent_result") return <Inbox className="w-3.5 h-3.5" />;
+  if (n === "steer_subagent") return <Send className="w-3.5 h-3.5" />;
   if (n.startsWith("internal_browser"))
     return <Globe className="w-3.5 h-3.5" />;
   return <MonitorPlay className="w-3.5 h-3.5" />;

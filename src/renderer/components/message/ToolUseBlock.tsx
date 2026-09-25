@@ -26,7 +26,20 @@ import { BashToolBlock, canHandleBashInput } from "./BashToolBlock";
 import { getToolIcon, getToolLabel } from "./toolHelpers";
 import { SubagentSteps } from "./SubagentSteps";
 import { agentNameZhLabel } from "../../../shared/agent-names";
+import {
+  resolveSubagentName,
+  splitSubagentOutput,
+} from "../../utils/subagent-card";
 import { MessageMarkdown } from "../MessageMarkdown";
+
+/**
+ * 输出要按「元信息头 + Markdown 正文」拆开渲染的子代理工具。
+ * 不含 `Agent`：它的输出是子代理的最终回答，本来就没有插件头部（误拆会吃掉正文）。
+ */
+const SUBAGENT_OUTPUT_TOOLS = new Set([
+  "get_subagent_result",
+  "steer_subagent",
+]);
 
 // Only allow safe image MIME types for data: URI rendering
 const WEB_SEARCH_TOOL_NAMES = new Set([
@@ -108,6 +121,17 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   );
   const [expanded, setExpanded] = useState(false);
   const { t, i18n } = useTranslation();
+  // 这两个工具的参数里用 agent_id 指向某个子代理：把 id 解析成别名（选择器只返回字符串，
+  // 否则 subagentActivities 每次事件换引用会让同会话每张卡都重渲）。
+  const resolvedName = useAppStore((s) =>
+    resolveSubagentName(
+      typeof block.input?.agent_id === "string" ? block.input.agent_id : "",
+      message?.sessionId
+        ? s.sessionStates[message.sessionId]?.subagentActivities
+        : undefined,
+      i18n.language,
+    ),
+  );
 
   // Compute toolResult here so the useMemo below is always called (hooks must be unconditional)
   const toolResult = findToolResult(block.id, allBlocks, allMessages);
@@ -204,6 +228,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const isWebSearchTool = WEB_SEARCH_TOOL_NAMES.has(block.name);
   const isAgentTool = AGENT_TOOL_NAMES.has(block.name);
   const toolInput = block.input as Record<string, unknown>;
+  const isSubagentOutputTool = SUBAGENT_OUTPUT_TOOLS.has(block.name);
+  const subagentOutput =
+    isSubagentOutputTool && typeof toolResult?.content === "string"
+      ? splitSubagentOutput(toolResult.content)
+      : null;
   const collapsedSummary = getCollapsedToolSummary(
     block.name,
     toolResult?.content,
@@ -427,6 +456,40 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     </div>
                   )}
                 </div>
+              ) : block.name === "get_subagent_result" ? (
+                <div className="text-xs text-text-secondary">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span>
+                      {resolvedName
+                        ? t("tool.subagentQuery", { name: resolvedName })
+                        : t("tool.actionGetSubagentResult")}
+                    </span>
+                    {toolInput.wait === true && (
+                      <span className="rounded bg-surface-muted px-1 text-[11px] text-text-muted">
+                        {t("tool.subagentWait")}
+                      </span>
+                    )}
+                    {toolInput.verbose === true && (
+                      <span className="rounded bg-surface-muted px-1 text-[11px] text-text-muted">
+                        {t("tool.subagentVerbose")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : block.name === "steer_subagent" ? (
+                <div className="text-xs text-text-secondary">
+                  <div>
+                    {resolvedName
+                      ? t("tool.subagentSteer", { name: resolvedName })
+                      : t("tool.actionSteerSubagent")}
+                  </div>
+                  {typeof toolInput.message === "string" &&
+                    toolInput.message.length > 0 && (
+                      <div className="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5 text-text-secondary">
+                        {toolInput.message}
+                      </div>
+                    )}
+                </div>
               ) : (
                 <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all bg-surface-muted rounded-lg p-2.5">
                   {JSON.stringify(block.input, null, 2)}
@@ -490,10 +553,21 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     );
                   })}
                 </pre>
-              ) : (isWebSearchTool || isAgentTool) &&
+              ) : (isWebSearchTool || isAgentTool || isSubagentOutputTool) &&
                 typeof toolResult.content === "string" ? (
                 <div className="text-xs text-text-secondary max-h-[400px] overflow-y-auto">
-                  <MessageMarkdown normalizedText={toolResult.content} />
+                  {subagentOutput?.header && (
+                    <div className="mb-2 whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5">
+                      {subagentOutput.header}
+                    </div>
+                  )}
+                  {subagentOutput ? (
+                    subagentOutput.body && (
+                      <MessageMarkdown normalizedText={subagentOutput.body} />
+                    )
+                  ) : (
+                    <MessageMarkdown normalizedText={toolResult.content} />
+                  )}
                 </div>
               ) : (
                 shouldShowOutputText && (

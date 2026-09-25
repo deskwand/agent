@@ -1,7 +1,7 @@
 // 子代理实时步骤列表 —— 供 Agent 工具卡片的展开区使用（前台阻塞型与后台 spawn 卡片同一套）。
 import { memo } from "react";
 import { useTranslation } from "react-i18next";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, XCircle } from "lucide-react";
 import type {
   SubagentActivity,
   SubagentStep,
@@ -65,9 +65,13 @@ export const SubagentSteps = memo(function SubagentSteps({
   return (
     <div className="px-3 py-2">
       <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-text-muted">
-        <Loader2
-          className={`w-3 h-3 ${activity.status === "running" ? "animate-spin text-accent" : ""}`}
-        />
+        {activity.status === "running" ? (
+          <Loader2 className="w-3 h-3 animate-spin text-accent" />
+        ) : activity.status === "error" ? (
+          <XCircle className="w-3 h-3 text-error" />
+        ) : (
+          <CheckCircle2 className="w-3 h-3 text-text-muted" />
+        )}
         {t("subagent.stepsTitle")}
         {activity.background && activity.status === "running" && (
           <span className="normal-case text-accent">
@@ -80,7 +84,7 @@ export const SubagentSteps = memo(function SubagentSteps({
           </span>
         )}
       </div>
-      {activity.current && (
+      {activity.current && activity.status === "running" && (
         <div className="text-xs font-mono text-accent">
           ◐ {stepLine(activity.current, t)}
         </div>
@@ -93,7 +97,9 @@ export const SubagentSteps = memo(function SubagentSteps({
               key={step.id}
               className="flex items-center gap-1 text-xs font-mono text-text-secondary"
             >
-              {step.isError ? (
+              {step.done === false ? (
+                <Circle className="w-3 h-3 flex-shrink-0 text-text-muted" />
+              ) : step.isError ? (
                 <XCircle className="w-3 h-3 flex-shrink-0 text-error" />
               ) : (
                 <CheckCircle2 className="w-3 h-3 flex-shrink-0 text-text-muted" />

@@ -113,4 +113,62 @@ describe("SubagentSteps", () => {
     act(() => root.render(createElement(SubagentSteps, { activity: failed })));
     expect(container.textContent ?? "").toContain("失败");
   });
+
+  it("完成态改用勾图标，且不残留「正在…」那行（current 仍存在）", () => {
+    const done: SubagentActivity = {
+      ...activity,
+      status: "completed",
+      // 故意**不**清 current：完成态的正常情况就是最后一步还没等到 tool_end，
+      // 只有保留它才能真测到 `status === "running"` 那道闸门。
+      current: activity.current,
+      background: true,
+      steps: activity.steps.map((step) => ({ ...step, done: true })),
+    };
+    act(() => root.render(createElement(SubagentSteps, { activity: done })));
+    const text = container.textContent ?? "";
+    // 表头不再是 Loader2：LoaderCircle 只有 <path>，CircleCheck/XCircle 都含 <circle>
+    const header = container.querySelector(".mb-1");
+    expect(header?.querySelector("circle")).not.toBeNull();
+    expect(container.querySelectorAll(".animate-spin")).toHaveLength(0);
+    expect(text).not.toContain("◐");
+    expect(text).not.toContain("后台运行中");
+  });
+
+  it("运行态仍有转圈图标与「正在…」那行", () => {
+    act(() => root.render(createElement(SubagentSteps, { activity })));
+    expect(container.querySelectorAll(".animate-spin").length).toBeGreaterThan(
+      0,
+    );
+    expect(container.textContent ?? "").toContain("◐");
+  });
+
+  it("失败态用错误色图标", () => {
+    const failed: SubagentActivity = { ...activity, status: "error" };
+    act(() => root.render(createElement(SubagentSteps, { activity: failed })));
+    expect(container.querySelectorAll(".text-error").length).toBeGreaterThan(0);
+  });
+
+  it("从未收到 tool_end 的步骤不打勾（空心中点）", () => {
+    const interrupted: SubagentActivity = {
+      ...activity,
+      status: "completed",
+      current: undefined,
+      steps: [
+        {
+          id: "t9",
+          toolName: "bash",
+          args: { command: "sleep 100" },
+          done: false,
+        },
+      ],
+    };
+    act(() =>
+      root.render(createElement(SubagentSteps, { activity: interrupted })),
+    );
+    // 结构断言：那一步的行里没有完成图标。
+    // 注意：Circle 与 CheckCircle2 **都**会渲染一个 <circle>，所以只能靠有没有 <path>（勾）来区分。
+    const row = container.querySelectorAll(".space-y-0\\.5 > div")[0];
+    expect(row?.querySelectorAll("svg").length).toBe(1);
+    expect(row?.querySelector("path")).toBeNull();
+  });
 });

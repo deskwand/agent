@@ -1,4 +1,4 @@
-import { Folder, FolderSearch, Globe } from "lucide-react";
+import { Bot, Folder, FolderSearch, Globe, Inbox, Send } from "lucide-react";
 import { describe, expect, it } from "vitest";
 import type { TFunction } from "i18next";
 import {
@@ -76,5 +76,13 @@ describe("ls/find tool icons and labels", () => {
     expect(getToolLabel("ls", { path: "/tmp" }, t)).toBe("List tmp");
     expect(getToolLabel("ls", {}, t)).toBe("List directory");
     expect(getToolLabel("find", { pattern: "*.ts" }, t)).toBe('Find "*.ts"');
+  });
+});
+
+describe("subagent tool icons", () => {
+  it("gives the three subagent tools their own icons", () => {
+    expect(getToolIcon("Agent").type).toBe(Bot);
+    expect(getToolIcon("get_subagent_result").type).toBe(Inbox);
+    expect(getToolIcon("steer_subagent").type).toBe(Send);
   });
 });
