@@ -420,14 +420,16 @@ export function ChatView() {
     // must show a non-null indicator so the user never sees a blank bar
     // while the session is running / a turn is active or pending.
     const hasStreamingText = !!partialMessage?.trim();
+    // 只要还能按停止，状态栏就必须有字（字面镜像停止按钮 canStop）。
+    // 不能只认 activeTurn：自动续跑的回合（后台子代理完成 → 主进程注入
+    // 系统通知继续）不带用户消息，渲染层既没有 pendingTurn 也永远建不出
+    // activeTurn，只认 activeTurn 会让状态栏整轮空白 —— 只剩一个能停的
+    // 按钮，看不出会话在忙什么。
     return resolveInputStatus({
       isSending: isSubmitting && !canStop,
       isCompacting,
       compactionResult,
-      // Guard with hasActiveTurn: once the turn ends we don't show
-      // "thinking" during the brief idle-window before session settles.
-      shouldShowThinkingIndicator:
-        canStop && hasActiveTurn && !hasStreamingText,
+      shouldShowThinkingIndicator: canStop && !hasStreamingText,
       isResponding: canStop && hasStreamingText,
       goalStatus:
         goalStatus?.status === "complete" || goalStatus?.status === "blocked"
@@ -441,7 +443,6 @@ export function ChatView() {
     isCompacting,
     compactionResult,
     canStop,
-    hasActiveTurn,
     partialMessage,
     goalStatus,
     goalTransitionVisible,

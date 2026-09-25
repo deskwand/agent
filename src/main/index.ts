@@ -1054,6 +1054,9 @@ app
     // This avoids session.start racing the startup path and hitting a null manager.
     sessionManager = new SessionManager(db, sendToRenderer, extensionManager);
 
+    // 上个进程被强杀时会话状态没人收尾；先归零再恢复 goal（后者会把会话真跑起来）。
+    sessionManager.resetStaleRunningStatuses();
+
     // Recover goals that were active before last shutdown
     sessionManager.recoverGoals();
     skillsManager = new SkillsManager(db);
