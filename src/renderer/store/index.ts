@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { SubagentActivity } from "../../shared/subagent-activity";
 import type {
   Session,
   Message,
@@ -91,6 +92,8 @@ export interface SessionState {
     description: string;
     status: "running" | "done";
   }>;
+  /** 子代理实时活动快照，key = 触发它的 Agent 工具调用 id（卡片 block.id）。 */
+  subagentActivities: Record<string, SubagentActivity>;
 }
 
 // Store window cap. prependOlderMessages allows the window to grow to
@@ -100,6 +103,9 @@ export interface SessionState {
 // with the ChatView locals MAX_MEMORY_WINDOW_MESSAGES / LOAD_OLDER_PAGE_SIZE.
 const MAX_MEMORY_WINDOW_MESSAGES = 2000;
 const MESSAGE_PAGE_SIZE = 1000;
+
+/** 每会话保留的子代理快照条数上限；超出丢最久未更新的那条。 */
+export const MAX_SUBAGENT_ACTIVITIES = 32;
 
 const DEFAULT_SESSION_STATE: SessionState = {
   historyHydrated: false,
@@ -120,6 +126,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   steerRecords: [],
   partialToolResults: {},
   backgroundAgents: [],
+  subagentActivities: {},
 };
 
 // Helper to immutably update a single session's state within the record
@@ -309,6 +316,7 @@ interface AppState {
     status: "running" | "done",
   ) => void;
   removeBackgroundAgent: (sessionId: string, agentId: string) => void;
+  setSubagentActivity: (sessionId: string, activity: SubagentActivity) => void;
   setMessages: (sessionId: string, messages: Message[]) => void;
   setMessagesTail: (
     sessionId: string,
@@ -811,6 +819,32 @@ export const useAppStore = create<AppState>((set, get) => ({
           backgroundAgents: current.backgroundAgents.filter(
             (a) => a.id !== agentId,
           ),
+        }),
+      };
+    }),
+
+  setSubagentActivity: (sessionId, activity) =>
+    set((state) => {
+      const current = state.sessionStates[sessionId] ?? DEFAULT_SESSION_STATE;
+      const next: Record<string, SubagentActivity> = {
+        ...current.subagentActivities,
+      };
+      // 先删后插：让对象插入序 = 「最近更新序」，淘汰时丢最久未更新的那条。
+      // 不重插的话，一个一直在刷新的活跃卡片会因插入得早而被先删。
+      delete next[activity.parentToolCallId];
+      next[activity.parentToolCallId] = activity;
+      const keys = Object.keys(next);
+      if (keys.length > MAX_SUBAGENT_ACTIVITIES) {
+        for (const key of keys.slice(
+          0,
+          keys.length - MAX_SUBAGENT_ACTIVITIES,
+        )) {
+          delete next[key];
+        }
+      }
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          subagentActivities: next,
         }),
       };
     }),

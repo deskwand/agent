@@ -98,6 +98,7 @@ function setInitialState(): void {
         steerRecords: [],
         partialToolResults: {},
         backgroundAgents: [],
+        subagentActivities: {},
       },
     },
   });

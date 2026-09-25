@@ -265,6 +265,11 @@ function registerSharedIpcListener(): () => void {
           break;
         }
 
+        case "subagent.activity": {
+          store.setSubagentActivity(event.payload.sessionId, event.payload);
+          break;
+        }
+
         case "session.status":
           console.log("[useIPC] session.status received:", event.payload);
           store.updateSession(event.payload.sessionId, {

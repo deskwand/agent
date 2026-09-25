@@ -24,6 +24,8 @@ import { TodoWriteBlock } from "./TodoWriteBlock";
 import { FileToolBlock, canHandleFileInput } from "./FileToolBlock";
 import { BashToolBlock, canHandleBashInput } from "./BashToolBlock";
 import { getToolIcon, getToolLabel } from "./toolHelpers";
+import { SubagentSteps } from "./SubagentSteps";
+import { agentNameZhLabel } from "../../../shared/agent-names";
 import { MessageMarkdown } from "../MessageMarkdown";
 
 // Only allow safe image MIME types for data: URI rendering
@@ -50,6 +52,25 @@ interface ToolUseBlockProps {
   allBlocks?: ContentBlock[];
   message?: Message;
   showIcon?: boolean;
+}
+
+/**
+ * 子代理显示名：tap 送来的插件别名（含兜底名）优先；
+ * 模型自填的名字能在会话里读到，但我们注入的兜底名不在（就地改参数发生在消息落盘之后）；
+ * 两者都没有时回落子代理类型。中文界面查表，表外名字原样显示。
+ */
+function agentDisplayName(
+  input: Record<string, unknown>,
+  alias: string | undefined,
+  language: string,
+): string {
+  const fromInput = typeof input.name === "string" ? input.name : undefined;
+  const name = alias ?? fromInput;
+  if (!name) return String(input.subagent_type ?? "Agent");
+  const zhLabel = language.startsWith("zh")
+    ? agentNameZhLabel(name)
+    : undefined;
+  return zhLabel ?? name;
 }
 
 export const ToolUseBlock = memo(function ToolUseBlock({
@@ -79,8 +100,14 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         null)
       : null,
   );
+  const subagentActivity = useAppStore((s) =>
+    message?.sessionId
+      ? (s.sessionStates[message.sessionId]?.subagentActivities?.[block.id] ??
+        null)
+      : null,
+  );
   const [expanded, setExpanded] = useState(false);
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // Compute toolResult here so the useMemo below is always called (hooks must be unconditional)
   const toolResult = findToolResult(block.id, allBlocks, allMessages);
@@ -191,7 +218,10 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const collapsedSummaryText = toolResult?.errorCode
     ? t(`webAccess.errors.${toolResult.errorCode}`)
     : isAgentTool
-      ? [toolInput.subagent_type, toolInput.description]
+      ? [
+          agentDisplayName(toolInput, subagentActivity?.name, i18n.language),
+          toolInput.description,
+        ]
           .filter(Boolean)
           .join(" · ")
       : defaultCollapsedSummaryText;
@@ -392,7 +422,9 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     </div>
                   )}
                   {(toolInput.description as string) && (
-                    <div className="truncate">{toolInput.description as string}</div>
+                    <div className="truncate">
+                      {toolInput.description as string}
+                    </div>
                   )}
                 </div>
               ) : (
@@ -403,18 +435,24 @@ export const ToolUseBlock = memo(function ToolUseBlock({
             </div>
           )}
 
+          {/* 有活动快照时显示实时步骤，替代上游那句 "N tool uses..." */}
+          {subagentActivity && <SubagentSteps activity={subagentActivity} />}
+
           {/* Streaming output when tool is running */}
-          {isRunning && partialToolResult && partialToolResult.content && (
-            <div className="px-3 py-2">
-              <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
-                <Loader2 className="w-3 h-3 animate-spin text-accent" />
-                {t("tool.sectionStreaming")}
+          {!subagentActivity &&
+            isRunning &&
+            partialToolResult &&
+            partialToolResult.content && (
+              <div className="px-3 py-2">
+                <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin text-accent" />
+                  {t("tool.sectionStreaming")}
+                </div>
+                <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">
+                  {partialToolResult.content}
+                </pre>
               </div>
-              <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">
-                {partialToolResult.content}
-              </pre>
-            </div>
-          )}
+            )}
 
           {/* Output section */}
           {toolResult && (
@@ -452,7 +490,8 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     );
                   })}
                 </pre>
-              ) : (isWebSearchTool || isAgentTool) && typeof toolResult.content === "string" ? (
+              ) : (isWebSearchTool || isAgentTool) &&
+                typeof toolResult.content === "string" ? (
                 <div className="text-xs text-text-secondary max-h-[400px] overflow-y-auto">
                   <MessageMarkdown normalizedText={toolResult.content} />
                 </div>

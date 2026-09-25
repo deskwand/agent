@@ -104,6 +104,18 @@ import {
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
 import {
+  AGENT_TOOL_NAME,
+  registerAgentNameHook,
+} from "./subagent/agent-name-hook";
+import {
+  createSubagentTap,
+  diffRegistryEntries,
+  type SubagentTap,
+  type TapRegistryEntry,
+  readManagerRegistry,
+  releaseManagerRegistryEntry,
+} from "./subagent/session-tap";
+import {
   deployBuiltinAgents,
   migrateAgentModelSpecs,
 } from "./subagent/agent-list";
@@ -487,6 +499,10 @@ export class AgentRunner {
   ) => Promise<string | null>;
   private pathResolver: PathResolver;
   private mcpManager?: MCPManager;
+  /** 每个会话一个子代理活动 tap；会话释放时一并销毁。 */
+  private subagentTaps = new Map<string, SubagentTap>();
+  /** 本会话激活时登记进插件全局列表的条目；必须由我们主动摘掉（见 releaseSubagentSession）。 */
+  private subagentRegistryEntries = new Map<string, TapRegistryEntry>();
   private _skillsAdapter?: SkillsAdapter;
   private extensionManager?: AgentRuntimeExtensionManager;
   private _browserViewManager: BrowserViewManager | null = null;
@@ -634,7 +650,25 @@ export class AgentRunner {
       this.piSessions.delete(sessionId);
       this.pendingSteerDeliveries.delete(sessionId);
       this.lastSteeringLengths.delete(sessionId);
+      this.releaseSubagentSession(sessionId);
       log("[AgentRunner] Disposed pi session for:", sessionId);
+    }
+  }
+
+  /**
+   * 释放一个会话的子代理资源：退订活动 tap，并从插件的全局 manager 列表里摘掉本会话登记的条目。
+   *
+   * 为什么必须自己做：补丁把摘除挂在 `session_shutdown`，而 DeskWand 的宿用
+   * `createAgentSession` + `session.dispose()`，它**不发** `session_shutdown`
+   * （pi-coding-agent/dist/core/agent-session.js:825-837），不管就会随会话数线性泄漏。
+   */
+  private releaseSubagentSession(sessionId: string): void {
+    this.subagentTaps.get(sessionId)?.disposeSession(sessionId);
+    this.subagentTaps.delete(sessionId);
+    const entry = this.subagentRegistryEntries.get(sessionId);
+    if (entry) {
+      releaseManagerRegistryEntry(entry);
+      this.subagentRegistryEntries.delete(sessionId);
     }
   }
 
@@ -2017,6 +2051,17 @@ ${hints.join("\n")}
     logCtx("[AgentRunner] run() started");
 
     const controller = new AbortController();
+    // 每个 turn 都会走 run()，而 pi session 是缓存的、后台子代理跨 turn 存活：
+    // tap 必须按会话复用。每次新建会遗弃上一个 tap 的未退订订阅，并让建会话时
+    // 注册的 subagents:completed/failed 监听（其闭包指向首次创建的 tap）对不上号。
+    let subagentTap = this.subagentTaps.get(session.id);
+    if (!subagentTap) {
+      subagentTap = createSubagentTap({
+        send: (activity) =>
+          this.sendToRenderer({ type: "subagent.activity", payload: activity }),
+      });
+      this.subagentTaps.set(session.id, subagentTap);
+    }
     try {
       // SDK 会在同一 AbortSignal 上挂载较多监听器，放开上限避免无意义告警干扰排错。
       setMaxListeners(0, controller.signal);
@@ -2773,6 +2818,7 @@ ${hints.join("\n")}
           );
         }
         this.piSessions.delete(session.id);
+        this.releaseSubagentSession(session.id);
         cachedSession = undefined;
       }
       if (cachedSession && cachedSession.skillsSignature !== skillsSignature) {
@@ -2789,6 +2835,7 @@ ${hints.join("\n")}
           );
         }
         this.piSessions.delete(session.id);
+        this.releaseSubagentSession(session.id);
         cachedSession = undefined;
       }
 
@@ -2832,6 +2879,7 @@ ${hints.join("\n")}
           );
         }
         this.piSessions.delete(session.id);
+        this.releaseSubagentSession(session.id);
         cachedSession = undefined;
       }
 
@@ -3165,6 +3213,9 @@ Tool routing:\n
         `<file_references>
 引用工作区内的文件时，给出相对工作区的路径或完整路径，不要只给文件名（例如写 \u0060test_docs/report.docx\u0060 而不是 \u0060report.docx\u0060）。这条对表格单元格、代码块、列表里的文件名同样适用——最容易漏的正是表格：上文已经写了目录、表格里却只填裸名，用户点不到。
 </file_references>`,
+        `<subagent_naming>
+调用 Agent 工具时，用一个历史人物名作为它的 name 参数（拉丁字母或拼音，例如 turing、curie、lovelace），每次尽量换一个不同的人。这个名字会成为该子代理的标识，之后可以用 @名字 找到它。
+</subagent_naming>`,
       ].filter((section): section is string =>
         Boolean(section && section.trim()),
       );
@@ -3336,6 +3387,7 @@ Tool routing:\n
           );
         }
         this.piSessions.delete(session.id);
+        this.releaseSubagentSession(session.id);
         cachedSession = undefined;
         cacheInvalidatedByTools = true;
       }
@@ -3416,7 +3468,15 @@ Tool routing:\n
           const wrappedFactory: InlineExtension = {
             name: "pi-subagents-wrapped",
             factory: (pi) => {
+              // 先把当前列表快照下来，factory 跑完的差集就是本次激活登记的那条 ——
+              // 它是我们唯一能摘下自己的机会（宿主不发 session_shutdown）。
+              const registryBefore = new Set(readManagerRegistry() ?? []);
               innerFactory(pi);
+              registerAgentNameHook(pi);
+              const registryEntry = diffRegistryEntries(registryBefore);
+              if (registryEntry) {
+                this.subagentRegistryEntries.set(sessionId, registryEntry);
+              }
               pi.events?.on?.("subagents:created", (data: any) => {
                 if (data.isBackground) {
                   this._backgroundAgentIds.add(data.id);
@@ -3437,6 +3497,9 @@ Tool routing:\n
               });
               pi.events?.on?.("subagents:completed", (data: any) => {
                 const isBackground = this._backgroundAgentIds.delete(data.id);
+                this.subagentTaps
+                  .get(sessionId)
+                  ?.finishAgent(data.id, "completed");
                 this.sendToRenderer({
                   type: "subagent.lifecycle",
                   payload: {
@@ -3457,6 +3520,7 @@ Tool routing:\n
               });
               pi.events?.on?.("subagents:failed", (data: any) => {
                 this._backgroundAgentIds.delete(data.id);
+                this.subagentTaps.get(sessionId)?.finishAgent(data.id, "error");
                 this.sendToRenderer({
                   type: "subagent.lifecycle",
                   payload: {
@@ -3728,6 +3792,7 @@ Tool routing:\n
             }
             this.piSessions.delete(oldestKey);
             this.sessionModelRuntimes.delete(oldestKey);
+            this.releaseSubagentSession(oldestKey);
             log("[AgentRunner] Evicted oldest cached session:", oldestKey);
           }
         }
@@ -4148,6 +4213,9 @@ Tool routing:\n
 
             case "tool_execution_start": {
               logCtx(`[AgentRunner] Tool execution start: ${event.toolName}`);
+              if (event.toolName === AGENT_TOOL_NAME) {
+                subagentTap.observeAgentToolCall(session.id, event.toolCallId);
+              }
               break;
             }
 
@@ -4730,6 +4798,7 @@ Tool routing:\n
         const cached = this.piSessions.get(session.id);
         if (cached) {
           this.piSessions.delete(session.id);
+          this.releaseSubagentSession(session.id);
           try {
             cached.session.dispose();
           } catch (e) {

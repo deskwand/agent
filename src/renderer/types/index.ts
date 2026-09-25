@@ -14,6 +14,7 @@ import type { UsageRange } from "../../shared/usage";
 import type { ChannelInstanceStatus } from "../../shared/ipc-types";
 import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
 import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
+import type { SubagentActivity } from "../../shared/subagent-activity";
 
 // Session types
 export interface Session {
@@ -689,6 +690,7 @@ export type ServerEvent =
         error?: string;
       };
     }
+  | { type: "subagent.activity"; payload: SubagentActivity }
   | { type: "new-session" }
   | { type: "navigate"; payload: string }
   | { type: "scheduled-task.error"; payload: { taskId: string; error: string } }

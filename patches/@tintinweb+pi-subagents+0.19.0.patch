@@ -1,0 +1,40 @@
+diff --git a/node_modules/@tintinweb/pi-subagents/dist/index.js b/node_modules/@tintinweb/pi-subagents/dist/index.js
+index 79e7820..917d43b 100644
+--- a/node_modules/@tintinweb/pi-subagents/dist/index.js
++++ b/node_modules/@tintinweb/pi-subagents/dist/index.js
+@@ -677,6 +677,7 @@ export default function (pi) {
+         waitForAll: () => manager.waitForAll(),
+         hasRunning: () => manager.hasRunning(),
+         spawn: spawnTopLevel,
++        listAgents: () => manager.listAgents(),
+         getRecord: (id) => {
+             const record = manager.getRecord(id);
+             return record !== undefined && isTopLevelAgent(record) ? record : undefined;
+@@ -686,6 +687,10 @@ export default function (pi) {
+     if (ownsManagerRegistry) {
+         globalThis[MANAGER_KEY] = registryEntry;
+     }
++    // DeskWand patch: 每次激活都登记的列表，供进程内其它扩展按 toolCallId 精确配对。
++    const REGISTRY_LIST_KEY = Symbol.for("pi-subagents:manager-list");
++    const registryList = (globalThis[REGISTRY_LIST_KEY] ??= new Set());
++    registryList.add(registryEntry);
+     // --- Cross-extension RPC via pi.events ---
+     let currentCtx;
+     // RPC handlers + the `subagents:ready` broadcast are wired on `session_start`
+@@ -1021,6 +1026,7 @@ export default function (pi) {
+         if (ownsManagerRegistry && globalThis[MANAGER_KEY] === registryEntry) {
+             delete globalThis[MANAGER_KEY];
+         }
++        registryList.delete(registryEntry);
+         scheduler.stop();
+         // Before abortAll, and not folded into it: a workflow owns a worker thread
+         // as well as its children, and only its own signal terminates that.
+@@ -2044,6 +2050,8 @@ Terse command-style prompts produce shallow, generic work.
+                     // onSpawned: called synchronously after spawn, before onSessionCreated fires.
+                     // Set up the output file so streamToOutputFile can pick it up.
+                     const fgRec = manager.getRecord(fgAgentId);
++                    // DeskWand patch: 前台 record 也记 toolCallId，供外部按 Agent 工具调用 id 精确配对。
++                    if (fgRec) fgRec.toolCallId = toolCallId;
+                     attachTranscript(fgRec, fgAgentId);
+                 });
+                 record = fgResult.record;

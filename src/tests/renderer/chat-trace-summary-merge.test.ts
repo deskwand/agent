@@ -136,6 +136,7 @@ function setSessionMessages(messages: Message[]): void {
         steerRecords: [],
         partialToolResults: {},
         backgroundAgents: [],
+        subagentActivities: {},
       },
     },
   });
