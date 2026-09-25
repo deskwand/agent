@@ -986,7 +986,7 @@ export function Sidebar({
       <aside
         className={`group bg-background-secondary flex flex-col overflow-hidden flex-shrink-0 ${panelWidthTransitionClass(
           dragging,
-        )} ${sidebarCollapsed ? "w-0" : "border-r border-border"}`}
+        )} ${sidebarCollapsed ? "w-0" : ""}`}
         style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
       >
         {!sidebarCollapsed && (

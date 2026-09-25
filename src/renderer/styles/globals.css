@@ -15,7 +15,11 @@
   /* ----- Graphite (default) — cool zinc gray, VS Code Dark Modern ----- */
   :root {
     --color-background: #18181b;
-    --color-background-secondary: #1f1f23;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #27272a;
     --color-surface-hover: #323237;
     --color-surface-active: #3f3f46;
@@ -71,7 +75,11 @@
   }
   .light {
     --color-background: #ffffff;
-    --color-background-secondary: #f8f8f8;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #ffffff;
     --color-surface-hover: #f4f4f5;
     --color-surface-active: #e4e4e7;
@@ -120,7 +128,11 @@
   /* ----- Paper — warm brown & cream, reading-focused ----- */
   :root[data-theme-preset="paper"] {
     --color-background: #1c1a16;
-    --color-background-secondary: #23201b;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #2b2721;
     --color-surface-hover: #363129;
     --color-surface-active: #453e34;
@@ -152,7 +164,11 @@
   }
   .light[data-theme-preset="paper"] {
     --color-background: #fdfbf7;
-    --color-background-secondary: #f7f3e8;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #fefdf9;
     --color-surface-hover: #f5efe0;
     --color-surface-active: #ede3cd;
@@ -188,7 +204,11 @@
   /* ----- Void — pure black OLED, extreme focus ----- */
   :root[data-theme-preset="void"] {
     --color-background: #000000;
-    --color-background-secondary: #080808;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #111111;
     --color-surface-hover: #1a1a1a;
     --color-surface-active: #262626;
@@ -224,7 +244,11 @@
   }
   .light[data-theme-preset="void"] {
     --color-background: #ffffff;
-    --color-background-secondary: #fafafa;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #ffffff;
     --color-surface-hover: #f5f5f5;
     --color-surface-active: #ebebeb;
@@ -260,7 +284,11 @@
   /* ----- Ocean — steel blue + teal accent, Linear-style focus ----- */
   :root[data-theme-preset="ocean"] {
     --color-background: #0c1222;
-    --color-background-secondary: #111827;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #1a2332;
     --color-surface-hover: #212d40;
     --color-surface-active: #2a3a54;
@@ -292,7 +320,11 @@
   }
   .light[data-theme-preset="ocean"] {
     --color-background: #f8fafc;
-    --color-background-secondary: #f0f4f8;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #ffffff;
     --color-surface-hover: #eef2f7;
     --color-surface-active: #e2e8f0;
@@ -328,7 +360,11 @@
   /* ----- Forest — pine green + sage accent, organic calm ----- */
   :root[data-theme-preset="forest"] {
     --color-background: #111810;
-    --color-background-secondary: #161c14;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #1d261a;
     --color-surface-hover: #253220;
     --color-surface-active: #304128;
@@ -360,7 +396,11 @@
   }
   .light[data-theme-preset="forest"] {
     --color-background: #fafbf9;
-    --color-background-secondary: #f2f6ef;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #ffffff;
     --color-surface-hover: #eef4ea;
     --color-surface-active: #e2ebdb;
@@ -396,7 +436,11 @@
   /* ----- Ember — charcoal + amber accent, warm industrial ----- */
   :root[data-theme-preset="ember"] {
     --color-background: #1a1512;
-    --color-background-secondary: #201b17;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #2b231d;
     --color-surface-hover: #362d25;
     --color-surface-active: #45392f;
@@ -428,7 +472,11 @@
   }
   .light[data-theme-preset="ember"] {
     --color-background: #fdfbf9;
-    --color-background-secondary: #f7f3ee;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #ffffff;
     --color-surface-hover: #f5efe6;
     --color-surface-active: #ede3d5;
@@ -464,7 +512,11 @@
   /* ----- Aurora — deep indigo + lavender accent, creative twilight ----- */
   :root[data-theme-preset="aurora"] {
     --color-background: #120f1a;
-    --color-background-secondary: #181424;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #211c33;
     --color-surface-hover: #2b2442;
     --color-surface-active: #383055;
@@ -496,7 +548,11 @@
   }
   .light[data-theme-preset="aurora"] {
     --color-background: #faf9fd;
-    --color-background-secondary: #f3f1fa;
+    --color-background-secondary: color-mix(
+      in srgb,
+      var(--color-text-primary) 5%,
+      var(--color-background)
+    );
     --color-surface: #ffffff;
     --color-surface-hover: #efecf7;
     --color-surface-active: #e4e0f2;

@@ -47,7 +47,7 @@ export function ScheduleToolbar({
       : t("schedule.dateFormatMonth", { year, month });
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-surface">
+    <div className="flex items-center justify-between px-3 py-2 border-b border-border-muted bg-surface">
       {/* Left: nav */}
       <div className="flex items-center gap-1">
         <button

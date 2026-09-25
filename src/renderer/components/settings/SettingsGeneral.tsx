@@ -246,7 +246,7 @@ export function SettingsGeneral() {
 
       {/* About */}
       {appVer && (
-        <div className="pt-4 border-t border-border">
+        <div className="pt-4 border-t border-border-muted">
           <p className="text-xs text-text-muted">DeskWand v{appVer}</p>
         </div>
       )}

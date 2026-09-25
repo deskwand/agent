@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   RENDERER,
+  backgroundSecondary,
   css,
   cssFlat,
   composite,
@@ -114,7 +115,7 @@ describe("叠层强度不变量", () => {
     const press = overlaySpec("--color-overlay-press");
     const on = overlaySpec("--color-overlay-on");
     return themeBlocks().map((block) => {
-      const bar = tokenOf(block, "--color-background-secondary");
+      const bar = backgroundSecondary(block);
       return {
         head: block.slice(0, 60).replace(/\s+/g, " "),
         hover: contrast(

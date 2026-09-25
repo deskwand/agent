@@ -195,7 +195,7 @@ export function BrowserPanel({ width }: { width: number }) {
 
   return (
     <div
-      className="h-full flex flex-col bg-surface/96 border-l border-border"
+      className="h-full flex flex-col bg-background-secondary"
       style={{ width }}
     >
       {/* Header */}
@@ -340,7 +340,10 @@ export function BrowserPanel({ width }: { width: number }) {
       ) : null}
 
       {/* Content area — WebContentsView overlays this */}
-      <div ref={contentRef} className="flex-1 min-h-0 bg-background/50" />
+      <div
+        ref={contentRef}
+        className="flex-1 min-h-0 bg-background-secondary"
+      />
     </div>
   );
 }

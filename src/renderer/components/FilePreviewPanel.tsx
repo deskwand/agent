@@ -233,9 +233,9 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
   const isMarkdown = [".md", ".mdx", ".markdown"].includes(ext);
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden border-l border-border bg-background">
+    <div className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden bg-background-secondary">
       {/* Tab strip */}
-      <div className="flex h-9 shrink-0 items-stretch gap-0.5 overflow-x-auto border-b border-border-muted bg-background px-2">
+      <div className="flex h-9 shrink-0 items-stretch gap-0.5 overflow-x-auto bg-background-secondary px-2">
         {previewTabs.map((item) => {
           const isActive = item.path === activePreviewTab;
           // 标签只需按扩展名区分视频，避免为了选图标去读每个标签的文件。
@@ -248,7 +248,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
               data-active={String(isActive)}
               className={`group flex min-w-0 max-w-[180px] shrink-0 items-center gap-1 self-center rounded-lg pl-2 pr-1 py-1 transition-colors ${
                 isActive
-                  ? "bg-background-secondary text-text-primary"
+                  ? "bg-surface text-text-primary"
                   : "text-text-secondary hover:bg-surface-hover"
               }`}
             >
@@ -278,7 +278,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
       </div>
 
       {/* Path row */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border-muted px-3 py-1.5">
+      <div className="flex shrink-0 items-center gap-2 px-3 py-1.5">
         <span
           className="min-w-0 flex-1 truncate text-xs text-text-muted"
           title={filePath}
@@ -296,7 +296,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 flex-col overflow-hidden bg-background/70 p-4 min-h-0">
+      <div className="flex flex-1 flex-col overflow-hidden bg-background-secondary p-4 min-h-0">
         {isVideo ? (
           <VideoPlayer
             filePath={filePath}

@@ -315,7 +315,7 @@ function ModelTable({
   // （它会把负数/非有限值夹到 0，否则 width 声明失效、条形反而满格）
   const max = Math.max(...rows.map((row) => modelBarValue(row, sortKey)), 1);
   const headClass =
-    "border-b border-border px-2 py-1.5 text-right text-[11px] font-normal text-text-muted";
+    "border-b border-border-muted px-2 py-1.5 text-right text-[11px] font-normal text-text-muted";
   const cellClass =
     "border-b border-border-muted px-2 py-1.5 text-right font-mono text-[11px] text-text-secondary";
 

@@ -41,7 +41,7 @@ export function SkillMdModal({
       }}
     >
       <div className="w-full max-w-2xl rounded-xl border border-border bg-surface shadow-elevated animate-slide-up">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border-muted">
           <h3 className="text-sm font-semibold text-text-primary truncate pr-4">
             {title}
           </h3>

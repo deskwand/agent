@@ -259,7 +259,7 @@ function DayView({
         </div>
 
         {/* Event area */}
-        <div className="relative flex-1 border-l border-border">
+        <div className="relative flex-1 border-l border-border-muted">
           {hours.map((h) => (
             <div
               key={h}
@@ -345,7 +345,7 @@ function WeekView({
   return (
     <div className="flex flex-col h-full overflow-auto">
       {/* Header row */}
-      <div className="flex border-b border-border sticky top-0 bg-surface z-10">
+      <div className="flex border-b border-border-muted sticky top-0 bg-surface z-10">
         <div className="w-12 flex-shrink-0" />
         {days.map((day) => {
           const isToday = sameDay(day, today);
@@ -386,7 +386,7 @@ function WeekView({
           ))}
         </div>
 
-        <div className="flex flex-1 border-l border-border">
+        <div className="flex flex-1 border-l border-border-muted">
           {days.map((day) => {
             const dayStart = dayMidnight(day);
             const dayEnd = addDays(dayStart, 1);
@@ -488,7 +488,7 @@ function MonthView({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="grid grid-cols-7 border-b border-border">
+      <div className="grid grid-cols-7 border-b border-border-muted">
         {WEEKDAY_SHORT_KEYS.map((key) => (
           <div
             key={key}

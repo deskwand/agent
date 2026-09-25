@@ -302,14 +302,14 @@ export default function ApiDiagnosticsPanel({
 
           {/* Skipped info */}
           {result?.skippedReason && !isRunning && (
-            <div className="mt-3 pt-3 border-t border-border text-sm text-text-muted">
+            <div className="mt-3 pt-3 border-t border-border-muted text-sm text-text-muted">
               {t("api.diagnostic.skipped")}
             </div>
           )}
 
           {/* Overall summary */}
           {result && !result.skippedReason && !isRunning && (
-            <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-sm">
+            <div className="mt-3 pt-3 border-t border-border-muted flex items-center justify-between text-sm">
               <span
                 className={
                   result.overallOk

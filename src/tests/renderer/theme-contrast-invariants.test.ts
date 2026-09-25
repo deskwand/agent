@@ -7,6 +7,7 @@
 //   2) 百分比必须是设计文档定下的值（否则把 18% 改成 3% 测试照样绿，而描边就没了）
 import { describe, expect, it } from "vitest";
 import {
+  backgroundSecondary,
   chroma,
   composite,
   contrast,
@@ -158,16 +159,69 @@ describe("主题对比度不变量", () => {
         `${head} border/background=${vsBg.toFixed(2)}`,
       ).toBeLessThanOrEqual(2.2);
 
-      // 侧栏的填充色是 background-secondary（Task 2 把它的分隔从阴影改成 border），
-      // 所以描边在它上面也必须看得见。这是上一轮漏掉的一组。
-      const vsBgSecondary = contrast(
-        border,
-        tokenOf(block, "--color-background-secondary"),
-      );
+      // --color-border 的控件（输入框、分段控件）会落在 background-secondary 上，
+      // 所以描边在那一层也必须看得见。这是上一轮漏掉的一组。
+      // 2026-09-25 起侧栏自己不再画描边（改由底色差承担），但 UsageView 那类
+      // `border border-border bg-background-secondary` 的控件仍然靠这条守着。
+      const vsBgSecondary = contrast(border, backgroundSecondary(block));
       expect(
         vsBgSecondary,
         `${head} border/background-secondary=${vsBgSecondary.toFixed(2)}`,
       ).toBeGreaterThanOrEqual(1.3);
+    }
+  });
+
+  /**
+   * 区域级分界不再靠描边，改由 `--color-background-secondary` 与 `--color-background`
+   * 的底色差承担（2026-09-25 设计文档 §3 / §4.1）。
+   *
+   * 三条一起锁才有效：
+   *   1) 必须由语义 token 派生 —— 否则退回硬编码 hex 也能"看起来对"，但换主题就漂
+   *   2) 分界带要够宽 —— 太窄则侧栏与主区分不开（改造前只有 1.042–1.079）
+   *   3) 又不能顶到 surface —— 否则侧栏里的卡片/选中行再也抬不起来
+   */
+  it("§9-4 background-secondary 由 background/text-primary 派生，且分界带成立", () => {
+    for (const block of blocks) {
+      const head = block.slice(0, 60).replace(/\s+/g, " ");
+      const decl = tokenOf(block, "--color-background-secondary").replace(
+        /\s+/g,
+        " ",
+      );
+      const m =
+        /color-mix\(\s*in srgb,\s*var\(--color-text-primary\)\s+(\d+)%,\s*var\(--color-background\)\s*\)/.exec(
+          decl,
+        );
+      expect(
+        m,
+        `${head} background-secondary 应当是 text-primary/background 的 color-mix：${decl}`,
+      ).toBeTruthy();
+      const pct = Number(m![1]) / 100;
+      expect(pct, `${head} 14 个块统一 5%`).toBe(0.05);
+
+      // 把 color-mix 真正解出来再算，而不是只看声明形式
+      const background = tokenOf(block, "--color-background");
+      const secondary = backgroundSecondary(block);
+
+      const step = contrast(secondary, background);
+      expect(
+        step,
+        `${head} background-secondary/background = ${step.toFixed(3)}，应在 [1.07, 1.16]`,
+      ).toBeGreaterThanOrEqual(1.07);
+      expect(step).toBeLessThanOrEqual(1.16);
+
+      // 方向：抬升面必须比次级表面亮。不能只写 contrast(...) >= 1.02 ——
+      // contrast() 用 max/min 恒 ≥1，那只等价于"两者不相等"（同文件 §9-2 的注释）。
+      const surface = tokenOf(block, "--color-surface");
+      expect(
+        relativeLuminance(parseHex(surface)),
+        `${head} surface 必须比 background-secondary 亮`,
+      ).toBeGreaterThan(relativeLuminance(parseHex(secondary)));
+
+      const lift = contrast(surface, secondary);
+      expect(
+        lift,
+        `${head} surface/background-secondary = ${lift.toFixed(3)}，必须 ≥ 1.02`,
+      ).toBeGreaterThanOrEqual(1.02);
     }
   });
 

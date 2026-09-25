@@ -118,6 +118,38 @@ export function composite(base: string, fg: string, alpha: number): string {
 }
 
 /**
+ * 解出某个主题块里 `--color-background-secondary` 的最终 hex。
+ *
+ * 它从 2026-09-25 起是 `color-mix(in srgb, var(--color-text-primary) 5%, var(--color-background))`，
+ * **不再是字面 hex**（2026-09-25-panel-boundary-design.md §4.1）。
+ *
+ * 所以不要再把 `tokenOf(block, "--color-background-secondary")` 直接喂给 `contrast()` /
+ * `parseHex()` —— 那会静默得到 `NaN`，而 NaN 参与的比较**全部为假**：断言确实会红，
+ * 但红成一副"阈值不对"的样子，很容易被误诊（本轮就踩过一次）。
+ */
+export function backgroundSecondary(block: string): string {
+  const value = tokenOf(block, "--color-background-secondary").replace(
+    /\s+/g,
+    " ",
+  );
+  const mix =
+    /color-mix\(\s*in srgb,\s*var\(--color-text-primary\)\s+([\d.]+)%,\s*var\(--color-background\)\s*\)/.exec(
+      value,
+    );
+  if (!mix) {
+    throw new Error(
+      `--color-background-secondary 不再是 text-primary/background 的 color-mix，` +
+        `用它的地方需要跟着改：${value}`,
+    );
+  }
+  return composite(
+    tokenOf(block, "--color-background"),
+    tokenOf(block, "--color-text-primary"),
+    Number(mix[1]) / 100,
+  );
+}
+
+/**
  * 从源码里的一个 className 取完整类串。
  *
  * `quote` 传该 className 的收尾定界符：属性值用 `"`，模板字符串用 `` ` ``。

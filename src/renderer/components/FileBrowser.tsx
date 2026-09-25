@@ -214,7 +214,7 @@ export function FileBrowser({ width }: { width: number }) {
   if (!effectiveDir) {
     return (
       <div
-        className="shrink-0 border-l border-border-subtle bg-background/60 flex items-center justify-center"
+        className="shrink-0 bg-background-secondary flex items-center justify-center"
         style={{ width }}
       >
         <div className="text-text-muted text-xs">
@@ -226,7 +226,7 @@ export function FileBrowser({ width }: { width: number }) {
 
   return (
     <div
-      className="shrink-0 border-l border-border-subtle bg-background/60 flex flex-col min-h-0 overflow-hidden"
+      className="shrink-0 bg-background-secondary flex flex-col min-h-0 overflow-hidden"
       style={{ width }}
     >
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border-subtle shrink-0">

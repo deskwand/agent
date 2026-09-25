@@ -151,7 +151,7 @@ export function SlashMenu({
       </div>
 
       {/* Divider below tabs */}
-      <div className="mx-2 border-t border-border shrink-0" />
+      <div className="mx-2 border-t border-border-subtle shrink-0" />
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-1.5">

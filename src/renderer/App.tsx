@@ -534,14 +534,10 @@ function App() {
             {rightPanelMode === "browser" && (
               <PanelErrorBoundary
                 name="BrowserPanel"
-                fallback={
-                  <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                }
+                fallback={<div className="flex-1 bg-background-secondary" />}
               >
                 <Suspense
-                  fallback={
-                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                  }
+                  fallback={<div className="flex-1 bg-background-secondary" />}
                 >
                   <BrowserPanel width={contextPanelWidth} />
                 </Suspense>
@@ -559,13 +555,11 @@ function App() {
                 <PanelErrorBoundary
                   name="FilePreviewPanel"
                   resetKey={activePreviewTab ?? undefined}
-                  fallback={
-                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                  }
+                  fallback={<div className="flex-1 bg-background-secondary" />}
                 >
                   <Suspense
                     fallback={
-                      <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                      <div className="flex-1 bg-background-secondary" />
                     }
                   >
                     <FilePreviewPanel visible={previewPanelActive} />
@@ -581,13 +575,11 @@ function App() {
                 <PanelErrorBoundary
                   name="ReviewPanel"
                   resetKey={activeSessionId ?? undefined}
-                  fallback={
-                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                  }
+                  fallback={<div className="flex-1 bg-background-secondary" />}
                 >
                   <Suspense
                     fallback={
-                      <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                      <div className="flex-1 bg-background-secondary" />
                     }
                   >
                     <ReviewPanel
@@ -609,13 +601,11 @@ function App() {
               >
                 <PanelErrorBoundary
                   name="FileBrowser"
-                  fallback={
-                    <div className="flex-1 border-l border-border-subtle bg-background/60" />
-                  }
+                  fallback={<div className="flex-1 bg-background-secondary" />}
                 >
                   <Suspense
                     fallback={
-                      <div className="flex-1 border-l border-border-subtle bg-background/60" />
+                      <div className="flex-1 bg-background-secondary" />
                     }
                   >
                     <FileBrowser width={panelWidth} />

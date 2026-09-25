@@ -159,7 +159,7 @@ export function Titlebar() {
   );
 
   return (
-    <div className="h-10 bg-background-secondary border-b border-border flex items-center titlebar-drag shrink-0">
+    <div className="h-10 bg-background-secondary flex items-center titlebar-drag shrink-0">
       {/* macOS: Traffic lights are positioned by trafficLightPosition, we just need left padding */}
 
       <div
