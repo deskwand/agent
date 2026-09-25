@@ -11,6 +11,7 @@ import {
   chroma,
   composite,
   contrast,
+  css,
   parseAlphaColor,
   parseHex,
   relativeLuminance,
@@ -245,6 +246,88 @@ describe("主题对比度不变量", () => {
         `${head} accent-foreground/accent`,
       ).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it("§9-7 选中高亮：唯一、不透明、14 块选中文字都 ≥ 4.5", () => {
+    // 症状：全项目没有 ::selection 规则时，Chromium 用系统灰蓝高亮 + 保持文字颜色不变，
+    // 而行内 code / 文件链接是 text-accent（#5b8cff）——在 macOS 深色那块不透明蓝
+    // rgb(94,121,160) 上只有 1.41:1，选中即「看不清字」。
+    //
+    // 四条不变量：
+    //   (1) 全局只有一条 ::selection。同特异性时后者胜，再写一条就会静默接管。
+    //   (2) 高亮不透明。带 alpha 会与元素自身底色合成，对比度变成「底下垫着什么」
+    //       的函数：亮色主题的 bg-[#0c0e12] 面板按 token 算只剩 1.47:1，
+    //       bg-success 徐章 2.42、bg-accent 按钮 2.88——要不出事就得逐个开例外。
+    //   (3) 选中文字回到正文色。若落在 accent 系文字上（填充 2.37~3.99）白改。
+    //   (4) 全 14 块：正文 ≥ 4.5，且填充对底色 ≥ 1.5（“看得见”的下限，不是 AA）。
+    //
+    // 不守什么：规则在不在 @layer 里。Tailwind 会把 @layer 拍平，且元素自身的
+    // color 与 ::selection 的 color 是两个不同的层叠目标——同引擎实测：把规则
+    // 放进 @layer base，被选中的 text-accent 仍然是正文色，layer 顺序不参与竞争。
+    const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
+    const rules = [...source.matchAll(/::selection\s*\{([^}]*)\}/g)];
+    expect(rules, "globals.css 里的 ::selection 规则不止一条").toHaveLength(1);
+    const body = rules[0]?.[1] ?? "";
+    expect(body).toMatch(/color:\s*var\(--color-text-primary\)/);
+    expect(body, "高亮掺了 alpha，会与元素底色合成").not.toContain(
+      "transparent",
+    );
+
+    // 高亮色值只从 background-color 的声明里认，允许两种写法：accent×background 的
+    // 混合（当前），或单个主题 token（如计划里的 --color-selected）。
+    // 不要在整段 body 上找 var(...) ——那会把前景的 --color-text-primary 当成背景。
+    const backgroundValue = (
+      /background-color:\s*([^;]+);/.exec(body)?.[1] ?? ""
+    )
+      .replace(/\s+/g, " ")
+      .trim();
+    const mix =
+      /^color-mix\(\s*in srgb,\s*var\(--color-accent\)\s+(\d+)%,\s*var\(--color-background\)\s*\)$/.exec(
+        backgroundValue,
+      );
+    const tokenRef = mix
+      ? null
+      : (/^var\((--[\w-]+)\)$/.exec(backgroundValue)?.[1] ?? null);
+    expect(
+      mix ?? tokenRef,
+      `选中背景必须由主题 token 派生，不能是字面色值：${backgroundValue}`,
+    ).not.toBeNull();
+    const alpha = mix ? Number(mix[1]) / 100 : null;
+
+    const lowText: string[] = [];
+    const invisible: string[] = [];
+    for (const block of blocks) {
+      const head = block.slice(0, 60).replace(/\s+/g, " ");
+      const background = tokenOf(block, "--color-background");
+      const accent = tokenOf(block, "--color-accent");
+      const fill =
+        alpha === null
+          ? tokenOf(block, tokenRef!)
+          : composite(background, accent, alpha);
+      // 不透明必须是解出来的事实，不是“没写 transparent 关键字”
+      expect(
+        parseAlphaColor(fill).alpha,
+        `${head} 高亮 ${fill} 是半透明的`,
+      ).toBe(1);
+      const text = contrast(tokenOf(block, "--color-text-primary"), fill);
+      if (text < 4.5) {
+        lowText.push(`${text.toFixed(2)}  ${head}  text-primary / ${fill}`);
+      }
+      const visible = contrast(fill, background);
+      if (visible < 1.5) {
+        invisible.push(
+          `${visible.toFixed(2)}  ${head}  ${fill} / ${background}`,
+        );
+      }
+    }
+    expect(
+      lowText,
+      `以下主题块选中后文字低于 4.5：\n${lowText.join("\n")}`,
+    ).toEqual([]);
+    expect(
+      invisible,
+      `以下主题块的高亮对底色不到 1.5（等于看不见）：\n${invisible.join("\n")}`,
+    ).toEqual([]);
   });
 
   it("§9-6 accent-muted 必须透明，且必须源自本块的 accent", () => {
