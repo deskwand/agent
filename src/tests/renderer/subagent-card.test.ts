@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBackgroundAgentRows,
-  findTurnEndMessageIdForToolCall,
+  collectCurrentRoundToolCallIds,
+  findToolCallOwnerMessageId,
   resolveSubagentName,
   splitSubagentOutput,
 } from "../../renderer/utils/subagent-card";
@@ -172,6 +173,102 @@ describe("buildBackgroundAgentRows", () => {
     expect(rows.map((row) => row.toolCallId)).toEqual(["call-new", "call-old"]);
   });
 
+  it("运行中的不在本轮也保留；已完成的仅保留本轮的", () => {
+    const rows = buildBackgroundAgentRows(
+      {
+        "old-done": rowActivity("old-done", {
+          background: true,
+          status: "completed",
+        }),
+        "old-running": rowActivity("old-running", {
+          background: true,
+          status: "running",
+        }),
+        "new-done": rowActivity("new-done", {
+          background: true,
+          status: "completed",
+        }),
+      },
+      labelFor,
+      "en",
+      new Set(["new-done"]),
+    );
+    expect(rows.map((row) => row.toolCallId).sort()).toEqual([
+      "new-done",
+      "old-running",
+    ]);
+  });
+
+  it("本轮已完成的至多保留最近 5 条，运行中不受限", () => {
+    const activities: Record<string, SubagentActivity> = {};
+    for (let i = 0; i < 7; i++) {
+      activities[`done-${i}`] = rowActivity(`done-${i}`, {
+        background: true,
+        status: "completed",
+      });
+    }
+    activities.live = rowActivity("live", {
+      background: true,
+      status: "running",
+    });
+
+    const rows = buildBackgroundAgentRows(
+      activities,
+      labelFor,
+      "en",
+      new Set(Object.keys(activities)),
+    );
+    const finished = rows.filter((row) => row.status !== "running");
+    expect(finished).toHaveLength(5);
+    // 组内最新在前 → 留下的是最后写入的那 5 条
+    expect(finished.map((row) => row.toolCallId)).toEqual([
+      "done-6",
+      "done-5",
+      "done-4",
+      "done-3",
+      "done-2",
+    ]);
+    expect(rows.filter((row) => row.status === "running")).toHaveLength(1);
+  });
+
+  it("空集合（本轮还没有任何工具调用）会收窄掉已完成的，但不影响运行中", () => {
+    const rows = buildBackgroundAgentRows(
+      {
+        "old-done": rowActivity("old-done", {
+          background: true,
+          status: "completed",
+        }),
+        "old-running": rowActivity("old-running", {
+          background: true,
+          status: "running",
+        }),
+      },
+      labelFor,
+      "en",
+      new Set(),
+    );
+    expect(rows.map((row) => row.toolCallId)).toEqual(["old-running"]);
+  });
+
+  it("集合为 null 或未传时不过滤（判不出来不误藏）", () => {
+    const activities = {
+      "old-done": rowActivity("old-done", {
+        background: true,
+        status: "completed",
+      }),
+    };
+    expect(
+      buildBackgroundAgentRows(activities, labelFor, "en", null).map(
+        (row) => row.toolCallId,
+      ),
+    ).toEqual(["old-done"]);
+    expect(
+      buildBackgroundAgentRows(activities, labelFor, "en").map(
+        (row) => row.toolCallId,
+      ),
+    ).toEqual(["old-done"]);
+  });
+
   it("优先用 current 作为当前动作；没有快照时返回空数组", () => {
     const rows = buildBackgroundAgentRows(
       {
@@ -201,52 +298,36 @@ describe("buildBackgroundAgentRows", () => {
   });
 });
 
-describe("findTurnEndMessageIdForToolCall", () => {
-  const messages = [
-    { id: "u1", role: "user", turnId: "t1", content: [] },
-    {
-      id: "a1",
-      role: "assistant",
-      turnId: "t1",
-      content: [{ type: "tool_use", id: "call-9" }],
-    },
-    { id: "a2", role: "assistant", turnId: "t1", content: [] },
-    { id: "u2", role: "user", turnId: "t2", content: [] },
-  ];
-
-  it("返回该回合最后一条 assistant 消息（process summary 就挂在那里）", () => {
-    expect(findTurnEndMessageIdForToolCall(messages, "call-9")).toBe("a2");
-  });
-
-  it("找不到 / 空输入都返回 null", () => {
-    expect(findTurnEndMessageIdForToolCall(messages, "missing")).toBeNull();
-    expect(findTurnEndMessageIdForToolCall(messages, "")).toBeNull();
-    expect(findTurnEndMessageIdForToolCall(undefined, "call-9")).toBeNull();
-  });
-
-  it("回合末是纯工具消息时，跳过它（渲染前被合并，自己没有 DOM 节点）", () => {
-    const withToolTail = [
-      { id: "u1", role: "user", turnId: "t1", content: [] },
+describe("findToolCallOwnerMessageId", () => {
+  it("跳到那条工具调用所属的消息（组从这里开始），而不是回合末", () => {
+    // 真实形态：m1 = 文本 + spawn 的 tool_use；m2 = 纯工具（结果）会被并进 m1；
+    // m3 = 本轮最后一条 assistant（它的顶部并没有这组卡片）
+    const messages = [
+      { id: "u2", role: "user", turnId: "t2", content: [] },
       {
-        id: "a1",
+        id: "m1",
         role: "assistant",
-        turnId: "t1",
-        content: [{ type: "tool_use", id: "call-9" }],
+        turnId: "t2",
+        content: [{ type: "text" }, { type: "tool_use", id: "call-9" }],
       },
       {
-        id: "a2",
+        id: "m2",
         role: "assistant",
-        turnId: "t1",
+        turnId: "t2",
         content: [{ type: "tool_result", toolUseId: "call-9" }],
       },
-      { id: "u2", role: "user", turnId: "t2", content: [] },
+      {
+        id: "m3",
+        role: "assistant",
+        turnId: "t2",
+        content: [{ type: "text" }],
+      },
     ];
-    // a1 自己没有 text 块、但它是回合内第一条 assistant → 保留节点；a2 被并进 a1
-    expect(findTurnEndMessageIdForToolCall(withToolTail, "call-9")).toBe("a1");
+    expect(findToolCallOwnerMessageId(messages, "call-9")).toBe("m1");
   });
 
-  it("tool_use 所在消息被合并时，返回它的合并目标", () => {
-    const merged = [
+  it("tool_use 所在消息是纯工具消息时，跳到它的合并目标", () => {
+    const messages = [
       { id: "u1", role: "user", turnId: "t1", content: [] },
       {
         id: "a1",
@@ -262,11 +343,24 @@ describe("findTurnEndMessageIdForToolCall", () => {
       },
       { id: "u2", role: "user", turnId: "t2", content: [] },
     ];
-    expect(findTurnEndMessageIdForToolCall(merged, "call-9")).toBe("a1");
+    expect(findToolCallOwnerMessageId(messages, "call-9")).toBe("a1");
   });
 
-  it("没有 turnId 时按「遇到下一条 user 消息为止」划回合", () => {
-    const legacy = [
+  it("纯工具且回合内前面没有 assistant 时，就是它自己（合并时会保留原样）", () => {
+    const messages = [
+      { id: "u1", role: "user", turnId: "t1", content: [] },
+      {
+        id: "a1",
+        role: "assistant",
+        turnId: "t1",
+        content: [{ type: "tool_use", id: "call-9" }],
+      },
+    ];
+    expect(findToolCallOwnerMessageId(messages, "call-9")).toBe("a1");
+  });
+
+  it("回合边界用 turnId 判定（与渲染层合并的判据一致）", () => {
+    const messages = [
       { id: "u1", role: "user", content: [] },
       { id: "a1", role: "assistant", content: [{ type: "text" }] },
       {
@@ -276,7 +370,103 @@ describe("findTurnEndMessageIdForToolCall", () => {
       },
       { id: "u2", role: "user", content: [] },
     ];
-    // a2 是纯工具消息且回合内前面有 a1 → 被并走；保留节点的是 a1
-    expect(findTurnEndMessageIdForToolCall(legacy, "call-9")).toBe("a1");
+    expect(findToolCallOwnerMessageId(messages, "call-9")).toBe("a1");
+  });
+
+  it("连串纯工具消息里，返回的是合并后仍然存在的那条（否则点击会静默失效）", () => {
+    // [a1 文本, a2 纯工具, a3 纯工具且含本次 tool_use]：a2/a3 都会并进 a1，只有 a1 有 DOM 节点
+    const messages = [
+      { id: "u1", role: "user", turnId: "t1", content: [] },
+      {
+        id: "a1",
+        role: "assistant",
+        turnId: "t1",
+        content: [{ type: "text" }],
+      },
+      {
+        id: "a2",
+        role: "assistant",
+        turnId: "t1",
+        content: [{ type: "tool_result", toolUseId: "other" }],
+      },
+      {
+        id: "a3",
+        role: "assistant",
+        turnId: "t1",
+        content: [{ type: "tool_use", id: "call-9" }],
+      },
+    ];
+    const target = findToolCallOwnerMessageId(messages, "call-9");
+    expect(target).toBe("a1");
+
+    // 不变量：返回值必须能扛过渲染层的合并（复刻 ChatView.tsx:700-746）
+    const survivors: string[] = [];
+    for (const message of messages) {
+      const blocks = message.content as Array<{ type?: string }>;
+      const pureTool =
+        message.role === "assistant" &&
+        blocks.length > 0 &&
+        !blocks.some((block) => block?.type === "text");
+      let merged = false;
+      if (pureTool) {
+        for (let j = survivors.length - 1; j >= 0; j--) {
+          const prev = messages.find((m) => m.id === survivors[j]);
+          if (prev?.role === "assistant" && prev.turnId === message.turnId) {
+            merged = true;
+            break;
+          }
+        }
+      }
+      if (!merged) survivors.push(message.id);
+    }
+    expect(survivors).toContain(target);
+  });
+
+  it("找不到 / 空输入都返回 null", () => {
+    expect(findToolCallOwnerMessageId([], "call-9")).toBeNull();
+    expect(findToolCallOwnerMessageId([], "")).toBeNull();
+    expect(findToolCallOwnerMessageId(undefined, "call-9")).toBeNull();
+  });
+});
+
+describe("collectCurrentRoundToolCallIds", () => {
+  const userMessage = (id: string, autoGenerated?: boolean) => ({
+    id,
+    role: "user",
+    content: [],
+    autoGenerated,
+  });
+  const assistantWithTools = (id: string, toolCallIds: string[]) => ({
+    id,
+    role: "assistant",
+    content: toolCallIds.map((toolCallId) => ({
+      type: "tool_use",
+      id: toolCallId,
+    })),
+  });
+
+  it("只收最后一条用户消息之后的 tool_use id", () => {
+    const ids = collectCurrentRoundToolCallIds([
+      userMessage("u1"),
+      assistantWithTools("a1", ["old-1"]),
+      userMessage("u2"),
+      assistantWithTools("a2", ["new-1", "new-2"]),
+    ]);
+    expect([...(ids ?? [])].sort()).toEqual(["new-1", "new-2"]);
+  });
+
+  it("注入的 autoGenerated 用户消息不算边界", () => {
+    const ids = collectCurrentRoundToolCallIds([
+      userMessage("u1"),
+      assistantWithTools("a1", ["new-1"]),
+      userMessage("notice", true),
+    ]);
+    expect([...(ids ?? [])]).toEqual(["new-1"]);
+  });
+
+  it("没有真实用户消息（只有注入消息 / 空输入）时返回 null", () => {
+    expect(collectCurrentRoundToolCallIds([userMessage("n", true)])).toBeNull();
+    expect(collectCurrentRoundToolCallIds([])).toBeNull();
+    expect(collectCurrentRoundToolCallIds(undefined)).toBeNull();
   });
 });

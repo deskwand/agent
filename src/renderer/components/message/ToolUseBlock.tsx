@@ -204,6 +204,15 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const isRunning = !toolResult && hasActiveTurn;
   const isError = toolResult?.isError === true;
 
+  // Agent 卡片的头状态以活动快照为准：工具调用返回 ≠ 子代理结束
+  // （后台型的调用是立刻返回的，结果就是 "Agent started in background…"）。
+  // 无快照时回落旧规则；快照的 key 就是 Agent 调用 id，非 Agent 块取不到。
+  const effectiveRunning = subagentActivity
+    ? subagentActivity.status === "running"
+    : isRunning;
+  // 工具调用自身的错误优先：调用都失败了就不该显示"在跑"。
+  const effectiveError = isError || subagentActivity?.status === "error";
+
   const isGoalTool =
     block.name === "get_goal" ||
     block.name === "update_goal" ||
@@ -304,7 +313,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   return (
     <div
       className={`rounded-2xl overflow-hidden transition-colors ${
-        isError ? "bg-error/5" : isRunning ? "bg-accent/5" : "bg-background/40"
+        effectiveError
+          ? "bg-error/5"
+          : effectiveRunning
+            ? "bg-accent/5"
+            : "bg-background/40"
       }`}
     >
       {/* Header — always visible */}
@@ -316,10 +329,10 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         {/* Status icon — goal tools are status queries, no execution indicator needed */}
         {!isGoalTool && (
           <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-text-muted">
-            {isRunning ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : isError ? (
+            {effectiveError ? (
               <XCircle className="w-3.5 h-3.5" />
+            ) : effectiveRunning ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <CheckCircle2 className="w-3.5 h-3.5" />
             )}

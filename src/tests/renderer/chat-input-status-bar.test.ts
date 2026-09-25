@@ -402,6 +402,25 @@ describe("background subagent entry", () => {
     }
   });
 
+  it("已完成的整行降透明度，运行中与失败的保持不变", () => {
+    renderEntry([
+      rows[0], // 本来就是 running
+      rows[1], // 本来就是 completed
+      { ...rows[1], toolCallId: "call-3", name: "欧拉", status: "error" },
+    ]);
+    act(() => container.querySelector("button")?.click());
+
+    const rowFor = (name: string) =>
+      Array.from(container.querySelectorAll("[role='dialog'] button")).find(
+        (el) => el.textContent?.includes(name),
+      );
+    // 用 classList 而不是 className 子串：仓库已吃过"子串断言易恒真"的亏
+    // （见 src/tests/renderer/status-popover.test.ts 的同类修订）
+    expect(rowFor("霍珀")?.classList.contains("opacity-60")).toBe(false);
+    expect(rowFor("居里")?.classList.contains("opacity-60")).toBe(true);
+    expect(rowFor("欧拉")?.classList.contains("opacity-60")).toBe(false);
+  });
+
   it("Escape 关面板；rows 为空时不渲染按钮", () => {
     renderEntry(rows);
     act(() => container.querySelector("button")?.click());

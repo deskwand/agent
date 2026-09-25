@@ -25,7 +25,8 @@ import { MessageCard } from "./MessageCard";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import {
   buildBackgroundAgentRows,
-  findTurnEndMessageIdForToolCall,
+  collectCurrentRoundToolCallIds,
+  findToolCallOwnerMessageId,
 } from "../utils/subagent-card";
 import { getToolLabel } from "./message/toolHelpers";
 import { RetryStatusRow } from "./message/RetryStatusRow";
@@ -251,14 +252,27 @@ export function ChatView() {
   const compaction = sessionState?.compaction ?? { status: "idle" as const };
   const retry = sessionState?.retry ?? { active: false, attempt: 0 };
   // 状态栏入口的面板行：只收后台型，运行中在前。
+  // 面板只列本轮：用 `messages`（:237）而不是 displayedMessages（:594 才声明，
+  // 引用它会撞 TDZ；且它随每个流式 token 重算）。
+  const currentRoundToolCallIds = useMemo(
+    () => collectCurrentRoundToolCallIds(messages),
+    [messages],
+  );
+
   const backgroundRows = useMemo(
     () =>
       buildBackgroundAgentRows(
         sessionState?.subagentActivities,
         (step) => getToolLabel(step.toolName, step.args, t),
         i18n.language,
+        currentRoundToolCallIds,
       ),
-    [sessionState?.subagentActivities, t, i18n.language],
+    [
+      sessionState?.subagentActivities,
+      t,
+      i18n.language,
+      currentRoundToolCallIds,
+    ],
   );
   const highlightToolCallId = useAppStore((s) => s.highlightToolCallId);
   const hasMoreOlder = sessionState?.hasMoreOlder ?? false;
@@ -958,7 +972,8 @@ export function ChatView() {
     (toolCallId: string) => {
       // 用整个 displayedMessages（不是渲染窗口）：目标常在窗口外，
       // handleDockTickSelect 自己会把窗口滑过去。
-      const messageId = findTurnEndMessageIdForToolCall(
+      // 目标是「该工具调用所属的那条消息」（这组卡片的起始位置），不是回合末那条。
+      const messageId = findToolCallOwnerMessageId(
         displayedMessages,
         toolCallId,
       );

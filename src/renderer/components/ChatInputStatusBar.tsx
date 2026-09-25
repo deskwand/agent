@@ -370,7 +370,11 @@ export function ChatInputStatusBar({
                       setPanelOpen(false);
                       onSelectBackgroundAgent?.(row.toolCallId);
                     }}
-                    className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60"
+                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60 ${
+                      // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
+                      // `error` 刻意不降 —— 失败是应该被注意到的信号。
+                      row.status === "completed" ? "opacity-60" : ""
+                    }`}
                   >
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       {/* ① 名字（只有面板内类型不统一时才带后缀） */}
