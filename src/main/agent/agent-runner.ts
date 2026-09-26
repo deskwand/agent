@@ -125,6 +125,7 @@ import {
   createDeskWandVisionTool,
 } from "./tools/vision-describe";
 import { createOfficeTools } from "./tools/office/office-tools";
+import { createTodoTools } from "./tools/todo-tools";
 import { webAccessCache } from "./tools/web-access/cache";
 import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter";
 import { createWebAccessTools } from "./tools/web-access/web-tools";
@@ -3352,6 +3353,7 @@ Tool routing:\n
         ...(visionTool ? [visionTool] : []),
         // Add office tools (always registered, no config required)
         ...officeTools,
+        ...createTodoTools(),
       ];
 
       // Diagnostic: log tools being passed to SDK (helps debug Ollama tool use)

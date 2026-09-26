@@ -150,7 +150,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   if (block.name === "AskUserQuestion") {
     return <AskUserQuestionBlock block={block} />;
   }
-  if (block.name === "TodoWrite") {
+  if (block.name === "todo_write" || block.name === "TodoWrite") {
     return <TodoWriteBlock block={block} />;
   }
   if (block.name === "write" || block.name === "write_file") {

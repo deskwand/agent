@@ -148,6 +148,16 @@ const BROWSE_TOOLS = new Set([
 
 const RESULT_TOOLS = new Set(["edit", "edit_file", "write", "write_file"]);
 
+/**
+ * 有专用渲染卡片、因此不进摘要组的工具（清单、提问这类必须独立可见的）。
+ *
+ * 纯声明式：`buildToolDisplayBlocks` 不读这个集合，往这里加名字**不会**改变渲染。
+ * 真正的约束在 src/tests/renderer/tool-group-coverage.test.ts —— 它断言每个成员
+ * ① 在 ToolUseBlock 里有对应的 `block.name === "..."` 分支，② 未被摘要组吸收。
+ * 驼峰名仅供历史会话回放（新工具一律 snake_case）。
+ */
+export const DEDICATED_CARD_TOOLS = new Set(["todo_write", "TodoWrite"]);
+
 function isToolResultBlock(block: ContentBlock): block is ToolResultContent {
   return block.type === "tool_result";
 }

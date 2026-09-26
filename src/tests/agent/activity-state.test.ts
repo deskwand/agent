@@ -45,7 +45,7 @@ describe("pickStepArgs", () => {
 
   it("未知工具与 mcp 工具只给空对象（只显示工具名）", () => {
     expect(pickStepArgs("mcp__foo__bar", { anything: 1 })).toEqual({});
-    expect(pickStepArgs("todo_write", { todos: [] })).toEqual({});
+    expect(pickStepArgs("nope_not_a_tool", { todos: [] })).toEqual({});
   });
 
   it("截断不会把 emoji 劈成半个代理对", () => {

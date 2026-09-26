@@ -284,5 +284,9 @@ export function getToolLabel(
     return t("tool.actionSteerSubagent");
   }
 
+  if (nameLower === "todo_write" || nameLower === "todowrite") {
+    return t("tool.actionTodoWrite");
+  }
+
   return name;
 }

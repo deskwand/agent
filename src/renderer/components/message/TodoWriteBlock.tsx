@@ -2,6 +2,7 @@
 import { useState, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   ListTodo,
@@ -10,6 +11,7 @@ import {
   Square,
   CheckSquare,
 } from "lucide-react";
+import { rejectTodoList } from "../../../shared/todos";
 import type { ToolUseContent } from "../../types";
 import type { TodoItem } from "./types";
 
@@ -31,6 +33,11 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
   const totalCount = todos.length;
   const progress = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
   const inProgressItem = todos.find((item) => item.status === "in_progress");
+
+  // 工具侧拒绝了这份清单时，状态并没有生效。工具结果对用户不可见（未分组工具的
+  // result 块会被消费掉），所以必须在这里如实展示，否则卡片会冒充成已生效的清单。
+  // 规则与工具共用同一份实现：src/shared/todos.ts。
+  const rejection = rejectTodoList(todos);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -60,6 +67,21 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
 
   if (todos.length === 0) {
     return null;
+  }
+
+  if (rejection) {
+    return (
+      <div className="rounded-xl border border-warning/40 bg-warning/5 px-4 py-3 flex items-center gap-3">
+        <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
+        <span className="text-sm text-text-primary">
+          {rejection.reason === "emptyContent"
+            ? t("messageCard.todoRejectedEmptyContent", {
+                index: rejection.index + 1,
+              })
+            : t("messageCard.todoRejectedMultipleInProgress")}
+        </span>
+      </div>
+    );
   }
 
   return (
