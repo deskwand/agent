@@ -54,6 +54,8 @@ function runningSessionState(): SessionState {
     subagentActivities: {},
     currentTodos: null,
     lastNonEmptyTodos: null,
+    currentPlanDone: false,
+    lastPlanDone: false,
   };
 }
 

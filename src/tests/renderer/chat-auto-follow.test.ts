@@ -101,6 +101,8 @@ function setInitialState(): void {
         subagentActivities: {},
         currentTodos: null,
         lastNonEmptyTodos: null,
+        currentPlanDone: false,
+        lastPlanDone: false,
       },
     },
   });

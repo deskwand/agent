@@ -106,6 +106,8 @@ function setInitialState(status: Session["status"]): void {
         subagentActivities: {},
         currentTodos: null,
         lastNonEmptyTodos: null,
+        currentPlanDone: false,
+        lastPlanDone: false,
       },
     },
   });

@@ -11,7 +11,7 @@ import {
   Square,
   CheckSquare,
 } from "lucide-react";
-import { rejectTodoList } from "../../../shared/todos";
+import { normalizePlanDone, rejectTodoList } from "../../../shared/todos";
 import type { ToolUseContent } from "../../types";
 import type { TodoItem } from "./types";
 
@@ -36,8 +36,12 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
 
   // 工具侧拒绝了这份清单时，状态并没有生效。工具结果对用户不可见（未分组工具的
   // result 块会被消费掉），所以必须在这里如实展示，否则卡片会冒充成已生效的清单。
-  // 规则与工具共用同一份实现：src/shared/todos.ts。
-  const rejection = rejectTodoList(todos);
+  // 规则与工具共用同一份实现：src/shared/todos.ts —— 包括"声明结束却没结算"那条，
+  // 所以这里也要把 done 归一化后一起传进去。
+  const rejection = rejectTodoList(
+    todos,
+    normalizePlanDone(todos, (block.input as Record<string, unknown>)?.done),
+  );
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -78,7 +82,9 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
             ? t("messageCard.todoRejectedEmptyContent", {
                 index: rejection.index + 1,
               })
-            : t("messageCard.todoRejectedMultipleInProgress")}
+            : rejection.reason === "unsettledItems"
+              ? t("messageCard.todoRejectedUnsettledItems")
+              : t("messageCard.todoRejectedMultipleInProgress")}
         </span>
       </div>
     );

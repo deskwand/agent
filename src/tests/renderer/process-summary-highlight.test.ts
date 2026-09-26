@@ -75,6 +75,8 @@ describe("ProcessSummaryBlock highlight and expand", () => {
           subagentActivities: {},
           currentTodos: null,
           lastNonEmptyTodos: null,
+          currentPlanDone: false,
+          lastPlanDone: false,
         },
       },
     });

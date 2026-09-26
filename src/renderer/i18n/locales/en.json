@@ -1090,6 +1090,7 @@
     "taskProgress": "Task Progress",
     "taskProgress": "Task Progress",
     "todoRejectedMultipleInProgress": "Task list not applied: only one item may be in progress",
+    "todoRejectedUnsettledItems": "Task list did not take effect: some items are still unfinished",
     "todoRejectedEmptyContent": "Task list not applied: item {{index}} has no content",
     "noQuestions": "No questions",
     "question": "Question",
@@ -1967,6 +1968,10 @@
     "planDone": "{{completed}}/{{total}} done",
     "subagentsSection": "Subagents",
     "subagents_one": "{{count}} subagent",
-    "subagents_other": "{{count}} subagents"
+    "subagents_other": "{{count}} subagents",
+    "statusDone": "Done",
+    "statusCancelled_one": "{{count}} item cancelled",
+    "statusCancelled_other": "{{count}} items cancelled",
+    "statusCleared": "List cleared"
   }
 }

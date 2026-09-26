@@ -54,6 +54,8 @@ function sessionState(): SessionState {
     subagentActivities: {},
     currentTodos: null,
     lastNonEmptyTodos: null,
+    currentPlanDone: false,
+    lastPlanDone: false,
   };
 }
 
@@ -112,5 +114,51 @@ describe("todo_write 卡片", () => {
     // 工具侧拒绝了这份清单，状态没有生效 —— 清单本体不得显示
     expect(container.textContent).not.toContain("先做 A");
     expect(container.textContent).not.toContain("0/2");
+  });
+  it("声明结束却留着未结算项 → 卡片也报「未生效」（与工具同一份规则）", async () => {
+    const unsettled: ToolUseContent = {
+      type: "tool_use",
+      id: "todo-2",
+      name: "todo_write",
+      input: {
+        todos: [{ content: "只做了一半", status: "pending" }],
+        done: true,
+      },
+    };
+    await act(async () => {
+      root.render(
+        createElement(ToolUseBlock, {
+          block: unsettled,
+          allBlocks: [unsettled],
+          message,
+        }),
+      );
+    });
+    // 工具会把这次调用拒掉，所以卡片不能把它显示成已生效的清单
+    expect(container.textContent).toContain("任务清单未生效");
+    expect(container.textContent).not.toContain("只做了一半");
+  });
+
+  it("声明结束且已结算 → 卡片照常显示清单", async () => {
+    const settled: ToolUseContent = {
+      type: "tool_use",
+      id: "todo-3",
+      name: "todo_write",
+      input: {
+        todos: [{ content: "全部做完了", status: "completed" }],
+        done: true,
+      },
+    };
+    await act(async () => {
+      root.render(
+        createElement(ToolUseBlock, {
+          block: settled,
+          allBlocks: [settled],
+          message,
+        }),
+      );
+    });
+    expect(container.textContent).toContain("全部做完了");
+    expect(container.textContent).not.toContain("任务清单未生效");
   });
 });

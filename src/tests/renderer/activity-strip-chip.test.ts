@@ -11,7 +11,12 @@ import type { ChatInputStatus } from "../../renderer/components/ChatInputStatusB
 import type { BackgroundAgentRow } from "../../renderer/utils/subagent-card";
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
+  useTranslation: () => ({
+    // 带上 count：像"N 项取消"这种把数字插进文案的断言才有意义
+    t: (key: string, opts?: { count?: number }) =>
+      opts?.count === undefined ? key : `${key}:${opts.count}`,
+    i18n: { language: "en" },
+  }),
 }));
 
 const TODOS = [
@@ -37,7 +42,9 @@ function strip(
   return React.createElement(ChatInputStatusBar, {
     status: null,
     currentTodos: null,
+    currentPlanDone: false,
     lastNonEmptyTodos: null,
+    lastPlanDone: false,
     backgroundAgentRows: [],
     ...props,
   });
@@ -253,7 +260,7 @@ describe("activity chip", () => {
     expect(container.textContent).not.toContain("写迁移脚本");
   });
 
-  it("finishing: 清空后显示收尾态，带 ✓ 与末项文案", () => {
+  it("finishing: 清空后仍显示最后一份清单的计数（不是 0/0）", () => {
     render(
       strip({
         currentTodos: [],
@@ -263,9 +270,10 @@ describe("activity chip", () => {
         ],
       }),
     );
+    // 没声明 done → 说"清单已清空"，且**不**加 ✓（✓ 只对声明负责）
     expect(container.textContent).toContain("2/2");
-    expect(container.textContent).toContain("✓");
-    expect(container.textContent).toContain("补 registry 单测");
+    expect(container.textContent).toContain("activity.statusCleared");
+    expect(container.textContent).not.toContain("✓");
   });
 
   it("finishing: 没跑完就清空时不加 ✓", () => {
@@ -280,7 +288,7 @@ describe("activity chip", () => {
     );
     expect(container.textContent).toContain("1/2");
     expect(container.textContent).not.toContain("✓");
-    expect(container.textContent).toContain("补 registry 单测");
+    expect(container.textContent).toContain("activity.statusCleared");
   });
 
   it("finishing: 不把上一份清单的进行中项当成「正在进行」", () => {
@@ -307,8 +315,8 @@ describe("activity chip", () => {
 
     // 进行时的措辞不能出现在收尾态（那是"此刻在做"的说法）
     expect(container.textContent).not.toContain("正在验证清空列表");
-    // 收尾态展示最后一项的 content
-    expect(container.textContent).toContain("验证任务完成后清空列表");
+    // 没声明 done → 明说"清单已清空"，而不是让 2/3 冒充"还在跑"
+    expect(container.textContent).toContain("activity.statusCleared");
     expect(container.textContent).toContain("2/3");
 
     // 展开面板：收尾态没有任何"正在跑"的指示器
@@ -355,5 +363,102 @@ describe("activity chip", () => {
     expect(container.textContent).toContain("0/2");
     expect(container.textContent).not.toContain("建表");
     expect(container.textContent).not.toContain("补测试");
+  });
+  it("done: 声明结束且全部完成 → ✓ 与「已完成」", () => {
+    render(
+      strip({
+        currentTodos: [
+          { content: "建表", status: "completed" },
+          { content: "补测试", status: "completed" },
+        ],
+        currentPlanDone: true,
+      }),
+    );
+    expect(container.textContent).toContain("✓");
+    expect(container.textContent).toContain("activity.statusDone");
+    expect(container.textContent).toContain("2/2");
+  });
+
+  it("done: 有 cancelled 时写明「N 项取消」，不说「已完成」", () => {
+    render(
+      strip({
+        currentTodos: [
+          { content: "建表", status: "completed" },
+          { content: "补测试", status: "cancelled" },
+        ],
+        currentPlanDone: true,
+      }),
+    );
+    // 比"已结束"更有用：直接说清有几项没完成
+    expect(container.textContent).toContain("activity.statusCancelled:1");
+    expect(container.textContent).not.toContain("activity.statusDone");
+    expect(container.textContent).toContain("1/2");
+  });
+
+  it("done: 两项取消时报出 2 项", () => {
+    render(
+      strip({
+        currentTodos: [
+          { content: "建表", status: "cancelled" },
+          { content: "补测试", status: "cancelled" },
+          { content: "写文档", status: "completed" },
+        ],
+        currentPlanDone: true,
+      }),
+    );
+    expect(container.textContent).toContain("activity.statusCancelled:2");
+    expect(container.textContent).toContain("1/3");
+  });
+
+  it("清空但上一份没声明 done → 「清单已清空」且无 ✓", () => {
+    render(
+      strip({
+        currentTodos: [],
+        lastNonEmptyTodos: [{ content: "建表", status: "completed" }],
+        lastPlanDone: false,
+      }),
+    );
+    expect(container.textContent).toContain("activity.statusCleared");
+    expect(container.textContent).not.toContain("✓");
+  });
+
+  it("清空且上一份声明过 done → 收尾态显示「已完成」", () => {
+    render(
+      strip({
+        currentTodos: [],
+        lastNonEmptyTodos: [{ content: "建表", status: "completed" }],
+        lastPlanDone: true,
+      }),
+    );
+    expect(container.textContent).toContain("✓");
+    expect(container.textContent).toContain("activity.statusDone");
+  });
+
+  it("全完成但**未声明** done → 不显示 ✓、也不说「已完成」", () => {
+    // ✓ 现在只对"模型声明结束"负责，不再等于"全部 completed"。
+    // 这条挡住把它改回 `planDone = allDone` 的回归。
+    render(
+      strip({
+        currentTodos: [
+          { content: "建表", status: "completed" },
+          { content: "补测试", status: "completed" },
+        ],
+      }),
+    );
+    expect(container.textContent).toContain("2/2");
+    expect(container.textContent).not.toContain("✓");
+    expect(container.textContent).not.toContain("activity.statusDone");
+  });
+
+  it("进行中（无 done）→ 不出现任何结束措辞", () => {
+    render(
+      strip({
+        currentTodos: [{ content: "写迁移", status: "in_progress" }],
+      }),
+    );
+    expect(container.textContent).toContain("写迁移");
+    expect(container.textContent).not.toContain("activity.statusDone");
+    expect(container.textContent).not.toContain("activity.statusCancelled");
+    expect(container.textContent).not.toContain("activity.statusCleared");
   });
 });

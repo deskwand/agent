@@ -9,6 +9,15 @@ const tool = createTodoTools()[0]!;
 const run = (todos: unknown) =>
   tool.execute("call-1", { todos }, undefined, undefined, undefined as never);
 
+const runDone = (todos: unknown, done: boolean) =>
+  tool.execute(
+    "call-1",
+    { todos, done },
+    undefined,
+    undefined,
+    undefined as never,
+  );
+
 describe("todo_write", () => {
   it("工具名是 snake_case", () => {
     expect(tool.name).toBe("todo_write");
@@ -42,5 +51,23 @@ describe("todo_write", () => {
   it("接受空数组（清空清单）", async () => {
     const result = await run([]);
     expect(JSON.stringify(result.content)).toContain("cleared");
+  });
+  it("done: true 且已结算 → 回执确认结束", async () => {
+    const result = await runDone([{ content: "a", status: "completed" }], true);
+    const text = JSON.stringify(result.content);
+    expect(text).toContain("1/1 completed");
+    expect(text).toContain("Plan finished");
+  });
+
+  it("done: true 但留着未结算项 → 拒绝并提示先结算", async () => {
+    const result = await runDone([{ content: "a", status: "pending" }], true);
+    const text = JSON.stringify(result.content);
+    expect(text).toContain("Rejected");
+    expect(text).toContain("completed or cancelled");
+  });
+
+  it("空数组上的 done 被忽略（仍按清空处理，不声称完成）", async () => {
+    const result = await runDone([], true);
+    expect(JSON.stringify(result.content)).toContain("Task list cleared.");
   });
 });

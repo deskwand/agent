@@ -91,8 +91,12 @@ interface ChatInputStatusBarProps {
   onSelectBackgroundAgent?: (toolCallId: string) => void;
   /** 当前生效的任务清单；null = 未知/没有，[] = 已清空。为空则右区不渲染计划部分。 */
   currentTodos?: CurrentTodos | null;
+  /** 当前清单是否被声明结束（`done: true`）。 */
+  currentPlanDone?: boolean;
   /** 最后一份非空清单，只服务收尾态（currentTodos 被清空后仍显示其最终状态）。 */
   lastNonEmptyTodos?: CurrentTodos | null;
+  /** 被记住那份清单当时是否声明了结束。 */
+  lastPlanDone?: boolean;
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
@@ -117,7 +121,9 @@ export function ChatInputStatusBar({
   backgroundAgentRows,
   onSelectBackgroundAgent,
   currentTodos,
+  currentPlanDone,
   lastNonEmptyTodos,
+  lastPlanDone,
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
   const rows = backgroundAgentRows ?? [];
@@ -195,6 +201,10 @@ export function ChatInputStatusBar({
     (item) => item.status === "completed",
   ).length;
   const allDone = todos.length > 0 && completedCount === todos.length;
+  // 展示的是哪一份清单：收尾态用被记住的那份，否则用当前的
+  const planDone = finishing
+    ? (lastPlanDone ?? false)
+    : (currentPlanDone ?? false);
   const hasPlan = todos.length > 0;
   const hasActivity = hasPlan || rows.length > 0;
   // 子代理计数由谁承载：左区已经在说这件事时（只可能发生在没有更高优先级状态时）
@@ -214,6 +224,22 @@ export function ChatInputStatusBar({
     : inProgressTodo
       ? inProgressTodo.activeForm || inProgressTodo.content
       : null;
+  // 结束声明优先于"当前步骤"：声明了结束就说明是过去态，不再说"正在…"
+  // 声明结束时，比起"已结束"这种笼统措辞，用户更需要知道**有几项没完成**。
+  // done 要求每一项都已结算，所以"未全部完成"必然意味着有取消项。
+  const cancelledCount = todos.filter(
+    (item) => item.status === "cancelled",
+  ).length;
+  const statusLabel = !hasPlan
+    ? null
+    : planDone
+      ? allDone
+        ? t("activity.statusDone")
+        : t("activity.statusCancelled", { count: cancelledCount })
+      : finishing
+        ? t("activity.statusCleared")
+        : stepText;
+
   // 类型只在面板内不统一时才值得占宽度（同类时逐行重复纯属噪音）
   const showType = new Set(rows.map((row) => row.type)).size > 1;
 
@@ -381,12 +407,12 @@ export function ChatInputStatusBar({
               />
             </span>
             <span className="flex-none">
-              {allDone ? "✓ " : ""}
+              {planDone ? "✓ " : ""}
               {completedCount}/{todos.length}
             </span>
-            {stepText ? (
+            {statusLabel ? (
               <span className="max-w-[12rem] min-w-0 truncate text-text-muted">
-                · {stepText}
+                · {statusLabel}
               </span>
             ) : null}
           </>

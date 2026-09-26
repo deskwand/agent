@@ -89,7 +89,9 @@ function setState(opts: {
   sessionStatus: Session["status"];
   messages: Message[];
   currentTodos: CurrentTodos | null;
+  currentPlanDone?: boolean;
   lastNonEmptyTodos?: CurrentTodos | null;
+  lastPlanDone?: boolean;
 }): void {
   const session: Session = {
     id: "s1",
@@ -129,7 +131,9 @@ function setState(opts: {
         backgroundAgents: [],
         subagentActivities: { [SPAWN]: runningActivity() },
         currentTodos: opts.currentTodos,
+        currentPlanDone: opts.currentPlanDone ?? false,
         lastNonEmptyTodos: opts.lastNonEmptyTodos ?? null,
+        lastPlanDone: opts.lastPlanDone ?? false,
       },
     },
   } as never);
@@ -263,6 +267,28 @@ describe("activity strip end to end", () => {
     render();
 
     expect(container.textContent).toContain("2/2");
-    expect(container.textContent).toContain("补测试");
+    expect(container.textContent).toContain("activity.statusCleared");
+  });
+
+  it("上一份清单声明过 done → 收尾态显示「已完成」", () => {
+    act(() =>
+      setState({
+        sessionStatus: "completed",
+        messages: [
+          makeMessage("u1", "user", [{ type: "text", text: "跑完了" }]),
+        ],
+        currentTodos: [],
+        lastNonEmptyTodos: [
+          { content: "建表", status: "completed" },
+          { content: "补测试", status: "completed" },
+        ],
+        lastPlanDone: true,
+      }),
+    );
+    render();
+
+    expect(container.textContent).toContain("2/2");
+    expect(container.textContent).toContain("✓");
+    expect(container.textContent).toContain("activity.statusDone");
   });
 });

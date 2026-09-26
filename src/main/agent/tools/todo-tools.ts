@@ -13,6 +13,7 @@ import { Type } from "@sinclair/typebox";
 import {
   MAX_TODOS,
   MAX_TODO_CONTENT_LENGTH,
+  normalizePlanDone,
   rejectTodoList,
 } from "../../../shared/todos";
 
@@ -36,7 +37,8 @@ export function createTodoTools(): ToolDefinition[] {
       "Replace the session task list and show it to the user as a progress list. " +
       "Always send the COMPLETE list, not a delta. Use it for work with 3+ steps: " +
       "keep at most one item in_progress, mark items completed as you finish them, " +
-      "and send an empty array once all work is done. " +
+      "and set done to true when the plan is over (every item must be completed or " +
+      "cancelled first); send an empty array only to discard the list. " +
       'activeForm is the present-continuous form of content (content "write tests" -> ' +
       'activeForm "writing tests") and is what the user sees while that item runs. ' +
       "Use cancelled for items you decided not to do.",
@@ -46,6 +48,7 @@ export function createTodoTools(): ToolDefinition[] {
       "At most one item may be in_progress at any time.",
       "Send the full list on every call; entries omitted from the call are removed.",
       "Do not use it for a single trivial action.",
+      "Set done: true when the plan is finished; every item must be completed or cancelled first.",
     ],
     parameters: Type.Object({
       todos: Type.Array(
@@ -63,30 +66,43 @@ export function createTodoTools(): ToolDefinition[] {
         }),
         { maxItems: MAX_TODOS },
       ),
+      done: Type.Optional(
+        Type.Boolean({
+          description:
+            "Set true when this plan is over; every item must be completed or cancelled first.",
+        }),
+      ),
     }),
     async execute(_toolCallId, params) {
-      const todos = params.todos;
+      const { todos, done } = params;
+      // done 只在与清单同时出现时有含义（归一化规则与渲染层共用同一份实现）
+      const finished = normalizePlanDone(todos, done);
 
       // 校验规则与渲染层共用（src/shared/todos.ts）：被拒绝的清单在 UI 上会显示
       // "未生效"，不能只靠工具结果告知模型。
-      const rejection = rejectTodoList(todos);
+      const rejection = rejectTodoList(todos, finished);
       if (rejection) {
         return text(
           rejection.reason === "emptyContent"
             ? `Rejected: item ${rejection.index + 1} has empty content.`
-            : "Rejected: at most one item may be in_progress. Fix the list and call again.",
+            : rejection.reason === "unsettledItems"
+              ? "Rejected: mark every item completed or cancelled before finishing."
+              : "Rejected: at most one item may be in_progress. Fix the list and call again.",
         );
       }
 
       if (todos.length === 0) return text("Task list cleared.");
 
-      const done = todos.filter((item) => item.status === "completed").length;
+      const completedCount = todos.filter(
+        (item) => item.status === "completed",
+      ).length;
       const active = todos.find((item) => item.status === "in_progress");
       return text(
-        `Task list updated: ${done}/${todos.length} completed.` +
+        `Task list updated: ${completedCount}/${todos.length} completed.` +
           (active
             ? ` Now working on: ${active.activeForm ?? active.content}`
-            : ""),
+            : "") +
+          (finished ? " Plan finished." : ""),
       );
     },
   });

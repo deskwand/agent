@@ -1931,6 +1931,8 @@ export function ChatView() {
             onGoalCommand={handleCommand}
             currentTodos={sessionState?.currentTodos ?? null}
             lastNonEmptyTodos={sessionState?.lastNonEmptyTodos ?? null}
+            currentPlanDone={sessionState?.currentPlanDone ?? false}
+            lastPlanDone={sessionState?.lastPlanDone ?? false}
           />
         </div>
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">
