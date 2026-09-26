@@ -650,13 +650,12 @@
   }
 
   /* 焦点环：宽度 1px，颜色用主题强调色。
-     不要写成 `ring-accent/30`，也不要加 `ring-opacity-30` —— accent 在
-     tailwind.config.js 里是 `var(--color-accent)` 形式的整值，没有
-     <alpha-value> 插槽，透明度修饰符与 ring-opacity 都不会生效。
-     这两种写法都不会「什么都不做」：透明度被忽略、环照画不误，因此
-     `focus:ring-2 focus:ring-accent/30` 的元素会画出一圈 2px 的 accent 环；
-     而同时带 ring-2 的非表单元素（例如开关的 track div）拿不到本规则的
-     颜色，会退回 Tailwind 预置的 rgb(59 130 246 / 0.5) 蓝色环。 */
+     历史坑（2026-09 已修）：语义色原本在 tailwind.config.js 里是
+     `var(--color-accent)` 的整值字符串，没有 <alpha-value> 插槽，
+     `ring-accent/30` 这类透明度修饰符在产物里一条规则都不生成，
+     ring-opacity-* 也不被消费，环于是回落到 Tailwind 预置的蓝色。
+     现在语义色走 token() 函数色 + color-mix，可以正常写透明度修饰符。
+     改这里的宽度前注意 focus-ring-css.test.ts 锁了 4 条 @apply 规则。 */
   select,
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
       [type="file"]
@@ -1483,6 +1482,18 @@
     transparent
   );
   --color-overlay-on: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  /* 搜索命中 / 列表高亮。与 ::selection 同一设计约束（必须不透明，否则会与元素
+     自身底色合成，对比度变成「底下垫着什么」的函数——见
+     theme-contrast-invariants.test.ts §9-7），但百分比故意更轻：
+     选区是一次性、要一眼看到；搜索命中会在同一个列表里同时出现十几行。
+     35% 是 14 个主题块全量算出来的最小值（两条门槛：文字 ≥4.5、对底色可见度
+     ≥1.5），30% 会差 0.01 差过可见度。
+     回归测试：src/tests/renderer/token-alpha.test.ts */
+  --color-highlight: color-mix(
+    in srgb,
+    var(--color-accent) 35%,
+    var(--color-background)
+  );
   /* 抬升面的顶部内高光：暗色下 inset 0 1px 0 合成后对比 1.28（可辨识）。 */
   --color-surface-highlight: rgba(255, 255, 255, 0.08);
   /* Windows 原生关闭键悬停红，镜像系统配色，不随应用主题变化 */

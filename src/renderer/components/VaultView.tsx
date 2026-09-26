@@ -882,7 +882,7 @@ export function VaultView(): JSX.Element {
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+                className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={busy}
                 onClick={() => void runAddSkills([...selectedSkills], false)}
               >
@@ -926,7 +926,7 @@ export function VaultView(): JSX.Element {
                 <button
                   type="button"
                   disabled={busy}
-                  className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+                  className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() =>
                     void runAddSkills(
                       pendingLinkConfirm.map((entry) => entry.name),
@@ -982,7 +982,7 @@ export function VaultView(): JSX.Element {
                 <button
                   type="button"
                   aria-label={t("vault.upload")}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={handleUpload}
                   disabled={uploadDisabled}
                 >
@@ -1319,7 +1319,7 @@ export function VaultView(): JSX.Element {
             )}
             <button
               type="button"
-              className="mt-3 rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40"
+              className="mt-3 rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => void handleInitialize()}
               disabled={
                 !recoveryConfirmed || busy || setupBlockedByRemoteBackup
@@ -1394,7 +1394,7 @@ function renderEmptyState(
         <p className="text-sm text-text-muted">{t("vault.reset.inProgress")}</p>
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={h.retryReset}
           disabled={h.busy || !h.token}
         >
@@ -1466,7 +1466,7 @@ function renderEmptyState(
         />
         <button
           type="button"
-          className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40"
+          className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
           onClick={h.handleRestore}
           disabled={h.busy || !h.restoreCode}
         >
@@ -1509,7 +1509,7 @@ function renderEmptyState(
             </label>
             <button
               type="button"
-              className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:bg-accent/40"
+              className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
               onClick={() => void h.handleInitialize()}
               disabled={!h.recoveryConfirmed || h.busy}
             >
@@ -1530,7 +1530,7 @@ function renderEmptyState(
         )}
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:bg-accent/40"
+          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={h.handleUpload}
           disabled={h.uploadDisabled}
         >

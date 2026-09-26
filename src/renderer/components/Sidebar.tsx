@@ -736,7 +736,7 @@ export function Sidebar({
     return (
       <>
         {title.slice(0, idx)}
-        <mark className="bg-accent/40 text-accent-foreground rounded-sm px-0.5">
+        <mark className="bg-highlight text-text-primary rounded-sm px-0.5">
           {title.slice(idx, idx + query.length)}
         </mark>
         {title.slice(idx + query.length)}
@@ -863,7 +863,7 @@ export function Sidebar({
                       }}
                       className={`h-6 w-6 rounded-lg flex items-center justify-center transition-colors ${
                         pendingArchiveId === session.id
-                          ? "text-accent bg-accent-muted/20 border border-accent/30"
+                          ? "text-accent bg-accent-muted border border-accent/30"
                           : "text-text-muted hover:text-accent hover:bg-surface-active"
                       }`}
                       title={

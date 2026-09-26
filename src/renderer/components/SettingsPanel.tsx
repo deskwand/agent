@@ -258,7 +258,7 @@ export function SettingsPanel({
 
       {/* Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <div className="flex items-center gap-3 px-4 lg:px-8 py-4 flex-shrink-0 bg-background/88">
+        <div className="flex items-center gap-3 px-4 lg:px-8 py-4 flex-shrink-0 bg-background/90">
           <div>
             <p className="text-xs uppercase tracking-[0.14em] text-text-muted">
               {t("settings.title")}

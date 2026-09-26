@@ -103,7 +103,7 @@ export function SettingsArchived() {
               key={session.id}
               onClick={() => toggleSelect(session.id)}
               className={`group cursor-pointer rounded-lg px-3 py-2 transition-colors ${
-                isSelected ? "bg-accent-muted/20" : "hover:bg-surface-hover/60"
+                isSelected ? "bg-accent-muted" : "hover:bg-surface-hover/60"
               }`}
             >
               <div className="flex items-center gap-2">

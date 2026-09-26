@@ -51,7 +51,7 @@ export function GlobalNoticeToast({ notice, onDismiss, onAction }: Props) {
       className="fixed top-4 right-4 left-4 sm:left-auto z-50 animate-toast-in-top"
     >
       <div
-        className={`max-w-sm rounded-4xl border bg-background/92 shadow-elevated ${tone.border}`}
+        className={`max-w-sm rounded-4xl border bg-background/95 shadow-elevated ${tone.border}`}
       >
         <div className="flex items-start gap-3 px-4 py-3">
           <div className={`flex-1 text-sm leading-relaxed ${tone.text}`}>

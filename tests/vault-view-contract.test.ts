@@ -368,9 +368,14 @@ describe("VaultView", () => {
     const upload = uploadButton();
     expect(upload.className).toContain("bg-accent");
     expect(upload.className).toContain("text-accent-foreground");
-    expect(upload.className).toContain("disabled:bg-accent/40");
+    expect(upload.className).toContain("disabled:opacity-50");
     // 1bb3c48 的回归护栏：禁用的实心按钮不得把文字刷成 text-primary。
     // 这条原先挂在同步按钮上，同步降为 ghost 后跟着谁还能用就挂给谁 —— 上传。
+    //
+    // 2026-09 改动：原来这里断言的是 `disabled:bg-accent/40`。那是个**不生成任何 CSS**
+    // 的类（语义色当时是 var() 整值，吞掉了透明度修饰符），所以这条护栏一直是
+    // 「绿着但禁用态根本没有样式」。改用 disabled:opacity-50 后意图不变（不重刷文字色），
+    // 而且禁用态真的可见。
     expect(upload.className).not.toContain("disabled:text-text-primary");
   });
 
@@ -1541,7 +1546,7 @@ describe("VaultView", () => {
       (button) => button.textContent === "Restore",
     );
     expect(restore?.className).toContain("text-accent-foreground");
-    expect(restore?.className).toContain("disabled:bg-accent/40");
+    expect(restore?.className).toContain("disabled:opacity-50");
     expect(restore?.className).not.toContain("disabled:text-text-primary");
     expect(
       Array.from(container.querySelectorAll("button")).filter(

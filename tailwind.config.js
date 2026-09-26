@@ -5,55 +5,62 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Use CSS variables for theme-aware colors
+        // 语义色一律包 token()。tailwind v3 对 `var(--x)` 整值不支持 /alpha：
+        // withAlphaValue() → parseColor 失败 → 返回 undefined → 整条 utility 被丢弃。
+        // token() 是函数色，tailwind 会把修饰符里的 alpha 交给它，由 color-mix 落地。
+        // 色值真相只有 globals.css 一份，这里只做「键路径 → 变量名」映射。
         background: {
-          DEFAULT: "var(--color-background)",
-          secondary: "var(--color-background-secondary)",
+          DEFAULT: token("background"),
+          secondary: token("background-secondary"),
         },
         surface: {
-          DEFAULT: "var(--color-surface)",
-          hover: "var(--color-surface-hover)",
-          active: "var(--color-surface-active)",
-          muted: "var(--color-surface-muted)",
+          DEFAULT: token("surface"),
+          hover: token("surface-hover"),
+          active: token("surface-active"),
+          muted: token("surface-muted"),
         },
         border: {
-          DEFAULT: "var(--color-border)",
-          muted: "var(--color-border-muted)",
-          subtle: "var(--color-border-subtle)",
+          DEFAULT: token("border"),
+          muted: token("border-muted"),
+          subtle: token("border-subtle"),
         },
         accent: {
-          DEFAULT: "var(--color-accent)",
-          hover: "var(--color-accent-hover)",
-          muted: "var(--color-accent-muted)",
-          foreground: "var(--color-accent-foreground)",
+          DEFAULT: token("accent"),
+          hover: token("accent-hover"),
+          muted: token("accent-muted"),
+          foreground: token("accent-foreground"),
         },
-        mention: "var(--color-mention)",
+        mention: token("mention"),
+        // 搜索命中 / 高亮的不透明色，声明在 globals.css 顶层 :root（只一次）。
+        // 取值理由与 14 个主题块下的实测对比度见
+        // design-docs/2026-09-26-tailwind-token-alpha-design.md §5.2。
+        highlight: token("highlight"),
         mcp: {
-          DEFAULT: "var(--color-mcp)",
+          DEFAULT: token("mcp"),
         },
         file: {
-          media: "var(--color-file-media)",
-          doc: "var(--color-file-doc)",
-          code: "var(--color-file-code)",
-          audio: "var(--color-file-audio)",
-          neutral: "var(--color-file-neutral)",
+          media: token("file-media"),
+          doc: token("file-doc"),
+          code: token("file-code"),
+          audio: token("file-audio"),
+          neutral: token("file-neutral"),
         },
         text: {
-          primary: "var(--color-text-primary)",
-          secondary: "var(--color-text-secondary)",
-          muted: "var(--color-text-muted)",
+          primary: token("text-primary"),
+          secondary: token("text-secondary"),
+          muted: token("text-muted"),
         },
-        success: "var(--color-success)",
-        "success-foreground": "var(--color-success-foreground)",
-        warning: "var(--color-warning)",
-        "warning-foreground": "var(--color-warning-foreground)",
-        error: "var(--color-error)",
+        success: token("success"),
+        "success-foreground": token("success-foreground"),
+        warning: token("warning"),
+        "warning-foreground": token("warning-foreground"),
+        error: token("error"),
         overlay: {
-          hover: "var(--color-overlay-hover)",
-          press: "var(--color-overlay-press)",
-          on: "var(--color-overlay-on)",
+          hover: token("overlay-hover"),
+          press: token("overlay-press"),
+          on: token("overlay-on"),
         },
-        "window-close-hover": "var(--color-window-close-hover)",
+        "window-close-hover": token("window-close-hover"),
       },
       fontFamily: {
         sans: [
@@ -130,3 +137,19 @@ module.exports = {
   },
   plugins: [],
 };
+
+// 语义色 → 可加透明度修饰符的 tailwind 颜色。
+//
+// 返回的是函数色：tailwind v3 的 withAlphaValue() 对函数会调用
+// color({ opacityValue })，把修饰符里的 alpha 原样交进来——
+//   无修饰符时是 "var(--tw-bg-opacity, 1)"（保留 bg-opacity 链路）
+//   有修饰符时是 "0.4"
+// 两种情况都走 color-mix，因此色值真相仍然只有 globals.css 一份。
+// 等价于 rgba(var(--color-x), alpha)，color-mix 在 srgb 空间下与之一致。
+// 回归测试：src/tests/renderer/token-alpha.test.ts
+function token(name) {
+  return ({ opacityValue }) =>
+    opacityValue === undefined
+      ? `var(--color-${name})`
+      : `color-mix(in srgb, var(--color-${name}) calc(${opacityValue} * 100%), transparent)`;
+}

@@ -70,14 +70,14 @@ function statusColors(status: DiagnosticStepStatus) {
     case "ok":
       return {
         border: "border-success/50",
-        bg: "bg-success/8",
+        bg: "bg-success/10",
         text: "text-success",
         iconText: "text-success",
       };
     case "fail":
       return {
         border: "border-error/50",
-        bg: "bg-error/8",
+        bg: "bg-error/10",
         text: "text-error",
         iconText: "text-error",
       };
@@ -91,7 +91,7 @@ function statusColors(status: DiagnosticStepStatus) {
     case "running":
       return {
         border: "border-accent/60",
-        bg: "bg-accent/8",
+        bg: "bg-accent/10",
         text: "text-accent",
         iconText: "text-accent",
       };
@@ -201,7 +201,7 @@ function FailureDetail({ step }: { step: DiagnosticStep }) {
   })();
 
   return (
-    <div className="mt-2 rounded-lg bg-error/8 border border-error/20 px-3 py-2 text-xs">
+    <div className="mt-2 rounded-lg bg-error/10 border border-error/20 px-3 py-2 text-xs">
       {step.error && <p className="text-error font-medium">{step.error}</p>}
       {fixText && <p className="mt-1 text-text-secondary">{fixText}</p>}
     </div>
@@ -292,7 +292,7 @@ export default function ApiDiagnosticsPanel({
           {failedStep && <FailureDetail step={failedStep} />}
 
           {result?.advisoryText && !isRunning && (
-            <div className="mt-3 rounded-lg bg-accent/8 border border-accent/20 px-3 py-2 text-xs text-text-secondary">
+            <div className="mt-3 rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 text-xs text-text-secondary">
               {t(
                 `api.diagnostic.advisory.${result.advisoryCode ?? ""}`,
                 result.advisoryText,

@@ -100,7 +100,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
     >
       <div className="bg-background border border-border-subtle rounded-6xl shadow-elevated max-w-md w-full mx-4 overflow-hidden">
         {/* Header */}
-        <div className="bg-background-secondary/88 px-6 py-5 border-b border-border-muted">
+        <div className="bg-background-secondary/90 px-6 py-5 border-b border-border-muted">
           <div className="flex items-center gap-3">
             <div className="text-3xl animate-pulse">{config.icon}</div>
             <div>
