@@ -922,6 +922,7 @@
     "switchModel": "切换模型",
     "searchModel": "搜索模型...",
     "noModelMatch": "无匹配模型",
+    "noAvailableModel": "暂无可用模型",
     "slashSkills": "技能",
     "slashCommands": "命令",
     "slashAll": "全部",

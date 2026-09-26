@@ -35,6 +35,11 @@ export interface MergedInputChipProps {
 // 面板向上展开，顶部需要让开标题栏（h-10）并留一点呼吸空间。
 const MENU_TOP_SAFE_AREA_PX = 48;
 const MODEL_MENU_MAX_HEIGHT_PX = 512;
+// 可见模型总数超过这个数才渲染搜索框：8 个模型 + 2 个分组标题 ≈ 317px，仍在面板
+// 512px 上限内（单行 28px 来自 MENU_ITEM_CLASS 的 h-7）。这笔账成立的前提是
+// uiFontSize 为默认值、且面板吃到 512px 上限——依据与偏差见
+// design-docs/2026-09-27-model-menu-compact-design.md §2、§7。
+const MODEL_SEARCH_MIN_ITEMS = 8;
 
 export function MergedInputChip({
   model,
@@ -97,8 +102,27 @@ export function MergedInputChip({
     );
   }, [modelOptions, isLoggedIn]);
 
+  // 搜索框只在列表长到一屏放不下时才出现。判据取 visibleModelOptions 而非 props：
+  // 未登录时云分组已被剔除，用 props 会拿失效 token 的残壳把总数撑大。
+  // 这里刻意不用 useMemo——只是数组上的 reduce，重算比 memo 自身开销还低。
+  const visibleModelCount = visibleModelOptions.reduce(
+    (sum, group) => sum + group.items.length,
+    0,
+  );
+  const showSearch = visibleModelCount > MODEL_SEARCH_MIN_ITEMS;
+  // 搜索框不渲染时过滤必须同步失效。modelSearch 只在关闭菜单时清空（closeMenu），
+  // 而 isLoggedIn 可能被后台 401 打成 false（仓里 10 处 setCloudConfig(null)），
+  // 那一瞬列表变短、搜索框卸载，残留 query 会留下一个无法清空的过滤结果。
+  const activeSearch = showSearch ? modelSearch : "";
+  // 只有一个分组时标题不提供任何导航价值——面板里没有第二个分组可跳。
+  // 判据是分组数而非模型数，与上面的搜索框阈值是两条独立规则。
+  // 分组数刻意取**未过滤**的 visibleModelOptions：搜索把结果收窄到 1 个分组时，
+  // 标题要留着说明这条结果来自哪个 provider；改用 filteredModelOptions 会让标题
+  // 随着打字增删。
+  const showGroupLabel = visibleModelOptions.length > 1;
+
   const filteredModelOptions = useMemo(() => {
-    const query = modelSearch.trim().toLowerCase();
+    const query = activeSearch.trim().toLowerCase();
     if (!query) return visibleModelOptions;
 
     return visibleModelOptions
@@ -111,7 +135,7 @@ export function MergedInputChip({
         ),
       }))
       .filter((group) => group.items.length > 0);
-  }, [visibleModelOptions, modelSearch]);
+  }, [visibleModelOptions, activeSearch]);
 
   const closeMenu = useCallback(() => {
     setMenuOpen(false);
@@ -167,10 +191,13 @@ export function MergedInputChip({
       );
     });
 
+  // 输入框绑的是 activeSearch 而不是 modelSearch。两者在输入框渲染期间恒等（渲染
+  // 条件就是 showSearch），绑派生值把「不渲染 ⇔ 不过滤」变成结构性保证：将来若这
+  // 两个条件被拆开，会立刻表现为输入框打不进字，而不是静默地 value 与过滤源不一致。
   const renderSearchInput = () => (
     <input
       type="text"
-      value={modelSearch}
+      value={activeSearch}
       onChange={(event) => setModelSearch(event.target.value)}
       onClick={(event) => event.stopPropagation()}
       placeholder={t("chat.searchModel")}
@@ -207,15 +234,19 @@ export function MergedInputChip({
 
   const renderGroupList = () => {
     if (filteredModelOptions.length === 0) {
+      // 判据用 activeSearch 而不是 showSearch：前者天然覆盖「有搜索框但用户还没输入」
+      // （此时列表非空，走不到这里），只有真在筛选时才说「无匹配」。
       return (
         <div className="px-2.5 py-3 text-center text-xs text-text-muted">
-          {t("chat.noModelMatch")}
+          {activeSearch ? t("chat.noModelMatch") : t("chat.noAvailableModel")}
         </div>
       );
     }
     return filteredModelOptions.map((group) => (
       <div key={group.profileKey} className="mb-1 last:mb-0">
-        <div className={MENU_LABEL_CLASS}>{group.groupLabel}</div>
+        {showGroupLabel && (
+          <div className={MENU_LABEL_CLASS}>{group.groupLabel}</div>
+        )}
         {renderGroupItems(group)}
       </div>
     ));
@@ -301,7 +332,7 @@ export function MergedInputChip({
             </>
           ) : (
             <>
-              {renderSearchInput()}
+              {showSearch && renderSearchInput()}
               {renderGroupList()}
               {renderThinkingRow()}
             </>

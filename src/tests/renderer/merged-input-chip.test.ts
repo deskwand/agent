@@ -35,6 +35,20 @@ const modelOptions: ModelOptionGroup[] = [
   },
 ];
 
+// 单分组长列表：搜索框判据只看模型总数，用单分组避免与分组标题判据相互干扰。
+function singleGroupOptions(count: number): ModelOptionGroup[] {
+  return [
+    {
+      profileKey: "profile-a" as never,
+      groupLabel: "Provider A",
+      items: Array.from({ length: count }, (_, i) => ({
+        id: `model-${i}`,
+        name: `Model ${i}`,
+      })),
+    },
+  ];
+}
+
 const thinkingLevelOptions = [
   "off",
   "minimal",
@@ -127,6 +141,19 @@ describe("MergedInputChip (single-panel)", () => {
     if (!el) throw new Error("element not found");
     act(() => {
       el.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+  }
+
+  function setSearchValue(value: string) {
+    const input = panel().querySelector("input");
+    if (!input) throw new Error("search input not found");
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
 
@@ -263,8 +290,9 @@ describe("MergedInputChip (single-panel)", () => {
     expect(text).toContain("Provider A");
   });
 
-  it("shows the no-match row when every group is hidden", () => {
-    // 未登录时云分组被过滤掉；列表为空也要给出空态行，且思考行仍在（设计文档已记录的行为偏差）
+  it("uses the available-models copy when the list itself is empty", () => {
+    // 未登录时云分组被过滤掉；列表为空也要给出空态行，且思考行仍在（设计文档已记录的行为偏差）。
+    // 这个场景下没有搜索框，文案不能再说「无匹配」——那是筛选语境的话术。
     render({
       modelOptions: modelOptions.filter(
         (g) => g.profileKey === "custom:deskwand",
@@ -272,23 +300,97 @@ describe("MergedInputChip (single-panel)", () => {
     });
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).toContain("chat.noModelMatch");
+    expect(text).toContain("chat.noAvailableModel");
+    expect(text).not.toContain("chat.noModelMatch");
     expect(text).toContain("modelMenu.thinkingWithValue");
   });
 
   it("shows no-match row when search filters everything out", () => {
-    render();
+    render({ modelOptions: singleGroupOptions(9) });
     click(trigger());
-    const input = panel().querySelector("input");
-    expect(input).toBeDefined();
-    act(() => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(input, "zzz-nothing");
-      input!.dispatchEvent(new Event("input", { bubbles: true }));
-    });
+    expect(panel().querySelector("input")).not.toBeNull();
+    setSearchValue("zzz-nothing");
     expect(panel().textContent).toContain("chat.noModelMatch");
+  });
+
+  it("hides the search input while the list is short", () => {
+    render(); // 默认数据 3 分组 5 模型；未登录下云分组被剔除，可见 2 分组 3 模型
+    click(trigger());
+    expect(panel().querySelector("input")).toBeNull();
+    expect(panel().textContent).toContain("Model One");
+  });
+
+  it("hides the search input at exactly the threshold", () => {
+    // 8 是阈值本身。`>` 写成 `>=` 的差异只有这一条能守住：
+    // 上面那条可见 3 个模型、下面那条 9 个，两者都离边界很远。
+    render({ modelOptions: singleGroupOptions(8) });
+    click(trigger());
+    expect(panel().querySelector("input")).toBeNull();
+    expect(panel().textContent).toContain("Model 7");
+  });
+
+  it("shows the search input once the visible models exceed the threshold", () => {
+    render({ modelOptions: singleGroupOptions(9) });
+    click(trigger());
+    expect(panel().querySelector("input")).not.toBeNull();
+  });
+
+  it("drops the filter when the list shrinks below the threshold", () => {
+    render({ modelOptions: singleGroupOptions(9) });
+    click(trigger());
+    setSearchValue("zzz-nothing");
+    expect(panel().textContent).toContain("chat.noModelMatch");
+
+    // 这里用替换 props 模拟同一场收缩（生产上的触发是后台 401 → isLoggedIn 变
+    // false → 云分组消失）。两条路径触发的是 visibleModelOptions 的同一次重算，
+    // 因为它的 memo 依赖就是 [modelOptions, isLoggedIn]；isLoggedIn 那条路径本身
+    // 已由上面「hides the cloud group when not logged in」等用例守住。
+    // 收缩之后搜索框卸载，残留的 query 必须一起失效，否则列表会停在一个
+    // 用户既无法解释、也无法清空的过滤结果上。
+    render({ modelOptions: singleGroupOptions(2) });
+    expect(panel().querySelector("input")).toBeNull();
+    expect(panel().textContent).toContain("Model 0");
+    expect(panel().textContent).not.toContain("chat.noModelMatch");
+  });
+
+  it("hides the group label when there is only one group", () => {
+    render({ modelOptions: singleGroupOptions(3) }); // 3 个模型、1 个分组
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(text).not.toContain("Provider A");
+    expect(text).toContain("Model 0");
+  });
+
+  it("keeps group labels when there are several groups", () => {
+    render(); // 默认数据：未登录下可见 2 个分组
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(text).toContain("Provider A");
+    expect(text).toContain("Provider B");
+  });
+
+  it("counts visible models, not raw props, for both thresholds", () => {
+    // 未登录时云分组被 visibleModelOptions 剔除，但它在 props 里仍然在。
+    // 这条数据 raw 是 2 分组 9 模型，visible 是 1 分组 7 模型——两个判据都必须按
+    // visible 算：按 raw 算会长出搜索框（9 > 8）和分组标题（2 > 1），两个断言都会红。
+    render({
+      modelOptions: [
+        {
+          profileKey: "custom:deskwand" as never,
+          groupLabel: "DeskWand 云",
+          items: [
+            { id: "cloud-1", name: "Cloud One" },
+            { id: "cloud-2", name: "Cloud Two" },
+          ],
+        },
+        ...singleGroupOptions(7),
+      ],
+    }); // cloudConfig 默认 null = 未登录
+    click(trigger());
+    const text = panel().textContent ?? "";
+    expect(panel().querySelector("input")).toBeNull();
+    expect(text).not.toContain("DeskWand 云");
+    expect(text).not.toContain("Provider A");
+    expect(text).toContain("Model 6");
   });
 });

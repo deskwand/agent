@@ -922,6 +922,7 @@
     "switchModel": "Switch model",
     "searchModel": "Search models...",
     "noModelMatch": "No matching models",
+    "noAvailableModel": "No models available",
     "slashSkills": "Skills",
     "slashCommands": "Commands",
     "slashAll": "All",
