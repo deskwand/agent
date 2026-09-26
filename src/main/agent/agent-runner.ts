@@ -156,6 +156,12 @@ import {
 import { modelResolutionService } from "../model/model-resolution-service";
 import { MEMORY_POLICY_SCHEMA_VERSION } from "../memory/memory-policy";
 import { piSessionFileContainsLegacyMemoryContext } from "./pi-session-safety";
+import {
+  isSudoAuthFailure,
+  planSudoCommand,
+  sanitizeSudoOutput,
+  SUDO_AUTH_FAILURE_TEXT,
+} from "./sudo-command";
 
 export { piSessionFileContainsLegacyMemoryContext };
 
@@ -1874,16 +1880,10 @@ ${hints.join("\n")}
     ];
   }
   /**
-   * Check if a command contains sudo
-   */
-  private static isSudoCommand(command: string): boolean {
-    return /\bsudo\b/.test(command);
-  }
-
-  /**
    * Wrap the bash tool in the coding tools array to intercept sudo commands.
-   * When a sudo command is detected, prompts the user for a password,
-   * then rewrites the command to pipe the password into sudo -S.
+   * A plain leading `sudo <command>` prompts the user for a password and runs with
+   * `-S` so sudo reads it from the stdin pipe; anything else is passed through or
+   * refused (see ./sudo-command).
    */
   private wrapBashToolForSudo(
     tools: ToolDefinition[],
@@ -1909,92 +1909,113 @@ ${hints.join("\n")}
           ctx: any,
         ) => {
           const command = params.command;
+          const plan = planSudoCommand(command);
 
-          if (AgentRunner.isSudoCommand(command)) {
-            log("[AgentRunner] Sudo command detected, requesting password");
-            const password = await requestSudoPassword(
-              sessionId,
-              toolCallId,
-              command,
-            );
-
-            if (!password) {
-              log("[AgentRunner] Sudo password cancelled by user");
-              return {
-                content: [
-                  {
-                    type: "text" as const,
-                    text: "Command cancelled: user denied sudo password.",
-                  },
-                ],
-                details: undefined as unknown,
-              };
-            }
-
-            // Add -S flag to sudo invocations that don't already have it
-            const rewrittenCommand = command.replace(
-              /\bsudo\b(?!\s+-S)/g,
-              "sudo -S",
-            );
-
-            // Pass password via stdin pipe so it never appears in process args
-            // or environment variables. Uses async spawn with stdio: 'pipe'.
-            log(
-              "[AgentRunner] Executing sudo command with password injection (via stdin pipe)",
-            );
-            try {
-              const shell =
-                process.platform === "win32" ? "cmd.exe" : "/bin/sh";
-              const shellArgs =
-                process.platform === "win32"
-                  ? ["/c", rewrittenCommand]
-                  : ["-c", rewrittenCommand];
-              const timeoutMs = (params.timeout ?? 120) * 1000;
-              const output = await new Promise<string>((resolve, reject) => {
-                const child = spawn(shell, shellArgs, {
-                  stdio: ["pipe", "pipe", "pipe"],
-                  cwd: effectiveCwd,
-                });
-                let stdout = "";
-                let stderr = "";
-                const timer = setTimeout(() => {
-                  child.kill("SIGKILL");
-                  reject(
-                    new Error(`Sudo command timed out after ${timeoutMs}ms`),
-                  );
-                }, timeoutMs);
-                child.stdout.on("data", (chunk: Buffer) => {
-                  stdout += chunk.toString();
-                });
-                child.stderr.on("data", (chunk: Buffer) => {
-                  stderr += chunk.toString();
-                });
-                child.on("error", (err) => {
-                  clearTimeout(timer);
-                  reject(err);
-                });
-                child.on("close", () => {
-                  clearTimeout(timer);
-                  resolve(stdout + stderr);
-                });
-                child.stdin.write(password + "\n");
-                child.stdin.end();
-              });
-              return {
-                content: [
-                  { type: "text" as const, text: output || "(no output)" },
-                ],
-                details: undefined as unknown,
-              };
-            } catch (sudoErr) {
-              logError("[AgentRunner] Sudo command failed:", sudoErr);
-              throw sudoErr instanceof Error
-                ? sudoErr
-                : new Error(String(sudoErr));
-            }
+          if (plan.disposition === "refuse") {
+            log("[AgentRunner] Sudo command refused:", command, plan.refusal);
+            return {
+              content: [{ type: "text" as const, text: plan.refusal ?? "" }],
+              details: undefined as unknown,
+            };
           }
 
-          return originalExecute(toolCallId, params, signal, onUpdate, ctx);
+          if (plan.disposition !== "inject") {
+            // "none": no sudo here; "passthrough": sudo present but nothing needs a
+            // password (sudo -n, credential-cache maintenance, timestamp-only).
+            return originalExecute(toolCallId, params, signal, onUpdate, ctx);
+          }
+
+          log("[AgentRunner] Sudo command detected, requesting password");
+          const password = await requestSudoPassword(
+            sessionId,
+            toolCallId,
+            command,
+          );
+
+          if (!password) {
+            log("[AgentRunner] Sudo password cancelled by user");
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: "Command cancelled: user denied sudo password. Do not retry; ask the user how to proceed.",
+                },
+              ],
+              details: undefined as unknown,
+            };
+          }
+
+          // plan.command already carries `-S` (plus `-p ''` unless the caller set a
+          // prompt), so sudo reads the password from the stdin pipe below instead of
+          // the terminal. The password never reaches argv or the environment.
+          log(
+            "[AgentRunner] Executing sudo command with password injection (via stdin pipe)",
+          );
+          try {
+            const shell = process.platform === "win32" ? "cmd.exe" : "/bin/sh";
+            const shellArgs =
+              process.platform === "win32"
+                ? ["/c", plan.command]
+                : ["-c", plan.command];
+            const timeoutMs = (params.timeout ?? 120) * 1000;
+            const result = await new Promise<{
+              output: string;
+              exitCode: number | null;
+            }>((resolve, reject) => {
+              const child = spawn(shell, shellArgs, {
+                stdio: ["pipe", "pipe", "pipe"],
+                cwd: effectiveCwd,
+              });
+              let stdout = "";
+              let stderr = "";
+              const timer = setTimeout(() => {
+                child.kill("SIGKILL");
+                reject(
+                  new Error(`Sudo command timed out after ${timeoutMs}ms`),
+                );
+              }, timeoutMs);
+              child.stdout.on("data", (chunk: Buffer) => {
+                stdout += chunk.toString();
+              });
+              child.stderr.on("data", (chunk: Buffer) => {
+                stderr += chunk.toString();
+              });
+              child.on("error", (err) => {
+                clearTimeout(timer);
+                reject(err);
+              });
+              child.on("close", (code) => {
+                clearTimeout(timer);
+                resolve({ output: stdout + stderr, exitCode: code });
+              });
+              child.stdin.write(password + "\n");
+              child.stdin.end();
+            });
+            if (isSudoAuthFailure(result.exitCode, result.output)) {
+              log(
+                "[AgentRunner] Sudo authentication failed; not retrying, handing off to the user",
+              );
+              return {
+                content: [
+                  { type: "text" as const, text: SUDO_AUTH_FAILURE_TEXT },
+                ],
+                details: undefined as unknown,
+              };
+            }
+
+            const cleaned = sanitizeSudoOutput(result.output);
+            return {
+              content: [
+                { type: "text" as const, text: cleaned || "(no output)" },
+              ],
+              details: undefined as unknown,
+            };
+          } catch (sudoErr) {
+            logError("[AgentRunner] Sudo command failed:", sudoErr);
+            throw sudoErr instanceof Error
+              ? sudoErr
+              : new Error(String(sudoErr));
+          }
         },
       } as ToolDefinition;
     });
