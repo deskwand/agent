@@ -1857,7 +1857,7 @@
       "hitRateHint": "cache read ÷ prompt tokens",
       "avgOutput": "{{value}} output tokens/call",
       "cost": "Est. cost",
-      "costHint": "Converted from the pi price table",
+      "costHint": "From official price tables, incl. peak/off-peak",
       "costUnpriced": "{{count}} calls unpriced · excluded"
     },
     "allTime": "all time",

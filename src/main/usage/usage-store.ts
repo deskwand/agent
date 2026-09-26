@@ -4,8 +4,10 @@
  * Only depends on node:sqlite's DatabaseSync (no Electron), so every unit test
  * runs against `new DatabaseSync(":memory:")`.
  *
- * Cost is priced per record via `usage-cost.ts` (pi-ai price table), never from
- * a provider-reported `Usage.cost` — see design-docs/2026-09-20-usage-cost-design.md.
+ * Cost is priced per record via `usage-cost.ts` (pi-ai price table plus
+ * deskwand's own override / peak-plan tables), never from a
+ * provider-reported `Usage.cost` — see
+ * design-docs/2026-09-25-deepseek-peak-pricing-design.md.
  */
 
 import type { DatabaseSync } from "node:sqlite";

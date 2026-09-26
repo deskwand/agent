@@ -220,3 +220,46 @@ describe("usage cost reconciliation", () => {
     expect(span.totals.cost).toBeCloseTo(59, 10);
   });
 });
+
+describe("DeepSeek peak pricing, end to end through the real table", () => {
+  // 自带 db：这个 describe 与文件里那个 describe 是兄弟（都在 module scope），
+  // 拿不到它内部的 db/beforeEach，所以这里自己建一套。
+  let db: DatabaseSync;
+  beforeEach(() => {
+    db = new DatabaseSync(":memory:");
+    createUsageSchema(db);
+  });
+  afterEach(() => db.close());
+
+  it("bills the same model at peak and off-peak rates by its timestamp", () => {
+    const at = (iso: string) => Date.parse(iso);
+    const insert = (over: Partial<UsageRecordInput>) =>
+      recordUsage(db, {
+        ts: at("2026-09-18T02:00:00Z"), // 周五 02:00 UTC = 高峰
+        sessionId: "s1",
+        model: "deepseek-flash",
+        provider: "deepseek",
+        source: "chat",
+        purpose: null,
+        dedupKey: null,
+        input: 1_000_000,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        ...over,
+      });
+
+    insert({ dedupKey: "peak" }); // 高峰：0.3 × 1e6 / 1e6 = 0.30
+    // 空闲：0.15 × 1e6 / 1e6 = 0.15（周五 04:00 UTC 是窗口右端，开区间）
+    insert({ ts: at("2026-09-18T04:00:00Z"), dedupKey: "off" });
+
+    // 不传 priceIndex：走 loadPriceIndex() 里的真实计划表，这正是要锁的东西
+    const span = queryUsage(db, "all", at("2026-09-18T12:00:00Z"));
+
+    expect(span.totals.cost).toBeCloseTo(0.45, 10);
+    const flash = span.byModel.find((r) => r.model === "deepseek-flash");
+    expect(flash?.cost).toBeCloseTo(0.45, 10);
+    // 全天按高峰算会得到 0.60
+    expect(span.totals.cost).not.toBeCloseTo(0.6, 5);
+  });
+});

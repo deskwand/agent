@@ -1856,7 +1856,7 @@
       "hitRateHint": "缓存读 ÷ 提示词总量",
       "avgOutput": "平均 {{value}} 输出 tokens/次",
       "cost": "参考成本",
-      "costHint": "按 pi 价目表折算",
+      "costHint": "按官方价目表折算，含峰谷",
       "costUnpriced": "{{count}} 次调用无价目 · 未计入"
     },
     "allTime": "全部区间",

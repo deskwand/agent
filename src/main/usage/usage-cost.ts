@@ -9,7 +9,11 @@
 import type { ModelCost, ModelCostRates } from "@earendil-works/pi-ai";
 import { getModels, getProviders } from "@earendil-works/pi-ai/compat";
 import type { UsageTokens } from "../../shared/usage";
-import { MODEL_PRICE_OVERRIDES } from "./model-price-overrides";
+import {
+  MODEL_PEAK_PRICING,
+  MODEL_PRICE_OVERRIDES,
+  type PeakRates,
+} from "./model-price-overrides";
 
 export interface UsageCostRow extends UsageTokens {
   ts: number;
@@ -27,6 +31,8 @@ export interface PriceIndex {
   registryExact: Map<string, ModelCost>;
   overrideWildcard: Map<string, ModelCost>;
   registryModel: Map<string, ModelCost>;
+  /** 键是**裸模型 id**（表键剥掉 `*|` 前缀）：计划不区分 provider，故只需一张表。 */
+  plans: Map<string, PeakRates>;
 }
 
 /** 查价键与归集键共用的唯一构造函数；键即覆盖表里写的那个字符串。 */
@@ -54,12 +60,14 @@ function isUsableCost(cost: ModelCost | undefined): cost is ModelCost {
 export function buildPriceIndex(
   registry: Iterable<{ provider: string; id: string; cost: ModelCost }>,
   overrides: Record<string, ModelCost>,
+  peakPlans: Record<string, PeakRates> = {},
 ): PriceIndex {
   const index: PriceIndex = {
     overrideExact: new Map(),
     registryExact: new Map(),
     overrideWildcard: new Map(),
     registryModel: new Map(),
+    plans: new Map(),
   };
 
   for (const [key, cost] of Object.entries(overrides)) {
@@ -83,6 +91,14 @@ export function buildPriceIndex(
     if (!index.registryModel.has(entry.id)) {
       index.registryModel.set(entry.id, entry.cost);
     }
+  }
+
+  for (const [key, rates] of Object.entries(peakPlans)) {
+    // 不以 `*|` 开头的键（含写坏的键）静默丢弃，与覆盖表对坏键的处理一致；
+    // 全表必须以 `*|` 开头这条由单测钉住，免得丢弃变成静默缺陷。
+    const model = key.startsWith("*|") ? key.slice(2) : "";
+    if (!model) continue;
+    index.plans.set(model, rates);
   }
 
   return index;
@@ -147,6 +163,13 @@ export function costOfRecord(
   index: PriceIndex,
   row: UsageCostRow,
 ): number | null {
+  // 计划命中即取代价目表，不再走优先级链
+  const plan = index.plans.get(row.model ?? "");
+  if (plan) {
+    // 计划值不含 tiers，所以刻意不调用 ratesFor
+    return costOfTokens(isPeakAt(row.ts) ? plan.peak : plan.offPeak, row);
+  }
+
   const cost = resolveModelCost(index, row.provider, row.model);
   if (!cost) return null;
   const promptTokens = row.input + row.cacheRead + row.cacheWrite;
@@ -179,7 +202,11 @@ let cachedIndex: PriceIndex | null = null;
  */
 export function loadPriceIndex(): PriceIndex {
   if (!cachedIndex) {
-    cachedIndex = buildPriceIndex(readRegistry(), MODEL_PRICE_OVERRIDES);
+    cachedIndex = buildPriceIndex(
+      readRegistry(),
+      MODEL_PRICE_OVERRIDES,
+      MODEL_PEAK_PRICING,
+    );
   }
   return cachedIndex;
 }
@@ -243,4 +270,37 @@ export function aggregateCosts(
   for (const [key, cost] of costByModel) byModel.set(key, cost);
 
   return { total, byDay, byModel };
+}
+
+/**
+ * DeepSeek 峰谷时段。官方用 UTC 定义（高峰 = UTC 01:00–04:00 与 06:00–10:00，
+ * 周一至周五），所以判定固定走 getUTC*，**与运行机器时区无关**。
+ * 注意这与本文件的 localDateKey 刻意相反：那里日界要和 SQLite 的 localtime 对齐
+ * 才能把同一天归成一行，而这里要对齐的是官方定义，不是本机。
+ *
+ * 不排除中国法定节假日（官方口径含这一条）：实测偏差 $0.42 / $350.54 = 0.12%，
+ * 方向恒为高估。见 design-docs/2026-09-25-deepseek-peak-pricing-design.md §2.5、§5。
+ */
+const DEEPSEEK_PEAK_SCHEDULE = {
+  /** 半开区间 [start, end)，UTC 分钟数。 */
+  windows: [
+    { startMinute: 60, endMinute: 240 },
+    { startMinute: 360, endMinute: 600 },
+  ],
+  /** 0 = 周日 … 6 = 周六，与 Date.getUTCDay() 及 src/shared/usage.ts 同一约定。 */
+  weekdays: [1, 2, 3, 4, 5],
+};
+
+/**
+ * 该时刻是否落在 DeepSeek 高峰时段。
+ *
+ * 跨窗口边界的流式请求按该行 ts 整体归一头，偏差 ≤ 一条请求，可忽略。
+ */
+export function isPeakAt(ts: number): boolean {
+  const at = new Date(ts);
+  if (!DEEPSEEK_PEAK_SCHEDULE.weekdays.includes(at.getUTCDay())) return false;
+  const minute = at.getUTCHours() * 60 + at.getUTCMinutes();
+  return DEEPSEEK_PEAK_SCHEDULE.windows.some(
+    (window) => minute >= window.startMinute && minute < window.endMinute,
+  );
 }
