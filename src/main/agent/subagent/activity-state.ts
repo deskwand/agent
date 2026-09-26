@@ -60,7 +60,8 @@ export interface AgentRecordView {
     input?: number;
     output?: number;
     cacheWrite?: number;
-    /** 声明但不参与 tokens 计算：上游的显示口径刻意排除它。 */
+    /** 参与全量 tokens 计算（见 buildSnapshot）：上游在自己所有展示总数里都排除它
+     *  （widget / fleet 行 / 完成摘要文案 / 通知）。 */
     cacheRead?: number;
     cost?: number;
   };
@@ -212,7 +213,10 @@ export function buildSnapshot(params: {
   const { state, record, now } = params;
   const usage = record.lifetimeUsage;
   const tokens = usage
-    ? (usage.input ?? 0) + (usage.output ?? 0) + (usage.cacheWrite ?? 0)
+    ? (usage.input ?? 0) +
+      (usage.output ?? 0) +
+      (usage.cacheWrite ?? 0) +
+      (usage.cacheRead ?? 0)
     : 0;
   const invocation = record.invocation;
   const hasModel = Boolean(invocation?.modelName || invocation?.modelId);

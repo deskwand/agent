@@ -29,6 +29,7 @@ import { agentNameZhLabel } from "../../../shared/agent-names";
 import {
   resolveSubagentName,
   splitSubagentOutput,
+  stripUpstreamAgentStats,
 } from "../../utils/subagent-card";
 import { MessageMarkdown } from "../MessageMarkdown";
 
@@ -241,6 +242,12 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   const subagentOutput =
     isSubagentOutputTool && typeof toolResult?.content === "string"
       ? splitSubagentOutput(toolResult.content)
+      : null;
+  // 有活动快照时，元信息行已经是全量口径，上游那句完成摘要里的统计括号是旧口径（不含缓存重读），
+  // 留着会同屏出现两个互相打架的 token 数。
+  const agentResultText =
+    isAgentTool && subagentActivity && typeof toolResult?.content === "string"
+      ? stripUpstreamAgentStats(toolResult.content)
       : null;
   const collapsedSummary = getCollapsedToolSummary(
     block.name,
@@ -579,7 +586,9 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                       <MessageMarkdown normalizedText={subagentOutput.body} />
                     )
                   ) : (
-                    <MessageMarkdown normalizedText={toolResult.content} />
+                    <MessageMarkdown
+                      normalizedText={agentResultText ?? toolResult.content}
+                    />
                   )}
                 </div>
               ) : (

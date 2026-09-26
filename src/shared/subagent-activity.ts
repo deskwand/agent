@@ -39,7 +39,7 @@ export interface SubagentActivity {
     toolUses: number;
     turnCount?: number;
     maxTurns?: number;
-    /** input + output + cacheWrite，不含 cacheRead；未知时省略。 */
+    /** input + output + cacheRead + cacheWrite（全量，含缓存重读）；未知时省略。 */
     tokens?: number;
     durationMs: number;
   };

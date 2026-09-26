@@ -134,7 +134,7 @@ describe("buildSnapshot", () => {
     now: 2000,
   };
 
-  it("tokens 口径为 input+output+cacheWrite（不含 cacheRead）", () => {
+  it("tokens 口径为 input+output+cacheRead+cacheWrite（全量，含缓存重读）", () => {
     const snapshot = buildSnapshot({
       ...base,
       record: {
@@ -149,9 +149,19 @@ describe("buildSnapshot", () => {
         },
       },
     });
-    expect(snapshot.stats.tokens).toBe(17);
+    expect(snapshot.stats.tokens).toBe(1016);
     expect(snapshot.stats.durationMs).toBe(1000);
     expect(snapshot.status).toBe("running");
+  });
+
+  it("cacheRead 缺失时按 0 计，不得变成 NaN", () => {
+    const snapshot = buildSnapshot({
+      ...base,
+      record: {
+        lifetimeUsage: { input: 10, output: 5, cacheWrite: 2 },
+      },
+    });
+    expect(snapshot.stats.tokens).toBe(17);
   });
 
   it("无 usage 时不发 tokens（不用 0 冒充）", () => {

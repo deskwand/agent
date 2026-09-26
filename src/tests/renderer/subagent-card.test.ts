@@ -5,6 +5,7 @@ import {
   findToolCallOwnerMessageId,
   resolveSubagentName,
   splitSubagentOutput,
+  stripUpstreamAgentStats,
 } from "../../renderer/utils/subagent-card";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 
@@ -468,5 +469,48 @@ describe("collectCurrentRoundToolCallIds", () => {
     expect(collectCurrentRoundToolCallIds([userMessage("n", true)])).toBeNull();
     expect(collectCurrentRoundToolCallIds([])).toBeNull();
     expect(collectCurrentRoundToolCallIds(undefined)).toBeNull();
+  });
+});
+
+describe("stripUpstreamAgentStats", () => {
+  it("摘掉统计括号，保留正文", () => {
+    expect(
+      stripUpstreamAgentStats(
+        "Agent completed in 194.1s (10 tool uses, 114.2k token).\n\n找到了三个文件。",
+      ),
+    ).toBe("Agent completed in 194.1s.\n\n找到了三个文件。");
+  });
+
+  it("只摘第一个括号：后面的结论说明必须留", () => {
+    expect(
+      stripUpstreamAgentStats(
+        "Agent completed in 221.6s (36 tool uses, 112.7k token) (wrapped up at the turn limit — output may be partial).\n\n正文",
+      ),
+    ).toBe(
+      "Agent completed in 221.6s (wrapped up at the turn limit — output may be partial).\n\n正文",
+    );
+  });
+
+  it("带 cost 的统计括号一并摘掉", () => {
+    expect(
+      stripUpstreamAgentStats(
+        "Agent completed in 1.2s (0 tool uses, 117 token, $0.0014).\n\nx",
+      ),
+    ).toBe("Agent completed in 1.2s.\n\nx");
+  });
+
+  it("无 token 时（只有工具数）同样摘掉", () => {
+    expect(
+      stripUpstreamAgentStats("Agent completed in 1.0s (3 tool uses).\n\nx"),
+    ).toBe("Agent completed in 1.0s.\n\nx");
+  });
+
+  it("非完成摘要原样返回（保守策略）", () => {
+    const failed = "Agent failed: boom (2 tool uses).\n\nx";
+    expect(stripUpstreamAgentStats(failed)).toBe(failed);
+    const queued = "Agent started in background.\n\n(id: a1)";
+    expect(stripUpstreamAgentStats(queued)).toBe(queued);
+    const note = "Fell back to X. Agent completed in 1s (2 tool uses).\n\nx";
+    expect(stripUpstreamAgentStats(note)).toBe(note);
   });
 });

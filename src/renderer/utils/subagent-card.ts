@@ -224,3 +224,20 @@ export function collectCurrentRoundToolCallIds(
   }
   return ids;
 }
+
+/**
+ * 有活动快照时，摘掉上游完成摘要里的统计括号。
+ *
+ * 上游那句形如 `Agent completed in 221.6s (36 tool uses, 112.7k token) (wrapped up …).`，
+ * 括号里的 token 数出自上游的 `getLifetimeTotal`（不含缓存重读），而卡片元信息行现在是
+ * 全量口径 —— 同屏两个数会互相打架，且用户无法判断哪个才是真实消耗。
+ * 耗时、工具数、token 我们自己的元信息行都有，所以那一组括号是多余的。
+ *
+ * 只摘**第一个**括号组：后面可能跟着 `(wrapped up at the turn limit — output may be partial)`
+ * 这类结论说明，必须留。规则保守：只有以 `Agent completed in ` 开头才动，其余原样返回
+ * （`fallbackNote` 前缀、`Agent failed: …`、`Agent queued …` 都不碰）。
+ */
+export function stripUpstreamAgentStats(content: string): string {
+  if (!content.startsWith("Agent completed in ")) return content;
+  return content.replace(/\s*\(\d+ tool uses[^)]*\)/, "");
+}
