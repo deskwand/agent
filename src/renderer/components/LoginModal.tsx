@@ -61,6 +61,8 @@ async function completeLogin(
       result.token,
       t,
     );
+    // 登录前是否已有可用 provider —— 决定登录后要不要接管默认模型。
+    const alreadyConfigured = await window.electronAPI.config.isConfigured();
     if (payload.config.models.length > 0) {
       const saved = await window.electronAPI.config.saveProvider(payload);
       console.log(
@@ -71,8 +73,20 @@ async function completeLogin(
         "models:",
         payload.config.models.length,
       );
+      const defaultModel =
+        saved?.config?.providers?.[payload.profileKey]?.defaultModel;
+      // 只在没有别的可用 provider 时才切 active：账号菜单也能打开这个弹窗，
+      // 那时用户可能已有自己的 Key，默认模型是他选的，不能动。
+      if (!alreadyConfigured && defaultModel) {
+        await window.electronAPI.config.setActiveProvider({
+          profileKey: payload.profileKey,
+          defaultModel,
+        });
+      }
     } else {
-      console.warn("[cloud] pricing returned no models — skipping provider injection");
+      console.warn(
+        "[cloud] pricing returned no models — skipping provider injection",
+      );
     }
   } catch (e) {
     console.error("[cloud] provider injection failed:", e);

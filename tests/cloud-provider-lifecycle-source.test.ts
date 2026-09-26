@@ -42,6 +42,13 @@ describe("cloud provider lifecycle wiring", () => {
     expect(occurrences).toBeGreaterThanOrEqual(2);
   });
 
+  it("only activates the cloud provider when nothing was configured before", () => {
+    expect(loginModal).toContain(
+      "const alreadyConfigured = await window.electronAPI.config.isConfigured();",
+    );
+    expect(loginModal).toContain("if (!alreadyConfigured && defaultModel)");
+  });
+
   it("hides the provider from the manual API settings list", () => {
     expect(settingsApi).toContain('profileKey !== "custom:deskwand"');
   });

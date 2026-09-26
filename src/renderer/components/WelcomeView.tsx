@@ -18,7 +18,7 @@ import type {
 } from "../types";
 import { getInitialSessionTitle } from "../../shared/session-title";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
-import { ArrowRight, Eye, Globe, Sparkles } from "lucide-react";
+import { Eye, Globe, Sparkles } from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import { resolveProviderDisplayName } from "../utils/model-label";
 import {
@@ -29,6 +29,12 @@ import {
 } from "./ChatInput";
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
+import { ConnectCards } from "./welcome/connect-cards";
+import { connectionNoticeValues } from "./welcome/connection-notice";
+import {
+  connectCodingSubscription,
+  connectOAuthProvider,
+} from "../services/connect-provider";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -53,7 +59,10 @@ export function WelcomeView() {
   const workingDir = useAppStore((state) => state.workingDir);
   const setShowSettings = useAppStore((state) => state.setShowSettings);
   const setSettingsTab = useAppStore((state) => state.setSettingsTab);
+  const setShowLoginModal = useAppStore((state) => state.setShowLoginModal);
+  const setGlobalNotice = useAppStore((state) => state.setGlobalNotice);
   const appConfig = useAppConfig();
+  const showConnectCards = appConfig !== null && !isConfigured;
   const projectName = (() => {
     if (!workingDir) return "";
     return workingDir.split(/[\\/]/).filter(Boolean).pop() || "";
@@ -126,6 +135,61 @@ export function WelcomeView() {
       setAttachedKeys((prev) => attachmentKeySet(files, prev)),
     [],
   );
+
+  const handleOpenApiKey = useCallback(() => {
+    setSettingsTab("api");
+    setShowSettings(true);
+  }, [setSettingsTab, setShowSettings]);
+
+  const handleConnectOAuth = useCallback(
+    async (providerId: string, name: string) => {
+      // 返回值不手工写 store：新配置由主进程推的 config.status 落到 store
+      //（见下面的提示 effect）。
+      await connectOAuthProvider(providerId, name, t);
+    },
+    [t],
+  );
+
+  const handleConnectSubscription = useCallback(
+    async (profileKey: string, apiKey: string) => {
+      await connectCodingSubscription(profileKey, apiKey, t);
+    },
+    [t],
+  );
+
+  // 连接成功的提示必须挂在这一层：卡片区随 isConfigured 变 true 立刻卸载，
+  // 挂在卡片组件上的提示会被 mounted 守卫吞掉；而 WelcomeView 只有出现
+  // activeSessionId 时才被 App 换掉，所以这里一定还活着。也不能监听
+  // config.status 事件本身——在设置页改配置同样会推它，会误报。
+  //
+  // 一次连接会发两个快照（saveProvider、setActiveProvider），而 saveProvider
+  // 不动 activeProviderKey：fresh install 上第一个快照是 isConfigured=true +
+  // activeProviderKey 仍指向旧的 "openrouter"，那时去读 provider 只会得到
+  // undefined，提示就成了「已连接 openrouter · 」。所以先别把"待提示"的标记
+  // 消掉，等到 activeProviderKey 真指向一个带 defaultModel 的 provider 再发
+  //（判定在 connection-notice.ts，那里有测试守着）。
+  const pendingAnnounceRef = useRef(false);
+  useEffect(() => {
+    // appConfig 为 null 时配置状态不可信（store 的 isConfigured 初值恒为 false），
+    // 在这里就进入待提示状态会让已配置用户每次启动都被提示一次。
+    if (appConfig === null) return;
+    if (!isConfigured) {
+      pendingAnnounceRef.current = true;
+      return;
+    }
+    if (!pendingAnnounceRef.current) return;
+    const messageValues = connectionNoticeValues(appConfig);
+    if (!messageValues) return;
+    pendingAnnounceRef.current = false;
+    setGlobalNotice({
+      id: `connect-ready-${Date.now()}`,
+      type: "success",
+      // message 是必填字段，填已解析的文案；messageKey 让通知在切语言后仍能跟随。
+      message: t("connect.connected", messageValues),
+      messageKey: "connect.connected",
+      messageValues,
+    });
+  }, [isConfigured, appConfig, setGlobalNotice, t]);
 
   // Model & thinking level — initialised from first available model, same source as ChatView
   const [initialized, setInitialized] = useState(false);
@@ -320,22 +384,13 @@ export function WelcomeView() {
           </p>
         </div>
 
-        {/* API Not Configured Hint */}
-        {!isConfigured && (
-          <p className="text-sm text-text-muted text-center">
-            {t("welcome.apiNotConfigured")}{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setSettingsTab("api");
-                setShowSettings(true);
-              }}
-              className="inline-flex items-center gap-1 text-accent hover:text-accent-hover transition-colors"
-            >
-              {t("welcome.goToSettings")}
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </p>
+        {showConnectCards && (
+          <ConnectCards
+            onOpenCloud={() => setShowLoginModal(true)}
+            onOpenApiKey={handleOpenApiKey}
+            onConnectOAuth={handleConnectOAuth}
+            onConnectSubscription={handleConnectSubscription}
+          />
         )}
 
         {/* 快捷入口 —— 能力发现，不分组、不隐藏 */}

@@ -25,10 +25,11 @@ import {
   profileKeyToProvider,
 } from "../../hooks/useApiConfigState";
 import { oauthProfileKey } from "../../../shared/oauth-utils";
+import { isCodingSubscriptionProfileKey } from "../../../shared/coding-subscriptions";
 import {
-  getCodingSubscription,
-  isCodingSubscriptionProfileKey,
-} from "../../../shared/coding-subscriptions";
+  connectCodingSubscription,
+  connectOAuthProvider,
+} from "../../services/connect-provider";
 import type {
   ApiProviderConfig,
   ApiProviderModel,
@@ -817,95 +818,26 @@ export function SettingsAPI({
       return next;
     });
     try {
-      if (providerId === "openrouter") {
-        const loginResult = await window.electronAPI.openrouterAuth.login();
-        const modelsResult =
-          await window.electronAPI.config.fetchOpenRouterModels();
-        const providerInfo = OAUTH_PROVIDERS.find((p) => p.id === providerId);
-        const models = modelsResult.models;
-        const defaultModel = models[0]?.id;
-        if (!defaultModel) {
-          throw new Error(t("api.oauthOpenRouterModelLoadError"));
-        }
-        await window.electronAPI.config.saveProvider({
-          profileKey: "openrouter",
-          config: {
-            provider: "openrouter",
-            customProtocol: "anthropic",
-            name: providerInfo?.name || providerId,
-            apiKey: loginResult.apiKey,
-            baseUrl: presets.openrouter.baseUrl,
-            defaultModel,
-            models,
-            updatedAt: new Date().toISOString(),
-          },
-        });
-        await window.electronAPI.config.setActiveProvider({
-          profileKey: "openrouter",
-          defaultModel,
-        });
-        const updatedConfig = await window.electronAPI.config.get();
-        applyConfig(updatedConfig);
-        const status = await window.electronAPI.openrouterAuth.status();
-        setOAuthStatuses((prev) => ({ ...prev, [providerId]: status }));
-        if (modelsResult.usedFallback) {
-          const fallbackMsg = t("api.oauthOpenRouterFallbackNotice");
-          setSuccessMessage(
-            modelsResult.error
-              ? `${fallbackMsg} (${modelsResult.error})`
-              : fallbackMsg,
-          );
-          console.warn(
-            "[OpenRouter] Model fetch fell back to presets:",
-            modelsResult.error || "unknown reason",
-          );
-        }
-        return;
-      }
-
-      // Only force re-auth if the existing token has expired
-      const currentStatus = oauthStatuses[providerId];
-      const force = Boolean(
-        currentStatus?.loggedIn &&
-        currentStatus?.expiresAt &&
-        Date.now() / 1000 > currentStatus.expiresAt,
-      );
-      await window.electronAPI.auth.login(providerId, force);
-
-      // Save OAuth provider to ConfigStore FIRST, before updating UI status.
-      // If saveProvider or setActiveProvider fails, the UI won't show
-      // a misleading "connected" state.
-      const profileKey: ProviderProfileKey = oauthProfileKey(providerId);
       const providerInfo = OAUTH_PROVIDERS.find((p) => p.id === providerId);
-      const saved = await window.electronAPI.config.saveProvider({
-        profileKey,
-        config: {
-          provider: "oauth",
-          customProtocol: "anthropic",
-          name: providerInfo?.name || providerId,
-          apiKey: "", // credentials live in auth.json
-          baseUrl: "",
-          defaultModel: "",
-          models: [],
-          updatedAt: new Date().toISOString(),
-        },
-      });
-      const defaultModel = saved.config.providers[profileKey]?.defaultModel;
-      if (!defaultModel) {
-        throw new Error(
-          `Pi SDK returned no default model for OAuth provider ${providerId}`,
+      const result = await connectOAuthProvider(
+        providerId,
+        providerInfo?.name || providerId,
+        t,
+      );
+      applyConfig(result.config);
+      if (result.openRouterModelsFromFallback) {
+        const fallbackMsg = t("api.oauthOpenRouterFallbackNotice");
+        setSuccessMessage(
+          result.openRouterModelsFromFallback.error
+            ? `${fallbackMsg} (${result.openRouterModelsFromFallback.error})`
+            : fallbackMsg,
         );
       }
-      // Switch active provider to the newly logged-in OAuth provider
-      await window.electronAPI.config.setActiveProvider({
-        profileKey,
-        defaultModel,
-      });
-      const updatedConfig = await window.electronAPI.config.get();
-      applyConfig(updatedConfig);
-
       // Only update UI after config save succeeded
-      const status = await window.electronAPI.auth.status(providerId);
+      const status =
+        providerId === "openrouter"
+          ? await window.electronAPI.openrouterAuth.status()
+          : await window.electronAPI.auth.status(providerId);
       setOAuthStatuses((prev) => ({ ...prev, [providerId]: status }));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed";
@@ -961,33 +893,13 @@ export function SettingsAPI({
   };
 
   const handleSubscriptionSave = async (profileKey: string, apiKey: string) => {
-    const plan = getCodingSubscription(profileKey);
-    if (!plan) throw new Error(t("api.subscriptionInvalidPlan"));
-    if (
-      profileKey === "custom:subscription-bailian-coding" &&
-      !apiKey.startsWith("sk-sp-")
-    ) {
-      throw new Error(t("api.subscriptionInvalidKey"));
-    }
-    const saved = await window.electronAPI.config.saveProvider({
+    const result = await connectCodingSubscription(
       profileKey,
-      config: {
-        provider: "custom",
-        customProtocol: "openai",
-        name: plan.name,
-        apiKey,
-        baseUrl: plan.baseUrl,
-        defaultModel:
-          appConfig?.providers[profileKey]?.defaultModel || plan.defaultModel,
-        models: plan.modelIds.map((id) => ({
-          id,
-          label: id,
-          source: "preset",
-        })),
-        updatedAt: new Date().toISOString(),
-      },
-    });
-    applyConfig(saved.config);
+      apiKey,
+      t,
+      appConfig?.providers[profileKey]?.defaultModel,
+    );
+    applyConfig(result.config);
     onSaved?.();
   };
 

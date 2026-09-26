@@ -7,12 +7,16 @@ const source = readFileSync(
 );
 
 describe("coding subscription settings wiring", () => {
-  it("uses the config IPC rather than OAuth for subscription keys", () => {
+  it("delegates subscription keys to the shared connect module", () => {
     expect(source).toContain("<CodingSubscriptionCards");
     expect(source).toContain("handleSubscriptionSave");
     expect(source).toContain("handleSubscriptionDelete");
-    expect(source).toContain("config.saveProvider({");
+    expect(source).toContain("connectCodingSubscription(");
     expect(source).toContain("config.deleteProvider({");
+  });
+
+  it("delegates oauth logins to the shared connect module", () => {
+    expect(source).toContain("connectOAuthProvider(");
   });
 
   it("excludes subscriptions from the generic API editor", () => {
