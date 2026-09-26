@@ -172,3 +172,105 @@ describe("currentTodos slice", () => {
     );
   });
 });
+
+describe("lastNonEmptyTodos (收尾态数据源)", () => {
+  const LIST2 = [
+    { content: "建表", status: "completed" as const },
+    { content: "写迁移", status: "completed" as const },
+  ];
+
+  function todoMsg(id: string, todos: unknown[]): Message {
+    return assistant([
+      { type: "tool_use", id, name: "todo_write", input: { todos } },
+    ]);
+  }
+
+  it("remembers the last non-empty list", () => {
+    const store = useAppStore.getState();
+    store.addSession(session);
+    store.addMessage("s1", todoMsg("t1", LIST));
+    store.addMessage("s1", todoMsg("t2", LIST2));
+    expect(
+      useAppStore.getState().sessionStates["s1"].lastNonEmptyTodos,
+    ).toEqual(LIST2);
+  });
+
+  it("keeps the remembered list when the model clears the list", () => {
+    const store = useAppStore.getState();
+    store.addSession(session);
+    store.addMessage("s1", todoMsg("t1", LIST2));
+    store.addMessage("s1", todoMsg("t2", []));
+    const state = useAppStore.getState().sessionStates["s1"];
+    expect(state.currentTodos).toEqual([]);
+    expect(state.lastNonEmptyTodos).toEqual(LIST2);
+  });
+
+  it("drops the remembered list once the user sends a message", () => {
+    const store = useAppStore.getState();
+    store.addSession(session);
+    store.addMessage("s1", todoMsg("t1", LIST2));
+    store.addMessage("s1", {
+      id: "u1",
+      sessionId: "s1",
+      role: "user",
+      timestamp: 1,
+      content: [{ type: "text", text: "下一件事" }],
+    });
+    expect(
+      useAppStore.getState().sessionStates["s1"].lastNonEmptyTodos,
+    ).toBeNull();
+  });
+
+  it("hydrate: 重建出非空清单时，两份都被写入", () => {
+    const store = useAppStore.getState();
+    store.addSession(session);
+    store.setMessagesTail(
+      "s1",
+      [
+        assistant([
+          {
+            type: "tool_use",
+            id: "t1",
+            name: "todo_write",
+            input: { todos: LIST2 },
+          },
+        ]),
+      ],
+      false,
+    );
+    const state = useAppStore.getState().sessionStates["s1"];
+    expect(state.currentTodos).toEqual(LIST2);
+    expect(state.lastNonEmptyTodos).toEqual(LIST2);
+  });
+
+  it("hydrate: 重建结果是「已清空」时不写 lastNonEmptyTodos（重启后不进收尾态）", () => {
+    const store = useAppStore.getState();
+    store.addSession(session);
+    store.setMessagesTail(
+      "s1",
+      [
+        assistant([
+          {
+            type: "tool_use",
+            id: "t1",
+            name: "todo_write",
+            input: { todos: [] },
+          },
+        ]),
+      ],
+      false,
+    );
+    const state = useAppStore.getState().sessionStates["s1"];
+    expect(state.currentTodos).toEqual([]);
+    expect(state.lastNonEmptyTodos).toBeNull();
+  });
+
+  it("stays null when nothing non-empty was ever seen", () => {
+    const store = useAppStore.getState();
+    store.addSession(session);
+    store.addMessage("s1", todoMsg("t1", []));
+    expect(
+      useAppStore.getState().sessionStates["s1"].lastNonEmptyTodos,
+    ).toBeNull();
+  });
+});

@@ -89,6 +89,7 @@ function setState(opts: {
   sessionStatus: Session["status"];
   messages: Message[];
   currentTodos: CurrentTodos | null;
+  lastNonEmptyTodos?: CurrentTodos | null;
 }): void {
   const session: Session = {
     id: "s1",
@@ -128,6 +129,7 @@ function setState(opts: {
         backgroundAgents: [],
         subagentActivities: { [SPAWN]: runningActivity() },
         currentTodos: opts.currentTodos,
+        lastNonEmptyTodos: opts.lastNonEmptyTodos ?? null,
       },
     },
   } as never);
@@ -242,5 +244,25 @@ describe("activity strip end to end", () => {
 
     expect(container.textContent).toContain("1/2");
     expect(container.querySelector("[role='progressbar']")).toBeTruthy();
+  });
+
+  it("清单被清空后，输入框上方仍显示收尾态", () => {
+    act(() =>
+      setState({
+        sessionStatus: "completed",
+        messages: [
+          makeMessage("u1", "user", [{ type: "text", text: "跑完了" }]),
+        ],
+        currentTodos: [],
+        lastNonEmptyTodos: [
+          { content: "建表", status: "completed" },
+          { content: "补测试", status: "completed" },
+        ],
+      }),
+    );
+    render();
+
+    expect(container.textContent).toContain("2/2");
+    expect(container.textContent).toContain("补测试");
   });
 });

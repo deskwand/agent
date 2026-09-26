@@ -1,23 +1,17 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createCodingTools,
   createReadOnlyTools,
 } from "@earendil-works/pi-coding-agent";
-import {
-  buildToolDisplayBlocks,
-  DEDICATED_CARD_TOOLS,
-} from "../../renderer/utils/tool-display-blocks";
+import { buildToolDisplayBlocks } from "../../renderer/utils/tool-display-blocks";
 import type { ContentBlock } from "../../renderer/types";
 
 /**
  * 主会话中注册的自定义工具：agent-runner.ts 的 allCustomTools（web ×3、browser ×11、
  * office ×4、vision_describe（条件注册））+ pi-subagents（Agent / get_subagent_result /
  * steer_subagent）+ memory 四件套 + goal 三件套。
- * 新增工具时必须同步加入此清单，并保证被摘要分组识别、或（对清单/提问这类必须
- * 独立可见的工具）在 DEDICATED_CARD_TOOLS 里声明且有真实渲染分支 —— 对应 AGENTS.md
- * 「不得默认作为未分组工具展示」规则。
+ * 新增工具时必须同步加入此清单，并保证被摘要分组识别（`isGrouped`）——
+ * 对应 AGENTS.md「不得默认作为未分组工具展示」规则。
  */
 const MAIN_SESSION_TOOLS = [
   "Agent",
@@ -65,25 +59,13 @@ function isGrouped(name: string): boolean {
   return first?.type === "process-summary" || first?.type === "result-summary";
 }
 
-const toolUseBlockSource = readFileSync(
-  path.resolve(
-    process.cwd(),
-    "src/renderer/components/message/ToolUseBlock.tsx",
-  ),
-  "utf8",
-);
-
 /**
- * 要么被摘要分组识别，要么是声明过的专用卡片 —— 且 ToolUseBlock 必须真的有渲染分支。
- * 后半句是关键：防有人把工具记进白名单却忘了写分支，卡片静默退化成通用卡。
+ * 每个主会话自定义工具都必须被摘要分组识别。
+ *
+ * 历史：这里以前还有一条"专用卡片"分支（`DEDICATED_CARD_TOOLS` 白名单 + 断言
+ * ToolUseBlock 有渲染分支）。清单折入过程摘要之后白名单为空、那条勒线会**空过**
+ * （测试还在、实际一条不跑），所以两者一并删了；将来真有工具需要独立卡片时再加回来。
  */
-function isGroupedOrDedicated(name: string): boolean {
-  if (isGrouped(name)) return true;
-  return (
-    DEDICATED_CARD_TOOLS.has(name) &&
-    toolUseBlockSource.includes(`block.name === "${name}"`)
-  );
-}
 
 describe("tool group coverage", () => {
   it("classifies every SDK built-in coding tool", () => {
@@ -98,26 +80,16 @@ describe("tool group coverage", () => {
 
   it("classifies every main-session custom tool", () => {
     for (const name of MAIN_SESSION_TOOLS) {
-      expect(
-        isGroupedOrDedicated(name),
-        `custom tool "${name}" must be grouped or declared as a dedicated card`,
-      ).toBe(true);
+      expect(isGrouped(name), `custom tool "${name}" must be grouped`).toBe(
+        true,
+      );
     }
   });
 
-  // 这条是绊线而非正向分类：任何一个不在 PROCESS_TOOLS/RESULT_TOOLS 里的名字都会
-  // 通过 `isGrouped === false`，所以它现在的意义是"将来有人把 todo_write 塞进
-  // PROCESS_TOOLS 时立刻失败"——被吸收会让专用卡片再也渲染不出来。
-  it("keeps dedicated-card tools out of the summaries", () => {
-    for (const name of DEDICATED_CARD_TOOLS) {
-      expect(
-        isGrouped(name),
-        `"${name}" 是专用卡片，必须留在摘要组之外（被吸收会折叠掉卡片）`,
-      ).toBe(false);
-      expect(
-        toolUseBlockSource.includes(`block.name === "${name}"`),
-        `"${name}" 在 ToolUseBlock 里没有渲染分支`,
-      ).toBe(true);
-    }
+  // 本次决定：清单不再独占卡片，折入过程摘要。两个名字都要管 ——
+  // 历史会话里是驼峰 TodoWrite，MAIN_SESSION_TOOLS 那个循环覆盖不到它。
+  it("folds todo_write into the process summary instead of a dedicated card", () => {
+    expect(isGrouped("todo_write")).toBe(true);
+    expect(isGrouped("TodoWrite")).toBe(true);
   });
 });

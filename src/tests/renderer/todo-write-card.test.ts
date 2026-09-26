@@ -53,6 +53,7 @@ function sessionState(): SessionState {
     backgroundAgents: [],
     subagentActivities: {},
     currentTodos: null,
+    lastNonEmptyTodos: null,
   };
 }
 

@@ -1930,6 +1930,7 @@ export function ChatView() {
             onSelectBackgroundAgent={handleSelectBackgroundAgent}
             onGoalCommand={handleCommand}
             currentTodos={sessionState?.currentTodos ?? null}
+            lastNonEmptyTodos={sessionState?.lastNonEmptyTodos ?? null}
           />
         </div>
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">

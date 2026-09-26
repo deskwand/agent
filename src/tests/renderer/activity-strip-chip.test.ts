@@ -37,6 +37,7 @@ function strip(
   return React.createElement(ChatInputStatusBar, {
     status: null,
     currentTodos: null,
+    lastNonEmptyTodos: null,
     backgroundAgentRows: [],
     ...props,
   });
@@ -219,5 +220,140 @@ describe("activity chip", () => {
     expect(container.textContent).toContain("subagent.statusRunning");
     // 同一句信息不在 chip 里再说一遍
     expect(container.textContent).not.toContain("activity.subagents");
+  });
+
+  it("step text: 有进行中项时显示该项文案", () => {
+    render(
+      strip({
+        currentTodos: [
+          { content: "建表", status: "completed" },
+          { content: "写迁移", status: "in_progress" },
+          { content: "补测试", status: "pending" },
+        ],
+      }),
+    );
+    expect(container.textContent).toContain("写迁移");
+    expect(container.textContent).toContain("1/3");
+  });
+
+  it("step text: activeForm 优先于 content", () => {
+    render(
+      strip({
+        currentTodos: [
+          {
+            content: "写迁移脚本",
+            status: "in_progress",
+            activeForm: "正在迁移",
+          },
+        ],
+      }),
+    );
+    expect(container.textContent).toContain("正在迁移");
+    // 两条文案不能互为子串，否则这条断言区分不了到底显示了哪个
+    expect(container.textContent).not.toContain("写迁移脚本");
+  });
+
+  it("finishing: 清空后显示收尾态，带 ✓ 与末项文案", () => {
+    render(
+      strip({
+        currentTodos: [],
+        lastNonEmptyTodos: [
+          { content: "建表", status: "completed" },
+          { content: "补 registry 单测", status: "completed" },
+        ],
+      }),
+    );
+    expect(container.textContent).toContain("2/2");
+    expect(container.textContent).toContain("✓");
+    expect(container.textContent).toContain("补 registry 单测");
+  });
+
+  it("finishing: 没跑完就清空时不加 ✓", () => {
+    render(
+      strip({
+        currentTodos: [],
+        lastNonEmptyTodos: [
+          { content: "建表", status: "completed" },
+          { content: "补 registry 单测", status: "pending" },
+        ],
+      }),
+    );
+    expect(container.textContent).toContain("1/2");
+    expect(container.textContent).not.toContain("✓");
+    expect(container.textContent).toContain("补 registry 单测");
+  });
+
+  it("finishing: 不把上一份清单的进行中项当成「正在进行」", () => {
+    // 真实复现（会话 081101f2）：模型跑完 3 项测试后直接清空清单，
+    // 第 3 项当时仍是 in_progress → 收尾态若沿用实时态的画法，
+    // 会显示「2/3 · 正在验证清空列表」+ 转圈，看起来像"状态没更新"。
+    render(
+      strip({
+        currentTodos: [],
+        lastNonEmptyTodos: [
+          { content: "验证 todo_write 能创建列表", status: "completed" },
+          {
+            content: "验证状态可从 in_progress 切到 completed",
+            status: "completed",
+          },
+          {
+            content: "验证任务完成后清空列表",
+            status: "in_progress",
+            activeForm: "正在验证清空列表",
+          },
+        ],
+      }),
+    );
+
+    // 进行时的措辞不能出现在收尾态（那是"此刻在做"的说法）
+    expect(container.textContent).not.toContain("正在验证清空列表");
+    // 收尾态展示最后一项的 content
+    expect(container.textContent).toContain("验证任务完成后清空列表");
+    expect(container.textContent).toContain("2/3");
+
+    // 展开面板：收尾态没有任何"正在跑"的指示器
+    act(() => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    const body = container.querySelector("[role='dialog']")?.textContent ?? "";
+    expect(body).toContain("验证任务完成后清空列表");
+    expect(body).not.toContain("正在验证清空列表");
+    expect(container.querySelector(".animate-spin")).toBeNull();
+  });
+
+  it("finishing: currentTodos 为 null 时不显示收尾态（无依据）", () => {
+    render(
+      strip({
+        currentTodos: null,
+        lastNonEmptyTodos: [{ content: "建表", status: "completed" }],
+      }),
+    );
+    expect(container.querySelector("button")).toBeNull();
+  });
+
+  it("finishing: 真实清单到来时收尾态被取代", () => {
+    render(
+      strip({
+        currentTodos: [{ content: "新的一步", status: "pending" }],
+        lastNonEmptyTodos: [{ content: "建表", status: "completed" }],
+      }),
+    );
+    expect(container.textContent).toContain("0/1");
+    expect(container.textContent).not.toContain("✓");
+    expect(container.textContent).not.toContain("建表");
+  });
+
+  it("step text: 没有进行中项时不留空槽", () => {
+    render(
+      strip({
+        currentTodos: [
+          { content: "建表", status: "pending" },
+          { content: "补测试", status: "pending" },
+        ],
+      }),
+    );
+    expect(container.textContent).toContain("0/2");
+    expect(container.textContent).not.toContain("建表");
+    expect(container.textContent).not.toContain("补测试");
   });
 });

@@ -74,6 +74,7 @@ describe("ProcessSummaryBlock highlight and expand", () => {
           backgroundAgents: [],
           subagentActivities: {},
           currentTodos: null,
+          lastNonEmptyTodos: null,
         },
       },
     });
@@ -124,5 +125,46 @@ describe("ProcessSummaryBlock highlight and expand", () => {
     expect(container.querySelector(".ring-2")).toBeNull();
     // 没被消费：留着给真正命中的那条
     expect(useAppStore.getState().pendingExpandToolCallId).toBe("other");
+  });
+
+  it("展开后仍渲染该次调用的清单卡", () => {
+    const items = [
+      {
+        id: "call-todo",
+        type: "tool_use" as const,
+        name: "todo_write",
+        input: { todos: [{ content: "建表", status: "in_progress" }] },
+      },
+    ];
+    const todoBlock = {
+      type: "process-summary",
+      items,
+      summary: {
+        ...block.summary,
+        subagentCount: 0,
+        subagents: [],
+        todoUpdateCount: 1,
+      },
+    } as unknown as ProcessSummaryDisplayBlock;
+
+    act(() =>
+      root.render(
+        createElement(ProcessSummaryBlock, {
+          block: todoBlock,
+          allBlocks: items,
+          message: { ...message, content: items },
+        }),
+      ),
+    );
+
+    // 折叠态：片段里只有“已更新 1 次任务清单”，看不到清单项内容
+    expect(container.textContent).not.toContain("建表");
+
+    act(() => {
+      container
+        .querySelector<HTMLButtonElement>("button[aria-expanded]")
+        ?.click();
+    });
+    expect(container.textContent).toContain("建表");
   });
 });

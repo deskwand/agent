@@ -92,6 +92,7 @@ describe("orderAssistantDisplayBlocks", () => {
           subagentCount: 0,
           hasGoal: false,
           usedToolCount: 0,
+          todoUpdateCount: 0,
         },
       },
       {
@@ -309,11 +310,43 @@ describe("process summary fragments", () => {
       "tool.grouped.ranSubagentWorkflows_other": `Ran ${options?.count} subagent workflows`,
       "tool.grouped.usedTools_one": `used ${options?.count} tool`,
       "tool.grouped.usedTools_other": `used ${options?.count} tools`,
+      "tool.grouped.updatedTaskList_one": `updated the task list ${options?.count} time`,
+      "tool.grouped.updatedTaskList_other": `updated the task list ${options?.count} times`,
       "tool.grouped.joinAnd": " and ",
       "tool.grouped.joinComma": ", ",
     };
     return map[key] ?? key;
   }) as never;
+
+  it("lists todo updates as their own fragment, not the fallback bucket", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("todo-1", "todo_write", {
+        todos: [{ content: "建表", status: "in_progress" }],
+      }),
+      toolResult("todo-1", { content: "Task list updated: 0/1 completed." }),
+    ]);
+
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      { text: "updated the task list 1 time", iconType: "tasklist" },
+    ]);
+  });
+
+  it("treats the legacy camel-case TodoWrite the same way", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("todo-2", "TodoWrite", { todos: [] }),
+      toolResult("todo-2"),
+    ]);
+
+    if (blocks[0]?.type !== "process-summary") {
+      throw new Error("expected process summary");
+    }
+    expect(getProcessSummaryFragments(blocks[0].summary, t)).toEqual([
+      { text: "updated the task list 1 time", iconType: "tasklist" },
+    ]);
+  });
 
   it("includes subagent details in the icon-aware group fragment", () => {
     const blocks = buildToolDisplayBlocks([
@@ -744,6 +777,7 @@ describe("Goal tools in process summary", () => {
         subagentSteerCount: 0,
         hasGoal: true,
         usedToolCount: 0,
+        todoUpdateCount: 0,
       },
       t,
     );
@@ -767,6 +801,7 @@ describe("Goal tools in process summary", () => {
         subagentSteerCount: 0,
         hasGoal: false,
         usedToolCount: 0,
+        todoUpdateCount: 0,
       },
       t,
     );

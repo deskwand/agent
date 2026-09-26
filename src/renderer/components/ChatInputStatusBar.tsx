@@ -91,6 +91,8 @@ interface ChatInputStatusBarProps {
   onSelectBackgroundAgent?: (toolCallId: string) => void;
   /** 当前生效的任务清单；null = 未知/没有，[] = 已清空。为空则右区不渲染计划部分。 */
   currentTodos?: CurrentTodos | null;
+  /** 最后一份非空清单，只服务收尾态（currentTodos 被清空后仍显示其最终状态）。 */
+  lastNonEmptyTodos?: CurrentTodos | null;
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
@@ -115,6 +117,7 @@ export function ChatInputStatusBar({
   backgroundAgentRows,
   onSelectBackgroundAgent,
   currentTodos,
+  lastNonEmptyTodos,
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
   const rows = backgroundAgentRows ?? [];
@@ -178,16 +181,39 @@ export function ChatInputStatusBar({
 
   // ── 右区（活动库存）──────────────────────────────────────────────────
   // 常驻、不参与上面的单槽位优先级链：模型回答中/目标长跑时也必须可见。
-  const todos = currentTodos ?? [];
+  const activeTodos = currentTodos ?? [];
+  // 收尾态：清单被显式清空（[]），但上次有一份非空清单 → 展示那份的最终状态。
+  // 注意 currentTodos === null（从未有过 / 重启后无水合结果）**不**进收尾态。
+  // 必须用 Array.isArray 而不是 `activeTodos.length === 0`：后者会把 null
+  // （从未有过清单）也当成"被清空"，于是凭空显示一份收尾态。
+  const finishing =
+    Array.isArray(currentTodos) &&
+    currentTodos.length === 0 &&
+    (lastNonEmptyTodos?.length ?? 0) > 0;
+  const todos = finishing ? (lastNonEmptyTodos ?? []) : activeTodos;
   const completedCount = todos.filter(
     (item) => item.status === "completed",
   ).length;
+  const allDone = todos.length > 0 && completedCount === todos.length;
   const hasPlan = todos.length > 0;
   const hasActivity = hasPlan || rows.length > 0;
   // 子代理计数由谁承载：左区已经在说这件事时（只可能发生在没有更高优先级状态时）
   // chip 不再重复一遍；模型回答中/目标长跑时左区在说别的，计数就落到 chip 上——
   // 那正是本次要修的场景（此前它被单槽位优先级吃掉，整行都看不到）。
   const countInChip = rows.length > 0 && status?.type !== "background-agent";
+
+  // pill 里的「当前步骤」：进行中那一项的文案。取值与原卡片头部一致
+  // （TodoWriteBlock.tsx:103 用的是 activeForm || content）。
+  const inProgressTodo = todos.find((item) => item.status === "in_progress");
+  // 收尾态必须**优先**判断：否则会沿用"进行中项"的 activeForm（"正在…"），
+  // 把已经停下来的过去状态渲染成现在进行时 —— 看起来就像状态没更新。
+  const stepText = finishing
+    ? // 显示清单数组的末项。数据里没有逐项完成时间戳，所以"最后完成的是哪一项"
+      // 无从得知——不要试图去猜。
+      (todos[todos.length - 1]?.content ?? null)
+    : inProgressTodo
+      ? inProgressTodo.activeForm || inProgressTodo.content
+      : null;
   // 类型只在面板内不统一时才值得占宽度（同类时逐行重复纯属噪音）
   const showType = new Set(rows.map((row) => row.type)).size > 1;
 
@@ -200,7 +226,7 @@ export function ChatInputStatusBar({
   // 右区（活动库存）：面板 + chip。目标态与普通态共用同一个元素——
   // 目标长跑是本次要修的典型场景，不共用的话它在目标态下会整块消失。
   const rightZone = hasActivity ? (
-    <span className="flex flex-none items-center">
+    <span className="flex min-w-0 items-center">
       {panelOpen && (
         <div
           role="dialog"
@@ -219,39 +245,47 @@ export function ChatInputStatusBar({
                   })}
                 </span>
               </div>
-              {todos.map((todo, index) => (
-                <div
-                  key={`${index}-${todo.content}`}
-                  className={`flex items-start gap-2 rounded-lg px-2 py-1 ${
-                    todo.status === "completed" || todo.status === "cancelled"
-                      ? "opacity-60"
-                      : ""
-                  }`}
-                >
-                  <span className="mt-0.5 flex-none">
-                    {todo.status === "completed" ? (
-                      <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                    ) : todo.status === "in_progress" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
-                    ) : todo.status === "cancelled" ? (
-                      <XCircle className="h-3.5 w-3.5 text-text-muted" />
-                    ) : (
-                      <Square className="h-3.5 w-3.5 text-text-muted" />
-                    )}
-                  </span>
-                  <span
-                    className={`min-w-0 flex-1 ${
-                      todo.status === "completed" || todo.status === "cancelled"
-                        ? "text-text-muted line-through"
-                        : todo.status === "in_progress"
-                          ? "font-medium text-accent"
-                          : "text-text-primary"
+              {todos.map((todo, index) => {
+                // 收尾态里没有任何东西在跑：把当时的 in_progress 按"没做完、已停止"
+                // 渲染（方框 + 常规色），不要转圈也不要强调色 —— 那是实时态的说法。
+                const shown =
+                  finishing && todo.status === "in_progress"
+                    ? "pending"
+                    : todo.status;
+                return (
+                  <div
+                    key={`${index}-${todo.content}`}
+                    className={`flex items-start gap-2 rounded-lg px-2 py-1 ${
+                      shown === "completed" || shown === "cancelled"
+                        ? "opacity-60"
+                        : ""
                     }`}
                   >
-                    {todo.content}
-                  </span>
-                </div>
-              ))}
+                    <span className="mt-0.5 flex-none">
+                      {shown === "completed" ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                      ) : shown === "in_progress" ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                      ) : shown === "cancelled" ? (
+                        <XCircle className="h-3.5 w-3.5 text-text-muted" />
+                      ) : (
+                        <Square className="h-3.5 w-3.5 text-text-muted" />
+                      )}
+                    </span>
+                    <span
+                      className={`min-w-0 flex-1 ${
+                        shown === "completed" || shown === "cancelled"
+                          ? "text-text-muted line-through"
+                          : shown === "in_progress"
+                            ? "font-medium text-accent"
+                            : "text-text-primary"
+                      }`}
+                    >
+                      {todo.content}
+                    </span>
+                  </div>
+                );
+              })}
             </>
           ) : null}
           {rows.length > 0 ? (
@@ -320,12 +354,15 @@ export function ChatInputStatusBar({
       )}
       <button
         type="button"
-        // 只有计数没有计划时按钮里只剩一个 chevron：没有可访问名、命中区也小
-        aria-label={t("activity.panelTitle")}
+        // 有可见文案（步骤/计数）时不要设 aria-label —— 它会把内容整个盖掉，
+        // 读屏用户就听不到"3/5 · 正在写迁移"了。只在只剩一个 chevron 时兜底。
+        aria-label={
+          hasPlan || countInChip ? undefined : t("activity.panelTitle")
+        }
         aria-haspopup="dialog"
         aria-expanded={panelOpen}
         onClick={() => setPanelOpen((value) => !value)}
-        className="flex min-h-5 items-center gap-1.5 rounded-full bg-background-secondary px-2 py-0.5 text-left text-text-primary transition-colors hover:bg-surface-active"
+        className="flex min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-background-secondary px-2 py-0.5 text-left text-text-primary transition-colors hover:bg-surface-active"
       >
         {hasPlan ? (
           <>
@@ -344,8 +381,14 @@ export function ChatInputStatusBar({
               />
             </span>
             <span className="flex-none">
+              {allDone ? "✓ " : ""}
               {completedCount}/{todos.length}
             </span>
+            {stepText ? (
+              <span className="max-w-[12rem] min-w-0 truncate text-text-muted">
+                · {stepText}
+              </span>
+            ) : null}
           </>
         ) : null}
         {countInChip ? (

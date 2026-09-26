@@ -97,6 +97,11 @@ export interface SessionState {
   subagentActivities: Record<string, SubagentActivity>;
   /** 当前生效的任务清单。null = 未知/没有；[] = 已被显式清空。 */
   currentTodos: CurrentTodos | null;
+  /**
+   * 最后一份**非空**清单，**仅供显示**（收尾态用）。
+   * 与 `currentTodos` 的分工：后者是"现在生效的是什么"，本字段只是"上一份长什么样"。
+   */
+  lastNonEmptyTodos: CurrentTodos | null;
 }
 
 // Store window cap. prependOlderMessages allows the window to grow to
@@ -131,6 +136,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   backgroundAgents: [],
   subagentActivities: {},
   currentTodos: null,
+  lastNonEmptyTodos: null,
 };
 
 // Helper to immutably update a single session's state within the record
@@ -727,6 +733,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       // 与消息流里那张卡片显示"未生效"的结论一致。
       const nextTodos =
         message.role === "assistant" ? collectCurrentTodos([message]) : null;
+      // 收尾态的数据源：非空清单被记住；人消息一到就清掉（事件驱动的退出条件）。
+      const rememberTodos =
+        nextTodos && nextTodos.length > 0
+          ? { lastNonEmptyTodos: nextTodos }
+          : {};
+      // 人消息到达 = 用户开始下一件事 → 收尾态退出。自动续跑（goal）注入的
+      // user 消息同样算"新的一轮开始"，一起清掉是有意的：那时 pill 该让位给
+      // 即将到来的新清单，而不是继续挂着上一份的收尾状态。
+      const clearRemembered =
+        message.role === "user" ? { lastNonEmptyTodos: null } : {};
 
       const shouldClearPartial = message.role === "assistant";
       return {
@@ -735,6 +751,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           pendingTurns: updatedPendingTurns,
           // null 表示本条消息没带新清单 → 保持原值；[] 是有效值，必须写入（清空生效）
           ...(nextTodos ? { currentTodos: nextTodos } : {}),
+          ...rememberTodos,
+          ...clearRemembered,
           ...(shouldClearPartial
             ? {
                 partialByTurn: message.turnId
@@ -884,6 +902,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const restored = messages.map(restoreUserMessage);
       const existing = state.sessionStates[sessionId]?.currentTodos ?? null;
+      const rebuilt = existing === null ? collectCurrentTodos(restored) : null;
       return {
         sessionStates: patchSession(state.sessionStates, sessionId, {
           messages: restored,
@@ -892,8 +911,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           historyHydrated: true,
           // 只在还没有切片时重建：应用重启后首次水合必须从消息恢复，
           // 而后续的分页/压缩重载不能覆盖已经累积好的切片。
-          ...(existing === null
-            ? { currentTodos: collectCurrentTodos(restored) }
+          ...(rebuilt ? { currentTodos: rebuilt } : {}),
+          // 首次水合重建出的就是非空清单 → 一并作为"最后一份非空"记住
+          ...(rebuilt && rebuilt.length > 0
+            ? { lastNonEmptyTodos: rebuilt }
             : {}),
         }),
       };
@@ -904,6 +925,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const ss = getSession(state.sessionStates, sessionId);
       const merged = [...older.map(restoreUserMessage), ...ss.messages];
+      // 刻意用**裁剪前**的 merged：裁剪丢的是最旧的一头，而"最后一次
+      // todo_write"完全可能就在刚加载进来的那一页里 —— 用裁剪后的窗口会得到
+      // "明明有计划却显示没有"的假阴性。代价是极少数情况下切片会引用一条
+      // 已被裁掉的消息，但那恰好是"当前生效的计划"，显示它是对的。
+      const rebuiltFromPaging =
+        ss.currentTodos === null ? collectCurrentTodos(merged) : null;
       let messages = merged;
       const cap = MAX_MEMORY_WINDOW_MESSAGES + MESSAGE_PAGE_SIZE;
       if (merged.length > cap) {
@@ -918,8 +945,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           historyHydrated: true,
           // 首页尾窗里可能还没有 todo_write（它在更早的分页里），所以补建也放在这里：
           // 一旦切片已有值就不再覆盖（后续分页不会改变"最后一次"是谁）。
-          ...(ss.currentTodos === null
-            ? { currentTodos: collectCurrentTodos(messages) }
+          ...(rebuiltFromPaging ? { currentTodos: rebuiltFromPaging } : {}),
+          ...(rebuiltFromPaging && rebuiltFromPaging.length > 0
+            ? { lastNonEmptyTodos: rebuiltFromPaging }
             : {}),
         }),
       };

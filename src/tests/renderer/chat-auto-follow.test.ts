@@ -100,6 +100,7 @@ function setInitialState(): void {
         backgroundAgents: [],
         subagentActivities: {},
         currentTodos: null,
+        lastNonEmptyTodos: null,
       },
     },
   });

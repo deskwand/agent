@@ -12,6 +12,7 @@ import {
   Target,
   Wrench,
   Folder,
+  ListTodo,
 } from "lucide-react";
 import type { Message, ContentBlock } from "../../types";
 import {
@@ -38,6 +39,7 @@ const PROCESS_ICON_MAP: Record<
   subagent: <Bot className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   tool: <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
   goal: <Target className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
+  tasklist: <ListTodo className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
 };
 
 interface ProcessSummaryBlockProps {

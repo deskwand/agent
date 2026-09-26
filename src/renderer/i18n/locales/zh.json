@@ -1469,6 +1469,8 @@
       "ranSubagentWorkflows_other": "已运行 {{count}} 个子代理工作流",
       "usedTools_one": "已使用 {{count}} 个工具",
       "usedTools_other": "已使用 {{count}} 个工具",
+      "updatedTaskList_one": "已更新 {{count}} 次任务清单",
+      "updatedTaskList_other": "已更新 {{count}} 次任务清单",
       "modifiedFiles_one": "已修改 {{count}} 个文件",
       "modifiedFiles_other": "已修改 {{count}} 个文件",
       "writtenFiles_one": "已写入 {{count}} 个文件",

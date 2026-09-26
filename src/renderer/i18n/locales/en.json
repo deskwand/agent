@@ -1470,6 +1470,8 @@
       "ranSubagentWorkflows_other": "Ran {{count}} subagent workflows",
       "usedTools_one": "Used {{count}} tool",
       "usedTools_other": "Used {{count}} tools",
+      "updatedTaskList_one": "Updated the task list {{count}} time",
+      "updatedTaskList_other": "Updated the task list {{count}} times",
       "modifiedFiles_one": "Modified {{count}} file",
       "modifiedFiles_other": "Modified {{count}} files",
       "writtenFiles_one": "Wrote {{count}} file",

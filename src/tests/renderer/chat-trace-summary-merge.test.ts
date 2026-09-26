@@ -138,6 +138,7 @@ function setSessionMessages(messages: Message[]): void {
         backgroundAgents: [],
         subagentActivities: {},
         currentTodos: null,
+        lastNonEmptyTodos: null,
       },
     },
   });

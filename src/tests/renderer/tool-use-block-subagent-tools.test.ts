@@ -46,6 +46,7 @@ function sessionState(extra: Partial<SessionState> = {}): SessionState {
       },
     },
     currentTodos: null,
+    lastNonEmptyTodos: null,
     ...extra,
   };
 }
