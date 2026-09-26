@@ -463,9 +463,21 @@ export function ImageLightbox({
         className="absolute w-0 h-0"
         style={toolbarAnchor ?? { right: 12, top: 0 }}
       >
+        {/* w-max 不是装饰，是这个锚点的必要条件：锚点盒子是 0×0，而工具条是它的
+            绝对定位子元素（left:auto / right:0 / width:auto），按 shrink-to-fit
+            规则可用宽度 = 0，宽度会塌成 min-content，而不是内容宽度。子项都是
+            shrink-0，塌下去的那部分收不回来，只有能收缩的图片名会顶包，于是在
+            「没有图片名」（粘贴的图）时最后一个子项（关闭按钮）会溢出圆角背景——
+            用户看到的就是「关闭按钮超出了」。实测锚点 0×0：塌陷宽度 97px，内容需要
+            106px，关闭按钮右溢 8px；加了 w-max 后 110px，按钮回到内缩 5px。
+            maxWidth（锚点 x − 12）依然生效，此时由图片名那一段负责截断。
+            成因是「标签可断行」，露出条件是「没有图片名」：中文「复制」能断行，
+            min-content 才小于内容宽度；英文 Copy 断不了行，量不到这个塌陷。
+            别再换回 w-fit —— 那是 min(max-content, available)，可用宽度 0 时
+            又塌回 min-content，等于把这个 bug 装回去。 */}
         <div
           data-testid="image-lightbox-toolbar"
-          className={`${toolbarPendingMeasure ? "invisible " : ""}absolute right-0 ${
+          className={`${toolbarPendingMeasure ? "invisible " : ""}w-max absolute right-0 ${
             toolbarAnchor ? "bottom-0 mb-2" : "top-0 mt-3"
           } z-10 flex items-center gap-1 p-1 rounded-lg bg-black/60 dark:bg-black/70 backdrop-blur-md border border-white/10 shadow-lg text-white select-none`}
           style={{ maxWidth: toolbarMaxWidth }}

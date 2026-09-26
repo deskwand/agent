@@ -178,4 +178,18 @@ describe("ImageLightbox toolbar", () => {
     render();
     expect(toolbar().className).toContain("invisible");
   });
+
+  it("keeps an intrinsic width so the close button cannot outgrow the pill", () => {
+    // 工具条的定位盒子是 0×0 的锚点，工具条自己是它的绝对定位子元素
+    // （left:auto / right:0 / width:auto）——可用宽度为 0 时 shrink-to-fit 会把宽度
+    // 压到 min-content。子项都是 shrink-0 收不回来，只有图片名能收缩，所以在
+    // 「没有图片名」（粘贴的图）时最后一个子项（关闭按钮）会溢出圆角背景。
+    // 真实 Chromium 实测：塌陷 97px，内容需要 106px，关闭按钮右溢 8px。
+    // jsdom 没有布局，只能守住这条类名契约。别换成 w-fit —— 那是
+    // min(max-content, available)，可用宽度 0 时又塌回 min-content。
+    render({ images: [{ src: SRC, name: "" }] });
+
+    // 按空白切词断言：toContain("w-max") 会被 max-w-max / min-w-max 误判为通过。
+    expect(toolbar().className.split(/\s+/)).toContain("w-max");
+  });
 });
