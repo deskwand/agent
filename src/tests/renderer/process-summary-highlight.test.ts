@@ -73,6 +73,7 @@ describe("ProcessSummaryBlock highlight and expand", () => {
           partialToolResults: {},
           backgroundAgents: [],
           subagentActivities: {},
+          currentTodos: null,
         },
       },
     });

@@ -45,6 +45,7 @@ function sessionState(extra: Partial<SessionState> = {}): SessionState {
         stats: { toolUses: 0, durationMs: 0 },
       },
     },
+    currentTodos: null,
     ...extra,
   };
 }

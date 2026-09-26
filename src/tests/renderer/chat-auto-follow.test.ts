@@ -99,6 +99,7 @@ function setInitialState(): void {
         partialToolResults: {},
         backgroundAgents: [],
         subagentActivities: {},
+        currentTodos: null,
       },
     },
   });

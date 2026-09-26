@@ -52,6 +52,7 @@ function sessionState(): SessionState {
     partialToolResults: {},
     backgroundAgents: [],
     subagentActivities: {},
+    currentTodos: null,
   };
 }
 

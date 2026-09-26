@@ -1642,7 +1642,6 @@
     "statusRunning": "{{count}} subagents running…{{detail}}",
     "statusDone": "{{count}} subagents completed",
     "statusFinishedWithErrors": "{{count}} subagents finished (some failed)",
-    "panelTitle": "Background subagents",
     "stepsTitle": "Steps",
     "stepsBackground": "running in background",
     "stepFailed": "failed",
@@ -1959,5 +1958,13 @@
     "windowSession": "5h window",
     "windowWeekly": "7d window",
     "resetAt": "Resets {{time}}"
+  },
+  "activity": {
+    "panelTitle": "Activity",
+    "planSection": "Plan",
+    "planDone": "{{completed}}/{{total}} done",
+    "subagentsSection": "Subagents",
+    "subagents_one": "{{count}} subagent",
+    "subagents_other": "{{count}} subagents"
   }
 }

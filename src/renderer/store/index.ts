@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SubagentActivity } from "../../shared/subagent-activity";
+import { collectCurrentTodos, type CurrentTodos } from "../utils/current-todos";
 import type {
   Session,
   Message,
@@ -94,6 +95,8 @@ export interface SessionState {
   }>;
   /** 子代理实时活动快照，key = 触发它的 Agent 工具调用 id（卡片 block.id）。 */
   subagentActivities: Record<string, SubagentActivity>;
+  /** 当前生效的任务清单。null = 未知/没有；[] = 已被显式清空。 */
+  currentTodos: CurrentTodos | null;
 }
 
 // Store window cap. prependOlderMessages allows the window to grow to
@@ -127,6 +130,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   partialToolResults: {},
   backgroundAgents: [],
   subagentActivities: {},
+  currentTodos: null,
 };
 
 // Helper to immutably update a single session's state within the record
@@ -718,11 +722,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
 
+      // 计划切片：只有本次追加的消息里存在"生效的 todo_write"时才更新。
+      // 被拒的清单会被 collectCurrentTodos 跳过，所以它永远进不了切片 ——
+      // 与消息流里那张卡片显示"未生效"的结论一致。
+      const nextTodos =
+        message.role === "assistant" ? collectCurrentTodos([message]) : null;
+
       const shouldClearPartial = message.role === "assistant";
       return {
         sessionStates: patchSession(state.sessionStates, sessionId, {
           messages: updatedMessages,
           pendingTurns: updatedPendingTurns,
+          // null 表示本条消息没带新清单 → 保持原值；[] 是有效值，必须写入（清空生效）
+          ...(nextTodos ? { currentTodos: nextTodos } : {}),
           ...(shouldClearPartial
             ? {
                 partialByTurn: message.turnId
@@ -869,14 +881,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
 
   setMessagesTail: (sessionId, messages, hasMore) =>
-    set((state) => ({
-      sessionStates: patchSession(state.sessionStates, sessionId, {
-        messages: messages.map(restoreUserMessage),
-        hasMoreOlder: hasMore,
-        oldestMessageId: messages[0]?.id ?? null,
-        historyHydrated: true,
-      }),
-    })),
+    set((state) => {
+      const restored = messages.map(restoreUserMessage);
+      const existing = state.sessionStates[sessionId]?.currentTodos ?? null;
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          messages: restored,
+          hasMoreOlder: hasMore,
+          oldestMessageId: messages[0]?.id ?? null,
+          historyHydrated: true,
+          // 只在还没有切片时重建：应用重启后首次水合必须从消息恢复，
+          // 而后续的分页/压缩重载不能覆盖已经累积好的切片。
+          ...(existing === null
+            ? { currentTodos: collectCurrentTodos(restored) }
+            : {}),
+        }),
+      };
+    }),
 
   prependOlderMessages: (sessionId, older, hasMore) => {
     let trimmedCount = 0;
@@ -895,6 +916,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           hasMoreOlder: hasMore,
           oldestMessageId: messages[0]?.id ?? ss.oldestMessageId,
           historyHydrated: true,
+          // 首页尾窗里可能还没有 todo_write（它在更早的分页里），所以补建也放在这里：
+          // 一旦切片已有值就不再覆盖（后续分页不会改变"最后一次"是谁）。
+          ...(ss.currentTodos === null
+            ? { currentTodos: collectCurrentTodos(messages) }
+            : {}),
         }),
       };
     });

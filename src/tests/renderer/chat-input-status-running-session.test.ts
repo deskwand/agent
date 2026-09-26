@@ -104,6 +104,7 @@ function setInitialState(status: Session["status"]): void {
         partialToolResults: {},
         backgroundAgents: [],
         subagentActivities: {},
+        currentTodos: null,
       },
     },
   });

@@ -137,6 +137,7 @@ function setSessionMessages(messages: Message[]): void {
         partialToolResults: {},
         backgroundAgents: [],
         subagentActivities: {},
+        currentTodos: null,
       },
     },
   });

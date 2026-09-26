@@ -1641,7 +1641,6 @@
     "statusRunning": "{{count}} 个子代理运行中…{{detail}}",
     "statusDone": "{{count}} 个子代理已完成",
     "statusFinishedWithErrors": "{{count}} 个子代理已结束（含失败）",
-    "panelTitle": "后台子代理",
     "stepsTitle": "执行步骤",
     "stepsBackground": "后台运行中",
     "stepFailed": "失败",
@@ -1956,5 +1955,13 @@
     "windowSession": "5h 窗口",
     "windowWeekly": "7d 窗口",
     "resetAt": "重置 {{time}}"
+  },
+  "activity": {
+    "panelTitle": "活动",
+    "planSection": "计划",
+    "planDone": "{{completed}}/{{total}} 完成",
+    "subagentsSection": "子代理",
+    "subagents_one": "{{count}} 个子代理",
+    "subagents_other": "{{count}} 个子代理"
   }
 }

@@ -16,9 +16,11 @@ import {
   Loader2,
   CheckCircle2,
   XCircle,
+  Square,
 } from "lucide-react";
 import { MENU_PANEL_CLASS } from "./menu-styles";
 import type { BackgroundAgentRow } from "../utils/subagent-card";
+import type { CurrentTodos } from "../utils/current-todos";
 
 export type ChatInputStatus =
   | { type: "sending" }
@@ -87,6 +89,8 @@ interface ChatInputStatusBarProps {
   /** 面板行；为空时 chip 退回纯文本（行为与今天一致）。 */
   backgroundAgentRows?: BackgroundAgentRow[];
   onSelectBackgroundAgent?: (toolCallId: string) => void;
+  /** 当前生效的任务清单；null = 未知/没有，[] = 已清空。为空则右区不渲染计划部分。 */
+  currentTodos?: CurrentTodos | null;
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
@@ -110,6 +114,7 @@ export function ChatInputStatusBar({
   onGoalCommand,
   backgroundAgentRows,
   onSelectBackgroundAgent,
+  currentTodos,
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
   const rows = backgroundAgentRows ?? [];
@@ -170,6 +175,189 @@ export function ChatInputStatusBar({
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [isTimeLive]);
+
+  // ── 右区（活动库存）──────────────────────────────────────────────────
+  // 常驻、不参与上面的单槽位优先级链：模型回答中/目标长跑时也必须可见。
+  const todos = currentTodos ?? [];
+  const completedCount = todos.filter(
+    (item) => item.status === "completed",
+  ).length;
+  const hasPlan = todos.length > 0;
+  const hasActivity = hasPlan || rows.length > 0;
+  // 子代理计数由谁承载：左区已经在说这件事时（只可能发生在没有更高优先级状态时）
+  // chip 不再重复一遍；模型回答中/目标长跑时左区在说别的，计数就落到 chip 上——
+  // 那正是本次要修的场景（此前它被单槽位优先级吃掉，整行都看不到）。
+  const countInChip = rows.length > 0 && status?.type !== "background-agent";
+  // 类型只在面板内不统一时才值得占宽度（同类时逐行重复纯属噪音）
+  const showType = new Set(rows.map((row) => row.type)).size > 1;
+
+  // 活动归零时把展开态一并关掉：面板渲染在 `hasActivity` 里面，不重置的话
+  // panelOpen 会残留为 true，下次一有活动面板会自己弹开。
+  useEffect(() => {
+    if (!hasActivity) setPanelOpen(false);
+  }, [hasActivity]);
+
+  // 右区（活动库存）：面板 + chip。目标态与普通态共用同一个元素——
+  // 目标长跑是本次要修的典型场景，不共用的话它在目标态下会整块消失。
+  const rightZone = hasActivity ? (
+    <span className="flex flex-none items-center">
+      {panelOpen && (
+        <div
+          role="dialog"
+          aria-label={t("activity.panelTitle")}
+          style={{ maxHeight: panelMaxHeight ?? undefined }}
+          className={`${MENU_PANEL_CLASS} animate-menu-in-up absolute bottom-full left-0 z-30 mb-2 w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs`}
+        >
+          {hasPlan ? (
+            <>
+              <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-text-muted uppercase">
+                <span>{t("activity.planSection")}</span>
+                <span className="ml-auto tracking-normal">
+                  {t("activity.planDone", {
+                    completed: completedCount,
+                    total: todos.length,
+                  })}
+                </span>
+              </div>
+              {todos.map((todo, index) => (
+                <div
+                  key={`${index}-${todo.content}`}
+                  className={`flex items-start gap-2 rounded-lg px-2 py-1 ${
+                    todo.status === "completed" || todo.status === "cancelled"
+                      ? "opacity-60"
+                      : ""
+                  }`}
+                >
+                  <span className="mt-0.5 flex-none">
+                    {todo.status === "completed" ? (
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                    ) : todo.status === "in_progress" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                    ) : todo.status === "cancelled" ? (
+                      <XCircle className="h-3.5 w-3.5 text-text-muted" />
+                    ) : (
+                      <Square className="h-3.5 w-3.5 text-text-muted" />
+                    )}
+                  </span>
+                  <span
+                    className={`min-w-0 flex-1 ${
+                      todo.status === "completed" || todo.status === "cancelled"
+                        ? "text-text-muted line-through"
+                        : todo.status === "in_progress"
+                          ? "font-medium text-accent"
+                          : "text-text-primary"
+                    }`}
+                  >
+                    {todo.content}
+                  </span>
+                </div>
+              ))}
+            </>
+          ) : null}
+          {rows.length > 0 ? (
+            <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-text-muted uppercase">
+              <span>{t("activity.subagentsSection")}</span>
+            </div>
+          ) : null}
+          {rows.map((row) => (
+            <button
+              key={row.toolCallId}
+              type="button"
+              onClick={() => {
+                setPanelOpen(false);
+                onSelectBackgroundAgent?.(row.toolCallId);
+              }}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60 ${
+                // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
+                // `error` 刻意不降 —— 失败是应该被注意到的信号。
+                row.status === "completed" ? "opacity-60" : ""
+              }`}
+            >
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                {/* ① 名字（只有面板内类型不统一时才带后缀） */}
+                <span className="truncate text-text-primary">
+                  {row.name ?? row.type ?? row.toolCallId}
+                  {showType && row.name && row.type ? (
+                    <span className="text-text-muted">
+                      {" · "}
+                      {row.type}
+                    </span>
+                  ) : null}
+                </span>
+                {/* ② 任务描述：始终显示（之前只在没有步骤时才出现） */}
+                {row.description ? (
+                  <span className="truncate text-text-secondary">
+                    {row.description}
+                  </span>
+                ) : null}
+                {/* ③ 当前动作 / 最后一步：没有就不渲染，避免与描述重复同一句话 */}
+                {row.currentLabel ? (
+                  <span className="truncate font-mono text-text-muted">
+                    {row.currentLabel}
+                  </span>
+                ) : null}
+              </span>
+              <span className="flex flex-shrink-0 items-center gap-1 text-text-muted">
+                {row.stepCount > 0 && <span>{row.stepCount}</span>}
+                {row.durationMs > 0 && (
+                  <span>
+                    {row.durationMs < 1000
+                      ? `${row.durationMs}ms`
+                      : `${(row.durationMs / 1000).toFixed(1)}s`}
+                  </span>
+                )}
+                {row.status === "running" ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-accent" />
+                ) : row.status === "error" ? (
+                  <XCircle className="h-3 w-3 text-error" />
+                ) : (
+                  <CheckCircle2 className="h-3 w-3" />
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        type="button"
+        // 只有计数没有计划时按钮里只剩一个 chevron：没有可访问名、命中区也小
+        aria-label={t("activity.panelTitle")}
+        aria-haspopup="dialog"
+        aria-expanded={panelOpen}
+        onClick={() => setPanelOpen((value) => !value)}
+        className="flex min-h-5 items-center gap-1.5 rounded-full bg-background-secondary px-2 py-0.5 text-left text-text-primary transition-colors hover:bg-surface-active"
+      >
+        {hasPlan ? (
+          <>
+            <span
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={todos.length}
+              aria-valuenow={completedCount}
+              className="h-1 w-[34px] flex-none overflow-hidden rounded-full bg-surface-active"
+            >
+              <span
+                className="block h-full bg-accent"
+                style={{
+                  width: `${(completedCount / todos.length) * 100}%`,
+                }}
+              />
+            </span>
+            <span className="flex-none">
+              {completedCount}/{todos.length}
+            </span>
+          </>
+        ) : null}
+        {countInChip ? (
+          <span className={`flex-none ${hasPlan ? "text-text-muted" : ""}`}>
+            {hasPlan ? "· " : ""}
+            {t("activity.subagents", { count: rows.length })}
+          </span>
+        ) : null}
+        <ChevronDown className="h-3 w-3 flex-none text-text-muted" />
+      </button>
+    </span>
+  ) : null;
 
   // ── Goal status rendering ──
   if (
@@ -237,7 +425,7 @@ export function ChatInputStatusBar({
     }
 
     return (
-      <div className="min-h-5 px-1 pb-1">
+      <div ref={panelRef} className="relative min-h-5 px-1 pb-1">
         <style>{gradientStyles}</style>
         <div className="flex items-center gap-1.5 text-xs text-text-primary">
           {renderGoalIcon(status.type)}
@@ -278,6 +466,7 @@ export function ChatInputStatusBar({
               </button>
             </>
           )}
+          {rightZone}
         </div>
       </div>
     );
@@ -342,9 +531,6 @@ export function ChatInputStatusBar({
   }
 
   // Always render a fixed-height container to prevent layout jump
-  const isEntry = status?.type === "background-agent" && rows.length > 0;
-  // 类型只在面板内不统一时才值得占宽度（同类时逐行重复纯属噪音）
-  const showType = new Set(rows.map((row) => row.type)).size > 1;
 
   return (
     // 定位锚点放在这个容器上（而不是 chip 那个 span）：面板是它的绝对定位子元素，
@@ -353,96 +539,14 @@ export function ChatInputStatusBar({
     <div ref={panelRef} className="relative min-h-5 px-1 pb-1">
       <style>{gradientStyles}</style>
       <div className={`flex items-center gap-1.5 text-xs ${toneClass}`}>
-        {isEntry ? (
-          <span className="inline-flex min-w-0 items-center">
-            {panelOpen && (
-              <div
-                role="dialog"
-                aria-label={t("subagent.panelTitle")}
-                style={{ maxHeight: panelMaxHeight ?? undefined }}
-                className={`${MENU_PANEL_CLASS} animate-menu-in-up absolute bottom-full left-0 z-30 mb-2 w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs`}
-              >
-                {rows.map((row) => (
-                  <button
-                    key={row.toolCallId}
-                    type="button"
-                    onClick={() => {
-                      setPanelOpen(false);
-                      onSelectBackgroundAgent?.(row.toolCallId);
-                    }}
-                    className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60 ${
-                      // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
-                      // `error` 刻意不降 —— 失败是应该被注意到的信号。
-                      row.status === "completed" ? "opacity-60" : ""
-                    }`}
-                  >
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      {/* ① 名字（只有面板内类型不统一时才带后缀） */}
-                      <span className="truncate text-text-primary">
-                        {row.name ?? row.type ?? row.toolCallId}
-                        {showType && row.name && row.type ? (
-                          <span className="text-text-muted">
-                            {" · "}
-                            {row.type}
-                          </span>
-                        ) : null}
-                      </span>
-                      {/* ② 任务描述：始终显示（之前只在没有步骤时才出现） */}
-                      {row.description ? (
-                        <span className="truncate text-text-secondary">
-                          {row.description}
-                        </span>
-                      ) : null}
-                      {/* ③ 当前动作 / 最后一步：没有就不渲染，避免与描述重复同一句话 */}
-                      {row.currentLabel ? (
-                        <span className="truncate font-mono text-text-muted">
-                          {row.currentLabel}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="flex flex-shrink-0 items-center gap-1 text-text-muted">
-                      {row.stepCount > 0 && <span>{row.stepCount}</span>}
-                      {row.durationMs > 0 && (
-                        <span>
-                          {row.durationMs < 1000
-                            ? `${row.durationMs}ms`
-                            : `${(row.durationMs / 1000).toFixed(1)}s`}
-                        </span>
-                      )}
-                      {row.status === "running" ? (
-                        <Loader2 className="h-3 w-3 animate-spin text-accent" />
-                      ) : row.status === "error" ? (
-                        <XCircle className="h-3 w-3 text-error" />
-                      ) : (
-                        <CheckCircle2 className="h-3 w-3" />
-                      )}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-            <button
-              type="button"
-              aria-haspopup="dialog"
-              aria-expanded={panelOpen}
-              onClick={() => setPanelOpen((value) => !value)}
-              className="flex min-w-0 items-center gap-1 text-left hover:text-text-primary"
-            >
-              <span
-                className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}
-              >
-                {text}
-              </span>
-              <ChevronDown className="h-3 w-3 flex-shrink-0 text-text-muted" />
-            </button>
-          </span>
-        ) : (
+        {text ? (
           <span
             className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}
           >
             {text}
           </span>
-        )}
+        ) : null}
+        {rightZone}
       </div>
     </div>
   );

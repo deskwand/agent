@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 //
-// 接线回归：面板必须真的只收到「本轮」的行。
+// 端到端验收：这两条是本次改动要修的用户可见结果，改动前可以直接复现失败。
+//  1. 模型正在回答（状态走 thinking/responding）时，后台子代理计数仍然可见；
+//  2. 窗口被压缩（不再含 todo_write）之后，计划条仍在。
 //
-// 纯函数（collectCurrentRoundToolCallIds / buildBackgroundAgentRows）各自有单测，
-// 但把第 4 个参数写掉、或传成 null，所有单测仍然全绿、功能却整体失效。
-// 这条测试挂真 ChatView + 真 ChatInputStatusBar，断言面板里出现的是哪些行。
+// 挂真 ChatView + 真 ChatInputStatusBar；mock 脚手架与
+// chat-input-status-bar / background-panel-round-scope 同一套。
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +18,7 @@ import type {
   Session,
 } from "../../renderer/types";
 import type { SubagentActivity } from "../../shared/subagent-activity";
+import type { CurrentTodos } from "../../renderer/utils/current-todos";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -58,9 +60,7 @@ vi.mock("../../renderer/components/ChatInputBottomBar", () => ({
   ChatInputBottomBar: () => React.createElement("div"),
 }));
 
-const OLD_SPAWN = "call-old-done";
-const OLD_LIVE = "call-old-running";
-const NEW_SPAWN = "call-new-done";
+const SPAWN = "call-live";
 
 function makeMessage(
   id: string,
@@ -70,32 +70,30 @@ function makeMessage(
   return { id, sessionId: "s1", role, timestamp: 1, content };
 }
 
-function makeActivity(
-  parentToolCallId: string,
-  name: string,
-  description: string,
-  status: SubagentActivity["status"],
-): SubagentActivity {
+function runningActivity(): SubagentActivity {
   return {
     sessionId: "s1",
-    agentId: `agent-${parentToolCallId}`,
-    parentToolCallId,
-    name,
+    agentId: "agent-live",
+    parentToolCallId: SPAWN,
+    name: "curie",
     type: "general-purpose",
-    description,
+    description: "background task",
     background: true,
-    status,
+    status: "running",
     steps: [],
     stats: { toolUses: 1, durationMs: 100 },
   };
 }
 
-function setState(): void {
+function setState(opts: {
+  sessionStatus: Session["status"];
+  messages: Message[];
+  currentTodos: CurrentTodos | null;
+}): void {
   const session: Session = {
     id: "s1",
-    title: "round scope",
-    // 必须不是 running：run 中状态栏会先显示「thinking」，面板压根不渲染
-    status: "completed",
+    title: "activity strip",
+    status: opts.sessionStatus,
     createdAt: 1,
     updatedAt: 1,
     cwd: "/tmp",
@@ -113,18 +111,7 @@ function setState(): void {
         historyHydrated: true,
         hasMoreOlder: false,
         oldestMessageId: null,
-        messages: [
-          makeMessage("u1", "user", [{ type: "text", text: "第一轮" }]),
-          makeMessage("a1", "assistant", [
-            { type: "tool_use", id: OLD_SPAWN, name: "Agent", input: {} },
-            { type: "tool_use", id: OLD_LIVE, name: "Agent", input: {} },
-          ]),
-          // 这一条把回合边界推到这里：它之前的两个 agent 都属于上一轮
-          makeMessage("u2", "user", [{ type: "text", text: "第二轮" }]),
-          makeMessage("a2", "assistant", [
-            { type: "tool_use", id: NEW_SPAWN, name: "Agent", input: {} },
-          ]),
-        ],
+        messages: opts.messages,
         partialByTurn: {},
         partialMessage: "",
         partialThinking: "",
@@ -139,32 +126,14 @@ function setState(): void {
         steerRecords: [],
         partialToolResults: {},
         backgroundAgents: [],
-        subagentActivities: {
-          [OLD_SPAWN]: makeActivity(
-            OLD_SPAWN,
-            "euler",
-            "old task",
-            "completed",
-          ),
-          [OLD_LIVE]: makeActivity(
-            OLD_LIVE,
-            "turing",
-            "old live task",
-            "running",
-          ),
-          [NEW_SPAWN]: makeActivity(
-            NEW_SPAWN,
-            "darwin",
-            "new task",
-            "completed",
-          ),
-        },
+        subagentActivities: { [SPAWN]: runningActivity() },
+        currentTodos: opts.currentTodos,
       },
     },
   } as never);
 }
 
-describe("background panel round scope wiring", () => {
+describe("activity strip end to end", () => {
   let container: HTMLDivElement;
   let root: Root;
 
@@ -200,27 +169,78 @@ describe("background panel round scope wiring", () => {
     vi.unstubAllGlobals();
   });
 
-  it("上一轮已完成的被收窄掉，上一轮还在跑的和本轮的都保留", () => {
-    act(() => setState());
+  function render(): void {
     act(() => {
       root.render(React.createElement(ChatView));
     });
+  }
 
-    // 入口已从"状态文本按钮"改为"活动 chip"：面板入口统一用 aria 查询，
-    // 不再依赖某个具体文案（文案在两种承载方式下会变）。"只能本轮"这条规矩本身没变。
-    const chip = container.querySelector<HTMLButtonElement>(
-      "button[aria-haspopup='dialog']",
+  it("回答进行中时，后台子代理计数仍然可见", () => {
+    // 改动前的失败态：会话在跑 → 状态走 thinking，整行只显示那句过程状态，
+    // 后台计数被单槽位优先级吃掉，页面上根本找不到它。
+    act(() =>
+      setState({
+        sessionStatus: "running",
+        messages: [
+          makeMessage("u1", "user", [
+            { type: "text", text: "起一个后台子代理" },
+          ]),
+          makeMessage("a1", "assistant", [
+            { type: "tool_use", id: SPAWN, name: "Agent", input: {} },
+          ]),
+        ],
+        currentTodos: null,
+      }),
     );
-    expect(chip).toBeTruthy();
-    act(() => chip?.click());
+    render();
 
-    const panel = container.querySelector("[role='dialog']");
-    expect(panel).toBeTruthy();
-    // 本轮完成 + 跨回合仍在跑 → 在
-    expect(panel?.textContent).toContain("darwin");
-    expect(panel?.textContent).toContain("turing");
-    // 上一轮已完成的 → 被收窄掉
-    expect(panel?.textContent).not.toContain("euler");
-    expect(panel?.textContent).not.toContain("old task");
+    expect(container.textContent).toContain("activity.subagents");
+  });
+
+  it("窗口被压缩（不再含 todo_write）后，计划条仍在", () => {
+    // 走真实链路，而不是直接往 store 里塞值：
+    // ① 累积（addMessage）→ ② 压缩后的窗口（setMessagesTail）→ ③ 仍然渲染。
+    // 破坏①或②任何一步，这条都会红。
+    act(() =>
+      setState({
+        sessionStatus: "completed",
+        messages: [],
+        currentTodos: null,
+      }),
+    );
+
+    act(() => {
+      useAppStore.getState().addMessage(
+        "s1",
+        makeMessage("a1", "assistant", [
+          {
+            type: "tool_use",
+            id: "t1",
+            name: "todo_write",
+            input: {
+              todos: [
+                { content: "建表", status: "completed" },
+                { content: "写迁移", status: "in_progress" },
+              ],
+            },
+          },
+        ]),
+      );
+    });
+
+    act(() => {
+      useAppStore
+        .getState()
+        .setMessagesTail(
+          "s1",
+          [makeMessage("u9", "user", [{ type: "text", text: "压缩后的摘要" }])],
+          false,
+        );
+    });
+
+    render();
+
+    expect(container.textContent).toContain("1/2");
+    expect(container.querySelector("[role='progressbar']")).toBeTruthy();
   });
 });
