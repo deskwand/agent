@@ -393,8 +393,9 @@ export function WelcomeView() {
           />
         )}
 
-        {/* 快捷入口 —— 能力发现，不分组、不隐藏 */}
-        {visibleEntries.length > 0 && (
+        {/* 快捷入口 —— 能力发现，不分组；只在已配置时出现：未配置时它们邀请的动作
+            注定会被主进程的会话闸门拒掉 */}
+        {visibleEntries.length > 0 && !showConnectCards && (
           <div className="flex flex-wrap justify-center gap-2">
             {visibleEntries.map((entry) => (
               <button
@@ -416,101 +417,113 @@ export function WelcomeView() {
           </div>
         )}
 
+        {showConnectCards && (
+          <p className="text-center text-xs text-text-muted">
+            {t("connect.capabilitySummary")}
+          </p>
+        )}
+
         {/* Chat Input — same as ChatView */}
         <ChatInput
           ref={chatInputRef}
           draftKey={NEW_SESSION_DRAFT_KEY}
           onSubmit={handleSubmit}
-          disabled={isSubmitting}
+          disabled={isSubmitting || showConnectCards}
           isExpanded={isInputExpanded}
           onToggleExpand={() => setIsInputExpanded((v) => !v)}
           onContentChange={setHasInputContent}
           onAttachmentsChange={handleAttachmentsChange}
           slashMenuDirection="down"
-          placeholder={t("welcome.placeholder")}
-          cardClassName="rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4"
+          placeholder={
+            showConnectCards
+              ? t("connect.startPlaceholder")
+              : t("welcome.placeholder")
+          }
+          cardClassName={`rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4${showConnectCards ? " cursor-not-allowed" : ""}`}
           textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed overflow-hidden"
           bottomSlot={
-            <ChatInputBottomBar
-              onAttach={() => chatInputRef.current?.selectFiles()}
-              onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
-              attachedKeys={attachedKeys}
-              onAttachMenuDismiss={() => chatInputRef.current?.focus()}
-              onInsertPromptCommand={(name) =>
-                chatInputRef.current?.insertCommandChip(name)
-              }
-              onInsertSkill={(name) =>
-                chatInputRef.current?.insertSkillChip(name)
-              }
-              attachMenuDirection="down"
-              model={selectedModel}
-              modelOptions={modelOptions}
-              activeProviderProfileKey={selectedProviderProfileKey}
-              onSelectModel={(profileKey, modelId) => {
-                // Validate modelId exists in modelOptions before applying
-                const group = modelOptions.find(
-                  (g) => g.profileKey === profileKey,
-                );
-                if (!group?.items.some((i) => i.id === modelId)) return;
-                setSelectedModel(modelId);
-                setSelectedProviderProfileKey(profileKey);
-                // ponytail: project → localStorage only, global → electron-store
-                if (workingDir) {
-                  try {
-                    localStorage.setItem(
-                      "deskwand.pm." + encodeURIComponent(workingDir),
-                      JSON.stringify({
-                        p: profileKey,
-                        m: modelId,
-                        t: selectedThinkingLevel,
-                      }),
-                    );
-                  } catch {
-                    /* ignore */
-                  }
-                } else {
-                  window.electronAPI.config.setActiveProvider({
-                    profileKey,
-                    defaultModel: modelId,
-                  });
+            showConnectCards ? undefined : (
+              <ChatInputBottomBar
+                onAttach={() => chatInputRef.current?.selectFiles()}
+                onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
+                attachedKeys={attachedKeys}
+                onAttachMenuDismiss={() => chatInputRef.current?.focus()}
+                onInsertPromptCommand={(name) =>
+                  chatInputRef.current?.insertCommandChip(name)
                 }
-              }}
-              thinkingLevel={selectedThinkingLevel}
-              thinkingLevelOptions={thinkingLevelOptions}
-              onSelectThinkingLevel={(level) => {
-                setSelectedThinkingLevel(level);
-                // ponytail: project → localStorage only, global → electron-store
-                if (workingDir) {
-                  try {
-                    localStorage.setItem(
-                      "deskwand.pm." + encodeURIComponent(workingDir),
-                      JSON.stringify({
-                        p: selectedProviderProfileKey,
-                        m: selectedModel,
-                        t: level,
-                      }),
-                    );
-                  } catch {
-                    /* ignore */
-                  }
-                } else {
-                  window.electronAPI.config.save({ thinkingLevel: level });
+                onInsertSkill={(name) =>
+                  chatInputRef.current?.insertSkillChip(name)
                 }
-              }}
-              contextUsagePercentage={0}
-              contextRingColorClass="text-accent"
-              contextStatusDetails={{
-                usedLabel: "0",
-                totalLabel: contextWindowTotal,
-                cacheHitRate: "--",
-              }}
-              canStop={false}
-              onStop={() => {}}
-              isSubmitting={isSubmitting}
-              isExpanded={isInputExpanded}
-              onToggleExpand={() => setIsInputExpanded((v) => !v)}
-              hasInputContent={hasInputContent}
-            />
+                attachMenuDirection="down"
+                model={selectedModel}
+                modelOptions={modelOptions}
+                activeProviderProfileKey={selectedProviderProfileKey}
+                onSelectModel={(profileKey, modelId) => {
+                  // Validate modelId exists in modelOptions before applying
+                  const group = modelOptions.find(
+                    (g) => g.profileKey === profileKey,
+                  );
+                  if (!group?.items.some((i) => i.id === modelId)) return;
+                  setSelectedModel(modelId);
+                  setSelectedProviderProfileKey(profileKey);
+                  // ponytail: project → localStorage only, global → electron-store
+                  if (workingDir) {
+                    try {
+                      localStorage.setItem(
+                        "deskwand.pm." + encodeURIComponent(workingDir),
+                        JSON.stringify({
+                          p: profileKey,
+                          m: modelId,
+                          t: selectedThinkingLevel,
+                        }),
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                  } else {
+                    window.electronAPI.config.setActiveProvider({
+                      profileKey,
+                      defaultModel: modelId,
+                    });
+                  }
+                }}
+                thinkingLevel={selectedThinkingLevel}
+                thinkingLevelOptions={thinkingLevelOptions}
+                onSelectThinkingLevel={(level) => {
+                  setSelectedThinkingLevel(level);
+                  // ponytail: project → localStorage only, global → electron-store
+                  if (workingDir) {
+                    try {
+                      localStorage.setItem(
+                        "deskwand.pm." + encodeURIComponent(workingDir),
+                        JSON.stringify({
+                          p: selectedProviderProfileKey,
+                          m: selectedModel,
+                          t: level,
+                        }),
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                  } else {
+                    window.electronAPI.config.save({ thinkingLevel: level });
+                  }
+                }}
+                contextUsagePercentage={0}
+                contextRingColorClass="text-accent"
+                contextStatusDetails={{
+                  usedLabel: "0",
+                  totalLabel: contextWindowTotal,
+                  cacheHitRate: "--",
+                }}
+                canStop={false}
+                onStop={() => {}}
+                isSubmitting={isSubmitting}
+                isExpanded={isInputExpanded}
+                onToggleExpand={() => setIsInputExpanded((v) => !v)}
+                hasInputContent={hasInputContent}
+              />
+            )
           }
         />
       </div>

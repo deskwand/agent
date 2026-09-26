@@ -1992,6 +1992,8 @@
     "loggingIn": "Signing in…",
     "keyPlaceholder": "Paste subscription key",
     "keyRequired": "Paste your subscription key",
+    "capabilitySummary": "Connect a model to: change code · write docs · handle PDFs · search the web · drive the browser",
+    "startPlaceholder": "Connect a model to get started",
     "connected": "Connected to {{provider}} · {{model}}"
   }
 }

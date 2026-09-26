@@ -1989,6 +1989,8 @@
     "loggingIn": "正在登录…",
     "keyPlaceholder": "粘贴订阅 Key",
     "keyRequired": "请粘贴订阅 Key",
+    "capabilitySummary": "连上模型后可以做：改代码 · 写文档 · 处理 PDF · 联网搜索 · 操作浏览器",
+    "startPlaceholder": "先连接一个模型，就能开始",
     "connected": "已连接 {{provider}} · {{model}}"
   }
 }

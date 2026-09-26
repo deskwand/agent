@@ -8,7 +8,9 @@ describe('WelcomeView submit guards', () => {
   it('disables the submit button when there is no text, image, or file to send', () => {
     const source = fs.readFileSync(welcomeViewPath, 'utf8');
 
-    expect(source).toContain('disabled={isSubmitting}');
+    // 未配置态也走同一个 disabled（与卡片区共用 showConnectCards），所以这里盯的是
+    // 完整表达式：只写 'disabled={isSubmitting}' 会在收敛改动后匹配不到。
+    expect(source).toContain('disabled={isSubmitting || showConnectCards}');
     expect(source).toContain('onSubmit={handleSubmit}');
   });
 

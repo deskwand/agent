@@ -81,6 +81,18 @@ describe('欢迎页快捷入口数据', () => {
     }
   });
 
+  // 未配置态首屏收敛用的文案。键落在文件尾部的 connect 对象下（不是 welcome.*）——
+  // 见 design-docs/2026-09-27-first-run-converged-welcome-plan.md 的 Global Constraints。
+  it('收敛态文案的 key 在 zh 与 en 里都存在且非空', () => {
+    const keys = ['connect.capabilitySummary', 'connect.startPlaceholder'];
+    for (const key of keys) {
+      expect(lookup(zh as Json, key), `zh 缺 ${key}`).toBeTypeOf('string');
+      expect(lookup(en as Json, key), `en 缺 ${key}`).toBeTypeOf('string');
+      expect(lookup(zh as Json, key), `zh 的 ${key} 是空串`).not.toBe('');
+      expect(lookup(en as Json, key), `en 的 ${key} 是空串`).not.toBe('');
+    }
+  });
+
 });
 
 describe('visibleQuickEntries 过滤', () => {

@@ -1066,6 +1066,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const handleDragOver = (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      // 护栏必须在 preventDefault 之后：本组件是全渲染进程唯一的 drop 目标，
+      // 提前返回会让浏览器走默认行为 → will-navigate → revealFileInFolder
+      //（往灰框上拖个文件，文件管理器会弹出来打开它）。
+      if (disabled) return;
       setIsDragging(true);
     };
     const handleDragLeave = (e: React.DragEvent) => {
@@ -1077,7 +1081,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const handleDrop = async (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      // 先收光圈再返回：拖拽可能在 enabled 时开始、在途中 disabled 翻成 true，
+      // 此时后面那句 setIsDragging 被跳过，光圈就亮在那儿直到下次 dragleave。
       setIsDragging(false);
+      if (disabled) return;
       const files = Array.from(e.dataTransfer.files);
       const imageFiles = files.filter((file) => file.type.startsWith("image/"));
       const otherFiles = files.filter(
@@ -1201,7 +1208,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
           {/* Input card wrapper — keeps slash menu outside card div so space-y-* doesn't add margin to textarea */}
           <div className="relative">
             {/* Slash command menu */}
-            {showSlashMenu && (
+            {showSlashMenu && !disabled && (
               <div ref={slashMenuRef}>
                 <SlashMenu
                   commands={filteredCommands}
@@ -1228,6 +1235,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 suppressContentEditableWarning
                 role="textbox"
                 aria-multiline="true"
+                aria-disabled={disabled || undefined}
                 aria-label={placeholder}
                 data-placeholder={placeholder}
                 spellCheck={false}
