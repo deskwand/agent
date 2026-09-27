@@ -29,8 +29,8 @@ async function mount(): Promise<void> {
 
 beforeEach(() => {
   useAppStore.setState(useAppStore.getInitialState(), true);
-  // 不 stub onFullScreenChanged：Titlebar 不再订阅全屏状态（决策 6），
-  // 留一个没人用的 stub 会暗示存在一个并不存在的依赖
+  // 这里不关心全屏：订阅逻辑由 titlebar-macos-fullscreen.test.ts 覆盖，
+  // 所以给个空对象即可（`window.onFullScreenChanged?.()` 是可选调用）。
   window.electronAPI = {} as unknown as typeof window.electronAPI;
   container = document.createElement("div");
   document.body.innerHTML = "";

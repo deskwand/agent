@@ -11,7 +11,7 @@ import {
   Globe,
   Package,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { Tooltip } from "./Tooltip";
@@ -63,6 +63,15 @@ function TitlebarButton({
 export function Titlebar() {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
+  // 全屏时 macOS 不显示红绿灯，左簇也就不该再留那 80px（否则窗口左上角一片空白）
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  useEffect(() => {
+    if (!isMac) return;
+    const cleanup =
+      window.electronAPI?.window.onFullScreenChanged?.(setIsFullScreen);
+    return cleanup;
+  }, []);
 
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessions = useAppStore((s) => s.sessions);
@@ -142,8 +151,8 @@ export function Titlebar() {
 
   return (
     <div className="h-10 bg-background flex items-center titlebar-drag shrink-0">
-      {/* macOS 红绿灯留白：恒定 80px（不订阅全屏状态，全屏时只是多一段空白） */}
-      {isMac && <div className="w-20 flex-shrink-0" />}
+      {/* macOS 红绿灯留白：全屏时没有红绿灯，这一格跟着去掉 */}
+      {isMac && !isFullScreen && <div className="w-20 flex-shrink-0" />}
 
       {/* 左簇：会话侧栏的开合，以及侧栏收起时的「新建会话」 */}
       {isChatView && (
