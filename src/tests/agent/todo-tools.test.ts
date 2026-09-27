@@ -70,4 +70,18 @@ describe("todo_write", () => {
     const result = await runDone([], true);
     expect(JSON.stringify(result.content)).toContain("Task list cleared.");
   });
+  it("要求逐项及时更新（进度不能攒到最后），且收尾要带 done", () => {
+    // 真机实测：长任务里相邻两次 todo_write 之间常夹几十次工具调用，而同一个模型在
+    // "只测工具"的会话里能做到每次操作都更新 —— 说明这是"要求强度"问题。
+    // 本测试是**文案金丝雀**：改动这两句措辞时请同步更新下面的正则，不要删掉它。
+    const text = [
+      tool.description ?? "",
+      ...(tool.promptGuidelines ?? []),
+    ].join("\n");
+    expect(text).toMatch(/do not defer updates/i);
+    expect(text).toMatch(/as you go/i);
+    // 终止分支：最后一项没有"下一项"，否则模型学到的是"做完就调一次、不带 done"
+    // —— 那正是 done 信号要治的病（实测 15 个会话只有 6 个以 done:true 收尾）。
+    expect(text).toMatch(/if that was the last item/i);
+  });
 });

@@ -36,7 +36,8 @@ export function createTodoTools(): ToolDefinition[] {
     description:
       "Replace the session task list and show it to the user as a progress list. " +
       "Always send the COMPLETE list, not a delta. Use it for work with 3+ steps: " +
-      "keep at most one item in_progress, mark items completed as you finish them, " +
+      "keep at most one item in_progress, mark each item completed the moment you finish it " +
+      "(do not defer updates to the end of the run), " +
       "and set done to true when the plan is over (every item must be completed or " +
       "cancelled first); send an empty array only to discard the list. " +
       'activeForm is the present-continuous form of content (content "write tests" -> ' +
@@ -49,6 +50,7 @@ export function createTodoTools(): ToolDefinition[] {
       "Send the full list on every call; entries omitted from the call are removed.",
       "Do not use it for a single trivial action.",
       "Set done: true when the plan is finished; every item must be completed or cancelled first.",
+      "Update the list as you go: right after finishing an item, mark it completed and set the next one in_progress — or, if that was the last item, send the settled list with done: true. The list is the user's only live view of the plan's progress, so it must not lag behind your work.",
     ],
     parameters: Type.Object({
       todos: Type.Array(
