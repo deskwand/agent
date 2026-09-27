@@ -177,9 +177,9 @@ export function Titlebar() {
         </div>
       )}
 
-      {/* 标题紧跟左簇、左对齐截断。注意：不要加 titlebar-no-drag，这一块要保持可拖窗 */}
-      <div className="flex-1 min-w-0 px-3">
-        <span className="block truncate text-sm font-medium text-text-primary">
+      {/* 标题在左簇与右簇之间居中。注意：不要加 titlebar-no-drag，这一块要保持可拖窗 */}
+      <div className="flex-1 min-w-0 px-3 flex justify-center">
+        <span className="min-w-0 truncate text-sm font-medium text-text-primary">
           {showSessionHeader ? activeSessionTitle : ""}
         </span>
       </div>

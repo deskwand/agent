@@ -42,12 +42,17 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
   });
 
   it("标题是可收缩的 flex 项，不再是绝对居中层", () => {
-    // 回归守卫：绝对定位 + px-40 的标题层在 Windows 上会被右侧 262px 的按钮组
+    // 回归守卫：绝对定位 + px-40 的标题层在 Windows 上会被右侧 266px 的按钮组
     // 压住（长标题钻到按钮下面）。改回绝对定位就会同时打破 f1 与 f2。
     const titlebar = read("components/Titlebar.tsx");
     expect(titlebar).not.toContain("absolute inset-0");
     expect(titlebar).not.toContain("px-40");
     expect(titlebar).toMatch(/flex-1 min-w-0/);
+    // 标题在左簇与右簇之间居中（2026-09-27 决策；改回左对齐或绝对居中都会失败）
+    expect(titlebar).toMatch(/flex-1 min-w-0[^\n]*justify-center/);
+    // 居中的前提：子项必须可收缩（`truncate` 的 overflow:hidden 把自动最小尺寸归零）。
+    // 换成 whitespace-nowrap 后子项会拒绝收缩、超宽盒子被居中，两端一起压到簇上。
+    expect(titlebar).toMatch(/min-w-0 truncate/);
   });
 
   it("标题栏底部不再有描边", () => {
