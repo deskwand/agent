@@ -68,6 +68,7 @@ export function Sidebar({
   const setTraceSteps = useAppStore((s) => s.setTraceSteps);
   const workingDir = useAppStore((s) => s.workingDir);
   const setWorkingDir = useAppStore((s) => s.setWorkingDir);
+  const startNewSession = useAppStore((s) => s.startNewSession);
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
@@ -876,10 +877,7 @@ export function Sidebar({
                 <div className="relative flex flex-shrink-0">
                   <Tooltip label={t("sidebar.newChat")}>
                     <button
-                      onClick={() => {
-                        setWorkingDir(null);
-                        handleNewSession();
-                      }}
+                      onClick={() => startNewSession()}
                       className="h-8 w-8 rounded-l-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
                       aria-label={t("sidebar.newChat")}
                     >

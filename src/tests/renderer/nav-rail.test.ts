@@ -4,7 +4,6 @@ import {
   RAIL_ITEMS,
   isSidebarAllowed,
   resolveRailActiveKey,
-  resolveRailClick,
 } from "../../renderer/utils/nav-rail";
 
 const ALL_VIEWS: ActiveView[] = [
@@ -55,23 +54,6 @@ describe("resolveRailActiveKey", () => {
       if (view === "settings") continue;
       expect(resolveRailActiveKey(view), view).not.toBeNull();
     }
-  });
-});
-
-describe("resolveRailClick", () => {
-  it("navigates when clicking an item that is not the active view", () => {
-    expect(resolveRailClick("apps", "chat")).toBe("navigate");
-    expect(resolveRailClick("chat", "apps")).toBe("navigate");
-  });
-
-  it("toggles the sidebar only when re-clicking chat while already in chat", () => {
-    expect(resolveRailClick("chat", "chat")).toBe("toggle-sidebar");
-  });
-
-  it("never touches the sidebar from a non-chat item", () => {
-    expect(resolveRailClick("settings", "settings")).toBe("navigate");
-    expect(resolveRailClick("usage", "usage")).toBe("navigate");
-    expect(resolveRailClick("automation", "automation")).toBe("navigate");
   });
 });
 

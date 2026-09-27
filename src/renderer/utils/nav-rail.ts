@@ -19,23 +19,9 @@ export const RAIL_ITEMS: readonly RailItem[] = [
   { key: "usage", view: "usage", labelKey: "accountMenu.usage" },
 ];
 
-export type RailClickAction = "navigate" | "toggle-sidebar";
-
 /** 当前视图对应的图标栏项 key；settings 不在栏上，返回 null。 */
 export function resolveRailActiveKey(activeView: ActiveView): string | null {
   return RAIL_ITEMS.find((item) => item.view === activeView)?.key ?? null;
-}
-
-/**
- * 点图标栏某一项的语义：只有「聊天」项承担侧栏开合，且仅在已经处于聊天视图时；
- * 其余项一律只切视图，点中当前项是 no-op。
- */
-export function resolveRailClick(
-  view: ActiveView,
-  activeView: ActiveView,
-): RailClickAction {
-  if (view !== "chat") return "navigate";
-  return activeView === "chat" ? "toggle-sidebar" : "navigate";
 }
 
 /** 侧栏（会话列表）只在聊天视图出现。 */

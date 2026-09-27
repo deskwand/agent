@@ -3,6 +3,9 @@ import {
   Square,
   X,
   Copy,
+  PanelLeft,
+  Columns2,
+  SquarePen,
   FolderOpen,
   Diff,
   Globe,
@@ -71,6 +74,11 @@ export function Titlebar() {
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
   const toggleArtifactPanel = useAppStore((s) => s.toggleArtifactPanel);
   const isArtifactPanelOpen = useAppStore((s) => s.isArtifactPanelOpen);
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const startNewSession = useAppStore((s) => s.startNewSession);
+  // 左簇只在聊天视图渲染：侧栏只挂聊天视图，别的视图里这按钮按了不会有反应
+  const isChatView = activeView === "chat";
 
   const activeSessionTitle = activeSessionId
     ? (sessions.find((session) => session.id === activeSessionId)?.title ?? "")
@@ -133,17 +141,50 @@ export function Titlebar() {
   );
 
   return (
-    <div className="relative h-10 bg-background flex items-center titlebar-drag shrink-0">
-      {/* 会话标题相对窗口居中：左右各留 160px，避免压住 macOS 的 traffic lights
-          与右侧按钮组。pointer-events-none 让这块仍然可以拖窗。 */}
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-40">
-        <span className="min-w-0 truncate text-sm font-medium text-text-primary">
+    <div className="h-10 bg-background flex items-center titlebar-drag shrink-0">
+      {/* macOS 红绿灯留白：恒定 80px（不订阅全屏状态，全屏时只是多一段空白） */}
+      {isMac && <div className="w-20 flex-shrink-0" />}
+
+      {/* 左簇：会话侧栏的开合，以及侧栏收起时的「新建会话」 */}
+      {isChatView && (
+        <div className="titlebar-no-drag flex items-center gap-0.5 pl-3">
+          <TitlebarButton
+            label={
+              sidebarCollapsed
+                ? t("context.expandPanel")
+                : t("context.collapsePanel")
+            }
+            tone="secondary"
+            onClick={toggleSidebar}
+          >
+            {sidebarCollapsed ? (
+              <PanelLeft className="w-3.5 h-3.5" />
+            ) : (
+              <Columns2 className="w-3.5 h-3.5" />
+            )}
+          </TitlebarButton>
+
+          {/* 展开态不显示：侧栏头部已经有「新建」了 */}
+          {sidebarCollapsed && (
+            <TitlebarButton
+              label={t("sidebar.newChat")}
+              tone="secondary"
+              onClick={() => startNewSession()}
+            >
+              <SquarePen className="w-3.5 h-3.5" />
+            </TitlebarButton>
+          )}
+        </div>
+      )}
+
+      {/* 标题紧跟左簇、左对齐截断。注意：不要加 titlebar-no-drag，这一块要保持可拖窗 */}
+      <div className="flex-1 min-w-0 px-3">
+        <span className="block truncate text-sm font-medium text-text-primary">
           {showSessionHeader ? activeSessionTitle : ""}
         </span>
       </div>
 
-      {/* 侧栏开合已改由图标栏的「聊天」项承担，顶栏不再有这个按钮 */}
-      <div className="ml-auto flex items-center">
+      <div className="flex items-center">
         {rightToolbar}
 
         {/* Window Controls (for Windows/Linux - macOS uses native traffic lights) */}

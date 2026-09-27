@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
-// 用真实 store 挂载真实 AppRail：resolveRailClick 有单测，但「图标栏点了以后
-// 到底动了什么」只有端到端点一遍才能锁住（源码字符串断言在分支被写反时照样通过）。
+// 用真实 store 挂载真实 AppRail：「图标栏点了以后到底动了什么」只有端到端点一遍
+// 才能锁住（源码字符串断言在分支被写反时照样通过）。
+// 注意：侧栏开合**不在**这里——它由顶栏的专用按钮负责（见 titlebar-left-cluster.test.ts）。
 
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -57,16 +58,6 @@ describe("AppRail 点击路由", () => {
     expect(buttonFor("sidebar.user")).toBeTruthy();
   });
 
-  it("聊天视图点「聊天」只开合侧栏，不切视图", async () => {
-    await mountRail("chat");
-    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
-
-    await act(async () => buttonFor("navRail.chat").click());
-
-    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
-    expect(useAppStore.getState().activeView).toBe("chat");
-  });
-
   it("点其它项切视图，且不动侧栏", async () => {
     await mountRail("chat");
 
@@ -76,12 +67,18 @@ describe("AppRail 点击路由", () => {
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
   });
 
-  it("从非聊天视图点「聊天」回到聊天，不顺手收起侧栏", async () => {
-    await mountRail("apps");
+  it("点聊天项只切视图，不碰侧栏状态", async () => {
+    await mountRail("chat");
+    useAppStore.setState({ sidebarCollapsed: true });
 
+    await act(async () => buttonFor("navRail.chat").click());
+    expect(useAppStore.getState().activeView).toBe("chat");
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+
+    await mountRail("apps");
     await act(async () => buttonFor("navRail.chat").click());
 
     expect(useAppStore.getState().activeView).toBe("chat");
-    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
   });
 });

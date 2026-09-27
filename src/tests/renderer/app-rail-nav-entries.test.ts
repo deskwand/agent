@@ -35,10 +35,11 @@ describe("AppRail", () => {
     expect(rail).toContain("bg-overlay-on text-accent");
   });
 
-  it("routes clicks through resolveRailClick so only chat can toggle the sidebar", () => {
-    expect(rail).toContain("resolveRailClick");
-    expect(rail).toContain("toggleSidebar()");
+  it("只切视图，不碰侧栏", () => {
     expect(rail).toContain("setActiveView(");
+    // 侧栏开合已交回顶栏的专用按钮，图标栏不再承担这件事
+    expect(rail).not.toContain("toggleSidebar");
+    expect(rail).not.toContain("resolveRailClick");
     expect(rail).not.toContain("setActiveSession(");
   });
 

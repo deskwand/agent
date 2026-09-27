@@ -41,6 +41,15 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
     ).toEqual([]);
   });
 
+  it("标题是可收缩的 flex 项，不再是绝对居中层", () => {
+    // 回归守卫：绝对定位 + px-40 的标题层在 Windows 上会被右侧 262px 的按钮组
+    // 压住（长标题钻到按钮下面）。改回绝对定位就会同时打破 f1 与 f2。
+    const titlebar = read("components/Titlebar.tsx");
+    expect(titlebar).not.toContain("absolute inset-0");
+    expect(titlebar).not.toContain("px-40");
+    expect(titlebar).toMatch(/flex-1 min-w-0/);
+  });
+
   it("标题栏底部不再有描边", () => {
     // titlebar-drag 在 className 的**中间**，所以我不能只截到标记之后那段
     // （classNameAt 会漏掉写在标记前面的类名）—— 必须取整行。

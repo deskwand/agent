@@ -432,6 +432,8 @@ interface AppState {
 
   // Working directory actions
   setWorkingDir: (path: string | null) => void;
+  /** 开一个新会话：清当前会话、清工作目录、回到聊天视图。 */
+  startNewSession: () => void;
 
   // Sandbox setup actions
   setSandboxSetupProgress: (progress: SandboxSetupProgress | null) => void;
@@ -1460,6 +1462,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Working directory actions
   setWorkingDir: (path) => set({ workingDir: path }),
+
+  startNewSession: () => {
+    // 与 setWorkingDir 不同，setActiveSession 不是纯 setter：它还会清
+    // localStorage 的 deskwand.lastSessionId，所以这里必须调动作本身。
+    const store = useAppStore.getState();
+    store.setActiveSession(null);
+    store.setWorkingDir(null);
+    store.setActiveView("chat");
+  },
 
   // Sandbox setup actions
   setSandboxSetupProgress: (progress) =>

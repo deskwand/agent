@@ -9,11 +9,7 @@ import {
 } from "lucide-react";
 import type { ActiveView } from "../store";
 import { useAppStore } from "../store";
-import {
-  RAIL_ITEMS,
-  resolveRailActiveKey,
-  resolveRailClick,
-} from "../utils/nav-rail";
+import { RAIL_ITEMS, resolveRailActiveKey } from "../utils/nav-rail";
 import { Tooltip } from "./Tooltip";
 import { HelpMenu } from "./HelpMenu";
 import { RAIL_BUTTON_CLASS } from "./rail-styles";
@@ -32,15 +28,11 @@ export function AppRail() {
   const { t } = useTranslation();
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
-  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
 
   const activeKey = resolveRailActiveKey(activeView);
 
   const handleItemClick = (view: ActiveView) => {
-    if (resolveRailClick(view, activeView) === "toggle-sidebar") {
-      toggleSidebar();
-      return;
-    }
+    // 图标栏只切视图；侧栏开合由顶栏左簇的专用按钮负责。
     // 视图互斥由 activeView 单一字段保证；此处不额外清空 activeSessionId，
     // 否则从 Vault/设置返回聊天会丢掉当前会话。
     setActiveView(view);
