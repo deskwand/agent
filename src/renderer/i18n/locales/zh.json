@@ -884,7 +884,10 @@
       "day_other": "{{count}}天",
       "week_one": "{{count}}周",
       "week_other": "{{count}}周"
-    }
+    },
+    "projects": "项目",
+    "expandProjects": "展开项目列表",
+    "collapseProjects": "收起项目列表"
   },
   "browser": {
     "placeholder": "搜索或输入网址",
@@ -1992,5 +1995,9 @@
     "capabilitySummary": "连上模型后可以做：改代码 · 写文档 · 处理 PDF · 联网搜索 · 操作浏览器",
     "startPlaceholder": "先连接一个模型，就能开始",
     "connected": "已连接 {{provider}} · {{model}}"
+  },
+  "navRail": {
+    "label": "主导航",
+    "chat": "聊天"
   }
 }

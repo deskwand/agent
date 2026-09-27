@@ -17,6 +17,11 @@ const settingsApi = fs.readFileSync(
   ),
   "utf8",
 );
+// 账号簇（含启动恢复登录与服务商重建/清理）已从 Sidebar 搬到图标栏底部
+const accountCluster = fs.readFileSync(
+  path.resolve(process.cwd(), "src/renderer/components/AccountCluster.tsx"),
+  "utf8",
+);
 
 describe("cloud provider lifecycle wiring", () => {
   it("injects the provider after login using pricing, not modes", () => {
@@ -30,15 +35,15 @@ describe("cloud provider lifecycle wiring", () => {
   });
 
   it("rebuilds the provider on startup restore so existing users get real model names", () => {
-    expect(sidebar).toContain("buildDeskwandProviderPayload(");
-    expect(sidebar).toContain("config.saveProvider(payload)");
-    expect(sidebar).toContain("getPricing()");
-    expect(sidebar).not.toContain("getModes");
+    expect(accountCluster).toContain("buildDeskwandProviderPayload(");
+    expect(accountCluster).toContain("config.saveProvider(payload)");
+    expect(accountCluster).toContain("getPricing()");
+    expect(accountCluster).not.toContain("getModes");
   });
 
   it("removes the provider on logout and on startup 401 restore", () => {
-    expect(sidebar).toContain('profileKey: "custom:deskwand"');
-    const occurrences = sidebar.split("deleteProvider(").length - 1;
+    expect(accountCluster).toContain('profileKey: "custom:deskwand"');
+    const occurrences = accountCluster.split("deleteProvider(").length - 1;
     expect(occurrences).toBeGreaterThanOrEqual(2);
   });
 

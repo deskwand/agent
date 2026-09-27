@@ -51,19 +51,18 @@ describe("标题栏操作按钮", () => {
     expect(titled).toEqual([]);
   });
 
-  it("5 个操作按钮都有 aria-label", async () => {
+  it("4 个操作按钮都有 aria-label", async () => {
     const el = await mountTitlebar();
     // store 初始值下的实际文案 key：
-    //   sidebarCollapsed=false    → context.collapsePanel
     //   rightPanelMode=null       → titlebar.fileBrowser / titlebar.builtInBrowser
-    //   rightPanelMode!=="review"        → reviewPanel.title
+    //   rightPanelMode!=="review" → reviewPanel.title
     //   isArtifactPanelOpen=false → artifactPanel.toggle
+    // 侧栏开合按钮已移到图标栏的「聊天」项，不再是顶栏按钮
     for (const key of [
       "artifactPanel.toggle",
       "titlebar.fileBrowser",
       "titlebar.builtInBrowser",
       "reviewPanel.title",
-      "context.collapsePanel",
     ]) {
       expect(el.querySelector(`[aria-label="${key}"]`), key).not.toBeNull();
     }

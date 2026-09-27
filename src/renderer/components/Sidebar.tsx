@@ -2,12 +2,10 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
-import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import { useIPC } from "../hooks/useIPC";
 import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 import {
   Trash2,
-  Settings,
   Search as SearchIcon,
   Check,
   Folder,
@@ -15,24 +13,14 @@ import {
   ChevronDown,
   MoreHorizontal,
   SquarePen,
-  Download,
   Pin,
   PinOff,
-  Clock3,
-  LayoutGrid,
 } from "lucide-react";
-import { AccountMenu } from "./AccountMenu";
-import { avatarInitials } from "../utils/identity";
 import { panelWidthTransitionClass } from "../utils/panel-width";
-import { LoginModal } from "./LoginModal";
-import { buildDeskwandProviderPayload } from "../utils/cloud-provider";
-import { ConfirmDialog } from "./ConfirmDialog";
-import { UpdateConfirmDialog } from "./UpdateConfirmDialog";
 import {
   SidebarAnimatedSection,
   SidebarGroupIcon,
 } from "./sidebar-disclosure-motion";
-import { CloudApiClient } from "../services/cloud-api";
 import type { Session } from "../types";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import {
@@ -53,6 +41,8 @@ import {
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
 const ORDINARY_SESSION_GROUP_KEY = "__ordinary_sessions__";
+/** 「项目」外层折叠行的持久化 key；内层各项目仍用各自 cwd 作 key。 */
+const PROJECTS_GROUP_KEY = "__projects__";
 const SIDEBAR_PINS_STORAGE_KEY = "deskwand.sidebarPins";
 const SIDEBAR_GROUP_EXPANSION_STORAGE_KEY = "deskwand.sidebarGroupExpansion";
 const SESSION_OVERFLOW_BUTTON_CLASS =
@@ -81,20 +71,8 @@ export function Sidebar({
   const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
   const setShowSettings = useAppStore((s) => s.setShowSettings);
   const setShowSchedule = useAppStore((s) => s.setShowSchedule);
-  const setActiveView = useAppStore((s) => s.setActiveView);
-  const showApps = useAppStore((s) => s.activeView === "apps");
   const setShowApps = useAppStore((s) => s.setShowApps);
-  const showSchedule = useAppStore((s) => s.activeView === "automation");
-  const showVault = useAppStore((s) => s.activeView === "vault");
-  const cloudConfig = useAppStore((s) => s.cloudConfig);
-  const showLoginModal = useAppStore((s) => s.showLoginModal);
-  const setShowLoginModal = useAppStore((s) => s.setShowLoginModal);
-  const setCloudConfig = useAppStore((s) => s.setCloudConfig);
   const setGlobalNotice = useAppStore((s) => s.setGlobalNotice);
-
-  const updateReady = useAppStore((s) => s.updateReady);
-  const updateVersion = useAppStore((s) => s.updateVersion);
-  const updateNotes = useAppStore((s) => s.updateNotes);
 
   const {
     invoke,
@@ -119,21 +97,11 @@ export function Sidebar({
   );
   const [sidebarPins, setSidebarPins] = useState<SidebarPins>(loadSidebarPins);
   const [showProjectActions, setShowProjectActions] = useState(false);
-  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
-  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
-  const [cloudRestoring, setCloudRestoring] = useState(false);
-  // 触发行身份化：登录恢复期/空邮箱保持「设置」胶囊，避免身份行闪变或空内容
-  const identityEmail =
-    !cloudRestoring && cloudConfig?.isLoggedIn && cloudConfig.email
-      ? cloudConfig.email
-      : null;
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
   const [sessionMenu, setSessionMenu] = useState<SessionMenuState | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
-  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
-  const [currentAppVersion, setCurrentAppVersion] = useState("");
 
   useEffect(() => {
     saveSidebarPins(sidebarPins);
@@ -167,83 +135,6 @@ export function Sidebar({
       window.removeEventListener("resize", closeMenu);
     };
   }, [sessionMenu]);
-
-  // Get current app version for update dialog
-  useEffect(() => {
-    if (!window.electronAPI) return;
-    try {
-      const v = window.electronAPI.getVersion?.();
-      if (v instanceof Promise) {
-        v.then((ver) => {
-          if (ver) setCurrentAppVersion(ver);
-        });
-      } else if (v) {
-        setCurrentAppVersion(v);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  // 启动时恢复云端登录状态
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("deskwand.cloud");
-      if (!raw) return;
-      const c = JSON.parse(raw);
-      if (!c?.token) return;
-      setCloudRestoring(true);
-      (async () => {
-        try {
-          const me = await new CloudApiClient(c.token).getMe();
-          setCloudConfig({
-            serverUrl: DESKWAND_API_URL,
-            token: c.token,
-            isLoggedIn: true,
-            email: me.email,
-            level: me.level,
-            balanceMicroUsd: me.balance_micro_usd,
-          });
-          // 已登录用户升级后仍持有带模式名的旧 payload：启动时按当前定价重建。
-          // 列表为空（如接口异常）时保留已保存的 payload，不能把云模型清空。
-          try {
-            const pricing = await new CloudApiClient(c.token).getPricing();
-            // 用户在全局路径选过的默认模型不能被启动重建静默改回第一个
-            const previousDefault =
-              useAppStore.getState().appConfig?.providers?.["custom:deskwand"]
-                ?.defaultModel;
-            const payload = buildDeskwandProviderPayload(
-              pricing.models,
-              c.token,
-              t,
-              previousDefault,
-            );
-            if (payload.config.models.length > 0) {
-              await window.electronAPI.config.saveProvider(payload);
-            }
-          } catch {
-            /* 保留已保存的 provider 配置 */
-          }
-        } catch (e: any) {
-          if (e?.status === 401) {
-            localStorage.removeItem("deskwand.cloud");
-            try {
-              await window.electronAPI.config.deleteProvider({
-                profileKey: "custom:deskwand",
-              });
-            } catch {
-              /* ignore */
-            }
-          }
-          // 网络错误时保留 localStorage，下次启动再试
-        } finally {
-          setCloudRestoring(false);
-        }
-      })();
-    } catch {
-      /* ignore */
-    }
-  }, []);
 
   const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -330,20 +221,24 @@ export function Sidebar({
 
   const resolveOrdinarySessionsExpanded = (): boolean => {
     if (normalizedQuery) return true;
-    const override = projectExpansionOverrides.get(ORDINARY_SESSION_GROUP_KEY);
+    // 「最近」默认展开：它是会话列表的主入口
+    return projectExpansionOverrides.get(ORDINARY_SESSION_GROUP_KEY) ?? true;
+  };
+
+  const resolveProjectsExpanded = (): boolean => {
+    if (normalizedQuery) return true;
+    const override = projectExpansionOverrides.get(PROJECTS_GROUP_KEY);
     if (override !== undefined) return override;
-    if (
-      activeSessionId &&
-      sessionGroups.unscopedSessions.some(
-        (session) => session.id === activeSessionId,
-      )
-    ) {
-      return true;
-    }
-    return false;
+    // 默认收起；但当前会话落在某个项目里时必须展开，
+    // 否则高亮会话在侧栏里根本不可见。
+    if (!activeSessionId) return false;
+    return sessionGroups.projectGroups.some((group) =>
+      group.sessions.some((session) => session.id === activeSessionId),
+    );
   };
 
   const ordinarySessionsExpanded = resolveOrdinarySessionsExpanded();
+  const projectsExpanded = resolveProjectsExpanded();
 
   const resolveSessionVisibleCount = (
     groupKey: string,
@@ -512,27 +407,6 @@ export function Sidebar({
     setShowSchedule(false);
     setShowApps(false);
   }, [setActiveSession, setShowSettings, setShowSchedule, setShowApps]);
-
-  const openApps = useCallback(() => {
-    setAccountMenuOpen(false);
-    setShowSettings(false);
-    setShowSchedule(false);
-    setShowApps(true);
-  }, [setShowSettings, setShowSchedule, setShowApps]);
-
-  const openAutomation = useCallback(() => {
-    setAccountMenuOpen(false);
-    setShowSettings(false);
-    setShowApps(false);
-    setShowSchedule(true);
-  }, [setShowSettings, setShowApps, setShowSchedule]);
-
-  const openVault = useCallback(() => {
-    setAccountMenuOpen(false);
-    // 不要清空 activeSessionId：Vault 是平级视图，返回聊天时应回到原会话
-    // （清空还会一并抹掉 localStorage 里记录的 lastSessionId）。
-    setActiveView("vault");
-  }, [setActiveView]);
 
   const handleDeleteSession = useCallback(
     (e: React.MouseEvent, session: Session) => {
@@ -745,11 +619,7 @@ export function Sidebar({
   };
 
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
-    const isActive =
-      activeSessionId === session.id &&
-      !showApps &&
-      !showSchedule &&
-      !showVault;
+    const isActive = activeSessionId === session.id;
     const hasStatusIndicator = isSessionBusy(
       session,
       sessionStates[session.id]?.backgroundAgents,
@@ -1075,47 +945,6 @@ export function Sidebar({
               className="flex-1 overflow-y-auto px-3 pt-2 pb-4 sidebar-scroll"
             >
               <div>
-                <div className="flex flex-col gap-0.5">
-                  <button
-                    type="button"
-                    onClick={openApps}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-medium leading-5 transition-colors ${
-                      showApps
-                        ? "bg-surface-active text-text-primary"
-                        : "text-text-secondary hover:bg-surface-hover/60"
-                    }`}
-                    aria-current={showApps ? "page" : undefined}
-                  >
-                    <LayoutGrid className="w-4 h-4 text-text-muted flex-shrink-0" />
-                    <span className="truncate">{t("sidebar.apps")}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openVault}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-medium leading-5 transition-colors ${
-                      showVault
-                        ? "bg-surface-active text-text-primary"
-                        : "text-text-secondary hover:bg-surface-hover/60"
-                    }`}
-                    aria-current={showVault ? "page" : undefined}
-                  >
-                    <Archive className="w-4 h-4 text-text-muted flex-shrink-0" />
-                    <span className="truncate">{t("sidebar.vault")}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openAutomation}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-medium leading-5 transition-colors ${
-                      showSchedule
-                        ? "bg-surface-active text-text-primary"
-                        : "text-text-secondary hover:bg-surface-hover/60"
-                    }`}
-                    aria-current={showSchedule ? "page" : undefined}
-                  >
-                    <Clock3 className="w-4 h-4 text-text-muted flex-shrink-0" />
-                    <span className="truncate">{t("sidebar.automation")}</span>
-                  </button>
-                </div>
                 <section>
                   <button
                     type="button"
@@ -1153,7 +982,7 @@ export function Sidebar({
                         ORDINARY_SESSION_GROUP_KEY,
                       )}
                     />
-                    <span>{t("sidebar.allSessions")}</span>
+                    <span>{t("sidebar.recents")}</span>
                   </button>
                   <SidebarAnimatedSection
                     expanded={ordinarySessionsExpanded}
@@ -1168,105 +997,163 @@ export function Sidebar({
                   </SidebarAnimatedSection>
                 </section>
 
-                {sessionGroups.projectGroups.map((group, projectIndex) => {
-                  const isProjectExpanded = resolveProjectExpanded(
-                    group.key,
-                    projectIndex,
-                    group.sessions,
-                  );
-                  const isProjectPinned = pinnedProjectKeys.has(group.key);
-
-                  return (
-                    <section key={group.key} className="pt-1.5">
-                      <div
-                        className="group/project flex items-center justify-between"
-                        title={group.cwd}
-                      >
-                        <button
-                          type="button"
-                          aria-expanded={isProjectExpanded}
-                          aria-label={t(
-                            isProjectExpanded
-                              ? "sidebar.collapseProject"
-                              : "sidebar.expandProject",
-                            { projectName: group.name },
-                          )}
-                          disabled={Boolean(normalizedQuery)}
-                          onClick={() => {
-                            requestSectionMotion(group.key);
-                            const nextExpanded = !isProjectExpanded;
-                            setProjectExpanded(group.key, nextExpanded);
-                            if (!nextExpanded) {
-                              setSessionVisibleCount(
-                                group.key,
-                                DEFAULT_VISIBLE_SESSIONS,
-                              );
-                            }
-                          }}
-                          className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
-                        >
-                          <SidebarGroupIcon
-                            kind="project"
-                            expanded={isProjectExpanded}
-                            motionVersion={
-                              sectionMotionVersions.get(group.key) ?? 0
-                            }
-                            showRunningBadge={runningGroupKeys.has(group.key)}
-                          />
-                          <span className="truncate">{group.name}</span>
-                          <span className="ml-auto text-xs font-normal text-text-muted opacity-0 transition-opacity group-hover/project:opacity-100">
-                            {group.sessions.length}
-                          </span>
-                        </button>
-                        <Tooltip label={t("sidebar.newSessionForProject")}>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleNewSessionInProject(group.cwd);
-                            }}
-                            className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                            aria-label={t("sidebar.newSessionForProject")}
-                          >
-                            <SquarePen className="h-3.5 w-3.5" />
-                          </button>
-                        </Tooltip>
-                        <Tooltip
-                          label={t(
-                            isProjectPinned ? "sidebar.unpin" : "sidebar.pin",
-                          )}
-                        >
-                          <button
-                            type="button"
-                            onClick={(event) =>
-                              handleToggleProjectPin(event, group.key)
-                            }
-                            className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
-                              isProjectPinned
-                                ? "opacity-100 text-accent hover:bg-accent/10"
-                                : "opacity-0 pointer-events-none text-text-muted hover:bg-accent/10 hover:text-accent group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                            }`}
-                            aria-label={t(
-                              isProjectPinned ? "sidebar.unpin" : "sidebar.pin",
-                            )}
-                          >
-                            <Pin
-                              className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
-                            />
-                          </button>
-                        </Tooltip>
-                      </div>
-                      <SidebarAnimatedSection
-                        expanded={isProjectExpanded}
+                {sessionGroups.projectGroups.length > 0 && (
+                  <section className="pt-1.5">
+                    <button
+                      type="button"
+                      aria-expanded={projectsExpanded}
+                      aria-label={t(
+                        projectsExpanded
+                          ? "sidebar.collapseProjects"
+                          : "sidebar.expandProjects",
+                      )}
+                      disabled={Boolean(normalizedQuery)}
+                      onClick={() => {
+                        requestSectionMotion(PROJECTS_GROUP_KEY);
+                        setProjectExpanded(
+                          PROJECTS_GROUP_KEY,
+                          !projectsExpanded,
+                        );
+                      }}
+                      className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                    >
+                      <SidebarGroupIcon
+                        kind="project"
+                        expanded={projectsExpanded}
                         motionVersion={
-                          sectionMotionVersions.get(group.key) ?? 0
+                          sectionMotionVersions.get(PROJECTS_GROUP_KEY) ?? 0
                         }
-                      >
-                        {renderSessionList(group.key, group.sessions)}
-                      </SidebarAnimatedSection>
-                    </section>
-                  );
-                })}
+                        showRunningBadge={sessionGroups.projectGroups.some(
+                          (group) => runningGroupKeys.has(group.key),
+                        )}
+                      />
+                      <span>{t("sidebar.projects")}</span>
+                      <span className="ml-auto text-xs font-normal text-text-muted">
+                        {sessionGroups.projectGroups.length}
+                      </span>
+                    </button>
+                    <SidebarAnimatedSection
+                      expanded={projectsExpanded}
+                      motionVersion={
+                        sectionMotionVersions.get(PROJECTS_GROUP_KEY) ?? 0
+                      }
+                    >
+                      {sessionGroups.projectGroups.map(
+                        (group, projectIndex) => {
+                          const isProjectExpanded = resolveProjectExpanded(
+                            group.key,
+                            projectIndex,
+                            group.sessions,
+                          );
+                          const isProjectPinned = pinnedProjectKeys.has(
+                            group.key,
+                          );
+
+                          return (
+                            <section key={group.key} className="pt-1.5">
+                              <div
+                                className="group/project flex items-center justify-between"
+                                title={group.cwd}
+                              >
+                                <button
+                                  type="button"
+                                  aria-expanded={isProjectExpanded}
+                                  aria-label={t(
+                                    isProjectExpanded
+                                      ? "sidebar.collapseProject"
+                                      : "sidebar.expandProject",
+                                    { projectName: group.name },
+                                  )}
+                                  disabled={Boolean(normalizedQuery)}
+                                  onClick={() => {
+                                    requestSectionMotion(group.key);
+                                    const nextExpanded = !isProjectExpanded;
+                                    setProjectExpanded(group.key, nextExpanded);
+                                    if (!nextExpanded) {
+                                      setSessionVisibleCount(
+                                        group.key,
+                                        DEFAULT_VISIBLE_SESSIONS,
+                                      );
+                                    }
+                                  }}
+                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                                >
+                                  <SidebarGroupIcon
+                                    kind="project"
+                                    expanded={isProjectExpanded}
+                                    motionVersion={
+                                      sectionMotionVersions.get(group.key) ?? 0
+                                    }
+                                    showRunningBadge={runningGroupKeys.has(
+                                      group.key,
+                                    )}
+                                  />
+                                  <span className="truncate">{group.name}</span>
+                                  <span className="ml-auto text-xs font-normal text-text-muted opacity-0 transition-opacity group-hover/project:opacity-100">
+                                    {group.sessions.length}
+                                  </span>
+                                </button>
+                                <Tooltip
+                                  label={t("sidebar.newSessionForProject")}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void handleNewSessionInProject(group.cwd);
+                                    }}
+                                    className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                    aria-label={t(
+                                      "sidebar.newSessionForProject",
+                                    )}
+                                  >
+                                    <SquarePen className="h-3.5 w-3.5" />
+                                  </button>
+                                </Tooltip>
+                                <Tooltip
+                                  label={t(
+                                    isProjectPinned
+                                      ? "sidebar.unpin"
+                                      : "sidebar.pin",
+                                  )}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(event) =>
+                                      handleToggleProjectPin(event, group.key)
+                                    }
+                                    className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
+                                      isProjectPinned
+                                        ? "opacity-100 text-accent hover:bg-accent/10"
+                                        : "opacity-0 pointer-events-none text-text-muted hover:bg-accent/10 hover:text-accent group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                    }`}
+                                    aria-label={t(
+                                      isProjectPinned
+                                        ? "sidebar.unpin"
+                                        : "sidebar.pin",
+                                    )}
+                                  >
+                                    <Pin
+                                      className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
+                                    />
+                                  </button>
+                                </Tooltip>
+                              </div>
+                              <SidebarAnimatedSection
+                                expanded={isProjectExpanded}
+                                motionVersion={
+                                  sectionMotionVersions.get(group.key) ?? 0
+                                }
+                              >
+                                {renderSessionList(group.key, group.sessions)}
+                              </SidebarAnimatedSection>
+                            </section>
+                          );
+                        },
+                      )}
+                    </SidebarAnimatedSection>
+                  </section>
+                )}
 
                 {sessionGroups.unscopedSessions.length === 0 &&
                   sessionGroups.projectGroups.length === 0 && (
@@ -1282,60 +1169,6 @@ export function Sidebar({
                     </div>
                   )}
               </div>
-            </div>
-
-            <div className="px-3 py-3 relative">
-              <div className="flex items-center gap-2 rounded-2xl bg-background/50 px-3 py-2.5">
-                <button
-                  onClick={() => setAccountMenuOpen((v) => !v)}
-                  className="flex-1 min-w-0 flex items-center gap-2 text-left text-text-secondary hover:text-text-primary transition-colors"
-                >
-                  {identityEmail ? (
-                    <>
-                      <span className="flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full bg-accent/15 text-[9px] font-semibold text-accent">
-                        {avatarInitials(identityEmail)}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium text-text-primary">
-                        {identityEmail}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Settings className="w-4 h-4 flex-shrink-0" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-text-primary">
-                          {t("sidebar.settings")}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </button>
-                {updateReady && updateVersion && (
-                  <button
-                    onClick={() => setShowUpdateDialog(true)}
-                    className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-lg bg-accent/15 hover:bg-accent/25 text-accent text-xs font-semibold transition-colors"
-                  >
-                    <Download className="w-3 h-3" />
-                    <span>v{updateVersion}</span>
-                  </button>
-                )}
-              </div>
-              <AccountMenu
-                isOpen={accountMenuOpen}
-                cloudConfig={cloudConfig}
-                cloudRestoring={cloudRestoring}
-                onOpenLogin={() => setShowLoginModal(true)}
-                onOpenSettings={() => {
-                  setShowApps(false);
-                  setShowSchedule(false);
-                  setShowSettings(true);
-                }}
-                onLogout={() => {
-                  setAccountMenuOpen(false);
-                  setConfirmLogoutOpen(true);
-                }}
-                onClose={() => setAccountMenuOpen(false)}
-              />
             </div>
 
             {deleteConfirm && (
@@ -1495,54 +1328,6 @@ export function Sidebar({
           </div>,
           document.body,
         )}
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-        onLoginSuccess={(config) => setCloudConfig(config)}
-      />
-      <ConfirmDialog
-        isOpen={confirmLogoutOpen}
-        title={t("auth.logoutConfirm")}
-        confirmLabel={t("auth.logoutConfirmBtn")}
-        onConfirm={async () => {
-          setConfirmLogoutOpen(false);
-          if (cloudConfig?.token) {
-            try {
-              await new CloudApiClient(cloudConfig.token).logout();
-            } catch {
-              /* ignore */
-            }
-            try {
-              await window.electronAPI.config.deleteProvider({
-                profileKey: "custom:deskwand",
-              });
-            } catch {
-              /* ignore */
-            }
-            setCloudConfig(null);
-          } else {
-            setCloudConfig(null);
-          }
-        }}
-        onCancel={() => setConfirmLogoutOpen(false)}
-      />
-      <UpdateConfirmDialog
-        isOpen={showUpdateDialog}
-        currentVersion={currentAppVersion}
-        newVersion={updateVersion}
-        releaseNotes={updateNotes}
-        onConfirm={() => {
-          setShowUpdateDialog(false);
-          // Send IPC to install the update (quitAndInstall)
-          if (window.electronAPI) {
-            window.electronAPI.send({
-              type: "update.install",
-              payload: {},
-            });
-          }
-        }}
-        onCancel={() => setShowUpdateDialog(false)}
-      />
     </>
   );
 }

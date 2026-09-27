@@ -66,12 +66,46 @@ describe("Sidebar project groups", () => {
     await act(async () => root.unmount());
   });
 
-  async function render(sessions: Session[]): Promise<void> {
+  async function render(
+    sessions: Session[],
+    options: { expandProjects?: boolean } = {},
+  ): Promise<void> {
+    // 「项目」默认收起后内层项目行不渲染；本文件测的是内层行为，
+    // 所以渲染前把外层折叠行播种为展开。只有 3 个「存储值回退」用例需要
+    // 保留脏存储，它们传 { expandProjects: false } 并在渲染后点击展开。
+    if (options.expandProjects !== false) seedProjectsExpanded();
     await act(async () => {
       useAppStore.setState({ sessions });
       root.render(React.createElement(Sidebar, { width: 280 }));
     });
     await flush();
+  }
+
+  function seedProjectsExpanded(): void {
+    let stored: Record<string, unknown> = {};
+    try {
+      const raw = localStorage.getItem("deskwand.sidebarGroupExpansion");
+      const parsed: unknown = raw ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === "object") {
+        stored = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // 存储是脏值时从空开始：与 Sidebar.loadGroupExpansion 的回退一致
+      stored = {};
+    }
+    const merged: Record<string, boolean> = {};
+    for (const [key, value] of Object.entries(stored)) {
+      if (typeof value === "boolean") merged[key] = value;
+    }
+    merged.__projects__ = true;
+    try {
+      localStorage.setItem(
+        "deskwand.sidebarGroupExpansion",
+        JSON.stringify(merged),
+      );
+    } catch {
+      // 存储不可用时保持内存态：与 Sidebar.saveGroupExpansion 一致
+    }
   }
 
   async function search(value: string): Promise<void> {
@@ -88,23 +122,12 @@ describe("Sidebar project groups", () => {
     await flush();
   }
 
-  it("aligns top navigation and sessions on the same horizontal inset", async () => {
+  it("keeps session group headers on the horizontal inset", async () => {
     await render([]);
-
-    for (const key of ["apps", "vault", "automation"] as const) {
-      const button = Array.from(container.querySelectorAll("button")).find(
-        (candidate) =>
-          candidate.textContent?.includes(i18n.t(`sidebar.${key}`)),
-      );
-      expect(button, `${key} button must render`).toBeTruthy();
-      expect(button?.className).toContain("px-3");
-    }
 
     const sessionsButton = Array.from(
       container.querySelectorAll("button[aria-expanded]"),
-    ).find((button) =>
-      button.textContent?.includes(i18n.t("sidebar.allSessions")),
-    );
+    ).find((button) => button.textContent?.includes(i18n.t("sidebar.recents")));
 
     expect(sessionsButton).toBeTruthy();
     expect(sessionsButton?.className).toContain("px-3");
@@ -174,7 +197,7 @@ describe("Sidebar project groups", () => {
     const button = Array.from(
       container.querySelectorAll("button[aria-expanded]"),
     ).find((candidate) =>
-      candidate.textContent?.includes(i18n.t("sidebar.allSessions")),
+      candidate.textContent?.includes(i18n.t("sidebar.recents")),
     );
     expect(button).toBeTruthy();
     return button as HTMLButtonElement;
@@ -278,7 +301,6 @@ describe("Sidebar project groups", () => {
         updatedAt: 20,
       }),
     ]);
-    await act(async () => ordinaryToggle().click());
 
     const text = container.textContent ?? "";
     expect(text.indexOf("Ordinary")).toBeLessThan(text.indexOf("deskwand"));
@@ -289,15 +311,15 @@ describe("Sidebar project groups", () => {
   it("fully collapses and expands ordinary sessions", async () => {
     await render([session("ordinary", { title: "Ordinary chat" })]);
 
-    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
-    expect(container.textContent).not.toContain("Ordinary chat");
-
-    await act(async () => ordinaryToggle().click());
     expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
     expect(container.textContent).toContain("Ordinary chat");
 
     await act(async () => ordinaryToggle().click());
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
     expect(container.textContent).not.toContain("Ordinary chat");
+
+    await act(async () => ordinaryToggle().click());
+    expect(container.textContent).toContain("Ordinary chat");
   });
 
   it("uses primary state icons instead of chevrons for group state", async () => {
@@ -321,18 +343,19 @@ describe("Sidebar project groups", () => {
     expect(collapsedSessionsIcon.classList.contains("text-text-muted")).toBe(
       false,
     );
-    expect(collapsedSessionsIcon.style.opacity).toBe("1");
-    expect(expandedSessionsIcon.style.opacity).toBe("0");
-    expect(ordinary.querySelector(".lucide-chevron-down")).toBeNull();
-
-    await act(async () => ordinary.click());
-    expect(collapsedSessionsIcon.style.opacity).toBe("0");
+    // 「最近」默认展开：展开态图标可见、收起态图标隐藏
     expect(expandedSessionsIcon.style.opacity).toBe("1");
+    expect(collapsedSessionsIcon.style.opacity).toBe("0");
+    expect(ordinary.querySelector(".lucide-chevron-down")).toBeNull();
     expect(
       sessionRow("ordinary").querySelector(
         ".lucide-message-square, .lucide-message-square-text, .lucide-folder, .lucide-folder-open",
       ),
     ).toBeNull();
+
+    await act(async () => ordinary.click());
+    expect(collapsedSessionsIcon.style.opacity).toBe("1");
+    expect(expandedSessionsIcon.style.opacity).toBe("0");
 
     const project = projectToggle("/work/deskwand");
     expect(project.classList.contains("text-text-primary")).toBe(true);
@@ -446,6 +469,8 @@ describe("Sidebar project groups", () => {
 
   it("temporarily expands ordinary search results", async () => {
     await render([session("ordinary", { title: "Find sidebar" })]);
+    // 先收起「最近」，才能看出搜索是否临时把它展开
+    await act(async () => ordinaryToggle().click());
     expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
 
     await search("sidebar");
@@ -489,7 +514,6 @@ describe("Sidebar project groups", () => {
       session("newer", { title: "Newer", updatedAt: 20 }),
       session("older", { title: "Older", updatedAt: 10 }),
     ]);
-    await act(async () => ordinaryToggle().click());
 
     await openSessionMenu("older");
     await act(async () => menuAction(i18n.t("sidebar.pin")).click());
@@ -620,8 +644,6 @@ describe("Sidebar project groups", () => {
         }),
       ),
     );
-    await act(async () => ordinaryToggle().click());
-
     expect(container.textContent).toContain("Ordinary 6");
     expect(container.textContent).not.toContain("Ordinary 7");
     expect(
@@ -905,8 +927,6 @@ describe("Sidebar project groups", () => {
         }),
       ),
     );
-    await act(async () => ordinaryToggle().click());
-
     expect(container.textContent).toContain("Ordinary 5");
     expect(container.textContent).not.toContain("Ordinary 6");
 
@@ -1085,7 +1105,6 @@ describe("Sidebar project groups", () => {
       }),
     );
     await render(ordinary);
-    await act(async () => ordinaryToggle().click());
     await act(async () =>
       findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }))?.click(),
     );
@@ -1241,7 +1260,14 @@ describe("Sidebar group expansion persistence", () => {
     await act(async () => root.unmount());
   });
 
-  async function render(sessions: Session[]): Promise<void> {
+  async function render(
+    sessions: Session[],
+    options: { expandProjects?: boolean } = {},
+  ): Promise<void> {
+    // 「项目」默认收起后内层项目行不渲染；本文件测的是内层行为，
+    // 所以渲染前把外层折叠行播种为展开。只有 3 个「存储值回退」用例需要
+    // 保留脏存储，它们传 { expandProjects: false } 并在渲染后点击展开。
+    if (options.expandProjects !== false) seedProjectsExpanded();
     await act(async () => {
       useAppStore.setState({ sessions });
       root.render(React.createElement(Sidebar, { width: 280 }));
@@ -1249,6 +1275,33 @@ describe("Sidebar group expansion persistence", () => {
     await act(async () => {
       await Promise.resolve();
     });
+  }
+
+  function seedProjectsExpanded(): void {
+    let stored: Record<string, unknown> = {};
+    try {
+      const raw = localStorage.getItem("deskwand.sidebarGroupExpansion");
+      const parsed: unknown = raw ? JSON.parse(raw) : {};
+      if (parsed && typeof parsed === "object") {
+        stored = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // 存储是脏值时从空开始：与 Sidebar.loadGroupExpansion 的回退一致
+      stored = {};
+    }
+    const merged: Record<string, boolean> = {};
+    for (const [key, value] of Object.entries(stored)) {
+      if (typeof value === "boolean") merged[key] = value;
+    }
+    merged.__projects__ = true;
+    try {
+      localStorage.setItem(
+        "deskwand.sidebarGroupExpansion",
+        JSON.stringify(merged),
+      );
+    } catch {
+      // 存储不可用时保持内存态：与 Sidebar.saveGroupExpansion 一致
+    }
   }
 
   function ordinarySessions(): Session[] {
@@ -1277,7 +1330,7 @@ describe("Sidebar group expansion persistence", () => {
     const button = Array.from(
       container.querySelectorAll("button[aria-expanded]"),
     ).find((candidate) =>
-      candidate.textContent?.includes(i18n.t("sidebar.allSessions")),
+      candidate.textContent?.includes(i18n.t("sidebar.recents")),
     );
     expect(button).toBeTruthy();
     return button as HTMLButtonElement;
@@ -1295,6 +1348,33 @@ describe("Sidebar group expansion persistence", () => {
     return button as HTMLButtonElement;
   }
 
+  function projectsToggle(): HTMLButtonElement {
+    const button = Array.from(
+      container.querySelectorAll("button[aria-expanded]"),
+    ).find((candidate) =>
+      candidate.textContent?.includes(i18n.t("sidebar.projects")),
+    );
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
+
+  it("defaults the projects row to collapsed and persists its toggle", async () => {
+    await render([...makeProjectSessions("proj-a", 1, 500)], {
+      expandProjects: false,
+    });
+
+    expect(projectsToggle().getAttribute("aria-expanded")).toBe("false");
+    expect(container.textContent).not.toContain("proj-a");
+
+    await act(async () => projectsToggle().click());
+    expect(projectsToggle().getAttribute("aria-expanded")).toBe("true");
+
+    const stored = JSON.parse(
+      localStorage.getItem("deskwand.sidebarGroupExpansion") ?? "{}",
+    );
+    expect(stored["__projects__"]).toBe(true);
+  });
+
   it("persists expansion state across re-renders", async () => {
     const sessions: Session[] = [
       ...ordinarySessions(),
@@ -1304,8 +1384,10 @@ describe("Sidebar group expansion persistence", () => {
       ...makeProjectSessions("proj-d", 1, 200),
     ];
 
-    // First render: toggle ordinary open, collapse the 2nd project
+    // First render:「最近」默认展开，点两下（收起再展开）写入显式状态；
+    // 并收起第 2 个项目
     await render(sessions);
+    await act(async () => ordinaryToggle().click());
     await act(async () => ordinaryToggle().click());
     expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
 
@@ -1369,14 +1451,19 @@ describe("Sidebar group expansion persistence", () => {
   it("falls back to defaults with invalid JSON", async () => {
     localStorage.setItem("deskwand.sidebarGroupExpansion", "{");
 
-    await render([
-      ...makeProjectSessions("proj-a", 1, 500),
-      ...makeProjectSessions("proj-b", 1, 400),
-      ...makeProjectSessions("proj-c", 1, 300),
-      ...makeProjectSessions("proj-d", 1, 200),
-    ]);
+    await render(
+      [
+        ...makeProjectSessions("proj-a", 1, 500),
+        ...makeProjectSessions("proj-b", 1, 400),
+        ...makeProjectSessions("proj-c", 1, 300),
+        ...makeProjectSessions("proj-d", 1, 200),
+      ],
+      { expandProjects: false },
+    );
+    // 脏存储不能被测试播种洗掉，所以渲染后点开「项目」行
+    await act(async () => projectsToggle().click());
 
-    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
     expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
       "true",
     );
@@ -1388,9 +1475,12 @@ describe("Sidebar group expansion persistence", () => {
   it("falls back to defaults with non-object stored value", async () => {
     localStorage.setItem("deskwand.sidebarGroupExpansion", "42");
 
-    await render([...makeProjectSessions("proj-a", 1, 500)]);
+    await render([...makeProjectSessions("proj-a", 1, 500)], {
+      expandProjects: false,
+    });
+    await act(async () => projectsToggle().click());
 
-    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
     expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
       "true",
     );
@@ -1405,10 +1495,13 @@ describe("Sidebar group expansion persistence", () => {
       }),
     );
 
-    await render([...makeProjectSessions("proj-a", 1, 500)]);
+    await render([...makeProjectSessions("proj-a", 1, 500)], {
+      expandProjects: false,
+    });
+    await act(async () => projectsToggle().click());
 
-    // The string value is filtered out, falls back to default (collapsed)
-    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+    // The string value is filtered out, falls back to default (expanded)
+    expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
     // proj-a has a valid boolean → respected
     expect(projectToggle("/work/proj-a").getAttribute("aria-expanded")).toBe(
       "true",
@@ -1475,10 +1568,10 @@ describe("Sidebar group expansion persistence", () => {
 
       // Should still render and toggle without crashing
       await act(async () => ordinaryToggle().click());
-      expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
+      expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
 
       await act(async () => ordinaryToggle().click());
-      expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("false");
+      expect(ordinaryToggle().getAttribute("aria-expanded")).toBe("true");
     } finally {
       localStorage.setItem = originalSetItem;
     }

@@ -164,23 +164,30 @@ describe("用户气泡：形状不随消息长度漂移", () => {
 
 describe("侧栏：四级两两可区分", () => {
   // 修复前四级的字号（13px）、字重（500）、行高（20px）完全相同，层级只能靠颜色，
-  // 而分组标签是 text-primary（最亮），压过了未激活的导航项（text-secondary）。
+  // 而分组标签是 text-primary（最亮），压过了下一级的会话行（text-secondary）。
   const group = classNameAt(
     sidebar,
     "min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2",
     '"',
   );
-  // 导航项是同构的三行（Apps / Vault / Automation），取第一个即可；
-  // marker **故意不含字号** —— 把 text-sm 写进搜索串会让右边那个操作数变成
-  // "期望值的硬编码副本"，断言就退化成 group < 常量，而不再是 group < nav。
-  // 这里只锚定不含尺寸的结构前缀，字号由 textSizeRem 从源码读出来。
-  const navMarker = "flex items-center gap-2 rounded-lg px-3 py-1 ";
-  const navStart = sidebar.indexOf(navMarker);
-  if (navStart < 0) throw new Error("找不到侧栏导航项的 className");
-  const navHead = sidebar.slice(navStart, sidebar.indexOf("${", navStart));
+  // 对照物是会话标题（`renderSessionItem` 的标题 span）。导航项已搬到图标栏，
+  // 图标按钮没有字号，不能拿来做字号对照。
+  // 这里 marker 必须含字号：标题的 className 是模板字符串且以 text-sm 开头，
+  // 若像旧版那样只锚定「不含字号的结构前缀」，切出来的串就从字号之后开始，
+  // textSizeRem 会直接抛「未找到 text-size 类」。含字号的 marker 仍是唯一的，
+  // 字号改了这里会立刻报错（而不是静默通过），所以防漂移性质仍在。
+  const contentMarker = "text-sm font-medium leading-5 truncate flex-1 ";
+  const contentStart = sidebar.indexOf(contentMarker);
+  if (contentStart < 0) throw new Error("找不到会话标题的 className");
+  const contentHead = sidebar.slice(
+    contentStart,
+    sidebar.indexOf("${", contentStart),
+  );
+  // marker 必须唯一：项目计数徽标的「12px + muted」样式现在也被「项目」外层
+  // 折叠行的计数共用，所以锚定它独有的 hover 显示部分。
   const badge = classNameAt(
     sidebar,
-    "ml-auto text-xs font-normal text-text-muted",
+    "ml-auto text-xs font-normal text-text-muted opacity-0 transition-opacity",
     '"',
   );
   const showMore = classNameAt(
@@ -189,11 +196,11 @@ describe("侧栏：四级两两可区分", () => {
     '"',
   );
 
-  it("分组标签字号严格小于导航项（这条就是「层级拉平」的修复本身）", () => {
-    // 两侧都从源码读：左边是分组开关，右边是被锚定的导航行。
-    // 导航行一旦改字号，右边会跟着变（而不是像硬编码副本那样看不出来）。
+  it("分组标签字号严格小于会话标题（这条就是「层级拉平」的修复本身）", () => {
+    // 两侧都从源码读：左边是分组开关，右边是被锚定的会话标题。
+    // 会话标题一旦改字号，右边会跟着变（而不是像硬编码副本那样看不出来）。
     expect(textSizeRem(group), `group=${group}`).toBeLessThan(
-      textSizeRem(navHead),
+      textSizeRem(contentHead),
     );
   });
 

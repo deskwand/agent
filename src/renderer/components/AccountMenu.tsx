@@ -73,7 +73,7 @@ export function AccountMenu({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
-        className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-up absolute bottom-full left-0 z-50 mb-2 w-64`}
+        className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-up absolute bottom-0 left-full z-50 ml-2 w-64`}
       >
         {isLoggedIn && cloudConfig ? (
           <>

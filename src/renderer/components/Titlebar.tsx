@@ -3,14 +3,12 @@ import {
   Square,
   X,
   Copy,
-  PanelLeft,
-  Columns2,
   FolderOpen,
   Diff,
   Globe,
   Package,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { Tooltip } from "./Tooltip";
@@ -62,31 +60,23 @@ function TitlebarButton({
 export function Titlebar() {
   const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
 
-  useEffect(() => {
-    if (!isMac) return;
-    const cleanup =
-      window.electronAPI?.window.onFullScreenChanged?.(setIsFullScreen);
-    return cleanup;
-  }, []);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessions = useAppStore((s) => s.sessions);
-  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
+  const activeView = useAppStore((s) => s.activeView);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
   const isReviewOpen = useAppStore((s) => s.rightPanelMode === "review");
-  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleFileBrowser = useAppStore((s) => s.toggleFileBrowser);
   const toggleReviewPanel = useAppStore((s) => s.toggleReviewPanel);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
   const toggleArtifactPanel = useAppStore((s) => s.toggleArtifactPanel);
   const isArtifactPanelOpen = useAppStore((s) => s.isArtifactPanelOpen);
-  const showSettings = useAppStore((s) => s.activeView === "settings");
 
   const activeSessionTitle = activeSessionId
     ? (sessions.find((session) => session.id === activeSessionId)?.title ?? "")
     : "";
-  const showSessionHeader = Boolean(activeSessionId) && !showSettings;
+  // 只在聊天视图显示会话标题；其余视图自带页头，中央留空
+  const showSessionHeader = activeView === "chat" && Boolean(activeSessionId);
 
   const handleMinimize = () => {
     window.electronAPI?.window.minimize();
@@ -142,91 +132,65 @@ export function Titlebar() {
     </div>
   );
 
-  const sidebarToggle = (
-    <TitlebarButton
-      label={
-        sidebarCollapsed ? t("context.expandPanel") : t("context.collapsePanel")
-      }
-      tone="secondary"
-      onClick={toggleSidebar}
-    >
-      {sidebarCollapsed ? (
-        <PanelLeft className="w-3.5 h-3.5" />
-      ) : (
-        <Columns2 className="w-3.5 h-3.5" />
-      )}
-    </TitlebarButton>
-  );
-
   return (
-    <div className="h-10 bg-background-secondary flex items-center titlebar-drag shrink-0">
-      {/* macOS: Traffic lights are positioned by trafficLightPosition, we just need left padding */}
-
-      <div
-        className={`flex-1 min-w-0 px-3 ${isMac && !isFullScreen ? "pl-20" : ""}`}
-      >
-        {showSessionHeader ? (
-          <div className="h-full grid grid-cols-[17.5rem_1fr_18rem] items-center">
-            <div className="titlebar-no-drag px-2">{sidebarToggle}</div>
-            <div className="text-sm font-medium text-text-primary text-center truncate px-4">
-              {activeSessionTitle}
-            </div>
-            {rightToolbar}
-          </div>
-        ) : !showSettings ? (
-          // 没有会话时也不能只剩右侧工具条：侧栏会被预览/浏览器自动收起，
-          // 少了这个按钮就再也展不开。
-          <div className="h-full flex items-center justify-between titlebar-no-drag">
-            <div className="px-2">{sidebarToggle}</div>
-            {rightToolbar}
-          </div>
-        ) : null}
+    <div className="relative h-10 bg-background flex items-center titlebar-drag shrink-0">
+      {/* 会话标题相对窗口居中：左右各留 160px，避免压住 macOS 的 traffic lights
+          与右侧按钮组。pointer-events-none 让这块仍然可以拖窗。 */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-40">
+        <span className="min-w-0 truncate text-sm font-medium text-text-primary">
+          {showSessionHeader ? activeSessionTitle : ""}
+        </span>
       </div>
 
-      {/* Window Controls (for Windows/Linux - macOS uses native traffic lights) */}
-      {!isMac && (
-        <div className="flex items-center titlebar-no-drag h-full">
-          <Tooltip label={t("window.minimize")}>
-            <button
-              type="button"
-              onClick={handleMinimize}
-              aria-label={t("window.minimize")}
-              className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+      {/* 侧栏开合已改由图标栏的「聊天」项承担，顶栏不再有这个按钮 */}
+      <div className="ml-auto flex items-center">
+        {rightToolbar}
+
+        {/* Window Controls (for Windows/Linux - macOS uses native traffic lights) */}
+        {!isMac && (
+          <div className="flex items-center titlebar-no-drag h-full">
+            <Tooltip label={t("window.minimize")}>
+              <button
+                type="button"
+                onClick={handleMinimize}
+                aria-label={t("window.minimize")}
+                className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            </Tooltip>
+            <Tooltip
+              label={isMaximized ? t("window.restore") : t("window.maximize")}
             >
-              <Minus className="w-4 h-4" />
-            </button>
-          </Tooltip>
-          <Tooltip
-            label={isMaximized ? t("window.restore") : t("window.maximize")}
-          >
-            <button
-              type="button"
-              onClick={handleMaximize}
-              aria-label={
-                isMaximized ? t("window.restore") : t("window.maximize")
-              }
-              className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
-            >
-              {isMaximized ? (
-                // lucide Copy 的两个错位叠加方框就是 Windows 11 的“还原”字形
-                <Copy className="w-3.5 h-3.5" />
-              ) : (
-                <Square className="w-3.5 h-3.5" />
-              )}
-            </button>
-          </Tooltip>
-          <Tooltip label={t("window.close")}>
-            <button
-              type="button"
-              onClick={handleClose}
-              aria-label={t("window.close")}
-              className="group w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-window-close-hover transition-colors"
-            >
-              <X className="w-4 h-4 group-hover:text-white" />
-            </button>
-          </Tooltip>
-        </div>
-      )}
+              <button
+                type="button"
+                onClick={handleMaximize}
+                aria-label={
+                  isMaximized ? t("window.restore") : t("window.maximize")
+                }
+                className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+              >
+                {isMaximized ? (
+                  // lucide Copy 的两个错位叠加方框就是 Windows 11 的“还原”字形
+                  <Copy className="w-3.5 h-3.5" />
+                ) : (
+                  <Square className="w-3.5 h-3.5" />
+                )}
+              </button>
+            </Tooltip>
+            <Tooltip label={t("window.close")}>
+              <button
+                type="button"
+                onClick={handleClose}
+                aria-label={t("window.close")}
+                className="group w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-window-close-hover transition-colors"
+              >
+                <X className="w-4 h-4 group-hover:text-white" />
+              </button>
+            </Tooltip>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

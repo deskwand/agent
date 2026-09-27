@@ -884,7 +884,10 @@
       "day_other": "{{count}}d",
       "week_one": "{{count}}w",
       "week_other": "{{count}}w"
-    }
+    },
+    "projects": "Projects",
+    "expandProjects": "Expand projects",
+    "collapseProjects": "Collapse projects"
   },
   "browser": {
     "placeholder": "Search or enter URL",
@@ -1995,5 +1998,9 @@
     "capabilitySummary": "Connect a model to: change code · write docs · handle PDFs · search the web · drive the browser",
     "startPlaceholder": "Connect a model to get started",
     "connected": "Connected to {{provider}} · {{model}}"
+  },
+  "navRail": {
+    "label": "Main navigation",
+    "chat": "Chat"
   }
 }

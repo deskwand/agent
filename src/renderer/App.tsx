@@ -21,6 +21,8 @@ import {
 import { useIPC } from "./hooks/useIPC";
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
+import { AppRail } from "./components/AppRail";
+import { isSidebarAllowed } from "./utils/nav-rail";
 import { ResizeHandle } from "./components/ResizeHandle";
 import {
   availablePanelWidth,
@@ -274,9 +276,13 @@ function App() {
   // 所以只由拖动状态开关，不删除过渡本身。
   const [isPanelDragging, setIsPanelDragging] = useState(false);
 
+  // 侧栏只在聊天视图挂载（utils/nav-rail 的 isSidebarAllowed）：非聊天视图下它
+  // 不占宽度，面板可用宽度必须按「侧栏已收起」算，否则会白留最多 400px。
+  const sidebarTakesSpace = isSidebarAllowed(activeView) && !sidebarCollapsed;
+
   const panelAvailableWidth = availablePanelWidth(
     window.innerWidth,
-    sidebarCollapsed,
+    !sidebarTakesSpace,
     sidebarWidth,
   );
   const panelWidth = resolvePanelWidth(
@@ -322,11 +328,11 @@ function App() {
 
   // Stable 50%-width calculator for browser panel
   const calcHalfWidth = useCallback(() => {
-    const available = sidebarCollapsed
-      ? window.innerWidth
-      : window.innerWidth - sidebarWidth;
+    const available = sidebarTakesSpace
+      ? window.innerWidth - sidebarWidth
+      : window.innerWidth;
     return Math.round(available / 2);
-  }, [sidebarCollapsed, sidebarWidth]);
+  }, [sidebarTakesSpace, sidebarWidth]);
 
   // Auto-set browser panel to 50% width when opened in auto mode
   useEffect(() => {
@@ -408,28 +414,34 @@ function App() {
         </Suspense>
       ) : (
         <div className="flex-1 min-h-0 flex overflow-hidden">
-          {/* Sidebar — always visible across all views */}
-          <>
-            <PanelErrorBoundary
-              name="Sidebar"
-              fallback={<div className="w-0" />}
-            >
-              <Sidebar width={sidebarWidth} dragging={isPanelDragging} />
-            </PanelErrorBoundary>
+          {/* 图标栏：常驻，跨所有视图提供导航 */}
+          <AppRail />
 
-            {/* Sidebar resize handle */}
-            {!sidebarCollapsed && (
-              <ResizeHandle
-                onResize={(delta) =>
-                  setSidebarWidth(
-                    Math.max(200, Math.min(400, sidebarWidth + delta)),
-                  )
-                }
-                onDoubleClick={() => setSidebarWidth(280)}
-                onDraggingChange={setIsPanelDragging}
-              />
-            )}
-          </>
+          {/* 会话列表只在聊天视图出现：其余视图由图标栏承担导航，侧栏连同
+              它的拖拽柄一起收起 */}
+          {isSidebarAllowed(activeView) && (
+            <>
+              <PanelErrorBoundary
+                name="Sidebar"
+                fallback={<div className="w-0" />}
+              >
+                <Sidebar width={sidebarWidth} dragging={isPanelDragging} />
+              </PanelErrorBoundary>
+
+              {/* Sidebar resize handle */}
+              {!sidebarCollapsed && (
+                <ResizeHandle
+                  onResize={(delta) =>
+                    setSidebarWidth(
+                      Math.max(200, Math.min(400, sidebarWidth + delta)),
+                    )
+                  }
+                  onDoubleClick={() => setSidebarWidth(280)}
+                  onDraggingChange={setIsPanelDragging}
+                />
+              )}
+            </>
+          )}
 
           {/* Main Content Area */}
           <main className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden bg-background relative">
@@ -500,7 +512,7 @@ function App() {
                   setPreviewWidth(
                     initialPreviewWidth(
                       window.innerWidth,
-                      sidebarCollapsed,
+                      !sidebarTakesSpace,
                       sidebarWidth,
                     ),
                   );
@@ -511,7 +523,7 @@ function App() {
                   setReviewWidth(
                     initialReviewWidth(
                       window.innerWidth,
-                      sidebarCollapsed,
+                      !sidebarTakesSpace,
                       sidebarWidth,
                     ),
                   );
