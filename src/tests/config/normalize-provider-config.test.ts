@@ -51,16 +51,18 @@ describe("normalizeProviderConfig — non-custom defaultModel selection", () => 
     );
   });
 
-  it("keeps an already-saved deepseek default model instead of shifting it", () => {
+  it("keeps a saved preset model, and falls back when the saved id left the preset", () => {
     expect(
       normalizeProviderConfig("deepseek", { defaultModel: "deepseek-v4-pro" })
         .defaultModel,
     ).toBe("deepseek-v4-pro");
+    // deepseek-v4-flash 已不在预设里 → 回落到字母序第一个。功能上等价：
+    // 上游把旧名路由到 V4.1 Flash，正是 deepseek-flash。
     expect(
       normalizeProviderConfig("deepseek", {
         defaultModel: "deepseek-v4-flash",
       }).defaultModel,
-    ).toBe("deepseek-v4-flash");
+    ).toBe("deepseek-flash");
   });
 });
 

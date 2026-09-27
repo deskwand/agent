@@ -26,14 +26,17 @@ describe("buildDeskwandProviderPayload", () => {
   });
 
   it("never emits a mode label even when a translator is provided", () => {
+    // t 的返回值刻意不等于真实文案：这样「payload 是否真的调了 t」才有区分度。
     const t = (key: string, opts?: { defaultValue: string }) =>
-      key === "providers.deskwandCloud" ? "DeskWand 云" : (opts?.defaultValue ?? key);
+      key === "providers.deskwandCloud"
+        ? "cloud-name-from-t"
+        : (opts?.defaultValue ?? key);
     const withT = buildDeskwandProviderPayload(MODELS, "tok123", t);
     expect(withT.config.models.map((m) => m.label)).toEqual([
       "deepseek-flash",
       "deepseek-v4-pro",
     ]);
-    expect(withT.config.name).toBe("DeskWand 云");
+    expect(withT.config.name).toBe("cloud-name-from-t");
   });
 
   it("defaults to the first model and carries the token as apiKey", () => {

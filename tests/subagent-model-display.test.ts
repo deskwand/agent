@@ -3,7 +3,7 @@ import { modelDisplay } from "../src/renderer/utils/subagent-model-display";
 
 // 只认云 provider 的 key，其余原样返回，用来确认走的是哪条分支
 const t = (key: string) =>
-  key === "providers.deskwandCloud" ? "DeskWand Cloud" : key;
+  key === "providers.deskwandCloud" ? "DeskWand" : key;
 
 const providers = {
   "custom:openai": {
@@ -15,8 +15,9 @@ const providers = {
     models: [{ id: "deepseek-v4-flash", label: "DeepSeek V4 Flash" }],
   },
   "custom:deskwand": {
-    // 配置里存的是登录当时语言写下的名字
-    name: "DeskWand 云",
+    // 配置里存的是登录当时语言写下的名字。刻意与 i18n 值不同：
+    // 两边一样时，删掉 i18n 分支的改动也能通过。
+    name: "登录时写入的旧名",
     models: [{ id: "deepseek-flash", label: "deepseek-flash" }],
   },
 };
@@ -31,7 +32,7 @@ describe("modelDisplay with deskwand prefix", () => {
   it("localizes the cloud provider name instead of the stored one", () => {
     expect(
       modelDisplay("deskwand:custom:deskwand/deepseek-flash", providers, t),
-    ).toBe("DeskWand Cloud / deepseek-flash");
+    ).toBe("DeskWand / deepseek-flash");
     // 非云 provider 仍然用配置里存的名字（用户自己填的）
     expect(
       modelDisplay("deskwand:custom:openai/deepseek-v4-flash", providers, t),

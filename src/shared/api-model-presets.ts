@@ -92,10 +92,11 @@ export const API_PROVIDER_PRESETS: SharedProviderPresets = {
     baseUrl: "https://api.deepseek.com/v1",
     models: [
       { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
-      // deepseek-v4-flash 是官方退役的旧名（仍被上游接受），选它会由
-      // src/main/agent/pi-model-resolution.ts 的 PI_MODEL_ID_RENAMES 重定向到 deepseek-flash。
-      // deepseek-v4-flash-vision-exp 已于 pi-ai 0.87.1 从 DeepSeek 目录移除，不再提供。
-      { id: "deepseek-v4-flash", name: "deepseek-v4-flash" },
+      // 官方现行只有 deepseek-flash（V4.1-Flash）与 deepseek-v4-pro；deepseek-v4-flash
+      // 是退役的兼容名（上游仍接受并路由到 V4.1 Flash），已从预设移除。老会话与用户
+      // 旧配置里若仍存着它，由 src/main/agent/pi-model-resolution.ts 的
+      // PI_MODEL_ID_RENAMES 兜底重定向。deepseek-v4-flash-vision-exp 另有原因不再
+      // 提供：pi-ai 0.87.1 起 DeepSeek 目录已无此条目。
       { id: "deepseek-flash", name: "deepseek-flash" },
     ],
     keyPlaceholder: "sk-...",
@@ -289,8 +290,7 @@ export function getModelInputGuidance(
 
   if (provider === "deepseek") {
     return {
-      placeholder:
-        "deepseek-flash, deepseek-v4-pro, deepseek-v4-flash, deepseek-chat",
+      placeholder: "deepseek-flash, deepseek-v4-pro",
       hint: "Use the exact model ID for the selected protocol or endpoint.",
     };
   }

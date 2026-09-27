@@ -30,7 +30,7 @@ export function resolveProviderDisplayName(
   t: (key: string, opts?: { defaultValue: string }) => string,
 ): string | undefined {
   if (profileKey === "custom:deskwand") {
-    return t("providers.deskwandCloud", { defaultValue: "DeskWand 云" });
+    return t("providers.deskwandCloud", { defaultValue: "DeskWand" });
   }
   return storedName;
 }

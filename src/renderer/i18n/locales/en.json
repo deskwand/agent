@@ -1834,7 +1834,7 @@
     "thinkingWithValue": "Thinking: {{value}}"
   },
   "providers": {
-    "deskwandCloud": "DeskWand Cloud"
+    "deskwandCloud": "DeskWand"
   },
   "usage": {
     "title": "Usage",
@@ -1974,7 +1974,7 @@
     "statusCleared": "List cleared"
   },
   "connect": {
-    "cloudTitle": "DeskWand Cloud",
+    "cloudTitle": "DeskWand",
     "cloudDesc": "Sign in and start",
     "subscribeTitle": "Connect a subscription",
     "subscribeDesc": "Account sign-in / plan key",

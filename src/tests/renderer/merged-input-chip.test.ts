@@ -14,7 +14,7 @@ vi.mock("react-i18next", () => ({
 const modelOptions: ModelOptionGroup[] = [
   {
     profileKey: "custom:deskwand" as never,
-    groupLabel: "DeskWand 云",
+    groupLabel: "DeskWand",
     items: [
       { id: "deepseek-flash", name: "deepseek-flash" },
       { id: "deepseek-v4-pro", name: "deepseek-v4-pro" },
@@ -200,7 +200,7 @@ describe("MergedInputChip (single-panel)", () => {
     const text = panel().textContent ?? "";
     expect(text).toContain("Provider A");
     expect(text).toContain("Provider B");
-    expect(text).not.toContain("DeskWand 云");
+    expect(text).not.toContain("DeskWand");
     expect(text).toContain("modelMenu.thinkingWithValue");
   });
 
@@ -215,7 +215,7 @@ describe("MergedInputChip (single-panel)", () => {
     expect(trigger().textContent).toContain("chat.thinkingLevel.xhigh");
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).toContain("DeskWand 云");
+    expect(text).toContain("DeskWand");
     expect(text).toContain("deepseek-flash");
     expect(text).toContain("deepseek-v4-pro");
     expect(text).toContain("Provider A");
@@ -228,7 +228,7 @@ describe("MergedInputChip (single-panel)", () => {
     render(); // activeProviderProfileKey = "profile-a"（BYOK）
     click(trigger());
     const text = panel().textContent ?? "";
-    expect(text).toContain("DeskWand 云");
+    expect(text).toContain("DeskWand");
     expect(text).toContain("deepseek-flash");
     expect(text).toContain("deepseek-v4-pro");
     expect(text).toContain("Provider A");
@@ -244,10 +244,8 @@ describe("MergedInputChip (single-panel)", () => {
     click(trigger());
     const text = panel().textContent ?? "";
     // 分组标题按 DOM 顺序出现在 textContent 里，用下标比较断言顺序
-    expect(text.indexOf("DeskWand 云")).toBeGreaterThanOrEqual(0);
-    expect(text.indexOf("DeskWand 云")).toBeLessThan(
-      text.indexOf("Provider A"),
-    );
+    expect(text.indexOf("DeskWand")).toBeGreaterThanOrEqual(0);
+    expect(text.indexOf("DeskWand")).toBeLessThan(text.indexOf("Provider A"));
   });
 
   it("selects a thinking level and returns to the list view", () => {
@@ -377,7 +375,7 @@ describe("MergedInputChip (single-panel)", () => {
       modelOptions: [
         {
           profileKey: "custom:deskwand" as never,
-          groupLabel: "DeskWand 云",
+          groupLabel: "DeskWand",
           items: [
             { id: "cloud-1", name: "Cloud One" },
             { id: "cloud-2", name: "Cloud Two" },
@@ -389,7 +387,7 @@ describe("MergedInputChip (single-panel)", () => {
     click(trigger());
     const text = panel().textContent ?? "";
     expect(panel().querySelector("input")).toBeNull();
-    expect(text).not.toContain("DeskWand 云");
+    expect(text).not.toContain("DeskWand");
     expect(text).not.toContain("Provider A");
     expect(text).toContain("Model 6");
   });

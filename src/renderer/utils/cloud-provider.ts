@@ -21,8 +21,8 @@ export function buildDeskwandProviderPayload(
       provider: "custom",
       customProtocol: "openai",
       name: t
-        ? t("providers.deskwandCloud", { defaultValue: "DeskWand 云" })
-        : "DeskWand 云",
+        ? t("providers.deskwandCloud", { defaultValue: "DeskWand" })
+        : "DeskWand",
       baseUrl: `${DESKWAND_API_URL}/api/models`,
       apiKey: token,
       defaultModel:

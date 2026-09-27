@@ -1833,7 +1833,7 @@
     "thinkingWithValue": "思考：{{value}}"
   },
   "providers": {
-    "deskwandCloud": "DeskWand 云"
+    "deskwandCloud": "DeskWand"
   },
   "usage": {
     "title": "用量统计",
@@ -1971,7 +1971,7 @@
     "statusCleared": "清单已清空"
   },
   "connect": {
-    "cloudTitle": "DeskWand 云",
+    "cloudTitle": "DeskWand",
     "cloudDesc": "登录即用 · 无需配 Key",
     "subscribeTitle": "连接订阅",
     "subscribeDesc": "账号授权 / 订阅 Key",

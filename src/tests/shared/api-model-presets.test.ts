@@ -59,4 +59,14 @@ describe("DeepSeek presets", () => {
       "deepseek-flash",
     );
   });
+
+  it("offers exactly the two models DeepSeek officially lists", () => {
+    // 官方现行只有 deepseek-flash（V4.1-Flash）与 deepseek-v4-pro；
+    // deepseek-v4-flash 已是退役兼容名，留在预设里会让用户选到一个官方名义上不存在的 id。
+    // 顺序也钉住：预设数组的原始顺序进不了模型菜单（getSortedPresetModels 会按 id 排序），
+    // 但设置页的视觉模型建议 chips 按原始顺序取前 5 个（SettingsAPI.tsx:2001），
+    // 所以别为了“看起来有序”重排这个数组。
+    const ids = API_PROVIDER_PRESETS.deepseek.models.map((m) => m.id);
+    expect(ids).toEqual(["deepseek-v4-pro", "deepseek-flash"]);
+  });
 });

@@ -55,13 +55,14 @@ describe("resolveModelLabel", () => {
 describe("resolveProviderDisplayName", () => {
   // 只认云 provider 的 key，其余 key 原样返回，用来确认走的是哪条分支
   const t = (key: string) =>
-    key === "providers.deskwandCloud" ? "DeskWand Cloud" : key;
+    key === "providers.deskwandCloud" ? "DeskWand" : key;
 
   it("localizes the cloud label live instead of the stored name", () => {
-    // 配置里存的是登录当时语言写下的字符串（旧值）
+    // 配置里存的是登录当时语言写下的字符串（旧值）。刻意用与 i18n 值不同的串：
+    // 两边写成一样时，删掉 i18n 分支（直接返回 storedName）的改动也能通过。
     expect(
-      resolveProviderDisplayName("custom:deskwand", "DeskWand 云", t),
-    ).toBe("DeskWand Cloud");
+      resolveProviderDisplayName("custom:deskwand", "登录时写入的旧名", t),
+    ).toBe("DeskWand");
   });
 
   it("keeps the stored name for other providers", () => {
@@ -84,7 +85,10 @@ describe("resolveProviderDisplayName", () => {
       const json = JSON.parse(
         fs.readFileSync(`src/renderer/i18n/locales/${locale}.json`, "utf8"),
       );
-      expect(typeof json.providers?.deskwandCloud).toBe("string");
+      // 断言值而不只是类型：改名的可见结果就是这两个串，其余测试都 mock 了 t，
+      // 只有这里能拦住漏空格、拼错这类错。
+      expect(json.providers?.deskwandCloud).toBe("DeskWand");
+      expect(json.connect?.cloudTitle).toBe("DeskWand");
     }
   });
 });
