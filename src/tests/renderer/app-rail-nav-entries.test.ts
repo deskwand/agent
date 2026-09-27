@@ -96,7 +96,6 @@ describe("账号簇在图标栏上", () => {
       "<AccountMenu",
       "<LoginModal",
       "<ConfirmDialog",
-      "<UpdateConfirmDialog",
       "deskwand.cloud",
       "deleteProvider(",
     ]) {
@@ -104,10 +103,29 @@ describe("账号簇在图标栏上", () => {
     }
   });
 
+  it("更新弹窗搬到帮助菜单里", () => {
+    expect(read("components/HelpMenu.tsx")).toContain("<UpdateConfirmDialog");
+    expect(read("components/AccountCluster.tsx")).not.toContain(
+      "<UpdateConfirmDialog",
+    );
+  });
+
+  it("wires the settings row to the settings view", () => {
+    // 栏区里设置的唯一入口：头像弹层的设置行 → setActiveView("settings")
+    expect(cluster).toContain('setActiveView("settings")');
+  });
+
   it("keeps the account trigger reachable without the sidebar", () => {
     expect(cluster).toContain("sidebar.user");
     expect(cluster).toContain("avatarInitials");
     expect(cluster).toContain("useAppStore");
+  });
+
+  it("hosts the help menu and the account cluster, and no longer has a settings gear", () => {
+    expect(appRail).toContain("<HelpMenu />");
+    expect(appRail).toContain("<AccountCluster />");
+    // 设置入口已移到头像弹层；图标栏不再直接跳设置
+    expect(appRail).not.toContain('setActiveView("settings")');
   });
 
   it("opens the account popover to the right of the rail", () => {

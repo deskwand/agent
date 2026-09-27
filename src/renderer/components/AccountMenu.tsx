@@ -1,24 +1,14 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { formatMicroUsd } from "../utils/topup";
-import {
-  LogIn,
-  User,
-  Settings,
-  LogOut,
-  Zap,
-  Coins,
-  BarChart3,
-  ChevronRight,
-} from "lucide-react";
+import { LogIn, User, Settings, LogOut, Zap, Coins } from "lucide-react";
 import type { CloudConfig } from "../types";
 import { useAppStore } from "../store";
 import { CloudApiClient } from "../services/cloud-api";
 import { avatarInitials } from "../utils/identity";
+import { MenuItem } from "./menu-item";
 import {
   MENU_ITEM_CLASS,
-  MENU_ITEM_DEFAULT_CLASS,
-  MENU_ITEM_DISABLED_CLASS,
   MENU_PANEL_PADDED_CLASS,
   MENU_SEPARATOR_CLASS,
 } from "./menu-styles";
@@ -92,27 +82,6 @@ export function AccountMenu({
           </>
         ) : null}
 
-        <MenuItem
-          icon={<Settings className="w-4 h-4" />}
-          label={t("sidebar.settings")}
-          onClick={() => {
-            onOpenSettings();
-            onClose();
-          }}
-        />
-
-        {/* Local usage stats need no account: keep this entry outside the
-            logged-in branch so it is reachable while logged out. */}
-        <MenuItem
-          icon={<BarChart3 className="w-4 h-4" />}
-          label={t("accountMenu.usage")}
-          trailing={<ChevronRight className="w-4 h-4" />}
-          onClick={() => {
-            useAppStore.getState().setActiveView("usage");
-            onClose();
-          }}
-        />
-
         {isLoggedIn && cloudConfig ? (
           /* 余额行是 div 而非 button（内含充值按钮，避免按钮嵌套）；
              不用 MENU_ITEM_DEFAULT_CLASS——整行不可点，不应有 hover 底色 */
@@ -138,6 +107,15 @@ export function AccountMenu({
             </button>
           </div>
         ) : null}
+
+        <MenuItem
+          icon={<Settings className="w-4 h-4" />}
+          label={t("sidebar.settings")}
+          onClick={() => {
+            onOpenSettings();
+            onClose();
+          }}
+        />
 
         <div className={MENU_SEPARATOR_CLASS} />
 
@@ -166,37 +144,5 @@ export function AccountMenu({
         )}
       </div>
     </>
-  );
-}
-
-function MenuItem({
-  icon,
-  label,
-  trailing,
-  onClick,
-  disabled,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  trailing?: React.ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`${MENU_ITEM_CLASS} ${
-        disabled ? MENU_ITEM_DISABLED_CLASS : MENU_ITEM_DEFAULT_CLASS
-      }`}
-    >
-      <span className="shrink-0 text-text-muted">{icon}</span>
-      <span className="truncate">{label}</span>
-      {trailing ? (
-        <span className="ml-auto flex-shrink-0 text-text-muted">
-          {trailing}
-        </span>
-      ) : null}
-    </button>
   );
 }

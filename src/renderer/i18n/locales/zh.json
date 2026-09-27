@@ -1999,5 +1999,10 @@
   "navRail": {
     "label": "主导航",
     "chat": "聊天"
+  },
+  "help": {
+    "label": "帮助",
+    "docs": "使用手册",
+    "feedback": "反馈问题"
   }
 }

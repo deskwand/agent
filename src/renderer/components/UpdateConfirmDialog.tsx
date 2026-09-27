@@ -59,9 +59,9 @@ export function UpdateConfirmDialog({
           </p>
           {currentVersion && (
             <div className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-md bg-surface-muted text-xs text-text-secondary">
-              <span>{currentVersion}</span>
+              <span>v{currentVersion}</span>
               <span className="text-accent">→</span>
-              <span className="text-accent font-semibold">{newVersion}</span>
+              <span className="text-accent font-semibold">v{newVersion}</span>
             </div>
           )}
         </div>

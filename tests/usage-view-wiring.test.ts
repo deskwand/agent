@@ -16,10 +16,13 @@ describe("usage view wiring", () => {
     expect(app).toContain('activeView === "usage"');
   });
 
-  it("puts the entry in the account menu, not in settings", () => {
+  it("puts the entry on the app rail, not in the account menu", async () => {
+    // 用量入口在图标栏上：RAIL_ITEMS 必须含 usage
+    const { RAIL_ITEMS } = await import("../src/renderer/utils/nav-rail");
+    expect(RAIL_ITEMS.some((item) => item.view === "usage")).toBe(true);
+    // 且不再重复出现在账号弹层里
     const menu = read("src/renderer/components/AccountMenu.tsx");
-    expect(menu).toContain('t("accountMenu.usage")');
-    expect(menu).toContain('setActiveView("usage")');
+    expect(menu).not.toContain('t("accountMenu.usage")');
     // Assert on the settings tab definitions, not on the word "usage" anywhere
     // in the file (unrelated comments/keys could contain it).
     expect(read("src/renderer/components/SettingsPanel.tsx")).not.toMatch(
@@ -27,17 +30,11 @@ describe("usage view wiring", () => {
     );
   });
 
-  it("keeps the entry reachable while logged out", () => {
-    const menu = read("src/renderer/components/AccountMenu.tsx");
-    const entry = menu.indexOf('t("accountMenu.usage")');
-    const loginOnly = menu.indexOf('t("auth.logout")');
-    expect(entry).toBeGreaterThan(-1);
-    expect(loginOnly).toBeGreaterThan(-1);
-    // 标记已从「首个 isLoggedIn 分支」改为「登录专属的退出登录行」：身份区
-    // 作为新的登录分支出现在用量统计之前，旧的 indexOf 标记不再可区分。
-    // 真正的守卫是 jsdom 渲染测试 account-menu-structure.test.ts 的未登录用例
-    // （渲染后仍有 usage 且无登录专属内容）；这里只保留一条源码级兑底。
-    expect(entry).toBeLessThan(loginOnly);
+  it("keeps the entry reachable while logged out", async () => {
+    // 图标栏常驻、与登录状态无关，所以用量项在栏上就等于"未登录也能到用量"。
+    // 这比原来那条源码字符串断言强：它锁的是"用量必须是图标栏项之一"。
+    const { RAIL_ITEMS } = await import("../src/renderer/utils/nav-rail");
+    expect(RAIL_ITEMS.map((item) => item.view)).toContain("usage");
   });
 
   it("ships both locales", () => {

@@ -63,38 +63,53 @@ describe("AccountMenu 已登录结构", () => {
     expect(container.textContent).toContain("jichun.zou@eacon.com");
   });
 
-  it("菜单组：设置 / 用量统计（右端 chevron）/ 余额一行含充值", () => {
+  it("菜单组：设置 / 余额一行含充值（用量与更新不在这里）", () => {
     expect(container.textContent).toContain("sidebar.settings");
-    expect(container.textContent).toContain("accountMenu.usage");
+    expect(container.textContent).not.toContain("accountMenu.usage");
+    expect(container.textContent).not.toContain("update.title");
     expect(container.textContent).toContain("accountMenu.balance");
     expect(container.textContent).toContain("$12.30");
     expect(container.textContent).toContain("accountMenu.topUpAction");
-    // chevron 是 lucide 的固定 path（m9 18 6-6-6-6）
-    expect(
-      [...container.querySelectorAll("svg path")].some(
-        (p) => p.getAttribute("d") === "m9 18 6-6-6-6",
-      ),
-    ).toBe(true);
+  });
+
+  it("点设置行走 onOpenSettings 并关闭弹层", () => {
+    const onOpenSettings = vi.fn();
+    const onClose = vi.fn();
+    renderMenu({
+      cloudConfig: loggedIn,
+      onOpenSettings,
+      onClose,
+    });
+
+    const settingsRow = [...container.querySelectorAll("button")].find(
+      (b) => b.textContent === "sidebar.settings",
+    );
+    expect(settingsRow, "设置行必须存在").toBeTruthy();
+    act(() => (settingsRow as HTMLButtonElement).click());
+
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("退出登录在菜单里，且菜单行用共享 token（h-7）", () => {
     expect(container.textContent).toContain("auth.logout");
     expect(MENU_ITEM_CLASS).toContain("h-7");
-    const settingsRow = [...container.querySelectorAll("button")].find(
-      (b) => b.textContent === "sidebar.settings",
+    const logoutRow = [...container.querySelectorAll("button")].find(
+      (b) => b.textContent === "auth.logout",
     );
-    expect(settingsRow?.className).toContain("h-7");
+    expect(logoutRow?.className).toContain("h-7");
   });
 });
 
 describe("AccountMenu 未登录结构", () => {
-  it("无身份区、无余额行，保留登录入口与本地用量统计", () => {
+  it("无身份区、无余额行，保留设置与登录入口", () => {
     renderMenu({ cloudConfig: null });
     expect(container.textContent).not.toContain("@");
     expect(container.textContent).not.toContain("JZ");
     expect(container.textContent).not.toContain("accountMenu.balance");
     expect(container.textContent).toContain("auth.loginEntry");
-    expect(container.textContent).toContain("accountMenu.usage");
+    // 用量在图标栏上，不再回账号弹层
+    expect(container.textContent).not.toContain("accountMenu.usage");
   });
 });
 

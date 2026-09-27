@@ -6,7 +6,6 @@ import {
   Clock3,
   LayoutGrid,
   MessageSquare,
-  Settings,
 } from "lucide-react";
 import type { ActiveView } from "../store";
 import { useAppStore } from "../store";
@@ -16,6 +15,8 @@ import {
   resolveRailClick,
 } from "../utils/nav-rail";
 import { Tooltip } from "./Tooltip";
+import { HelpMenu } from "./HelpMenu";
+import { RAIL_BUTTON_CLASS } from "./rail-styles";
 import { AccountCluster } from "./AccountCluster";
 
 /** 图标只在这里映射：nav-rail.ts 保持纯数据，不引入 React。 */
@@ -27,9 +28,6 @@ const RAIL_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   usage: BarChart3,
 };
 
-const ITEM_BASE_CLASS =
-  "w-8 h-8 rounded-control grid place-items-center transition-[background-color,color,transform] duration-150";
-
 export function AppRail() {
   const { t } = useTranslation();
   const activeView = useAppStore((s) => s.activeView);
@@ -37,7 +35,6 @@ export function AppRail() {
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
 
   const activeKey = resolveRailActiveKey(activeView);
-  const settingsActive = activeView === "settings";
 
   const handleItemClick = (view: ActiveView) => {
     if (resolveRailClick(view, activeView) === "toggle-sidebar") {
@@ -64,7 +61,7 @@ export function AppRail() {
               onClick={() => handleItemClick(item.view)}
               aria-label={t(item.labelKey)}
               aria-current={isActive ? "page" : undefined}
-              className={`${ITEM_BASE_CLASS} ${
+              className={`${RAIL_BUTTON_CLASS} ${
                 isActive
                   ? "bg-overlay-on text-accent"
                   : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
@@ -78,21 +75,7 @@ export function AppRail() {
 
       <span className="flex-1" />
 
-      <Tooltip label={t("sidebar.settings")}>
-        <button
-          type="button"
-          onClick={() => setActiveView("settings")}
-          aria-label={t("sidebar.settings")}
-          aria-current={settingsActive ? "page" : undefined}
-          className={`${ITEM_BASE_CLASS} ${
-            settingsActive
-              ? "bg-overlay-on text-accent"
-              : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
-          }`}
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-      </Tooltip>
+      <HelpMenu />
 
       <AccountCluster />
     </nav>

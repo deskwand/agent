@@ -8,8 +8,8 @@ export interface RailItem {
 }
 
 /**
- * `settings` 不在其中：它渲染在图标栏底部那一格（与账号头像同组），
- * 所以 resolveRailActiveKey("settings") 返回 null，由底部自行判断激活态。
+ * `settings` 不在其中：它不在图标栏上，而是从头像弹层进入（HelpMenu 占栏底第一格）。
+ * 所以 resolveRailActiveKey("settings") 返回 null，图标栏没有对应的高亮项。
  */
 export const RAIL_ITEMS: readonly RailItem[] = [
   { key: "chat", view: "chat", labelKey: "navRail.chat" },
@@ -21,7 +21,7 @@ export const RAIL_ITEMS: readonly RailItem[] = [
 
 export type RailClickAction = "navigate" | "toggle-sidebar";
 
-/** 当前视图对应的图标栏项 key；底部那格（settings）返回 null。 */
+/** 当前视图对应的图标栏项 key；settings 不在栏上，返回 null。 */
 export function resolveRailActiveKey(activeView: ActiveView): string | null {
   return RAIL_ITEMS.find((item) => item.view === activeView)?.key ?? null;
 }

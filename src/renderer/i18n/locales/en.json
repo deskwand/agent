@@ -2002,5 +2002,10 @@
   "navRail": {
     "label": "Main navigation",
     "chat": "Chat"
+  },
+  "help": {
+    "label": "Help",
+    "docs": "User Manual",
+    "feedback": "Report an issue"
   }
 }

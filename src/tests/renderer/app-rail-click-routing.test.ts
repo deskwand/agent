@@ -24,9 +24,7 @@ function buttonFor(labelKey: string): HTMLButtonElement {
   return element as HTMLButtonElement;
 }
 
-async function mountRail(
-  activeView: "chat" | "apps" | "settings" = "chat",
-): Promise<void> {
+async function mountRail(activeView: "chat" | "apps" = "chat"): Promise<void> {
   await act(async () => {
     useAppStore.setState({ activeView });
     root.render(React.createElement(AppRail));
@@ -55,7 +53,8 @@ describe("AppRail 点击路由", () => {
         item.key,
       ).toBeTruthy();
     }
-    expect(buttonFor("sidebar.settings").querySelector("svg")).toBeTruthy();
+    expect(buttonFor("help.label").querySelector("svg")).toBeTruthy();
+    expect(buttonFor("sidebar.user")).toBeTruthy();
   });
 
   it("聊天视图点「聊天」只开合侧栏，不切视图", async () => {
@@ -83,15 +82,6 @@ describe("AppRail 点击路由", () => {
     await act(async () => buttonFor("navRail.chat").click());
 
     expect(useAppStore.getState().activeView).toBe("chat");
-    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
-  });
-
-  it("点当前已激活的设置齿轮是 no-op（不会收起侧栏）", async () => {
-    await mountRail("settings");
-
-    await act(async () => buttonFor("sidebar.settings").click());
-
-    expect(useAppStore.getState().activeView).toBe("settings");
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
   });
 });
