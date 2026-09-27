@@ -41,7 +41,7 @@ export function AppRail() {
   return (
     <nav
       aria-label={t("navRail.label")}
-      className="w-14 flex-shrink-0 bg-background-secondary flex flex-col items-center gap-1 py-2"
+      className="w-14 flex-shrink-0 bg-background flex flex-col items-center gap-1 py-2"
     >
       {RAIL_ITEMS.map((item) => {
         const Icon = RAIL_ICONS[item.key];

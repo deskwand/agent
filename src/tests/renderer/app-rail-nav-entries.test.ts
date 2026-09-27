@@ -24,7 +24,10 @@ describe("AppRail", () => {
 
   it("keeps the rail narrow, themed and non-resizable", () => {
     expect(rail).toContain("w-14");
-    expect(rail).toContain("bg-background-secondary");
+    // 图标栏属"外圈"，与标题栏同色（2026-09-27 决策；参考 ChatGPT Work 的结构）。
+    // themed 的本意不变：仍然只用语义 token。
+    expect(rail).toContain("bg-background");
+    expect(rail).not.toContain("bg-background-secondary");
     expect(rail).not.toContain("ResizeHandle");
     expect(rail).not.toContain("sidebarWidth");
   });

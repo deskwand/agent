@@ -855,7 +855,7 @@ export function Sidebar({
   return (
     <>
       <aside
-        className={`group bg-background-secondary flex flex-col overflow-hidden flex-shrink-0 ${panelWidthTransitionClass(
+        className={`group bg-background-secondary rounded-tl-lg flex flex-col overflow-hidden flex-shrink-0 ${panelWidthTransitionClass(
           dragging,
         )} ${sidebarCollapsed ? "w-0" : ""}`}
         style={{ width: sidebarCollapsed ? 0 : `${width}px` }}

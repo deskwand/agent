@@ -8,6 +8,7 @@
 //   1) 区域级分界的三个位置不得再有单边描边
 //   2) 旧的 inset 阴影机制不得回流（它当年的合成对比只有 1.058–1.100，等于没分开）
 //   3) 右面板必须靠底色差分界，且活动标签不能与面板底色撞车
+//   4) 外圈结构：图标栏与标题栏同为 background，会话栏是唯一被抬起的 secondary
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
@@ -63,6 +64,22 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
       .find((l) => l.includes("titlebar-drag"));
     expect(line, "找不到标题栏元素").toBeTruthy();
     expect(line).not.toMatch(/\bborder-b\b/);
+  });
+
+  it("外圈同色：图标栏与标题栏都是纯 background，会话栏是唯一被抬起的 secondary", () => {
+    // 参考图（ChatGPT Work）的结构：外圈（图标栏＋标题栏）同色，会话栏是嵌在外圈里的面板
+    const rail = read("components/AppRail.tsx");
+    expect(rail).toMatch(/\bbg-background\b/);
+    expect(rail).not.toMatch(/\bbg-background-secondary\b/);
+    // 标题栏这半边必须有负向断言：`\b` 在 `-` 处也成立，
+    // `\bbg-background\b` 对 `bg-background-secondary` 照样命中（本文件的既有教训）。
+    const titlebar = read("components/Titlebar.tsx");
+    expect(titlebar).toMatch(/\bbg-background\b/);
+    expect(titlebar).not.toMatch(/\bbg-background-secondary\b/);
+    const sidebar = read("components/Sidebar.tsx");
+    expect(sidebar).toMatch(/\bbg-background-secondary\b/);
+    // 参考图细节：面板左上角圆角，让外圈在角落里露出来
+    expect(sidebar).toMatch(/\brounded-tl-lg\b/);
   });
 });
 
