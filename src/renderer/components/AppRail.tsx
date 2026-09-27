@@ -47,7 +47,7 @@ export function AppRail() {
         const Icon = RAIL_ICONS[item.key];
         const isActive = activeKey === item.key;
         return (
-          <Tooltip key={item.key} label={t(item.labelKey)}>
+          <Tooltip key={item.key} label={t(item.labelKey)} placement="right">
             <button
               type="button"
               onClick={() => handleItemClick(item.view)}

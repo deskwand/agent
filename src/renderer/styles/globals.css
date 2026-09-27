@@ -24,6 +24,8 @@
     --color-surface-hover: #323237;
     --color-surface-active: #3f3f46;
     --color-surface-muted: #1b1b1f;
+    --color-tooltip-bg: #464648;
+    --color-tooltip-fg: var(--color-text-primary);
     /* 由 text-primary 与 surface 派生：同一条描边要同时服务最深到最亮的
        所有表面，硬编码值做不到（见设计文档 §4.2.1）。 */
     --color-border: color-mix(
@@ -84,6 +86,8 @@
     --color-surface-hover: #f4f4f5;
     --color-surface-active: #e4e4e7;
     --color-surface-muted: #fafafa;
+    --color-tooltip-bg: var(--color-text-primary);
+    --color-tooltip-fg: var(--color-background);
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 22%,
@@ -137,6 +141,7 @@
     --color-surface-hover: #363129;
     --color-surface-active: #453e34;
     --color-surface-muted: #1f1c18;
+    --color-tooltip-bg: #48433c;
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 18%,
@@ -173,6 +178,7 @@
     --color-surface-hover: #f5efe0;
     --color-surface-active: #ede3cd;
     --color-surface-muted: #faf7ef;
+    --color-tooltip-bg: var(--color-text-primary);
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 22%,
@@ -213,6 +219,7 @@
     --color-surface-hover: #1a1a1a;
     --color-surface-active: #262626;
     --color-surface-muted: #050505;
+    --color-tooltip-bg: #343434;
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 18%,
@@ -253,6 +260,7 @@
     --color-surface-hover: #f5f5f5;
     --color-surface-active: #ebebeb;
     --color-surface-muted: #f8f8f8;
+    --color-tooltip-bg: var(--color-text-primary);
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 22%,
@@ -293,6 +301,7 @@
     --color-surface-hover: #212d40;
     --color-surface-active: #2a3a54;
     --color-surface-muted: #0e1526;
+    --color-tooltip-bg: #38414e;
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 18%,
@@ -329,6 +338,7 @@
     --color-surface-hover: #eef2f7;
     --color-surface-active: #e2e8f0;
     --color-surface-muted: #f4f7fb;
+    --color-tooltip-bg: var(--color-text-primary);
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 22%,
@@ -369,6 +379,7 @@
     --color-surface-hover: #253220;
     --color-surface-active: #304128;
     --color-surface-muted: #131a11;
+    --color-tooltip-bg: #3b4438;
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 18%,
@@ -405,6 +416,7 @@
     --color-surface-hover: #eef4ea;
     --color-surface-active: #e2ebdb;
     --color-surface-muted: #f5f8f3;
+    --color-tooltip-bg: var(--color-text-primary);
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 22%,
@@ -445,6 +457,7 @@
     --color-surface-hover: #362d25;
     --color-surface-active: #45392f;
     --color-surface-muted: #1c1714;
+    --color-tooltip-bg: #49403a;
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 18%,
@@ -481,6 +494,7 @@
     --color-surface-hover: #f5efe6;
     --color-surface-active: #ede3d5;
     --color-surface-muted: #faf7f2;
+    --color-tooltip-bg: var(--color-text-primary);
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 22%,
@@ -521,6 +535,7 @@
     --color-surface-hover: #2b2442;
     --color-surface-active: #383055;
     --color-surface-muted: #14111d;
+    --color-tooltip-bg: #3f3a50;
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 18%,
@@ -557,6 +572,7 @@
     --color-surface-hover: #efecf7;
     --color-surface-active: #e4e0f2;
     --color-surface-muted: #f6f4fb;
+    --color-tooltip-bg: var(--color-text-primary);
     --color-border: color-mix(
       in srgb,
       var(--color-text-primary) 22%,
@@ -1527,9 +1543,9 @@
   border-radius: 6px;
   font-size: 0.6875rem;
   line-height: 1.5;
-  background: var(--color-surface);
-  color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
+  /* 反色气泡：浅色主题深底浅字、深色主题中间灰浅字（见 tooltip-palette.test.ts 的界值） */
+  background: var(--color-tooltip-bg);
+  color: var(--color-tooltip-fg);
   box-shadow: var(--shadow-elevated);
 }
 

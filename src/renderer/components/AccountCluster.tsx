@@ -98,7 +98,7 @@ export function AccountCluster() {
 
   return (
     <div className="relative flex flex-col items-center">
-      <Tooltip label={t("sidebar.user")}>
+      <Tooltip label={t("sidebar.user")} placement="right">
         <button
           type="button"
           aria-label={t("sidebar.user")}

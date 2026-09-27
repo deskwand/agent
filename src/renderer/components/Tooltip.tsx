@@ -18,6 +18,8 @@ interface TooltipProps {
    * 空 label 时直接返回 children，不渲染气泡。这是真实存在的调用形态。
    */
   label: string;
+  /** 气泡方位；默认下方（既有调用都是这个），rail 用 "right" 让气泡落在图标右侧 */
+  placement?: "bottom" | "right";
   children: ReactNode;
 }
 
@@ -44,14 +46,18 @@ interface TooltipProps {
  * 对“按钮内已有可见文字”的情况注入会覆盖可见文字（违反 WCAG 2.5.3）。
  * 可访问名由调用方负责。
  */
-export function Tooltip({ label, children }: TooltipProps) {
+export function Tooltip({
+  label,
+  placement = "bottom",
+  children,
+}: TooltipProps) {
   const [open, setOpen] = useState(false);
   const hasLabel = Boolean(label);
 
   const { refs, floatingStyles, context } = useFloating({
     open,
     onOpenChange: setOpen,
-    placement: "bottom",
+    placement,
     whileElementsMounted: autoUpdate,
     middleware: [offset(6), flip(), shift({ padding: 8 })],
   });

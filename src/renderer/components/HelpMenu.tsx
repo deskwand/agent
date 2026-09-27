@@ -58,7 +58,7 @@ export function HelpMenu() {
 
   return (
     <div className="relative flex flex-col items-center">
-      <Tooltip label={t("help.label")}>
+      <Tooltip label={t("help.label")} placement="right">
         <button
           type="button"
           aria-label={t("help.label")}
