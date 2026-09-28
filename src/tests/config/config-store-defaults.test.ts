@@ -15,6 +15,10 @@ describe("defaultStoredConfig", () => {
   it("defaults auto skill learning to disabled", () => {
     expect(defaultStoredConfig().autoSkillLearning).toBe(false);
   });
+
+  it("defaults the desktop pet to disabled", () => {
+    expect(defaultStoredConfig().petEnabled).toBe(false);
+  });
 });
 
 describe("uiFontSize", () => {

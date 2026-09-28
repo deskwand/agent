@@ -253,6 +253,15 @@ export default defineConfig({
           },
         },
       },
+      {
+        entry: "src/preload/pet.ts",
+        vite: {
+          build: {
+            outDir: "dist-electron/preload",
+            rollupOptions: { external: ["electron"] },
+          },
+        },
+      },
     ]),
   ],
   resolve: {
@@ -271,5 +280,11 @@ export default defineConfig({
     sourcemap: process.env.NODE_ENV !== "production",
     outDir: "dist",
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        index: resolve(__dirname, "index.html"),
+        pet: resolve(__dirname, "pet.html"),
+      },
+    },
   },
 });

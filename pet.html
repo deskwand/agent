@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- 桌宠窗口只渲染本地资源：不开字体 CDN、不用远程 connect-src。
+         style-src 保留 'unsafe-inline'、connect-src 保留 ws:，否则 Vite dev 的
+         样式注入与 HMR 连接会被 CSP 拦掉。 -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeskWand</title>
+  </head>
+  <body>
+    <div id="pet-root"></div>
+    <script type="module" src="/src/renderer/pet.tsx"></script>
+  </body>
+</html>

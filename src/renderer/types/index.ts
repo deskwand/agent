@@ -798,6 +798,7 @@ export interface Settings {
   theme: AppTheme;
   themePreset: ThemePreset;
   uiFontSize: number;
+  petEnabled: boolean;
   apiKey?: string;
   defaultTools: string[];
   permissionRules: PermissionRule[];
@@ -920,6 +921,7 @@ export interface AppConfig {
   theme?: AppTheme;
   themePreset?: ThemePreset;
   uiFontSize?: number;
+  petEnabled?: boolean;
   sandboxEnabled?: boolean;
   memoryEnabled?: boolean;
   memoryRuntime?: MemoryRuntimeConfig;

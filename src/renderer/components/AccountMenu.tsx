@@ -1,7 +1,15 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { formatMicroUsd } from "../utils/topup";
-import { LogIn, User, Settings, LogOut, Zap, Coins } from "lucide-react";
+import {
+  LogIn,
+  User,
+  Settings,
+  LogOut,
+  Zap,
+  Coins,
+  CircleDot,
+} from "lucide-react";
 import type { CloudConfig } from "../types";
 import { useAppStore } from "../store";
 import { CloudApiClient } from "../services/cloud-api";
@@ -33,6 +41,8 @@ export function AccountMenu({
   onClose,
 }: AccountMenuProps) {
   const { t } = useTranslation();
+  const petEnabled = useAppStore((s) => s.settings.petEnabled);
+  const updateSettings = useAppStore((s) => s.updateSettings);
 
   useEffect(() => {
     if (!isOpen || cloudRestoring || !cloudConfig?.token) return;
@@ -116,6 +126,25 @@ export function AccountMenu({
             onClose();
           }}
         />
+        <button
+          type="button"
+          role="switch"
+          aria-checked={petEnabled}
+          onClick={() => updateSettings({ petEnabled: !petEnabled })}
+          className={`${MENU_ITEM_CLASS} w-full text-text-primary`}
+        >
+          <CircleDot className="w-4 h-4 text-text-muted" />
+          <span className="flex-1 text-left">
+            {t("accountMenu.desktopPet")}
+          </span>
+          <span
+            className={`h-4 w-7 rounded-full p-0.5 ${petEnabled ? "bg-accent" : "bg-border"}`}
+          >
+            <span
+              className={`block h-3 w-3 rounded-full bg-surface transition-transform ${petEnabled ? "translate-x-3" : ""}`}
+            />
+          </span>
+        </button>
 
         <div className={MENU_SEPARATOR_CLASS} />
 

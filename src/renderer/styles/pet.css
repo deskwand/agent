@@ -1,0 +1,91 @@
+html,
+body,
+#pet-root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  overflow: hidden;
+}
+.pet-target {
+  width: 120px;
+  height: 120px;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.pet-target:active {
+  cursor: grabbing;
+}
+.pet-lens {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(
+    circle at 35% 28%,
+    #454b53,
+    #191d25 48%,
+    #07090e 80%
+  );
+  box-shadow:
+    0 0 0 4px #1c222b,
+    0 0 0 6px #5a626b,
+    0 0 0 10px #10141b,
+    0 12px 18px #0009;
+}
+.pet-lens__rim {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid #454950;
+  box-shadow: inset 0 0 12px #000b;
+}
+.pet-lens__eye {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 35%,
+    #ffe4d1 0,
+    #ff7564 9%,
+    #dc201b 23%,
+    #790609 47%,
+    #200305 74%
+  );
+  box-shadow: 0 0 12px #dc202080;
+  animation: breathe 4s ease-in-out infinite;
+}
+.pet-lens[data-state="running"] .pet-lens__eye {
+  box-shadow:
+    0 0 21px #f03a34,
+    0 0 30px #e71b1b88;
+  animation-duration: 1.3s;
+}
+.pet-lens[data-state="success"] .pet-lens__eye {
+  filter: brightness(1.7);
+  box-shadow: 0 0 30px #ff9570;
+  animation: none;
+}
+.pet-lens[data-state="failure"] .pet-lens__eye {
+  filter: hue-rotate(22deg) brightness(1.5);
+  box-shadow: 0 0 26px #ff651a;
+  animation: none;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pet-lens__eye,
+  .pet-lens[data-state="running"] .pet-lens__eye {
+    animation: none;
+  }
+}

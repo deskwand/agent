@@ -121,6 +121,7 @@ export interface AppConfig {
   theme: AppTheme;
   themePreset: ThemePreset;
   uiFontSize?: number;
+  petEnabled?: boolean;
   sandboxEnabled: boolean;
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
@@ -145,6 +146,7 @@ interface StoredConfig {
   theme: AppTheme;
   themePreset: ThemePreset;
   uiFontSize?: number;
+  petEnabled?: boolean;
   sandboxEnabled: boolean;
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
@@ -252,6 +254,7 @@ export function defaultStoredConfig(): StoredConfig {
     theme: "light",
     themePreset: "graphite",
     uiFontSize: UI_FONT_SIZE_DEFAULT,
+    petEnabled: false,
     sandboxEnabled: false,
     memoryEnabled: false,
     memoryRuntime: defaultMemoryRuntime(),
@@ -887,6 +890,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     theme: stored.theme,
     themePreset: stored.themePreset,
     uiFontSize: stored.uiFontSize,
+    petEnabled: stored.petEnabled ?? false,
     sandboxEnabled: stored.sandboxEnabled,
     memoryEnabled: stored.memoryEnabled,
     memoryRuntime: stored.memoryRuntime,
@@ -1049,6 +1053,8 @@ export class ConfigStore {
       stored.telemetryEnabled = updates.telemetryEnabled;
     if (updates.uiFontSize !== undefined)
       stored.uiFontSize = clampUiFontSize(updates.uiFontSize);
+    if (updates.petEnabled !== undefined)
+      stored.petEnabled = updates.petEnabled;
     if (updates.visionModel !== undefined)
       stored.visionModel = updates.visionModel;
     if (updates.webAccess !== undefined)

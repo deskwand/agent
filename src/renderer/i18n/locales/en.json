@@ -1592,7 +1592,8 @@
   "accountMenu": {
     "balance": "Balance",
     "topUpAction": "Top Up",
-    "usage": "Usage"
+    "usage": "Usage",
+    "desktopPet": "Desktop pet"
   },
   "update": {
     "title": "New Version Available",

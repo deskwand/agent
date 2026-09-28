@@ -39,6 +39,10 @@ import { initDatabase, closeDatabase, getDatabase } from "./db/database";
 import { registerVaultIpc } from "./vault/ipc";
 import { scanWorkspaceFiles } from "./workspace-file-scan";
 import { SessionManager } from "./session/session-manager";
+import {
+  createPetWindowController,
+  type PetWindowController,
+} from "./desktop-pet/pet-window";
 import { SkillsManager, validateSkillName } from "./skills/skills-manager";
 import { MemoryService } from "./memory/memory-service";
 import { MemoryExtension } from "./memory/memory-extension";
@@ -243,6 +247,7 @@ let sessionManager: SessionManager | null = null;
 let skillsManager: SkillsManager | null = null;
 let memoryService: MemoryService | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
+let petWindowController: PetWindowController | null = null;
 
 function sanitizeDiagnosticBaseUrl(value: string | undefined): string | null {
   if (!value) {
@@ -720,6 +725,12 @@ function createWindow() {
     for (const [id] of pendingDialogs) {
       resolveUiDialog(id, undefined);
     }
+    // Windows/Linux 上关闭主窗口就是退出：桌宠窗口若还开着，`window-all-closed`
+    // 永远不会触发，应用会变成一个只剩桌宠的僵尸进程。
+    if (process.platform !== "darwin" || process.env.VITE_DEV_SERVER_URL) {
+      petWindowController?.dispose();
+      petWindowController = null;
+    }
   });
 
   // Notify renderer of fullscreen state changes (for macOS titlebar spacer)
@@ -1077,6 +1088,21 @@ app
     // Show window after core managers are ready so first-load actions can be handled.
     createWindow();
 
+    // 桌宠：默认关闭，用户从头像菜单开关。窗口独立于主窗口，位置由控制器保存。
+    if (sessionManager) {
+      petWindowController = createPetWindowController({
+        // 主窗口可能已被关掉：这时点击桌宠要重新把它开出来，而不是静默无反应。
+        getMainWindow: () => {
+          if (!mainWindow || mainWindow.isDestroyed()) {
+            createWindow();
+          }
+          return mainWindow;
+        },
+        tracker: sessionManager.getPetStateTracker(),
+      });
+      petWindowController.setEnabled(configStore.get("petEnabled") ?? false);
+    }
+
     // Warm the usage backfill off the first usage-page open. The pass is
     // incremental, so this is ~50ms — except once per install, right after an
     // upgrade adds the per-file fingerprint table, when it re-imports the whole
@@ -1283,10 +1309,9 @@ app
     });
 
     app.on("activate", () => {
-      const hasVisibleWindow = BrowserWindow.getAllWindows().some(
-        (w) => !w.isDestroyed(),
-      );
-      if (!hasVisibleWindow) {
+      // 只看主窗口：开着桌宠不算“已有窗口”，否则 macOS 上关掉主窗口后
+      // 点 Dock 图标再也叫不回主窗口。
+      if (!mainWindow || mainWindow.isDestroyed()) {
         createWindow();
       }
     });
@@ -1344,6 +1369,8 @@ async function cleanupSandboxResources(): Promise<void> {
   scheduledTaskManager?.stop();
   tray?.destroy();
   tray = null;
+  petWindowController?.dispose();
+  petWindowController = null;
 
   // 停止远程控制
   try {
@@ -4587,6 +4614,17 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       }
       if (typeof event.payload.uiFontSize === "number") {
         configStore.update({ uiFontSize: event.payload.uiFontSize });
+        sendToRenderer({
+          type: "config.status",
+          payload: {
+            isConfigured: configStore.isConfigured(),
+            config: configStore.getAll(),
+          },
+        });
+      }
+      if (typeof event.payload.petEnabled === "boolean") {
+        configStore.update({ petEnabled: event.payload.petEnabled });
+        petWindowController?.setEnabled(event.payload.petEnabled);
         sendToRenderer({
           type: "config.status",
           payload: {

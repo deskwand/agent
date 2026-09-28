@@ -498,6 +498,7 @@ const defaultSettings: Settings = {
   theme: "light",
   themePreset: "graphite",
   uiFontSize: 14,
+  petEnabled: false,
   defaultTools: [
     "askuserquestion",
     "todowrite",

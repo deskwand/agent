@@ -1591,7 +1591,8 @@
   "accountMenu": {
     "balance": "余额",
     "topUpAction": "充值",
-    "usage": "用量统计"
+    "usage": "用量统计",
+    "desktopPet": "桌面宠物"
   },
   "update": {
     "title": "发现新版本",
