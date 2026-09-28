@@ -39,6 +39,7 @@ const ALL_CLIENT_EVENT_TYPES = [
   "usage.exchange-rate",
   "permission.response",
   "sudo.password.response",
+  "askUser.response",
   "settings.update",
   "folder.select",
   "workdir.get",

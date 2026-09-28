@@ -126,10 +126,12 @@ import {
 } from "./tools/vision-describe";
 import { createOfficeTools } from "./tools/office/office-tools";
 import { createTodoTools } from "./tools/todo-tools";
+import { createAskUserTools } from "./tools/ask-user-tools";
 import { webAccessCache } from "./tools/web-access/cache";
 import { resolveWebAccessProviderAuth } from "./tools/web-access/config-adapter";
 import { createWebAccessTools } from "./tools/web-access/web-tools";
 import type { VisionModelConfig } from "../../shared/api-model-presets";
+import type { AskUserPromptList, AskUserResult } from "../../shared/ask-user";
 import type { WebAccessErrorCode } from "../../shared/web-access";
 import { getDatabase } from "../db/database";
 import { normalizeTokenUsage } from "../usage/normalize-usage";
@@ -448,6 +450,12 @@ interface AgentRunnerOptions {
     toolUseId: string,
     command: string,
   ) => Promise<string | null>;
+  /** ask_user 回调；仅主会话注入（子代理在 extension 中过滤该工具）。 */
+  requestAskUser?: (
+    sessionId: string,
+    toolCallId: string,
+    questions: AskUserPromptList,
+  ) => Promise<AskUserResult>;
   /** Turn finalizer options (for background skill/memory review). */
   turnFinalizer?: TurnFinalizerOptions;
   /** Extra tools to register beyond the standard set. Used by background review. */
@@ -504,6 +512,11 @@ export class AgentRunner {
     toolUseId: string,
     command: string,
   ) => Promise<string | null>;
+  private requestAskUser?: (
+    sessionId: string,
+    toolCallId: string,
+    questions: AskUserPromptList,
+  ) => Promise<AskUserResult>;
   private pathResolver: PathResolver;
   private mcpManager?: MCPManager;
   /** 每个会话一个子代理活动 tap；会话释放时一并销毁。 */
@@ -1013,6 +1026,7 @@ ${hints.join("\n")}
     this.saveMessage = options.saveMessage;
     this.onBackgroundAgentComplete = options.onBackgroundAgentComplete;
     this.requestSudoPassword = options.requestSudoPassword;
+    this.requestAskUser = options.requestAskUser;
     this.createSessionRecord = options.createSessionRecord;
     this.enqueuePromptForSession = options.enqueuePromptForSession;
     this.findSessionByPiFile = options.findSessionByPiFile;
@@ -3375,6 +3389,10 @@ Tool routing:\n
         // Add office tools (always registered, no config required)
         ...officeTools,
         ...createTodoTools(),
+        // ask_user：仅主对话可用（有回调才注册；子代理在 extension 中过滤）
+        ...(this.requestAskUser
+          ? createAskUserTools(session.id, this.requestAskUser)
+          : []),
       ];
 
       // Diagnostic: log tools being passed to SDK (helps debug Ollama tool use)

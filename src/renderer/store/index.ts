@@ -22,6 +22,7 @@ import type {
   SteerFailReason,
   ImageContent,
   FileAttachmentContent,
+  AskUserRequest,
 } from "../types";
 import { applySessionUpdate } from "../utils/session-update";
 import { initialPreviewWidth, initialReviewWidth } from "../utils/panel-width";
@@ -221,6 +222,9 @@ interface AppState {
   // Sudo password
   pendingSudoPassword: SudoPasswordRequest | null;
 
+  // Ask user (ask_user tool): 按toolCallId 索引的待答提问（支持多会话并发）
+  pendingAskUsers: Record<string, AskUserRequest>;
+
   // Settings
   settings: Settings;
 
@@ -416,6 +420,9 @@ interface AppState {
 
   setPendingSudoPassword: (request: SudoPasswordRequest | null) => void;
 
+  setPendingAskUser: (request: AskUserRequest) => void;
+  clearPendingAskUser: (toolCallId: string) => void;
+
   setSettings: (updates: Partial<Settings>) => void;
   updateSettings: (updates: Partial<Settings>) => void;
 
@@ -575,6 +582,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isArtifactPanelOpen: false,
   pendingPermission: null,
   pendingSudoPassword: null,
+  pendingAskUsers: {},
   settings: defaultSettings,
   appConfig: null,
   highlightedToolCallId: null,
@@ -1400,6 +1408,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Sudo password actions
   setPendingSudoPassword: (request) => set({ pendingSudoPassword: request }),
+
+  // Ask user actions
+  setPendingAskUser: (request) =>
+    set({
+      pendingAskUsers: {
+        ...get().pendingAskUsers,
+        [request.toolCallId]: request,
+      },
+    }),
+
+  clearPendingAskUser: (toolCallId) => {
+    const next = { ...get().pendingAskUsers };
+    delete next[toolCallId];
+    set({ pendingAskUsers: next });
+  },
 
   // Settings actions
   setSettings: (updates) =>

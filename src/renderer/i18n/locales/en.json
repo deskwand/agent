@@ -816,6 +816,7 @@
   "sidebar": {
     "recents": "Recents",
     "running": "Running",
+    "asking": "Asking you",
     "expandToView": "Expand to view tasks",
     "noTasks": "No tasks yet",
     "noTasksHint": "Start a new chat to begin building, researching, or editing files.",
@@ -1481,6 +1482,22 @@
       "writtenFiles_other": "Wrote {{count}} files",
       "joinAnd": " and ",
       "joinComma": ", "
+    },
+    "askUser": {
+      "title": "Question for you",
+      "questionsCount_one": "{{count}} question",
+      "questionsCount_other": "{{count}} questions",
+      "submit": "Submit",
+      "skip": "Skip",
+      "other": "Other…",
+      "otherPlaceholder": "Type your answer",
+      "inputPlaceholder": "Type here",
+      "yes": "Yes",
+      "no": "No",
+      "answered": "Submitted",
+      "skippedItem": "Skipped",
+      "cancelled": "Cancelled",
+      "interrupted": "Session interrupted"
     }
   },
   "imageLightbox": {

@@ -11,6 +11,7 @@ import type {
   ContentBlock,
   ThinkingLevel,
   ProviderProfileKey,
+  AskUserAnswers,
 } from "../types";
 import i18n from "../i18n/config";
 import {
@@ -451,6 +452,14 @@ function registerSharedIpcListener(): () => void {
           }
           break;
         }
+
+        case "askUser.request":
+          store.setPendingAskUser(event.payload);
+          break;
+
+        case "askUser.dismiss":
+          store.clearPendingAskUser(event.payload.toolCallId);
+          break;
 
         case "stream.executionTime":
           store.updateMessage(
@@ -1276,6 +1285,16 @@ export function useIPC() {
     [send, setPendingPermission],
   );
 
+  const submitAskUser = useCallback(
+    (sessionId: string, toolCallId: string, answers: AskUserAnswers) => {
+      send({
+        type: "askUser.response",
+        payload: { sessionId, toolCallId, answers },
+      });
+    },
+    [send],
+  );
+
   const setPendingSudoPassword = useAppStore((s) => s.setPendingSudoPassword);
 
   const respondToSudoPassword = useCallback(
@@ -1391,6 +1410,7 @@ export function useIPC() {
     getSessionMessagesPage,
     getSessionTraceSteps,
     respondToPermission,
+    submitAskUser,
     respondToSudoPassword,
     selectFolder,
     getWorkingDir,

@@ -92,4 +92,22 @@ describe("tool group coverage", () => {
     expect(isGrouped("todo_write")).toBe(true);
     expect(isGrouped("TodoWrite")).toBe(true);
   });
+
+  // ask_user 需要独立可交互卡片，绝不折入摘要：若归组，buildToolDisplayBlocks
+  // 会把它折进 process-summary，卡片永远不渲染（设计文档 §4 blocker 修复）。
+  // AGENTS.md 归类评估结论：按设计不归组。
+  it("exempts ask_user from grouping as a dedicated card", () => {
+    const blocks = buildToolDisplayBlocks([
+      {
+        type: "tool_use",
+        id: "t-1",
+        name: "ask_user",
+        input: {},
+      } as ContentBlock,
+      { type: "tool_result", toolUseId: "t-1", content: "ok" } as ContentBlock,
+    ]);
+    const first = blocks[0] as { type: string; block?: { name?: string } };
+    expect(first.type).toBe("content");
+    expect(first.block?.name).toBe("ask_user");
+  });
 });

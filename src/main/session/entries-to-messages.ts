@@ -222,6 +222,9 @@ export function entriesToMessages(
       if (typeof t.details?.errorCode === "string") {
         block.errorCode = t.details.errorCode as ToolResultContent["errorCode"];
       }
+      if (t.details?.askUserStatus === "cancelled") {
+        block.askUserStatus = "cancelled";
+      }
       messages.push({
         id: entry.id,
         sessionId,

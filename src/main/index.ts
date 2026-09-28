@@ -4427,6 +4427,13 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.password,
       );
 
+    case "askUser.response":
+      return sm.handleAskUserResponse(
+        event.payload.sessionId,
+        event.payload.toolCallId,
+        event.payload.answers,
+      );
+
     case "folder.select": {
       const folderResult = await dialog.showOpenDialog(mainWindow!, {
         properties: ["openDirectory"],

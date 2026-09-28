@@ -91,6 +91,11 @@ import {
   normalizeSessionTitle,
   type RenameSessionResult,
 } from "../../shared/session-title";
+import type {
+  AskUserAnswers,
+  AskUserQuestion,
+  AskUserResult,
+} from "../../shared/ask-user";
 
 interface IAgentRunner {
   run(
@@ -185,6 +190,10 @@ export class SessionManager {
     string,
     { sessionId: string; resolve: (password: string | null) => void }
   > = new Map();
+  private pendingAskUsers: Map<
+    string,
+    { sessionId: string; resolve: (result: AskUserResult) => void }
+  > = new Map();
   private sandboxInitPromises: Map<string, Promise<void>> = new Map();
   private sessionTitleAttempts: Set<string> = new Set();
   private titleGenerationTokens: Map<string, symbol> = new Map();
@@ -262,6 +271,11 @@ export class SessionManager {
           toolUseId: string,
           command: string,
         ) => this.requestSudoPassword(sessionId, toolUseId, command),
+        requestAskUser: (
+          sessionId: string,
+          toolCallId: string,
+          questions: AskUserQuestion[],
+        ) => this.requestAskUser(sessionId, toolCallId, questions),
         createSessionRecord: (title: string, cwd?: string) =>
           this.createSessionRecord(title, cwd),
         enqueuePromptForSession: (sessionId: string, prompt: string) =>
@@ -1958,6 +1972,8 @@ export class SessionManager {
         });
       }
     }
+    // Cancel any pending ask_user requests for this session
+    this.cancelPendingAskUsers(sessionId);
     // Also abort any pending controller we tracked
     const controller = this.activeSessions.get(sessionId);
     if (controller) {
@@ -2460,6 +2476,61 @@ export class SessionManager {
     if (entry) {
       entry.resolve(password);
       this.pendingSudoPasswords.delete(toolUseId);
+    }
+  }
+
+  /**
+   * ask_user：向用户提问并挂起等待。无超时（用户决策不该被计时器打断）；
+   * 会话停止/删除统一在 stopSession 里经 cancelPendingAskUsers 清理
+   * （deleteSession/batchDeleteSessions 均经 stopSession，单点挂钩足够）。
+   */
+  requestAskUser(
+    sessionId: string,
+    toolCallId: string,
+    questions: AskUserQuestion[],
+  ): Promise<AskUserResult> {
+    return new Promise((resolve) => {
+      this.pendingAskUsers.set(toolCallId, { sessionId, resolve });
+      this.sendToRenderer({
+        type: "askUser.request",
+        payload: { sessionId, toolCallId, questions },
+      });
+    });
+  }
+
+  handleAskUserResponse(
+    sessionId: string,
+    toolCallId: string,
+    answers: AskUserAnswers,
+  ): void {
+    // 结构校验：非法 answers 忽略、保持 pending（防渲染层 bug 卡死流程）
+    const valid =
+      answers !== null &&
+      typeof answers === "object" &&
+      Object.values(answers).every(
+        (v) =>
+          typeof v === "string" ||
+          (Array.isArray(v) && v.every((s) => typeof s === "string")),
+      );
+    const entry = this.pendingAskUsers.get(toolCallId);
+    if (!entry || entry.sessionId !== sessionId || !valid) return;
+    this.pendingAskUsers.delete(toolCallId);
+    entry.resolve({ status: "answered", answers });
+    this.sendToRenderer({
+      type: "askUser.dismiss",
+      payload: { toolCallId },
+    });
+  }
+
+  cancelPendingAskUsers(sessionId: string): void {
+    for (const [toolCallId, entry] of this.pendingAskUsers) {
+      if (entry.sessionId !== sessionId) continue;
+      this.pendingAskUsers.delete(toolCallId);
+      entry.resolve({ status: "cancelled" });
+      this.sendToRenderer({
+        type: "askUser.dismiss",
+        payload: { toolCallId },
+      });
     }
   }
 

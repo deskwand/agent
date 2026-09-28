@@ -63,6 +63,7 @@ export function Sidebar({
   const sessions = useAppStore((s) => s.sessions);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const sessionStates = useAppStore((s) => s.sessionStates);
+  const pendingAskUsers = useAppStore((s) => s.pendingAskUsers);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const setMessagesTail = useAppStore((s) => s.setMessagesTail);
   const setTraceSteps = useAppStore((s) => s.setTraceSteps);
@@ -162,11 +163,20 @@ export function Sidebar({
     () => buildSidebarSessionGroups(sessions, normalizedQuery, sidebarPins),
     [sessions, normalizedQuery, sidebarPins],
   );
+  const sessionHasPendingAskUser = useCallback(
+    (sessionId: string) =>
+      Object.values(pendingAskUsers).some((r) => r.sessionId === sessionId),
+    [pendingAskUsers],
+  );
   const runningGroupKeys = useMemo(() => {
     const keys = new Set<string>();
     if (
       sessionGroups.unscopedSessions.some((s) =>
-        isSessionBusy(s, sessionStates[s.id]?.backgroundAgents),
+        isSessionBusy(
+          s,
+          sessionStates[s.id]?.backgroundAgents,
+          sessionHasPendingAskUser(s.id),
+        ),
       )
     ) {
       keys.add(ORDINARY_SESSION_GROUP_KEY);
@@ -174,14 +184,18 @@ export function Sidebar({
     for (const group of sessionGroups.projectGroups) {
       if (
         group.sessions.some((s) =>
-          isSessionBusy(s, sessionStates[s.id]?.backgroundAgents),
+          isSessionBusy(
+            s,
+            sessionStates[s.id]?.backgroundAgents,
+            sessionHasPendingAskUser(s.id),
+          ),
         )
       ) {
         keys.add(group.key);
       }
     }
     return keys;
-  }, [sessionGroups, sessionStates]);
+  }, [sessionGroups, sessionStates, sessionHasPendingAskUser]);
   const pinnedSessionIds = useMemo(
     () => new Set(sidebarPins.sessionIds),
     [sidebarPins.sessionIds],
@@ -621,9 +635,11 @@ export function Sidebar({
 
   const renderSessionItem = (session: Session, showRelativeTime: boolean) => {
     const isActive = activeSessionId === session.id;
+    const hasPendingAskUser = sessionHasPendingAskUser(session.id);
     const hasStatusIndicator = isSessionBusy(
       session,
       sessionStates[session.id]?.backgroundAgents,
+      hasPendingAskUser,
     );
     const isPinned = pinnedSessionIds.has(session.id);
     const isHovered = hoveredSessionId === session.id;
@@ -698,7 +714,11 @@ export function Sidebar({
                     <span
                       className="h-4 w-4 flex items-center justify-center"
                       role="status"
-                      aria-label={t("sidebar.running")}
+                      aria-label={t(
+                        hasPendingAskUser
+                          ? "sidebar.asking"
+                          : "sidebar.running",
+                      )}
                     >
                       <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
                     </span>

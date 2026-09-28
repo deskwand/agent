@@ -24,7 +24,10 @@ export function createDeskwandToolsExtension(
   return {
     name: "deskwand-tools",
     factory: (pi: ExtensionAPI) => {
-      const allTools = [...(codingTools ?? []), ...(customTools ?? [])];
+      const allTools = [...(codingTools ?? []), ...(customTools ?? [])].filter(
+        // ask_user 依赖主会话的内联卡片与挂起等待，仅主对话可用
+        (tool) => tool.name !== "ask_user",
+      );
       for (const tool of allTools) {
         pi.registerTool(tool);
       }

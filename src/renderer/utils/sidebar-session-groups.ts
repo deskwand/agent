@@ -156,15 +156,17 @@ export interface SidebarBackgroundAgent {
 
 /**
  * 会话是否有活跃工作需要侧栏显示"运行中"指示：
- * 主轮次运行中，或有后台子代理仍处于 running。
+ * 主轮次运行中、后台子代理运行中，或有待答 ask_user 提问。
  * 注意：不能用 length > 0 —— 完成事件后代理以 done 状态保留 1 秒才移除。
  */
 export function isSessionBusy(
   session: Session,
   backgroundAgents?: SidebarBackgroundAgent[],
+  hasPendingAskUser?: boolean,
 ): boolean {
   return (
     session.status === "running" ||
+    Boolean(hasPendingAskUser) ||
     (backgroundAgents?.some((agent) => agent.status === "running") ?? false)
   );
 }

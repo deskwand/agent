@@ -20,6 +20,7 @@ import {
 } from "../../utils/tool-result-summary";
 import type { ToolUseContent, ContentBlock, Message } from "../../types";
 import { AskUserQuestionBlock } from "./AskUserQuestionBlock";
+import { AskUserCard } from "./AskUserCard";
 import { TodoWriteBlock } from "./TodoWriteBlock";
 import { FileToolBlock, canHandleFileInput } from "./FileToolBlock";
 import { BashToolBlock, canHandleBashInput } from "./BashToolBlock";
@@ -150,6 +151,15 @@ export const ToolUseBlock = memo(function ToolUseBlock({
   // Special-case tool UIs
   if (block.name === "AskUserQuestion") {
     return <AskUserQuestionBlock block={block} />;
+  }
+  if (block.name === "ask_user") {
+    return (
+      <AskUserCard
+        block={block}
+        allBlocks={allBlocks}
+        allMessages={allMessages}
+      />
+    );
   }
   if (block.name === "todo_write" || block.name === "TodoWrite") {
     return <TodoWriteBlock block={block} />;

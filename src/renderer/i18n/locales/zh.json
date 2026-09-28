@@ -816,6 +816,7 @@
   "sidebar": {
     "recents": "最近",
     "running": "运行中",
+    "asking": "提问中",
     "expandToView": "展开查看任务",
     "noTasks": "暂无任务",
     "noTasksHint": "开始一个新聊天，继续构建、调研或编辑文件。",
@@ -1480,6 +1481,22 @@
       "writtenFiles_other": "已写入 {{count}} 个文件",
       "joinAnd": "并",
       "joinComma": "、"
+    },
+    "askUser": {
+      "title": "向你提问",
+      "questionsCount_one": "{{count}} 个问题",
+      "questionsCount_other": "{{count}} 个问题",
+      "submit": "提交",
+      "skip": "跳过",
+      "other": "其他…",
+      "otherPlaceholder": "请输入你的答案",
+      "inputPlaceholder": "请输入",
+      "yes": "是",
+      "no": "否",
+      "answered": "已提交",
+      "skippedItem": "已跳过",
+      "cancelled": "已取消",
+      "interrupted": "会话已中断"
     }
   },
   "imageLightbox": {

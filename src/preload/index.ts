@@ -88,6 +88,7 @@ const ALLOWED_CLIENT_EVENTS = new Set([
   "usage.exchange-rate",
   "permission.response",
   "sudo.password.response",
+  "askUser.response",
   "settings.update",
   "folder.select",
   "workdir.get",

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Session } from "../../renderer/types";
-import { buildSidebarSessionGroups } from "../../renderer/utils/sidebar-session-groups";
+import {
+  buildSidebarSessionGroups,
+  isSessionBusy,
+} from "../../renderer/utils/sidebar-session-groups";
 
 function session(id: string, overrides: Partial<Session> = {}): Session {
   return {
@@ -240,5 +243,12 @@ describe("buildSidebarSessionGroups", () => {
       "first",
       "second",
     ]);
+  });
+});
+
+describe("isSessionBusy", () => {
+  it("hasPendingAskUser 为 true 时视为忙碌", () => {
+    expect(isSessionBusy(session("s-1"))).toBe(false);
+    expect(isSessionBusy(session("s-1"), [], true)).toBe(true);
   });
 });

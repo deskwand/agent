@@ -15,6 +15,7 @@ import type { ChannelInstanceStatus } from "../../shared/ipc-types";
 import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
 import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
 import type { SubagentActivity } from "../../shared/subagent-activity";
+import type { AskUserQuestion, AskUserAnswers } from "../../shared/ask-user";
 
 // Session types
 export interface Session {
@@ -129,6 +130,8 @@ export interface ToolResultContent {
     data: string; // base64 encoded image data
     mimeType: string; // e.g., 'image/png'
   }>;
+  /** ask_user 卡片终态标记：会话被取消时由工具写入 details 并投影到这里 */
+  askUserStatus?: "cancelled";
 }
 
 /** Streaming partial tool output while a tool is still executing */
@@ -513,7 +516,15 @@ export type ClientEvent =
   | { type: "project.delete"; payload: { cwd: string } }
   | { type: "update.check"; payload: Record<string, never> }
   | { type: "update.install"; payload: Record<string, never> }
-  | { type: "i18n.setLocale"; payload: { locale: "zh" | "en" } };
+  | { type: "i18n.setLocale"; payload: { locale: "zh" | "en" } }
+  | {
+      type: "askUser.response";
+      payload: {
+        sessionId: string;
+        toolCallId: string;
+        answers: AskUserAnswers;
+      };
+    };
 
 // Sandbox setup types (app startup)
 export type SandboxSetupPhase =
@@ -778,7 +789,9 @@ export type ServerEvent =
   | { type: "pi.set-editor-text"; payload: { text: string } }
   | { type: "session.create"; payload: { session: Session } }
   | { type: "browser.picker.state-changed"; payload: { active: boolean } }
-  | { type: "browser.picker.selected"; payload: ElementSelection };
+  | { type: "browser.picker.selected"; payload: ElementSelection }
+  | { type: "askUser.request"; payload: AskUserRequest }
+  | { type: "askUser.dismiss"; payload: { toolCallId: string } };
 
 // Settings types
 export interface Settings {
@@ -1103,4 +1116,18 @@ export interface MarketplaceSkill {
   skill_md?: string;
   created_at?: string;
   updated_at?: string;
+}
+
+export type {
+  AskUserQuestion,
+  AskUserQuestionOption,
+  AskUserQuestionType,
+  AskUserAnswers,
+  AskUserResult,
+} from "../../shared/ask-user";
+
+export interface AskUserRequest {
+  sessionId: string;
+  toolCallId: string;
+  questions: AskUserQuestion[];
 }
