@@ -7,9 +7,11 @@ body,
   background: transparent;
   overflow: hidden;
 }
+
+/* 整个窗口就是拖动/点击热区；窗口尺寸由主进程的 SIZE 常量决定。 */
 .pet-target {
-  width: 120px;
-  height: 120px;
+  width: 100%;
+  height: 100%;
   display: grid;
   place-items: center;
   cursor: grab;
@@ -19,9 +21,11 @@ body,
 .pet-target:active {
   cursor: grabbing;
 }
+
+/* 以下尺寸都用百分比：改主进程的 SIZE 就够了，不必同步第二处像素值。 */
 .pet-lens {
-  width: 92px;
-  height: 92px;
+  width: 78%;
+  height: 78%;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -31,24 +35,25 @@ body,
     #191d25 48%,
     #07090e 80%
   );
+  /* 只留外圈环，不加投影：透明窗口 hasShadow:false 且窗口只比环大不到 1px，
+     带模糊的投影会被窗口边界切出硬边。 */
   box-shadow:
-    0 0 0 4px #1c222b,
-    0 0 0 6px #5a626b,
-    0 0 0 10px #10141b,
-    0 12px 18px #0009;
+    0 0 0 2px #1c222b,
+    0 0 0 4px #5a626b,
+    0 0 0 7px #10141b;
 }
 .pet-lens__rim {
-  width: 68px;
-  height: 68px;
+  width: 74%;
+  height: 74%;
   border-radius: 50%;
   display: grid;
   place-items: center;
-  border: 2px solid #454950;
-  box-shadow: inset 0 0 12px #000b;
+  border: 1.5px solid #454950;
+  box-shadow: inset 0 0 8px #000b;
 }
 .pet-lens__eye {
-  width: 50px;
-  height: 50px;
+  width: 72%;
+  height: 72%;
   border-radius: 50%;
   background: radial-gradient(
     circle at 40% 35%,
@@ -58,29 +63,31 @@ body,
     #790609 47%,
     #200305 74%
   );
-  box-shadow: 0 0 12px #dc202080;
+  box-shadow: 0 0 10px #dc202080;
   animation: breathe 4s ease-in-out infinite;
 }
+/* 待机暗红 vs 执行中亮红：亮度与脉动速度都要拉开，否则一眼分不出。 */
 .pet-lens[data-state="running"] .pet-lens__eye {
+  filter: brightness(1.35) saturate(1.2);
   box-shadow:
-    0 0 21px #f03a34,
-    0 0 30px #e71b1b88;
+    0 0 16px #f03a34,
+    0 0 24px #e71b1b88;
   animation-duration: 1.3s;
 }
 .pet-lens[data-state="success"] .pet-lens__eye {
   filter: brightness(1.7);
-  box-shadow: 0 0 30px #ff9570;
+  box-shadow: 0 0 24px #ff9570;
   animation: none;
 }
 .pet-lens[data-state="failure"] .pet-lens__eye {
   filter: hue-rotate(22deg) brightness(1.5);
-  box-shadow: 0 0 26px #ff651a;
+  box-shadow: 0 0 20px #ff651a;
   animation: none;
 }
 @keyframes breathe {
   50% {
-    opacity: 0.55;
-    transform: scale(0.94);
+    opacity: 0.5;
+    transform: scale(0.92);
   }
 }
 @media (prefers-reduced-motion: reduce) {

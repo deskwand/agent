@@ -10,7 +10,36 @@ import {
   type PetPosition,
 } from "./pet-position";
 
-const SIZE = 120;
+const SIZE = 72;
+
+/**
+ * Electron 的 `BrowserWindow.setPosition` 只收真正的整数：小数会抛
+ * `TypeError: Error processing argument at index N, conversion failure from`，
+ * 而且是主进程未捕获异常（弹“A JavaScript error occurred in the main process”）。
+ * 实测（electron 35，macOS）：`-0` 与 `NaN` 同样被拒，`-0` 尤其阴——
+ * `Math.round(-0.5)` 就是 `-0`，而 `Number.isInteger(-0)` 为 true。
+ * 渲染层的 `PointerEvent.screenX/Y` 与缩放显示器上的 `workArea` 都可能是小数，
+ * 所以所有交给 Electron 的坐标都在这里归一化。
+ */
+function toWindowCoordinate(value: number): number {
+  const rounded = Math.round(value);
+  // -0 → 0：算术上相等，但 Electron 的 int 转换不认。
+  return rounded === 0 ? 0 : rounded;
+}
+
+function toWindowPoint(point: { x: number; y: number }): {
+  x: number;
+  y: number;
+} {
+  return { x: toWindowCoordinate(point.x), y: toWindowCoordinate(point.y) };
+}
+
+/** 保存的位置可能被外部改坏：非有限值当作没保存过，不能让 NaN 流到 Electron。 */
+function isValidStoredPosition(
+  value: PetPosition | undefined,
+): value is PetPosition {
+  return Boolean(value && Number.isFinite(value.x) && Number.isFinite(value.y));
+}
 
 /**
  * 单次拖动位移的上限。这不是安全边界（连续小步同样能把窗口拖到任何位置），
@@ -37,11 +66,23 @@ export function createPetWindowController({
   });
   let petWindow: BrowserWindow | null = null;
   let unsubscribe: (() => void) | null = null;
+  /**
+   * 拖动中的位置：`exact` 是浮点精确值（累加余量，不丢亚像素），
+   * `applied` 是上一次真正写进窗口的整数位置。
+   */
+  let dragExact: { x: number; y: number } | null = null;
+  let dragApplied: { x: number; y: number } | null = null;
   const displays = () => screen.getAllDisplays() as PetDisplay[];
+  const savedPosition = () => {
+    const stored = positions.get("position");
+    return isValidStoredPosition(stored) ? stored : undefined;
+  };
 
   const keepVisible = (fallbackOnMissing = false) => {
     if (!petWindow || petWindow.isDestroyed()) return;
-    const saved = positions.get("position");
+    dragExact = null;
+    dragApplied = null;
+    const saved = savedPosition();
     const current = petWindow.getBounds();
     const present = saved && displays().some((d) => d.id === saved.displayId);
     // 窗口现在在哪块屏就按哪块屏夹取：保存的位置可能过期（例如拖动中途退出），
@@ -51,20 +92,22 @@ export function createPetWindowController({
       width: SIZE,
       height: SIZE,
     });
-    const next = restorePosition(
-      fallbackOnMissing && saved && !present
-        ? undefined
-        : { displayId: currentDisplay.id, x: current.x, y: current.y },
-      SIZE,
-      displays(),
+    const rounded = toWindowPoint(
+      restorePosition(
+        fallbackOnMissing && saved && !present
+          ? undefined
+          : { displayId: currentDisplay.id, x: current.x, y: current.y },
+        SIZE,
+        displays(),
+      ),
     );
-    petWindow.setPosition(next.x, next.y);
+    petWindow.setPosition(rounded.x, rounded.y);
     const display = screen.getDisplayMatching({
-      ...next,
+      ...rounded,
       width: SIZE,
       height: SIZE,
     });
-    positions.set("position", { displayId: display.id, ...next });
+    positions.set("position", { displayId: display.id, ...rounded });
   };
   const onDisplayChange = () => keepVisible(true);
   screen.on("display-removed", onDisplayChange);
@@ -89,23 +132,49 @@ export function createPetWindowController({
       !Number.isFinite(delta?.dy)
     )
       return;
-    const clampStep = (value: number) =>
-      Math.max(-MAX_DRAG_STEP, Math.min(MAX_DRAG_STEP, value));
-    const bounds = petWindow.getBounds();
-    const next = {
-      x: bounds.x + clampStep(delta.dx),
-      y: bounds.y + clampStep(delta.dy),
-    };
-    petWindow.setPosition(next.x, next.y);
-    if (delta.done) {
-      const display = screen.getDisplayMatching({
-        ...next,
-        width: SIZE,
-        height: SIZE,
-      });
-      const clamped = clampToDisplay(next, SIZE, display);
-      petWindow.setPosition(clamped.x, clamped.y);
-      positions.set("position", { displayId: display.id, ...clamped });
+    // 桌宠是装饰窗口，绝不能因为一次坐标问题把主进程变成
+    // “A JavaScript error occurred in the main process”弹窗。
+    // 归一化才是修复，这里的 try/catch 只把未知的同类问题降级成一条日志。
+    try {
+      const clampStep = (value: number) =>
+        Math.max(-MAX_DRAG_STEP, Math.min(MAX_DRAG_STEP, value));
+      const bounds = petWindow.getBounds();
+      // 窗口不在我们上次放的位置上，说明它被别的东西移动过（macOS 会把越出
+      // 屏幕的坐标夹回可见区域，keepVisible 也可能挪动它）。此时旧锚点已失效，
+      // 继续拿它累加会让窗口在下次拖动时跳回原位。
+      if (
+        dragExact &&
+        dragApplied &&
+        (bounds.x !== dragApplied.x || bounds.y !== dragApplied.y)
+      ) {
+        dragExact = null;
+      }
+      const exact = dragExact ?? { x: bounds.x, y: bounds.y };
+      const next = {
+        x: exact.x + clampStep(delta.dx),
+        y: exact.y + clampStep(delta.dy),
+      };
+      const applied = toWindowPoint(next);
+      petWindow.setPosition(applied.x, applied.y);
+      if (delta.done) {
+        dragExact = null;
+        dragApplied = null;
+        const display = screen.getDisplayMatching({
+          ...applied,
+          width: SIZE,
+          height: SIZE,
+        });
+        const clamped = toWindowPoint(clampToDisplay(applied, SIZE, display));
+        petWindow.setPosition(clamped.x, clamped.y);
+        positions.set("position", { displayId: display.id, ...clamped });
+      } else {
+        dragExact = next;
+        dragApplied = applied;
+      }
+    } catch (error) {
+      dragExact = null;
+      dragApplied = null;
+      logError("[DesktopPet] drag failed:", error);
     }
   };
   ipcMain.on("pet.activate", onActivate);
@@ -115,15 +184,15 @@ export function createPetWindowController({
     if (!enabled) {
       unsubscribe?.();
       unsubscribe = null;
+      dragExact = null;
+      dragApplied = null;
       petWindow?.destroy();
       petWindow = null;
       return;
     }
     if (petWindow && !petWindow.isDestroyed()) return;
-    const position = restorePosition(
-      positions.get("position"),
-      SIZE,
-      displays(),
+    const position = toWindowPoint(
+      restorePosition(savedPosition(), SIZE, displays()),
     );
     const window = new BrowserWindow({
       width: SIZE,
@@ -132,6 +201,8 @@ export function createPetWindowController({
       y: position.y,
       transparent: true,
       frame: false,
+      // 透明窗口默认的系统阴影是矩形，会在圆镜头四角露出方块。
+      hasShadow: false,
       alwaysOnTop: true,
       skipTaskbar: true,
       resizable: false,
