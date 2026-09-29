@@ -93,6 +93,7 @@ import {
   type SaveProviderPayload,
   type ProviderProfileKey,
   enrichProviderModelsFromRegistry,
+  setOnConfiguredHook,
 } from "./config/config-store";
 import { runConfigApiTest } from "./config/config-test-routing";
 import {
@@ -160,6 +161,7 @@ import { DEFAULT_USAGE_RANGE, type UsageRange } from "../shared/usage";
 import { getUnsupportedWorkspacePathReason } from "./workspace-path-constraints";
 import { getDefaultWorkingDirPath } from "../shared/workspace-path";
 import { startTelemetryHeartbeat } from "./telemetry";
+import { trackEvent } from "./telemetry-events";
 import {
   log,
   logWarn,
@@ -1044,6 +1046,18 @@ app
     log("===========================");
 
     startTelemetryHeartbeat();
+    // Report the funnel's first step once the user's config becomes usable.
+    const reportConfigDone = () => {
+      void trackEvent("config_done");
+    };
+    setOnConfiguredHook(reportConfigDone);
+    // Devices configured before this shipped never see a transition, so they would
+    // report session_start/reply_ok but never the funnel's first step — leaving the
+    // funnel inconsistent for the existing install base. Report them once per
+    // launch; the server derives first-use from MIN(received_at).
+    if (configStore.isConfigured()) {
+      reportConfigDone();
+    }
     warmExchangeRateCache(EXCHANGE_RATE_CACHE_PATH);
 
     // Initialize default working directory
@@ -2162,6 +2176,7 @@ ipcMain.handle(
 ipcMain.handle("shell.openPath", async (_event, filePath: string) => {
   if (!filePath) return { error: "no-path" };
   const err = await shell.openPath(filePath);
+  if (!err) void trackEvent("feature_use", { feature: "file_op" });
   return { error: err || null };
 });
 
@@ -2875,6 +2890,7 @@ ipcMain.handle("mcp.saveServer", async (_event, config: MCPServerConfig) => {
       return { success: false, error: errorMessage };
     }
   }
+  void trackEvent("feature_use", { feature: "connector" });
   return { success: true };
 });
 
@@ -3123,6 +3139,7 @@ ipcMain.handle("skills.install", async (_event, skillPath: string) => {
     }
     const skill = await skillsManager.installSkill(skillPath);
     sessionManager?.invalidateSkillsSetup();
+    void trackEvent("feature_use", { feature: "skill_install" });
     return { success: true, skill };
   } catch (error) {
     logError("[Skills] Error installing skill:", error);
@@ -3834,11 +3851,13 @@ ipcMain.handle(
       payload.cwd,
       payload.title,
     );
-    return scheduledTaskManager.create({
+    const created = await scheduledTaskManager.create({
       ...payload,
       prompt: normalizedPrompt,
       title,
     });
+    void trackEvent("feature_use", { feature: "schedule" });
+    return created;
   },
 );
 
@@ -4112,8 +4131,10 @@ ipcMain.handle("browser.hide", () =>
 
 ipcMain.handle("browser.navigate", (_event, url: string) =>
   safeBrowserCall(() => {
-    browserViewManager?.navigate(url);
-    return browserViewManager?.getStatus() ?? null;
+    if (!browserViewManager) return null;
+    browserViewManager.navigate(url);
+    void trackEvent("feature_use", { feature: "browser" });
+    return browserViewManager.getStatus() ?? null;
   }, null),
 );
 
@@ -4274,7 +4295,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.prompt,
         event.payload.elSelections,
       );
-      return sm.startSession(
+      const startedSession = await sm.startSession(
         event.payload.title,
         event.payload.prompt,
         event.payload.cwd,
@@ -4287,6 +4308,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.turnId,
         elementRefsOf(event.payload.elSelections),
       );
+      void trackEvent("session_start");
+      return startedSession;
     }
 
     case "session.continue": {

@@ -65,6 +65,7 @@ import {
   logCtxError,
   logTiming,
 } from "../utils/logger";
+import { trackEvent } from "../telemetry-events";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -4810,6 +4811,10 @@ Tool routing:\n
         logCtxError("[AgentRunner] Error:", error);
 
         const errorText = toUserFacingErrorText(toErrorText(error));
+        // Record it so the anonymous `error` event can bucket this failure —
+        // the thrown path never emits a terminal message, and without this every
+        // thrown failure would classify as `other`. The text is never sent.
+        outcomeTracker.setTerminalError(errorText);
         const errorMsg: Message = {
           id: uuidv4(),
           sessionId: session.id,
@@ -4916,7 +4921,13 @@ Tool routing:\n
     }
 
     // 放在 try/catch/finally 之后：只有清理（含 finally 的收尾）跑完，本轮结果才成立。
-    return outcomeTracker.resolve(controller.signal.aborted);
+    const outcome = outcomeTracker.resolve(controller.signal.aborted);
+    if (outcome === "success") {
+      void trackEvent("reply_ok");
+    } else if (outcome === "failure") {
+      void trackEvent("error", { code: classifyTurnFailure(outcomeTracker) });
+    }
+    return outcome;
   }
 
   cancel(sessionId: string): void {
@@ -5445,6 +5456,11 @@ export class TurnOutcomeTracker {
     this.terminalError = text;
   }
 
+  /** The last terminal error text — used for coarse bucketing, never reported verbatim. */
+  getTerminalErrorText(): string | undefined {
+    return this.terminalError;
+  }
+
   markThrown(_error: unknown): void {
     this.thrown = true;
   }
@@ -5455,4 +5471,41 @@ export class TurnOutcomeTracker {
     if (!this.settled) return "unknown";
     return this.terminalError ? "failure" : "success";
   }
+}
+
+/**
+ * Coarse bucket for the anonymous `error` event. The raw message is never sent —
+ * only the bucket name — so the wire format stays enum-only.
+ */
+export function classifyTurnFailure(tracker: TurnOutcomeTracker): string {
+  const text = (tracker.getTerminalErrorText() ?? "").toLowerCase();
+  // Checked before the API-key branch: this codebase phrases the missing-credential
+  // case as "No API key provided" / "No API key configured for provider", which
+  // would otherwise be read as an auth failure.
+  if (
+    text.includes("not configured") ||
+    text.includes("no provider") ||
+    text.includes("no api key")
+  ) {
+    return "no_provider";
+  }
+  if (
+    text.includes("api key") ||
+    text.includes("unauthorized") ||
+    text.includes("401")
+  ) {
+    return "auth_failed";
+  }
+  if (
+    text.includes("econnrefused") ||
+    text.includes("enotfound") ||
+    text.includes("network")
+  ) {
+    return "network";
+  }
+  if (text.includes("rate limit") || text.includes("429")) {
+    return "rate_limit";
+  }
+  if (text.includes("model")) return "model_error";
+  return "other";
 }

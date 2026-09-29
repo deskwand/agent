@@ -215,4 +215,30 @@ describe('ConfigStore plain JSON behavior', () => {
     store.update({ telemetryEnabled: true });
     expect(store.get('telemetryEnabled')).toBe(true);
   });
+
+  it('fires the configured hook once, only on the false->true transition', async () => {
+    const { ConfigStore, setOnConfiguredHook } = await import(
+      '../src/main/config/config-store'
+    );
+    const store = new ConfigStore();
+    const fired: number[] = [];
+    setOnConfiguredHook(() => fired.push(1));
+
+    try {
+      // Not configured yet — a UI toggle must not report config_done.
+      store.update({ theme: 'dark' });
+      expect(fired).toHaveLength(0);
+
+      // Becomes configured — fires exactly once.
+      store.update({ provider: 'openai', apiKey: 'sk-test', model: 'gpt-5.4' });
+      expect(fired).toHaveLength(1);
+
+      // Later UI toggles must not re-fire it.
+      store.update({ theme: 'light' });
+      store.update({ uiFontSize: 16 });
+      expect(fired).toHaveLength(1);
+    } finally {
+      setOnConfiguredHook(null);
+    }
+  });
 });

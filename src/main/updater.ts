@@ -9,6 +9,7 @@
 import { autoUpdater } from "electron-updater";
 import { app } from "electron";
 import { log } from "./utils/logger";
+import { trackEvent } from "./telemetry-events";
 import type { ServerEvent } from "../renderer/types";
 import * as fs from "fs";
 
@@ -88,6 +89,7 @@ export function initUpdater(
 
   autoUpdater.on("update-available", (info) => {
     log("[AutoUpdater] Update available:", info.version);
+    void trackEvent("update_result", { code: "available" });
     sendToRenderer({
       type: "update.available",
       payload: { version: info.version },
@@ -96,6 +98,7 @@ export function initUpdater(
 
   autoUpdater.on("update-not-available", () => {
     log("[AutoUpdater] Already up to date");
+    void trackEvent("update_result", { code: "up_to_date" });
     sendToRenderer({ type: "update.not-available", payload: {} });
   });
 
@@ -123,6 +126,7 @@ export function initUpdater(
 
   autoUpdater.on("update-downloaded", (info) => {
     log("[AutoUpdater] Update downloaded:", info.version);
+    void trackEvent("update_result", { code: "downloaded" });
     sendToRenderer({
       type: "update.downloaded",
       payload: {
@@ -140,6 +144,7 @@ export function initUpdater(
 
   autoUpdater.on("error", (err) => {
     log("[AutoUpdater] Error:", err.message);
+    void trackEvent("update_result", { code: "failed" });
     sendToRenderer({
       type: "update.error",
       payload: { message: err.message },

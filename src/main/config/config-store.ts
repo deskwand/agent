@@ -941,6 +941,7 @@ export class ConfigStore {
 
   update(updates: Partial<AppConfig>): void {
     const stored = { ...this.store.store };
+    const wasConfigured = stored.isConfigured;
 
     // ── Resolve target provider key ──
     let targetKey = stored.activeProviderKey;
@@ -1068,15 +1069,18 @@ export class ConfigStore {
       );
 
     this.store.set(stored);
+    if (!wasConfigured && stored.isConfigured) onConfiguredHook?.();
   }
 
   saveProvider(payload: SaveProviderPayload): AppConfig {
     const stored = { ...this.store.store };
+    const wasConfigured = stored.isConfigured;
     stored.providers[payload.profileKey] = sanitizeSaveProviderPayload(payload);
     stored.isConfigured = Object.values(stored.providers).some(
       (p) => !!p?.apiKey?.trim() || p?.provider === "oauth",
     );
     this.store.set(stored);
+    if (!wasConfigured && stored.isConfigured) onConfiguredHook?.();
     return this.getAll();
   }
 
@@ -1265,3 +1269,15 @@ export class ConfigStore {
 }
 
 export const configStore = new ConfigStore();
+
+/**
+ * Fired the first time the stored config flips to "configured" — by the main
+ * process to report the `config_done` analytics event. Kept as an injected hook
+ * so this module stays unaware of telemetry.
+ */
+let onConfiguredHook: (() => void) | null = null;
+
+/** Registers (or clears) the configured hook. */
+export function setOnConfiguredHook(fn: (() => void) | null): void {
+  onConfiguredHook = fn;
+}

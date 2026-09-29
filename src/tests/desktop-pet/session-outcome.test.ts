@@ -246,12 +246,17 @@ describe("runner/manager pet wiring (source guard)", () => {
 
   it("AgentRunner.run() resolves its outcome after the turn settled", () => {
     const resolveCall = runnerSrc.indexOf(
-      "return outcomeTracker.resolve(controller.signal.aborted);",
+      "outcomeTracker.resolve(controller.signal.aborted);",
     );
     const finallyAfterRun = runnerSrc.lastIndexOf(
       "this.activeControllers.delete(session.id);",
     );
     expect(resolveCall).toBeGreaterThan(finallyAfterRun);
+    // The resolved outcome must still be returned, now that telemetry bucketing
+    // sits between resolve and return.
+    expect(runnerSrc.indexOf("return outcome;", resolveCall)).toBeGreaterThan(
+      resolveCall,
+    );
   });
 
   it("SessionManager brackets the runner call with start/finish per turn", () => {

@@ -10,6 +10,30 @@ import { configStore } from "./config/config-store";
 export const TELEMETRY_PING_INTERVAL_MS = 60 * 60 * 1000;
 
 /**
+ * Reads the anonymous device id, generating and persisting one on first use.
+ * Shared by the ping heartbeat and the event reporter so both report under the
+ * same id.
+ */
+export async function getOrCreateDeviceId(): Promise<string> {
+  const deviceIdPath = join(app.getPath("userData"), "device-id.json");
+  try {
+    const stored = JSON.parse(fs.readFileSync(deviceIdPath, "utf-8")) as {
+      id?: unknown;
+    };
+    // A well-formed file with a missing/non-string id must regenerate rather
+    // than send `undefined`, which the API would reject with a silent 400.
+    if (typeof stored?.id !== "string") {
+      throw new Error("invalid device id file");
+    }
+    return stored.id;
+  } catch {
+    const deviceId = randomUUID();
+    fs.writeFileSync(deviceIdPath, JSON.stringify({ id: deviceId }));
+    return deviceId;
+  }
+}
+
+/**
  * Anonymous install counting. Sent once at startup and then on every heartbeat
  * so that long-running (tray) sessions keep reporting without a restart.
  *
@@ -23,22 +47,7 @@ export async function sendTelemetryPing(): Promise<void> {
       return;
     }
 
-    const deviceIdPath = join(app.getPath("userData"), "device-id.json");
-    let deviceId: string;
-    try {
-      const stored = JSON.parse(fs.readFileSync(deviceIdPath, "utf-8")) as {
-        id?: unknown;
-      };
-      // A well-formed file with a missing/non-string id must regenerate rather
-      // than send `undefined`, which the API would reject with a silent 400.
-      if (typeof stored?.id !== "string") {
-        throw new Error("invalid device id file");
-      }
-      deviceId = stored.id;
-    } catch {
-      deviceId = randomUUID();
-      fs.writeFileSync(deviceIdPath, JSON.stringify({ id: deviceId }));
-    }
+    const deviceId = await getOrCreateDeviceId();
 
     await fetch(`${DESKWAND_API_URL}/v1/telemetry/ping`, {
       method: "POST",
