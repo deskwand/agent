@@ -1514,6 +1514,16 @@
   --color-surface-highlight: rgba(255, 255, 255, 0.08);
   /* Windows 原生关闭键悬停红，镜像系统配色，不随应用主题变化 */
   --color-window-close-hover: #c42b1c;
+  /* 窗口最外那圈（图标栏＋标题栏）。2026-09-29 起外圈要比它框住的面板更暗：
+     亮色 外圈 < 会话栏 < 内容区，暗色 外圈 < 内容区 < 会话栏。
+     压黑是“减法”，明暗两个方向通吃，所以只声明一条；var(--color-background) 由各主题块解析。
+     void 暗色的 background 已是 #000000，压黑是恒等操作 → 该主题下外圈与内容同色（唯一例外）。
+     回归测试：src/tests/renderer/theme-contrast-invariants.test.ts §9-8 */
+  --color-background-chrome: color-mix(
+    in srgb,
+    #000000 50%,
+    var(--color-background)
+  );
 }
 
 /* 亮色下白色内高光的合成对比只有 1.06–1.11（等于没有），置空。
@@ -1523,6 +1533,13 @@
    :root.light 是 (0,2,0)，不依赖顺序。 */
 :root.light {
   --color-surface-highlight: transparent;
+  /* 亮色外圈：向黑压 12%（2026-09-29-outer-ring-depth-design.md §3）。
+     必须先核对 :root.light 的 (0,2,0) 特异性 —— 写成 .light 会被上面的顶层 :root 盖掉。 */
+  --color-background-chrome: color-mix(
+    in srgb,
+    #000000 12%,
+    var(--color-background)
+  );
 }
 
 /* Tooltip 气泡。定位与可见性都由 @floating-ui/react 驱动（见 Tooltip.tsx）：

@@ -71,10 +71,12 @@ export function HelpMenu() {
           {hasUpdate && (
             <span
               aria-hidden="true"
-              // 挖坑环必须等于图标栏自己的底色：这颗点长在图标栏（外圈，background）上。
-              // 2026-09-27 图标栏从 secondary 改入 background 时这里漏改过一次（reviewer 抓的）；
+              // 挖坑环必须等于图标栏自己的底色：这颗点长在图标栏（外圈，background-chrome）上。
+              // 2026-09-27 图标栏从 secondary 改入 background 时这里漏改过一次（reviewer 抓的），
+              // 2026-09-29 外圈再改成 background-chrome 时又漏了一次（同一个 reviewer 又抓到）——
+              // 图标栏换底色时，这一行是必须跟着改的地方之一。
               // 会话栏里那颗（sidebar-disclosure-motion.tsx）仍在 secondary 上，别一起改。
-              className="absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_0_2px_var(--color-background)]"
+              className="absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_0_2px_var(--color-background-chrome)]"
             />
           )}
         </button>

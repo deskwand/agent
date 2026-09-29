@@ -6,12 +6,15 @@
 //   1) 必须由语义 token 派生（杜绝退回硬编码/不透明实色）
 //   2) 百分比必须是设计文档定下的值（否则把 18% 改成 3% 测试照样绿，而描边就没了）
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import {
   backgroundSecondary,
   chroma,
   composite,
   contrast,
   css,
+  cssFlat,
   parseAlphaColor,
   parseHex,
   relativeLuminance,
@@ -20,6 +23,50 @@ import {
 } from "./theme-css-helpers";
 
 const blocks = themeBlocks();
+
+const tailwindSource = fs.readFileSync(
+  path.resolve(process.cwd(), "tailwind.config.js"),
+  "utf8",
+);
+
+/**
+ * 解出某个主题块下 `--color-background-chrome`（外圈）的最终 hex。
+ *
+ * 与 `background-secondary` 不同：外圈**不是逐块声明的**，只在 globals.css 里声明两次
+ * （顶层 `:root` 给暗色、`:root.light` 给亮色），值里的 `var(--color-background)` 由各主题块解析
+ * ——与 `--color-overlay-hover` / `--color-highlight` 同款（2026-09-29-outer-ring-depth-design.md §3）。
+ * 所以这里按块的明暗取对应的那一条，再 composite 到本块的 background 上。
+ *
+ * 不要退回 `tokenOf(block, "--color-background-chrome")`：各主题块里根本没有这条声明，
+ * 那种写法解不出色值，NaN 参与的比较全为假（同文件 `backgroundSecondary()` 记过的坑）。
+ */
+const CHROME_DECL =
+  /--color-background-chrome\s*:\s*color-mix\(\s*in srgb,\s*#000000\s+([\d.]+)%,\s*var\(--color-background\)\s*\)/;
+
+function chromePercent(isLight: boolean): number {
+  // 亮色那条只可能在 :root.light 里（(0,2,0) 特异性，不依赖源码顺序）；
+  // 暗色那条在顶层 :root 的控制叠层块里 —— 先把 :root.light 整块摘掉再找，免得命中它。
+  const lightBlock = /^:root\.light\s*\{[\s\S]*?\n\}/m.exec(css)?.[0];
+  if (!lightBlock) throw new Error("globals.css 里找不到 :root.light 块");
+  const source = (isLight ? lightBlock : css.replace(lightBlock, "")).replace(
+    /\s+/g,
+    " ",
+  );
+  const m = CHROME_DECL.exec(source);
+  if (!m)
+    throw new Error(
+      `globals.css 里找不到${isLight ? "亮色" : "暗色"}的 --color-background-chrome 声明`,
+    );
+  return Number(m[1]) / 100;
+}
+
+function backgroundChrome(block: string): string {
+  return composite(
+    tokenOf(block, "--color-background"),
+    "#000000",
+    chromePercent(/^\s*\.light/.test(block)),
+  );
+}
 
 /**
  * 从 accent-muted 的声明里取 alpha。
@@ -350,5 +397,118 @@ describe("主题对比度不变量", () => {
         `${head} accent-muted 与本块 accent (${accent}) 无关：${decl}`,
       ).toBe(true);
     }
+  });
+
+  it("§9-8 外圈（图标栏＋标题栏）：比会话栏与内容区都暗，方向与台阶都成立", () => {
+    // 2026-09-29 决策：参考图里外圈是最暗的一级（取代 2026-09-27 的「外圈同色」）。
+    // 两条声明各自盯死百分比：把 12 改成 3 也"看起来对"，但外圈就没了 —— 同 §9-2 的教训。
+    expect(chromePercent(true), "亮色压黑比例").toBeCloseTo(0.12, 5);
+    expect(chromePercent(false), "暗色压黑比例").toBeCloseTo(0.5, 5);
+
+    // 只钉源码文本不够：tailwind 里少了 background.chrome 键，bg-background-chrome 就是一条
+    // 死类（不生成任何 CSS），外圈静默变透明，而下面全部断言照样绿。所以必须钉住映射。
+    // 锚到 background: { … } 块内：不锚的话 chrome 挂到别的父级（→ bg-surface-chrome）也照样命中，
+    // 而那正是这条断言要拦的失效。
+    const backgroundKeys =
+      /background:\s*\{([\s\S]*?)\},/.exec(tailwindSource)?.[1] ?? "";
+    expect(
+      backgroundKeys,
+      "tailwind.config.js 里缺 background.chrome，bg-background-chrome 会是一条死类",
+    ).toMatch(/chrome:\s*token\("background-chrome"\)/);
+
+    // 外圈只在 globals.css 里声明两次（顶层 :root / :root.light）。若谁把它写进某个主题块，
+    // 上面的 chromePercent() 会静默按错的百分比算（且与 :root.light 的覆盖关系也变了）——必须显式拦。
+    for (const block of blocks) {
+      expect(
+        block,
+        "外圈 token 不得逐块声明（只允许顶层 :root 与 :root.light 各一次）",
+      ).not.toContain("--color-background-chrome");
+    }
+
+    const outOfBand: string[] = [];
+    const lowIcons: string[] = [];
+    const lowSelected: string[] = [];
+    // 已知缺口：外圈变暗后，这 3 个亮色预设的选中态 accent 图标落在 2.92–2.95（白底时 3.85–3.94），
+    // 比非文本门槛 3.0 低 2–3%。不为此去动共享的 --color-overlay-on（那会牵动 14 套主题的 on 态，
+    // 属另一轮）。例外必须具名，且下面给它们一条 2.9 的地板 —— 不允许再掉。
+    const UNDER_FLOOR = new Set(["ember", "forest", "ocean"]); // 仅亮色
+    // bg-overlay-on 里 accent 的占比（选中态淡色底），从 globals.css 真实解析，不写死。
+    const onAlpha =
+      Number(
+        /--color-overlay-on\s*:\s*color-mix\(\s*in srgb,\s*var\(--color-accent\)\s+([\d.]+)%/.exec(
+          cssFlat,
+        )?.[1],
+      ) / 100;
+    expect(onAlpha, "解析不到 --color-overlay-on 的百分比").toBeGreaterThan(0);
+    for (const block of blocks) {
+      const head = block.slice(0, 60).replace(/\s+/g, " ");
+      const isLight = /^\s*\.light/.test(block);
+      const preset = /data-theme-preset="(\w+)"/.exec(block)?.[1] ?? "graphite";
+      const background = tokenOf(block, "--color-background");
+      const secondary = backgroundSecondary(block);
+      const chrome = backgroundChrome(block);
+      const accent = tokenOf(block, "--color-accent");
+
+      // 决策 6：外圈内的静止图标保持 text-muted，门槛按非文本（WCAG 1.4.11）取 3.0
+      const icon = contrast(tokenOf(block, "--color-text-muted"), chrome);
+      if (icon < 3) lowIcons.push(`${icon.toFixed(2)}  ${head}`);
+
+      // 选中态：accent 图标画在自己 14% 的淡色底（bg-overlay-on）上。选中仍由淡色底
+      // （对底色 1.17–1.21）与 aria-current 承担，所以三个具名例外站得住。
+      const onTint = contrast(accent, composite(chrome, accent, onAlpha));
+      if (isLight && UNDER_FLOOR.has(preset)) {
+        expect(onTint, `${head} 已知缺口继续恶化`).toBeGreaterThanOrEqual(2.9);
+      } else if (onTint < 3) {
+        lowSelected.push(`${onTint.toFixed(2)}  ${head}`);
+      }
+
+      // void 暗色是唯一允许的例外：它的 background 已是 #000000，压黑是恒等操作
+      if (chrome === background) {
+        expect(
+          /data-theme-preset="void"/.test(block) && !isLight,
+          `${head} 的外圈与内容区同色，只有 void 暗色允许`,
+        ).toBe(true);
+        // 例外块必须跳过后面的台阶断言，否则这里会是一条永远红的断言
+        continue;
+      }
+
+      const lum = (hex: string) => relativeLuminance(parseHex(hex));
+      // 方向用亮度符号断言，不用 contrast() >= 1（那恒成立，等于没断言 —— 同 §9-2 的注释）
+      const ordered = isLight
+        ? lum(chrome) < lum(secondary) && lum(secondary) < lum(background)
+        : lum(chrome) < lum(background) && lum(background) < lum(secondary);
+      expect(
+        ordered,
+        `${head} 三级亮度顺序不对：外圈 ${lum(chrome).toFixed(4)} / 会话栏 ${lum(secondary).toFixed(4)} / 内容 ${lum(background).toFixed(4)}`,
+      ).toBe(true);
+
+      const vsContent = contrast(chrome, background);
+      const vsSecondary = contrast(chrome, secondary);
+      const ok = isLight
+        ? vsContent >= 1.25 &&
+          vsContent <= 1.4 &&
+          vsSecondary >= 1.14 &&
+          vsSecondary <= 1.25
+        : vsContent >= 1.03 &&
+          vsContent <= 1.15 &&
+          vsSecondary >= 1.12 &&
+          vsSecondary <= 1.3;
+      if (!ok)
+        outOfBand.push(
+          `${head} 外圈/内容=${vsContent.toFixed(3)} 外圈/会话栏=${vsSecondary.toFixed(3)}`,
+        );
+    }
+    expect(
+      outOfBand,
+      `以下主题块的外圈台阶出界：\n${outOfBand.join("\n")}`,
+    ).toEqual([]);
+    expect(
+      lowIcons,
+      `以下主题块里 muted 图标在外圈上低于 3.0：\n${lowIcons.join("\n")}`,
+    ).toEqual([]);
+    expect(
+      lowSelected,
+      `以下主题块里选中态 accent 图标在自己的淡色底上低于 3.0：\n${lowSelected.join("\n")}`,
+    ).toEqual([]);
   });
 });

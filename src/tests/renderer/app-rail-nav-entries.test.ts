@@ -24,9 +24,12 @@ describe("AppRail", () => {
 
   it("keeps the rail narrow, themed and non-resizable", () => {
     expect(rail).toContain("w-14");
-    // 图标栏属"外圈"，与标题栏同色（2026-09-27 决策；参考 ChatGPT Work 的结构）。
+    // 图标栏属"外圈"，比会话栏更暗一级（2026-09-29 决策，取代 2026-09-27 的"同色"）。
+    // 注意 toContain 是**子串**匹配：`toContain("bg-background")` 对 `bg-background-chrome`
+    // 照样命中，所以这条是弱断言 —— 真正拦住回流的是 panel-boundary.test.ts 里的
+    // `\bbg-background(?![\w-])`。
     // themed 的本意不变：仍然只用语义 token。
-    expect(rail).toContain("bg-background");
+    expect(rail).toContain("bg-background-chrome");
     expect(rail).not.toContain("bg-background-secondary");
     expect(rail).not.toContain("ResizeHandle");
     expect(rail).not.toContain("sidebarWidth");

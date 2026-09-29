@@ -8,7 +8,7 @@
 //   1) 区域级分界的三个位置不得再有单边描边
 //   2) 旧的 inset 阴影机制不得回流（它当年的合成对比只有 1.058–1.100，等于没分开）
 //   3) 右面板必须靠底色差分界，且活动标签不能与面板底色撞车
-//   4) 外圈结构：图标栏与标题栏同为 background，会话栏是唯一被抬起的 secondary
+//   4) 外圈结构：图标栏与标题栏同为 background-chrome（比会话栏更暗），会话栏是唯一被抬起的 secondary
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
@@ -66,19 +66,38 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
     expect(line).not.toMatch(/\bborder-b\b/);
   });
 
-  it("外圈同色：图标栏与标题栏都是纯 background，会话栏是唯一被抬起的 secondary", () => {
-    // 参考图（ChatGPT Work）的结构：外圈（图标栏＋标题栏）同色，会话栏是嵌在外圈里的面板
+  it("图标栏上的未读点：挖坑环等于图标栏自己的底色", () => {
+    // HelpMenu.tsx 那行自己写着这条不变量：“挖坑环必须等于图标栏自己的底色”。
+    // 它已经破过一次（2026-09-27 图标栏 secondary → background，reviewer 抓的），
+    // 2026-09-29 图标栏 background → background-chrome，同一个不变量必须跟着走。
+    // 会话栏里那颗（sidebar-disclosure-motion.tsx）仍在 secondary 上，不在本文件范围。
+    expect(read("components/HelpMenu.tsx")).toMatch(
+      /shadow-\[0_0_0_2px_var\(--color-background-chrome\)\]/,
+    );
+  });
+
+  it("外圈更暗：图标栏与标题栏用 background-chrome，会话栏仍是唯一被抬起的 secondary", () => {
+    // 2026-09-29 决策（取代 2026-09-27 的「外圈同色」）：参考图里外圈是最暗的一级。
+    // 负向断言必须排除 `-`：`\bbg-background\b` 对 `bg-background-chrome` 照样命中
+    // （`-` 是词边界），这是本文件已经记录过的教训。
+    const bareBackground = /\bbg-background(?![\w-])/;
+
     const rail = read("components/AppRail.tsx");
-    expect(rail).toMatch(/\bbg-background\b/);
-    expect(rail).not.toMatch(/\bbg-background-secondary\b/);
-    // 标题栏这半边必须有负向断言：`\b` 在 `-` 处也成立，
-    // `\bbg-background\b` 对 `bg-background-secondary` 照样命中（本文件的既有教训）。
-    const titlebar = read("components/Titlebar.tsx");
-    expect(titlebar).toMatch(/\bbg-background\b/);
-    expect(titlebar).not.toMatch(/\bbg-background-secondary\b/);
+    expect(rail).toMatch(/\bbg-background-chrome\b/);
+    expect(rail).not.toMatch(bareBackground);
+
+    // 标题栏这半边用「含 titlebar-drag 的整行」取类串：titlebar-drag 写在 className 中间，
+    // 只截标记之后那段会漏掉写在标记前面的类名（本文件既有注释）。
+    const titlebarLine = read("components/Titlebar.tsx")
+      .split("\n")
+      .find((line) => line.includes("titlebar-drag"));
+    expect(titlebarLine, "找不到标题栏元素").toBeTruthy();
+    expect(titlebarLine).toMatch(/\bbg-background-chrome\b/);
+    expect(titlebarLine).not.toMatch(bareBackground);
+
     const sidebar = read("components/Sidebar.tsx");
     expect(sidebar).toMatch(/\bbg-background-secondary\b/);
-    // 参考图细节：面板左上角圆角，让外圈在角落里露出来
+    // 参考图细节：面板左上角圆角，让外圈在角落里露出来（外圈变暗后这个圆角才第一次看得见）
     expect(sidebar).toMatch(/\brounded-tl-lg\b/);
   });
 });

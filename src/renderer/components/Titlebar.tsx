@@ -150,7 +150,7 @@ export function Titlebar() {
   );
 
   return (
-    <div className="h-10 bg-background flex items-center titlebar-drag shrink-0">
+    <div className="h-10 bg-background-chrome flex items-center titlebar-drag shrink-0">
       {/* macOS 红绿灯留白：全屏时没有红绿灯，这一格跟着去掉 */}
       {isMac && !isFullScreen && <div className="w-20 flex-shrink-0" />}
 

@@ -12,6 +12,7 @@ module.exports = {
         background: {
           DEFAULT: token("background"),
           secondary: token("background-secondary"),
+          chrome: token("background-chrome"),
         },
         surface: {
           DEFAULT: token("surface"),

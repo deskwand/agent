@@ -430,6 +430,9 @@ function App() {
 
               {/* Sidebar resize handle */}
               {!sidebarCollapsed && (
+                // 这条柄是透明的（ResizeHandle 默认无底色）→ 吐出来的 4px 是根节点的 bg-background
+                // （内容区底色），不是外圈的 background-chrome。看着像“漏改”，实际是外圈设计 §5
+                // 记录在案的已知缺口（参考图那个位置是外圈色），不要给它上新颜色。
                 <ResizeHandle
                   onResize={(delta) =>
                     setSidebarWidth(
