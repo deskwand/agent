@@ -206,6 +206,10 @@ export function createPetWindowController({
       alwaysOnTop: true,
       skipTaskbar: true,
       resizable: false,
+      // macOS：主窗口处于原生全屏时 show() 一个新窗口，只要它的 fullscreenable
+      // 还是默认的 true，macOS 就会把它一起全屏（electron#32374 / #39614，
+      // electron 35 实测仍复现），72px 的桌宠会被拉成整屏。resizable: false 挡不住它。
+      fullscreenable: false,
       show: false,
       webPreferences: {
         preload: join(__dirname, "../preload/pet.js"),

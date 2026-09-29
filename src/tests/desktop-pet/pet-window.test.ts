@@ -58,8 +58,10 @@ class MockWindow extends EventEmitter {
     this.bounds.y = y;
   });
   bounds = { x: 1784, y: 944, width: 72, height: 72 };
-  constructor(options: { x?: number; y?: number }) {
+  options: Electron.BrowserWindowConstructorOptions = {};
+  constructor(options: Electron.BrowserWindowConstructorOptions) {
     super();
+    this.options = options;
     // 注意：真实 BrowserWindow 构造器对小数 x/y 不报错，而是静默忽略并居中；
     // 这里不模拟那个行为，所以构造器不断言坐标，只验证真实的 setPosition 契约。
     this.bounds.x = options.x ?? this.bounds.x;
@@ -342,5 +344,13 @@ it("restores a saved position after the controller is recreated", () => {
   });
   controller.setEnabled(true);
   expect(windows[1].getBounds()).toMatchObject({ x: 2500, y: 400 });
+  controller.dispose();
+});
+
+it("stays out of fullscreen so a fullscreen main window cannot stretch it", () => {
+  const { controller, pet } = enable();
+  // macOS 会把「主窗口全屏时新显示的窗口」一起全屏（electron#32374/#39614）：
+  // fullscreenable 默认 true 的话，72px 的桌宠会被拉成整屏的椭圆。
+  expect(pet.options.fullscreenable).toBe(false);
   controller.dispose();
 });
