@@ -11,6 +11,16 @@ import type { SessionExecutionClock } from "../store";
 /** 收尾窗口时长（毫秒）。 */
 export const TURN_CLOCK_LINGER_MS = 5_000;
 
+/**
+ * 秒表槽位哨兵：`formatDurationShort(36_000)` === `"10h00m"`。
+ *
+ * 它是 100 小时以内所有取值的宽度上界（输出只有 `\d+s` / `\d+m\d{2}s` / `\d+h\d{2}m`
+ * 三种形态，两个 6 字符形态里 `NNhNNm` 更宽），渲染层拿它生成隐形的最长串
+ * 把秒表宽度撑死。为什么是 100 小时、为什么不写死 px：见
+ * design-docs/2026-09-29-turn-timer-width-stability-design.md。
+ */
+export const TURN_CLOCK_SLOT_SENTINEL_SECONDS = 36_000;
+
 /** `endAt` 距今是否仍在收尾窗口内（4.999s 内算同一任务，恰好 5.000s 不算）。 */
 export function isLingering(
   clock: SessionExecutionClock,

@@ -224,14 +224,24 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
   });
 
   describe("turn elapsed timer", () => {
+    /** 只读可见的那一格：隐形哨兵也在 textContent 里，直接读 container 会把它们算进来。
+     *  返回 null 表示这一格整个不存在（秒表没渲染）—— 与「存在但文本为空」区分开，
+     *  否则 toBe("") 在元素缺失时会空过。 */
+    function visibleElapsed(): string | null {
+      return (
+        container.querySelector('[data-testid="turn-elapsed-visible"]')
+          ?.textContent ?? null
+      );
+    }
+
     it("ticks the running time once per second", async () => {
       const t0 = Date.now();
       await render({ type: "thinking" }, { startAt: t0, endAt: null });
-      expect(container.textContent).toContain("running:0s");
+      expect(visibleElapsed()).toBe("running:0s");
       await act(async () => {
         vi.advanceTimersByTime(12_000);
       });
-      expect(container.textContent).toContain("running:12s");
+      expect(visibleElapsed()).toBe("running:12s");
     });
 
     it("shows the frozen time for 5s after the run ends, then hides it", async () => {
@@ -242,30 +252,29 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
       });
       // 这一轮在第 12s 结束
       await render({ type: "thinking" }, { startAt: t0, endAt: t0 + 12_000 });
-      expect(container.textContent).toContain("done:12s");
+      expect(visibleElapsed()).toBe("done:12s");
 
       await act(async () => {
         vi.advanceTimersByTime(4_000);
       });
-      expect(container.textContent).toContain("done:12s");
+      expect(visibleElapsed()).toBe("done:12s");
 
       // 第 5 秒起不再显示
       await act(async () => {
         vi.advanceTimersByTime(1_000);
       });
-      expect(container.textContent).not.toContain("done:");
-      expect(container.textContent).not.toContain("running:");
+      expect(visibleElapsed()).toBeNull();
     });
 
     it("shows nothing without a clock or without an origin", async () => {
       await render({ type: "thinking" });
-      expect(container.textContent).not.toContain("running:");
+      expect(visibleElapsed()).toBeNull();
 
       await render({ type: "thinking" }, { startAt: null, endAt: null });
-      expect(container.textContent).not.toContain("running:");
+      expect(visibleElapsed()).toBeNull();
 
       await render({ type: "thinking" }, { startAt: Date.now(), endAt: null });
-      expect(container.textContent).toContain("running:0s");
+      expect(visibleElapsed()).toBe("running:0s");
     });
 
     it("shows the frozen time once the status has resolved to null", async () => {
@@ -277,7 +286,7 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
       // 真实路径：回合结束后 canStop 转假 → resolveInputStatus 返回 null，
       // 左区没有文案，只剩冻结的「本轮耗时」（不带 "· " 分隔符）。
       await render(null, { startAt: t0, endAt: t0 + 8_000 });
-      expect(container.textContent).toContain("done:8s");
+      expect(visibleElapsed()).toBe("done:8s");
       expect(container.textContent).not.toContain("· done:");
     });
 
@@ -292,8 +301,57 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
         },
         { startAt: Date.now(), endAt: null },
       );
-      expect(container.textContent).not.toContain("running:");
-      expect(container.textContent).not.toContain("done:");
+      expect(visibleElapsed()).toBeNull();
+      // goal 分支是提前 return 的，槽位也不应存在
+      expect(
+        container.querySelectorAll('[data-testid="turn-elapsed-slot"]'),
+      ).toHaveLength(0);
+    });
+
+    it("keeps the slot in the DOM so the chip never moves", async () => {
+      await render({ type: "thinking" }, { startAt: Date.now(), endAt: null });
+      const slots = container.querySelectorAll(
+        '[data-testid="turn-elapsed-slot"]',
+      );
+      // 只一个哨兵。第二个（用「本轮耗时」文案的）实测会让槽位从 85.297px
+      // 涨到 97.30px（叠格子格被 stretch 到列宽 = 最宽子格），留白永远贴不到 0；
+      // 而它买不到任何东西：运行期与收尾期的盒宽本来都是常量。详见设计文档。
+      expect(slots).toHaveLength(1);
+      expect(slots[0].getAttribute("aria-hidden")).toBe("true");
+      expect(slots[0].textContent).toBe("running:10h00m");
+      // 可见格只有一格，且不参与哨兵
+      expect(
+        container.querySelectorAll('[data-testid="turn-elapsed-visible"]'),
+      ).toHaveLength(1);
+    });
+
+    it("keeps the slot content constant across a band boundary", async () => {
+      const t0 = Date.now();
+      await render({ type: "thinking" }, { startAt: t0, endAt: null });
+
+      const slotText = () =>
+        container.querySelector('[data-testid="turn-elapsed-slot"]')
+          ?.textContent ?? null;
+
+      // 关键：断言槽位的「具体内容」，不是「前后相等」。
+      // 槽位内容与 elapsed 无关，写成 after === before 是套路的 ——
+      // 把整个槽位机制删掉后两边都是空串，照样通过。
+      expect(visibleElapsed()).toBe("running:0s");
+      expect(slotText()).toBe("running:10h00m");
+
+      await act(async () => {
+        vi.advanceTimersByTime(10_000);
+      });
+      // 9s → 10s 是 +7.20px 的跨档（比例宽度时代最疼的一次之一）
+      expect(visibleElapsed()).toBe("running:10s");
+      expect(slotText()).toBe("running:10h00m");
+    });
+
+    it("does not render the slot without a clock", async () => {
+      await render({ type: "thinking" });
+      expect(
+        container.querySelectorAll('[data-testid="turn-elapsed-slot"]'),
+      ).toHaveLength(0);
     });
   });
 });

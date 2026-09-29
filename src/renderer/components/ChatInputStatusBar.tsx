@@ -22,7 +22,11 @@ import { MENU_PANEL_CLASS } from "./menu-styles";
 import type { BackgroundAgentRow } from "../utils/subagent-card";
 import type { CurrentTodos } from "../utils/current-todos";
 import type { SessionExecutionClock } from "../store";
-import { formatDurationShort, isLingering } from "../utils/execution-clock";
+import {
+  TURN_CLOCK_SLOT_SENTINEL_SECONDS,
+  formatDurationShort,
+  isLingering,
+} from "../utils/execution-clock";
 
 export type ChatInputStatus =
   | { type: "sending" }
@@ -184,6 +188,8 @@ export function ChatInputStatusBar({
   // dep 是布尔量而不是 now，所以窗口内不会每秒重建 effect；
   // 窗口到期时它变 false，effect 自行清理。
   const [now, setNow] = useState(() => Date.now());
+  // 槽位哨兵：用最长且最宽的时间 token 生成一句不可见文案，把秒表的宽度撑死。
+  const slotToken = formatDurationShort(TURN_CLOCK_SLOT_SENTINEL_SECONDS);
   const isTimeLive =
     isGoalTimeLive(status) ||
     isTurnClockLive(status, executionClock) ||
@@ -644,9 +650,27 @@ export function ChatInputStatusBar({
           // flex-shrink-0 + 不参与 truncate：长文案先被截断，秒表始终可见。
           <span className="flex-shrink-0 text-text-muted">
             {text ? "· " : ""}
-            {t(elapsed.live ? "chat.elapsedRunning" : "chat.elapsedDone", {
-              time: formatDurationShort(elapsed.seconds),
-            })}
+            {/* 槽位：两格叠在同一个 grid 单元格，盒宽取两者最大值 ——
+                正常时长下 = 哨兵宽度（恒定），于是 chip 零位移。
+                为什么不写死 px、为什么只用一个哨兵：见
+                design-docs/2026-09-29-turn-timer-width-stability-design.md。 */}
+            <span className="inline-grid tabular-nums">
+              <span
+                aria-hidden="true"
+                data-testid="turn-elapsed-slot"
+                className="invisible col-start-1 row-start-1"
+              >
+                {t("chat.elapsedRunning", { time: slotToken })}
+              </span>
+              <span
+                data-testid="turn-elapsed-visible"
+                className="col-start-1 row-start-1"
+              >
+                {t(elapsed.live ? "chat.elapsedRunning" : "chat.elapsedDone", {
+                  time: formatDurationShort(elapsed.seconds),
+                })}
+              </span>
+            </span>
           </span>
         ) : null}
         {rightZone}
