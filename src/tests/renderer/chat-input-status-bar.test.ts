@@ -29,6 +29,10 @@ vi.mock("react-i18next", () => ({
           return `turn:${opts?.n ?? 0}`;
         case "goal.turnsDone":
           return `turns:${opts?.n ?? 0}`;
+        case "chat.elapsedRunning":
+          return `running:${opts?.time ?? ""}`;
+        case "chat.elapsedDone":
+          return `done:${opts?.time ?? ""}`;
         default:
           return key;
       }
@@ -53,9 +57,14 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
     vi.useRealTimers();
   });
 
-  async function render(status: ChatInputStatus): Promise<void> {
+  async function render(
+    status: ChatInputStatus,
+    executionClock?: { startAt: number | null; endAt: number | null },
+  ): Promise<void> {
     await act(async () =>
-      root.render(React.createElement(ChatInputStatusBar, { status })),
+      root.render(
+        React.createElement(ChatInputStatusBar, { status, executionClock }),
+      ),
     );
   }
 
@@ -212,6 +221,80 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
       vi.advanceTimersByTime(10_000);
     });
     expect(container.textContent).toContain("elapsed:2m"); // ~130s, not ~490s
+  });
+
+  describe("turn elapsed timer", () => {
+    it("ticks the running time once per second", async () => {
+      const t0 = Date.now();
+      await render({ type: "thinking" }, { startAt: t0, endAt: null });
+      expect(container.textContent).toContain("running:0s");
+      await act(async () => {
+        vi.advanceTimersByTime(12_000);
+      });
+      expect(container.textContent).toContain("running:12s");
+    });
+
+    it("shows the frozen time for 5s after the run ends, then hides it", async () => {
+      const t0 = Date.now();
+      await render({ type: "thinking" }, { startAt: t0, endAt: null });
+      await act(async () => {
+        vi.advanceTimersByTime(12_000);
+      });
+      // 这一轮在第 12s 结束
+      await render({ type: "thinking" }, { startAt: t0, endAt: t0 + 12_000 });
+      expect(container.textContent).toContain("done:12s");
+
+      await act(async () => {
+        vi.advanceTimersByTime(4_000);
+      });
+      expect(container.textContent).toContain("done:12s");
+
+      // 第 5 秒起不再显示
+      await act(async () => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(container.textContent).not.toContain("done:");
+      expect(container.textContent).not.toContain("running:");
+    });
+
+    it("shows nothing without a clock or without an origin", async () => {
+      await render({ type: "thinking" });
+      expect(container.textContent).not.toContain("running:");
+
+      await render({ type: "thinking" }, { startAt: null, endAt: null });
+      expect(container.textContent).not.toContain("running:");
+
+      await render({ type: "thinking" }, { startAt: Date.now(), endAt: null });
+      expect(container.textContent).toContain("running:0s");
+    });
+
+    it("shows the frozen time once the status has resolved to null", async () => {
+      const t0 = Date.now();
+      await render({ type: "thinking" }, { startAt: t0, endAt: null });
+      await act(async () => {
+        vi.advanceTimersByTime(8_000);
+      });
+      // 真实路径：回合结束后 canStop 转假 → resolveInputStatus 返回 null，
+      // 左区没有文案，只剩冻结的「本轮耗时」（不带 "· " 分隔符）。
+      await render(null, { startAt: t0, endAt: t0 + 8_000 });
+      expect(container.textContent).toContain("done:8s");
+      expect(container.textContent).not.toContain("· done:");
+    });
+
+    it("does not add a second timer next to the goal clock", async () => {
+      await render(
+        {
+          type: "goal-active",
+          objective: "fix login",
+          iteration: 1,
+          timeUsedSeconds: 0,
+          activePeriodStartedAt: Date.now(),
+        },
+        { startAt: Date.now(), endAt: null },
+      );
+      expect(container.textContent).not.toContain("running:");
+      expect(container.textContent).not.toContain("done:");
+    });
   });
 });
 

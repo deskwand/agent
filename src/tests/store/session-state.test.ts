@@ -237,6 +237,83 @@ describe("SessionState unified store", () => {
         },
       );
     });
+
+    it("should not push the origin forward while a run is live", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().startExecutionClock("s1", 1000);
+      // 排队发送：这一轮还在跑，起点不能被新消息推后
+      useAppStore.getState().startExecutionClock("s1", 30_000);
+      expect(useAppStore.getState().sessionStates["s1"].executionClock).toEqual(
+        {
+          startAt: 1000,
+          endAt: null,
+        },
+      );
+    });
+
+    it("should reset the origin once the previous run has ended", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().startExecutionClock("s1", 1000);
+      useAppStore.getState().finishExecutionClock("s1", 2000);
+      useAppStore.getState().startExecutionClock("s1", 5000);
+      expect(useAppStore.getState().sessionStates["s1"].executionClock).toEqual(
+        {
+          startAt: 5000,
+          endAt: null,
+        },
+      );
+    });
+
+    it("should treat 0 as a valid origin", () => {
+      useAppStore.getState().addSession(makeSession("s1"));
+      useAppStore.getState().startExecutionClock("s1", 0);
+      expect(useAppStore.getState().sessionStates["s1"].executionClock).toEqual(
+        {
+          startAt: 0,
+          endAt: null,
+        },
+      );
+    });
+
+    describe("ensureExecutionClock", () => {
+      it("should start from now when there is no clock yet", () => {
+        useAppStore.getState().addSession(makeSession("s1"));
+        useAppStore.getState().ensureExecutionClock("s1", 4000);
+        expect(
+          useAppStore.getState().sessionStates["s1"].executionClock,
+        ).toEqual({ startAt: 4000, endAt: null });
+      });
+
+      it("should keep the origin when a run resumes inside the linger window", () => {
+        useAppStore.getState().addSession(makeSession("s1"));
+        useAppStore.getState().startExecutionClock("s1", 1000);
+        useAppStore.getState().finishExecutionClock("s1", 2000);
+        useAppStore.getState().ensureExecutionClock("s1", 6999);
+        expect(
+          useAppStore.getState().sessionStates["s1"].executionClock,
+        ).toEqual({ startAt: 1000, endAt: null });
+      });
+
+      it("should discard a stale origin past the linger window", () => {
+        useAppStore.getState().addSession(makeSession("s1"));
+        useAppStore.getState().startExecutionClock("s1", 1000);
+        useAppStore.getState().finishExecutionClock("s1", 2000);
+        // 恰好 5s：算新任务，否则定时任务会显示「已运行 3 小时」
+        useAppStore.getState().ensureExecutionClock("s1", 7000);
+        expect(
+          useAppStore.getState().sessionStates["s1"].executionClock,
+        ).toEqual({ startAt: 7000, endAt: null });
+      });
+
+      it("should be a no-op while a run is live", () => {
+        useAppStore.getState().addSession(makeSession("s1"));
+        useAppStore.getState().startExecutionClock("s1", 1000);
+        useAppStore.getState().ensureExecutionClock("s1", 5000);
+        expect(
+          useAppStore.getState().sessionStates["s1"].executionClock,
+        ).toEqual({ startAt: 1000, endAt: null });
+      });
+    });
   });
 
   describe("turns", () => {

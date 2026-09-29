@@ -14,6 +14,7 @@ import {
   useActivePartialContent,
   useActiveTurn,
   usePendingTurns,
+  useActiveExecutionClock,
   useAppConfig,
 } from "../store/selectors";
 import { useAppStore } from "../store";
@@ -239,6 +240,7 @@ export function ChatView() {
   const { partialMessage } = useActivePartialContent();
   const activeTurn = useActiveTurn();
   const pendingTurns = usePendingTurns();
+  const activeExecutionClock = useActiveExecutionClock();
 
   const appConfig = useAppConfig();
   const contextWindow = useAppStore((s) =>
@@ -1933,6 +1935,7 @@ export function ChatView() {
             lastNonEmptyTodos={sessionState?.lastNonEmptyTodos ?? null}
             currentPlanDone={sessionState?.currentPlanDone ?? false}
             lastPlanDone={sessionState?.lastPlanDone ?? false}
+            executionClock={activeExecutionClock}
           />
         </div>
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">

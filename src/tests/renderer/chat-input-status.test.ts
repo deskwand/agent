@@ -9,7 +9,9 @@ const chatViewSource = fs.readFileSync(
 import {
   computeElapsedSeconds,
   isGoalTimeLive,
+  isTurnClockLive,
   resolveInputStatus,
+  type ChatInputStatus,
 } from "../../renderer/components/ChatInputStatusBar";
 
 describe("resolveInputStatus", () => {
@@ -368,5 +370,43 @@ describe("ChatView optimistic goal clock updates", () => {
     expect(chatViewSource).toContain("activePeriodStartedAt: undefined");
     expect(chatViewSource).toContain("computeElapsedSeconds");
     expect(chatViewSource).toContain('status: "active"');
+  });
+});
+
+describe("isTurnClockLive", () => {
+  const live = { startAt: 1000, endAt: null };
+  const finished = { startAt: 1000, endAt: 2000 };
+  const empty = { startAt: null, endAt: null };
+  const runningStatuses: ChatInputStatus[] = [
+    { type: "sending" },
+    { type: "thinking" },
+    { type: "responding" },
+    { type: "compacting" },
+  ];
+
+  it("is true only for running statuses on a live clock", () => {
+    for (const status of runningStatuses) {
+      expect(isTurnClockLive(status, live)).toBe(true);
+    }
+  });
+
+  it("is false without a clock, without an origin, or once finished", () => {
+    for (const status of runningStatuses) {
+      expect(isTurnClockLive(status, undefined)).toBe(false);
+      expect(isTurnClockLive(status, empty)).toBe(false);
+      expect(isTurnClockLive(status, finished)).toBe(false);
+    }
+  });
+
+  it("is false for goal, background-agent and null statuses", () => {
+    const statuses: ChatInputStatus[] = [
+      { type: "goal-active", objective: "fix login", iteration: 1 },
+      { type: "background-agent", count: 2 },
+      { type: "compaction-failed" },
+      null,
+    ];
+    for (const status of statuses) {
+      expect(isTurnClockLive(status, live)).toBe(false);
+    }
   });
 });

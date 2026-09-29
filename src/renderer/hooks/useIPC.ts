@@ -288,6 +288,11 @@ function registerSharedIpcListener(): () => void {
               "[useIPC] session.status non-running cleanup done:",
               event.payload,
             );
+          } else {
+            // 无用户消息的自动 running（定时任务、扩展触发、后台子代理续跑）
+            // 没有 startExecutionClock 调用点 —— 上游只有 updateSessionStatus
+            // (session-manager.ts:1891) 这一处发 running，这里兜底起算。
+            store.ensureExecutionClock(event.payload.sessionId, Date.now());
           }
           break;
 
@@ -1041,6 +1046,10 @@ export function useIPC() {
         };
         addMessage(sessionId, assistantMessage);
 
+        // mock 路径不经过 session.status 事件，必须自己冻结计时 —— 否则
+        // endAt 永远是 null，startExecutionClock 的 live 守卫会把后续每一轮
+        // 都当成「同一轮在跑」。
+        finishExecutionClock(sessionId);
         updateSession(sessionId, { status: "idle" });
         clearActiveTurn(sessionId, mockStepId);
         clearPendingTurns(sessionId);
@@ -1088,6 +1097,7 @@ export function useIPC() {
       clearActiveTurn,
       clearPendingTurns,
       startExecutionClock,
+      finishExecutionClock,
     ],
   );
 

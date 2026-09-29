@@ -21,6 +21,8 @@ import {
 import { MENU_PANEL_CLASS } from "./menu-styles";
 import type { BackgroundAgentRow } from "../utils/subagent-card";
 import type { CurrentTodos } from "../utils/current-todos";
+import type { SessionExecutionClock } from "../store";
+import { formatDurationShort, isLingering } from "../utils/execution-clock";
 
 export type ChatInputStatus =
   | { type: "sending" }
@@ -97,6 +99,8 @@ interface ChatInputStatusBarProps {
   lastNonEmptyTodos?: CurrentTodos | null;
   /** 被记住那份清单当时是否声明了结束。 */
   lastPlanDone?: boolean;
+  /** 当前会话的回合计时；undefined = 不显示秒表（既有调用方与测试无需改动）。 */
+  executionClock?: SessionExecutionClock;
 }
 
 // Inline keyframes for gradient text animation (currentColor-based, auto-adapts to theme).
@@ -124,6 +128,7 @@ export function ChatInputStatusBar({
   currentPlanDone,
   lastNonEmptyTodos,
   lastPlanDone,
+  executionClock,
 }: ChatInputStatusBarProps) {
   const { t } = useTranslation();
   const rows = backgroundAgentRows ?? [];
@@ -175,9 +180,14 @@ export function ChatInputStatusBar({
     };
   }, [panelOpen]);
 
-  // Live-tick the elapsed clock while the goal is actively running.
+  // 目标长跑、当前回合运行中、以及回合结束后短暂的收尾窗口内，每秒推进一次。
+  // dep 是布尔量而不是 now，所以窗口内不会每秒重建 effect；
+  // 窗口到期时它变 false，effect 自行清理。
   const [now, setNow] = useState(() => Date.now());
-  const isTimeLive = isGoalTimeLive(status);
+  const isTimeLive =
+    isGoalTimeLive(status) ||
+    isTurnClockLive(status, executionClock) ||
+    (executionClock !== undefined && isLingering(executionClock, now));
   useEffect(() => {
     if (!isTimeLive) return;
     setNow(Date.now());
@@ -542,6 +552,21 @@ export function ChatInputStatusBar({
   }
 
   // ── Non-goal status rendering ──
+  // 回合秒表：运行中显示实时耗时，收尾窗口内显示冻结值，其余时候不渲染。
+  const elapsed = (() => {
+    if (!executionClock || executionClock.startAt === null) return null;
+    if (isTurnClockLive(status, executionClock)) {
+      return {
+        live: true,
+        seconds: (now - executionClock.startAt) / 1000,
+      };
+    }
+    const { endAt } = executionClock;
+    if (endAt !== null && isLingering(executionClock, now)) {
+      return { live: false, seconds: (endAt - executionClock.startAt) / 1000 };
+    }
+    return null;
+  })();
   let text = "";
   let toneClass = "text-text-muted";
   let isRunning = false;
@@ -613,6 +638,15 @@ export function ChatInputStatusBar({
             className={`min-w-0 truncate ${isRunning ? "gradient-text" : ""}`}
           >
             {text}
+          </span>
+        ) : null}
+        {elapsed ? (
+          // flex-shrink-0 + 不参与 truncate：长文案先被截断，秒表始终可见。
+          <span className="flex-shrink-0 text-text-muted">
+            {text ? "· " : ""}
+            {t(elapsed.live ? "chat.elapsedRunning" : "chat.elapsedDone", {
+              time: formatDurationShort(elapsed.seconds),
+            })}
           </span>
         ) : null}
         {rightZone}
@@ -741,6 +775,22 @@ export function resolveInputStatus(params: {
 export function isGoalTimeLive(status: ChatInputStatus): boolean {
   return (
     status?.type === "goal-active" || status?.type === "goal-budget-limited"
+  );
+}
+
+/** 非 goal 的运行态里，回合秒表是否在走。
+ *  `endAt === null` 就是 live 的定义：它让本函数与 5s 收尾分支互为补集，
+ *  两者不会同时为真，所以同一帧只可能渲染一种措辞。 */
+export function isTurnClockLive(
+  status: ChatInputStatus,
+  clock: SessionExecutionClock | undefined,
+): boolean {
+  if (!clock || clock.startAt === null || clock.endAt !== null) return false;
+  return (
+    status?.type === "sending" ||
+    status?.type === "thinking" ||
+    status?.type === "responding" ||
+    status?.type === "compacting"
   );
 }
 

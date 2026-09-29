@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 import { collectCurrentPlan, type CurrentTodos } from "../utils/current-todos";
+import { isLingering } from "../utils/execution-clock";
 import type {
   Session,
   Message,
@@ -326,6 +327,7 @@ interface AppState {
   startExecutionClock: (sessionId: string, startAt: number) => void;
   finishExecutionClock: (sessionId: string, endAt?: number) => void;
   clearExecutionClock: (sessionId: string) => void;
+  ensureExecutionClock: (sessionId: string, now: number) => void;
   setGoalStatus: (
     sessionId: string,
     goalStatus: SessionState["goalStatus"],
@@ -824,11 +826,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   startExecutionClock: (sessionId, startAt) =>
-    set((state) => ({
-      sessionStates: patchSession(state.sessionStates, sessionId, {
-        executionClock: { startAt, endAt: null },
-      }),
-    })),
+    set((state) => {
+      const { executionClock } = getSession(state.sessionStates, sessionId);
+      // 正在跑：排队发送不能把当前这一轮的起点往后推。
+      // live 的定义是 endAt === null —— 与 isTurnClockLive 保持一致。
+      if (executionClock.startAt !== null && executionClock.endAt === null) {
+        return {};
+      }
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          executionClock: { startAt, endAt: null },
+        }),
+      };
+    }),
 
   finishExecutionClock: (sessionId, endAt) =>
     set((state) => {
@@ -850,6 +860,28 @@ export const useAppStore = create<AppState>((set, get) => ({
         executionClock: { startAt: null, endAt: null },
       }),
     })),
+
+  ensureExecutionClock: (sessionId, now) =>
+    set((state) => {
+      const { executionClock } = getSession(state.sessionStates, sessionId);
+      // 已在进行中：不动，避免每次 status 事件都把起点往后推。
+      if (executionClock.startAt !== null && executionClock.endAt === null) {
+        return {};
+      }
+      // 5s 内续跑：同一任务，保留原点。`?? now` 是死分支
+      // （finishExecutionClock 在 startAt 为 null 时提前返回，
+      //  所以 isLingering 为真时 startAt 必非 null），只是为了让类型收窄。
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          executionClock: {
+            startAt: isLingering(executionClock, now)
+              ? (executionClock.startAt ?? now)
+              : now,
+            endAt: null,
+          },
+        }),
+      };
+    }),
 
   setGoalStatus: (sessionId, goalStatus) =>
     set((state) => ({

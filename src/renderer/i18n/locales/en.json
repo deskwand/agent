@@ -1004,7 +1004,9 @@
     "openCodeReview": "Code Review · {{count}} changed files",
     "compactSkipped": "Nothing to compact in this session",
     "forkFailed": "Failed to fork session. Please try again.",
-    "forkSuffix": " (fork)"
+    "forkSuffix": " (fork)",
+    "elapsedRunning": "running {{time}}",
+    "elapsedDone": "took {{time}}"
   },
   "steer": {
     "label": "Steer",

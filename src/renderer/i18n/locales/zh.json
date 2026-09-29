@@ -1003,7 +1003,9 @@
     "openCodeReview": "代码审查 · {{count}} 个文件变更",
     "compactSkipped": "当前会话没有可压缩的内容",
     "forkFailed": "分叉失败，请稍后重试",
-    "forkSuffix": "（分叉）"
+    "forkSuffix": "（分叉）",
+    "elapsedRunning": "已运行 {{time}}",
+    "elapsedDone": "本轮耗时 {{time}}"
   },
   "steer": {
     "label": "引导",
