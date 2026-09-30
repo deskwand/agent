@@ -34,8 +34,10 @@ function piOAuthElectronPlugin(): Plugin {
       if (isOAuthModule(id, "load.js")) return transformLoadJs(code);
       if (isOAuthModule(id, "openai-codex.js"))
         return transformOpenaiCodex(code);
-      if (isOAuthModule(id, "anthropic.js")) return transformAnthropic(code);
-      if (isOAuthModule(id, "radius.js")) return transformRadius(code);
+      if (isOAuthModule(id, "anthropic.js"))
+        return assertAnthropicCallbackServer(code);
+      if (isOAuthModule(id, "radius.js"))
+        return assertRadiusCallbackServer(code);
       return null;
     },
   };
@@ -52,6 +54,7 @@ function transformLoadJs(code: string): string {
   const staticImports = [
     'import { anthropicOAuth } from "./anthropic.js";',
     'import { openaiCodexOAuth } from "./openai-codex.js";',
+    'import { openaiChatGPTOAuth } from "./openai-chatgpt.js";',
     'import { githubCopilotOAuth } from "./github-copilot.js";',
     'import { openRouterOAuth } from "./openrouter.js";',
     'import { kimiCodingOAuth } from "./kimi-coding.js";',
@@ -70,6 +73,9 @@ function transformLoadJs(code: string): string {
       "return anthropicOAuth;",
     'return (await importOAuthModule("./openai-codex.ts")).openaiCodexOAuth;':
       "return openaiCodexOAuth;",
+    // pi-ai 0.99.0 起新增的 Sign in with ChatGPT（loadOpenAIChatGPTOAuth）。
+    'return (await importOAuthModule("./openai-chatgpt.ts")).openaiChatGPTOAuth;':
+      "return openaiChatGPTOAuth;",
     'return (await importOAuthModule("./github-copilot.ts")).githubCopilotOAuth;':
       "return githubCopilotOAuth;",
     'return (await importOAuthModule("./openrouter.ts")).openRouterOAuth;':
@@ -101,46 +107,71 @@ function transformLoadJs(code: string): string {
   return code;
 }
 
-// Single replace — if it doesn't match, the un-patched dynamic imports will
-// fail with "Cannot find module" at runtime, which is equally loud.
+// 0.99.1 起上游把这里的 _http 惰性加载移出（改走 callback-server.ts），
+// 只剩 node:crypto 一段。断言指向**真实的危险**：火并忘的惰性赋值会让
+// createState() 误报 "OpenAI Codex OAuth is only available in Node.js
+// environments"（_randomBytes 在 .then() 里才被赋值，之后很快就做非空检查）。
+//
+// 两个方向都不能偏：不能断言「不得残留 import("node:」—— node:crypto 是合法
+// 保留项，那会让构建永远失败；也不能只断言那一个字面量 —— 上游若换成别的
+// 火并忘惰性导入（历史上 radius.js 的 _http 就是这种），就会静默溜过。
+// 因此断言的是模式本身。
 function transformOpenaiCodex(code: string): string {
-  return code.replace(
-    `// NEVER convert to top-level imports - breaks browser/Vite builds\nlet _randomBytes = null;\nlet _http = null;\nif (typeof process !== "undefined" && (process.versions?.node || process.versions?.bun)) {\n    import("node:crypto").then((m) => {\n        _randomBytes = m.randomBytes;\n    });\n    import("node:http").then((m) => {\n        _http = m;\n    });\n}\n`,
-    `import { randomBytes as _randomBytes } from "node:crypto";\nimport * as _http from "node:http";\n`,
-  );
+  code = code.replace(
+    `// NEVER convert to top-level imports - breaks browser/Vite builds
+let _randomBytes = null;
+if (typeof process !== "undefined" && (process.versions?.node || process.versions?.bun)) {
+    import("node:crypto").then((m) => {
+        _randomBytes = m.randomBytes;
+    });
 }
-
-function transformAnthropic(code: string): string {
-  // Remove lazy nodeApis/getNodeApis pattern, replace with static import.
-  code = code.replace(
-    "let nodeApis = null;\nlet nodeApisPromise = null;\nconst decode = (s) => atob(s);",
-    `import { createServer } from "node:http";\nconst decode = (s) => atob(s);`,
-  );
-  // Remove getNodeApis function.
-  code = code.replace(/async function getNodeApis\(\) \{[\s\S]*?^\}/gm, "");
-  // Remove the now-unnecessary await call.
-  code = code.replace(
-    "    const { createServer } = await getNodeApis();\n",
-    "",
+`,
+    `import { randomBytes as _randomBytes } from "node:crypto";\n`,
   );
 
-  // Assert the function was fully removed so upstream format changes fail
-  // at build time rather than silently producing broken output.
-  if (code.includes("getNodeApis") || code.includes("nodeApisPromise")) {
+  if (/import\("node:[a-z0-9_/.-]+"\)\s*\.then\(/.test(code)) {
     throw new Error(
-      "[pi-oauth-electron] Failed to remove getNodeApis from anthropic.js. " +
-        "The upstream source format may have changed.",
+      "[pi-oauth-electron] openai-codex.js still lazily initializes a node builtin " +
+        "with a fire-and-forget import().then(). This makes createState() throw " +
+        '"OpenAI Codex OAuth is only available in Node.js environments". ' +
+        "Re-derive the replace target from " +
+        "node_modules/@earendil-works/pi-ai/dist/auth/oauth/openai-codex.js " +
+        "(see design-docs/2026-09-30-pi-sdk-0.99.1-upgrade-design.md §4.2).",
     );
   }
   return code;
 }
 
-// Single replace — runtime "Cannot find module" is equally loud if missed.
-function transformRadius(code: string): string {
-  return code.replace(
-    `// NEVER convert to top-level imports - breaks browser/Vite builds\nlet _http = null;\nif (typeof process !== "undefined" && (process.versions?.node || process.versions?.bun)) {\n    import("node:http").then((m) => {\n        _http = m;\n    });\n}\n`,
-    `import * as _http from "node:http";\n`,
-  );
+// 0.99.1 起 anthropic.js 与 radius.js 通过 callback-server.ts 顶层静态导入
+// node:http，本仓库原先的两个「动态→静态」变换已成为纯 no-op（要替换的字符串
+// 已不存在）。保留为断言而非删除：一旦上游撤销该修复，构建会失败而不是静默坏掉。
+// 谓词刻意收窄到「精确的历史痕迹」—— 上游出于浏览器安全而故意使用
+// import("node:…") 是合法的，不该被拦。
+function assertAnthropicCallbackServer(code: string): null {
+  if (code.includes("getNodeApis") || code.includes("nodeApisPromise")) {
+    throw new Error(
+      "[pi-oauth-electron] anthropic.js reintroduced the lazy getNodeApis() pattern. " +
+        "Re-apply a static node:http import transform (see design §3.1).",
+    );
+  }
+  return null;
+}
+
+function assertRadiusCallbackServer(code: string): null {
+  // 注意谓词是**故意收窄**的：`let _http = null;` 是历史痕迹的字面量，
+  // 若上游换个变量名重新引入惰性 node:http，这里会静默漏过 —— 那是接受的
+  // 代价（放宽会挡住上游合法的惰性导入，见 design §4.2）。
+  if (
+    code.includes("let _http = null;") &&
+    /import\("node:http"\)\s*\.then/.test(code)
+  ) {
+    throw new Error(
+      "[pi-oauth-electron] radius.js reintroduced the fire-and-forget node:http import, " +
+        'which makes startOAuthCallbackServer() throw "only available in Node.js ' +
+        'environments" (see design §3.1).',
+    );
+  }
+  return null;
 }
 
 /**

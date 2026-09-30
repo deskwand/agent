@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index 36fdb31..2832c6c 100644
+index 07af8cf..7360793 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -629,7 +629,10 @@ export class AgentSession {
+@@ -775,7 +775,10 @@ export class AgentSession {
          if (this._agentRunAbortRequested)
              return false;
          const settings = this.settingsManager.getRetrySettings();
@@ -14,7 +14,7 @@ index 36fdb31..2832c6c 100644
              return false;
          }
          for (let i = event.messages.length - 1; i >= 0; i--) {
-@@ -2687,7 +2690,7 @@ export class AgentSession {
+@@ -2952,7 +2955,7 @@ export class AgentSession {
              return false;
          }
          this._retryAttempt++;
@@ -24,10 +24,10 @@ index 36fdb31..2832c6c 100644
              this._retryAttempt--;
              return false;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-index be748bf..7d3a836 100644
+index 249c082..1392906 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-@@ -38,16 +38,186 @@ function getAliases() {
+@@ -39,16 +39,186 @@ function getAliases() {
          return _aliases;
      const __dirname = path.dirname(fileURLToPath(import.meta.url));
      const packageIndex = path.resolve(__dirname, "../..", "index.js");
@@ -221,7 +221,7 @@ index be748bf..7d3a836 100644
      };
      const piCodingAgentEntry = packageIndex;
      const piAgentCoreEntry = resolveWorkspaceOrImport("agent/dist/index.js", "@earendil-works/pi-agent-core");
-@@ -80,6 +250,7 @@ function getAliases() {
+@@ -81,6 +251,7 @@ function getAliases() {
          "@sinclair/typebox/compile": typeboxCompileEntry,
          "@sinclair/typebox/value": typeboxValueEntry,
      };
@@ -230,7 +230,7 @@ index be748bf..7d3a836 100644
  }
  let extensionCacheCwd;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
-index 53d2865..6b071d4 100644
+index 99a2a9b..a1a369c 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
 @@ -25,6 +25,8 @@ export interface RetrySettings {
@@ -242,7 +242,7 @@ index 53d2865..6b071d4 100644
      provider?: ProviderRetrySettings;
  }
  export type TuiMode = RendererTuiMode;
-@@ -249,6 +251,7 @@ export declare class SettingsManager {
+@@ -270,6 +272,7 @@ export declare class SettingsManager {
          maxRetries: number;
          baseDelayMs: number;
          maxAgentDelayMs: number;
@@ -251,10 +251,10 @@ index 53d2865..6b071d4 100644
      getHttpIdleTimeoutMs(): number;
      setHttpIdleTimeoutMs(timeoutMs: number): void;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
-index ed9d8d2..7d6205b 100644
+index 0a2b0f5..4093abb 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
-@@ -620,6 +620,7 @@ export class SettingsManager {
+@@ -662,6 +662,7 @@ export class SettingsManager {
              maxRetries: this.settings.retry?.maxRetries ?? 3,
              baseDelayMs: this.settings.retry?.baseDelayMs ?? 2000,
              maxAgentDelayMs: this.settings.retry?.maxAgentDelayMs ?? DEFAULT_MAX_AGENT_RETRY_DELAY_MS,

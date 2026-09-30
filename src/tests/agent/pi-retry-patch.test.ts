@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { AgentSession, SettingsManager } from "@earendil-works/pi-coding-agent";
 
@@ -106,5 +106,27 @@ describe("deskwand retry configuration", () => {
     // 弱断言：只证明意图已传递（行为封顶由上面的 describe 覆盖）
     expect(source.match(/maxAgentDelayMs: 60000/g) ?? []).toHaveLength(2);
     expect(source.match(/unbounded: true/g) ?? []).toHaveLength(2);
+  });
+});
+
+describe("pi SDK patch version lockstep", () => {
+  it("ships exactly one pi-coding-agent patch, matching the installed version", () => {
+    const installed = JSON.parse(
+      readFileSync(
+        join(
+          process.cwd(),
+          "node_modules/@earendil-works/pi-coding-agent/package.json",
+        ),
+        "utf8",
+      ),
+    ).version as string;
+    // patch-package 的文件名是 <包名>+<版本>.patch，scope 的 "/" 变成 "+"，
+    // 所以路径里会出现三段 "+"。用 startsWith + 精确比对，避免 split("+") 的陷阱。
+    const patches = readdirSync(join(process.cwd(), "patches")).filter((name) =>
+      name.startsWith("@earendil-works+pi-coding-agent+"),
+    );
+    expect(patches).toEqual([
+      `@earendil-works+pi-coding-agent+${installed}.patch`,
+    ]);
   });
 });
