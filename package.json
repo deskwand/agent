@@ -68,7 +68,8 @@
     "pre-build-check": "node scripts/pre-build-check.js",
     "clean": "rimraf dist dist-electron dist-mcp dist-wsl-agent dist-lima-agent .bundle-resources release",
     "deploy:local": "bash scripts/deploy-local.sh",
-    "publish:local": "node scripts/publish-local.js"
+    "publish:local": "node scripts/publish-local.js",
+    "spike:mcp": "electron scripts/mcp-pi-sdk-spike.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -159,7 +160,8 @@
     "typescript": "^5.3.3",
     "vite": "^7.3.1",
     "vite-plugin-electron": "^0.29.1",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "zod": "3.25.76"
   },
   "overrides": {
     "fast-xml-parser": "^5.5.6",

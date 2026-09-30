@@ -10,7 +10,7 @@
  * - Streams responses back as ServerEvents (stream.message, stream.partial, trace.step)
  * - Skills injection, system prompt assembly, permission handling
  *
- * Dependencies: session-manager, mcp-manager, config-store, skills-manager
+ * Dependencies: session-manager, mcp-client-extension, config-store, skills-manager
  */
 import {
   createAgentSession,
@@ -25,7 +25,7 @@ import {
   type ModelRuntime,
   type SessionEntry,
 } from "@earendil-works/pi-coding-agent";
-import { Type, type TSchema } from "@sinclair/typebox";
+import { Type } from "@sinclair/typebox";
 import {
   getAuthPath,
   registerSessionModelRuntime,
@@ -45,8 +45,6 @@ import type {
 } from "../../renderer/types";
 import { v4 as uuidv4 } from "uuid";
 import type { PathResolver } from "../sandbox/path-resolver";
-import type { MCPManager } from "../mcp/mcp-manager";
-import { mcpConfigStore } from "../mcp/mcp-config-store";
 import {
   collectImageAttachmentPaths,
   collectPromptImagesFromBlocks,
@@ -104,6 +102,7 @@ import {
 } from "./bundled-paths";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
+import { createDeskwandMcpExtension } from "../mcp/mcp-client-extension";
 import {
   AGENT_TOOL_NAME,
   registerAgentNameHook,
@@ -152,10 +151,7 @@ import { detectInsufficientCredits, toErrorText } from "./credits-error";
 import { buildPiSessionRuntimeSignature } from "./pi-session-runtime";
 import { resolveCompactionSettingsForWindow } from "./compaction-settings";
 import { ThinkTagStreamParser } from "./think-tag-parser";
-import {
-  normalizeMcpToolResultForModel,
-  normalizeToolExecutionResultForUi,
-} from "./tool-result-utils";
+import { normalizeToolExecutionResultForUi } from "./tool-result-utils";
 import { modelResolutionService } from "../model/model-resolution-service";
 import { MEMORY_POLICY_SCHEMA_VERSION } from "../memory/memory-policy";
 import { piSessionFileContainsLegacyMemoryContext } from "./pi-session-safety";
@@ -338,53 +334,6 @@ async function enrichProcessPathForBuild(): Promise<void> {
 // Shared pi-ai auth storage — created once, reused across sessions.
 
 /**
- * Bridge MCP tools from MCPManager into pi-coding-agent ToolDefinition[] format.
- * Each MCP tool becomes a customTool whose execute() delegates to mcpManager.callTool().
- */
-function buildMcpCustomTools(mcpManager: MCPManager): ToolDefinition[] {
-  const mcpTools = mcpManager.getTools();
-  return mcpTools.map((mcpTool) => {
-    // Wrap the raw JSON Schema inputSchema as a TypeBox TSchema
-    const parameters = Type.Unsafe<Record<string, unknown>>(
-      mcpTool.inputSchema as Record<string, unknown>,
-    );
-
-    const toolDef: ToolDefinition<TSchema, unknown> = {
-      name: mcpTool.name,
-      label: mcpTool.name.replace(/^mcp__/, "").replace(/__/g, " → "),
-      description: mcpTool.description || `MCP tool from ${mcpTool.serverName}`,
-      parameters,
-      async execute(
-        _toolCallId: any,
-        params: any,
-        _signal: any,
-        _onUpdate: any,
-        _ctx: any,
-      ) {
-        try {
-          const result = await mcpManager.callTool(
-            mcpTool.name,
-            params as Record<string, unknown>,
-          );
-          const normalizedResult = normalizeMcpToolResultForModel(result);
-          return {
-            content: [{ type: "text" as const, text: normalizedResult.text }],
-            details:
-              normalizedResult.images.length > 0
-                ? { openCoworkImages: normalizedResult.images }
-                : undefined,
-          };
-        } catch (err: unknown) {
-          logError(`[AgentRunner] MCP tool ${mcpTool.name} failed:`, err);
-          throw err instanceof Error ? err : new Error(String(err));
-        }
-      },
-    };
-    return toolDef;
-  });
-}
-
-/**
  * Get shell environment with proper PATH (including node, npm, etc.)
  * GUI apps on macOS don't inherit shell PATH, so we need to extract it
  */
@@ -519,7 +468,6 @@ export class AgentRunner {
     questions: AskUserPromptList,
   ) => Promise<AskUserResult>;
   private pathResolver: PathResolver;
-  private mcpManager?: MCPManager;
   /** 每个会话一个子代理活动 tap；会话释放时一并销毁。 */
   private subagentTaps = new Map<string, SubagentTap>();
   /** 本会话激活时登记进插件全局列表的条目；必须由我们主动摘掉（见 releaseSubagentSession）。 */
@@ -563,10 +511,6 @@ export class AgentRunner {
   private static readonly MAX_CACHED_SESSIONS = 50;
 
   // Per-instance caches — invalidated when the underlying config changes.
-  private _mcpServersCache: {
-    fingerprint: string;
-    servers: Record<string, unknown>;
-  } | null = null;
   private _skillsSetupDone = false;
   private _skillsSetupInProgress = false;
 
@@ -762,15 +706,6 @@ export class AgentRunner {
     // session would reuse its stale ExtensionRunner and never see newly
     // installed plugin commands (e.g. /subagents-doctor).
     this.clearAllSdkSessions();
-  }
-
-  /** Call after the user changes MCP server config so the next query rebuilds mcpServers. */
-  invalidateMcpServersCache(): void {
-    this._mcpServersCache = null;
-    // Sessions stay alive — MCP tools are rebuilt each query via buildMcpCustomTools()
-    log(
-      "[AgentRunner] MCP servers cache invalidated — tools will rebuild on next query",
-    );
   }
 
   /**
@@ -1018,7 +953,6 @@ ${hints.join("\n")}
   constructor(
     options: AgentRunnerOptions,
     pathResolver: PathResolver,
-    mcpManager?: MCPManager,
     skillsAdapter?: SkillsAdapter,
     extensionManager?: AgentRuntimeExtensionManager,
     browserViewManager?: BrowserViewManager,
@@ -1034,7 +968,6 @@ ${hints.join("\n")}
     this.activateSession = options.activateSession;
     this.getSessionInfo = options.getSessionInfo;
     this.pathResolver = pathResolver;
-    this.mcpManager = mcpManager;
     this._skillsAdapter = skillsAdapter;
     this.extensionManager = extensionManager;
     this._browserViewManager = browserViewManager ?? null;
@@ -1043,9 +976,6 @@ ${hints.join("\n")}
     log(
       "[AgentRunner] Skills enabled: settingSources=[user, project], Skill tool enabled",
     );
-    if (mcpManager) {
-      log("[AgentRunner] MCP support enabled");
-    }
     if (this._browserViewManager) {
       log("[AgentRunner] Internal browser support enabled");
     }
@@ -2618,7 +2548,6 @@ ${hints.join("\n")}
       logTiming("after pi-ai model resolution", runStartTime);
 
       // pi-coding-agent handles path sandboxing via its own tools
-      const imageCapable = true; // pi-ai models generally support images; let the model handle unsupported cases
       // session.cwd is always set (createSession), so workingDir is always
       // a valid path; fall back to userData as a safe default instead of
       // process.cwd() which can be '/' in packaged macOS builds.
@@ -3037,192 +2966,6 @@ ${hints.join("\n")}
         contextualPrompt = `${extensionResult.promptPrefix.trim()}\n\n${contextualPrompt}`;
       }
 
-      logTiming("before building MCP servers config", runStartTime);
-
-      // Build MCP servers configuration for SDK
-      // IMPORTANT: SDK uses tool names in format: mcp__<ServerKey>__<toolName>
-      const mcpServers: Record<string, unknown> = {};
-      if (this.mcpManager) {
-        const serverStatuses = this.mcpManager.getServerStatus();
-        const connectedServers = serverStatuses.filter((s) => s.connected);
-        log(
-          "[AgentRunner] MCP server statuses:",
-          safeStringify(serverStatuses),
-        );
-        log("[AgentRunner] Connected MCP servers:", connectedServers.length);
-
-        let allConfigs: ReturnType<typeof mcpConfigStore.getEnabledServers> =
-          [];
-        try {
-          allConfigs = mcpConfigStore.getEnabledServers();
-          log(
-            "[AgentRunner] Enabled MCP configs:",
-            allConfigs.map((c) => c.name),
-          );
-        } catch (error) {
-          logWarn(
-            "[AgentRunner] Failed to read enabled MCP configs; MCP tools will be unavailable this query",
-            error,
-          );
-          allConfigs = [];
-        }
-
-        // Cache key: serialized config list + imageCapable flag.  The bundled node
-        // paths are stable for the lifetime of the process so they don't need to be
-        // part of the fingerprint.
-        const mcpFingerprint =
-          JSON.stringify(allConfigs) + String(imageCapable);
-        if (this._mcpServersCache?.fingerprint === mcpFingerprint) {
-          Object.assign(mcpServers, this._mcpServersCache.servers);
-          log("[AgentRunner] MCP servers config reused from cache");
-        } else {
-          // Resolve bundled Node for MCP servers spawned from this config.
-          const bundledNodePaths = resolveBundledNodePaths(bundleContext());
-          const bundledNpx = bundledNodePaths?.npx ?? null;
-
-          for (const config of allConfigs) {
-            try {
-              // Use a simpler key without spaces to avoid issues
-              const serverKey = config.name;
-
-              if (config.type === "stdio") {
-                // 当命令是 npx 或 node 时优先使用内置路径
-                const command =
-                  config.command === "npx" && bundledNpx
-                    ? bundledNpx
-                    : config.command === "node" && bundledNodePaths
-                      ? bundledNodePaths.node
-                      : config.command;
-
-                // 使用内置 npx/node 时，将内置 node bin 注入 PATH
-                const serverEnv = { ...config.env };
-                if (
-                  bundledNodePaths &&
-                  (config.command === "npx" || config.command === "node")
-                ) {
-                  const nodeBinDir = path.dirname(bundledNodePaths.node);
-                  const currentPath = process.env.PATH || "";
-                  // Prepend bundled node bin to PATH so npx can find node
-                  serverEnv.PATH = `${nodeBinDir}${path.delimiter}${currentPath}`;
-                  log(
-                    `[AgentRunner]   Added bundled node bin to PATH: ${nodeBinDir}`,
-                  );
-                }
-
-                if (!imageCapable) {
-                  serverEnv.OPEN_COWORK_DISABLE_IMAGE_TOOL_OUTPUT = "1";
-                }
-
-                // Resolve path placeholders for presets
-                let resolvedArgs = config.args || [];
-
-                // Check if any args contain placeholders that need resolving
-                const hasPlaceholders = resolvedArgs.some(
-                  (arg) =>
-                    arg.includes("{SOFTWARE_DEV_SERVER_PATH}") ||
-                    arg.includes("{GUI_OPERATE_SERVER_PATH}"),
-                );
-
-                if (hasPlaceholders) {
-                  // Get the appropriate preset based on config name
-                  let presetKey: string | null = null;
-                  if (
-                    config.name === "Software_Development" ||
-                    config.name === "Software Development"
-                  ) {
-                    presetKey = "software-development";
-                  } else if (
-                    config.name === "GUI_Operate" ||
-                    config.name === "GUI Operate"
-                  ) {
-                    presetKey = "gui-operate";
-                  }
-
-                  if (presetKey) {
-                    const preset = mcpConfigStore.createFromPreset(
-                      presetKey,
-                      true,
-                    );
-                    if (preset && preset.args) {
-                      resolvedArgs = preset.args;
-                    }
-                  }
-                }
-
-                mcpServers[serverKey] = {
-                  type: "stdio",
-                  command,
-                  args: resolvedArgs,
-                  env: serverEnv,
-                };
-                log(`[AgentRunner] Added STDIO MCP server: ${serverKey}`);
-                log(
-                  `[AgentRunner]   Command: ${command} ${resolvedArgs.join(" ")}`,
-                );
-                log(
-                  `[AgentRunner]   Tools will be named: mcp__${serverKey}__<toolName>`,
-                );
-              } else if (config.type === "sse") {
-                mcpServers[serverKey] = {
-                  type: "sse",
-                  url: config.url,
-                  headers: config.headers || {},
-                };
-                log(`[AgentRunner] Added SSE MCP server: ${serverKey}`);
-              }
-            } catch (error) {
-              logError(
-                "[AgentRunner] Failed to prepare MCP server config, skipping server",
-                {
-                  serverId: config.id,
-                  serverName: config.name,
-                  error: toErrorText(error),
-                },
-              );
-            }
-          }
-
-          // Store in cache for subsequent queries
-          this._mcpServersCache = {
-            fingerprint: mcpFingerprint,
-            servers: { ...mcpServers },
-          };
-        }
-
-        const mcpServersSummary = Object.entries(mcpServers).map(
-          ([name, serverConfig]) => {
-            const typedServerConfig = serverConfig as {
-              type?: string;
-              command?: string;
-              args?: unknown[];
-              env?: Record<string, unknown>;
-            };
-            return {
-              name,
-              type: typedServerConfig.type ?? "unknown",
-              command: typedServerConfig.command ?? "",
-              argsCount: Array.isArray(typedServerConfig.args)
-                ? typedServerConfig.args.length
-                : 0,
-              envKeys: typedServerConfig.env
-                ? Object.keys(typedServerConfig.env).length
-                : 0,
-            };
-          },
-        );
-        log(
-          "[AgentRunner] Final mcpServers summary:",
-          safeStringify(mcpServersSummary, 2),
-        );
-        if (process.env.COWORK_LOG_SDK_MESSAGES_FULL === "1") {
-          log(
-            "[AgentRunner] Final mcpServers config:",
-            safeStringify(mcpServers, 2),
-          );
-        }
-      }
-      logTiming("after building MCP servers config", runStartTime);
-
       const workspaceInfoPrompt =
         useSandboxIsolation && sandboxPath
           ? `<workspace_info>
@@ -3267,11 +3010,7 @@ Tool routing:\n
       logTiming("before pi-coding-agent session creation", runStartTime);
 
       // Create or reuse pi-coding-agent session
-      // Bridge MCP tools as customTools for pi-coding-agent.
-      // Re-read every query so newly added/removed MCP servers take effect immediately.
-      const mcpCustomTools = this.mcpManager
-        ? buildMcpCustomTools(this.mcpManager)
-        : [];
+      // MCP 工具不再走这里：内置 MCP 扩展会把 mcp__* 工具直接注册进会话。
 
       const internalBrowserTools = this.buildInternalBrowserTools();
       const webTools = createWebAccessTools({
@@ -3289,17 +3028,10 @@ Tool routing:\n
 
       const extensionCustomTools = extensionResult.customTools || [];
       const customTools = [
-        ...mcpCustomTools,
         ...internalBrowserTools,
         ...webTools,
         ...extensionCustomTools,
       ];
-      if (mcpCustomTools.length > 0) {
-        log(
-          `[AgentRunner] Registered ${mcpCustomTools.length} MCP tools as customTools:`,
-          mcpCustomTools.map((t) => t.name).join(", "),
-        );
-      }
       if (extensionCustomTools.length > 0) {
         log(
           `[AgentRunner] Registered ${extensionCustomTools.length} extension tools as customTools:`,
@@ -3598,6 +3330,10 @@ Tool routing:\n
         if (deskwandToolExt) {
           extensionFactories.push(deskwandToolExt);
         }
+
+        // 注入内置 MCP 扩展（替换自研客户端；陷阱① 的 exposure/autoEnableCodemode
+        // 由投影强制，见 mcp-config-projection.ts）
+        extensionFactories.push(createDeskwandMcpExtension());
 
         // ── Pi Extension Host（按 cwd 复用）──────────────────────────────
         // 负责扩展/包/设置/信任的加载与生命周期。agentDir 固定为 ~/.pi/agent

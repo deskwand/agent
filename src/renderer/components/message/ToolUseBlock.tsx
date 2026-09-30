@@ -1,5 +1,6 @@
 // Tool use card — collapsible, merges matching tool_result from same/other messages
 import { useState, useMemo, memo } from "react";
+import { isMcpToolName } from "../../../shared/mcp-tool-names";
 import { useTranslation } from "react-i18next";
 import {
   ChevronDown,
@@ -241,7 +242,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       displayLabel = `${label} · ${match[1]}`;
     }
   }
-  const isMCPTool = block.name.startsWith("mcp__");
+  const isMCPTool = isMcpToolName(block.name);
   const mcpServerName = isMCPTool
     ? block.name.match(/^mcp__(.+?)__/)?.[1]
     : null;

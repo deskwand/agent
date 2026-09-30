@@ -107,12 +107,24 @@ import {
 import { removeAllWebAccessTempDirs } from "./agent/tools/web-access/session-temp";
 import { listOllamaModels } from "./config/ollama-api";
 import { mcpConfigStore } from "./mcp/mcp-config-store";
+import {
+  createProjectionContext,
+  getMcpToolsSnapshot,
+} from "./mcp/mcp-client-extension";
+import {
+  closeAllDeskwandMcpTransports,
+  getMcpServerState,
+} from "./mcp/mcp-transport-adapter";
+import {
+  projectMcpServers,
+  sanitizeMcpServerKey,
+} from "./mcp/mcp-config-projection";
 import { getSandboxAdapter, shutdownSandbox } from "./sandbox/sandbox-adapter";
 import { SandboxSync } from "./sandbox/sandbox-sync";
 import { WSLBridge } from "./sandbox/wsl-bridge";
 import { LimaBridge } from "./sandbox/lima-bridge";
 import { getSandboxBootstrap } from "./sandbox/sandbox-bootstrap";
-import type { MCPServerConfig } from "./mcp/mcp-manager";
+import type { MCPServerConfig } from "./mcp/mcp-config-store";
 import type {
   ClientEvent,
   ServerEvent,
@@ -1423,20 +1435,16 @@ async function cleanupSandboxResources(): Promise<void> {
   try {
     await withTimeout(shutdownSandbox(), 8000, "Sandbox shutdown");
     log("[App] Sandbox shutdown complete");
+
+    // 关闭内置 MCP 的传输（回收 stdio 子进程）。旧实现靠 mcpManager.shutdown() 做这件事。
+    await withTimeout(
+      closeAllDeskwandMcpTransports(),
+      5000,
+      "MCP transport shutdown",
+    );
+    log("[App] MCP transports closed");
   } catch (error) {
     logError("[App] Error shutting down sandbox:", error);
-  }
-
-  // Shutdown MCP servers
-  try {
-    const mcpManager = sessionManager?.getMCPManager();
-    if (mcpManager) {
-      log("[App] Shutting down MCP servers...");
-      await withTimeout(mcpManager.shutdown(), 5000, "MCP shutdown");
-      log("[App] MCP servers shutdown complete");
-    }
-  } catch (error) {
-    logError("[App] Error shutting down MCP servers:", error);
   }
 
   try {
@@ -2871,52 +2879,29 @@ ipcMain.handle("mcp.getServer", (_event, serverId: string) => {
 });
 
 ipcMain.handle("mcp.saveServer", async (_event, config: MCPServerConfig) => {
-  mcpConfigStore.saveServer(config);
-  // Update only this specific server, not all servers
-  if (sessionManager) {
-    const mcpManager = sessionManager.getMCPManager();
-    try {
-      await mcpManager.updateServer(config);
-      sessionManager.invalidateMcpServersCache();
-      log(`[MCP] Server ${config.name} updated successfully`);
-    } catch (err) {
-      logError("[MCP] Failed to update server:", err);
-      // Roll back: save the config with enabled=false so a broken connector
-      // is not retried on next app startup
-      if (config.enabled) {
-        mcpConfigStore.saveServer({ ...config, enabled: false });
-      }
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      return { success: false, error: errorMessage };
-    }
+  // 校验：先跑一次投影 dry-run。取代旧的「连接失败就回滚为 enabled:false」——
+  // 内置扩展只在 session_start 读配置，保存时不再做连接尝试。
+  const probe = projectMcpServers([config], createProjectionContext());
+  if (probe.errors.length > 0) {
+    logError("[MCP] Rejected server config:", probe.errors.join("; "));
+    return { success: false, error: probe.errors.join("; ") };
   }
+  mcpConfigStore.saveServer(config);
+  log(`[MCP] Server ${config.name} saved (takes effect on the next session)`);
   void trackEvent("feature_use", { feature: "connector" });
   return { success: true };
 });
 
 ipcMain.handle("mcp.deleteServer", async (_event, serverId: string) => {
   mcpConfigStore.deleteServer(serverId);
-  // Remove and disconnect only this specific server
-  if (sessionManager) {
-    const mcpManager = sessionManager.getMCPManager();
-    try {
-      await mcpManager.removeServer(serverId);
-      sessionManager.invalidateMcpServersCache();
-      log(`[MCP] Server ${serverId} removed successfully`);
-    } catch (err) {
-      logError("[MCP] Failed to remove server:", err);
-    }
-  }
+  log(`[MCP] Server ${serverId} deleted (takes effect on the next session)`);
   return { success: true };
 });
 
 ipcMain.handle("mcp.getTools", () => {
   try {
-    if (!sessionManager) {
-      return [];
-    }
-    const mcpManager = sessionManager.getMCPManager();
-    return mcpManager.getTools();
+    // 工具由内置 MCP 扩展注册进会话；连接状态由传输适配器记录。
+    return getMcpToolsSnapshot();
   } catch (error) {
     logError("[MCP] Error getting tools:", error);
     return [];
@@ -2925,11 +2910,21 @@ ipcMain.handle("mcp.getTools", () => {
 
 ipcMain.handle("mcp.getServerStatus", () => {
   try {
-    if (!sessionManager) {
-      return [];
-    }
-    const mcpManager = sessionManager.getMCPManager();
-    return mcpManager.getServerStatus();
+    const tools = getMcpToolsSnapshot();
+    return mcpConfigStore.getServers().map((server) => {
+      const raw = server.enabled
+        ? getMcpServerState(sanitizeMcpServerKey(server.name))
+        : undefined;
+      // 适配器的状态集合里没有 disabled —— 它由 store 的 enabled 直接给出
+      const status = !server.enabled ? "disabled" : (raw ?? "connecting");
+      return {
+        id: server.id,
+        name: server.name,
+        connected: status === "connected",
+        status,
+        toolCount: tools.filter((tool) => tool.serverId === server.id).length,
+      };
+    });
   } catch (error) {
     logError("[MCP] Error getting server status:", error);
     return [];

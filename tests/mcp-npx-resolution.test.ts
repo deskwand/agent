@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { findPreferredWindowsNpxPath } from '../src/main/mcp/mcp-manager';
+import { findPreferredWindowsNpxPath } from '../src/main/mcp/mcp-server-paths';
 
 describe('findPreferredWindowsNpxPath', () => {
   it('prefers a system npx.cmd later in PATH over the bundled npx.cmd', () => {

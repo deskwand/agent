@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { mergeShellEnvForMcp } from '../src/main/mcp/mcp-manager';
+import { mergeShellEnvForMcp } from '../src/main/mcp/mcp-server-paths';
 
 describe('mcp-manager env merge', () => {
   it('keeps app-configured auth env over shell env', () => {

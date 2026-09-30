@@ -693,6 +693,7 @@
     "toolsAvailable": "{{count}} tool available",
     "toolsAvailable_plural": "{{count}} tools available",
     "connected": "Connected",
+    "needsAuth": "Sign-in required — send /mcp in the chat to authorize",
     "notConnected": "Not connected",
     "disabled": "Disabled",
     "connecting": "Connecting...",

@@ -4,13 +4,29 @@ import * as fs from "fs";
 import * as os from "os";
 import * as crypto from "crypto";
 import path from "path";
-import type { MCPServerConfig } from "./mcp-manager";
 import { log, logError } from "../utils/logger";
 
 /**
  * Preset MCP Server Configurations
  * These are common MCP servers that users can quickly add
  */
+/**
+ * MCP Server Configuration（原先定义在 mcp-manager.ts；搬到 store 是因为
+ * store 自己就是它的消费者，而 manager 将被删除）。
+ */
+export interface MCPServerConfig {
+  id: string;
+  name: string;
+  type: "stdio" | "sse" | "streamable-http";
+  command?: string; // For stdio: command to run
+  args?: string[]; // For stdio: command arguments
+  env?: Record<string, string>; // Environment variables
+  cwd?: string; // Working directory for stdio command
+  url?: string; // For SSE / Streamable HTTP: server URL
+  headers?: Record<string, string>; // For SSE / Streamable HTTP: HTTP headers
+  enabled: boolean;
+}
+
 export const MCP_SERVER_PRESETS: Record<
   string,
   Omit<MCPServerConfig, "id" | "enabled"> & {
@@ -143,6 +159,20 @@ class MCPConfigStore {
   /**
    * Get the path to a MCP server file in the mcp directory
    */
+  /**
+   * 解析 `{..._SERVER_PATH}` 占位符（供配置投影使用）。
+   *
+   * store 本来就在 `createFromPreset` 里解析这两个 token；这里把同一逻辑公开出来，
+   * 避免第三份拷贝（\`mcp-manager.ts\` 里已有一份重复的）。
+   */
+  resolveServerPathToken(token: string): string | null {
+    if (token === "SOFTWARE_DEV_SERVER_PATH")
+      return this.getSoftwareDevServerPath();
+    if (token === "GUI_OPERATE_SERVER_PATH")
+      return this.getGuiOperateServerPath();
+    return null;
+  }
+
   private getMcpServerPath(filename: string): string | null {
     // In development: __dirname points to dist-electron/main
     // In production: appPath points to the app.asar or unpacked app

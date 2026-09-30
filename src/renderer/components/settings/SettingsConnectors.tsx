@@ -497,9 +497,11 @@ function ServerCard({
                     ? "bg-success"
                     : serverStatus === "failed"
                       ? "bg-error"
-                      : serverStatus === "connecting"
-                        ? "bg-warning"
-                        : "bg-text-muted"
+                      : serverStatus === "needs-auth"
+                        ? "bg-accent"
+                        : serverStatus === "connecting"
+                          ? "bg-warning"
+                          : "bg-text-muted"
                 }`}
               />
               <h3 className="font-medium text-text-primary">{server.name}</h3>
@@ -533,18 +535,22 @@ function ServerCard({
                     ? "bg-success/10 text-success"
                     : serverStatus === "failed"
                       ? "bg-error/10 text-error"
-                      : serverStatus === "connecting"
-                        ? "bg-warning/10 text-warning"
-                        : "bg-accent/10 text-accent"
+                      : serverStatus === "needs-auth"
+                        ? "bg-accent/10 text-accent"
+                        : serverStatus === "connecting"
+                          ? "bg-warning/10 text-warning"
+                          : "bg-accent/10 text-accent"
                 }`}
               >
                 {serverStatus === "connected"
                   ? `✓ ${t("mcp.connected")}`
                   : serverStatus === "failed"
                     ? t("mcp.failed", { defaultValue: "Connection failed" })
-                    : serverStatus === "connecting"
-                      ? `⏳ ${t("mcp.connecting")}`
-                      : t("mcp.disabled")}
+                    : serverStatus === "needs-auth"
+                      ? `🔑 ${t("mcp.needsAuth")}`
+                      : serverStatus === "connecting"
+                        ? `⏳ ${t("mcp.connecting")}`
+                        : t("mcp.disabled")}
               </div>
               <div className="flex items-center gap-4 mt-2">
                 <button

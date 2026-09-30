@@ -1,5 +1,6 @@
 // Utility functions for tool use/result display
 import type { TFunction } from "i18next";
+import { isMcpToolName } from "../../../shared/mcp-tool-names";
 import {
   MonitorPlay,
   Target,
@@ -77,7 +78,7 @@ export function getToolLabel(
 ): string {
   const inp = input || {};
   // MCP tools
-  if (name.startsWith("mcp__")) {
+  if (isMcpToolName(name)) {
     const match = name.match(/^mcp__(.+?)__(.+)$/);
     return match?.[2] || name;
   }

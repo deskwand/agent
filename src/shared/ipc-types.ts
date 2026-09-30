@@ -14,7 +14,7 @@ import type { PromptCommandNameError } from "./prompt-command-name";
 // MCP
 // ---------------------------------------------------------------------------
 
-/** Configuration for a single MCP server (mirrors MCPServerConfig in mcp-manager.ts). */
+/** Configuration for a single MCP server (mirrors MCPServerConfig in mcp-config-store.ts). */
 export interface McpServerConfig {
   id: string;
   name: string;
@@ -46,7 +46,7 @@ export interface McpServerStatus {
   id: string;
   name: string;
   connected: boolean;
-  status: "connecting" | "connected" | "failed" | "disabled";
+  status: "connecting" | "connected" | "needs-auth" | "failed" | "disabled";
   toolCount: number;
 }
 
@@ -182,7 +182,14 @@ export interface ChannelInstanceStatus {
   type: ChannelRuntimeInstanceType;
   enabled: boolean;
   connected: boolean;
-  state: "stopped" | "starting" | "connected" | "reconnecting" | "failed" | "draining" | "stopping";
+  state:
+    | "stopped"
+    | "starting"
+    | "connected"
+    | "reconnecting"
+    | "failed"
+    | "draining"
+    | "stopping";
   error?: string;
   lastActiveAt?: number;
 }
@@ -330,7 +337,12 @@ export interface PiCommandListDto {
 // ---------------------------------------------------------------------------
 
 /** Pi 市场条目类型（由 npm keywords 推导，镜像 PiMarketService.PiPackageType）。 */
-export type PiMarketType = "extension" | "skill" | "prompt" | "theme" | "package";
+export type PiMarketType =
+  | "extension"
+  | "skill"
+  | "prompt"
+  | "theme"
+  | "package";
 
 /** Pi 市场搜索结果条目（镜像 PiMarketService.PiMarketPackage）。 */
 export interface PiMarketPackageDto {

@@ -98,7 +98,6 @@ learning opportunities.`;
           customTools: reviewTools,
         },
         this.options.pathResolver,
-        undefined, // MCPManager
         this.options.skillsAdapter,
         undefined, // ExtensionManager
         undefined, // BrowserViewManager

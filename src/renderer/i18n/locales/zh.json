@@ -693,6 +693,7 @@
     "toolsAvailable": "有 {{count}} 个可用工具",
     "toolsAvailable_plural": "有 {{count}} 个可用工具",
     "connected": "已连接",
+    "needsAuth": "需要登录，在对话里发送 /mcp 完成授权",
     "notConnected": "未连接",
     "disabled": "已禁用",
     "connecting": "连接中...",

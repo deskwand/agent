@@ -20,6 +20,9 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
+      "@earendil-works/pi-mcp": [
+        "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-mcp/dist/index.d.ts"
+      ],
       "@/*": ["src/*"],
       "@main/*": ["src/main/*"],
       "@renderer/*": ["src/renderer/*"]
@@ -28,4 +31,3 @@
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
-

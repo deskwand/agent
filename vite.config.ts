@@ -295,8 +295,25 @@ export default defineConfig({
       },
     ]),
   ],
+
+/**
+ * `@earendil-works/pi-mcp` 必须解析到 pi-coding-agent **内部的那一份**。
+ *
+ * 原因（评审 blocker）：npm 会装出两份 pi-mcp（顶层 + pi-coding-agent 的 shrinkwrap 锁定的一份），
+ * 而两份的类**不是同一个对象** —— `a.StdioTransport === b.StdioTransport` 为 false。
+ * 上游 `extensions/mcp/runtime.js` 用 `instanceof McpAuthRequiredError / McpSessionExpiredError /
+ * McpHttpError / StdioTransport` 判定鉴权与瞬时错误，所以自建传输只要来自另一份，
+ * 鉴权错误就永远认不出来 → `needs-auth` 与 `/mcp` 登录流程不可达（OAuth 是本功能存在的理由）。
+ *
+ * 因此：依赖里**不声明**顶层 pi-mcp（否则又会装出两份），而是把 specifier 别名到这里，
+ * 与上游的解析结果指向同一个文件 → 打包后只有一个模块实例。
+ * 改这里等于破坏 OAuth —— 见 tests/mcp-pi-mcp-single-copy.test.ts。
+ */
+export const PI_MCP_ROOT = "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-mcp";
+
   resolve: {
     alias: {
+      "@earendil-works/pi-mcp": resolve(__dirname, `${PI_MCP_ROOT}/dist/index.js`),
       "@": resolve(__dirname, "src"),
       "@main": resolve(__dirname, "src/main"),
       "@renderer": resolve(__dirname, "src/renderer"),

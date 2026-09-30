@@ -49,8 +49,6 @@ import {
   getDefaultWorkingDirPath,
 } from "../../shared/workspace-path";
 import type { AppConfig, ProviderProfileKey } from "../config/config-store";
-import { MCPManager } from "../mcp/mcp-manager";
-import { mcpConfigStore } from "../mcp/mcp-config-store";
 import type { BrowserViewManager } from "../browser/browser-view-manager";
 import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { BackgroundReviewService } from "../agent/background-review";
@@ -170,7 +168,6 @@ export class SessionManager {
   private pathResolver: PathResolver;
   private sandboxAdapter: SandboxAdapter;
   private agentRunner!: IAgentRunner;
-  private mcpManager: MCPManager;
   private extensionManager?: AgentRuntimeExtensionManager;
   private _userSkillsPath: string;
   private browserViewManager: BrowserViewManager | null = null;
@@ -248,8 +245,6 @@ export class SessionManager {
     );
 
     // Initialize MCP Manager
-    this.mcpManager = new MCPManager();
-    this.initializeMCP();
 
     // Create agent runner based on current config
     this.createAgentRunner();
@@ -322,7 +317,6 @@ export class SessionManager {
         },
       },
       this.pathResolver,
-      this.mcpManager,
       undefined, // skillsAdapter
       this.extensionManager,
       this.browserViewManager ?? undefined,
@@ -380,17 +374,6 @@ export class SessionManager {
    */
   async reloadMCP(): Promise<void> {
     log("[SessionManager] Reloading MCP servers");
-    await this.initializeMCP();
-  }
-
-  /**
-   * Invalidate cached MCP servers config so the next query rebuilds tools.
-   * Call after MCP server add/update/delete.
-   */
-  invalidateMcpServersCache(): void {
-    if (this.agentRunner && "invalidateMcpServersCache" in this.agentRunner) {
-      (this.agentRunner as AgentRunner).invalidateMcpServersCache();
-    }
   }
 
   /**
@@ -448,30 +431,8 @@ export class SessionManager {
   }
 
   /**
-   * Initialize MCP servers from configuration
-   */
-  private async initializeMCP(): Promise<void> {
-    try {
-      const servers = mcpConfigStore.getEnabledServers();
-      await this.mcpManager.initializeServers(servers);
-      log(`[SessionManager] Initialized ${servers.length} MCP servers`);
-    } catch (error) {
-      logError("[SessionManager] Failed to initialize MCP servers:", error);
-      this.sendToRenderer({
-        type: "error",
-        payload: {
-          message: `Failed to initialize MCP servers: ${error instanceof Error ? error.message : String(error)}`,
-        },
-      });
-    }
-  }
-
-  /**
    * Get MCP manager instance
    */
-  getMCPManager(): MCPManager {
-    return this.mcpManager;
-  }
 
   /**
    * Get sandbox adapter instance

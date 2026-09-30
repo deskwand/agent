@@ -1,134 +1,42 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from "vitest";
 
-import { MCPManager } from '../src/main/mcp/mcp-manager';
+import { sanitizeMcpServerKey } from "../src/main/mcp/mcp-config-projection";
 
-function createManagerWithTool(toolName: string) {
-  const manager = new MCPManager();
-  const mockClient = {
-    callTool: vi.fn().mockResolvedValue({ ok: true }),
-  } as any;
-
-  (manager as any).clients = new Map([['server-1', mockClient]]);
-  (manager as any).tools = new Map([
-    [
-      toolName,
-      {
-        name: toolName,
-        description: '',
-        inputSchema: { type: 'object', properties: {} },
-        serverId: 'server-1',
-        serverName: 'Software Development',
-      },
-    ],
-  ]);
-
-  return { manager, mockClient };
-}
-
-describe('MCP tool name parsing', () => {
-  it('strips server prefix when server name contains underscores', async () => {
-    const toolName = 'mcp__Software_Development__create_or_modify_code';
-    const { manager, mockClient } = createManagerWithTool(toolName);
-
-    await manager.callTool(toolName, { foo: 'bar' });
-
-    expect(mockClient.callTool).toHaveBeenCalledWith({
-      name: 'create_or_modify_code',
-      arguments: { foo: 'bar' },
-    });
+/**
+ * 旧 `MCPManager` 已删除（内置 MCP 扩展接管连接与工具注册）。本文件保留其**仍然有效的
+ * 契约**：工具名前缀 `mcp__<serverKey>__<toolName>` 里的 serverKey 换算方式。
+ *
+ * 「工具返回结构化 Not connected 时重连并重试」的启发式**没有丢** —— 它搬到了传输层
+ * （`mcp-transport-adapter.ts` 里对 tools/call 响应的拦截），因为上游的 tool_result 是
+ * 只读观察事件、无法改写结果，而该行为必须由我们自己的传输来补。
+ */
+describe("MCP server key (tool name prefix)", () => {
+  it("collapses whitespace to underscores", () => {
+    expect(sanitizeMcpServerKey("Software Development")).toBe(
+      "Software_Development",
+    );
   });
 
-  it('strips server prefix for simple names', async () => {
-    const toolName = 'mcp__Chrome__navigate';
-    const { manager, mockClient } = createManagerWithTool(toolName);
-
-    await manager.callTool(toolName, { url: 'https://example.com' });
-
-    expect(mockClient.callTool).toHaveBeenCalledWith({
-      name: 'navigate',
-      arguments: { url: 'https://example.com' },
-    });
+  it("keeps an already-underscored name stable", () => {
+    expect(sanitizeMcpServerKey("Software_Development")).toBe(
+      "Software_Development",
+    );
+    expect(sanitizeMcpServerKey("GUI_Operate")).toBe("GUI_Operate");
   });
 
-  it('reconnects and retries when tool returns structured Not connected error', async () => {
-    const toolName = 'mcp__GUI_Operate__screenshot_for_display';
-    const manager = new MCPManager();
-    const mockClient = {
-      callTool: vi
-        .fn()
-        .mockResolvedValueOnce({
-          content: [
-            {
-              type: 'text',
-              text: '{"error":true,"message":"Not connected"}',
-            },
-          ],
-        })
-        .mockResolvedValueOnce({ ok: true }),
-    } as any;
-
-    (manager as any).clients = new Map([['server-1', mockClient]]);
-    (manager as any).tools = new Map([
-      [
-        toolName,
-        {
-          name: toolName,
-          description: '',
-          inputSchema: { type: 'object', properties: {} },
-          serverId: 'server-1',
-          serverName: 'GUI_Operate',
-        },
-      ],
-    ]);
-    (manager as any).reconnectServer = vi.fn().mockResolvedValue(true);
-
-    const result = await manager.callTool(toolName, { display_index: 0 });
-
-    expect((manager as any).reconnectServer).toHaveBeenCalledWith('server-1');
-    expect(mockClient.callTool).toHaveBeenCalledTimes(2);
-    expect(result).toEqual({ ok: true });
+  it("collapses accidental double underscores so the tool name stays parseable", () => {
+    expect(sanitizeMcpServerKey("a__b")).toBe("a_b");
+    expect(sanitizeMcpServerKey("Chrome")).toBe("Chrome");
   });
 
-  it('does not reconnect when tool returns plain text content without structured error envelope', async () => {
-    const toolName = 'mcp__GUI_Operate__screenshot_for_display';
-    const manager = new MCPManager();
-    const mockClient = {
-      callTool: vi.fn().mockResolvedValue({
-        content: [
-          {
-            type: 'text',
-            text: 'Not connected',
-          },
-        ],
-      }),
-    } as any;
-
-    (manager as any).clients = new Map([['server-1', mockClient]]);
-    (manager as any).tools = new Map([
-      [
-        toolName,
-        {
-          name: toolName,
-          description: '',
-          inputSchema: { type: 'object', properties: {} },
-          serverId: 'server-1',
-          serverName: 'GUI_Operate',
-        },
-      ],
-    ]);
-    (manager as any).reconnectServer = vi.fn().mockResolvedValue(true);
-
-    const result = await manager.callTool(toolName, { display_index: 0 });
-
-    expect((manager as any).reconnectServer).not.toHaveBeenCalled();
-    expect(mockClient.callTool).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({
-      content: [
-        {
-          type: 'text',
-          text: 'Not connected',
-        },
-      ],
-    });
+  it("produces a name that round-trips through the mcp__<server>__<tool> pattern", () => {
+    const serverKey = sanitizeMcpServerKey("Software Development");
+    const toolName = `mcp__${serverKey}__create_or_modify_code`;
+    expect(/^mcp__(.+?)__(.+)$/.exec(toolName)?.[1]).toBe(
+      "Software_Development",
+    );
+    expect(/^mcp__(.+?)__(.+)$/.exec(toolName)?.[2]).toBe(
+      "create_or_modify_code",
+    );
   });
 });

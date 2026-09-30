@@ -309,7 +309,6 @@ Be thorough — fewer than 10 actions means you stopped too early.`;
     const forkRunner = new AgentRunner(
       { sendToRenderer: () => {}, customTools: tools },
       this.pathResolver,
-      undefined,
       this.skillsAdapter,
     );
 

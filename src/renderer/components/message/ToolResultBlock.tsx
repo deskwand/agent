@@ -1,5 +1,6 @@
 // Fallback ToolResultBlock — only renders for truly orphan results (no matching tool_use anywhere)
 import { useState, memo, useMemo } from "react";
+import { isMcpToolName } from "../../../shared/mcp-tool-names";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, XCircle, CheckCircle2 } from "lucide-react";
 import { useAppStore } from "../../store";
@@ -80,7 +81,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
     toolName = toolUseBlock?.name;
   }
 
-  const isMCPTool = toolName?.startsWith("mcp__") || false;
+  const isMCPTool = isMcpToolName(toolName);
   const mcpServerName = isMCPTool
     ? (toolName || "").match(/^mcp__(.+?)__(.+)$/)?.[1] || null
     : null;

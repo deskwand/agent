@@ -1,4 +1,5 @@
 import type { TFunction } from "i18next";
+import { isMcpToolName } from "../../shared/mcp-tool-names";
 import type { ContentBlock, ToolResultContent, ToolUseContent } from "../types";
 import { extractFilePathFromToolInput } from "./tool-output-path";
 
@@ -166,7 +167,7 @@ function isToolTraceBlock(block: ContentBlock): boolean {
 
 function getToolKind(name: string): "process" | "result" | null {
   const lower = name.toLowerCase();
-  if (PROCESS_TOOLS.has(lower) || lower.startsWith("mcp__")) {
+  if (PROCESS_TOOLS.has(lower) || isMcpToolName(lower)) {
     return "process";
   }
   if (RESULT_TOOLS.has(lower)) {
