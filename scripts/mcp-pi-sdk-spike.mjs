@@ -7,18 +7,6 @@
  */
 import { app } from "electron";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-
-/**
- * 必须指向 pi-coding-agent 内部的那一份 pi-mcp —— 而不是顶层再装一份。
- * 两份的类不是同一个对象，而上游用 `instanceof` 判定鉴权/瞬时错误，
- * 所以顶层那份会让 needs-auth 与 /mcp 登录流程失效。
- * 本脚本显式用同一个路径，测的就是应用实际使用的实现。
- */
-const PI_MCP_INDEX = join(
-  process.cwd(),
-  "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-mcp/dist/index.js",
-);
 
 async function main() {
   console.log(
@@ -28,9 +16,7 @@ async function main() {
     process.versions.electron,
   );
 
-  const { McpClient, StdioTransport } = await import(
-    pathToFileURL(PI_MCP_INDEX).href
-  );
+  const { McpClient, StdioTransport } = await import("@earendil-works/pi-mcp");
   console.log(
     "pi-mcp loaded: McpClient =",
     typeof McpClient,

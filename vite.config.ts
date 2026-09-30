@@ -210,6 +210,24 @@ function photonWasmPlugin(): Plugin {
   };
 }
 
+/**
+ * `@earendil-works/pi-mcp` 打包后必须**只有一个模块实例** —— 由两处 `resolve.dedupe` 保证：
+ * 顶层 `resolve`（renderer）与主进程 entry 的内嵌 `vite.resolve`（app 的 MCP 代码编在那里，
+ * 且内嵌配置**不继承**顶层 resolve）。
+ *
+ * 为什么必须这样（评审 blocker）：npm 会装出两份 pi-mcp（顶层 + pi-coding-agent 的
+ * shrinkwrap 锁定的一份），两份的类**不是同一个对象** —— `a.StdioTransport === b.StdioTransport`
+ * 为 false。上游 `extensions/mcp/runtime.js` 用 `instanceof McpAuthRequiredError /
+ * McpSessionExpiredError / McpHttpError / StdioTransport` 判定鉴权与瞬时错误，所以自建传输
+ * 只要来自另一份，鉴权错误就永远认不出来 → `needs-auth` 与 `/mcp` 登录流程不可达，
+ * 而 OAuth 正是本次用内置实现替换自研客户端的全部理由。
+ *
+ * 为什么不用字符串别名：Vite 的别名是**纯前缀替换**，不查 `exports`，会把上游的
+ * `@earendil-works/pi-mcp/oauth` 拼成 `<别名>/oauth` → 构建失败（实测）。dedupe 在包解析层
+ * 生效，子路径正常走 `exports`。
+ *
+ * 改这里等于破坏 OAuth —— 守卫见 src/tests/mcp/mcp-pi-mcp-single-copy.test.ts。
+ */
 export default defineConfig({
   plugins: [
     react(),
@@ -221,6 +239,11 @@ export default defineConfig({
         },
         vite: {
           plugins: [piOAuthElectronPlugin(), photonWasmPlugin()],
+          // 主进程有自己这份内嵌 vite 配置，**不继承**顶层 resolve ——
+          // 所以 dedupe 必须在这里再声明一次（app 的 MCP 代码就编在这里）。
+          resolve: {
+            dedupe: ["@earendil-works/pi-mcp"],
+          },
           build: {
             outDir: "dist-electron/main",
             emptyOutDir: true,
@@ -296,24 +319,12 @@ export default defineConfig({
     ]),
   ],
 
-/**
- * `@earendil-works/pi-mcp` 必须解析到 pi-coding-agent **内部的那一份**。
- *
- * 原因（评审 blocker）：npm 会装出两份 pi-mcp（顶层 + pi-coding-agent 的 shrinkwrap 锁定的一份），
- * 而两份的类**不是同一个对象** —— `a.StdioTransport === b.StdioTransport` 为 false。
- * 上游 `extensions/mcp/runtime.js` 用 `instanceof McpAuthRequiredError / McpSessionExpiredError /
- * McpHttpError / StdioTransport` 判定鉴权与瞬时错误，所以自建传输只要来自另一份，
- * 鉴权错误就永远认不出来 → `needs-auth` 与 `/mcp` 登录流程不可达（OAuth 是本功能存在的理由）。
- *
- * 因此：依赖里**不声明**顶层 pi-mcp（否则又会装出两份），而是把 specifier 别名到这里，
- * 与上游的解析结果指向同一个文件 → 打包后只有一个模块实例。
- * 改这里等于破坏 OAuth —— 见 tests/mcp-pi-mcp-single-copy.test.ts。
- */
-export const PI_MCP_ROOT = "node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-mcp";
-
   resolve: {
+    // dedupe 在**包解析层**生效（字符串别名做不到 —— 它会把 `.../pi-mcp/oauth`
+    // 这种子路径拼成 `<别名>/oauth`）。上游 runtime.js 同时用 `.` 与 `./oauth`，
+    // 所以只能用 dedupe。见文件顶部 PI_MCP_ROOT 的说明。
+    dedupe: ["@earendil-works/pi-mcp"],
     alias: {
-      "@earendil-works/pi-mcp": resolve(__dirname, `${PI_MCP_ROOT}/dist/index.js`),
       "@": resolve(__dirname, "src"),
       "@main": resolve(__dirname, "src/main"),
       "@renderer": resolve(__dirname, "src/renderer"),
