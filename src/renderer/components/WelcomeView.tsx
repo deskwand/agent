@@ -8,6 +8,7 @@ import {
   WELCOME_QUICK_ENTRIES,
   visibleQuickEntries,
   type WelcomeQuickEntry,
+  type WelcomeQuickEntryIcon,
 } from "../welcome-quick-entries";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import type {
@@ -18,7 +19,14 @@ import type {
 } from "../types";
 import { getInitialSessionTitle } from "../../shared/session-title";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
-import { Eye, Globe, Sparkles } from "lucide-react";
+import {
+  Bug,
+  Eye,
+  FileText,
+  Globe,
+  Sparkles,
+  type LucideIcon,
+} from "lucide-react";
 import { API_PROVIDER_PRESETS } from "../../shared/api-model-presets";
 import { resolveProviderDisplayName } from "../utils/model-label";
 import {
@@ -78,7 +86,7 @@ export function WelcomeView() {
   // 而输入框把它渲染成「技能已生效」的令牌，等于骗用户。
   //
   // 初值取「全部可用」而不是空集：技能表要等一次 IPC 往返，若初值为空，首屏会
-  // 先只画出 2 个工具 chip，数据回来再补上 8 个技能 chip —— 而欢迎页是垂直居中
+  // 先只画出 1 个工具 chip，数据回来再补上 4 个技能 chip —— 而欢迎页是垂直居中
   // （justify-center），整块高度一变，输入框就跟着上下跳。乐观默认下，常见情况
   // （没禁用任何技能）首屏与加载后逐字一致，位移为零。
   // 代价：真被禁用的技能，它的 chip 会在 IPC 回来后才消失 —— 那点窗口短到无法
@@ -404,13 +412,7 @@ export function WelcomeView() {
                 onClick={() => handleQuickEntry(entry)}
                 className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
               >
-                {entry.kind === "skill" ? (
-                  <Sparkles className="w-3.5 h-3.5 flex-shrink-0" />
-                ) : entry.icon === "eye" ? (
-                  <Eye className="w-3.5 h-3.5 flex-shrink-0" />
-                ) : (
-                  <Globe className="w-3.5 h-3.5 flex-shrink-0" />
-                )}
+                <QuickEntryIcon icon={entry.icon} />
                 {t(entry.labelKey)}
               </button>
             ))}
@@ -529,4 +531,23 @@ export function WelcomeView() {
       </div>
     </div>
   );
+}
+
+/**
+ * 图标名 → lucide 组件。`Record<WelcomeQuickEntryIcon, LucideIcon>` 是穷尽的：
+ * 数据表里加一个图标名而这里没跟上，tsc 直接报错，不需要额外测试来守。
+ *
+ * 只在这一处映射。不许在别处按 id 再写一份 —— 两份表迟早漂移。
+ */
+const QUICK_ENTRY_ICONS: Record<WelcomeQuickEntryIcon, LucideIcon> = {
+  sparkles: Sparkles,
+  bug: Bug,
+  "file-text": FileText,
+  globe: Globe,
+  eye: Eye,
+};
+
+function QuickEntryIcon({ icon }: { icon: WelcomeQuickEntryIcon }) {
+  const Icon = QUICK_ENTRY_ICONS[icon];
+  return <Icon className="w-3.5 h-3.5 flex-shrink-0" />;
 }

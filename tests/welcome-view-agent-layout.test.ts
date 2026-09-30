@@ -51,4 +51,18 @@ describe('WelcomeView Agent-style layout', () => {
     expect(source).toContain('insertSkillChip');
     expect(source).toContain('appendPromptExample');
   });
+
+  it('renders the chip icon from the entry data, not from the entry kind', () => {
+    const source = fs.readFileSync(welcomeViewPath, 'utf8');
+    // 只守接线存在。图标的穷尽性由 tsc 守：QUICK_ENTRY_ICONS 标注为
+    // Record<WelcomeQuickEntryIcon, LucideIcon>，数据表里加一个图标名而这里没跟上
+    // 就编译不过。「5 个图标互不相同」由 tests/welcome-quick-entries.test.ts 对
+    // 数据表做行为断言。不要用本用例冒充行为守门。
+    expect(source).toContain('QUICK_ENTRY_ICONS[icon]');
+    expect(source).toContain('icon={entry.icon}');
+    // 还要断言旧分支真没了：只查「读了 entry.icon」的话，半回退写法
+    // `entry.kind === "skill" ? <Sparkles/> : <QuickEntryIcon icon={entry.icon}/>`
+    // 照样能过，而技能 chip 的图标会静默变回清一色星形。
+    expect(source).not.toContain('entry.kind === "skill" ? (');
+  });
 });

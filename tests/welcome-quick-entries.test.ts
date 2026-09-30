@@ -38,14 +38,21 @@ describe('欢迎页快捷入口数据', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('10 个入口，8 技能 2 工具', () => {
-    expect(WELCOME_QUICK_ENTRIES.length).toBe(10);
+  it('5 个入口，4 技能 1 工具', () => {
+    expect(WELCOME_QUICK_ENTRIES.length).toBe(5);
     expect(
       WELCOME_QUICK_ENTRIES.filter((e) => e.kind === 'skill').length,
-    ).toBe(8);
+    ).toBe(4);
     expect(
       WELCOME_QUICK_ENTRIES.filter((e) => e.kind === 'tool').length,
-    ).toBe(2);
+    ).toBe(1);
+  });
+
+  // 图标是这 5 个入口唯一的「它们不是同一件事」的视觉信号。两个入口共用同一个
+  // 图标 = 那一对等于没带信息，比不放图标更糟：它谎称两者同类。
+  it('5 个入口的图标互不相同', () => {
+    const icons = WELCOME_QUICK_ENTRIES.map((e) => e.icon);
+    expect(new Set(icons).size).toBe(icons.length);
   });
 
   it('每个技能入口的技能名真实存在于内置技能目录', () => {
@@ -96,41 +103,52 @@ describe('欢迎页快捷入口数据', () => {
 });
 
 describe('visibleQuickEntries 过滤', () => {
-  it('技能启用且视觉可用时，10 个入口全在', () => {
+  it('技能启用且视觉可用时，5 个入口全在', () => {
     expect(
       visibleQuickEntries(WELCOME_QUICK_ENTRIES, allSkillNames(), true).length,
-    ).toBe(10);
+    ).toBe(5);
   });
 
   it('被禁用的技能，它的入口不出现 —— 否则会插入 pi 不展开的令牌', () => {
     const enabled = allSkillNames();
-    enabled.delete('pdf');
+    // allSkillNames 收的是技能名（brainstorming / systematic-debugging / officecli /
+    // web-search），不是入口 id。名字写错时 delete 会安静地返回 false，这条守卫就
+    // 退化成恒真 —— 所以断言 delete 真的命中过。
+    expect(enabled.delete('web-search')).toBe(true);
     const visible = visibleQuickEntries(WELCOME_QUICK_ENTRIES, enabled, true);
-    expect(visible.some((e) => e.id === 'pdf')).toBe(false);
+    expect(visible.some((e) => e.id === 'web')).toBe(false);
     expect(visible.some((e) => e.id === 'office')).toBe(true);
   });
 
-  it('视觉不可用时「看图」不出现', () => {
+  it('视觉不可用时只隐藏「看图」，其余 4 个仍在', () => {
     const visible = visibleQuickEntries(
       WELCOME_QUICK_ENTRIES,
       allSkillNames(),
       false,
     );
-    expect(visible.some((e) => e.id === 'vision')).toBe(false);
-    expect(visible.some((e) => e.id === 'browser')).toBe(true);
+    expect(visible.map((e) => e.id)).toEqual([
+      'brainstorm',
+      'debug',
+      'office',
+      'web',
+    ]);
   });
 
-  it('技能全禁用时只剩两个工具入口', () => {
+  it('技能全禁用时只剩「看图」', () => {
     const visible = visibleQuickEntries(WELCOME_QUICK_ENTRIES, new Set(), true);
-    expect(visible.map((e) => e.id).sort()).toEqual(['browser', 'vision']);
+    expect(visible.map((e) => e.id)).toEqual(['vision']);
   });
 
-  it('技能全禁用且视觉不可用时只剩「操作浏览器」', () => {
+  // 行为变化：收敛前 browser 是无条件存在的兜底，任何状态下 chip 行都至少有 1 个
+  // 入口；现在没有了。这一态（用户禁掉全部相关技能且没配视觉模型）极罕见，且
+  // WelcomeView 用 `visibleEntries.length > 0` 兜住了空数组 —— 整行不渲染，页面
+  // 其余部分照旧。硬塞一个入口比留白更乱。
+  it('技能全禁用且视觉不可用时没有入口', () => {
     const visible = visibleQuickEntries(
       WELCOME_QUICK_ENTRIES,
       new Set(),
       false,
     );
-    expect(visible.map((e) => e.id)).toEqual(['browser']);
+    expect(visible).toEqual([]);
   });
 });

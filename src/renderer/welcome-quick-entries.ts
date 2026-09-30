@@ -2,16 +2,28 @@
  * 欢迎页快捷入口的数据表。
  *
  * 单独成文件的理由：它是测试的断言对象（「技能名是否真实存在」「i18n key 是否
- * 齐全」「禁用后是否隐藏」都不需要渲染 React），而 chip 行的展示内联在
- * WelcomeView 里 —— 那部分单次使用，不为它造抽象。
+ * 齐全」「禁用后是否隐藏」「图标是否互不相同」都不需要渲染 React），而 chip 行的
+ * 展示内联在 WelcomeView 里 —— 那部分单次使用，不为它造抽象。
  *
- * 顺序承载可读性：界面不分组，所以相邻关系就是唯一的组织手段。两个工具入口按
- * 能力亲缘插在中间 ——「看图」紧跟「处理 PDF」（都是处理输入），「操作浏览器」
- * 紧跟「联网搜索」（都是面向网络）。
+ * 规模：5 个入口，每个代表一个能力簇 —— 通用任务 / 代码 / 文档产物 / 网络 /
+ * 多模态。界面不给小标题，所以「一个簇一个入口」就是这 5 个位置的全部组织规则。
+ * 想加第 6 个，先回答它代表哪个新簇；答不上来就是在往发现性里掺水 —— 欢迎页是
+ * 能力边界的教学场，不是功能清单。落选的入口（审代码 / PR / PDF / 会议纪要 /
+ * 操作浏览器）仍可从「+」菜单与斜杠菜单进入，不是没了。
+ *
+ * 图标名必须由这张表决定（见 WelcomeQuickEntryIcon），不许在 WelcomeView 里按 id
+ * 另写一份映射 —— 两份表迟早漂移。
  *
  * labelKey 写成字面量而不是用 id 拼模板串：模板串 grep 不到，字面量能被搜索和
  * 逐条核对。
  */
+
+export type WelcomeQuickEntryIcon =
+  | "sparkles"
+  | "bug"
+  | "file-text"
+  | "globe"
+  | "eye";
 
 export type WelcomeQuickEntry =
   | {
@@ -20,6 +32,7 @@ export type WelcomeQuickEntry =
       /** `/skill:<skill>` 里的技能名，必须与 .deskwand/skills/<skill>/ 目录同名 */
       skill: string;
       labelKey: string;
+      icon: WelcomeQuickEntryIcon;
     }
   | {
       id: string;
@@ -27,48 +40,46 @@ export type WelcomeQuickEntry =
       labelKey: string;
       /** 示例任务提示词的 i18n key，点击后填进输入框 */
       promptKey: string;
-      icon: "globe" | "eye";
+      icon: WelcomeQuickEntryIcon;
       /** 该入口依赖视觉能力；能力不可用时整个入口不渲染 */
       needsVision?: boolean;
     };
 
 export const WELCOME_QUICK_ENTRIES: readonly WelcomeQuickEntry[] = [
+  // 位置 1 固定给覆盖面最广的入口：回来后总能在同一个地方找到它。
   {
     id: "brainstorm",
     kind: "skill",
     skill: "brainstorming",
     labelKey: "welcome.quick.brainstorm",
+    icon: "sparkles",
   },
+  // 代码
   {
     id: "debug",
     kind: "skill",
     skill: "systematic-debugging",
     labelKey: "welcome.quick.debug",
+    icon: "bug",
   },
-  {
-    id: "review",
-    kind: "skill",
-    skill: "requesting-code-review",
-    labelKey: "welcome.quick.review",
-  },
-  {
-    id: "git",
-    kind: "skill",
-    skill: "git-workflow",
-    labelKey: "welcome.quick.git",
-  },
+  // 文档产物
   {
     id: "office",
     kind: "skill",
     skill: "officecli",
     labelKey: "welcome.quick.office",
+    icon: "file-text",
   },
+  // 网络
   {
-    id: "pdf",
+    id: "web",
     kind: "skill",
-    skill: "pdf",
-    labelKey: "welcome.quick.pdf",
+    skill: "web-search",
+    labelKey: "welcome.quick.web",
+    icon: "globe",
   },
+  // 多模态。放末位是因为它是唯一有前置条件的入口：前 4 个点一下技能令牌就进输入
+  // 框，用户补一句话即可发送；这个点完得到一段长提示词、还得自己把图拖进来。
   {
     id: "vision",
     kind: "tool",
@@ -76,25 +87,6 @@ export const WELCOME_QUICK_ENTRIES: readonly WelcomeQuickEntry[] = [
     promptKey: "welcome.quickPrompt.vision",
     icon: "eye",
     needsVision: true,
-  },
-  {
-    id: "notes",
-    kind: "skill",
-    skill: "meeting-notes",
-    labelKey: "welcome.quick.notes",
-  },
-  {
-    id: "web",
-    kind: "skill",
-    skill: "web-search",
-    labelKey: "welcome.quick.web",
-  },
-  {
-    id: "browser",
-    kind: "tool",
-    labelKey: "welcome.quick.browser",
-    promptKey: "welcome.quickPrompt.browser",
-    icon: "globe",
   },
 ];
 
