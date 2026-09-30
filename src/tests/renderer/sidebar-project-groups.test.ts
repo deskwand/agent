@@ -11,6 +11,7 @@ import type { Session } from "../../renderer/types";
 const ipc = vi.hoisted(() => ({
   invoke: vi.fn(),
   deleteSession: vi.fn(),
+  deleteProject: vi.fn(),
   archiveSession: vi.fn(),
   getSessionMessages: vi.fn(),
   getSessionTraceSteps: vi.fn(),
@@ -1238,6 +1239,179 @@ describe("Sidebar project groups", () => {
         "span.rounded-full.bg-accent.animate-pulse",
       ),
     ).toBeNull();
+  });
+
+  it("deletes a project through the header trash action", async () => {
+    ipc.deleteProject.mockResolvedValue({
+      success: true,
+      path: "/work/deskwand",
+      deletedSessionIds: ["p1", "p2"],
+    });
+    await render([
+      session("p1", { isProjectMode: true, cwd: "/work/deskwand" }),
+      session("p2", { isProjectMode: true, cwd: "/work/deskwand" }),
+    ]);
+
+    const trash = projectHeader("/work/deskwand")?.querySelector(
+      `button[aria-label="${i18n.t("common.delete")}"]`,
+    ) as HTMLButtonElement;
+    expect(trash).toBeTruthy();
+    expect(trash.className).toContain("opacity-0");
+    expect(trash.className).toContain("pointer-events-none");
+
+    await act(async () => trash.click());
+    expect(ipc.deleteProject).not.toHaveBeenCalled();
+    expect(container.textContent).toContain(
+      i18n.t("sidebar.deleteProjectConfirmWithName", { name: "deskwand" }),
+    );
+    expect(container.textContent).not.toContain(
+      i18n.t("sidebar.deleteProjectRunningHint", { count: 2 }),
+    );
+
+    await act(async () => findButton(i18n.t("sidebar.confirmDelete"))?.click());
+    await flush();
+    expect(ipc.deleteProject).toHaveBeenCalledWith("/work/deskwand");
+    expect(findButton(i18n.t("sidebar.confirmDelete"))).toBeUndefined();
+  });
+
+  it("warns about sessions still active in the project", async () => {
+    ipc.deleteProject.mockResolvedValue({
+      success: true,
+      path: "/work/deskwand",
+      deletedSessionIds: ["p1", "p2"],
+    });
+    await render([
+      session("p1", { isProjectMode: true, cwd: "/work/deskwand" }),
+      session("p2", {
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+        status: "running",
+      }),
+    ]);
+
+    const trash = projectHeader("/work/deskwand")?.querySelector(
+      `button[aria-label="${i18n.t("common.delete")}"]`,
+    ) as HTMLButtonElement;
+    expect(trash).toBeTruthy();
+    await act(async () => trash.click());
+
+    expect(container.textContent).toContain(
+      i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
+    );
+  });
+
+  it("keeps the confirmation open when the delete fails", async () => {
+    ipc.deleteProject.mockResolvedValue({
+      success: false,
+      path: "",
+      deletedSessionIds: [],
+      error: "boom",
+    });
+    await render([
+      session("p1", { isProjectMode: true, cwd: "/work/deskwand" }),
+    ]);
+
+    const trash = projectHeader("/work/deskwand")?.querySelector(
+      `button[aria-label="${i18n.t("common.delete")}"]`,
+    ) as HTMLButtonElement;
+    expect(trash).toBeTruthy();
+    await act(async () => trash.click());
+    await act(async () => findButton(i18n.t("sidebar.confirmDelete"))?.click());
+    await flush();
+
+    expect(findButton(i18n.t("sidebar.confirmDelete"))).toBeTruthy();
+    expect(useAppStore.getState().globalNotice).toMatchObject({
+      type: "error",
+    });
+  });
+
+  it("counts the active sessions hidden by search, not the rendered group", async () => {
+    ipc.deleteProject.mockResolvedValue({
+      success: true,
+      path: "/work/deskwand",
+      deletedSessionIds: ["p1", "p2"],
+    });
+    await render([
+      session("p1", {
+        title: "Alpha",
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+      }),
+      session("p2", {
+        title: "Beta",
+        isProjectMode: true,
+        cwd: "/work/deskwand",
+        status: "running",
+      }),
+    ]);
+
+    // 搜 "alpha" 后组里只剩 idle 的 Alpha，运行中的 Beta 被过滤掉了。
+    // 若计数取自渲染出来的 group.sessions，这里会算成 0 —— 这正是本用例守的规则。
+    await search("alpha");
+
+    const trash = projectHeader("/work/deskwand")?.querySelector(
+      `button[aria-label="${i18n.t("common.delete")}"]`,
+    ) as HTMLButtonElement;
+    expect(trash).toBeTruthy();
+    await act(async () => trash.click());
+
+    expect(container.textContent).toContain(
+      i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
+    );
+  });
+
+  it("drops the deleted project's pin and expansion state", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarPins",
+      JSON.stringify({ sessionIds: [], projectKeys: ["/work/deskwand"] }),
+    );
+    localStorage.setItem(
+      "deskwand.sidebarGroupExpansion",
+      JSON.stringify({ __projects__: true, "/work/deskwand": false }),
+    );
+    ipc.deleteProject.mockResolvedValue({
+      success: true,
+      path: "/work/deskwand",
+      deletedSessionIds: ["p1"],
+    });
+    await render([
+      session("p1", { isProjectMode: true, cwd: "/work/deskwand" }),
+    ]);
+
+    const trash = projectHeader("/work/deskwand")?.querySelector(
+      `button[aria-label="${i18n.t("common.delete")}"]`,
+    ) as HTMLButtonElement;
+    await act(async () => trash.click());
+    await act(async () => findButton(i18n.t("sidebar.confirmDelete"))?.click());
+    await flush();
+
+    expect(localStorage.getItem("deskwand.sidebarPins") ?? "").not.toContain(
+      "/work/deskwand",
+    );
+    expect(
+      localStorage.getItem("deskwand.sidebarGroupExpansion") ?? "",
+    ).not.toContain("/work/deskwand");
+  });
+
+  it("returns to the welcome view when the active session was deleted", async () => {
+    ipc.deleteProject.mockResolvedValue({
+      success: true,
+      path: "/work/deskwand",
+      deletedSessionIds: ["p1"],
+    });
+    useAppStore.setState({ activeSessionId: "p1" });
+    await render([
+      session("p1", { isProjectMode: true, cwd: "/work/deskwand" }),
+    ]);
+
+    const trash = projectHeader("/work/deskwand")?.querySelector(
+      `button[aria-label="${i18n.t("common.delete")}"]`,
+    ) as HTMLButtonElement;
+    await act(async () => trash.click());
+    await act(async () => findButton(i18n.t("sidebar.confirmDelete"))?.click());
+    await flush();
+
+    expect(useAppStore.getState().activeSessionId).toBeNull();
   });
 });
 

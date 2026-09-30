@@ -869,6 +869,8 @@
     "deleteProjectConfirm": "确认删除这个项目？项目内聊天也会一起删除。",
     "deleteProjectConfirmWithName": "确认删除项目“{{name}}”？这只会删除应用内的项目记录和聊天，不会删除磁盘目录。",
     "deleteProjectFailed": "删除项目失败，请稍后重试",
+    "deleteProjectRunningHint_one": "其中 {{count}} 个会话还在进行中，确认后会立即停止。",
+    "deleteProjectRunningHint_other": "其中 {{count}} 个会话还在进行中，确认后会立即停止。",
     "cancel": "取消",
     "confirmDelete": "删除",
     "relativeTime": {

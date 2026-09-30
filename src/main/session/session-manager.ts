@@ -47,6 +47,7 @@ import { configStore } from "../config/config-store";
 import {
   DEFAULT_WORKDIR_DIRNAME,
   getDefaultWorkingDirPath,
+  toWorkspaceKey,
 } from "../../shared/workspace-path";
 import type { AppConfig, ProviderProfileKey } from "../config/config-store";
 import type { BrowserViewManager } from "../browser/browser-view-manager";
@@ -2170,16 +2171,16 @@ export class SessionManager {
   }
 
   async deleteProjectByCwd(cwd: string): Promise<string[]> {
-    const normalizedCwd = cwd.trim().replace(/[/]+$/, "");
-    if (!normalizedCwd) {
+    const projectKey = toWorkspaceKey(cwd);
+    if (!projectKey) {
       return [];
     }
 
     const sessionIds = this.listSessions()
-      .sessions.filter(
-        (session) =>
-          (session.cwd || "").trim().replace(/[\\/]+$/, "") === normalizedCwd,
-      )
+      .sessions.filter((session) => {
+        const sessionCwd = session.cwd;
+        return sessionCwd ? toWorkspaceKey(sessionCwd) === projectKey : false;
+      })
       .map((session) => session.id);
 
     if (sessionIds.length === 0) {

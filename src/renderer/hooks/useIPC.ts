@@ -1379,7 +1379,7 @@ export function useIPC() {
       if (!isElectron) {
         return { success: true, path: cwd, deletedSessionIds: [] };
       }
-      return invoke<{
+      const result = await invoke<{
         success: boolean;
         path: string;
         deletedSessionIds: string[];
@@ -1388,6 +1388,12 @@ export function useIPC() {
         type: "project.delete",
         payload: { cwd },
       });
+      if (result.success) {
+        // 会话已在主进程删除，本地 store 必须同步摘掉；否则界面继续显示
+        // 已不存在的会话，表现为「点了删除，项目还在」。
+        useAppStore.getState().removeSessions(result.deletedSessionIds);
+      }
+      return result;
     },
     [invoke],
   );

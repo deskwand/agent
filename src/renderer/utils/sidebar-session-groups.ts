@@ -1,4 +1,7 @@
-import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
+import {
+  DEFAULT_WORKDIR_DIRNAME,
+  toWorkspaceKey,
+} from "../../shared/workspace-path";
 import type { Session } from "../types";
 
 export interface SidebarProjectGroup {
@@ -30,17 +33,6 @@ function sessionTime(session: Session): number {
 
 function normalizeWorkspacePath(cwd: string): string {
   return cwd.trim().replace(/[\\/]+$/, "");
-}
-
-function workspaceKey(cwd: string): string {
-  const normalized = normalizeWorkspacePath(cwd);
-  const isWindowsPath =
-    /^[A-Za-z]:([\\/]|$)/.test(normalized) ||
-    normalized.startsWith("\\\\") ||
-    normalized.startsWith("//");
-  return isWindowsPath
-    ? normalized.replace(/\\/g, "/").toLowerCase()
-    : normalized;
 }
 
 function workspaceName(cwd: string): string {
@@ -107,7 +99,7 @@ export function buildSidebarSessionGroups(
     }
 
     const cwd = normalizeWorkspacePath(session.cwd);
-    const key = workspaceKey(cwd);
+    const key = toWorkspaceKey(cwd);
     const group = projects.get(key) ?? { cwd, sessions: [] };
     group.sessions.push(session);
     projects.set(key, group);

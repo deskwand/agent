@@ -869,6 +869,8 @@
     "deleteProjectConfirm": "Delete this project? Chats inside it will also be deleted.",
     "deleteProjectConfirmWithName": "Delete project “{{name}}”? This only removes the project entry and chats in the app. It will not delete the directory on disk.",
     "deleteProjectFailed": "Failed to delete project. Please try again.",
+    "deleteProjectRunningHint_one": "{{count}} chat in it is still active and will be stopped immediately.",
+    "deleteProjectRunningHint_other": "{{count}} chats in it are still active and will be stopped immediately.",
     "cancel": "Cancel",
     "confirmDelete": "Delete",
     "relativeTime": {

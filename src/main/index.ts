@@ -171,7 +171,10 @@ import { removePooledSubagentRows } from "./usage/usage-store";
 import { queryUsage } from "./usage/usage-store";
 import { DEFAULT_USAGE_RANGE, type UsageRange } from "../shared/usage";
 import { getUnsupportedWorkspacePathReason } from "./workspace-path-constraints";
-import { getDefaultWorkingDirPath } from "../shared/workspace-path";
+import {
+  getDefaultWorkingDirPath,
+  toWorkspaceKey,
+} from "../shared/workspace-path";
 import { startTelemetryHeartbeat } from "./telemetry";
 import { trackEvent } from "./telemetry-events";
 import {
@@ -4538,7 +4541,11 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
       const deletedSessionIds = sessionManager
         ? await sessionManager.deleteProjectByCwd(normalizedCwd)
         : [];
-      if (normalizeWorkspacePath(getWorkingDir()) === normalizedCwd) {
+      const currentWorkspaceKey = toWorkspaceKey(getWorkingDir() ?? "");
+      if (
+        currentWorkspaceKey &&
+        currentWorkspaceKey === toWorkspaceKey(normalizedCwd)
+      ) {
         const defaultDir = initializeDefaultWorkingDir();
         await setWorkingDir(defaultDir);
       }

@@ -324,3 +324,89 @@ describe('SessionManager.handleSudoPasswordResponse', () => {
   });
 });
 
+
+// ------------------------------------------------------------------
+// deleteProjectByCwd
+// ------------------------------------------------------------------
+describe('SessionManager.deleteProjectByCwd', () => {
+  function row(id: string, cwd: string | null, archived = false) {
+    return {
+      id,
+      title: id,
+      deskwand_session_id: null,
+      openai_thread_id: null,
+      status: 'idle',
+      cwd,
+      mounted_paths: '[]',
+      allowed_tools: '[]',
+      memory_enabled: 0,
+      is_project_mode: 1,
+      provider_profile_key: null,
+      model: null,
+      thinking_level: 'medium',
+      archived: archived ? 1 : 0,
+      archived_at: null,
+      pi_session_file: null,
+      created_at: 1,
+      updated_at: 1,
+    };
+  }
+
+  function managerFor(rows: ReturnType<typeof row>[]) {
+    const deleted: string[] = [];
+    const db = makeDb({
+      // batchDeleteSessions 的 DB 删除包在 raw.exec("BEGIN"/"COMMIT") 里，
+      // 假库必须给出这个 stub，否则会挂在 this.db.raw.exec 上。
+      // 只提供 stub，不断言它的调用 —— 事务机制不是我们实现的东西。
+      raw: { exec: vi.fn() } as unknown as DatabaseInstance['raw'],
+      sessions: {
+        create: vi.fn(),
+        get: vi.fn(() => null),
+        getAll: vi.fn(() => rows),
+        update: vi.fn(),
+        delete: vi.fn((id: string) => {
+          deleted.push(id);
+        }),
+      } as unknown as DatabaseInstance['sessions'],
+    });
+    return { manager: new SessionManager(db, vi.fn()), deleted };
+  }
+
+  it('deletes every session of the workspace, including archived ones', async () => {
+    const { manager, deleted } = managerFor([
+      row('a', '/work/proj'),
+      row('b', '/work/proj', true),
+      row('c', '/work/other'),
+    ]);
+
+    await expect(manager.deleteProjectByCwd('/work/proj')).resolves.toEqual([
+      'a',
+      'b',
+    ]);
+    expect(deleted.sort()).toEqual(['a', 'b']);
+  });
+
+  it('matches Windows paths that differ only by separators or case', async () => {
+    const { manager, deleted } = managerFor([
+      row('a', 'D:\\Foo'),
+      row('b', 'd:/foo/'),
+      row('c', 'd:/foobar'),
+    ]);
+
+    await expect(manager.deleteProjectByCwd('D:\\Foo\\')).resolves.toEqual([
+      'a',
+      'b',
+    ]);
+    expect(deleted.sort()).toEqual(['a', 'b']);
+  });
+
+  it('returns an empty list when nothing matches or the path is blank', async () => {
+    const { manager, deleted } = managerFor([row('a', '/work/proj')]);
+
+    await expect(manager.deleteProjectByCwd('/work/absent')).resolves.toEqual(
+      [],
+    );
+    await expect(manager.deleteProjectByCwd('   ')).resolves.toEqual([]);
+    expect(deleted).toEqual([]);
+  });
+});

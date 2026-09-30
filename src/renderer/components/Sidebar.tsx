@@ -22,11 +22,15 @@ import {
   SidebarGroupIcon,
 } from "./sidebar-disclosure-motion";
 import type { Session } from "../types";
-import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
+import {
+  DEFAULT_WORKDIR_DIRNAME,
+  toWorkspaceKey,
+} from "../../shared/workspace-path";
 import {
   buildSidebarSessionGroups,
   isSessionBusy,
   type SidebarPins,
+  type SidebarProjectGroup,
 } from "../utils/sidebar-session-groups";
 import { Tooltip } from "./Tooltip";
 import {
@@ -79,6 +83,7 @@ export function Sidebar({
   const {
     invoke,
     deleteSession,
+    deleteProject,
     renameSession,
     archiveSession,
     getSessionMessagesPage,
@@ -141,6 +146,7 @@ export function Sidebar({
   const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     message: string;
+    detail?: string;
     onConfirm: () => void;
   } | null>(null);
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
@@ -616,6 +622,94 @@ export function Sidebar({
       }
     },
     [handleNewSession, invoke, isElectron, setGlobalNotice, setWorkingDir, t],
+  );
+
+  const handleDeleteProject = useCallback(
+    (group: SidebarProjectGroup) => {
+      // 计数口径必须与「实际会被停掉的会话」一致：搜索态下 group.sessions
+      // 已被过滤，用它统计会把没显示的进行中会话算漏，所以遍历未过滤的
+      // activeSessions。判定用 isSessionBusy（运行中 / 有后台子代理 /
+      // 在等 ask_user），这三类在删除时都会被 stopSession 打断。
+      const activeCount = activeSessions.filter((s) => {
+        const sessionCwd = s.cwd;
+        if (!sessionCwd) return false;
+        return (
+          toWorkspaceKey(sessionCwd) === group.key &&
+          isSessionBusy(
+            s,
+            sessionStates[s.id]?.backgroundAgents,
+            sessionHasPendingAskUser(s.id),
+          )
+        );
+      }).length;
+
+      // 「是否回欢迎页」在点击这一刻就定下来：确认后 removeSessions 已把活跃会话
+      // 清空，那时再去问 store 永远得不到答案。
+      const previousActiveSessionId = activeSessionId;
+
+      setDeleteConfirm({
+        message: t("sidebar.deleteProjectConfirmWithName", {
+          name: group.name,
+        }),
+        detail:
+          activeCount > 0
+            ? t("sidebar.deleteProjectRunningHint", { count: activeCount })
+            : undefined,
+        onConfirm: async () => {
+          try {
+            const result = await deleteProject(group.cwd);
+            if (!result.success) {
+              setGlobalNotice({
+                id: `notice-project-delete-failed-${Date.now()}`,
+                type: "error",
+                message: result.error || t("sidebar.deleteProjectFailed"),
+              });
+              return;
+            }
+
+            if (
+              previousActiveSessionId &&
+              result.deletedSessionIds.includes(previousActiveSessionId)
+            ) {
+              handleNewSession();
+            }
+
+            setSidebarPins((current) => ({
+              ...current,
+              projectKeys: current.projectKeys.filter((k) => k !== group.key),
+            }));
+            setProjectExpansionOverrides((current) => {
+              const next = new Map(current);
+              next.delete(group.key);
+              return next;
+            });
+            setSessionVisibleCountOverrides((current) => {
+              const next = new Map(current);
+              next.delete(group.key);
+              return next;
+            });
+            setDeleteConfirm(null);
+          } catch (error) {
+            console.error("[Sidebar] Failed to delete project:", error);
+            setGlobalNotice({
+              id: `notice-project-delete-failed-${Date.now()}`,
+              type: "error",
+              message: t("sidebar.deleteProjectFailed"),
+            });
+          }
+        },
+      });
+    },
+    [
+      activeSessionId,
+      activeSessions,
+      deleteProject,
+      handleNewSession,
+      sessionHasPendingAskUser,
+      sessionStates,
+      setGlobalNotice,
+      t,
+    ],
   );
 
   const highlightTitle = (title: string, query: string) => {
@@ -1156,6 +1250,19 @@ export function Sidebar({
                                     />
                                   </button>
                                 </Tooltip>
+                                <Tooltip label={t("common.delete")}>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleDeleteProject(group);
+                                    }}
+                                    className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-error/10 hover:text-error transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                    aria-label={t("common.delete")}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </Tooltip>
                               </div>
                               <SidebarAnimatedSection
                                 expanded={isProjectExpanded}
@@ -1202,6 +1309,11 @@ export function Sidebar({
                     <p className="text-sm leading-6 text-text-primary">
                       {deleteConfirm.message}
                     </p>
+                    {deleteConfirm.detail && (
+                      <p className="mt-2 text-sm leading-6 text-error">
+                        {deleteConfirm.detail}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center justify-end gap-2 border-t border-border-muted px-4 py-3">
                     <button

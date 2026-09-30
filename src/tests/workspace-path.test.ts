@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { resolvePathAgainstWorkspace } from "../shared/workspace-path";
+import {
+  resolvePathAgainstWorkspace,
+  toWorkspaceKey,
+} from "../shared/workspace-path";
 
 describe("resolvePathAgainstWorkspace", () => {
   it("returns empty/falsy pathValue as-is", () => {
@@ -74,5 +77,38 @@ describe("resolvePathAgainstWorkspace", () => {
     expect(resolvePathAgainstWorkspace("/workspace/src/main.ts")).toBe(
       "/workspace/src/main.ts",
     );
+  });
+});
+
+describe("toWorkspaceKey", () => {
+  it("keeps POSIX paths case-sensitive and only strips trailing slashes", () => {
+    expect(toWorkspaceKey("/work/deskwand/")).toBe("/work/deskwand");
+    expect(toWorkspaceKey("/work/Foo")).not.toBe(toWorkspaceKey("/work/foo"));
+  });
+
+  it("returns an empty key for empty or slash-only input", () => {
+    expect(toWorkspaceKey("   ")).toBe("");
+    expect(toWorkspaceKey("/")).toBe("");
+  });
+
+  it("matches the rule the sidebar used before it moved into shared code", () => {
+    // 这些期望值就是迁移前 sidebar-session-groups.ts 里私有 workspaceKey 的输出。
+    // 逐字保持的原因：localStorage 的 deskwand.sidebarPins /
+    // deskwand.sidebarGroupExpansion 以这个字符串为键。
+    const cases: Array<[string, string]> = [
+      ["/work/deskwand", "/work/deskwand"],
+      ["/work/deskwand/", "/work/deskwand"],
+      ["  /work/padded  ", "/work/padded"],
+      ["D:/work/App", "d:/work/app"],
+      ["D:\\work\\app\\", "d:/work/app"],
+      ["\\\\srv\\share\\App\\", "//srv/share/app"],
+      // 退化输入：`D:` 被当成 Windows 路径（旧规则如此），
+      // 而 shared/local-file-path.ts 的 isWindowsDrivePath 不认它 —— 所以这里
+      // 特地把规则钉住，不允许改成复用那个 helper。
+      ["D:", "d:"],
+    ];
+    for (const [input, expected] of cases) {
+      expect(toWorkspaceKey(input)).toBe(expected);
+    }
   });
 });

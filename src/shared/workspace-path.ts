@@ -99,3 +99,24 @@ function joinRelativePath(basePath: string, relativePath: string): string {
 
   return result;
 }
+
+/**
+ * 把工作目录路径折成一个可比较的「项目键」。
+ *
+ * renderer 用它给侧边栏分组建键，main 用它匹配「删哪个项目的会话」——
+ * 两边必须是同一个函数：一旦规则分叉，Windows 上大小写或分隔符一变就会出现
+ * 「界面上是一个项目、删除只干掉一半」，剩下的会话让分组当场复活。
+ *
+ * Windows 盘符路径与 UNC 路径统一分隔符并折叠大小写；POSIX 路径只去尾部斜杠、
+ * 保持大小写敏感（`/a` 与 `/A` 是两个目录）。
+ */
+export function toWorkspaceKey(cwd: string): string {
+  const normalized = cwd.trim().replace(/[/\\]+$/, "");
+  const isWindowsPath =
+    /^[A-Za-z]:([\\/]|$)/.test(normalized) ||
+    normalized.startsWith("\\\\") ||
+    normalized.startsWith("//");
+  return isWindowsPath
+    ? normalized.replace(/\\/g, "/").toLowerCase()
+    : normalized;
+}
