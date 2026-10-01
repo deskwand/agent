@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ConnectorEntry } from "../../../shared/connectors";
+import type { ActionResult, ConnectorEntry } from "../../../shared/connectors";
 import { ConnectorCard } from "./ConnectorCard";
 import { SettingsSkills } from "../settings/SettingsSkills";
 import { PiExtensionManagerView } from "../PiExtensionManagerView";
@@ -17,6 +17,11 @@ function needsAttention(entry: ConnectorEntry): boolean {
   return kind === "failed" || kind === "needs-auth";
 }
 
+/** 用户主动取消不是失败：主进程用 cancelled 标记，界面不该报红。 */
+function isCancelled(res: ActionResult): boolean {
+  return res.cancelled === true;
+}
+
 export function ConnectorsView() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<TabId>("connect");
@@ -24,6 +29,48 @@ export function ConnectorsView() {
   const [entries, setEntries] = useState<ConnectorEntry[]>([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  /**
+   * 本地的「正在等这次授权」，按 server name 记。
+   * 与传输层的 `connecting` 无关：从点下「连接/重新授权」到 IPC 返回之间，
+   * 传输层可能什么都还没发生，但用户必须看得到进度、也必须能中止。
+   */
+  const [authPending, setAuthPending] = useState<Record<string, boolean>>({});
+  /** 同步守卫：同一个事件里连点两次时 state 还没落地，只有 ref 拦得住。 */
+  const authPendingRef = useRef(new Set<string>());
+  /** 每个 server 一个操作序号：断开会让在途操作作废，其回调不再报错/提示。 */
+  const actionSeqRef = useRef(new Map<string, number>());
+
+  const beginAuth = useCallback((serverName: string): number | undefined => {
+    if (authPendingRef.current.has(serverName)) return undefined;
+    authPendingRef.current.add(serverName);
+    setAuthPending((prev) => ({ ...prev, [serverName]: true }));
+    const seq = (actionSeqRef.current.get(serverName) ?? 0) + 1;
+    actionSeqRef.current.set(serverName, seq);
+    return seq;
+  }, []);
+
+  const endAuth = useCallback((serverName: string): void => {
+    authPendingRef.current.delete(serverName);
+    setAuthPending((prev) => {
+      if (!(serverName in prev)) return prev;
+      const next = { ...prev };
+      delete next[serverName];
+      return next;
+    });
+  }, []);
+
+  const isStale = useCallback(
+    (serverName: string, seq: number): boolean =>
+      actionSeqRef.current.get(serverName) !== seq,
+    [],
+  );
+
+  const invalidate = useCallback((serverName: string): void => {
+    actionSeqRef.current.set(
+      serverName,
+      (actionSeqRef.current.get(serverName) ?? 0) + 1,
+    );
+  }, []);
 
   /** 把「写盘成功但没会话，下次对话才生效」如实说出来 —— 否则界面毫无变化。 */
   /**
@@ -78,52 +125,100 @@ export function ConnectorsView() {
 
   const onConnect = useCallback(
     async (key: string) => {
+      // 已经在等授权就别再发一次：在途的流程还没结束，重复发起只会多一个回调服务器。
+      const seq = beginAuth(key);
+      if (seq === undefined) return;
       setError("");
       // 连接会顺带发起授权（并可能打开浏览器）。整个过程要等用户在浏览器里
       // 点完「批准」，可能几十秒 —— 先说出来，别让人以为卡住了。
       setNotice(t("connectors.signInStarted"));
-      const res = await window.electronAPI.connectors.addCatalogServer(key);
-      if (!res.ok) setError(res.error ?? t("connectors.connectFailed"));
-      reportIfPending(res);
-      await refresh();
+      try {
+        const res = await window.electronAPI.connectors.addCatalogServer(key);
+        // 断开已经作废了这次操作：它的结果不该再影响界面。
+        if (isStale(key, seq)) return;
+        if (!res.ok && !isCancelled(res)) {
+          setError(res.error ?? t("connectors.connectFailed"));
+        }
+        reportIfPending(res);
+      } catch {
+        if (!isStale(key, seq)) setError(t("connectors.connectFailed"));
+      } finally {
+        // 只有原流程真正 settle 之后才允许再次授权。
+        endAuth(key);
+        await refresh();
+      }
     },
-    [refresh, t, reportIfPending],
+    [beginAuth, endAuth, isStale, refresh, t, reportIfPending],
   );
 
   const onDisconnect = useCallback(
     async (id: string) => {
       setError("");
-      const res = await window.electronAPI.connectors.removeServer(id);
-      if (!res.ok) setError(res.error ?? t("connectors.disconnectFailed"));
-      await refresh();
+      setNotice("");
+      if (authPendingRef.current.has(id)) {
+        // 先中止授权再删：等回调回来再写凭据，会把刚删掉的 server 又接上。
+        // 同时作废在途操作，免得它收尾时再弹一次失败/提示。
+        invalidate(id);
+        void window.electronAPI.connectors.cancelSignIn(id).catch(() => {});
+      }
+      try {
+        const res = await window.electronAPI.connectors.removeServer(id);
+        if (!res.ok) setError(res.error ?? t("connectors.disconnectFailed"));
+      } catch {
+        setError(t("connectors.disconnectFailed"));
+      } finally {
+        // 原授权的 finally 负责清 pending，删除成功不代表它已经结束。
+        await refresh();
+      }
     },
-    [refresh, t],
+    [invalidate, refresh, t],
   );
 
   const onAuthorize = useCallback(
     async (id: string) => {
+      const seq = beginAuth(id);
+      if (seq === undefined) return;
       setError("");
       setNotice("");
-      const res = await window.electronAPI.connectors.authorize(id);
-      if (!res.ok) setError(res.error ?? t("connectors.connectFailed"));
-      reportIfPending(res);
-      await refresh();
+      try {
+        const res = await window.electronAPI.connectors.authorize(id);
+        if (isStale(id, seq)) return;
+        if (!res.ok && !isCancelled(res)) {
+          setError(res.error ?? t("connectors.connectFailed"));
+        }
+        reportIfPending(res);
+      } catch {
+        if (!isStale(id, seq)) setError(t("connectors.connectFailed"));
+      } finally {
+        endAuth(id);
+        await refresh();
+      }
     },
-    [refresh, t, reportIfPending],
+    [beginAuth, endAuth, isStale, refresh, t, reportIfPending],
   );
 
   const onCancel = useCallback(
     async (id: string) => {
       setError("");
       setNotice("");
-      const res = await window.electronAPI.connectors.cancelSignIn(id);
-      // 没有在等授权时不算错 —— 用户只是想中止，结果本来就可能是「已经结束了」。
-      if (!res.ok && res.error !== "no sign-in in progress") {
-        setError(res.error ?? t("connectors.connectFailed"));
+      try {
+        const res = await window.electronAPI.connectors.cancelSignIn(id);
+        // 没有在等授权时不算错 —— 用户只是想中止，结果本来就可能是「已经结束了」。
+        // 主动取消（cancelled）同理：那是预期结果，不是失败。
+        if (
+          !res.ok &&
+          !isCancelled(res) &&
+          res.error !== "no sign-in in progress"
+        ) {
+          setError(res.error ?? t("connectors.connectFailed"));
+        }
+      } catch {
+        setError(t("connectors.connectFailed"));
       }
-      await refresh();
+      // 刻意不在这里收尾：等原流程 settle 后由它的 finally 清 pending，
+      // 否则旧流程还挂着就能重新点授权。
     },
-    [refresh, t],
+    [t],
   );
 
   const onToggle = useCallback(
@@ -227,6 +322,7 @@ export function ConnectorsView() {
                     key={entry.key}
                     entry={entry}
                     variant="row"
+                    authorizing={authPending[entry.serverName] === true}
                     onConnect={onConnect}
                     onDisconnect={onDisconnect}
                     onAuthorize={onAuthorize}
@@ -241,6 +337,7 @@ export function ConnectorsView() {
                   <ConnectorCard
                     key={entry.key}
                     entry={entry}
+                    authorizing={authPending[entry.serverName] === true}
                     onConnect={onConnect}
                     onDisconnect={onDisconnect}
                     onAuthorize={onAuthorize}
@@ -261,6 +358,7 @@ export function ConnectorsView() {
                 key={entry.key}
                 entry={entry}
                 variant="row"
+                authorizing={authPending[entry.serverName] === true}
                 onConnect={onConnect}
                 onDisconnect={onDisconnect}
                 onAuthorize={onAuthorize}

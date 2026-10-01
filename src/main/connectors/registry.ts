@@ -119,6 +119,7 @@ export function buildRegistry(deps: RegistryDeps): Registry {
   async function removeServer(serverName: string): Promise<ActionResult> {
     // 两步都必须做：只删配置不删凭据，重新添加时会静默复用旧 token。
     const entry = deps.loadConfig().servers.find((s) => s.name === serverName);
+    if (entry && "url" in entry.config) deps.cancelSignIn(entry.config.url);
     const res = await deps.removeServer(serverName);
     if (entry && "url" in entry.config) {
       await deps.removeCredentials(entry.config.url);

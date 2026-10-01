@@ -8,6 +8,12 @@ interface Props {
   entry: ConnectorEntry;
   /** "grid" 是发现视图（卡片），"row" 是管理视图（紧凑行）。见设计文档 D12。 */
   variant?: "grid" | "row";
+  /**
+   * 本地正在等这次授权（IPC 还没返回）。它优先于传输状态：
+   * 传输层此时可能什么都还没发生，但用户刚点了「连接/重新授权」，
+   * 看到的必须是「授权中 + 取消」，而不是一个还能再点的「连接」。
+   */
+  authorizing?: boolean;
   /** 传 entry.serverName —— registry 按目录 key 查表，不认卡片的复合 key */
   onConnect: (serverName: string) => void;
   onDisconnect: (instanceId: string) => void;
@@ -57,6 +63,7 @@ function statusText(
 export function ConnectorCard({
   entry,
   variant = "grid",
+  authorizing = false,
   onConnect,
   onDisconnect,
   onAuthorize,
@@ -144,18 +151,24 @@ export function ConnectorCard({
         ) : (
           <>
             <span className="flex items-center gap-1.5 text-xs text-text-secondary min-w-0">
-              {instance && (
+              {authorizing ? (
+                <span
+                  className={`w-1.5 h-1.5 rounded-full flex-none ${dotClass("connecting")}`}
+                />
+              ) : instance ? (
                 <span
                   className={`w-1.5 h-1.5 rounded-full flex-none ${dotClass(instance.status.kind)}`}
                 />
-              )}
+              ) : null}
               <span className="truncate">
-                {instance
-                  ? statusText(instance.status, t)
-                  : t("connectors.status.off")}
+                {authorizing
+                  ? t("connectors.status.connecting")
+                  : instance
+                    ? statusText(instance.status, t)
+                    : t("connectors.status.off")}
               </span>
             </span>
-            {renderAction(entry, instance, t, {
+            {renderAction(entry, instance, authorizing, t, {
               onConnect,
               onDisconnect,
               onAuthorize,
@@ -171,6 +184,7 @@ export function ConnectorCard({
 function renderAction(
   entry: ConnectorEntry,
   instance: ConnectorInstance | undefined,
+  authorizing: boolean,
   t: (key: string) => string,
   handlers: {
     onConnect: (serverName: string) => void;
@@ -184,6 +198,38 @@ function renderAction(
   const ghost =
     "px-2.5 py-1 text-xs rounded-control border border-border text-text-primary hover:bg-surface-hover transition-colors";
 
+  // 规则：只要已添加，就永远给一条退路（「断开」）。
+  // 之前 `connecting` 只给一个禁用按钮 —— 用户不能取消、不能重试、不能断开，
+  // 只能手动去改 mcp.json。任何状态都不该把人困住。
+  const disconnectButton = instance ? (
+    <button
+      type="button"
+      className={ghost}
+      onClick={() => handlers.onDisconnect(instance.id)}
+    >
+      {t("connectors.action.disconnect")}
+    </button>
+  ) : null;
+
+  // 本地授权待处理优先于传输状态。未添加的条目此刻还没有实例，
+  // 取消只能用 serverName —— registry 按 mcp.json 里的 server 名查授权表。
+  if (authorizing) {
+    return (
+      <>
+        <button
+          type="button"
+          className={primary}
+          onClick={() =>
+            handlers.onCancel(instance ? instance.id : entry.serverName)
+          }
+        >
+          {t("connectors.action.cancel")}
+        </button>
+        {disconnectButton}
+      </>
+    );
+  }
+
   if (!instance) {
     return (
       <button
@@ -195,19 +241,6 @@ function renderAction(
       </button>
     );
   }
-
-  // 规则：只要已添加，就永远给一条退路（「断开」）。
-  // 之前 `connecting` 只给一个禁用按钮 —— 用户不能取消、不能重试、不能断开，
-  // 只能手动去改 mcp.json。任何状态都不该把人困住。
-  const disconnectButton = (
-    <button
-      type="button"
-      className={ghost}
-      onClick={() => handlers.onDisconnect(instance.id)}
-    >
-      {t("connectors.action.disconnect")}
-    </button>
-  );
 
   switch (instance.status.kind) {
     case "ready":
@@ -229,19 +262,10 @@ function renderAction(
       );
 
     case "connecting":
-      // 正在授权/连接：必须能中止，否则用户要干等最多 5 分钟的超时。
-      return (
-        <>
-          <button
-            type="button"
-            className={primary}
-            onClick={() => handlers.onCancel(instance.id)}
-          >
-            {t("connectors.action.cancel")}
-          </button>
-          {disconnectButton}
-        </>
-      );
+      // 传输适配器在连接 / 等授权，但本地没有对应的授权流程 ——
+      // `cancelSignIn` 此时找不到东西可中止。只保留「断开」这条退路，
+      // 真正的授权取消走上面的 `authorizing` 分支。
+      return disconnectButton;
 
     case "needs-auth":
       return (

@@ -10,6 +10,8 @@ import {
   setServerEnabled,
 } from "../../main/connectors/mcp-config-file";
 
+import { ipcConfigToSdkConfig } from "../../main/connectors/ipc-config-adapter";
+
 let dir: string;
 
 beforeEach(() => {
@@ -209,5 +211,161 @@ describe("refuses to clobber a broken file", () => {
     fs.writeFileSync(mcpConfigPath(dir), "{ broken");
     expect(setServerEnabled(dir, "notion", false)).toBe(false);
     expect(fs.readFileSync(mcpConfigPath(dir), "utf8")).toBe("{ broken");
+  });
+});
+
+describe("upsertServer rename (previousName)", () => {
+  it("renames an existing server in a single write", () => {
+    upsertServer(dir, "old-name", { type: "http", url: "https://x/mcp" });
+    upsertServer(
+      dir,
+      "new-name",
+      { type: "http", url: "https://x/mcp" },
+      "old-name",
+    );
+    expect(Object.keys(file().mcpServers)).toEqual(["new-name"]);
+  });
+
+  it("rejects a rename that would overwrite an unrelated server", () => {
+    upsertServer(dir, "a", { type: "http", url: "https://a/mcp" });
+    upsertServer(dir, "b", { type: "http", url: "https://b/mcp" });
+    const before = fs.readFileSync(mcpConfigPath(dir), "utf8");
+    expect(() =>
+      upsertServer(dir, "b", { type: "http", url: "https://renamed/mcp" }, "a"),
+    ).toThrow(/already exists/);
+    // 冲突时必须原地退出，不能把 a 或 b 覆盖掉
+    expect(fs.readFileSync(mcpConfigPath(dir), "utf8")).toBe(before);
+  });
+
+  it("treats previousName equal to name as a plain update", () => {
+    upsertServer(dir, "a", { type: "http", url: "https://old/mcp" });
+    upsertServer(dir, "a", { type: "http", url: "https://new/mcp" }, "a");
+    expect(file().mcpServers.a.url).toBe("https://new/mcp");
+    expect(Object.keys(file().mcpServers)).toEqual(["a"]);
+  });
+
+  it("ignores a previousName that is not in the file", () => {
+    upsertServer(
+      dir,
+      "fresh",
+      { type: "http", url: "https://x/mcp" },
+      "never-existed",
+    );
+    expect(Object.keys(file().mcpServers)).toEqual(["fresh"]);
+  });
+});
+
+describe("upsertServer partial saves", () => {
+  it("keeps SDK/options fields when the transport is unchanged", () => {
+    upsertServer(dir, "remote", {
+      type: "http",
+      url: "https://x/mcp",
+      oauth: { clientId: "abc" },
+      timeout: 30,
+    });
+    // 相当于设置页 toggle enabled 时发来的部分配置：只有表单字段
+    upsertServer(dir, "remote", {
+      type: "http",
+      url: "https://x/mcp",
+      enabled: false,
+      exposure: "direct",
+    });
+    const written = file().mcpServers.remote;
+    expect(written.enabled).toBe(false);
+    expect(written.oauth).toEqual({ clientId: "abc" });
+    expect(written.timeout).toBe(30);
+  });
+
+  it("drops the old transport's fields when the transport changes", () => {
+    upsertServer(dir, "switch", {
+      type: "stdio",
+      command: "node",
+      args: ["server.js"],
+      env: { A: "1" },
+    });
+    upsertServer(dir, "switch", { type: "http", url: "https://x/mcp" });
+    const written = file().mcpServers.switch;
+    expect(written.url).toBe("https://x/mcp");
+    expect(written.command).toBeUndefined();
+    expect(written.args).toBeUndefined();
+    expect(written.env).toBeUndefined();
+  });
+
+  it("drops http fields when switching to stdio", () => {
+    upsertServer(dir, "switch", {
+      type: "http",
+      url: "https://x/mcp",
+      headers: { Authorization: "Bearer t" },
+    });
+    upsertServer(dir, "switch", { type: "stdio", command: "node" });
+    const written = file().mcpServers.switch;
+    expect(written.command).toBe("node");
+    expect(written.url).toBeUndefined();
+    expect(written.headers).toBeUndefined();
+  });
+
+  it("keeps options fields across a rename with the same transport", () => {
+    upsertServer(dir, "before", {
+      type: "http",
+      url: "https://x/mcp",
+      oauth: { clientId: "abc" },
+    });
+    upsertServer(
+      dir,
+      "after",
+      { type: "http", url: "https://x/mcp" },
+      "before",
+    );
+    expect(file().mcpServers.after.oauth).toEqual({ clientId: "abc" });
+  });
+});
+
+describe("advanced settings field removal", () => {
+  it("clears removed arguments and environment while keeping unmodeled options", () => {
+    upsertServer(dir, "local", {
+      type: "stdio",
+      command: "node",
+      args: ["old.js"],
+      env: { OLD_TOKEN: "secret" },
+      cwd: "/workspace",
+      timeout: 30,
+    });
+    upsertServer(
+      dir,
+      "local",
+      ipcConfigToSdkConfig({
+        id: "local",
+        name: "local",
+        type: "stdio",
+        command: "node",
+        enabled: true,
+      }),
+    );
+    const saved = file().mcpServers.local;
+    expect(saved.args).toBeUndefined();
+    expect(saved.env).toBeUndefined();
+    expect(saved.cwd).toBe("/workspace");
+    expect(saved.timeout).toBe(30);
+  });
+});
+
+describe("atomic write", () => {
+  it("keeps the previous config and no temp file when the write fails", () => {
+    upsertServer(dir, "a", { type: "http", url: "https://a/mcp" });
+    const before = fs.readFileSync(mcpConfigPath(dir), "utf8");
+
+    fs.chmodSync(dir, 0o500);
+    try {
+      expect(() =>
+        upsertServer(dir, "b", { type: "http", url: "https://b/mcp" }),
+      ).toThrow();
+    } finally {
+      fs.chmodSync(dir, 0o700);
+    }
+
+    expect(fs.readFileSync(mcpConfigPath(dir), "utf8")).toBe(before);
+    expect(
+      fs.readdirSync(dir).filter((entry) => entry.endsWith(".tmp")),
+    ).toEqual([]);
   });
 });

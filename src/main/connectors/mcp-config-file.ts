@@ -75,7 +75,24 @@ function readRaw(agentDir: string): { shape: McpFileShape; errors: string[] } {
 function writeRaw(agentDir: string, shape: McpFileShape): void {
   const file = mcpConfigPath(agentDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, `${JSON.stringify(shape, null, 2)}\n`, "utf8");
+  // 先写同目录临时文件再 rename：直接 writeFileSync 遇到磁盘满/进程中断会
+  // 留下半截 JSON，用户整份 mcp.json 就废了。rename 是原子的，失败时原文件
+  // 保持原样，临时文件清掉。临时文件沿用目标文件的所有者可读写权限。
+  const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`;
+  try {
+    fs.writeFileSync(tmp, `${JSON.stringify(shape, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    try {
+      fs.rmSync(tmp, { force: true });
+    } catch {
+      // 清理失败不掩盖原始错误
+    }
+    throw e;
+  }
 }
 
 export function readMcpConfig(agentDir: string): LoadedMcpConfig {
@@ -92,17 +109,27 @@ export function readMcpConfig(agentDir: string): LoadedMcpConfig {
   return { servers, errors };
 }
 
+/** stdio 与 http 靠 `url` 区分，与 SDK 联合类型的判定方式一致。 */
+function sameTransport(a: McpServerConfig, b: McpServerConfig): boolean {
+  return "url" in a === "url" in b;
+}
+
 /**
  * 写入前**强制** `exposure: "direct"`。
  *
  * SDK 默认是 `"codemode"`，那会让 MCP 工具对模型完全不可见，而且**不报错** ——
  * 本仓历史上踩过这个坑（已删的 `mcp-config-projection.ts` 注释里记着）。
  * 所以这里覆盖调用方给的值，不给"忘了传"留余地。
+ *
+ * `previousName` 是条目的原名（设置页表单的 `id`）。给了它且与 `name` 不同时按
+ * 重命名处理：删旧键、写新键，一次落盘。改成已存在的名字时**报错**而不是覆盖 ——
+ * 那多半是用户笔误，静默覆盖会连带丢掉另一个 server 的配置。
  */
 export function upsertServer(
   agentDir: string,
   name: string,
   config: McpServerConfig,
+  previousName?: string,
 ): void {
   if (!isValidServerName(name)) {
     // 名字不合规时 SDK 会静默拒绝（激活抛异常、加载丢弃），
@@ -121,7 +148,27 @@ export function upsertServer(
     );
   }
   const servers = { ...(shape.mcpServers ?? {}) };
-  servers[name] = { ...config, exposure: "direct" };
+  const sourceName =
+    previousName && servers[previousName] ? previousName : undefined;
+
+  if (sourceName && sourceName !== name && servers[name]) {
+    throw new Error(
+      `cannot rename "${sourceName}" to "${name}": a server named "${name}" already exists`,
+    );
+  }
+
+  // 同一 transport 的部分保存（例如设置页只切 enabled）要保留 mcp.json 里
+  // 表单表达不了的字段（exposure、oauth、timeout、未来的 SDK 选项）。
+  // transport 变了则只写新配置，避免旧的 command/args/env 或 url/headers 残留。
+  // 重命名时以上一条为准；普通更新则看当前同名条目。
+  const existing = servers[sourceName ?? name];
+  const merged =
+    existing && sameTransport(existing, config)
+      ? { ...existing, ...config }
+      : { ...config };
+
+  if (sourceName && sourceName !== name) delete servers[sourceName];
+  servers[name] = { ...merged, exposure: "direct" };
   writeRaw(agentDir, { ...shape, mcpServers: servers });
 }
 

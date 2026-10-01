@@ -117,7 +117,38 @@ describe("远程服务卡片", () => {
     expect(buttonByKey(DISCONNECT)).toBeDefined();
   });
 
-  it("connecting 可以取消，不是禁用按钮", () => {
+  it("本地授权待处理时给出「取消」，未添加的条目也传 serverName", () => {
+    // 传输层此时可能什么都还没发生（实例都还没写进 mcp.json），
+    // 但用户刚点过「连接」，必须能中止。
+    const h = handlers();
+    render(<ConnectorCard entry={entry()} authorizing {...h} />);
+
+    const cancel = buttonByKey(CANCEL)!;
+    expect(cancel).toBeDefined();
+    expect(cancel.disabled).toBe(false);
+    act(() => cancel.click());
+    // registry 按 mcp.json 里的 server 名查授权表 —— 没有实例时用 serverName
+    expect(h.onCancel).toHaveBeenCalledWith("notion");
+  });
+
+  it("本地授权待处理优先于传输状态，且已有实例时保留退路", () => {
+    const h = handlers();
+    render(
+      <ConnectorCard
+        entry={entry({ instances: [withStatus({ kind: "idle" })] })}
+        authorizing
+        {...h}
+      />,
+    );
+
+    expect(container.textContent).toContain("connectors.status.connecting");
+    expect(buttonByKey(CANCEL)).toBeDefined();
+    expect(buttonByKey(DISCONNECT)).toBeDefined();
+  });
+
+  it("传输层的 connecting 只留「断开」，不调 signIn 的取消", () => {
+    // cancelSignIn 中止的是 OAuth 等待；传输层在连但没有本地授权流程时
+    // 它找不到东西可中止，所以这里根本不该出现「取消」。
     const h = handlers();
     render(
       <ConnectorCard
@@ -126,11 +157,12 @@ describe("远程服务卡片", () => {
       />,
     );
 
-    const cancel = buttonByKey(CANCEL)!;
-    expect(cancel).toBeDefined();
-    expect(cancel.disabled).toBe(false);
-    act(() => cancel.click());
-    expect(h.onCancel).toHaveBeenCalledWith("notion");
+    expect(buttonByKey(CANCEL)).toBeUndefined();
+    const disconnect = buttonByKey(DISCONNECT)!;
+    expect(disconnect.disabled).toBe(false);
+    act(() => disconnect.click());
+    expect(h.onDisconnect).toHaveBeenCalledWith("notion");
+    expect(h.onCancel).not.toHaveBeenCalled();
   });
 
   it("每个非 ready 状态都保留「断开」这条退路", () => {

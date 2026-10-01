@@ -2890,7 +2890,20 @@ ipcMain.handle("mcp.getServers", () => {
 ipcMain.handle("mcp.saveServer", async (_event, config: IpcMcpServerConfig) => {
   // 形状校验交给 SDK 在连接时报错；upsertServer 内部强制 exposure:"direct"。
   try {
-    upsertServer(piAgentDir, config.name, ipcConfigToSdkConfig(config));
+    // 表单的 id 是编辑前的原名；用户改了 name 就按重命名处理，否则会在
+    // mcp.json 里另外长出一个条目。新建表单的 id 是占位值（空串或生成值），
+    // 靠它能否命中现有条目来区分「重命名」与「新建」。
+    const previousName = readMcpConfig(piAgentDir).servers.some(
+      (server) => server.name === config.id,
+    )
+      ? config.id
+      : undefined;
+    upsertServer(
+      piAgentDir,
+      config.name,
+      ipcConfigToSdkConfig(config),
+      previousName,
+    );
     log(`[MCP] Server ${config.name} saved`);
     void trackEvent("feature_use", { feature: "connector" });
     return { success: true };
@@ -2944,7 +2957,8 @@ ipcMain.handle("mcp.getServerStatus", () => {
         name: server.name,
         connected: status === "connected",
         status,
-        toolCount: tools.filter((tool) => tool.serverName === server.name).length,
+        toolCount: tools.filter((tool) => tool.serverName === server.name)
+          .length,
       };
     });
   } catch (error) {

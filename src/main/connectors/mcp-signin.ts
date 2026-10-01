@@ -192,7 +192,10 @@ const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
  * 授权要等用户在浏览器里点「批准」，最长等到超时（默认 5 分钟）。没有这个表，
  * 用户就没有任何办法中止 —— 界面只能干等，看起来就是「卡住且无法取消」。
  */
-const pendingSignIns = new Map<string, OAuthCallbackServer>();
+const pendingSignIns = new Map<
+  string,
+  { controller: AbortController; callback?: OAuthCallbackServer }
+>();
 
 /** 中止某个 server 正在进行的授权。返回 false 表示当前没有在等它。 */
 export function cancelSignIn(serverUrl: string): boolean {
@@ -202,11 +205,11 @@ export function cancelSignIn(serverUrl: string): boolean {
   } catch {
     key = serverUrl;
   }
-  const callback = pendingSignIns.get(key);
-  if (!callback) return false;
-  // close() 会让 waitForCallback 以「回调服务器已关闭」拒绝，
-  // 从而让 startSignIn 走 catch 返回失败 —— 这正是「取消」该有的样子。
-  void callback.close().catch(() => {});
+  const pending = pendingSignIns.get(key);
+  if (!pending) return false;
+  pending.controller.abort();
+  // 同时中止网络请求与回调等待；监听器尚未启动时也能登记取消。
+  void pending.callback?.close().catch(() => {});
   return true;
 }
 
@@ -219,6 +222,23 @@ export function cancelSignIn(serverUrl: string): boolean {
 export async function startSignIn(opts: SignInOptions): Promise<ActionResult> {
   const { agentDir, serverUrl, openAuthorizationUrl } = opts;
   const url = String(new URL(serverUrl));
+  if (pendingSignIns.has(url)) {
+    return { ok: false, error: "sign-in already in progress" };
+  }
+  // 在第一个 await 之前占位，避免重复请求覆盖彼此的回调服务器。
+  const pending: {
+    controller: AbortController;
+    callback?: OAuthCallbackServer;
+  } = {
+    controller: new AbortController(),
+  };
+  pendingSignIns.set(url, pending);
+  const signal = pending.controller.signal;
+  const oauthFetch = (input: string | URL, init?: RequestInit) =>
+    fetch(input, {
+      ...init,
+      signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal,
+    });
 
   let callback: OAuthCallbackServer | undefined;
   try {
@@ -240,7 +260,8 @@ export async function startSignIn(opts: SignInOptions): Promise<ActionResult> {
       timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       ...(preferredPort ? { port: preferredPort } : {}),
     });
-    pendingSignIns.set(url, callback);
+    pending.callback = callback;
+    signal.throwIfAborted();
 
     // 本次的 redirect_uri 与已注册的不一致 → 之前登记的客户端作废，必须重新注册。
     // 顺带清掉残留的 oauthState（旧的 state 会让新一代请求对不上）。
@@ -251,6 +272,7 @@ export async function startSignIn(opts: SignInOptions): Promise<ActionResult> {
       registeredRedirect !== callback.redirectUrl;
     if (staleRedirect || stored?.oauthState) {
       await modifyCredentialsLocked(agentDir, (data) => {
+        signal.throwIfAborted();
         const current = data[url];
         if (!current) return false;
         const next = { ...current };
@@ -276,18 +298,25 @@ export async function startSignIn(opts: SignInOptions): Promise<ActionResult> {
         // 走锁写：SDK 的刷新可能同时在改同一个文件，
         // 整文件覆盖会把刚刷出来的 token 抹掉（refresh token 轮换后等于登录失效）。
         save: async (next) => {
+          signal.throwIfAborted();
           await modifyCredentialsLocked(agentDir, (data) => {
+            signal.throwIfAborted();
             data[url] = { ...next, serverUrl: url };
             return true;
           });
         },
       },
       onRedirect: (redirect) => {
+        signal.throwIfAborted();
         authorizationUrl = redirect.toString();
       },
     });
 
-    const first = await authorizeMcp(provider, { serverUrl: url });
+    const first = await authorizeMcp(provider, {
+      serverUrl: url,
+      fetch: oauthFetch,
+    });
+    signal.throwIfAborted();
     if (first === "AUTHORIZED") {
       log(`[connectors] ${url} authorized from stored tokens`);
       return { ok: true };
@@ -300,20 +329,25 @@ export async function startSignIn(opts: SignInOptions): Promise<ActionResult> {
     openAuthorizationUrl(authorizationUrl);
 
     const oauthState = await provider.state();
+    signal.throwIfAborted();
     const callbackResult = await callback.waitForCallback(oauthState);
+    signal.throwIfAborted();
 
     await authorizeMcp(provider, {
       serverUrl: url,
       authorizationCode: callbackResult.code,
+      fetch: oauthFetch,
     });
+    signal.throwIfAborted();
 
     log(`[connectors] signed in to ${url}`);
     return { ok: true };
   } catch (e) {
+    if (signal.aborted) return { ok: false, cancelled: true };
     logError(`[connectors] sign-in failed for ${serverUrl}`, e);
     return { ok: false, error: (e as Error).message };
   } finally {
-    pendingSignIns.delete(url);
     await callback?.close().catch(() => {});
+    if (pendingSignIns.get(url) === pending) pendingSignIns.delete(url);
   }
 }

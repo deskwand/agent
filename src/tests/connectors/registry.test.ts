@@ -495,3 +495,26 @@ describe("registry.cancelSignIn", () => {
     expect(buildRegistry(d).cancelSignIn("Chrome").ok).toBe(false);
   });
 });
+
+describe("disconnect during authorization", () => {
+  it("cancels the sign-in before removing configuration and credentials", async () => {
+    const order: string[] = [];
+    const { deps: d } = deps({
+      servers: [httpServer("notion", NOTION.url)],
+      cancelSignIn: () => {
+        order.push("cancel");
+        return true;
+      },
+      removeServer: async () => {
+        order.push("config");
+        return { ok: true };
+      },
+      removeCredentials: async () => {
+        order.push("credentials");
+        return true;
+      },
+    });
+    await buildRegistry(d).removeServer("notion");
+    expect(order).toEqual(["cancel", "config", "credentials"]);
+  });
+});

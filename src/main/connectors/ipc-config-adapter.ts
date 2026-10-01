@@ -21,8 +21,9 @@ export function ipcConfigToSdkConfig(
     return {
       type: "stdio",
       command: config.command ?? "",
-      ...(config.args ? { args: config.args } : {}),
-      ...(config.env ? { env: config.env } : {}),
+      // 表单省略这些字段表示用户已清空；显式 undefined 覆盖旧值，落盘时移除。
+      args: config.args,
+      env: config.env,
       ...(config.cwd ? { cwd: config.cwd } : {}),
       enabled,
       exposure: "direct",

@@ -56,6 +56,8 @@ export interface ConnectorEntry {
 export interface ActionResult {
   ok: boolean;
   error?: string;
+  /** 用户主动中止授权，不作为连接失败展示。 */
+  cancelled?: boolean;
   /**
    * 配置已写入，但当前没有活跃会话，所以还没真正连上 —— 下次对话才生效。
    * 没有这个标记时，用户会觉得「点了没反应」。

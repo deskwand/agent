@@ -51,7 +51,10 @@ export function activateDeskwandMcpServer(
 ): boolean {
   if (!activePi) return false;
   try {
-    activePi.registerMcpServer(name, config);
+    activePi.registerMcpServer(name, {
+      ...config,
+      exposure: config.exposure ?? "direct",
+    });
     log(`[MCP] registered ${name} for immediate connection`);
     return true;
   } catch (e) {
@@ -110,7 +113,12 @@ export function loadDeskwandMcpConfig(agentDir: string): LoadedMcpConfig {
     errors: loaded.errors,
     servers: loaded.servers.map((entry) => ({
       ...entry,
-      config: applyTransportPaths(entry.config),
+      config: {
+        ...applyTransportPaths(entry.config),
+        // 用户从别的客户端拷进来的标准配置不带 exposure，SDK 会默认
+        // codemode 把工具藏掉且不报错；这里补成 direct，但保留用户显式写的值。
+        exposure: entry.config.exposure ?? "direct",
+      },
     })),
   };
 }
