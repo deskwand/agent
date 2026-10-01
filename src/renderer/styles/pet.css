@@ -51,36 +51,48 @@ body,
   border: 1.5px solid #454950;
   box-shadow: inset 0 0 8px #000b;
 }
+/* 球体基准色 = globals.css 里 graphite 深色档的 --color-accent（发送按钮的蓝）。
+   桌宠是独立 BrowserWindow，不加载 globals.css、也拿不到 data-theme-preset，
+   所以这里写死：#5b8cff 与主题 accent 是两份需要人工同步的值。 */
 .pet-lens__eye {
   width: 72%;
   height: 72%;
   border-radius: 50%;
   background: radial-gradient(
     circle at 40% 35%,
-    #ffe4d1 0,
-    #ff7564 9%,
-    #dc201b 23%,
-    #790609 47%,
-    #200305 74%
+    #eaf1ff 0,
+    #9db9ff 9%,
+    #5b8cff 23%,
+    #2c3f86 47%,
+    #0a1024 74%
   );
-  box-shadow: 0 0 10px #dc202080;
+  box-shadow: 0 0 10px #5b8cff80;
   animation: breathe 4s ease-in-out infinite;
 }
-/* 待机暗红 vs 执行中亮红：亮度与脉动速度都要拉开，否则一眼分不出。 */
+/* 待机暗蓝 vs 执行中亮蓝：亮度与脉动速度都要拉开，否则一眼分不出。 */
 .pet-lens[data-state="running"] .pet-lens__eye {
   filter: brightness(1.35) saturate(1.2);
   box-shadow:
-    0 0 16px #f03a34,
-    0 0 24px #e71b1b88;
+    0 0 16px #6f9bff,
+    0 0 24px #5b8cff88;
   animation-duration: 1.3s;
 }
 .pet-lens[data-state="success"] .pet-lens__eye {
   filter: brightness(1.7);
-  box-shadow: 0 0 24px #ff9570;
+  box-shadow: 0 0 24px #a9c6ff;
   animation: none;
 }
+/* 失败态不再靠滤镜从基色推导：蓝底上 hue-rotate(22deg) 会转到紫，
+   "异常"信号会消失。暖色直接写进渐变，颜色即语义。 */
 .pet-lens[data-state="failure"] .pet-lens__eye {
-  filter: hue-rotate(22deg) brightness(1.5);
+  background: radial-gradient(
+    circle at 40% 35%,
+    #ffe4d1 0,
+    #ff8a5c 9%,
+    #ff651a 23%,
+    #8a2b06 47%,
+    #200705 74%
+  );
   box-shadow: 0 0 20px #ff651a;
   animation: none;
 }
