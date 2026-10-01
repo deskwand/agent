@@ -19,41 +19,66 @@ interface ResolveMessageEndPayloadOptions {
   streamedText: string;
 }
 
-interface ResolvedMessageEndPayload {
+interface ResolvedMessageEndPayloadBase {
   effectiveContent: MessageEndContentBlock[];
-  errorText?: string;
   nextStreamedText: string;
   shouldEmitMessage: boolean;
 }
 
-export function toUserFacingErrorText(errorText: string): string {
+/**
+ * `errorText` and `errorCategory` are derived together and must never diverge:
+ * the turn tracker keys "this turn failed" off the category, so a payload that
+ * carried text but no category would silently turn a failure into a success.
+ */
+export type ResolvedMessageEndPayload = ResolvedMessageEndPayloadBase &
+  (
+    | { errorText?: undefined; errorCategory?: undefined }
+    | { errorText: string; errorCategory: ErrorCategory }
+  );
+
+export type ErrorCategory =
+  | "timeout"
+  | "empty_result"
+  | "bad_request"
+  | "auth_failed"
+  | "rate_limit"
+  | "upstream_error"
+  | "network"
+  | "other";
+
+/**
+ * Coarse bucket for a provider error. Derived from the raw provider text, which
+ * is language-independent — callers must not pass the localised user-facing
+ * string. The raw text itself is never reported anywhere.
+ */
+export function categorizeErrorText(errorText: string): ErrorCategory {
   const lower = errorText.toLowerCase();
   if (lower.includes("first_response_timeout")) {
-    return t("errors.modelTimeout");
+    return "timeout";
   }
   if (lower.includes("empty_success_result")) {
-    return t("errors.emptyResult");
+    return "empty_result";
   }
   if (
     /\b400\b/.test(errorText) ||
     lower.includes("bad request") ||
     lower.includes("invalid request")
   ) {
-    return t("errors.badRequest", { error: errorText });
+    return "bad_request";
   }
   if (
     /\b(401|403)\b/.test(errorText) ||
     lower.includes("unauthorized") ||
     lower.includes("forbidden")
   ) {
-    return t("errors.authFailed", { error: errorText });
+    return "auth_failed";
   }
   if (
     /\b429\b/.test(errorText) ||
     lower.includes("rate limit") ||
     lower.includes("too many requests")
   ) {
-    return t("errors.rateLimited", { error: errorText });
+    return "rate_limit";
   }
   if (
     /\b(5\d{2})\b/.test(errorText) ||
@@ -62,7 +87,7 @@ export function toUserFacingErrorText(errorText: string): string {
     lower.includes("service unavailable") ||
     lower.includes("overloaded")
   ) {
-    return t("errors.upstreamError", { error: errorText });
+    return "upstream_error";
   }
   if (
     lower.includes("terminated") ||
@@ -78,9 +103,30 @@ export function toUserFacingErrorText(errorText: string): string {
     lower.includes("timeout") ||
     lower.includes("timed out")
   ) {
-    return t("errors.networkInterrupted");
+    return "network";
   }
-  return errorText;
+  return "other";
+}
+
+export function toUserFacingErrorText(errorText: string): string {
+  switch (categorizeErrorText(errorText)) {
+    case "timeout":
+      return t("errors.modelTimeout");
+    case "empty_result":
+      return t("errors.emptyResult");
+    case "bad_request":
+      return t("errors.badRequest", { error: errorText });
+    case "auth_failed":
+      return t("errors.authFailed", { error: errorText });
+    case "rate_limit":
+      return t("errors.rateLimited", { error: errorText });
+    case "upstream_error":
+      return t("errors.upstreamError", { error: errorText });
+    case "network":
+      return t("errors.networkInterrupted");
+    default:
+      return errorText;
+  }
 }
 
 /** Suffix appended after error messages in the chat area. */
@@ -103,6 +149,7 @@ export function resolveMessageEndPayload(
     return {
       effectiveContent: [],
       errorText: toUserFacingErrorText(message.errorMessage),
+      errorCategory: categorizeErrorText(message.errorMessage),
       nextStreamedText,
       shouldEmitMessage: false,
     };
@@ -119,6 +166,7 @@ export function resolveMessageEndPayload(
     return {
       effectiveContent: [],
       errorText: toUserFacingErrorText("empty_success_result"),
+      errorCategory: "empty_result",
       nextStreamedText,
       shouldEmitMessage: false,
     };

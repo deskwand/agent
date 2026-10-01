@@ -1,30 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { join } from "node:path";
 import { PiExtensionHost } from "../../main/extensions/pi-extension-host";
 import { createAgentSession } from "@earendil-works/pi-coding-agent";
+import { setMcpAgentDir } from "../../main/mcp/mcp-client-extension";
 
 const FIXTURE = join(process.cwd(), "scripts/mcp-fixture-server.mjs");
-
-// store 换成 fixture server —— 其它字段留空，投影会补上 enabled/exposure。
-vi.mock("../../main/mcp/mcp-config-store", () => ({
-  mcpConfigStore: {
-    getServers: () => [
-      {
-        id: "fixture-id",
-        name: "Fixture",
-        type: "stdio",
-        command: process.execPath,
-        args: [FIXTURE],
-        env: {},
-        enabled: true,
-      },
-    ],
-    resolveServerPathToken: () => null,
-  },
-}));
 
 function makeTempProject(): { dir: string; agentDir: string } {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), "mcp-switchover-"));
@@ -35,10 +18,22 @@ function makeTempProject(): { dir: string; agentDir: string } {
   return { dir: project, agentDir };
 }
 
+/** 把 fixture server 写进 agentDir/mcp.json —— 配置的真相源现在是这个文件。 */
+function seedFixture(agentDir: string): void {
+  fs.writeFileSync(
+    path.join(agentDir, "mcp.json"),
+    JSON.stringify({
+      mcpServers: {
+        Fixture: { type: "stdio", command: process.execPath, args: [FIXTURE] },
+      },
+    }),
+  );
+}
+
 /**
  * 门禁 2（设计 §7）：陷阱① 的**端到端**断言。
  *
- * 投影层的断言（mcp-config-projection.test.ts / mcp-client-extension.test.ts）只证明
+ * 配置层的断言（mcp-client-extension.test.ts）只证明
  * 「我们返回了 exposure:direct 且 autoEnableCodemode:false」；这里证明**那个配置真的
  * 产生了预期效果**：MCP 工具对模型可见，而 codemode 没有被激活。
  */
@@ -47,6 +42,8 @@ describe("builtin mcp switchover (trap 1 end to end)", () => {
 
   beforeEach(() => {
     ctx = makeTempProject();
+    seedFixture(ctx.agentDir);
+    setMcpAgentDir(ctx.agentDir);
     PiExtensionHost.registry.clear();
   });
 

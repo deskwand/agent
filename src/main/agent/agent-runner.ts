@@ -146,6 +146,8 @@ import {
   resolveMessageEndPayload,
   toUserFacingErrorText,
   getErrorSuffix,
+  categorizeErrorText,
+  type ErrorCategory,
 } from "./agent-runner-message-end";
 import { detectInsufficientCredits, toErrorText } from "./credits-error";
 import { buildPiSessionRuntimeSignature } from "./pi-session-runtime";
@@ -3332,7 +3334,7 @@ Tool routing:\n
         }
 
         // 注入内置 MCP 扩展（替换自研客户端；陷阱① 的 exposure/autoEnableCodemode
-        // 由投影强制，见 mcp-config-projection.ts）
+        // 由 upsertServer 强制 exposure:"direct"，见 connectors/mcp-config-file.ts）
         extensionFactories.push(createDeskwandMcpExtension());
 
         // ── Pi Extension Host（按 cwd 复用）──────────────────────────────
@@ -3883,10 +3885,10 @@ Tool routing:\n
                   }),
                 );
               }
-              if (resolvedPayload.errorText) {
+              if (resolvedPayload.errorCategory !== undefined) {
                 const errorText = resolvedPayload.errorText;
                 terminalErrorText = errorText;
-                outcomeTracker.setTerminalError(errorText);
+                outcomeTracker.setTerminalError(resolvedPayload.errorCategory);
                 // 落不落错误气泡推迟到 agent_end：只有 willRetry === false 才是终局。
                 // 重试期间落红气泡会让“其实已经自愈”的回合看起来像失败了。
                 break;
@@ -4546,11 +4548,11 @@ Tool routing:\n
       } else {
         logCtxError("[AgentRunner] Error:", error);
 
-        const errorText = toUserFacingErrorText(toErrorText(error));
-        // Record it so the anonymous `error` event can bucket this failure —
-        // the thrown path never emits a terminal message, and without this every
-        // thrown failure would classify as `other`. The text is never sent.
-        outcomeTracker.setTerminalError(errorText);
+        const rawErrorText = toErrorText(error);
+        const errorText = toUserFacingErrorText(rawErrorText);
+        // Bucket from the raw provider text — it is language-independent, unlike
+        // the localised string above. The raw text itself is never sent.
+        outcomeTracker.setTerminalError(categorizeErrorText(rawErrorText));
         const errorMsg: Message = {
           id: uuidv4(),
           sessionId: session.id,
@@ -4661,7 +4663,9 @@ Tool routing:\n
     if (outcome === "success") {
       void trackEvent("reply_ok");
     } else if (outcome === "failure") {
-      void trackEvent("error", { code: classifyTurnFailure(outcomeTracker) });
+      void trackEvent("error", {
+        code: outcomeTracker.getTerminalErrorCategory() ?? "other",
+      });
     }
     return outcome;
   }
@@ -5180,7 +5184,7 @@ export type AgentTurnOutcome = "success" | "failure" | "cancelled" | "unknown";
  */
 export class TurnOutcomeTracker {
   private settled = false;
-  private terminalError: string | undefined;
+  private terminalError: ErrorCategory | undefined;
   private thrown = false;
 
   observeEvent(event: { type?: string; willRetry?: boolean }): void {
@@ -5188,12 +5192,12 @@ export class TurnOutcomeTracker {
     this.settled = !event.willRetry;
   }
 
-  setTerminalError(text: string | undefined): void {
-    this.terminalError = text;
+  /** Records the coarse bucket of a terminal error — never the raw text. */
+  setTerminalError(category: ErrorCategory | undefined): void {
+    this.terminalError = category;
   }
 
-  /** The last terminal error text — used for coarse bucketing, never reported verbatim. */
-  getTerminalErrorText(): string | undefined {
+  getTerminalErrorCategory(): ErrorCategory | undefined {
     return this.terminalError;
   }
 
@@ -5205,43 +5209,6 @@ export class TurnOutcomeTracker {
     if (aborted) return "cancelled";
     if (this.thrown) return "failure";
     if (!this.settled) return "unknown";
-    return this.terminalError ? "failure" : "success";
+    return this.terminalError !== undefined ? "failure" : "success";
   }
-}
-
-/**
- * Coarse bucket for the anonymous `error` event. The raw message is never sent —
- * only the bucket name — so the wire format stays enum-only.
- */
-export function classifyTurnFailure(tracker: TurnOutcomeTracker): string {
-  const text = (tracker.getTerminalErrorText() ?? "").toLowerCase();
-  // Checked before the API-key branch: this codebase phrases the missing-credential
-  // case as "No API key provided" / "No API key configured for provider", which
-  // would otherwise be read as an auth failure.
-  if (
-    text.includes("not configured") ||
-    text.includes("no provider") ||
-    text.includes("no api key")
-  ) {
-    return "no_provider";
-  }
-  if (
-    text.includes("api key") ||
-    text.includes("unauthorized") ||
-    text.includes("401")
-  ) {
-    return "auth_failed";
-  }
-  if (
-    text.includes("econnrefused") ||
-    text.includes("enotfound") ||
-    text.includes("network")
-  ) {
-    return "network";
-  }
-  if (text.includes("rate limit") || text.includes("429")) {
-    return "rate_limit";
-  }
-  if (text.includes("model")) return "model_error";
-  return "other";
 }

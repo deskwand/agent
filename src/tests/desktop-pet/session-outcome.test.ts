@@ -17,7 +17,7 @@ import type { PetState } from "../../main/desktop-pet/pet-state";
 describe("TurnOutcomeTracker (SDK event stream)", () => {
   it("does not report failure while the SDK will retry the turn", () => {
     const tracker = new TurnOutcomeTracker();
-    tracker.setTerminalError("socket hang up");
+    tracker.setTerminalError("network");
     tracker.observeEvent({ type: "agent_end", willRetry: true });
 
     expect(tracker.resolve(false)).not.toBe("failure");
@@ -26,7 +26,7 @@ describe("TurnOutcomeTracker (SDK event stream)", () => {
 
   it("reports success once the retried turn finishes without a terminal error", () => {
     const tracker = new TurnOutcomeTracker();
-    tracker.setTerminalError("socket hang up");
+    tracker.setTerminalError("network");
     tracker.observeEvent({ type: "agent_end", willRetry: true });
 
     // 重试成功后 message_end 带回正常回复：之前的错误不再是终局错误。
@@ -38,7 +38,7 @@ describe("TurnOutcomeTracker (SDK event stream)", () => {
 
   it("reports failure for a terminal error the SDK stops retrying", () => {
     const tracker = new TurnOutcomeTracker();
-    tracker.setTerminalError("insufficient balance");
+    tracker.setTerminalError("other");
     tracker.observeEvent({ type: "agent_end", willRetry: false });
 
     expect(tracker.resolve(false)).toBe("failure");
@@ -46,7 +46,7 @@ describe("TurnOutcomeTracker (SDK event stream)", () => {
 
   it("reports cancelled when the user stopped the run", () => {
     const tracker = new TurnOutcomeTracker();
-    tracker.setTerminalError("insufficient balance");
+    tracker.setTerminalError("other");
     tracker.observeEvent({ type: "agent_end", willRetry: false });
 
     expect(tracker.resolve(true)).toBe("cancelled");

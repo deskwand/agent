@@ -74,8 +74,13 @@ describe("AgentRunner pi-coding-agent integration", () => {
   it("reuses the shared user-facing error helper", () => {
     expect(agentRunnerContent).toContain('from "./agent-runner-message-end"');
     expect(agentRunnerContent).toContain("toUserFacingErrorText,");
+    // The raw text is extracted once, then both the localised message and the
+    // telemetry bucket are derived from that same expression.
+    expect(agentRunnerContent).toMatch(
+      /const rawErrorText = toErrorText\(error\);\s*\n\s*const errorText = toUserFacingErrorText\(rawErrorText\);/,
+    );
     expect(agentRunnerContent).toContain(
-      "const errorText = toUserFacingErrorText(toErrorText(error));",
+      "outcomeTracker.setTerminalError(categorizeErrorText(rawErrorText));",
     );
   });
 

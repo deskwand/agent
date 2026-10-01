@@ -16,8 +16,6 @@
  * —— 后者要求完整的 OAuth 客户端行为（动态注册、redirect、codeVerifier 等）。
  * 因此带 OAuth 的 HTTP 传输必须用 pi-mcp 自己的 `StreamableHttpTransport`，不能用 SDK 的。
  */
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import type { Transport as SdkTransport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import type {
   AuthProvider,
   JsonRpcMessage,
@@ -29,7 +27,6 @@ import {
 } from "@earendil-works/pi-mcp";
 import type { McpServerEntry } from "@earendil-works/pi-coding-agent";
 import { ensureChromeReady, mcpServerNeedsChrome } from "./chrome-readiness";
-import { mcpConfigStore } from "./mcp-config-store";
 import { getEnhancedEnv } from "./mcp-server-paths";
 import { log, logWarn } from "../utils/logger";
 
@@ -94,19 +91,6 @@ export async function closeAllDeskwandMcpTransports(): Promise<void> {
   await Promise.allSettled(closers.map((close) => close()));
 }
 
-/** 自研 store 里的原始 type —— 上游配置表达不了 SSE，只能回查。 */
-function resolveStoreType(
-  serverName: string,
-): "stdio" | "sse" | "streamable-http" {
-  const server = mcpConfigStore
-    .getServers()
-    .find(
-      (candidate) =>
-        candidate.name.replace(/\s+/g, "_").replace(/__/g, "_") === serverName,
-    );
-  return server?.type ?? "stdio";
-}
-
 function isAuthRequiredError(error: unknown): boolean {
   const name = (error as { constructor?: { name?: string } })?.constructor
     ?.name;
@@ -119,42 +103,12 @@ function isAuthRequiredError(error: unknown): boolean {
   );
 }
 
-/** 把 `@modelcontextprotocol/sdk` 的传输适配成 pi-mcp 的 `McpTransport`（SSE 用）。 */
-function adaptSdkTransport(sdk: SdkTransport): McpTransport {
-  return {
-    start: () => sdk.start(),
-    // 两套 SDK 的 JSON-RPC 类型名义不同、结构一致
-    send: (message: JsonRpcMessage) =>
-      sdk.send(message as unknown as Parameters<SdkTransport["send"]>[0]),
-    close: () => sdk.close(),
-    onMessage: (listener) => {
-      sdk.onmessage = (message) => listener(message as JsonRpcMessage);
-      return () => {
-        sdk.onmessage = undefined;
-      };
-    },
-    onError: (listener) => {
-      sdk.onerror = (error) => listener(error);
-      return () => {
-        sdk.onerror = undefined;
-      };
-    },
-    onClose: (listener) => {
-      sdk.onclose = () => listener();
-      return () => {
-        sdk.onclose = undefined;
-      };
-    },
-  };
-}
-
 export function createDeskwandTransport(
   entry: McpServerEntry,
   cwd: string,
   authProvider: AuthProvider | undefined,
 ): McpTransport {
   const name = entry.name;
-  const storeType = resolveStoreType(name);
   const needsChrome = mcpServerNeedsChrome(name);
 
   let initializedId: string | number | undefined;
@@ -246,16 +200,10 @@ export function createDeskwandTransport(
       setState(name, "connecting");
       try {
         if (needsChrome) await ensureChromeReady(name);
-        delegate =
-          storeType === "sse" && httpConfig
-            ? adaptSdkTransport(
-                new SSEClientTransport(new URL(httpConfig.url), {
-                  requestInit: httpConfig.headers
-                    ? { headers: httpConfig.headers }
-                    : undefined,
-                }),
-              )
-            : await buildDelegate();
+        // SSE 分支已移除：SDK 的 mcp.json 只能表达 stdio | http
+        // （McpHttpServerConfig.type?: "http"）。旧配置里的 sse 条目在写入时
+        // 已归一为 http，且 SSE 已被 Streamable HTTP 取代。见设计文档 §8。
+        delegate = await buildDelegate();
         // 转发先前缓存的监听器（客户端在 start() 之前就注册了它们）
         unsubscribers = [
           ...pending.message.map((listener) =>
@@ -355,6 +303,6 @@ export function createDeskwandTransport(
     await delegate?.close();
   });
 
-  log(`[MCP] transport created for ${name} (storeType=${storeType})`);
+  log(`[MCP] transport created for ${name} (${httpConfig ? "http" : "stdio"})`);
   return transport;
 }

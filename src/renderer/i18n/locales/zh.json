@@ -66,8 +66,8 @@
     "apiSettingsDesc": "配置 API 提供商和密钥",
     "sandbox": "沙盒",
     "sandboxDesc": "隔离执行环境",
-    "connectors": "MCP 连接器",
-    "connectorsDesc": "管理 MCP 连接器",
+    "connectors": "MCP 服务（高级）",
+    "connectorsDesc": "手动添加自定义 MCP 服务",
     "skills": "技能",
     "skillsDesc": "管理自定义技能",
     "personalization": "个性化",
@@ -146,10 +146,10 @@
   "marketplace": {
     "title": "技能云",
     "desc": "浏览和安装技能，管理你的云端技能库",
-    "tabMCP": "MCP"
+    "tabMCP": "MCP 服务（高级）"
   },
   "apps": {
-    "title": "应用"
+    "title": "连接"
   },
   "skillMarket": {
     "tabMySkills": "我的技能",
@@ -837,7 +837,7 @@
     "previousWeek": "最近 7 天",
     "older": "更早",
     "settings": "设置",
-    "apps": "应用",
+    "apps": "连接",
     "allSessions": "会话",
     "emptyTitle": "还没有会话",
     "emptyHint": "点击「新建」开始",
@@ -1088,7 +1088,6 @@
     "copyMessage": "复制消息",
     "revealInFolder": "在文件夹中定位",
     "pastedContentAlt": "粘贴内容",
-    "taskProgress": "任务进度",
     "taskProgress": "任务进度",
     "todoRejectedMultipleInProgress": "任务清单未生效：只能有一项进行中",
     "todoRejectedUnsettledItems": "任务清单未生效：还有未完成的条目",
@@ -2021,5 +2020,71 @@
     "label": "帮助",
     "docs": "使用手册",
     "feedback": "反馈问题"
+  },
+  "connectors": {
+    "title": "连接",
+    "subtitle": "把外部工具接到 DeskWand",
+    "tab": {
+      "connect": "连接",
+      "capability": "本机能力",
+      "skills": "技能云",
+      "plugins": "插件"
+    },
+    "filter": {
+      "all": "全部",
+      "added": "已添加",
+      "attention": "需处理"
+    },
+    "status": {
+      "ready": "已连接",
+      "connecting": "授权中…",
+      "needsAuth": "需要重新授权",
+      "failed": "连接失败",
+      "off": "未启用",
+      "disabled": "已停用",
+      "idle": "未连接"
+    },
+    "action": {
+      "connect": "连接",
+      "disconnect": "断开",
+      "reauthorize": "重新授权",
+      "retry": "重试",
+      "manage": "管理",
+      "inProgress": "连接中…",
+      "cancel": "取消"
+    },
+    "credentialLocalOnly": "凭据仅存本机",
+    "allHealthy": "所有已添加的连接都正常",
+    "moreComing": "更多连接随版本加入",
+    "moreComingHint": "Slack、GitHub 在计划中",
+    "loadFailed": "加载连接失败",
+    "connectFailed": "连接失败",
+    "disconnectFailed": "断开失败",
+    "activatePending": "已添加，下次对话生效",
+    "catalog": {
+      "notion": "Notion",
+      "notionDesc": "搜索与读写你的 Notion 页面、数据库",
+      "linear": "Linear",
+      "linearDesc": "读取与创建 issue、项目与迭代",
+      "sentry": "Sentry",
+      "sentryDesc": "查询错误事件与 issue 追踪",
+      "stripe": "Stripe",
+      "stripeDesc": "查询支付、订阅与客户数据",
+      "atlassian": "Atlassian",
+      "atlassianDesc": "Jira 与 Confluence 的读写"
+    },
+    "builtin": {
+      "chrome": "Chrome 操控",
+      "chromeDesc": "让 AI 驱动浏览器抓取、填表、截图",
+      "guiOperate": "GUI 操控",
+      "guiOperateDesc": "读写本机应用的窗口与控件",
+      "softwareDevelopment": "软件开发",
+      "softwareDevelopmentDesc": "代码生成、测试、重构工作区"
+    },
+    "summary": {
+      "remote": "远端服务",
+      "local": "本机 stdio"
+    },
+    "signInStarted": "已在浏览器打开授权页，完成后此卡片会自动更新"
   }
 }

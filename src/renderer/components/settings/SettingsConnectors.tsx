@@ -3,7 +3,6 @@ import { useTranslation } from "react-i18next";
 import {
   Plug,
   AlertCircle,
-  CheckCircle,
   Edit3,
   Trash2,
   Plus,
@@ -12,13 +11,11 @@ import {
   Loader2,
   ChevronRight,
   ChevronDown,
-  X,
 } from "lucide-react";
 import type {
   MCPServerConfig,
   MCPServerStatus,
   MCPToolInfo,
-  MCPPreset,
 } from "./shared";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { Tooltip } from "../Tooltip";
@@ -41,29 +38,7 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
     null,
   );
   const [showAddForm, setShowAddForm] = useState(false);
-  const [presets, setPresets] = useState<Record<string, MCPPreset>>({});
-  const [showPresets, setShowPresets] = useState(true);
-  const [configuringPreset, setConfiguringPreset] = useState<{
-    key: string;
-    preset: MCPPreset;
-  } | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [presetEnvValues, setPresetEnvValues] = useState<
-    Record<string, string>
-  >({});
-
-  // Auto-refresh
-  const loadPresets = useCallback(async () => {
-    try {
-      const loaded = (await window.electronAPI.mcp.getPresets()) as Record<
-        string,
-        MCPPreset
-      >;
-      setPresets(loaded || {});
-    } catch (err) {
-      console.error("Failed to load presets:", err);
-    }
-  }, []);
 
   const loadServers = useCallback(async () => {
     try {
@@ -97,13 +72,8 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
   }, []);
 
   const loadAll = useCallback(async () => {
-    await Promise.all([
-      loadServers(),
-      loadStatuses(),
-      loadTools(),
-      loadPresets(),
-    ]);
-  }, [loadPresets, loadServers, loadStatuses, loadTools]);
+    await Promise.all([loadServers(), loadStatuses(), loadTools()]);
+  }, [loadServers, loadStatuses, loadTools]);
 
   useEffect(() => {
     if (!isElectron || !isActive) {
@@ -116,59 +86,6 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
     }, 3000);
     return () => clearInterval(interval);
   }, [isActive, loadAll, loadStatuses, loadTools]);
-
-  async function handleAddPreset(presetKey: string) {
-    const preset = presets[presetKey];
-    if (!preset) return;
-
-    const existing = servers.find(
-      (s) => s.name === preset.name && s.command === preset.command,
-    );
-    if (existing) {
-      setError(t("mcp.presetAlreadyConfigured", { name: preset.name }));
-      return;
-    }
-
-    // Check if preset requires environment variables
-    if (preset.requiresEnv && preset.requiresEnv.length > 0) {
-      // Initialize env values from preset defaults
-      const initialEnv: Record<string, string> = {};
-      preset.requiresEnv.forEach((key: string) => {
-        initialEnv[key] = preset.env?.[key] || "";
-      });
-      setPresetEnvValues(initialEnv);
-      setConfiguringPreset({ key: presetKey, preset });
-      return;
-    }
-
-    // No env required, add directly
-    await addPresetServer(presetKey, preset, {});
-  }
-
-  async function addPresetServer(
-    presetKey: string,
-    preset: MCPPreset,
-    envOverrides: Record<string, string>,
-  ) {
-    const serverConfig: MCPServerConfig = {
-      id: `mcp-${presetKey}-${Date.now()}`,
-      name: preset.name,
-      type: preset.type,
-      // STDIO fields
-      command: preset.command,
-      args: preset.args,
-      env: { ...preset.env, ...envOverrides },
-      // SSE fields
-      url: preset.url,
-      headers: preset.headers,
-      enabled: false,
-    };
-
-    await handleSaveServer(serverConfig);
-    setShowPresets(false);
-    setConfiguringPreset(null);
-    setPresetEnvValues({});
-  }
 
   async function handleSaveServer(server: MCPServerConfig) {
     setIsLoading(true);
@@ -273,161 +190,6 @@ export function SettingsConnectors({ isActive }: { isActive: boolean }) {
           )}
         </div>
       )}
-
-      {/* Preset Environment Configuration Modal */}
-      {configuringPreset && (
-        <div className="p-4 rounded-lg border border-accent/30 bg-accent/5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-text-primary">
-              {t("mcp.configure")} {configuringPreset.preset.name}
-            </h3>
-            <button
-              onClick={() => {
-                setConfiguringPreset(null);
-                setPresetEnvValues({});
-              }}
-              className="text-text-muted hover:text-text-primary"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <p className="text-xs text-text-muted">
-            This connector requires configuration before it can be added.
-          </p>
-          <div className="space-y-3">
-            {configuringPreset.preset.requiresEnv?.map((envKey: string) => (
-              <div key={envKey}>
-                <label className="block text-xs font-medium text-text-secondary mb-1">
-                  {configuringPreset.preset.envDescription?.[envKey] || envKey}
-                </label>
-                <input
-                  type="password"
-                  value={presetEnvValues[envKey] || ""}
-                  onChange={(e) =>
-                    setPresetEnvValues((prev) => ({
-                      ...prev,
-                      [envKey]: e.target.value,
-                    }))
-                  }
-                  placeholder={`Enter ${envKey}`}
-                  className="w-full px-3 py-2 rounded-lg bg-surface border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
-                />
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => {
-                setConfiguringPreset(null);
-                setPresetEnvValues({});
-              }}
-              className="px-3 py-1.5 rounded-md text-sm text-text-secondary hover:text-text-primary transition-colors"
-            >
-              {t("common.cancel")}
-            </button>
-            <button
-              onClick={() =>
-                void addPresetServer(
-                  configuringPreset.key,
-                  configuringPreset.preset,
-                  presetEnvValues,
-                )
-              }
-              disabled={
-                isLoading ||
-                configuringPreset.preset.requiresEnv?.some(
-                  (key: string) => !presetEnvValues[key]?.trim(),
-                )
-              }
-              className="px-4 py-1.5 rounded-md bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-colors disabled:opacity-50"
-            >
-              {t("common.add")}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Preset Servers */}
-      {!showAddForm &&
-        !editingServer &&
-        !configuringPreset &&
-        Object.keys(presets).length > 0 && (
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowPresets(!showPresets)}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-surface-muted hover:bg-surface transition-colors"
-            >
-              <h3 className="text-sm font-medium text-text-primary">
-                {t("mcp.quickAddPresets")}
-              </h3>
-              <div className="flex items-center gap-1.5 text-text-muted">
-                <span className="text-xs">
-                  {showPresets ? t("mcp.hide") : t("mcp.show")}
-                </span>
-                <ChevronDown
-                  className={`w-4 h-4 transition-transform ${showPresets ? "rotate-180" : ""}`}
-                />
-              </div>
-            </button>
-            {showPresets && (
-              <div className="grid grid-cols-1 gap-2">
-                {Object.entries(presets).map(([key, preset]) => {
-                  const isAdded = servers.some(
-                    (s) =>
-                      s.name === preset.name && s.command === preset.command,
-                  );
-                  const requiresConfig =
-                    preset.requiresEnv && preset.requiresEnv.length > 0;
-                  return (
-                    <div
-                      key={key}
-                      className={`p-3 rounded-lg border flex items-center gap-3 ${
-                        isAdded
-                          ? "border-border bg-surface-muted opacity-60"
-                          : "border-border bg-surface"
-                      }`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm text-text-primary">
-                            {preset.name}
-                          </span>
-                          {requiresConfig && !isAdded && (
-                            <span className="px-1.5 py-0.5 text-xs font-medium rounded bg-warning/10 text-warning border border-warning/20">
-                              {t("mcp.requiresToken")}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-text-muted mt-0.5 truncate">
-                          {preset.type === "stdio"
-                            ? `${preset.command} ${preset.args?.join(" ") || ""}`
-                            : preset.url || "Remote server"}
-                        </div>
-                      </div>
-                      {isAdded ? (
-                        <div className="flex items-center gap-1 text-success text-xs whitespace-nowrap">
-                          <CheckCircle className="w-4 h-4" />
-                          <span>{t("mcp.added")}</span>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleAddPreset(key)}
-                          disabled={isLoading}
-                          className="px-3 py-1.5 rounded-md bg-accent text-accent-foreground text-xs font-medium hover:bg-accent/90 transition-colors disabled:opacity-50 whitespace-nowrap flex items-center gap-1"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          {requiresConfig
-                            ? t("mcp.configure")
-                            : t("common.add")}
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
 
       {/* Add Custom Button */}
       {!showAddForm && !editingServer && (

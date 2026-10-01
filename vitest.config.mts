@@ -51,14 +51,17 @@ export default defineConfig({
     restoreMocks: true,
   },
   resolve: {
+    // 与 vite.config.ts 同构：dedupe 在**包解析层**生效，子路径（`.../pi-mcp/oauth`）正常走 exports。
+    //
+    // 不能用字符串别名：Vite 的别名是纯前缀替换，会把子路径拼成 `<别名>/oauth` → 解析失败。
+    // 也不能去掉 dedupe：npm 会装出两份 pi-mcp，两份的类不是同一个对象，
+    // 上游用 instanceof 判定鉴权/瞬时错误，来自另一份的实例永远认不出来 → needs-auth 不可达。
+    //
+    // 守卫见 src/tests/mcp/mcp-pi-mcp-single-copy.test.ts。
+    dedupe: ["@earendil-works/pi-mcp"],
     alias: {
-      // 见 vite.config.ts 里的 PI_MCP_ROOT 说明：必须与上游解析到同一份，
-      // 否则 instanceof 判定失效、needs-auth 不可达。
-      "@earendil-works/pi-mcp": path.resolve(
-        import.meta.dirname,
-        "./node_modules/@earendil-works/pi-coding-agent/node_modules/@earendil-works/pi-mcp/dist/index.js",
-      ),
       "@": path.resolve(import.meta.dirname, "./src"),
+      "/@": path.resolve(import.meta.dirname, "./src"),
     },
   },
 });
