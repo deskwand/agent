@@ -1,42 +1,52 @@
 import { describe, it, expect } from "vitest";
 
-import { sanitizeMcpServerKey } from "../src/main/mcp/mcp-config-projection";
-
 /**
- * 旧 `MCPManager` 已删除（内置 MCP 扩展接管连接与工具注册）。本文件保留其**仍然有效的
- * 契约**：工具名前缀 `mcp__<serverKey>__<toolName>` 里的 serverKey 换算方式。
+ * 旧 `MCPManager` 与 `sanitizeMcpServerKey` 已删除（内置 MCP 扩展接管连接与工具注册，
+ * 配置改为通用 `mcp.json`，server 名不再做 sanitize）。
  *
- * 「工具返回结构化 Not connected 时重连并重试」的启发式**没有丢** —— 它搬到了传输层
- * （`mcp-transport-adapter.ts` 里对 tools/call 响应的拦截），因为上游的 tool_result 是
- * 只读观察事件、无法改写结果，而该行为必须由我们自己的传输来补。
+ * 本文件保留其**仍然有效的契约**：工具名前缀是 `mcp__<server>__<tool>`，
+ * 且 `<server>` 与 `mcp.json` 里的 key 逐字一致（工具名一变就破坏提示词缓存）。
+ *
+ * 历史坑：旧实现会 sanitize 名字（空格→下划线、`__`→`_`）。新路径**不做**这件事 ——
+ * 名字逐字落盘，因为改名会让所有 MCP 工具名变化。因此反解工具名时不能靠正则拆，
+ * 必须用已知名字做前缀匹配（见 `mcp-client-extension.ts` 的 `recordMcpTools`）。
  */
-describe("MCP server key (tool name prefix)", () => {
-  it("collapses whitespace to underscores", () => {
-    expect(sanitizeMcpServerKey("Software Development")).toBe(
-      "Software_Development",
-    );
+
+/** 与 recordMcpTools 同样的前缀匹配策略。 */
+function serverForToolName(toolName: string, names: readonly string[]): string | undefined {
+  const sorted = [...names].sort((a, b) => b.length - a.length);
+  return sorted.find((name) => toolName.startsWith(`mcp__${name}__`));
+}
+
+describe("MCP tool name prefix", () => {
+  it("extracts the server name for plain names", () => {
+    expect(serverForToolName("mcp__Chrome__click", ["Chrome"])).toBe("Chrome");
   });
 
-  it("keeps an already-underscored name stable", () => {
-    expect(sanitizeMcpServerKey("Software_Development")).toBe(
-      "Software_Development",
-    );
-    expect(sanitizeMcpServerKey("GUI_Operate")).toBe("GUI_Operate");
+  it("handles the builtin preset names", () => {
+    const names = ["Chrome", "GUI_Operate", "Software_Development"];
+    expect(serverForToolName("mcp__Chrome__click", names)).toBe("Chrome");
+    expect(serverForToolName("mcp__GUI_Operate__list_windows", names)).toBe("GUI_Operate");
+    expect(
+      serverForToolName("mcp__Software_Development__create_or_modify_code", names),
+    ).toBe("Software_Development");
   });
 
-  it("collapses accidental double underscores so the tool name stays parseable", () => {
-    expect(sanitizeMcpServerKey("a__b")).toBe("a_b");
-    expect(sanitizeMcpServerKey("Chrome")).toBe("Chrome");
+  it("keeps whitespace in a user-chosen name (names are no longer sanitized)", () => {
+    expect(serverForToolName("mcp__My Server__do", ["My Server"])).toBe("My Server");
   });
 
-  it("produces a name that round-trips through the mcp__<server>__<tool> pattern", () => {
-    const serverKey = sanitizeMcpServerKey("Software Development");
-    const toolName = `mcp__${serverKey}__create_or_modify_code`;
-    expect(/^mcp__(.+?)__(.+)$/.exec(toolName)?.[1]).toBe(
-      "Software_Development",
-    );
-    expect(/^mcp__(.+?)__(.+)$/.exec(toolName)?.[2]).toBe(
-      "create_or_modify_code",
-    );
+  it("matches the longest name when one is a prefix of another", () => {
+    // 正则非贪婪拆分会把 "a__b" 切成 "a"，这正是不能靠正则的原因
+    expect(serverForToolName("mcp__a__b__tool", ["a", "a__b"])).toBe("a__b");
+  });
+
+  it("returns undefined for tools that are not MCP tools", () => {
+    expect(serverForToolName("read_file", ["Chrome"])).toBeUndefined();
+    expect(serverForToolName("mcp__Unknown__x", ["Chrome"])).toBeUndefined();
+  });
+
+  it("does not confuse a tool name that merely contains the prefix", () => {
+    expect(serverForToolName("xmcp__Chrome__t", ["Chrome"])).toBeUndefined();
   });
 });

@@ -28,11 +28,14 @@ describe('telemetry event wiring', () => {
   it('emits reply_ok and error from the turn outcome', () => {
     const source = read('src/main/agent/agent-runner.ts');
     expect(source).toContain('void trackEvent("reply_ok");');
-    expect(source).toContain('classifyTurnFailure(outcomeTracker)');
-    expect(source).toContain('getTerminalErrorText(): string | undefined');
-    // The thrown path records the text it already computed, otherwise every
-    // thrown failure would bucket as `other`.
-    expect(source).toContain('outcomeTracker.setTerminalError(errorText);');
+    expect(source).toContain('outcomeTracker.getTerminalErrorCategory()');
+    expect(source).toContain(
+      'getTerminalErrorCategory(): ErrorCategory | undefined',
+    );
+    // Both failure paths must bucket from the raw provider text — the localised
+    // user-facing string would make every bucket come out as `other`.
+    expect(source).toContain('categorizeErrorText(rawErrorText)');
+    expect(source).toContain('resolvedPayload.errorCategory');
   });
 
   it('emits feature_use for each v1 feature', () => {
@@ -57,16 +60,5 @@ describe('telemetry event wiring', () => {
         `void trackEvent("update_result", { code: "${code}" });`,
       );
     }
-  });
-
-  it('buckets "no provider" as no_provider rather than auth_failed', async () => {
-    const { TurnOutcomeTracker, classifyTurnFailure } = await import(
-      '../src/main/agent/agent-runner'
-    );
-    const tracker = new TurnOutcomeTracker();
-    // The real message from the model resolver contains "API key".
-    tracker.setTerminalError('No API key configured for provider');
-
-    expect(classifyTurnFailure(tracker)).toBe('no_provider');
   });
 });

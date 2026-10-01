@@ -20,6 +20,11 @@ import type {
 } from "../renderer/types";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
+import type {
+  ActionResult,
+  AddCustomServerInput,
+  ConnectorEntry,
+} from "../shared/connectors";
 import type { ElementSelection, PickerStartResult } from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
 import type {
@@ -35,7 +40,6 @@ import type {
   McpServerConfig,
   McpTool,
   McpServerStatus,
-  McpPresetsMap,
   RemoteConfig,
   ChannelInstanceConfig,
   ChannelInstanceLog,
@@ -420,23 +424,40 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
   },
 
-  // MCP methods
+  // MCP methods（保留给设置里的「MCP 服务（高级）」）
   mcp: {
     getServers: (): Promise<McpServerConfig[]> =>
       ipcRenderer.invoke("mcp.getServers"),
-    getServer: (serverId: string): Promise<McpServerConfig | undefined> =>
-      ipcRenderer.invoke("mcp.getServer", serverId),
     saveServer: (
       config: McpServerConfig,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke("mcp.saveServer", config),
-    deleteServer: (serverId: string): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke("mcp.deleteServer", serverId),
+    deleteServer: (serverName: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke("mcp.deleteServer", serverName),
     getTools: (): Promise<McpTool[]> => ipcRenderer.invoke("mcp.getTools"),
+    // ChatView 每 5 秒轮询这个来渲染输入栏的连接器指示器 —— 不要移除
     getServerStatus: (): Promise<McpServerStatus[]> =>
       ipcRenderer.invoke("mcp.getServerStatus"),
-    getPresets: (): Promise<McpPresetsMap> =>
-      ipcRenderer.invoke("mcp.getPresets"),
+  },
+
+  // Connectors page
+  connectors: {
+    list: (): Promise<ConnectorEntry[]> => ipcRenderer.invoke("connectors.list"),
+    addCatalogServer: (key: string): Promise<ActionResult> =>
+      ipcRenderer.invoke("connectors.addCatalogServer", key),
+    removeServer: (name: string): Promise<ActionResult> =>
+      ipcRenderer.invoke("connectors.removeServer", name),
+    setEnabled: (name: string, enabled: boolean): Promise<ActionResult> =>
+      ipcRenderer.invoke("connectors.setEnabled", name, enabled),
+    authorize: (name: string): Promise<ActionResult> =>
+      ipcRenderer.invoke("connectors.authorize", name),
+    addCustomServer: (input: AddCustomServerInput): Promise<ActionResult> =>
+      ipcRenderer.invoke("connectors.addCustomServer", input),
+    onStatusChanged: (cb: () => void): (() => void) => {
+      const handler = (): void => cb();
+      ipcRenderer.on("connectors.statusChanged", handler);
+      return () => ipcRenderer.removeListener("connectors.statusChanged", handler);
+    },
   },
 
   // Skills methods
@@ -979,14 +1000,22 @@ declare global {
       };
       mcp: {
         getServers: () => Promise<McpServerConfig[]>;
-        getServer: (serverId: string) => Promise<McpServerConfig | undefined>;
         saveServer: (
           config: McpServerConfig,
         ) => Promise<{ success: boolean; error?: string }>;
-        deleteServer: (serverId: string) => Promise<{ success: boolean }>;
+        deleteServer: (serverName: string) => Promise<{ success: boolean }>;
         getTools: () => Promise<McpTool[]>;
         getServerStatus: () => Promise<McpServerStatus[]>;
-        getPresets: () => Promise<McpPresetsMap>;
+      };
+      connectors: {
+        list: () => Promise<ConnectorEntry[]>;
+        addCatalogServer: (key: string) => Promise<ActionResult>;
+        removeServer: (name: string) => Promise<ActionResult>;
+        setEnabled: (name: string, enabled: boolean) => Promise<ActionResult>;
+        authorize: (name: string) => Promise<ActionResult>;
+        cancelSignIn: (name: string) => Promise<ActionResult>;
+        addCustomServer: (input: AddCustomServerInput) => Promise<ActionResult>;
+        onStatusChanged: (cb: () => void) => () => void;
       };
       skills: {
         getAll: () => Promise<Skill[]>;
