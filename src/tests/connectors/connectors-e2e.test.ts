@@ -89,7 +89,7 @@ describe("builtin capability names stay in sync", () => {
   it("every capability card carries the server name used for lookup", () => {
     const entries = realRegistry()
       .list()
-      .filter((e) => e.tab === "capability");
+      .filter((e) => e.source === "mcp-builtin");
     expect(entries).toHaveLength(3);
     for (const entry of entries) {
       expect(findBuiltinPresetByName(entry.serverName)).toBeDefined();
@@ -241,7 +241,7 @@ describe("the key the UI passes to addCatalogServer", () => {
     // 而 registry 是按目录的 key（"notion"）查表的 —— 直接传 entry.key
     // 会让每一次点「连接」都返回 "unknown catalog key"。
     const reg = realRegistry();
-    for (const entry of reg.list().filter((e) => e.tab === "connect")) {
+    for (const entry of reg.list()) {
       // 卡片需要知道该把什么交给 addCatalogServer
       expect(entry.instances).toBeDefined();
     }
@@ -282,7 +282,7 @@ describe("the exact value the UI now sends", () => {
 
   it("connects every catalog card in the list", async () => {
     const reg = realRegistry();
-    for (const card of reg.list().filter((e) => e.tab === "connect")) {
+    for (const card of reg.list().filter((e) => e.source === "mcp-remote")) {
       expect((await reg.addCatalogServer(card.serverName, vi.fn())).ok).toBe(
         true,
       );

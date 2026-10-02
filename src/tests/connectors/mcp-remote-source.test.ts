@@ -108,7 +108,7 @@ describe("buildRemoteEntries", () => {
   it("every entry uses tab=connect and source=mcp-remote", () => {
     const entries = buildRemoteEntries(ctx([NOTION_SERVER]), CATALOG);
     for (const e of entries) {
-      expect(e.tab).toBe("connect");
+      expect(e.transport).toBe("http");
       expect(e.source).toBe("mcp-remote");
     }
   });

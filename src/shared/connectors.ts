@@ -11,9 +11,6 @@
 
 export type ConnectorSourceId = "mcp-remote" | "mcp-builtin" | "mcp-custom";
 
-/** 决定分组，也决定卡片画什么控件。 */
-export type ConnectorTab = "connect" | "capability";
-
 export type ConnectorStatus =
   | { kind: "ready" }
   /** 已配置，但运行时没有任何状态 —— 也就是「没在连、也没连上」。
@@ -35,15 +32,6 @@ export interface ConnectorInstance {
   label: string;
   status: ConnectorStatus;
   /**
-   * 传输方式 —— **决定卡片给什么动作**。
-   *
-   * `http` 是远程服务：「连接」= OAuth 授权，「断开」= 移除配置。
-   * `stdio` 是本机进程：它由会话启动时连接，没有独立的授权步骤，
-   * 所以动作只能是**启用/停用**（非破坏性）。用 `summary` 的 i18n key 去推断
-   * 传输方式是不行的 —— 那是展示字符串，改文案就会静默坏掉。
-   */
-  transport: "stdio" | "http";
-  /**
    * 副标题（i18n key）：传输方式。
    * 两个 source 都会设置，所以是必填 —— 可选只会让每处使用都要判空。
    */
@@ -59,7 +47,17 @@ export interface ConnectorEntry {
    */
   serverName: string;
   source: ConnectorSourceId;
-  tab: ConnectorTab;
+  /**
+   * 传输方式 —— **决定卡片给什么动作与标记**。
+   *
+   * `http` 是远程服务：「连接」= OAuth 授权，「断开」= 移除配置。
+   * `stdio` 是本机进程：会话启动时连接，没有独立授权步骤，动作只能是**启用/停用**。
+   *
+   * **放在 entry 级而不是 instance 级**：未添加的内置条目 `instances` 为空，
+   * 而卡片那时也要画对动作（开关而非「连接」）。用 `summary` 的 i18n key 反推是不行的 ——
+   * 那是展示字符串，改文案就静默坏掉。
+   */
+  transport: "stdio" | "http";
   nameKey: string;
   descriptionKey?: string;
   instances: ConnectorInstance[];

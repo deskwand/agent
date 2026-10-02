@@ -51,7 +51,7 @@ export function buildBuiltinEntries(ctx: SourceBuildContext): ConnectorEntry[] {
       key: `mcp:builtin:${preset.name}`,
       serverName: preset.name,
       source: "mcp-builtin",
-      tab: "capability",
+      transport: "stdio",
       nameKey: preset.nameKey,
       descriptionKey: preset.descriptionKey,
       instances: server
@@ -65,7 +65,6 @@ export function buildBuiltinEntries(ctx: SourceBuildContext): ConnectorEntry[] {
                   ? ({ kind: "off" } as ConnectorStatus)
                   : (ctx.statusFor(preset.name) ?? { kind: "idle" }),
               summary: SERVER_SUMMARY_LOCAL,
-              transport: "stdio",
             },
           ]
         : [],

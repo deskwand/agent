@@ -42,7 +42,7 @@ describe("buildBuiltinEntries", () => {
 
   it("every entry uses tab=capability and source=mcp-builtin", () => {
     for (const e of buildBuiltinEntries(ctx([]))) {
-      expect(e.tab).toBe("capability");
+      expect(e.transport).toBe("stdio");
       expect(e.source).toBe("mcp-builtin");
     }
   });

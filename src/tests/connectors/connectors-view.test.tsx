@@ -77,7 +77,6 @@ function instance(status: ConnectorStatus): ConnectorInstance {
     id: "notion",
     label: "notion",
     status,
-    transport: "http",
     summary: "connectors.summary.remote",
   };
 }
@@ -88,7 +87,7 @@ function notion(instances: ConnectorInstance[] = []): ConnectorEntry {
     key: "mcp:catalog:notion",
     serverName: "notion",
     source: "mcp-remote",
-    tab: "connect",
+    transport: "http",
     nameKey: "connectors.catalog.notion",
     descriptionKey: "connectors.catalog.notionDesc",
     instances,

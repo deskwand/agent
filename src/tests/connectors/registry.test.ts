@@ -87,8 +87,8 @@ describe("registry.list", () => {
   it("aggregates remote and builtin entries", () => {
     const { deps: d } = deps();
     const all = buildRegistry(d).list();
-    const tabs = new Set(all.map((e) => e.tab));
-    expect(tabs).toEqual(new Set(["connect", "capability"]));
+    const transports = new Set(all.map((e) => e.transport));
+    expect(transports).toEqual(new Set(["http", "stdio"]));
   });
 
   it("includes all three builtin presets", () => {

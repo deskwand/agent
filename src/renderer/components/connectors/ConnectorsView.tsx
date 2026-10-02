@@ -5,7 +5,7 @@ import { ConnectorCard } from "./ConnectorCard";
 import { SettingsSkills } from "../settings/SettingsSkills";
 import { PiExtensionManagerView } from "../PiExtensionManagerView";
 
-type TabId = "connect" | "capability" | "skills" | "plugins";
+type TabId = "connect" | "skills" | "plugins";
 type FilterId = "all" | "added" | "attention";
 
 const isElectron =
@@ -107,8 +107,8 @@ export function ConnectorsView() {
     });
   }, [refresh]);
 
-  const connectEntries = entries.filter((e) => e.tab === "connect");
-  const capabilityEntries = entries.filter((e) => e.tab === "capability");
+  // 只有一个 MCP 列表 —— 条目不再带 tab（动作由 entry.transport 判定）
+  const connectEntries = entries;
 
   const addedCount = connectEntries.filter(
     (e) => e.instances.length > 0,
@@ -235,7 +235,6 @@ export function ConnectorsView() {
 
   const tabs: Array<[TabId, string]> = [
     ["connect", t("connectors.tab.connect")],
-    ["capability", t("connectors.tab.capability")],
     ["skills", t("connectors.tab.skills")],
     ["plugins", t("connectors.tab.plugins")],
   ];
@@ -349,24 +348,6 @@ export function ConnectorsView() {
               </div>
             )}
           </>
-        )}
-
-        {tab === "capability" && (
-          <div className="flex flex-col gap-2.5">
-            {capabilityEntries.map((entry) => (
-              <ConnectorCard
-                key={entry.key}
-                entry={entry}
-                variant="row"
-                authorizing={authPending[entry.serverName] === true}
-                onConnect={onConnect}
-                onDisconnect={onDisconnect}
-                onAuthorize={onAuthorize}
-                onCancel={onCancel}
-                onToggle={onToggle}
-              />
-            ))}
-          </div>
         )}
 
         {tab === "skills" && <SettingsSkills isActive={true} />}

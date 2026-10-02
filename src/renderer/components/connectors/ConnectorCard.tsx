@@ -77,7 +77,10 @@ export function ConnectorCard({
 }: Props) {
   const { t } = useTranslation();
   const instance = entry.instances[0];
-  const isCapability = entry.tab === "capability";
+  // 本机（stdio）卡片画开关，远程（http）画连接/断开。
+  // 判据用 **entry 级** 的 transport —— 未添加的内置条目 instances 为空，
+  // 那时也要画对动作。
+  const isCapability = entry.transport === "stdio";
   const isRow = variant === "row";
   /** 没有实例 = 还没添加过，视为关闭；开关照样可点。 */
   const capabilityOn = !!instance && instance.status.kind !== "off";
@@ -217,15 +220,18 @@ function renderAction(
   // 「连接」= OAuth 授权，用在 stdio 上必报 `not a remote server`；
   // 「断开」= 从 mcp.json **删掉**这条配置 —— 对目录条目可接受（能一键加回），
   // 对手写的自定义 server 是**不可恢复的删除**。两者都不是它该有的动作。
-  if (instance?.transport === "stdio") {
-    const enabled = instance.status.kind !== "off";
+  if (entry.transport === "stdio") {
+    // 未添加的本机条目（instances 为空）也要能打开开关 —— registry 会先写进
+    // mcp.json 再启用，所以没有实例时用 serverName 作为标识。
+    const enabled = !!instance && instance.status.kind !== "off";
+    const toggleId = instance ? instance.id : entry.serverName;
     return (
       <button
         type="button"
         role="switch"
         aria-checked={enabled}
         aria-label={t(entry.nameKey)}
-        onClick={() => handlers.onToggle(instance.id, !enabled)}
+        onClick={() => handlers.onToggle(toggleId, !enabled)}
         className={`w-[34px] h-5 rounded-full relative transition-colors flex-none ${
           enabled ? "bg-accent" : "bg-surface-active"
         }`}

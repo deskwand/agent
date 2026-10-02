@@ -61,7 +61,7 @@ export function buildRemoteEntries(
       key: `mcp:catalog:${cat.key}`,
       serverName: cat.key,
       source: "mcp-remote",
-      tab: "connect",
+      transport: "http",
       nameKey: cat.nameKey,
       descriptionKey: cat.descriptionKey,
       instances: server
@@ -71,7 +71,6 @@ export function buildRemoteEntries(
               label: server.name,
               status: statusOrFallback(ctx, server),
               summary: SERVER_SUMMARY_REMOTE,
-              transport: "http",
             },
           ]
         : [],
@@ -85,7 +84,7 @@ export function buildRemoteEntries(
       key: `mcp:server:${name}`,
       serverName: name,
       source: "mcp-remote",
-      tab: "connect",
+      transport: "http",
       // 用户自建的名字不是 i18n key，直接用原名当 key（t() 查不到就回退原文）
       nameKey: name,
       instances: [
@@ -94,7 +93,6 @@ export function buildRemoteEntries(
           label: name,
           status: statusOrFallback(ctx, server),
           summary: SERVER_SUMMARY_REMOTE,
-          transport: "http",
         },
       ],
     });

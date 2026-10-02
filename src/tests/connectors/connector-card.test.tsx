@@ -54,7 +54,6 @@ function withStatus(status: ConnectorStatus): ConnectorInstance {
     id: "notion",
     label: "notion",
     status,
-    transport: "http",
     summary: "connectors.summary.remote",
   };
 }
@@ -64,7 +63,7 @@ function entry(over: Partial<ConnectorEntry> = {}): ConnectorEntry {
     key: "mcp:catalog:notion",
     serverName: "notion",
     source: "mcp-remote",
-    tab: "connect",
+    transport: "http",
     nameKey: "connectors.catalog.notion",
     descriptionKey: "connectors.catalog.notionDesc",
     instances: [],
@@ -294,7 +293,7 @@ describe("本机能力卡片", () => {
       key: "mcp:builtin:Chrome",
       serverName: "Chrome",
       source: "mcp-builtin",
-      tab: "capability",
+      transport: "stdio",
       nameKey: "connectors.builtin.chrome",
       descriptionKey: "connectors.builtin.chromeDesc",
       instances,
@@ -324,7 +323,6 @@ describe("本机能力卡片", () => {
             id: "Chrome",
             label: "Chrome",
             status: { kind: "ready" },
-            transport: "stdio",
             summary: "connectors.summary.local",
           },
         ])}
