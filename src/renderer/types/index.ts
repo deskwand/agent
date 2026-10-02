@@ -20,6 +20,7 @@ import type { AskUserQuestion, AskUserAnswers } from "../../shared/ask-user";
 import type {
   NestedToolCallsUi,
   NestedToolRuntimeUi,
+  NestedToolStatus,
 } from "../../shared/nested-tool-calls";
 
 // Session types
@@ -122,6 +123,8 @@ export interface ToolUseContent {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  /** 虚拟投影块的归属/状态信息；普通工具块没有此字段。 */
+  trace?: ToolTraceUi;
 }
 
 export interface ToolResultContent {
@@ -142,6 +145,10 @@ export interface ToolResultContent {
    * 旧消息类型无此字段，读取方需按可选处理。
    */
   nestedCalls?: NestedToolCallsUi;
+  /** 虚拟投影结果的子调用状态；普通结果没有此字段。 */
+  status?: NestedToolStatus;
+  /** 子调用终态但运行时明细（正文/diff/图片）缺失，仅表示正文不可用。 */
+  outputUnavailable?: boolean;
 }
 
 /** Streaming partial tool output while a tool is still executing */
@@ -1163,4 +1170,19 @@ export interface AskUserRequest {
   sessionId: string;
   toolCallId: string;
   questions: AskUserQuestion[];
+}
+
+/**
+ * 嵌套调用的展示归属：把虚拟子块挂回它所属的 codemode 外层脚本。
+ * 仅用于渲染详情，不代表权威的终态统计依据。
+ */
+export interface ToolTraceUi {
+  parentToolCallId: string;
+  status: NestedToolStatus;
+  parentStatus: NestedToolStatus;
+  complete: boolean;
+  source: NestedToolCallsUi["source"];
+  argumentsBytes?: number;
+  cancelled?: boolean;
+  script?: { id: string; input: Record<string, unknown> };
 }
