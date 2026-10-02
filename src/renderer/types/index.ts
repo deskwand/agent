@@ -17,7 +17,10 @@ import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
 import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 import type { AskUserQuestion, AskUserAnswers } from "../../shared/ask-user";
-import type { NestedToolCallsUi } from "../../shared/nested-tool-calls";
+import type {
+  NestedToolCallsUi,
+  NestedToolRuntimeUi,
+} from "../../shared/nested-tool-calls";
 
 // Session types
 export interface Session {
@@ -798,7 +801,11 @@ export type ServerEvent =
   | { type: "browser.picker.state-changed"; payload: { active: boolean } }
   | { type: "browser.picker.selected"; payload: ElementSelection }
   | { type: "askUser.request"; payload: AskUserRequest }
-  | { type: "askUser.dismiss"; payload: { toolCallId: string } };
+  | { type: "askUser.dismiss"; payload: { toolCallId: string } }
+  | {
+      type: "stream.nestedToolCalls";
+      payload: { sessionId: string; runtime: NestedToolRuntimeUi };
+    };
 
 // Settings types
 export interface Settings {
