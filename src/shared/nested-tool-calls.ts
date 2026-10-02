@@ -35,7 +35,10 @@ export interface NestedToolCallsUi {
   parentToolCallId: string;
   parentStatus: NestedToolStatus;
   calls: NestedToolCallUi[];
-  /** 最终记录完整性：调用被丢弃、参数省略或调用未完成时为 false。 */
+  /**
+   * 完整性标记直接取 SDK 最终记录自带的 `complete`；调用行被丢弃（数量
+   * 截断或去重）时在本层降级为 false。不从参数省略、状态等本地推断。
+   */
   complete: boolean;
   source: "live" | "final" | "legacy" | "missing";
 }
