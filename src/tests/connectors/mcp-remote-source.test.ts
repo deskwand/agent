@@ -29,8 +29,13 @@ const NOTION_SERVER: McpServerEntry = {
 function ctx(
   servers: McpServerEntry[],
   statusFor: (n: string) => ConnectorStatus | undefined = () => undefined,
+  credentialed: string[] = [],
 ) {
-  return { loaded: { servers, errors: [] }, statusFor };
+  return {
+    loaded: { servers, errors: [] },
+    statusFor,
+    hasCredentials: (url: string) => credentialed.includes(url),
+  };
 }
 
 describe("buildRemoteEntries", () => {
@@ -106,5 +111,35 @@ describe("buildRemoteEntries", () => {
       expect(e.tab).toBe("connect");
       expect(e.source).toBe("mcp-remote");
     }
+  });
+});
+
+describe("已授权但运行时还没连上", () => {
+  it("报 authorized，而不是笼统的「未连接」", () => {
+    // 回归：用户刚在浏览器里授权成功（凭据已落盘），但运行时还没有任何状态，
+    // 卡片却显示「未连接」—— 看起来像授权失败了。
+    // 凭据存在是我们确知的事实，状态必须反映它。
+    const entries = buildRemoteEntries(
+      ctx([NOTION_SERVER], () => undefined, [CATALOG[0].url]),
+      CATALOG,
+    );
+    const notion = entries.find((e) => e.key === "mcp:catalog:notion")!;
+    expect(notion.instances[0].status).toEqual({ kind: "authorized" });
+  });
+
+  it("没有凭据时仍是 idle", () => {
+    const entries = buildRemoteEntries(ctx([NOTION_SERVER]), CATALOG);
+    const notion = entries.find((e) => e.key === "mcp:catalog:notion")!;
+    expect(notion.instances[0].status).toEqual({ kind: "idle" });
+  });
+
+  it("运行时状态优先于凭据判断", () => {
+    // 已连上就不能再显示「已授权」
+    const entries = buildRemoteEntries(
+      ctx([NOTION_SERVER], () => ({ kind: "ready" }), [CATALOG[0].url]),
+      CATALOG,
+    );
+    const notion = entries.find((e) => e.key === "mcp:catalog:notion")!;
+    expect(notion.instances[0].status).toEqual({ kind: "ready" });
   });
 });

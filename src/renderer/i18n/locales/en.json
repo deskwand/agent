@@ -2045,7 +2045,8 @@
       "failed": "Connection failed",
       "off": "Disabled",
       "disabled": "Disabled",
-      "idle": "Not connected"
+      "idle": "Not connected",
+      "authorized": "Authorized"
     },
     "action": {
       "connect": "Connect",
@@ -2054,7 +2055,8 @@
       "retry": "Retry",
       "manage": "Manage",
       "inProgress": "Connecting…",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "connectNow": "Connect now"
     },
     "credentialLocalOnly": "Credentials stay on this device",
     "allHealthy": "Everything you added is working",

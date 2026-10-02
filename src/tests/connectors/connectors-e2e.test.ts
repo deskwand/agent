@@ -13,7 +13,10 @@ import {
   setServerEnabled,
   upsertServer,
 } from "../../main/connectors/mcp-config-file";
-import { removeCredentials } from "../../main/connectors/mcp-signin";
+import {
+  readCredentials,
+  removeCredentials,
+} from "../../main/connectors/mcp-signin";
 import {
   BUILTIN_PRESETS,
   findBuiltinPresetByName,
@@ -69,6 +72,7 @@ function realRegistry() {
     builtinConfigFor: (name) => findBuiltinPresetByName(name)?.config(),
     isValidServerName,
     cancelSignIn: () => false,
+    hasCredentials: (url) => Boolean(readCredentials(agentDir)[url]?.tokens),
   };
   return buildRegistry(deps);
 }

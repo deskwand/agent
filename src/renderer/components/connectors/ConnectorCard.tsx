@@ -29,6 +29,8 @@ function dotClass(kind: ConnectorInstance["status"]["kind"]): string {
       return "bg-success";
     case "idle":
       return "bg-text-muted";
+    case "authorized":
+      return "bg-success/60";
     case "connecting":
       return "bg-accent animate-pulse";
     case "needs-auth":
@@ -49,6 +51,8 @@ function statusText(
       return t("connectors.status.ready");
     case "idle":
       return t("connectors.status.idle");
+    case "authorized":
+      return t("connectors.status.authorized");
     case "connecting":
       return t("connectors.status.connecting");
     case "needs-auth":
@@ -260,7 +264,7 @@ function renderAction(
       return disconnectButton;
 
     case "idle":
-      // 已配置但当前没有连接活动（例如没开会话）。给「连接」重试授权，并保留退路。
+      // 已配置但当前没有连接活动。给「连接」重试授权，并保留退路。
       return (
         <>
           <button
@@ -269,6 +273,21 @@ function renderAction(
             onClick={() => handlers.onAuthorize(instance.id)}
           >
             {t("connectors.action.connect")}
+          </button>
+          {disconnectButton}
+        </>
+      );
+
+    case "authorized":
+      // 凭据已在本地，等运行时连上（通常是下次会话）。不再是「未连接」。
+      return (
+        <>
+          <button
+            type="button"
+            className={primary}
+            onClick={() => handlers.onAuthorize(instance.id)}
+          >
+            {t("connectors.action.connectNow")}
           </button>
           {disconnectButton}
         </>

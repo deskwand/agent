@@ -68,6 +68,7 @@ function deps(
       name === "Chrome" ? { type: "stdio", command: "npx" } : undefined,
     isValidServerName: (name) => /^[A-Za-z0-9_-]+$/.test(name),
     cancelSignIn: over.cancelSignIn ?? (() => true),
+    hasCredentials: () => false,
     ...over,
   };
 

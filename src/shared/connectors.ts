@@ -19,6 +19,9 @@ export type ConnectorStatus =
   /** 已配置，但运行时没有任何状态 —— 也就是「没在连、也没连上」。
    *  不能拿它冒充 `connecting`：那会让卡片永远显示「进行中」且无处可退。 */
   | { kind: "idle" }
+  /** 凭据已在本地（用户授权过了），只是运行时还没连上 —— 通常是等下次会话。
+   *  不区分它和 `idle` 的话，刚授权成功的用户会看到「未连接」，以为失败了。 */
+  | { kind: "authorized" }
   | { kind: "connecting" }
   /** 已配置但 enabled:false */
   | { kind: "off" }

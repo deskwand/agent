@@ -20,6 +20,24 @@ export const SERVER_SUMMARY_REMOTE = "connectors.summary.remote";
 export interface SourceBuildContext {
   loaded: { servers: McpServerEntry[]; errors: string[] };
   statusFor: (name: string) => ConnectorStatus | undefined;
+  /** 该 server URL 是否已有本地凭据（= 用户授权过）。 */
+  hasCredentials: (url: string) => boolean;
+}
+
+/**
+ * 没有运行时状态时，靠凭据判断是「已授权」还是「未连接」。
+ * 运行时状态永远优先 —— 已连上就不该再显示「已授权」。
+ */
+function statusOrFallback(
+  ctx: SourceBuildContext,
+  server: McpServerEntry,
+): ConnectorStatus {
+  const runtime = ctx.statusFor(server.name);
+  if (runtime) return runtime;
+  if ("url" in server.config && ctx.hasCredentials(server.config.url)) {
+    return { kind: "authorized" };
+  }
+  return { kind: "idle" };
 }
 
 function isHttp(entry: McpServerEntry): boolean {
@@ -51,7 +69,7 @@ export function buildRemoteEntries(
             {
               id: server.name,
               label: server.name,
-              status: ctx.statusFor(server.name) ?? { kind: "idle" },
+              status: statusOrFallback(ctx, server),
               summary: SERVER_SUMMARY_REMOTE,
             },
           ]
@@ -60,7 +78,7 @@ export function buildRemoteEntries(
   });
 
   // 目录之外的用户自建远程 server：不能因为不在目录里就藏起来
-  for (const name of byName.keys()) {
+  for (const [name, server] of byName) {
     if (claimed.has(name)) continue;
     entries.push({
       key: `mcp:server:${name}`,
@@ -73,7 +91,7 @@ export function buildRemoteEntries(
         {
           id: name,
           label: name,
-          status: ctx.statusFor(name) ?? { kind: "idle" },
+          status: statusOrFallback(ctx, server),
           summary: SERVER_SUMMARY_REMOTE,
         },
       ],

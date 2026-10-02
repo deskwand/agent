@@ -117,6 +117,23 @@ describe("远程服务卡片", () => {
     expect(buttonByKey(DISCONNECT)).toBeDefined();
   });
 
+  it("已授权（凭据在本地）不显示「未连接」", () => {
+    // 用户刚在浏览器授权成功、凭据已落盘，此时运行时还没连上。
+    // 显示「未连接」会让人以为授权失败了。
+    const h = handlers();
+    render(
+      <ConnectorCard
+        entry={entry({ instances: [withStatus({ kind: "authorized" })] })}
+        {...h}
+      />,
+    );
+    expect(container.textContent).toContain("connectors.status.authorized");
+    expect(container.textContent).not.toContain("connectors.status.idle");
+    // 仍可催一次连接，也仍可断开
+    expect(buttonByKey("connectors.action.connectNow")).toBeDefined();
+    expect(buttonByKey(DISCONNECT)).toBeDefined();
+  });
+
   it("本地授权待处理时给出「取消」，未添加的条目也传 serverName", () => {
     // 传输层此时可能什么都还没发生（实例都还没写进 mcp.json），
     // 但用户刚点过「连接」，必须能中止。
@@ -168,6 +185,7 @@ describe("远程服务卡片", () => {
   it("每个非 ready 状态都保留「断开」这条退路", () => {
     const statuses: ConnectorStatus[] = [
       { kind: "idle" },
+      { kind: "authorized" },
       { kind: "connecting" },
       { kind: "needs-auth" },
       { kind: "failed", message: "boom" },
@@ -238,9 +256,9 @@ describe("远程服务卡片", () => {
     expect(group.className).toContain("flex-none");
     // 容器里只应该有按钮：状态文字若被塞回来，说明按钮组又被摆进了
     // 「状态 + 按钮」的两端对齐容器里（P3 的根因）。这条不依赖 i18n mock 的返回值。
-    expect(Array.from(group.children).every((c) => c.tagName === "BUTTON")).toBe(
-      true,
-    );
+    expect(
+      Array.from(group.children).every((c) => c.tagName === "BUTTON"),
+    ).toBe(true);
     expect(group.textContent).not.toContain("connectors.status.");
   });
 });

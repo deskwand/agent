@@ -10,7 +10,11 @@ function ctx(
   servers: McpServerEntry[],
   statusFor: (n: string) => ConnectorStatus | undefined = () => undefined,
 ) {
-  return { loaded: { servers, errors: [] }, statusFor };
+  return {
+    loaded: { servers, errors: [] },
+    statusFor,
+    hasCredentials: () => false,
+  };
 }
 
 const CHROME: McpServerEntry = {

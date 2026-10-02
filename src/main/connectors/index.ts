@@ -22,7 +22,12 @@ import {
   setServerEnabled,
   isValidServerName,
 } from "./mcp-config-file";
-import { cancelSignIn, removeCredentials, startSignIn } from "./mcp-signin";
+import {
+  cancelSignIn,
+  readCredentials,
+  removeCredentials,
+  startSignIn,
+} from "./mcp-signin";
 import { findBuiltinPresetByName } from "./builtin-presets";
 import { log, logError } from "../utils/logger";
 
@@ -99,6 +104,10 @@ export function registerConnectorsIpc({
       findBuiltinPresetByName(serverName)?.config(),
     isValidServerName,
     cancelSignIn,
+    hasCredentials: (url) =>
+      Boolean(
+        readCredentials(agentDir)[String(new URL(url))]?.tokens?.access_token,
+      ),
   });
 
   ipcMain.handle("connectors.list", () => registry.list());

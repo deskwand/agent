@@ -46,6 +46,8 @@ export interface RegistryDeps {
   activateNow: (name: string, config: McpServerConfig) => boolean;
   /** 与 SDK 的 validateMcpServerConfig 同规则；不合规的名字必须在写入前拦下。 */
   isValidServerName: (name: string) => boolean;
+  /** 该 server URL 是否已有本地凭据（= 授权过）。用于区分「已授权」与「未连接」。 */
+  hasCredentials: (url: string) => boolean;
   /** 中止某个 server 正在进行的授权（用户在浏览器里没点完就想退出）。 */
   cancelSignIn: (serverUrl: string) => boolean;
   /**
@@ -86,7 +88,11 @@ function withDirectExposure(config: McpServerConfig): McpServerConfig {
 export function buildRegistry(deps: RegistryDeps): Registry {
   function list(): ConnectorEntry[] {
     const loaded = deps.loadConfig();
-    const ctx = { loaded, statusFor: deps.statusFor };
+    const ctx = {
+      loaded,
+      statusFor: deps.statusFor,
+      hasCredentials: deps.hasCredentials,
+    };
     return [
       ...buildRemoteEntries(ctx, deps.catalog),
       ...buildBuiltinEntries(ctx),
