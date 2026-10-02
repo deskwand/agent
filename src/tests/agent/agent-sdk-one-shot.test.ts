@@ -15,6 +15,7 @@ vi.mock("../../main/agent/shared-model-runtime", () => ({
 }));
 
 import type { AppConfig } from "../../main/config/config-store";
+import { normalizeCodemodeConfig } from "../../shared/codemode-config";
 import { normalizeWebAccessConfig } from "../../shared/web-access";
 import { runPiAiOneShot } from "../../main/agent/agent-sdk-one-shot";
 
@@ -63,6 +64,7 @@ function makeConfig(): AppConfig {
     telemetryEnabled: true,
     isConfigured: true,
     webAccess: normalizeWebAccessConfig(undefined),
+    codemode: normalizeCodemodeConfig(undefined),
   };
 }
 

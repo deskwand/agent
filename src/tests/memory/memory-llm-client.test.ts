@@ -11,6 +11,7 @@ vi.mock("../../main/agent/agent-sdk-one-shot", () => ({
 }));
 
 import type { AppConfig } from "../../main/config/config-store";
+import { normalizeCodemodeConfig } from "../../shared/codemode-config";
 import { normalizeWebAccessConfig } from "../../shared/web-access";
 import { MemoryLLMClient } from "../../main/memory/memory-llm-client";
 
@@ -59,6 +60,7 @@ function makeConfig(timeoutMs: number): AppConfig {
     telemetryEnabled: true,
     isConfigured: true,
     webAccess: normalizeWebAccessConfig(undefined),
+    codemode: normalizeCodemodeConfig(undefined),
   };
 }
 

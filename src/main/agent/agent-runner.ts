@@ -104,6 +104,10 @@ import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
 import { createDeskwandMcpExtension } from "../mcp/mcp-client-extension";
 import {
+  codemodeDefaultToolsPatch,
+  createDeskwandCodemodeExtension,
+} from "./codemode-extension";
+import {
   AGENT_TOOL_NAME,
   registerAgentNameHook,
 } from "./subagent/agent-name-hook";
@@ -3337,6 +3341,10 @@ Tool routing:\n
         // 由 upsertServer 强制 exposure:"direct"，见 connectors/mcp-config-file.ts）
         extensionFactories.push(createDeskwandMcpExtension());
 
+        // codemode（默认关；由设置里的开关决定是否激活）—— 与 MCP 无关，见
+        // src/main/agent/codemode-extension.ts
+        extensionFactories.push(createDeskwandCodemodeExtension());
+
         // ── Pi Extension Host（按 cwd 复用）──────────────────────────────
         // 负责扩展/包/设置/信任的加载与生命周期。agentDir 固定为 ~/.pi/agent
         // （与 Pi CLI 共用同一套配置/扩展/信任，spec 决策 A）。首次使用时
@@ -3456,6 +3464,9 @@ Tool routing:\n
             sessionManager: piSessionManager,
             settingsManager: PiSettingsManager.inMemory({
               compaction: compactionSettings,
+              // codemode 的激活走设置（会话初始化的一部分）—— 工厂里的 setActiveTools 会被
+              // 会话初始化的重算覆盖，见 src/main/agent/codemode-extension.ts 的文件头说明。
+              ...codemodeDefaultToolsPatch(),
               retry: {
                 enabled: true,
                 // 压缩 / 分支摘要仍用 2 次预算（见 design-docs/2026-09-22-network-retry-policy.md §4.3）

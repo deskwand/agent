@@ -15,6 +15,10 @@ import {
   type WebAccessConfig,
 } from "../../shared/web-access";
 import { type SubagentConfig } from "../../shared/subagent-config";
+import {
+  normalizeCodemodeConfig,
+  type CodemodeConfig,
+} from "../../shared/codemode-config";
 import { logWarn } from "../utils/logger";
 import {
   normalizeAnthropicBaseUrl,
@@ -138,6 +142,7 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
+  codemode: CodemodeConfig;
   subagent?: SubagentConfig;
 }
 
@@ -163,6 +168,7 @@ interface StoredConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
+  codemode: CodemodeConfig;
   subagent?: SubagentConfig;
 }
 
@@ -276,6 +282,7 @@ export function defaultStoredConfig(): StoredConfig {
     isConfigured: false,
     visionModel: undefined,
     webAccess: normalizeWebAccessConfig(undefined),
+    codemode: normalizeCodemodeConfig(undefined),
   };
 }
 
@@ -919,6 +926,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
     webAccess: normalizeWebAccessConfig(stored.webAccess),
+    codemode: normalizeCodemodeConfig(stored.codemode),
     subagent: stored.subagent,
   };
 }
@@ -1077,6 +1085,8 @@ export class ConfigStore {
       stored.visionModel = updates.visionModel;
     if (updates.webAccess !== undefined)
       stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
+    if (updates.codemode !== undefined)
+      stored.codemode = normalizeCodemodeConfig(updates.codemode);
     if (updates.subagent !== undefined) stored.subagent = updates.subagent;
 
     stored.isConfigured =

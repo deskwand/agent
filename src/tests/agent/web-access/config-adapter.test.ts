@@ -11,6 +11,7 @@ import type {
   AppConfig,
 } from "../../../main/config/config-store";
 import { resolveWebAccessProviderAuth } from "../../../main/agent/tools/web-access/config-adapter";
+import { normalizeCodemodeConfig } from "../../../shared/codemode-config";
 import { normalizeWebAccessConfig } from "../../../shared/web-access";
 
 function providerConfig(
@@ -62,6 +63,7 @@ function appConfigWithProviders(providers: AppConfig["providers"]): AppConfig {
     telemetryEnabled: true,
     isConfigured: true,
     webAccess: normalizeWebAccessConfig(undefined),
+    codemode: normalizeCodemodeConfig(undefined),
   };
 }
 

@@ -19,6 +19,7 @@ import type {
   AppConfig,
   ProviderProfileKey,
 } from "../../main/config/config-store";
+import { normalizeCodemodeConfig } from "../../shared/codemode-config";
 import { normalizeWebAccessConfig } from "../../shared/web-access";
 
 function buildAppConfig(): AppConfig {
@@ -171,6 +172,7 @@ function buildAppConfig(): AppConfig {
     telemetryEnabled: true,
     isConfigured: true,
     webAccess: normalizeWebAccessConfig(undefined),
+    codemode: normalizeCodemodeConfig(undefined),
   };
 }
 

@@ -6,6 +6,8 @@ export function SettingsGeneral() {
   const { i18n, t } = useTranslation();
   const settings = useAppStore((s) => s.settings);
   const updateSettings = useAppStore((s) => s.updateSettings);
+  const appConfig = useAppStore((s) => s.appConfig);
+  const setAppConfig = useAppStore((s) => s.setAppConfig);
   const currentLang = i18n.language.startsWith("zh") ? "zh" : "en";
   const [appVer, setAppVer] = useState("");
   useEffect(() => {
@@ -31,6 +33,17 @@ export function SettingsGeneral() {
     const clamped = Math.min(20, Math.max(12, Math.round(value)));
     updateSettings({ uiFontSize: clamped });
     setFontDraft(String(clamped));
+  };
+
+  // codemode 属于主进程配置（appConfig），与 webAccess 同一条管线 —— **不是** UI 偏好那条
+  // （`updateSettings` 走的是 `settings.update`，与 AppConfig 无关）。
+  const saveCodemode = async (
+    patch: Partial<NonNullable<typeof appConfig>["codemode"]>,
+  ) => {
+    if (!appConfig || !window.electronAPI) return;
+    const next = { ...appConfig.codemode, ...patch };
+    const saved = await window.electronAPI.config.save({ codemode: next });
+    if (saved?.config) setAppConfig(saved.config);
   };
 
   const handleFontDraftCommit = () => {
@@ -212,6 +225,80 @@ export function SettingsGeneral() {
             {t("common.disable")}
           </button>
         </div>
+      </div>
+
+      {/* Codemode */}
+      <div className="space-y-3">
+        <h4 className="text-sm font-medium text-text-primary">
+          {t("general.codemode")}
+        </h4>
+        <p className="text-xs text-text-muted">{t("general.codemodeDesc")}</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => void saveCodemode({ enabled: true })}
+            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+              appConfig?.codemode?.enabled
+                ? "border-accent bg-accent/5 text-text-primary"
+                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
+            }`}
+          >
+            {t("common.enable")}
+          </button>
+          <button
+            onClick={() => void saveCodemode({ enabled: false })}
+            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+              !appConfig?.codemode?.enabled
+                ? "border-accent bg-accent/5 text-text-primary"
+                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
+            }`}
+          >
+            {t("common.disable")}
+          </button>
+        </div>
+        {appConfig?.codemode?.enabled && (
+          <>
+            <div className="flex gap-2">
+              {(["on", "only"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => void saveCodemode({ mode })}
+                  className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                    (appConfig?.codemode?.mode ?? "on") === mode
+                      ? "border-accent bg-accent/5 text-text-primary"
+                      : "border-border bg-surface hover:border-accent/50 text-text-secondary"
+                  }`}
+                >
+                  {t(`general.codemodeMode_${mode}`)}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-text-muted">
+              {t("general.codemodeModeNote")}
+            </p>
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-text-muted">
+                {t("general.codemodeInlineBudget")}
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={appConfig?.codemode?.inlineBudget ?? 3000}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  if (!Number.isFinite(value) || value < 0) return;
+                  void saveCodemode({ inlineBudget: Math.floor(value) });
+                }}
+                className="w-28 px-3 py-1.5 rounded-md border border-border bg-surface text-sm text-text-primary"
+              />
+            </div>
+            <p className="text-xs text-text-muted">
+              {t("general.codemodeInlineBudgetNote")}
+            </p>
+          </>
+        )}
+        <p className="text-xs text-text-muted">
+          {t("general.codemodeRestart")}
+        </p>
       </div>
 
       {/* Telemetry */}

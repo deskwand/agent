@@ -5,6 +5,7 @@ import {
   ConfigStore,
 } from "../../main/config/config-store";
 import type { ProviderProfileKey } from "../../main/config/config-store";
+import { normalizeCodemodeConfig } from "../../shared/codemode-config";
 import { normalizeWebAccessConfig } from "../../shared/web-access";
 
 // --------------- normalizeProviderConfig (non-custom path) ---------------
@@ -98,6 +99,7 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
       telemetryEnabled: true,
       isConfigured: false,
       webAccess: normalizeWebAccessConfig(undefined),
+      codemode: normalizeCodemodeConfig(undefined),
       ...overrides,
     });
   }
@@ -230,6 +232,7 @@ describe("buildProjectedConfig — visionModel pass-through", () => {
       telemetryEnabled: true,
       isConfigured: false,
       webAccess: normalizeWebAccessConfig(undefined),
+      codemode: normalizeCodemodeConfig(undefined),
       ...overrides,
     });
   }

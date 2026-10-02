@@ -211,6 +211,60 @@ function photonWasmPlugin(): Plugin {
 }
 
 /**
+ * codemode 的两个运行期产物，必须与主进程 chunk 同目录/可解析。
+ *
+ * 上游的查找方式是写死的（`isBundledNode = true`）：
+ *  - worker：`new URL("./codemode-worker.js", import.meta.url)` —— 相对 chunk 所在目录
+ *  - wasm  ：`createRequire(import.meta.url).resolve("quickjs-wasi/quickjs.wasm")` —— 从 chunk 位置做模块解析
+ * 两者都不在 electron-builder 的 `files` 白名单里（pi-coding-agent 是靠 vite 内联的），
+ * 所以没人把它们拷进产物目录。
+ *
+ * 不泛化 `photonWasmPlugin`：那个是 25 行自成一体且正在生产里工作，而两者目标形状不同
+ * （photon 只搬 1 个文件到 outDir；codemode 还要多搬 1 个到 `outDir/node_modules/quickjs-wasi/`）。
+ */
+function codemodeArtifactsPlugin(): Plugin {
+  const piCodemodeRoot = resolve(
+    process.cwd(),
+    "node_modules/@earendil-works/pi-coding-agent/dist/bundle/chunks",
+  );
+  const workerCandidates = [resolve(piCodemodeRoot, "codemode-worker.js")];
+  const wasmCandidates = [
+    resolve(
+      process.cwd(),
+      "node_modules/@earendil-works/pi-coding-agent/node_modules/quickjs-wasi/quickjs.wasm",
+    ),
+    resolve(process.cwd(), "node_modules/quickjs-wasi/quickjs.wasm"),
+  ];
+  return {
+    name: "codemode-artifacts",
+    closeBundle() {
+      const outDir = resolve(process.cwd(), "dist-electron/main");
+      mkdirSync(outDir, { recursive: true });
+
+      const worker = workerCandidates.find((candidate) => existsSync(candidate));
+      if (!worker) {
+        throw new Error(
+          `[codemode-artifacts] codemode-worker.js not found. Looked in:\n  ${workerCandidates.join("\n  ")}`,
+        );
+      }
+      copyFileSync(worker, resolve(outDir, "codemode-worker.js"));
+
+      const wasm = wasmCandidates.find((candidate) => existsSync(candidate));
+      if (!wasm) {
+        throw new Error(
+          `[codemode-artifacts] quickjs.wasm not found. Looked in:\n  ${wasmCandidates.join("\n  ")}`,
+        );
+      }
+      // 上游的 `createRequire(...).resolve("quickjs-wasi/quickjs.wasm")` 从 chunk 位置向上找
+      // `node_modules/quickjs-wasi/`，所以放这里。
+      const wasmDir = resolve(outDir, "node_modules/quickjs-wasi");
+      mkdirSync(wasmDir, { recursive: true });
+      copyFileSync(wasm, resolve(wasmDir, "quickjs.wasm"));
+    },
+  };
+}
+
+/**
  * `@earendil-works/pi-mcp` 打包后必须**只有一个模块实例** —— 由两处 `resolve.dedupe` 保证：
  * 顶层 `resolve`（renderer）与主进程 entry 的内嵌 `vite.resolve`（app 的 MCP 代码编在那里，
  * 且内嵌配置**不继承**顶层 resolve）。
@@ -238,7 +292,11 @@ export default defineConfig({
           args.startup();
         },
         vite: {
-          plugins: [piOAuthElectronPlugin(), photonWasmPlugin()],
+          plugins: [
+            piOAuthElectronPlugin(),
+            photonWasmPlugin(),
+            codemodeArtifactsPlugin(),
+          ],
           // 主进程有自己这份内嵌 vite 配置，**不继承**顶层 resolve ——
           // 所以 dedupe 必须在这里再声明一次（app 的 MCP 代码就编在这里）。
           resolve: {
