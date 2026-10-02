@@ -962,6 +962,63 @@ describe("ChatView auto-follow", () => {
     expect(scrollContainer!.scrollTop).toBe(1120);
   });
 
+  it("pins the final reply after a long conversation's streaming card expands beyond the render window", async () => {
+    // No real layout in jsdom: keep auto-fill from mistaking it for an
+    // empty viewport, and model the tail reply's extra rendered height.
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    const history = Array.from({ length: 500 }, (_, i) =>
+      makeMessage(`history-${i}`, i % 2 === 0 ? "user" : "assistant"),
+    );
+    const replies = Array.from({ length: 3 }, (_, i) => ({
+      ...makeMessage(`reply-${i}`, "assistant"),
+      turnId: "turn-1",
+      content: [{ type: "text" as const, text: `answer-${i}` }],
+    }));
+    useAppStore.setState((state) => ({
+      sessionStates: {
+        ...state.sessionStates,
+        s1: {
+          ...state.sessionStates.s1!,
+          messages: [...history, makeMessage("u1", "user"), ...replies],
+          activeTurn: {
+            turnId: "turn-1",
+            userMessageId: "u1",
+            startedAt: Date.now(),
+          },
+          partialMessage: "streaming tail",
+        },
+      },
+    }));
+    await act(async () => root.render(React.createElement(ChatView)));
+    const scroller =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto")!;
+    let scrollTop = 500;
+    Object.defineProperties(scroller, {
+      scrollHeight: {
+        configurable: true,
+        get: () =>
+          scroller.querySelector('[data-message-id="reply-2"]') ? 1500 : 1000,
+      },
+      clientHeight: { configurable: true, value: 500 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (top: number) => {
+          scrollTop = Math.min(Math.max(0, top), scroller.scrollHeight - 500);
+        },
+      },
+    });
+    await act(async () => scroller.dispatchEvent(new Event("scroll")));
+    expect(scroller.textContent).toContain("streaming tail");
+
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+
+    expect(
+      scroller.querySelector('[data-message-id="reply-2"]'),
+    ).not.toBeNull();
+    expect(scroller.scrollTop).toBe(1000);
+  });
+
   it("does not pin the final assistant message after the user scrolls up", async () => {
     useAppStore.setState((state) => ({
       sessionStates: {
