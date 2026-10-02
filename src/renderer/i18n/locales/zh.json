@@ -2043,7 +2043,8 @@
       "off": "未启用",
       "disabled": "已停用",
       "idle": "未连接",
-      "authorized": "已授权"
+      "authorized": "已授权",
+      "authorizedHint": "下次对话时连接"
     },
     "action": {
       "connect": "连接",
@@ -2052,8 +2053,7 @@
       "retry": "重试",
       "manage": "管理",
       "inProgress": "连接中…",
-      "cancel": "取消",
-      "connectNow": "立即连接"
+      "cancel": "取消"
     },
     "credentialLocalOnly": "凭据仅存本机",
     "allHealthy": "所有已添加的连接都正常",

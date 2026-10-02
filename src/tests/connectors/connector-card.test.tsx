@@ -117,7 +117,7 @@ describe("远程服务卡片", () => {
     expect(buttonByKey(DISCONNECT)).toBeDefined();
   });
 
-  it("已授权（凭据在本地）不显示「未连接」", () => {
+  it("已授权（凭据在本地）不显示「未连接」，并说明接下来会发生什么", () => {
     // 用户刚在浏览器授权成功、凭据已落盘，此时运行时还没连上。
     // 显示「未连接」会让人以为授权失败了。
     const h = handlers();
@@ -129,9 +129,33 @@ describe("远程服务卡片", () => {
     );
     expect(container.textContent).toContain("connectors.status.authorized");
     expect(container.textContent).not.toContain("connectors.status.idle");
-    // 仍可催一次连接，也仍可断开
-    expect(buttonByKey("connectors.action.connectNow")).toBeDefined();
     expect(buttonByKey(DISCONNECT)).toBeDefined();
+  });
+
+  it("已授权不给主按钮：连着「已授权」旁边放「立即连接」是自相矛盾的", () => {
+    // 「已授权」出现的条件（运行时无状态 + 凭据在本地）意味着没有活跃会话接手过它，
+    // 而 activateNow 在没有会话时直接返回 false —— 这个按钮按下去什么也不会发生，
+    // 只会重新注册一遍。用户真正需要知道的是「下次对话会自动连上」。
+    const h = handlers();
+    render(
+      <ConnectorCard
+        entry={entry({ instances: [withStatus({ kind: "authorized" })] })}
+        {...h}
+      />,
+    );
+    const labels = [...container.querySelectorAll("button")].map(
+      (b) => b.textContent ?? "",
+    );
+    expect(
+      labels.filter((l) => l.includes("connectors.action.connectNow")),
+    ).toEqual([]);
+    expect(
+      labels.filter((l) => l.includes("connectors.action.connect")),
+    ).toEqual([]);
+    // 唯一的按钮是退路
+    expect(labels.filter((l) => l.includes(DISCONNECT))).toHaveLength(1);
+    // 状态行要解释「下次对话时连接」
+    expect(container.textContent).toContain("connectors.status.authorizedHint");
   });
 
   it("本地授权待处理时给出「取消」，未添加的条目也传 serverName", () => {

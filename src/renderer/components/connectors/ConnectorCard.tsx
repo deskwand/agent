@@ -52,7 +52,8 @@ function statusText(
     case "idle":
       return t("connectors.status.idle");
     case "authorized":
-      return t("connectors.status.authorized");
+      // 说清接下来会发生什么 —— 这个状态没有可点的动作。
+      return `${t("connectors.status.authorized")} · ${t("connectors.status.authorizedHint")}`;
     case "connecting":
       return t("connectors.status.connecting");
     case "needs-auth":
@@ -279,19 +280,11 @@ function renderAction(
       );
 
     case "authorized":
-      // 凭据已在本地，等运行时连上（通常是下次会话）。不再是「未连接」。
-      return (
-        <>
-          <button
-            type="button"
-            className={primary}
-            onClick={() => handlers.onAuthorize(instance.id)}
-          >
-            {t("connectors.action.connectNow")}
-          </button>
-          {disconnectButton}
-        </>
-      );
+      // 凭据已在本地，等运行时接手（下次会话自动连上）。**不给主按钮**：
+      // 这个状态意味着没有活跃会话，而 activateNow 在没有会话时直接返回 false
+      // —— 按钮按下去什么也不会发生。在「已授权」旁边放「立即连接」既无用又矛盾。
+      // 用户需要知道的是「接下来会发生什么」，那由状态行负责说清。
+      return disconnectButton;
 
     case "connecting":
       // 传输适配器在连接 / 等授权，但本地没有对应的授权流程 ——
@@ -328,6 +321,9 @@ function renderAction(
       );
 
     case "off":
+      // 目前不可达：`off` 只由内置预设产生（enabled:false），而那是 capability 条目，
+      // 走上面的开关分支。留着是因为 renderAction 的 switch 必须穷尽 ConnectorStatus
+      // —— 将来远程 server 支持「停用」时，这里就是它该落的地方。
       return (
         <>
           <button

@@ -2046,7 +2046,8 @@
       "off": "Disabled",
       "disabled": "Disabled",
       "idle": "Not connected",
-      "authorized": "Authorized"
+      "authorized": "Authorized",
+      "authorizedHint": "connects in your next chat"
     },
     "action": {
       "connect": "Connect",
@@ -2055,8 +2056,7 @@
       "retry": "Retry",
       "manage": "Manage",
       "inProgress": "Connecting…",
-      "cancel": "Cancel",
-      "connectNow": "Connect now"
+      "cancel": "Cancel"
     },
     "credentialLocalOnly": "Credentials stay on this device",
     "allHealthy": "Everything you added is working",
