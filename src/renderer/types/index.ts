@@ -17,6 +17,7 @@ import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
 import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 import type { AskUserQuestion, AskUserAnswers } from "../../shared/ask-user";
+import type { NestedToolCallsUi } from "../../shared/nested-tool-calls";
 
 // Session types
 export interface Session {
@@ -133,6 +134,11 @@ export interface ToolResultContent {
   }>;
   /** ask_user 卡片终态标记：会话被取消时由工具写入 details 并投影到这里 */
   askUserStatus?: "cancelled";
+  /**
+   * codemode 外层结果携带的内部调用标准化快照。仅 codemode 结果有值；
+   * 旧消息类型无此字段，读取方需按可选处理。
+   */
+  nestedCalls?: NestedToolCallsUi;
 }
 
 /** Streaming partial tool output while a tool is still executing */

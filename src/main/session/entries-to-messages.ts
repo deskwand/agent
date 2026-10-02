@@ -13,6 +13,7 @@ import type {
   ToolUseContent,
 } from "../../renderer/types";
 import type { ElementSelectionRef } from "../../shared/ipc-types";
+import { normalizeNestedToolCalls } from "../../shared/nested-tool-calls";
 
 type PiMessage = SessionMessageEntry["message"];
 
@@ -115,6 +116,23 @@ function toolResultText(blocks: unknown): string {
 }
 
 /**
+ * 老会话的 toolResult 可能没有 toolName：从已映射的 tool_use 按 toolCallId 查名称，
+ * 不能按 ID 字符串猜测。
+ */
+function findToolUseName(
+  messages: Message[],
+  toolCallId: string,
+): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    for (const block of messages[i].content) {
+      if (block.type === "tool_use" && block.id === toolCallId)
+        return block.name;
+    }
+  }
+  return undefined;
+}
+
+/**
  * Convert pi SessionEntry[] (from PiSessionManager.getEntries()) to the
  * renderer's Message[] representation.
  *
@@ -207,6 +225,8 @@ export function entriesToMessages(
     } else if (role === "toolResult") {
       const t = msg as {
         toolCallId?: string;
+        toolName?: string;
+        nestedCalls?: unknown;
         content?: unknown;
         isError?: boolean;
         timestamp?: unknown;
@@ -224,6 +244,18 @@ export function entriesToMessages(
       }
       if (t.details?.askUserStatus === "cancelled") {
         block.askUserStatus = "cancelled";
+      }
+      const toolName =
+        typeof t.toolName === "string"
+          ? t.toolName
+          : findToolUseName(messages, block.toolUseId);
+      if (toolName?.toLowerCase() === "codemode") {
+        block.nestedCalls = normalizeNestedToolCalls(
+          block.toolUseId,
+          t.nestedCalls,
+          t.details?.calls,
+          block.isError ? "error" : "ok",
+        );
       }
       messages.push({
         id: entry.id,
