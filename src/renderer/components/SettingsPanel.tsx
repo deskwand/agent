@@ -11,7 +11,6 @@ import {
   BrainCircuit,
   Archive,
   Info,
-  Plug,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useWindowSize } from "../hooks/useWindowSize";
@@ -25,7 +24,6 @@ import { SettingsLogs } from "./settings/SettingsLogs";
 import { SettingsPersonalization } from "./settings/SettingsPersonalization";
 import { SettingsArchived } from "./settings/SettingsArchived";
 import { SettingsAbout } from "./settings/SettingsAbout";
-import { SettingsConnectors } from "./settings/SettingsConnectors";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -38,8 +36,7 @@ interface SettingsPanelProps {
     | "logs"
     | "general"
     | "archived"
-    | "about"
-    | "connectors";
+    | "about";
 }
 
 type TabId =
@@ -51,8 +48,7 @@ type TabId =
   | "logs"
   | "general"
   | "archived"
-  | "about"
-  | "connectors";
+  | "about";
 
 const SHOW_SANDBOX_TAB = false;
 
@@ -66,7 +62,6 @@ const VALID_TABS = new Set<TabId>([
   "general",
   "archived",
   "about",
-  "connectors",
 ]);
 
 export function SettingsPanel({
@@ -128,12 +123,6 @@ export function SettingsPanel({
       label: t("settings.apiSettings"),
       icon: Settings,
       description: t("settings.apiSettingsDesc"),
-    },
-    {
-      id: "connectors" as TabId,
-      label: t("marketplace.tabMCP"),
-      icon: Plug,
-      description: t("settings.connectorsDesc"),
     },
     {
       id: "subagent" as TabId,
@@ -281,11 +270,6 @@ export function SettingsPanel({
                   <>
                     <SettingsAPI />
                   </>
-                )}
-              </div>
-              <div className={activeTab === "connectors" ? "" : "hidden"}>
-                {viewedTabs.has("connectors") && (
-                  <SettingsConnectors isActive={activeTab === "connectors"} />
                 )}
               </div>
               <div className={activeTab === "subagent" ? "" : "hidden"}>

@@ -9,7 +9,7 @@
  *  - 没有 `capability` 字段：`tab` 已经决定卡片画什么控件，多一个字段就是同一事实存两份。
  */
 
-export type ConnectorSourceId = "mcp-remote" | "mcp-builtin";
+export type ConnectorSourceId = "mcp-remote" | "mcp-builtin" | "mcp-custom";
 
 /** 决定分组，也决定卡片画什么控件。 */
 export type ConnectorTab = "connect" | "capability";
@@ -34,6 +34,15 @@ export interface ConnectorInstance {
   id: string;
   label: string;
   status: ConnectorStatus;
+  /**
+   * 传输方式 —— **决定卡片给什么动作**。
+   *
+   * `http` 是远程服务：「连接」= OAuth 授权，「断开」= 移除配置。
+   * `stdio` 是本机进程：它由会话启动时连接，没有独立的授权步骤，
+   * 所以动作只能是**启用/停用**（非破坏性）。用 `summary` 的 i18n key 去推断
+   * 传输方式是不行的 —— 那是展示字符串，改文案就会静默坏掉。
+   */
+  transport: "stdio" | "http";
   /**
    * 副标题（i18n key）：传输方式。
    * 两个 source 都会设置，所以是必填 —— 可选只会让每处使用都要判空。

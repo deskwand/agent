@@ -6,16 +6,14 @@ import {
   resetForTest,
   type StatusSource,
 } from "../../main/connectors/status-store";
-import type { McpServerState } from "../../main/mcp/mcp-transport-adapter";
+import type { McpServerState } from "../../main/connectors/status-store";
 
-/** 可注入的假数据源 —— 生产环境注入真正的 transport adapter。 */
+/** 可注入的假数据源 —— 生产注入 `mcpToolsSnapshotStatusSource`（从工具快照派生，只可能给出 connected）。 */
 function makeStubSource() {
   const states = new Map<string, McpServerState>();
-  const errors = new Map<string, string>();
   const listeners = new Set<(name: string, state: McpServerState) => void>();
   const source: StatusSource = {
     getState: (name) => states.get(name),
-    getError: (name) => errors.get(name),
     subscribe: (fn) => {
       listeners.add(fn);
       return () => listeners.delete(fn);
@@ -23,10 +21,8 @@ function makeStubSource() {
   };
   return {
     source,
-    emit(name: string, state: McpServerState, error?: string) {
+    emit(name: string, state: McpServerState) {
       states.set(name, state);
-      if (error) errors.set(name, error);
-      else errors.delete(name);
       listeners.forEach((fn) => fn(name, state));
     },
   };
@@ -50,31 +46,8 @@ describe("status-store", () => {
     expect(getConnectorStatus("notion")).toEqual({ kind: "ready" });
   });
 
-  it("maps connecting to connecting", () => {
-    stub.emit("notion", "connecting");
-    expect(getConnectorStatus("notion")).toEqual({ kind: "connecting" });
-  });
-
-  it("maps needs-auth to needs-auth", () => {
-    stub.emit("notion", "needs-auth");
-    expect(getConnectorStatus("notion")).toEqual({ kind: "needs-auth" });
-  });
-
-  it("maps failed with the adapter's error message", () => {
-    stub.emit("notion", "failed", "timeout");
-    expect(getConnectorStatus("notion")).toEqual({
-      kind: "failed",
-      message: "timeout",
-    });
-  });
-
-  it("falls back to a generic message when failed without one", () => {
-    stub.emit("notion", "failed");
-    expect(getConnectorStatus("notion")).toEqual({
-      kind: "failed",
-      message: "failed",
-    });
-  });
+  // 注：`connecting` / `failed` / `needs-auth` 随传输适配器一并删除 ——
+  // 新的数据源只能派出 `connected`，那三种状态不可能再出现（见 mcp-status-source.ts）。
 
   it("notifies subscribers when the adapter emits", () => {
     let count = 0;
@@ -82,7 +55,7 @@ describe("status-store", () => {
       count++;
     });
     stub.emit("notion", "connected");
-    stub.emit("linear", "needs-auth");
+    stub.emit("linear", "connected");
     expect(count).toBe(2);
   });
 

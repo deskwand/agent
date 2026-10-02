@@ -98,14 +98,15 @@ describe("builtin capability names stay in sync", () => {
 });
 
 describe("enabling a capability that was never added", () => {
-  it("writes it into mcp.json with exposure=direct", async () => {
+  it("writes it into mcp.json without an exposure key", async () => {
     const reg = realRegistry();
     const res = await reg.setEnabled("Chrome", true);
 
     expect(res.ok).toBe(true);
     const written = readMcpConfig(agentDir).servers;
     expect(written.map((s) => s.name)).toEqual(["Chrome"]);
-    expect(written[0].config.exposure).toBe("direct");
+    // 不写该键 ⇒ 上游取默认 codemode（pi 的参考实现）
+    expect(written[0].config).not.toHaveProperty("exposure");
     expect(written[0].config.type).toBe("stdio");
   });
 
@@ -177,8 +178,8 @@ describe("connecting a catalog service end to end", () => {
     expect(written[0].config).toMatchObject({
       type: "http",
       url: "https://mcp.notion.com/mcp",
-      exposure: "direct",
     });
+    expect(written[0].config).not.toHaveProperty("exposure");
     expect(activated).toEqual(["notion"]);
   });
 
@@ -203,7 +204,7 @@ describe("connecting a catalog service end to end", () => {
 });
 
 describe("pasting a mcpServers fragment", () => {
-  it("adds every server and forces exposure=direct on each", async () => {
+  it("adds every server without forcing exposure on any", async () => {
     const reg = realRegistry();
     const res = await reg.addCustomServer({
       kind: "json",
@@ -219,7 +220,7 @@ describe("pasting a mcpServers fragment", () => {
     const written = readMcpConfig(agentDir).servers;
     expect(written.map((s) => s.name).sort()).toEqual(["local", "remote"]);
     for (const server of written) {
-      expect(server.config.exposure).toBe("direct");
+      expect(server.config).not.toHaveProperty("exposure");
     }
   });
 

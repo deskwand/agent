@@ -129,7 +129,7 @@ describe("registry.addCatalogServer", () => {
     expect(added).toEqual([
       {
         name: "notion",
-        config: { type: "http", url: NOTION.url, exposure: "direct" },
+        config: { type: "http", url: NOTION.url },
       },
     ]);
   });
@@ -358,7 +358,7 @@ describe("registry.addCustomServer", () => {
     });
   });
 
-  it("forces exposure=direct on json-pasted servers", async () => {
+  it("does not force exposure on json-pasted servers", async () => {
     const { deps: d, added } = deps();
     const res = await buildRegistry(d).addCustomServer({
       kind: "json",
@@ -369,7 +369,7 @@ describe("registry.addCustomServer", () => {
       }),
     });
     expect(res.ok).toBe(true);
-    expect(added[0].config).toMatchObject({ exposure: "direct" });
+    expect(added[0].config).not.toHaveProperty("exposure");
   });
 
   it("adds every server in a multi-server json payload", async () => {

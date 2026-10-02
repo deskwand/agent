@@ -6,19 +6,13 @@ import {
 } from "../../shared/codemode-config";
 
 describe("normalizeCodemodeConfig", () => {
-  it("defaults to disabled with the upstream defaults (follows the reference implementation)", () => {
+  it("defaults to the upstream values, and has no global enable switch", () => {
+    // pi 没有 `enabled` —— 激活是派生的（有 exposure=codemode 的 server 连上时）。
     expect(normalizeCodemodeConfig(undefined)).toEqual({
-      enabled: false,
       mode: "on",
       inlineBudget: DEFAULT_CODEMODE_INLINE_BUDGET,
     });
-  });
-
-  it("requires an explicit true to enable", () => {
-    // 只有字面 true 才开 —— 任何真值（"1"/1/{}）都不开，避免配置漂移
-    expect(normalizeCodemodeConfig({ enabled: "true" }).enabled).toBe(false);
-    expect(normalizeCodemodeConfig({ enabled: 1 }).enabled).toBe(false);
-    expect(normalizeCodemodeConfig({ enabled: true }).enabled).toBe(true);
+    expect(normalizeCodemodeConfig(undefined)).not.toHaveProperty("enabled");
   });
 
   it("falls back to mode=on for unknown modes", () => {
@@ -42,7 +36,7 @@ describe("normalizeCodemodeConfig", () => {
   });
 
   it("survives non-object input", () => {
-    expect(normalizeCodemodeConfig("junk").enabled).toBe(false);
+    expect(normalizeCodemodeConfig("junk").mode).toBe("on");
     expect(normalizeCodemodeConfig(null).mode).toBe("on");
   });
 });

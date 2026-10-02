@@ -77,6 +77,7 @@ function instance(status: ConnectorStatus): ConnectorInstance {
     id: "notion",
     label: "notion",
     status,
+    transport: "http",
     summary: "connectors.summary.remote",
   };
 }

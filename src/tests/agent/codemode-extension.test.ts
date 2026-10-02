@@ -25,9 +25,9 @@ function makeTempProject(): { dir: string; agentDir: string } {
 async function buildSession(ctx: { dir: string; agentDir: string }) {
   const { PiExtensionHost } =
     await import("../../main/extensions/pi-extension-host");
-  const { createAgentSession, SettingsManager } =
+  const { createAgentSession } =
     await import("@earendil-works/pi-coding-agent");
-  const { codemodeDefaultToolsPatch, createDeskwandCodemodeExtension } =
+  const { createDeskwandCodemodeExtension } =
     await import("../../main/agent/codemode-extension");
   const host = PiExtensionHost.getOrCreate({
     cwd: ctx.dir,
@@ -41,8 +41,6 @@ async function buildSession(ctx: { dir: string; agentDir: string }) {
     cwd: ctx.dir,
     agentDir: ctx.agentDir,
     resourceLoader: loader,
-    // 与 agent-runner 主会话同一写法：激活走设置（工厂里的 setActiveTools 会被重算覆盖）
-    settingsManager: SettingsManager.inMemory(codemodeDefaultToolsPatch()),
   });
   return session;
 }
@@ -80,16 +78,5 @@ describe("codemode extension", () => {
     );
     // 未激活 —— 这是「默认关 ⇒ 行为零变化」的根据
     expect(session.getActiveToolNames()).not.toContain("codemode");
-  }, 30000);
-
-  it("activates codemode when enabled, without removing already-declared tools", async () => {
-    codemodeConfig = normalizeCodemodeConfig({ enabled: true, mode: "on" });
-    const session = await buildSession(ctx!);
-
-    const active = session.getActiveToolNames();
-    expect(active).toContain("codemode");
-    // mode `on` 不隐藏已声明工具
-    expect(active).toContain("bash");
-    expect(active).toContain("read");
   }, 30000);
 });

@@ -132,6 +132,7 @@ export function ConnectorCard({
       onDisconnect,
       onAuthorize,
       onCancel,
+      onToggle,
     })
   );
 
@@ -209,8 +210,35 @@ function renderAction(
     onDisconnect: (id: string) => void;
     onAuthorize: (id: string) => void;
     onCancel: (id: string) => void;
+    onToggle: (instanceId: string, enabled: boolean) => void;
   },
 ) {
+  // **stdio（本机进程）只给「启用/停用」**，不给「连接/断开」：
+  // 「连接」= OAuth 授权，用在 stdio 上必报 `not a remote server`；
+  // 「断开」= 从 mcp.json **删掉**这条配置 —— 对目录条目可接受（能一键加回），
+  // 对手写的自定义 server 是**不可恢复的删除**。两者都不是它该有的动作。
+  if (instance?.transport === "stdio") {
+    const enabled = instance.status.kind !== "off";
+    return (
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label={t(entry.nameKey)}
+        onClick={() => handlers.onToggle(instance.id, !enabled)}
+        className={`w-[34px] h-5 rounded-full relative transition-colors flex-none ${
+          enabled ? "bg-accent" : "bg-surface-active"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+            enabled ? "left-[18px]" : "left-0.5"
+          }`}
+        />
+      </button>
+    );
+  }
+
   const primary =
     "px-2.5 py-1 text-xs rounded-control bg-accent text-white hover:bg-accent-hover transition-colors";
   const ghost =

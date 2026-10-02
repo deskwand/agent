@@ -1398,14 +1398,6 @@ export function useIPC() {
     [invoke],
   );
 
-  const getMCPServers = useCallback(async () => {
-    if (!isElectron) {
-      return [];
-    }
-    // Use the exposed mcp.getServerStatus method
-    return window.electronAPI.mcp.getServerStatus();
-  }, []);
-
   return {
     send,
     invoke,
@@ -1434,7 +1426,6 @@ export function useIPC() {
     changeWorkingDir,
     createProject,
     deleteProject,
-    getMCPServers,
     isElectron,
   };
 }

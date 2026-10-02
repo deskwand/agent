@@ -24,6 +24,7 @@ import type {
 import type { ConnectorStatus } from "../../shared/connectors";
 import { buildRemoteEntries } from "./sources/mcp-remote-source";
 import { buildBuiltinEntries } from "./sources/mcp-builtin-source";
+import { buildCustomEntries } from "./sources/mcp-custom-source";
 
 export interface RegistryDeps {
   loadConfig: () => LoadedMcpConfig;
@@ -80,11 +81,6 @@ export interface Registry {
   cancelSignIn(serverName: string): ActionResult;
 }
 
-/** 写入时永远带上它 —— SDK 默认是 codemode，会让工具对模型不可见且不报错。 */
-function withDirectExposure(config: McpServerConfig): McpServerConfig {
-  return { ...config, exposure: "direct" };
-}
-
 export function buildRegistry(deps: RegistryDeps): Registry {
   function list(): ConnectorEntry[] {
     const loaded = deps.loadConfig();
@@ -96,6 +92,7 @@ export function buildRegistry(deps: RegistryDeps): Registry {
     return [
       ...buildRemoteEntries(ctx, deps.catalog),
       ...buildBuiltinEntries(ctx),
+      ...buildCustomEntries(ctx, deps.catalog),
     ];
   }
 
@@ -106,7 +103,7 @@ export function buildRegistry(deps: RegistryDeps): Registry {
     const entry = deps.catalog.find((c) => c.key === key);
     if (!entry) return { ok: false, error: `unknown catalog key: ${key}` };
 
-    const config = withDirectExposure({ type: "http", url: entry.url });
+    const config: McpServerConfig = { type: "http", url: entry.url };
     const res = await deps.addServer(key, config);
     if (!res.ok) return res;
 
@@ -193,10 +190,7 @@ export function buildRegistry(deps: RegistryDeps): Registry {
     input: AddCustomServerInput,
   ): Promise<ActionResult> {
     if (input.kind === "url") {
-      return deps.addServer(
-        input.name,
-        withDirectExposure({ type: "http", url: input.url }),
-      );
+      return deps.addServer(input.name, { type: "http", url: input.url });
     }
 
     let parsed: unknown;
@@ -236,7 +230,7 @@ export function buildRegistry(deps: RegistryDeps): Registry {
           error: `invalid server name "${name}": use letters, digits, "_" and "-"`,
         };
       }
-      const res = await deps.addServer(name, withDirectExposure(config));
+      const res = await deps.addServer(name, config);
       if (!res.ok) return res;
     }
     return { ok: true };

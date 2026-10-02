@@ -377,9 +377,6 @@ export function ChatView() {
     return session?.cwd || undefined;
   });
 
-  const [activeConnectors, setActiveConnectors] = useState<
-    { id: string; name: string; connected: boolean; toolCount: number }[]
-  >([]);
   const [showConnectorLabel, setShowConnectorLabel] = useState(true);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [attachedKeys, setAttachedKeys] = useState<ReadonlySet<string>>(
@@ -1311,8 +1308,14 @@ export function ChatView() {
 
     prevMessageCountRef.current = messages.length;
     // Clearing the active turn swaps the synthetic streaming card for the
-    // committed message cards, which can change the rendered height.
-  }, [activeTurn?.turnId, messages.length, partialMessage.length]);
+    // committed message cards, which can change the rendered height. The
+    // tail window slides in a subsequent commit; pin again once it renders.
+  }, [
+    activeTurn?.turnId,
+    messages.length,
+    partialMessage.length,
+    visibleMessageStartIndex,
+  ]);
 
   // Additional scroll trigger for content height changes (e.g., TodoWrite expand/collapse)
   useEffect(() => {
@@ -1358,33 +1361,6 @@ export function ChatView() {
     return () => cancelAnimationFrame(raf);
   }, [isInputExpanded]);
 
-  // Load active MCP connectors
-  useEffect(() => {
-    if (isElectron && typeof window !== "undefined" && window.electronAPI) {
-      const loadConnectors = async () => {
-        try {
-          const statuses = await window.electronAPI.mcp.getServerStatus();
-          const active =
-            (
-              statuses as Array<{
-                id: string;
-                name: string;
-                connected: boolean;
-                toolCount: number;
-              }>
-            )?.filter((s) => s.connected && s.toolCount > 0) || [];
-          setActiveConnectors(active);
-        } catch (err) {
-          console.error("Failed to load MCP connectors:", err);
-        }
-      };
-      loadConnectors();
-      // Refresh every 5 seconds
-      const interval = setInterval(loadConnectors, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [isElectron]);
-
   useEffect(() => {
     const titleEl = titleRef.current;
     const headerEl = headerRef.current;
@@ -1413,7 +1389,7 @@ export function ChatView() {
     observer.observe(titleEl);
     observer.observe(headerEl);
     return () => observer.disconnect();
-  }, [activeSession?.title, activeConnectors.length]);
+  }, [activeSession?.title]);
 
   const handleSubmit = async (data: ChatInputSubmitData) => {
     if (!activeSessionId || isSubmitting || isCompacting) return;
@@ -1765,7 +1741,7 @@ export function ChatView() {
       </h2>
       <div ref={connectorMeasureRef} aria-hidden="true" className="hidden" />
       <div className="hidden" aria-hidden="true">
-        {showConnectorLabel && activeConnectors.length >= 0 && (
+        {showConnectorLabel && (
           <Plug className="w-0 h-0" />
         )}
       </div>

@@ -45,12 +45,15 @@ describe('telemetry event wiring', () => {
       'file_op',
       'schedule',
       'browser',
-      'connector',
     ]) {
       expect(source).toContain(
         `void trackEvent("feature_use", { feature: "${feature}" });`,
       );
     }
+    // `connector` 随已删的 `mcp.saveServer` 搬到了连接器层 —— 现在服务从那里添加。
+    expect(read("src/main/connectors/index.ts")).toContain(
+      'void trackEvent("feature_use", { feature: "connector" });',
+    );
   });
 
   it('reports update outcomes', () => {

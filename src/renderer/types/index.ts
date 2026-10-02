@@ -1,4 +1,5 @@
 import type { ThemePreset } from "../../shared/theme";
+import type { CodemodeConfig } from "../../shared/codemode-config";
 import type {
   WebAccessConfig,
   WebAccessErrorCode,
@@ -938,7 +939,7 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   webAccess: WebAccessConfig;
-  codemode: import("../../shared/codemode-config").CodemodeConfig;
+  codemode: CodemodeConfig;
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   subagent?: import("../../shared/subagent-config").SubagentConfig;
 }

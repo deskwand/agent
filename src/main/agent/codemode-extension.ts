@@ -27,9 +27,6 @@ import {
 import { configStore } from "../config/config-store";
 import { log } from "../utils/logger";
 
-/** codemode 的工具名（与上游一致）。 */
-const CODEMODE_TOOL_NAME = "codemode";
-
 export function createDeskwandCodemodeExtension(): ExtensionFactory {
   const config = configStore.get("codemode");
   const inner = createCodemodeExtension({
@@ -37,18 +34,6 @@ export function createDeskwandCodemodeExtension(): ExtensionFactory {
     inlineBudget: config.inlineBudget,
   });
 
-  log(`[codemode] registered (mode=${config.mode}, enabled=${config.enabled})`);
+  log(`[codemode] registered (mode=${config.mode})`);
   return inner;
-}
-
-/**
- * 传给主会话 `PiSettingsManager.inMemory(...)` 的 `defaultTools` 补丁。
- *
- * 为什么用设置而不是 `setActiveTools`：见文件头第 2 条（会话初始化会重算 active 集合并覆盖工厂里的调用）。
- * 展开进设置块即可，逻辑仍集中在本模块。
- */
-export function codemodeDefaultToolsPatch(): { defaultTools?: string[] } {
-  return configStore.get("codemode").enabled
-    ? { defaultTools: [`+${CODEMODE_TOOL_NAME}`] }
-    : {};
 }

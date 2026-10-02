@@ -71,6 +71,7 @@ export function buildRemoteEntries(
               label: server.name,
               status: statusOrFallback(ctx, server),
               summary: SERVER_SUMMARY_REMOTE,
+              transport: "http",
             },
           ]
         : [],
@@ -93,6 +94,7 @@ export function buildRemoteEntries(
           label: name,
           status: statusOrFallback(ctx, server),
           summary: SERVER_SUMMARY_REMOTE,
+          transport: "http",
         },
       ],
     });

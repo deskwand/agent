@@ -54,6 +54,7 @@ function withStatus(status: ConnectorStatus): ConnectorInstance {
     id: "notion",
     label: "notion",
     status,
+    transport: "http",
     summary: "connectors.summary.remote",
   };
 }
@@ -323,6 +324,7 @@ describe("本机能力卡片", () => {
             id: "Chrome",
             label: "Chrome",
             status: { kind: "ready" },
+            transport: "stdio",
             summary: "connectors.summary.local",
           },
         ])}

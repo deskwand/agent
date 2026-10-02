@@ -18,8 +18,15 @@
 export const CODEMODE_MODES = ["on", "only"] as const;
 export type CodemodeMode = (typeof CODEMODE_MODES)[number];
 
+/**
+ * 只有 pi 真实存在的两个旋钮。
+ *
+ * **没有 `enabled`** —— pi 没有这个字段。codemode 的激活是**派生**的：有 `exposure: "codemode"`
+ * 的 MCP server 连上时由上游激活（`ensureDiscoveryActive`），或用 `defaultTools: ["+codemode"]`。
+ * 曾经加过一个全局 `enabled`，但它会被那条派生路径**静默盖过** ⇒ 是个会撒谎的开关，已删。
+ * 全局 opt-out 请用 `mcp.json` 顶层的 `autoEnableCodemode: false`（pi 的官方做法）。
+ */
 export interface CodemodeConfig {
-  enabled: boolean;
   mode: CodemodeMode;
   inlineBudget: number;
 }
@@ -34,7 +41,6 @@ export function normalizeCodemodeConfig(raw: unknown): CodemodeConfig {
   const mode = CODEMODE_MODES.find((candidate) => candidate === value.mode);
   const budget = Number(value.inlineBudget);
   return {
-    enabled: value.enabled === true,
     mode: mode ?? "on",
     inlineBudget: Number.isFinite(budget)
       ? Math.min(

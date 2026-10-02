@@ -233,71 +233,45 @@ export function SettingsGeneral() {
           {t("general.codemode")}
         </h4>
         <p className="text-xs text-text-muted">{t("general.codemodeDesc")}</p>
+        {/* 没有开关：codemode 的激活是派生的（有 exposure=codemode 的 MCP 服务连上时由
+            上游激活）。要让它不生效，请在该服务的设置里把 exposure 改成「直接声明」，
+            或在 mcp.json 顶层写 autoEnableCodemode: false。 */}
         <div className="flex gap-2">
-          <button
-            onClick={() => void saveCodemode({ enabled: true })}
-            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-              appConfig?.codemode?.enabled
-                ? "border-accent bg-accent/5 text-text-primary"
-                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-            }`}
-          >
-            {t("common.enable")}
-          </button>
-          <button
-            onClick={() => void saveCodemode({ enabled: false })}
-            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-              !appConfig?.codemode?.enabled
-                ? "border-accent bg-accent/5 text-text-primary"
-                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-            }`}
-          >
-            {t("common.disable")}
-          </button>
+          {(["on", "only"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => void saveCodemode({ mode })}
+              className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
+                (appConfig?.codemode?.mode ?? "on") === mode
+                  ? "border-accent bg-accent/5 text-text-primary"
+                  : "border-border bg-surface hover:border-accent/50 text-text-secondary"
+              }`}
+            >
+              {t(`general.codemodeMode_${mode}`)}
+            </button>
+          ))}
         </div>
-        {appConfig?.codemode?.enabled && (
-          <>
-            <div className="flex gap-2">
-              {(["on", "only"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => void saveCodemode({ mode })}
-                  className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                    (appConfig?.codemode?.mode ?? "on") === mode
-                      ? "border-accent bg-accent/5 text-text-primary"
-                      : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-                  }`}
-                >
-                  {t(`general.codemodeMode_${mode}`)}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-text-muted">
-              {t("general.codemodeModeNote")}
-            </p>
-            <div className="flex items-center gap-3">
-              <label className="text-xs text-text-muted">
-                {t("general.codemodeInlineBudget")}
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={appConfig?.codemode?.inlineBudget ?? 3000}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  if (!Number.isFinite(value) || value < 0) return;
-                  void saveCodemode({ inlineBudget: Math.floor(value) });
-                }}
-                className="w-28 px-3 py-1.5 rounded-md border border-border bg-surface text-sm text-text-primary"
-              />
-            </div>
-            <p className="text-xs text-text-muted">
-              {t("general.codemodeInlineBudgetNote")}
-            </p>
-          </>
-        )}
         <p className="text-xs text-text-muted">
-          {t("general.codemodeRestart")}
+          {t("general.codemodeModeNote")}
+        </p>
+        <div className="flex items-center gap-3">
+          <label className="text-xs text-text-muted">
+            {t("general.codemodeInlineBudget")}
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={appConfig?.codemode?.inlineBudget ?? 3000}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              if (!Number.isFinite(value) || value < 0) return;
+              void saveCodemode({ inlineBudget: Math.floor(value) });
+            }}
+            className="w-28 px-3 py-1.5 rounded-md border border-border bg-surface text-sm text-text-primary"
+          />
+        </div>
+        <p className="text-xs text-text-muted">
+          {t("general.codemodeInlineBudgetNote")}
         </p>
       </div>
 

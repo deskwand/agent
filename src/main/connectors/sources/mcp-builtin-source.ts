@@ -65,6 +65,7 @@ export function buildBuiltinEntries(ctx: SourceBuildContext): ConnectorEntry[] {
                   ? ({ kind: "off" } as ConnectorStatus)
                   : (ctx.statusFor(preset.name) ?? { kind: "idle" }),
               summary: SERVER_SUMMARY_LOCAL,
+              transport: "stdio",
             },
           ]
         : [],

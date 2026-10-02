@@ -10,8 +10,6 @@ import {
   setServerEnabled,
 } from "../../main/connectors/mcp-config-file";
 
-import { ipcConfigToSdkConfig } from "../../main/connectors/ipc-config-adapter";
-
 let dir: string;
 
 beforeEach(() => {
@@ -95,18 +93,18 @@ describe("upsertServer", () => {
     },
   );
 
-  it("forces exposure=direct — codemode would hide tools silently", () => {
+  it("leaves exposure unset — upstream defaults to codemode", () => {
     upsertServer(dir, "notion", { type: "http", url: "https://x/mcp" });
-    expect(file().mcpServers.notion.exposure).toBe("direct");
+    expect(file().mcpServers.notion).not.toHaveProperty("exposure");
   });
 
-  it("overrides an exposure the caller supplied", () => {
+  it("preserves an exposure the caller supplied", () => {
     upsertServer(dir, "notion", {
       type: "http",
       url: "https://x/mcp",
       exposure: "codemode",
     });
-    expect(file().mcpServers.notion.exposure).toBe("direct");
+    expect(file().mcpServers.notion.exposure).toBe("codemode");
   });
 
   it("creates the file and directory when missing", () => {
@@ -150,7 +148,7 @@ describe("upsertServer", () => {
     expect(written.command).toBe("node");
     expect(written.args).toEqual(["server.js"]);
     expect(written.env).toEqual({ FOO: "bar" });
-    expect(written.exposure).toBe("direct");
+    expect(written).not.toHaveProperty("exposure");
   });
 });
 
@@ -330,17 +328,14 @@ describe("advanced settings field removal", () => {
       cwd: "/workspace",
       timeout: 30,
     });
-    upsertServer(
-      dir,
-      "local",
-      ipcConfigToSdkConfig({
-        id: "local",
-        name: "local",
-        type: "stdio",
-        command: "node",
-        enabled: true,
-      }),
-    );
+    // 表单省略 args/env ⇒ 显式 undefined 覆盖旧值（落盘时移除）
+    upsertServer(dir, "local", {
+      type: "stdio",
+      command: "node",
+      args: undefined,
+      env: undefined,
+      enabled: true,
+    });
     const saved = file().mcpServers.local;
     expect(saved.args).toBeUndefined();
     expect(saved.env).toBeUndefined();

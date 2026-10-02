@@ -67,7 +67,6 @@
     "sandbox": "沙盒",
     "sandboxDesc": "隔离执行环境",
     "connectors": "MCP 服务（高级）",
-    "connectorsDesc": "手动添加自定义 MCP 服务",
     "skills": "技能",
     "skillsDesc": "管理自定义技能",
     "personalization": "个性化",
@@ -145,8 +144,7 @@
   },
   "marketplace": {
     "title": "技能云",
-    "desc": "浏览和安装技能，管理你的云端技能库",
-    "tabMCP": "MCP 服务（高级）"
+    "desc": "浏览和安装技能，管理你的云端技能库"
   },
   "apps": {
     "title": "连接"
@@ -229,13 +227,12 @@
     "language": "语言",
     "autoSkillLearning": "自动技能学习",
     "codemode": "代码模式",
-    "codemodeDesc": "让模型写 JavaScript 来调用工具：批量、串联、在沙箱里过滤大输出，而不是一次次单独调用。关闭时行为与现在完全一致。",
+    "codemodeDesc": "让模型写 JavaScript 来调用 MCP 工具：批量、串联、在沙箱里过滤大输出。默认开启 —— 只要配了 MCP 服务，其工具就经脚本调用；想让它直接声明给模型，请在该服务的设置里把 exposure 改为直接声明。",
     "codemodeMode_on": "同时保留直接调用",
     "codemodeMode_only": "只经脚本",
     "codemodeModeNote": "「同时保留直接调用」下，模型既能直接调工具，也能用脚本编排；「只经脚本」会把已声明的工具从模型视野里撤掉，一切都要写成脚本 —— 上下文更省，但多一步。",
     "codemodeInlineBudget": "工具声明的 token 预算",
     "codemodeInlineBudgetNote": "仅在「只经脚本」模式下生效；估算方式为字符数 ÷ 4。放不下的工具仍可调用，靠脚本里的 searchTools() 现场查找。",
-    "codemodeRestart": "改动在下一个新对话生效。",
     "autoSkillLearningDesc": "开启后，AI 助手可在对话中自动发现并学习新技能，定期整理已有技能。关闭后停止所有自动学习与整理行为。",
     "autoSkillLearningProjectNote": "项目模式下不支持自动学习。",
     "telemetry": "匿名使用统计",

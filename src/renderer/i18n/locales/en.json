@@ -67,7 +67,6 @@
     "sandbox": "Sandbox",
     "sandboxDesc": "Isolated execution environment",
     "connectors": "MCP servers (advanced)",
-    "connectorsDesc": "Manually add custom MCP servers",
     "skills": "Skills",
     "skillsDesc": "Manage custom skills",
     "personalization": "Personalization",
@@ -145,8 +144,7 @@
   },
   "marketplace": {
     "title": "Skills Cloud",
-    "desc": "Browse and install skills, manage your cloud skill library",
-    "tabMCP": "MCP servers (advanced)"
+    "desc": "Browse and install skills, manage your cloud skill library"
   },
   "apps": {
     "title": "Connectors"
@@ -229,13 +227,12 @@
     "language": "Language",
     "autoSkillLearning": "Auto Skill Learning",
     "codemode": "Code mode",
-    "codemodeDesc": "Let the model write JavaScript to call tools: batch and chain calls, and filter large output inside the sandbox instead of issuing many individual tool calls. When off, behavior is unchanged.",
+    "codemodeDesc": "Let the model write JavaScript to call MCP tools: batch and chain calls, and filter large output inside the sandbox. On by default — whenever an MCP server is configured, its tools are reached through scripts; to declare them to the model instead, set that server's exposure to direct.",
     "codemodeMode_on": "Keep direct calls too",
     "codemodeMode_only": "Scripts only",
     "codemodeModeNote": "\"Keep direct calls too\" lets the model call tools directly and script them; \"Scripts only\" removes declared tools from the model's view so everything goes through a script — lighter context, one extra step.",
     "codemodeInlineBudget": "Tool-declaration token budget",
     "codemodeInlineBudgetNote": "Only applies in \"Scripts only\" mode; estimated as characters ÷ 4. Tools that do not fit are still callable via searchTools() inside a script.",
-    "codemodeRestart": "Changes take effect in the next new conversation.",
     "autoSkillLearningDesc": "When enabled, the AI can automatically discover and learn new skills during conversations, and periodically curate existing ones. Turning this off stops all automatic learning and curation.",
     "autoSkillLearningProjectNote": "Not supported in project mode.",
     "telemetry": "Anonymous Usage Statistics",

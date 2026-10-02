@@ -108,30 +108,17 @@ import { removeAllWebAccessTempDirs } from "./agent/tools/web-access/session-tem
 import { listOllamaModels } from "./config/ollama-api";
 import {
   activateDeskwandMcpServer,
-  getMcpToolsSnapshot,
   openExternalUrl,
   setMcpAgentDir,
 } from "./mcp/mcp-client-extension";
-import { closeAllDeskwandMcpTransports } from "./mcp/mcp-transport-adapter";
-import {
-  readMcpConfig,
-  removeServer,
-  upsertServer,
-} from "./connectors/mcp-config-file";
 import { registerConnectorsIpc } from "./connectors";
-import { removeCredentials } from "./connectors/mcp-signin";
-import { getConnectorStatus, initStatusStore } from "./connectors/status-store";
-import {
-  ipcConfigToSdkConfig,
-  sdkConfigToIpcConfig,
-} from "./connectors/ipc-config-adapter";
-import { mcpTransportStatusSource } from "./mcp/mcp-status-source";
+import { initStatusStore } from "./connectors/status-store";
+import { mcpToolsSnapshotStatusSource } from "./mcp/mcp-status-source";
 import { getSandboxAdapter, shutdownSandbox } from "./sandbox/sandbox-adapter";
 import { SandboxSync } from "./sandbox/sandbox-sync";
 import { WSLBridge } from "./sandbox/wsl-bridge";
 import { LimaBridge } from "./sandbox/lima-bridge";
 import { getSandboxBootstrap } from "./sandbox/sandbox-bootstrap";
-import type { McpServerConfig as IpcMcpServerConfig } from "../shared/ipc-types";
 import type {
   ClientEvent,
   ServerEvent,
@@ -1445,14 +1432,6 @@ async function cleanupSandboxResources(): Promise<void> {
   try {
     await withTimeout(shutdownSandbox(), 8000, "Sandbox shutdown");
     log("[App] Sandbox shutdown complete");
-
-    // 关闭内置 MCP 的传输（回收 stdio 子进程）。旧实现靠 mcpManager.shutdown() 做这件事。
-    await withTimeout(
-      closeAllDeskwandMcpTransports(),
-      5000,
-      "MCP transport shutdown",
-    );
-    log("[App] MCP transports closed");
   } catch (error) {
     logError("[App] Error shutting down sandbox:", error);
   }
@@ -2871,106 +2850,10 @@ ipcMain.handle("subagent.deleteAgent", async (_event, name: string) => {
 
 // MCP Server IPC handlers
 //
-// 配置的真相源已改为 <agentDir>/mcp.json（见 src/main/connectors/）。
-// `mcp.getServerStatus` 被保留且必须可用 —— ChatView.tsx 每 5 秒轮询它来渲染
-// 输入栏的连接器指示器（它只看 connected / toolCount）。其余旧 handler 已随
-// mcp-config-store 一并移除。
-ipcMain.handle("mcp.getServers", () => {
-  // 设置页的「MCP 服务（高级）」要编辑这些字段，所以从 mcp.json 反向映射回表单形状。
-  try {
-    return readMcpConfig(piAgentDir).servers.map((server) =>
-      sdkConfigToIpcConfig(server.name, server.config),
-    );
-  } catch (error) {
-    logError("[MCP] Error getting servers:", error);
-    return [];
-  }
-});
-
-ipcMain.handle("mcp.saveServer", async (_event, config: IpcMcpServerConfig) => {
-  // 形状校验交给 SDK 在连接时报错；upsertServer 内部强制 exposure:"direct"。
-  try {
-    // 表单的 id 是编辑前的原名；用户改了 name 就按重命名处理，否则会在
-    // mcp.json 里另外长出一个条目。新建表单的 id 是占位值（空串或生成值），
-    // 靠它能否命中现有条目来区分「重命名」与「新建」。
-    const previousName = readMcpConfig(piAgentDir).servers.some(
-      (server) => server.name === config.id,
-    )
-      ? config.id
-      : undefined;
-    upsertServer(
-      piAgentDir,
-      config.name,
-      ipcConfigToSdkConfig(config),
-      previousName,
-    );
-    log(`[MCP] Server ${config.name} saved`);
-    void trackEvent("feature_use", { feature: "connector" });
-    return { success: true };
-  } catch (error) {
-    logError("[MCP] Error saving server:", error);
-    return { success: false, error: String(error) };
-  }
-});
-
-ipcMain.handle("mcp.deleteServer", async (_event, serverName: string) => {
-  // 两步清理：只删配置不删凭据的话，重新添加会静默复用旧 token
-  const entry = readMcpConfig(piAgentDir).servers.find(
-    (server) => server.name === serverName,
-  );
-  removeServer(piAgentDir, serverName);
-  if (entry && "url" in entry.config) {
-    await removeCredentials(piAgentDir, entry.config.url);
-  }
-  log(`[MCP] Server ${serverName} deleted`);
-  return { success: true };
-});
-
-ipcMain.handle("mcp.getTools", () => {
-  try {
-    // 工具由内置 MCP 扩展注册进会话；快照由 mcp-client-extension 维护。
-    return getMcpToolsSnapshot();
-  } catch (error) {
-    logError("[MCP] Error getting tools:", error);
-    return [];
-  }
-});
-
-ipcMain.handle("mcp.getServerStatus", () => {
-  try {
-    const tools = getMcpToolsSnapshot();
-    return readMcpConfig(piAgentDir).servers.map((server) => {
-      const enabled = server.config.enabled !== false;
-      const mapped = enabled ? getConnectorStatus(server.name) : undefined;
-      // 旧消费者(expected: SettingsConnectors / useIPC / ChatView)看到的是
-      // "connected" | "connecting" | "needs-auth" | "failed" | "disabled" 这套字符串，
-      // 所以这里把 ConnectorStatus 翻回旧词表，不改变已有 IPC 的对外契约。
-      const status = !enabled
-        ? "disabled"
-        : mapped === undefined
-          ? "connecting"
-          : mapped.kind === "ready"
-            ? "connected"
-            : mapped.kind;
-      return {
-        id: server.name,
-        name: server.name,
-        connected: status === "connected",
-        status,
-        toolCount: tools.filter((tool) => tool.serverName === server.name)
-          .length,
-      };
-    });
-  } catch (error) {
-    logError("[MCP] Error getting server status:", error);
-    return [];
-  }
-});
-
 // 连接页的 IPC（list / addCatalogServer / removeServer / setEnabled / authorize / addCustomServer）
 //
 // 状态源必须在注册 IPC 之前接上 —— status-store 只在首次 init 时接受注入。
-initStatusStore(mcpTransportStatusSource);
+initStatusStore(mcpToolsSnapshotStatusSource);
 setMcpAgentDir(piAgentDir);
 registerConnectorsIpc({
   ipcMain,

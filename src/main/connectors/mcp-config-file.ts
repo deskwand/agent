@@ -106,7 +106,14 @@ export function readMcpConfig(agentDir: string): LoadedMcpConfig {
       scope: "global" as const,
     }),
   );
-  return { servers, errors };
+  // 透传顶层 `autoEnableCodemode`（pi 的全局 opt-out，见 docs/mcp.md:154）。
+  // 原先直接丢掉它 ⇒ 用户在文件里关掉 codemode 会被静默忽略。
+  const autoEnableCodemode = shape.autoEnableCodemode;
+  return {
+    servers,
+    errors,
+    ...(typeof autoEnableCodemode === "boolean" ? { autoEnableCodemode } : {}),
+  };
 }
 
 /** stdio 与 http 靠 `url` 区分，与 SDK 联合类型的判定方式一致。 */
@@ -115,11 +122,12 @@ function sameTransport(a: McpServerConfig, b: McpServerConfig): boolean {
 }
 
 /**
- * 写入前**强制** `exposure: "direct"`。
+ * 写入配置（**不再覆盖** `exposure`）。
  *
- * SDK 默认是 `"codemode"`，那会让 MCP 工具对模型完全不可见，而且**不报错** ——
- * 本仓历史上踩过这个坑（已删的 `mcp-config-projection.ts` 注释里记着）。
- * 所以这里覆盖调用方给的值，不给"忘了传"留余地。
+ * 这里原先强制 `"direct"`，理由是「SDK 默认 codemode 会让工具对模型不可见」。
+ * 现在按 pi 的参考实现走：默认就是 `codemode`，由上游按 exposure **派生激活** codemode；
+ * 用户可在连接器界面显式改成 `direct`。见
+ * design-docs/2026-10-02-mcp-codemode-default-plan.md §2.3/§2.5。
  *
  * `previousName` 是条目的原名（设置页表单的 `id`）。给了它且与 `name` 不同时按
  * 重命名处理：删旧键、写新键，一次落盘。改成已存在的名字时**报错**而不是覆盖 ——
@@ -168,7 +176,9 @@ export function upsertServer(
       : { ...config };
 
   if (sourceName && sourceName !== name) delete servers[sourceName];
-  servers[name] = { ...merged, exposure: "direct" };
+  // 不写 `exposure`：不写该键即取上游默认 `codemode`（`exposureOf` 的 `?? "codemode"`）。
+  // 跟随 pi 参考实现，保留调用方显式给的值。
+  servers[name] = merged;
   writeRaw(agentDir, { ...shape, mcpServers: servers });
 }
 

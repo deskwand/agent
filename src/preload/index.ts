@@ -37,9 +37,6 @@ import type {
   VaultSnapshot,
 } from "../shared/vault";
 import type {
-  McpServerConfig,
-  McpTool,
-  McpServerStatus,
   RemoteConfig,
   ChannelInstanceConfig,
   ChannelInstanceLog,
@@ -424,25 +421,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
   },
 
-  // MCP methods（保留给设置里的「MCP 服务（高级）」）
-  mcp: {
-    getServers: (): Promise<McpServerConfig[]> =>
-      ipcRenderer.invoke("mcp.getServers"),
-    saveServer: (
-      config: McpServerConfig,
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke("mcp.saveServer", config),
-    deleteServer: (serverName: string): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke("mcp.deleteServer", serverName),
-    getTools: (): Promise<McpTool[]> => ipcRenderer.invoke("mcp.getTools"),
-    // ChatView 每 5 秒轮询这个来渲染输入栏的连接器指示器 —— 不要移除
-    getServerStatus: (): Promise<McpServerStatus[]> =>
-      ipcRenderer.invoke("mcp.getServerStatus"),
-  },
-
   // Connectors page
   connectors: {
-    list: (): Promise<ConnectorEntry[]> => ipcRenderer.invoke("connectors.list"),
+    list: (): Promise<ConnectorEntry[]> =>
+      ipcRenderer.invoke("connectors.list"),
     addCatalogServer: (key: string): Promise<ActionResult> =>
       ipcRenderer.invoke("connectors.addCatalogServer", key),
     removeServer: (name: string): Promise<ActionResult> =>
@@ -456,7 +438,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     onStatusChanged: (cb: () => void): (() => void) => {
       const handler = (): void => cb();
       ipcRenderer.on("connectors.statusChanged", handler);
-      return () => ipcRenderer.removeListener("connectors.statusChanged", handler);
+      return () =>
+        ipcRenderer.removeListener("connectors.statusChanged", handler);
     },
   },
 
@@ -997,15 +980,6 @@ declare global {
         onFullScreenChanged: (
           callback: (isFullScreen: boolean) => void,
         ) => () => void;
-      };
-      mcp: {
-        getServers: () => Promise<McpServerConfig[]>;
-        saveServer: (
-          config: McpServerConfig,
-        ) => Promise<{ success: boolean; error?: string }>;
-        deleteServer: (serverName: string) => Promise<{ success: boolean }>;
-        getTools: () => Promise<McpTool[]>;
-        getServerStatus: () => Promise<McpServerStatus[]>;
       };
       connectors: {
         list: () => Promise<ConnectorEntry[]>;

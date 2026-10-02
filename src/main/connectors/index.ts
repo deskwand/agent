@@ -14,6 +14,7 @@ import type { McpServerConfig } from "@earendil-works/pi-coding-agent";
 import { MCP_CATALOG } from "../../shared/mcp-catalog";
 import type { AddCustomServerInput } from "../../shared/connectors";
 import { buildRegistry } from "./registry";
+import { trackEvent } from "../telemetry-events";
 import { getConnectorStatus, subscribeStatus } from "./status-store";
 import {
   readMcpConfig,
@@ -111,10 +112,13 @@ export function registerConnectorsIpc({
   });
 
   ipcMain.handle("connectors.list", () => registry.list());
-  ipcMain.handle("connectors.addCatalogServer", (_e, key: string) =>
+  ipcMain.handle("connectors.addCatalogServer", async (_e, key: string) => {
     // openUrl 由主进程注入（与 MCP 扩展同一实现），IPC 边界不传函数
-    registry.addCatalogServer(key, openUrl),
-  );
+    const res = await registry.addCatalogServer(key, openUrl);
+    // 遥测原先挂在已删的 `mcp.saveServer` 上 —— 现在服务由连接器层添加，归宿在这里。
+    if (res.ok) void trackEvent("feature_use", { feature: "connector" });
+    return res;
+  });
   ipcMain.handle("connectors.removeServer", (_e, name: string) =>
     registry.removeServer(name),
   );
@@ -129,7 +133,11 @@ export function registerConnectorsIpc({
   );
   ipcMain.handle(
     "connectors.addCustomServer",
-    (_e, input: AddCustomServerInput) => registry.addCustomServer(input),
+    async (_e, input: AddCustomServerInput) => {
+      const res = await registry.addCustomServer(input);
+      if (res.ok) void trackEvent("feature_use", { feature: "connector" });
+      return res;
+    },
   );
   ipcMain.handle("connectors.cancelSignIn", (_e, name: string) =>
     registry.cancelSignIn(name),

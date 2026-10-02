@@ -29,19 +29,30 @@ afterEach(() => {
 });
 
 describe("builtin mcp extension assembly", () => {
-  it("forces exposure=direct on every server (trap 1a: codemode would hide tools)", () => {
+  it("leaves exposure unset so upstream defaults to codemode", () => {
+    // 原先这里断言强制 "direct"（避免工具对模型不可见）。现在跟随 pi 的参考实现：
+    // 不写该键 ⇒ 上游 `exposureOf` 取 `codemode`，并由它派生激活 codemode。
     upsertServer(agentDir, "notion", {
       type: "http",
       url: "https://mcp.notion.com/mcp",
     });
     const loaded = loadDeskwandMcpConfig(agentDir);
     expect(loaded.servers).toHaveLength(1);
-    for (const server of loaded.servers) {
-      expect(server.config.exposure).toBe("direct");
-    }
+    expect(loaded.servers[0].config).not.toHaveProperty("exposure");
   });
 
-  it("disables autoEnableCodemode so codemode cannot be activated (trap 1b)", () => {
+  it("does not set autoEnableCodemode (upstream default true applies)", () => {
+    expect(loadDeskwandMcpConfig(agentDir)).not.toHaveProperty(
+      "autoEnableCodemode",
+    );
+  });
+
+  it("passes through autoEnableCodemode from the top level of mcp.json", () => {
+    // pi 的全局 opt-out（docs/mcp.md:154）。原先这个键被 readMcpConfig 丢掉 ⇒ 静默忽略。
+    fs.writeFileSync(
+      mcpConfigPath(agentDir),
+      JSON.stringify({ mcpServers: {}, autoEnableCodemode: false }),
+    );
     expect(loadDeskwandMcpConfig(agentDir).autoEnableCodemode).toBe(false);
   });
 
@@ -83,13 +94,11 @@ describe("builtin mcp extension assembly", () => {
     expect(loadDeskwandMcpConfig(agentDir)).toEqual({
       servers: [],
       errors: [],
-      autoEnableCodemode: false,
     });
   });
 
-  it("defaults a raw standard config (no exposure) to direct", () => {
-    // 用户从别的 MCP 客户端拷进来的标准配置不带 exposure；
-    // SDK 默认 codemode 会让工具对模型完全不可见，且不报错。
+  it("leaves a raw standard config (no exposure) untouched", () => {
+    // 用户从别的 MCP 客户端拷进来的标准配置不带 exposure ⇒ 取上游默认 codemode。
     fs.writeFileSync(
       mcpConfigPath(agentDir),
       JSON.stringify({
@@ -100,7 +109,7 @@ describe("builtin mcp extension assembly", () => {
     );
     const loaded = loadDeskwandMcpConfig(agentDir);
     expect(loaded.servers).toHaveLength(1);
-    expect(loaded.servers[0].config.exposure).toBe("direct");
+    expect(loaded.servers[0].config).not.toHaveProperty("exposure");
   });
 
   it("retains an exposure the user wrote explicitly", () => {
@@ -142,7 +151,7 @@ describe("immediate MCP activation", () => {
     }
   }
 
-  it("defaults exposure for servers registered into an existing session", async () => {
+  it("leaves exposure unset for servers registered into an existing session", async () => {
     await withSession((registered) => {
       expect(
         activateDeskwandMcpServer("remote", {
@@ -150,7 +159,7 @@ describe("immediate MCP activation", () => {
           url: "https://x/mcp",
         }),
       ).toBe(true);
-      expect(registered[0].exposure).toBe("direct");
+      expect(registered[0]).not.toHaveProperty("exposure");
     });
   });
 
@@ -163,5 +172,67 @@ describe("immediate MCP activation", () => {
       });
       expect(registered[0].exposure).toBe("deferred");
     });
+  });
+});
+
+describe("transport path projection", () => {
+  it("rewrites a bare node/npx command to the bundled binaries", async () => {
+    const { getBundledNodePath } =
+      await import("../../main/mcp/mcp-server-paths");
+    const bundled = getBundledNodePath();
+    // 打包环境才有打包 node；开发环境可能没有 —— 那就不该断言改写结果。
+    if (!bundled) return;
+
+    for (const [input, expected] of [
+      ["node", bundled.node],
+      ["npx", bundled.npx],
+    ] as const) {
+      upsertServer(agentDir, "proj", {
+        type: "stdio",
+        command: input,
+        args: ["x"],
+      });
+      const config = loadDeskwandMcpConfig(agentDir).servers[0].config as {
+        command?: string;
+      };
+      expect(config.command).toBe(expected);
+    }
+  });
+
+  it("injects env.PATH even when the server declares no env at all", async () => {
+    const { getBundledNodePath } =
+      await import("../../main/mcp/mcp-server-paths");
+    const bundled = getBundledNodePath();
+    if (!bundled) return;
+
+    upsertServer(agentDir, "proj", { type: "stdio", command: "npx" });
+    const config = loadDeskwandMcpConfig(agentDir).servers[0].config as {
+      env?: Record<string, string>;
+    };
+    // 这条注入的意义就在「没有 env 的 server」（绝大多数）—— 所以必须造出 env 来
+    expect(config.env?.PATH).toBeTruthy();
+    expect(config.env?.PATH?.split(":").at(0)).toBe(
+      bundled.node.replace(/\/node$/, ""),
+    );
+  });
+
+  it("keeps an explicit PATH the user wrote", () => {
+    upsertServer(agentDir, "proj", {
+      type: "stdio",
+      command: "npx",
+      env: { PATH: "/custom/bin" },
+    });
+    const config = loadDeskwandMcpConfig(agentDir).servers[0].config as {
+      env?: Record<string, string>;
+    };
+    expect(config.env?.PATH).toBe("/custom/bin");
+  });
+
+  it("leaves http servers untouched", () => {
+    upsertServer(agentDir, "proj", { type: "http", url: "https://x/mcp" });
+    const config = loadDeskwandMcpConfig(agentDir).servers[0].config as {
+      env?: unknown;
+    };
+    expect(config).not.toHaveProperty("env");
   });
 });

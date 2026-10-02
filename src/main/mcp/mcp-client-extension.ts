@@ -14,11 +14,9 @@ import {
   type McpServerConfig,
   type McpServerEntry,
 } from "@earendil-works/pi-coding-agent";
-import type { AuthProvider, McpTransport } from "@earendil-works/pi-mcp";
 import { app, shell } from "electron";
 import path from "node:path";
 import { readMcpConfig, setServerEnabled } from "../connectors/mcp-config-file";
-import { createDeskwandTransport } from "./mcp-transport-adapter";
 import {
   findPreferredWindowsNpxPath,
   getBundledNodePath,
@@ -51,10 +49,8 @@ export function activateDeskwandMcpServer(
 ): boolean {
   if (!activePi) return false;
   try {
-    activePi.registerMcpServer(name, {
-      ...config,
-      exposure: config.exposure ?? "direct",
-    });
+    // 不再补默认值：上游 `exposureOf` 对未带该键的 entry 取 `codemode`。
+    activePi.registerMcpServer(name, config);
     log(`[MCP] registered ${name} for immediate connection`);
     return true;
   } catch (e) {
@@ -84,20 +80,48 @@ export function openExternalUrl(url: string): void {
  * 注意：不重写 server 名 —— 名字直接决定 `mcp__<server>__<tool>`，改了就破坏提示词缓存。
  * 路径占位符已在写入 `mcp.json` 时解析（见 `builtin-presets.ts`）。
  */
+/**
+ * 传输层已交还 SDK（不再传 `createTransport`），所以「打包环境找不到 node / npx」这件事
+ * 只能在**配置投影**里解决：把 `command` 改写成打包二进制的绝对路径，并注入 `env.PATH`。
+ *
+ * 两件事的必要性不同（已核实）：
+ *  - **改写 `command` 是必需的**。打包的 `npx` 是个 shell wrapper（`exec "$DIR/node" …`），
+ *    用绝对路径调用它就能工作；而裸 `npx` / `node` 在 Finder 启动的应用里 PATH 上没有。
+ *  - **注入 `env.PATH` 是便宜的保险**，不是第一跳的必需：npm/npx **派生的那个包子进程**
+ *    其 bin 常带 `#!/usr/bin/env node`，没有 PATH 就找不到 node。
+ *
+ * 不显式写 `command: "node"` / `"npx"` 的 server（如绝对路径、`uvx`、自建脚本）原样不动。
+ */
 function applyTransportPaths(config: McpServerConfig): McpServerConfig {
   if (!("command" in config)) return config;
 
-  const command =
-    config.command === "node"
-      ? (getBundledNodePath()?.node ?? "node")
-      : process.platform === "win32" && !path.isAbsolute(config.command)
-        ? (findPreferredWindowsNpxPath(
-            process.env.PATH,
-            getBundledNodePath()?.npx ?? null,
-          ) ?? config.command)
-        : config.command;
+  const bundled = getBundledNodePath();
+  let command = config.command;
+  if (command === "node") {
+    command = bundled?.node ?? command;
+  } else if (command === "npx" && bundled?.npx) {
+    command = bundled.npx;
+  } else if (process.platform === "win32" && !path.isAbsolute(command)) {
+    command =
+      findPreferredWindowsNpxPath(process.env.PATH, bundled?.npx ?? null) ??
+      command;
+  }
 
-  return { ...config, command };
+  // 用户显式给的 PATH 优先；否则打包 bin 目录前置 + 沿用现有 PATH。
+  // 注意：即使配置里**没有** `env` 也要造一个出来 —— 否则对「无 env 的 server」
+  // （绝大多数）这步注入就是空操作，那正是本注入存在的理由。
+  const env: Record<string, string> = { ...(config.env ?? {}) };
+  if (bundled && env.PATH === undefined) {
+    env.PATH = [path.dirname(bundled.node), process.env.PATH]
+      .filter(Boolean)
+      .join(path.delimiter);
+  }
+
+  return {
+    ...config,
+    command,
+    ...(Object.keys(env).length > 0 ? { env } : {}),
+  };
 }
 
 /** 供 `loadConfig` 注入点使用：读 `<agentDir>/mcp.json`，套上传输路径改写。 */
@@ -107,18 +131,17 @@ export function loadDeskwandMcpConfig(agentDir: string): LoadedMcpConfig {
     logWarn("[MCP] mcp.json errors:", loaded.errors.join("; "));
   }
   return {
-    // autoEnableCodemode: false 与每个条目的 exposure:"direct" 配对；
-    // 缺任何一个都会让 MCP 工具对模型不可见。
-    autoEnableCodemode: false,
+    // 不再写 `autoEnableCodemode` —— 透传 mcp.json 顶层的值（pi 的全局 opt-out），
+    // 无则让上游取默认 true。codemode 的激活按 pi 的设计由「有 codemode exposure
+    // 的 server 连上」派生，不由这里决定。
+    ...(loaded.autoEnableCodemode === undefined
+      ? {}
+      : { autoEnableCodemode: loaded.autoEnableCodemode }),
     errors: loaded.errors,
     servers: loaded.servers.map((entry) => ({
       ...entry,
-      config: {
-        ...applyTransportPaths(entry.config),
-        // 用户从别的客户端拷进来的标准配置不带 exposure，SDK 会默认
-        // codemode 把工具藏掉且不报错；这里补成 direct，但保留用户显式写的值。
-        exposure: entry.config.exposure ?? "direct",
-      },
+      // 不再补 `exposure` 默认值：不写该键即取上游默认 `codemode`（见 §2.5）。
+      config: applyTransportPaths(entry.config),
     })),
   };
 }
@@ -136,16 +159,21 @@ export interface McpToolSnapshotEntry {
 
 let toolSnapshot: McpToolSnapshotEntry[] = [];
 
+const toolsListeners = new Set<() => void>();
+
+/** 工具快照变化时通知（连接页据此刷新「已连接 / 工具数」）。 */
+export function onMcpToolsChange(fn: () => void): () => void {
+  toolsListeners.add(fn);
+  return () => {
+    toolsListeners.delete(fn);
+  };
+}
+
 export function getMcpToolsSnapshot(): McpToolSnapshotEntry[] {
   return toolSnapshot;
 }
 
-function recordMcpTools(pi: ExtensionAPI): void {
-  // server 名即 id —— 配置的真相源现在是 mcp.json，不再有 store 生成的 uuid。
-  //
-  // **不能用正则拆 `mcp__<server>__<tool>`**：server 名里可能含 `__`（用户自建），
-  // 非贪婪匹配会把它切错。改成拿已知 server 名去前缀匹配 —— 名字是我们自己写的，
-  // 唯一确定，不需要从工具名反推。
+function collectMcpTools(pi: ExtensionAPI): McpToolSnapshotEntry[] {
   const names = readMcpConfig(piAgentDirRef())
     .servers.map((s) => s.name)
     // 长的优先，避免 "a" 抢走 "a__b" 的工具
@@ -165,7 +193,30 @@ function recordMcpTools(pi: ExtensionAPI): void {
       break;
     }
   }
-  toolSnapshot = next;
+  return next;
+}
+
+/**
+ * 刷新「连接器页」用的工具快照。
+ *
+ * **整体包在 try 里是必须的**：这只是一个界面用的副作用，但它原先抛异常时会把
+ * `createDeskwandMcpExtension()` 的工厂一起带崩 —— 工厂里后面那两句
+ * `pi.on("session_start" | "tool_execution_end", …)` 就再也不会注册，
+ * 而且**日志里不留任何痕迹**（排查时为此白跑了几轮）。副作用绝不能有这种能力。
+ *
+ * **不能用正则拆 `mcp__<server>__<tool>`**：server 名里可能含 `__`（用户自建），
+ * 非贪婪匹配会把它切错。改成拿已知 server 名做前缀匹配 —— 名字是我们自己写的。
+ */
+function recordMcpTools(pi: ExtensionAPI): void {
+  try {
+    toolSnapshot = collectMcpTools(pi);
+  } catch (error) {
+    // 只是界面用的副作用，绝不能让它把扩展工厂带崩 —— 它曾经在「扩展加载期」调用
+    // `getAllTools()`（SDK 禁止 action 方法），抛出后连后面两个 `pi.on(...)` 都不再注册，
+    // 且不留痕迹。留着这个 catch 是为了下次能立刻看到原因。
+    logWarn("[MCP] recordMcpTools failed:", error);
+  }
+  for (const listener of toolsListeners) listener();
 }
 
 /**
@@ -194,12 +245,6 @@ export function createDeskwandMcpExtension(): ExtensionFactory {
   log("[MCP] creating builtin mcp extension");
   const inner = createMcpExtension({
     loadConfig: (): LoadedMcpConfig => loadDeskwandMcpConfig(piAgentDirRef()),
-
-    createTransport: (
-      entry: McpServerEntry,
-      cwd: string,
-      authProvider: AuthProvider | undefined,
-    ): McpTransport => createDeskwandTransport(entry, cwd, authProvider),
 
     logPath: mcpLogPath(),
 
@@ -230,7 +275,11 @@ export function createDeskwandMcpExtension(): ExtensionFactory {
       activePi = undefined;
     });
     await inner(pi);
-    recordMcpTools(pi);
+    // **不要在工厂里同步调用 `recordMcpTools`** —— 那是「扩展加载期」，SDK 禁止
+    // `getAllTools()` 这类 action 方法：
+    //   Error: Extension runtime not initialized. Action methods cannot be called
+    //          during extension loading.
+    // 只在会话事件里刷新（那时 runtime 已就绪）。
     pi.on("session_start", () => recordMcpTools(pi));
     pi.on("tool_execution_end", () => recordMcpTools(pi));
   };
