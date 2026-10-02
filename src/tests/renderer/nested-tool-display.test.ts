@@ -312,3 +312,16 @@ describe("projectNestedToolBlocks", () => {
     expect(childUse?.trace?.cancelled).toBe(true);
   });
 });
+
+it("does not re-project a virtual child named codemode", () => {
+  const blocks: ContentBlock[] = [
+    toolUse("parent", "codemode", { code: "source" }),
+    toolResult("parent", "done", {
+      nestedCalls: snapshot("parent", [
+        child("nested", "codemode", { code: "nested source" }),
+      ]),
+    }),
+  ];
+  const once = projectNestedToolBlocks(blocks, {}, false);
+  expect(projectNestedToolBlocks(once, {}, false)).toEqual(once);
+});

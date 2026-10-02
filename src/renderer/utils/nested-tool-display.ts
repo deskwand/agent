@@ -18,7 +18,11 @@ import type {
 } from "../../shared/nested-tool-calls";
 
 function isCodemode(block: ContentBlock): block is ToolUseContent {
-  return block.type === "tool_use" && block.name.toLowerCase() === "codemode";
+  return (
+    block.type === "tool_use" &&
+    block.name.toLowerCase() === "codemode" &&
+    !block.trace
+  );
 }
 
 export function projectNestedToolBlocks(
