@@ -76,106 +76,119 @@ export function ConnectorCard({
   const isRow = variant === "row";
   /** 没有实例 = 还没添加过，视为关闭；开关照样可点。 */
   const capabilityOn = !!instance && instance.status.kind !== "off";
+  const name = t(entry.nameKey);
 
-  const shell = isRow
-    ? "bg-surface border border-border-muted rounded-lg px-3.5 py-3 flex items-center gap-3"
-    : "bg-surface border border-border-muted rounded-container p-3.5 flex flex-col gap-2.5 shadow-card hover:bg-surface-hover min-h-[132px]";
+  /** 传输层状态文案；能力开关卡片也用它（开关卡片没有 OAuth 流程，不看 authorizing）。 */
+  const instanceStatus = instance
+    ? statusText(instance.status, t)
+    : t("connectors.status.off");
+  /** 本地待授权优先于传输状态。 */
+  const statusLabel = authorizing
+    ? t("connectors.status.connecting")
+    : instanceStatus;
+  const dotKind = authorizing ? "connecting" : instance?.status.kind;
 
-  return (
-    <div className={shell}>
-      <div
-        className={
-          isRow
-            ? "flex items-center gap-3 flex-1 min-w-0"
-            : "flex items-start gap-2.5"
-        }
-      >
-        <div
-          className={`${isRow ? "w-7 h-7 text-xs" : "w-8 h-8 text-sm"} rounded-lg bg-accent-muted text-accent grid place-items-center font-bold flex-none`}
-        >
-          {t(entry.nameKey).slice(0, 1).toUpperCase()}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-text-primary">
-            {t(entry.nameKey)}
+  const statusLine = isCapability ? (
+    <span className="text-xs text-text-secondary">{instanceStatus}</span>
+  ) : (
+    <span className="flex items-center gap-1.5 text-xs text-text-secondary min-w-0">
+      {dotKind && (
+        <span
+          className={`w-1.5 h-1.5 rounded-full flex-none ${dotClass(dotKind)}`}
+        />
+      )}
+      <span className="truncate">{statusLabel}</span>
+    </span>
+  );
+
+  const actions = isCapability ? (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={capabilityOn}
+      aria-label={t(entry.nameKey)}
+      // 未添加的预设也要能打开：registry 会先把它写进 mcp.json 再启用。
+      // 之前这里是 `disabled={!instance}` + `instance && onToggle(...)`，
+      // 于是开关永远是灰的 —— 后端支持、前端把门堵上了。
+      onClick={() => onToggle(entry.serverName, !capabilityOn)}
+      className={`w-[34px] h-5 rounded-full relative transition-colors flex-none ${
+        capabilityOn ? "bg-accent" : "bg-surface-active"
+      }`}
+    >
+      <span
+        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
+          capabilityOn ? "left-[18px]" : "left-0.5"
+        }`}
+      />
+    </button>
+  ) : (
+    renderAction(entry, instance, authorizing, t, {
+      onConnect,
+      onDisconnect,
+      onAuthorize,
+      onCancel,
+    })
+  );
+
+  /**
+   * 动作组包一层，多个按钮从此不可拆。
+   * grid 卡里它进标题行右侧，与状态文字不在同一个容器 —— 否则任何
+   * 「两端对齐」的容器都会把按钮甩到卡片正中（见设计文档 P3）。
+   * row 形态不加包裹，DOM 与改版前逐字一致。
+   */
+  const actionGroup = isRow ? (
+    actions
+  ) : (
+    <div className="flex items-center gap-2 flex-none">{actions}</div>
+  );
+
+  // row：管理视图（「已添加」筛选 / 本机能力 tab）。结构刻意与改版前逐字一致 ——
+  // src/tests/connectors/connectors-e2e.test.ts 按源码文本断言 t(instance.summary)。
+  if (isRow) {
+    return (
+      <div className="bg-surface border border-border-muted rounded-lg px-3.5 py-3 flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="w-7 h-7 text-xs rounded-lg bg-accent-muted text-accent grid place-items-center font-bold flex-none">
+            {name.slice(0, 1).toUpperCase()}
           </div>
-          {entry.descriptionKey && !isRow && (
-            <div className="text-xs text-text-muted mt-0.5 line-clamp-2">
-              {t(entry.descriptionKey)}
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-text-primary">
+              {name}
             </div>
-          )}
-          {isRow && instance && (
-            <div className="text-xs text-text-muted mt-0.5 truncate">
-              {t(instance.summary)}
-            </div>
-          )}
+            {instance && (
+              <div className="text-xs text-text-muted mt-0.5 truncate">
+                {t(instance.summary)}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-none">
+          {!isCapability && statusLine}
+          {actionGroup}
         </div>
       </div>
+    );
+  }
 
-      <div
-        className={
-          isRow
-            ? "flex items-center gap-3 flex-none"
-            : "flex items-center justify-between gap-2 mt-auto"
-        }
-      >
-        {isCapability ? (
-          <>
-            {!isRow && (
-              <span className="text-xs text-text-secondary">
-                {instance
-                  ? statusText(instance.status, t)
-                  : t("connectors.status.off")}
-              </span>
-            )}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={capabilityOn}
-              aria-label={t(entry.nameKey)}
-              // 未添加的预设也要能打开：registry 会先把它写进 mcp.json 再启用。
-              // 之前这里是 `disabled={!instance}` + `instance && onToggle(...)`，
-              // 于是开关永远是灰的 —— 后端支持、前端把门堵上了。
-              onClick={() => onToggle(entry.serverName, !capabilityOn)}
-              className={`w-[34px] h-5 rounded-full relative transition-colors flex-none ${
-                capabilityOn ? "bg-accent" : "bg-surface-active"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-                  capabilityOn ? "left-[18px]" : "left-0.5"
-                }`}
-              />
-            </button>
-          </>
-        ) : (
-          <>
-            <span className="flex items-center gap-1.5 text-xs text-text-secondary min-w-0">
-              {authorizing ? (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full flex-none ${dotClass("connecting")}`}
-                />
-              ) : instance ? (
-                <span
-                  className={`w-1.5 h-1.5 rounded-full flex-none ${dotClass(instance.status.kind)}`}
-                />
-              ) : null}
-              <span className="truncate">
-                {authorizing
-                  ? t("connectors.status.connecting")
-                  : instance
-                    ? statusText(instance.status, t)
-                    : t("connectors.status.off")}
-              </span>
-            </span>
-            {renderAction(entry, instance, authorizing, t, {
-              onConnect,
-              onDisconnect,
-              onAuthorize,
-              onCancel,
-            })}
-          </>
+  // grid：发现视图。名称与动作同一行，说明与状态在内容列里各占一行。
+  return (
+    <div className="bg-surface border border-border-muted rounded-container p-3.5 flex gap-2.5 shadow-card hover:bg-surface-hover">
+      <div className="w-8 h-8 text-sm rounded-lg bg-accent-muted text-accent grid place-items-center font-bold flex-none">
+        {name.slice(0, 1).toUpperCase()}
+      </div>
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <div className="text-sm font-semibold text-text-primary flex-1 min-w-0 truncate">
+            {name}
+          </div>
+          {actionGroup}
+        </div>
+        {entry.descriptionKey && (
+          <div className="text-xs text-text-muted line-clamp-2">
+            {t(entry.descriptionKey)}
+          </div>
         )}
+        {statusLine}
       </div>
     </div>
   );

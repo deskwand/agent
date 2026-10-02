@@ -215,6 +215,34 @@ describe("远程服务卡片", () => {
       expect(b.disabled, `意外禁用：${b.textContent}`).toBe(false);
     }
   });
+
+  it("两个动作按钮是一个整体，状态文字不会跟它们挤在同一个容器里", () => {
+    // 回归：底栏曾用 justify-between 摆「状态 + 两个按钮」三个子元素，
+    // 中间那个（「取消」）被甩到卡片正中。
+    // 注意：只断言「两个按钮同父节点」是无效护栏 —— 它们本来就在同一个底栏 div 里，
+    // 修复前也会通过。真正要守的是「那个容器里没有状态文字」。
+    const h = handlers();
+    render(
+      <ConnectorCard
+        entry={entry({ instances: [withStatus({ kind: "idle" })] })}
+        authorizing
+        {...h}
+      />,
+    );
+
+    const cancel = buttonByKey(CANCEL)!;
+    const disconnect = buttonByKey(DISCONNECT)!;
+    const group = cancel.parentElement!;
+
+    expect(group).toBe(disconnect.parentElement);
+    expect(group.className).toContain("flex-none");
+    // 容器里只应该有按钮：状态文字若被塞回来，说明按钮组又被摆进了
+    // 「状态 + 按钮」的两端对齐容器里（P3 的根因）。这条不依赖 i18n mock 的返回值。
+    expect(Array.from(group.children).every((c) => c.tagName === "BUTTON")).toBe(
+      true,
+    );
+    expect(group.textContent).not.toContain("connectors.status.");
+  });
 });
 
 describe("本机能力卡片", () => {

@@ -413,7 +413,7 @@ function FilterChip({
 function MoreComingCard() {
   const { t } = useTranslation();
   return (
-    <div className="rounded-container border border-dashed border-border-muted grid place-items-center min-h-[132px]">
+    <div className="rounded-container border border-dashed border-border-muted grid place-items-center min-h-[96px]">
       <div className="text-center text-xs text-text-muted leading-relaxed">
         {t("connectors.moreComing")}
         <br />
