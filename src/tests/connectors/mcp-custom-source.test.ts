@@ -85,7 +85,7 @@ describe("buildCustomEntries", () => {
   });
 
   it("excludes builtin preset names", () => {
-    const entries = buildCustomEntries(ctx([stdio("Chrome")]), []);
+    const entries = buildCustomEntries(ctx([stdio("GUI_Operate")]), []);
     expect(entries).toEqual([]);
   });
 

@@ -84,7 +84,7 @@ describe("upsertServer", () => {
     },
   );
 
-  it.each(["good-name", "good_name", "Name123", "Chrome", "a__b"])(
+  it.each(["good-name", "good_name", "Name123", "GUI_Operate", "a__b"])(
     "accepts an SDK-valid server name: %s",
     (name) => {
       expect(() =>

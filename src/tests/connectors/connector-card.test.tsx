@@ -290,12 +290,12 @@ describe("远程服务卡片", () => {
 describe("本机能力卡片", () => {
   const capability = (instances: ConnectorInstance[] = []): ConnectorEntry =>
     entry({
-      key: "mcp:builtin:Chrome",
-      serverName: "Chrome",
+      key: "mcp:builtin:GUI_Operate",
+      serverName: "GUI_Operate",
       source: "mcp-builtin",
       transport: "stdio",
-      nameKey: "connectors.builtin.chrome",
-      descriptionKey: "connectors.builtin.chromeDesc",
+      nameKey: "connectors.builtin.guiOperate",
+      descriptionKey: "connectors.builtin.guiOperateDesc",
       instances,
     });
 
@@ -311,7 +311,7 @@ describe("本机能力卡片", () => {
 
     act(() => sw.click());
     // 传 serverName，不是 undefined
-    expect(h.onToggle).toHaveBeenCalledWith("Chrome", true);
+    expect(h.onToggle).toHaveBeenCalledWith("GUI_Operate", true);
   });
 
   it("已启用的预设，点一下关闭", () => {
@@ -320,8 +320,8 @@ describe("本机能力卡片", () => {
       <ConnectorCard
         entry={capability([
           {
-            id: "Chrome",
-            label: "Chrome",
+            id: "GUI_Operate",
+            label: "GUI_Operate",
             status: { kind: "ready" },
             summary: "connectors.summary.local",
           },
@@ -333,6 +333,6 @@ describe("本机能力卡片", () => {
     const sw = container.querySelector('[role="switch"]') as HTMLButtonElement;
     expect(sw.getAttribute("aria-checked")).toBe("true");
     act(() => sw.click());
-    expect(h.onToggle).toHaveBeenCalledWith("Chrome", false);
+    expect(h.onToggle).toHaveBeenCalledWith("GUI_Operate", false);
   });
 });

@@ -65,7 +65,7 @@ function deps(
       return true;
     },
     builtinConfigFor: (name) =>
-      name === "Chrome" ? { type: "stdio", command: "npx" } : undefined,
+      name === "GUI_Operate" ? { type: "stdio", command: "npx" } : undefined,
     isValidServerName: (name) => /^[A-Za-z0-9_-]+$/.test(name),
     cancelSignIn: over.cancelSignIn ?? (() => true),
     hasCredentials: () => false,
@@ -96,7 +96,7 @@ describe("registry.list", () => {
     const builtin = buildRegistry(d)
       .list()
       .filter((e) => e.source === "mcp-builtin");
-    expect(builtin).toHaveLength(3);
+    expect(builtin).toHaveLength(1);
   });
 
   it("reflects mcp.json contents as instances", () => {
@@ -230,13 +230,13 @@ describe("registry.removeServer", () => {
 
   it("does not touch credentials for a stdio server", async () => {
     const stdio: McpServerEntry = {
-      name: "Chrome",
+      name: "GUI_Operate",
       config: { type: "stdio", command: "npx" },
       source: "test",
       scope: "global",
     };
     const { deps: d, credentialCalls } = deps({ servers: [stdio] });
-    await buildRegistry(d).removeServer("Chrome");
+    await buildRegistry(d).removeServer("GUI_Operate");
     expect(credentialCalls).toEqual([]);
   });
 
@@ -250,28 +250,28 @@ describe("registry.removeServer", () => {
 describe("registry.setEnabled", () => {
   it("delegates to the enabled setter when the server already exists", async () => {
     const stdio: McpServerEntry = {
-      name: "Chrome",
+      name: "GUI_Operate",
       config: { type: "stdio", command: "npx" },
       source: "test",
       scope: "global",
     };
     const { deps: d, enabledCalls } = deps({ servers: [stdio] });
-    await buildRegistry(d).setEnabled("Chrome", false);
-    expect(enabledCalls).toEqual([{ name: "Chrome", enabled: false }]);
+    await buildRegistry(d).setEnabled("GUI_Operate", false);
+    expect(enabledCalls).toEqual([{ name: "GUI_Operate", enabled: false }]);
   });
 
   it("creates an un-added builtin capability when switched on", async () => {
     // 能力 tab 的开关必须能在「还没添加」时直接打开 —— 否则那个开关永远是灰的
     const { deps: d, added, activated } = deps();
-    const res = await buildRegistry(d).setEnabled("Chrome", true);
+    const res = await buildRegistry(d).setEnabled("GUI_Operate", true);
     expect(res.ok).toBe(true);
-    expect(added.map((a) => a.name)).toEqual(["Chrome"]);
-    expect(activated).toEqual(["Chrome"]);
+    expect(added.map((a) => a.name)).toEqual(["GUI_Operate"]);
+    expect(activated).toEqual(["GUI_Operate"]);
   });
 
   it("does not create anything when switching off a missing capability", async () => {
     const { deps: d, added } = deps();
-    const res = await buildRegistry(d).setEnabled("Chrome", false);
+    const res = await buildRegistry(d).setEnabled("GUI_Operate", false);
     expect(res.ok).toBe(true);
     expect(added).toEqual([]);
   });
@@ -285,14 +285,14 @@ describe("registry.setEnabled", () => {
 
   it("activates an existing server when re-enabled", async () => {
     const stdio: McpServerEntry = {
-      name: "Chrome",
+      name: "GUI_Operate",
       config: { type: "stdio", command: "npx", enabled: false },
       source: "test",
       scope: "global",
     };
     const { deps: d, activated } = deps({ servers: [stdio] });
-    await buildRegistry(d).setEnabled("Chrome", true);
-    expect(activated).toEqual(["Chrome"]);
+    await buildRegistry(d).setEnabled("GUI_Operate", true);
+    expect(activated).toEqual(["GUI_Operate"]);
   });
 });
 
@@ -314,13 +314,13 @@ describe("registry.authorize", () => {
 
   it("rejects a server that is not remote", async () => {
     const stdio: McpServerEntry = {
-      name: "Chrome",
+      name: "GUI_Operate",
       config: { type: "stdio", command: "npx" },
       source: "test",
       scope: "global",
     };
     const { deps: d, signInCalls } = deps({ servers: [stdio] });
-    const res = await buildRegistry(d).authorize("Chrome", vi.fn());
+    const res = await buildRegistry(d).authorize("GUI_Operate", vi.fn());
     expect(res.ok).toBe(false);
     expect(signInCalls).toEqual([]);
   });
@@ -486,14 +486,14 @@ describe("registry.cancelSignIn", () => {
     const { deps: d } = deps({
       servers: [
         {
-          name: "Chrome",
+          name: "GUI_Operate",
           config: { type: "stdio", command: "npx" },
           source: "t",
           scope: "global",
         },
       ],
     });
-    expect(buildRegistry(d).cancelSignIn("Chrome").ok).toBe(false);
+    expect(buildRegistry(d).cancelSignIn("GUI_Operate").ok).toBe(false);
   });
 });
 

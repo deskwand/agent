@@ -96,13 +96,13 @@ describe("buildRemoteEntries", () => {
 
   it("ignores stdio servers (they belong to the builtin source)", () => {
     const stdio: McpServerEntry = {
-      name: "Chrome",
+      name: "GUI_Operate",
       config: { type: "stdio", command: "npx" },
       source: "test",
       scope: "global",
     };
     const entries = buildRemoteEntries(ctx([stdio]), CATALOG);
-    expect(entries.some((e) => e.key.includes("Chrome"))).toBe(false);
+    expect(entries.some((e) => e.key.includes("GUI_Operate"))).toBe(false);
   });
 
   it("every entry uses tab=connect and source=mcp-remote", () => {

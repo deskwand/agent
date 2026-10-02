@@ -25,19 +25,9 @@ interface BuiltinPreset {
 
 export const BUILTIN_PRESETS: readonly BuiltinPreset[] = [
   {
-    name: "Chrome",
-    nameKey: "connectors.builtin.chrome",
-    descriptionKey: "connectors.builtin.chromeDesc",
-  },
-  {
     name: "GUI_Operate",
     nameKey: "connectors.builtin.guiOperate",
     descriptionKey: "connectors.builtin.guiOperateDesc",
-  },
-  {
-    name: "Software_Development",
-    nameKey: "connectors.builtin.softwareDevelopment",
-    descriptionKey: "connectors.builtin.softwareDevelopmentDesc",
   },
 ] as const;
 

@@ -1,5 +1,5 @@
 /**
- * 三个内置本机能力的定义（从已删的 `mcp-config-store.ts` 搬来）。
+ * 应用自带 MCP server 的定义（现已只剩 GUI_Operate）（从已删的 `mcp-config-store.ts` 搬来）。
  *
  * ⚠️ **名字不可改**：工具名是 `mcp__<server>__<tool>`，改名字会变更工具声明，
  * 破坏提示词缓存并让老会话的工具调用记录对不上（本仓 AGENTS.md 明令）。
@@ -52,36 +52,6 @@ export function resolveMcpServerPath(filename: string): string | null {
 }
 
 export const BUILTIN_PRESETS: readonly BuiltinPreset[] = [
-  {
-    key: "chrome",
-    name: "Chrome",
-    config: () => ({
-      type: "stdio",
-      command: "npx",
-      args: [
-        "-y",
-        "chrome-devtools-mcp@latest",
-        "--browser-url",
-        "http://localhost:9222",
-      ],
-    }),
-    envDescription: {},
-  },
-  {
-    key: "software-development",
-    name: "Software_Development",
-    config: () => ({
-      type: "stdio",
-      command: "node",
-      args: [resolveMcpServerPath("software-dev-server-example.ts") ?? ""],
-      env: { WORKSPACE_DIR: "", TEST_ENV: "development" },
-    }),
-    envDescription: {
-      WORKSPACE_DIR: "Workspace directory for code development (optional)",
-      TEST_ENV:
-        "Test environment: development, staging, or production (optional)",
-    },
-  },
   {
     key: "gui-operate",
     name: "GUI_Operate",
