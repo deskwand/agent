@@ -228,6 +228,12 @@ function codemodeArtifactsPlugin(): Plugin {
     "node_modules/@earendil-works/pi-coding-agent/dist/bundle/chunks",
   );
   const workerCandidates = [resolve(piCodemodeRoot, "codemode-worker.js")];
+  // 先存缺口（与 codemode 无关，是新门禁查出来的）：图片缩放走同一个模式 ——
+  // `new URL(i ? "./image-resize-worker.ts" : "./image-resize-worker.js", import.meta.url)`，
+  // 而那个文件同样没有被打进产物。
+  const imageResizeCandidates = [
+    resolve(piCodemodeRoot, "image-resize-worker.js"),
+  ];
   const wasmCandidates = [
     resolve(
       process.cwd(),
@@ -241,13 +247,38 @@ function codemodeArtifactsPlugin(): Plugin {
       const outDir = resolve(process.cwd(), "dist-electron/main");
       mkdirSync(outDir, { recursive: true });
 
-      const worker = workerCandidates.find((candidate) => existsSync(candidate));
+      const worker = workerCandidates.find((candidate) =>
+        existsSync(candidate),
+      );
       if (!worker) {
         throw new Error(
           `[codemode-artifacts] codemode-worker.js not found. Looked in:\n  ${workerCandidates.join("\n  ")}`,
         );
       }
+      // 两个名字都要：上游有两处查找（见文件头注释）——
+      //   `getCodemodeWorkerUrl()` → `./codemode-worker.js`
+      //   `defaultWorkerUrl()`（execute chunk 内的回落）→ `./worker.js`
+      // **实际生效的是后者**：`getCodemodeWorkerUrl()` 的 bundled-node 分支靠构建期全局
+      // `PI_BUNDLED_NODE` 判断（`isBundledNode = typeof PI_BUNDLED_NODE < "u" && PI_BUNDLED_NODE`），
+      // 而我们的 vite 没有定义它 ⇒ 该分支是死的 ⇒ 返回 undefined ⇒ 回落到 `./worker.js`。
+      // （不能靠 `define: { PI_BUNDLED_NODE: true }` 来走另一条分支：同一个
+      //  `isBundledNode` 还参与 `a7e = isBunBinary || … || isBundledNode`，
+      //  会翻转另一处走 jiti 的运行时 TS 加载分支 —— 打包版里没有 jiti/TS。）
+      // 内容必须是 **自包含** 的那份（`dist/bundle/chunks/codemode-worker.js`）：
+      // `dist/extensions/codemode/worker.js` 只有 340 字节，是个 `import "@earendil-works/pi-codemode/worker"`
+      // 的转发 shim，打包版里该裸包不存在。
+      copyFileSync(worker, resolve(outDir, "worker.js"));
       copyFileSync(worker, resolve(outDir, "codemode-worker.js"));
+
+      const imageResize = imageResizeCandidates.find((candidate) =>
+        existsSync(candidate),
+      );
+      if (!imageResize) {
+        throw new Error(
+          `[codemode-artifacts] image-resize-worker.js not found. Looked in:\n  ${imageResizeCandidates.join("\n  ")}`,
+        );
+      }
+      copyFileSync(imageResize, resolve(outDir, "image-resize-worker.js"));
 
       const wasm = wasmCandidates.find((candidate) => existsSync(candidate));
       if (!wasm) {

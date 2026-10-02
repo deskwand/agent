@@ -1,96 +1,90 @@
 /**
- * codemode 打包门禁（只验证，不接产品）。
+ * codemode 打包门禁。
  *
- * 待验证的假设：**打包后**（vite 内联进 dist-electron/main）codemode 能否真的跑一段脚本。
+ * **上一次它是假绿的**：它用我自己构造的 `new URL("./codemode-worker.js", …)` 去断言，
+ * 也就是验的是**我的假设**，而不是产物真实的查找路径。结果用户实测报
+ * `Cannot find module '<app.asar>/dist-electron/main/worker.js'` —— 真实查找的是
+ * `./worker.js`（`defaultWorkerUrl()` 的回落），而我根本没拷那个名字。
  *
- * 与「开发模式能跑」无关 —— 这里要证的是两个产物的解析：
- *  1. `quickjs.wasm`（637KB）：上游走
- *     `createRequire(import.meta.url).resolve("quickjs-wasi/quickjs.wasm")`
- *     —— 从**打包后的代码位置**解析模块，而 electron-builder 的 files 白名单里
- *     既没有 `quickjs-wasi` 也没有 `@earendil-works`，所以产物里本来没有它。
- *  2. `codemode-worker.js`（67KB ESM）：上游走
- *     `new URL("./codemode-worker.js", import.meta.url)`
- *     —— 相对**打包后代码所在目录**，得把文件放到同一个 chunk 目录。
- *
- * 结论只有两种：能跑 → A 可行（再谈产物搬运与 exposure 策略）；
- * 不能跑 → 按错误的类型决定是「补搬运」还是「A 不可行」。
+ * 所以现在的做法：**从产物自身的字面量推导它需要哪些 worker 文件**，再逐个断言存在、
+ * 且内容自包含。（存在但 import 不到裸包同样会挂 —— 340 字节的转发 shim 就是这种情况。）
  */
 import pkg from "electron";
 const { app } = pkg;
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const OUT_MAIN = join(process.cwd(), "dist-electron/main");
 
-function surveyArtifacts() {
-  const files = existsSync(OUT_MAIN) ? readdirSync(OUT_MAIN) : [];
-  return {
-    chunks: files.filter((f) => f.endsWith(".js")).length,
-    wasm: files.filter((f) => f.endsWith(".wasm")),
-    hasCodemodeWorker: files.some((f) => f.toLowerCase().includes("codemode")),
-    hasQuickjsWasm: files.some((f) => f.toLowerCase().includes("quickjs")),
-  };
+/** 产物引用的同目录 worker 文件名（形如 `"./xxxworker.js"`）。 */
+function requiredWorkerFiles() {
+  const names = new Set();
+  for (const file of readdirSync(OUT_MAIN)) {
+    if (!file.endsWith(".js")) continue;
+    const source = readFileSync(join(OUT_MAIN, file), "utf8");
+    for (const match of source.matchAll(/"\.\/([A-Za-z0-9_.-]*worker\.js)"/g)) {
+      names.add(match[1]);
+    }
+  }
+  return [...names].sort();
+}
+
+/** 该文件是否自包含（不含会解析失败的裸包 import）。 */
+function isSelfContained(name) {
+  const source = readFileSync(join(OUT_MAIN, name), "utf8");
+  return !/from\s*"@earendil-works|require\("@earendil-works/.test(source);
 }
 
 async function main() {
   const out = {
     node: process.versions.node,
     electron: process.versions.electron,
-    artifacts: surveyArtifacts(),
+    requiredWorkers: [],
+    missingWorkers: [],
+    notSelfContained: [],
   };
 
-  // ① 能不能连执行器一起加载（vite 是否把 execute.js 也内联了）
-  try {
-    const pi = await import("@earendil-works/pi-coding-agent");
-    out.createCodemodeExtension = typeof pi.createCodemodeExtension;
-  } catch (error) {
-    out.piImportError = String(error);
+  for (const name of requiredWorkerFiles()) {
+    out.requiredWorkers.push(name);
+    if (!existsSync(join(OUT_MAIN, name))) {
+      out.missingWorkers.push(name);
+    } else if (!isSelfContained(name)) {
+      out.notSelfContained.push(name);
+    }
   }
 
-  // ② 最直接的探针：从主进程 bundle 的目录去解析这两个资源
+  // wasm：上游走 createRequire(<chunk 位置>).resolve("quickjs-wasi/quickjs.wasm")
   const { createRequire } = await import("node:module");
   const requireFromBundle = createRequire(
     pathToFileURL(join(OUT_MAIN, "index.js")).href,
   );
   try {
-    out.quickjsWasmResolved = requireFromBundle.resolve(
-      "quickjs-wasi/quickjs.wasm",
-    );
-    out.quickjsWasmExists = existsSync(out.quickjsWasmResolved);
+    const resolved = requireFromBundle.resolve("quickjs-wasi/quickjs.wasm");
+    out.quickjsWasmResolved = resolved;
+    out.quickjsWasmExists = existsSync(resolved);
   } catch (error) {
     out.quickjsWasmResolveError = String(error);
   }
 
-  try {
-    // 直接照上游那行做：worker 必须与当前 chunk 同目录
-    const workerUrl = new URL("./codemode-worker.js", pathToFileURL(join(OUT_MAIN, "index.js")).href);
-    out.workerUrl = workerUrl.href;
-    out.workerExists = existsSync(workerUrl);
-  } catch (error) {
-    out.workerUrlError = String(error);
-  }
-
-  // ③ 真正跑一段脚本：用 CodemodeSandbox 执行 `1 + 1`
-  try {
-    const pi = await import("@earendil-works/pi-coding-agent");
-    const ext = pi.createCodemodeExtension?.();
-    out.extensionCreated = typeof ext;
-    // 不接会话，直接看模块能否把执行器载起来（worker + wasm 都会在这里触发）
-    out.note = "session-level execution needs the full harness; artifact resolution above is the decisive probe";
-  } catch (error) {
-    out.executorError = String(error);
-  }
+  out.ok =
+    out.missingWorkers.length === 0 &&
+    out.notSelfContained.length === 0 &&
+    out.quickjsWasmExists === true;
 
   const { writeFileSync } = await import("node:fs");
   writeFileSync("/tmp/codemode-gate.json", JSON.stringify(out, null, 2));
-  console.log("GATE RESULT WRITTEN");
+  console.log(out.ok ? "GATE OK" : "GATE FAILED");
+  if (!out.ok) console.log(JSON.stringify(out, null, 2));
 }
 
-app.whenReady().then(main).then(
-  () => app.exit(0),
-  (error) => {
-    console.error("GATE FAILED:", error);
-    app.exit(1);
-  },
-);
+app
+  .whenReady()
+  .then(main)
+  .then(
+    () => app.exit(0),
+    (error) => {
+      console.error("GATE ERROR:", error);
+      app.exit(1);
+    },
+  );

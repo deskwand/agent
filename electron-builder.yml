@@ -55,6 +55,12 @@ asarUnpack:
   - node_modules/@img/**/*.so
   - node_modules/bufferutil/**/*.node
   - node_modules/utf-8-validate/**/*.node
+  # codemode 的两个运行期产物：worker_threads 从 asar 内加载未在 CI 验证，
+  # 解包后 asar 内的原路径仍可读（Electron 会重定向到 app.asar.unpacked）。
+  - dist-electron/main/worker.js
+  - dist-electron/main/codemode-worker.js
+  - dist-electron/main/image-resize-worker.js
+  - dist-electron/main/node_modules/quickjs-wasi/quickjs.wasm
 
 win:
   icon: resources/icon.ico
