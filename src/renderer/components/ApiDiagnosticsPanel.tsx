@@ -25,6 +25,8 @@ interface ApiDiagnosticsPanelProps {
   onRunDiagnostics: () => void;
   onRunDeepDiagnostics?: () => void;
   disabled?: boolean;
+  /** false 时只展示结果，不渲染「快速诊断 / 深度验证推理」按钮（连接流程用） */
+  showActions?: boolean;
 }
 
 const STEP_NAME_FALLBACKS: Record<string, string> = {
@@ -222,6 +224,7 @@ export default function ApiDiagnosticsPanel({
   onRunDiagnostics,
   onRunDeepDiagnostics,
   disabled = false,
+  showActions = true,
 }: ApiDiagnosticsPanelProps) {
   const { t } = useTranslation();
   const showSteps = result !== null;
@@ -235,40 +238,42 @@ export default function ApiDiagnosticsPanel({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onRunDiagnostics()}
-          disabled={disabled || isRunning}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl
+      {showActions && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onRunDiagnostics()}
+            disabled={disabled || isRunning}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl
             bg-accent text-accent-foreground text-sm font-medium
             hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed
             transition-colors"
-        >
-          {isRunning ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Stethoscope className="w-4 h-4" />
-          )}
-          {onRunDeepDiagnostics
-            ? t("api.diagnostic.runQuickDiagnostics", "Quick Diagnose")
-            : t("api.diagnostic.runDiagnostics", "Diagnose Connection")}
-        </button>
-        {onRunDeepDiagnostics && (
-          <button
-            type="button"
-            onClick={() => onRunDeepDiagnostics()}
-            disabled={disabled || isRunning}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border
+          >
+            {isRunning ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Stethoscope className="w-4 h-4" />
+            )}
+            {onRunDeepDiagnostics
+              ? t("api.diagnostic.runQuickDiagnostics", "Quick Diagnose")
+              : t("api.diagnostic.runDiagnostics", "Diagnose Connection")}
+          </button>
+          {onRunDeepDiagnostics && (
+            <button
+              type="button"
+              onClick={() => onRunDeepDiagnostics()}
+              disabled={disabled || isRunning}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border
               bg-background text-text-primary text-sm font-medium
               hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed
               transition-colors"
-          >
-            <Cpu className="w-4 h-4" />
-            {t("api.diagnostic.runDeepDiagnostics", "Deep Inference Check")}
-          </button>
-        )}
-      </div>
+            >
+              <Cpu className="w-4 h-4" />
+              {t("api.diagnostic.runDeepDiagnostics", "Deep Inference Check")}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Pipeline visualization */}
       {(showSteps || isRunning) && (

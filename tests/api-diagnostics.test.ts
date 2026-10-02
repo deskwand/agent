@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+/** 真实 SDK 的 models.list() 返回可分页且可 `for await` 的对象，Mock 也要同形。 */
+function paged<T>(items: T[]) {
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield* items;
+    },
+  };
+}
+
 const mocks = vi.hoisted(() => {
   const dnsLookup = vi.fn();
   const tcpConnect = vi.fn();
@@ -96,7 +105,7 @@ describe('runDiagnostics TLS step', () => {
     global.fetch = mocks.fetch;
 
     mocks.dnsLookup.mockResolvedValue({ address: '127.0.0.1', family: 4 });
-    mocks.openaiModelsList.mockResolvedValue({});
+    mocks.openaiModelsList.mockResolvedValue(paged([]));
     mocks.probeWithAgentSdk.mockResolvedValue({ ok: true, latencyMs: 10 });
 
     mocks.tcpConnect.mockImplementation(() => {

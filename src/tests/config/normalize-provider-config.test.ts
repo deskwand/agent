@@ -275,3 +275,74 @@ describe("buildProjectedConfig — visionModel pass-through", () => {
     expect(result.visionModel?.enabled).toBe(false);
   });
 });
+
+// --------------- 持久化模型与 disabledModels ---------------
+// 设计文档 §4.2.3：预设供应商的模型列表现在来自「连接」流程，
+// 读（normalizeProviderConfig）与写（sanitizeSaveProviderPayload）两条路径
+// 都必须保留它，只有为空时才回落内置目录。
+
+describe("preset providers keep their persisted model list", () => {
+  const persisted = {
+    provider: "openai" as const,
+    customProtocol: "openai" as const,
+    apiKey: "sk-test",
+    baseUrl: "https://api.openai.com/v1",
+    defaultModel: "gpt-5.5-preview",
+    models: [
+      { id: "gpt-5.4", label: "gpt-5.4", source: "preset" as const },
+      {
+        id: "gpt-5.5-preview",
+        label: "gpt-5.5-preview",
+        source: "preset" as const,
+      },
+    ],
+    disabledModels: ["gpt-5.4"],
+    updatedAt: "2024-01-01T00:00:00.000Z",
+  };
+
+  it("keeps the persisted models on read", () => {
+    const result = normalizeProviderConfig("openai", persisted);
+    expect(result.models.map((m) => m.id)).toEqual([
+      "gpt-5.4",
+      "gpt-5.5-preview",
+    ]);
+    expect(result.defaultModel).toBe("gpt-5.5-preview");
+    expect(result.disabledModels).toEqual(["gpt-5.4"]);
+  });
+
+  it("falls back to the preset list when nothing was persisted", () => {
+    const result = normalizeProviderConfig("openai", undefined);
+    expect(result.models.length).toBeGreaterThan(0);
+    expect(result.disabledModels).toBeUndefined();
+  });
+
+  it("drops a default model that is not in the persisted list", () => {
+    const result = normalizeProviderConfig("openai", {
+      ...persisted,
+      defaultModel: "gpt-9-does-not-exist",
+    });
+    expect(result.models.some((m) => m.id === result.defaultModel)).toBe(true);
+  });
+});
+
+describe("disabledModels normalization", () => {
+  it("dedupes, trims and ignores empty entries", () => {
+    const result = normalizeProviderConfig("anthropic", {
+      provider: "anthropic",
+      customProtocol: "anthropic",
+      apiKey: "sk-ant-test",
+      baseUrl: "https://api.anthropic.com",
+      defaultModel: "claude-sonnet-4-6",
+      models: [
+        {
+          id: "claude-sonnet-4-6",
+          label: "claude-sonnet-4-6",
+          source: "preset",
+        },
+      ],
+      disabledModels: [" claude-opus-4-6 ", "claude-opus-4-6", "", "   "],
+      updatedAt: "2024-01-01T00:00:00.000Z",
+    });
+    expect(result.disabledModels).toEqual(["claude-opus-4-6"]);
+  });
+});

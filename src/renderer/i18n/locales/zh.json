@@ -324,6 +324,25 @@
     "saveFailed": "保存失败，请稍后重试",
     "getStarted": "开始使用",
     "saveSettings": "保存设置",
+    "connect": "连接",
+    "connecting": "连接中...",
+    "connected": "已连接",
+    "reconnect": "重新连接",
+    "retryConnect": "重试连接",
+    "done": "完成",
+    "connectTimeout": "连接超时，请检查网络后重试",
+    "modelsUnsupported": "该端点未提供模型列表，已使用内置目录",
+    "modelsSection": "模型",
+    "modelsEnabledCount": "已启用 {{enabled}} / 共 {{total}}",
+    "modelsSearch": "搜索模型",
+    "modelsNew": "新增",
+    "modelsDefault": "默认",
+    "atLeastOneModel": "至少保留一个模型",
+    "modelsSyncFailed": "模型设置保存失败，已回滚",
+    "modelsRefreshFailed": "刷新失败，显示本地列表",
+    "modelsManualHint": "该端点未提供模型列表，请手动填写模型 ID",
+    "modelsBusy": "正在诊断中，请稍后重试",
+    "modelsFiltered": "探测到 {{count}} 个模型，已过滤掉非聊天模型",
     "mainModelTab": "主模型",
     "visionModelTab": "视觉模型",
     "searchModelTab": "搜索",
@@ -539,7 +558,8 @@
         "ollama_no_models_loaded": "端点可访问，但当前没有返回任何可选模型，请先在 Ollama 中拉取模型。",
         "ollama_model_not_listed": "当前模型 {{model}} 不在端点返回的模型列表中，请从列表重新选择或改用手动输入。",
         "ollama_model_loading": "模型 {{model}} 可能仍在加载中，稍后再试深度验证。",
-        "model_cold_start": "模型可能仍在加载到 GPU/CPU 内存中。大型模型（7B+）首次使用可能需要 30–120 秒，请稍后重试。"
+        "model_cold_start": "模型可能仍在加载到 GPU/CPU 内存中。大型模型（7B+）首次使用可能需要 30–120 秒，请稍后重试。",
+        "models_list_not_supported": "该端点未提供模型列表，已跳过模型校验"
       }
     },
     "oauthSectionTitle": "订阅接入",
@@ -567,7 +587,9 @@
     "oauthAnthropicNote": "需要 Claude Max 订阅 + 额外用量额度，Claude Pro 不可用",
     "oauthOpenRouterDesc": "通过 OpenRouter 账号接入",
     "oauthOpenRouterFallbackNotice": "OpenRouter 已连接，但模型同步失败，当前已回退到内置模型列表。",
-    "oauthOpenRouterModelLoadError": "OpenRouter 没有返回可用模型。"
+    "oauthOpenRouterModelLoadError": "OpenRouter 没有返回可用模型。",
+    "modelsConnectHint": "点击「连接」后自动获取模型列表",
+    "customModelsManual": "手动添加模型"
   },
   "window": {
     "minimize": "最小化",

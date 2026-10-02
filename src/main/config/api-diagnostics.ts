@@ -8,21 +8,16 @@
 import * as dns from "dns";
 import * as net from "net";
 import * as tls from "tls";
-import OpenAI from "openai";
-import { Anthropic } from "@anthropic-ai/sdk";
 import { PROVIDER_PRESETS, configStore } from "./config-store";
 import { DEFAULT_OLLAMA_BASE_URL } from "../../shared/ollama-base-url";
 import { isLoopbackBaseUrl } from "../../shared/network/loopback";
+import { normalizeOllamaBaseUrl } from "./auth-utils";
 import {
-  normalizeAnthropicBaseUrl,
-  resolveOllamaCredentials,
-  resolveOpenAICredentials,
-  shouldAllowEmptyAnthropicApiKey,
-  shouldUseAnthropicAuthToken,
-  normalizeOpenAICompatibleBaseUrl,
-  normalizeOllamaBaseUrl,
-} from "./auth-utils";
+  listProviderModels,
+  type ProviderModelsSource,
+} from "./provider-models";
 import type {
+  ProviderModelInfo,
   DiagnosticInput,
   DiagnosticResult,
   DiagnosticStep,
@@ -37,7 +32,6 @@ import { fetchOllamaModelIndex } from "./ollama-api";
 const STEP_NAMES: DiagnosticStepName[] = ["dns", "tcp", "tls", "auth", "model"];
 const TCP_TIMEOUT_MS = 5000;
 const TLS_TIMEOUT_MS = 5000;
-const LOCAL_ANTHROPIC_PLACEHOLDER_KEY = "sk-ant-local-proxy";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -102,50 +96,8 @@ function defaultPort(
   return protocol === "https:" ? 443 : 80;
 }
 
-function isOpenAICompatible(input: DiagnosticInput): boolean {
-  return (
-    input.provider === "openai" ||
-    input.provider === "deepseek" ||
-    input.provider === "ollama" ||
-    input.provider === "openrouter" ||
-    input.provider === "opencode" ||
-    input.provider === "opencode-go" ||
-    (input.provider === "custom" && input.customProtocol === "openai")
-  );
-}
-
-function isAnthropicCompatible(input: DiagnosticInput): boolean {
-  return (
-    input.provider === "anthropic" ||
-    (input.provider === "custom" &&
-      (input.customProtocol ?? "anthropic") === "anthropic")
-  );
-}
-
-function isGeminiProtocol(input: DiagnosticInput): boolean {
-  return (
-    input.provider === "gemini" ||
-    (input.provider === "custom" && input.customProtocol === "gemini")
-  );
-}
-
 function getErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
-}
-
-function getApiErrorInfo(err: unknown): { status?: number; message: string } {
-  if (err instanceof Error) {
-    const apiErr = err as Error & { status?: number };
-    return { status: apiErr.status, message: apiErr.message };
-  }
-  if (typeof err === "object" && err !== null) {
-    const obj = err as { status?: number; message?: unknown };
-    return {
-      status: typeof obj.status === "number" ? obj.status : undefined,
-      message: typeof obj.message === "string" ? obj.message : String(err),
-    };
-  }
-  return { message: String(err) };
 }
 
 function getModelDiagnosticFix(
@@ -166,60 +118,6 @@ function getModelDiagnosticFix(
     default:
       return `model_unavailable:${model}`;
   }
-}
-
-/**
- * Build an Anthropic client with credentials passed explicitly.
- * baseURL and apiKey/authToken are always provided directly so the SDK
- * never falls back to reading process.env, avoiding race conditions in
- * concurrent diagnostic runs.
- */
-function makeAnthropicClient(opts: {
-  effectiveKey: string;
-  useAuthToken: boolean;
-  baseUrl: string | undefined;
-}): Anthropic {
-  const base = { baseURL: opts.baseUrl, timeout: 15000 };
-  return opts.useAuthToken
-    ? new Anthropic({ ...base, authToken: opts.effectiveKey })
-    : new Anthropic({ ...base, apiKey: opts.effectiveKey });
-}
-
-/**
- * Resolve the effective base URL for SDK clients, applying provider-specific normalization.
- */
-function resolveClientBaseUrl(input: DiagnosticInput): string | undefined {
-  const raw = input.baseUrl?.trim();
-
-  if (input.provider === "ollama") {
-    return normalizeOllamaBaseUrl(raw || DEFAULT_OLLAMA_BASE_URL);
-  }
-
-  if (isOpenAICompatible(input)) {
-    if (raw) return normalizeOpenAICompatibleBaseUrl(raw);
-    if (input.provider !== "custom") {
-      return (
-        PROVIDER_PRESETS as unknown as Record<string, { baseUrl?: string }>
-      )[input.provider]?.baseUrl;
-    }
-    return undefined;
-  }
-
-  if (isAnthropicCompatible(input)) {
-    if (raw) return normalizeAnthropicBaseUrl(raw);
-    if (input.provider === "anthropic") {
-      return normalizeAnthropicBaseUrl(PROVIDER_PRESETS.anthropic?.baseUrl);
-    }
-    return undefined;
-  }
-
-  // Gemini or unknown
-  if (raw) return raw;
-  if (input.provider !== "custom") {
-    return PROVIDER_PRESETS[input.provider as keyof typeof PROVIDER_PRESETS]
-      ?.baseUrl;
-  }
-  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -343,152 +241,64 @@ async function stepTls(
   step.latencyMs = Date.now() - start;
 }
 
+interface DiagnosticModelCapture {
+  models?: ProviderModelInfo[];
+  source?: ProviderModelsSource;
+  filtered?: number;
+  error?: string;
+}
+
 async function stepAuth(
   input: DiagnosticInput,
   step: DiagnosticStep,
+  capture?: DiagnosticModelCapture,
 ): Promise<void> {
-  // Gemini: verify key via models.get() — lightweight and always available
-  if (isGeminiProtocol(input)) {
-    const start = Date.now();
-    const apiKey = input.apiKey?.trim() || "";
-
-    if (!apiKey) {
-      step.status = "fail";
-      step.error = "No API key provided";
-      step.fix = "missing_api_key";
-      step.latencyMs = Date.now() - start;
-      return;
-    }
-
-    try {
-      const { GoogleGenAI } =
-        // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-        (await import("@google/genai")) as typeof import("@google/genai");
-      const clientBaseUrl = resolveClientBaseUrl(input);
-      const httpOptions = {
-        ...(clientBaseUrl ? { baseUrl: clientBaseUrl } : {}),
-        timeout: 15000,
-      };
-      const client = new GoogleGenAI({ apiKey, httpOptions });
-      const modelToCheck = input.model?.trim() || "gemini-3-flash-preview";
-      await client.models.get({ model: modelToCheck });
-      step.status = "ok";
-    } catch (err) {
-      const e = getApiErrorInfo(err);
-      if (e.status === 404) {
-        // Custom Gemini proxy may not implement models.get — treat like OpenAI 404 path
-        step.status = "ok";
-        step.fix = "models_get_not_supported";
-        log(
-          "[Diagnostics] Gemini auth: models.get returned 404 — proxy may not support this endpoint, continuing to model check",
-        );
-      } else {
-        step.status = "fail";
-        step.error = e.message;
-        step.fix =
-          e.status === 401 || e.status === 403
-            ? "auth_invalid_key"
-            : "auth_request_failed";
-      }
-    }
-
-    step.latencyMs = Date.now() - start;
-    return;
-  }
-
   const start = Date.now();
-  const apiKey = input.apiKey?.trim() || "";
-  const clientBaseUrl = resolveClientBaseUrl(input);
+  const listed = await listProviderModels({
+    provider: input.provider,
+    apiKey: input.apiKey,
+    baseUrl: input.baseUrl,
+    customProtocol: input.customProtocol,
+  });
 
-  try {
-    if (isOpenAICompatible(input)) {
-      const resolved =
-        input.provider === "ollama"
-          ? resolveOllamaCredentials({
-              provider: input.provider,
-              customProtocol: input.customProtocol,
-              apiKey,
-              baseUrl: clientBaseUrl,
-            })
-          : resolveOpenAICredentials({
-              provider: input.provider,
-              customProtocol: input.customProtocol,
-              apiKey,
-              baseUrl: clientBaseUrl,
-            });
-
-      if (!resolved?.apiKey) {
-        step.status = "fail";
-        step.error = "No API key provided";
-        step.fix = "missing_api_key";
-        step.latencyMs = Date.now() - start;
-        return;
-      }
-
-      const client = new OpenAI({
-        apiKey: resolved.apiKey,
-        baseURL: resolved.baseUrl || clientBaseUrl,
-        timeout: 15000,
-      });
-      await client.models.list();
-    } else {
-      // Anthropic-compatible
-      const allowEmpty = shouldAllowEmptyAnthropicApiKey({
-        provider: input.provider,
-        customProtocol: input.customProtocol,
-        baseUrl: clientBaseUrl,
-      });
-      const effectiveKey =
-        apiKey || (allowEmpty ? LOCAL_ANTHROPIC_PLACEHOLDER_KEY : "");
-
-      if (!effectiveKey) {
-        step.status = "fail";
-        step.error = "No API key provided";
-        step.fix = "missing_api_key";
-        step.latencyMs = Date.now() - start;
-        return;
-      }
-
-      const useAuthToken = shouldUseAnthropicAuthToken({
-        provider: input.provider,
-        customProtocol: input.customProtocol,
-        apiKey: effectiveKey,
-      });
-
-      // Credentials are passed explicitly so the SDK never reads process.env
-      const client = makeAnthropicClient({
-        effectiveKey,
-        useAuthToken,
-        baseUrl: clientBaseUrl,
-      });
-      await client.models.list();
-    }
-
+  if (listed.source === "error") {
+    step.status = "fail";
+    step.error = listed.error || "Request failed";
+    step.fix =
+      listed.errorType === "missing_key"
+        ? "missing_api_key"
+        : listed.errorType === "unauthorized"
+          ? "auth_invalid_key"
+          : "auth_request_failed";
+  } else {
     step.status = "ok";
-  } catch (err) {
-    const e = getApiErrorInfo(err);
-
-    if (e.status === 404) {
-      // Many OpenAI-compatible providers (e.g. Alibaba DashScope) don't
-      // implement GET /v1/models.  A 404 does NOT mean auth failed — let
-      // stepModel (which uses chat completion) make the real determination.
-      step.status = "ok";
+    if (listed.source === "unsupported") {
+      // 很多 OpenAI 兼容端点（如阿里 DashScope）不实现 GET /v1/models，
+      // 404 不能等同于认证失败。Gemini 的代理端点同样走这一段。
       step.fix = "models_list_not_supported";
-      log(
-        "[Diagnostics] Auth: models.list returned 404 — provider may not support this endpoint, continuing to model check",
-      );
-    } else {
-      step.status = "fail";
-      step.error = e.message;
-
-      if (e.status === 401 || e.status === 403) {
-        step.fix = "auth_invalid_key";
-      } else {
-        step.fix = "auth_request_failed";
-      }
     }
   }
   step.latencyMs = Date.now() - start;
+
+  if (capture) {
+    capture.source = listed.source;
+    capture.filtered = listed.filtered;
+    capture.error = listed.error;
+    capture.models =
+      listed.source === "live"
+        ? listed.models.map((model) => ({
+            id: model.id,
+            name: model.label,
+            ...(typeof model.contextWindow === "number"
+              ? { contextWindow: model.contextWindow }
+              : {}),
+            ...(typeof model.maxTokens === "number"
+              ? { maxTokens: model.maxTokens }
+              : {}),
+            ...(Array.isArray(model.input) ? { input: model.input } : {}),
+          }))
+        : undefined;
+  }
 }
 
 async function stepModel(
@@ -616,6 +426,7 @@ async function runDiagnosticsImpl(
     DiagnosticStepName,
     DiagnosticStep
   >;
+  const capture: DiagnosticModelCapture = {};
 
   let failed = false;
   const isFail = (s: DiagnosticStep): boolean => s.status === "fail";
@@ -652,7 +463,7 @@ async function runDiagnosticsImpl(
   // Step 4: Auth
   if (!failed) {
     stepMap.auth.status = "running";
-    await stepAuth(input, stepMap.auth);
+    await stepAuth(input, stepMap.auth, capture);
     if (isFail(stepMap.auth)) failed = true;
   }
 
@@ -682,6 +493,13 @@ async function runDiagnosticsImpl(
     totalLatencyMs,
     verificationLevel,
   };
+
+  if (input.captureModels) {
+    result.models = capture.models;
+    result.modelsSource = capture.source;
+    result.modelsFiltered = capture.filtered;
+    result.modelsError = capture.error;
+  }
 
   if (
     overallOk &&

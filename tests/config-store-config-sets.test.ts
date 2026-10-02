@@ -63,7 +63,7 @@ describe('ConfigStore provider configs', () => {
     expect(config.model).toBe('gpt-5.4');
   });
 
-  it('uses preset runtime defaults for preset providers and ignores custom model payloads', () => {
+  it('keeps the payload model list for preset providers but always uses the preset baseUrl', () => {
     const store = new ConfigStore();
 
     store.saveProvider({
@@ -83,10 +83,36 @@ describe('ConfigStore provider configs', () => {
     });
     const saved = store.setActiveProvider({ profileKey: 'openai' });
 
-    expect(saved.providers.openai?.models).toHaveLength(7);
+    // 预设供应商的模型列表现在来自「连接」流程（真实端点 ∪ 目录），
+    // payload 带了非空列表就保留；baseUrl 仍然强制回落官方端点。
+    expect(saved.providers.openai?.models?.map((m) => m.id)).toEqual([
+      'gpt-5.4',
+      'gpt-5.4-mini',
+    ]);
     expect(saved.providers.openai?.baseUrl).toBe('https://api.openai.com/v1');
-    expect(saved.providers.openai?.defaultModel).toBe('gpt-5.3-codex');
-    expect(saved.model).toBe('gpt-5.3-codex');
+    expect(saved.providers.openai?.defaultModel).toBe('gpt-5.4-mini');
+    expect(saved.model).toBe('gpt-5.4-mini');
+  });
+
+  it('falls back to the preset catalogue when a preset payload carries no models', () => {
+    const store = new ConfigStore();
+
+    store.saveProvider({
+      profileKey: 'openai',
+      config: {
+        provider: 'openai',
+        customProtocol: 'openai',
+        apiKey: 'sk-openai',
+        baseUrl: 'https://api.openai.com/v1',
+        defaultModel: '',
+        models: [],
+        updatedAt: '2026-05-24T00:00:00.000Z',
+      },
+    });
+    const saved = store.getAll();
+
+    expect((saved.providers.openai?.models ?? []).length).toBeGreaterThan(0);
+    expect(saved.providers.openai?.defaultModel).not.toBe('');
   });
 
   it('clears preset provider credentials instead of removing the slot', () => {

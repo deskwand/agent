@@ -68,6 +68,11 @@ export interface ApiProviderConfig {
   baseUrl?: string;
   defaultModel: string;
   models: ApiProviderModel[];
+  /**
+   * 用户在「连接/编辑」弹窗里取消勾选过的模型 id。
+   * 只作为"记忆"：合并时用它把模型默认置为未勾选，不参与展示与执行。
+   */
+  disabledModels?: string[];
   updatedAt: string;
 }
 
@@ -508,6 +513,16 @@ function normalizeProviderModel(
   return model;
 }
 
+function normalizeDisabledModels(raw: unknown): string[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const ids = raw
+    .filter((id): id is string => typeof id === "string")
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0);
+  const unique = Array.from(new Set(ids));
+  return unique.length > 0 ? unique : undefined;
+}
+
 export function normalizeProviderConfig(
   profileKey: ProviderProfileKey,
   raw: Partial<ApiProviderConfig> | undefined,
@@ -522,11 +537,10 @@ export function normalizeProviderConfig(
   const isCustomProfile =
     meta.provider === "custom" || meta.provider === "oauth";
   const rawModels = Array.isArray(raw?.models) ? raw.models : [];
-  // Provider metadata flag: openrouter/opencode keep dynamically enriched
-  // models from the pi-ai registry instead of the static preset list.
-  const preserveRawModels =
-    isCustomProfile ||
-    (meta.preserveDynamicModels === true && rawModels.length > 0);
+  // 任何供应商只要持久化里带了非空 models 就保留它（预设供应商的列表
+  // 现在可能来自「连接」流程拉到的真实端点列表）——为空才回落预设目录。
+  // 注：meta.preserveDynamicModels 因此变得冗余，但既有测试断言了它，保留不删。
+  const preserveRawModels = isCustomProfile || rawModels.length > 0;
   const deduped = new Map<string, ApiProviderModel>();
 
   if (preserveRawModels) {
@@ -589,6 +603,7 @@ export function normalizeProviderConfig(
       : fallbackProfile.baseUrl,
     defaultModel,
     models,
+    disabledModels: normalizeDisabledModels(raw?.disabledModels),
     updatedAt: toNonEmptyString(raw?.updatedAt) || nowISO(),
   };
 }
@@ -727,8 +742,9 @@ function sanitizeSaveProviderPayload(
   const normalized = normalizeProviderConfig(profileKey, payload.config);
 
   if (meta.provider !== "custom") {
-    const preserveOpenRouterModels =
-      meta.provider === "openrouter" && normalized.models.length > 0;
+    // 预设供应商的模型列表现在可能来自「连接」流程（真实端点 ∪ 目录），
+    // 只要 payload 带了非空列表就保留；为空才回落静态预设。
+    const preservePayloadModels = normalized.models.length > 0;
     return {
       ...normalized,
       provider: meta.provider,
@@ -738,12 +754,13 @@ function sanitizeSaveProviderPayload(
           ? payload.config.apiKey.trim()
           : "",
       baseUrl: normalizeProviderConfig(profileKey, undefined).baseUrl,
-      defaultModel: preserveOpenRouterModels
+      defaultModel: preservePayloadModels
         ? normalized.defaultModel
         : getDefaultProviderModel(profileKey).id,
-      models: preserveOpenRouterModels
+      models: preservePayloadModels
         ? normalized.models
         : getSortedPresetModels(profileKey),
+      disabledModels: normalized.disabledModels,
       updatedAt: nowISO(),
     };
   }

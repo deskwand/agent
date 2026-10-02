@@ -11,6 +11,7 @@ import {
   Key,
   Loader2,
   Pencil,
+  PlugZap,
   Plus,
   Search,
   Server,
@@ -18,6 +19,16 @@ import {
   X,
   Zap,
 } from "lucide-react";
+import ApiDiagnosticsPanel from "../ApiDiagnosticsPanel";
+import { mergeProviderModels } from "../../utils/merge-provider-models";
+import type {
+  MergeProviderModelsResult,
+  ProviderModelRow,
+} from "../../utils/merge-provider-models";
+import {
+  ConnectTimeoutError,
+  diagnoseProviderModels,
+} from "../../services/connect-models";
 import { useAppStore } from "../../store";
 import {
   FALLBACK_PROVIDER_PRESETS,
@@ -35,6 +46,7 @@ import type {
   ApiProviderModel,
   AppConfig,
   CustomProtocolType,
+  DiagnosticResult,
   ProviderPreset,
   ProviderPresets,
   ProviderProfileKey,
@@ -69,6 +81,8 @@ interface ProviderDraft {
   baseUrl: string;
   defaultModel: string;
   models: ApiProviderModel[];
+  /** 用户取消勾选过的模型 id，写回 config.disabledModels */
+  disabledModels?: string[];
 }
 
 const PROVIDER_ORDER: ProviderChoice[] = [
@@ -291,6 +305,7 @@ function createDraftFromProvider(
     baseUrl: config.baseUrl || preset.baseUrl,
     defaultModel: config.defaultModel,
     models: config.models.map((item) => ({ ...item })),
+    disabledModels: config.disabledModels ? [...config.disabledModels] : [],
   };
 }
 
@@ -427,6 +442,28 @@ export function SettingsAPI({
   );
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // ── 连接 / 模型探测状态 ──
+  const [connectState, setConnectState] = useState<
+    "idle" | "connecting" | "connected" | "failed"
+  >("idle");
+  const [diagResult, setDiagResult] = useState<DiagnosticResult | null>(null);
+  const [modelRows, setModelRows] = useState<ProviderModelRow[]>([]);
+  const [modelFilter, setModelFilter] = useState("");
+  const [connectMessage, setConnectMessage] = useState("");
+
+  const resetConnectState = () => {
+    setConnectState("idle");
+    setDiagResult(null);
+    setModelRows([]);
+    setModelFilter("");
+    setConnectMessage("");
+  };
+
+  const closeEditor = () => {
+    setEditorOpen(false);
+    resetConnectState();
+  };
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [editorOpen, setEditorOpen] = useState(false);
@@ -562,6 +599,7 @@ export function SettingsAPI({
     setDraft(createEmptyDraft("openrouter", presets));
     setError("");
     setSuccessMessage("");
+    resetConnectState();
     setEditorOpen(true);
   };
 
@@ -569,10 +607,35 @@ export function SettingsAPI({
     const provider = appConfig?.providers?.[profileKey];
     if (!provider) return;
     setOriginalProfileKey(profileKey);
-    setDraft(createDraftFromProvider(profileKey, provider, presets));
+    const nextDraft = createDraftFromProvider(profileKey, provider, presets);
+    setDraft(nextDraft);
     setError("");
     setSuccessMessage("");
+    resetConnectState();
     setEditorOpen(true);
+
+    // 先把本地已有列表显示出来（断网也能看到当前启用集）
+    const isOpencode =
+      nextDraft.provider === "opencode" || nextDraft.provider === "opencode-go";
+    if (isOpencode) return;
+    setModelRows(
+      provider.models.map((model) => ({
+        id: model.id,
+        label: model.label,
+        isNew: false,
+        contextWindow: model.contextWindow,
+        maxTokens: model.maxTokens,
+        input: model.input,
+        enabled: true,
+        isDefault: model.id === provider.defaultModel,
+      })),
+    );
+    // 后台静默刷新：失败只在顶部留一行提示，不打断用户（设计 §4.5）
+    if (nextDraft.apiKey) {
+      void runConnect(nextDraft, true).catch(() => {
+        setConnectMessage(t("api.modelsRefreshFailed"));
+      });
+    }
   };
 
   const applyConfig = (config: typeof appConfig) => {
@@ -613,6 +676,9 @@ export function SettingsAPI({
           baseUrl: sanitized.baseUrl,
           defaultModel: sanitized.defaultModel,
           models: sanitized.models,
+          ...((sanitized.disabledModels ?? []).length > 0
+            ? { disabledModels: sanitized.disabledModels }
+            : {}),
           updatedAt: new Date().toISOString(),
         },
       };
@@ -635,6 +701,349 @@ export function SettingsAPI({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // ── 连接：落盘 → 诊断拉模型 → 合并 → 写回 ──
+  const isOpencodeDraft =
+    draft?.provider === "opencode" || draft?.provider === "opencode-go";
+
+  /** 目录（预设供应商才有；自定义与 oauth/opencode 传空数组） */
+  const catalogForDraft = (value: ProviderDraft) => {
+    if (value.provider === "custom" || value.provider === "oauth") return [];
+    return sortedPresetModels(
+      modelsPresetForDraft(value.provider, value.customProtocol, presets),
+    );
+  };
+
+  /**
+   * 连接写回必须自拼 payload：`sanitizeDraft` 对非 custom 供应商会把
+   * models 置为空数组（现有行为，不动）。
+   */
+  const buildProviderPayload = (
+    sanitized: ProviderDraft,
+    models: ApiProviderModel[],
+    defaultModel: string,
+    disabledModels: string[],
+  ) => ({
+    profileKey: sanitized.profileKey,
+    config: {
+      provider: sanitized.provider,
+      customProtocol: sanitized.customProtocol,
+      name: sanitized.name || undefined,
+      apiKey: sanitized.apiKey,
+      baseUrl: sanitized.baseUrl,
+      defaultModel,
+      models,
+      ...(disabledModels.length > 0 ? { disabledModels } : {}),
+      updatedAt: new Date().toISOString(),
+    },
+  });
+
+  /** 写回模型集；失败时把原因写进 connectMessage 并返回 false */
+  const persistModels = async (
+    sanitized: ProviderDraft,
+    models: ApiProviderModel[],
+    defaultModel: string,
+    disabledModels: string[],
+  ): Promise<boolean> => {
+    if (!window.electronAPI) return false;
+    try {
+      const saved = await window.electronAPI.config.saveProvider(
+        buildProviderPayload(sanitized, models, defaultModel, disabledModels),
+      );
+      applyConfig(saved.config);
+      return true;
+    } catch (saveError) {
+      setConnectMessage(
+        saveError instanceof Error ? saveError.message : String(saveError),
+      );
+      return false;
+    }
+  };
+
+  /** 勾选行 → 持久化模型（保留端点提供的元数据） */
+  const rowsToModels = (
+    rows: ProviderModelRow[],
+    source: ApiProviderModel["source"],
+  ): ApiProviderModel[] =>
+    rows.map((row) => ({
+      id: row.id,
+      label: row.label,
+      source,
+      ...(typeof row.contextWindow === "number" && row.contextWindow > 0
+        ? { contextWindow: Math.round(row.contextWindow) }
+        : {}),
+      ...(typeof row.maxTokens === "number" && row.maxTokens > 0
+        ? { maxTokens: Math.round(row.maxTokens) }
+        : {}),
+      ...(Array.isArray(row.input) && row.input.length > 0
+        ? { input: row.input }
+        : {}),
+    }));
+
+  const applyMergeToDraft = (merge: MergeProviderModelsResult) => {
+    setDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            models: merge.enabled,
+            defaultModel: merge.defaultModel,
+            disabledModels: merge.disabled,
+          }
+        : prev,
+    );
+    setModelRows(merge.rows);
+  };
+
+  /**
+   * `silent` = 打开编辑弹窗时的后台刷新（设计 §4.5）：失败只在顶部留一行
+   * 提示并保留本地列表，不弹出诊断面板、不打断用户。
+   */
+  const runConnect = async (draftValue: ProviderDraft, silent = false) => {
+    if (!window.electronAPI) return;
+    const sanitized = sanitizeDraft(draftValue, presets);
+    const isCustom = sanitized.provider === "custom";
+    // 从配置里判定是否已落过盘（不能读 originalProfileKey：openEdit 会
+    // 同步调它，那时 state 还是上一轮的值）
+    const alreadySaved = Boolean(appConfig?.providers?.[sanitized.profileKey]);
+
+    const fail = (message?: string) => {
+      if (silent) {
+        setConnectMessage(message ?? t("api.modelsRefreshFailed"));
+        setConnectState("idle");
+        return;
+      }
+      if (message) setConnectMessage(message);
+      setConnectState("failed");
+    };
+
+    if (requiresApiKey(sanitized.provider) && !sanitized.apiKey) {
+      setError(t("api.enterApiKey"));
+      return;
+    }
+    if (isCustom && !sanitized.baseUrl) {
+      setError(t("api.enterBaseUrl"));
+      return;
+    }
+
+    setError("");
+    setSuccessMessage("");
+    setConnectMessage("");
+    setDiagResult(null);
+    setConnectState("connecting");
+
+    // 预设供应商先落盘（目录兜底，断网也可用）；自定义供应商等拉取成功再落盘。
+    // 编辑已有供应商时不预写 —— 它已经落过盘，预写会把现有模型列表洗回目录。
+    if (!isCustom && !alreadySaved) {
+      setIsSaving(true);
+      const savedFirst = await persistModels(
+        sanitized,
+        [],
+        sanitized.defaultModel,
+        sanitized.disabledModels ?? [],
+      );
+      setIsSaving(false);
+      if (!savedFirst) {
+        setConnectState("idle");
+        return;
+      }
+    }
+
+    let result: DiagnosticResult;
+    try {
+      result = await diagnoseProviderModels({
+        provider: sanitized.provider,
+        apiKey: sanitized.apiKey,
+        baseUrl: isCustom ? sanitized.baseUrl : undefined,
+        customProtocol: sanitized.customProtocol,
+        captureModels: true,
+      });
+    } catch (connectError) {
+      fail(
+        connectError instanceof ConnectTimeoutError
+          ? t("api.connectTimeout")
+          : connectError instanceof Error
+            ? connectError.message
+            : String(connectError),
+      );
+      return;
+    }
+
+    setDiagResult(result);
+
+    if (result.skippedReason) {
+      fail(t("api.modelsBusy"));
+      return;
+    }
+    if (!result.overallOk) {
+      fail();
+      return;
+    }
+
+    const live = result.modelsSource === "live" ? (result.models ?? []) : null;
+    const merge = mergeProviderModels({
+      catalog: catalogForDraft(draftValue),
+      live,
+      saved: draftValue.models,
+      disabled: draftValue.disabledModels ?? [],
+      defaultModel: draftValue.defaultModel,
+      modelSource: isCustom ? "custom" : "preset",
+    });
+    applyMergeToDraft(merge);
+
+    // 自定义供应商拿不到可用列表：不落盘，退回手填编辑器 + 「保存」
+    if (isCustom && (!live || merge.enabled.length === 0)) {
+      fail(t("api.modelsManualHint"));
+      return;
+    }
+
+    // 有可用的启用集才写回：预设供应商已在前面用内置目录兜底落过盘。
+    if (merge.enabled.length > 0) {
+      const persisted = await persistModels(
+        sanitized,
+        merge.enabled,
+        merge.defaultModel,
+        merge.disabled,
+      );
+      if (!persisted) {
+        fail();
+        return;
+      }
+    }
+
+    setConnectState("connected");
+    if (result.modelsSource === "unsupported") {
+      setConnectMessage(t("api.modelsUnsupported"));
+    } else if (result.modelsFiltered) {
+      setConnectMessage(
+        t("api.modelsFiltered", { count: result.modelsFiltered }),
+      );
+    } else {
+      setConnectMessage(t("api.connected"));
+    }
+  };
+
+  const handleConnect = () => {
+    if (draft) void runConnect(draft);
+  };
+
+  /**
+   * 失败态的「保存」：把当前草稿字段（新 Key / 名称）落盘，避免它们被静默丢弃。
+   * 有探测结果时用启用集写回（保留端点独有的模型），没有则走原有保存路径
+   * （主进程按内置目录兜底）。
+   */
+  const handleSaveDraft = async () => {
+    if (!draft || !window.electronAPI) return;
+    if (modelRows.length === 0) {
+      await handleSave();
+      return;
+    }
+    const sanitized = sanitizeDraft(draft, presets);
+    const rows = modelRows;
+    const ok = await persistModels(
+      sanitized,
+      rowsToModels(rows, isCustomDraft ? "custom" : "preset"),
+      rows.some((row) => row.isDefault)
+        ? (rows.find((row) => row.isDefault)?.id ?? draft.defaultModel)
+        : draft.defaultModel,
+      rows.filter((row) => !row.enabled).map((row) => row.id),
+    );
+    if (ok) closeEditor();
+  };
+
+  const persistCurrentModels = async (
+    rows: ProviderModelRow[],
+    defaultModel: string,
+    disabled: string[],
+  ): Promise<boolean> => {
+    if (!draft) return false;
+    const sanitized = sanitizeDraft(draft, presets);
+    const enabled = rowsToModels(
+      rows.filter((row) => row.enabled),
+      isCustomDraft ? "custom" : "preset",
+    );
+    const ok = await persistModels(sanitized, enabled, defaultModel, disabled);
+    if (!ok) {
+      setConnectMessage(t("api.modelsSyncFailed"));
+    }
+    return ok;
+  };
+
+  /** 写回失败时回滚到快照（设计 §4.4：不能只有乐观更新） */
+  const restoreSnapshot = (snapshot: {
+    rows: ProviderModelRow[];
+    draft: ProviderDraft | null;
+  }) => {
+    setModelRows(snapshot.rows);
+    if (snapshot.draft) setDraft(snapshot.draft);
+  };
+
+  const toggleModel = (id: string) => {
+    const target = modelRows.find((row) => row.id === id);
+    if (!target) return;
+    const enabledNow = modelRows.filter((row) => row.enabled).length;
+    if (target.enabled && enabledNow <= 1) {
+      setConnectMessage(t("api.atLeastOneModel"));
+      return;
+    }
+
+    const nextRows = modelRows.map((row) =>
+      row.id === id ? { ...row, enabled: !row.enabled } : row,
+    );
+    const nextEnabled = nextRows.filter((row) => row.enabled);
+    const nextDefault = nextEnabled.some(
+      (row) => row.id === draft?.defaultModel,
+    )
+      ? (draft?.defaultModel ?? "")
+      : (nextEnabled[0]?.id ?? "");
+    const nextRowsWithDefault = nextRows.map((row) => ({
+      ...row,
+      isDefault: row.id === nextDefault,
+    }));
+    const nextDisabled = nextRowsWithDefault
+      .filter((row) => !row.enabled)
+      .map((row) => row.id);
+
+    const snapshot = { rows: modelRows, draft };
+    setModelRows(nextRowsWithDefault);
+    setConnectMessage("");
+    setDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            defaultModel: nextDefault,
+            disabledModels: nextDisabled,
+            models: rowsToModels(
+              nextEnabled,
+              prev.provider === "custom" ? "custom" : "preset",
+            ),
+          }
+        : prev,
+    );
+    void persistCurrentModels(
+      nextRowsWithDefault,
+      nextDefault,
+      nextDisabled,
+    ).then((ok) => {
+      if (!ok) restoreSnapshot(snapshot);
+    });
+  };
+
+  const setDefaultModelRow = (id: string) => {
+    if (!modelRows.some((row) => row.id === id && row.enabled)) return;
+    const nextRows = modelRows.map((row) => ({
+      ...row,
+      isDefault: row.id === id,
+    }));
+    const nextDisabled = nextRows
+      .filter((row) => !row.enabled)
+      .map((r) => r.id);
+    const snapshot = { rows: modelRows, draft };
+    setModelRows(nextRows);
+    setDraft((prev) => (prev ? { ...prev, defaultModel: id } : prev));
+    void persistCurrentModels(nextRows, id, nextDisabled).then((ok) => {
+      if (!ok) restoreSnapshot(snapshot);
+    });
   };
 
   // ── Vision model save (from modal) ──
@@ -2169,7 +2578,7 @@ export function SettingsAPI({
               </h3>
               <button
                 type="button"
-                onClick={() => setEditorOpen(false)}
+                onClick={closeEditor}
                 className="rounded-lg p-2 hover:bg-surface-hover"
               >
                 <X className="h-4 w-4 text-text-secondary" />
@@ -2260,6 +2669,18 @@ export function SettingsAPI({
                   </div>
                 )}
 
+                {modelRows.length === 0 && !isCustomDraft && (
+                  <div className="space-y-3 border-b border-border-muted py-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <PlugZap className="h-4 w-4" />
+                      {t("api.modelsSection")}
+                    </label>
+                    <p className="text-xs text-text-muted">
+                      {t("api.modelsConnectHint")}
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-3 border-b border-border-muted py-5">
                   <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
                     <Pencil className="h-4 w-4" />
@@ -2325,7 +2746,9 @@ export function SettingsAPI({
                     <div className="space-y-4 border-b border-border-muted py-5">
                       <div className="flex items-center justify-between">
                         <label className="text-sm font-medium text-text-primary">
-                          {t("api.models")}
+                          {modelRows.length > 0
+                            ? t("api.customModelsManual")
+                            : t("api.models")}
                         </label>
                         <button
                           type="button"
@@ -2406,6 +2829,93 @@ export function SettingsAPI({
                   </>
                 )}
 
+                {connectState === "failed" && diagResult && (
+                  <div className="border-b border-border-muted py-5">
+                    <ApiDiagnosticsPanel
+                      result={diagResult}
+                      isRunning={false}
+                      onRunDiagnostics={handleConnect}
+                      showActions={false}
+                    />
+                  </div>
+                )}
+
+                {modelRows.length > 0 && (
+                  <div className="space-y-3 border-b border-border-muted py-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="text-sm font-medium text-text-primary">
+                        {t("api.modelsSection")}
+                      </label>
+                      <span className="text-xs text-text-muted">
+                        {t("api.modelsEnabledCount", {
+                          enabled: modelRows.filter((row) => row.enabled)
+                            .length,
+                          total: modelRows.length,
+                        })}
+                      </span>
+                    </div>
+
+                    <input
+                      type="text"
+                      value={modelFilter}
+                      onChange={(event) => setModelFilter(event.target.value)}
+                      placeholder={t("api.modelsSearch")}
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    />
+
+                    <div className="max-h-72 space-y-1 overflow-y-auto">
+                      {modelRows
+                        .filter((row) => {
+                          const needle = modelFilter.trim().toLowerCase();
+                          if (!needle) return true;
+                          return (
+                            row.id.toLowerCase().includes(needle) ||
+                            row.label.toLowerCase().includes(needle)
+                          );
+                        })
+                        .map((row) => (
+                          <div
+                            key={row.id}
+                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover"
+                          >
+                            <input
+                              type="checkbox"
+                              data-testid={`model-row-${row.id}`}
+                              checked={row.enabled}
+                              onChange={() => toggleModel(row.id)}
+                              className="rounded"
+                            />
+                            <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                              {row.label}
+                              {row.label !== row.id && (
+                                <span className="ml-2 text-xs text-text-muted">
+                                  {row.id}
+                                </span>
+                              )}
+                            </span>
+                            {row.isNew && (
+                              <span className="rounded-md border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">
+                                {t("api.modelsNew")}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setDefaultModelRow(row.id)}
+                              disabled={!row.enabled}
+                              className={`rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
+                                row.isDefault
+                                  ? "border-accent bg-accent/10 text-accent"
+                                  : "border-border-muted text-text-muted hover:border-border hover:text-text-secondary"
+                              } disabled:opacity-40`}
+                            >
+                              {t("api.modelsDefault")}
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
                 {error && (
                   <div className="flex items-center gap-2 rounded-lg bg-error/10 px-4 py-3 text-sm text-error">
                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
@@ -2419,26 +2929,107 @@ export function SettingsAPI({
                   </div>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleSave();
-                  }}
-                  disabled={isSaving}
-                  className="inline-flex items-center gap-2 self-end rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isSaving ? (
+                {connectMessage && (
+                  <p
+                    className={`text-xs ${
+                      connectState === "failed"
+                        ? "text-error"
+                        : "text-text-secondary"
+                    }`}
+                  >
+                    {connectMessage}
+                  </p>
+                )}
+
+                <div className="flex items-center justify-end gap-2">
+                  {isOpencodeDraft ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleSave();
+                      }}
+                      disabled={isSaving}
+                      className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {t("common.saving")}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="h-4 w-4" />
+                          {t("api.saveSettings")}
+                        </>
+                      )}
+                    </button>
+                  ) : connectState === "connected" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      {t("common.saving")}
+                      <button
+                        type="button"
+                        onClick={handleConnect}
+                        className="rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                      >
+                        {t("api.reconnect")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closeEditor}
+                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground hover:bg-accent-hover"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        {t("api.done")}
+                      </button>
+                    </>
+                  ) : connectState === "failed" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleSaveDraft();
+                        }}
+                        className="inline-flex items-center gap-2 rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                      >
+                        {t("common.save")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConnect}
+                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground hover:bg-accent-hover"
+                      >
+                        {t("api.retryConnect")}
+                      </button>
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="h-4 w-4" />
-                      {t("api.saveSettings")}
+                      <button
+                        type="button"
+                        onClick={closeEditor}
+                        className="rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                      >
+                        {t("common.cancel")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleConnect}
+                        disabled={connectState === "connecting"}
+                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {connectState === "connecting" ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            {t("api.connecting")}
+                          </>
+                        ) : (
+                          <>
+                            <PlugZap className="h-4 w-4" />
+                            {t("api.connect")}
+                          </>
+                        )}
+                      </button>
                     </>
                   )}
-                </button>
+                </div>
               </div>
             </div>
           </div>

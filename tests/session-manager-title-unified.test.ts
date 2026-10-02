@@ -148,12 +148,15 @@ describe("SessionManager unified title generation", () => {
 
     expect(title).toBe("Unified Title");
     expect(mockedGenerateTitleWithAgentSdk).toHaveBeenCalledTimes(1);
+    // 带 provider 前缀的历史 id 现在会被原样保留：预设供应商的模型选择
+    // 不再被目录覆盖（见 tests/config-store-config-sets.test.ts）。
+    // 前缀在 pi-model-resolution 的注册表解析里会被剥掉。
     expect(mockedGenerateTitleWithAgentSdk).toHaveBeenCalledWith(
       "Please generate title",
       expect.objectContaining({
         provider: "gemini",
         customProtocol: "gemini",
-        model: "gemini-2.5-flash",
+        model: "gemini/gemini-2.5-flash",
       }),
       undefined,
     );

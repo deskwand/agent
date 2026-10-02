@@ -324,6 +324,25 @@
     "saveFailed": "Failed to save settings. Please try again.",
     "getStarted": "Get Started",
     "saveSettings": "Save Settings",
+    "connect": "Connect",
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "reconnect": "Reconnect",
+    "retryConnect": "Retry",
+    "done": "Done",
+    "connectTimeout": "Connection timed out. Check your network and try again.",
+    "modelsUnsupported": "This endpoint does not list models; using the built-in catalogue",
+    "modelsSection": "Models",
+    "modelsEnabledCount": "{{enabled}} of {{total}} enabled",
+    "modelsSearch": "Search models",
+    "modelsNew": "New",
+    "modelsDefault": "Default",
+    "atLeastOneModel": "Keep at least one model enabled",
+    "modelsSyncFailed": "Could not save the model selection; reverted",
+    "modelsRefreshFailed": "Refresh failed; showing the local list",
+    "modelsManualHint": "This endpoint does not list models; enter model IDs manually",
+    "modelsBusy": "A diagnostics run is already in progress",
+    "modelsFiltered": "Found {{count}} models; non-chat models were filtered out",
     "mainModelTab": "Main Model",
     "visionModelTab": "Vision Model",
     "searchModelTab": "Search",
@@ -539,7 +558,8 @@
         "ollama_no_models_loaded": "The endpoint is reachable, but it did not return any models. Pull a model in Ollama first.",
         "ollama_model_not_listed": "Model {{model}} is not in the endpoint model list. Pick a detected model or switch to manual entry.",
         "ollama_model_loading": "Model {{model}} may still be loading. Try the deep check again in a moment.",
-        "model_cold_start": "The model may still be loading into GPU/CPU memory. Large models (7B+) can take 30–120 seconds on first use. Try again shortly."
+        "model_cold_start": "The model may still be loading into GPU/CPU memory. Large models (7B+) can take 30–120 seconds on first use. Try again shortly.",
+        "models_list_not_supported": "This endpoint does not list models; the model check was skipped"
       }
     },
     "oauthSectionTitle": "Subscriptions",
@@ -567,7 +587,9 @@
     "oauthAnthropicNote": "Requires Claude Max subscription with extra usage credits. Claude Pro is not supported.",
     "oauthOpenRouterDesc": "Connect via your OpenRouter account",
     "oauthOpenRouterFallbackNotice": "Connected to OpenRouter. Model sync failed, so the built-in fallback list is being used.",
-    "oauthOpenRouterModelLoadError": "OpenRouter did not return any usable models."
+    "oauthOpenRouterModelLoadError": "OpenRouter did not return any usable models.",
+    "modelsConnectHint": "Connect to fetch the model list from the endpoint",
+    "customModelsManual": "Add models manually"
   },
   "window": {
     "minimize": "Minimize",

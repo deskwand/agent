@@ -883,6 +883,11 @@ export interface ApiProviderConfig {
   baseUrl?: string;
   defaultModel: string;
   models: ApiProviderModel[];
+  /**
+   * 用户在「连接/编辑」弹窗里取消勾选过的模型 id。
+   * 只作为"记忆"：合并时用它把模型默认置为未勾选，不参与展示与执行。
+   */
+  disabledModels?: string[];
   updatedAt: string;
 }
 
@@ -962,6 +967,10 @@ export interface ProviderPresets {
 export interface ProviderModelInfo {
   id: string;
   name: string;
+  /** 端点提供的元数据（不是所有端点都给），优先用目录里的同名字段 */
+  contextWindow?: number;
+  maxTokens?: number;
+  input?: ("text" | "image")[];
 }
 
 export interface ApiTestInput {
@@ -1015,6 +1024,11 @@ export interface DiagnosticStep {
 }
 
 export interface DiagnosticResult {
+  /** 仅在 captureModels 为 true 且端点确实返回列表时有值 */
+  models?: ProviderModelInfo[];
+  modelsSource?: "live" | "unsupported" | "error";
+  modelsFiltered?: number;
+  modelsError?: string;
   steps: DiagnosticStep[];
   overallOk: boolean;
   /** Which step failed first (null if all ok) */
@@ -1034,6 +1048,8 @@ export interface DiagnosticInput {
   customProtocol?: AppConfig["customProtocol"];
   model?: string;
   verificationLevel?: DiagnosticVerificationLevel;
+  /** 为 true 时把端点返回的模型列表（已过滤非聊天模型）带回来 */
+  captureModels?: boolean;
 }
 
 export interface LocalServiceInfo {
