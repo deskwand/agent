@@ -2,7 +2,9 @@ import { BrowserWindow, ipcMain, screen } from "electron";
 import Store from "electron-store";
 import { join } from "node:path";
 import { logError } from "../utils/logger";
+import type { PetCharacter } from "../../shared/pet-characters";
 import type { PetStateTracker } from "./pet-state";
+import { openPetCharacterMenu } from "./pet-menu";
 import {
   clampToDisplay,
   restorePosition,
@@ -50,16 +52,22 @@ const MAX_DRAG_STEP = 1000;
 
 export interface PetWindowController {
   setEnabled(enabled: boolean): void;
+  setCharacter(character: PetCharacter): void;
   dispose(): void;
 }
 
 export function createPetWindowController({
   getMainWindow,
   tracker,
+  getCharacter,
+  onSelectCharacter,
 }: {
   /** 主窗口关闭后会被重建，因此每次点击都取当前窗口，不能保存旧引用。 */
   getMainWindow: () => BrowserWindow | null;
   tracker: PetStateTracker;
+  getCharacter: () => PetCharacter;
+  /** 菜单选中角色后的回写（写配置 + 下发窗口）：唯一的生产调用方是 index.ts，必填以免漏接线后静默失效。 */
+  onSelectCharacter: (character: PetCharacter) => void;
 }): PetWindowController {
   const positions = new Store<{ position?: PetPosition }>({
     name: "desktop-pet-position",
@@ -177,8 +185,23 @@ export function createPetWindowController({
       logError("[DesktopPet] drag failed:", error);
     }
   };
+  const onOpenMenu = (event: Electron.IpcMainEvent) => {
+    if (event.sender !== petWindow?.webContents || !petWindow) return;
+    openPetCharacterMenu({
+      window: petWindow,
+      // 当前值以配置为准，不信渲染层。
+      current: getCharacter(),
+      onSelect: onSelectCharacter,
+    });
+  };
   ipcMain.on("pet.activate", onActivate);
   ipcMain.on("pet.drag", onDrag);
+  ipcMain.on("pet.menu", onOpenMenu);
+
+  const setCharacter = (character: PetCharacter) => {
+    if (!petWindow || petWindow.isDestroyed()) return;
+    petWindow.webContents.send("pet.character", character);
+  };
 
   const setEnabled = (enabled: boolean) => {
     if (!enabled) {
@@ -223,6 +246,7 @@ export function createPetWindowController({
     window.webContents.on("will-navigate", (event) => event.preventDefault());
     window.webContents.on("did-finish-load", () => {
       window.webContents.send("pet.state", tracker.snapshot());
+      window.webContents.send("pet.character", getCharacter());
       window.showInactive();
     });
     // 加载失败也要留线索：窗口默认不显示，否则只会是一个静默的空窗。
@@ -243,12 +267,14 @@ export function createPetWindowController({
   };
   return {
     setEnabled,
+    setCharacter,
     dispose() {
       setEnabled(false);
       screen.removeListener("display-removed", onDisplayChange);
       screen.removeListener("display-metrics-changed", onDisplayChange);
       ipcMain.removeListener("pet.activate", onActivate);
       ipcMain.removeListener("pet.drag", onDrag);
+      ipcMain.removeListener("pet.menu", onOpenMenu);
     },
   };
 }

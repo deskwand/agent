@@ -11,6 +11,11 @@ import { getCodingSubscription } from "../../shared/coding-subscriptions";
 import { VALID_THEME_PRESETS } from "../../shared/theme";
 import type { ThemePreset } from "../../shared/theme";
 import {
+  DEFAULT_PET_CHARACTER,
+  isPetCharacter,
+} from "../../shared/pet-characters";
+import type { PetCharacter } from "../../shared/pet-characters";
+import {
   normalizeWebAccessConfig,
   type WebAccessConfig,
 } from "../../shared/web-access";
@@ -131,6 +136,7 @@ export interface AppConfig {
   themePreset: ThemePreset;
   uiFontSize?: number;
   petEnabled?: boolean;
+  petCharacter?: PetCharacter;
   sandboxEnabled: boolean;
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
@@ -147,7 +153,7 @@ export interface AppConfig {
 }
 
 // ── StoredConfig: what actually hits disk (no root projection dupes) ─
-interface StoredConfig {
+export interface StoredConfig {
   activeProviderKey: ProviderProfileKey;
   providers: Partial<Record<ProviderProfileKey, ApiProviderConfig>>;
   deskWandCodePath: string;
@@ -157,6 +163,7 @@ interface StoredConfig {
   themePreset: ThemePreset;
   uiFontSize?: number;
   petEnabled?: boolean;
+  petCharacter?: PetCharacter;
   sandboxEnabled: boolean;
   memoryEnabled: boolean;
   memoryRuntime: MemoryRuntimeConfig;
@@ -266,6 +273,7 @@ export function defaultStoredConfig(): StoredConfig {
     themePreset: "graphite",
     uiFontSize: UI_FONT_SIZE_DEFAULT,
     petEnabled: false,
+    petCharacter: DEFAULT_PET_CHARACTER,
     sandboxEnabled: false,
     memoryEnabled: false,
     memoryRuntime: defaultMemoryRuntime(),
@@ -915,6 +923,10 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     themePreset: stored.themePreset,
     uiFontSize: stored.uiFontSize,
     petEnabled: stored.petEnabled ?? false,
+    // 配置被外部改坏时回退默认，不抛错：桌宠是装饰功能，不能拖垮主窗口启动。
+    petCharacter: isPetCharacter(stored.petCharacter)
+      ? stored.petCharacter
+      : DEFAULT_PET_CHARACTER,
     sandboxEnabled: stored.sandboxEnabled,
     memoryEnabled: stored.memoryEnabled,
     memoryRuntime: stored.memoryRuntime,
@@ -1081,6 +1093,8 @@ export class ConfigStore {
       stored.uiFontSize = clampUiFontSize(updates.uiFontSize);
     if (updates.petEnabled !== undefined)
       stored.petEnabled = updates.petEnabled;
+    if (isPetCharacter(updates.petCharacter))
+      stored.petCharacter = updates.petCharacter;
     if (updates.visionModel !== undefined)
       stored.visionModel = updates.visionModel;
     if (updates.webAccess !== undefined)

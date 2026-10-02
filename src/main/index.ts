@@ -68,6 +68,7 @@ import {
   toPromptCommandEntries,
 } from "./prompts/prompt-command-store";
 import { validatePromptCommandName } from "../shared/prompt-command-name";
+import { DEFAULT_PET_CHARACTER } from "../shared/pet-characters";
 import { PiTrustResolver } from "./extensions/pi-trust-resolver";
 import { ensureSubagentUsageReporting } from "./usage/subagent-usage-setting";
 import {
@@ -1122,6 +1123,12 @@ app
           return mainWindow;
         },
         tracker: sessionManager.getPetStateTracker(),
+        getCharacter: () =>
+          configStore.get("petCharacter") ?? DEFAULT_PET_CHARACTER,
+        onSelectCharacter: (character) => {
+          configStore.update({ petCharacter: character });
+          petWindowController?.setCharacter(character);
+        },
       });
       petWindowController.setEnabled(configStore.get("petEnabled") ?? false);
     }

@@ -102,6 +102,11 @@ const MSG: Record<Locale, MessageTable> = {
 
     // ── remote channels ──
     "feishu.unsupportedMessageType": "[不支持的消息类型: {{type}}]",
+
+    // ── pet ──
+    "pet.charLens": "镜片",
+    "pet.charSlime": "史莱姆",
+    "pet.charGhost": "小幽灵",
   },
   en: {
     // ── goal ──
@@ -204,6 +209,11 @@ const MSG: Record<Locale, MessageTable> = {
 
     // ── remote channels ──
     "feishu.unsupportedMessageType": "[Unsupported message type: {{type}}]",
+
+    // ── pet ──
+    "pet.charLens": "Lens",
+    "pet.charSlime": "Slime",
+    "pet.charGhost": "Ghost",
   },
 };
 

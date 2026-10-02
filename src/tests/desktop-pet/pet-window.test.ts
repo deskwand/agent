@@ -125,11 +125,51 @@ beforeEach(() => {
 function enable(main: MockWindow = new MockWindow({})) {
   const controller = createPetWindowController({
     getMainWindow: () => main as never,
+    getCharacter: () => "lens",
+    onSelectCharacter: () => {},
     tracker: new PetStateTracker(),
   });
   controller.setEnabled(true);
   return { controller, main, pet: windows[1] };
 }
+
+it("pushes a newly selected character to the live window", () => {
+  const main = new MockWindow({});
+  const controller = createPetWindowController({
+    getMainWindow: () => main as never,
+    tracker: new PetStateTracker(),
+    getCharacter: () => "lens",
+    onSelectCharacter: () => {},
+  });
+  controller.setEnabled(true);
+  const pet = windows[1];
+  pet.webContents.send.mockClear();
+  controller.setCharacter("ghost");
+  // 选中即生效：改角色必须把新值推给活着的窗口，而不是等下次重建。
+  expect(pet.webContents.send).toHaveBeenCalledWith("pet.character", "ghost");
+  controller.setCharacter("lens");
+  expect(pet.webContents.send).toHaveBeenLastCalledWith(
+    "pet.character",
+    "lens",
+  );
+  controller.dispose();
+});
+
+it("pushes the current character on load", () => {
+  const main = new MockWindow({});
+  const controller = createPetWindowController({
+    getMainWindow: () => main as never,
+    tracker: new PetStateTracker(),
+    // 用非默认值，断言才有意义（默认值会让"没发也过"）。
+    getCharacter: () => "ghost",
+    onSelectCharacter: () => {},
+  });
+  controller.setEnabled(true);
+  const pet = windows[1];
+  pet.webContents.emit("did-finish-load");
+  expect(pet.webContents.send).toHaveBeenCalledWith("pet.character", "ghost");
+  controller.dispose();
+});
 
 it("creates an independent window and restores state on load", () => {
   const main = new MockWindow({});
@@ -137,6 +177,8 @@ it("creates an independent window and restores state on load", () => {
   tracker.start("a");
   const controller = createPetWindowController({
     getMainWindow: () => main as never,
+    getCharacter: () => "lens",
+    onSelectCharacter: () => {},
     tracker,
   });
   controller.setEnabled(true);
@@ -144,6 +186,8 @@ it("creates an independent window and restores state on load", () => {
   expect(pet).toBeDefined();
   pet.webContents.emit("did-finish-load");
   expect(pet.webContents.send).toHaveBeenCalledWith("pet.state", "running");
+  // 角色与状态一起下发；顺序不重要，重要的是两个都发了。
+  expect(pet.webContents.send).toHaveBeenCalledWith("pet.character", "lens");
   controller.setEnabled(false);
   expect(pet.destroy).toHaveBeenCalled();
   controller.dispose();
@@ -153,6 +197,8 @@ it("moves across displays, persists position, and rejects other senders", () => 
   const main = new MockWindow({});
   const controller = createPetWindowController({
     getMainWindow: () => main as never,
+    getCharacter: () => "lens",
+    onSelectCharacter: () => {},
     tracker: new PetStateTracker(),
   });
   controller.setEnabled(true);
@@ -193,6 +239,8 @@ it("focuses the current main window after the original one was closed", () => {
   const controller = createPetWindowController({
     // 主窗口关闭后会被重建，控制器必须每次向 getter 取当前窗口。
     getMainWindow: () => currentMain as never,
+    getCharacter: () => "lens",
+    onSelectCharacter: () => {},
     tracker: new PetStateTracker(),
   });
   controller.setEnabled(true);
@@ -340,6 +388,8 @@ it("restores a saved position after the controller is recreated", () => {
   const main = new MockWindow({});
   const controller = createPetWindowController({
     getMainWindow: () => main as never,
+    getCharacter: () => "lens",
+    onSelectCharacter: () => {},
     tracker: new PetStateTracker(),
   });
   controller.setEnabled(true);

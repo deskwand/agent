@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildProjectedConfig,
   clampUiFontSize,
   defaultStoredConfig,
   UI_FONT_SIZE_DEFAULT,
   UI_FONT_SIZE_MAX,
   UI_FONT_SIZE_MIN,
 } from "../../main/config/config-store";
+import type { StoredConfig } from "../../main/config/config-store";
 
 describe("defaultStoredConfig", () => {
   it("defaults the global memory switch to disabled", () => {
@@ -18,6 +20,21 @@ describe("defaultStoredConfig", () => {
 
   it("defaults the desktop pet to disabled", () => {
     expect(defaultStoredConfig().petEnabled).toBe(false);
+  });
+
+  it("defaults the pet character to the lens", () => {
+    expect(defaultStoredConfig().petCharacter).toBe("lens");
+  });
+});
+
+describe("petCharacter", () => {
+  it("falls back to the lens when the stored character is bogus", () => {
+    // 脏配置来自外部手改的 config 文件：读取路径必须回退，不能抛错。
+    const stored = {
+      ...defaultStoredConfig(),
+      petCharacter: "dragon",
+    } as unknown as StoredConfig;
+    expect(buildProjectedConfig(stored).petCharacter).toBe("lens");
   });
 });
 
