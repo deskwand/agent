@@ -99,7 +99,9 @@ export function ConnectorCard({
   const statusLabel = authorizing
     ? t("connectors.status.connecting")
     : instanceStatus;
-  const statusKind = authorizing ? "connecting" : (instance?.status.kind ?? "off");
+  const statusKind = authorizing
+    ? "connecting"
+    : (instance?.status.kind ?? "off");
 
   // 状态行固定高度（不跳动），但**不留透明占位圆点** —— 那会让「未启用」比名称和描述
   // 多缩进一格，看上去没对齐。状态文字直接与名称/描述左对齐；状态本身用文字表达。
@@ -114,7 +116,10 @@ export function ConnectorCard({
     </span>
   );
 
-  /** 传输标记 —— 固定宽度且**永不条件渲染**，替代被删掉的「本机能力」tab 的区分作用。 */
+  /** 传输标记 —— 固定宽度且**永不条件渲染**，替代被删掉的「本机能力」tab 的区分作用。
+   *  它排在动作组的**后面**（标题行的最后一个元素）：徽标位置因此与动作宽度无关，
+   *  「本机」开关（34px）与「连接」（44px）宽窄不同也不会让徽标在列内漂 12px（用户报过）。
+   *  徽标放左边则反过来：得给动作组写个最小宽度兜底，而两按钮状态会超出它（见下）。 */
   const transportBadge = (
     <span
       data-testid="transport-badge"
@@ -166,11 +171,14 @@ export function ConnectorCard({
    * 它进标题行右侧，与状态文字不在同一个容器 —— 否则任何「两端对齐」的容器
    * 都会把按钮甩到卡片正中（见设计文档 P3）。
    */
-  // **动作槽位固定宽度**：动作本身有宽有窄（「连接/断开」≈46px、开关 34px），
-  // 而徽标紧挨在它左边 —— 槽位不固定的话，徽标会随动作宽度左右漂 12px，
-  // 同一列里「远程」与「本机」就对不齐（用户报过）。
+  // **宽度完全交给内容**（不写 `w-` / `min-w-` / `max-w-`）：写死 `w-[52px]` 时，
+  // 连接/断开、取消/断开、重试/断开这类两按钮状态各分到 22px，减去 `px-2.5` 的 20px
+  // 只剩 2px，中文标签一字一行、按钮高 40px 再撑破 `h-5` 标题行（用户报过截图）。
+  // 徽标排在它右边（见上），所以内容定宽不会让徽标漂移 —— 两个约束同时成立。
+  // **最窄可达列宽 ≈ 346px**（800px 最小窗宽 − rail 56px − `p-5` 两侧 40px，`md:` 两列）：
+  // 最宽的动作组「重新授权 + 断开」≈120px 仍有富余；往动作组前面塞东西时要重算。
   const actionGroup = (
-    <div className="flex items-center justify-end flex-none w-[52px]">
+    <div className="flex items-center justify-end gap-1.5 flex-none">
       {actions}
     </div>
   );
@@ -204,8 +212,8 @@ export function ConnectorCard({
           <div className="text-sm font-semibold text-text-primary flex-1 min-w-0 truncate">
             {name}
           </div>
-          {transportBadge}
           {actionGroup}
+          {transportBadge}
         </div>
         {/* 单行截断 + 固定高度：多行会让同排卡片高度不齐，状态一变就跳 */}
         <div className="h-4 text-xs text-text-muted truncate">
@@ -231,10 +239,12 @@ function renderAction(
   },
 ) {
   // **stdio（本机进程）只给「启用/停用」**，不给「连接/断开」：
+  // **whitespace-nowrap 是硬约束**：中文标签一旦分到小于一个字宽的盒子就会竖排。
+  // 槽位现在按内容定宽，本来不会挤，但换行与否不该依赖上一层的宽度怎么算出来。
   const primary =
-    "px-2.5 py-1 text-xs rounded-control bg-accent text-white hover:bg-accent-hover transition-colors";
+    "px-2.5 py-1 text-xs rounded-control bg-accent text-white hover:bg-accent-hover transition-colors whitespace-nowrap";
   const ghost =
-    "px-2.5 py-1 text-xs rounded-control border border-border text-text-primary hover:bg-surface-hover transition-colors";
+    "px-2.5 py-1 text-xs rounded-control border border-border text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap";
 
   // 规则：只要已添加，就永远给一条退路（「断开」）。
   // 之前 `connecting` 只给一个禁用按钮 —— 用户不能取消、不能重试、不能断开，

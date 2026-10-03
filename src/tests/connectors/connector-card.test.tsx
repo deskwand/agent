@@ -285,6 +285,38 @@ describe("远程服务卡片", () => {
     ).toBe(true);
     expect(group.textContent).not.toContain("connectors.status.");
   });
+
+  it("动作组按内容定宽，且徽标排在它后面 —— 两个按钮不换行、徽标不漂", () => {
+    // 回归：动作槽位曾写死 `w-[52px]`（为了让徽标不随动作宽度漂移），
+    // 但「取消 + 断开」这种两按钮状态下，两个按钮被压进 52px、各分到 22px，
+    // 减去 padding 只剩 2px —— 中文标签于是竖着排（用户给的截图）。
+    // 现在徽标改排在动作组**后面**，由它钉住行的右缘，动作组再按内容定宽。
+    // jsdom 不做排版，这里只能守 class 与 DOM 顺序。
+    const h = handlers();
+    render(
+      <ConnectorCard
+        entry={entry({ instances: [withStatus({ kind: "idle" })] })}
+        authorizing
+        {...h}
+      />,
+    );
+
+    const group = buttonByKey(CANCEL)!.parentElement!;
+    // 任何宽度工具类（`w-` / `min-w-` / `max-w-`）都会把两个按钮压回去
+    const widthUtils = group.className
+      .split(/\s+/)
+      .filter((c) => /(?:^|-)w-\[/.test(c));
+    expect(widthUtils).toEqual([]);
+    // 徽标排组后是「不漂移」的机制本身：换成放左边，内容定宽就会重新导致漂移
+    expect(group.nextElementSibling?.getAttribute("data-testid")).toBe(
+      "transport-badge",
+    );
+    const buttons = [...group.querySelectorAll("button")];
+    expect(buttons.length).toBe(2);
+    for (const b of buttons) {
+      expect(b.className, b.textContent ?? "").toContain("whitespace-nowrap");
+    }
+  });
 });
 
 describe("本机能力卡片", () => {
