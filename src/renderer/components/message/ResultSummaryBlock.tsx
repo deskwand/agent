@@ -17,6 +17,8 @@ import { NestedToolDetails } from "./NestedToolDetails";
 import { ToolGroupStatus } from "./ToolGroupStatus";
 import { useAppStore } from "../../store";
 
+const EMPTY_MESSAGES: Message[] = [];
+
 interface ResultSummaryBlockProps {
   block: Extract<DisplayBlock, { type: "result-summary" }>;
   allBlocks?: ContentBlock[];
@@ -30,6 +32,7 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
 }: ResultSummaryBlockProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const [failureScrollRequest, setFailureScrollRequest] = useState(0);
   const files = block.files;
   const failedToolCallId = block.status?.firstFailedToolCallId;
   const failedItemRef = useRef<HTMLDivElement | null>(null);
@@ -72,10 +75,11 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
     if (typeof element?.scrollIntoView === "function") {
       element.scrollIntoView({ block: "nearest" });
     }
-  }, [expanded, failedToolCallId]);
+  }, [expanded, failedToolCallId, failureScrollRequest]);
 
   const handleFailure = () => {
     setExpanded(true);
+    setFailureScrollRequest((value) => value + 1);
     if (failedToolCallId) {
       useAppStore.getState().highlightToolCallId(failedToolCallId);
     }
@@ -87,8 +91,8 @@ export const ResultSummaryBlock = memo(function ResultSummaryBlock({
 
   const allMessages = useAppStore((s) =>
     message?.sessionId
-      ? (s.sessionStates[message.sessionId]?.messages ?? [])
-      : [],
+      ? (s.sessionStates[message.sessionId]?.messages ?? EMPTY_MESSAGES)
+      : EMPTY_MESSAGES,
   );
 
   const fileDiffStats = useMemo(() => {

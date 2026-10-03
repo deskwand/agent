@@ -73,13 +73,15 @@ export function NestedToolDetails({
               {t("tool.grouped.argumentsOmitted")}
             </p>
           )}
-          {unavailable && (
+          {unavailable && trace.status !== "ok" && (
             <p className="text-xs text-text-muted">
               {t("tool.grouped.outputUnavailable")}
             </p>
           )}
           {result?.content && (
-            <pre className="whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono text-error">
+            <pre
+              className={`whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono ${trace.status === "error" ? "text-error" : "text-text-secondary"}`}
+            >
               {result.content}
             </pre>
           )}

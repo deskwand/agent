@@ -239,6 +239,13 @@ describe("ProcessSummaryBlock highlight and expand", () => {
     expect(useAppStore.getState().highlightedToolCallId).toBe("child");
     // 失败条目由 ref 滚进视野，而不是 querySelector 查业务 DOM。
     expect(scrollIntoViewSpy).toHaveBeenCalled();
+    const previousScrolls = scrollIntoViewSpy.mock.calls.length;
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>("[data-tool-group-failure]")
+        ?.click(),
+    );
+    expect(scrollIntoViewSpy.mock.calls.length).toBe(previousScrolls + 1);
   });
 
   it("命中被投影掉的父脚本 ID 时也展开脚本详情并高亮", () => {

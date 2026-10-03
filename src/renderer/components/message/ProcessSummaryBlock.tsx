@@ -57,6 +57,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
 }: ProcessSummaryBlockProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
+  const [failureScrollRequest, setFailureScrollRequest] = useState(0);
   const fragments = getProcessSummaryFragments(block.summary, t, block.status);
   const failedToolCallId = block.status?.firstFailedToolCallId;
   const failedItemRef = useRef<HTMLDivElement | null>(null);
@@ -102,10 +103,11 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
     if (typeof element?.scrollIntoView === "function") {
       element.scrollIntoView({ block: "nearest" });
     }
-  }, [expanded, failedToolCallId]);
+  }, [expanded, failedToolCallId, failureScrollRequest]);
 
   const handleFailure = () => {
     setExpanded(true);
+    setFailureScrollRequest((value) => value + 1);
     if (failedToolCallId) {
       useAppStore.getState().highlightToolCallId(failedToolCallId);
     }
