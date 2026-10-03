@@ -26,6 +26,7 @@ const api = vi.hoisted(() => {
   const connectors = {
     list: vi.fn(),
     addCatalogServer: vi.fn(),
+    connectWithKey: vi.fn(),
     authorize: vi.fn(),
     cancelSignIn: vi.fn(),
     removeServer: vi.fn(),
@@ -481,5 +482,101 @@ describe("按分类分段与筛选", () => {
     const all = container.querySelector('[data-category="all"]')!;
     expect(all.textContent).toContain("1");
     expect(all.textContent).not.toContain("2");
+  });
+});
+
+/** key 型目录条目：凭据走对话框，不走 OAuth。 */
+function keyCatalogEntry(
+  key: string,
+  instances: ConnectorInstance[] = [],
+): ConnectorEntry {
+  return {
+    key: `mcp:catalog:${key}`,
+    serverName: key,
+    source: "mcp-remote",
+    transport: "http",
+    nameKey: `connectors.catalog.${key}`,
+    descriptionKey: `connectors.catalog.${key}Desc`,
+    category: "dev",
+    auth: {
+      kind: "key",
+      placement: "header",
+      name: "Authorization",
+      valuePrefix: "Bearer ",
+      consoleUrl: "https://example.com/console",
+      credentialLabelKey: `connectors.catalog.${key}Credential`,
+    },
+    instances,
+  };
+}
+
+describe("key 型条目：弹框填凭据，绝不走 OAuth", () => {
+  it("「连接」开输入框，提交走 connectWithKey，不碰 addCatalogServer", async () => {
+    entries = [keyCatalogEntry("gitee")];
+    api.connectWithKey.mockResolvedValue({ ok: true });
+    await mount();
+
+    await act(async () => {
+      byKey(CONNECT)!.click();
+    });
+    const box = container.querySelector(
+      '[data-testid="key-credential"]',
+    ) as HTMLInputElement;
+    expect(box).not.toBeNull();
+    // 这条路径上没有浏览器要开：走去 addCatalogServer 会拉起授权回调服务器
+    expect(api.addCatalogServer).not.toHaveBeenCalled();
+
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    await act(async () => {
+      setter.call(box, "tok-123");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      [...container.querySelectorAll("button")]
+        .find((b) =>
+          (b.textContent ?? "").includes("connectors.keyDialog.submit"),
+        )!
+        .click();
+    });
+
+    expect(api.connectWithKey).toHaveBeenCalledWith("gitee", "tok-123");
+    expect(api.authorize).not.toHaveBeenCalled();
+  });
+
+  it("已添加但 idle 时，重试也是填凭据而不是重新授权", async () => {
+    entries = [keyCatalogEntry("gitee", [instance({ kind: "idle" })])];
+    await mount();
+
+    await act(async () => {
+      byKey(CONNECT)!.click();
+    });
+
+    // 「重新授权」会去调 signIn，对着一个不需要授权的端点只会报错
+    expect(api.authorize).not.toHaveBeenCalled();
+    expect(
+      container.querySelector('[data-testid="key-credential"]'),
+    ).not.toBeNull();
+  });
+
+  it("OAuth 条目的「连接」仍然走浏览器授权，不弹框", async () => {
+    entries = [notion()];
+    const signIn = deferred<ActionResult>();
+    api.addCatalogServer.mockReturnValue(signIn.promise);
+    await mount();
+
+    await act(async () => {
+      byKey(CONNECT)!.click();
+    });
+
+    expect(api.addCatalogServer).toHaveBeenCalledWith("notion");
+    expect(
+      container.querySelector('[data-testid="key-credential"]'),
+    ).toBeNull();
+    await act(async () => {
+      signIn.resolve({ ok: true });
+    });
   });
 });

@@ -189,3 +189,107 @@ describe("已授权但运行时还没连上", () => {
     expect(notion.instances[0].status).toEqual({ kind: "ready" });
   });
 });
+
+describe("buildRemoteEntries：key 型条目的凭据判定", () => {
+  const GITEE: CatalogEntry = {
+    key: "gitee",
+    nameKey: "g",
+    descriptionKey: "gd",
+    url: "https://api.gitee.com/mcp",
+    category: "dev",
+    verified: "key-required",
+    auth: {
+      kind: "key",
+      placement: "header",
+      name: "Authorization",
+      valuePrefix: "Bearer ",
+      consoleUrl: "https://gitee.com/profile/personal_access_tokens",
+      credentialLabelKey: "connectors.catalog.giteeCredential",
+    },
+  };
+  const AMAP: CatalogEntry = {
+    key: "amap",
+    nameKey: "a",
+    descriptionKey: "ad",
+    url: "https://mcp.amap.com/mcp",
+    category: "life",
+    verified: "key-required",
+    auth: {
+      kind: "key",
+      placement: "query",
+      name: "key",
+      consoleUrl: "https://console.amap.com/",
+      credentialLabelKey: "connectors.catalog.amapCredential",
+    },
+  };
+
+  function keyServer(name: string, config: McpServerEntry["config"]) {
+    return { name, config, source: "test", scope: "global" } as McpServerEntry;
+  }
+
+  it("marks a header-credential server authorized without asking the runtime", () => {
+    const entries = buildRemoteEntries(
+      ctx([
+        keyServer("gitee", {
+          type: "http",
+          url: GITEE.url,
+          headers: { Authorization: "Bearer tok" },
+        }),
+      ]),
+      [GITEE],
+    );
+    expect(entries[0].instances[0].status).toEqual({ kind: "authorized" });
+  });
+
+  it("keeps an empty header credential at idle", () => {
+    const entries = buildRemoteEntries(
+      ctx([
+        keyServer("gitee", {
+          type: "http",
+          url: GITEE.url,
+          headers: { Authorization: "   " },
+        }),
+      ]),
+      [GITEE],
+    );
+    expect(entries[0].instances[0].status).toEqual({ kind: "idle" });
+  });
+
+  it("marks a query-credential server authorized", () => {
+    const entries = buildRemoteEntries(
+      ctx([
+        keyServer("amap", {
+          type: "http",
+          url: `${AMAP.url}?key=secret`,
+        }),
+      ]),
+      [AMAP],
+    );
+    expect(entries[0].instances[0].status).toEqual({ kind: "authorized" });
+  });
+
+  it("keeps a query-credential server at idle when the param is missing", () => {
+    const entries = buildRemoteEntries(
+      ctx([keyServer("amap", { type: "http", url: AMAP.url })]),
+      [AMAP],
+    );
+    expect(entries[0].instances[0].status).toEqual({ kind: "idle" });
+  });
+
+  it("lets a runtime status win over the stored credential", () => {
+    // 已连上就不该再显示「已授权」
+    const entries = buildRemoteEntries(
+      ctx(
+        [
+          keyServer("amap", {
+            type: "http",
+            url: `${AMAP.url}?key=secret`,
+          }),
+        ],
+        () => ({ kind: "ready" }),
+      ),
+      [AMAP],
+    );
+    expect(entries[0].instances[0].status).toEqual({ kind: "ready" });
+  });
+});

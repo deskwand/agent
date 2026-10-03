@@ -19,6 +19,16 @@ const NOTION: CatalogEntry = {
   verified: "authorized",
 };
 
+/** `McpServerConfig` 是 `stdio | http` 的联合，`.url` / `.headers` 只存在于后者。
+ *  测试断言的永远是 http 形态 —— 用类型守卫窄化，不用 `as`。 */
+function httpConfig(config: McpServerConfig): {
+  url: string;
+  headers?: Record<string, string>;
+} {
+  if (!("url" in config)) throw new Error("expected an http config");
+  return config;
+}
+
 function httpServer(name: string, url: string, enabled = true): McpServerEntry {
   return {
     name,
@@ -558,5 +568,123 @@ describe("disconnect during authorization", () => {
     });
     await buildRegistry(d).removeServer("notion");
     expect(order).toEqual(["cancel", "config", "credentials"]);
+  });
+});
+
+describe("registry.connectWithKey", () => {
+  /** query 型（高德/百度地图/腾讯位置）：凭据进 URL */
+  const QUERY_ENTRY: CatalogEntry = {
+    key: "amap",
+    nameKey: "a",
+    descriptionKey: "ad",
+    url: "https://mcp.amap.com/mcp",
+    category: "life",
+    verified: "key-required",
+    auth: {
+      kind: "key",
+      placement: "query",
+      name: "key",
+      consoleUrl: "https://console.amap.com/",
+      credentialLabelKey: "connectors.catalog.amapCredential",
+    },
+  };
+
+  /** header 型（Gitee/智谱）：凭据进 headers，带厂商要求的前缀 */
+  const HEADER_ENTRY: CatalogEntry = {
+    key: "gitee",
+    nameKey: "g",
+    descriptionKey: "gd",
+    url: "https://api.gitee.com/mcp",
+    category: "dev",
+    verified: "key-required",
+    auth: {
+      kind: "key",
+      placement: "header",
+      name: "Authorization",
+      valuePrefix: "Bearer ",
+      consoleUrl: "https://gitee.com/profile/personal_access_tokens",
+      credentialLabelKey: "connectors.catalog.giteeCredential",
+    },
+  };
+
+  it("puts a query credential into the URL, keeping existing template params", async () => {
+    const {
+      deps: d,
+      added,
+      activated,
+    } = deps({
+      catalog: [{ ...QUERY_ENTRY, url: "https://mcp.map.qq.com/mcp?format=0" }],
+    });
+    const res = await buildRegistry(d).connectWithKey("amap", "secret-key");
+    expect(res).toEqual({ ok: true });
+    const url = httpConfig(added[0].config).url;
+    // 模板里已有的 format=0 必须还在 —— 拼错分隔符会静默产生一个坏 URL
+    expect(new URL(url).searchParams.get("format")).toBe("0");
+    expect(new URL(url).searchParams.get("key")).toBe("secret-key");
+    expect(activated).toEqual(["amap"]);
+  });
+
+  it("percent-encodes a query credential", async () => {
+    const { deps: d, added } = deps({ catalog: [QUERY_ENTRY] });
+    await buildRegistry(d).connectWithKey("amap", "a b&c");
+    expect(httpConfig(added[0].config).url).toContain("key=a+b%26c");
+  });
+
+  it("puts a header credential into headers with the vendor prefix", async () => {
+    const { deps: d, added } = deps({ catalog: [HEADER_ENTRY] });
+    await buildRegistry(d).connectWithKey("gitee", "tok");
+    expect(httpConfig(added[0].config).headers).toEqual({
+      Authorization: "Bearer tok",
+    });
+    // header 型不许把凭据也塞进 URL
+    expect(httpConfig(added[0].config).url).toBe("https://api.gitee.com/mcp");
+  });
+
+  it("reports pendingActivation when there is no live session", async () => {
+    const { deps: d } = deps({
+      catalog: [HEADER_ENTRY],
+      activateNow: () => false,
+    });
+    await expect(
+      buildRegistry(d).connectWithKey("gitee", "tok"),
+    ).resolves.toEqual({ ok: true, pendingActivation: true });
+  });
+
+  it("rejects an unknown key, an OAuth entry and an empty credential", async () => {
+    const reg = buildRegistry(deps({ catalog: [NOTION, HEADER_ENTRY] }).deps);
+    await expect(reg.connectWithKey("nope", "tok")).resolves.toMatchObject({
+      ok: false,
+    });
+    // OAuth 条目走这个入口会把凭据写到一个不需要它的端点上，
+    // 用户看到「已连接」而服务永远未授权。
+    await expect(reg.connectWithKey("notion", "tok")).resolves.toMatchObject({
+      ok: false,
+    });
+    await expect(reg.connectWithKey("gitee", "   ")).resolves.toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("refuses to overwrite a same-named server pointing elsewhere", async () => {
+    const { deps: d, added } = deps({
+      catalog: [HEADER_ENTRY],
+      servers: [httpServer("gitee", "https://example.com/mcp")],
+    });
+    const res = await buildRegistry(d).connectWithKey("gitee", "tok");
+    expect(res.ok).toBe(false);
+    expect(added).toEqual([]);
+  });
+
+  it("matches a same-named server on the same endpoint even with a query credential", async () => {
+    // 用户重填凭据时，已存配置的 URL 带 ?key=… —— sameEndpoint 忽略 query，
+    // 所以这里必须能覆盖写，不能误判成「别人的 server」。
+    const { deps: d, added } = deps({
+      catalog: [QUERY_ENTRY],
+      servers: [httpServer("amap", "https://mcp.amap.com/mcp?key=old")],
+    });
+    await expect(
+      buildRegistry(d).connectWithKey("amap", "new"),
+    ).resolves.toEqual({ ok: true });
+    expect(httpConfig(added[0].config).url).toContain("key=new");
   });
 });

@@ -290,6 +290,13 @@ function renderAction(
     );
   }
 
+  // key 型条目**没有 OAuth 可重走**：「重新授权」会去调 signIn，对着一个
+  // 不需要授权的端点只会报错。重试的唯一含义是重新填凭据 —— 也就是重新弹框。
+  const retry =
+    entry.auth?.kind === "key"
+      ? () => handlers.onConnect(entry.serverName)
+      : () => handlers.onAuthorize(instance.id);
+
   switch (instance.status.kind) {
     case "ready":
       return disconnectButton;
@@ -298,11 +305,7 @@ function renderAction(
       // 已配置但当前没有连接活动。给「连接」重试授权，并保留退路。
       return (
         <>
-          <button
-            type="button"
-            className={primary}
-            onClick={() => handlers.onAuthorize(instance.id)}
-          >
+          <button type="button" className={primary} onClick={retry}>
             {t("connectors.action.connect")}
           </button>
           {disconnectButton}
@@ -325,12 +328,12 @@ function renderAction(
     case "needs-auth":
       return (
         <>
-          <button
-            type="button"
-            className={primary}
-            onClick={() => handlers.onAuthorize(instance.id)}
-          >
-            {t("connectors.action.reauthorize")}
+          <button type="button" className={primary} onClick={retry}>
+            {t(
+              entry.auth?.kind === "key"
+                ? "connectors.action.connect"
+                : "connectors.action.reauthorize",
+            )}
           </button>
           {disconnectButton}
         </>
@@ -339,11 +342,7 @@ function renderAction(
     case "failed":
       return (
         <>
-          <button
-            type="button"
-            className={ghost}
-            onClick={() => handlers.onAuthorize(instance.id)}
-          >
+          <button type="button" className={ghost} onClick={retry}>
             {t("connectors.action.retry")}
           </button>
           {disconnectButton}

@@ -18,7 +18,7 @@ import {
 import type { McpFetch } from "@earendil-works/pi-mcp";
 
 export interface VerifyResult {
-  level: "none" | "metadata" | "registered";
+  level: "none" | "metadata" | "registered" | "key-required";
   registration: boolean;
   authUrlAccepted: boolean;
   detail: string;
@@ -140,6 +140,96 @@ export async function verifyEndpoint(
   return out;
 }
 
+/**
+ * 三条分支共用的一次 JSON-RPC 调用。
+ *
+ * **必须共用**：每个分支各撑一份，改一处漏一处会让「工具发的请求」与「产品发的请求」
+ * 漂移，而漂移方向可能是**假阳性**，比假阴性更危险。
+ *
+ * 带 session：有些服务（腾讯位置服务）要求把 initialize 返回的 `Mcp-Session-Id`
+ * 在后面每个请求里带上，否则 `tools/list` 直接回 `unsupported protocol version`。
+ * 工具不带这条头，就会把一个能用的端点误判成连不上。
+ */
+async function mcpCall(
+  f: typeof fetch,
+  url: string,
+  method: string,
+  params: unknown,
+  id: number,
+  sessionId?: string,
+): Promise<{
+  status: number;
+  text: string;
+  json: Record<string, unknown> | null;
+  sessionId?: string;
+}> {
+  try {
+    const res = await f(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        ...(sessionId ? { "mcp-session-id": sessionId } : {}),
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+    });
+    // 假 fetch（单测）不提供 headers，所以这里逐层判空
+    const next = res.headers?.get?.("mcp-session-id") ?? sessionId;
+    const text = await res.text().catch(() => "");
+    // SSE 帧**不保证 `data:` 后面有空格** —— 腾讯位置服务发的是 `data:{…}`。
+    // 只认 `data: `（带空格）会把一个能用的端点误判成「tools/list 没有返回工具」。
+    const line = text.split("\n").find((l) => l.startsWith("data:"));
+    const payload = line ? line.replace(/^data:\s?/, "") : text;
+    try {
+      return {
+        status: res.status,
+        text,
+        json: JSON.parse(payload) as Record<string, unknown>,
+        sessionId: next,
+      };
+    } catch {
+      return { status: res.status, text, json: null, sessionId: next };
+    }
+  } catch {
+    return { status: 0, text: "", json: null, sessionId };
+  }
+}
+
+/** 跟着上一个响应走的调用器 —— session id 自动带到下一个请求。 */
+function sessionCaller(f: typeof fetch, url: string) {
+  let session: string | undefined;
+  return async (method: string, params: unknown, id: number) => {
+    const res = await mcpCall(f, url, method, params, id, session);
+    session = res.sessionId ?? session;
+    return res;
+  };
+}
+
+/**
+ * 无凭据时「明确要凭据」的判据。
+ *
+ * 各家形态不一，实测过的四种都要认：
+ *  - `401` / `403`（有道云笔记、百度智能云：initialize 就直接拒）
+ *  - 纯文本 4xx（百度地图：`400 ak is required`）
+ *  - JSON 业务错误码（高德：HTTP 200 + `INVALID_USER_KEY`）
+ *  - JSON-RPC error / 工具 `isError`（Gitee：`-32603 … 401`）
+ *
+ * **不把 404 / 5xx / 网络失败算进来** —— 那些是端点不在或挂了，不是「要凭据」。
+ */
+const CREDENTIAL_HINT =
+  /\bak\b|key|token|auth|credential|unauthor|forbidden|凭证|鉴权|未授权|授权/i;
+
+/** 响应体本身在说凭据的事（不看状态码）。高德那种 `HTTP 200 + INVALID_USER_KEY`
+ *  就是靠这一条认出来的 —— 只看状态码会把它当成一个正常的 200 响应。 */
+function mentionsCredential(text: string): boolean {
+  return CREDENTIAL_HINT.test(text);
+}
+
+function demandsCredentials(status: number, text: string): boolean {
+  if (status === 401 || status === 403) return true;
+  return status >= 400 && status < 500 && mentionsCredential(text);
+}
+
 /** 免认证分支：initialize → tools/list → 真调一次只读工具。
  *  `tools/list` 公开 ≠ 能用（Gmail 就是反例），所以必须走到 L3′。 */
 export async function verifyOpenEndpoint(
@@ -147,36 +237,7 @@ export async function verifyOpenEndpoint(
   f: typeof fetch,
 ): Promise<VerifyResult> {
   const out = emptyResult();
-  const call = async (method: string, params: unknown, id: number) => {
-    try {
-      const res = await f(url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          accept: "application/json, text/event-stream",
-        },
-        body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
-      });
-      const text = await res.text().catch(() => "");
-      const line = text.split("\n").find((l) => l.startsWith("data: "));
-      try {
-        return {
-          status: res.status,
-          json: JSON.parse(line ? line.slice(6) : text) as Record<
-            string,
-            unknown
-          >,
-        };
-      } catch {
-        return {
-          status: res.status,
-          json: null as Record<string, unknown> | null,
-        };
-      }
-    } catch {
-      return { status: 0, json: null as Record<string, unknown> | null };
-    }
-  };
+  const call = sessionCaller(f, url);
 
   const init = await call(
     "initialize",
@@ -212,9 +273,17 @@ export async function verifyOpenEndpoint(
     { name: readTool.name, arguments: {} },
     3,
   );
-  const content = (
-    called.json?.result as { content?: Array<{ text?: string }> }
-  )?.content;
+  const result = called.json?.result as
+    | { content?: Array<{ text?: string }>; isError?: boolean }
+    | undefined;
+  // **`isError` 的响应体也带内容**，把它当成「调到数据」会把「要凭据」误判成「免认证」：
+  // 腾讯位置服务无 key 时返回 `{"content":[{"text":"Invalid Key"}],"isError":true}`。
+  if (result?.isError) {
+    out.level = "metadata";
+    out.detail = `只读工具 ${readTool.name} 返回错误（isError）—— 不算免认证可用`;
+    return out;
+  }
+  const content = result?.content;
   const gotData =
     Array.isArray(content) && content.some((c) => (c.text ?? "").length > 0);
   if (!gotData) {
@@ -223,5 +292,112 @@ export async function verifyOpenEndpoint(
   }
   out.level = "registered";
   out.detail = `tools/list ${tools.length} + ${readTool.name} 返回数据`;
+  return out;
+}
+
+/**
+ * key 分支：端点活着，且不带凭据时被拒。
+ *
+ * 这一档**不验凭据的真假** —— 本仓没有厂商凭据，工具也没有。它能证明的是：
+ * 端点还在、确实是 MCP、且确实要凭据。凭据投放方式（参数名 / 头名 / 前缀）
+ * 来自厂商文档，记在 `catalog` 的 `auth` 里。
+ *
+ * 三种拒绝形态都算数（各家不一样，实测过）：
+ *  - JSON-RPC 错误（Gitee 的 `-32603 API returned error status: 401`）
+ *  - 工具返回 `isError: true`（百度地图的 `Authentication failed: APP不存在`）
+ *  - 非 JSON 的鉴权报文体（智谱的 `Header中未收到Authorization参数`）
+ * 反过来，**能真调到数据就不算 key 型** —— 那是免认证，应该走 L2′/L3′ 那一档，
+ * 否则会把「免认证」错记成「要凭据」。
+ */
+export async function verifyKeyEndpoint(
+  url: string,
+  f: typeof fetch,
+): Promise<VerifyResult> {
+  const out = emptyResult();
+  const call = sessionCaller(f, url);
+
+  const init = await call(
+    "initialize",
+    {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "deskwand-verify", version: "1" },
+    },
+    1,
+  );
+  // 高德那类：initialize 就直接回业务错误码（HTTP 200，体里是 INVALID_USER_KEY）。
+  // **必须先过 demandsCredentials** —— 否则一个 500 带 JSON 体、或者任何
+  // 「有 json 但没 result/error」的响应都会被记成「明确要凭据」，
+  // 而 verified 是写进目录的结论，假阳性比假阴性危险。
+  if (
+    init.json &&
+    !init.json.result &&
+    !init.json.error &&
+    (demandsCredentials(init.status, init.text) ||
+      mentionsCredential(init.text))
+  ) {
+    out.level = "key-required";
+    out.detail = `端点拒绝无凭据请求：${init.text.replace(/\s+/g, " ").slice(0, 120)}`;
+    return out;
+  }
+  if (init.status !== 200 || !init.json?.result) {
+    // 有些服务连 initialize 都要凭据（有道云笔记 401、百度地图 400 ak is required）
+    if (demandsCredentials(init.status, init.text)) {
+      out.level = "key-required";
+      out.detail = `端点拒绝无凭据请求：HTTP ${init.status} ${init.text
+        .replace(/\s+/g, " ")
+        .slice(0, 100)}`;
+      return out;
+    }
+    out.detail = `initialize HTTP ${init.status}（端点不可达或无 MCP 响应）`;
+    return out;
+  }
+
+  const list = await call("tools/list", {}, 2);
+  const tools = (
+    list.json?.result as { tools?: Array<{ name: string }> } | undefined
+  )?.tools;
+  if (!Array.isArray(tools) || tools.length === 0) {
+    out.detail = "tools/list 没有返回工具";
+    return out;
+  }
+
+  const probeTool = tools.find((t) => /read|list|search|get/i.test(t.name));
+  if (!probeTool) {
+    // 工具列表**无凭据就拿到了**，而没有可用作探针的工具 ⇒ 关于凭据一无所知。
+    // 这里不能记 key-required：那会把「没验」当成「验过要凭据」。
+    out.detail = `tools/list ${tools.length}，但没有识别出可用作探针的工具，无法判定`;
+    return out;
+  }
+  const called = await call(
+    "tools/call",
+    { name: probeTool.name, arguments: {} },
+    3,
+  );
+  const result = called.json?.result as
+    | { content?: Array<{ text?: string }>; isError?: boolean }
+    | undefined;
+  if (result?.isError) {
+    const text = (result.content ?? []).map((c) => c.text ?? "").join(" ");
+    out.level = "key-required";
+    out.detail = `无凭据调用被拒：${text.replace(/\s+/g, " ").slice(0, 120)}`;
+    return out;
+  }
+  const gotData =
+    Array.isArray(result?.content) &&
+    (result?.content ?? []).some((c) => (c.text ?? "").length > 0);
+  if (gotData) {
+    out.detail = `无凭据就能调到数据（${probeTool.name}）—— 这不是 key 型`;
+    return out;
+  }
+  if (called.json?.error || demandsCredentials(called.status, called.text)) {
+    const why = called.json?.error
+      ? JSON.stringify(called.json.error)
+      : called.text;
+    out.level = "key-required";
+    out.detail = `无凭据调用被拒：${why.replace(/\s+/g, " ").slice(0, 120)}`;
+    return out;
+  }
+  out.detail = `无凭据调用既没数据也没报错，无法判定`;
   return out;
 }

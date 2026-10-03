@@ -128,6 +128,14 @@ export function registerConnectorsIpc({
     if (res.ok) void trackEvent("feature_use", { feature: "connector" });
     return res;
   });
+  ipcMain.handle(
+    "connectors.connectWithKey",
+    async (_e, key: string, credential: string) => {
+      const res = await registry.connectWithKey(key, credential);
+      if (res.ok) void trackEvent("feature_use", { feature: "connector" });
+      return res;
+    },
+  );
   ipcMain.handle("connectors.removeServer", (_e, name: string) =>
     registry.removeServer(name),
   );

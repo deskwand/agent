@@ -477,3 +477,66 @@ describe("头像", () => {
     expect(avatar()!.className).not.toContain("bg-white");
   });
 });
+
+/** key 型目录条目（凭据靠粘，不走 OAuth）。 */
+const KEY_AUTH = {
+  kind: "key",
+  placement: "header",
+  name: "Authorization",
+  valuePrefix: "Bearer ",
+  consoleUrl: "https://example.com/console",
+  credentialLabelKey: "connectors.catalog.giteeCredential",
+} as const;
+
+describe("key 型卡片：重试 = 重新填凭据", () => {
+  const keyEntry = (status: ConnectorStatus): ConnectorEntry =>
+    entry({
+      key: "mcp:catalog:gitee",
+      serverName: "gitee",
+      nameKey: "connectors.catalog.gitee",
+      auth: { ...KEY_AUTH },
+      instances: [{ ...withStatus(status), id: "gitee", label: "gitee" }],
+    });
+
+  it("failed ⇒ 重试去填凭据，不调 authorize", () => {
+    const h = handlers();
+    render(
+      <ConnectorCard
+        entry={keyEntry({ kind: "failed", message: "x" })}
+        {...h}
+      />,
+    );
+
+    act(() => buttonByKey(RETRY)!.click());
+    // authorize 走的是 OAuth 入口，对 key 型条目必然报错
+    expect(h.onAuthorize).not.toHaveBeenCalled();
+    expect(h.onConnect).toHaveBeenCalledWith("gitee");
+  });
+
+  it("needs-auth ⇒ 按钮说的是「连接」而不是「重新授权」", () => {
+    const h = handlers();
+    render(<ConnectorCard entry={keyEntry({ kind: "needs-auth" })} {...h} />);
+
+    expect(buttonByKey("connectors.action.reauthorize")).toBeUndefined();
+    const btn = buttonByKey(CONNECT)!;
+    expect(btn).toBeDefined();
+    act(() => btn.click());
+    expect(h.onConnect).toHaveBeenCalledWith("gitee");
+  });
+
+  it("OAuth 条目在 failed 时仍然走 authorize（未被连带改坏）", () => {
+    const h = handlers();
+    render(
+      <ConnectorCard
+        entry={entry({
+          instances: [withStatus({ kind: "failed", message: "x" })],
+        })}
+        {...h}
+      />,
+    );
+
+    act(() => buttonByKey(RETRY)!.click());
+    expect(h.onAuthorize).toHaveBeenCalledWith("notion");
+    expect(h.onConnect).not.toHaveBeenCalled();
+  });
+});

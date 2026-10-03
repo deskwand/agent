@@ -10,7 +10,7 @@
  *    `transport` 放在 entry 级：未添加的条目 `instances` 为空，而那时也要画对控件。
  */
 
-import type { CatalogCategory } from "./mcp-catalog";
+import type { CatalogAuth, CatalogCategory } from "./mcp-catalog";
 
 export type ConnectorSourceId = "mcp-remote" | "mcp-builtin" | "mcp-custom";
 
@@ -68,6 +68,11 @@ export interface ConnectorEntry {
    * 视图把它们归入 `other` 段。视图只消费 entry，不反查目录表。
    */
   category?: CatalogCategory;
+  /**
+   * 凭据形态（只对目录条目有意义）。视图靠它决定点「连接」是开浏览器还是弹输入框。
+   * **同样不能反查目录表** —— 理由与 `category` 一致。
+   */
+  auth?: CatalogAuth;
   instances: ConnectorInstance[];
 }
 

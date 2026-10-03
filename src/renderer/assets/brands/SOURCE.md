@@ -26,6 +26,8 @@
 | `datadog.svg`     | `datadog`      |
 | `dropbox.svg`     | `dropbox`      |
 | `framer.svg`      | `framer`       |
+| `gitee.svg`       | `gitee`        |
+| `baidu.svg`       | `baidu`        |
 | `grafana.svg`     | `grafana`      |
 | `greenhouse.svg`  | `greenhouse`   |
 | `huggingface.svg` | `huggingface`  |

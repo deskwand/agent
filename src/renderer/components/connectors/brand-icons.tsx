@@ -32,6 +32,8 @@ import vercel from "../../assets/brands/vercel.svg";
 import webflow from "../../assets/brands/webflow.svg";
 import wix from "../../assets/brands/wix.svg";
 import zapier from "../../assets/brands/zapier.svg";
+import baidu from "../../assets/brands/baidu.svg";
+import gitee from "../../assets/brands/gitee.svg";
 
 /**
  * 连接器卡片头像的判定 —— 名字 → 画什么。
@@ -66,6 +68,8 @@ const BRAND_ICONS: Record<string, string> = {
   datadog,
   dropbox,
   framer,
+  gitee,
+  baidu,
   grafana,
   greenhouse,
   huggingface,

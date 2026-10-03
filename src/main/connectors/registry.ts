@@ -16,7 +16,7 @@ import type {
   AddCustomServerInput,
   ConnectorEntry,
 } from "../../shared/connectors";
-import type { CatalogEntry } from "../../shared/mcp-catalog";
+import { authOf, type CatalogEntry } from "../../shared/mcp-catalog";
 import { sameEndpoint } from "./sources/mcp-remote-source";
 import type {
   LoadedMcpConfig,
@@ -77,12 +77,67 @@ export interface Registry {
     serverName: string,
     openUrl: (url: string) => void,
   ): Promise<ActionResult>;
+  /**
+   * key 型目录条目：把用户粘的凭据写进配置并立刻生效。**不开浏览器** ——
+   * 这条路径上没有 OAuth，调 `signIn` 只会得到一句 `not a remote server` 之类的错。
+   */
+  connectWithKey(key: string, credential: string): Promise<ActionResult>;
   addCustomServer(input: AddCustomServerInput): Promise<ActionResult>;
   /** 中止正在进行的授权。这是「连接中」状态唯一的退路。 */
   cancelSignIn(serverName: string): ActionResult;
 }
 
+/**
+ * 目录条目 + 用户凭据 → mcp.json 配置。**纯函数**，单测不必 mock 文件系统。
+ *
+ * query 型用 URL API 拼参，而不是字符串拼 `?`：模板里可能已有 `format=0` 这类
+ * **非凭据**参数（腾讯位置服务就是），拼错分隔符会静默产生一个坏 URL。
+ */
+export function configForCatalogEntry(
+  entry: CatalogEntry,
+  credential: string,
+): McpServerConfig {
+  const auth = authOf(entry);
+  if (auth.kind !== "key") {
+    throw new Error(`catalog entry "${entry.key}" does not take a key`);
+  }
+  if (auth.placement === "query") {
+    const url = new URL(entry.url);
+    url.searchParams.set(auth.name, credential);
+    return { type: "http", url: url.toString() };
+  }
+  return {
+    type: "http",
+    url: entry.url,
+    headers: { [auth.name]: `${auth.valuePrefix ?? ""}${credential}` },
+  };
+}
+
 export function buildRegistry(deps: RegistryDeps): Registry {
+  /**
+   * 同名条目已存在但**不是这个端点**时拒绝写入。
+   *
+   * `upsertServer` 对同 transport 是 `{...existing, ...config}`（url 被换掉），
+   * transport 不同则整个配置被替换 —— 无论哪种都会静默毁掉用户自己那台 server。
+   * 归属判定已经把它显示成「未添加」，这里就是那条路径的出口，必须堵上。
+   */
+  function conflictingServer(
+    key: string,
+    url: string,
+  ): ActionResult | undefined {
+    const existing = deps.loadConfig().servers.find((s) => s.name === key);
+    if (
+      existing &&
+      !("url" in existing.config && sameEndpoint(existing.config.url, url))
+    ) {
+      return {
+        ok: false,
+        error: `a server named "${key}" already exists with a different endpoint; remove it first`,
+      };
+    }
+    return undefined;
+  }
+
   function list(): ConnectorEntry[] {
     const loaded = deps.loadConfig();
     const ctx = {
@@ -104,22 +159,8 @@ export function buildRegistry(deps: RegistryDeps): Registry {
     const entry = deps.catalog.find((c) => c.key === key);
     if (!entry) return { ok: false, error: `unknown catalog key: ${key}` };
 
-    // 同名条目已存在但不是这个端点时**拒绝写入**：`upsertServer` 对同 transport 是
-    // `{...existing, ...config}`（url 被换掉）、transport 不同则整个配置被替换 ——
-    // 无论哪种都会静默毁掉用户自己那台 server。归属判定刚把它显示成「未添加」，
-    // 这里就是那条路径的出口，必须堵上。
-    const existing = deps.loadConfig().servers.find((s) => s.name === key);
-    if (
-      existing &&
-      !(
-        "url" in existing.config && sameEndpoint(existing.config.url, entry.url)
-      )
-    ) {
-      return {
-        ok: false,
-        error: `a server named "${key}" already exists with a different endpoint; remove it first`,
-      };
-    }
+    const conflict = conflictingServer(key, entry.url);
+    if (conflict) return conflict;
 
     const config: McpServerConfig = { type: "http", url: entry.url };
     const res = await deps.addServer(key, config);
@@ -204,6 +245,31 @@ export function buildRegistry(deps: RegistryDeps): Registry {
       : { ok: false, error: "no sign-in in progress" };
   }
 
+  async function connectWithKey(
+    key: string,
+    credential: string,
+  ): Promise<ActionResult> {
+    const entry = deps.catalog.find((c) => c.key === key);
+    if (!entry) return { ok: false, error: `unknown catalog key: ${key}` };
+    // 反向也要堵：OAuth 条目走这个入口会把凭据写到一个不需要它的端点上，
+    // 用户看到「已连接」而服务永远未授权。
+    if (authOf(entry).kind !== "key") {
+      return { ok: false, error: `"${key}" does not take a key` };
+    }
+    const value = credential.trim();
+    if (!value) return { ok: false, error: "credential is empty" };
+
+    const conflict = conflictingServer(key, entry.url);
+    if (conflict) return conflict;
+
+    const config = configForCatalogEntry(entry, value);
+    const res = await deps.addServer(key, config);
+    if (!res.ok) return res;
+    return deps.activateNow(key, config)
+      ? { ok: true }
+      : { ok: true, pendingActivation: true };
+  }
+
   async function addCustomServer(
     input: AddCustomServerInput,
   ): Promise<ActionResult> {
@@ -257,6 +323,7 @@ export function buildRegistry(deps: RegistryDeps): Registry {
   return {
     list,
     addCatalogServer,
+    connectWithKey,
     removeServer,
     setEnabled,
     authorize,

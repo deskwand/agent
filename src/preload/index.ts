@@ -431,6 +431,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("connectors.list"),
     addCatalogServer: (key: string): Promise<ActionResult> =>
       ipcRenderer.invoke("connectors.addCatalogServer", key),
+    connectWithKey: (key: string, credential: string): Promise<ActionResult> =>
+      ipcRenderer.invoke("connectors.connectWithKey", key, credential),
     removeServer: (name: string): Promise<ActionResult> =>
       ipcRenderer.invoke("connectors.removeServer", name),
     setEnabled: (name: string, enabled: boolean): Promise<ActionResult> =>
@@ -994,6 +996,10 @@ declare global {
       connectors: {
         list: () => Promise<ConnectorEntry[]>;
         addCatalogServer: (key: string) => Promise<ActionResult>;
+        connectWithKey: (
+          key: string,
+          credential: string,
+        ) => Promise<ActionResult>;
         removeServer: (name: string) => Promise<ActionResult>;
         setEnabled: (name: string, enabled: boolean) => Promise<ActionResult>;
         authorize: (name: string) => Promise<ActionResult>;

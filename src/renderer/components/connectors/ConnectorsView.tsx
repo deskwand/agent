@@ -7,6 +7,7 @@ import {
 } from "../../../shared/mcp-catalog";
 import { AddServerDialog } from "./AddServerDialog";
 import { ConnectorCard } from "./ConnectorCard";
+import { KeyDialog } from "./KeyDialog";
 import { SettingsSkills } from "../settings/SettingsSkills";
 import { PiExtensionManagerView } from "../PiExtensionManagerView";
 import { ArrowLeft } from "lucide-react";
@@ -34,7 +35,13 @@ export function ConnectorsView() {
   const setActiveView = useAppStore((s) => s.setActiveView);
   const [tab, setTab] = useState<TabId>("connect");
   const [entries, setEntries] = useState<ConnectorEntry[]>([]);
+  /** 回调里要读**最新**列表，但 `connectEntries` 是每渲染新建的数组，
+   *  放进 `useCallback` 依赖会让回调身份每渲染都变。用 ref 取。 */
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
   const [addOpen, setAddOpen] = useState(false);
+  /** 正在填凭据的 key 型条目。null = 对话框关闭。 */
+  const [keyEntry, setKeyEntry] = useState<ConnectorEntry | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   /**
@@ -121,7 +128,6 @@ export function ConnectorsView() {
   const connectEntries = entries.filter(
     (entry) => entry.source !== "mcp-builtin",
   );
-
   // 顺序 = registry.list() 的返回序（目录 → 应用自带 → 用户自建），
   // 但展示时按分类分段：段序由 CATEGORY_ORDER 决定，`other`（用户自建）永远在最后。
   const [category, setCategory] = useState<GroupId | "all">("all");
@@ -146,6 +152,16 @@ export function ConnectorsView() {
 
   const onConnect = useCallback(
     async (key: string) => {
+      // key 型条目**不走授权**：没有浏览器要开，让用户先粘凭据。
+      // 入口分在这里而不是卡片里 —— 卡片只转发 serverName，再让它认识凭据形态
+      // 就会把「怎么连」变成两处各自实现的规则。
+      // 用 ref 读列表，不用 `connectEntries`：它是每渲染新建的数组，
+      // 放进依赖数组会让这个回调的身份每渲染都变。
+      const target = entriesRef.current.find((e) => e.serverName === key);
+      if (target?.auth?.kind === "key") {
+        setKeyEntry(target);
+        return;
+      }
       // 已经在等授权就别再发一次：在途的流程还没结束，重复发起只会多一个回调服务器。
       const seq = beginAuth(key);
       if (seq === undefined) return;
@@ -170,6 +186,16 @@ export function ConnectorsView() {
       }
     },
     [beginAuth, endAuth, isStale, refresh, t, reportIfPending],
+  );
+
+  /** key 型条目写盘成功后的收尾：刷新列表 + 把「下次对话生效」如实说出来（没会话时）。 */
+  const onKeyConnected = useCallback(
+    (res: ActionResult) => {
+      setError("");
+      reportIfPending(res);
+      void refresh();
+    },
+    [refresh, reportIfPending],
   );
 
   const onDisconnect = useCallback(
@@ -386,6 +412,11 @@ export function ConnectorsView() {
         isOpen={addOpen}
         onClose={() => setAddOpen(false)}
         onAdded={() => void refresh()}
+      />
+      <KeyDialog
+        entry={keyEntry}
+        onClose={() => setKeyEntry(null)}
+        onConnected={onKeyConnected}
       />
     </div>
   );

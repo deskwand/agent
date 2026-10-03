@@ -11,7 +11,11 @@ import type {
   ConnectorEntry,
   ConnectorStatus,
 } from "../../../shared/connectors";
-import type { CatalogEntry } from "../../../shared/mcp-catalog";
+import {
+  authOf,
+  type CatalogAuth,
+  type CatalogEntry,
+} from "../../../shared/mcp-catalog";
 import type { McpServerEntry } from "@earendil-works/pi-coding-agent";
 
 /** UI 副标题的 i18n key。文案不在源码里硬编码。 */
@@ -30,18 +34,41 @@ export interface SourceBuildContext {
  */
 function statusOrFallback(
   ctx: SourceBuildContext,
-  server: McpServerEntry,
+  server: HttpServerEntry,
+  auth: CatalogAuth,
 ): ConnectorStatus {
   const runtime = ctx.statusFor(server.name);
   if (runtime) return runtime;
-  if ("url" in server.config && ctx.hasCredentials(server.config.url)) {
+  if (ctx.hasCredentials(server.config.url)) {
+    return { kind: "authorized" };
+  }
+  if (hasKeyCredential(server, auth)) {
     return { kind: "authorized" };
   }
   return { kind: "idle" };
 }
 
+/**
+ * key 型条目的「凭据已在本地」判定：配置里那个参数 / 头非空就是有。
+ * **只看配置，不发网络请求** —— 这个函数在每次渲染列表时都跑。
+ */
+function hasKeyCredential(server: HttpServerEntry, auth: CatalogAuth): boolean {
+  if (auth.kind !== "key") return false;
+  if (auth.placement === "query") {
+    try {
+      return Boolean(new URL(server.config.url).searchParams.get(auth.name));
+    } catch {
+      return false;
+    }
+  }
+  const value = server.config.headers?.[auth.name];
+  return typeof value === "string" && value.trim().length > 0;
+}
+
 /** http（远程）server —— 只有这一支有 url。 */
-type HttpServerEntry = McpServerEntry & { config: { url: string } };
+type HttpServerEntry = McpServerEntry & {
+  config: { url: string; headers?: Record<string, string> };
+};
 
 function isHttp(entry: McpServerEntry): entry is HttpServerEntry {
   return "url" in entry.config;
@@ -88,12 +115,16 @@ export function buildRemoteEntries(
       nameKey: cat.nameKey,
       descriptionKey: cat.descriptionKey,
       category: cat.category,
+      // 只带目录条目**确实声明过**的凭据形态：写成 `authOf(cat)` 会给 44 条 OAuth 条目
+      // 也塞上一个 `{kind:"oauth"}`，数据变多、信息量为零。
+      // 缺省即 OAuth，由消费者的 `entry.auth?.kind === "key"` 自己表达。
+      auth: cat.auth,
       instances: server
         ? [
             {
               id: server.name,
               label: server.name,
-              status: statusOrFallback(ctx, server),
+              status: statusOrFallback(ctx, server, authOf(cat)),
               summary: SERVER_SUMMARY_REMOTE,
             },
           ]
@@ -115,7 +146,7 @@ export function buildRemoteEntries(
         {
           id: name,
           label: name,
-          status: statusOrFallback(ctx, server),
+          status: statusOrFallback(ctx, server, { kind: "oauth" }),
           summary: SERVER_SUMMARY_REMOTE,
         },
       ],
