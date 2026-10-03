@@ -1035,6 +1035,7 @@
     "voiceEngineFailed": "The voice engine failed to start — try reinstalling it",
     "voiceMicDenied": "Microphone access was denied. Allow DeskWand to use the microphone in System Settings.",
     "voiceMicUnavailable": "No usable microphone found",
+    "voiceCaptureFailed": "Microphone is ready, but audio processing failed to start. Try again.",
     "voiceInstallFailed": "Voice engine installation failed",
     "voicePolishFailed": "Clean-up failed, keeping the original text",
     "voicePolishSuspicious": "The clean-up result looked wrong, keeping the original text"

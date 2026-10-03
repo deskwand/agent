@@ -35,4 +35,13 @@ module.exports = {
     'no-var': 'error',
   },
   ignorePatterns: ['dist', 'dist-electron', 'node_modules', 'release', 'publish'],
+  overrides: [
+    {
+      // `public/` 下的文件由 vite 原样拷贝到 dist，不属于 TS 工程，
+      // 所以这里关掉“需要 project”的类型检查，而不是把整个目录 ignore 掉。
+      files: ['public/**/*.js'],
+      parserOptions: { project: null },
+      env: { browser: true },
+    },
+  ],
 };

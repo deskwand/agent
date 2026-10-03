@@ -67,6 +67,7 @@ export const VOICE_MESSAGE_KEYS: Record<VoiceErrorCode, string> = {
   VOICE_ENGINE_FAILED: "chat.voiceEngineFailed",
   VOICE_MIC_DENIED: "chat.voiceMicDenied",
   VOICE_MIC_UNAVAILABLE: "chat.voiceMicUnavailable",
+  VOICE_CAPTURE_FAILED: "chat.voiceCaptureFailed",
   VOICE_INSTALL_FAILED: "chat.voiceInstallFailed",
 };
 
@@ -122,7 +123,10 @@ export function useVoiceInput(
         void api.pushAudio(sessionId, buffer);
       });
     } catch (error) {
-      onError(error instanceof MicError ? error.code : "VOICE_MIC_UNAVAILABLE");
+      // startMicCapture 只会抛 MicError。能走到这里说明出了预料之外的事，
+      // 以前它被报成「找不到可用的麦克风」—— 麦克风那时大概率是好的。
+      console.error("[voice] unexpected capture error:", error);
+      onError(error instanceof MicError ? error.code : "VOICE_CAPTURE_FAILED");
       setStatus("idle");
       return;
     }

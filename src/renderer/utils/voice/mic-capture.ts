@@ -7,35 +7,16 @@
  * 三个刻意的选择：
  *  1. `new AudioContext({ sampleRate: 16000 })` 让 Chromium 内部的重采样器干活，
  *     不手写降采样（手写盒式抽取会混叠，还多一个模块）。
- *  2. Worklet 源码经 Blob URL 加载，不落成独立文件 —— 否则要给 vite 加 worklet 规则。
+ *  2. Worklet 从**同源真文件**加载（`public/pcm-worklet.js`）。worklet 加载的是脚本，
+ *     受 CSP 的 `script-src` 管辖，而本应用的 script-src 不含 `blob:` 和 `data:` ——
+ *     用 Blob URL 会被 Chromium 直接拒掉（`addModule` 抛 AbortError）。
  *  3. 每 100ms 交一片，而不是每帧（128 采样）：IPC 消息少 12 倍。
  */
-const WORKLET_SOURCE = `
-class VoicePcmCapture extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    this.buffer = new Float32Array(${16000 / 10});
-    this.offset = 0;
-  }
-  process(inputs) {
-    const channel = inputs[0] && inputs[0][0];
-    if (channel) {
-      for (let i = 0; i < channel.length; i += 1) {
-        this.buffer[this.offset] = channel[i];
-        this.offset += 1;
-        if (this.offset === this.buffer.length) {
-          this.port.postMessage(this.buffer.slice());
-          this.offset = 0;
-        }
-      }
-    }
-    return true;
-  }
-}
-registerProcessor("voice-pcm-capture", VoicePcmCapture);
-`;
 
-export type MicErrorCode = "VOICE_MIC_DENIED" | "VOICE_MIC_UNAVAILABLE";
+export type MicErrorCode =
+  | "VOICE_MIC_DENIED"
+  | "VOICE_MIC_UNAVAILABLE"
+  | "VOICE_CAPTURE_FAILED";
 
 export class MicError extends Error {
   constructor(readonly code: MicErrorCode) {
@@ -75,40 +56,45 @@ export async function startMicCapture(
     throw new MicError(classifyMicError(error));
   }
 
-  const context = new AudioContext({ sampleRate: 16000 });
-  const moduleUrl = URL.createObjectURL(
-    new Blob([WORKLET_SOURCE], { type: "application/javascript" }),
-  );
+  // 权限拿到之后的一切失败都归到这里：之前它们会以裸异常逃出去，
+  // 被上层兜底成「找不到可用的麦克风」—— 麦克风明明是好的。
   try {
-    await context.audioWorklet.addModule(moduleUrl);
-  } finally {
-    URL.revokeObjectURL(moduleUrl);
+    const context = new AudioContext({ sampleRate: 16000 });
+    await context.audioWorklet.addModule(
+      new URL("./pcm-worklet.js", document.baseURI).href,
+    );
+
+    const source = context.createMediaStreamSource(stream);
+    const node = new AudioWorkletNode(context, "voice-pcm-capture");
+    node.port.onmessage = (event: MessageEvent<Float32Array>) => {
+      const { pcm, level } = toPcm16(event.data);
+      onSamples(pcm, level);
+    };
+
+    // Worklet 必须连到 destination 才会被拉取。直连会回授，所以中间插一个零增益节点。
+    const sink = context.createGain();
+    sink.gain.value = 0;
+    source.connect(node);
+    node.connect(sink);
+    sink.connect(context.destination);
+
+    return {
+      stop: () => {
+        node.port.onmessage = null;
+        source.disconnect();
+        node.disconnect();
+        sink.disconnect();
+        for (const track of stream.getTracks()) track.stop();
+        void context.close();
+      },
+    };
+  } catch (error) {
+    // 先把麦克风关掉再抛：否则系统录音指示灯会一直亮着，用户以为还在录。
+    for (const track of stream.getTracks()) track.stop();
+    // 上层只会看到「采集启动失败」这一个码，真实原因只能留在日志里。
+    console.error("[voice] capture setup failed:", error);
+    throw new MicError("VOICE_CAPTURE_FAILED");
   }
-
-  const source = context.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(context, "voice-pcm-capture");
-  node.port.onmessage = (event: MessageEvent<Float32Array>) => {
-    const { pcm, level } = toPcm16(event.data);
-    onSamples(pcm, level);
-  };
-
-  // Worklet 必须连到 destination 才会被拉取。直连会回授，所以中间插一个零增益节点。
-  const sink = context.createGain();
-  sink.gain.value = 0;
-  source.connect(node);
-  node.connect(sink);
-  sink.connect(context.destination);
-
-  return {
-    stop: () => {
-      node.port.onmessage = null;
-      source.disconnect();
-      node.disconnect();
-      sink.disconnect();
-      for (const track of stream.getTracks()) track.stop();
-      void context.close();
-    },
-  };
 }
 
 /** 权限被拒与「没有可用设备」要分开：前者能让用户去系统设置改，后者不能。 */

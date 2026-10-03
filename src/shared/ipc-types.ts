@@ -462,6 +462,7 @@ export type VoiceErrorCode =
   | "VOICE_ENGINE_FAILED"
   | "VOICE_MIC_DENIED"
   | "VOICE_MIC_UNAVAILABLE"
+  | "VOICE_CAPTURE_FAILED"
   | "VOICE_INSTALL_FAILED";
 
 export type VoiceStartResult =

@@ -1034,6 +1034,7 @@
     "voiceEngineFailed": "语音引擎启动失败，可以试试重装",
     "voiceMicDenied": "麦克风权限被拒绝，请在系统设置里允许 DeskWand 使用麦克风",
     "voiceMicUnavailable": "找不到可用的麦克风",
+    "voiceCaptureFailed": "麦克风已就绪，但音频处理没能启动，可以重试一下",
     "voiceInstallFailed": "语音引擎安装失败",
     "voicePolishFailed": "整理失败，已保留原文",
     "voicePolishSuspicious": "整理结果看起来不太对，已保留原文"
