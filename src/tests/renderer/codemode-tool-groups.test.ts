@@ -168,20 +168,18 @@ describe("virtual nested calls in process/result groups", () => {
     });
   });
 
-  it("counts an unknown nested tool as a generic process tool with its real name", () => {
+  it("counts an unknown tool name as a generic process tool, nested or ordinary", () => {
     const nested = toolUse("c1", "mystery_step", {}, trace());
     const ordinary = toolUse("u1", "mystery_step", {});
+    // 未登记的名字一律归组：虚拟嵌套块与普通块没有区别（AGENTS.md §4）。
     expect(isProcessToolUse(nested)).toBe(true);
-    expect(isProcessToolUse(ordinary)).toBe(false);
+    expect(isProcessToolUse(ordinary)).toBe(true);
 
     const blocks = buildToolDisplayBlocks([nested, toolResult("c1"), ordinary]);
-    expect(blocks.map((block) => block.type)).toEqual([
-      "process-summary",
-      "content",
-    ]);
+    expect(blocks.map((block) => block.type)).toEqual(["process-summary"]);
     expect(blocks[0]).toMatchObject({
       type: "process-summary",
-      summary: { usedToolCount: 1, scriptCount: 0 },
+      summary: { usedToolCount: 2, scriptCount: 0 },
     });
   });
 

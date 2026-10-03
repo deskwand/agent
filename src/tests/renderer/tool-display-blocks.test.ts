@@ -880,3 +880,47 @@ describe("ls/find process grouping", () => {
     });
   });
 });
+
+/**
+ * 未分类的工具名（模型幻觉出的名字、新增但漏登记的工具）也必须落进过程摘要。
+ * 否则它会渲染成裸行（违反 AGENTS.md §4），并把所在的过程摘要切成两段。
+ * 用例名取自真实会话：DeskWand 2026-10-03 的一次 `codemodedeclaration_placeholder` 调用。
+ */
+describe("buildToolDisplayBlocks unclassified tools", () => {
+  it("folds an unclassified tool name into the process summary as a generic tool", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("bash-1", "bash", { command: "ls" }),
+      toolResult("bash-1"),
+      toolUse("bad-1", "codemodedeclaration_placeholder"),
+      toolResult("bad-1", {
+        content: "Tool codemodedeclaration_placeholder not found",
+        isError: true,
+      }),
+      toolUse("bash-2", "bash", { command: "git status" }),
+      toolResult("bash-2"),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: { commandCount: 2, usedToolCount: 1 },
+      status: { failed: true, firstFailedToolCallId: "bad-1" },
+    });
+  });
+
+  it("keeps ask_user as a standalone card outside the summaries", () => {
+    const blocks = buildToolDisplayBlocks([
+      toolUse("read-1", "read", { path: "src/a.ts" }),
+      toolResult("read-1"),
+      toolUse("ask-1", "ask_user", { questions: [] }),
+      toolUse("bash-1", "bash", { command: "ls" }),
+      toolResult("bash-1"),
+    ]);
+
+    expect(blocks.map((entry) => entry.type)).toEqual([
+      "process-summary",
+      "content",
+      "process-summary",
+    ]);
+  });
+});

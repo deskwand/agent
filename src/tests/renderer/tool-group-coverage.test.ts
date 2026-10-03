@@ -63,8 +63,10 @@ function isGrouped(name: string): boolean {
  * 每个主会话自定义工具都必须被摘要分组识别。
  *
  * 历史：这里以前还有一条"专用卡片"分支（`DEDICATED_CARD_TOOLS` 白名单 + 断言
- * ToolUseBlock 有渲染分支）。清单折入过程摘要之后白名单为空、那条勒线会**空过**
- * （测试还在、实际一条不跑），所以两者一并删了；将来真有工具需要独立卡片时再加回来。
+ * ToolUseBlock 有渲染分支）。清单折入过程摘要之后白名单为空，那条勒线会**空过**
+ * （测试还在、实际一条不跑），所以两者一并删了。
+ * 现在白名单回到了 `tool-display-blocks.ts` 的 `DEDICATED_CARD_TOOLS`（ask_user），
+ * 下面那条豁免用例就是它的勒线。
  */
 
 describe("tool group coverage", () => {
@@ -93,21 +95,33 @@ describe("tool group coverage", () => {
     expect(isGrouped("TodoWrite")).toBe(true);
   });
 
-  // ask_user 需要独立可交互卡片，绝不折入摘要：若归组，buildToolDisplayBlocks
-  // 会把它折进 process-summary，卡片永远不渲染（设计文档 §4 blocker 修复）。
-  // AGENTS.md 归类评估结论：按设计不归组。
+  // ask_user 需要独立可交互卡片，绝不折入摘要：折进去后要展开才能看见，
+  // 而提问的价值就在于不用展开（设计文档 §4 blocker 修复）。
+  // AGENTS.md 归类评估结论：按设计不归组。驼峰名同属专用卡片，历史会话要能重放。
   it("exempts ask_user from grouping as a dedicated card", () => {
-    const blocks = buildToolDisplayBlocks([
-      {
-        type: "tool_use",
-        id: "t-1",
-        name: "ask_user",
-        input: {},
-      } as ContentBlock,
-      { type: "tool_result", toolUseId: "t-1", content: "ok" } as ContentBlock,
-    ]);
-    const first = blocks[0] as { type: string; block?: { name?: string } };
-    expect(first.type).toBe("content");
-    expect(first.block?.name).toBe("ask_user");
+    for (const name of ["ask_user", "AskUserQuestion"]) {
+      const blocks = buildToolDisplayBlocks([
+        {
+          type: "tool_use",
+          id: "t-1",
+          name,
+          input: {},
+        } as ContentBlock,
+        {
+          type: "tool_result",
+          toolUseId: "t-1",
+          content: "ok",
+        } as ContentBlock,
+      ]);
+      const first = blocks[0] as { type: string; block?: { name?: string } };
+      expect(first.type).toBe("content");
+      expect(first.block?.name).toBe(name);
+    }
+  });
+
+  // 未登记的名字（模型幻觉出的工具名、漏登记的新工具）同样必须归组：
+  // 归类清单是"摘要措辞"的白名单，不是"是否归组"的白名单。
+  it("groups tool names that are absent from every classification list", () => {
+    expect(isGrouped("codemodedeclaration_placeholder")).toBe(true);
   });
 });

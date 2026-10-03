@@ -1,5 +1,4 @@
 import type { TFunction } from "i18next";
-import { isMcpToolName } from "../../shared/mcp-tool-names";
 import type { NestedToolStatus } from "../../shared/nested-tool-calls";
 import type { ContentBlock, ToolResultContent, ToolUseContent } from "../types";
 import { extractFilePathFromToolInput } from "./tool-output-path";
@@ -85,54 +84,12 @@ export type ProcessSummaryDisplayBlock = Extract<
   { type: "process-summary" }
 >;
 
-const PROCESS_TOOLS = new Set([
-  "read",
-  "read_file",
-  "grep",
-  "glob",
-  "find",
-  "ls",
-  "bash",
-  "execute_command",
-  "agent",
-  "get_subagent_result",
-  "steer_subagent",
-  "subagentworkflow",
-  "websearch",
-  "web_fetch",
-  "web_search",
-  "fetch_content",
-  "get_search_content",
-  "memory_search",
-  "memory_read",
-  "memory_upsert",
-  "memory_delete",
-  "vision_describe",
-  "office_read_xlsx",
-  "office_read_docx",
-  "office_read_pptx",
-  "office_read_pdf",
-  "internal_browser_navigate",
-  "internal_browser_screenshot",
-  "internal_browser_click",
-  "internal_browser_fill",
-  "internal_browser_scroll",
-  "internal_browser_hover",
-  "internal_browser_select",
-  "internal_browser_press",
-  "internal_browser_snapshot",
-  "internal_browser_evaluate",
-  "internal_browser_wait_for",
-  "internal_browser_get_state",
-  "get_goal",
-  "update_goal",
-  "goal_complete",
-  // 外层脚本调用；有可用子条目时会被投影替换，只剩兜底时计为脚本
-  "codemode",
-  // 清单：与相邻工具合并成一行摘要；驼峰名来自历史会话
-  "todo_write",
-  "todowrite",
-]);
+/**
+ * 必须独立渲染的工具：它们要在折叠状态下就能看见（ask_user 的核心交付物就是内联
+ * 问题卡片，折进摘要后要展开才能看见，提问就失效了）。除此以外没有豁免 ——
+ * 名字不认识也要归组，见 getToolKind。
+ */
+const DEDICATED_CARD_TOOLS = new Set(["ask_user", "askuserquestion"]);
 
 const SEARCH_TOOLS = new Set([
   // grep/glob = code search only; web/browser tools are BROWSE_TOOLS
@@ -191,15 +148,19 @@ function isToolTraceBlock(block: ContentBlock): boolean {
   return block.type === "tool_use" || block.type === "tool_result";
 }
 
+/**
+ * 归类只决定摘要措辞与计数，不决定“是否归组”。
+ *
+ * 除专用卡片外一律进过程摘要：模型幻觉出的工具名、漏登记的新工具、MCP 工具
+ * 都会以通用工具（`usedToolCount`）身份计入，绝不渲染成裸 `tool_use` 行
+ * —— AGENTS.md §4 禁止工具作为未分组工具展示。
+ */
 function getToolKind(name: string): "process" | "result" | null {
   const lower = name.toLowerCase();
-  if (PROCESS_TOOLS.has(lower) || isMcpToolName(lower)) {
-    return "process";
+  if (DEDICATED_CARD_TOOLS.has(lower)) {
+    return null;
   }
-  if (RESULT_TOOLS.has(lower)) {
-    return "result";
-  }
-  return null;
+  return RESULT_TOOLS.has(lower) ? "result" : "process";
 }
 
 export function isProcessToolUse(item: ToolUseContent): boolean {
@@ -207,7 +168,7 @@ export function isProcessToolUse(item: ToolUseContent): boolean {
   if (kind) {
     return kind === "process";
   }
-  // 虚拟投影的嵌套调用即使名字未知也归入过程分组，而不是作为普通内容块。
+  // 只剩专用卡片会返回 null；虚拟投影的嵌套块仍归过程分组，不退回普通内容块。
   return Boolean(item.trace);
 }
 
@@ -580,7 +541,7 @@ export function buildToolDisplayBlocks(
     }
 
     const resultIndex = findToolResultIndex(blocks, index, block.id);
-    // 虚拟嵌套块即使是未知工具名也走过程分组，普通未知工具仍保持原行为。
+    // 除专用卡片外一律归组；虚拟嵌套块连专用卡片名字也不豁免（它只能来自投影）。
     const kind = getToolKind(block.name) ?? (block.trace ? "process" : null);
 
     if (kind === null) {
