@@ -2228,6 +2228,11 @@
       "life": "Life",
       "other": "Yours"
     },
+    "filter": {
+      "added": "Added",
+      "empty": "Nothing added yet",
+      "showAll": "Show all"
+    },
     "tab": {
       "connect": "Connectors",
       "skills": "Skills",

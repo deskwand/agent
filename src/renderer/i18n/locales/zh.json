@@ -2225,6 +2225,11 @@
       "life": "生活",
       "other": "自建服务"
     },
+    "filter": {
+      "added": "已接入",
+      "empty": "还没有已接入的服务",
+      "showAll": "查看全部"
+    },
     "tab": {
       "connect": "连接",
       "skills": "技能",

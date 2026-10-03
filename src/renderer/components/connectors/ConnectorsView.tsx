@@ -131,10 +131,16 @@ export function ConnectorsView() {
   // 顺序 = registry.list() 的返回序（目录 → 应用自带 → 用户自建），
   // 但展示时按分类分段：段序由 CATEGORY_ORDER 决定，`other`（用户自建）永远在最后。
   const [category, setCategory] = useState<GroupId | "all">("all");
+  /** 「已接入」筛选：只看有实例的条目（服务在 mcp.json 里）。
+   *  不看 status —— ready 会随会话在 ready/idle 之间跳、off 只表示停用，
+   *  拿状态当判定会让计数自己变、也会把停用的服务从列表里弄丢（见设计文档 F3）。 */
+  const [addedOnly, setAddedOnly] = useState(false);
+  const added = connectEntries.filter((e) => e.instances.length > 0);
+  const shown = addedOnly ? added : connectEntries;
   /** 空分组不参与渲染 —— 没有内容的分段标题是噪音，chip 同理（见下）。 */
   const groups = GROUP_ORDER.map((id) => ({
     id,
-    entries: connectEntries.filter((e) => groupKeyOf(e) === id),
+    entries: shown.filter((e) => groupKeyOf(e) === id),
   })).filter((g) => g.entries.length > 0);
   /** 选中的分类若因条目消失而归零（用户删掉了最后一条自建 server），回落「全部」——
    *  这样列表里不存在「筛选后空空荡荡」的状态。 */
@@ -349,7 +355,7 @@ export function ConnectorsView() {
                 <CategoryChip
                   id="all"
                   label={t("connectors.category.all")}
-                  count={connectEntries.length}
+                  count={shown.length}
                   active={activeCategory}
                   onSelect={setCategory}
                 />
@@ -366,12 +372,48 @@ export function ConnectorsView() {
                 <span className="flex-1" />
                 <button
                   type="button"
+                  data-testid="added-filter"
+                  aria-pressed={addedOnly}
+                  onClick={() => setAddedOnly((v) => !v)}
+                  className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap transition-colors ${
+                    addedOnly
+                      ? "bg-accent-muted text-accent border-transparent"
+                      : "border-border-muted text-text-secondary hover:bg-surface-hover"
+                  }`}
+                >
+                  {t("connectors.filter.added")}
+                  <span className="text-[11px] opacity-75 ml-1">
+                    {added.length}
+                  </span>
+                </button>
+                <button
+                  type="button"
                   onClick={() => setAddOpen(true)}
                   className="px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
                 >
                   {t("connectors.action.add")}
                 </button>
               </div>
+
+              {/* 筛选开着且一条都没有：必须给出口 —— 此时既没有卡片可点，
+                  也没有任何「连接」按钮可达，没有出口就是死路（见设计文档 F6）。 */}
+              {addedOnly && added.length === 0 && (
+                <div className="flex flex-col items-center gap-3 py-12">
+                  {/* role="status"：屏幕阅读器要听到列表已空 —— 否则开关的 aria-pressed
+                      变了、内容却静默换了。 */}
+                  <p role="status" className="text-sm text-text-secondary">
+                    {t("connectors.filter.empty")}
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="added-filter-show-all"
+                    onClick={() => setAddedOnly(false)}
+                    className="text-xs px-3 py-1 rounded-full border border-border-muted text-text-secondary hover:bg-surface-hover transition-colors"
+                  >
+                    {t("connectors.filter.showAll")}
+                  </button>
+                </div>
+              )}
 
               {visibleGroups.map((g) => (
                 <section key={g.id} className="mb-5 last:mb-0">

@@ -160,6 +160,31 @@ function byKey(key: string): HTMLButtonElement | undefined {
   );
 }
 
+/** 「已接入」开关。 */
+function addedFilter(): HTMLButtonElement {
+  return container.querySelector(
+    '[data-testid="added-filter"]',
+  ) as HTMLButtonElement;
+}
+
+/** 卡片数：头像每个卡片恰好一个（卡片根节点没有 testid）。 */
+function cardCount(): number {
+  return container.querySelectorAll('[data-testid="card-avatar"]').length;
+}
+
+/** 分类 chip 标签末尾的数字。 */
+function chipCount(category: string): string | undefined {
+  const chip = container.querySelector(
+    `[data-testid="category-chip"][data-category="${category}"]`,
+  );
+  return chip?.textContent?.match(/\d+$/)?.[0];
+}
+
+/** 开关上的数字。 */
+function addedCount(): string | undefined {
+  return addedFilter().textContent?.match(/\d+$/)?.[0];
+}
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   container = document.createElement("div");
@@ -578,5 +603,155 @@ describe("key 型条目：弹框填凭据，绝不走 OAuth", () => {
     await act(async () => {
       signIn.resolve({ ok: true });
     });
+  });
+});
+
+describe("已接入筛选", () => {
+  it("默认不筛选：未接入的目录条目照样渲染", async () => {
+    entries = [
+      catalogEntry("notion", "collab", [instance({ kind: "ready" })]),
+      catalogEntry("sentry", "dev"),
+    ];
+
+    await mount();
+
+    expect(cardCount()).toBe(2);
+    expect(chipCount("all")).toBe("2");
+    expect(addedFilter().getAttribute("aria-pressed")).toBe("false");
+    expect(addedCount()).toBe("1");
+    // F1：开关在工具栏里、排在「添加」之前 —— 它不是分类 chip 那一排的一员
+    const add = byKey("connectors.action.add")!;
+    expect(
+      addedFilter().compareDocumentPosition(add) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("打开后只留有实例的条目", async () => {
+    entries = [
+      catalogEntry("notion", "collab", [instance({ kind: "ready" })]),
+      catalogEntry("sentry", "dev"),
+    ];
+
+    await mount();
+    await act(async () => {
+      addedFilter().click();
+    });
+
+    expect(cardCount()).toBe(1);
+    expect(container.textContent).not.toContain("connectors.catalog.sentry");
+    expect(addedFilter().getAttribute("aria-pressed")).toBe("true");
+    // 计数统计的是全集，不是交集：筛选打开后 N 不变
+    expect(addedCount()).toBe("1");
+  });
+
+  it("状态不参与判定：待授权 / 失败 / 停用都留在结果里", async () => {
+    entries = [
+      catalogEntry("notion", "collab", [instance({ kind: "needs-auth" })]),
+      catalogEntry("sentry", "dev", [
+        instance({ kind: "failed", message: "x" }),
+      ]),
+      customEntry("my-server"),
+    ];
+
+    await mount();
+    await act(async () => {
+      addedFilter().click();
+    });
+
+    expect(cardCount()).toBe(3);
+  });
+
+  it("计数跟筛选走：「全部」chip 等于可见卡片数", async () => {
+    entries = [
+      catalogEntry("notion", "collab", [instance({ kind: "ready" })]),
+      catalogEntry("sentry", "dev"),
+      catalogEntry("vercel", "dev"),
+    ];
+
+    await mount();
+    expect(chipCount("all")).toBe("3");
+
+    await act(async () => {
+      addedFilter().click();
+    });
+    expect(chipCount("all")).toBe("1");
+  });
+
+  it("筛选归零时显示空态，「查看全部」能退出", async () => {
+    entries = [catalogEntry("notion", "collab"), catalogEntry("sentry", "dev")];
+
+    await mount();
+    await act(async () => {
+      addedFilter().click();
+    });
+
+    expect(container.textContent).toContain("connectors.filter.empty");
+    // 屏幕阅读器：空态要作为状态播报，不能静默换掉列表
+    expect(container.querySelector('[role="status"]')?.textContent).toContain(
+      "connectors.filter.empty",
+    );
+    expect(cardCount()).toBe(0);
+    // 计数为 0 时开关照样在（F5），「全部」chip 也还在、「添加」按钮也还在
+    expect(addedCount()).toBe("0");
+    expect(chipCount("all")).toBe("0");
+
+    const showAll = container.querySelector(
+      '[data-testid="added-filter-show-all"]',
+    ) as HTMLButtonElement;
+    await act(async () => {
+      showAll.click();
+    });
+
+    expect(cardCount()).toBe(2);
+    expect(addedFilter().getAttribute("aria-pressed")).toBe("false");
+    expect(container.textContent).not.toContain("connectors.filter.empty");
+  });
+
+  it("开着筛选时再选分类：两个维度叠加（交集）", async () => {
+    entries = [
+      catalogEntry("notion", "collab", [instance({ kind: "ready" })]),
+      catalogEntry("sentry", "dev", [instance({ kind: "ready" })]),
+      catalogEntry("vercel", "dev"),
+    ];
+
+    await mount();
+    await clickChip("collab");
+    expect(cardCount()).toBe(1);
+
+    await act(async () => {
+      addedFilter().click();
+    });
+
+    // 交集：剩下 collab 里已接入的那一张
+    expect(cardCount()).toBe(1);
+    expect(container.textContent).toContain("connectors.catalog.notion");
+    expect(container.textContent).not.toContain("connectors.catalog.sentry");
+    // 计数仍按已接入全集算（F8），不受选中分类影响
+    expect(chipCount("all")).toBe("2");
+    expect(addedCount()).toBe("2");
+    // 未选中分类的 chip 计数也跟着筛选走：dev 里只剩已接入的 sentry
+    expect(chipCount("dev")).toBe("1");
+  });
+
+  it("选中的分类被筛空时回落「全部」", async () => {
+    entries = [
+      catalogEntry("notion", "collab", [instance({ kind: "ready" })]),
+      catalogEntry("sentry", "dev"),
+    ];
+
+    await mount();
+    await clickChip("dev");
+    expect(cardCount()).toBe(1);
+
+    await act(async () => {
+      addedFilter().click();
+    });
+
+    // dev 里没有已接入的条目 → 该分段消失、选中分类回落「全部」
+    expect(chipCount("dev")).toBeUndefined();
+    expect(cardCount()).toBe(1);
+    expect(container.textContent).toContain("connectors.catalog.notion");
+    expect(addedFilter().getAttribute("aria-pressed")).toBe("true");
   });
 });
