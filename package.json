@@ -70,7 +70,8 @@
     "deploy:local": "bash scripts/deploy-local.sh",
     "publish:local": "node scripts/publish-local.js",
     "spike:mcp": "electron scripts/mcp-pi-sdk-spike.mjs",
-    "verify:mcp": "electron scripts/codemode-behavior-verify.mjs"
+    "verify:mcp": "electron scripts/codemode-behavior-verify.mjs",
+    "verify:catalog": "VERIFY_CATALOG=1 vitest run src/tests/connectors/catalog-live.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -40,22 +40,45 @@ function statusOrFallback(
   return { kind: "idle" };
 }
 
-function isHttp(entry: McpServerEntry): boolean {
+/** http（远程）server —— 只有这一支有 url。 */
+type HttpServerEntry = McpServerEntry & { config: { url: string } };
+
+function isHttp(entry: McpServerEntry): entry is HttpServerEntry {
   return "url" in entry.config;
+}
+
+/** 目录与用户自建的分界：**名字相同还不够，端点也得同源同路径**。
+ *  忽略末尾斜杠与 query/hash —— 用户可能加了 `?project_ref=x` 这类参数。
+ *  不这样做的话，用户给自己那台同名 server 点「断开」会删掉他的配置。 */
+export function sameEndpoint(a: string, b: string): boolean {
+  try {
+    const norm = (raw: string) => {
+      const u = new URL(raw);
+      return `${u.origin}${u.pathname.replace(/\/$/, "")}`;
+    };
+    return norm(a) === norm(b);
+  } catch {
+    return false;
+  }
 }
 
 export function buildRemoteEntries(
   ctx: SourceBuildContext,
   catalog: readonly CatalogEntry[],
 ): ConnectorEntry[] {
-  const byName = new Map<string, McpServerEntry>();
+  const byName = new Map<string, HttpServerEntry>();
   for (const server of ctx.loaded.servers) {
     if (isHttp(server)) byName.set(server.name, server);
   }
 
   const claimed = new Set<string>();
   const entries: ConnectorEntry[] = catalog.map((cat) => {
-    const server = byName.get(cat.key);
+    const candidate = byName.get(cat.key);
+    // 名字相同但端点不同 ⇒ 那是用户自己的 server，不是这条目录实例
+    const server =
+      candidate && sameEndpoint(candidate.config.url, cat.url)
+        ? candidate
+        : undefined;
     if (server) claimed.add(cat.key);
     return {
       key: `mcp:catalog:${cat.key}`,
@@ -64,6 +87,7 @@ export function buildRemoteEntries(
       transport: "http",
       nameKey: cat.nameKey,
       descriptionKey: cat.descriptionKey,
+      category: cat.category,
       instances: server
         ? [
             {

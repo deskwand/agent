@@ -64,4 +64,24 @@ describe("serviceIconFor", () => {
   it("前后空白不影响判定", () => {
     expect(serviceIconFor(" notion ")).toMatchObject({ kind: "brand" });
   });
+
+  it("returns a brand icon for the newly added vendors", () => {
+    for (const name of ["Supabase", "Vercel", "Framer", "Postman", "Clerk"]) {
+      expect(serviceIconFor(name)).toEqual({
+        kind: "brand",
+        url: expect.anything(),
+      });
+    }
+  });
+
+  it("falls back to the letter for vendors without an icon", () => {
+    for (const name of ["DeepWiki", "Vanta", "Canva", "Figma"]) {
+      expect(serviceIconFor(name)).toBeUndefined();
+    }
+  });
+
+  it("is case-insensitive", () => {
+    expect(serviceIconFor("supabase")?.kind).toBe("brand");
+    expect(serviceIconFor("SUPABASE")?.kind).toBe("brand");
+  });
 });

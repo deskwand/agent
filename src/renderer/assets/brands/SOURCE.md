@@ -9,14 +9,42 @@
 - 版本：commit `1089fb7d2bf0e323f834c205ab76265005a6d5e8`（`develop` 分支）
 - 抓取方式：`raw.githubusercontent.com/simple-icons/simple-icons/<SHA>/icons/<slug>.svg`
 
-| 本目录文件      | 上游 slug      |
-| --------------- | -------------- |
-| `notion.svg`    | `notion`       |
-| `linear.svg`    | `linear`       |
-| `sentry.svg`    | `sentry`       |
-| `stripe.svg`    | `stripe`       |
-| `atlassian.svg` | `atlassian`    |
-| `chrome.svg`    | `googlechrome` |
+| 本目录文件        | 上游 slug      |
+| ----------------- | -------------- |
+| `notion.svg`      | `notion`       |
+| `linear.svg`      | `linear`       |
+| `sentry.svg`      | `sentry`       |
+| `stripe.svg`      | `stripe`       |
+| `atlassian.svg`   | `atlassian`    |
+| `chrome.svg`      | `googlechrome` |
+| `airtable.svg`    | `airtable`     |
+| `buffer.svg`      | `buffer`       |
+| `clickhouse.svg`  | `clickhouse`   |
+| `clerk.svg`       | `clerk`        |
+| `clickup.svg`     | `clickup`      |
+| `cloudflare.svg`  | `cloudflare`   |
+| `datadog.svg`     | `datadog`      |
+| `dropbox.svg`     | `dropbox`      |
+| `framer.svg`      | `framer`       |
+| `grafana.svg`     | `grafana`      |
+| `greenhouse.svg`  | `greenhouse`   |
+| `huggingface.svg` | `huggingface`  |
+| `intercom.svg`    | `intercom`     |
+| `lucid.svg`       | `lucid`        |
+| `miro.svg`        | `miro`         |
+| `neon.svg`        | `neon`         |
+| `netlify.svg`     | `netlify`      |
+| `paypal.svg`      | `paypal`       |
+| `postman.svg`     | `postman`      |
+| `railway.svg`     | `railway`      |
+| `resend.svg`      | `resend`       |
+| `supabase.svg`    | `supabase`     |
+| `todoist.svg`     | `todoist`      |
+| `trello.svg`      | `trello`       |
+| `vercel.svg`      | `vercel`       |
+| `webflow.svg`     | `webflow`      |
+| `wix.svg`         | `wix`          |
+| `zapier.svg`      | `zapier`       |
 
 ## 2. 许可证
 

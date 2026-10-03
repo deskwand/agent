@@ -15,6 +15,8 @@ const NOTION: CatalogEntry = {
   nameKey: "n",
   descriptionKey: "nd",
   url: "https://mcp.notion.com/mcp",
+  category: "collab",
+  verified: "authorized",
 };
 
 function httpServer(name: string, url: string, enabled = true): McpServerEntry {
@@ -169,6 +171,45 @@ describe("registry.addCatalogServer", () => {
     const res = await buildRegistry(d).addCatalogServer("notion", vi.fn());
     expect(res.ok).toBe(false);
     expect(activated).toEqual([]);
+  });
+});
+
+describe("registry.addCatalogServer 的覆盖保护", () => {
+  it("refuses to overwrite a user server that shares the name but not the endpoint", async () => {
+    // 归属判定把同名不同端点的 server 显示成「未添加」，于是这张目录卡会给出
+    // 「连接」；不挡住它就是静默覆盖用户配置（http 换 url、stdio 整份替换）。
+    const { deps: d, added } = deps({
+      servers: [
+        {
+          name: "notion",
+          config: { type: "stdio", command: "my-own-notion" },
+          source: "test",
+          scope: "global",
+        },
+      ],
+    });
+    const res = await buildRegistry(d).addCatalogServer("notion", vi.fn());
+    expect(res.ok).toBe(false);
+    expect(res.error).toContain("already exists");
+    expect(added).toEqual([]);
+  });
+
+  it("refuses when an http server with the same name points elsewhere", async () => {
+    const { deps: d, added } = deps({
+      servers: [httpServer("notion", "https://my-gateway.example.com/notion")],
+    });
+    const res = await buildRegistry(d).addCatalogServer("notion", vi.fn());
+    expect(res.ok).toBe(false);
+    expect(added).toEqual([]);
+  });
+
+  it("still allows re-adding when the endpoint matches", async () => {
+    const { deps: d, added } = deps({
+      servers: [httpServer("notion", NOTION.url)],
+    });
+    const res = await buildRegistry(d).addCatalogServer("notion", vi.fn());
+    expect(res.ok).toBe(true);
+    expect(added).toHaveLength(1);
   });
 });
 

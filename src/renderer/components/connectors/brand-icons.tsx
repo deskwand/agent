@@ -4,6 +4,34 @@ import sentry from "../../assets/brands/sentry.svg";
 import stripe from "../../assets/brands/stripe.svg";
 import atlassian from "../../assets/brands/atlassian.svg";
 import chrome from "../../assets/brands/chrome.svg";
+import airtable from "../../assets/brands/airtable.svg";
+import buffer from "../../assets/brands/buffer.svg";
+import clickhouse from "../../assets/brands/clickhouse.svg";
+import clerk from "../../assets/brands/clerk.svg";
+import clickup from "../../assets/brands/clickup.svg";
+import cloudflare from "../../assets/brands/cloudflare.svg";
+import datadog from "../../assets/brands/datadog.svg";
+import dropbox from "../../assets/brands/dropbox.svg";
+import framer from "../../assets/brands/framer.svg";
+import grafana from "../../assets/brands/grafana.svg";
+import greenhouse from "../../assets/brands/greenhouse.svg";
+import huggingface from "../../assets/brands/huggingface.svg";
+import intercom from "../../assets/brands/intercom.svg";
+import lucid from "../../assets/brands/lucid.svg";
+import miro from "../../assets/brands/miro.svg";
+import neon from "../../assets/brands/neon.svg";
+import netlify from "../../assets/brands/netlify.svg";
+import paypal from "../../assets/brands/paypal.svg";
+import postman from "../../assets/brands/postman.svg";
+import railway from "../../assets/brands/railway.svg";
+import resend from "../../assets/brands/resend.svg";
+import supabase from "../../assets/brands/supabase.svg";
+import todoist from "../../assets/brands/todoist.svg";
+import trello from "../../assets/brands/trello.svg";
+import vercel from "../../assets/brands/vercel.svg";
+import webflow from "../../assets/brands/webflow.svg";
+import wix from "../../assets/brands/wix.svg";
+import zapier from "../../assets/brands/zapier.svg";
 
 /**
  * 连接器卡片头像的判定 —— 名字 → 画什么。
@@ -12,7 +40,7 @@ import chrome from "../../assets/brands/chrome.svg";
  * 加一个自研服务，都只改这里（详见 design-docs/2026-10-02-connector-brand-icons-design.md）。
  *
  * 图标是**打进仓库**的一次性资源（`src/renderer/assets/brands/SOURCE.md` 记了来源与许可），
- * 运行时零网络请求：6 张图都低于 Vite 的 `assetsInlineLimit`，构建时会被内联成 data URI。
+ * 运行时零网络请求：34 张图都低于 Vite 的 `assetsInlineLimit`，构建时会被内联成 data URI。
  *
  * 两类图形的实现方式**刻意不同**：
  *  - **厂商 logo 走 `<img>`**：图片自带配色，用不着页面的 `currentColor`
@@ -29,6 +57,34 @@ const BRAND_ICONS: Record<string, string> = {
   stripe,
   atlassian,
   chrome,
+  airtable,
+  buffer,
+  clickhouse,
+  clerk,
+  clickup,
+  cloudflare,
+  datadog,
+  dropbox,
+  framer,
+  grafana,
+  greenhouse,
+  huggingface,
+  intercom,
+  lucid,
+  miro,
+  neon,
+  netlify,
+  paypal,
+  postman,
+  railway,
+  resend,
+  supabase,
+  todoist,
+  trello,
+  vercel,
+  webflow,
+  wix,
+  zapier,
 };
 
 /** DeskWand 自己的服务（名字来自 `BUILTIN_PRESETS`，大小写不敏感地比对） */

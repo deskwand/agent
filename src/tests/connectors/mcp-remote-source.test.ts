@@ -10,12 +10,16 @@ const CATALOG: CatalogEntry[] = [
     nameKey: "n",
     descriptionKey: "nd",
     url: "https://mcp.notion.com/mcp",
+    category: "collab",
+    verified: "authorized",
   },
   {
     key: "linear",
     nameKey: "l",
     descriptionKey: "ld",
     url: "https://mcp.linear.app/mcp",
+    category: "collab",
+    verified: "authorized",
   },
 ];
 
@@ -87,6 +91,48 @@ describe("buildRemoteEntries", () => {
     expect(mine).toBeDefined();
     expect(mine!.instances).toHaveLength(1);
     expect(mine!.nameKey).toBe("my-tools");
+  });
+
+  it("does not claim an http server that shares a catalog name but has a different url", () => {
+    const mine: McpServerEntry = {
+      name: "notion",
+      config: {
+        type: "http",
+        url: "https://my-own-gateway.example.com/notion",
+      },
+      source: "test",
+      scope: "global",
+    };
+    const entries = buildRemoteEntries(ctx([mine]), CATALOG);
+    // 目录卡片仍然「未添加」
+    expect(
+      entries.find((e) => e.key === "mcp:catalog:notion")!.instances,
+    ).toEqual([]);
+    // 用户自己的 server 作为独立卡片出现
+    const custom = entries.find((e) => e.key === "mcp:server:notion")!;
+    expect(custom.serverName).toBe("notion");
+    expect(custom.instances).toHaveLength(1);
+  });
+
+  it("still claims the server when the url matches, ignoring a trailing slash", () => {
+    const mine: McpServerEntry = {
+      name: "notion",
+      config: { type: "http", url: "https://mcp.notion.com/mcp/" },
+      source: "test",
+      scope: "global",
+    };
+    const entries = buildRemoteEntries(ctx([mine]), CATALOG);
+    expect(
+      entries.find((e) => e.key === "mcp:catalog:notion")!.instances,
+    ).toHaveLength(1);
+    expect(entries.find((e) => e.key === "mcp:server:notion")).toBeUndefined();
+  });
+
+  it("carries the catalog category onto the entry", () => {
+    const entries = buildRemoteEntries(ctx([]), CATALOG);
+    expect(entries.find((e) => e.key === "mcp:catalog:notion")!.category).toBe(
+      "collab",
+    );
   });
 
   it("does not duplicate a catalog server as a custom entry", () => {

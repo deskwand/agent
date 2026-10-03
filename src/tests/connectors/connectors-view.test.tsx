@@ -95,6 +95,45 @@ function notion(instances: ConnectorInstance[] = []): ConnectorEntry {
   };
 }
 
+function catalogEntry(
+  key: string,
+  category: ConnectorEntry["category"],
+  instances: ConnectorInstance[] = [],
+): ConnectorEntry {
+  return {
+    key: `mcp:catalog:${key}`,
+    serverName: key,
+    source: "mcp-remote",
+    transport: "http",
+    nameKey: `connectors.catalog.${key}`,
+    descriptionKey: `connectors.catalog.${key}Desc`,
+    category,
+    instances,
+  };
+}
+
+function customEntry(name: string): ConnectorEntry {
+  return {
+    key: `mcp:server:${name}`,
+    serverName: name,
+    source: "mcp-custom",
+    transport: "stdio",
+    nameKey: name,
+    instances: [instance({ kind: "off" })],
+  };
+}
+
+async function clickChip(category: string): Promise<void> {
+  const chip = [
+    ...container.querySelectorAll('[data-testid="category-chip"]'),
+  ].find(
+    (c) => (c.getAttribute("data-category") ?? "") === category,
+  ) as HTMLElement;
+  await act(async () => {
+    chip.click();
+  });
+}
+
 function byKey(key: string): HTMLButtonElement | undefined {
   return [...container.querySelectorAll("button")].find((b) =>
     (b.textContent ?? "").includes(key),
@@ -333,5 +372,77 @@ describe("「添加」接线", () => {
     // onAdded 必须真的去刷新 —— 「加上了但列表没变」是这类接线最容易漏的回归
     expect(api.list.mock.calls.length).toBeGreaterThan(listCallsBefore);
     expect(container.querySelector('[data-testid="add-payload"]')).toBeNull();
+  });
+});
+
+describe("按分类分段与筛选", () => {
+  it("groups cards by category, in CATEGORY_ORDER", async () => {
+    entries = [catalogEntry("notion", "collab"), catalogEntry("sentry", "dev")];
+    await mount();
+    const titles = [
+      ...container.querySelectorAll('[data-testid="section-title"]'),
+    ].map((e) => e.textContent);
+    expect(titles).toHaveLength(2);
+    // 段序由 CATEGORY_ORDER 决定：dev 在 collab 之前，而不是按 entries 的传入顺序
+    expect(titles[0]).toContain("connectors.category.dev");
+    expect(titles[1]).toContain("connectors.category.collab");
+  });
+
+  it("does not render a section for a category with no entries", async () => {
+    entries = [catalogEntry("notion", "collab")];
+    await mount();
+    const titles = [
+      ...container.querySelectorAll('[data-testid="section-title"]'),
+    ].map((e) => e.textContent);
+    expect(titles).toHaveLength(1);
+    expect(titles[0]).toContain("connectors.category.collab");
+  });
+
+  it("renders the custom section and its chip only when the user has their own servers", async () => {
+    entries = [catalogEntry("notion", "collab")];
+    await mount();
+    expect(container.textContent).not.toContain("connectors.category.other");
+    expect(container.querySelector('[data-category="other"]')).toBeNull();
+
+    entries = [catalogEntry("notion", "collab"), customEntry("qmd-tools")];
+    await mount();
+    expect(container.textContent).toContain("connectors.category.other");
+    expect(container.querySelector('[data-category="other"]')).not.toBeNull();
+  });
+
+  it("filters to one category when its chip is clicked", async () => {
+    entries = [catalogEntry("notion", "collab"), catalogEntry("sentry", "dev")];
+    await mount();
+    await clickChip("dev");
+    expect(container.textContent).toContain("connectors.catalog.sentry");
+    expect(container.textContent).not.toContain("connectors.catalog.notion");
+  });
+
+  it("goes back to every section when the all chip is clicked", async () => {
+    entries = [catalogEntry("notion", "collab"), catalogEntry("sentry", "dev")];
+    await mount();
+    await clickChip("dev");
+    expect(container.textContent).not.toContain("connectors.catalog.notion");
+    await clickChip("all");
+    expect(container.textContent).toContain("connectors.catalog.notion");
+    expect(container.textContent).toContain("connectors.catalog.sentry");
+  });
+
+  it("falls back to all when the selected category disappears", async () => {
+    entries = [catalogEntry("notion", "collab"), customEntry("qmd-tools")];
+    await mount();
+    await clickChip("other");
+    expect(container.textContent).not.toContain("connectors.catalog.notion");
+
+    entries = [catalogEntry("notion", "collab")];
+    await mount();
+    expect(container.textContent).toContain("connectors.catalog.notion");
+  });
+
+  it("keeps the add button inside the sticky toolbar", async () => {
+    entries = [catalogEntry("notion", "collab")];
+    await mount();
+    const toolbar = container.querySelector('[data-testid="catalog-toolbar"]')!;
+    expect(toolbar.textContent).toContain("connectors.action.add");
   });
 });

@@ -10,6 +10,8 @@
  *    `transport` 放在 entry 级：未添加的条目 `instances` 为空，而那时也要画对控件。
  */
 
+import type { CatalogCategory } from "./mcp-catalog";
+
 export type ConnectorSourceId = "mcp-remote" | "mcp-builtin" | "mcp-custom";
 
 export type ConnectorStatus =
@@ -61,6 +63,11 @@ export interface ConnectorEntry {
   transport: "stdio" | "http";
   nameKey: string;
   descriptionKey?: string;
+  /**
+   * 目录分类 —— 只对来自目录的条目有意义。用户自建 / 内置条目没有它，
+   * 视图把它们归入 `other` 段。视图只消费 entry，不反查目录表。
+   */
+  category?: CatalogCategory;
   instances: ConnectorInstance[];
 }
 

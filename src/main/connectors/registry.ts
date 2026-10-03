@@ -17,6 +17,7 @@ import type {
   ConnectorEntry,
 } from "../../shared/connectors";
 import type { CatalogEntry } from "../../shared/mcp-catalog";
+import { sameEndpoint } from "./sources/mcp-remote-source";
 import type {
   LoadedMcpConfig,
   McpServerConfig,
@@ -102,6 +103,23 @@ export function buildRegistry(deps: RegistryDeps): Registry {
   ): Promise<ActionResult> {
     const entry = deps.catalog.find((c) => c.key === key);
     if (!entry) return { ok: false, error: `unknown catalog key: ${key}` };
+
+    // 同名条目已存在但不是这个端点时**拒绝写入**：`upsertServer` 对同 transport 是
+    // `{...existing, ...config}`（url 被换掉）、transport 不同则整个配置被替换 ——
+    // 无论哪种都会静默毁掉用户自己那台 server。归属判定刚把它显示成「未添加」，
+    // 这里就是那条路径的出口，必须堵上。
+    const existing = deps.loadConfig().servers.find((s) => s.name === key);
+    if (
+      existing &&
+      !(
+        "url" in existing.config && sameEndpoint(existing.config.url, entry.url)
+      )
+    ) {
+      return {
+        ok: false,
+        error: `a server named "${key}" already exists with a different endpoint; remove it first`,
+      };
+    }
 
     const config: McpServerConfig = { type: "http", url: entry.url };
     const res = await deps.addServer(key, config);

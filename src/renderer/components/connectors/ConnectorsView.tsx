@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ActionResult, ConnectorEntry } from "../../../shared/connectors";
+import {
+  CATEGORY_ORDER,
+  type CatalogCategory,
+} from "../../../shared/mcp-catalog";
 import { AddServerDialog } from "./AddServerDialog";
 import { ConnectorCard } from "./ConnectorCard";
 import { SettingsSkills } from "../settings/SettingsSkills";
@@ -9,6 +13,13 @@ import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store";
 
 type TabId = "connect" | "skills" | "plugins";
+
+/** 分段与 chip 的分组 id：目录的 5 个分类 + 视图层的 `other`（用户自建）。
+ *  放在模块级 —— 类型与顺序都是常量，放进组件体会每次渲染重建。 */
+type GroupId = CatalogCategory | "other";
+const GROUP_ORDER: readonly GroupId[] = [...CATEGORY_ORDER, "other"];
+const groupKeyOf = (entry: ConnectorEntry): GroupId =>
+  entry.category ?? "other";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -107,10 +118,27 @@ export function ConnectorsView() {
   // 只有一个 MCP 列表 —— 条目不再带 tab（动作由 entry.transport 判定）
   const connectEntries = entries;
 
-  // 平铺 + 固定顺序（D12）：不按状态分组、已添加的不上浮。
-  // 顺序 = registry.list() 的返回序（目录 → 应用自带 → 用户自建）。
-  // 本轮去掉了筛选行（只剩「全部」不构成筛选），所以直接用全量。
-  const shown = connectEntries;
+  // 顺序 = registry.list() 的返回序（目录 → 应用自带 → 用户自建），
+  // 但展示时按分类分段：段序由 CATEGORY_ORDER 决定，`other`（用户自建）永远在最后。
+  const [category, setCategory] = useState<GroupId | "all">("all");
+  /** 空分组不参与渲染 —— 没有内容的分段标题是噪音，chip 同理（见下）。 */
+  const groups = GROUP_ORDER.map((id) => ({
+    id,
+    entries: connectEntries.filter((e) => groupKeyOf(e) === id),
+  })).filter((g) => g.entries.length > 0);
+  /** 选中的分类若因条目消失而归零（用户删掉了最后一条自建 server），回落「全部」——
+   *  这样列表里不存在「筛选后空空荡荡」的状态。 */
+  const selectedGroupGone =
+    category !== "all" && !groups.some((g) => g.id === category);
+  // 只改显示是不够的：状态还记着那个分类，用户下次再加回同类条目时会静默套上旧筛选。
+  useEffect(() => {
+    if (selectedGroupGone) setCategory("all");
+  }, [selectedGroupGone]);
+  const activeCategory: GroupId | "all" = selectedGroupGone ? "all" : category;
+  const visibleGroups =
+    activeCategory === "all"
+      ? groups
+      : groups.filter((g) => g.id === activeCategory);
 
   const onConnect = useCallback(
     async (key: string) => {
@@ -262,20 +290,6 @@ export function ConnectorsView() {
             {label}
           </button>
         ))}
-        {/* 「添加」只对 MCP 有意义，所以只在这一 tab 出现 —— 放在标签栏里，
-            它不再独占一行（原先列表上方多出一整行空白） */}
-        {tab === "connect" && (
-          <>
-            <span className="flex-1" />
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="mb-1 px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
-            >
-              {t("connectors.action.add")}
-            </button>
-          </>
-        )}
       </div>
 
       {/* 外层相对定位：报错/提示用**浮层**呈现 —— 既不会留一片永久空白
@@ -284,40 +298,80 @@ export function ConnectorsView() {
         {(error || notice) && (
           <div
             role={error ? "alert" : "status"}
-            className={`absolute top-3 left-5 right-5 z-10 px-4 py-2.5 rounded-lg shadow-elevated text-sm ${
-              error ? "bg-error/10 text-error" : "bg-surface-hover text-text-secondary"
+            className={`absolute top-3 left-5 right-5 z-20 px-4 py-2.5 rounded-lg shadow-elevated text-sm ${
+              error
+                ? "bg-error/10 text-error"
+                : "bg-surface-hover text-text-secondary"
             }`}
           >
             {error || notice}
           </div>
         )}
         <div className="h-full overflow-y-auto p-5">
-        {tab === "connect" && (
-          <>
-
-            {shown.length === 0 ? (
-              <div className="py-10 text-center text-sm text-text-muted border border-dashed border-border-muted rounded-container">
-                {t("connectors.allHealthy")}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {shown.map((entry) => (
-                  <ConnectorCard
-                    key={entry.key}
-                    entry={entry}
-                    authorizing={authPending[entry.serverName] === true}
-                    onConnect={onConnect}
-                    onDisconnect={onDisconnect}
-                    onAuthorize={onAuthorize}
-                    onCancel={onCancel}
-                    onToggle={onToggle}
+          {tab === "connect" && (
+            <>
+              {/* 吸顶工具栏：左 = 分类 chip 条（可点 = 过滤），右 = 添加。
+                吸顶让「添加」永远可见，不随列表滚出视野。 */}
+              <div
+                data-testid="catalog-toolbar"
+                className="sticky top-0 z-10 -mx-1 px-1 pb-3 bg-background flex items-center gap-1.5 flex-wrap"
+              >
+                <CategoryChip
+                  id="all"
+                  label={t("connectors.category.all")}
+                  count={connectEntries.length}
+                  active={activeCategory}
+                  onSelect={setCategory}
+                />
+                {groups.map((g) => (
+                  <CategoryChip
+                    key={g.id}
+                    id={g.id}
+                    label={t(`connectors.category.${g.id}`)}
+                    count={g.entries.length}
+                    active={activeCategory}
+                    onSelect={setCategory}
                   />
                 ))}
-                <MoreComingCard />
+                <span className="flex-1" />
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(true)}
+                  className="px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
+                >
+                  {t("connectors.action.add")}
+                </button>
               </div>
-            )}
-          </>
-        )}
+
+              {visibleGroups.map((g) => (
+                <section key={g.id} className="mb-5 last:mb-0">
+                  <h3
+                    data-testid="section-title"
+                    className="text-sm font-semibold text-text-secondary mb-2 flex items-baseline gap-2"
+                  >
+                    {t(`connectors.category.${g.id}`)}
+                    <span className="text-[11px] font-normal text-text-muted">
+                      {g.entries.length}
+                    </span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    {g.entries.map((entry) => (
+                      <ConnectorCard
+                        key={entry.key}
+                        entry={entry}
+                        authorizing={authPending[entry.serverName] === true}
+                        onConnect={onConnect}
+                        onDisconnect={onDisconnect}
+                        onAuthorize={onAuthorize}
+                        onCancel={onCancel}
+                        onToggle={onToggle}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </>
+          )}
 
           {tab === "skills" && <SettingsSkills isActive={true} />}
           {tab === "plugins" && <PiExtensionManagerView />}
@@ -333,16 +387,36 @@ export function ConnectorsView() {
   );
 }
 
-/** 网格末尾的占位卡：首期 5 个不至于看起来像「就这么点」。 */
-function MoreComingCard() {
-  const { t } = useTranslation();
+/** 吸顶工具栏里的分类 chip。计数为 0 的分类不会走到这里 —— 调用方已经过滤掉了。 */
+function CategoryChip({
+  id,
+  label,
+  count,
+  active,
+  onSelect,
+}: {
+  id: GroupId | "all";
+  label: string;
+  count: number;
+  active: GroupId | "all";
+  onSelect: (id: GroupId | "all") => void;
+}) {
+  const isActive = active === id;
   return (
-    <div className="rounded-container border border-dashed border-border-muted grid place-items-center min-h-[96px]">
-      <div className="text-center text-xs text-text-muted leading-relaxed">
-        {t("connectors.moreComing")}
-        <br />
-        <span className="text-[11px]">{t("connectors.moreComingHint")}</span>
-      </div>
-    </div>
+    <button
+      type="button"
+      data-testid="category-chip"
+      data-category={id}
+      aria-pressed={isActive}
+      onClick={() => onSelect(id)}
+      className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap transition-colors ${
+        isActive
+          ? "bg-accent-muted text-accent border-transparent"
+          : "border-border-muted text-text-secondary hover:bg-surface-hover"
+      }`}
+    >
+      {label}
+      <span className="text-[11px] opacity-75 ml-1">{count}</span>
+    </button>
   );
 }

@@ -19,12 +19,14 @@ import { SERVER_SUMMARY_LOCAL } from "./mcp-builtin-source";
 
 export function buildCustomEntries(
   ctx: SourceBuildContext,
-  catalog: readonly CatalogEntry[],
+  _catalog: readonly CatalogEntry[],
 ): ConnectorEntry[] {
-  // 已归 remote / builtin 的名字不再重复列出。
+  // 已归 builtin 的名字不再重复列出。
+  // **不把目录 key 放进来**：目录条目全是 http，而本来源只产出 stdio —
+  // 名字撞上目录 key 的 stdio server（用户自己起的名字）不是那条目录实例，
+  // 放进来会让它从界面上静默消失。http 的撞名由 remote source 按端点判定。
   const claimed = new Set<string>();
   for (const preset of BUILTIN_PRESETS) claimed.add(preset.name);
-  for (const entry of catalog) claimed.add(entry.key);
 
   return (
     ctx.loaded.servers
@@ -51,7 +53,7 @@ export function buildCustomEntries(
                 : (ctx.statusFor(server.name) ?? { kind: "idle" }),
             summary: SERVER_SUMMARY_LOCAL,
             // 本来源只剩 stdio（http 在 remote 来源里）—— 所以动作是启用/停用
-            },
+          },
         ],
       }))
   );

@@ -10,6 +10,8 @@ const NOTION: CatalogEntry = {
   nameKey: "n",
   descriptionKey: "nd",
   url: "https://mcp.notion.com/mcp",
+  category: "collab",
+  verified: "authorized",
 };
 
 function ctx(
@@ -82,6 +84,11 @@ describe("buildCustomEntries", () => {
       [NOTION],
     );
     expect(entries).toEqual([]);
+  });
+
+  it("still lists a stdio server whose name equals a catalog key", () => {
+    const entries = buildCustomEntries(ctx([stdio("notion")]), [NOTION]);
+    expect(entries.map((e) => e.key)).toEqual(["mcp:server:notion"]);
   });
 
   it("excludes builtin preset names", () => {
