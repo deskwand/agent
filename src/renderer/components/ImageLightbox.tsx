@@ -13,6 +13,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Check,
   ExternalLink,
   AlertCircle,
   Loader2,
@@ -510,12 +511,12 @@ export function ImageLightbox({
               className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
               aria-label={t("imageLightbox.copy")}
             >
-              <Copy className="w-4 h-4" />
-              <span>
-                {copyFeedback
-                  ? t("imageLightbox.copied")
-                  : t("imageLightbox.copy")}
-              </span>
+              {copyFeedback ? (
+                <Check className="w-4 h-4 text-success" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+              <span>{t("imageLightbox.copy")}</span>
             </button>
           )}
           {canActOnImage && hasFilePath && (

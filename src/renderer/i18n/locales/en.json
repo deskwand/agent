@@ -1520,7 +1520,6 @@
   "imageLightbox": {
     "close": "Close",
     "copy": "Copy",
-    "copied": "Copied",
     "openExternal": "Open",
     "loadFailed": "Failed to load",
     "imageCount": "{{current}} / {{total}}",
