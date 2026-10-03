@@ -74,33 +74,43 @@ export interface LocalEngineOptions {
 }
 
 export class LocalTranscriptionEngine implements TranscriptionEngine {
+  /**
+   * 建一次就复用。这一步把模型读进内存（实测 743ms），而它曾经在
+   * `createStream()` 里 —— 每条录音都会调一次，于是每按一次麦克风都重付一遍。
+   * 识别状态跟着 stream 走，所以 stream 仍要每条会话新建，recognizer 不必。
+   */
+  private recognizer: unknown = null;
+
   constructor(private readonly options: LocalEngineOptions) {}
 
   createStream(): TranscriptionStream {
     const { addon, modelDir, numThreads = 4 } = this.options;
-    // modelType 与 bpeVocab 缺一不可：这个模型是 BPE 词表的 zipformer2，
-    // 少了就报 "Errors in config!"，而报错完全不提示是哪个字段。
-    const recognizer = addon.createOnlineRecognizer({
-      featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
-      modelConfig: {
-        transducer: {
-          encoder: `${modelDir}/encoder.int8.onnx`,
-          decoder: `${modelDir}/decoder.onnx`,
-          joiner: `${modelDir}/joiner.int8.onnx`,
+    if (!this.recognizer) {
+      // modelType 与 bpeVocab 缺一不可：这个模型是 BPE 词表的 zipformer2，
+      // 少了就报 "Errors in config!"，而报错完全不提示是哪个字段。
+      this.recognizer = addon.createOnlineRecognizer({
+        featConfig: { sampleRate: SAMPLE_RATE, featureDim: 80 },
+        modelConfig: {
+          transducer: {
+            encoder: `${modelDir}/encoder.int8.onnx`,
+            decoder: `${modelDir}/decoder.onnx`,
+            joiner: `${modelDir}/joiner.int8.onnx`,
+          },
+          tokens: `${modelDir}/tokens.txt`,
+          modelType: "zipformer2",
+          bpeVocab: `${modelDir}/bpe.model`,
+          numThreads,
+          provider: "cpu",
         },
-        tokens: `${modelDir}/tokens.txt`,
-        modelType: "zipformer2",
-        bpeVocab: `${modelDir}/bpe.model`,
-        numThreads,
-        provider: "cpu",
-      },
-      decodingMethod: "greedy_search",
-      enableEndpoint: true,
-      // 断句规则：尾部静音 2.4s、或无新词 1.2s、或说了 20s
-      rule1MinTrailingSilence: 2.4,
-      rule2MinTrailingSilence: 1.2,
-      rule3MinUtteranceLength: 20,
-    });
+        decodingMethod: "greedy_search",
+        enableEndpoint: true,
+        // 断句规则：尾部静音 2.4s、或无新词 1.2s、或说了 20s
+        rule1MinTrailingSilence: 2.4,
+        rule2MinTrailingSilence: 1.2,
+        rule3MinUtteranceLength: 20,
+      });
+    }
+    const recognizer = this.recognizer;
     const stream = addon.createOnlineStream(recognizer);
     let closed = false;
 

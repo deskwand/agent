@@ -82,7 +82,13 @@ export function registerVoiceIpc({
     percent: 0,
     installed: false,
   };
-  /** 引擎只在第一次用时构造，且只构造一次（构建 743ms，见设计文档 §3.3）。 */
+  /**
+   * 引擎（连同它内部的 recognizer）只构造一次，之后所有会话共用。
+   *
+   * 真正的冷启动代价（743ms，见设计文档 §3.3）不在构造函数里，而在**第一次**
+   * `createStream()` —— 那一步才把模型读进内存。所以必须让这个实例活到进程结束；
+   * 重建它就会把每条录音的延迟打回 743ms。
+   */
   let engine: LocalTranscriptionEngine | null = null;
 
   const pushInstallState = (next: Partial<VoiceInstallState>): void => {

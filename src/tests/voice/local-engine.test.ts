@@ -12,14 +12,20 @@ function fakeAddon(script: { partials: string[]; endpointsAt: number[] }) {
     accepts: 0,
     resets: 0,
     inputFinished: false,
+    recognizers: 0,
+    streams: 0,
   };
   let steps = 0;
   const addon = {
     createOnlineRecognizer: (config: unknown) => {
       calls.config = config;
+      calls.recognizers += 1;
       return { id: "recognizer" };
     },
-    createOnlineStream: () => ({ id: "stream" }),
+    createOnlineStream: () => {
+      calls.streams += 1;
+      return { id: "stream" };
+    },
     acceptWaveformOnline: () => {
       calls.accepts += 1;
     },
@@ -145,5 +151,22 @@ describe("LocalTranscriptionEngine", () => {
     push(stream, 3);
 
     expect(calls.accepts).toBe(before);
+  });
+
+  it("只建一次 recognizer，多条会话共用它", () => {
+    // `createOnlineRecognizer` 会把上百 MB 的模型读进内存（实测 743ms）。
+    // 它曾经被放在 createStream() 里 —— 而每条录音都会 createStream()，
+    // 于是每按一次键都重付一次这个代价。引擎实例虽然被缓存了，但它的构造函数
+    // 只存 options，缓存它等于没缓存。
+    const { addon, calls } = fakeAddon({ partials: [], endpointsAt: [] });
+    const engine = new LocalTranscriptionEngine({ addon, modelDir: "/m" });
+
+    engine.createStream();
+    engine.createStream();
+    engine.createStream();
+
+    expect(calls.recognizers).toBe(1);
+    // 每条会话仍然要有自己独立的 stream：状态是跟着 stream 走的
+    expect(calls.streams).toBe(3);
   });
 });
