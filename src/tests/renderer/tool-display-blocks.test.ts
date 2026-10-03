@@ -223,10 +223,12 @@ describe("buildToolDisplayBlocks", () => {
     ]);
 
     expect(blocks).toHaveLength(1);
+    // 失败的读取仍属于过程分组，但不计入已读取文件。
     expect(blocks[0]).toMatchObject({
       type: "process-summary",
       summary: {
-        readCount: 1,
+        readCount: 0,
+        calledRead: true,
         hasSearch: false,
         hasWebSearch: false,
         hasBrowse: false,

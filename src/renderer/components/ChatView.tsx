@@ -23,6 +23,7 @@ import { attachmentKeySet } from "../utils/attached-files";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { resolveDisplayedContextUsage } from "../utils/context-usage";
 import { MessageCard } from "./MessageCard";
+import { projectNestedToolMessages } from "../utils/nested-tool-display";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import {
   buildBackgroundAgentRows,
@@ -228,6 +229,7 @@ const LOAD_OLDER_THRESHOLD_PX = 160;
 // forcing every historical MessageCard to re-render on each streaming tick
 // and history prepend. Sharing one stable reference keeps memoization intact
 // (these are only ever read — ArtifactCard filters/maps, never mutates).
+const EMPTY_NESTED_CALLS = {};
 const EMPTY_RESULT_FILES: ResultFileEntry[] = [];
 const EMPTY_VIDEO_REFERENCES: VideoReference[] = [];
 
@@ -604,7 +606,7 @@ export function ChatView() {
     [messagesWithoutThinking],
   );
 
-  const displayedMessages = useMemo(() => {
+  const rawDisplayedMessages = useMemo(() => {
     // Use the full list (including auto-generated) for anchor lookup &
     // aggregation; filter auto-generated out of the final result only.
     const full = messagesWithoutThinking;
@@ -686,6 +688,22 @@ export function ChatView() {
     messagesWithoutThinking,
     partialMessage,
   ]);
+
+  const nestedCalls = useAppStore((s) =>
+    activeSessionId
+      ? (s.sessionStates[activeSessionId]?.nestedToolCalls ??
+        EMPTY_NESTED_CALLS)
+      : EMPTY_NESTED_CALLS,
+  );
+  const displayedMessages = useMemo(
+    () =>
+      projectNestedToolMessages(
+        rawDisplayedMessages,
+        nestedCalls,
+        activeTurn?.turnId,
+      ),
+    [rawDisplayedMessages, nestedCalls, activeTurn?.turnId],
+  );
 
   // Keep the window pinned to the tail while the user is at the bottom,
   // so streamed messages stay visible as the list grows.
@@ -822,7 +840,10 @@ export function ChatView() {
           ) {
             turnProcessSummaries.set(
               msgId,
-              buildProcessSummaryDisplayBlock(currentTurnProcessToolUses),
+              buildProcessSummaryDisplayBlock(
+                currentTurnProcessToolUses,
+                currentTurnBlocks,
+              ),
             );
             turnsWithProcessSummary.add(msg.turnId);
           }
@@ -1741,9 +1762,7 @@ export function ChatView() {
       </h2>
       <div ref={connectorMeasureRef} aria-hidden="true" className="hidden" />
       <div className="hidden" aria-hidden="true">
-        {showConnectorLabel && (
-          <Plug className="w-0 h-0" />
-        )}
+        {showConnectorLabel && <Plug className="w-0 h-0" />}
       </div>
 
       {/* Messages */}
@@ -1802,10 +1821,18 @@ export function ChatView() {
                         {turnProcessSummary ? (
                           <ProcessSummaryBlock
                             block={turnProcessSummary}
+                            allBlocks={displayedMessages
+                              .filter(
+                                (item) =>
+                                  item.role === "assistant" &&
+                                  item.turnId === message.turnId,
+                              )
+                              .flatMap((item) => item.content)}
                             message={message}
                           />
                         ) : null}
                         <MessageCard
+                          toolBlocksProjected={true}
                           message={message}
                           isStreaming={isStreaming}
                           isLatestRound={isLatestRound}

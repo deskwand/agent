@@ -23,8 +23,16 @@ import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
 import { ArtifactCard } from "./message/ArtifactCard";
 import { useAppStore } from "../store";
 import { Tooltip } from "./Tooltip";
+import {
+  projectNestedToolBlocks,
+  projectNestedToolMessages,
+} from "../utils/nested-tool-display";
+
+const EMPTY_NESTED_CALLS = {};
+const EMPTY_MESSAGES: Message[] = [];
 
 interface MessageCardProps {
+  toolBlocksProjected?: boolean;
   message: Message;
   isStreaming?: boolean;
   /** Whether this turn is the latest (actively streaming or just completed) */
@@ -73,6 +81,7 @@ export const MessageCard = memo(function MessageCard({
   artifactFiles = [],
   videoReferences = [],
   suppressProcessSummaries = false,
+  toolBlocksProjected = false,
   onForkMessage,
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
@@ -105,7 +114,42 @@ export const MessageCard = memo(function MessageCard({
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
     : [{ type: "text", text: String(rawContent ?? "") } as ContentBlock];
-  const visibleBlocks = stripSyntheticBlocks(contentBlocks);
+  const rawVisibleBlocks = stripSyntheticBlocks(contentBlocks);
+  const sessionMessages = useAppStore(
+    (s) => s.sessionStates[message.sessionId]?.messages ?? EMPTY_MESSAGES,
+  );
+  const nestedCalls = useAppStore(
+    (s) =>
+      s.sessionStates[message.sessionId]?.nestedToolCalls ?? EMPTY_NESTED_CALLS,
+  );
+  const activeTurnId = useAppStore(
+    (s) => s.sessionStates[message.sessionId]?.activeTurn?.turnId,
+  );
+  const sameTurnMessages = sessionMessages.filter(
+    (item) =>
+      item.role === "assistant" &&
+      Boolean(message.turnId) &&
+      item.turnId === message.turnId,
+  );
+  const lookupBlocks = sameTurnMessages.length
+    ? sameTurnMessages.flatMap((item) => item.content)
+    : rawVisibleBlocks;
+  const visibleBlocks =
+    toolBlocksProjected || isUser
+      ? rawVisibleBlocks
+      : projectNestedToolBlocks(
+          rawVisibleBlocks,
+          nestedCalls,
+          Boolean(activeTurnId) && message.turnId === activeTurnId,
+          lookupBlocks,
+        );
+  const allDisplayBlocks = sameTurnMessages.length
+    ? projectNestedToolMessages(
+        sameTurnMessages,
+        nestedCalls,
+        activeTurnId,
+      ).flatMap((item) => item.content)
+    : visibleBlocks;
   const lastTextBlockIndex = useMemo(() => {
     let idx = -1;
     visibleBlocks.forEach((b, i) => {
@@ -132,7 +176,10 @@ export const MessageCard = memo(function MessageCard({
     return ids;
   }, [visibleBlocks]);
   const groupedDisplayBlocks = useMemo(() => {
-    const blocks = buildToolDisplayBlocks(visibleBlocks).filter(
+    const blocks = buildToolDisplayBlocks(
+      visibleBlocks,
+      allDisplayBlocks,
+    ).filter(
       (block) => !suppressProcessSummaries || block.type !== "process-summary",
     );
     // Keep natural block order for the latest round so process summaries appear
@@ -140,7 +187,13 @@ export const MessageCard = memo(function MessageCard({
     // then results, then process summaries.
     if (isUser || isLatestRound) return blocks;
     return orderAssistantDisplayBlocks(blocks);
-  }, [isUser, isLatestRound, suppressProcessSummaries, visibleBlocks]);
+  }, [
+    isUser,
+    isLatestRound,
+    suppressProcessSummaries,
+    visibleBlocks,
+    allDisplayBlocks,
+  ]);
 
   // Group consecutive summary blocks so they render with tighter spacing,
   // matching inline text rhythm (historical messages where blocks are reordered).
@@ -301,7 +354,7 @@ export const MessageCard = memo(function MessageCard({
                       isStreaming &&
                       (block.type !== "text" || index === lastTextBlockIndex)
                     }
-                    allBlocks={visibleBlocks}
+                    allBlocks={allDisplayBlocks}
                   />
                 ))
               )}
@@ -322,7 +375,7 @@ export const MessageCard = memo(function MessageCard({
                         <ProcessSummaryBlock
                           key={`proc-${gi}-${bi}`}
                           block={b}
-                          allBlocks={visibleBlocks}
+                          allBlocks={allDisplayBlocks}
                           message={message}
                         />
                       );
@@ -332,7 +385,7 @@ export const MessageCard = memo(function MessageCard({
                         <ResultSummaryBlock
                           key={`res-${gi}-${bi}`}
                           block={b}
-                          allBlocks={visibleBlocks}
+                          allBlocks={allDisplayBlocks}
                           message={message}
                         />
                       );
@@ -366,7 +419,7 @@ export const MessageCard = memo(function MessageCard({
                   isStreaming &&
                   (block.type !== "text" || gi === lastTextBlockIndex)
                 }
-                allBlocks={visibleBlocks}
+                allBlocks={allDisplayBlocks}
                 message={message}
               />
             );

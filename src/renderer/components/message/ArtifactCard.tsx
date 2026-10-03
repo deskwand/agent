@@ -449,16 +449,32 @@ export const ArtifactCard = memo(function ArtifactCard({
                   <div className="mt-0.5 flex items-center gap-1.5 text-xs text-text-muted">
                     {status === "edited" ? (
                       <>
-                        <span className="text-success">+{file.addedLines}</span>
-                        <span className="text-error">-{file.removedLines}</span>
-                        <span>·</span>
+                        {!file.lineStatsUnavailable && (
+                          <>
+                            <span className="text-success">
+                              +{file.addedLines}
+                            </span>
+                            <span className="text-error">
+                              -{file.removedLines}
+                            </span>
+                            <span>·</span>
+                          </>
+                        )}
                         <span>{t("artifactCard.statusEdited")}</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-success">+{file.addedLines}</span>
-                        <span className="text-error">-{file.removedLines}</span>
-                        <span>·</span>
+                        {!file.lineStatsUnavailable && (
+                          <>
+                            <span className="text-success">
+                              +{file.addedLines}
+                            </span>
+                            <span className="text-error">
+                              -{file.removedLines}
+                            </span>
+                            <span>·</span>
+                          </>
+                        )}
                         <span>{t("artifactCard.statusNew")}</span>
                       </>
                     )}

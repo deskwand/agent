@@ -11,7 +11,12 @@
  *  - 同一个块列表重复投影结果不变（幂等）；
  *  - 同一轮尚未落入当前切片的外层结果可通过 lookupBlocks 显式传入。
  */
-import type { ContentBlock, ToolResultContent, ToolUseContent } from "../types";
+import type {
+  ContentBlock,
+  Message,
+  ToolResultContent,
+  ToolUseContent,
+} from "../types";
 import type {
   NestedToolCallsUi,
   NestedToolRuntimeUi,
@@ -118,4 +123,38 @@ export function projectNestedToolBlocks(
     }
   }
   return out;
+}
+
+export function projectNestedToolMessages(
+  messages: Message[],
+  runtimes: Record<string, NestedToolRuntimeUi>,
+  activeTurnId?: string,
+): Message[] {
+  const turns = new Map<string, ContentBlock[]>();
+  for (const message of messages) {
+    if (message.role !== "assistant" || !Array.isArray(message.content))
+      continue;
+    const key = message.turnId ?? message.id;
+    turns.set(key, [...(turns.get(key) ?? []), ...message.content]);
+  }
+  return messages
+    .map((message) => {
+      if (message.role !== "assistant" || !Array.isArray(message.content))
+        return message;
+      return {
+        ...message,
+        content: projectNestedToolBlocks(
+          message.content,
+          runtimes,
+          Boolean(activeTurnId) && message.turnId === activeTurnId,
+          turns.get(message.turnId ?? message.id) ?? message.content,
+        ),
+      };
+    })
+    .filter(
+      (message) =>
+        message.role !== "assistant" ||
+        !Array.isArray(message.content) ||
+        message.content.length > 0,
+    );
 }
