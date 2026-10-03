@@ -25,6 +25,7 @@ import {
   shell,
   Menu,
   nativeTheme,
+  session,
   Tray,
 } from "electron";
 import { join, resolve, dirname, isAbsolute, basename, extname } from "path";
@@ -115,6 +116,9 @@ import {
 import { registerConnectorsIpc } from "./connectors";
 import { registerCapabilitiesIpc } from "./capabilities";
 import { initStatusStore } from "./connectors/status-store";
+import { registerVoiceIpc } from "./voice/ipc";
+import { allowMediaRequest } from "./media-permission";
+import type { VoiceIpcHandle } from "./voice/ipc";
 import { mcpToolsSnapshotStatusSource } from "./mcp/mcp-status-source";
 import { getSandboxAdapter, shutdownSandbox } from "./sandbox/sandbox-adapter";
 import { SandboxSync } from "./sandbox/sandbox-sync";
@@ -261,6 +265,7 @@ let skillsManager: SkillsManager | null = null;
 let memoryService: MemoryService | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
 let petWindowController: PetWindowController | null = null;
+let voiceIpc: VoiceIpcHandle | null = null;
 
 function sanitizeDiagnosticBaseUrl(value: string | undefined): string | null {
   if (!value) {
@@ -744,6 +749,8 @@ function createWindow() {
       petWindowController?.dispose();
       petWindowController = null;
     }
+    voiceIpc?.dispose();
+    voiceIpc = null;
   });
 
   // Notify renderer of fullscreen state changes (for macOS titlebar spacer)
@@ -997,6 +1004,23 @@ app
   .then(async () => {
     await installVideoProtocol();
     installFileDownloadFallback();
+
+    // 这个 handler 一旦存在就替代了 Electron 的默认策略：不显式放行等于全部拒绝。
+    // 只放行自身窗口的「纯音频」请求 —— 摄像头一律拒。
+    session.defaultSession.setPermissionRequestHandler(
+      (webContents, permission, callback, details) => {
+        // 判定抽到 ./media-permission 是为了能测 —— 这段原本内联在这里，
+        // 而 index.ts import 就会启动应用，单测够不到（见该模块的注释）。
+        callback(
+          allowMediaRequest({
+            isOwnWindow:
+              mainWindow !== null && webContents === mainWindow.webContents,
+            permission,
+            mediaTypes: (details as { mediaTypes?: string[] }).mediaTypes,
+          }),
+        );
+      },
+    );
 
     // Smoke test mode: verify the app can start, then exit cleanly
     if (process.argv.includes("--smoke-test")) {
@@ -2877,6 +2901,16 @@ registerConnectorsIpc({
 
 // 能力的 IPC：目前只有 Computer Use 的 macOS 权限查询与跳转系统设置。
 registerCapabilitiesIpc({ ipcMain, openUrl: openExternalUrl });
+
+// 语音输入：七个 invoke 通道 + 独立的 voice.event 推送通道。
+voiceIpc = registerVoiceIpc({
+  userDataPath: app.getPath("userData"),
+  sendEvent: (event) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("voice.event", event);
+    }
+  },
+});
 
 // Skills API handlers
 ipcMain.handle("skills.getAll", async () => {

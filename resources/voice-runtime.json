@@ -1,0 +1,10 @@
+{
+  "modelUrl": "https://file.deskwand.com/voice-models/x-asr-480ms-zh-en-punct-int8.tar.gz",
+  "modelSha256": "f442cfced700bc374fd1ee76f9217b3e3b749c5eb9326404accf4ef96ce92bf6",
+  "nodeSha256": "db2a7b8b18d950b6e9ca5c1c919afec33fd3dd2bfef1aade0bea5a9fe7a1f0f1",
+  "runtimeSha256": {
+    "darwin-arm64": "e1abc1d9676478996574de922e55714d80b4500b860bc4e7349aa01cd0ea4929",
+    "win32-x64": "fe522f02a5c113c2567a43982107ef41ae517f9a431931e90731e7e4d4341073",
+    "linux-x64": "13291bcd825da5858ca27a35443e9a2c229a40616c0910086de2db12c5c9312c"
+  }
+}

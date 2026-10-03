@@ -66,6 +66,17 @@ const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
   canStop: false,
   onStop: () => {},
   isSubmitting: false,
+  voice: {
+    status: "idle",
+    level: 0,
+    seconds: 0,
+    onToggle: () => {},
+    onCancel: () => {},
+    canPolish: false,
+    canRevert: false,
+    onPolish: () => {},
+    onRevert: () => {},
+  },
 };
 
 /**
@@ -258,6 +269,17 @@ describe("ChatInputBottomBar expand button", () => {
           ...baseBarProps,
           onToggleExpand: () => {},
           hasInputContent: false,
+          voice: {
+            status: "idle",
+            level: 0,
+            seconds: 0,
+            onToggle: () => {},
+            onCancel: () => {},
+            canPolish: false,
+            canRevert: false,
+            onPolish: () => {},
+            onRevert: () => {},
+          },
           ...props,
         }),
       );

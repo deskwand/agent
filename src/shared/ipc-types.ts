@@ -451,3 +451,52 @@ export interface ElementSelectionRef {
   width: number;
   height: number;
 }
+
+// ---------------------------------------------------------------------------
+// Voice
+// ---------------------------------------------------------------------------
+
+export type VoiceErrorCode =
+  | "VOICE_NOT_CONFIGURED"
+  | "VOICE_NOT_INSTALLED"
+  | "VOICE_ENGINE_FAILED"
+  | "VOICE_MIC_DENIED"
+  | "VOICE_MIC_UNAVAILABLE"
+  | "VOICE_INSTALL_FAILED";
+
+export type VoiceStartResult =
+  | { ok: true; sessionId: string }
+  | { ok: false; code: VoiceErrorCode };
+
+export type VoiceInstallPhase =
+  | "idle"
+  | "downloading"
+  | "extracting"
+  | "ready"
+  | "error";
+
+export interface VoiceInstallState {
+  phase: VoiceInstallPhase;
+  /** 0-100。 */
+  percent: number;
+  installed: boolean;
+  error?: string;
+}
+
+export interface VoicePolishedResult {
+  ok: boolean;
+  text?: string;
+  reason?: "empty" | "failed" | "suspicious";
+}
+
+/**
+ * `voice.event` 通道的推送载荷。
+ *
+ * `partial.text` 是**累积全量文本**，不是增量：渲染层只做替换，不做拼接，
+ * 于是 UI 永远不会显示拼错的中间态。
+ */
+export type VoiceEvent =
+  | { type: "partial"; sessionId: string; text: string }
+  | { type: "done"; sessionId: string; text: string; discarded: boolean }
+  | { type: "error"; sessionId: string; code: VoiceErrorCode; message: string }
+  | { type: "install"; state: VoiceInstallState };

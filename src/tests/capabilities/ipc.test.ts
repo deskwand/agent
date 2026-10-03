@@ -19,7 +19,12 @@ function fakeIpcMain() {
   return { ipcMain, handlers };
 }
 
-const GRANTED = { required: true, accessibility: true, screenRecording: true };
+const GRANTED = {
+  required: true,
+  accessibility: true,
+  screenRecording: true,
+  microphone: true,
+};
 
 describe("registerCapabilitiesIpc", () => {
   it("returns the injected permission state", async () => {
@@ -68,6 +73,7 @@ describe("registerCapabilitiesIpc", () => {
     registerCapabilitiesIpc({ ipcMain });
     await handlers.get("capabilities.permissions")!(null);
     expect(media).toHaveBeenCalledWith("screen");
+    expect(media).toHaveBeenCalledWith("microphone");
     // false = 只查询、不弹窗（弹窗该发生在真正用到该能力的时候）
     expect(trusted).toHaveBeenCalledWith(false);
   });

@@ -52,6 +52,17 @@ const baseProps: ChatInputBottomBarProps = {
   onStop: () => {},
   isSubmitting: false,
   hasInputContent: false,
+  voice: {
+    status: "idle",
+    level: 0,
+    seconds: 0,
+    onToggle: () => {},
+    onCancel: () => {},
+    canPolish: false,
+    canRevert: false,
+    onPolish: () => {},
+    onRevert: () => {},
+  },
 };
 
 describe("底栏到技能入口的接线", () => {

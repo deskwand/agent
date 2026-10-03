@@ -101,6 +101,8 @@ export interface ChatInputHandle {
    * 绝不覆盖已有文字；仅空白草稿被替换，是与 hasInputContent 同一套「空白不算内容」的定义。
    */
   appendPromptExample: (text: string) => void;
+  /** 读编辑器纯文本。语音输入用它取录音开始前的草稿快照。 */
+  getPrompt: () => string;
 }
 
 interface ChatInputProps {
@@ -110,6 +112,11 @@ interface ChatInputProps {
   /** 草稿内容变化时上报（文本 / 贴图 / 附件任一存在即为 true）。 */
   onContentChange?: (hasInputContent: boolean) => void;
   disabled?: boolean;
+  /**
+   * 录音中：编辑器置为只读。
+   * 不复用 `disabled` —— 那个 prop 还带整框禁用语义，混用会让两件事互相牵连。
+   */
+  voiceRecording?: boolean;
   submitDisabled?: boolean;
   placeholder: string;
   cardClassName: string;
@@ -150,6 +157,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       onCommand,
       onContentChange,
       disabled = false,
+      voiceRecording = false,
       submitDisabled = false,
       placeholder,
       cardClassName,
@@ -622,6 +630,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       addFiles(files: ChatInputAttachedFile[]) {
         setAttachedFiles((prev) => mergeAttachedFiles(prev, files));
       },
+      getPrompt: () => getPlainText(),
     }));
 
     // 上报附件列表：选择器用它把已附加的文件标成「已添加」。
@@ -1231,7 +1240,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
               <AttachmentTiles tiles={attachmentTiles} />
               <div
                 ref={editorRef}
-                contentEditable={!disabled}
+                contentEditable={!disabled && !voiceRecording}
                 suppressContentEditableWarning
                 role="textbox"
                 aria-multiline="true"

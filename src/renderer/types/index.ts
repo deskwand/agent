@@ -22,6 +22,7 @@ import type {
   NestedToolRuntimeUi,
   NestedToolStatus,
 } from "../../shared/nested-tool-calls";
+import type { VoiceShortcut } from "../../shared/voice-shortcuts";
 
 // Session types
 export interface Session {
@@ -876,6 +877,10 @@ export interface VisionModelConfig {
   baseUrl?: string;
   model: string;
 }
+export interface VoiceEngineConfig {
+  enabled: boolean;
+  shortcut: VoiceShortcut;
+}
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
 export type ProviderProfileKey = string;
@@ -958,6 +963,7 @@ export interface AppConfig {
   telemetryEnabled?: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
+  voiceEngine?: VoiceEngineConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports

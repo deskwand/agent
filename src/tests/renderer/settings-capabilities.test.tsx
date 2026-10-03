@@ -68,6 +68,7 @@ beforeEach(() => {
     required: true,
     accessibility: false,
     screenRecording: true,
+    microphone: true,
   });
   api.capabilities.openPermissionSettings.mockResolvedValue(undefined);
 });
@@ -182,6 +183,7 @@ describe("SettingsCapabilities", () => {
       required: true,
       accessibility: true,
       screenRecording: false,
+      microphone: true,
     });
     await mount();
     expect(container.textContent).toContain(
@@ -194,6 +196,7 @@ describe("SettingsCapabilities", () => {
       required: false,
       accessibility: false,
       screenRecording: false,
+      microphone: true,
     });
     await mount();
     expect(
@@ -206,6 +209,7 @@ describe("SettingsCapabilities", () => {
       required: true,
       accessibility: true,
       screenRecording: true,
+      microphone: true,
     });
     await mount();
     // 只断言「没有 row」是不够的：容器与「重新检查」也必须一起消失。
@@ -234,6 +238,7 @@ describe("SettingsCapabilities", () => {
       required: true,
       accessibility: true,
       screenRecording: false,
+      microphone: true,
     });
     await mount();
     await act(async () => {
@@ -243,6 +248,46 @@ describe("SettingsCapabilities", () => {
     });
     expect(api.capabilities.openPermissionSettings).toHaveBeenCalledWith(
       "screen-recording",
+    );
+  });
+
+  it("reports a missing microphone by its own field, not by position", async () => {
+    // 回归测试：设置页重构后，这个判断曾退化成三元链
+    // （`kind === "accessibility" ? !a : !screenRecording`），于是
+    // 屏幕录制已授予、麦克风未授予时，麦克风那一行**根本不会出现**。
+    api.capabilities.permissions.mockResolvedValue({
+      required: true,
+      accessibility: true,
+      screenRecording: true,
+      microphone: false,
+    });
+    await mount();
+
+    const rows = container.querySelectorAll('[data-testid="permission-row"]');
+    expect(rows.length).toBe(1);
+    expect(container.textContent).toContain(
+      "settings.capabilities.permission.microphone",
+    );
+    expect(container.textContent).toContain(
+      "settings.capabilities.permission.microphoneHint",
+    );
+  });
+
+  it("opens the microphone pane from its own row", async () => {
+    api.capabilities.permissions.mockResolvedValue({
+      required: true,
+      accessibility: true,
+      screenRecording: true,
+      microphone: false,
+    });
+    await mount();
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="permission-open"]')!
+        .click();
+    });
+    expect(api.capabilities.openPermissionSettings).toHaveBeenCalledWith(
+      "microphone",
     );
   });
 

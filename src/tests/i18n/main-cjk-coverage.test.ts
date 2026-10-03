@@ -18,6 +18,8 @@ import { describe, expect, it } from "vitest";
 const ALLOWED_FILES = new Set([
   // Model-visible prompts / JSON field descriptions.
   "src/main/memory/memory-prompts.ts",
+  // 同样是模型提示词，不是 UI 文案：整理口语转写的 system prompt。
+  "src/main/voice/transcript-polish.ts",
   // Chinese stop-word list (tokenization, not copy).
   "src/main/memory/memory-utils.ts",
   // Intentionally bilingual prompt: the model must answer in the user's language.

@@ -37,6 +37,9 @@ import {
 } from "./ChatInput";
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
+import { toMicButtonProps } from "./VoiceMicButton";
+import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
+import { usePushToTalk } from "../hooks/usePushToTalk";
 import { ConnectCards } from "./welcome/connect-cards";
 import { connectionNoticeValues } from "./welcome/connection-notice";
 import {
@@ -70,6 +73,55 @@ export function WelcomeView() {
   const setShowLoginModal = useAppStore((state) => state.setShowLoginModal);
   const setGlobalNotice = useAppStore((state) => state.setGlobalNotice);
   const appConfig = useAppConfig();
+
+  // 语音输入。与 ChatView 同一套接线；注意 getSnapshot 是**实时读取**输入框。
+  const voiceEngine = appConfig?.voiceEngine;
+  const voiceNoticeSeqRef = useRef(0);
+  const notifyVoice = useCallback(
+    (messageKey: string, type: "warning" | "error") => {
+      voiceNoticeSeqRef.current += 1;
+      setGlobalNotice({
+        id: `voice-${Date.now()}-${voiceNoticeSeqRef.current}`,
+        type,
+        message: t(messageKey),
+        messageKey,
+      });
+    },
+    [setGlobalNotice, t],
+  );
+  const voice = useVoiceInput({
+    enabled: Boolean(voiceEngine?.enabled),
+    getSnapshot: () => chatInputRef.current?.getPrompt() ?? "",
+    onText: (text) => chatInputRef.current?.setPrompt(text),
+    onRestore: (snapshot) => chatInputRef.current?.setPrompt(snapshot),
+    onBlocked: () => notifyVoice("chat.voiceEngineOff", "warning"),
+    onError: (code) => notifyVoice(VOICE_MESSAGE_KEYS[code], "error"),
+    onPolishFailed: (reason) =>
+      notifyVoice(
+        reason === "suspicious"
+          ? "chat.voicePolishSuspicious"
+          : "chat.voicePolishFailed",
+        "warning",
+      ),
+  });
+  // 记住这次录音是不是「按住说话」启动的，否则手滑按一下 Option 会把按钮启动的录音停掉。
+  const pushToTalkOwns = useRef(false);
+  usePushToTalk(
+    voiceEngine?.shortcut ?? "disabled",
+    {
+      onStart: () => {
+        if (voice.status !== "idle") return;
+        pushToTalkOwns.current = true;
+        voice.toggle();
+      },
+      onStop: () => {
+        if (!pushToTalkOwns.current) return;
+        pushToTalkOwns.current = false;
+        if (voice.status === "recording") voice.toggle();
+      },
+    },
+    Boolean(voiceEngine?.enabled),
+  );
   const showConnectCards = appConfig !== null && !isConfigured;
   const projectName = (() => {
     if (!workingDir) return "";
@@ -524,6 +576,7 @@ export function WelcomeView() {
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
+                voice={toMicButtonProps(voice)}
               />
             )
           }

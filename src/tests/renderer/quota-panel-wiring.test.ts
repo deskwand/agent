@@ -53,6 +53,17 @@ const baseProps: ChatInputBottomBarProps = {
   onStop: () => {},
   isSubmitting: false,
   hasInputContent: false,
+  voice: {
+    status: "idle",
+    level: 0,
+    seconds: 0,
+    onToggle: () => {},
+    onCancel: () => {},
+    canPolish: false,
+    canRevert: false,
+    onPolish: () => {},
+    onRevert: () => {},
+  },
 };
 
 const quota = [

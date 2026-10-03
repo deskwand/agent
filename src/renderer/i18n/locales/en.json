@@ -100,7 +100,24 @@
         "recheck": "Check again"
       },
       "loadFailed": "Could not load capabilities",
-      "actionFailed": "Could not change this capability"
+      "actionFailed": "Could not change this capability",
+      "localFeatures": "On-device features",
+      "voice": {
+        "title": "Voice input",
+        "desc": "Offline and free to use. Needs a ~140MB download and keeps ~300MB in memory.",
+        "install": "Install voice engine",
+        "installing": "Installing… {{percent}}%",
+        "installed": "Installed",
+        "notInstalled": "Not installed",
+        "remove": "Delete voice model",
+        "installFailed": "Installation failed — you can retry",
+        "shortcut": "Push to talk",
+        "shortcutAltRight": "Right Option (recommended)",
+        "shortcutAltSpace": "⌥ + Space",
+        "shortcutMetaShiftSpace": "⌘ + ⇧ + Space",
+        "shortcutDisabled": "No shortcut",
+        "shortcutFnHint": "The Fn key cannot be observed inside the app, so right Option is the default (matching WeChat desktop’s hold-right-Alt)."
+      }
     },
     "groupGeneral": "General",
     "groupPersonal": "Personal",
@@ -1007,7 +1024,20 @@
     "forkFailed": "Failed to fork session. Please try again.",
     "forkSuffix": " (fork)",
     "elapsedRunning": "running {{time}}",
-    "elapsedDone": "took {{time}}"
+    "elapsedDone": "took {{time}}",
+    "voiceStart": "Voice input",
+    "voiceStop": "Stop recording",
+    "voiceCancel": "Cancel this voice input",
+    "voicePolish": "Clean up",
+    "voiceRevert": "Undo",
+    "voiceEngineOff": "Voice input is off — turn it on in Settings → Capabilities",
+    "voiceNotInstalled": "The voice engine is not installed — install it in Settings → Capabilities",
+    "voiceEngineFailed": "The voice engine failed to start — try reinstalling it",
+    "voiceMicDenied": "Microphone access was denied. Allow DeskWand to use the microphone in System Settings.",
+    "voiceMicUnavailable": "No usable microphone found",
+    "voiceInstallFailed": "Voice engine installation failed",
+    "voicePolishFailed": "Clean-up failed, keeping the original text",
+    "voicePolishSuspicious": "The clean-up result looked wrong, keeping the original text"
   },
   "steer": {
     "label": "Steer",
