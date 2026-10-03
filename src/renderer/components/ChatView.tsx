@@ -705,6 +705,17 @@ export function ChatView() {
     [rawDisplayedMessages, nestedCalls, activeTurn?.turnId],
   );
 
+  const turnBlocksById = useMemo(() => {
+    const turns = new Map<string, ContentBlock[]>();
+    for (const message of displayedMessages) {
+      if (message.role !== "assistant" || !message.turnId) continue;
+      const blocks = turns.get(message.turnId) ?? [];
+      blocks.push(...message.content);
+      turns.set(message.turnId, blocks);
+    }
+    return turns;
+  }, [displayedMessages]);
+
   // Keep the window pinned to the tail while the user is at the bottom,
   // so streamed messages stay visible as the list grows.
   useEffect(() => {
@@ -813,14 +824,8 @@ export function ChatView() {
         const next = mergedMessages[i + 1];
         if (!next || next.role === "user") {
           turnEndIds.add(msgId);
-          const summaryBlocks = msg.turnId
-            ? displayedMessages
-                .filter(
-                  (item) =>
-                    item.role === "assistant" && item.turnId === msg.turnId,
-                )
-                .flatMap((item) => item.content)
-            : currentTurnBlocks;
+          const summaryBlocks =
+            (msg.turnId && turnBlocksById.get(msg.turnId)) || currentTurnBlocks;
           const summaryItems = summaryBlocks.filter(
             (block): block is ToolUseContent => block.type === "tool_use",
           );
@@ -886,7 +891,7 @@ export function ChatView() {
     mergedMessages,
     hoistedProcessSummaryTurnIds,
     activeSessionCwd,
-    displayedMessages,
+    turnBlocksById,
   ]);
 
   // Dock ticks are anchored to the IN-MEMORY window (all loaded history),
@@ -1826,18 +1831,21 @@ export function ChatView() {
                         {turnProcessSummary ? (
                           <ProcessSummaryBlock
                             block={turnProcessSummary}
-                            allBlocks={displayedMessages
-                              .filter(
-                                (item) =>
-                                  item.role === "assistant" &&
-                                  item.turnId === message.turnId,
-                              )
-                              .flatMap((item) => item.content)}
+                            allBlocks={
+                              message.turnId
+                                ? turnBlocksById.get(message.turnId)
+                                : message.content
+                            }
                             message={message}
                           />
                         ) : null}
                         <MessageCard
                           toolBlocksProjected={true}
+                          toolLookupBlocks={
+                            message.turnId
+                              ? turnBlocksById.get(message.turnId)
+                              : message.content
+                          }
                           message={message}
                           isStreaming={isStreaming}
                           isLatestRound={isLatestRound}

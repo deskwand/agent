@@ -33,6 +33,7 @@ const EMPTY_MESSAGES: Message[] = [];
 
 interface MessageCardProps {
   toolBlocksProjected?: boolean;
+  toolLookupBlocks?: ContentBlock[];
   message: Message;
   isStreaming?: boolean;
   /** Whether this turn is the latest (actively streaming or just completed) */
@@ -82,6 +83,7 @@ export const MessageCard = memo(function MessageCard({
   videoReferences = [],
   suppressProcessSummaries = false,
   toolBlocksProjected = false,
+  toolLookupBlocks,
   onForkMessage,
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
@@ -109,11 +111,18 @@ export const MessageCard = memo(function MessageCard({
   const activeTurnId = useAppStore(
     (s) => s.sessionStates[message.sessionId]?.activeTurn?.turnId,
   );
-  const sameTurnMessages = sessionMessages.filter(
-    (item) =>
-      item.role === "assistant" &&
-      Boolean(message.turnId) &&
-      item.turnId === message.turnId,
+  const sameTurnMessages = useMemo(
+    () =>
+      toolBlocksProjected
+        ? EMPTY_MESSAGES
+        : sessionMessages.filter(
+            (item) =>
+              item.role === "assistant" &&
+              Array.isArray(item.content) &&
+              Boolean(message.turnId) &&
+              item.turnId === message.turnId,
+          ),
+    [toolBlocksProjected, sessionMessages, message.turnId],
   );
   const lookupBlocks = sameTurnMessages.length
     ? sameTurnMessages.flatMap((item) => item.content)
@@ -127,13 +136,19 @@ export const MessageCard = memo(function MessageCard({
           Boolean(activeTurnId) && message.turnId === activeTurnId,
           lookupBlocks,
         );
-  const allDisplayBlocks = sameTurnMessages.length
-    ? projectNestedToolMessages(
-        sameTurnMessages,
-        nestedCalls,
-        activeTurnId,
-      ).flatMap((item) => item.content)
-    : visibleBlocks;
+  const projectedLookup = useMemo(
+    () =>
+      sameTurnMessages.length
+        ? projectNestedToolMessages(
+            sameTurnMessages,
+            nestedCalls,
+            activeTurnId,
+          ).flatMap((item) => item.content)
+        : undefined,
+    [sameTurnMessages, nestedCalls, activeTurnId],
+  );
+  const allDisplayBlocks = toolLookupBlocks ?? projectedLookup ?? visibleBlocks;
+
   const lastTextBlockIndex = useMemo(() => {
     let idx = -1;
     visibleBlocks.forEach((b, i) => {

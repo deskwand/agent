@@ -128,12 +128,23 @@ export function projectNestedToolMessages(
   runtimes: Record<string, NestedToolRuntimeUi>,
   activeTurnId?: string,
 ): Message[] {
+  if (
+    !messages.some(
+      (message) =>
+        message.role === "assistant" &&
+        Array.isArray(message.content) &&
+        message.content.some(isCodemode),
+    )
+  )
+    return messages;
   const turns = new Map<string, ContentBlock[]>();
   for (const message of messages) {
     if (message.role !== "assistant" || !Array.isArray(message.content))
       continue;
     const key = message.turnId ?? message.id;
-    turns.set(key, [...(turns.get(key) ?? []), ...message.content]);
+    const blocks = turns.get(key) ?? [];
+    blocks.push(...message.content);
+    turns.set(key, blocks);
   }
   return messages
     .map((message) => {
