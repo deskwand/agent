@@ -669,6 +669,7 @@ export type ProcessSummaryFragment = {
 export function getProcessSummaryFragments(
   summary: ProcessSummary,
   t: TFunction,
+  status?: ToolGroupStatusUi,
 ): ProcessSummaryFragment[] {
   const fragments: ProcessSummaryFragment[] = [];
 
@@ -679,6 +680,9 @@ export function getProcessSummaryFragments(
       }),
       iconType: "read",
     });
+  }
+  if (summary.readCount === 0 && summary.calledRead) {
+    fragments.push({ text: t("tool.grouped.calledRead"), iconType: "read" });
   }
   if ((summary.browseDirCount ?? 0) > 0) {
     fragments.push({
@@ -695,6 +699,12 @@ export function getProcessSummaryFragments(
   if (summary.hasSearch) {
     fragments.push({
       text: t("tool.grouped.searchedCode"),
+      iconType: "search",
+    });
+  }
+  if (!summary.hasSearch && summary.calledSearch) {
+    fragments.push({
+      text: t("tool.grouped.calledSearch"),
       iconType: "search",
     });
   }
@@ -785,6 +795,28 @@ export function getProcessSummaryFragments(
     });
   }
 
+  if ((summary.scriptCount ?? 0) > 0) {
+    const count = summary.scriptCount ?? 0;
+    fragments.push({
+      text: status?.running
+        ? t("tool.grouped.runningScript")
+        : t(
+            pluralKey(
+              status?.failed || status?.unfinished || status?.unavailable
+                ? "tool.grouped.calledScripts"
+                : "tool.grouped.executedScripts",
+              count,
+            ),
+            { count },
+          ),
+      iconType: "command",
+    });
+  } else if (fragments.length === 0 && status?.running) {
+    fragments.push({
+      text: t("tool.grouped.runningScript"),
+      iconType: "command",
+    });
+  }
   return fragments;
 }
 
@@ -809,6 +841,10 @@ export function formatResultSummaryLabel(
     );
   }
 
+  if (summary.editedFiles === 0 && summary.calledEdit)
+    fragments.push(t("tool.grouped.calledEdit"));
+  if (summary.writtenFiles === 0 && summary.calledWrite)
+    fragments.push(t("tool.grouped.calledWrite"));
   return joinSummaryFragments(fragments, t);
 }
 

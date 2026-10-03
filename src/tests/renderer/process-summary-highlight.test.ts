@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ProcessSummaryBlock } from "../../renderer/components/message/ProcessSummaryBlock";
 import i18n from "../../renderer/i18n/config";
 import { useAppStore } from "../../renderer/store";
@@ -46,9 +46,17 @@ const message: Message = {
 describe("ProcessSummaryBlock highlight and expand", () => {
   let container: HTMLDivElement;
   let root: Root;
+  const scrollIntoViewSpy = vi.fn();
 
   beforeEach(async () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+    // jsdom 没有 scrollIntoView；失败跳转的 ref 滚动要能被观测。
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: scrollIntoViewSpy,
+    });
+    scrollIntoViewSpy.mockClear();
     await i18n.changeLanguage("zh");
     useAppStore.setState(useAppStore.getInitialState(), true);
     useAppStore.setState({
@@ -168,5 +176,103 @@ describe("ProcessSummaryBlock highlight and expand", () => {
         ?.click();
     });
     expect(container.textContent).toContain("建表");
+  });
+
+  it("折叠时保留失败提示，点击失败按钮展开并定位首个失败子项", () => {
+    const failedBlock = {
+      ...block,
+      items: [
+        {
+          type: "tool_use" as const,
+          id: "child",
+          name: "read",
+          input: {},
+          trace: {
+            parentToolCallId: "p",
+            status: "error" as const,
+            parentStatus: "ok" as const,
+            complete: true,
+            source: "final" as const,
+          },
+        },
+      ],
+      status: {
+        running: false,
+        failed: true,
+        unfinished: false,
+        incomplete: false,
+        unavailable: false,
+        firstFailedToolCallId: "child",
+      },
+    } as unknown as ProcessSummaryDisplayBlock;
+
+    act(() =>
+      root.render(
+        createElement(ProcessSummaryBlock, {
+          block: failedBlock,
+          message: { ...message, content: failedBlock.items },
+          allBlocks: failedBlock.items,
+        }),
+      ),
+    );
+
+    // 折叠态即可断言失败标签，不需要先打开详情。
+    expect(container.textContent).toContain(
+      i18n.t("tool.grouped.failedOperations"),
+    );
+    expect(
+      container
+        .querySelector("button[aria-expanded]")
+        ?.getAttribute("aria-expanded"),
+    ).toBe("false");
+
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>("[data-tool-group-failure]")
+        ?.click(),
+    );
+    expect(
+      container
+        .querySelector("button[aria-expanded]")
+        ?.getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(useAppStore.getState().highlightedToolCallId).toBe("child");
+    // 失败条目由 ref 滚进视野，而不是 querySelector 查业务 DOM。
+    expect(scrollIntoViewSpy).toHaveBeenCalled();
+  });
+
+  it("命中被投影掉的父脚本 ID 时也展开脚本详情并高亮", () => {
+    const scriptBlock = {
+      ...block,
+      items: [],
+      summary: { ...block.summary, subagentCount: 0, subagents: [] },
+      scripts: [{ id: "script-1", input: { code: "1 + 1" } }],
+    } as unknown as ProcessSummaryDisplayBlock;
+
+    useAppStore.setState({ pendingExpandToolCallId: "script-1" });
+    act(() =>
+      root.render(
+        createElement(ProcessSummaryBlock, {
+          block: scriptBlock,
+          message,
+          allBlocks: [],
+        }),
+      ),
+    );
+
+    expect(
+      container
+        .querySelector("button[aria-expanded]")
+        ?.getAttribute("aria-expanded"),
+    ).toBe("true");
+    expect(useAppStore.getState().pendingExpandToolCallId).toBeNull();
+    expect(container.textContent).toContain(
+      i18n.t("tool.grouped.scriptDetails"),
+    );
+
+    act(() => {
+      useAppStore.setState({ highlightedToolCallId: "script-1" });
+    });
+    expect(container.querySelector(".ring-2")).not.toBeNull();
   });
 });
