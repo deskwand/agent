@@ -788,8 +788,6 @@ export function ChatView() {
     const turnProcessSummaries = new Map<string, ProcessSummaryDisplayBlock>();
     const turnsWithProcessSummary = new Set<string>();
     let latestAssistantId: string | null = null;
-    let currentTurnToolUses: ToolUseContent[] = [];
-    let currentTurnProcessToolUses: ToolUseContent[] = [];
     let currentTurnAssistantText: string[] = [];
     let currentTurnBlocks: ContentBlock[] = [];
 
@@ -803,14 +801,9 @@ export function ChatView() {
         const blocks = Array.isArray(rawContent)
           ? (rawContent as ContentBlock[])
           : [];
-        const toolUses = blocks.filter(
-          (b): b is ToolUseContent => b.type === "tool_use",
-        );
         currentTurnAssistantText.push(
           ...blocks.filter((b) => b.type === "text").map((b) => b.text),
         );
-        currentTurnToolUses.push(...toolUses);
-        currentTurnProcessToolUses.push(...toolUses.filter(isProcessToolUse));
         currentTurnBlocks.push(...blocks);
 
         const msgId = String(msg.id);
@@ -820,10 +813,22 @@ export function ChatView() {
         const next = mergedMessages[i + 1];
         if (!next || next.role === "user") {
           turnEndIds.add(msgId);
-          if (currentTurnToolUses.length > 0) {
+          const summaryBlocks = msg.turnId
+            ? displayedMessages
+                .filter(
+                  (item) =>
+                    item.role === "assistant" && item.turnId === msg.turnId,
+                )
+                .flatMap((item) => item.content)
+            : currentTurnBlocks;
+          const summaryItems = summaryBlocks.filter(
+            (block): block is ToolUseContent => block.type === "tool_use",
+          );
+          const processItems = summaryItems.filter(isProcessToolUse);
+          if (summaryItems.length > 0) {
             turnArtifactFiles.set(
               msgId,
-              collectResultFiles(currentTurnToolUses, currentTurnBlocks),
+              collectResultFiles(summaryItems, summaryBlocks),
             );
           }
           const videoReferences = extractVideoReferences(
@@ -834,21 +839,16 @@ export function ChatView() {
             turnVideoReferences.set(msgId, videoReferences);
           }
           if (
-            currentTurnProcessToolUses.length > 0 &&
+            processItems.length > 0 &&
             typeof msg.turnId === "string" &&
             hoistedProcessSummaryTurnIds.has(msg.turnId)
           ) {
             turnProcessSummaries.set(
               msgId,
-              buildProcessSummaryDisplayBlock(
-                currentTurnProcessToolUses,
-                currentTurnBlocks,
-              ),
+              buildProcessSummaryDisplayBlock(processItems, summaryBlocks),
             );
             turnsWithProcessSummary.add(msg.turnId);
           }
-          currentTurnToolUses = [];
-          currentTurnProcessToolUses = [];
           currentTurnAssistantText = [];
           currentTurnBlocks = [];
         }
@@ -882,7 +882,12 @@ export function ChatView() {
           turnsWithProcessSummary.has(turnId),
       };
     });
-  }, [mergedMessages, hoistedProcessSummaryTurnIds, activeSessionCwd]);
+  }, [
+    mergedMessages,
+    hoistedProcessSummaryTurnIds,
+    activeSessionCwd,
+    displayedMessages,
+  ]);
 
   // Dock ticks are anchored to the IN-MEMORY window (all loaded history),
   // not the render window: sliding the render window while scrolling up

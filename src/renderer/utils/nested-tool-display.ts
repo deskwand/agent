@@ -88,7 +88,7 @@ export function projectNestedToolBlocks(
       continue;
     }
 
-    for (const [index, call] of snapshot.calls.entries()) {
+    for (const call of snapshot.calls) {
       const output = runtime?.outputs[call.id];
       out.push({
         type: "tool_use",
@@ -103,9 +103,7 @@ export function projectNestedToolBlocks(
           source: snapshot.source,
           argumentsBytes: call.argumentsBytes,
           cancelled: call.cancelled,
-          ...(index === 0
-            ? { script: { id: block.id, input: block.input } }
-            : {}),
+          script: { id: block.id, input: block.input },
         },
       });
       if (call.status !== "running" || output) {

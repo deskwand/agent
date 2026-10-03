@@ -252,10 +252,9 @@ describe("codemode group entrypoints", () => {
         .setMessages("s1", [makeMessage("u1"), parent, result]);
       await act(async () =>
         root.render(
-          React.createElement(
-            entry === "chat" ? ChatView : MessageCard,
-            entry === "chat" ? {} : { message: parent },
-          ),
+          entry === "chat"
+            ? React.createElement(ChatView)
+            : React.createElement(MessageCard, { message: parent }),
         ),
       );
       const groups = Array.from(
@@ -288,6 +287,63 @@ describe("codemode group entrypoints", () => {
       ).toBe(false);
     },
   );
+  it("keeps full-turn counts when earlier operations are outside the render window", async () => {
+    setInitialState("idle");
+    const messages: Message[] = Array.from({ length: 410 }, (_, index) => ({
+      id: `a${index}`,
+      sessionId: "s1",
+      role: "assistant",
+      turnId: "long",
+      timestamp: index + 2,
+      content: [{ type: "text", text: `text ${index}` }],
+    }));
+    messages[0].content.push(
+      {
+        type: "tool_use",
+        id: "early-read",
+        name: "read",
+        input: { path: "early" },
+      },
+      {
+        type: "tool_result",
+        toolUseId: "early-read",
+        content: "ok",
+        isError: false,
+      },
+    );
+    messages.push({
+      id: "last",
+      sessionId: "s1",
+      role: "assistant",
+      turnId: "long",
+      timestamp: 500,
+      content: [
+        {
+          type: "tool_use",
+          id: "last-command",
+          name: "bash",
+          input: { command: "true" },
+        },
+        {
+          type: "tool_result",
+          toolUseId: "last-command",
+          content: "",
+          isError: false,
+        },
+      ],
+    });
+    useAppStore.getState().setMessages("s1", [makeMessage("u1"), ...messages]);
+    await act(async () => root.render(React.createElement(ChatView)));
+    const groups = Array.from(container.querySelectorAll("[data-summary]")).map(
+      (node) => JSON.parse(node.textContent ?? "{}"),
+    );
+    expect(
+      groups.filter((group) => group.type === "process-summary"),
+    ).toHaveLength(1);
+    expect(
+      groups.find((group) => group.type === "process-summary").summary,
+    ).toMatchObject({ readCount: 1, commandCount: 1 });
+  });
 });
 
 vi.mock("../../renderer/components/message/ProcessSummaryBlock", () => ({
