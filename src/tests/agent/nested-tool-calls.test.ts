@@ -88,3 +88,11 @@ describe("normalizeNestedToolCalls", () => {
     expect(snapshot.complete).toBe(false);
   });
 });
+
+it("treats empty or unusable legacy previews as unavailable, not confirmed empty", () => {
+  for (const legacy of [[], [{}]]) {
+    expect(
+      normalizeNestedToolCalls("p", undefined, legacy, "ok"),
+    ).toMatchObject({ source: "missing", complete: false, calls: [] });
+  }
+});

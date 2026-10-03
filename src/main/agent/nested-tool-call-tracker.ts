@@ -51,7 +51,7 @@ function liveSnapshot(parentId: string): NestedToolRuntimeUi {
       parentToolCallId: parentId,
       parentStatus: "running",
       calls: [],
-      complete: true,
+      complete: false,
       source: "live",
     },
     outputs: {},
@@ -60,6 +60,8 @@ function liveSnapshot(parentId: string): NestedToolRuntimeUi {
 
 export function createNestedToolCallTracker(): NestedToolCallTracker {
   const runtimes = new Map<string, NestedToolRuntimeUi>();
+  // interrupt() is provisional; only the first SDK terminal event closes a root.
+  const finalizedRoots = new Set<string>();
   // 子调用 ID 视为不透明标识：只按登记结果解析根，不拆分 ID 推断父子关系。
   const roots = new Map<string, string>();
   const getRoot = (id: string): string => roots.get(id) ?? id;
@@ -136,7 +138,8 @@ export function createNestedToolCallTracker(): NestedToolCallTracker {
     ): void {
       const root = getRoot(parentId);
       const current = runtimes.get(root);
-      if (!current || current.snapshot.source === "final") return;
+      if (!current || finalizedRoots.has(root)) return;
+      finalizedRoots.add(root);
       const parentStatus: NestedToolStatus = isError ? "error" : "ok";
       if (raw == null && current.snapshot.calls.length > 0) {
         // 终态记录不可用：保留已观察明细，pending 转 unfinished；

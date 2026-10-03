@@ -26,6 +26,8 @@ export function createNestedToolSessionEventHandler(
           message.isError,
         );
         publish(message.toolCallId);
+        // The runner's message_end handler accepts assistant messages only.
+        // Keep this exception metadata-only, especially after cancellation.
         return;
       }
     }

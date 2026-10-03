@@ -427,3 +427,27 @@ it("preserves the first authoritative final record after duplicate terminal even
   tracker.finishParent("p", undefined, undefined, true);
   expect(tracker.get("p")).toEqual(final);
 });
+
+it("does not infer live completeness before the SDK terminal record", () => {
+  const tracker = createNestedToolCallTracker();
+  tracker.startParent("p");
+  expect(tracker.get("p")?.snapshot.complete).toBe(false);
+});
+
+it("keeps the first terminal record even when its source is missing", () => {
+  const tracker = createNestedToolCallTracker();
+  tracker.startParent("p");
+  tracker.start("p", { id: "observed", name: "bash" });
+  tracker.finishParent("p", undefined, undefined, false);
+  const first = tracker.get("p");
+  tracker.finishParent(
+    "p",
+    {
+      complete: true,
+      calls: [{ id: "replacement", name: "read", status: "ok" }],
+    },
+    undefined,
+    false,
+  );
+  expect(tracker.get("p")).toEqual(first);
+});

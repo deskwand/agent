@@ -107,6 +107,6 @@ export function normalizeNestedToolCalls(
     calls,
     complete:
       final && record?.complete === true && calls.length === rows.length,
-    source: final ? "final" : Array.isArray(legacyCalls) ? "legacy" : "missing",
+    source: final ? "final" : calls.length > 0 ? "legacy" : "missing",
   };
 }

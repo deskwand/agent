@@ -481,3 +481,13 @@ describe("group boundaries", () => {
     expect(blocks[2]).toMatchObject({ summary: { readCount: 1 } });
   });
 });
+
+it("counts diff content beginning with triple signs consistently with result summaries", () => {
+  const item = toolUse("c", "edit", { path: "a" }, trace());
+  const result = toolResult("c");
+  result.diff = "+++ a\n--- a\n+++x\n---x";
+  expect(collectResultFiles([item], [result])[0]).toMatchObject({
+    addedLines: 1,
+    removedLines: 1,
+  });
+});
