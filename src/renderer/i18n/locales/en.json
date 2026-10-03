@@ -2067,7 +2067,8 @@
       "manage": "Manage",
       "inProgress": "Connecting…",
       "cancel": "Cancel",
-      "add": "Add"
+      "add": "Add",
+      "remove": "Remove"
     },
     "loadFailed": "Failed to load connectors",
     "connectFailed": "Connection failed",
@@ -2240,6 +2241,7 @@
       "connect": "Connectors",
       "skills": "Skills",
       "plugins": "Plugins"
-    }
+    },
+    "removeFailed": "Failed to remove connector"
   }
 }

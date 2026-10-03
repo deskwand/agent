@@ -216,9 +216,9 @@ export function ConnectorsView() {
       }
       try {
         const res = await window.electronAPI.connectors.removeServer(id);
-        if (!res.ok) setError(res.error ?? t("connectors.disconnectFailed"));
+        if (!res.ok) setError(res.error ?? t("connectors.removeFailed"));
       } catch {
-        setError(t("connectors.disconnectFailed"));
+        setError(t("connectors.removeFailed"));
       } finally {
         // 原授权的 finally 负责清 pending，删除成功不代表它已经结束。
         await refresh();

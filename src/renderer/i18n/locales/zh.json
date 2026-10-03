@@ -2064,7 +2064,8 @@
       "manage": "管理",
       "inProgress": "连接中…",
       "cancel": "取消",
-      "add": "添加"
+      "add": "添加",
+      "remove": "移除"
     },
     "loadFailed": "加载连接失败",
     "connectFailed": "连接失败",
@@ -2237,6 +2238,7 @@
       "connect": "连接",
       "skills": "技能",
       "plugins": "插件"
-    }
+    },
+    "removeFailed": "移除失败"
   }
 }

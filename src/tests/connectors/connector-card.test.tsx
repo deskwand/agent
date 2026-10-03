@@ -84,7 +84,7 @@ function buttonByKey(key: string): HTMLButtonElement | undefined {
 }
 
 const CONNECT = "connectors.action.connect";
-const DISCONNECT = "connectors.action.disconnect";
+const REMOVE = "connectors.action.remove";
 const CANCEL = "connectors.action.cancel";
 const RETRY = "connectors.action.retry";
 
@@ -96,13 +96,14 @@ describe("远程服务卡片", () => {
     const btn = buttonByKey(CONNECT)!;
     expect(btn).toBeDefined();
     expect(btn.disabled).toBe(false);
+    expect(buttonByKey(REMOVE)).toBeUndefined();
 
     act(() => btn.click());
     // registry 按 serverName 查目录；传 entry.key 会得到 "unknown catalog key"
     expect(h.onConnect).toHaveBeenCalledWith("notion");
   });
 
-  it("idle（已配置但运行时没有状态）不谎称进行中，并给出重试与断开", () => {
+  it("idle（已配置但运行时没有状态）不谎称进行中，并给出重试与移除", () => {
     const h = handlers();
     render(
       <ConnectorCard
@@ -114,7 +115,26 @@ describe("远程服务卡片", () => {
     expect(container.textContent).toContain("connectors.status.idle");
     expect(container.textContent).not.toContain("connectors.status.connecting");
     expect(buttonByKey(CONNECT)).toBeDefined();
-    expect(buttonByKey(DISCONNECT)).toBeDefined();
+    const remove = buttonByKey(REMOVE);
+    expect(remove).toBeDefined();
+    expect(buttonByKey("connectors.action.disconnect")).toBeUndefined();
+    act(() => remove!.click());
+    expect(h.onDisconnect).toHaveBeenCalledWith("notion");
+    expect(h.onConnect).not.toHaveBeenCalled();
+    expect(h.onAuthorize).not.toHaveBeenCalled();
+  });
+
+  it("已连接时只显示「移除」", () => {
+    render(
+      <ConnectorCard
+        entry={entry({ instances: [withStatus({ kind: "ready" })] })}
+        {...handlers()}
+      />,
+    );
+    expect(buttonByKey(REMOVE)).toBeDefined();
+    expect(buttonByKey(CONNECT)).toBeUndefined();
+    expect(buttonByKey("connectors.action.disconnect")).toBeUndefined();
+    expect(container.querySelectorAll("button")).toHaveLength(1);
   });
 
   it("已授权（凭据在本地）不显示「未连接」，并说明接下来会发生什么", () => {
@@ -129,7 +149,7 @@ describe("远程服务卡片", () => {
     );
     expect(container.textContent).toContain("connectors.status.authorized");
     expect(container.textContent).not.toContain("connectors.status.idle");
-    expect(buttonByKey(DISCONNECT)).toBeDefined();
+    expect(buttonByKey(REMOVE)).toBeDefined();
   });
 
   it("已授权不给主按钮：连着「已授权」旁边放「立即连接」是自相矛盾的", () => {
@@ -153,7 +173,7 @@ describe("远程服务卡片", () => {
       labels.filter((l) => l.includes("connectors.action.connect")),
     ).toEqual([]);
     // 唯一的按钮是退路
-    expect(labels.filter((l) => l.includes(DISCONNECT))).toHaveLength(1);
+    expect(labels.filter((l) => l.includes(REMOVE))).toHaveLength(1);
     // 状态行要解释「下次对话时连接」
     expect(container.textContent).toContain("connectors.status.authorizedHint");
   });
@@ -184,10 +204,10 @@ describe("远程服务卡片", () => {
 
     expect(container.textContent).toContain("connectors.status.connecting");
     expect(buttonByKey(CANCEL)).toBeDefined();
-    expect(buttonByKey(DISCONNECT)).toBeDefined();
+    expect(buttonByKey(REMOVE)).toBeDefined();
   });
 
-  it("传输层的 connecting 只留「断开」，不调 signIn 的取消", () => {
+  it("传输层的 connecting 只留「移除」，不调 signIn 的取消", () => {
     // cancelSignIn 中止的是 OAuth 等待；传输层在连但没有本地授权流程时
     // 它找不到东西可中止，所以这里根本不该出现「取消」。
     const h = handlers();
@@ -199,14 +219,14 @@ describe("远程服务卡片", () => {
     );
 
     expect(buttonByKey(CANCEL)).toBeUndefined();
-    const disconnect = buttonByKey(DISCONNECT)!;
-    expect(disconnect.disabled).toBe(false);
-    act(() => disconnect.click());
+    const remove = buttonByKey(REMOVE)!;
+    expect(remove.disabled).toBe(false);
+    act(() => remove.click());
     expect(h.onDisconnect).toHaveBeenCalledWith("notion");
     expect(h.onCancel).not.toHaveBeenCalled();
   });
 
-  it("每个非 ready 状态都保留「断开」这条退路", () => {
+  it("每个非 ready 状态都保留「移除」这条退路", () => {
     const statuses: ConnectorStatus[] = [
       { kind: "idle" },
       { kind: "authorized" },
@@ -224,7 +244,7 @@ describe("远程服务卡片", () => {
         />,
       );
       expect(
-        buttonByKey(DISCONNECT),
+        buttonByKey(REMOVE),
         `status=${status.kind} 没有退路`,
       ).toBeDefined();
     }
@@ -273,10 +293,10 @@ describe("远程服务卡片", () => {
     );
 
     const cancel = buttonByKey(CANCEL)!;
-    const disconnect = buttonByKey(DISCONNECT)!;
+    const remove = buttonByKey(REMOVE)!;
     const group = cancel.parentElement!;
 
-    expect(group).toBe(disconnect.parentElement);
+    expect(group).toBe(remove.parentElement);
     expect(group.className).toContain("flex-none");
     // 容器里只应该有按钮：状态文字若被塞回来，说明按钮组又被摆进了
     // 「状态 + 按钮」的两端对齐容器里（P3 的根因）。这条不依赖 i18n mock 的返回值。
@@ -288,7 +308,7 @@ describe("远程服务卡片", () => {
 
   it("动作组按内容定宽，且徽标排在它后面 —— 两个按钮不换行、徽标不漂", () => {
     // 回归：动作槽位曾写死 `w-[52px]`（为了让徽标不随动作宽度漂移），
-    // 但「取消 + 断开」这种两按钮状态下，两个按钮被压进 52px、各分到 22px，
+    // 但「取消 + 移除」这种两按钮状态下，两个按钮被压进 52px、各分到 22px，
     // 减去 padding 只剩 2px —— 中文标签于是竖着排（用户给的截图）。
     // 现在徽标改排在动作组**后面**，由它钉住行的右缘，动作组再按内容定宽。
     // jsdom 不做排版，这里只能守 class 与 DOM 顺序。

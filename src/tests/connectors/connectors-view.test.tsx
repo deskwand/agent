@@ -55,7 +55,7 @@ vi.mock("../../renderer/components/PiExtensionManagerView", () => ({
 
 const CONNECT = "connectors.action.connect";
 const REAUTHORIZE = "connectors.action.reauthorize";
-const DISCONNECT = "connectors.action.disconnect";
+const REMOVE = "connectors.action.remove";
 const CANCEL = "connectors.action.cancel";
 const CONNECT_FAILED = "connectors.connectFailed";
 
@@ -269,7 +269,7 @@ describe("连接期间的可取消性", () => {
   });
 
   it("本地授权中优先于传输状态显示", async () => {
-    // idle 卡片平时只显示「连接 + 断开」；授权期间必须变成「授权中 + 取消」。
+    // idle 卡片平时只显示「连接 + 移除」；授权期间必须变成「授权中 + 取消」。
     entries = [notion([instance({ kind: "idle" })])];
     const signIn = deferred<ActionResult>();
     api.authorize.mockReturnValue(signIn.promise);
@@ -282,7 +282,7 @@ describe("连接期间的可取消性", () => {
     expect(container.textContent).toContain("connectors.status.connecting");
     expect(byKey(CANCEL)).toBeDefined();
     // 已有实例时退路照旧保留
-    expect(byKey(DISCONNECT)).toBeDefined();
+    expect(byKey(REMOVE)).toBeDefined();
 
     await act(async () => {
       signIn.resolve({ ok: false, cancelled: true });
@@ -328,16 +328,16 @@ describe("重复点击", () => {
 });
 
 describe("传输层的 connecting 不是授权", () => {
-  it("只留「断开」，绝不调 signIn 的取消", async () => {
+  it("只留「移除」，绝不调 signIn 的取消", async () => {
     entries = [notion([instance({ kind: "connecting" })])];
 
     await mount();
     expect(byKey(CANCEL)).toBeUndefined();
-    const disconnect = byKey(DISCONNECT);
-    expect(disconnect).toBeDefined();
+    const remove = byKey(REMOVE);
+    expect(remove).toBeDefined();
 
     await act(async () => {
-      disconnect!.click();
+      remove!.click();
     });
     // 本地没有在等授权 —— cancelSignIn 找不到东西可中止，不该乱调
     expect(api.cancelSignIn).not.toHaveBeenCalled();
@@ -345,7 +345,7 @@ describe("传输层的 connecting 不是授权", () => {
   });
 });
 
-describe("授权中断开", () => {
+describe("授权中移除", () => {
   it("先取消再删除，旧流程结束后的失败不弹红条", async () => {
     entries = [notion([instance({ kind: "idle" })])];
     const signIn = deferred<ActionResult>();
@@ -359,14 +359,14 @@ describe("授权中断开", () => {
     // 删除后列表里不该再有这个实例
     entries = [notion()];
     await act(async () => {
-      byKey(DISCONNECT)!.click();
+      byKey(REMOVE)!.click();
     });
     expect(api.cancelSignIn).toHaveBeenCalledWith("notion");
     expect(api.removeServer).toHaveBeenCalledWith("notion");
     // 删除完成不意味着旧授权结束；在它 settle 前仍不允许启动新流程。
     expect(byKey(CONNECT)).toBeUndefined();
 
-    // 旧流程随后以失败收尾 —— 是断开导致的，用户不该看到一个红条
+    // 旧流程随后以失败收尾 —— 是移除导致的，用户不该看到一个红条
     await act(async () => {
       signIn.resolve({ ok: false, error: "boom" });
     });
@@ -753,5 +753,29 @@ describe("已接入筛选", () => {
     expect(cardCount()).toBe(1);
     expect(container.textContent).toContain("connectors.catalog.notion");
     expect(addedFilter().getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("remove failure messages", () => {
+  it("uses removeFailed as a defensive fallback for an errorless failure", async () => {
+    entries = [notion([instance({ kind: "idle" })])];
+    api.removeServer.mockResolvedValueOnce({ ok: false });
+    await mount();
+    await act(async () => {
+      byKey(REMOVE)!.click();
+    });
+    expect(api.removeServer).toHaveBeenCalledWith("notion");
+    expect(container.textContent).toContain("connectors.removeFailed");
+    expect(container.textContent).not.toContain("connectors.disconnectFailed");
+  });
+  it("shows removeFailed when the API rejects", async () => {
+    entries = [notion([instance({ kind: "idle" })])];
+    api.removeServer.mockRejectedValueOnce(new Error("boom"));
+    await mount();
+    await act(async () => {
+      byKey(REMOVE)!.click();
+    });
+    expect(container.textContent).toContain("connectors.removeFailed");
+    expect(container.textContent).not.toContain("connectors.disconnectFailed");
   });
 });

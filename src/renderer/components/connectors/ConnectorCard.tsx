@@ -79,7 +79,7 @@ export function ConnectorCard({
 }: Props) {
   const { t } = useTranslation();
   const instance = entry.instances[0];
-  // 本机（stdio）卡片画开关，远程（http）画连接/断开。
+  // 本机（stdio）卡片画开关，远程（http）画连接/移除。
   // 判据用 **entry 级** 的 transport —— 未添加的内置条目 instances 为空，
   // 那时也要画对动作。
   const isCapability = entry.transport === "stdio";
@@ -134,7 +134,7 @@ export function ConnectorCard({
   );
 
   // stdio（本机进程）只给「启用/停用」：**「连接」是 OAuth 授权**，用在 stdio 上必报
-  // `not a remote server`；**「断开」会从 mcp.json 删掉配置** —— 对目录条目可接受
+  // `not a remote server`；**「移除」会从 mcp.json 删掉配置** —— 对目录条目可接受
   // （能一键加回），对手写的自定义 server 是不可恢复的删除。
   const actions = isCapability ? (
     <button
@@ -238,7 +238,7 @@ function renderAction(
     onToggle: (instanceId: string, enabled: boolean) => void;
   },
 ) {
-  // **stdio（本机进程）只给「启用/停用」**，不给「连接/断开」：
+  // **stdio（本机进程）只给「启用/停用」**，不给「连接/移除」：
   // **whitespace-nowrap 是硬约束**：中文标签一旦分到小于一个字宽的盒子就会竖排。
   // 槽位现在按内容定宽，本来不会挤，但换行与否不该依赖上一层的宽度怎么算出来。
   const primary =
@@ -246,16 +246,16 @@ function renderAction(
   const ghost =
     "px-2.5 py-1 text-xs rounded-control border border-border text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap";
 
-  // 规则：只要已添加，就永远给一条退路（「断开」）。
+  // 规则：只要已添加，就保留删除配置和已存凭据的入口（「移除」）。
   // 之前 `connecting` 只给一个禁用按钮 —— 用户不能取消、不能重试、不能断开，
   // 只能手动去改 mcp.json。任何状态都不该把人困住。
-  const disconnectButton = instance ? (
+  const removeButton = instance ? (
     <button
       type="button"
       className={ghost}
       onClick={() => handlers.onDisconnect(instance.id)}
     >
-      {t("connectors.action.disconnect")}
+      {t("connectors.action.remove")}
     </button>
   ) : null;
 
@@ -273,7 +273,7 @@ function renderAction(
         >
           {t("connectors.action.cancel")}
         </button>
-        {disconnectButton}
+        {removeButton}
       </>
     );
   }
@@ -299,7 +299,7 @@ function renderAction(
 
   switch (instance.status.kind) {
     case "ready":
-      return disconnectButton;
+      return removeButton;
 
     case "idle":
       // 已配置但当前没有连接活动。给「连接」重试授权，并保留退路。
@@ -308,7 +308,7 @@ function renderAction(
           <button type="button" className={primary} onClick={retry}>
             {t("connectors.action.connect")}
           </button>
-          {disconnectButton}
+          {removeButton}
         </>
       );
 
@@ -317,13 +317,13 @@ function renderAction(
       // 这个状态意味着没有活跃会话，而 activateNow 在没有会话时直接返回 false
       // —— 按钮按下去什么也不会发生。在「已授权」旁边放「立即连接」既无用又矛盾。
       // 用户需要知道的是「接下来会发生什么」，那由状态行负责说清。
-      return disconnectButton;
+      return removeButton;
 
     case "connecting":
       // 传输适配器在连接 / 等授权，但本地没有对应的授权流程 ——
-      // `cancelSignIn` 此时找不到东西可中止。只保留「断开」这条退路，
+      // `cancelSignIn` 此时找不到东西可中止。只保留「移除」这条退路，
       // 真正的授权取消走上面的 `authorizing` 分支。
-      return disconnectButton;
+      return removeButton;
 
     case "needs-auth":
       return (
@@ -335,7 +335,7 @@ function renderAction(
                 : "connectors.action.reauthorize",
             )}
           </button>
-          {disconnectButton}
+          {removeButton}
         </>
       );
 
@@ -345,7 +345,7 @@ function renderAction(
           <button type="button" className={ghost} onClick={retry}>
             {t("connectors.action.retry")}
           </button>
-          {disconnectButton}
+          {removeButton}
         </>
       );
 
@@ -362,7 +362,7 @@ function renderAction(
           >
             {t("connectors.action.connect")}
           </button>
-          {disconnectButton}
+          {removeButton}
         </>
       );
   }
