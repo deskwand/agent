@@ -287,7 +287,7 @@ describe("codemode group entrypoints", () => {
       ).toBe(false);
     },
   );
-  it("keeps full-turn counts when earlier operations are outside the render window", async () => {
+  it("keeps full-turn counts for operations outside the render window", async () => {
     setInitialState("idle");
     const messages: Message[] = Array.from({ length: 410 }, (_, index) => ({
       id: `a${index}`,
@@ -311,6 +311,15 @@ describe("codemode group entrypoints", () => {
         isError: false,
       },
     );
+    messages[1].content = [
+      {
+        type: "tool_use",
+        id: "middle",
+        name: "bash",
+        input: { command: "true" },
+      },
+      { type: "tool_result", toolUseId: "middle", content: "", isError: false },
+    ];
     messages.push({
       id: "last",
       sessionId: "s1",
@@ -332,8 +341,12 @@ describe("codemode group entrypoints", () => {
         },
       ],
     });
-    useAppStore.getState().setMessages("s1", [makeMessage("u1"), ...messages]);
     await act(async () => root.render(React.createElement(ChatView)));
+    await act(async () => {
+      useAppStore
+        .getState()
+        .setMessages("s1", [makeMessage("u1"), ...messages]);
+    });
     const groups = Array.from(container.querySelectorAll("[data-summary]")).map(
       (node) => JSON.parse(node.textContent ?? "{}"),
     );
@@ -342,7 +355,7 @@ describe("codemode group entrypoints", () => {
     ).toHaveLength(1);
     expect(
       groups.find((group) => group.type === "process-summary").summary,
-    ).toMatchObject({ readCount: 1, commandCount: 1 });
+    ).toMatchObject({ readCount: 1, commandCount: 2 });
   });
 });
 
