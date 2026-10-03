@@ -185,9 +185,11 @@ const IN_SURFACE_DIVIDERS: Array<{ file: string; from: string; to: string }> = [
     to: 'border-b border-border-muted">',
   },
   {
-    file: "components/settings/SettingsGeneral.tsx",
+    // 设置页的行与行之间的分隔线现在在 SettingsRow 里（SettingsGeneral 已换成卡片行，
+    // 分隔线不再内联在页面里）。约束不变：表面内部的分隔线用弱描边。
+    file: "components/settings/shared.tsx",
     from: 'border-t border-border">',
-    to: 'border-t border-border-muted">',
+    to: "border-t border-border-muted px-4 py-3",
   },
   {
     file: "components/ApiDiagnosticsPanel.tsx",

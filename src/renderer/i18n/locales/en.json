@@ -77,7 +77,6 @@
     "remoteDesc": "Use DeskWand from connected channels",
     "logs": "Logs",
     "logsDesc": "View and export application logs",
-    "panelDesc": "Configure your workspace, tools, and account behavior.",
     "general": "General",
     "generalDesc": "Appearance, language & preferences",
     "archivedSessions": "Archived",
@@ -90,11 +89,8 @@
     "capabilitiesDesc": "Capabilities that ship with the app and need system permissions",
     "capabilitiesIntro": "Capabilities that ship with the app. When on, they load with your sessions.",
     "capabilities": {
-      "statusOn": "Enabled",
-      "statusOff": "Disabled",
       "pendingActivation": "Takes effect in your next chat",
       "permission": {
-        "title": "System permissions required",
         "accessibility": "Accessibility",
         "accessibilityHint": "Not granted: cannot control the pointer or read UI elements",
         "screen-recording": "Screen recording",
@@ -105,7 +101,12 @@
       },
       "loadFailed": "Could not load capabilities",
       "actionFailed": "Could not change this capability"
-    }
+    },
+    "groupGeneral": "General",
+    "groupPersonal": "Personal",
+    "groupIntegrations": "Integrations",
+    "groupOther": "Other",
+    "subagentDesc": "Configure the default model and tools for subagents"
   },
   "webAccess": {
     "groupTitle": "Web Access",
@@ -259,7 +260,9 @@
     "telemetryDesc": "Help improve DeskWand by sharing anonymous device ID and app version. No personal data is collected.",
     "uiFontSize": "UI Font Size",
     "uiFontSizeDesc": "Base font size for the whole interface",
-    "uiFontSizeUnit": "PX"
+    "uiFontSizeUnit": "PX",
+    "uiFontSizeDecrease": "Decrease font size",
+    "uiFontSizeIncrease": "Increase font size"
   },
   "memory": {
     "title": "Memory",

@@ -1,6 +1,16 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
+import type { AppTheme, ThemePreset } from "../../types";
+import type { CodemodeMode } from "../../../shared/codemode-config";
+import { CODEMODE_MODES } from "../../../shared/codemode-config";
+import {
+  SettingsCard,
+  SettingsRow,
+  SettingsSection,
+  SettingsSelect,
+  SettingsSwitch,
+} from "./shared";
 
 export function SettingsGeneral() {
   const { i18n, t } = useTranslation();
@@ -9,16 +19,6 @@ export function SettingsGeneral() {
   const appConfig = useAppStore((s) => s.appConfig);
   const setAppConfig = useAppStore((s) => s.setAppConfig);
   const currentLang = i18n.language.startsWith("zh") ? "zh" : "en";
-  const [appVer, setAppVer] = useState("");
-  useEffect(() => {
-    try {
-      const v = window.electronAPI?.getVersion?.();
-      if (v instanceof Promise) v.then(setAppVer);
-      else if (v) setAppVer(v);
-    } catch {
-      /* ignore */
-    }
-  }, []);
 
   const [fontDraft, setFontDraft] = useState<string>(
     String(settings.uiFontSize),
@@ -51,266 +51,194 @@ export function SettingsGeneral() {
     commitFont(Number.isFinite(v) ? v : settings.uiFontSize);
   };
 
-  const languages = [
-    { code: "en", nativeName: "English" },
-    { code: "zh", nativeName: "中文" },
+  const languageOptions = [
+    { value: "en" as const, label: "English" },
+    { value: "zh" as const, label: "中文" },
   ];
 
-  const themeOptions = [
-    { value: "light" as const, label: t("general.themeLight") },
-    { value: "dark" as const, label: t("general.themeDark") },
-    { value: "system" as const, label: t("general.themeSystem", "System") },
+  const themeOptions: Array<{ value: AppTheme; label: string }> = [
+    { value: "light", label: t("general.themeLight") },
+    { value: "dark", label: t("general.themeDark") },
+    { value: "system", label: t("general.themeSystem", "System") },
   ];
 
-  const themePresets = [
-    {
-      value: "graphite" as const,
-      label: t("general.themePresetGraphite", "Graphite"),
-    },
-    { value: "paper" as const, label: t("general.themePresetPaper", "Paper") },
-    { value: "void" as const, label: t("general.themePresetVoid", "Void") },
-    { value: "ocean" as const, label: t("general.themePresetOcean", "Ocean") },
-    {
-      value: "forest" as const,
-      label: t("general.themePresetForest", "Forest"),
-    },
-    { value: "ember" as const, label: t("general.themePresetEmber", "Ember") },
-    {
-      value: "aurora" as const,
-      label: t("general.themePresetAurora", "Aurora"),
-    },
+  const themePresetOptions: Array<{ value: ThemePreset; label: string }> = [
+    { value: "graphite", label: t("general.themePresetGraphite", "Graphite") },
+    { value: "paper", label: t("general.themePresetPaper", "Paper") },
+    { value: "void", label: t("general.themePresetVoid", "Void") },
+    { value: "ocean", label: t("general.themePresetOcean", "Ocean") },
+    { value: "forest", label: t("general.themePresetForest", "Forest") },
+    { value: "ember", label: t("general.themePresetEmber", "Ember") },
+    { value: "aurora", label: t("general.themePresetAurora", "Aurora") },
   ];
+
+  const codemodeModeOptions: Array<{ value: CodemodeMode; label: string }> =
+    CODEMODE_MODES.map((mode) => ({
+      value: mode,
+      label: t(`general.codemodeMode_${mode}`),
+    }));
 
   return (
     <div className="space-y-6">
-      {/* Theme */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">
-          {t("general.appearance")}
-        </h4>
-        <div className="flex gap-2">
-          {themeOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => updateSettings({ theme: opt.value })}
-              className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                settings.theme === opt.value
-                  ? "border-accent bg-accent/5 text-text-primary"
-                  : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Theme Preset */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">
-          {t("general.themePreset", "Palette")}
-        </h4>
-        <div className="flex gap-2 flex-wrap">
-          {themePresets.map((preset) => (
-            <button
-              key={preset.value}
-              onClick={() => updateSettings({ themePreset: preset.value })}
-              className={`px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                settings.themePreset === preset.value
-                  ? "border-accent bg-accent/5 text-text-primary"
-                  : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-              }`}
-            >
-              {preset.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* UI Font Size */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">
-          {t("general.uiFontSize")}
-        </h4>
-        <p className="text-xs text-text-muted">{t("general.uiFontSizeDesc")}</p>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center rounded-lg border border-border bg-surface">
-            <button
-              aria-label="decrease font size"
-              onClick={() => commitFont(settings.uiFontSize - 1)}
-              disabled={settings.uiFontSize <= 12}
-              className="px-3 py-2 text-sm text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              −
-            </button>
-            <input
-              type="number"
-              min={12}
-              max={20}
-              value={fontDraft}
-              onChange={(e) => setFontDraft(e.target.value)}
-              onBlur={handleFontDraftCommit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleFontDraftCommit();
-              }}
-              className="w-16 border-x border-border bg-transparent py-2 text-center text-sm font-medium text-text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            <button
-              aria-label="increase font size"
-              onClick={() => commitFont(settings.uiFontSize + 1)}
-              disabled={settings.uiFontSize >= 20}
-              className="px-3 py-2 text-sm text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              +
-            </button>
-          </div>
-          <span className="text-sm text-text-muted">
-            {t("general.uiFontSizeUnit", "PX")}
-          </span>
-        </div>
-      </div>
-
-      {/* Language */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">
-          {t("general.language")}
-        </h4>
-        <div className="flex gap-2">
-          {languages.map((lang) => (
-            <button
-              key={lang.code}
-              onClick={() => i18n.changeLanguage(lang.code)}
-              className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                currentLang === lang.code
-                  ? "border-accent bg-accent/5 text-text-primary"
-                  : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-              }`}
-            >
-              {lang.nativeName}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Auto Skill Learning */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">
-          {t("general.autoSkillLearning")}
-        </h4>
-        <p className="text-xs text-text-muted">
-          {t("general.autoSkillLearningDesc")}
-        </p>
-        <p className="text-xs text-text-muted">
-          {t("general.autoSkillLearningProjectNote")}
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => updateSettings({ autoSkillLearning: true })}
-            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-              settings.autoSkillLearning
-                ? "border-accent bg-accent/5 text-text-primary"
-                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-            }`}
-          >
-            {t("common.enable")}
-          </button>
-          <button
-            onClick={() => updateSettings({ autoSkillLearning: false })}
-            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-              !settings.autoSkillLearning
-                ? "border-accent bg-accent/5 text-text-primary"
-                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-            }`}
-          >
-            {t("common.disable")}
-          </button>
-        </div>
-      </div>
-
-      {/* Codemode */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">
-          {t("general.codemode")}
-        </h4>
-        <p className="text-xs text-text-muted">{t("general.codemodeDesc")}</p>
-        {/* 没有开关：codemode 的激活是派生的（有 exposure=codemode 的 MCP 服务连上时由
-            上游激活）。要让它不生效，请在该服务的设置里把 exposure 改成「直接声明」，
-            或在 mcp.json 顶层写 autoEnableCodemode: false。 */}
-        <div className="flex gap-2">
-          {(["on", "only"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => void saveCodemode({ mode })}
-              className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                (appConfig?.codemode?.mode ?? "on") === mode
-                  ? "border-accent bg-accent/5 text-text-primary"
-                  : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-              }`}
-            >
-              {t(`general.codemodeMode_${mode}`)}
-            </button>
-          ))}
-        </div>
-        <p className="text-xs text-text-muted">
-          {t("general.codemodeModeNote")}
-        </p>
-        <div className="flex items-center gap-3">
-          <label className="text-xs text-text-muted">
-            {t("general.codemodeInlineBudget")}
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={appConfig?.codemode?.inlineBudget ?? 3000}
-            onChange={(e) => {
-              const value = Number(e.target.value);
-              if (!Number.isFinite(value) || value < 0) return;
-              void saveCodemode({ inlineBudget: Math.floor(value) });
-            }}
-            className="w-28 px-3 py-1.5 rounded-md border border-border bg-surface text-sm text-text-primary"
+      <SettingsSection title={t("general.appearance")}>
+        <SettingsCard>
+          <SettingsRow
+            title={t("general.theme")}
+            control={
+              // 只有一个调用点，所以不抽成公共原语。
+              <div
+                role="group"
+                aria-label={t("general.theme")}
+                className="flex overflow-hidden rounded-control border border-border"
+              >
+                {themeOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={settings.theme === option.value}
+                    onClick={() => updateSettings({ theme: option.value })}
+                    className={`px-2.5 py-1 text-xs transition-colors ${
+                      settings.theme === option.value
+                        ? "bg-surface-active text-text-primary"
+                        : "text-text-secondary hover:bg-surface-hover"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            }
           />
-        </div>
-        <p className="text-xs text-text-muted">
-          {t("general.codemodeInlineBudgetNote")}
-        </p>
-      </div>
+          <SettingsRow
+            title={t("general.themePreset", "Palette")}
+            control={
+              <SettingsSelect
+                label={t("general.themePreset", "Palette")}
+                value={settings.themePreset}
+                options={themePresetOptions}
+                onChange={(next) => updateSettings({ themePreset: next })}
+              />
+            }
+          />
+          <SettingsRow
+            title={t("general.uiFontSize")}
+            description={t("general.uiFontSizeDesc")}
+            control={
+              <>
+                <div className="flex items-center rounded-control border border-border bg-surface">
+                  <button
+                    aria-label={t("general.uiFontSizeDecrease")}
+                    onClick={() => commitFont(settings.uiFontSize - 1)}
+                    disabled={settings.uiFontSize <= 12}
+                    className="px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    −
+                  </button>
+                  <input
+                    type="number"
+                    min={12}
+                    max={20}
+                    aria-label={t("general.uiFontSize")}
+                    value={fontDraft}
+                    onChange={(e) => setFontDraft(e.target.value)}
+                    onBlur={handleFontDraftCommit}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleFontDraftCommit();
+                    }}
+                    className="w-12 border-x border-border bg-transparent py-1 text-center text-xs font-medium text-text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                  <button
+                    aria-label={t("general.uiFontSizeIncrease")}
+                    onClick={() => commitFont(settings.uiFontSize + 1)}
+                    disabled={settings.uiFontSize >= 20}
+                    className="px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    +
+                  </button>
+                </div>
+                <span className="text-xs text-text-muted">
+                  {t("general.uiFontSizeUnit", "PX")}
+                </span>
+              </>
+            }
+          />
+        </SettingsCard>
+      </SettingsSection>
 
-      {/* Telemetry */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium text-text-primary">
-          {t("general.telemetry")}
-        </h4>
-        <p className="text-xs text-text-muted">{t("general.telemetryDesc")}</p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => updateSettings({ telemetryEnabled: true })}
-            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-              settings.telemetryEnabled
-                ? "border-accent bg-accent/5 text-text-primary"
-                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-            }`}
-          >
-            {t("common.enable")}
-          </button>
-          <button
-            onClick={() => updateSettings({ telemetryEnabled: false })}
-            className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-              !settings.telemetryEnabled
-                ? "border-accent bg-accent/5 text-text-primary"
-                : "border-border bg-surface hover:border-accent/50 text-text-secondary"
-            }`}
-          >
-            {t("common.disable")}
-          </button>
-        </div>
-      </div>
-
-      {/* About */}
-      {appVer && (
-        <div className="pt-4 border-t border-border-muted">
-          <p className="text-xs text-text-muted">DeskWand v{appVer}</p>
-        </div>
-      )}
+      <SettingsSection title={t("settings.general")}>
+        <SettingsCard>
+          <SettingsRow
+            title={t("general.language")}
+            control={
+              <SettingsSelect
+                label={t("general.language")}
+                value={currentLang}
+                options={languageOptions}
+                onChange={(next) => void i18n.changeLanguage(next)}
+              />
+            }
+          />
+          <SettingsRow
+            title={t("general.autoSkillLearning")}
+            description={`${t("general.autoSkillLearningDesc")} ${t(
+              "general.autoSkillLearningProjectNote",
+            )}`}
+            control={
+              <SettingsSwitch
+                label={t("general.autoSkillLearning")}
+                checked={settings.autoSkillLearning}
+                onChange={(next) => updateSettings({ autoSkillLearning: next })}
+              />
+            }
+          />
+          {/* codemode 没有开关：它的激活是派生的（有 exposure=codemode 的 MCP 服务连上时由
+              上游激活）。要让它不生效，请在该服务的设置里把 exposure 改成「直接声明」，
+              或在 mcp.json 顶层写 autoEnableCodemode: false。 */}
+          <SettingsRow
+            title={t("general.codemode")}
+            description={`${t("general.codemodeDesc")} ${t(
+              "general.codemodeModeNote",
+            )}`}
+            control={
+              <SettingsSelect
+                label={t("general.codemode")}
+                value={appConfig?.codemode?.mode ?? "on"}
+                options={codemodeModeOptions}
+                onChange={(next) => void saveCodemode({ mode: next })}
+              />
+            }
+          />
+          <SettingsRow
+            title={t("general.codemodeInlineBudget")}
+            description={t("general.codemodeInlineBudgetNote")}
+            control={
+              <input
+                type="number"
+                min={0}
+                aria-label={t("general.codemodeInlineBudget")}
+                value={appConfig?.codemode?.inlineBudget ?? 3000}
+                onChange={(e) => {
+                  const value = Number(e.target.value);
+                  if (!Number.isFinite(value) || value < 0) return;
+                  void saveCodemode({ inlineBudget: Math.floor(value) });
+                }}
+                className="w-24 rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none"
+              />
+            }
+          />
+          <SettingsRow
+            title={t("general.telemetry")}
+            description={t("general.telemetryDesc")}
+            control={
+              <SettingsSwitch
+                label={t("general.telemetry")}
+                checked={settings.telemetryEnabled}
+                onChange={(next) => updateSettings({ telemetryEnabled: next })}
+              />
+            }
+          />
+        </SettingsCard>
+      </SettingsSection>
     </div>
   );
 }

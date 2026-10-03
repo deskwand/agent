@@ -5,6 +5,7 @@ import type {
   CapabilityPermissions,
   PermissionKind,
 } from "../../../shared/capabilities";
+import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -96,57 +97,36 @@ export function SettingsCapabilities({
 
   return (
     <div className="space-y-4">
-      <h2 className="text-base font-semibold text-text-primary">
-        {t("settings.capabilitiesTitle")}
-      </h2>
-      <p className="text-xs text-text-muted">
+      <p className="text-xs leading-5 text-text-muted">
         {t("settings.capabilitiesIntro")}
       </p>
 
-      {entries.map((entry) => {
-        const instance = entry.instances[0];
-        const on = !!instance && instance.status.kind !== "off";
-        return (
-          <div
-            key={entry.key}
-            data-testid="capability-card"
-            className="bg-surface border border-border-muted rounded-container p-3.5 flex gap-2.5"
-          >
-            <div className="flex-1 min-w-0 flex flex-col gap-1">
-              <div className="flex items-center gap-2 h-5">
-                <div className="text-sm font-semibold text-text-primary flex-1 min-w-0 truncate">
-                  {t(entry.nameKey)}
-                </div>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={on}
-                  aria-label={t(entry.nameKey)}
-                  data-testid="capability-toggle"
-                  onClick={() => void onToggle(entry.serverName, !on)}
-                  className={`w-[34px] h-5 rounded-full relative transition-colors flex-none ${
-                    on ? "bg-accent" : "bg-surface-active"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-                      on ? "left-[18px]" : "left-0.5"
-                    }`}
+      {entries.length > 0 && (
+        <SettingsCard>
+          {entries.map((entry) => {
+            const instance = entry.instances[0];
+            const on = !!instance && instance.status.kind !== "off";
+            return (
+              <SettingsRow
+                key={entry.key}
+                testId="capability-card"
+                title={t(entry.nameKey)}
+                description={
+                  entry.descriptionKey ? t(entry.descriptionKey) : undefined
+                }
+                control={
+                  <SettingsSwitch
+                    testId="capability-toggle"
+                    label={t(entry.nameKey)}
+                    checked={on}
+                    onChange={(next) => void onToggle(entry.serverName, next)}
                   />
-                </button>
-              </div>
-              <div className="h-4 text-xs text-text-muted truncate">
-                {entry.descriptionKey ? t(entry.descriptionKey) : ""}
-              </div>
-              <div className="h-4 text-xs text-text-muted">
-                {on
-                  ? t("settings.capabilities.statusOn")
-                  : t("settings.capabilities.statusOff")}
-              </div>
-            </div>
-          </div>
-        );
-      })}
+                }
+              />
+            );
+          })}
+        </SettingsCard>
+      )}
 
       {loadFailed && (
         <p className="text-xs text-error" role="alert">
@@ -161,51 +141,43 @@ export function SettingsCapabilities({
       {notice && <p className="text-xs text-text-secondary">{notice}</p>}
 
       {missing.length > 0 && (
-        <div className="border border-border-muted rounded-container p-3.5 space-y-3">
-          <div className="text-sm font-semibold text-text-primary">
-            {t("settings.capabilities.permission.title")}
-          </div>
-          {missing.map((kind) => (
-            <div
-              key={kind}
-              data-testid="permission-row"
-              data-permission={kind}
-              className="flex items-start gap-3"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-text-primary">
-                  {t(`settings.capabilities.permission.${kind}`)}
-                </div>
-                <div className="text-xs text-text-muted">
-                  {t(`settings.capabilities.permission.${kind}Hint`)}
-                </div>
-                {kind === "screen-recording" && (
-                  <div className="text-xs text-text-muted">
-                    {t(
-                      "settings.capabilities.permission.screenRecordingRestart",
-                    )}
-                  </div>
-                )}
-              </div>
-              <button
-                type="button"
-                data-testid="permission-open"
-                onClick={() =>
-                  void window.electronAPI.capabilities.openPermissionSettings(
-                    kind,
-                  )
+        <div className="space-y-3">
+          <SettingsCard>
+            {missing.map((kind) => (
+              <SettingsRow
+                key={kind}
+                testId="permission-row"
+                title={t(`settings.capabilities.permission.${kind}`)}
+                description={t(`settings.capabilities.permission.${kind}Hint`)}
+                note={
+                  kind === "screen-recording"
+                    ? t(
+                        "settings.capabilities.permission.screenRecordingRestart",
+                      )
+                    : undefined
                 }
-                className="flex-none px-2.5 py-1 text-xs rounded-control border border-border text-text-primary"
-              >
-                {t("settings.capabilities.permission.openSettings")}
-              </button>
-            </div>
-          ))}
+                control={
+                  <button
+                    type="button"
+                    data-testid="permission-open"
+                    onClick={() =>
+                      void window.electronAPI.capabilities.openPermissionSettings(
+                        kind,
+                      )
+                    }
+                    className="rounded-control border border-border px-2.5 py-1 text-xs text-text-primary hover:bg-surface-hover"
+                  >
+                    {t("settings.capabilities.permission.openSettings")}
+                  </button>
+                }
+              />
+            ))}
+          </SettingsCard>
           <button
             type="button"
             data-testid="permission-recheck"
             onClick={() => void refresh()}
-            className="px-2.5 py-1 text-xs rounded-control border border-border text-text-primary"
+            className="rounded-control border border-border px-2.5 py-1 text-xs text-text-primary hover:bg-surface-hover"
           >
             {t("settings.capabilities.permission.recheck")}
           </button>

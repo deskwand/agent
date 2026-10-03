@@ -77,8 +77,7 @@
     "remoteDesc": "通过已连接的频道远程使用 DeskWand",
     "logs": "日志",
     "logsDesc": "查看和导出应用日志",
-    "panelDesc": "配置工作区、工具以及账号相关行为。",
-    "general": "通用",
+    "general": "常规",
     "generalDesc": "外观、语言等通用偏好",
     "archivedSessions": "已归档",
     "archivedSessionsDesc": "浏览、恢复或彻底删除已归档会话",
@@ -90,11 +89,8 @@
     "capabilitiesDesc": "应用自带、需要系统权限的能力",
     "capabilitiesIntro": "应用自带的能力。开启后该能力会随会话加载。",
     "capabilities": {
-      "statusOn": "已启用",
-      "statusOff": "已停用",
       "pendingActivation": "下次对话生效",
       "permission": {
-        "title": "需要系统权限",
         "accessibility": "辅助功能",
         "accessibilityHint": "未授予：无法控制鼠标键盘、读取界面元素",
         "screen-recording": "屏幕录制",
@@ -105,7 +101,12 @@
       },
       "loadFailed": "加载能力失败",
       "actionFailed": "操作失败"
-    }
+    },
+    "groupGeneral": "常规",
+    "groupPersonal": "个人",
+    "groupIntegrations": "集成",
+    "groupOther": "其它",
+    "subagentDesc": "配置子代理的默认模型与工具"
   },
   "webAccess": {
     "groupTitle": "网络访问",
@@ -259,7 +260,9 @@
     "telemetryDesc": "帮助改进 DeskWand，仅上报随机设备标识与应用版本信息，不包含任何个人数据",
     "uiFontSize": "UI 字号",
     "uiFontSizeDesc": "调整整个界面使用的基准字号",
-    "uiFontSizeUnit": "PX"
+    "uiFontSizeUnit": "PX",
+    "uiFontSizeDecrease": "减小字号",
+    "uiFontSizeIncrease": "增大字号"
   },
   "memory": {
     "title": "Memory 机制",

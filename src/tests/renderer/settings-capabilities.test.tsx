@@ -79,10 +79,10 @@ afterEach(() => {
 });
 
 describe("SettingsCapabilities", () => {
-  it("renders the capability and its off state", async () => {
+  it("renders the capability with its switch off", async () => {
     await mount();
     expect(container.textContent).toContain("connectors.builtin.computerUse");
-    expect(container.textContent).toContain("settings.capabilities.statusOff");
+    expect(toggle().getAttribute("aria-checked")).toBe("false");
   });
 
   it("renders the capability description too", async () => {
@@ -167,8 +167,14 @@ describe("SettingsCapabilities", () => {
     await mount();
     const rows = [
       ...container.querySelectorAll('[data-testid="permission-row"]'),
-    ].map((r) => r.getAttribute("data-permission"));
-    expect(rows).toEqual(["accessibility"]);
+    ];
+    expect(rows).toHaveLength(1);
+    expect(rows[0].textContent).toContain(
+      "settings.capabilities.permission.accessibility",
+    );
+    expect(rows[0].textContent).not.toContain(
+      "settings.capabilities.permission.screen-recording",
+    );
   });
 
   it("tells the user a screen-recording grant needs a restart", async () => {
@@ -203,9 +209,6 @@ describe("SettingsCapabilities", () => {
     });
     await mount();
     // 只断言「没有 row」是不够的：容器与「重新检查」也必须一起消失。
-    expect(container.textContent).not.toContain(
-      "settings.capabilities.permission.title",
-    );
     expect(
       container.querySelector('[data-testid="permission-row"]'),
     ).toBeNull();

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { GLOBAL_AGENTS_MD_TEMPLATE } from "./globalAgentsMdTemplate";
-import { SettingsContentSection } from "./shared";
+import { SettingsCard, SettingsSection } from "./shared";
 
 export function SettingsGlobalAgentsMd() {
   const { t } = useTranslation();
@@ -72,43 +72,47 @@ export function SettingsGlobalAgentsMd() {
   };
 
   return (
-    <SettingsContentSection
+    <SettingsSection
       title={t("agentsMd.title")}
       description={t("agentsMd.description")}
     >
-      <div className="space-y-3">
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder={t("agentsMd.placeholder")}
-          className="min-h-44 w-full resize-y rounded-lg border border-border-muted bg-background-secondary p-3 font-mono text-sm text-text-primary"
-        />
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-text-muted">{t("agentsMd.hint")}</span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleInsertTemplate}
-              className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-primary hover:bg-surface-hover"
-            >
-              {t("agentsMd.insertTemplate")}
-            </button>
-            <button
-              onClick={() => {
-                void handleSave();
-              }}
-              disabled={isBusy || !loaded}
-              className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {t("agentsMd.save")}
-            </button>
+      <SettingsCard>
+        <div className="space-y-3 p-4">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder={t("agentsMd.placeholder")}
+            className="min-h-44 w-full resize-y rounded-lg border border-border-muted bg-background-secondary p-3 font-mono text-sm text-text-primary"
+          />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-text-muted">
+              {t("agentsMd.hint")}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleInsertTemplate}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-primary hover:bg-surface-hover"
+              >
+                {t("agentsMd.insertTemplate")}
+              </button>
+              <button
+                onClick={() => {
+                  void handleSave();
+                }}
+                disabled={isBusy || !loaded}
+                className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {t("agentsMd.save")}
+              </button>
+            </div>
           </div>
+          {status && (
+            <div className="rounded-lg border border-border-muted bg-background-secondary px-4 py-3 text-sm text-text-secondary">
+              {status}
+            </div>
+          )}
         </div>
-        {status && (
-          <div className="rounded-lg border border-border-muted bg-background-secondary px-4 py-3 text-sm text-text-secondary">
-            {status}
-          </div>
-        )}
-      </div>
+      </SettingsCard>
       <ConfirmDialog
         isOpen={confirmInsert}
         title={t("agentsMd.replaceConfirm")}
@@ -116,6 +120,6 @@ export function SettingsGlobalAgentsMd() {
         onConfirm={doInsert}
         onCancel={() => setConfirmInsert(false)}
       />
-    </SettingsContentSection>
+    </SettingsSection>
   );
 }
