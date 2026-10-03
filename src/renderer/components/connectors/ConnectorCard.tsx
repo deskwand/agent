@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { FirstPartyServiceIcon, serviceIconFor } from "./brand-icons";
 import type {
   ConnectorEntry,
   ConnectorInstance,
@@ -85,6 +86,10 @@ export function ConnectorCard({
   /** 没有实例 = 还没添加过，视为关闭；开关照样可点。 */
   const capabilityOn = !!instance && instance.status.kind !== "off";
   const name = t(entry.nameKey);
+  /** 头像画什么：厂商 logo / 自研图形 / 首字母兜底。名字匹配全在 brand-icons 里，卡片不写名字常量。 */
+  const icon = serviceIconFor(entry.serverName);
+  /** 厂商 logo 的 url —— 白底只给这一支，不是厂商时为 null（见下方头像处）。 */
+  const brandIconUrl = icon?.kind === "brand" ? icon.url : null;
 
   /** 传输层状态文案；能力开关卡片也用它（开关卡片没有 OAuth 流程，不看 authorizing）。 */
   const instanceStatus = instance
@@ -173,8 +178,26 @@ export function ConnectorCard({
   // grid：发现视图。名称与动作同一行，说明与状态在内容列里各占一行。
   return (
     <div className="bg-surface border border-border-muted rounded-container p-3.5 flex gap-2.5 shadow-card hover:bg-surface-hover">
-      <div className="w-8 h-8 text-sm rounded-lg bg-accent-muted text-accent grid place-items-center font-bold flex-none">
-        {name.slice(0, 1).toUpperCase()}
+      {/* 三分支头像。白底只给厂商 logo（厂商只发布浅底版图）；另两支画的是 text-accent，
+          深色主题的 accent 放白底上只有 1.86–3.16:1，所以留着 bg-accent-muted。
+          24px 是内缩 4px 后的图形区；六个图标都是 24×24 viewBox，所以 w-6 h-6 够用。 */}
+      <div
+        data-testid="card-avatar"
+        className={`w-8 h-8 rounded-lg grid place-items-center flex-none ${
+          brandIconUrl ? "bg-white border border-border" : "bg-accent-muted"
+        }`}
+      >
+        {brandIconUrl ? (
+          <img src={brandIconUrl} alt="" className="w-6 h-6" />
+        ) : icon?.kind === "firstParty" ? (
+          <span className="text-accent grid place-items-center">
+            <FirstPartyServiceIcon />
+          </span>
+        ) : (
+          <span className="text-sm font-bold text-accent">
+            {name.slice(0, 1).toUpperCase()}
+          </span>
+        )}
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-1">
         <div className="flex items-center gap-2 h-5">

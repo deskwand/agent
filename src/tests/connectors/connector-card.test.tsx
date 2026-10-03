@@ -392,3 +392,56 @@ describe("状态行对齐", () => {
     ).toContain("text-success");
   });
 });
+
+describe("头像", () => {
+  const avatar = () => container.querySelector('[data-testid="card-avatar"]');
+
+  it("厂商条目画 logo，不画首字母", () => {
+    render(
+      <ConnectorCard entry={entry({ serverName: "Notion" })} {...handlers()} />,
+    );
+    const img = avatar()!.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toBeTruthy();
+    // 白底只给这一支：厂商只发布浅底版 logo
+    expect(avatar()!.className).toContain("bg-white");
+    expect(avatar()!.className).toContain("border-border");
+  });
+
+  it("自研服务画内联图形，不用 <img>，且保留淡色底", () => {
+    render(
+      <ConnectorCard
+        entry={entry({ serverName: "GUI_Operate" })}
+        {...handlers()}
+      />,
+    );
+    expect(avatar()!.querySelector("img")).toBeNull();
+    // 用 testid 定位，别用 querySelector("svg") —— 那会误撞卡片里将来可能出现的图标
+    expect(
+      container.querySelector('[data-testid="first-party-icon"]'),
+    ).not.toBeNull();
+    // 这一支画的是 text-accent：深色主题的 accent 放白底上只有 1.86–3.16:1，必须留在淡色底上
+    expect(avatar()!.className).toContain("bg-accent-muted");
+    expect(avatar()!.className).not.toContain("bg-white");
+  });
+
+  it("认不出的仍画首字母，底色与自研支一致", () => {
+    // ⚠ 首字母来自**显示名**（name = t(nameKey)，测试里 t 是恒等函数），
+    //   不是 serverName。所以必须同时覆盖 nameKey，否则拿到的是默认 key 的首字母。
+    render(
+      <ConnectorCard
+        entry={entry({ serverName: "my-server", nameKey: "MyServer" })}
+        {...handlers()}
+      />,
+    );
+    expect(avatar()!.querySelector("img")).toBeNull();
+    expect(
+      container.querySelector('[data-testid="first-party-icon"]'),
+    ).toBeNull();
+    // 一定要落在**头像方块里面**：容器级 textContent 里本来就有名称行（`MyServer`），
+    // 拿它断言「画了首字母」是空的 —— 把首字母那个 span 删掉，那条断言照样绿。
+    expect(avatar()!.textContent?.trim()).toBe("M");
+    expect(avatar()!.className).toContain("bg-accent-muted");
+    expect(avatar()!.className).not.toContain("bg-white");
+  });
+});
