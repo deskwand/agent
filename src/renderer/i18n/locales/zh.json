@@ -2110,8 +2110,8 @@
       "atlassianDesc": "Jira 与 Confluence 的读写"
     },
     "builtin": {
-      "guiOperate": "GUI 操控",
-      "guiOperateDesc": "读写本机应用的窗口与控件"
+      "computerUse": "Computer Use",
+      "computerUseDesc": "看屏幕并操作鼠标键盘"
     },
     "summary": {
       "remote": "远端服务",

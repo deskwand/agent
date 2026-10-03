@@ -27,8 +27,8 @@ interface BuiltinPreset {
 export const BUILTIN_PRESETS: readonly BuiltinPreset[] = [
   {
     name: "GUI_Operate",
-    nameKey: "connectors.builtin.guiOperate",
-    descriptionKey: "connectors.builtin.guiOperateDesc",
+    nameKey: "connectors.builtin.computerUse",
+    descriptionKey: "connectors.builtin.computerUseDesc",
   },
 ] as const;
 

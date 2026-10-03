@@ -2113,8 +2113,8 @@
       "atlassianDesc": "Read and write Jira and Confluence"
     },
     "builtin": {
-      "guiOperate": "GUI control",
-      "guiOperateDesc": "Read and drive windows and controls of local apps"
+      "computerUse": "Computer Use",
+      "computerUseDesc": "See the screen and drive the mouse and keyboard"
     },
     "summary": {
       "remote": "Remote service",

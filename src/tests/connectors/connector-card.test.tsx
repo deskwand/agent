@@ -294,8 +294,8 @@ describe("本机能力卡片", () => {
       serverName: "GUI_Operate",
       source: "mcp-builtin",
       transport: "stdio",
-      nameKey: "connectors.builtin.guiOperate",
-      descriptionKey: "connectors.builtin.guiOperateDesc",
+      nameKey: "connectors.builtin.computerUse",
+      descriptionKey: "connectors.builtin.computerUseDesc",
       instances,
     });
 
