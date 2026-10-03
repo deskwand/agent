@@ -357,7 +357,15 @@ describe("codemode tool group UI", () => {
         argumentsBytes: 10033,
       },
     });
-    const message = setSession([]);
+    const message = setSession([
+      {
+        id: "m1",
+        sessionId: "s1",
+        role: "assistant",
+        timestamp: 1,
+        content: [item],
+      },
+    ]);
     act(() =>
       root.render(
         createElement(NestedToolDetails, {
