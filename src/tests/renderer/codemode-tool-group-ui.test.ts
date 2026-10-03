@@ -344,4 +344,38 @@ describe("codemode tool group UI", () => {
     expect(text).toContain(PARENT_ERROR);
     expect(text).not.toContain(i18n.t("tool.grouped.outputUnavailable"));
   });
+  it("shows omitted arguments even when live output is retained", () => {
+    const item = child({
+      name: "write",
+      input: {},
+      trace: {
+        parentToolCallId: "script-1",
+        parentStatus: "ok",
+        status: "ok",
+        source: "final",
+        complete: false,
+        argumentsBytes: 10033,
+      },
+    });
+    const message = setSession([]);
+    act(() =>
+      root.render(
+        createElement(NestedToolDetails, {
+          item,
+          message,
+          allBlocks: [
+            {
+              type: "tool_result",
+              toolUseId: item.id,
+              content: "saved",
+              isError: false,
+            },
+          ],
+        }),
+      ),
+    );
+    expect(container.textContent).toContain(
+      i18n.t("tool.grouped.argumentsOmitted"),
+    );
+  });
 });

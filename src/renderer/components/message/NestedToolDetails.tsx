@@ -47,6 +47,11 @@ export function NestedToolDetails({
       <span className="text-xs text-text-muted">
         {t("tool.grouped.scriptOwner", { id: trace.parentToolCallId })}
       </span>
+      {trace.argumentsBytes !== undefined && (
+        <p className="text-xs text-text-muted">
+          {t("tool.grouped.argumentsOmitted")}
+        </p>
+      )}
       {needsOwnDetails ? (
         <details>
           <summary
@@ -67,11 +72,6 @@ export function NestedToolDetails({
             <pre className="whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono text-text-secondary">
               {JSON.stringify(item.input, null, 2)}
             </pre>
-          )}
-          {trace.argumentsBytes !== undefined && (
-            <p className="text-xs text-text-muted">
-              {t("tool.grouped.argumentsOmitted")}
-            </p>
           )}
           {unavailable && trace.status !== "ok" && (
             <p className="text-xs text-text-muted">
