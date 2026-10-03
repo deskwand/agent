@@ -158,6 +158,41 @@ describe("ChatView paged older-history loading", () => {
     return rail?.querySelectorAll('[role="button"]').length ?? -1;
   }
 
+  it("hides actions when the render window ends inside an assistant turn", async () => {
+    const all = Array.from({ length: 300 }, (_, i) =>
+      turn("boundary", i + 1),
+    ).flat();
+    all[400] = {
+      ...all[399],
+      id: "boundary-final",
+      content: [{ type: "text", text: "Answer outside the render window." }],
+    };
+    useAppStore.getState().setMessagesTail("s1", all, false);
+
+    await act(async () => {
+      root.render(React.createElement(ChatView));
+    });
+
+    const intermediate = container.querySelector(
+      '[data-message-id="boundary-a200"]',
+    );
+    expect(intermediate).not.toBeNull();
+    expect(
+      container.querySelector('[data-message-id="boundary-final"]'),
+    ).toBeNull();
+    expect(
+      intermediate!.querySelector('[aria-label="messageCard.copyMessage"]'),
+    ).toBeNull();
+    expect(
+      intermediate!.querySelector('[aria-label="messageCard.forkMessage"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector(
+        '[data-message-id="boundary-a199"] [aria-label="messageCard.copyMessage"]',
+      ),
+    ).not.toBeNull();
+  });
+
   it("slides the render window within the memory window without IPC, keeping the dock stable", async () => {
     // 300 turns = 600 messages; dock caps at MAX_DOCK_TICKS=50.
     const all = Array.from({ length: 300 }, (_, i) => turn("m", i + 1)).flat();

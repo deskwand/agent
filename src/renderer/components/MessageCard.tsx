@@ -38,6 +38,8 @@ interface MessageCardProps {
   isStreaming?: boolean;
   /** Whether this turn is the latest (actively streaming or just completed) */
   isLatestRound?: boolean;
+  /** Whether this message ends its assistant turn. Defaults to true. */
+  isTurnEnd?: boolean;
   /** Files changed in this turn (aggregated by ChatView) */
   artifactFiles?: ResultFileEntry[];
   /** Local videos referenced by assistant text in this turn. */
@@ -79,6 +81,7 @@ export const MessageCard = memo(function MessageCard({
   message,
   isStreaming,
   isLatestRound = false,
+  isTurnEnd = true,
   artifactFiles = [],
   videoReferences = [],
   suppressProcessSummaries = false,
@@ -246,6 +249,7 @@ export const MessageCard = memo(function MessageCard({
 
   const canFork =
     message.role === "assistant" &&
+    isTurnEnd &&
     !isToolResultRow &&
     !isQueued &&
     !isCancelled &&
@@ -253,6 +257,7 @@ export const MessageCard = memo(function MessageCard({
     groupedDisplayBlocks.length > 0;
 
   const showActions =
+    (message.role !== "assistant" || isTurnEnd) &&
     !isStreaming &&
     !isQueued &&
     !isCancelled &&

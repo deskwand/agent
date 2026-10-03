@@ -57,7 +57,7 @@ function renderCard(
 }
 
 describe("MessageCard action bar", () => {
-  it("shows copy and fork for assistant messages that are not the latest round", () => {
+  it("shows copy and fork for a final answer in a historical turn", () => {
     renderCard(makeMessage(), false, vi.fn());
     expect(
       container.querySelector('[aria-label="Copy message"]'),
@@ -94,7 +94,23 @@ describe("MessageCard action bar", () => {
     expect(src).toContain("!isToolResultRow");
   });
 
-  it("hides fork while streaming", () => {
+  it("keeps system message copy outside assistant turn ends", async () => {
+    await act(async () => {
+      root.render(
+        React.createElement(MessageCard, {
+          message: makeMessage({ role: "system" }),
+          isTurnEnd: false,
+          onForkMessage: vi.fn(),
+        }),
+      );
+    });
+    expect(
+      container.querySelector('[aria-label="Copy message"]'),
+    ).not.toBeNull();
+    expect(container.querySelector('[aria-label="Fork from here"]')).toBeNull();
+  });
+
+  it("hides the action bar while streaming", () => {
     act(() => {
       root.render(
         React.createElement(MessageCard, {
@@ -106,6 +122,8 @@ describe("MessageCard action bar", () => {
       );
     });
     expect(container.querySelector('[aria-label="Fork from here"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Copy message"]')).toBeNull();
+    expect(container.querySelector(".select-none")).toBeNull();
   });
 
   it("hides fork for a queued message", () => {

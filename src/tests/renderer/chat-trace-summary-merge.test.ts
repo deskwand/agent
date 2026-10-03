@@ -288,6 +288,65 @@ describe("ChatView trace summary merging", () => {
     expect(getBrowseSummaryButtons(container)).toHaveLength(2);
   });
 
+  it("shows actions only on the final assistant message of each turn", async () => {
+    setSessionMessages([
+      userMessage("turn-actions"),
+      assistantMessage(
+        "intermediate",
+        "turn-actions",
+        [
+          { type: "text", text: "I will fetch the page." },
+          toolUse("fetch-actions", "web_fetch", { url: "https://example.com" }),
+          toolResult("fetch-actions", "fetched"),
+        ],
+        2,
+      ),
+      assistantMessage(
+        "final",
+        "turn-actions",
+        [{ type: "text", text: "The page is ready." }],
+        3,
+      ),
+      { ...userMessage("turn-next"), id: "u2" },
+      assistantMessage(
+        "next-final",
+        "turn-next",
+        [{ type: "text", text: "Next answer." }],
+        4,
+      ),
+    ]);
+
+    await act(async () => {
+      root!.render(React.createElement(ChatView));
+    });
+    await flush();
+
+    const intermediate = container.querySelector(
+      '[data-message-id="intermediate"]',
+    )!;
+    expect(intermediate.textContent).toContain("I will fetch the page.");
+    expect(
+      intermediate.querySelector('[aria-label="Copy message"]'),
+    ).toBeNull();
+    expect(
+      intermediate.querySelector('[aria-label="Fork from here"]'),
+    ).toBeNull();
+    for (const id of ["final", "next-final"]) {
+      const message = container.querySelector(`[data-message-id="${id}"]`)!;
+      expect(
+        message.querySelector('[aria-label="Copy message"]'),
+      ).not.toBeNull();
+      expect(
+        message.querySelector('[aria-label="Fork from here"]'),
+      ).not.toBeNull();
+    }
+    expect(
+      container.querySelector(
+        '[data-message-id="u1"] [aria-label="Copy message"]',
+      ),
+    ).not.toBeNull();
+  });
+
   it("does not merge browser summaries across turns", async () => {
     setSessionMessages([
       userMessage("turn-3"),

@@ -823,7 +823,15 @@ export function ChatView() {
         latestAssistantId = msgId;
         const next = mergedMessages[i + 1];
         if (!next || next.role === "user") {
-          turnEndIds.add(msgId);
+          // Keep summaries at the window edge, but only show actions at a turn end.
+          const nextDisplayedMessage =
+            next ??
+            displayedMessages[
+              visibleMessageStartIndex + visibleMessages.length
+            ];
+          if (!nextDisplayedMessage || nextDisplayedMessage.role === "user") {
+            turnEndIds.add(msgId);
+          }
           const summaryBlocks =
             (msg.turnId && turnBlocksById.get(msg.turnId)) || currentTurnBlocks;
           const summaryItems = summaryBlocks.filter(
@@ -889,6 +897,9 @@ export function ChatView() {
     });
   }, [
     mergedMessages,
+    displayedMessages,
+    visibleMessageStartIndex,
+    visibleMessages.length,
     hoistedProcessSummaryTurnIds,
     activeSessionCwd,
     turnBlocksById,
@@ -1816,6 +1827,7 @@ export function ChatView() {
                     const {
                       message,
                       isStreaming,
+                      isTurnEnd,
                       isLatestRound,
                       artifactFiles,
                       videoReferences,
@@ -1848,6 +1860,7 @@ export function ChatView() {
                           }
                           message={message}
                           isStreaming={isStreaming}
+                          isTurnEnd={isTurnEnd}
                           isLatestRound={isLatestRound}
                           artifactFiles={artifactFiles}
                           videoReferences={videoReferences}
