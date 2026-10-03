@@ -20,8 +20,6 @@ const { continueSessionMock } = vi.hoisted(() => ({
   ),
 }));
 
-let capturedOnStop: (() => void) | null = null;
-
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
@@ -60,8 +58,9 @@ vi.mock("../../renderer/components/ChatInput", async () => {
 vi.mock("../../renderer/components/ChatInputBottomBar", async () => {
   const ReactModule = await import("react");
   return {
-    ChatInputBottomBar: function MockBottomBar(props: { onStop?: () => void }) {
-      capturedOnStop = props.onStop ?? null;
+    ChatInputBottomBar: function MockBottomBar(_props: {
+      onStop?: () => void;
+    }) {
       return ReactModule.createElement("div");
     },
   };
@@ -176,7 +175,7 @@ describe("codemode group entrypoints", () => {
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
-    capturedOnStop = null;
+
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     if (scrollToDescriptor) {

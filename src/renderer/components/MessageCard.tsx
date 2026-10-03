@@ -86,22 +86,6 @@ export const MessageCard = memo(function MessageCard({
 }: MessageCardProps) {
   const { t, i18n } = useTranslation();
 
-  // 余额不足（402 INSUFFICIENT_BALANCE）：渲染充值引导卡片，替代原始错误文本
-  if (message.code === "INSUFFICIENT_BALANCE") {
-    return (
-      <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
-        <p className="text-sm text-text-primary">
-          {t("topUp.insufficientCredits")}
-        </p>
-        <button
-          className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground"
-          onClick={() => useAppStore.getState().setTopUpOpen(true)}
-        >
-          {t("topUp.goTopUp")}
-        </button>
-      </div>
-    );
-  }
   const isUser = message.role === "user";
   const isQueued = message.localStatus === "queued";
   const isCancelled = message.localStatus === "cancelled";
@@ -221,6 +205,23 @@ export const MessageCard = memo(function MessageCard({
     flush();
     return groups;
   }, [groupedDisplayBlocks]);
+
+  // 余额不足（402 INSUFFICIENT_BALANCE）：渲染充值引导卡片，替代原始错误文本
+  if (message.code === "INSUFFICIENT_BALANCE") {
+    return (
+      <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
+        <p className="text-sm text-text-primary">
+          {t("topUp.insufficientCredits")}
+        </p>
+        <button
+          className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground"
+          onClick={() => useAppStore.getState().setTopUpOpen(true)}
+        >
+          {t("topUp.goTopUp")}
+        </button>
+      </div>
+    );
+  }
 
   const canFork =
     message.role === "assistant" &&
