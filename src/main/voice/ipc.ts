@@ -120,6 +120,27 @@ export function registerVoiceIpc({
           modelDir: `${voiceRoot(userDataPath)}/models/${MODEL_ID}`,
         });
       }
+      // 构造 VoiceSession 会立刻建识别流（addon.createOnlineRecognizer），模型配置不对就在这里抛。
+      // 它必须在 try 里：否则 handler 直接 reject，渲染侧那个 await 没人接 ——
+      // 采集不会停（系统录音灯常亮），且状态卡在 requesting，而 requesting 下按钮是禁用的。
+      sessions.set(
+        sessionId,
+        new VoiceSession({
+          engine,
+          events: {
+            onPartial: (text) =>
+              sendEvent({ type: "partial", sessionId, text }),
+            onDone: ({ text, discarded }) => {
+              drop(sessionId);
+              sendEvent({ type: "done", sessionId, text, discarded });
+            },
+            onError: (code, message) => {
+              drop(sessionId);
+              sendEvent({ type: "error", sessionId, code, message });
+            },
+          },
+        }),
+      );
     } catch (error) {
       // VoiceStartResult 没有 message 字段（错误文案由渲染层按 code 查表），
       // 细节只进日志。
@@ -127,23 +148,6 @@ export function registerVoiceIpc({
       return { ok: false, code: "VOICE_ENGINE_FAILED" };
     }
 
-    sessions.set(
-      sessionId,
-      new VoiceSession({
-        engine,
-        events: {
-          onPartial: (text) => sendEvent({ type: "partial", sessionId, text }),
-          onDone: ({ text, discarded }) => {
-            drop(sessionId);
-            sendEvent({ type: "done", sessionId, text, discarded });
-          },
-          onError: (code, message) => {
-            drop(sessionId);
-            sendEvent({ type: "error", sessionId, code, message });
-          },
-        },
-      }),
-    );
     return { ok: true, sessionId };
   });
 

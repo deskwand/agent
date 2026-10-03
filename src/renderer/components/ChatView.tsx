@@ -462,6 +462,10 @@ export function ChatView() {
   // onStop 只看 status === "recording"，录音会被静默停掉。
   const pushToTalkOwns = useRef(false);
 
+  // 录音期间禁发。否则会把半截转写发出去，而清空草稿后下一个 partial 又把文字写回输入框。
+  // 撮在一个常量里是因为这里有两条渲染路径：以前只有一处接了录音状态，另一处漏了。
+  const submitBlocked = isCompacting || voice.status === "recording";
+
   usePushToTalk(
     voiceEngine?.shortcut ?? "disabled",
     {
@@ -2032,7 +2036,7 @@ export function ChatView() {
             onCompact={handleCompact}
             onCommand={handleCommand}
             disabled={isSubmitting}
-            submitDisabled={isCompacting}
+            submitDisabled={submitBlocked}
             isExpanded={isInputExpanded}
             onToggleExpand={() => setIsInputExpanded((v) => !v)}
             onContentChange={setHasInputContent}
@@ -2127,7 +2131,7 @@ export function ChatView() {
                 canStop={canStop}
                 onStop={handleStop}
                 isSubmitting={isSubmitting}
-                submitDisabled={isCompacting}
+                submitDisabled={submitBlocked}
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}

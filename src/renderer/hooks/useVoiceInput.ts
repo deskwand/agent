@@ -71,6 +71,12 @@ export const VOICE_MESSAGE_KEYS: Record<VoiceErrorCode, string> = {
   VOICE_INSTALL_FAILED: "chat.voiceInstallFailed",
 };
 
+/**
+ * 会话建好之前最多缓存多少音频。2 秒足够覆盖引擎冷启动与首次权限弹窗，
+ * 再多就是在为一个不该持续那么久的状态占内存。
+ */
+const MAX_PENDING_BYTES = 16000 * 2 * 2;
+
 export function useVoiceInput(
   options: UseVoiceInputOptions,
 ): VoiceInputController {
@@ -83,6 +89,14 @@ export function useVoiceInput(
   const sessionRef = useRef<string | null>(null);
   const captureRef = useRef<MicCapture | null>(null);
   const snapshotRef = useRef("");
+  /** 会话建好之前采到的帧，按序保存。上限见 MAX_PENDING_BYTES。 */
+  const pendingRef = useRef<{ frames: ArrayBuffer[]; bytes: number }>({
+    frames: [],
+    bytes: 0,
+  });
+  const clearPending = useCallback(() => {
+    pendingRef.current = { frames: [], bytes: 0 };
+  }, []);
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
@@ -92,10 +106,11 @@ export function useVoiceInput(
     // 会话已结束，把 id 一并清掉：事件监听器拿它当归属判断，
     // 留着的话一条迟到的事件会把已经结束的那段文字重新写进输入框。
     sessionRef.current = null;
+    clearPending();
     setLevel(0);
     setSeconds(0);
     setStatus("idle");
-  }, []);
+  }, [clearPending]);
 
   const start = useCallback(async () => {
     const { enabled, onBlocked, onError, getSnapshot } = optionsRef.current;
@@ -107,19 +122,31 @@ export function useVoiceInput(
     }
 
     sessionRef.current = null;
+    clearPending();
     setStatus("requesting");
     const snapshot = getSnapshot();
 
     let capture: MicCapture;
     try {
       capture = await startMicCapture((pcm, nextLevel) => {
-        const sessionId = sessionRef.current;
-        if (!sessionId) return;
+        // 音量条立即响应：按下就该有反馈，不该等会话建好
         setLevel(nextLevel);
         const buffer = pcm.buffer.slice(
           pcm.byteOffset,
           pcm.byteOffset + pcm.byteLength,
         ) as ArrayBuffer;
+        const sessionId = sessionRef.current;
+        if (!sessionId) {
+          // 会话还没建好（引擎冷启动 ~700ms，首次还要过权限弹窗）。
+          // 先存着，建好后冲进去 —— 本地方案不要那 200ms 门槛就是为了不切字，
+          // 把这段丢掉等于把当初否掉的东西又加了回来。
+          const pending = pendingRef.current;
+          if (pending.bytes + buffer.byteLength <= MAX_PENDING_BYTES) {
+            pending.frames.push(buffer);
+            pending.bytes += buffer.byteLength;
+          }
+          return;
+        }
         void api.pushAudio(sessionId, buffer);
       });
     } catch (error) {
@@ -131,9 +158,16 @@ export function useVoiceInput(
       return;
     }
 
-    const started = await api.start();
+    // handler 抛错会让 invoke 直接 reject。不接住的话状态会卡在 "requesting"，
+    // 而 requesting 下麦克风按钮是禁用的 —— 用户只能重开窗口。
+    // 转成同形状的失败结果，后面的清理路径就能照常跑（含 capture.stop()）。
+    const started = await api.start().catch((error: unknown) => {
+      console.error("[voice] voice.start rejected:", error);
+      return { ok: false as const, code: "VOICE_ENGINE_FAILED" as const };
+    });
     if (!started.ok) {
       capture.stop();
+      clearPending();
       onError(started.code);
       setStatus("idle");
       return;
@@ -141,12 +175,18 @@ export function useVoiceInput(
 
     snapshotRef.current = snapshot;
     sessionRef.current = started.sessionId;
+    // 把会话建好之前采到的帧按序冲进去。顺序不能乱：识别器拿到的流必须是时间序。
+    const pending = pendingRef.current;
+    for (const frame of pending.frames) {
+      void api.pushAudio(started.sessionId, frame);
+    }
+    clearPending();
     captureRef.current = capture;
     setVoiceText("");
     setOriginalText(null);
     setSeconds(0);
     setStatus("recording");
-  }, []);
+  }, [clearPending]);
 
   const stop = useCallback(async () => {
     const sessionId = sessionRef.current;

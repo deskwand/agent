@@ -39,6 +39,8 @@ const calls = {
   getSnapshot: vi.fn(() => draft),
 };
 
+let onSamplesRef: ((pcm: Int16Array, level: number) => void) | null = null;
+
 function Probe() {
   api = useVoiceInput({ enabled: true, ...calls });
   return React.createElement("span", null, api.status);
@@ -63,7 +65,15 @@ beforeEach(() => {
     }),
   };
   (window as unknown as { electronAPI: unknown }).electronAPI = { voice };
-  micMock.start.mockResolvedValue({ stop: stopCapture });
+  // 替身必须**真的调用** onSamples：以前它从不发声，于是
+  // Int16Array → ArrayBuffer → IPC 那一段一次也没被执行过（和 worklet 那个 bug 同一种接缝形状）。
+  onSamplesRef = null;
+  micMock.start.mockImplementation(
+    async (cb: (pcm: Int16Array, level: number) => void) => {
+      onSamplesRef = cb;
+      return { stop: stopCapture };
+    },
+  );
   // mockClear 只清调用记录、不清实现；mockReset 两者都清。
   // 这里必须 reset：某条用例给 polish 装了“挂住不返回”的实现，
   // 用 clear 的话它会泄漏到后面的用例里去。
@@ -278,3 +288,82 @@ function Probe2() {
   api = useVoiceInput({ enabled: false, ...calls });
   return React.createElement("span", null, api.status);
 }
+
+/**
+ * 补一个真实存在的盲区：以前的替身从不调 `onSamples`，所以
+ * 「采集帧 → ArrayBuffer → IPC」这条唯一的音频通路**一次也没被执行过**。
+ * 这和 worklet 被 CSP 拦掉那个 bug 是同一种接缝形状 —— 替身恰好停在会坏的那条边界上。
+ */
+describe("useVoiceInput — 采集帧到 IPC 的真实通路", () => {
+  const frame = (samples: number) => {
+    const pcm = new Int16Array(samples);
+    for (let i = 0; i < samples; i += 1) pcm[i] = i % 1000;
+    return pcm;
+  };
+
+  it("把采集帧原样交给 pushAudio，载荷长度与采样数一致", async () => {
+    await render();
+    await act(async () => api.toggle());
+
+    await act(async () => onSamplesRef?.(frame(1600), 0.5));
+
+    expect(voice.pushAudio).toHaveBeenCalledTimes(1);
+    const [sessionId, payload] = voice.pushAudio.mock.calls[0];
+    expect(sessionId).toBe("s1");
+    expect(payload).toBeInstanceOf(ArrayBuffer);
+    // 1600 个 int16 = 3200 字节。截错 byteOffset 或漏乘 2 都会在这里现形。
+    expect((payload as ArrayBuffer).byteLength).toBe(1600 * 2);
+    const roundTrip = new Int16Array(payload as ArrayBuffer);
+    expect(roundTrip[17]).toBe(17);
+  });
+
+  it("音量条在会话建好之前就响应 —— 按下即开始", async () => {
+    await render();
+    await act(async () => api.toggle());
+
+    await act(async () => onSamplesRef?.(frame(1600), 0.8));
+
+    expect(api.level).toBe(0.8);
+  });
+
+  it("会话建好前采到的帧被缓存、建好后按序冲入 —— 不切首字", async () => {
+    // 让 voice.start 挂住，模拟引擎冷启动 / 首次权限弹窗那段时间
+    let release: (value: unknown) => void = () => {};
+    voice.start.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    await render();
+    await act(async () => api.toggle());
+
+    // 麦克风已经开了、已经出声，但会话还没建好
+    await act(async () => onSamplesRef?.(frame(1600), 0.5));
+    await act(async () => onSamplesRef?.(frame(1600), 0.5));
+    expect(voice.pushAudio).not.toHaveBeenCalled();
+
+    await act(async () => release({ ok: true, sessionId: "s1" }));
+
+    expect(voice.pushAudio).toHaveBeenCalledTimes(2);
+    // 顺序不能乱：识别器拿到的流必须是时间序
+    expect(voice.pushAudio.mock.calls.map((call) => call[0])).toEqual([
+      "s1",
+      "s1",
+    ]);
+  });
+
+  it("voice.start 被拒时不留开着采集，也不卡在 requesting", async () => {
+    // handler 抛错会让 invoke reject。不接住的话状态卡在 requesting，
+    // 而 requesting 下麦克风按钮是禁用的 —— 用户只能重开窗口。
+    voice.start.mockRejectedValue(new Error("handler blew up"));
+
+    await render();
+    await act(async () => api.toggle());
+
+    expect(stopCapture).toHaveBeenCalled();
+    expect(calls.onError).toHaveBeenCalledWith("VOICE_ENGINE_FAILED");
+    expect(container.textContent).toBe("idle");
+  });
+});
