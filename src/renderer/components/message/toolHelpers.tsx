@@ -18,6 +18,7 @@ import {
   Bot,
   Inbox,
   Send,
+  Volume2,
 } from "lucide-react";
 
 /** Map a tool name to a small icon element */
@@ -48,6 +49,7 @@ export function getToolIcon(name: string) {
   )
     return <Globe className="w-3.5 h-3.5" />;
   if (n === "vision_describe") return <Eye className="w-3.5 h-3.5" />;
+  if (n === "tts") return <Volume2 className="w-3.5 h-3.5" />;
   if (n === "office_read_xlsx") return <Table className="w-3.5 h-3.5" />;
   if (n === "office_read_docx") return <FileText className="w-3.5 h-3.5" />;
   if (n === "office_read_pptx") return <Presentation className="w-3.5 h-3.5" />;
@@ -246,6 +248,16 @@ export function getToolLabel(
     return p
       ? t("tool.labelReadPdf", { path: shortenPath(p) })
       : t("tool.actionReadPdf");
+  }
+
+  // --- Text to speech ---
+  if (nameLower === "tts") {
+    const text = String(inp.text || "");
+    return text
+      ? t("tool.labelTextToSpeech", {
+          text: text.length > 30 ? text.slice(0, 27) + "…" : text,
+        })
+      : t("tool.actionTextToSpeech");
   }
 
   // --- Vision tools ---

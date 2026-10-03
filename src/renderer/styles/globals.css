@@ -1625,3 +1625,9 @@
   );
   color: var(--color-text-primary);
 }
+
+/* 朗读时当前句的高亮。CSS Custom Highlight API 只能改颜色/下划线/文字装饰 ——
+   没有圆角与内边距，句子跨行时底色是断开的。这是 API 的限制，不是没做。 */
+::highlight(tts) {
+  background-color: color-mix(in oklab, var(--color-accent) 22%, transparent);
+}

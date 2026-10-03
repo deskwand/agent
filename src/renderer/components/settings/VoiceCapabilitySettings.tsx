@@ -128,7 +128,7 @@ export function VoiceCapabilitySettings() {
             note={
               install?.phase === "error"
                 ? t("settings.capabilities.voice.installFailed")
-                : undefined
+                : t("settings.capabilities.voice.memoryNote")
             }
             control={
               installed ? (

@@ -34,6 +34,9 @@ import { USAGE_CURRENCIES, type CurrencyCode } from "../../shared/usage";
 import { restoreUserMessage } from "../utils/prompt-decorations";
 import type { ElementSelection } from "../../shared/ipc-types";
 import { pruneDrafts, removeDraft } from "../utils/chat-draft-store";
+// 必须是类型 import：hook 那边要真的 import 本模块的 useAppStore，
+// 两边都用真值 import 就是循环依赖。类型 import 编译后会被抹掉，不成环。
+import type { ReadAloudState } from "../hooks/useReadAloud";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
@@ -510,6 +513,10 @@ interface AppState {
 
   // Update actions
   setUpdateReady: (version: string | null, notes: string | null) => void;
+
+  // Read aloud actions
+  readAloud: ReadAloudState;
+  setReadAloud: (patch: Partial<ReadAloudState>) => void;
 }
 
 const defaultSettings: Settings = {
@@ -635,6 +642,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     rightPanelMode: "files" | "browser" | "preview" | "review" | null;
     contextPanelWidth: number;
   } | null,
+  readAloud: {
+    messageId: null,
+    status: "idle",
+    currentIndex: 0,
+    total: 0,
+  } as ReadAloudState,
 
   // Session actions
   setSessions: (sessions) => {
@@ -1766,6 +1779,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       browserOcclusionIds.delete(id);
       return { browserOcclusionIds };
     }),
+
+  // Read aloud actions：每次都是新对象，zustand 的引用比较才能触发重渲染。
+  setReadAloud: (patch) =>
+    set((s) => ({ readAloud: { ...s.readAloud, ...patch } })),
 
   // Browser fullscreen actions
   enterBrowserFullscreen: () =>

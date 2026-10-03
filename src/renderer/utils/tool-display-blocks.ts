@@ -26,6 +26,8 @@ export interface ProcessSummary {
   hasGoal: boolean;
   usedToolCount: number;
   scriptCount?: number;
+  /** 朗读工具被调用的次数。与 scriptCount 一样是可选：老测试字面量不必跟着改。 */
+  ttsCount?: number;
   calledRead?: boolean;
   calledSearch?: boolean;
 }
@@ -212,6 +214,7 @@ function buildProcessSummary(
   let subagentWorkflowCount = 0;
   let hasGoal = false;
   let usedToolCount = 0;
+  let ttsCount = 0;
   let todoUpdateCount = 0;
   let scriptCount = 0;
   let calledRead = false;
@@ -220,6 +223,12 @@ function buildProcessSummary(
   for (const item of items) {
     const lower = item.name.toLowerCase();
     let countedAsSpecific = false;
+    // 朗读工具：它在过程摘要里有自己的措辞（「朗读了 N 段文字」），
+    // 不能被算进通用的 usedToolCount —— AGENTS.md §4 要求新工具必须归类。
+    if (lower === "tts") {
+      ttsCount += 1;
+      continue;
+    }
     if (lower === "codemode") {
       // 投影只会保留没有可用子条目的父调用；它本身不是一次通用工具使用。
       scriptCount += 1;
@@ -327,6 +336,7 @@ function buildProcessSummary(
     subagentSteerCount,
     subagentWorkflowCount,
     hasGoal,
+    ttsCount,
     usedToolCount,
     todoUpdateCount,
     scriptCount,
@@ -625,6 +635,7 @@ export type ProcessSummaryFragment = {
     | "subagent"
     | "goal"
     | "tasklist"
+    | "tts"
     | "tool";
 };
 
@@ -746,6 +757,14 @@ export function getProcessSummaryFragments(
         },
       ),
       iconType: "tasklist",
+    });
+  }
+  if ((summary.ttsCount ?? 0) > 0) {
+    fragments.push({
+      text: t(pluralKey("tool.grouped.spokeText", summary.ttsCount ?? 0), {
+        count: summary.ttsCount ?? 0,
+      }),
+      iconType: "tts",
     });
   }
   if (summary.usedToolCount > 0) {

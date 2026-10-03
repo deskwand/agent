@@ -48,26 +48,26 @@ vi.mock("../../main/config/config-store", () => ({
   },
 }));
 
-vi.mock("../../main/voice/installer", async () => {
+vi.mock("../../main/speech/installer", async () => {
   const actual = await vi.importActual<typeof InstallerModule>(
-    "../../main/voice/installer",
+    "../../main/speech/installer",
   );
   return {
     ...actual,
     readManifest: mocks.readManifest,
     installRuntime: mocks.installRuntime,
     installModel: mocks.installModel,
-    removeVoice: vi.fn(),
+    removeVoiceModel: vi.fn(),
   };
 });
 
-vi.mock("../../main/voice/runtime-spec", () => ({
+vi.mock("../../main/speech/runtime-spec", () => ({
   readRuntimeSpec: mocks.readRuntimeSpec,
   runtimeKey: () => "darwin-arm64",
 }));
 
-import type * as InstallerModule from "../../main/voice/installer";
-import { MODEL_ID, RUNTIME_VERSION } from "../../main/voice/installer";
+import type * as InstallerModule from "../../main/speech/installer";
+import { MODEL_ID, RUNTIME_VERSION } from "../../main/speech/installer";
 import { registerVoiceIpc } from "../../main/voice/ipc";
 
 const events: VoiceEvent[] = [];
@@ -234,10 +234,10 @@ function runRemove() {
 
 describe("voice.removeInstall", () => {
   it("删不掉时返回失败，并且不谎称已删", async () => {
-    const { removeVoice } = await import("../../main/voice/installer");
-    vi.mocked(removeVoice).mockRejectedValue(
-      new Error("EBUSY: resource busy or locked"),
-    );
+    const { removeVoiceModel } = await import("../../main/speech/installer");
+    vi.mocked(removeVoiceModel).mockImplementation(() => {
+      throw new Error("EBUSY: resource busy or locked");
+    });
     // 删失败时清单还在 → 它确实还是「已安装」
     mocks.readManifest.mockReturnValue({
       runtimeVersion: RUNTIME_VERSION,
@@ -253,8 +253,8 @@ describe("voice.removeInstall", () => {
   });
 
   it("删成功时落 idle", async () => {
-    const { removeVoice } = await import("../../main/voice/installer");
-    vi.mocked(removeVoice).mockResolvedValue(undefined);
+    const { removeVoiceModel } = await import("../../main/speech/installer");
+    vi.mocked(removeVoiceModel).mockImplementation(() => {});
     mocks.readManifest.mockReturnValue(null);
 
     const result = await runRemove();

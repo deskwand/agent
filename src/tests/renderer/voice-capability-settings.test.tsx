@@ -116,6 +116,20 @@ describe("VoiceCapabilitySettings", () => {
     expect(api.voice.removeInstall).toHaveBeenCalledTimes(1);
   });
 
+  it("内存要重启才归还，这一句两个本机功能都要有", async () => {
+    setEngine({ enabled: true, shortcut: "AltRight" });
+    api.voice.getInstallState.mockResolvedValue({
+      phase: "ready",
+      percent: 100,
+      installed: true,
+    });
+    await mount();
+
+    expect(container.textContent).toContain(
+      "settings.capabilities.voice.memoryNote",
+    );
+  });
+
   it("未安装时给安装按钮，点了就装", async () => {
     setEngine({ enabled: true, shortcut: "AltRight" });
     await mount();

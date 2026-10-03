@@ -40,6 +40,11 @@ import type {
   VoicePolishedResult,
   VoiceStartResult,
 } from "../shared/ipc-types";
+import type {
+  TtsEvent,
+  TtsInstallState,
+  TtsSpeakResult,
+} from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
 import type {
   RestoreResult,
@@ -930,6 +935,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
       return () => ipcRenderer.removeListener("voice.event", handler);
     },
   },
+
+  // ── Read aloud（朗读）──────────────────────────────────────────
+  tts: {
+    speak: (text: string): Promise<TtsSpeakResult> =>
+      ipcRenderer.invoke("tts.speak", text),
+    install: (): Promise<void> => ipcRenderer.invoke("tts.install"),
+    removeInstall: (): Promise<void> => ipcRenderer.invoke("tts.removeInstall"),
+    getInstallState: (): Promise<TtsInstallState> =>
+      ipcRenderer.invoke("tts.getInstallState"),
+    // 与 voice.event 同理：独立通道，不走 server-event 总线。
+    onEvent: (callback: (event: TtsEvent) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: TtsEvent) =>
+        callback(data);
+      ipcRenderer.on("tts.event", handler);
+      return () => ipcRenderer.removeListener("tts.event", handler);
+    },
+  },
 });
 
 // Type declaration for the renderer process
@@ -1583,6 +1605,13 @@ declare global {
         removeInstall: () => Promise<{ ok: boolean }>;
         getInstallState: () => Promise<VoiceInstallState>;
         onEvent: (callback: (event: VoiceEvent) => void) => () => void;
+      };
+      tts: {
+        speak: (text: string) => Promise<TtsSpeakResult>;
+        install: () => Promise<void>;
+        removeInstall: () => Promise<void>;
+        getInstallState: () => Promise<TtsInstallState>;
+        onEvent: (callback: (event: TtsEvent) => void) => () => void;
       };
     };
   }

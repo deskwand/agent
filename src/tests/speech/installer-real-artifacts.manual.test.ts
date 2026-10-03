@@ -3,7 +3,7 @@
  *
  * 默认跳过，只在显式设置 `VOICE_E2E=1` 时运行（要下 ~130MB，不适合进日常套件）：
  *
- *   VOICE_E2E=1 npx vitest run src/tests/voice/installer-real-artifacts.manual.test.ts
+ *   VOICE_E2E=1 npx vitest run src/tests/speech/installer-real-artifacts.manual.test.ts
  *
  * 装到 `/tmp/voice-install-check`。
  *
@@ -23,7 +23,7 @@ import {
   installRuntime,
   readManifest,
   voiceRoot,
-} from "../../main/voice/installer";
+} from "../../main/speech/installer";
 
 const ROOT = "/tmp/voice-install-check";
 const ENABLED = process.env.VOICE_E2E === "1";

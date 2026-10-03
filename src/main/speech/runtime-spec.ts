@@ -1,5 +1,5 @@
 /**
- * @module main/voice/runtime-spec
+ * @module main/speech/runtime-spec
  *
  * 运行时与模型的下载坐标。文件随包发布，只有 URL 与 sha256，没有二进制。
  */
@@ -13,6 +13,9 @@ export interface VoiceRuntimeSpec {
   nodeSha256: string;
   /** 键是 `${process.platform}-${process.arch}`，win 平台写 win32。 */
   runtimeSha256: Record<string, string>;
+  /** 朗读模型。Task 0 产出。 */
+  ttsModelUrl: string;
+  ttsModelSha256: string;
 }
 
 /** 打包后 resources/ 是 extraResources 的根；开发时在仓库根目录。 */

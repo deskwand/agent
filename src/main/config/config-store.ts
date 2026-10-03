@@ -153,6 +153,7 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  readAloud?: ReadAloudConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
@@ -181,6 +182,7 @@ export interface StoredConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  readAloud?: ReadAloudConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
@@ -297,6 +299,7 @@ export function defaultStoredConfig(): StoredConfig {
     isConfigured: false,
     visionModel: undefined,
     voiceEngine: { enabled: false, shortcut: DEFAULT_VOICE_SHORTCUT },
+    readAloud: { enabled: false },
     webAccess: normalizeWebAccessConfig(undefined),
     codemode: normalizeCodemodeConfig(undefined),
   };
@@ -946,6 +949,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
     voiceEngine: normalizeVoiceEngineConfig(stored.voiceEngine),
+    readAloud: normalizeReadAloudConfig(stored.readAloud),
     webAccess: normalizeWebAccessConfig(stored.webAccess),
     codemode: normalizeCodemodeConfig(stored.codemode),
     subagent: stored.subagent,
@@ -1108,6 +1112,8 @@ export class ConfigStore {
       stored.visionModel = updates.visionModel;
     if (updates.voiceEngine !== undefined)
       stored.voiceEngine = updates.voiceEngine;
+    if (updates.readAloud !== undefined)
+      stored.readAloud = normalizeReadAloudConfig(updates.readAloud);
     if (updates.webAccess !== undefined)
       stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
     // 注意：删掉 `codemode.enabled` 时**不能连这个分支一起删** —— 少了它
@@ -1361,4 +1367,19 @@ export function normalizeVoiceEngineConfig(raw: unknown): VoiceEngineConfig {
       ? value.shortcut
       : DEFAULT_VOICE_SHORTCUT,
   };
+}
+
+/**
+ * 朗读配置。今天只有一个开关 —— 音色/语速都不做，所以不要为了「对称」先占位。
+ *
+ * 与语音输入同一条理由不存「已装状态」：那个事实的唯一真源是 install.json。
+ */
+export interface ReadAloudConfig {
+  enabled: boolean;
+}
+
+/** 脏配置（手改过的 config 文件）要能回退，不能抛错。 */
+export function normalizeReadAloudConfig(raw: unknown): ReadAloudConfig {
+  const enabled = (raw as { enabled?: unknown } | undefined)?.enabled;
+  return { enabled: enabled === true };
 }

@@ -116,7 +116,19 @@
         "shortcutAltSpace": "⌥ + 空格",
         "shortcutMetaShiftSpace": "⌘ + ⇧ + 空格",
         "shortcutDisabled": "不使用快捷键",
-        "shortcutFnHint": "Fn 键无法在应用内监听，所以默认用右 Option（对齐微信电脑端的「长按右 Alt」）"
+        "shortcutFnHint": "Fn 键无法在应用内监听，所以默认用右 Option（对齐微信电脑端的「长按右 Alt」）",
+        "memoryNote": "关掉开关后，已加载的模型要重启应用才释放内存。"
+      },
+      "readAloud": {
+        "title": "朗读",
+        "desc": "把助手回复读出来。完全本机，不上传文字。需要下载约 157MB，并在内存中常驻约 324MB。",
+        "install": "下载语音模型",
+        "installing": "正在下载… {{percent}}%",
+        "installed": "已安装 · MeloTTS zh_en",
+        "notInstalled": "未安装",
+        "remove": "删除朗读模型",
+        "installFailed": "下载失败，可以重试",
+        "memoryNote": "关掉开关后，已加载的模型要重启应用才释放内存。"
       }
     },
     "groupGeneral": "常规",
@@ -1131,7 +1143,14 @@
     "question": "问题",
     "thinking": "思考",
     "executionTime": "执行时间: {{time}}",
-    "forkMessage": "从此处分叉"
+    "forkMessage": "从此处分叉",
+    "readAloud": "朗读这条回复",
+    "pauseReading": "暂停",
+    "resumeReading": "继续",
+    "stopReading": "停止",
+    "readAloudProgress": "第 {{current}} / {{total}} 句",
+    "readAloudEmpty": "这条没有可读的文字",
+    "readAloudFailed": "朗读失败，去设置 → 能力里检查语音模型"
   },
   "schedule": {
     "createTitle": "新建定时任务",
@@ -1471,6 +1490,8 @@
     "bashNoOutput": "(无输出)",
     "readReading": "读取中...",
     "readEmptyFile": "(空文件)",
+    "actionTextToSpeech": "朗读成语音",
+    "labelTextToSpeech": "朗读了「{{text}}」",
     "actionVisionDescribe": "描述图片",
     "labelVisionDescribe": "描述了 {{path}}",
     "labelVisionDescribeWithPrompt": "描述了 {{path}}（{{prompt}}）",
@@ -1504,6 +1525,8 @@
       "steeredSubagents_other": "已引导 {{count}} 次子代理",
       "ranSubagentWorkflows_one": "已运行 {{count}} 个子代理工作流",
       "ranSubagentWorkflows_other": "已运行 {{count}} 个子代理工作流",
+      "spokeText_one": "已朗读 {{count}} 段文字",
+      "spokeText_other": "已朗读 {{count}} 段文字",
       "usedTools_one": "已使用 {{count}} 个工具",
       "usedTools_other": "已使用 {{count}} 个工具",
       "updatedTaskList_one": "已更新 {{count}} 次任务清单",

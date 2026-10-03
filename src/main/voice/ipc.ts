@@ -30,10 +30,10 @@ import {
   installModel,
   installRuntime,
   readManifest,
-  removeVoice,
+  removeVoiceModel,
   voiceRoot,
-} from "./installer";
-import { readRuntimeSpec, runtimeKey } from "./runtime-spec";
+} from "../speech/installer";
+import { readRuntimeSpec, runtimeKey } from "../speech/runtime-spec";
 import { polishTranscriptWithAgentSdk } from "./transcript-polish";
 
 export interface VoiceIpcOptions {
@@ -248,7 +248,7 @@ export function registerVoiceIpc({
   ipcMain.handle("voice.removeInstall", async () => {
     engine = null;
     try {
-      await removeVoice(userDataPath);
+      removeVoiceModel(userDataPath);
     } catch (error) {
       // Windows 上删不掉正被原生 addon 映射着的模型文件（内存映射占用）。
       // 不接住的话渲染侧的 await 直接 reject，设置页停在「已安装」，而目录可能

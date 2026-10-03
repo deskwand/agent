@@ -6,6 +6,7 @@ import {
   type CapabilityPermissions,
 } from "../../../shared/capabilities";
 import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
+import { ReadAloudSettings } from "./ReadAloudSettings";
 import { VoiceCapabilitySettings } from "./VoiceCapabilitySettings";
 
 const isElectron =
@@ -135,8 +136,13 @@ export function SettingsCapabilities({
       )}
       {notice && <p className="text-xs text-text-secondary">{notice}</p>}
 
-      {/* 本机功能：应用自带、但不是 MCP 能力，所以不进上面的 entries 列表。 */}
-      <VoiceCapabilitySettings />
+      {/* 本机功能：应用自带、但不是 MCP 能力，所以不进上面的 entries 列表。
+          「本机功能」这个标题由语音卡渲染；两张卡同组，间距取 SettingsSection
+          内部的 2，不能听任外层 space-y-4 把朗读卡拆成另一组。 */}
+      <div className="space-y-2">
+        <VoiceCapabilitySettings />
+        <ReadAloudSettings />
+      </div>
 
       {missing.length > 0 && (
         <div className="space-y-3">

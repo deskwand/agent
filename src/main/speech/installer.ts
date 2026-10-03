@@ -1,5 +1,5 @@
 /**
- * @module main/voice/installer
+ * @module main/speech/installer
  *
  * 运行时与模型的按需安装：下载 → sha256 校验 → 解包 → 落清单。
  *
@@ -28,6 +28,8 @@ import { log } from "../utils/logger";
 
 export const RUNTIME_VERSION = "1.13.8";
 export const MODEL_ID = "x-asr-480ms-zh-en-punct-int8";
+/** 朗读的模型。目录名跟随上游模型 id。 */
+export const TTS_MODEL_ID = "vits-melo-tts-zh_en";
 
 const RUNTIME_URL = (platform: string, arch: string) =>
   `https://registry.npmmirror.com/sherpa-onnx-${platform}-${arch}/-/sherpa-onnx-${platform}-${arch}-${RUNTIME_VERSION}.tgz`;
@@ -36,6 +38,11 @@ const RUNTIME_NODE_URL = `https://registry.npmmirror.com/sherpa-onnx-node/-/sher
 export interface VoiceManifest {
   runtimeVersion: string;
   model: string;
+  /**
+   * 朗读模型 id。**缺字段 = 未装** —— 语音输入已经发布，老用户的 install.json
+   * 里没有这个键，所以不能要求它存在，也不需要写迁移。
+   */
+  ttsModel?: string;
   installedAt: string;
 }
 
@@ -79,11 +86,17 @@ export interface InstallOptions {
   sha256: string;
   /** 已下载字节数 → 触发一次进度回调。 */
   onProgress: (percent: number) => void;
+  /** 阶段切换。语音输入不关心，朗读用它把「解包中」显示出来。 */
+  onPhase?: (phase: "downloading" | "extracting") => void;
   signal?: AbortSignal;
 }
 
-/** 下载到临时文件、校验 sha256、解包到目标目录。校验失败不留任何东西。 */
-async function downloadAndExtract(
+/**
+ * 下载到临时文件、校验 sha256、解包到目标目录。校验失败不留任何东西。
+ *
+ * 导出给朗读用 —— 它就是通用件，两个模型（语音输入 / 朗读）都走它。
+ */
+export async function downloadAndExtract(
   opts: InstallOptions,
   targetDir: string,
   strip: number,
@@ -98,6 +111,7 @@ async function downloadAndExtract(
     const hash = createHash("sha256");
     let received = 0;
     opts.onProgress(0);
+    opts.onPhase?.("downloading");
 
     // 一边写盘一边算 hash：128MB 不留在内存里
     // undici 的 response.body 是 DOM 的 ReadableStream，而 node:stream/web 的
@@ -126,6 +140,7 @@ async function downloadAndExtract(
     }
 
     mkdirSync(targetDir, { recursive: true });
+    opts.onPhase?.("extracting");
     await tar.x({ file: tempFile, cwd: targetDir, strip });
     opts.onProgress(100);
   } finally {
@@ -181,6 +196,40 @@ export async function installModel(opts: InstallOptions): Promise<void> {
   }
 }
 
-export async function removeVoice(userDataPath: string): Promise<void> {
-  rmSync(voiceRoot(userDataPath), { recursive: true, force: true });
+/**
+ * 只删语音输入自己的模型。
+ *
+ * 改前它删整个 `<userData>/voice/`：朗读接入后那会连朗读的模型和共享运行时
+ * 一起抹掉。运行时不提供删除入口 —— 它被两个功能共享，而且只有 23–33MB。
+ */
+export function removeVoiceModel(userDataPath: string): void {
+  rmSync(join(voiceRoot(userDataPath), "models", MODEL_ID), {
+    recursive: true,
+    force: true,
+  });
+  writeManifest(userDataPath, { model: "" });
+}
+
+/**
+ * 朗读模型。包是我们自己打的，顶层没有包装目录 → strip 0（与 installModel 同理）。
+ * 失败时把半成品目录删掉：留着半份模型，下次「已安装」会误判。
+ */
+export async function installTtsModel(opts: InstallOptions): Promise<void> {
+  const dir = join(voiceRoot(opts.userDataPath), "models", TTS_MODEL_ID);
+  try {
+    await downloadAndExtract(opts, dir, 0);
+    writeManifest(opts.userDataPath, { ttsModel: TTS_MODEL_ID });
+    log("[Tts] model installed");
+  } catch (error) {
+    rmSync(dir, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+export function removeTtsModel(userDataPath: string): void {
+  rmSync(join(voiceRoot(userDataPath), "models", TTS_MODEL_ID), {
+    recursive: true,
+    force: true,
+  });
+  writeManifest(userDataPath, { ttsModel: "" });
 }

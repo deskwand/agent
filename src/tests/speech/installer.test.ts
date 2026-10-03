@@ -1,16 +1,26 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import {
   MODEL_ID,
+  RUNTIME_VERSION,
+  TTS_MODEL_ID,
   installModel,
+  installTtsModel,
   readManifest,
-  removeVoice,
+  removeTtsModel,
+  removeVoiceModel,
   voiceRoot,
-} from "../../main/voice/installer";
+} from "../../main/speech/installer";
 
 let root: string;
 
@@ -124,24 +134,78 @@ describe("installModel", () => {
   });
 });
 
-describe("removeVoice", () => {
-  it("deletes the whole voice directory", async () => {
+describe("installTtsModel", () => {
+  it("records the tts model without touching the voice model", async () => {
+    const archive = tarGz("model.onnx", "weights");
     vi.stubGlobal(
       "fetch",
-      vi.fn(
-        async () =>
-          new Response(new Uint8Array(tarGz("a", "b")), { status: 200 }),
-      ),
+      vi.fn(async () => new Response(new Uint8Array(archive), { status: 200 })),
     );
-    await installModel({
+
+    await installTtsModel({
       userDataPath: root,
-      url: "https://example.test/m.tar.gz",
-      sha256: createHash("sha256").update(tarGz("a", "b")).digest("hex"),
+      url: "https://example.test/tts.tar.gz",
+      sha256: createHash("sha256").update(archive).digest("hex"),
       onProgress: () => {},
     });
 
-    await removeVoice(root);
+    const manifest = readManifest(root);
+    expect(manifest?.ttsModel).toBe(TTS_MODEL_ID);
+    // 朗读的安装不许写坏语音输入那一栏
+    expect(manifest?.model ?? "").toBe("");
+    expect(
+      existsSync(join(voiceRoot(root), "models", TTS_MODEL_ID, "model.onnx")),
+    ).toBe(true);
+  });
 
-    expect(existsSync(voiceRoot(root))).toBe(false);
+  it("reads a legacy manifest that has no ttsModel field", () => {
+    mkdirSync(voiceRoot(root), { recursive: true });
+    writeFileSync(
+      join(voiceRoot(root), "install.json"),
+      JSON.stringify({
+        runtimeVersion: RUNTIME_VERSION,
+        model: MODEL_ID,
+        installedAt: "x",
+      }),
+    );
+
+    expect(readManifest(root)?.ttsModel).toBeUndefined();
+    expect(readManifest(root)?.model).toBe(MODEL_ID);
+  });
+});
+
+describe("removal", () => {
+  it("removing the tts model leaves the runtime and the voice model alone", () => {
+    mkdirSync(join(voiceRoot(root), "runtime", RUNTIME_VERSION), {
+      recursive: true,
+    });
+    mkdirSync(join(voiceRoot(root), "models", TTS_MODEL_ID), {
+      recursive: true,
+    });
+    mkdirSync(join(voiceRoot(root), "models", MODEL_ID), { recursive: true });
+
+    removeTtsModel(root);
+
+    expect(existsSync(join(voiceRoot(root), "models", TTS_MODEL_ID))).toBe(
+      false,
+    );
+    expect(existsSync(join(voiceRoot(root), "models", MODEL_ID))).toBe(true);
+    expect(existsSync(join(voiceRoot(root), "runtime", RUNTIME_VERSION))).toBe(
+      true,
+    );
+  });
+
+  it("removing the voice model still leaves the runtime (read-aloud shares it)", () => {
+    mkdirSync(join(voiceRoot(root), "runtime", RUNTIME_VERSION), {
+      recursive: true,
+    });
+    mkdirSync(join(voiceRoot(root), "models", MODEL_ID), { recursive: true });
+
+    removeVoiceModel(root);
+
+    expect(existsSync(join(voiceRoot(root), "models", MODEL_ID))).toBe(false);
+    expect(existsSync(join(voiceRoot(root), "runtime", RUNTIME_VERSION))).toBe(
+      true,
+    );
   });
 });

@@ -501,3 +501,29 @@ export type VoiceEvent =
   | { type: "done"; sessionId: string; text: string; discarded: boolean }
   | { type: "error"; sessionId: string; code: VoiceErrorCode; message: string }
   | { type: "install"; state: VoiceInstallState };
+
+// ---------------------------------------------------------------------------
+// TTS / read aloud（朗读）
+// ---------------------------------------------------------------------------
+
+export type TtsInstallPhase =
+  | "idle"
+  | "downloading"
+  | "extracting"
+  | "ready"
+  | "error";
+
+export interface TtsInstallState {
+  phase: TtsInstallPhase;
+  /** 0-100。 */
+  percent: number;
+  installed: boolean;
+  /** 原始错误信息。失败时给用户看的就是它（不做三种失败各写一条文案）。 */
+  error?: string;
+}
+
+export type TtsSpeakResult =
+  | { ok: true; samples: Float32Array; sampleRate: number }
+  | { ok: false; error: string };
+
+export type TtsEvent = { type: "install"; state: TtsInstallState };

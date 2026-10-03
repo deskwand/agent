@@ -1,8 +1,18 @@
 // MessageCard — top-level chat message renderer.
 // Delegates block rendering to ContentBlockView and its sub-components.
-import { useState, memo, useMemo } from "react";
+import { useState, memo, useMemo, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Copy, Check, Clock, XCircle, GitBranch } from "lucide-react";
+import {
+  Copy,
+  Check,
+  Clock,
+  XCircle,
+  GitBranch,
+  Volume2,
+  Play,
+  Loader2,
+  Square,
+} from "lucide-react";
 import type {
   Message,
   ContentBlock,
@@ -22,6 +32,7 @@ import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
 import { ArtifactCard } from "./message/ArtifactCard";
 import { useAppStore } from "../store";
+import { useReadAloud } from "../hooks/useReadAloud";
 import { Tooltip } from "./Tooltip";
 import {
   projectNestedToolBlocks,
@@ -230,6 +241,56 @@ export const MessageCard = memo(function MessageCard({
     return groups;
   }, [groupedDisplayBlocks]);
 
+  // Extract all text content for copying. For assistant messages all visible
+  // text blocks include markdown code fences — no separate code block type exists.
+  const getCopyContent = (): string =>
+    visibleBlocks
+      .filter(
+        (block): block is { type: "text"; text: string } =>
+          block.type === "text",
+      )
+      .map((block) => block.text)
+      .join("\n");
+
+  // 朗读：正文容器的 ref。切句与高亮都只读这份 DOM，不改 markdown。
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const reader = useReadAloud();
+  // 能力开关关掉就不渲染按钮 —— 与语音输入同一条（ChatView 也是先看 voiceEngine.enabled）。
+  const readAloudEnabled = useAppStore(
+    (s) => s.appConfig?.readAloud?.enabled === true,
+  );
+  const readingThis = reader.messageId === message.id;
+  // 「有没有可读的文字」用已有的 visibleBlocks 判断，不去读 DOM ——
+  // 正文一律是 text 块（代码块也是 text，会被念成「代码块，共 N 行」），
+  // 只有纯图片消息会落到 false。
+  const speechAvailable = visibleBlocks.some(
+    (block) => block.type === "text" && block.text.trim().length > 0,
+  );
+
+  const startKeyRef = useRef<string | null>(null);
+  const readerRef = useRef(reader);
+  readerRef.current = reader;
+
+  // 消息被卸载（被删除 / 切了会话）就停 —— 否则高亮会落在已经不在的 DOM 上
+  useEffect(
+    () => () => {
+      if (readerRef.current.messageId === message.id) readerRef.current.stop();
+    },
+    [message.id],
+  );
+
+  // 正文变了就停：句子表是开播时的快照，改了就对不上了（不做增量对齐）
+  const speechKey = getCopyContent();
+  useEffect(() => {
+    if (!readingThis) {
+      startKeyRef.current = null;
+      return;
+    }
+    if (startKeyRef.current !== null && speechKey !== startKeyRef.current) {
+      reader.stop();
+    }
+  }, [speechKey, readingThis, reader]);
+
   // 余额不足（402 INSUFFICIENT_BALANCE）：渲染充值引导卡片，替代原始错误文本
   if (message.code === "INSUFFICIENT_BALANCE") {
     return (
@@ -262,17 +323,6 @@ export const MessageCard = memo(function MessageCard({
     !isQueued &&
     !isCancelled &&
     groupedDisplayBlocks.length > 0;
-
-  // Extract all text content for copying. For assistant messages all visible
-  // text blocks include markdown code fences — no separate code block type exists.
-  const getCopyContent = (): string =>
-    visibleBlocks
-      .filter(
-        (block): block is { type: "text"; text: string } =>
-          block.type === "text",
-      )
-      .map((block) => block.text)
-      .join("\n");
 
   const handleCopy = async () => {
     const text = getCopyContent();
@@ -314,6 +364,78 @@ export const MessageCard = memo(function MessageCard({
                 )}
               </button>
             </Tooltip>
+            {/* 朗读只给助手回复 —— showActions 对用户消息也为真（上面的
+                `message.role !== "assistant"` 分支），所以这里必须自己挡一道。
+                开关关掉时整个按钮不出现：与语音输入一致，不是「点了没反应」。 */}
+            {!isUser && readAloudEnabled ? (
+              <>
+                <Tooltip
+                  label={
+                    readingThis && reader.status === "playing"
+                      ? t("messageCard.pauseReading")
+                      : readingThis && reader.status === "paused"
+                        ? t("messageCard.resumeReading")
+                        : !readingThis && !speechAvailable
+                          ? t("messageCard.readAloudEmpty")
+                          : t("messageCard.readAloud")
+                  }
+                >
+                  <button
+                    type="button"
+                    data-testid="read-aloud-button"
+                    disabled={!readingThis && !speechAvailable}
+                    aria-label={t("messageCard.readAloud")}
+                    onClick={() => {
+                      if (readingThis) {
+                        reader.toggle();
+                      } else if (bodyRef.current) {
+                        startKeyRef.current = getCopyContent();
+                        reader.start(message.id, bodyRef.current);
+                      }
+                    }}
+                    className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary disabled:opacity-40"
+                  >
+                    {readingThis &&
+                    (reader.status === "playing" ||
+                      reader.status === "preparing") ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : readingThis && reader.status === "paused" ? (
+                      <Play className="w-3 h-3" />
+                    ) : (
+                      <Volume2 className="w-3 h-3" />
+                    )}
+                  </button>
+                </Tooltip>
+                {readingThis &&
+                reader.status !== "idle" &&
+                reader.status !== "error" ? (
+                  <>
+                    <button
+                      type="button"
+                      data-testid="stop-reading-button"
+                      aria-label={t("messageCard.stopReading")}
+                      onClick={() => reader.stop()}
+                      className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary"
+                    >
+                      <Square className="w-3 h-3" />
+                    </button>
+                    <span className="text-xs text-text-muted tabular-nums">
+                      {t("messageCard.readAloudProgress", {
+                        current: reader.currentIndex + 1,
+                        total: reader.total,
+                      })}
+                    </span>
+                  </>
+                ) : null}
+                {/* 没装模型 / 引擎起不来时，错误就落在这里，并指路到设置 ——
+                    不做第二条「提示条 + 下载按钮」的 UI 路径，少一条状态就少一批 bug。 */}
+                {readingThis && reader.status === "error" ? (
+                  <span className="text-xs text-error">
+                    {t("messageCard.readAloudFailed")}
+                  </span>
+                ) : null}
+              </>
+            ) : null}
           </>
         ) : null}
         {showFork ? (
@@ -392,65 +514,68 @@ export const MessageCard = memo(function MessageCard({
       ) : (
         // Assistant message — no bubble, direct content with action bar below
         <div className="group space-y-1.5">
-          {renderGroups.map((group, gi) => {
-            if (group.kind === "summary-group") {
-              return (
-                <div key={`sg-${gi}`} className="space-y-0.5">
-                  {group.blocks.map((b, bi) => {
-                    if (b.type === "process-summary") {
-                      return (
-                        <ProcessSummaryBlock
-                          key={`proc-${gi}-${bi}`}
-                          block={b}
-                          allBlocks={allDisplayBlocks}
-                          message={message}
-                        />
-                      );
-                    }
-                    if (b.type === "result-summary") {
-                      return (
-                        <ResultSummaryBlock
-                          key={`res-${gi}-${bi}`}
-                          block={b}
-                          allBlocks={allDisplayBlocks}
-                          message={message}
-                        />
-                      );
-                    }
-                    return null;
-                  })}
-                </div>
-              );
-            }
+          {/* bodyRef 只圈正文块：下面的操作栏（时间戳 / 进度）不参与切句。 */}
+          <div ref={bodyRef} className="space-y-1.5">
+            {renderGroups.map((group, gi) => {
+              if (group.kind === "summary-group") {
+                return (
+                  <div key={`sg-${gi}`} className="space-y-0.5">
+                    {group.blocks.map((b, bi) => {
+                      if (b.type === "process-summary") {
+                        return (
+                          <ProcessSummaryBlock
+                            key={`proc-${gi}-${bi}`}
+                            block={b}
+                            allBlocks={allDisplayBlocks}
+                            message={message}
+                          />
+                        );
+                      }
+                      if (b.type === "result-summary") {
+                        return (
+                          <ResultSummaryBlock
+                            key={`res-${gi}-${bi}`}
+                            block={b}
+                            allBlocks={allDisplayBlocks}
+                            message={message}
+                          />
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                );
+              }
 
-            // Non-summary blocks are always content blocks
-            const displayBlock = group.block;
-            if (displayBlock.type !== "content") return null;
-            const { block } = displayBlock;
-            if (
-              block.type === "tool_result" &&
-              mergedResultIds.has((block as ToolResultContent).toolUseId)
-            ) {
-              return null;
-            }
-            return (
-              <ContentBlockView
-                key={
-                  "id" in block
-                    ? (block as { id: string }).id
-                    : `block-${block.type}-${gi}`
-                }
-                block={block}
-                isUser={isUser}
-                isStreaming={
-                  isStreaming &&
-                  (block.type !== "text" || gi === lastTextBlockIndex)
-                }
-                allBlocks={allDisplayBlocks}
-                message={message}
-              />
-            );
-          })}
+              // Non-summary blocks are always content blocks
+              const displayBlock = group.block;
+              if (displayBlock.type !== "content") return null;
+              const { block } = displayBlock;
+              if (
+                block.type === "tool_result" &&
+                mergedResultIds.has((block as ToolResultContent).toolUseId)
+              ) {
+                return null;
+              }
+              return (
+                <ContentBlockView
+                  key={
+                    "id" in block
+                      ? (block as { id: string }).id
+                      : `block-${block.type}-${gi}`
+                  }
+                  block={block}
+                  isUser={isUser}
+                  isStreaming={
+                    isStreaming &&
+                    (block.type !== "text" || gi === lastTextBlockIndex)
+                  }
+                  allBlocks={allDisplayBlocks}
+                  message={message}
+                />
+              );
+            })}
+          </div>
           {artifactFiles.length > 0 || videoReferences.length > 0 ? (
             <ArtifactCard
               files={artifactFiles}

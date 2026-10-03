@@ -116,7 +116,19 @@
         "shortcutAltSpace": "⌥ + Space",
         "shortcutMetaShiftSpace": "⌘ + ⇧ + Space",
         "shortcutDisabled": "No shortcut",
-        "shortcutFnHint": "The Fn key cannot be observed inside the app, so right Option is the default (matching WeChat desktop’s hold-right-Alt)."
+        "shortcutFnHint": "The Fn key cannot be observed inside the app, so right Option is the default (matching WeChat desktop’s hold-right-Alt).",
+        "memoryNote": "After you turn the switch off, a loaded model keeps its memory until you restart the app."
+      },
+      "readAloud": {
+        "title": "Read aloud",
+        "desc": "Read assistant replies out loud. Runs fully on this machine; your text is not uploaded. Needs a ~157MB download and ~324MB of memory while loaded.",
+        "install": "Download voice model",
+        "installing": "Downloading… {{percent}}%",
+        "installed": "Installed · MeloTTS zh_en",
+        "notInstalled": "Not installed",
+        "remove": "Delete read-aloud model",
+        "installFailed": "Download failed — you can retry",
+        "memoryNote": "After you turn the switch off, a loaded model keeps its memory until you restart the app."
       }
     },
     "groupGeneral": "General",
@@ -1132,7 +1144,14 @@
     "question": "Question",
     "thinking": "Thinking",
     "executionTime": "Execution time: {{time}}",
-    "forkMessage": "Fork from here"
+    "forkMessage": "Fork from here",
+    "readAloud": "Read this reply",
+    "pauseReading": "Pause",
+    "resumeReading": "Resume",
+    "stopReading": "Stop",
+    "readAloudProgress": "Sentence {{current}} / {{total}}",
+    "readAloudEmpty": "No readable text in this message",
+    "readAloudFailed": "Read aloud failed. Check the speech model in Settings → Capabilities"
   },
   "schedule": {
     "createTitle": "Create Schedule",
@@ -1472,6 +1491,8 @@
     "bashNoOutput": "(no output)",
     "readReading": "Reading...",
     "readEmptyFile": "(empty file)",
+    "actionTextToSpeech": "text to speech",
+    "labelTextToSpeech": "spoke \"{{text}}\"",
     "actionVisionDescribe": "Describe image",
     "labelVisionDescribe": "Described {{path}}",
     "labelVisionDescribeWithPrompt": "Described {{path}} ({{prompt}})",
@@ -1505,6 +1526,8 @@
       "steeredSubagents_other": "Steered {{count}} subagents",
       "ranSubagentWorkflows_one": "Ran {{count}} subagent workflow",
       "ranSubagentWorkflows_other": "Ran {{count}} subagent workflows",
+      "spokeText_one": "read {{count}} passage aloud",
+      "spokeText_other": "read {{count}} passages aloud",
       "usedTools_one": "Used {{count}} tool",
       "usedTools_other": "Used {{count}} tools",
       "updatedTaskList_one": "Updated the task list {{count}} time",

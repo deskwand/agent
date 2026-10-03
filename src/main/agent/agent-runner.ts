@@ -131,6 +131,8 @@ import {
   createVisionDescribeTool,
   createDeskWandVisionTool,
 } from "./tools/vision-describe";
+import { createTtsTool } from "./tools/tts";
+import { getTtsService } from "../tts/service";
 import { createOfficeTools } from "./tools/office/office-tools";
 import { createTodoTools } from "./tools/todo-tools";
 import { createAskUserTools } from "./tools/ask-user-tools";
@@ -3121,6 +3123,13 @@ Tool routing:\n
         }
       }
 
+      // 朗读工具：与界面朗读共用同一个引擎实例（getTtsService 自带单例缓存，
+      // 不要再包一层）。模型未安装时只返回指向设置的文案，不在工具里触发下载。
+      const ttsTool = createTtsTool({
+        workspaceDir: effectiveCwd,
+        service: getTtsService({ userDataPath: app.getPath("userData") }),
+      });
+
       // Register built-in office document read tools (zero-dependency, pure JS)
       const officeTools = createOfficeTools(effectiveCwd);
       log(
@@ -3132,6 +3141,7 @@ Tool routing:\n
         ...this._customTools, // background review tools
         ...(wrappedBashTool ? [wrappedBashTool] : []),
         ...(visionTool ? [visionTool] : []),
+        ttsTool,
         // Add office tools (always registered, no config required)
         ...officeTools,
         ...createTodoTools(),

@@ -881,6 +881,10 @@ export interface VoiceEngineConfig {
   enabled: boolean;
   shortcut: VoiceShortcut;
 }
+
+export interface ReadAloudConfig {
+  enabled: boolean;
+}
 export type AppTheme = "dark" | "light" | "system";
 export type { ThemePreset };
 export type ProviderProfileKey = string;
@@ -964,6 +968,7 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  readAloud?: ReadAloudConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports

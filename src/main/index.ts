@@ -119,6 +119,8 @@ import { initStatusStore } from "./connectors/status-store";
 import { registerVoiceIpc } from "./voice/ipc";
 import { allowMediaRequest } from "./media-permission";
 import type { VoiceIpcHandle } from "./voice/ipc";
+import { registerTtsIpc } from "./tts/ipc";
+import type { TtsIpcHandle } from "./tts/ipc";
 import { mcpToolsSnapshotStatusSource } from "./mcp/mcp-status-source";
 import { getSandboxAdapter, shutdownSandbox } from "./sandbox/sandbox-adapter";
 import { SandboxSync } from "./sandbox/sandbox-sync";
@@ -266,6 +268,7 @@ let memoryService: MemoryService | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
 let petWindowController: PetWindowController | null = null;
 let voiceIpc: VoiceIpcHandle | null = null;
+let ttsIpc: TtsIpcHandle | null = null;
 
 function sanitizeDiagnosticBaseUrl(value: string | undefined): string | null {
   if (!value) {
@@ -751,6 +754,8 @@ function createWindow() {
     }
     voiceIpc?.dispose();
     voiceIpc = null;
+    ttsIpc?.dispose();
+    ttsIpc = null;
   });
 
   // Notify renderer of fullscreen state changes (for macOS titlebar spacer)
@@ -2909,6 +2914,19 @@ voiceIpc = registerVoiceIpc({
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("voice.event", event);
     }
+  },
+});
+
+// 朗读：四个 invoke 通道 + 独立的 tts.event 推送通道。
+ttsIpc = registerTtsIpc({
+  ipcMain,
+  deps: {
+    userDataPath: app.getPath("userData"),
+    sendEvent: (event) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("tts.event", event);
+      }
+    },
   },
 });
 
