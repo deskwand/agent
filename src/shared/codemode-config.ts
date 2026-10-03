@@ -2,15 +2,17 @@
  * codemode（模型写 JS 调用工具）的开关与旋钮。
  *
  * **默认关**，跟随参考实现：pi 的内置扩展 `builtin:codemode` 虽然默认加载，但**未激活**，
- * 要手动 `+codemode`（`docs/settings.md`）。DeskBend 照做 —— 装上、由这里决定开不开。
+ * 要手动 `+codemode`（`docs/settings.md`）。DeskBend 照做 —— 装上但不主动激活：
+ * 激活由 MCP 的 exposure 派生（见下），没有 MCP 服务时它就不激活。
  *
  * 两个旋钮直接透传给 `createCodemodeExtension(options)`（它**覆盖**同名 SDK 设置，
  * 所以不需要碰 `PiSettingsManager`）：
  *  - `mode`：`on` = 已声明的工具在自己描述里追加一份自己的 TS 签名，codemode 只列未声明的工具；
  *           `only` = 已声明工具从请求里整个撤掉，模型只能经 codemode 到达它们。
  *  - `inlineBudget`：codemode 描述里最多花多少估算 token（字符/4）列工具声明；
- *           放不下的仍可调，用 `searchTools()` 现场找。**仅 `only` 模式实际生效** ——
- *           `on` 模式下 `listed` 只含非 `direct` 工具，而 DeskBand 的工具全是 `direct`。
+ *           放不下的仍可调，用 `searchTools()` 现场找。它约束的是 `listed`
+ *           （非 `direct` 的可调工具，主要是 MCP），**与 `mode` 无关，两种模式都生效**；
+ *           `on` 下 `direct` 工具走「在自己描述里追加签名」那条路，不受它约束。
  *
  * 不传 `models` —— 跟随上游默认（`true`，脚本可访问模型目录/分类器）。
  * 若将来要关掉，那是**显式偏离**，必须在此处与 design doc 写明理由。
