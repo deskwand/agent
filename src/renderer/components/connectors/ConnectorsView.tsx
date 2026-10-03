@@ -5,6 +5,8 @@ import { AddServerDialog } from "./AddServerDialog";
 import { ConnectorCard } from "./ConnectorCard";
 import { SettingsSkills } from "../settings/SettingsSkills";
 import { PiExtensionManagerView } from "../PiExtensionManagerView";
+import { ArrowLeft } from "lucide-react";
+import { useAppStore } from "../../store";
 
 type TabId = "connect" | "skills" | "plugins";
 
@@ -18,6 +20,7 @@ function isCancelled(res: ActionResult): boolean {
 
 export function ConnectorsView() {
   const { t } = useTranslation();
+  const setActiveView = useAppStore((s) => s.setActiveView);
   const [tab, setTab] = useState<TabId>("connect");
   const [entries, setEntries] = useState<ConnectorEntry[]>([]);
   const [addOpen, setAddOpen] = useState(false);
@@ -227,7 +230,15 @@ export function ConnectorsView() {
 
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-background">
-      <div className="flex items-baseline gap-3 px-5 pt-4 flex-none">
+      <div className="flex items-center gap-3 px-5 pt-4 flex-none">
+        <button
+          type="button"
+          onClick={() => setActiveView("chat")}
+          aria-label={t("common.back")}
+          className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+        >
+          <ArrowLeft className="h-5 w-5 text-text-secondary" />
+        </button>
         <h2 className="text-xl font-semibold text-text-primary">
           {t("connectors.title")}
         </h2>
