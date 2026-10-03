@@ -8,7 +8,7 @@
  * 这里渲染真实的 View + Card，用受控（deferred）的 IPC 把「等待期」摊开，
  * 守住那段时间里可达的按钮与状态。
  *
- * 辅助的「技能云 / 插件」子视图按惯例 mock 掉（本用例从不切到那两个 tab，
+ * 辅助的「技能 / 插件」子视图按惯例 mock 掉（本用例从不切到那两个 tab，
  * 但模块加载仍会 import 它们）。i18n 同样整模块 mock：`t(key) => key`。
  */
 import { act } from "react";

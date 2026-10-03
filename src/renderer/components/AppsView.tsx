@@ -7,7 +7,7 @@ import { CloudApiClient } from "../services/cloud-api";
 /**
  * 连接页（rail 的 apps 项）。
  *
- * 四个 tab 由 `ConnectorsView` 自己管：连接 / 本机能力 / 技能云 / 插件。
+ * 三个 tab 由 `ConnectorsView` 自己管：连接 / 技能 / 插件。
  * 这个组件只负责登录后的团队信息预取（原有行为）与页面外壳。
  */
 export function AppsView() {

@@ -143,7 +143,7 @@
     }
   },
   "marketplace": {
-    "title": "技能云",
+    "title": "技能",
     "desc": "浏览和安装技能，管理你的云端技能库"
   },
   "apps": {
@@ -2111,7 +2111,7 @@
     },
     "tab": {
       "connect": "连接",
-      "skills": "技能云",
+      "skills": "技能",
       "plugins": "插件"
     }
   }

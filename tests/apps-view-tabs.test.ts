@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * 连接页取代了原来的「应用」视图：三个 tab（连接 / 技能云 / 插件）——
+ * 连接页取代了原来的「应用」视图：三个 tab（连接 / 技能 / 插件）——
  * MCP 只剩一个 tab，条目不再带 `tab` 字段（动作与徽标由 entry.transport 决定）
  * 现在由 `ConnectorsView` 承担，`AppsView` 只剩页面外壳与登录后的团队信息预取。
  *

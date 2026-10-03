@@ -36,7 +36,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-// 「技能云 / 插件」两个子视图的模块在加载时就会被 import，
+// 「技能 / 插件」两个子视图的模块在加载时就会被 import，
 // 但本用例从不切到那两个 tab —— 与 src/tests/connectors 下的惯例一致，mock 掉。
 vi.mock("../src/renderer/components/settings/SettingsSkills", () => ({
   SettingsSkills: () => null,
