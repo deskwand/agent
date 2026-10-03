@@ -14,12 +14,16 @@
 npm run dev                      # 开发模式
 npm run build                    # 生产构建（当前平台；macOS 构建 .dmg）
 npm run build:win-x64            # 构建 Windows .exe
-npm test                         # 全部测试
+npx vitest run                   # 全部测试（`npm test` 会进 watch 模式）
 npx vitest run <file> -t "<name>"  # 聚焦单个测试用例
-npm run lint:fix && npm run format:check   # 提交前检查
+npx eslint <改动文件> --fix && npx prettier --check <改动文件>   # 提交前检查
 ```
 
-提交前必跑：`npm run lint:fix && npm run format:check && npm test`
+提交前必跑：`npx eslint <改动文件> --fix && npx prettier --check <改动文件> && npx vitest run`
+
+两个全仓脚本（`npm run lint`、`npm run format`）不能当门禁：全仓既有 5 个 eslint error、
+约 119 个文件不合 `prettier --check`，跑它们只会淹掉本次改动的问题（`--fix` 还会顺手改掉
+无关文件）。它们适合定期大扫除，不适合提交前检查 —— 门禁只查本次改过的文件。
 
 ## 3. 代码风格
 
