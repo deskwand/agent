@@ -5,6 +5,7 @@ import { MergedInputChip } from "./MergedInputChip";
 import { Tooltip } from "./Tooltip";
 import { AttachMenu } from "./attach/AttachMenu";
 import { StatusPopover } from "./StatusPopover";
+import { VoiceMicButton, type VoiceMicButtonProps } from "./VoiceMicButton";
 import type { ChatInputAttachedFile } from "./ChatInput";
 
 export interface ModelOptionGroup {
@@ -60,6 +61,11 @@ export interface ChatInputBottomBarProps {
    * 必填：漏接线要变成编译错误，而不是静默不显示按钮。
    */
   hasInputContent: boolean;
+  /**
+   * 语音输入的全部状态与动作。必填：漏接线要变成编译错误，
+   * 而不是静默不显示麦克风（与 hasInputContent 同一套约定）。
+   */
+  voice: VoiceMicButtonProps;
 }
 
 export function ChatInputBottomBar({
@@ -90,6 +96,7 @@ export function ChatInputBottomBar({
   isExpanded = false,
   onToggleExpand,
   hasInputContent,
+  voice,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
@@ -130,6 +137,8 @@ export function ChatInputBottomBar({
             </button>
           </Tooltip>
         )}
+
+        <VoiceMicButton {...voice} />
       </div>
 
       <div className="flex min-w-0 items-center justify-end gap-2">

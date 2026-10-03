@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { missingPermissionKinds } from "../../shared/capabilities";
 import {
   readCapabilityPermissions,
   type PermissionProbes,
@@ -9,6 +10,7 @@ function probes(over: Partial<PermissionProbes> = {}): PermissionProbes {
     platform: "darwin",
     isAccessibilityTrusted: () => true,
     screenAccessStatus: () => "granted",
+    microphoneAccessStatus: () => "granted",
     ...over,
   };
 }
@@ -19,6 +21,7 @@ describe("readCapabilityPermissions", () => {
       required: true,
       accessibility: true,
       screenRecording: true,
+      microphone: true,
     });
   });
 
@@ -30,6 +33,7 @@ describe("readCapabilityPermissions", () => {
       required: true,
       accessibility: false,
       screenRecording: true,
+      microphone: true,
     });
   });
 
@@ -43,13 +47,59 @@ describe("readCapabilityPermissions", () => {
     expect(r.screenRecording).toBe(false);
   });
 
+  it("reports microphone access on macOS", () => {
+    const permissions = readCapabilityPermissions({
+      platform: "darwin",
+      isAccessibilityTrusted: () => true,
+      screenAccessStatus: () => "granted",
+      microphoneAccessStatus: () => "granted",
+    });
+    expect(permissions.microphone).toBe(true);
+  });
+
+  it("treats not-determined microphone access as not granted", () => {
+    // 与 screen-recording 同一条原则：not-determined 不是已授予，
+    // 否则界面会显示"已授予"而首次录音仍然失败。
+    const permissions = readCapabilityPermissions({
+      platform: "darwin",
+      isAccessibilityTrusted: () => true,
+      screenAccessStatus: () => "granted",
+      microphoneAccessStatus: () => "not-determined",
+    });
+    expect(permissions.microphone).toBe(false);
+  });
+
   it("does not require permissions off macOS", () => {
     for (const platform of ["win32", "linux"] as const) {
       expect(readCapabilityPermissions(probes({ platform }))).toEqual({
         required: false,
         accessibility: false,
         screenRecording: false,
+        microphone: false,
       });
     }
+  });
+});
+
+describe("missingPermissionKinds", () => {
+  it("flags each missing kind by its own field, not by position", () => {
+    const missing = missingPermissionKinds({
+      required: true,
+      accessibility: true,
+      screenRecording: true,
+      microphone: false,
+    });
+    expect(missing).toEqual(["microphone"]);
+  });
+
+  it("returns nothing when the platform does not require permissions", () => {
+    expect(
+      missingPermissionKinds({
+        required: false,
+        accessibility: false,
+        screenRecording: false,
+        microphone: false,
+      }),
+    ).toEqual([]);
   });
 });

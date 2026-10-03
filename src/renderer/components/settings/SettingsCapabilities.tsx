@@ -1,20 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ConnectorEntry } from "../../../shared/connectors";
-import type {
-  CapabilityPermissions,
-  PermissionKind,
+import {
+  missingPermissionKinds,
+  type CapabilityPermissions,
 } from "../../../shared/capabilities";
 import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
+import { VoiceCapabilitySettings } from "./VoiceCapabilitySettings";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
-
-/** 逐项渲染的顺序。类型来自 shared，不在界面里另立一套。 */
-const PERMISSION_KINDS: readonly PermissionKind[] = [
-  "accessibility",
-  "screen-recording",
-];
 
 /**
  * 设置 → 能力。应用自带的能力（今天只有 Computer Use）住在这里，
@@ -87,13 +82,13 @@ export function SettingsCapabilities({
     [refresh, t],
   );
 
-  const missing: PermissionKind[] = permissions?.required
-    ? PERMISSION_KINDS.filter((kind) =>
-        kind === "accessibility"
-          ? !permissions.accessibility
-          : !permissions.screenRecording,
-      )
-    : [];
+  // 缺哪些权限由 shared 里的 `missingPermissionKinds` 算 —— 它用
+  // `Record<PermissionKind, keyof CapabilityPermissions>` 把 kind 映射到字段，
+  // 加第四种权限时必须在那里补一行，不会静默算错。
+  //
+  // 这里曾经是一个三元链（`kind === "accessibility" ? !a : !screenRecording`），
+  // 加 microphone 后它会静默把麦克风未授予报成屏幕录制未授予。
+  const missing = missingPermissionKinds(permissions);
 
   return (
     <div className="space-y-4">
@@ -139,6 +134,9 @@ export function SettingsCapabilities({
         </p>
       )}
       {notice && <p className="text-xs text-text-secondary">{notice}</p>}
+
+      {/* 本机功能：应用自带、但不是 MCP 能力，所以不进上面的 entries 列表。 */}
+      <VoiceCapabilitySettings />
 
       {missing.length > 0 && (
         <div className="space-y-3">

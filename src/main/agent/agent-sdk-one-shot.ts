@@ -375,7 +375,7 @@ export async function runPiAiOneShot(
  */
 function recordAuxUsage(
   usage: TokenUsage | undefined,
-  purpose: "title" | "memory" | "probe",
+  purpose: "title" | "memory" | "probe" | "polish",
   model: string,
   provider: string,
   sessionId: string | null,

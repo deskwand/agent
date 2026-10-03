@@ -24,6 +24,11 @@ import {
   normalizeCodemodeConfig,
   type CodemodeConfig,
 } from "../../shared/codemode-config";
+import {
+  DEFAULT_VOICE_SHORTCUT,
+  isVoiceShortcut,
+  type VoiceShortcut,
+} from "../../shared/voice-shortcuts";
 import { logWarn } from "../utils/logger";
 import {
   normalizeAnthropicBaseUrl,
@@ -147,6 +152,7 @@ export interface AppConfig {
   telemetryEnabled: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
+  voiceEngine?: VoiceEngineConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
@@ -174,6 +180,7 @@ export interface StoredConfig {
   telemetryEnabled: boolean;
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
+  voiceEngine?: VoiceEngineConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
@@ -289,6 +296,7 @@ export function defaultStoredConfig(): StoredConfig {
     telemetryEnabled: true,
     isConfigured: false,
     visionModel: undefined,
+    voiceEngine: { enabled: false, shortcut: DEFAULT_VOICE_SHORTCUT },
     webAccess: normalizeWebAccessConfig(undefined),
     codemode: normalizeCodemodeConfig(undefined),
   };
@@ -937,6 +945,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     telemetryEnabled: stored.telemetryEnabled,
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
+    voiceEngine: normalizeVoiceEngineConfig(stored.voiceEngine),
     webAccess: normalizeWebAccessConfig(stored.webAccess),
     codemode: normalizeCodemodeConfig(stored.codemode),
     subagent: stored.subagent,
@@ -1097,6 +1106,8 @@ export class ConfigStore {
       stored.petCharacter = updates.petCharacter;
     if (updates.visionModel !== undefined)
       stored.visionModel = updates.visionModel;
+    if (updates.voiceEngine !== undefined)
+      stored.voiceEngine = updates.voiceEngine;
     if (updates.webAccess !== undefined)
       stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
     // 注意：删掉 `codemode.enabled` 时**不能连这个分支一起删** —— 少了它
@@ -1323,4 +1334,31 @@ let onConfiguredHook: (() => void) | null = null;
 /** Registers (or clears) the configured hook. */
 export function setOnConfiguredHook(fn: (() => void) | null): void {
   onConfiguredHook = fn;
+}
+
+/**
+ * 语音引擎配置。`shortcut` 用共享白名单的联合类型，渲染层的镜像见
+ * `src/renderer/types/index.ts`（渲染进程不 import 主进程模块）。
+ */
+export interface VoiceEngineConfig {
+  enabled: boolean;
+  shortcut: VoiceShortcut;
+}
+
+/**
+ * 引擎配置的归一化。脏配置（手改过的 config 文件）要能回退，不能抛错。
+ * shortcut 的白名单在 `src/shared/voice-shortcuts.ts` —— 渲染层的设置界面也要用它
+ * 渲染选项，而渲染进程不能 import 主进程模块。
+ *
+ * 不存「已装版本」：那个事实的唯一真源是 install.json（installer.readManifest），
+ * 它才是 isInstalled() 读的东西。同时在 config 里再存一份只会漂移。
+ */
+export function normalizeVoiceEngineConfig(raw: unknown): VoiceEngineConfig {
+  const value = (raw ?? {}) as Partial<VoiceEngineConfig>;
+  return {
+    enabled: value.enabled === true,
+    shortcut: isVoiceShortcut(value.shortcut)
+      ? value.shortcut
+      : DEFAULT_VOICE_SHORTCUT,
+  };
 }

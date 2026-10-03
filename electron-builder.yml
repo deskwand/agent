@@ -27,20 +27,20 @@ files:
   - node_modules/bufferutil/**/*
   - node_modules/utf-8-validate/**/*
   # Exclude non-essential files from node_modules to reduce bundle size
-  - '!**/*.js.map'
-  - '!**/*.mjs.map'
-  - '!**/*.d.ts.map'
-  - '!**/*.mts.map'
-  - '!**/*.d.ts'
-  - '!**/*.ts'
-  - '!**/README.md'
-  - '!**/CHANGELOG.md'
-  - '!**/CHANGELOG'
-  - '!**/LICENSE'
-  - '!**/LICENSE.md'
-  - '!**/.npmignore'
-  - '!**/.eslintrc*'
-  - '!**/tsconfig.json'
+  - "!**/*.js.map"
+  - "!**/*.mjs.map"
+  - "!**/*.d.ts.map"
+  - "!**/*.mts.map"
+  - "!**/*.d.ts"
+  - "!**/*.ts"
+  - "!**/README.md"
+  - "!**/CHANGELOG.md"
+  - "!**/CHANGELOG"
+  - "!**/LICENSE"
+  - "!**/LICENSE.md"
+  - "!**/.npmignore"
+  - "!**/.eslintrc*"
+  - "!**/tsconfig.json"
 
 # MCP servers and platform-specific resources are declared in each platform's
 # extraResources section below (win/mac/linux).
@@ -83,6 +83,9 @@ win:
       to: msys2
     - from: resources/bin/win32-x64
       to: bin
+    # Voice runtime/model download coordinates (URL + sha256 only).
+    - from: resources/voice-runtime.json
+      to: voice-runtime.json
     - from: .deskwand/skills
       to: skills
 mac:
@@ -97,8 +100,9 @@ mac:
   gatekeeperAssess: false
   extendInfo:
     LSApplicationCategoryType: public.app-category.developer-tools
-    NSScreenCaptureUsageDescription: 'DeskWand needs screen recording access for GUI automation.'
-    NSAccessibilityUsageDescription: 'DeskWand needs accessibility access for GUI automation.'
+    NSMicrophoneUsageDescription: "DeskWand needs microphone access for voice input in the chat box."
+    NSScreenCaptureUsageDescription: "DeskWand needs screen recording access for GUI automation."
+    NSAccessibilityUsageDescription: "DeskWand needs accessibility access for GUI automation."
   extraResources:
     - from: .bundle-resources/mcp
       to: mcp
@@ -110,6 +114,9 @@ mac:
       to: bin
     - from: dist-lima-agent
       to: lima-agent
+    # Voice runtime/model download coordinates (URL + sha256 only).
+    - from: resources/voice-runtime.json
+      to: voice-runtime.json
     - from: .deskwand/skills
       to: skills
 
@@ -130,6 +137,9 @@ linux:
       to: node
     - from: resources/bin/linux-x64
       to: bin
+    # Voice runtime/model download coordinates (URL + sha256 only).
+    - from: resources/voice-runtime.json
+      to: voice-runtime.json
     - from: .deskwand/skills
       to: skills
 
@@ -146,19 +156,19 @@ dmg:
   # Explicit size to avoid dmgbuild "No space left on device" for large apps.
   # The temporary writable DMG is auto-shrunk after copying, so this doesn't
   # affect final DMG size. Our ULMO compression hook further reduces it.
-  size: '3g'
+  size: "3g"
   window:
     width: 600
     height: 440
   contents:
     - x: 150
       y: 220
-      name: 'DeskWand.app'
+      name: "DeskWand.app"
     - x: 450
       y: 220
       type: link
       path: /Applications
-      name: 'Applications'
+      name: "Applications"
 
 extraMetadata:
   main: dist-electron/main/index.js

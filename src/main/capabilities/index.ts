@@ -5,7 +5,7 @@ import type {
 } from "../../shared/capabilities";
 import {
   readCapabilityPermissions,
-  type ScreenAccessStatus,
+  type MediaAccessStatus,
 } from "./permissions";
 
 /** 系统设置里对应面板的深链。只有 macOS 有。
@@ -15,6 +15,8 @@ const PERMISSION_PANES: Record<PermissionKind, string> = {
     "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
   "screen-recording":
     "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
+  microphone:
+    "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
 };
 
 export interface RegisterCapabilitiesIpcArgs {
@@ -34,7 +36,9 @@ function systemPermissions(): CapabilityPermissions {
     isAccessibilityTrusted: () =>
       systemPreferences.isTrustedAccessibilityClient(false),
     screenAccessStatus: () =>
-      systemPreferences.getMediaAccessStatus("screen") as ScreenAccessStatus,
+      systemPreferences.getMediaAccessStatus("screen") as MediaAccessStatus,
+    microphoneAccessStatus: () =>
+      systemPreferences.getMediaAccessStatus("microphone") as MediaAccessStatus,
   });
 }
 

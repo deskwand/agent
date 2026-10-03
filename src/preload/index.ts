@@ -29,7 +29,17 @@ import type {
   CapabilityPermissions,
   PermissionKind,
 } from "../shared/capabilities";
-import type { ElementSelection, PickerStartResult } from "../shared/ipc-types";
+import type {
+  ElementSelection,
+  OAuthStatusResult,
+  PickerStartResult,
+} from "../shared/ipc-types";
+import type {
+  VoiceEvent,
+  VoiceInstallState,
+  VoicePolishedResult,
+  VoiceStartResult,
+} from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
 import type {
   RestoreResult,
@@ -698,11 +708,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("auth.login", providerId, force),
     logout: (providerId: string): Promise<void> =>
       ipcRenderer.invoke("auth.logout", providerId),
-    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-    status: (
-      providerId: string,
-    ): Promise<import("../shared/ipc-types").OAuthStatusResult> =>
-      // eslint-disable-line @typescript-eslint/consistent-type-imports
+    status: (providerId: string): Promise<OAuthStatusResult> =>
       ipcRenderer.invoke("auth.status", providerId),
   },
 
@@ -894,6 +900,35 @@ contextBridge.exposeInMainWorld("electronAPI", {
         "vault.discardRemoteBackupAndStart",
         token,
       ) as Promise<VaultResetResult>,
+  },
+
+  // ── Voice input（语音输入）──────────────────────────────────────
+  voice: {
+    start: (): Promise<VoiceStartResult> => ipcRenderer.invoke("voice.start"),
+    pushAudio: (sessionId: string, pcm: ArrayBuffer): Promise<void> =>
+      ipcRenderer.invoke("voice.pushAudio", sessionId, pcm),
+    stop: (sessionId: string): Promise<void> =>
+      ipcRenderer.invoke("voice.stop", sessionId),
+    cancel: (sessionId: string): Promise<void> =>
+      ipcRenderer.invoke("voice.cancel", sessionId),
+    polish: (
+      text: string,
+      sessionId: string | null,
+    ): Promise<VoicePolishedResult> =>
+      ipcRenderer.invoke("voice.polish", text, sessionId),
+    install: (): Promise<{ ok: boolean; error?: string }> =>
+      ipcRenderer.invoke("voice.install"),
+    removeInstall: (): Promise<{ ok: boolean }> =>
+      ipcRenderer.invoke("voice.removeInstall"),
+    getInstallState: (): Promise<VoiceInstallState> =>
+      ipcRenderer.invoke("voice.getInstallState"),
+    // 独立通道，不走 server-event 总线（那条带远程会话路由语义）。
+    onEvent: (callback: (event: VoiceEvent) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: VoiceEvent) =>
+        callback(data);
+      ipcRenderer.on("voice.event", handler);
+      return () => ipcRenderer.removeListener("voice.event", handler);
+    },
   },
 });
 
@@ -1225,9 +1260,7 @@ declare global {
         login: (providerId: string, force?: boolean) => Promise<void>;
         logout: (providerId: string) => Promise<void>;
         // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-        status: (
-          providerId: string,
-        ) => Promise<import("../shared/ipc-types").OAuthStatusResult>; // eslint-disable-line @typescript-eslint/consistent-type-imports
+        status: (providerId: string) => Promise<OAuthStatusResult>;
       };
       quota: {
         list: () => Promise<QuotaSnapshot[]>;
@@ -1536,6 +1569,20 @@ declare global {
         discardRemoteBackupAndStart: (
           token: string,
         ) => Promise<VaultResetResult>;
+      };
+      voice: {
+        start: () => Promise<VoiceStartResult>;
+        pushAudio: (sessionId: string, pcm: ArrayBuffer) => Promise<void>;
+        stop: (sessionId: string) => Promise<void>;
+        cancel: (sessionId: string) => Promise<void>;
+        polish: (
+          text: string,
+          sessionId: string | null,
+        ) => Promise<VoicePolishedResult>;
+        install: () => Promise<{ ok: boolean; error?: string }>;
+        removeInstall: () => Promise<{ ok: boolean }>;
+        getInstallState: () => Promise<VoiceInstallState>;
+        onEvent: (callback: (event: VoiceEvent) => void) => () => void;
       };
     };
   }

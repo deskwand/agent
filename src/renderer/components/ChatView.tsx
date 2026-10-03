@@ -19,6 +19,8 @@ import {
 } from "../store/selectors";
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
+import { usePushToTalk } from "../hooks/usePushToTalk";
+import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { attachmentKeySet } from "../utils/attached-files";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { resolveDisplayedContextUsage } from "../utils/context-usage";
@@ -75,6 +77,7 @@ import {
 } from "./ChatInput";
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
+import { toMicButtonProps } from "./VoiceMicButton";
 import { ChatInputQueueBar } from "./ChatInputQueueBar";
 import {
   ChatInputStatusBar,
@@ -423,6 +426,58 @@ export function ChatView() {
   // Bumped on every session switch; async stage-2 continuations check it
   // so a fetch started for the old session cannot prepend into the new one.
   const sessionGenerationRef = useRef(0);
+
+  // --- 语音输入 ---
+  const voiceEngine = appConfig?.voiceEngine;
+  const voiceNoticeSeqRef = useRef(0);
+  const notify = (messageKey: string, type: "warning" | "error") => {
+    voiceNoticeSeqRef.current += 1;
+    setGlobalNotice({
+      id: `voice-${Date.now()}-${voiceNoticeSeqRef.current}`,
+      type,
+      message: t(messageKey),
+      // 一起传 messageKey：切语言后提示跟着变（与 WelcomeView 同一套约定）。
+      messageKey,
+    });
+  };
+  const voice = useVoiceInput({
+    enabled: Boolean(voiceEngine?.enabled),
+    // getSnapshot 是**实时读取**输入框，不是一次性快照。不要缓存它。
+    getSnapshot: () => chatInputRef.current?.getPrompt() ?? "",
+    onText: (text) => chatInputRef.current?.setPrompt(text),
+    onRestore: (snapshot) => chatInputRef.current?.setPrompt(snapshot),
+    onBlocked: () => notify("chat.voiceEngineOff", "warning"),
+    onError: (code) => notify(VOICE_MESSAGE_KEYS[code], "error"),
+    onPolishFailed: (reason) =>
+      notify(
+        reason === "suspicious"
+          ? "chat.voicePolishSuspicious"
+          : "chat.voicePolishFailed",
+        "warning",
+      ),
+  });
+
+  // 记住这次录音是不是「按住说话」启动的。
+  // 不记的话：用户点按钮开始录音后，手滑按一下右 Option 再松开，
+  // onStop 只看 status === "recording"，录音会被静默停掉。
+  const pushToTalkOwns = useRef(false);
+
+  usePushToTalk(
+    voiceEngine?.shortcut ?? "disabled",
+    {
+      onStart: () => {
+        if (voice.status !== "idle") return;
+        pushToTalkOwns.current = true;
+        voice.toggle();
+      },
+      onStop: () => {
+        if (!pushToTalkOwns.current) return;
+        pushToTalkOwns.current = false;
+        if (voice.status === "recording") voice.toggle();
+      },
+    },
+    Boolean(voiceEngine?.enabled),
+  );
 
   const hasActiveTurn = Boolean(activeTurn);
 
@@ -1982,6 +2037,7 @@ export function ChatView() {
             onToggleExpand={() => setIsInputExpanded((v) => !v)}
             onContentChange={setHasInputContent}
             onAttachmentsChange={handleAttachmentsChange}
+            voiceRecording={voice.status === "recording"}
             placeholder={t("chat.typeMessage")}
             cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
             textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
@@ -2075,6 +2131,7 @@ export function ChatView() {
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
+                voice={toMicButtonProps(voice)}
               />
             }
           />

@@ -100,7 +100,24 @@
         "recheck": "重新检查"
       },
       "loadFailed": "加载能力失败",
-      "actionFailed": "操作失败"
+      "actionFailed": "操作失败",
+      "localFeatures": "本机功能",
+      "voice": {
+        "title": "语音输入",
+        "desc": "离线识别、不计费。需要下载约 140MB，并在内存中常驻约 300MB。",
+        "install": "安装语音引擎",
+        "installing": "正在安装… {{percent}}%",
+        "installed": "已安装",
+        "notInstalled": "未安装",
+        "remove": "删除语音模型",
+        "installFailed": "安装失败，可以重试",
+        "shortcut": "按住说话",
+        "shortcutAltRight": "右 Option（推荐）",
+        "shortcutAltSpace": "⌥ + 空格",
+        "shortcutMetaShiftSpace": "⌘ + ⇧ + 空格",
+        "shortcutDisabled": "不使用快捷键",
+        "shortcutFnHint": "Fn 键无法在应用内监听，所以默认用右 Option（对齐微信电脑端的「长按右 Alt」）"
+      }
     },
     "groupGeneral": "常规",
     "groupPersonal": "个人",
@@ -1006,7 +1023,20 @@
     "forkFailed": "分叉失败，请稍后重试",
     "forkSuffix": "（分叉）",
     "elapsedRunning": "已运行 {{time}}",
-    "elapsedDone": "本轮耗时 {{time}}"
+    "elapsedDone": "本轮耗时 {{time}}",
+    "voiceStart": "语音输入",
+    "voiceStop": "停止录音",
+    "voiceCancel": "取消这次语音输入",
+    "voicePolish": "整理",
+    "voiceRevert": "还原",
+    "voiceEngineOff": "还没启用语音输入，去设置 →「能力」里开一下",
+    "voiceNotInstalled": "语音引擎还没装好，去设置 →「能力」里安装",
+    "voiceEngineFailed": "语音引擎启动失败，可以试试重装",
+    "voiceMicDenied": "麦克风权限被拒绝，请在系统设置里允许 DeskWand 使用麦克风",
+    "voiceMicUnavailable": "找不到可用的麦克风",
+    "voiceInstallFailed": "语音引擎安装失败",
+    "voicePolishFailed": "整理失败，已保留原文",
+    "voicePolishSuspicious": "整理结果看起来不太对，已保留原文"
   },
   "steer": {
     "label": "引导",
