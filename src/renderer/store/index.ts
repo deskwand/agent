@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { NestedToolRuntimeUi } from "../../shared/nested-tool-calls";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 import { collectCurrentPlan, type CurrentTodos } from "../utils/current-todos";
 import { isLingering } from "../utils/execution-clock";
@@ -73,6 +74,11 @@ export interface SessionState {
   inputQueue: QueuedInput[];
   steerRecords: SteerRecord[];
   partialToolResults: Record<string, PartialToolResult>;
+  /**
+   * codemode 外层调用的运行时明细，key = 外层工具调用 id。
+   * 仅作展示快照；历史权威信息始终以父结果里的 nestedCalls 为准。
+   */
+  nestedToolCalls?: Record<string, NestedToolRuntimeUi>;
   goalStatus?: {
     status:
       | "active"
@@ -139,6 +145,7 @@ const DEFAULT_SESSION_STATE: SessionState = {
   inputQueue: [],
   steerRecords: [],
   partialToolResults: {},
+  nestedToolCalls: {},
   backgroundAgents: [],
   subagentActivities: {},
   currentTodos: null,
@@ -166,6 +173,13 @@ function getSession(
   sessionId: string,
 ): SessionState {
   return states[sessionId] ?? DEFAULT_SESSION_STATE;
+}
+
+/** 会话是否仍在运行：运行中的历史分页/重载不得清空尚未落入历史的运行时明细。 */
+function isSessionRunning(sessions: Session[], sessionId: string): boolean {
+  return sessions.some(
+    (session) => session.id === sessionId && session.status === "running",
+  );
 }
 
 export type ActiveView =
@@ -488,6 +502,8 @@ interface AppState {
     toolCallId: string,
     result: PartialToolResult | null,
   ) => void;
+  /** 替换某个 codemode 外层调用的运行时快照；晚到的 live 不得覆盖权威 final。 */
+  setNestedToolCalls: (sessionId: string, runtime: NestedToolRuntimeUi) => void;
 
   // System theme actions
   setSystemDarkMode: (dark: boolean) => void;
@@ -962,6 +978,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       sessionStates: patchSession(state.sessionStates, sessionId, {
         messages: messages.map(restoreUserMessage),
         historyHydrated: true,
+        // 完整重载且会话不在运行时，历史只从父结果读取，旧运行时明细作废。
+        ...(isSessionRunning(state.sessions, sessionId)
+          ? {}
+          : { nestedToolCalls: {} }),
       }),
     })),
 
@@ -976,6 +996,11 @@ export const useAppStore = create<AppState>((set, get) => ({
           hasMoreOlder: hasMore,
           oldestMessageId: messages[0]?.id ?? null,
           historyHydrated: true,
+          // 外层整窗重载且会话不在运行时，清掉旧的运行时明细；
+          // 运行中重载（切回活动会话）必须保留，分页 prepend 不受影响。
+          ...(isSessionRunning(state.sessions, sessionId)
+            ? {}
+            : { nestedToolCalls: {} }),
           // 只在还没有切片时重建：应用重启后首次水合必须从消息恢复，
           // 而后续的分页/压缩重载不能覆盖已经累积好的切片。
           ...(rebuilt
@@ -1675,6 +1700,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       return {
         sessionStates: patchSession(state.sessionStates, sessionId, {
           partialToolResults: { ...current, [toolCallId]: result },
+        }),
+      };
+    }),
+
+  setNestedToolCalls: (sessionId, runtime) =>
+    set((state) => {
+      const ss = getSession(state.sessionStates, sessionId);
+      const id = runtime.snapshot.parentToolCallId;
+      const previous = ss.nestedToolCalls?.[id];
+      // 权威最终记录落地后，晚到的 live 事件不得把它降级；
+      // 旧 input 也不回填进 final 快照。
+      if (
+        previous?.snapshot.source === "final" &&
+        runtime.snapshot.source === "live"
+      ) {
+        return {};
+      }
+      return {
+        sessionStates: patchSession(state.sessionStates, sessionId, {
+          nestedToolCalls: { ...ss.nestedToolCalls, [id]: runtime },
         }),
       };
     }),

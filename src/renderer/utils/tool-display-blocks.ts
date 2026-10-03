@@ -1,7 +1,9 @@
 import type { TFunction } from "i18next";
 import { isMcpToolName } from "../../shared/mcp-tool-names";
+import type { NestedToolStatus } from "../../shared/nested-tool-calls";
 import type { ContentBlock, ToolResultContent, ToolUseContent } from "../types";
 import { extractFilePathFromToolInput } from "./tool-output-path";
+import { countDiffLines } from "./tool-result-summary";
 
 export interface SubagentSummary {
   name: string;
@@ -24,12 +26,29 @@ export interface ProcessSummary {
   subagentWorkflowCount?: number;
   hasGoal: boolean;
   usedToolCount: number;
+  scriptCount?: number;
+  calledRead?: boolean;
+  calledSearch?: boolean;
 }
 
 export interface ResultSummary {
   editedFiles: number;
   writtenFiles: number;
+  calledEdit?: boolean;
+  calledWrite?: boolean;
 }
+
+/** 分组状态：只在分组含有虚拟 trace 或普通失败时附加。 */
+export interface ToolGroupStatusUi {
+  running: boolean;
+  failed: boolean;
+  unfinished: boolean;
+  incomplete: boolean;
+  unavailable: boolean;
+  firstFailedToolCallId?: string;
+}
+
+type GroupScriptUi = { id: string; input: Record<string, unknown> };
 
 export interface ResultFileEntry {
   path: string;
@@ -37,6 +56,7 @@ export interface ResultFileEntry {
   writes: number;
   addedLines: number;
   removedLines: number;
+  lineStatsUnavailable?: boolean;
 }
 
 export type DisplayBlock =
@@ -48,12 +68,16 @@ export type DisplayBlock =
       type: "process-summary";
       items: ToolUseContent[];
       summary: ProcessSummary;
+      status?: ToolGroupStatusUi;
+      scripts?: GroupScriptUi[];
     }
   | {
       type: "result-summary";
       items: ToolUseContent[];
       summary: ResultSummary;
       files: ResultFileEntry[];
+      status?: ToolGroupStatusUi;
+      scripts?: GroupScriptUi[];
     };
 
 export type ProcessSummaryDisplayBlock = Extract<
@@ -103,6 +127,8 @@ const PROCESS_TOOLS = new Set([
   "get_goal",
   "update_goal",
   "goal_complete",
+  // 外层脚本调用；有可用子条目时会被投影替换，只剩兜底时计为脚本
+  "codemode",
   // 清单：与相邻工具合并成一行摘要；驼峰名来自历史会话
   "todo_write",
   "todowrite",
@@ -177,12 +203,40 @@ function getToolKind(name: string): "process" | "result" | null {
 }
 
 export function isProcessToolUse(item: ToolUseContent): boolean {
-  return getToolKind(item.name) === "process";
+  const kind = getToolKind(item.name);
+  if (kind) {
+    return kind === "process";
+  }
+  // 虚拟投影的嵌套调用即使名字未知也归入过程分组，而不是作为普通内容块。
+  return Boolean(item.trace);
+}
+
+/**
+ * 分组统计只采信成功状态：虚拟块读 trace，普通块读自己的结果。
+ * 没有结果就是未知，不能算作已读取 / 已搜索。
+ */
+function statusOf(
+  item: ToolUseContent,
+  blocks: ContentBlock[],
+): NestedToolStatus | undefined {
+  if (item.trace) {
+    return item.trace.status;
+  }
+  const result = blocks.find(
+    (block): block is ToolResultContent =>
+      block.type === "tool_result" && block.toolUseId === item.id,
+  );
+  return result
+    ? (result.status ?? (result.isError ? "error" : "ok"))
+    : undefined;
 }
 
 const GOAL_TOOLS = new Set(["get_goal", "update_goal", "goal_complete"]);
 
-function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
+function buildProcessSummary(
+  items: ToolUseContent[],
+  blocks: ContentBlock[] = [],
+): ProcessSummary {
   const readPaths = new Set<string>();
   let browseDirCount = 0;
   let hasSearch = false;
@@ -198,10 +252,18 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
   let hasGoal = false;
   let usedToolCount = 0;
   let todoUpdateCount = 0;
+  let scriptCount = 0;
+  let calledRead = false;
+  let calledSearch = false;
 
   for (const item of items) {
     const lower = item.name.toLowerCase();
     let countedAsSpecific = false;
+    if (lower === "codemode") {
+      // 投影只会保留没有可用子条目的父调用；它本身不是一次通用工具使用。
+      scriptCount += 1;
+      continue;
+    }
     // read / read_file / vision_describe / office_read_* all count as "read files"
     // in the process summary. Using startsWith for office_read_ means future
     // formats (csv, md, etc.) are automatically covered.
@@ -211,14 +273,23 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
       lower === "vision_describe" ||
       lower.startsWith("office_read_")
     ) {
+      calledRead = true;
       const path = extractFilePathFromToolInput(item.input);
-      if (path) {
+      // 只统计已确认成功且参数未因历史缺失而丢失的读取。
+      if (
+        path &&
+        statusOf(item, blocks) === "ok" &&
+        item.trace?.source !== "missing"
+      ) {
         readPaths.add(path);
       }
       countedAsSpecific = true;
     }
     if (SEARCH_TOOLS.has(lower)) {
-      hasSearch = true;
+      calledSearch = true;
+      if (statusOf(item, blocks) === "ok") {
+        hasSearch = true;
+      }
       countedAsSpecific = true;
     }
     if (FILE_BROWSE_TOOLS.has(lower)) {
@@ -297,23 +368,43 @@ function buildProcessSummary(items: ToolUseContent[]): ProcessSummary {
     hasGoal,
     usedToolCount,
     todoUpdateCount,
+    scriptCount,
+    calledRead,
+    calledSearch,
   };
 }
 
 function buildResultSummary(items: ToolUseContent[]): ResultSummary {
   const editedFiles = new Set<string>();
   const writtenFiles = new Set<string>();
+  let calledEdit = false;
+  let calledWrite = false;
 
   for (const item of items) {
-    const path = extractFilePathFromToolInput(item.input);
+    const lower = item.name.toLowerCase();
+    const isEdit = lower === "edit" || lower === "edit_file";
+    const isWrite = lower === "write" || lower === "write_file";
+    if (!isEdit && !isWrite) {
+      continue;
+    }
+    if (isEdit) {
+      calledEdit = true;
+    }
+    if (isWrite) {
+      calledWrite = true;
+    }
+    // missing 来源的参数只能用于详情展示，不作为已持久化文件统计。
+    const path =
+      item.trace?.source === "missing"
+        ? null
+        : extractFilePathFromToolInput(item.input);
     if (!path) {
       continue;
     }
-    const lower = item.name.toLowerCase();
-    if (lower === "edit" || lower === "edit_file") {
+    if (isEdit) {
       editedFiles.add(path);
     }
-    if (lower === "write" || lower === "write_file") {
+    if (isWrite) {
       writtenFiles.add(path);
     }
   }
@@ -321,16 +412,72 @@ function buildResultSummary(items: ToolUseContent[]): ResultSummary {
   return {
     editedFiles: editedFiles.size,
     writtenFiles: writtenFiles.size,
+    calledEdit,
+    calledWrite,
   };
+}
+
+function buildGroupStatus(
+  items: ToolUseContent[],
+  blocks: ContentBlock[],
+): ToolGroupStatusUi | undefined {
+  const traces = items.flatMap((item) => (item.trace ? [item.trace] : []));
+  const failedItems = items.filter(
+    (item) => statusOf(item, blocks) === "error",
+  );
+  // 无 trace 也无普通失败时不附加状态，保持旧调用方输出稳定。
+  if (traces.length === 0 && failedItems.length === 0) {
+    return undefined;
+  }
+  return {
+    running: traces.some(
+      (trace) => trace.status === "running" || trace.parentStatus === "running",
+    ),
+    failed:
+      failedItems.length > 0 ||
+      traces.some((trace) => trace.parentStatus === "error"),
+    unfinished: traces.some(
+      (trace) =>
+        trace.status === "unfinished" || trace.parentStatus === "unfinished",
+    ),
+    incomplete: traces.some(
+      (trace) => !trace.complete && trace.source !== "missing",
+    ),
+    unavailable: traces.some(
+      (trace) =>
+        trace.source === "missing" ||
+        (trace.source === "live" && trace.parentStatus === "unfinished"),
+    ),
+    firstFailedToolCallId:
+      failedItems[0]?.id ??
+      traces.find((trace) => trace.parentStatus === "error")?.parentToolCallId,
+  };
+}
+
+function collectGroupScripts(items: ToolUseContent[]): GroupScriptUi[] {
+  return [
+    ...new Map(
+      items.flatMap((item) =>
+        item.trace?.script
+          ? [[item.trace.script.id, item.trace.script] as const]
+          : [],
+      ),
+    ).values(),
+  ];
 }
 
 export function buildProcessSummaryDisplayBlock(
   items: ToolUseContent[],
+  blocks: ContentBlock[] = [],
 ): ProcessSummaryDisplayBlock {
+  const status = buildGroupStatus(items, blocks);
+  const scripts = collectGroupScripts(items);
   return {
     type: "process-summary",
     items,
-    summary: buildProcessSummary(items),
+    summary: buildProcessSummary(items, blocks),
+    ...(status ? { status } : {}),
+    ...(scripts.length > 0 ? { scripts } : {}),
   };
 }
 
@@ -339,17 +486,25 @@ function buildSummaryBlock(
   items: ToolUseContent[],
   blocks: ContentBlock[],
 ): DisplayBlock {
+  const status = buildGroupStatus(items, blocks);
+  const scripts = collectGroupScripts(items);
+  const group = {
+    ...(status ? { status } : {}),
+    ...(scripts.length > 0 ? { scripts } : {}),
+  };
   return kind === "process"
     ? {
         type: "process-summary",
         items,
-        summary: buildProcessSummary(items),
+        summary: buildProcessSummary(items, blocks),
+        ...group,
       }
     : {
         type: "result-summary",
         items,
         summary: buildResultSummary(items),
         files: collectResultFiles(items, blocks),
+        ...group,
       };
 }
 
@@ -386,7 +541,10 @@ export function filterAssistantVisibleBlocks(
   });
 }
 
-export function buildToolDisplayBlocks(blocks: ContentBlock[]): DisplayBlock[] {
+export function buildToolDisplayBlocks(
+  blocks: ContentBlock[],
+  lookupBlocks: ContentBlock[] = blocks,
+): DisplayBlock[] {
   const displayBlocks: DisplayBlock[] = [];
   const consumedToolResultIndexes = new Set<number>();
   let currentItems: ToolUseContent[] = [];
@@ -398,7 +556,9 @@ export function buildToolDisplayBlocks(blocks: ContentBlock[]): DisplayBlock[] {
       currentKind = null;
       return;
     }
-    displayBlocks.push(buildSummaryBlock(currentKind, currentItems, blocks));
+    displayBlocks.push(
+      buildSummaryBlock(currentKind, currentItems, lookupBlocks),
+    );
     currentItems = [];
     currentKind = null;
   };
@@ -420,7 +580,8 @@ export function buildToolDisplayBlocks(blocks: ContentBlock[]): DisplayBlock[] {
     }
 
     const resultIndex = findToolResultIndex(blocks, index, block.id);
-    const kind = getToolKind(block.name);
+    // 虚拟嵌套块即使是未知工具名也走过程分组，普通未知工具仍保持原行为。
+    const kind = getToolKind(block.name) ?? (block.trace ? "process" : null);
 
     if (kind === null) {
       flush();
@@ -509,6 +670,7 @@ export type ProcessSummaryFragment = {
 export function getProcessSummaryFragments(
   summary: ProcessSummary,
   t: TFunction,
+  status?: ToolGroupStatusUi,
 ): ProcessSummaryFragment[] {
   const fragments: ProcessSummaryFragment[] = [];
 
@@ -519,6 +681,9 @@ export function getProcessSummaryFragments(
       }),
       iconType: "read",
     });
+  }
+  if (summary.readCount === 0 && summary.calledRead) {
+    fragments.push({ text: t("tool.grouped.calledRead"), iconType: "read" });
   }
   if ((summary.browseDirCount ?? 0) > 0) {
     fragments.push({
@@ -535,6 +700,12 @@ export function getProcessSummaryFragments(
   if (summary.hasSearch) {
     fragments.push({
       text: t("tool.grouped.searchedCode"),
+      iconType: "search",
+    });
+  }
+  if (!summary.hasSearch && summary.calledSearch) {
+    fragments.push({
+      text: t("tool.grouped.calledSearch"),
       iconType: "search",
     });
   }
@@ -625,6 +796,28 @@ export function getProcessSummaryFragments(
     });
   }
 
+  if ((summary.scriptCount ?? 0) > 0) {
+    const count = summary.scriptCount ?? 0;
+    fragments.push({
+      text: status?.running
+        ? t("tool.grouped.runningScript")
+        : t(
+            pluralKey(
+              status?.failed || status?.unfinished || status?.unavailable
+                ? "tool.grouped.calledScripts"
+                : "tool.grouped.executedScripts",
+              count,
+            ),
+            { count },
+          ),
+      iconType: "command",
+    });
+  } else if (fragments.length === 0 && status?.running) {
+    fragments.push({
+      text: t("tool.grouped.runningScript"),
+      iconType: "command",
+    });
+  }
   return fragments;
 }
 
@@ -649,21 +842,11 @@ export function formatResultSummaryLabel(
     );
   }
 
+  if (summary.editedFiles === 0 && summary.calledEdit)
+    fragments.push(t("tool.grouped.calledEdit"));
+  if (summary.writtenFiles === 0 && summary.calledWrite)
+    fragments.push(t("tool.grouped.calledWrite"));
   return joinSummaryFragments(fragments, t);
-}
-
-function countDiffLines(diff: string | undefined): {
-  added: number;
-  removed: number;
-} {
-  if (!diff) return { added: 0, removed: 0 };
-  let added = 0;
-  let removed = 0;
-  for (const line of diff.split("\n")) {
-    if (line.startsWith("+") && !line.startsWith("+++")) added += 1;
-    if (line.startsWith("-") && !line.startsWith("---")) removed += 1;
-  }
-  return { added, removed };
 }
 
 function countWriteLines(content: unknown): number {
@@ -684,6 +867,10 @@ export function collectResultFiles(
   const files = new Map<string, ResultFileEntry>();
 
   for (const item of items) {
+    // 缺失权威记录的详情参数不能进入 artifact 文件统计。
+    if (item.trace?.source === "missing") {
+      continue;
+    }
     const path = extractFilePathFromToolInput(item.input);
     if (!path) {
       continue;
@@ -697,21 +884,34 @@ export function collectResultFiles(
       removedLines: 0,
     };
     const lower = item.name.toLowerCase();
+    const found = blocks.find(
+      (block) => block.type === "tool_result" && block.toolUseId === item.id,
+    );
+    const result = found?.type === "tool_result" ? found : undefined;
+
+    if (item.trace && !result?.diff) current.lineStatsUnavailable = true;
 
     if (lower === "edit" || lower === "edit_file") {
       current.edits += 1;
-      const result = blocks.find(
-        (b) => b.type === "tool_result" && b.toolUseId === item.id,
-      );
-      if (result && result.type === "tool_result") {
-        const { added, removed } = countDiffLines(result.diff);
+      // 只有已有真实 diff 才计算增删，运行时明细缺失时不推算。
+      if (result && !result.outputUnavailable) {
+        const { added, removed } = countDiffLines(result.diff ?? "");
         current.addedLines += added;
         current.removedLines += removed;
       }
     }
     if (lower === "write" || lower === "write_file") {
       current.writes += 1;
-      current.addedLines += countWriteLines(item.input.content);
+      // 终态但正文不可用时，参数里的内容不代表已落盘的结果。
+      if (item.trace) {
+        if (result?.diff) {
+          const { added, removed } = countDiffLines(result.diff ?? "");
+          current.addedLines += added;
+          current.removedLines += removed;
+        }
+      } else if (!result?.outputUnavailable) {
+        current.addedLines += countWriteLines(item.input.content);
+      }
     }
 
     files.set(path, current);

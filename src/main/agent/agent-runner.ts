@@ -24,7 +24,13 @@ import {
   type ExtensionFactory,
   type ModelRuntime,
   type SessionEntry,
+  type AgentSessionEvent,
 } from "@earendil-works/pi-coding-agent";
+import { createNestedToolCallTracker } from "./nested-tool-call-tracker";
+import {
+  createNestedToolSessionEventHandler,
+  isMetadataOnlyCodemodeUpdate,
+} from "./nested-tool-events";
 import { Type } from "@sinclair/typebox";
 import {
   getAuthPath,
@@ -3707,7 +3713,16 @@ Tool routing:\n
           ),
         );
 
-      const unsubscribe = piSession.subscribe((event) => {
+      const nestedTracker = createNestedToolCallTracker();
+      const publishNested = (parentId: string) => {
+        const runtime = nestedTracker.get(parentId);
+        if (runtime)
+          this.sendToRenderer({
+            type: "stream.nestedToolCalls",
+            payload: { sessionId: session.id, runtime },
+          });
+      };
+      const handleSessionEvent = (event: AgentSessionEvent) => {
         try {
           if (controller.signal.aborted) return;
 
@@ -4027,6 +4042,8 @@ Tool routing:\n
                   }
                 | undefined;
               if (!partialResult) break;
+              if (isMetadataOnlyCodemodeUpdate(event.toolName, partialResult))
+                break;
 
               const textContent = Array.isArray(partialResult.content)
                 ? partialResult.content.find(
@@ -4093,6 +4110,24 @@ Tool routing:\n
                 toolName: event.toolName,
                 toolOutput: sanitizeOutputPaths(outputText).slice(0, 800),
               });
+
+              if (
+                event.parentToolCallId &&
+                nestedTracker.get(event.parentToolCallId)
+              ) {
+                nestedTracker.finish(event.parentToolCallId, toolCallId, {
+                  content: sanitizeOutputPaths(outputText),
+                  isError,
+                  ...(typeof resultDetails?.diff === "string"
+                    ? { diff: resultDetails.diff }
+                    : {}),
+                  ...(normalizedToolResult.images.length
+                    ? { images: normalizedToolResult.images }
+                    : {}),
+                });
+                publishNested(event.parentToolCallId);
+                break; // Trace and partial cleanup ran; do not create an orphan result message.
+              }
 
               // Send tool result message
               const toolResultMsg: Message = {
@@ -4262,6 +4297,20 @@ Tool routing:\n
                 : undefined,
             });
           }
+        }
+      };
+      const handleNestedEvent = createNestedToolSessionEventHandler({
+        tracker: nestedTracker,
+        isAborted: () => controller.signal.aborted,
+        publish: publishNested,
+        handleEvent: handleSessionEvent,
+      });
+      const unsubscribe = piSession.subscribe((event) => {
+        try {
+          handleNestedEvent(event);
+        } catch (error) {
+          // Metadata publication must not escape the SDK event callback.
+          logCtxError("[AgentRunner] Nested event handling failed:", error);
         }
       });
 
@@ -4521,6 +4570,14 @@ Tool routing:\n
           unsubscribe();
         } catch (e) {
           logWarn("[AgentRunner] unsubscribe error:", e);
+        }
+        for (const runtime of nestedTracker.interrupt()) {
+          if (
+            runtime.snapshot.source === "live" &&
+            runtime.snapshot.parentStatus === "unfinished"
+          ) {
+            publishNested(runtime.snapshot.parentToolCallId);
+          }
         }
         // 重试行是临时状态，任何异常路径都不能让它卡在界面上。
         if (retryRowActive) {

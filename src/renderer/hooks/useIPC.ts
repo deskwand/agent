@@ -495,6 +495,13 @@ function registerSharedIpcListener(): () => void {
           break;
         }
 
+        case "stream.nestedToolCalls":
+          store.setNestedToolCalls(
+            event.payload.sessionId,
+            event.payload.runtime,
+          );
+          break;
+
         case "sudo.password.request":
           store.setPendingSudoPassword(event.payload);
           break;

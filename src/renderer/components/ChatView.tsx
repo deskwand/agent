@@ -23,6 +23,7 @@ import { attachmentKeySet } from "../utils/attached-files";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
 import { resolveDisplayedContextUsage } from "../utils/context-usage";
 import { MessageCard } from "./MessageCard";
+import { projectNestedToolMessages } from "../utils/nested-tool-display";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import {
   buildBackgroundAgentRows,
@@ -228,6 +229,7 @@ const LOAD_OLDER_THRESHOLD_PX = 160;
 // forcing every historical MessageCard to re-render on each streaming tick
 // and history prepend. Sharing one stable reference keeps memoization intact
 // (these are only ever read — ArtifactCard filters/maps, never mutates).
+const EMPTY_NESTED_CALLS = {};
 const EMPTY_RESULT_FILES: ResultFileEntry[] = [];
 const EMPTY_VIDEO_REFERENCES: VideoReference[] = [];
 
@@ -604,7 +606,7 @@ export function ChatView() {
     [messagesWithoutThinking],
   );
 
-  const displayedMessages = useMemo(() => {
+  const rawDisplayedMessages = useMemo(() => {
     // Use the full list (including auto-generated) for anchor lookup &
     // aggregation; filter auto-generated out of the final result only.
     const full = messagesWithoutThinking;
@@ -686,6 +688,33 @@ export function ChatView() {
     messagesWithoutThinking,
     partialMessage,
   ]);
+
+  const nestedCalls = useAppStore((s) =>
+    activeSessionId
+      ? (s.sessionStates[activeSessionId]?.nestedToolCalls ??
+        EMPTY_NESTED_CALLS)
+      : EMPTY_NESTED_CALLS,
+  );
+  const displayedMessages = useMemo(
+    () =>
+      projectNestedToolMessages(
+        rawDisplayedMessages,
+        nestedCalls,
+        activeTurn?.turnId,
+      ),
+    [rawDisplayedMessages, nestedCalls, activeTurn?.turnId],
+  );
+
+  const turnBlocksById = useMemo(() => {
+    const turns = new Map<string, ContentBlock[]>();
+    for (const message of displayedMessages) {
+      if (message.role !== "assistant" || !message.turnId) continue;
+      const blocks = turns.get(message.turnId) ?? [];
+      blocks.push(...message.content);
+      turns.set(message.turnId, blocks);
+    }
+    return turns;
+  }, [displayedMessages]);
 
   // Keep the window pinned to the tail while the user is at the bottom,
   // so streamed messages stay visible as the list grows.
@@ -770,8 +799,6 @@ export function ChatView() {
     const turnProcessSummaries = new Map<string, ProcessSummaryDisplayBlock>();
     const turnsWithProcessSummary = new Set<string>();
     let latestAssistantId: string | null = null;
-    let currentTurnToolUses: ToolUseContent[] = [];
-    let currentTurnProcessToolUses: ToolUseContent[] = [];
     let currentTurnAssistantText: string[] = [];
     let currentTurnBlocks: ContentBlock[] = [];
 
@@ -785,14 +812,9 @@ export function ChatView() {
         const blocks = Array.isArray(rawContent)
           ? (rawContent as ContentBlock[])
           : [];
-        const toolUses = blocks.filter(
-          (b): b is ToolUseContent => b.type === "tool_use",
-        );
         currentTurnAssistantText.push(
           ...blocks.filter((b) => b.type === "text").map((b) => b.text),
         );
-        currentTurnToolUses.push(...toolUses);
-        currentTurnProcessToolUses.push(...toolUses.filter(isProcessToolUse));
         currentTurnBlocks.push(...blocks);
 
         const msgId = String(msg.id);
@@ -802,10 +824,16 @@ export function ChatView() {
         const next = mergedMessages[i + 1];
         if (!next || next.role === "user") {
           turnEndIds.add(msgId);
-          if (currentTurnToolUses.length > 0) {
+          const summaryBlocks =
+            (msg.turnId && turnBlocksById.get(msg.turnId)) || currentTurnBlocks;
+          const summaryItems = summaryBlocks.filter(
+            (block): block is ToolUseContent => block.type === "tool_use",
+          );
+          const processItems = summaryItems.filter(isProcessToolUse);
+          if (summaryItems.length > 0) {
             turnArtifactFiles.set(
               msgId,
-              collectResultFiles(currentTurnToolUses, currentTurnBlocks),
+              collectResultFiles(summaryItems, summaryBlocks),
             );
           }
           const videoReferences = extractVideoReferences(
@@ -816,18 +844,16 @@ export function ChatView() {
             turnVideoReferences.set(msgId, videoReferences);
           }
           if (
-            currentTurnProcessToolUses.length > 0 &&
+            processItems.length > 0 &&
             typeof msg.turnId === "string" &&
             hoistedProcessSummaryTurnIds.has(msg.turnId)
           ) {
             turnProcessSummaries.set(
               msgId,
-              buildProcessSummaryDisplayBlock(currentTurnProcessToolUses),
+              buildProcessSummaryDisplayBlock(processItems, summaryBlocks),
             );
             turnsWithProcessSummary.add(msg.turnId);
           }
-          currentTurnToolUses = [];
-          currentTurnProcessToolUses = [];
           currentTurnAssistantText = [];
           currentTurnBlocks = [];
         }
@@ -861,7 +887,12 @@ export function ChatView() {
           turnsWithProcessSummary.has(turnId),
       };
     });
-  }, [mergedMessages, hoistedProcessSummaryTurnIds, activeSessionCwd]);
+  }, [
+    mergedMessages,
+    hoistedProcessSummaryTurnIds,
+    activeSessionCwd,
+    turnBlocksById,
+  ]);
 
   // Dock ticks are anchored to the IN-MEMORY window (all loaded history),
   // not the render window: sliding the render window while scrolling up
@@ -1741,9 +1772,7 @@ export function ChatView() {
       </h2>
       <div ref={connectorMeasureRef} aria-hidden="true" className="hidden" />
       <div className="hidden" aria-hidden="true">
-        {showConnectorLabel && (
-          <Plug className="w-0 h-0" />
-        )}
+        {showConnectorLabel && <Plug className="w-0 h-0" />}
       </div>
 
       {/* Messages */}
@@ -1802,10 +1831,21 @@ export function ChatView() {
                         {turnProcessSummary ? (
                           <ProcessSummaryBlock
                             block={turnProcessSummary}
+                            allBlocks={
+                              message.turnId
+                                ? turnBlocksById.get(message.turnId)
+                                : message.content
+                            }
                             message={message}
                           />
                         ) : null}
                         <MessageCard
+                          toolBlocksProjected={true}
+                          toolLookupBlocks={
+                            message.turnId
+                              ? turnBlocksById.get(message.turnId)
+                              : message.content
+                          }
                           message={message}
                           isStreaming={isStreaming}
                           isLatestRound={isLatestRound}

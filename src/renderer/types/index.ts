@@ -17,6 +17,11 @@ import type { PiUiRequest, PiTrustPrompt } from "../../shared/ipc-types";
 import type { PiTuiOpenEvent, PiTuiFrameEvent } from "../../shared/ipc-types";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 import type { AskUserQuestion, AskUserAnswers } from "../../shared/ask-user";
+import type {
+  NestedToolCallsUi,
+  NestedToolRuntimeUi,
+  NestedToolStatus,
+} from "../../shared/nested-tool-calls";
 
 // Session types
 export interface Session {
@@ -118,6 +123,8 @@ export interface ToolUseContent {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  /** 虚拟投影块的归属/状态信息；普通工具块没有此字段。 */
+  trace?: ToolTraceUi;
 }
 
 export interface ToolResultContent {
@@ -133,6 +140,15 @@ export interface ToolResultContent {
   }>;
   /** ask_user 卡片终态标记：会话被取消时由工具写入 details 并投影到这里 */
   askUserStatus?: "cancelled";
+  /**
+   * codemode 外层结果携带的内部调用标准化快照。仅 codemode 结果有值；
+   * 旧消息类型无此字段，读取方需按可选处理。
+   */
+  nestedCalls?: NestedToolCallsUi;
+  /** 虚拟投影结果的子调用状态；普通结果没有此字段。 */
+  status?: NestedToolStatus;
+  /** 子调用终态但运行时明细（正文/diff/图片）缺失，仅表示正文不可用。 */
+  outputUnavailable?: boolean;
 }
 
 /** Streaming partial tool output while a tool is still executing */
@@ -792,7 +808,11 @@ export type ServerEvent =
   | { type: "browser.picker.state-changed"; payload: { active: boolean } }
   | { type: "browser.picker.selected"; payload: ElementSelection }
   | { type: "askUser.request"; payload: AskUserRequest }
-  | { type: "askUser.dismiss"; payload: { toolCallId: string } };
+  | { type: "askUser.dismiss"; payload: { toolCallId: string } }
+  | {
+      type: "stream.nestedToolCalls";
+      payload: { sessionId: string; runtime: NestedToolRuntimeUi };
+    };
 
 // Settings types
 export interface Settings {
@@ -1150,4 +1170,19 @@ export interface AskUserRequest {
   sessionId: string;
   toolCallId: string;
   questions: AskUserQuestion[];
+}
+
+/**
+ * 嵌套调用的展示归属：把虚拟子块挂回它所属的 codemode 外层脚本。
+ * 仅用于渲染详情，不代表权威的终态统计依据。
+ */
+export interface ToolTraceUi {
+  parentToolCallId: string;
+  status: NestedToolStatus;
+  parentStatus: NestedToolStatus;
+  complete: boolean;
+  source: NestedToolCallsUi["source"];
+  argumentsBytes?: number;
+  cancelled?: boolean;
+  script?: { id: string; input: Record<string, unknown> };
 }
