@@ -147,7 +147,13 @@ export const MessageCard = memo(function MessageCard({
         : undefined,
     [sameTurnMessages, nestedCalls, activeTurnId],
   );
-  const allDisplayBlocks = toolLookupBlocks ?? projectedLookup ?? visibleBlocks;
+  // 跨消息查表只服务助手侧「tool_use / tool_result 落在不同 entry」的配对：表里
+  // 只有 assistant 块。用户消息拿它当块表，会丢掉这一轮自己的块（历史回合里图片
+  // 块没了 → 点图不开预览）。用户消息只看自己的块：它们不带工具块（见
+  // entries-to-messages），跨回合查表对它们没有意义。
+  const allDisplayBlocks = isUser
+    ? visibleBlocks
+    : (toolLookupBlocks ?? projectedLookup ?? visibleBlocks);
 
   const lastTextBlockIndex = useMemo(() => {
     let idx = -1;
