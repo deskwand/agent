@@ -91,6 +91,8 @@ export function WelcomeView() {
   );
   const voice = useVoiceInput({
     enabled: Boolean(voiceEngine?.enabled),
+    // 「整理 / 还原」作用在输入框里的文字上，而宿主是唯一知道框里有没有内容的地方
+    hasInputContent,
     getSnapshot: () => chatInputRef.current?.getPrompt() ?? "",
     onText: (text) => chatInputRef.current?.setPrompt(text),
     onRestore: (snapshot) => chatInputRef.current?.setPrompt(snapshot),

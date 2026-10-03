@@ -26,6 +26,8 @@ let api: ReturnType<typeof useVoiceInput>;
 // 早先的版本把 `getSnapshot` 写成常量 `() => "草稿"`，于是“用户手改输入框”根本
 // 表达不出来 —— 静态的替身会把真实的竞态藏起来。
 let draft = "";
+/** 输入框当前是否有内容 —— 宿主用 ChatInput 的 onContentChange 喂进来。 */
+let inputHasContent = true;
 const calls = {
   onText: vi.fn((text: string) => {
     draft = text;
@@ -42,7 +44,11 @@ const calls = {
 let onSamplesRef: ((pcm: Int16Array, level: number) => void) | null = null;
 
 function Probe() {
-  api = useVoiceInput({ enabled: true, ...calls });
+  api = useVoiceInput({
+    enabled: true,
+    hasInputContent: inputHasContent,
+    ...calls,
+  });
   return React.createElement("span", null, api.status);
 }
 
@@ -79,6 +85,7 @@ beforeEach(() => {
   // 用 clear 的话它会泄漏到后面的用例里去。
   for (const spy of Object.values(calls)) spy.mockReset();
   draft = "草稿";
+  inputHasContent = true;
   calls.onText.mockImplementation((text: string) => {
     draft = text;
   });
@@ -285,7 +292,11 @@ describe("useVoiceInput", () => {
 });
 
 function Probe2() {
-  api = useVoiceInput({ enabled: false, ...calls });
+  api = useVoiceInput({
+    enabled: false,
+    hasInputContent: inputHasContent,
+    ...calls,
+  });
   return React.createElement("span", null, api.status);
 }
 
@@ -365,5 +376,53 @@ describe("useVoiceInput — 采集帧到 IPC 的真实通路", () => {
     expect(stopCapture).toHaveBeenCalled();
     expect(calls.onError).toHaveBeenCalledWith("VOICE_ENGINE_FAILED");
     expect(container.textContent).toBe("idle");
+  });
+});
+
+/**
+ * 「整理 / 还原」操作的是**输入框里的东西**，所以输入框空的时候它们不该存在。
+ *
+ * 判据以前只看钩子自己的 `voiceText` / `originalText`：用户把字删光，那两个值
+ * 不会变，按钮就留在空输入框旁边。宿主早就知道「框里有没有内容」
+ * （`ChatInput` 的 `onContentChange`，展开按钮用的就是它），所以把它喂进来。
+ */
+describe("输入框为空时的语音动作", () => {
+  it("输入框为空 → 整理与还原都不可用", async () => {
+    inputHasContent = false;
+    await render();
+    await act(async () => api.toggle());
+    await act(async () =>
+      emit({ type: "done", sessionId: "s1", text: "你好", discarded: false }),
+    );
+
+    // 钩子里确实记着这段语音，但框是空的，没什么可整理的
+    expect(api.canPolish).toBe(false);
+    expect(api.canRevert).toBe(false);
+  });
+
+  it("输入框被清空后丢掉原文 —— 重新打字不会复活一个早已不相干的「还原」", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await act(async () =>
+      emit({
+        type: "done",
+        sessionId: "s1",
+        text: "嗯那个今天天气不错",
+        discarded: false,
+      }),
+    );
+    await act(async () => api.polish());
+    expect(api.canRevert).toBe(true);
+
+    // 用户把刚整理好的文字删干净
+    draft = "";
+    inputHasContent = false;
+    await render();
+    expect(api.canRevert).toBe(false);
+
+    // 他接着打了一段新话。还原若在这时出现，还原回去的是一段他不认识的旧文本。
+    inputHasContent = true;
+    await render();
+    expect(api.canRevert).toBe(false);
   });
 });

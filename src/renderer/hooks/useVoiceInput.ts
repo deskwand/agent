@@ -28,6 +28,13 @@ export interface UseVoiceInputOptions {
   /** 引擎已启用且已安装。false 时点按钮只提示，不碰麦克风。 */
   enabled: boolean;
   /**
+   * 输入框当前是否有内容（宿主用 `ChatInput` 的 `onContentChange` 喂进来）。
+   *
+   * 「整理 / 还原」操作的是框里的东西，框空的时候它们没有意义。
+   * 必填：漏接线要变成编译错误，而不是静默留两个按钮在空输入框旁边。
+   */
+  hasInputContent: boolean;
+  /**
    * 读当前草稿。**这是一个实时读取，不是快照**：录音开始时调一次取基线，
    * 整理结果回来时再调一次比对该不该写入（用户可能刚刚手改过）。
    */
@@ -85,6 +92,7 @@ export function useVoiceInput(
   const [seconds, setSeconds] = useState(0);
   const [voiceText, setVoiceText] = useState("");
   const [originalText, setOriginalText] = useState<string | null>(null);
+  const hasInputContent = options.hasInputContent;
 
   const sessionRef = useRef<string | null>(null);
   const captureRef = useRef<MicCapture | null>(null);
@@ -263,6 +271,14 @@ export function useVoiceInput(
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [status, cancel]);
 
+  // 把输入框清空要连「可还原」的记忆一起丢掉。
+  //
+  // 不丢的话：删光 → 再打一段新话，「还原」会冒出来，而它拿回来的是一段
+  // 用户早就不记得的语音原文。
+  useEffect(() => {
+    if (!hasInputContent) setOriginalText(null);
+  }, [hasInputContent]);
+
   const polish = useCallback(async () => {
     const api = window.electronAPI?.voice;
     if (!api || !voiceText.trim() || status !== "idle") return false;
@@ -315,7 +331,10 @@ export function useVoiceInput(
     polish,
     revert,
     canPolish:
-      status === "idle" && voiceText.trim().length > 0 && originalText === null,
-    canRevert: originalText !== null,
+      status === "idle" &&
+      hasInputContent &&
+      voiceText.trim().length > 0 &&
+      originalText === null,
+    canRevert: hasInputContent && originalText !== null,
   };
 }

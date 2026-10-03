@@ -442,6 +442,8 @@ export function ChatView() {
   };
   const voice = useVoiceInput({
     enabled: Boolean(voiceEngine?.enabled),
+    // 「整理 / 还原」作用在输入框里的文字上，而宿主是唯一知道框里有没有内容的地方
+    hasInputContent,
     // getSnapshot 是**实时读取**输入框，不是一次性快照。不要缓存它。
     getSnapshot: () => chatInputRef.current?.getPrompt() ?? "",
     onText: (text) => chatInputRef.current?.setPrompt(text),
