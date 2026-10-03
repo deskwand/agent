@@ -89,8 +89,8 @@ describe("builtin capability names stay in sync", () => {
   it("every capability card carries the server name used for lookup", () => {
     const entries = realRegistry()
       .list()
-      .filter((e) => e.tab === "capability");
-    expect(entries).toHaveLength(3);
+      .filter((e) => e.source === "mcp-builtin");
+    expect(entries).toHaveLength(1);
     for (const entry of entries) {
       expect(findBuiltinPresetByName(entry.serverName)).toBeDefined();
     }
@@ -100,22 +100,22 @@ describe("builtin capability names stay in sync", () => {
 describe("enabling a capability that was never added", () => {
   it("writes it into mcp.json without an exposure key", async () => {
     const reg = realRegistry();
-    const res = await reg.setEnabled("Chrome", true);
+    const res = await reg.setEnabled("GUI_Operate", true);
 
     expect(res.ok).toBe(true);
     const written = readMcpConfig(agentDir).servers;
-    expect(written.map((s) => s.name)).toEqual(["Chrome"]);
+    expect(written.map((s) => s.name)).toEqual(["GUI_Operate"]);
     // 不写该键 ⇒ 上游取默认 codemode（pi 的参考实现）
     expect(written[0].config).not.toHaveProperty("exposure");
     expect(written[0].config.type).toBe("stdio");
   });
 
   it("activates it so it connects without waiting for a new session", async () => {
-    await realRegistry().setEnabled("Chrome", true);
-    expect(activated).toEqual(["Chrome"]);
+    await realRegistry().setEnabled("GUI_Operate", true);
+    expect(activated).toEqual(["GUI_Operate"]);
   });
 
-  it("works for all three presets", async () => {
+  it("works for the builtin preset", async () => {
     const reg = realRegistry();
     for (const preset of BUILTIN_PRESETS) {
       expect((await reg.setEnabled(preset.name, true)).ok).toBe(true);
@@ -124,13 +124,13 @@ describe("enabling a capability that was never added", () => {
       readMcpConfig(agentDir)
         .servers.map((s) => s.name)
         .sort(),
-    ).toEqual(["Chrome", "GUI_Operate", "Software_Development"]);
+    ).toEqual(["GUI_Operate"]);
   });
 
-  it("resolves the packaged script path for node-based presets", async () => {
-    // software-development 与 gui-operate 用 node 跑打包脚本；
+  it("resolves the packaged script path for the preset", async () => {
+    // GUI_Operate 用 node 跑打包脚本（`resolveMcpServerPath` 注入应用内路径）；
     // 路径没解析出来会让 server 起不来（且不报错）
-    await realRegistry().setEnabled("Software_Development", true);
+    await realRegistry().setEnabled("GUI_Operate", true);
     const config = readMcpConfig(agentDir).servers[0].config;
     expect("args" in config && config.args?.[0]).toBeTruthy();
     expect("args" in config && config.args?.[0]).not.toContain("{");
@@ -138,17 +138,17 @@ describe("enabling a capability that was never added", () => {
 
   it("then the card shows an instance instead of an empty one", async () => {
     const reg = realRegistry();
-    await reg.setEnabled("Chrome", true);
-    const chrome = reg.list().find((e) => e.key === "mcp:builtin:Chrome")!;
-    expect(chrome.instances).toHaveLength(1);
+    await reg.setEnabled("GUI_Operate", true);
+    const entry = reg.list().find((e) => e.key === "mcp:builtin:GUI_Operate")!;
+    expect(entry.instances).toHaveLength(1);
   });
 });
 
 describe("toggling a capability off and on again", () => {
   it("disables without removing the entry", async () => {
     const reg = realRegistry();
-    await reg.setEnabled("Chrome", true);
-    await reg.setEnabled("Chrome", false);
+    await reg.setEnabled("GUI_Operate", true);
+    await reg.setEnabled("GUI_Operate", false);
 
     const written = readMcpConfig(agentDir).servers;
     expect(written).toHaveLength(1);
@@ -157,9 +157,9 @@ describe("toggling a capability off and on again", () => {
 
   it("re-enables the existing entry rather than duplicating it", async () => {
     const reg = realRegistry();
-    await reg.setEnabled("Chrome", true);
-    await reg.setEnabled("Chrome", false);
-    await reg.setEnabled("Chrome", true);
+    await reg.setEnabled("GUI_Operate", true);
+    await reg.setEnabled("GUI_Operate", false);
+    await reg.setEnabled("GUI_Operate", true);
 
     expect(readMcpConfig(agentDir).servers).toHaveLength(1);
     expect(readMcpConfig(agentDir).servers[0].config.enabled).toBe(true);
@@ -241,7 +241,7 @@ describe("the key the UI passes to addCatalogServer", () => {
     // 而 registry 是按目录的 key（"notion"）查表的 —— 直接传 entry.key
     // 会让每一次点「连接」都返回 "unknown catalog key"。
     const reg = realRegistry();
-    for (const entry of reg.list().filter((e) => e.tab === "connect")) {
+    for (const entry of reg.list()) {
       // 卡片需要知道该把什么交给 addCatalogServer
       expect(entry.instances).toBeDefined();
     }
@@ -282,7 +282,7 @@ describe("the exact value the UI now sends", () => {
 
   it("connects every catalog card in the list", async () => {
     const reg = realRegistry();
-    for (const card of reg.list().filter((e) => e.tab === "connect")) {
+    for (const card of reg.list().filter((e) => e.source === "mcp-remote")) {
       expect((await reg.addCatalogServer(card.serverName, vi.fn())).ok).toBe(
         true,
       );
@@ -338,9 +338,9 @@ describe("i18n keys the sources emit", () => {
     }
   });
 
-  it("the card renders summary through t(), not as a raw key", () => {
-    // 回归：summary 改成 i18n key 后忘了包 t()，界面上直接显示
-    // "connectors.summary.remote"。用 source 断言守这一类「漏了 t()」。
+  it("the transport badge renders through t(), not as a raw key", () => {
+    // 回归：把 i18n key 直接铺到界面上（漏了 t()），会显示
+    // "connectors.transport.remote"。传输标记替代了原来的 summary 行。
     const card = fs.readFileSync(
       path.join(
         process.cwd(),
@@ -348,7 +348,7 @@ describe("i18n keys the sources emit", () => {
       ),
       "utf8",
     );
-    expect(card).toContain("t(instance.summary)");
-    expect(card).not.toContain("{instance.summary}");
+    const badge = card.slice(card.indexOf('data-testid="transport-badge"'));
+    expect(badge.slice(0, 400)).toContain("t(");
   });
 });

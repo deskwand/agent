@@ -2051,17 +2051,6 @@
   "connectors": {
     "title": "连接",
     "subtitle": "把外部工具接到 DeskWand",
-    "tab": {
-      "connect": "连接",
-      "capability": "本机能力",
-      "skills": "技能云",
-      "plugins": "插件"
-    },
-    "filter": {
-      "all": "全部",
-      "added": "已添加",
-      "attention": "需处理"
-    },
     "status": {
       "ready": "已连接",
       "connecting": "授权中…",
@@ -2080,9 +2069,9 @@
       "retry": "重试",
       "manage": "管理",
       "inProgress": "连接中…",
-      "cancel": "取消"
+      "cancel": "取消",
+      "add": "添加"
     },
-    "credentialLocalOnly": "凭据仅存本机",
     "allHealthy": "所有已添加的连接都正常",
     "moreComing": "更多连接随版本加入",
     "moreComingHint": "Slack、GitHub 在计划中",
@@ -2103,17 +2092,27 @@
       "atlassianDesc": "Jira 与 Confluence 的读写"
     },
     "builtin": {
-      "chrome": "Chrome 操控",
-      "chromeDesc": "让 AI 驱动浏览器抓取、填表、截图",
       "guiOperate": "GUI 操控",
-      "guiOperateDesc": "读写本机应用的窗口与控件",
-      "softwareDevelopment": "软件开发",
-      "softwareDevelopmentDesc": "代码生成、测试、重构工作区"
+      "guiOperateDesc": "读写本机应用的窗口与控件"
     },
     "summary": {
       "remote": "远端服务",
       "local": "本机 stdio"
     },
-    "signInStarted": "已在浏览器打开授权页，完成后此卡片会自动更新"
+    "signInStarted": "已在浏览器打开授权页，完成后此卡片会自动更新",
+    "transport": {
+      "remote": "远程",
+      "local": "本机"
+    },
+    "add": {
+      "title": "添加",
+      "hint": "粘贴 MCP 配置（mcpServers），一次一台。支持 stdio 与 url，${VAR} 会被展开。",
+      "multiServer": "这个片段含 {{count}} 台，请一次贴一台（名称就是 mcpServers 里那个键）"
+    },
+    "tab": {
+      "connect": "连接",
+      "skills": "技能云",
+      "plugins": "插件"
+    }
   }
 }

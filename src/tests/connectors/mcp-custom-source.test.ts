@@ -44,12 +44,12 @@ describe("buildCustomEntries", () => {
       key: "mcp:server:testn",
       serverName: "testn",
       source: "mcp-custom",
-      tab: "connect",
+      transport: "stdio",
     });
     // 用户自己起的名字没有 i18n key，直接用名字显示
     expect(entries[0].nameKey).toBe("testn");
     expect(entries[0].instances[0].status).toEqual({ kind: "idle" });
-    expect(entries[0].instances[0].transport).toBe("stdio");
+    expect(entries[0].transport).toBe("stdio");
   });
 
   it("ignores http servers — the remote source already owns them", () => {
@@ -85,7 +85,7 @@ describe("buildCustomEntries", () => {
   });
 
   it("excludes builtin preset names", () => {
-    const entries = buildCustomEntries(ctx([stdio("Chrome")]), []);
+    const entries = buildCustomEntries(ctx([stdio("GUI_Operate")]), []);
     expect(entries).toEqual([]);
   });
 

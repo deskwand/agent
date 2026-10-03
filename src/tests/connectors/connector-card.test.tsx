@@ -54,7 +54,6 @@ function withStatus(status: ConnectorStatus): ConnectorInstance {
     id: "notion",
     label: "notion",
     status,
-    transport: "http",
     summary: "connectors.summary.remote",
   };
 }
@@ -64,7 +63,7 @@ function entry(over: Partial<ConnectorEntry> = {}): ConnectorEntry {
     key: "mcp:catalog:notion",
     serverName: "notion",
     source: "mcp-remote",
-    tab: "connect",
+    transport: "http",
     nameKey: "connectors.catalog.notion",
     descriptionKey: "connectors.catalog.notionDesc",
     instances: [],
@@ -291,12 +290,12 @@ describe("远程服务卡片", () => {
 describe("本机能力卡片", () => {
   const capability = (instances: ConnectorInstance[] = []): ConnectorEntry =>
     entry({
-      key: "mcp:builtin:Chrome",
-      serverName: "Chrome",
+      key: "mcp:builtin:GUI_Operate",
+      serverName: "GUI_Operate",
       source: "mcp-builtin",
-      tab: "capability",
-      nameKey: "connectors.builtin.chrome",
-      descriptionKey: "connectors.builtin.chromeDesc",
+      transport: "stdio",
+      nameKey: "connectors.builtin.guiOperate",
+      descriptionKey: "connectors.builtin.guiOperateDesc",
       instances,
     });
 
@@ -304,7 +303,7 @@ describe("本机能力卡片", () => {
     // 回归：`disabled={!instance}` 让这个开关永远是灰的，
     // 而 registry 明明支持「先写进 mcp.json 再启用」。
     const h = handlers();
-    render(<ConnectorCard entry={capability()} variant="row" {...h} />);
+    render(<ConnectorCard entry={capability()} {...h} />);
 
     const sw = container.querySelector('[role="switch"]') as HTMLButtonElement;
     expect(sw).toBeDefined();
@@ -312,7 +311,7 @@ describe("本机能力卡片", () => {
 
     act(() => sw.click());
     // 传 serverName，不是 undefined
-    expect(h.onToggle).toHaveBeenCalledWith("Chrome", true);
+    expect(h.onToggle).toHaveBeenCalledWith("GUI_Operate", true);
   });
 
   it("已启用的预设，点一下关闭", () => {
@@ -321,20 +320,75 @@ describe("本机能力卡片", () => {
       <ConnectorCard
         entry={capability([
           {
-            id: "Chrome",
-            label: "Chrome",
+            id: "GUI_Operate",
+            label: "GUI_Operate",
             status: { kind: "ready" },
-            transport: "stdio",
             summary: "connectors.summary.local",
           },
         ])}
-        variant="row"
         {...h}
       />,
     );
     const sw = container.querySelector('[role="switch"]') as HTMLButtonElement;
     expect(sw.getAttribute("aria-checked")).toBe("true");
     act(() => sw.click());
-    expect(h.onToggle).toHaveBeenCalledWith("Chrome", false);
+    expect(h.onToggle).toHaveBeenCalledWith("GUI_Operate", false);
+  });
+});
+
+describe("传输徽标", () => {
+  const badgeText = () =>
+    container.querySelector('[data-testid="transport-badge"]')?.textContent;
+
+  it("远程条目标「远程」", () => {
+    render(<ConnectorCard entry={entry()} {...handlers()} />);
+    expect(badgeText()).toBe("connectors.transport.remote");
+  });
+
+  it("本机条目标「本机」", () => {
+    render(
+      <ConnectorCard
+        entry={entry({ source: "mcp-builtin", transport: "stdio" })}
+        {...handlers()}
+      />,
+    );
+    expect(badgeText()).toBe("connectors.transport.local");
+  });
+
+  it("未添加的条目也保留槽位", () => {
+    // instances 为空时徽标仍要在 —— 否则加入后整张卡片会变宽
+    render(
+      <ConnectorCard
+        entry={entry({
+          source: "mcp-builtin",
+          transport: "stdio",
+          instances: [],
+        })}
+        {...handlers()}
+      />,
+    );
+    expect(badgeText()).toBe("connectors.transport.local");
+  });
+});
+
+describe("状态行对齐", () => {
+  it("状态文字与名称/描述左对齐 —— 不留透明占位圆点", () => {
+    render(<ConnectorCard entry={entry()} {...handlers()} />);
+    const status = container.querySelector('[data-testid="card-status"]')!;
+    // 父元素里除了状态文字不该有别的子元素：那个占位圆点会把文字右推一格，
+    // 于是「未启用」看起来比名称和描述缩进（用户报过）。
+    expect(status.parentElement!.children.length).toBe(1);
+  });
+
+  it("状态用文字颜色表达，不再靠圆点", () => {
+    render(
+      <ConnectorCard
+        entry={entry({ instances: [withStatus({ kind: "ready" })] })}
+        {...handlers()}
+      />,
+    );
+    expect(
+      container.querySelector('[data-testid="card-status"]')!.className,
+    ).toContain("text-success");
   });
 });

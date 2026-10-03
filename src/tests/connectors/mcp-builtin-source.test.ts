@@ -18,46 +18,46 @@ function ctx(
 }
 
 const CHROME: McpServerEntry = {
-  name: "Chrome",
+  name: "GUI_Operate",
   config: { type: "stdio", command: "npx" },
   source: "test",
   scope: "global",
 };
 
 describe("BUILTIN_PRESETS", () => {
-  it("has exactly 3 entries", () => {
-    expect(BUILTIN_PRESETS).toHaveLength(3);
+  it("has exactly one entry", () => {
+    expect(BUILTIN_PRESETS).toHaveLength(1);
   });
 
   it("names are frozen — changing them breaks prompt cache", () => {
     const names = BUILTIN_PRESETS.map((p) => p.name).sort();
-    expect(names).toEqual(["Chrome", "GUI_Operate", "Software_Development"]);
+    expect(names).toEqual(["GUI_Operate"]);
   });
 });
 
 describe("buildBuiltinEntries", () => {
-  it("produces one entry per preset", () => {
-    expect(buildBuiltinEntries(ctx([]))).toHaveLength(3);
+  it("produces one entry for the single preset", () => {
+    expect(buildBuiltinEntries(ctx([]))).toHaveLength(1);
   });
 
-  it("every entry uses tab=capability and source=mcp-builtin", () => {
+  it("every entry uses transport=stdio and source=mcp-builtin", () => {
     for (const e of buildBuiltinEntries(ctx([]))) {
-      expect(e.tab).toBe("capability");
+      expect(e.transport).toBe("stdio");
       expect(e.source).toBe("mcp-builtin");
     }
   });
 
   it("a preset absent from mcp.json has empty instances", () => {
     const chrome = buildBuiltinEntries(ctx([])).find(
-      (e) => e.key === "mcp:builtin:Chrome",
+      (e) => e.key === "mcp:builtin:GUI_Operate",
     )!;
     expect(chrome.instances).toEqual([]);
   });
 
   it("a present preset gets one instance with the adapter status", () => {
     const chrome = buildBuiltinEntries(
-      ctx([CHROME], (n) => (n === "Chrome" ? { kind: "ready" } : undefined)),
-    ).find((e) => e.key === "mcp:builtin:Chrome")!;
+      ctx([CHROME], (n) => (n === "GUI_Operate" ? { kind: "ready" } : undefined)),
+    ).find((e) => e.key === "mcp:builtin:GUI_Operate")!;
     expect(chrome.instances).toHaveLength(1);
     expect(chrome.instances[0].status).toEqual({ kind: "ready" });
   });
@@ -69,13 +69,13 @@ describe("buildBuiltinEntries", () => {
     };
     const chrome = buildBuiltinEntries(
       ctx([disabled], () => ({ kind: "ready" })),
-    ).find((e) => e.key === "mcp:builtin:Chrome")!;
+    ).find((e) => e.key === "mcp:builtin:GUI_Operate")!;
     expect(chrome.instances[0].status).toEqual({ kind: "off" });
   });
 
   it("does not claim progress when present but the adapter has no state", () => {
     const chrome = buildBuiltinEntries(ctx([CHROME])).find(
-      (e) => e.key === "mcp:builtin:Chrome",
+      (e) => e.key === "mcp:builtin:GUI_Operate",
     )!;
     expect(chrome.instances[0].status).toEqual({ kind: "idle" });
   });

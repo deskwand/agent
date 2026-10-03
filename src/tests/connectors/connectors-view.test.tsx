@@ -30,6 +30,7 @@ const api = vi.hoisted(() => {
     cancelSignIn: vi.fn(),
     removeServer: vi.fn(),
     setEnabled: vi.fn(),
+    addCustomServer: vi.fn(),
     onStatusChanged: vi.fn(),
   };
   // ConnectorsView 在**模块作用域**读 window.electronAPI 决定 isElectron，
@@ -77,7 +78,6 @@ function instance(status: ConnectorStatus): ConnectorInstance {
     id: "notion",
     label: "notion",
     status,
-    transport: "http",
     summary: "connectors.summary.remote",
   };
 }
@@ -88,7 +88,7 @@ function notion(instances: ConnectorInstance[] = []): ConnectorEntry {
     key: "mcp:catalog:notion",
     serverName: "notion",
     source: "mcp-remote",
-    tab: "connect",
+    transport: "http",
     nameKey: "connectors.catalog.notion",
     descriptionKey: "connectors.catalog.notionDesc",
     instances,
@@ -287,5 +287,51 @@ describe("授权中断开", () => {
       signIn.resolve({ ok: false, error: "boom" });
     });
     expect(container.textContent).not.toContain(CONNECT_FAILED);
+  });
+});
+
+describe("「添加」接线", () => {
+  /** 弹窗里的确认按钮 —— 页头那个「添加」文案相同，必须限定在弹窗内找。 */
+  function confirmButton(): HTMLButtonElement {
+    const dialog = container
+      .querySelector('[data-testid="add-payload"]')!
+      .closest(".card") as HTMLElement;
+    return [...dialog.querySelectorAll("button")].find((b) =>
+      (b.textContent ?? "").includes("connectors.action.add"),
+    ) as HTMLButtonElement;
+  }
+
+  function typePayload(value: string): void {
+    const box = container.querySelector(
+      '[data-testid="add-payload"]',
+    ) as HTMLTextAreaElement;
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement.prototype,
+      "value",
+    )!.set!;
+    act(() => {
+      setter.call(box, value);
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  it("点「添加」打开弹窗，成功后重新拉列表", async () => {
+    api.addCustomServer.mockResolvedValue({ ok: true });
+    await mount();
+    expect(container.querySelector('[data-testid="add-payload"]')).toBeNull();
+
+    await act(async () => byKey("connectors.action.add")!.click());
+    expect(
+      container.querySelector('[data-testid="add-payload"]'),
+    ).not.toBeNull();
+
+    const listCallsBefore = api.list.mock.calls.length;
+    typePayload('{"mcpServers":{"my-tools":{"command":"npx"}}}');
+    await act(async () => confirmButton().click());
+
+    expect(api.addCustomServer).toHaveBeenCalledTimes(1);
+    // onAdded 必须真的去刷新 —— 「加上了但列表没变」是这类接线最容易漏的回归
+    expect(api.list.mock.calls.length).toBeGreaterThan(listCallsBefore);
+    expect(container.querySelector('[data-testid="add-payload"]')).toBeNull();
   });
 });

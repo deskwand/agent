@@ -2054,17 +2054,6 @@
   "connectors": {
     "title": "Connectors",
     "subtitle": "Connect external tools to DeskWand",
-    "tab": {
-      "connect": "Connectors",
-      "capability": "Capabilities",
-      "skills": "Skill cloud",
-      "plugins": "Plugins"
-    },
-    "filter": {
-      "all": "All",
-      "added": "Added",
-      "attention": "Needs attention"
-    },
     "status": {
       "ready": "Connected",
       "connecting": "Authorizing…",
@@ -2083,9 +2072,9 @@
       "retry": "Retry",
       "manage": "Manage",
       "inProgress": "Connecting…",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "add": "Add"
     },
-    "credentialLocalOnly": "Credentials stay on this device",
     "allHealthy": "Everything you added is working",
     "moreComing": "More connectors in future releases",
     "moreComingHint": "Slack and GitHub are planned",
@@ -2106,17 +2095,27 @@
       "atlassianDesc": "Read and write Jira and Confluence"
     },
     "builtin": {
-      "chrome": "Chrome control",
-      "chromeDesc": "Let the AI drive the browser to scrape, fill and capture",
       "guiOperate": "GUI control",
-      "guiOperateDesc": "Read and drive windows and controls of local apps",
-      "softwareDevelopment": "Software development",
-      "softwareDevelopmentDesc": "Code generation, testing and refactoring workspace"
+      "guiOperateDesc": "Read and drive windows and controls of local apps"
     },
     "summary": {
       "remote": "Remote service",
       "local": "Local stdio"
     },
-    "signInStarted": "Authorization page opened in your browser; this card updates when done"
+    "signInStarted": "Authorization page opened in your browser; this card updates when done",
+    "transport": {
+      "remote": "Remote",
+      "local": "Local"
+    },
+    "add": {
+      "title": "Add",
+      "hint": "Paste an MCP configuration (mcpServers), one server at a time. Supports stdio and url; ${VAR} is expanded.",
+      "multiServer": "This snippet contains {{count}} servers — paste one at a time (the name is the key under mcpServers)."
+    },
+    "tab": {
+      "connect": "Connectors",
+      "skills": "Skill cloud",
+      "plugins": "Plugins"
+    }
   }
 }

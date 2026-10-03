@@ -1,21 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ActionResult, ConnectorEntry } from "../../../shared/connectors";
+import { AddServerDialog } from "./AddServerDialog";
 import { ConnectorCard } from "./ConnectorCard";
 import { SettingsSkills } from "../settings/SettingsSkills";
 import { PiExtensionManagerView } from "../PiExtensionManagerView";
 
-type TabId = "connect" | "capability" | "skills" | "plugins";
-type FilterId = "all" | "added" | "attention";
+type TabId = "connect" | "skills" | "plugins";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
-
-/** 失败或待授权 —— 筛选条与「需处理」计数都用它。 */
-function needsAttention(entry: ConnectorEntry): boolean {
-  const kind = entry.instances[0]?.status.kind;
-  return kind === "failed" || kind === "needs-auth";
-}
 
 /** 用户主动取消不是失败：主进程用 cancelled 标记，界面不该报红。 */
 function isCancelled(res: ActionResult): boolean {
@@ -25,8 +19,8 @@ function isCancelled(res: ActionResult): boolean {
 export function ConnectorsView() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<TabId>("connect");
-  const [filter, setFilter] = useState<FilterId>("all");
   const [entries, setEntries] = useState<ConnectorEntry[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   /**
@@ -107,21 +101,13 @@ export function ConnectorsView() {
     });
   }, [refresh]);
 
-  const connectEntries = entries.filter((e) => e.tab === "connect");
-  const capabilityEntries = entries.filter((e) => e.tab === "capability");
-
-  const addedCount = connectEntries.filter(
-    (e) => e.instances.length > 0,
-  ).length;
-  const attentionCount = connectEntries.filter(needsAttention).length;
+  // 只有一个 MCP 列表 —— 条目不再带 tab（动作由 entry.transport 判定）
+  const connectEntries = entries;
 
   // 平铺 + 固定顺序（D12）：不按状态分组、已添加的不上浮。
-  // 顺序 = registry.list() 的返回序（目录顺序 + 用户自建排在其后）。
-  const shown = connectEntries.filter((e) => {
-    if (filter === "added") return e.instances.length > 0;
-    if (filter === "attention") return needsAttention(e);
-    return true;
-  });
+  // 顺序 = registry.list() 的返回序（目录 → 应用自带 → 用户自建）。
+  // 本轮去掉了筛选行（只剩「全部」不构成筛选），所以直接用全量。
+  const shown = connectEntries;
 
   const onConnect = useCallback(
     async (key: string) => {
@@ -235,7 +221,6 @@ export function ConnectorsView() {
 
   const tabs: Array<[TabId, string]> = [
     ["connect", t("connectors.tab.connect")],
-    ["capability", t("connectors.tab.capability")],
     ["skills", t("connectors.tab.skills")],
     ["plugins", t("connectors.tab.plugins")],
   ];
@@ -251,7 +236,7 @@ export function ConnectorsView() {
         </span>
       </div>
 
-      <div className="flex gap-0.5 px-5 pt-3 border-b border-border-muted flex-none">
+      <div className="flex items-center gap-0.5 px-5 pt-3 border-b border-border-muted flex-none">
         {tabs.map(([id, label]) => (
           <button
             key={id}
@@ -266,70 +251,42 @@ export function ConnectorsView() {
             {label}
           </button>
         ))}
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-5">
-        {error && (
-          <div className="mb-4 px-4 py-2.5 rounded-lg bg-error/10 text-error text-sm">
-            {error}
-          </div>
-        )}
-
-        {notice && (
-          <div className="mb-4 px-4 py-2.5 rounded-lg bg-surface-hover text-text-secondary text-sm">
-            {notice}
-          </div>
-        )}
-
+        {/* 「添加」只对 MCP 有意义，所以只在这一 tab 出现 —— 放在标签栏里，
+            它不再独占一行（原先列表上方多出一整行空白） */}
         {tab === "connect" && (
           <>
-            <div className="flex items-center gap-2 mb-3.5 flex-wrap">
-              <FilterChip
-                label={t("connectors.filter.all")}
-                count={connectEntries.length}
-                active={filter === "all"}
-                onClick={() => setFilter("all")}
-              />
-              <FilterChip
-                label={t("connectors.filter.added")}
-                count={addedCount}
-                active={filter === "added"}
-                onClick={() => setFilter("added")}
-              />
-              {attentionCount > 0 && (
-                <FilterChip
-                  label={t("connectors.filter.attention")}
-                  count={attentionCount}
-                  active={filter === "attention"}
-                  attention
-                  onClick={() => setFilter("attention")}
-                />
-              )}
-              <span className="flex-1" />
-              <span className="text-[11px] text-text-muted">
-                {t("connectors.credentialLocalOnly")}
-              </span>
-            </div>
+            <span className="flex-1" />
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="mb-1 px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
+            >
+              {t("connectors.action.add")}
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* 外层相对定位：报错/提示用**浮层**呈现 —— 既不会留一片永久空白
+          （固定槽位试过，用户否掉了），也不会在出现时把整个列表推下去。 */}
+      <div className="flex-1 relative min-h-0">
+        {(error || notice) && (
+          <div
+            role={error ? "alert" : "status"}
+            className={`absolute top-3 left-5 right-5 z-10 px-4 py-2.5 rounded-lg shadow-elevated text-sm ${
+              error ? "bg-error/10 text-error" : "bg-surface-hover text-text-secondary"
+            }`}
+          >
+            {error || notice}
+          </div>
+        )}
+        <div className="h-full overflow-y-auto p-5">
+        {tab === "connect" && (
+          <>
 
             {shown.length === 0 ? (
               <div className="py-10 text-center text-sm text-text-muted border border-dashed border-border-muted rounded-container">
                 {t("connectors.allHealthy")}
-              </div>
-            ) : filter === "added" ? (
-              <div className="flex flex-col gap-2">
-                {shown.map((entry) => (
-                  <ConnectorCard
-                    key={entry.key}
-                    entry={entry}
-                    variant="row"
-                    authorizing={authPending[entry.serverName] === true}
-                    onConnect={onConnect}
-                    onDisconnect={onDisconnect}
-                    onAuthorize={onAuthorize}
-                    onCancel={onCancel}
-                    onToggle={onToggle}
-                  />
-                ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -351,61 +308,17 @@ export function ConnectorsView() {
           </>
         )}
 
-        {tab === "capability" && (
-          <div className="flex flex-col gap-2.5">
-            {capabilityEntries.map((entry) => (
-              <ConnectorCard
-                key={entry.key}
-                entry={entry}
-                variant="row"
-                authorizing={authPending[entry.serverName] === true}
-                onConnect={onConnect}
-                onDisconnect={onDisconnect}
-                onAuthorize={onAuthorize}
-                onCancel={onCancel}
-                onToggle={onToggle}
-              />
-            ))}
-          </div>
-        )}
-
-        {tab === "skills" && <SettingsSkills isActive={true} />}
-        {tab === "plugins" && <PiExtensionManagerView />}
+          {tab === "skills" && <SettingsSkills isActive={true} />}
+          {tab === "plugins" && <PiExtensionManagerView />}
+        </div>
       </div>
+
+      <AddServerDialog
+        isOpen={addOpen}
+        onClose={() => setAddOpen(false)}
+        onAdded={() => void refresh()}
+      />
     </div>
-  );
-}
-
-function FilterChip({
-  label,
-  count,
-  active,
-  attention,
-  onClick,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  attention?: boolean;
-  onClick: () => void;
-}) {
-  const tone = attention
-    ? active
-      ? "bg-warning/20 text-warning border-transparent font-semibold"
-      : "text-warning border-border-muted"
-    : active
-      ? "bg-accent-muted text-accent border-transparent font-semibold"
-      : "text-text-secondary border-border-muted hover:text-text-primary";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`text-xs px-3 py-1 rounded-full border inline-flex items-center gap-1.5 transition-colors ${tone}`}
-    >
-      {label}
-      <span className="text-[11px] opacity-75">{count}</span>
-    </button>
   );
 }
 

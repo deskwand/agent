@@ -1,7 +1,8 @@
 /**
- * 本机能力来源：三个内置预设 × mcp.json × 运行状态。
+ * 应用自带 MCP server 来源：预设 × mcp.json × 运行状态。
  *
- * 产出 `tab: "capability"` 的条目，卡片画开关而不是「连接」按钮。
+ * 现在只剩 `GUI_Operate` 一个（`Chrome` 与示例 server 已下架），产出 `transport: "stdio"`
+ * 的条目 —— 卡片画开关而不是「连接」按钮。
  *
  * ⚠️ **预设名字不可改**：工具名是 `mcp__<server>__<tool>`，改名字会变更工具声明，
  * 破坏提示词缓存并让老会话的工具调用记录对不上（本仓 AGENTS.md 明令）。
@@ -25,19 +26,9 @@ interface BuiltinPreset {
 
 export const BUILTIN_PRESETS: readonly BuiltinPreset[] = [
   {
-    name: "Chrome",
-    nameKey: "connectors.builtin.chrome",
-    descriptionKey: "connectors.builtin.chromeDesc",
-  },
-  {
     name: "GUI_Operate",
     nameKey: "connectors.builtin.guiOperate",
     descriptionKey: "connectors.builtin.guiOperateDesc",
-  },
-  {
-    name: "Software_Development",
-    nameKey: "connectors.builtin.softwareDevelopment",
-    descriptionKey: "connectors.builtin.softwareDevelopmentDesc",
   },
 ] as const;
 
@@ -51,7 +42,7 @@ export function buildBuiltinEntries(ctx: SourceBuildContext): ConnectorEntry[] {
       key: `mcp:builtin:${preset.name}`,
       serverName: preset.name,
       source: "mcp-builtin",
-      tab: "capability",
+      transport: "stdio",
       nameKey: preset.nameKey,
       descriptionKey: preset.descriptionKey,
       instances: server
@@ -65,7 +56,6 @@ export function buildBuiltinEntries(ctx: SourceBuildContext): ConnectorEntry[] {
                   ? ({ kind: "off" } as ConnectorStatus)
                   : (ctx.statusFor(preset.name) ?? { kind: "idle" }),
               summary: SERVER_SUMMARY_LOCAL,
-              transport: "stdio",
             },
           ]
         : [],

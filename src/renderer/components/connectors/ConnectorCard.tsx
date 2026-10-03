@@ -6,8 +6,6 @@ import type {
 
 interface Props {
   entry: ConnectorEntry;
-  /** "grid" 是发现视图（卡片），"row" 是管理视图（紧凑行）。见设计文档 D12。 */
-  variant?: "grid" | "row";
   /**
    * 本地正在等这次授权（IPC 还没返回）。它优先于传输状态：
    * 传输层此时可能什么都还没发生，但用户刚点了「连接/重新授权」，
@@ -23,22 +21,26 @@ interface Props {
   onToggle: (instanceId: string, enabled: boolean) => void;
 }
 
-function dotClass(kind: ConnectorInstance["status"]["kind"]): string {
+/**
+ * 状态颜色 —— 原先是一个彩色圆点，但圆点要么占位（让「未启用」比名称多缩进一格，
+ * 显得没对齐）、要么只在有状态时才出现（那又会让各行文字左右不齐）。
+ * 改成给**状态文字本身**上色：信息保留，缩进与对齐都正常。
+ */
+function statusTextClass(kind: ConnectorInstance["status"]["kind"]): string {
   switch (kind) {
     case "ready":
-      return "bg-success";
-    case "idle":
-      return "bg-text-muted";
+      return "text-success";
     case "authorized":
-      return "bg-success/60";
+      return "text-success/80";
     case "connecting":
-      return "bg-accent animate-pulse";
+      return "text-accent";
     case "needs-auth":
-      return "bg-warning";
+      return "text-warning";
     case "failed":
-      return "bg-error";
+      return "text-error";
+    case "idle":
     case "off":
-      return "bg-text-muted";
+      return "text-text-muted";
   }
 }
 
@@ -67,7 +69,6 @@ function statusText(
 
 export function ConnectorCard({
   entry,
-  variant = "grid",
   authorizing = false,
   onConnect,
   onDisconnect,
@@ -77,8 +78,10 @@ export function ConnectorCard({
 }: Props) {
   const { t } = useTranslation();
   const instance = entry.instances[0];
-  const isCapability = entry.tab === "capability";
-  const isRow = variant === "row";
+  // 本机（stdio）卡片画开关，远程（http）画连接/断开。
+  // 判据用 **entry 级** 的 transport —— 未添加的内置条目 instances 为空，
+  // 那时也要画对动作。
+  const isCapability = entry.transport === "stdio";
   /** 没有实例 = 还没添加过，视为关闭；开关照样可点。 */
   const capabilityOn = !!instance && instance.status.kind !== "off";
   const name = t(entry.nameKey);
@@ -91,21 +94,38 @@ export function ConnectorCard({
   const statusLabel = authorizing
     ? t("connectors.status.connecting")
     : instanceStatus;
-  const dotKind = authorizing ? "connecting" : instance?.status.kind;
+  const statusKind = authorizing ? "connecting" : (instance?.status.kind ?? "off");
 
-  const statusLine = isCapability ? (
-    <span className="text-xs text-text-secondary">{instanceStatus}</span>
-  ) : (
-    <span className="flex items-center gap-1.5 text-xs text-text-secondary min-w-0">
-      {dotKind && (
-        <span
-          className={`w-1.5 h-1.5 rounded-full flex-none ${dotClass(dotKind)}`}
-        />
-      )}
-      <span className="truncate">{statusLabel}</span>
+  // 状态行固定高度（不跳动），但**不留透明占位圆点** —— 那会让「未启用」比名称和描述
+  // 多缩进一格，看上去没对齐。状态文字直接与名称/描述左对齐；状态本身用文字表达。
+  const statusLine = (
+    <span className="flex items-center h-4 text-xs min-w-0">
+      <span
+        className={`truncate ${statusTextClass(statusKind)}`}
+        data-testid="card-status"
+      >
+        {isCapability ? instanceStatus : statusLabel}
+      </span>
     </span>
   );
 
+  /** 传输标记 —— 固定宽度且**永不条件渲染**，替代被删掉的「本机能力」tab 的区分作用。 */
+  const transportBadge = (
+    <span
+      data-testid="transport-badge"
+      className="flex-none w-[34px] text-center text-[10px] leading-4 rounded-sm border border-border-muted text-text-muted"
+    >
+      {t(
+        entry.transport === "stdio"
+          ? "connectors.transport.local"
+          : "connectors.transport.remote",
+      )}
+    </span>
+  );
+
+  // stdio（本机进程）只给「启用/停用」：**「连接」是 OAuth 授权**，用在 stdio 上必报
+  // `not a remote server`；**「断开」会从 mcp.json 删掉配置** —— 对目录条目可接受
+  // （能一键加回），对手写的自定义 server 是不可恢复的删除。
   const actions = isCapability ? (
     <button
       type="button"
@@ -138,43 +158,17 @@ export function ConnectorCard({
 
   /**
    * 动作组包一层，多个按钮从此不可拆。
-   * grid 卡里它进标题行右侧，与状态文字不在同一个容器 —— 否则任何
-   * 「两端对齐」的容器都会把按钮甩到卡片正中（见设计文档 P3）。
-   * row 形态不加包裹，DOM 与改版前逐字一致。
+   * 它进标题行右侧，与状态文字不在同一个容器 —— 否则任何「两端对齐」的容器
+   * 都会把按钮甩到卡片正中（见设计文档 P3）。
    */
-  const actionGroup = isRow ? (
-    actions
-  ) : (
-    <div className="flex items-center gap-2 flex-none">{actions}</div>
+  // **动作槽位固定宽度**：动作本身有宽有窄（「连接/断开」≈46px、开关 34px），
+  // 而徽标紧挨在它左边 —— 槽位不固定的话，徽标会随动作宽度左右漂 12px，
+  // 同一列里「远程」与「本机」就对不齐（用户报过）。
+  const actionGroup = (
+    <div className="flex items-center justify-end flex-none w-[52px]">
+      {actions}
+    </div>
   );
-
-  // row：管理视图（「已添加」筛选 / 本机能力 tab）。结构刻意与改版前逐字一致 ——
-  // src/tests/connectors/connectors-e2e.test.ts 按源码文本断言 t(instance.summary)。
-  if (isRow) {
-    return (
-      <div className="bg-surface border border-border-muted rounded-lg px-3.5 py-3 flex items-center gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="w-7 h-7 text-xs rounded-lg bg-accent-muted text-accent grid place-items-center font-bold flex-none">
-            {name.slice(0, 1).toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-text-primary">
-              {name}
-            </div>
-            {instance && (
-              <div className="text-xs text-text-muted mt-0.5 truncate">
-                {t(instance.summary)}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-3 flex-none">
-          {!isCapability && statusLine}
-          {actionGroup}
-        </div>
-      </div>
-    );
-  }
 
   // grid：发现视图。名称与动作同一行，说明与状态在内容列里各占一行。
   return (
@@ -183,17 +177,17 @@ export function ConnectorCard({
         {name.slice(0, 1).toUpperCase()}
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 h-5">
           <div className="text-sm font-semibold text-text-primary flex-1 min-w-0 truncate">
             {name}
           </div>
+          {transportBadge}
           {actionGroup}
         </div>
-        {entry.descriptionKey && (
-          <div className="text-xs text-text-muted line-clamp-2">
-            {t(entry.descriptionKey)}
-          </div>
-        )}
+        {/* 单行截断 + 固定高度：多行会让同排卡片高度不齐，状态一变就跳 */}
+        <div className="h-4 text-xs text-text-muted truncate">
+          {entry.descriptionKey ? t(entry.descriptionKey) : ""}
+        </div>
         {statusLine}
       </div>
     </div>
@@ -214,31 +208,6 @@ function renderAction(
   },
 ) {
   // **stdio（本机进程）只给「启用/停用」**，不给「连接/断开」：
-  // 「连接」= OAuth 授权，用在 stdio 上必报 `not a remote server`；
-  // 「断开」= 从 mcp.json **删掉**这条配置 —— 对目录条目可接受（能一键加回），
-  // 对手写的自定义 server 是**不可恢复的删除**。两者都不是它该有的动作。
-  if (instance?.transport === "stdio") {
-    const enabled = instance.status.kind !== "off";
-    return (
-      <button
-        type="button"
-        role="switch"
-        aria-checked={enabled}
-        aria-label={t(entry.nameKey)}
-        onClick={() => handlers.onToggle(instance.id, !enabled)}
-        className={`w-[34px] h-5 rounded-full relative transition-colors flex-none ${
-          enabled ? "bg-accent" : "bg-surface-active"
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-            enabled ? "left-[18px]" : "left-0.5"
-          }`}
-        />
-      </button>
-    );
-  }
-
   const primary =
     "px-2.5 py-1 text-xs rounded-control bg-accent text-white hover:bg-accent-hover transition-colors";
   const ghost =

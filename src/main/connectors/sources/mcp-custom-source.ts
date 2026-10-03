@@ -37,7 +37,7 @@ export function buildCustomEntries(
         key: `mcp:server:${server.name}`,
         serverName: server.name,
         source: "mcp-custom" as const,
-        tab: "connect" as const,
+        transport: "stdio" as const,
         // 自定义 server 没有 i18n key —— 直接用名字（t() 查不到时原样返回）。
         nameKey: server.name,
         instances: [
@@ -51,8 +51,7 @@ export function buildCustomEntries(
                 : (ctx.statusFor(server.name) ?? { kind: "idle" }),
             summary: SERVER_SUMMARY_LOCAL,
             // 本来源只剩 stdio（http 在 remote 来源里）—— 所以动作是启用/停用
-            transport: "stdio",
-          },
+            },
         ],
       }))
   );
