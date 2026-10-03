@@ -123,6 +123,25 @@ function customEntry(name: string): ConnectorEntry {
   };
 }
 
+function builtinEntry(name = "GUI_Operate"): ConnectorEntry {
+  return {
+    key: `mcp:builtin:${name}`,
+    serverName: name,
+    source: "mcp-builtin",
+    transport: "stdio",
+    nameKey: "connectors.builtin.computerUse",
+    descriptionKey: "connectors.builtin.computerUseDesc",
+    instances: [
+      {
+        id: name,
+        label: name,
+        status: { kind: "off" },
+        summary: "connectors.summary.local",
+      },
+    ],
+  };
+}
+
 async function clickChip(category: string): Promise<void> {
   const chip = [
     ...container.querySelectorAll('[data-testid="category-chip"]'),
@@ -444,5 +463,23 @@ describe("按分类分段与筛选", () => {
     await mount();
     const toolbar = container.querySelector('[data-testid="catalog-toolbar"]')!;
     expect(toolbar.textContent).toContain("connectors.action.add");
+  });
+
+  it("never renders built-in capabilities on the connectors page", async () => {
+    // 它们住在设置的「能力」里 —— 这一页只装外部服务。
+    entries = [catalogEntry("notion", "collab"), builtinEntry()];
+    await mount();
+    expect(container.textContent).toContain("connectors.catalog.notion");
+    expect(container.textContent).not.toContain(
+      "connectors.builtin.computerUse",
+    );
+  });
+
+  it("excludes built-in capabilities from the all chip count", async () => {
+    entries = [catalogEntry("notion", "collab"), builtinEntry()];
+    await mount();
+    const all = container.querySelector('[data-category="all"]')!;
+    expect(all.textContent).toContain("1");
+    expect(all.textContent).not.toContain("2");
   });
 });

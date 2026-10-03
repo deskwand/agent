@@ -6,6 +6,7 @@ import {
   Shield,
   Wifi,
   AlertCircle,
+  Cpu,
   Globe,
   ChevronRight,
   BrainCircuit,
@@ -20,6 +21,7 @@ import { SettingsAPI } from "./settings/SettingsAPI";
 import { SubagentSettings } from "./settings/SubagentSettings";
 import { SettingsSandbox } from "./settings/SettingsSandbox";
 import { SettingsGeneral } from "./settings/SettingsGeneral";
+import { SettingsCapabilities } from "./settings/SettingsCapabilities";
 import { SettingsLogs } from "./settings/SettingsLogs";
 import { SettingsPersonalization } from "./settings/SettingsPersonalization";
 import { SettingsArchived } from "./settings/SettingsArchived";
@@ -28,6 +30,7 @@ import { SettingsAbout } from "./settings/SettingsAbout";
 interface SettingsPanelProps {
   onClose: () => void;
   initialTab?:
+    | "capabilities"
     | "api"
     | "subagent"
     | "sandbox"
@@ -40,6 +43,7 @@ interface SettingsPanelProps {
 }
 
 type TabId =
+  | "capabilities"
   | "api"
   | "subagent"
   | "sandbox"
@@ -53,6 +57,7 @@ type TabId =
 const SHOW_SANDBOX_TAB = false;
 
 const VALID_TABS = new Set<TabId>([
+  "capabilities",
   "api",
   "subagent",
   ...(SHOW_SANDBOX_TAB ? (["sandbox"] as TabId[]) : []),
@@ -117,6 +122,12 @@ export function SettingsPanel({
       label: t("settings.general"),
       icon: Globe,
       description: t("settings.generalDesc"),
+    },
+    {
+      id: "capabilities" as TabId,
+      label: t("settings.capabilitiesTitle"),
+      icon: Cpu,
+      description: t("settings.capabilitiesDesc"),
     },
     {
       id: "api" as TabId,
@@ -297,6 +308,13 @@ export function SettingsPanel({
               </div>
               <div className={activeTab === "general" ? "" : "hidden"}>
                 {viewedTabs.has("general") && <SettingsGeneral />}
+              </div>
+              <div className={activeTab === "capabilities" ? "" : "hidden"}>
+                {viewedTabs.has("capabilities") && (
+                  <SettingsCapabilities
+                    isActive={activeTab === "capabilities"}
+                  />
+                )}
               </div>
               <div className={activeTab === "archived" ? "" : "hidden"}>
                 {viewedTabs.has("archived") && <SettingsArchived />}

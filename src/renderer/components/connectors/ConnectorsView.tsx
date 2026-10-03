@@ -115,8 +115,12 @@ export function ConnectorsView() {
     });
   }, [refresh]);
 
-  // 只有一个 MCP 列表 —— 条目不再带 tab（动作由 entry.transport 判定）
-  const connectEntries = entries;
+  // 连接页只装**外部服务**（目录条目 + 用户自建）。应用自带的能力（Computer Use）
+  // 住在设置的「能力」里 —— 它的数据仍由 registry.list() 产出，只是不在这里渲染。
+  // 若将来有第三个页面读这份列表，那就该把能力拆成独立的 IPC（见设计文档 §3.1）。
+  const connectEntries = entries.filter(
+    (entry) => entry.source !== "mcp-builtin",
+  );
 
   // 顺序 = registry.list() 的返回序（目录 → 应用自带 → 用户自建），
   // 但展示时按分类分段：段序由 CATEGORY_ORDER 决定，`other`（用户自建）永远在最后。

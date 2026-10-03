@@ -85,7 +85,27 @@
     "about": "About",
     "aboutDesc": "Version & updates",
     "tools": "Tools",
-    "toolsDesc": "Configure built-in agent tools"
+    "toolsDesc": "Configure built-in agent tools",
+    "capabilitiesTitle": "Capabilities",
+    "capabilitiesDesc": "Capabilities that ship with the app and need system permissions",
+    "capabilitiesIntro": "Capabilities that ship with the app. When on, they load with your sessions.",
+    "capabilities": {
+      "statusOn": "Enabled",
+      "statusOff": "Disabled",
+      "pendingActivation": "Takes effect in your next chat",
+      "permission": {
+        "title": "System permissions required",
+        "accessibility": "Accessibility",
+        "accessibilityHint": "Not granted: cannot control the pointer or read UI elements",
+        "screen-recording": "Screen recording",
+        "screen-recordingHint": "Not granted: cannot take screenshots",
+        "screenRecordingRestart": "After granting it in System Settings, restart the app",
+        "openSettings": "Open System Settings",
+        "recheck": "Check again"
+      },
+      "loadFailed": "Could not load capabilities",
+      "actionFailed": "Could not change this capability"
+    }
   },
   "webAccess": {
     "groupTitle": "Web Access",
@@ -2166,7 +2186,7 @@
       "business": "Business",
       "ai": "AI & research",
       "life": "Life",
-      "other": "Other"
+      "other": "Yours"
     },
     "tab": {
       "connect": "Connectors",

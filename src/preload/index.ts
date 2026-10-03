@@ -25,6 +25,10 @@ import type {
   AddCustomServerInput,
   ConnectorEntry,
 } from "../shared/connectors";
+import type {
+  CapabilityPermissions,
+  PermissionKind,
+} from "../shared/capabilities";
 import type { ElementSelection, PickerStartResult } from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
 import type {
@@ -441,6 +445,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
       return () =>
         ipcRenderer.removeListener("connectors.statusChanged", handler);
     },
+  },
+  capabilities: {
+    permissions: (): Promise<CapabilityPermissions> =>
+      ipcRenderer.invoke("capabilities.permissions"),
+    openPermissionSettings: (kind: PermissionKind): Promise<void> =>
+      ipcRenderer.invoke("capabilities.openPermissionSettings", kind),
   },
 
   // Skills methods
@@ -990,6 +1000,10 @@ declare global {
         cancelSignIn: (name: string) => Promise<ActionResult>;
         addCustomServer: (input: AddCustomServerInput) => Promise<ActionResult>;
         onStatusChanged: (cb: () => void) => () => void;
+      };
+      capabilities: {
+        permissions: () => Promise<CapabilityPermissions>;
+        openPermissionSettings: (kind: PermissionKind) => Promise<void>;
       };
       skills: {
         getAll: () => Promise<Skill[]>;

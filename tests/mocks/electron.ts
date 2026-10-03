@@ -107,6 +107,12 @@ export const shell = {
   showItemInFolder: noop,
 };
 
+export const systemPreferences = {
+  // 默认「已授予」：需要未授予分支的测试在自己的用例里 mock 掉。
+  isTrustedAccessibilityClient: () => true,
+  getMediaAccessStatus: () => 'granted' as const,
+};
+
 export const nativeTheme = {
   shouldUseDarkColors: false,
   themeSource: 'light',
@@ -142,6 +148,7 @@ const electron = {
   ipcRenderer,
   dialog,
   shell,
+  systemPreferences,
   nativeTheme,
   Menu,
   BrowserWindow,

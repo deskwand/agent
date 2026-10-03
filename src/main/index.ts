@@ -113,6 +113,7 @@ import {
   setMcpAgentDir,
 } from "./mcp/mcp-client-extension";
 import { registerConnectorsIpc } from "./connectors";
+import { registerCapabilitiesIpc } from "./capabilities";
 import { initStatusStore } from "./connectors/status-store";
 import { mcpToolsSnapshotStatusSource } from "./mcp/mcp-status-source";
 import { getSandboxAdapter, shutdownSandbox } from "./sandbox/sandbox-adapter";
@@ -2873,6 +2874,9 @@ registerConnectorsIpc({
   },
   activateMcpServer: (name, config) => activateDeskwandMcpServer(name, config),
 });
+
+// 能力的 IPC：目前只有 Computer Use 的 macOS 权限查询与跳转系统设置。
+registerCapabilitiesIpc({ ipcMain, openUrl: openExternalUrl });
 
 // Skills API handlers
 ipcMain.handle("skills.getAll", async () => {

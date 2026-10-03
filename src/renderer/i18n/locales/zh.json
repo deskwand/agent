@@ -85,7 +85,27 @@
     "about": "关于",
     "aboutDesc": "版本与更新",
     "tools": "工具",
-    "toolsDesc": "配置内置智能体工具"
+    "toolsDesc": "配置内置智能体工具",
+    "capabilitiesTitle": "能力",
+    "capabilitiesDesc": "应用自带、需要系统权限的能力",
+    "capabilitiesIntro": "应用自带的能力。开启后该能力会随会话加载。",
+    "capabilities": {
+      "statusOn": "已启用",
+      "statusOff": "已停用",
+      "pendingActivation": "下次对话生效",
+      "permission": {
+        "title": "需要系统权限",
+        "accessibility": "辅助功能",
+        "accessibilityHint": "未授予：无法控制鼠标键盘、读取界面元素",
+        "screen-recording": "屏幕录制",
+        "screen-recordingHint": "未授予：无法截图",
+        "screenRecordingRestart": "在系统设置中授予后，需重启应用才生效",
+        "openSettings": "打开系统设置",
+        "recheck": "重新检查"
+      },
+      "loadFailed": "加载能力失败",
+      "actionFailed": "操作失败"
+    }
   },
   "webAccess": {
     "groupTitle": "网络访问",
@@ -2163,7 +2183,7 @@
       "business": "商务与增长",
       "ai": "AI 与检索",
       "life": "生活",
-      "other": "其他"
+      "other": "自建服务"
     },
     "tab": {
       "connect": "连接",
