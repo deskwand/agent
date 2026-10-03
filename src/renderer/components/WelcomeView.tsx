@@ -489,6 +489,9 @@ export function WelcomeView() {
           onToggleExpand={() => setIsInputExpanded((v) => !v)}
           onContentChange={setHasInputContent}
           onAttachmentsChange={handleAttachmentsChange}
+          // 与 ChatView 一致：录音期间编辑器只读、提交被拦。门禁在 ChatInput 自身，
+          // 这里传是为了界面也对得上（只读 + 发送键置灰）。
+          voiceRecording={voice.status === "recording"}
           slashMenuDirection="down"
           placeholder={
             showConnectCards
@@ -575,6 +578,7 @@ export function WelcomeView() {
                 canStop={false}
                 onStop={() => {}}
                 isSubmitting={isSubmitting}
+                submitDisabled={voice.status === "recording"}
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}

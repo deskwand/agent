@@ -75,7 +75,7 @@ export interface LocalEngineOptions {
 
 export class LocalTranscriptionEngine implements TranscriptionEngine {
   /**
-   * 建一次就复用。这一步把模型读进内存（实测 743ms），而它曾经在
+   * 建一次就复用。这一步把模型读进内存（实测约 2.2s），而它曾经在
    * `createStream()` 里 —— 每条录音都会调一次，于是每按一次麦克风都重付一遍。
    * 识别状态跟着 stream 走，所以 stream 仍要每条会话新建，recognizer 不必。
    */

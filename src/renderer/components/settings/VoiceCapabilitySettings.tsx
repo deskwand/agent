@@ -83,9 +83,10 @@ export function VoiceCapabilitySettings() {
   const remove = async () => {
     setRemoving(true);
     try {
-      await window.electronAPI?.voice.removeInstall();
-      // 事件比 invoke 回包可能晚到，先本地落定，避免闪一下「已安装」。
-      setInstall({ phase: "idle", percent: 0, installed: false });
+      const result = await window.electronAPI?.voice.removeInstall();
+      // 只在真删掉时才本地落定。删失败（Windows 上原生模型文件被映射占用）时
+      // 留着原状态，否则界面会声称「已删除」而磁盘上还在。
+      if (result?.ok) setInstall({ phase: "idle", percent: 0, installed: false });
     } finally {
       setRemoving(false);
     }

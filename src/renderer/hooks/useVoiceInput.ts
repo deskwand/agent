@@ -79,10 +79,11 @@ export const VOICE_MESSAGE_KEYS: Record<VoiceErrorCode, string> = {
 };
 
 /**
- * 会话建好之前最多缓存多少音频。2 秒足够覆盖引擎冷启动与首次权限弹窗，
+ * 会话建好之前最多缓存多少音频。4 秒 = 冷启动实测约 2.2~2.4s 留一倍余量
+ * （早期版本按当时估的「~700ms」定了 2 秒，首次按下会把尾巴截掉）。
  * 再多就是在为一个不该持续那么久的状态占内存。
  */
-const MAX_PENDING_BYTES = 16000 * 2 * 2;
+const MAX_PENDING_BYTES = 16000 * 2 * 4;
 
 export function useVoiceInput(
   options: UseVoiceInputOptions,
@@ -97,6 +98,14 @@ export function useVoiceInput(
   const sessionRef = useRef<string | null>(null);
   const captureRef = useRef<MicCapture | null>(null);
   const snapshotRef = useRef("");
+  /**
+   * 每次 `start()` 取一次当前值，`cancel()` 递增它来作废「还在半路上」的那次 start()。
+   *
+   * 没有它的话，`requesting` 期间按 Esc 会两头落空：cancel() 手里 `sessionRef` 与
+   * `captureRef` 都还是 null（两者要等 await 回来才赋值），所以它只能什么都不做；
+   * 而那次 start() 接着跑完，把会话装好 —— 录音自己复活，文字继续往输入框里写。
+   */
+  const attemptRef = useRef(0);
   /** 会话建好之前采到的帧，按序保存。上限见 MAX_PENDING_BYTES。 */
   const pendingRef = useRef<{ frames: ArrayBuffer[]; bytes: number }>({
     frames: [],
@@ -132,6 +141,7 @@ export function useVoiceInput(
     sessionRef.current = null;
     clearPending();
     setStatus("requesting");
+    const attempt = attemptRef.current;
     const snapshot = getSnapshot();
 
     let capture: MicCapture;
@@ -145,7 +155,7 @@ export function useVoiceInput(
         ) as ArrayBuffer;
         const sessionId = sessionRef.current;
         if (!sessionId) {
-          // 会话还没建好（引擎冷启动 ~700ms，首次还要过权限弹窗）。
+          // 会话还没建好（首次要加载 162MB 模型，实测 2.2~2.4s；首次还要过权限弹窗）。
           // 先存着，建好后冲进去 —— 本地方案不要那 200ms 门槛就是为了不切字，
           // 把这段丢掉等于把当初否掉的东西又加了回来。
           const pending = pendingRef.current;
@@ -166,6 +176,12 @@ export function useVoiceInput(
       return;
     }
 
+    // 取消发生在「拿麦克风」的过程中：会话压根别建。
+    if (attempt !== attemptRef.current) {
+      capture.stop();
+      return;
+    }
+
     // handler 抛错会让 invoke 直接 reject。不接住的话状态会卡在 "requesting"，
     // 而 requesting 下麦克风按钮是禁用的 —— 用户只能重开窗口。
     // 转成同形状的失败结果，后面的清理路径就能照常跑（含 capture.stop()）。
@@ -178,6 +194,13 @@ export function useVoiceInput(
       clearPending();
       onError(started.code);
       setStatus("idle");
+      return;
+    }
+
+    // 取消发生在「建会话」的过程中：把刚建好的会话收掉，别让它复活成一次录音。
+    if (attempt !== attemptRef.current) {
+      void api.cancel(started.sessionId);
+      capture.stop();
       return;
     }
 
@@ -203,14 +226,26 @@ export function useVoiceInput(
     setStatus("finishing");
     captureRef.current?.stop();
     captureRef.current = null;
-    await api.stop(sessionId);
-  }, []);
+    // 收尾失败不能把状态留在 finishing —— 那个态下麦克风按钮是禁用的，
+    // 用户除了重开窗口没别的出路。与上面 `voice.start` 被拒同一类问题。
+    try {
+      await api.stop(sessionId);
+    } catch (error) {
+      console.error("[voice] voice.stop rejected:", error);
+      optionsRef.current.onError("VOICE_ENGINE_FAILED");
+      teardown();
+    }
+  }, [teardown]);
 
   const cancel = useCallback(async () => {
-    const sessionId = sessionRef.current;
-    window.electronAPI?.voice.cancel(sessionId ?? "");
+    // 作废还在半路上的 start()，否则它会把这次取消掉的录音装回来。
+    attemptRef.current += 1;
+    const hadSession = sessionRef.current !== null;
+    window.electronAPI?.voice.cancel(sessionRef.current ?? "");
     sessionRef.current = null;
-    optionsRef.current.onRestore(snapshotRef.current);
+    // 只有真的开始过才回滚：requesting 期间被取消时，输入框里是用户自己的草稿，
+    // 而快照还是初始的空串 —— 回滚等于替他清空。
+    if (hadSession) optionsRef.current.onRestore(snapshotRef.current);
     setVoiceText("");
     teardown();
   }, [teardown]);

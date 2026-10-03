@@ -85,9 +85,9 @@ export function registerVoiceIpc({
   /**
    * 引擎（连同它内部的 recognizer）只构造一次，之后所有会话共用。
    *
-   * 真正的冷启动代价（743ms，见设计文档 §3.3）不在构造函数里，而在**第一次**
+   * 真正的冷启动代价（读 162MB 模型，实测约 2.2s）不在构造函数里，而在**第一次**
    * `createStream()` —— 那一步才把模型读进内存。所以必须让这个实例活到进程结束；
-   * 重建它就会把每条录音的延迟打回 743ms。
+   * 重建它就会把每条录音的延迟打回两秒多。
    */
   let engine: LocalTranscriptionEngine | null = null;
 
@@ -247,7 +247,22 @@ export function registerVoiceIpc({
 
   ipcMain.handle("voice.removeInstall", async () => {
     engine = null;
-    await removeVoice(userDataPath);
+    try {
+      await removeVoice(userDataPath);
+    } catch (error) {
+      // Windows 上删不掉正被原生 addon 映射着的模型文件（内存映射占用）。
+      // 不接住的话渲染侧的 await 直接 reject，设置页停在「已安装」，而目录可能
+      // 只删了一半 —— 用户既用不了也删不掉。所以返回失败形态，并把**真实的**
+      // 已装状态报回去（而不是假定删干净了）。
+      const message = error instanceof Error ? error.message : String(error);
+      logWarn("[Voice] removeInstall failed:", error);
+      pushInstallState({
+        phase: "error",
+        error: message,
+        installed: isInstalled(),
+      });
+      return { ok: false, error: message };
+    }
     pushInstallState({ phase: "idle", percent: 0, installed: false });
     return { ok: true };
   });

@@ -150,6 +150,12 @@ describe("startMicCapture — 权限通过之后失败", () => {
     expect(trackStop).toHaveBeenCalled();
   });
 
+  it("启动失败时把 AudioContext 也关掉 —— 否则反复失败会耗尽 context 上限", async () => {
+    addModule.mockRejectedValueOnce(new Error("boom"));
+    await startMicCapture(() => {}).catch(() => {});
+    expect(close).toHaveBeenCalled();
+  });
+
   it("把真实错误打进日志 —— 兜底文案会盖住原因，日志是唯一的线索", async () => {
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     addModule.mockRejectedValueOnce(new Error("real cause"));

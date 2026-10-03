@@ -87,6 +87,38 @@ describe("ChatInput submit blocking", () => {
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
+it("录音中不提交 —— 宿主漏传 submitDisabled 也拦得住", async () => {
+    // 守的是漂移：ChatView 传了 submitDisabled，WelcomeView 忘了传，
+    // 于是在欢迎页录音时按 Enter 会把半截转写发出去、清掉草稿，而下一个
+    // partial 又把文字写回空框。门禁放在 ChatInput 自己身上（它已经收到
+    // voiceRecording），宿主漏传也拦得住。
+    const onSubmit = vi.fn();
+    await act(async () => {
+      root.render(
+        React.createElement(ChatInput, {
+          draftKey: "test-session",
+          onSubmit,
+          voiceRecording: true,
+          placeholder: "Message",
+          cardClassName: "",
+          textareaClassName: "",
+          bottomSlot: null,
+        }),
+      );
+    });
+
+    await typeText("半截转写");
+    await act(async () => {
+      container
+        .querySelector("form")!
+        .dispatchEvent(
+          new Event("submit", { bubbles: true, cancelable: true }),
+        );
+    });
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
   it("纯元素也是非空草稿", () => {
     expect(hasInputContent("", 0, 0, 1)).toBe(true);
     expect(hasInputContent("", 0, 0, 0)).toBe(false);

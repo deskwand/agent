@@ -1157,7 +1157,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         )
       )
         return;
-      if (disabled || submitDisabled) return;
+      // 录音中一并拦住：`voiceRecording` 是**这个组件自己知道的**，而 submitDisabled
+      // 靠宿主传 —— 漏传过一次（WelcomeView），录音时按 Enter 把半截转写发了出去。
+      if (disabled || submitDisabled || voiceRecording) return;
 
       // --- /compact command interception ---
       if (currentPrompt.startsWith("/compact")) {
@@ -1194,6 +1196,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       elementSelections,
       disabled,
       submitDisabled,
+      voiceRecording,
       onSubmit,
       onCompact,
       isExpanded,

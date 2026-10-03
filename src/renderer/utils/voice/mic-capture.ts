@@ -58,8 +58,10 @@ export async function startMicCapture(
 
   // 权限拿到之后的一切失败都归到这里：之前它们会以裸异常逃出去，
   // 被上层兜底成「找不到可用的麦克风」—— 麦克风明明是好的。
+  let openedContext: AudioContext | null = null;
   try {
     const context = new AudioContext({ sampleRate: 16000 });
+    openedContext = context;
     await context.audioWorklet.addModule(
       new URL("./pcm-worklet.js", document.baseURI).href,
     );
@@ -91,6 +93,9 @@ export async function startMicCapture(
   } catch (error) {
     // 先把麦克风关掉再抛：否则系统录音指示灯会一直亮着，用户以为还在录。
     for (const track of stream.getTracks()) track.stop();
+    // AudioContext 也要关：Chromium 对同时存在的 context 有上限，反复失败会把
+    // 上限耗光，之后连 `new AudioContext` 都抛 —— 那就只剩重启能救。
+    void openedContext?.close();
     // 上层只会看到「采集启动失败」这一个码，真实原因只能留在日志里。
     console.error("[voice] capture setup failed:", error);
     throw new MicError("VOICE_CAPTURE_FAILED");
