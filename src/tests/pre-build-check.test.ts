@@ -40,6 +40,8 @@ function populateDarwinArtifacts(root: string, arch: string = "arm64"): void {
   makeDir(path.join(root, "dist-electron"));
   makeFile(path.join(root, "dist-electron/main/photon_rs_bg.wasm"));
   makeDir(path.join(root, "dist"));
+  // worklet 由 public/ 原样拷进 dist，不是打包图的产物
+  makeFile(path.join(root, "dist/pcm-worklet.js"));
   makeDir(path.join(root, ".deskwand/skills"));
 
   // macOS FATAL resources
@@ -61,6 +63,8 @@ function populateWin32Artifacts(root: string): void {
   makeDir(path.join(root, "dist-electron"));
   makeFile(path.join(root, "dist-electron/main/photon_rs_bg.wasm"));
   makeDir(path.join(root, "dist"));
+  // worklet 由 public/ 原样拷进 dist，不是打包图的产物
+  makeFile(path.join(root, "dist/pcm-worklet.js"));
   makeDir(path.join(root, ".deskwand/skills"));
   makeFile(path.join(root, "resources/node/win32-x64/node.exe"));
   makeFile(path.join(root, "dist-wsl-agent/index.js"));

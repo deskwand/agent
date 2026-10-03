@@ -121,6 +121,15 @@ function buildCheckList(platform, arch) {
       severity: 'fatal',
     },
     {
+      // 语音采集的 worklet。它由 `public/` 原样拷进 dist，不入打包图，也不被任何
+      // import 引用 —— 拓了没有任何构建错误，只会在用户按下麦克风时报
+      // 「音频处理没能启动」。这个接缝已经坏过一次（当时是被 CSP 拦），所以在这里钉住。
+      label: 'Voice capture worklet (dist/pcm-worklet.js)',
+      relPath: 'dist/pcm-worklet.js',
+      type: 'file',
+      severity: 'fatal',
+    },
+    {
       label: 'Built-in skills directory (.deskwand/skills/)',
       relPath: '.deskwand/skills',
       type: 'dir',

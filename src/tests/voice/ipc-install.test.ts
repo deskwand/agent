@@ -211,3 +211,58 @@ describe("voice.install", () => {
     });
   });
 });
+
+/**
+ * `voice.removeInstall` 的失败形态。
+ *
+ * Windows 上正被原生 addon 内存映射着的模型文件删不掉（EBUSY/EPERM）。原来的
+ * handler 没有 try/catch：异常直接让渲染侧的 `await` reject，设置页停在「已安装」，
+ * 而目录可能只删了一半 —— 用户既用不了也删不掉，还多一条未处理的 rejection。
+ */
+function runRemove() {
+  mocks.handlers.clear();
+  events.length = 0;
+  registerVoiceIpc({
+    userDataPath: "/tmp/voice-install-orchestration",
+    sendEvent: (e: VoiceEvent) => events.push(e),
+  } as never);
+  return mocks.handlers.get("voice.removeInstall")!(null) as Promise<{
+    ok: boolean;
+    error?: string;
+  }>;
+}
+
+describe("voice.removeInstall", () => {
+  it("删不掉时返回失败，并且不谎称已删", async () => {
+    const { removeVoice } = await import("../../main/voice/installer");
+    vi.mocked(removeVoice).mockRejectedValue(
+      new Error("EBUSY: resource busy or locked"),
+    );
+    // 删失败时清单还在 → 它确实还是「已安装」
+    mocks.readManifest.mockReturnValue({
+      runtimeVersion: RUNTIME_VERSION,
+      model: MODEL_ID,
+    });
+
+    const result = await runRemove();
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("EBUSY");
+    // 最后推给渲染层的状态必须是「仍然装着」，不能是 idle
+    expect(installStates().at(-1)?.installed).toBe(true);
+  });
+
+  it("删成功时落 idle", async () => {
+    const { removeVoice } = await import("../../main/voice/installer");
+    vi.mocked(removeVoice).mockResolvedValue(undefined);
+    mocks.readManifest.mockReturnValue(null);
+
+    const result = await runRemove();
+
+    expect(result.ok).toBe(true);
+    expect(installStates().at(-1)).toMatchObject({
+      phase: "idle",
+      installed: false,
+    });
+  });
+});

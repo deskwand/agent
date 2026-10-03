@@ -426,3 +426,82 @@ describe("输入框为空时的语音动作", () => {
     expect(api.canRevert).toBe(false);
   });
 });
+
+/**
+ * `requesting` 是这条特性里最长的一段窗口：首次要加载 162MB 模型，实测 2.2~2.4 秒，
+ * 首次用还要过系统权限弹窗。这段时间里 `sessionRef` 与 `captureRef` 都还是 null
+ * （两者要等 await 回来才赋值），所以取消必须靠别的东西作废那次 start()。
+ */
+describe("requesting 期间的取消", () => {
+  /** 让 voice.start 挂住，复现那段等待窗口。 */
+  function hangStart() {
+    let release: (value: { ok: true; sessionId: string }) => void = () => {};
+    voice.start.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve as typeof release;
+        }),
+    );
+    return () => release({ ok: true, sessionId: "s1" });
+  }
+
+  it("取消后那次 start() 回来时不建会话，也不复活成录音", async () => {
+    const finishStart = hangStart();
+    await render();
+    await act(async () => {
+      void api.toggle();
+    });
+    expect(api.status).toBe("requesting");
+
+    // 用户按 Esc
+    await act(async () => {
+      api.cancel();
+    });
+
+    // 现在请求才回来 —— 它不能被当成一次有效录音
+    await act(async () => {
+      finishStart();
+    });
+
+    expect(voice.cancel).toHaveBeenCalledWith("s1");
+    expect(stopCapture).toHaveBeenCalled();
+    expect(container.textContent).toBe("idle");
+  });
+
+  it("取消不该回滚输入框 —— 那里面是用户自己的草稿，不是这次语音的产物", async () => {
+    const finishStart = hangStart();
+    await render();
+    draft = "这是我自己打的草稿";
+    await act(async () => {
+      void api.toggle();
+    });
+
+    await act(async () => {
+      api.cancel();
+    });
+    await act(async () => {
+      finishStart();
+    });
+
+    // 回滚会把「开始录音前的快照」写回去，而 requesting 期间那个快照还是初始空串
+    expect(calls.onRestore).not.toHaveBeenCalled();
+  });
+});
+
+describe("voice.stop 被拒", () => {
+  it("不把状态卡在 finishing —— 那个态下麦克风按钮是禁用的", async () => {
+    voice.stop.mockRejectedValue(new Error("handler blew up"));
+    await render();
+    await act(async () => {
+      void api.toggle();
+    });
+    expect(container.textContent).toBe("recording");
+
+    await act(async () => {
+      void api.toggle();
+    });
+
+    expect(container.textContent).toBe("idle");
+    expect(calls.onError).toHaveBeenCalledWith("VOICE_ENGINE_FAILED");
+  });
+});
