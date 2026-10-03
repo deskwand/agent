@@ -1,0 +1,182 @@
+/* ==================== 小幽灵 ==================== */
+.pet-ghost {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.pet-ghost__pose,
+.pet-ghost__drift,
+.pet-ghost__peek,
+.pet-ghost__body,
+.pet-ghost__eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.pet-ghost__fill {
+  fill: #dfe7f5;
+  fill-opacity: 0.92;
+  transition: fill-opacity 240ms ease;
+}
+/* 设计 §3.2：幽灵 idle 是"缓慢漂浮"，不是史莱姆那种挤压鼓动。 */
+.pet-ghost__body {
+  animation: pet-ghost-float 4.2s ease-in-out infinite;
+}
+@keyframes pet-ghost-float {
+  50% {
+    transform: translateY(-2.5px);
+  }
+}
+/* 招牌小动作：19s 绕一小圈、29s 快速眨两下（与 5.3s 眨眼周期互质） */
+.pet-ghost__peek {
+  animation: pet-ghost-peek 29s ease-in-out infinite;
+}
+/* 设计 §3.2：每约 29s"快速眨两下"，所以是两次下压而不是一次。 */
+@keyframes pet-ghost-peek {
+  0%,
+  95%,
+  100% {
+    transform: scaleY(1);
+  }
+  95.8% {
+    transform: scaleY(0.86);
+  }
+  96.6% {
+    transform: scaleY(1);
+  }
+  97.4% {
+    transform: scaleY(0.86);
+  }
+  98.2% {
+    transform: scaleY(1);
+  }
+}
+.pet-ghost__drift {
+  animation: pet-ghost-drift 19s ease-in-out infinite;
+}
+@keyframes pet-ghost-drift {
+  0%,
+  84%,
+  100% {
+    transform: translate(0, 0);
+  }
+  88% {
+    transform: translate(-2px, -1.5px);
+  }
+  92% {
+    transform: translate(-2px, 1.5px);
+  }
+  96% {
+    transform: translate(0, 0);
+  }
+}
+.pet-ghost__eyes {
+  animation: pet-blink 5.3s ease-in-out infinite;
+}
+.pet-ghost__eyes--dot ellipse {
+  fill: #0b1018;
+}
+.pet-ghost__eyes--arc path {
+  fill: none;
+  stroke: #0b1018;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+.pet-ghost__eyes--dash path {
+  fill: none;
+  stroke: #ff8a5c;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.pet-ghost__eyes--arc,
+.pet-ghost__eyes--dash {
+  display: none;
+}
+/* running：更忙 —— 1.5s 来回一趟（±5px），中途"穿墙"式瞬间变透明 */
+.pet-ghost[data-state="running"] .pet-ghost__body {
+  animation: pet-ghost-dash 1.5s ease-in-out infinite;
+}
+@keyframes pet-ghost-dash {
+  0%,
+  100% {
+    transform: translateX(-5px);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+.pet-ghost[data-state="running"] .pet-ghost__fill {
+  /* 静态值同样重要：reduced-motion 下动画被关掉，靠它保住 idle≠running。 */
+  fill-opacity: 0.78;
+  animation: pet-ghost-phase 1.5s ease-in-out infinite;
+}
+@keyframes pet-ghost-phase {
+  0%,
+  100% {
+    fill-opacity: 0.78;
+  }
+  40% {
+    fill-opacity: 0.42;
+  }
+  60% {
+    fill-opacity: 0.82;
+  }
+}
+/* running 时不放大眼睛：眼睛层已经有眨眼动画占着 transform，
+   再叠一条状态 transform 只会被动画覆盖，白写。运行态的"忙"靠位移与透明度表达。 */
+/* success：停住、变实、眼睛弯成弧 */
+.pet-ghost[data-state="success"] .pet-ghost__pose {
+  transform: translateY(-3px);
+}
+.pet-ghost[data-state="success"] .pet-ghost__body {
+  animation: none;
+}
+.pet-ghost[data-state="success"] .pet-ghost__fill {
+  fill: #eef4ff;
+  fill-opacity: 1;
+  filter: drop-shadow(0 0 4px #5b8cff88);
+}
+.pet-ghost[data-state="success"] .pet-ghost__eyes--dot,
+.pet-ghost[data-state="success"] .pet-ghost__eyes--dash {
+  display: none;
+}
+.pet-ghost[data-state="success"] .pet-ghost__eyes--arc {
+  display: block;
+}
+/* failure：沉到地面、几乎透明、眼睛下垂且转暖（A 方案） */
+.pet-ghost[data-state="failure"] .pet-ghost__pose {
+  transform: translateY(6px);
+}
+.pet-ghost[data-state="failure"] .pet-ghost__body {
+  animation: none;
+}
+.pet-ghost[data-state="failure"] .pet-ghost__fill {
+  fill-opacity: 0.42;
+}
+.pet-ghost[data-state="failure"] .pet-ghost__eyes--dot,
+.pet-ghost[data-state="failure"] .pet-ghost__eyes--arc {
+  display: none;
+}
+.pet-ghost[data-state="failure"] .pet-ghost__eyes--dash {
+  display: block;
+}
+.pet-ghost:not([data-state="idle"]) .pet-ghost__drift,
+.pet-ghost:not([data-state="idle"]) .pet-ghost__peek {
+  animation: none;
+}
+.pet-ghost[data-state="success"] .pet-ghost__eyes,
+.pet-ghost[data-state="failure"] .pet-ghost__eyes {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-ghost__body,
+  .pet-ghost__drift,
+  .pet-ghost__peek,
+  /* __fill 也要关：running 的"穿墙"相位动画挂在它身上，
+     漏掉它等于 reduced-motion 下仍有一条无限循环的透明度动画。 */
+  .pet-ghost__fill,
+  .pet-ghost__eyes {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,174 @@
+/* 原创蛋仔：弹跳 + 裂痕。影子与身体分层，成功跳起时影子留在原地（拉开距离＝离地）。 */
+.pet-egg {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.pet-egg__pose,
+.pet-egg__body {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+.pet-egg__leg,
+.pet-egg__arm {
+  transform-box: fill-box;
+}
+.pet-egg__leg--l {
+  transform-origin: 50% 0%;
+}
+.pet-egg__leg--r {
+  transform-origin: 50% 0%;
+}
+.pet-egg__arm--l {
+  transform-origin: 100% 0%;
+}
+.pet-egg__arm--r {
+  transform-origin: 0% 0%;
+}
+.pet-egg__shadow ellipse {
+  fill: #000;
+  opacity: 0.28;
+  transition:
+    opacity 240ms ease,
+    transform 240ms ease;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.pet-egg__shell {
+  fill: #e8eef8;
+  transition: fill 240ms ease;
+}
+.pet-egg__limb {
+  fill: #2b3342;
+}
+.pet-egg__arm-under {
+  fill: none;
+  stroke: #0b1018;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+.pet-egg__arm-fill {
+  fill: none;
+  stroke: #e8eef8;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  transition: stroke 240ms ease;
+}
+.pet-egg__crack {
+  fill: none;
+  stroke: #0b1018;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+/* 招牌动作：约 21s 晃一下（像站不稳）+ 共享眨眼周期 */
+.pet-egg__pose {
+  animation: pet-egg-wobble 21s ease-in-out infinite;
+}
+@keyframes pet-egg-wobble {
+  0%,
+  93%,
+  100% {
+    transform: rotate(0deg);
+  }
+  95% {
+    transform: rotate(5deg);
+  }
+  97% {
+    transform: rotate(-4deg);
+  }
+}
+.pet-egg__eyes {
+  animation: pet-blink 5.3s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.pet-egg__eyes--dot ellipse {
+  fill: #0b1018;
+}
+.pet-egg__eyes--arc path,
+.pet-egg__eyes--dash path {
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.pet-egg__eyes--arc path {
+  stroke: #0b1018;
+}
+.pet-egg__eyes--dash path {
+  stroke: #ff8a5c;
+}
+.pet-egg__eyes--arc,
+.pet-egg__eyes--dash {
+  display: none;
+}
+.pet-egg[data-state="running"] .pet-egg__pose {
+  animation: pet-egg-hop 1.1s ease-in-out infinite;
+}
+@keyframes pet-egg-hop {
+  0%,
+  100% {
+    transform: translateY(0) rotate(4deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(2deg);
+  }
+}
+.pet-egg[data-state="running"] .pet-egg__leg--r {
+  transform: scaleY(0.55);
+}
+.pet-egg[data-state="success"] .pet-egg__pose {
+  animation: none;
+  transform: translateY(-6px);
+}
+.pet-egg[data-state="success"] .pet-egg__shell {
+  fill: #f6f9ff;
+}
+.pet-egg[data-state="success"] .pet-egg__shadow ellipse {
+  opacity: 0.16;
+  transform: scale(0.8);
+}
+.pet-egg[data-state="success"] .pet-egg__arm--l {
+  transform: rotate(90deg);
+}
+.pet-egg[data-state="success"] .pet-egg__arm--r {
+  transform: rotate(-90deg);
+}
+.pet-egg[data-state="success"] .pet-egg__eyes--dot,
+.pet-egg[data-state="success"] .pet-egg__eyes--dash {
+  display: none;
+}
+.pet-egg[data-state="success"] .pet-egg__eyes--arc {
+  display: block;
+  animation: none;
+}
+.pet-egg[data-state="failure"] .pet-egg__pose {
+  animation: none;
+  transform: translateY(3px) scale(1.04, 0.9);
+}
+.pet-egg[data-state="failure"] .pet-egg__shell {
+  fill: #b9c2d2;
+}
+.pet-egg[data-state="failure"] .pet-egg__arm-fill {
+  stroke: #b9c2d2;
+}
+.pet-egg[data-state="failure"] .pet-egg__crack {
+  opacity: 1;
+}
+.pet-egg[data-state="failure"] .pet-egg__eyes--dot,
+.pet-egg[data-state="failure"] .pet-egg__eyes--arc {
+  display: none;
+}
+.pet-egg[data-state="failure"] .pet-egg__eyes--dash {
+  display: block;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-egg__pose,
+  .pet-egg__eyes {
+    animation: none !important;
+  }
+}

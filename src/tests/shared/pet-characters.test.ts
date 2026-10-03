@@ -18,4 +18,10 @@ describe("pet characters", () => {
   it("keeps the default inside the list", () => {
     expect(PET_CHARACTERS).toContain(DEFAULT_PET_CHARACTER);
   });
+
+  it("lists all seven characters, including the four newest", () => {
+    expect(PET_CHARACTERS).toHaveLength(7);
+    for (const id of ["flame", "jellyfish", "octopus", "egg"] as const)
+      expect(PET_CHARACTERS).toContain(id);
+  });
 });

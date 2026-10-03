@@ -1,33 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { ComponentType } from "react";
 import type { PetState } from "../main/desktop-pet/pet-state";
 import {
   DEFAULT_PET_CHARACTER,
   isPetCharacter,
   type PetCharacter,
 } from "../shared/pet-characters";
-import { PetGhost } from "./pet-ghost";
-import { PetLens } from "./pet-lens";
-import { PetSlime } from "./pet-slime";
+import { PET_CHARACTER_COMPONENTS } from "./pet-characters";
 import "./styles/pet.css";
-
-export interface PetCharacterProps {
-  state: PetState;
-}
-
-/**
- * 穷尽的角色映射：漏一只就编译不过（与 WelcomeView 的 QUICK_ENTRY_ICONS 同一手法）。
- * 镜片只声明 `{ state }`——更窄的 props 可直接放进这里，不必为"统一签名"改它。
- */
-const PET_CHARACTER_COMPONENTS: Record<
-  PetCharacter,
-  ComponentType<PetCharacterProps>
-> = {
-  lens: PetLens,
-  slime: PetSlime,
-  ghost: PetGhost,
-};
 
 declare global {
   interface Window {

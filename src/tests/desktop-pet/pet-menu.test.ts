@@ -27,6 +27,24 @@ describe("pet character menu", () => {
     );
   });
 
+  // 只断言"标签互不相同"挡不住错抄：把 flame 写成 pet.charGhost 照样全绿。
+  it("maps every character to its own label key", () => {
+    const template = buildPetCharacterMenuTemplate("lens", () => {});
+    const expected: Array<[string, string]> = [
+      ["lens", "pet.charLens"],
+      ["slime", "pet.charSlime"],
+      ["ghost", "pet.charGhost"],
+      ["flame", "pet.charFlame"],
+      ["jellyfish", "pet.charJellyfish"],
+      ["octopus", "pet.charOctopus"],
+      ["egg", "pet.charEgg"],
+    ];
+    expect(expected).toHaveLength(PET_CHARACTERS.length);
+    for (const [id, key] of expected) {
+      expect(template[PET_CHARACTERS.indexOf(id as never)].label).toBe(t(key));
+    }
+  });
+
   it("reports the clicked character back", () => {
     const seen: string[] = [];
     const template = buildPetCharacterMenuTemplate("lens", (id) =>

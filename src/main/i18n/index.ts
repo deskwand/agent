@@ -107,6 +107,10 @@ const MSG: Record<Locale, MessageTable> = {
     "pet.charLens": "镜片",
     "pet.charSlime": "史莱姆",
     "pet.charGhost": "小幽灵",
+    "pet.charFlame": "小火苗",
+    "pet.charJellyfish": "小水母",
+    "pet.charOctopus": "小章鱼",
+    "pet.charEgg": "蛋仔",
   },
   en: {
     // ── goal ──
@@ -214,6 +218,10 @@ const MSG: Record<Locale, MessageTable> = {
     "pet.charLens": "Lens",
     "pet.charSlime": "Slime",
     "pet.charGhost": "Ghost",
+    "pet.charFlame": "Flame",
+    "pet.charJellyfish": "Jellyfish",
+    "pet.charOctopus": "Octopus",
+    "pet.charEgg": "Egg",
   },
 };
 

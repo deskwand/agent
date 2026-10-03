@@ -1,0 +1,178 @@
+/* 小水母：伞体脉动 + 触手。触手用 rotate 表示“荡/缩紧/缠成一团”，不换路径。 */
+.pet-jellyfish {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.pet-jellyfish__pose,
+.pet-jellyfish__pulse,
+.pet-jellyfish__bell {
+  transform-box: fill-box;
+  transform-origin: center top;
+}
+.pet-jellyfish__tent {
+  transform-box: fill-box;
+  transform-origin: center top;
+}
+.pet-jellyfish__bell-fill {
+  fill: #8fb4ff;
+  fill-opacity: 0.92;
+  transition:
+    fill 240ms ease,
+    fill-opacity 240ms ease;
+}
+.pet-jellyfish__tent-under {
+  fill: none;
+  stroke: #0b1018;
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+.pet-jellyfish__tent-fill {
+  fill: none;
+  stroke: #8fb4ff;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+}
+.pet-jellyfish__bell {
+  animation: pet-jellyfish-pulse 4.6s ease-in-out infinite;
+}
+@keyframes pet-jellyfish-pulse {
+  50% {
+    transform: scale(0.96, 1.04);
+  }
+}
+.pet-jellyfish__tent--1 {
+  animation: pet-jellyfish-drift1 3.1s ease-in-out infinite;
+}
+.pet-jellyfish__tent--2 {
+  animation: pet-jellyfish-drift2 3.7s ease-in-out infinite;
+}
+.pet-jellyfish__tent--3 {
+  animation: pet-jellyfish-drift3 4.3s ease-in-out infinite;
+}
+@keyframes pet-jellyfish-drift1 {
+  50% {
+    transform: rotate(7deg);
+  }
+}
+@keyframes pet-jellyfish-drift2 {
+  50% {
+    transform: rotate(-6deg);
+  }
+}
+@keyframes pet-jellyfish-drift3 {
+  50% {
+    transform: rotate(5deg);
+  }
+}
+/* 招牌动作：约 23s 快速开合两下 */
+.pet-jellyfish__pulse {
+  animation: pet-jellyfish-flutter 23s ease-in-out infinite;
+}
+@keyframes pet-jellyfish-flutter {
+  0%,
+  95%,
+  100% {
+    transform: scale(1, 1);
+  }
+  96.2% {
+    transform: scale(0.9, 1.08);
+  }
+  97.4% {
+    transform: scale(1, 1);
+  }
+  98.6% {
+    transform: scale(0.9, 1.08);
+  }
+}
+.pet-jellyfish__eyes--dot ellipse {
+  fill: #0b1018;
+}
+.pet-jellyfish__eyes--arc path,
+.pet-jellyfish__eyes--dash path {
+  fill: none;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.pet-jellyfish__eyes--arc path {
+  stroke: #0b1018;
+}
+.pet-jellyfish__eyes--dash path {
+  stroke: #ff8a5c;
+}
+.pet-jellyfish__eyes--arc,
+.pet-jellyfish__eyes--dash {
+  display: none;
+}
+.pet-jellyfish[data-state="running"] .pet-jellyfish__pose {
+  transform: translateY(-1px) scale(0.9, 1.1);
+}
+.pet-jellyfish[data-state="running"] .pet-jellyfish__bell {
+  animation-duration: 2s;
+}
+.pet-jellyfish[data-state="running"] .pet-jellyfish__bell-fill {
+  fill: #a8c6ff;
+}
+.pet-jellyfish[data-state="running"] .pet-jellyfish__tent {
+  transform: rotate(0deg) scaleY(0.86);
+}
+.pet-jellyfish[data-state="success"] .pet-jellyfish__pose {
+  transform: translateY(-3px);
+}
+.pet-jellyfish[data-state="success"] .pet-jellyfish__bell-fill {
+  fill: #d8e6ff;
+  filter: drop-shadow(0 0 4px #5b8cff88);
+}
+.pet-jellyfish[data-state="success"] .pet-jellyfish__eyes--dot,
+.pet-jellyfish[data-state="success"] .pet-jellyfish__eyes--dash {
+  display: none;
+}
+.pet-jellyfish[data-state="success"] .pet-jellyfish__eyes--arc {
+  display: block;
+}
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__pose {
+  transform: translateY(7px) scale(1.06, 0.8);
+}
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__bell-fill {
+  fill: #8fa3c4;
+  fill-opacity: 0.42;
+}
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__tent-fill {
+  stroke: #8fa3c4;
+  stroke-opacity: 0.5;
+}
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__tent--1 {
+  transform: rotate(24deg) scaleY(0.6);
+}
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__tent--2 {
+  transform: rotate(-20deg) scaleY(0.55);
+}
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__tent--3 {
+  transform: rotate(18deg) scaleY(0.6);
+}
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__eyes--dot,
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__eyes--arc {
+  display: none;
+}
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__eyes--dash {
+  display: block;
+}
+.pet-jellyfish:not([data-state="idle"]) .pet-jellyfish__pulse {
+  animation: none;
+}
+.pet-jellyfish:not([data-state="idle"]) .pet-jellyfish__tent {
+  animation: none;
+}
+.pet-jellyfish[data-state="success"] .pet-jellyfish__bell,
+.pet-jellyfish[data-state="failure"] .pet-jellyfish__bell {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-jellyfish__bell,
+  .pet-jellyfish__pulse,
+  .pet-jellyfish__tent {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,177 @@
+@keyframes pet-breathe {
+  50% {
+    transform: scale(1.035, 0.96);
+  }
+}
+/* ==================== 史莱姆 ==================== */
+.pet-slime {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.pet-slime__pose,
+.pet-slime__puff,
+.pet-slime__sway,
+.pet-slime__body,
+.pet-slime__eyes {
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+.pet-slime__fill {
+  fill: #3f7ae0;
+  transition: fill 240ms ease;
+}
+.pet-slime__gloss {
+  fill: #fff;
+  opacity: 0.28;
+  transition: opacity 240ms ease;
+}
+.pet-slime__body {
+  animation: pet-breathe 3.4s ease-in-out infinite;
+}
+/* 招牌小动作：17s / 23s 互质，组合起来显得不规律（不用 JS 定时器/随机数） */
+.pet-slime__sway {
+  animation: pet-slime-sway 17s ease-in-out infinite;
+}
+@keyframes pet-slime-sway {
+  0%,
+  88%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  91% {
+    transform: translateX(-1.5px) rotate(-1.5deg);
+  }
+  94% {
+    transform: translateX(1.5px) rotate(1.5deg);
+  }
+  97% {
+    transform: translateX(0) rotate(0deg);
+  }
+}
+.pet-slime__puff {
+  animation: pet-slime-puff 23s ease-in-out infinite;
+}
+@keyframes pet-slime-puff {
+  0%,
+  90%,
+  100% {
+    transform: scale(1, 1);
+  }
+  93% {
+    transform: scale(1.02, 1.06);
+  }
+  96% {
+    transform: scale(1.03, 0.95);
+  }
+}
+/* 眼睛三套：默认点状；success 弯弧；failure 横线（并转暖色） */
+.pet-slime__eyes {
+  animation: pet-blink 5.3s ease-in-out infinite;
+}
+.pet-slime__eyes--dot ellipse {
+  fill: #eaf1ff;
+}
+.pet-slime__eyes--arc path {
+  fill: none;
+  stroke: #eaf1ff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.pet-slime__eyes--dash line {
+  stroke: #c3cbd8;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.pet-slime__eyes--arc,
+.pet-slime__eyes--dash {
+  display: none;
+}
+/* running：更忙 —— 0.55s 一轮、±6% 形变 + 亚像素横移（companion 确认的节奏） */
+.pet-slime[data-state="running"] .pet-slime__body {
+  animation: pet-slime-jitter 0.55s ease-in-out infinite;
+}
+@keyframes pet-slime-jitter {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1.02, 0.96);
+  }
+  25% {
+    transform: translate(-1.2px, -1.6px) scale(0.96, 1.06);
+  }
+  50% {
+    transform: translate(0, 0) scale(1.03, 0.95);
+  }
+  75% {
+    transform: translate(1.2px, -1.6px) scale(0.96, 1.06);
+  }
+}
+.pet-slime[data-state="running"] .pet-slime__fill {
+  fill: #4a86ec;
+}
+.pet-slime[data-state="running"] .pet-slime__gloss {
+  opacity: 0.4;
+}
+/* success：弹起、眼睛弯成弧、高光最亮 */
+.pet-slime[data-state="success"] .pet-slime__pose {
+  transform: translateY(-3px) scale(1, 1.04);
+}
+.pet-slime[data-state="success"] .pet-slime__body {
+  animation: none;
+}
+.pet-slime[data-state="success"] .pet-slime__fill {
+  fill: #5b8cff;
+}
+.pet-slime[data-state="success"] .pet-slime__gloss {
+  opacity: 0.5;
+}
+.pet-slime[data-state="success"] .pet-slime__eyes--dot,
+.pet-slime[data-state="success"] .pet-slime__eyes--dash {
+  display: none;
+}
+.pet-slime[data-state="success"] .pet-slime__eyes--arc {
+  display: block;
+}
+/* failure：摊平、去光泽、眼睛转暖（A 方案：暖色只在眼睛上） */
+.pet-slime[data-state="failure"] .pet-slime__pose {
+  transform: scale(1.18, 0.78);
+}
+.pet-slime[data-state="failure"] .pet-slime__body {
+  animation: none;
+}
+.pet-slime[data-state="failure"] .pet-slime__fill {
+  fill: #5f6b7d;
+}
+.pet-slime[data-state="failure"] .pet-slime__gloss {
+  opacity: 0;
+}
+.pet-slime[data-state="failure"] .pet-slime__eyes--dot,
+.pet-slime[data-state="failure"] .pet-slime__eyes--arc {
+  display: none;
+}
+.pet-slime[data-state="failure"] .pet-slime__eyes--dash {
+  display: block;
+}
+.pet-slime[data-state="failure"] .pet-slime__eyes--dash line {
+  stroke: #ff8a5c;
+}
+/* 非 idle 时关掉招牌小动作，避免与状态体态打架 */
+.pet-slime:not([data-state="idle"]) .pet-slime__puff,
+.pet-slime:not([data-state="idle"]) .pet-slime__sway {
+  animation: none;
+}
+/* 明确表情时不眨眼 */
+.pet-slime[data-state="success"] .pet-slime__eyes,
+.pet-slime[data-state="failure"] .pet-slime__eyes {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-slime__body,
+  .pet-slime__puff,
+  .pet-slime__sway,
+  .pet-slime__eyes {
+    animation: none !important;
+  }
+}

@@ -20,6 +20,10 @@ const LABEL_KEYS: Record<PetCharacter, string> = {
   lens: "pet.charLens",
   slime: "pet.charSlime",
   ghost: "pet.charGhost",
+  flame: "pet.charFlame",
+  jellyfish: "pet.charJellyfish",
+  octopus: "pet.charOctopus",
+  egg: "pet.charEgg",
 };
 
 export function buildPetCharacterMenuTemplate(

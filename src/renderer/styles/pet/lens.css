@@ -1,0 +1,87 @@
+/* 以下尺寸都用百分比：改主进程的 SIZE 就够了，不必同步第二处像素值。 */
+.pet-lens {
+  width: 78%;
+  height: 78%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(
+    circle at 35% 28%,
+    #454b53,
+    #191d25 48%,
+    #07090e 80%
+  );
+  /* 只留外圈环，不加投影：透明窗口 hasShadow:false 且窗口只比环大不到 1px，
+     带模糊的投影会被窗口边界切出硬边。 */
+  box-shadow:
+    0 0 0 2px #1c222b,
+    0 0 0 4px #5a626b,
+    0 0 0 7px #10141b;
+}
+.pet-lens__rim {
+  width: 74%;
+  height: 74%;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid #454950;
+  box-shadow: inset 0 0 8px #000b;
+}
+/* 球体基准色 = globals.css 里 graphite 深色档的 --color-accent（发送按钮的蓝）。
+   桌宠是独立 BrowserWindow，不加载 globals.css、也拿不到 data-theme-preset，
+   所以这里写死：#5b8cff 与主题 accent 是两份需要人工同步的值。 */
+.pet-lens__eye {
+  width: 72%;
+  height: 72%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 35%,
+    #eaf1ff 0,
+    #9db9ff 9%,
+    #5b8cff 23%,
+    #2c3f86 47%,
+    #0a1024 74%
+  );
+  box-shadow: 0 0 10px #5b8cff80;
+  animation: breathe 4s ease-in-out infinite;
+}
+/* 待机暗蓝 vs 执行中亮蓝：亮度与脉动速度都要拉开，否则一眼分不出。 */
+.pet-lens[data-state="running"] .pet-lens__eye {
+  filter: brightness(1.35) saturate(1.2);
+  box-shadow:
+    0 0 16px #6f9bff,
+    0 0 24px #5b8cff88;
+  animation-duration: 1.3s;
+}
+.pet-lens[data-state="success"] .pet-lens__eye {
+  filter: brightness(1.7);
+  box-shadow: 0 0 24px #a9c6ff;
+  animation: none;
+}
+/* 失败态不再靠滤镜从基色推导：蓝底上 hue-rotate(22deg) 会转到紫，
+   "异常"信号会消失。暖色直接写进渐变，颜色即语义。 */
+.pet-lens[data-state="failure"] .pet-lens__eye {
+  background: radial-gradient(
+    circle at 40% 35%,
+    #ffe4d1 0,
+    #ff8a5c 9%,
+    #ff651a 23%,
+    #8a2b06 47%,
+    #200705 74%
+  );
+  box-shadow: 0 0 20px #ff651a;
+  animation: none;
+}
+@keyframes breathe {
+  50% {
+    opacity: 0.5;
+    transform: scale(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-lens__eye,
+  .pet-lens[data-state="running"] .pet-lens__eye {
+    animation: none;
+  }
+}

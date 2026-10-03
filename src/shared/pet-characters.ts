@@ -5,7 +5,15 @@
  * 因为只有主进程要画原生菜单，渲染层从不显示角色名。
  * 校验模式与 themePreset 一致：非法值一律回退默认，不抛错。
  */
-export const PET_CHARACTERS = ["lens", "slime", "ghost"] as const;
+export const PET_CHARACTERS = [
+  "lens",
+  "slime",
+  "ghost",
+  "flame",
+  "jellyfish",
+  "octopus",
+  "egg",
+] as const;
 
 export type PetCharacter = (typeof PET_CHARACTERS)[number];
 
