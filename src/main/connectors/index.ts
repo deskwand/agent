@@ -30,6 +30,7 @@ import {
   startSignIn,
 } from "./mcp-signin";
 import { findBuiltinPresetByName } from "./builtin-presets";
+import { cleanupRetiredPresets } from "./retired-presets";
 import { log, logError } from "../utils/logger";
 
 export interface RegisterConnectorsIpcArgs {
@@ -53,6 +54,14 @@ export function registerConnectorsIpc({
   sendToRenderer,
   activateMcpServer,
 }: RegisterConnectorsIpcArgs): void {
+  // 先清旧版本下架预设的残留：它们会被当成用户自建 server，渲染成一张删不掉、
+  // 也连不上的卡片（见 retired-presets.ts）。幂等；失败只记日志，不阻塞启动。
+  try {
+    cleanupRetiredPresets(agentDir);
+  } catch (e) {
+    logError("[connectors] retired preset cleanup failed", e);
+  }
+
   const registry = buildRegistry({
     loadConfig: () => readMcpConfig(agentDir),
     statusFor: getConnectorStatus,

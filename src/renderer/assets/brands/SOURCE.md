@@ -37,9 +37,10 @@ Google Chrome 的名称与图形标志归各自厂商所有。
 
 ## 4. `chrome.svg` 的适用范围
 
-它只服务用户 `mcp.json` 里**历史残留**的 `Chrome` 条目（早期版本写入的 chrome-devtools-mcp
-配置）。本仓库的 `BUILTIN_PRESETS` 现在只剩 `GUI_Operate`，所以这张图在仓库侧没有别的消费方 ——
-如果哪天那个残留条目不再出现，这张图可以连同映射表里的一项一起删掉。
+它服务名为 `Chrome` 的 server，来源有两类：早期版本写进 `mcp.json` 的**历史残留**
+（启动时由 `src/main/connectors/retired-presets.ts` 清掉），以及用户自己照 chrome-devtools-mcp
+文档加的同名 server。本仓库的 `BUILTIN_PRESETS` 里没有它，所以这张图在仓库侧没有别的消费方；
+映射表里这一项留着是为后一类 —— 不要在清理残留的那次改动里顺手删掉它。
 
 ## 5. 自研图形
 

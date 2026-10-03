@@ -46,17 +46,17 @@ function MyComponent() {
 ### 3. 复数形式
 
 ```tsx
-// en.json
+// en.json —— i18next v4 的 JSON 后缀是 _one / _other（老的 _plural 不再生效）
 {
-  "mcp": {
-    "toolsAvailable": "{{count}} tool available",
-    "toolsAvailable_plural": "{{count}} tools available"
+  "sandbox": {
+    "syncFiles_one": "{{count}} file",
+    "syncFiles_other": "{{count}} files"
   }
 }
 
-// 使用
-{t('mcp.toolsAvailable', { count: 1 })} // "1 tool available"
-{t('mcp.toolsAvailable', { count: 5 })} // "5 tools available"
+// 使用（真实用例见 components/SandboxSyncToast.tsx）
+{t('sandbox.syncFiles', { count: 1 })} // "1 file"
+{t('sandbox.syncFiles', { count: 5 })} // "5 files"
 ```
 
 ### 4. 切换语言
