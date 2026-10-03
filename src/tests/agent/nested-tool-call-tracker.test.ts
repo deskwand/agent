@@ -253,13 +253,13 @@ describe("nested tool call tracker — final record authority", () => {
     });
   });
 
-  it("synthesizes an empty final record only when no call was observed", () => {
+  it("does not fabricate an empty final record when metadata is missing", () => {
     const tracker = createNestedToolCallTracker();
     tracker.startParent("p");
     tracker.finishParent("p", undefined, undefined, false);
     expect(tracker.get("p")?.snapshot).toMatchObject({
-      source: "final",
-      complete: true,
+      source: "missing",
+      complete: false,
       parentStatus: "ok",
       calls: [],
     });
@@ -407,4 +407,23 @@ describe("nested tool call tracker — interrupt", () => {
     });
     expect(tracker.get("p")?.outputs.c.content).toBe("late");
   });
+});
+
+it("preserves the first authoritative final record after duplicate terminal events", () => {
+  const tracker = createNestedToolCallTracker();
+  tracker.startParent("p");
+  tracker.finishParent(
+    "p",
+    {
+      complete: true,
+      calls: [
+        { id: "c", name: "read", status: "ok", arguments: { path: "a" } },
+      ],
+    },
+    undefined,
+    false,
+  );
+  const final = tracker.get("p");
+  tracker.finishParent("p", undefined, undefined, true);
+  expect(tracker.get("p")).toEqual(final);
 });

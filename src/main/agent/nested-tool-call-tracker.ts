@@ -136,7 +136,7 @@ export function createNestedToolCallTracker(): NestedToolCallTracker {
     ): void {
       const root = getRoot(parentId);
       const current = runtimes.get(root);
-      if (!current) return;
+      if (!current || current.snapshot.source === "final") return;
       const parentStatus: NestedToolStatus = isError ? "error" : "ok";
       if (raw == null && current.snapshot.calls.length > 0) {
         // 终态记录不可用：保留已观察明细，pending 转 unfinished；
@@ -149,11 +149,9 @@ export function createNestedToolCallTracker(): NestedToolCallTracker {
         });
         return;
       }
-      // 本次运行确认没有真实子调用时，可构造明确空记录；
-      // 旧历史不能据此推断，必须走 legacy/missing 降级。
-      const record = raw ?? { calls: [], complete: true };
+      // 未观察到调用不能替代持久化事实；与历史使用相同的缺失记录降级。
       runtimes.set(root, {
-        snapshot: normalizeNestedToolCalls(root, record, legacy, parentStatus),
+        snapshot: normalizeNestedToolCalls(root, raw, legacy, parentStatus),
         outputs: current.outputs,
       });
     },
