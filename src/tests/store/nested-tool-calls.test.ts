@@ -139,3 +139,33 @@ describe("setNestedToolCalls", () => {
     expect(useAppStore.getState().sessionStates.s1.nestedToolCalls).toEqual({});
   });
 });
+
+it.each(["tail", "replace"])(
+  "clears only the reloaded session metadata (%s)",
+  (mode) => {
+    const store = useAppStore.getState();
+    store.addSession(session("s1"));
+    store.addSession(session("s2"));
+    store.setNestedToolCalls("s1", runtime("p1", "final", "ok"));
+    const other = runtime("p2", "final", "ok");
+    store.setNestedToolCalls("s2", other);
+    if (mode === "tail")
+      store.setMessagesTail("s1", [message("m1", "history")], false);
+    else store.setMessages("s1", [message("m1", "history")]);
+    expect(useAppStore.getState().sessionStates.s1.nestedToolCalls).toEqual({});
+    expect(useAppStore.getState().sessionStates.s2.nestedToolCalls?.p2).toEqual(
+      other,
+    );
+  },
+);
+
+it("preserves final metadata during a running history reload", () => {
+  const store = useAppStore.getState();
+  store.addSession(session("s1", "running"));
+  const final = runtime("p", "final", "ok");
+  store.setNestedToolCalls("s1", final);
+  store.setMessagesTail("s1", [message("m1", "history")], false);
+  expect(useAppStore.getState().sessionStates.s1.nestedToolCalls?.p).toEqual(
+    final,
+  );
+});
