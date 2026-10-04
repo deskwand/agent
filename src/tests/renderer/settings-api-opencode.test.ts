@@ -106,13 +106,7 @@ describe("SettingsAPI OpenCode provider", () => {
     });
     await flush();
 
-    // 打开「添加 Provider」编辑器（i18n key `api.addApi`，测试环境 fallbackLng=en 渲染英文文案）
-    await act(async () => {
-      clickButton(container, "Add Provider");
-    });
-    await flush();
-
-    // 选择 OpenCode 卡片
+    // api.addApi 从按钮变成分类网格的标题：直接点网格里的 OpenCode 瓦片进编辑器
     await act(async () => {
       clickButton(container, "OpenCode");
     });
@@ -182,10 +176,6 @@ describe("SettingsAPI OpenCode provider", () => {
     });
     await flush();
 
-    await act(async () => {
-      clickButton(container, "Add Provider");
-    });
-    await flush();
     await act(async () => {
       clickButton(container, "OpenCode");
     });

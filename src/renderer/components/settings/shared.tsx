@@ -113,19 +113,36 @@ export function SettingsSection({
   title,
   description,
   children,
+  inlineHint = false,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
+  /**
+   * 把说明挤到标题同一行（标题 + 小一号灰字）。
+   * 分类目录用这种：三类各占一行标题会白吃三行高度。默认仍是上下两行。
+   */
+  inlineHint?: boolean;
 }) {
   return (
     <section className="space-y-2">
-      <div className="space-y-0.5 px-1">
-        <h4 className="text-sm font-medium text-text-primary">{title}</h4>
-        {description && (
-          <p className="text-xs leading-5 text-text-muted">{description}</p>
-        )}
-      </div>
+      {inlineHint ? (
+        // 说明不在 h4 里：否则它会并进标题的可访问名，
+        // 读屏用户会把「订阅 登录即可，无需密钥」当成一个标题。
+        <div className="flex items-baseline gap-2 px-1">
+          <h4 className="text-sm font-medium text-text-primary">{title}</h4>
+          {description && (
+            <span className="text-xs text-text-muted">{description}</span>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-0.5 px-1">
+          <h4 className="text-sm font-medium text-text-primary">{title}</h4>
+          {description && (
+            <p className="text-xs leading-5 text-text-muted">{description}</p>
+          )}
+        </div>
+      )}
       <div className="space-y-2">{children}</div>
     </section>
   );
@@ -147,6 +164,7 @@ export function SettingsRow({
   testId,
   sub,
   badge,
+  icon,
 }: {
   title: string;
   description?: string;
@@ -157,6 +175,8 @@ export function SettingsRow({
   sub?: boolean;
   /** 标题行内的状态徽标。 */
   badge?: React.ReactNode;
+  /** 标题行左侧的品牌图标。 */
+  icon?: React.ReactNode;
 }) {
   return (
     <div
@@ -168,9 +188,10 @@ export function SettingsRow({
           className={
             sub
               ? "text-xs text-text-secondary"
-              : "text-sm font-medium text-text-primary"
+              : "flex items-center gap-2 text-sm font-medium text-text-primary"
           }
         >
+          {icon}
           {title}
           {badge}
         </div>
@@ -270,18 +291,39 @@ export function SettingsStatusBadge({
   tone,
   label,
   testId,
+  dotOnly = false,
 }: {
   tone: StatusBadgeTone;
   label: string;
   testId?: string;
+  /**
+   * 只渲染一个装饰圆点，label 不使用（调用方要把它并进按钮的 aria-label）。
+   * 窄容器（分类网格的 40px 瓦片）容不下一个带字的胶囊，且瓦片的文字列
+   * 还要靠剩余宽度，所以在那里用点。
+   */
+  dotOnly?: boolean;
 }) {
+  if (dotOnly) {
+    // 纯装饰点：button 的子节点在无障碍树里被压平（Children Presentational），
+    // 所以这里放 role="status" 或 sr-only 都不会被读出。状态由调用方
+    // 并进按钮的 aria-label，那才是读屏真正拿到的东西。
+    return (
+      <span data-testid={testId} aria-hidden="true" className="flex-none">
+        <span
+          className={`block h-2 w-2 rounded-full ${STATUS_BADGE_DOTS[tone]}`}
+        />
+      </span>
+    );
+  }
   return (
     <span
       data-testid={testId}
       // 状态会自己变（未安装 → 下载中 42% → 已安装），所以它是 live region：
       // 否则读屏用户在 140MB 的下载期间听不到任何反馈。
       role="status"
-      className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-border-muted bg-surface-muted px-2 py-0.5 text-xs text-text-secondary"
+      // flex-none + whitespace-nowrap：这个胶囊一旦落进 flex 行，默认会被压缩，
+      // 中文就会一个字一行地竖排并撞穿行高。
+      className="ml-2 inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border-muted bg-surface-muted px-2 py-0.5 text-xs text-text-secondary"
     >
       <span
         className={`h-1.5 w-1.5 flex-none rounded-full ${STATUS_BADGE_DOTS[tone]}`}

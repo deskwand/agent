@@ -315,7 +315,16 @@ export function SettingsPanel({
           </div>
         </div>
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 py-8 lg:px-8">
-          <div className="w-full min-w-0 max-w-[720px]">
+          {/*
+            api tab 不在这里封顶：它下面四个子 tab 想要的宽度不同
+            （主模型是目录网格，视觉/搜索/轻量是表单），由 SettingsAPI 各自封。
+            其余设置页维持「一行一设置」的 720px。
+          */}
+          <div
+            className={`w-full min-w-0 ${
+              activeTab === "api" ? "" : "max-w-[720px]"
+            }`}
+          >
             <div className="">
               <div className={activeTab === "api" ? "" : "hidden"}>
                 {viewedTabs.has("api") && (

@@ -121,10 +121,7 @@ describe("SettingsAPI connect flow", () => {
       root.render(React.createElement(SettingsAPI, {}));
     });
     await flush();
-    await act(async () => {
-      clickButton(container, "Add Provider");
-    });
-    await flush();
+    // api.addApi 从按钮变成分类网格的标题，改点网格瓦片。
     await act(async () => {
       clickButton(container, providerLabel);
     });

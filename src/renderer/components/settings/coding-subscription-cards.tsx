@@ -71,23 +71,10 @@ function SubscriptionCard({
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
-          <svg
-            viewBox="0 0 24 24"
-            aria-hidden="true"
+          <SubscriptionPlanIcon
+            profileKey={plan.profileKey}
             className="mt-px h-5 w-5 shrink-0 fill-none stroke-current text-text-secondary"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            {plan.profileKey === "custom:subscription-bailian-coding" ? (
-              <path d="M6.3 18h10.5a4 4 0 0 0 .2-8 6 6 0 0 0-11.2-.7A4.5 4.5 0 0 0 6.3 18Z" />
-            ) : plan.profileKey === "custom:subscription-ark-coding" ? (
-              <>
-                <path d="M3 19h18l-5.2-8h-7.6L3 19Z" />
-                <path d="m9 11 3-6 3 6" />
-              </>
-            ) : null}
-          </svg>
+          />
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
               <span className="truncate">{plan.name}</span>
@@ -227,5 +214,34 @@ export function CodingSubscriptionCards({ profiles, onSave, onDelete }: Props) {
         />
       ))}
     </div>
+  );
+}
+
+/** 订阅套餐的品牌图标。两类计划各一套路径，供网格瓦片复用。 */
+export function SubscriptionPlanIcon({
+  profileKey,
+  className,
+}: {
+  profileKey: string;
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={className}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {profileKey === "custom:subscription-bailian-coding" ? (
+        <path d="M6.3 18h10.5a4 4 0 0 0 .2-8 6 6 0 0 0-11.2-.7A4.5 4.5 0 0 0 6.3 18Z" />
+      ) : profileKey === "custom:subscription-ark-coding" ? (
+        <>
+          <path d="M3 19h18l-5.2-8h-7.6L3 19Z" />
+          <path d="m9 11 3-6 3 6" />
+        </>
+      ) : null}
+    </svg>
   );
 }

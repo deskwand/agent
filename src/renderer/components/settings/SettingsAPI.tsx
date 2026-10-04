@@ -62,8 +62,17 @@ import {
 } from "../../../shared/web-access";
 import { ProviderBrandIcon, resolveProviderBrand } from "./provider-icons";
 import { resolveProviderDisplayName } from "../../utils/model-label";
-import { SettingsContentSection } from "./shared";
+import {
+  SettingsCard,
+  SettingsContentSection,
+  SettingsRow,
+  SettingsSection,
+  SettingsSwitch,
+} from "./shared";
 import { CodingSubscriptionCards } from "./coding-subscription-cards";
+import { OAUTH_PROVIDERS } from "./provider-catalog";
+import { ConfiguredProviderList } from "./configured-provider-list";
+import { ProviderCatalogGrid } from "./provider-catalog-grid";
 
 type ProviderChoice = ProviderType;
 
@@ -126,37 +135,6 @@ const OPENCODE_PLANS = [
     id: "go",
     provider: "opencode-go" as const,
     labelKey: "api.opencodePlanGo",
-  },
-] as const;
-
-const OAUTH_PROVIDERS = [
-  {
-    id: "openai-codex",
-    name: "OpenAI Codex",
-    descriptionKey: "api.oauthOpenAIDesc",
-    noteKey: "",
-    brand: "openai",
-  },
-  {
-    id: "github-copilot",
-    name: "GitHub Copilot",
-    descriptionKey: "api.oauthGitHubDesc",
-    noteKey: "",
-    brand: "github",
-  },
-  {
-    id: "anthropic",
-    name: "Anthropic",
-    descriptionKey: "api.oauthAnthropicDesc",
-    noteKey: "api.oauthAnthropicNote",
-    brand: "anthropic",
-  },
-  {
-    id: "openrouter",
-    name: "OpenRouter",
-    descriptionKey: "api.oauthOpenRouterDesc",
-    noteKey: "",
-    brand: "openrouter",
   },
 ] as const;
 
@@ -375,10 +353,6 @@ function sanitizeDraft(
   };
 }
 
-function isCustomProfileKey(profileKey: ProviderProfileKey): boolean {
-  return profileKey.startsWith("custom:");
-}
-
 function searchMatchingProfiles(
   appConfig: AppConfig,
   provider: WebAccessAuthProvider,
@@ -524,6 +498,8 @@ export function SettingsAPI({
   const [oauthErrors, setOAuthErrors] = useState<Record<string, string>>({});
   const [pendingOAuthLogoutProviderId, setPendingOAuthLogoutProviderId] =
     useState<string | null>(null);
+  // ── 订阅套餐弹窗（Coding Plan）：包住既有的 CodingSubscriptionCards ──
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
 
   const isVisionConfigured = !!appConfig?.visionModel?.model?.trim();
 
@@ -591,12 +567,27 @@ export function SettingsAPI({
     }));
   }, [appConfig]);
 
+  /**
+   * 网格「已配置」角标用。
+   * 供应商走 configuredProviders（与列表同一份判断）；Coding Plan 被那个筛选
+   * 排除在外，但它们确实已配置，所以单独补进来，否则中转分类的角标永远是空的。
+   */
+  const configuredProfileKeys = useMemo(() => {
+    const keys = new Set(
+      configuredProviders.map((row) => row.profileKey as string),
+    );
+    for (const key of Object.keys(appConfig?.providers ?? {})) {
+      if (isCodingSubscriptionProfileKey(key)) keys.add(key);
+    }
+    return keys;
+  }, [configuredProviders, appConfig]);
+
   const isCreating = originalProfileKey === null;
   const isCustomDraft = draft?.provider === "custom";
 
-  const openCreate = () => {
+  const openCreate = (provider: ProviderType = "openrouter") => {
     setOriginalProfileKey(null);
-    setDraft(createEmptyDraft("openrouter", presets));
+    setDraft(createEmptyDraft(provider, presets));
     setError("");
     setSuccessMessage("");
     resetConnectState();
@@ -1372,6 +1363,31 @@ export function SettingsAPI({
     });
   };
 
+  /**
+   * 已配置列表（或空态）。
+   * 标题块在 embedded 时隐藏，但列表本身照常渲染 —— 与改动前一致。
+   */
+  const configuredList =
+    configuredProviders.length === 0 ? (
+      <SettingsCard>
+        <SettingsRow
+          title={t("api.configuredListEmptyTitle")}
+          description={t("api.configuredListEmpty")}
+        />
+      </SettingsCard>
+    ) : (
+      <ConfiguredProviderList
+        rows={configuredProviders}
+        presets={presets}
+        oauthStatuses={oauthStatuses}
+        onEdit={openEdit}
+        onDelete={requestDelete}
+        onDisconnect={(providerId) =>
+          setPendingOAuthLogoutProviderId(providerId)
+        }
+      />
+    );
+
   if (isLoadingConfig) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-3">
@@ -1444,93 +1460,22 @@ export function SettingsAPI({
       )}
 
       {(activeTab === "main" || embedded) && (
-        <div className="space-y-5">
+        <div className="max-w-[1080px] space-y-5">
           {!embedded && (
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-medium text-text-primary">
-                  {t("api.configuredListTitle")}
-                </h3>
-                <p className="mt-1 text-xs text-text-muted">
-                  {t("api.configuredListDesc")}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={openCreate}
-                className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                {t("api.addApi")}
-              </button>
-            </div>
+            <SettingsSection
+              title={t("api.configuredListTitle")}
+              description={t("api.configuredListDesc")}
+            >
+              {configuredList}
+            </SettingsSection>
           )}
 
-          {configuredProviders.length === 0 ? (
-            <div className="rounded-2xl border border-border-muted px-4 py-5 text-sm text-text-muted">
-              {t("api.configuredListEmpty")}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {configuredProviders.map(({ profileKey, config }) => {
-                const isCustomProvider = isCustomProfileKey(profileKey);
-                return (
-                  <div
-                    key={profileKey}
-                    className="rounded-2xl border border-border-muted bg-background px-4 py-3 shadow-card"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-primary">
-                          <ProviderBrandIcon
-                            brand={
-                              resolveProviderBrand(
-                                profileKeyToProvider(profileKey).provider,
-                                config.customProtocol,
-                              ) ?? "custom"
-                            }
-                            className="h-4 w-4 flex-shrink-0"
-                          />
-                          <span className="truncate">
-                            {config.name ||
-                              providerLabel(profileKey, presets, t, config)}
-                          </span>
-                        </p>
-                        {isCustomProvider && (
-                          <p className="mt-1 truncate text-xs text-text-muted">
-                            {config.baseUrl}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(profileKey)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          {t("api.editApi")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => requestDelete(profileKey)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-error/10 hover:text-error"
-                        >
-                          <Trash2 className="h-3 w-3" />
-                          {t("api.deleteApi")}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {embedded && configuredList}
 
           {embedded && (
             <button
               type="button"
-              onClick={openCreate}
+              onClick={() => openCreate()}
               className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -1538,106 +1483,26 @@ export function SettingsAPI({
             </button>
           )}
 
-          {/* ── OAuth Section ── */}
-          <div className="mt-6 border-t border-border-muted pt-5">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-text-muted">
-                {t("api.oauthSectionTitle")}
-              </span>
-            </div>
-            <div className="space-y-2">
-              {OAUTH_PROVIDERS.map((provider) => {
-                const status = oauthStatuses[provider.id];
-                const loading = oauthLoading[provider.id] || false;
-                const isConnected = status?.loggedIn;
-
-                return (
-                  <div
-                    key={provider.id}
-                    data-testid={`${provider.id}-oauth-card`}
-                    className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 ${
-                      isConnected
-                        ? "border-success/30 bg-success/5"
-                        : "border-border-muted bg-surface"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <ProviderBrandIcon
-                        brand={provider.brand}
-                        className="h-5 w-5 flex-shrink-0"
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-text-primary">
-                            {provider.name}
-                          </span>
-                          {isConnected && (
-                            <span className="inline-flex items-center gap-1 text-xs text-success">
-                              <span className="w-1.5 h-1.5 rounded-full bg-success" />
-                              {t("api.oauthConnected")}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-text-muted mt-0.5">
-                          {isConnected
-                            ? t("api.oauthConnectedDesc", {
-                                provider: provider.name,
-                              })
-                            : t(provider.descriptionKey)}
-                        </div>
-                        {!isConnected && provider.noteKey && (
-                          <div className="text-xs text-warning mt-1">
-                            {t(provider.noteKey)}
-                          </div>
-                        )}
-                        {oauthErrors[provider.id] && (
-                          <div className="text-xs text-error mt-1">
-                            {oauthErrors[provider.id]}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {isConnected ? (
-                      <button
-                        type="button"
-                        data-testid={`${provider.id}-oauth-disconnect`}
-                        onClick={() =>
-                          setPendingOAuthLogoutProviderId(provider.id)
-                        }
-                        className="rounded-lg border border-border-muted px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-error flex-shrink-0"
-                      >
-                        {t("api.oauthDisconnect")}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        data-testid={`${provider.id}-oauth-connect`}
-                        onClick={() => void handleOAuthLogin(provider.id)}
-                        disabled={loading}
-                        className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50 flex-shrink-0"
-                      >
-                        {loading
-                          ? t("api.oauthLoggingIn")
-                          : t("api.oauthLoginBtn")}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="mt-3">
-              <CodingSubscriptionCards
-                profiles={appConfig?.providers || {}}
-                onSave={handleSubscriptionSave}
-                onDelete={handleSubscriptionDelete}
-              />
-            </div>
-          </div>
+          <SettingsSection title={t("api.addApi")}>
+            <ProviderCatalogGrid
+              presets={presets}
+              configuredProfileKeys={configuredProfileKeys}
+              oauthStatuses={oauthStatuses}
+              oauthLoading={oauthLoading}
+              oauthErrors={oauthErrors}
+              onCreateProvider={openCreate}
+              onCreatePlan={() => setPlanDialogOpen(true)}
+              onOAuthLogin={handleOAuthLogin}
+              onOAuthDisconnect={(providerId) =>
+                setPendingOAuthLogoutProviderId(providerId)
+              }
+            />
+          </SettingsSection>
         </div>
       )}
 
       {activeTab === "vision" && !embedded && (
-        <div className="space-y-5">
+        <div className="max-w-[720px] space-y-5">
           {!isVisionConfigured ? (
             /* ── Empty state ── */
             <div className="rounded-2xl border border-dashed border-border-muted px-6 py-10 text-center">
@@ -1697,17 +1562,14 @@ export function SettingsAPI({
                   </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={visionDraft.enabled}
-                      onChange={(e) => {
-                        void handleVisionToggle(e.target.checked);
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-surface-hover rounded-full peer peer-checked:bg-accent peer-focus:ring-2 peer-focus:ring-accent/30 transition-colors after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                  </label>
+                  <SettingsSwitch
+                    checked={visionDraft.enabled}
+                    onChange={(next) => {
+                      void handleVisionToggle(next);
+                    }}
+                    label={t("api.visionModelEnable")}
+                    testId="vision-model-enabled"
+                  />
                   <button
                     type="button"
                     onClick={openVisionEditor}
@@ -1725,7 +1587,7 @@ export function SettingsAPI({
 
       {/* ── Search tab ── */}
       {activeTab === "search" && !embedded && searchDraft && (
-        <div className="space-y-5">
+        <div className="max-w-[720px] space-y-5">
           <SettingsContentSection
             title={t("webAccess.groupTitle")}
             description={t("webAccess.groupDescription")}
@@ -2036,7 +1898,7 @@ export function SettingsAPI({
 
       {/* ── Utility model tab ── */}
       {activeTab === "utility" && !embedded && (
-        <div className="space-y-5">
+        <div className="max-w-[720px] space-y-5">
           <SettingsContentSection
             title={t("api.utilityModelTitle")}
             description={t("api.utilityModelDesc")}
@@ -2049,21 +1911,18 @@ export function SettingsAPI({
                 <span className="text-xs font-medium text-text-secondary">
                   {t("api.utilityInheritActive")}
                 </span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={utilityDraft.inheritFromActive}
-                    onChange={(e) => {
-                      setUtilityDraft((prev) => ({
-                        ...prev,
-                        inheritFromActive: e.target.checked,
-                      }));
-                      setUtilityMessage(null);
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-surface-hover rounded-full peer peer-checked:bg-accent peer-focus:ring-2 peer-focus:ring-accent/30 transition-colors after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                </label>
+                <SettingsSwitch
+                  checked={utilityDraft.inheritFromActive}
+                  onChange={(next) => {
+                    setUtilityDraft((prev) => ({
+                      ...prev,
+                      inheritFromActive: next,
+                    }));
+                    setUtilityMessage(null);
+                  }}
+                  label={t("api.utilityInheritActive")}
+                  testId="utility-inherit-active"
+                />
               </div>
 
               {!utilityDraft.inheritFromActive && (
@@ -2191,20 +2050,14 @@ export function SettingsAPI({
                   <span className="text-sm font-medium text-text-primary">
                     {t("api.visionModelEnable")}
                   </span>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={visionDraft.enabled}
-                      onChange={(e) =>
-                        setVisionDraft((prev) => ({
-                          ...prev,
-                          enabled: e.target.checked,
-                        }))
-                      }
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-surface-hover rounded-full peer peer-checked:bg-accent peer-focus:ring-2 peer-focus:ring-accent/30 transition-colors after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full"></div>
-                  </label>
+                  <SettingsSwitch
+                    checked={visionDraft.enabled}
+                    onChange={(next) => {
+                      setVisionDraft((prev) => ({ ...prev, enabled: next }));
+                    }}
+                    label={t("api.visionModelEnable")}
+                    testId="vision-model-enabled-in-modal"
+                  />
                 </div>
 
                 {/* Provider selection */}
@@ -2562,6 +2415,34 @@ export function SettingsAPI({
                     <Trash2 className="h-4 w-4" />
                   )}
                   {t("api.deleteApi")}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {planDialogOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
+          <div className="mx-4 w-full max-w-2xl rounded-2xl border border-border-muted bg-background shadow-xl">
+            <div className="border-b border-border-muted px-5 py-4">
+              <h3 className="text-sm font-medium text-text-primary">
+                {t("api.planDialogTitle")}
+              </h3>
+            </div>
+            <div className="space-y-3 px-5 py-4">
+              <CodingSubscriptionCards
+                profiles={appConfig?.providers || {}}
+                onSave={handleSubscriptionSave}
+                onDelete={handleSubscriptionDelete}
+              />
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setPlanDialogOpen(false)}
+                  className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                >
+                  {t("api.done")}
                 </button>
               </div>
             </div>
