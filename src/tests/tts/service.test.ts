@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TTS_ENGLISH_MODEL_ID,
+  TTS_FAST_MODEL_ID,
   TTS_MODEL_ID,
   voiceRoot,
 } from "../../main/speech/installer";
@@ -207,5 +208,104 @@ describe("per-engine installation gate", () => {
       ok: false,
       error: "model not installed",
     });
+  });
+});
+
+/** 三个模型全装：软偏好与回退都跑得到。 */
+function installedAllModels(): string {
+  const userDataPath = mkdtempSync(join(tmpdir(), "tts-svc-"));
+  mkdirSync(voiceRoot(userDataPath), { recursive: true });
+  writeFileSync(
+    join(voiceRoot(userDataPath), "install.json"),
+    JSON.stringify({
+      runtimeVersion: "1.13.8",
+      model: "",
+      ttsModel: TTS_MODEL_ID,
+      ttsEnglishModel: TTS_ENGLISH_MODEL_ID,
+      ttsFastModel: TTS_FAST_MODEL_ID,
+      installedAt: "x",
+    }),
+  );
+  return userDataPath;
+}
+
+describe("prefer (语音模式的高速音色)", () => {
+  it("uses the fast voice for every sentence", async () => {
+    // 语音模式传 prefer，所以中英文两句都该落在 matcha 上，不走语言路由
+    const seen: string[] = [];
+    const service = getTtsService({
+      userDataPath: installedAllModels(),
+      createEngine: recordingEngine(seen),
+    });
+    await service.speak("运行 npm install 安装依赖。", { prefer: "matcha" });
+    await service.speak("The build failed.", { prefer: "matcha" });
+    expect(seen).toEqual([
+      "matcha:运行 npm install 安装依赖。",
+      "matcha:The build failed.",
+    ]);
+  });
+
+  it("does not expand English digits on the fast voice", async () => {
+    // 数字转写是给英文 MeloTTS 模型补的（它包里一个 .fst 都没有）；matcha 自带三个 -zh.fst
+    const seen: string[] = [];
+    const service = getTtsService({
+      userDataPath: installedAllModels(),
+      createEngine: recordingEngine(seen),
+    });
+    await service.speak("Version 1.0.47 is ready now.", { prefer: "matcha" });
+    expect(seen).toEqual(["matcha:Version 1.0.47 is ready now."]);
+  });
+
+  it("falls back to the routed engine when the fast voice is missing", async () => {
+    const seen: string[] = [];
+    const service = getTtsService({
+      userDataPath: installedBothModels(),
+      createEngine: recordingEngine(seen),
+    });
+    await service.speak("The build failed.", { prefer: "matcha" });
+    await service.speak("构建失败了。", { prefer: "matcha" });
+    expect(seen).toEqual(["en:The build failed.", "zh:构建失败了。"]);
+  });
+
+  it("reports an error when neither the fast voice nor its fallback is installed", async () => {
+    const seen: string[] = [];
+    const service = getTtsService({
+      userDataPath: englishOnlyUserData(),
+      createEngine: recordingEngine(seen),
+    });
+    await expect(
+      service.speak("构建失败了。", { prefer: "matcha" }),
+    ).resolves.toEqual({ ok: false, error: "model not installed" });
+    expect(seen).toEqual([]);
+  });
+
+  it("keeps engine a hard choice, so the self-check still fails loudly", async () => {
+    // engine 是硬指定（安装自检用），prefer 不得改掉它的语义：
+    // 半装的模型必须报错才能被 ipc.ts 那一段撤掉。
+    const seen: string[] = [];
+    const service = getTtsService({
+      userDataPath: installedBothModels(),
+      createEngine: recordingEngine(seen),
+    });
+    await expect(service.speak("test", { engine: "matcha" })).resolves.toEqual({
+      ok: false,
+      error: "model not installed",
+    });
+    expect(seen).toEqual([]);
+  });
+
+  it("lets engine win when both engine and prefer are given", async () => {
+    // 优先级也是规则的一部分：ipc 那道日志开关的门控按"最终用哪个引擎"判，
+    // 它读的就是这条规则（resolveTtsEngine）。
+    const seen: string[] = [];
+    const service = getTtsService({
+      userDataPath: installedAllModels(),
+      createEngine: recordingEngine(seen),
+    });
+    await service.speak("The build failed.", {
+      engine: "en",
+      prefer: "matcha",
+    });
+    expect(seen).toEqual(["en:The build failed."]);
   });
 });

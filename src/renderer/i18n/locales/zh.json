@@ -141,7 +141,11 @@
         "title": "语音对话",
         "desc": "停下说话后最多等你这么久。判定你没说完就继续等，直到你接上话或到点收尾。",
         "silenceLabel": "最多等待",
-        "silenceValue": "{{ms}} 毫秒"
+        "silenceValue": "{{ms}} 毫秒",
+        "voiceFast": "高速音色（Matcha）",
+        "voiceFastDesc": "首声约 1 秒（16kHz）。包 123MB，常驻内存约 260MB；同时用朗读再加约 320MB，两者都要重启应用才归还。未安装时用朗读的音色（需开启朗读）。",
+        "voiceFastDownload": "下载高速音色",
+        "voiceFastRemove": "删除高速音色"
       }
     },
     "groupGeneral": "常规",

@@ -15,9 +15,10 @@
  */
 import type { TtsModelKey } from "../../shared/ipc-types";
 
+/** 路由只会在朗读的两个模型里选：高速音色不参与路由（语音模式用 prefer 点它）。 */
 const LATIN_LETTER = /^[A-Za-z]$/;
 
-export function pickEngine(text: string): TtsModelKey {
+export function pickEngine(text: string): Extract<TtsModelKey, "zh" | "en"> {
   const letters = text.match(/\p{L}/gu) ?? [];
   if (letters.length < 2) return "zh";
   return letters.every((ch) => LATIN_LETTER.test(ch)) ? "en" : "zh";

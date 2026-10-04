@@ -32,16 +32,25 @@ export const MODEL_ID = "x-asr-480ms-zh-en-punct-int8";
 export const TTS_MODEL_ID = "vits-melo-tts-zh_en";
 /** 英文音色模型。它读不了中文（词表里没有汉字），所以只用在拉丁文本上。 */
 export const TTS_ENGLISH_MODEL_ID = "vits-melo-tts-en";
+/**
+ * 语音模式的高速音色。一个模型同时吃中英文，所以语音模式不再需要语言路由。
+ * 包内含 vocos 声码器与 espeak-ng-data（后者是 GPL-3.0，见 package-tts-model.sh）。
+ */
+export const TTS_FAST_MODEL_ID = "matcha-icefall-zh-en";
 
-export type TtsModelId = typeof TTS_MODEL_ID | typeof TTS_ENGLISH_MODEL_ID;
+export type TtsModelId =
+  | typeof TTS_MODEL_ID
+  | typeof TTS_ENGLISH_MODEL_ID
+  | typeof TTS_FAST_MODEL_ID;
 
-/** 模型 → 清单字段。两个模型各自记自己的，删一个不动另一个。 */
+/** 模型 → 清单字段。三个模型各自记自己的，删一个不动另两个。 */
 const MANIFEST_KEY_BY_MODEL: Record<
   TtsModelId,
-  "ttsModel" | "ttsEnglishModel"
+  "ttsModel" | "ttsEnglishModel" | "ttsFastModel"
 > = {
   [TTS_MODEL_ID]: "ttsModel",
   [TTS_ENGLISH_MODEL_ID]: "ttsEnglishModel",
+  [TTS_FAST_MODEL_ID]: "ttsFastModel",
 };
 
 const RUNTIME_URL = (platform: string, arch: string) =>
@@ -61,6 +70,11 @@ export interface VoiceManifest {
    * 两个模型各自记自己的，删一个不动另一个。
    */
   ttsEnglishModel?: string;
+  /**
+   * 语音模式的高速音色（matcha-icefall-zh-en）。**缺字段 = 未装**，与上面两个同一条约定，
+   * 所以老用户的清单不用迁移。
+   */
+  ttsFastModel?: string;
   installedAt: string;
 }
 

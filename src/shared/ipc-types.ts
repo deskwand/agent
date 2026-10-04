@@ -517,8 +517,12 @@ export type VoiceEvent =
 // TTS / read aloud（朗读）
 // ---------------------------------------------------------------------------
 
-/** 两个语音模型的键。主进程与渲染层共用这一个名字。 */
-export type TtsModelKey = "zh" | "en";
+/**
+ * 三个语音模型的键。主进程与渲染层共用这一个名字。
+ *
+ * `"matcha"` 是语音模式的高速音色（朗读那两张卡看不到它）。
+ */
+export type TtsModelKey = "zh" | "en" | "matcha";
 
 export type TtsInstallPhase =
   | "idle"
@@ -536,10 +540,25 @@ export interface TtsInstallState {
   error?: string;
 }
 
-/** 两个模型各自的状态。渲染层两行各读一行。 */
+/** 三个模型各自的状态。渲染层每行各读一行。 */
 export interface TtsInstallStates {
   zh: TtsInstallState;
   en: TtsInstallState;
+  matcha: TtsInstallState;
+}
+
+/**
+ * speak 的引擎选择。两个入参语义不同，**不要合并**：
+ *
+ * - `engine`：硬指定（安装自检用）。指定的没装就报错。
+ * - `prefer`：软偏好（语音模式用）。没装就回退到按文本路由。
+ *
+ * 一个参数两种期望 = 迟早改错一个：自检需要"没装就报错"才能把半装的模型撤掉，
+ * 语音模式需要"没装就照旧出声"。
+ */
+export interface TtsSpeakOptions {
+  engine?: TtsModelKey;
+  prefer?: TtsModelKey;
 }
 
 export type TtsSpeakResult =

@@ -10,5 +10,7 @@
   "ttsModelUrl": "https://file.deskwand.com/voice-models/vits-melo-tts-zh_en-7bab2690.tar.gz",
   "ttsModelSha256": "7bab269000d966e73c33e78409254ffb3394cf557c7fde004ff5c256c4d3f45f",
   "ttsEnglishModelUrl": "https://file.deskwand.com/voice-models/vits-melo-tts-en-e265040a.tar.gz",
-  "ttsEnglishModelSha256": "e265040a1477020688118380a270dec78d06675d21b161a0d07671385442a0f2"
+  "ttsEnglishModelSha256": "e265040a1477020688118380a270dec78d06675d21b161a0d07671385442a0f2",
+  "ttsFastModelUrl": "https://file.deskwand.com/voice-models/matcha-icefall-zh-en-d08c42e0.tar.gz",
+  "ttsFastModelSha256": "d08c42e0af7c546784a6689e905846a3bec36ecdd48623a0ae4624ddaf3c96c2"
 }

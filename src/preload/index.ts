@@ -49,6 +49,7 @@ import type {
   TtsEvent,
   TtsInstallStates,
   TtsModelKey,
+  TtsSpeakOptions,
   TtsSpeakResult,
 } from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
@@ -971,8 +972,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // ── Read aloud（朗读）──────────────────────────────────────────
   tts: {
-    speak: (text: string): Promise<TtsSpeakResult> =>
-      ipcRenderer.invoke("tts.speak", text),
+    speak: (text: string, opts?: TtsSpeakOptions): Promise<TtsSpeakResult> =>
+      ipcRenderer.invoke("tts.speak", text, opts),
     install: (model: TtsModelKey): Promise<void> =>
       ipcRenderer.invoke("tts.install", model),
     removeInstall: (model: TtsModelKey): Promise<void> =>
@@ -1657,7 +1658,10 @@ declare global {
         onEvent: (callback: (event: VoiceEvent) => void) => () => void;
       };
       tts: {
-        speak: (text: string) => Promise<TtsSpeakResult>;
+        speak: (
+          text: string,
+          opts?: TtsSpeakOptions,
+        ) => Promise<TtsSpeakResult>;
         install: (model: TtsModelKey) => Promise<void>;
         removeInstall: (model: TtsModelKey) => Promise<void>;
         getInstallState: () => Promise<TtsInstallStates>;

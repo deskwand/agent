@@ -9,6 +9,9 @@
  *
  * 两个模型（中文 zh / 英文 en）各有各的状态与守卫：中文已装**不能**把英文的安装
  * 挡在门外（否则英文行的按钮会静默无反应），英文自检失败也只撤英文那一个。
+ *
+ * 现在是**三个**：再加上语音模式的高速音色（`matcha`）。它同样各管各的，但它不归
+ * 朗读开关管 —— 那道门控的判据见 `tts.speak` 里的注释与设计 D7。
  */
 import type { IpcMain } from "electron";
 import type {
@@ -16,12 +19,14 @@ import type {
   TtsInstallState,
   TtsInstallStates,
   TtsModelKey,
+  TtsSpeakOptions,
   TtsSpeakResult,
 } from "../../shared/ipc-types";
 import type { TtsService } from "./service";
-import { getTtsService } from "./service";
+import { getTtsService, resolveTtsEngine } from "./service";
 import {
   TTS_ENGLISH_MODEL_ID,
+  TTS_FAST_MODEL_ID,
   TTS_MODEL_ID,
   installRuntime,
   installTtsModel,
@@ -58,11 +63,12 @@ const CHANNELS = [
   "tts.speak",
 ] as const;
 
-const MODELS: TtsModelKey[] = ["zh", "en"];
+const MODELS: TtsModelKey[] = ["zh", "en", "matcha"];
 
 const MODEL_ID_BY_KEY: Record<TtsModelKey, TtsModelId> = {
   zh: TTS_MODEL_ID,
   en: TTS_ENGLISH_MODEL_ID,
+  matcha: TTS_FAST_MODEL_ID,
 };
 
 /**
@@ -72,6 +78,14 @@ const MODEL_ID_BY_KEY: Record<TtsModelKey, TtsModelId> = {
 const SELF_CHECK: Record<TtsModelKey, { text: string; engine: TtsModelKey }> = {
   zh: { text: "语音引擎自检。", engine: "zh" }, // i18n-allow-cjk 自检用语，产物丢弃，不给用户看
   en: { text: "This is a test.", engine: "en" },
+  // 句子里刻意带数字与英文词：
+  // 数字走三个 -zh.fst，英文走 espeak-ng-data。后者缺失时**不报错**（只静默丢词），
+  // 但缺得更彻底（比如整个 dataDir 没了）时原生层会在合成时 exit 255 ——
+  // 那时候应该在**安装时**就崩掉，而不是等用户说第一句英文。
+  matcha: {
+    text: "语音引擎自检，共 12 个字。English too.", // i18n-allow-cjk 同上
+    engine: "matcha",
+  },
 };
 
 export function registerTtsIpc({
@@ -92,8 +106,16 @@ export function registerTtsIpc({
   };
 
   const idle: TtsInstallState = { phase: "idle", percent: 0, installed: false };
-  const states: TtsInstallStates = { zh: { ...idle }, en: { ...idle } };
-  const installing: Record<TtsModelKey, boolean> = { zh: false, en: false };
+  const states: TtsInstallStates = {
+    zh: { ...idle },
+    en: { ...idle },
+    matcha: { ...idle },
+  };
+  const installing: Record<TtsModelKey, boolean> = {
+    zh: false,
+    en: false,
+    matcha: false,
+  };
 
   const publish = (model: TtsModelKey, next: TtsInstallState) => {
     states[model] = next;
@@ -136,6 +158,7 @@ export function registerTtsIpc({
   ipcMain.handle("tts.getInstallState", () => ({
     zh: { ...states.zh, installed: service.isInstalled("zh") },
     en: { ...states.en, installed: service.isInstalled("en") },
+    matcha: { ...states.matcha, installed: service.isInstalled("matcha") },
   }));
 
   ipcMain.handle("tts.install", async (_event, model: TtsModelKey) => {
@@ -154,12 +177,16 @@ export function registerTtsIpc({
       publish(model, { phase, percent: 100, installed: false });
     try {
       const spec = installer.readSpec();
-      const target = {
-        id: MODEL_ID_BY_KEY[model],
-        url: model === "zh" ? spec.ttsModelUrl : spec.ttsEnglishModelUrl,
-        sha256:
-          model === "zh" ? spec.ttsModelSha256 : spec.ttsEnglishModelSha256,
+      // 一张表而不是嵌套三元：三个模型后三元式已经读不动了
+      const sources: Record<TtsModelKey, { url: string; sha256: string }> = {
+        zh: { url: spec.ttsModelUrl, sha256: spec.ttsModelSha256 },
+        en: {
+          url: spec.ttsEnglishModelUrl,
+          sha256: spec.ttsEnglishModelSha256,
+        },
+        matcha: { url: spec.ttsFastModelUrl, sha256: spec.ttsFastModelSha256 },
       };
+      const target = { id: MODEL_ID_BY_KEY[model], ...sources[model] };
       publish(model, { phase: "downloading", percent: 0, installed: false });
       await ensureRuntime(onProgress, onPhase);
       publish(model, { phase: "downloading", percent: 0, installed: false });
@@ -207,13 +234,29 @@ export function registerTtsIpc({
 
   ipcMain.handle(
     "tts.speak",
-    async (_event, text: string): Promise<TtsSpeakResult> => {
-      // 与 voice.start 同一条：开关关掉就不干活。设置卡只管下载是不够的 ——
-      // 关掉之后必须真的不加载引擎、不出声（设计 §6.1 验收第 4 条）。
-      if (!configStore.getAll().readAloud?.enabled) {
+    async (
+      _event,
+      text: string,
+      opts?: TtsSpeakOptions,
+    ): Promise<TtsSpeakResult> => {
+      // 每个模型有自己的归属：zh / en 属于朗读，那个开关就是朗读的总闸；
+      // matcha 属于语音模式（它的开关就是浮层本身），音色也是用户单独下的。
+      //
+      // 所以：开关关掉时，**只有真的会用高速音色的那一次**能继续出声。否则语音模式
+      // 会连回退到朗读模型的机会都没有 —— 而那条回退正是"没开朗读的语音模式"的常态。
+      //
+      // 问的是"这次最终用哪个引擎"，而那个规则在 resolveTtsEngine 里（只有一处）：
+      // 这里自己再写一遍 `prefer === "matcha"` 就会在 engine/prefer 同时给出时判错。
+      const engineForCall = resolveTtsEngine(text, opts, (engine) =>
+        service.isInstalled(engine),
+      );
+      if (
+        !configStore.getAll().readAloud?.enabled &&
+        engineForCall !== "matcha"
+      ) {
         return { ok: false, error: "read aloud disabled" };
       }
-      return service.speak(text);
+      return service.speak(text, opts);
     },
   );
 

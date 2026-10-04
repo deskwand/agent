@@ -15,3 +15,14 @@ This product includes the Silero VAD model (silero_vad.onnx),
 Copyright (c) 2020-present Silero Team.
 Licensed under the MIT License.
 https://github.com/snakers4/silero-vad
+
+--------------------------------------------------------------------------------
+espeak-ng data
+
+The fast voice model for voice conversation (matcha-icefall-zh-en) bundles the
+espeak-ng data files (espeak-ng-data), Copyright (c) 2013-2025 Reece H. Dunn and
+espeak-ng contributors.
+Licensed under the GNU General Public License, version 3.
+https://github.com/espeak-ng/espeak-ng
+The full license text is included at espeak-ng-data/COPYING inside the model
+archive that the app downloads.

@@ -8,6 +8,7 @@
  * 用法：
  *   npx electron scripts/tts-smoke.mjs --variant zh_en --runtime <runtime根> --model <模型目录>
  *   npx electron scripts/tts-smoke.mjs --variant en    --runtime <runtime根> --model <英文模型目录>
+ *   npx electron scripts/tts-smoke.mjs --variant matcha --runtime <runtime根> --model <高速音色目录>
  *   npx electron scripts/tts-smoke.mjs --variant both  --runtime <runtime根> \
  *       --model-zh <中文模型目录> --model-en <英文模型目录>
  *   （node 也能跑，参数相同）
@@ -37,12 +38,12 @@ for (let i = 2; i < process.argv.length; ) {
 }
 
 const USAGE =
-  "usage: --runtime <dir> [--variant zh_en|en|both] --model <dir> | " +
+  "usage: --runtime <dir> [--variant zh_en|en|matcha|both] --model <dir> | " +
   "--variant both --model-zh <dir> --model-en <dir> [--text …] [--out …]";
 
 const runtimeRoot = args.get("runtime");
 const variant = args.get("variant") ?? "zh_en";
-if (!["zh_en", "en", "both"].includes(variant)) {
+if (!["zh_en", "en", "matcha", "both"].includes(variant)) {
   console.error(`未知 variant: ${variant}\n${USAGE}`);
   process.exit(2);
 }
@@ -51,27 +52,38 @@ const zhDir =
   args.get("model-zh") ?? (variant === "both" ? undefined : args.get("model"));
 const enDir =
   args.get("model-en") ?? (variant === "both" ? undefined : args.get("model"));
-const needsZh = variant !== "en";
-const needsEn = variant !== "zh_en";
-if (!runtimeRoot || (needsZh && !zhDir) || (needsEn && !enDir)) {
+// matcha 是单模型同时吃中英文，所以和 zh_en / en 一样只看 --model。
+// 不能只写 needsZh / needsEn：那样 matcha 两个都为 false，就会跳过对 --model 的检查，
+// 接着 configFor 拿到 undefined 报一个没法看的 TypeError。
+const dirOk =
+  variant === "both"
+    ? Boolean(args.get("model-zh") && args.get("model-en"))
+    : Boolean(args.get("model"));
+if (!runtimeRoot || !dirOk) {
   console.error(USAGE);
   process.exit(2);
 }
 
-/** 英文分支刻意带数字：英文模型没有任何 .fst，数字会整段消失，必须端到端跑到。 */
+/**
+ * 英文分支刻意带数字：英文模型没有任何 .fst，数字会整段消失，必须端到端跑到。
+ * matcha 同样带数字与英文词：它的数字靠三个 -zh.fst，英文发音靠 espeak-ng-data，
+ * 两件东西缺一件都不报错（静默丢词），所以冒烟文本必须同时含这两类。
+ */
 const DEFAULT_TEXT = {
   zh_en: "朗读冒烟测试，共 12 个字。",
   en: "Smoke test for the English voice, with 12 words.",
+  matcha: "高速音色冒烟测试，共 12 个字。It reads English too.",
 };
-const text =
-  args.get("text") ?? DEFAULT_TEXT[variant === "en" ? "en" : "zh_en"];
+const text = args.get("text") ?? DEFAULT_TEXT[variant] ?? DEFAULT_TEXT.zh_en;
 const out = args.get("out") ?? "/tmp/tts-smoke.wav";
 
 /** 失败提示按 variant 给，不然会把人指去查不存在的 .fst。 */
 const SILENT_HINT =
   variant === "en"
     ? "检查英文模型目录（model.onnx / lexicon.txt / tokens.txt）与 enableExternalBuffer 是否为 false"
-    : "检查三个 .fst 是否齐全、model.onnx 是否完整";
+    : variant === "matcha"
+      ? "检查 model-steps-3.onnx / vocos-16khz-univ.onnx / 三个 -zh.fst / espeak-ng-data 是否齐全"
+      : "检查三个 .fst 是否齐全、model.onnx 是否完整";
 
 // 锚点用 process.cwd()：路径本身是绝对的，而 __filename / import.meta.url
 // 各在一半运行环境里不存在。
@@ -90,8 +102,28 @@ const peakOf = (samples) => {
 /**
  * 与生产同形的配置。英文模型包里没有 dict/ 也没有任何 .fst（实测），
  * 带上它们会加载失败或静默失效。
+ * matcha 与它们都不同：声学模型 + 声码器 + espeak-ng-data，见 buildMatchaTtsConfig。
  */
 function configFor(kind, dir) {
+  if (kind === "matcha") {
+    return {
+      model: {
+        matcha: {
+          acousticModel: join(dir, "model-steps-3.onnx"),
+          vocoder: join(dir, "vocos-16khz-univ.onnx"),
+          lexicon: join(dir, "lexicon.txt"),
+          tokens: join(dir, "tokens.txt"),
+          // 必填。不给它时构造能过、合成时原生层 exit 255，见 local-engine 注释。
+          dataDir: join(dir, "espeak-ng-data"),
+        },
+      },
+      ruleFsts: ["phone-zh.fst", "date-zh.fst", "number-zh.fst"]
+        .map((name) => join(dir, name))
+        .join(","),
+      numThreads: 4,
+      provider: "cpu",
+    };
+  }
   const vits = {
     model: join(dir, "model.onnx"),
     lexicon: join(dir, "lexicon.txt"),
@@ -145,9 +177,7 @@ async function runSingle() {
   const rss0 = process.memoryUsage().rss;
   let started = Date.now();
 
-  const tts = new sherpa.OfflineTts(
-    configFor(variant === "en" ? "en" : "zh_en", dir),
-  );
+  const tts = new sherpa.OfflineTts(configFor(variant, dir));
   const loadMs = Date.now() - started;
   const rssLoaded = process.memoryUsage().rss;
 

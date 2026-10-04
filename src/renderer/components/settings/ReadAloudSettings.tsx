@@ -43,7 +43,13 @@ interface RowIds {
   progress: string;
 }
 
-const ROW_IDS: Record<TtsModelKey, RowIds> = {
+/**
+ * 朗读只有两个模型。`"matcha"` 是语音模式的高速音色，不进这张卡。
+ * 收窄类型而不是往 ROW_IDS 里塞一个永不渲染的 matcha 条目：后者是把语音模式的东西塞进朗读卡。
+ */
+type ReadAloudModelKey = Extract<TtsModelKey, "zh" | "en">;
+
+const ROW_IDS: Record<ReadAloudModelKey, RowIds> = {
   zh: {
     row: "read-aloud-state",
     badge: "read-aloud-badge",
@@ -90,6 +96,8 @@ export function ReadAloudSettings() {
       setStates((prev) => ({
         zh: prev?.zh ?? IDLE,
         en: prev?.en ?? IDLE,
+        // matcha 不进这张卡，但 TtsInstallStates 要求三个键齐全
+        matcha: prev?.matcha ?? IDLE,
         [event.model]: event.state,
       }));
     });
@@ -118,7 +126,7 @@ export function ReadAloudSettings() {
     }
   };
 
-  const modelRow = (model: TtsModelKey) => {
+  const modelRow = (model: ReadAloudModelKey) => {
     const ids = ROW_IDS[model];
     const row = rowOf(model);
     const busy = isInstalling(row);

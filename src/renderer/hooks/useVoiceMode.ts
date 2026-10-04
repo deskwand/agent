@@ -106,7 +106,8 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
     // 的 AudioContext 有上限，攒够了连 `new AudioContext` 都会抛。
     const audioContext = new AudioContext();
     const speech = createStreamingSpeech({
-      speak: (text: string) => window.electronAPI.tts.speak(text),
+      speak: (text: string) =>
+        window.electronAPI.tts.speak(text, { prefer: "matcha" }),
       createQueue: () =>
         createAudioQueue({ createContext: () => audioContext }),
     });

@@ -19,6 +19,12 @@ export interface VoiceRuntimeSpec {
   /** 英文音色模型（vits-melo-tts-en）。 */
   ttsEnglishModelUrl: string;
   ttsEnglishModelSha256: string;
+  /**
+   * 语音模式的高速音色（matcha-icefall-zh-en + vocos 声码器 + espeak-ng-data）。
+   * 一包三件：声码器不在上游 tarball 里，所以由我们打进同一个包。
+   */
+  ttsFastModelUrl: string;
+  ttsFastModelSha256: string;
 }
 
 /** 打包后 resources/ 是 extraResources 的根；开发时在仓库根目录。 */

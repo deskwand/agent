@@ -14,6 +14,7 @@ import {
   MODEL_ID,
   RUNTIME_VERSION,
   TTS_ENGLISH_MODEL_ID,
+  TTS_FAST_MODEL_ID,
   TTS_MODEL_ID,
   installModel,
   installTtsModel,
@@ -258,6 +259,58 @@ describe("english model install and removal", () => {
     expect(
       existsSync(join(voiceRoot(root), "models", TTS_ENGLISH_MODEL_ID)),
     ).toBe(false);
+    expect(existsSync(join(voiceRoot(root), "models", TTS_MODEL_ID))).toBe(
+      true,
+    );
+  });
+});
+
+describe("fast voice model install and removal", () => {
+  it("writes the fast voice model into its own manifest field", async () => {
+    const archive = tarGz("model-steps-3.onnx", "fake");
+    const digest = createHash("sha256").update(archive).digest("hex");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Uint8Array(archive), { status: 200 })),
+    );
+
+    await installTtsModel({
+      userDataPath: root,
+      url: "https://example.test/matcha.tar.gz",
+      sha256: digest,
+      model: TTS_FAST_MODEL_ID,
+      onProgress: () => {},
+    });
+
+    expect(readManifest(root)?.ttsFastModel).toBe(TTS_FAST_MODEL_ID);
+    expect(readManifest(root)?.ttsModel).toBeUndefined();
+    expect(readManifest(root)?.ttsEnglishModel).toBeUndefined();
+  });
+
+  it("removes only the fast voice model", () => {
+    for (const id of [TTS_MODEL_ID, TTS_ENGLISH_MODEL_ID, TTS_FAST_MODEL_ID]) {
+      mkdirSync(join(voiceRoot(root), "models", id), { recursive: true });
+    }
+    writeFileSync(
+      join(voiceRoot(root), "install.json"),
+      JSON.stringify({
+        runtimeVersion: RUNTIME_VERSION,
+        model: MODEL_ID,
+        ttsModel: TTS_MODEL_ID,
+        ttsEnglishModel: TTS_ENGLISH_MODEL_ID,
+        ttsFastModel: TTS_FAST_MODEL_ID,
+        installedAt: "x",
+      }),
+    );
+
+    removeTtsModel(root, TTS_FAST_MODEL_ID);
+
+    expect(readManifest(root)?.ttsFastModel).toBeUndefined();
+    expect(readManifest(root)?.ttsModel).toBe(TTS_MODEL_ID);
+    expect(readManifest(root)?.ttsEnglishModel).toBe(TTS_ENGLISH_MODEL_ID);
+    expect(existsSync(join(voiceRoot(root), "models", TTS_FAST_MODEL_ID))).toBe(
+      false,
+    );
     expect(existsSync(join(voiceRoot(root), "models", TTS_MODEL_ID))).toBe(
       true,
     );

@@ -141,7 +141,11 @@
         "title": "Voice conversation",
         "desc": "After you stop speaking, wait up to this long. If the sentence looks unfinished, keep waiting.",
         "silenceLabel": "Wait up to",
-        "silenceValue": "{{ms}} ms"
+        "silenceValue": "{{ms}} ms",
+        "voiceFast": "Fast voice (Matcha)",
+        "voiceFastDesc": "About 1 second to first sound (16 kHz). One 123 MB download, about 260 MB in memory, plus about 320 MB more if you also read aloud; a restart frees both. Falls back to the read-aloud voice, which needs read aloud switched on.",
+        "voiceFastDownload": "Download fast voice",
+        "voiceFastRemove": "Remove fast voice"
       }
     },
     "groupGeneral": "General",

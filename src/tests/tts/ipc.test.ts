@@ -12,6 +12,7 @@ vi.mock("../../main/config/config-store", () => ({
 }));
 import {
   TTS_ENGLISH_MODEL_ID,
+  TTS_FAST_MODEL_ID,
   TTS_MODEL_ID,
   voiceRoot,
 } from "../../main/speech/installer";
@@ -76,7 +77,19 @@ const specFixture = () => ({
   ttsModelSha256: "h",
   ttsEnglishModelUrl: "u",
   ttsEnglishModelSha256: "h",
+  ttsFastModelUrl: "u-fast",
+  ttsFastModelSha256: "h-fast",
 });
+
+/**
+ * 模型 id → 键。写这两行映射的常量，别用三元式：
+ * 上一版是 `id === TTS_ENGLISH_MODEL_ID ? "en" : "zh"`，加第三个模型后 matcha 会静默变 zh。
+ */
+const MODEL_ID_TO_KEY: Record<TtsModelId, TtsModelKey> = {
+  [TTS_MODEL_ID]: "zh",
+  [TTS_ENGLISH_MODEL_ID]: "en",
+  [TTS_FAST_MODEL_ID]: "matcha",
+};
 
 /**
  * 按模型安装要写 7 条用例，逐条手搭 registerTtsIpc 的参数太啰嗦。
@@ -95,10 +108,10 @@ function harness(
 
   const installRuntime = vi.fn(async () => {});
   const installTtsModel = vi.fn(async (opts: { model: TtsModelId }) => {
-    installed.add(opts.model === TTS_ENGLISH_MODEL_ID ? "en" : "zh");
+    installed.add(MODEL_ID_TO_KEY[opts.model]);
   });
   const removeTtsModel = vi.fn((_path: string, model: TtsModelId) => {
-    installed.delete(model === TTS_ENGLISH_MODEL_ID ? "en" : "zh");
+    installed.delete(MODEL_ID_TO_KEY[model]);
   });
   const speak = vi.fn(async (_text: string, opts?: { engine?: TtsModelKey }) =>
     options.selfCheck?.[opts?.engine ?? "zh"] === "fail"
@@ -379,5 +392,102 @@ describe("per-model install channels", () => {
       en: { installed: boolean };
     };
     expect(states.en.installed).toBe(false);
+  });
+
+  it("installs the fast voice from its own coordinate", async () => {
+    const { ipc, installTtsModel } = harness();
+    await ipc.invoke("tts.install", "matcha");
+    expect(installTtsModel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "u-fast",
+        sha256: "h-fast",
+        model: TTS_FAST_MODEL_ID,
+      }),
+    );
+  });
+
+  it("self-checks the fast voice on its own engine", async () => {
+    const { ipc, speak } = harness();
+    await ipc.invoke("tts.install", "matcha");
+    // 自检句带数字与英文词：数字走 -zh.fst，英文走 espeak-ng-data。
+    // 后者彻底缺失时原生层会在合成时 exit 255 —— 自检要把它折到安装时。
+    expect(speak).toHaveBeenCalledWith(
+      "语音引擎自检，共 12 个字。English too.",
+      {
+        engine: "matcha",
+      },
+    );
+  });
+
+  it("rolls back the fast voice alone when its self-check fails", async () => {
+    const { ipc, removeTtsModel } = harness({ selfCheck: { matcha: "fail" } });
+    await ipc.invoke("tts.install", "matcha");
+    expect(removeTtsModel).toHaveBeenCalledWith(
+      expect.any(String),
+      TTS_FAST_MODEL_ID,
+    );
+  });
+
+  it("reports the fast voice install state", async () => {
+    const { ipc } = harness({ installed: ["matcha"] });
+    const states = (await ipc.invoke("tts.getInstallState")) as {
+      zh: { installed: boolean };
+      matcha: { installed: boolean };
+    };
+    expect(states.matcha.installed).toBe(true);
+    expect(states.zh.installed).toBe(false);
+  });
+});
+
+describe("speak 与朗读开关", () => {
+  beforeEach(() => {
+    config.readAloudEnabled = false;
+  });
+
+  it("passes prefer through to the service", async () => {
+    const { ipc, speak } = harness({ installed: ["matcha"] });
+    await ipc.invoke("tts.speak", "你好", { prefer: "matcha" });
+    expect(speak).toHaveBeenCalledWith("你好", { prefer: "matcha" });
+  });
+
+  it("lets an installed fast voice speak while 朗读 is switched off", async () => {
+    // 朗读开关是朗读那条路的总闸。语音模式的音色是用户单独下的，两者不能互相锁死：
+    // 否则"装了音色、没开朗读"的语音模式会是静音。
+    const { ipc, speak } = harness({ installed: ["matcha"] });
+    const result = await ipc.invoke("tts.speak", "你好", {
+      prefer: "matcha",
+    });
+    expect(result).toMatchObject({ ok: true });
+    expect(speak).toHaveBeenCalled();
+  });
+
+  it("still refuses when the fast voice is missing", async () => {
+    // 没装 matcha 时这次调用会回退到朗读的模型 —— 那就该被开关拦住，
+    // 不然"关掉开关就不加载引擎"的承诺就空了。
+    const { ipc, speak } = harness({ installed: ["zh"] });
+    const result = await ipc.invoke("tts.speak", "你好", {
+      prefer: "matcha",
+    });
+    expect(result).toEqual({ ok: false, error: "read aloud disabled" });
+    expect(speak).not.toHaveBeenCalled();
+  });
+
+  it("gates on the engine that will really be used, not on prefer alone", async () => {
+    // engine 是硬指定，它压过 prefer。所以这一句实际会用 zh —— 而 zh 归朗读开关管。
+    // 门控只看 prefer 的话这里会放行，朗读关掉却照念朗读模型。
+    const { ipc, speak } = harness({ installed: ["zh", "matcha"] });
+    const result = await ipc.invoke("tts.speak", "你好", {
+      prefer: "matcha",
+      engine: "zh",
+    });
+    expect(result).toEqual({ ok: false, error: "read aloud disabled" });
+    expect(speak).not.toHaveBeenCalled();
+  });
+
+  it("still refuses an ordinary read-aloud call", async () => {
+    const { ipc, speak } = harness({ installed: ["zh"] });
+    const result = await ipc.invoke("tts.speak", "你好");
+    expect(result).toEqual({ ok: false, error: "read aloud disabled" });
+    expect(speak).not.toHaveBeenCalled();
   });
 });

@@ -44,7 +44,10 @@ export interface SherpaTtsModule {
 }
 
 export interface LocalTtsOptions {
-  /** 模型目录：`<userData>/voice/models/vits-melo-tts-zh_en`。 */
+  /**
+   * 模型目录：`<userData>/voice/models/<模型 id>`。
+   * 三个 id 见 installer：vits-melo-tts-zh_en / vits-melo-tts-en / matcha-icefall-zh-en。
+   */
   modelDir: string;
   createTts: (config: unknown) => SherpaOfflineTts;
   createGenerationConfig: (options: { sid: number; speed: number }) => unknown;
@@ -87,6 +90,40 @@ export function buildLocalTtsConfig(
   return config;
 }
 
+/**
+ * Matcha 家族的配置。与 VITS 的差别全在形状里：没有 `model`/`dictDir`，
+ * 换成 `acousticModel` + `vocoder`，多一个必填的 `dataDir`。
+ *
+ * **`dataDir` 不要删。** 实测过四种情况：目录完整则一切正常；目录缺文件（哪怕只缺一个）
+ * 或指向不存在的路径，都在构造时抛可捕获的 `TypeError: Please check your config!`
+ * 并点名缺哪个文件（原生校验器会逐个枚举 phontab / phonindex / phondata / intonations）；
+ * 但**完全不传 dataDir** 时构造能过，合成时原生层直接退出进程（exit 255），
+ * JS 的 try/catch 抓不住 —— 死的是整个 Electron 主进程。
+ */
+export function buildMatchaTtsConfig(
+  opts: Pick<LocalTtsOptions, "modelDir" | "numThreads">,
+): unknown {
+  const { modelDir } = opts;
+  return {
+    model: {
+      matcha: {
+        acousticModel: join(modelDir, "model-steps-3.onnx"),
+        vocoder: join(modelDir, "vocos-16khz-univ.onnx"),
+        lexicon: join(modelDir, "lexicon.txt"),
+        tokens: join(modelDir, "tokens.txt"),
+        dataDir: join(modelDir, "espeak-ng-data"),
+      },
+    },
+    // 与中文模型同一个坑：必须与 `model` 同级，放进 model.matcha 里不报错也不生效。
+    // 三个都是中文侧的规则（matcha-zh-en 包里只有 -zh 那一套），数字靠它们读出来。
+    ruleFsts: ["phone-zh.fst", "date-zh.fst", "number-zh.fst"]
+      .map((name) => join(modelDir, name))
+      .join(","),
+    numThreads: opts.numThreads ?? 4,
+    provider: "cpu",
+  };
+}
+
 export function createLocalTtsEngine(opts: LocalTtsOptions): TtsEngine {
   let tts: SherpaOfflineTts | null = null;
   const sid = opts.variant === "en" ? ENGLISH_SPEAKER_ID : SPEAKER_ID;
@@ -94,7 +131,11 @@ export function createLocalTtsEngine(opts: LocalTtsOptions): TtsEngine {
     isLoaded: () => tts !== null,
     async load() {
       if (tts) return;
-      tts = opts.createTts(buildLocalTtsConfig(opts));
+      tts = opts.createTts(
+        opts.variant === "matcha"
+          ? buildMatchaTtsConfig(opts)
+          : buildLocalTtsConfig(opts),
+      );
     },
     async synthesize(text) {
       if (!tts) throw new Error("tts engine not loaded");

@@ -30,4 +30,15 @@ describe("voice runtime spec", () => {
       "7bab269000d966e73c33e78409254ffb3394cf557c7fde004ff5c256c4d3f45f",
     );
   });
+
+  it("exposes the fast voice coordinates", () => {
+    expect(spec.ttsFastModelUrl).toMatch(
+      /^https:\/\/file\.deskwand\.com\/voice-models\/matcha-icefall-zh-en-[0-9a-f]{8}\.tar\.gz$/,
+    );
+    // 钉字面量：键名是内容寻址的，所以改这里必须先重新打包并重新上传，
+    // 否则公网上的旧字节会被 CDN 钉住（上传脚本的注释里有实测记录）。
+    expect(spec.ttsFastModelSha256).toBe(
+      "d08c42e0af7c546784a6689e905846a3bec36ecdd48623a0ae4624ddaf3c96c2",
+    );
+  });
 });

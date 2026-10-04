@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from "vitest";
 import {
   ENGLISH_SPEAKER_ID,
   buildLocalTtsConfig,
+  buildMatchaTtsConfig,
   createLocalTtsEngine,
 } from "../../main/tts/local-engine";
 
 const MODEL_DIR = "/tmp/models/vits-melo-tts-zh_en";
+const MATCHA_DIR = "/tmp/models/matcha-icefall-zh-en";
 
 describe("local tts config", () => {
   it("puts ruleFsts next to model, not inside model.vits", () => {
@@ -96,6 +98,45 @@ describe("local tts config by variant", () => {
     const vits = (config.model as { vits: Record<string, unknown> }).vits;
     expect(vits.dictDir).toBeUndefined();
     expect(config.ruleFsts).toBeUndefined();
+  });
+});
+
+describe("matcha tts config", () => {
+  const matcha = (dir = MATCHA_DIR) => {
+    const config = buildMatchaTtsConfig({ modelDir: dir }) as Record<
+      string,
+      unknown
+    >;
+    return {
+      config,
+      model: (config.model as { matcha: Record<string, unknown> }).matcha,
+    };
+  };
+
+  it("points at all five files and the vocoder", () => {
+    const { model } = matcha();
+    expect(model.acousticModel).toBe(`${MATCHA_DIR}/model-steps-3.onnx`);
+    // 声码器必须打同一个包里：它不在上游 tarball 里，见 package-tts-model.sh
+    expect(model.vocoder).toBe(`${MATCHA_DIR}/vocos-16khz-univ.onnx`);
+    expect(model.lexicon).toBe(`${MATCHA_DIR}/lexicon.txt`);
+    expect(model.tokens).toBe(`${MATCHA_DIR}/tokens.txt`);
+  });
+
+  it("keeps ruleFsts next to model, not inside model.matcha", () => {
+    const { config, model } = matcha();
+    expect(model.ruleFsts).toBeUndefined();
+    expect(config.ruleFsts).toBe(
+      ["phone-zh.fst", "date-zh.fst", "number-zh.fst"]
+        .map((name) => `${MATCHA_DIR}/${name}`)
+        .join(","),
+    );
+  });
+
+  it("always sets dataDir", () => {
+    // 不要删这一行。实测：不给 dataDir 时构造能过，但合成时原生层直接 exit 255，
+    // JS 的 try/catch 抓不住 —— 会打死整个 Electron 主进程。
+    const { model } = matcha();
+    expect(model.dataDir).toBe(`${MATCHA_DIR}/espeak-ng-data`);
   });
 });
 
