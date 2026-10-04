@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { ConnectorEntry } from "../../../shared/connectors";
 import {
   missingPermissionKinds,
   type CapabilityPermissions,
+  type PermissionKind,
 } from "../../../shared/capabilities";
 import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
 import { ReadAloudSettings } from "./ReadAloudSettings";
@@ -12,9 +13,24 @@ import { VoiceCapabilitySettings } from "./VoiceCapabilitySettings";
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
 
+/** 每种权限归哪个能力。纯展示映射：只有本页一个消费者，所以不进 shared。 */
+const PERMISSION_OWNERS: Record<PermissionKind, "computerUse" | "voiceInput"> =
+  {
+    accessibility: "computerUse",
+    "screen-recording": "computerUse",
+    microphone: "voiceInput",
+  };
+
 /**
- * 设置 → 能力。应用自带的能力（今天只有 Computer Use）住在这里，
- * 不再和外部服务混在连接页里。
+ * 权限行要长在它服务的那个能力的行下面。Computer Use 的身份是 preset 名
+ * （见 `src/main/connectors/sources/mcp-builtin-source.ts`）—— 写死这一个字符串，
+ * 好过靠「内置条目只有一个」这个位置假设：加第二个内置能力时权限行不会串到别人名下。
+ */
+const COMPUTER_USE_SERVER_NAME = "GUI_Operate";
+
+/**
+ * 设置 → 能力。一张卡 = 一个能力，卡头就是它的名字。
+ * 权限行是它所服务的那个能力的子行（辅助功能/屏幕录制 → Computer Use，麦克风 → 语音输入）。
  *
  * 数据仍来自 `connectors.list()`：内置能力本来就是一条 MCP server。
  *
@@ -60,6 +76,15 @@ export function SettingsCapabilities({
     if (isActive) void refresh();
   }, [isActive, refresh]);
 
+  // 用户去系统设置授权再切回来时，tab 没变、isActive 不会翻 —— 靠窗口焦点重查。
+  // 屏幕录制与麦克风由 macOS 按进程缓存，这一步也拿不到新值（文案已说明要重启）。
+  useEffect(() => {
+    if (!isActive) return;
+    const onFocus = () => void refresh();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [isActive, refresh]);
+
   const onToggle = useCallback(
     async (serverName: string, enabled: boolean) => {
       setNotice("");
@@ -91,37 +116,84 @@ export function SettingsCapabilities({
   // 加 microphone 后它会静默把麦克风未授予报成屏幕录制未授予。
   const missing = missingPermissionKinds(permissions);
 
+  /** 权限行是它所服务的那个能力的子行，所以按 owner 分成两组。 */
+  const permissionRows = (owner: "computerUse" | "voiceInput") =>
+    missing
+      .filter((kind) => PERMISSION_OWNERS[kind] === owner)
+      .map((kind) => (
+        <SettingsRow
+          key={kind}
+          testId="permission-row"
+          sub
+          title={t(`settings.capabilities.permission.${kind}`)}
+          note={
+            kind === "screen-recording"
+              ? `${t(`settings.capabilities.permission.${kind}Hint`)} ${t(
+                  "settings.capabilities.permission.screenRecordingRestart",
+                )}`
+              : t(`settings.capabilities.permission.${kind}Hint`)
+          }
+          control={
+            <button
+              type="button"
+              data-testid="permission-open"
+              onClick={() =>
+                void window.electronAPI.capabilities.openPermissionSettings(
+                  kind,
+                )
+              }
+              className="rounded-control border border-border px-2.5 py-1 text-xs text-text-primary hover:bg-surface-hover"
+            >
+              {t("settings.capabilities.permission.openSettings")}
+            </button>
+          }
+        />
+      ));
+
+  const computerUsePermissions = permissionRows("computerUse");
+  const voicePermissions = permissionRows("voiceInput");
+  const computerUseEntry = entries.find(
+    (entry) => entry.serverName === COMPUTER_USE_SERVER_NAME,
+  );
+
   return (
     <div className="space-y-4">
-      <p className="text-xs leading-5 text-text-muted">
-        {t("settings.capabilitiesIntro")}
-      </p>
-
+      {/* 一张卡 = 一个能力，卡头就是它的名字。 */}
       {entries.length > 0 && (
         <SettingsCard>
           {entries.map((entry) => {
             const instance = entry.instances[0];
             const on = !!instance && instance.status.kind !== "off";
             return (
-              <SettingsRow
-                key={entry.key}
-                testId="capability-card"
-                title={t(entry.nameKey)}
-                description={
-                  entry.descriptionKey ? t(entry.descriptionKey) : undefined
-                }
-                control={
-                  <SettingsSwitch
-                    testId="capability-toggle"
-                    label={t(entry.nameKey)}
-                    checked={on}
-                    onChange={(next) => void onToggle(entry.serverName, next)}
-                  />
-                }
-              />
+              <Fragment key={entry.key}>
+                <SettingsRow
+                  testId="capability-card"
+                  title={t(entry.nameKey)}
+                  description={[
+                    entry.descriptionKey ? t(entry.descriptionKey) : "",
+                    t("settings.capabilities.sessionToolNote"),
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  control={
+                    <SettingsSwitch
+                      testId="capability-toggle"
+                      label={t(entry.nameKey)}
+                      checked={on}
+                      onChange={(next) => void onToggle(entry.serverName, next)}
+                    />
+                  }
+                />
+                {entry === computerUseEntry && computerUsePermissions}
+              </Fragment>
             );
           })}
         </SettingsCard>
+      )}
+
+      {/* 内置条目读不到、或 Computer Use 不在里面时，权限提示不该跟着消失。 */}
+      {!computerUseEntry && computerUsePermissions.length > 0 && (
+        <SettingsCard>{computerUsePermissions}</SettingsCard>
       )}
 
       {loadFailed && (
@@ -136,57 +208,8 @@ export function SettingsCapabilities({
       )}
       {notice && <p className="text-xs text-text-secondary">{notice}</p>}
 
-      {/* 本机功能：应用自带、但不是 MCP 能力，所以不进上面的 entries 列表。
-          「本机功能」这个标题由语音卡渲染；两张卡同组，间距取 SettingsSection
-          内部的 2，不能听任外层 space-y-4 把朗读卡拆成另一组。 */}
-      <div className="space-y-2">
-        <VoiceCapabilitySettings />
-        <ReadAloudSettings />
-      </div>
-
-      {missing.length > 0 && (
-        <div className="space-y-3">
-          <SettingsCard>
-            {missing.map((kind) => (
-              <SettingsRow
-                key={kind}
-                testId="permission-row"
-                title={t(`settings.capabilities.permission.${kind}`)}
-                description={t(`settings.capabilities.permission.${kind}Hint`)}
-                note={
-                  kind === "screen-recording"
-                    ? t(
-                        "settings.capabilities.permission.screenRecordingRestart",
-                      )
-                    : undefined
-                }
-                control={
-                  <button
-                    type="button"
-                    data-testid="permission-open"
-                    onClick={() =>
-                      void window.electronAPI.capabilities.openPermissionSettings(
-                        kind,
-                      )
-                    }
-                    className="rounded-control border border-border px-2.5 py-1 text-xs text-text-primary hover:bg-surface-hover"
-                  >
-                    {t("settings.capabilities.permission.openSettings")}
-                  </button>
-                }
-              />
-            ))}
-          </SettingsCard>
-          <button
-            type="button"
-            data-testid="permission-recheck"
-            onClick={() => void refresh()}
-            className="rounded-control border border-border px-2.5 py-1 text-xs text-text-primary hover:bg-surface-hover"
-          >
-            {t("settings.capabilities.permission.recheck")}
-          </button>
-        </div>
-      )}
+      <VoiceCapabilitySettings>{voicePermissions}</VoiceCapabilitySettings>
+      <ReadAloudSettings />
     </div>
   );
 }

@@ -6,14 +6,22 @@
  * 放在这里与语音输入同一条理由：应用自带、默认关、有下载物。它不需要任何系统
  * 权限（不碰麦克风、不碰屏幕），所以不走 CapabilityPermissions 那一套。
  *
- * 卡片自身不带 `SettingsSection`：「本机功能」那个标题由 `VoiceCapabilitySettings`
- * 渲染，两张卡共用它，顺序是语音输入在前、朗读在后。
+ * 一张卡 = 一个能力，卡头就是它的名字；朗读今天没有系统权限，所以不接
+ * `children`（权限行只注入有权限需求的那两张卡）。
  */
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TtsInstallState } from "../../../shared/ipc-types";
 import { useAppStore } from "../../store";
-import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
+import {
+  InstallProgress,
+  installStatusLabel,
+  isInstalling,
+  SettingsCard,
+  SettingsRow,
+  SettingsStatusBadge,
+  SettingsSwitch,
+} from "./shared";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -26,9 +34,9 @@ export function ReadAloudSettings() {
   const [removing, setRemoving] = useState(false);
 
   const enabled = appConfig?.readAloud?.enabled === true;
-  const busy =
-    install?.phase === "downloading" || install?.phase === "extracting";
+  const busy = isInstalling(install);
   const installed = install?.installed === true;
+  const status = installStatusLabel(t, install);
 
   const refresh = useCallback(async () => {
     if (!isElectron) return;
@@ -70,16 +78,6 @@ export function ReadAloudSettings() {
     }
   };
 
-  const statusText = busy
-    ? t("settings.capabilities.readAloud.installing", {
-        percent: install?.percent ?? 0,
-      })
-    : installed
-      ? t("settings.capabilities.readAloud.installed")
-      : install?.phase === "error"
-        ? t("settings.capabilities.readAloud.installFailed")
-        : t("settings.capabilities.readAloud.notInstalled");
-
   return (
     <SettingsCard>
       <SettingsRow
@@ -99,32 +97,51 @@ export function ReadAloudSettings() {
       {enabled && (
         <SettingsRow
           testId="read-aloud-state"
-          title={statusText}
-          description={t("settings.capabilities.readAloud.memoryNote")}
+          sub
+          title={t("settings.capabilities.readAloud.model")}
+          badge={
+            <SettingsStatusBadge
+              testId="read-aloud-badge"
+              tone={status.tone}
+              label={status.label}
+            />
+          }
+          note={t("settings.capabilities.memoryNote")}
           control={
             installed ? (
               <button
                 type="button"
                 data-testid="read-aloud-remove"
+                aria-label={t("settings.capabilities.readAloud.remove")}
                 disabled={removing}
                 onClick={() => void remove()}
                 className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
               >
-                {t("settings.capabilities.readAloud.remove")}
+                {t("settings.capabilities.install.delete")}
               </button>
             ) : (
               !busy && (
                 <button
                   type="button"
                   data-testid="read-aloud-install"
+                  aria-label={t("settings.capabilities.readAloud.download")}
                   onClick={() => void window.electronAPI?.tts?.install()}
                   className="rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
                 >
-                  {t("settings.capabilities.readAloud.install")}
+                  {install?.phase === "error"
+                    ? t("settings.capabilities.install.retry")
+                    : t("settings.capabilities.install.download")}
                 </button>
               )
             )
           }
+        />
+      )}
+
+      {enabled && busy && (
+        <InstallProgress
+          percent={install?.percent ?? 0}
+          testId="read-aloud-progress"
         />
       )}
     </SettingsCard>

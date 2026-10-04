@@ -1,6 +1,7 @@
 // Shared types, constants, and components used across settings tab files.
 
 import type { TFunction } from "i18next";
+import type { VoiceInstallPhase } from "../../../shared/ipc-types";
 import type { ScheduleWeekday } from "../../types";
 
 // ==================== Shared Types ====================
@@ -144,20 +145,35 @@ export function SettingsRow({
   note,
   control,
   testId,
+  sub,
+  badge,
 }: {
   title: string;
   description?: string;
   note?: string;
   control?: React.ReactNode;
   testId?: string;
+  /** 子行：属于上面那一行的配置项。只缩进文字列并降级标题，行容器不动。 */
+  sub?: boolean;
+  /** 标题行内的状态徽标。 */
+  badge?: React.ReactNode;
 }) {
   return (
     <div
       data-testid={testId}
       className="flex min-h-[54px] items-center gap-4 border-t border-border-muted px-4 py-3 first:border-t-0"
     >
-      <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium text-text-primary">{title}</div>
+      <div className={`min-w-0 flex-1${sub ? " pl-4" : ""}`}>
+        <div
+          className={
+            sub
+              ? "text-xs text-text-secondary"
+              : "text-sm font-medium text-text-primary"
+          }
+        >
+          {title}
+          {badge}
+        </div>
         {description && (
           <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-text-muted">
             {description}
@@ -237,5 +253,106 @@ export function SettingsSelect<T extends string>({
         </option>
       ))}
     </select>
+  );
+}
+
+export type StatusBadgeTone = "ok" | "muted" | "busy" | "error";
+
+/** 状态徽标的点色。tone → 语义 token，不硬编码色值。 */
+const STATUS_BADGE_DOTS = {
+  ok: "bg-success",
+  muted: "bg-text-muted",
+  busy: "bg-accent",
+  error: "bg-error",
+} as const;
+
+export function SettingsStatusBadge({
+  tone,
+  label,
+  testId,
+}: {
+  tone: StatusBadgeTone;
+  label: string;
+  testId?: string;
+}) {
+  return (
+    <span
+      data-testid={testId}
+      // 状态会自己变（未安装 → 下载中 42% → 已安装），所以它是 live region：
+      // 否则读屏用户在 140MB 的下载期间听不到任何反馈。
+      role="status"
+      className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-border-muted bg-surface-muted px-2 py-0.5 text-xs text-text-secondary"
+    >
+      <span
+        className={`h-1.5 w-1.5 flex-none rounded-full ${STATUS_BADGE_DOTS[tone]}`}
+      />
+      {label}
+    </span>
+  );
+}
+
+/** 安装状态的最小形状。语音与朗读两套 state 结构相同，共用一条判定。 */
+export interface InstallStateLike {
+  phase: VoiceInstallPhase;
+  percent: number;
+  installed: boolean;
+}
+
+/** 下载中/解压中都算「进行中」——两卡共用，避免一处只写 downloading 而漏掉 extracting。 */
+export function isInstalling(state: InstallStateLike | null): boolean {
+  return state?.phase === "downloading" || state?.phase === "extracting";
+}
+
+/**
+ * 安装状态 → 徽标文案与色调。语音输入与朗读共用这一条，
+ * 两卡的「未安装 / 下载中 / 已安装 / 下载失败」从此不会各自分叉。
+ */
+export function installStatusLabel(
+  t: TFunction,
+  state: InstallStateLike | null,
+): { tone: StatusBadgeTone; label: string } {
+  if (isInstalling(state)) {
+    return {
+      tone: "busy",
+      label: t("settings.capabilities.install.downloading", {
+        percent: state?.percent ?? 0,
+      }),
+    };
+  }
+  if (state?.installed === true) {
+    return { tone: "ok", label: t("settings.capabilities.install.installed") };
+  }
+  if (state?.phase === "error") {
+    return { tone: "error", label: t("settings.capabilities.install.failed") };
+  }
+  return {
+    tone: "muted",
+    label: t("settings.capabilities.install.notInstalled"),
+  };
+}
+
+/** 安装进度条。不是一行内容，所以直接躺在卡片里，不塞进 SettingsRow 的 control。 */
+export function InstallProgress({
+  percent,
+  testId,
+}: {
+  percent: number;
+  testId?: string;
+}) {
+  return (
+    <div className="px-4 pb-3" data-testid={testId}>
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
+      >
+        <div
+          className="h-full bg-accent transition-all"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
   );
 }

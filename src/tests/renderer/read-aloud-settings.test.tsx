@@ -90,11 +90,9 @@ describe("ReadAloudSettings", () => {
 
     expect(byTestId("read-aloud-state")).not.toBeNull();
     expect(container.textContent).toContain(
-      "settings.capabilities.readAloud.notInstalled",
+      "settings.capabilities.install.notInstalled",
     );
-    expect(container.textContent).toContain(
-      "settings.capabilities.readAloud.memoryNote",
-    );
+    expect(container.textContent).toContain("settings.capabilities.memoryNote");
     expect(byTestId("read-aloud-install")).not.toBeNull();
     expect(byTestId("read-aloud-remove")).toBeNull();
   });
@@ -134,7 +132,7 @@ describe("ReadAloudSettings", () => {
     await mount();
 
     expect(container.textContent).toContain(
-      "settings.capabilities.readAloud.installed",
+      "settings.capabilities.install.installed",
     );
     expect(byTestId("read-aloud-remove")).not.toBeNull();
     expect(byTestId("read-aloud-install")).toBeNull();
@@ -149,7 +147,7 @@ describe("ReadAloudSettings", () => {
 
     expect(api.tts.removeInstall).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain(
-      "settings.capabilities.readAloud.notInstalled",
+      "settings.capabilities.install.notInstalled",
     );
   });
 
@@ -163,7 +161,7 @@ describe("ReadAloudSettings", () => {
     await mount();
 
     expect(container.textContent).toContain(
-      "settings.capabilities.readAloud.installing",
+      "settings.capabilities.install.downloading",
     );
     expect(byTestId("read-aloud-install")).toBeNull();
     expect(byTestId("read-aloud-remove")).toBeNull();
@@ -180,9 +178,50 @@ describe("ReadAloudSettings", () => {
     await mount();
 
     expect(container.textContent).toContain(
-      "settings.capabilities.readAloud.installFailed",
+      "settings.capabilities.install.failed",
     );
     expect(byTestId("read-aloud-install")).not.toBeNull();
+  });
+
+  it("下载中进度条与语音卡同款", async () => {
+    setReadAloud(true);
+    api.tts.getInstallState.mockResolvedValue({
+      phase: "downloading",
+      percent: 42,
+      installed: false,
+    });
+    await mount();
+
+    expect(byTestId("read-aloud-progress")).not.toBeNull();
+    expect(
+      byTestId("read-aloud-progress")!.querySelector('[role="progressbar"]'),
+    ).not.toBeNull();
+    expect(byTestId("read-aloud-badge")!.getAttribute("role")).toBe("status");
+  });
+
+  it("失败态用徽标 + 重试按钮，标题槽只放名词", async () => {
+    setReadAloud(true);
+    api.tts.getInstallState.mockResolvedValue({
+      phase: "error",
+      percent: 0,
+      installed: false,
+      error: "boom",
+    });
+    await mount();
+
+    const row = byTestId("read-aloud-state")!;
+    const titleNode = (row.firstElementChild as HTMLElement)
+      .firstElementChild as HTMLElement;
+
+    expect(titleNode.firstChild?.textContent).toBe(
+      "settings.capabilities.readAloud.model",
+    );
+    expect(byTestId("read-aloud-badge")!.textContent).toContain(
+      "settings.capabilities.install.failed",
+    );
+    expect(byTestId("read-aloud-install")!.textContent).toContain(
+      "settings.capabilities.install.retry",
+    );
   });
 
   it("preload 缺 tts 时不崩，停在未安装", async () => {
@@ -195,7 +234,7 @@ describe("ReadAloudSettings", () => {
     await mount();
 
     expect(container.textContent).toContain(
-      "settings.capabilities.readAloud.notInstalled",
+      "settings.capabilities.install.notInstalled",
     );
 
     (window as unknown as { electronAPI: unknown }).electronAPI = original;

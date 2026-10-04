@@ -6,6 +6,7 @@ import {
   SettingsCard,
   SettingsRow,
   SettingsSelect,
+  SettingsStatusBadge,
   SettingsSwitch,
 } from "../../renderer/components/settings/shared";
 
@@ -137,5 +138,82 @@ describe("设置行原语", () => {
     expect(container.textContent).toContain("外观偏好");
     expect(container.textContent).toContain("语言");
     expect(container.querySelectorAll(".line-clamp-2")).toHaveLength(1);
+  });
+
+  it("子行只缩进文字列并把标题降级，行容器的类串一字不动", async () => {
+    await render(
+      <SettingsCard>
+        <SettingsRow testId="parent" title="语音输入" />
+        <SettingsRow
+          testId="child"
+          sub
+          title="语音模型"
+          note="关掉开关后要重启"
+        />
+      </SettingsCard>,
+    );
+    const parent = container.querySelector<HTMLElement>(
+      '[data-testid="parent"]',
+    )!;
+    const child = container.querySelector<HTMLElement>(
+      '[data-testid="child"]',
+    )!;
+
+    // 行容器（分隔线 + 内边距）必须完全一致：panel-boundary.test.ts 守着这个字面串。
+    expect(parent.className).toContain(
+      "border-t border-border-muted px-4 py-3",
+    );
+    expect(child.className).toBe(parent.className);
+
+    const textCol = (row: HTMLElement) => row.firstElementChild as HTMLElement;
+    const titleOf = (row: HTMLElement) =>
+      (row.firstElementChild as HTMLElement).firstElementChild as HTMLElement;
+
+    expect(textCol(parent).className).toBe("min-w-0 flex-1");
+    expect(textCol(child).className).toBe("min-w-0 flex-1 pl-4");
+    expect(titleOf(parent).className).toContain(
+      "text-sm font-medium text-text-primary",
+    );
+    expect(titleOf(child).className).toContain("text-xs text-text-secondary");
+  });
+
+  it("badge 落在标题行内，标题文字仍是标题节点的第一个文本节点", async () => {
+    await render(
+      <SettingsCard>
+        <SettingsRow
+          testId="child"
+          sub
+          title="语音模型"
+          badge={<SettingsStatusBadge tone="ok" label="已安装" />}
+        />
+      </SettingsCard>,
+    );
+    const row = container.querySelector<HTMLElement>('[data-testid="child"]')!;
+    const titleNode = (row.firstElementChild as HTMLElement)
+      .firstElementChild as HTMLElement;
+
+    expect(titleNode.firstChild?.textContent).toBe("语音模型");
+    expect(titleNode.textContent).toContain("已安装");
+  });
+
+  it("四个档位的徽标各自用对应的语义色", async () => {
+    await render(
+      <div>
+        <SettingsStatusBadge tone="ok" label="已安装" />
+        <SettingsStatusBadge tone="muted" label="未安装" />
+        <SettingsStatusBadge tone="busy" label="下载中 42%" />
+        <SettingsStatusBadge tone="error" label="下载失败" />
+      </div>,
+    );
+    const html = container.innerHTML;
+    for (const className of [
+      "bg-success",
+      "bg-text-muted",
+      "bg-accent",
+      "bg-error",
+    ]) {
+      expect(html).toContain(className);
+    }
+    expect(container.textContent).toBe("已安装未安装下载中 42%下载失败");
   });
 });

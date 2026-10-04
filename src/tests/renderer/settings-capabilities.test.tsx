@@ -212,12 +212,8 @@ describe("SettingsCapabilities", () => {
       microphone: true,
     });
     await mount();
-    // 只断言「没有 row」是不够的：容器与「重新检查」也必须一起消失。
     expect(
       container.querySelector('[data-testid="permission-row"]'),
-    ).toBeNull();
-    expect(
-      container.querySelector('[data-testid="permission-recheck"]'),
     ).toBeNull();
   });
 
@@ -291,15 +287,24 @@ describe("SettingsCapabilities", () => {
     );
   });
 
-  it("re-checks permissions on demand", async () => {
+  it("re-checks permissions when the window regains focus", async () => {
     await mount();
     api.capabilities.permissions.mockClear();
     await act(async () => {
-      container
-        .querySelector<HTMLButtonElement>('[data-testid="permission-recheck"]')!
-        .click();
+      window.dispatchEvent(new Event("focus"));
     });
     expect(api.capabilities.permissions).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not listen for focus while the tab is not active", async () => {
+    await act(async () => {
+      root.render(<SettingsCapabilities isActive={false} />);
+    });
+    api.capabilities.permissions.mockClear();
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
+    expect(api.capabilities.permissions).not.toHaveBeenCalled();
   });
 
   it("shows a load error when the capability list fails, and keeps the page", async () => {
@@ -343,5 +348,94 @@ describe("SettingsCapabilities", () => {
       root.render(<SettingsCapabilities isActive={true} />);
     });
     expect(api.capabilities.permissions).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("能力页：一卡一能力与权限归属", () => {
+  it("不再渲染页面级段落与分组标题", async () => {
+    await mount();
+    expect(container.textContent).not.toContain("settings.capabilitiesIntro");
+    expect(container.textContent).not.toContain(
+      "settings.capabilities.localFeatures",
+    );
+  });
+
+  it("Computer Use 的权限行与它同一张卡", async () => {
+    await mount();
+    const card = container.querySelector<HTMLElement>(
+      '[data-testid="capability-card"]',
+    )!;
+    const perm = container.querySelector<HTMLElement>(
+      '[data-testid="permission-row"]',
+    )!;
+    expect(card.closest(".rounded-container")).toBe(
+      perm.closest(".rounded-container"),
+    );
+  });
+
+  it("麦克风的权限行挂在语音输入那张卡里", async () => {
+    api.capabilities.permissions.mockResolvedValue({
+      required: true,
+      accessibility: true,
+      screenRecording: true,
+      microphone: false,
+    });
+    await mount();
+    const voiceRow = container.querySelector<HTMLElement>(
+      '[data-testid="capability-voice"]',
+    )!;
+    const perm = container.querySelector<HTMLElement>(
+      '[data-testid="permission-row"]',
+    )!;
+    expect(voiceRow.closest(".rounded-container")).toBe(
+      perm.closest(".rounded-container"),
+    );
+  });
+
+  it("Computer Use 的说明带上「随会话加载」", async () => {
+    await mount();
+    expect(container.textContent).toContain(
+      "settings.capabilities.sessionToolNote",
+    );
+  });
+
+  it("内置条目读不到时，权限提示仍有自己的卡", async () => {
+    api.connectors.list.mockResolvedValue([]);
+    await mount();
+    expect(
+      container.querySelector('[data-testid="capability-card"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-testid="permission-row"]'),
+    ).not.toBeNull();
+  });
+
+  it("第二个内置能力上线时，权限行仍跟着 Computer Use", async () => {
+    const OTHER: ConnectorEntry = {
+      ...COMPUTER_USE,
+      key: "mcp:builtin:Other",
+      serverName: "Other",
+      nameKey: "connectors.builtin.other",
+    };
+    api.connectors.list.mockResolvedValue([COMPUTER_USE, OTHER]);
+    await mount();
+
+    const rows = [
+      ...container.querySelectorAll<HTMLElement>(
+        '[data-testid="capability-card"]',
+      ),
+    ];
+    const perm = container.querySelector<HTMLElement>(
+      '[data-testid="permission-row"]',
+    )!;
+
+    expect(rows).toHaveLength(2);
+    // 权限行夹在 Computer Use 与后一个能力之间，而不是掉到卡尾（那会读成别人的权限）。
+    expect(
+      rows[0].compareDocumentPosition(perm) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      perm.compareDocumentPosition(rows[1]) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 });

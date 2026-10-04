@@ -6,12 +6,12 @@
  * 放在这里而不放「设置 API」：它的定义是**应用自带 + 需要系统权限 + 默认关**，
  * 三条全中「能力」区块；一条都不沾「API 渠道配置」。
  *
- * 它是「本机功能」，不是 MCP 能力，所以**不混进 entries 列表**（那个列表来自
+ * 它不是 MCP 能力，所以**不混进 entries 列表**（那个列表来自
  * `connectors.list()` 的 mcp-builtin，开关走 `connectors.setEnabled`）。
- * 见设计文档 §3.4。
  *
  * 布局用 `./shared` 的卡片原语（与 9fe760f「设置页对齐卡片行布局」那次重构一致），
- * 不手搓容器。
+ * 不手搓容器。权限行等子行由调用方通过 `children` 注入：它们属于这张卡，
+ * 但不属于这个组件。
  */
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,10 +23,13 @@ import {
 import type { VoiceEngineConfig } from "../../types";
 import { useAppStore } from "../../store";
 import {
+  InstallProgress,
+  installStatusLabel,
+  isInstalling,
   SettingsCard,
   SettingsRow,
-  SettingsSection,
   SettingsSelect,
+  SettingsStatusBadge,
   SettingsSwitch,
 } from "./shared";
 
@@ -37,7 +40,11 @@ const SHORTCUT_LABEL_KEYS: Record<VoiceShortcut, string> = {
   disabled: "settings.capabilities.voice.shortcutDisabled",
 };
 
-export function VoiceCapabilitySettings() {
+export function VoiceCapabilitySettings({
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
   const { t } = useTranslation();
   const appConfig = useAppStore((s) => s.appConfig);
   const setAppConfig = useAppStore((s) => s.setAppConfig);
@@ -86,108 +93,105 @@ export function VoiceCapabilitySettings() {
       const result = await window.electronAPI?.voice.removeInstall();
       // 只在真删掉时才本地落定。删失败（Windows 上原生模型文件被映射占用）时
       // 留着原状态，否则界面会声称「已删除」而磁盘上还在。
-      if (result?.ok) setInstall({ phase: "idle", percent: 0, installed: false });
+      if (result?.ok)
+        setInstall({ phase: "idle", percent: 0, installed: false });
     } finally {
       setRemoving(false);
     }
   };
 
-  const busy =
-    install?.phase === "downloading" || install?.phase === "extracting";
+  const busy = isInstalling(install);
   const installed = install?.installed === true;
-
-  const statusText = busy
-    ? t("settings.capabilities.voice.installing", {
-        percent: install?.percent ?? 0,
-      })
-    : installed
-      ? t("settings.capabilities.voice.installed")
-      : t("settings.capabilities.voice.notInstalled");
+  const status = installStatusLabel(t, install);
 
   return (
-    <SettingsSection title={t("settings.capabilities.localFeatures")}>
-      <SettingsCard>
+    <SettingsCard>
+      <SettingsRow
+        testId="capability-voice"
+        title={t("settings.capabilities.voice.title")}
+        description={t("settings.capabilities.voice.desc")}
+        control={
+          <SettingsSwitch
+            checked={enabled}
+            label={t("settings.capabilities.voice.title")}
+            testId="voice-enable"
+            onChange={(next) => void toggle(next)}
+          />
+        }
+      />
+
+      {enabled && (
         <SettingsRow
-          testId="capability-voice"
-          title={t("settings.capabilities.voice.title")}
-          description={t("settings.capabilities.voice.desc")}
+          testId="voice-engine"
+          sub
+          title={t("settings.capabilities.voice.model")}
+          badge={
+            <SettingsStatusBadge
+              testId="voice-engine-badge"
+              tone={status.tone}
+              label={status.label}
+            />
+          }
+          note={t("settings.capabilities.memoryNote")}
           control={
-            <SettingsSwitch
-              checked={enabled}
-              label={t("settings.capabilities.voice.title")}
-              testId="voice-enable"
-              onChange={(next) => void toggle(next)}
+            installed ? (
+              <button
+                type="button"
+                data-testid="voice-remove"
+                aria-label={t("settings.capabilities.voice.remove")}
+                disabled={removing}
+                onClick={() => void remove()}
+                className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
+              >
+                {t("settings.capabilities.install.delete")}
+              </button>
+            ) : (
+              !busy && (
+                <button
+                  type="button"
+                  data-testid="voice-install"
+                  aria-label={t("settings.capabilities.voice.download")}
+                  onClick={() => void window.electronAPI?.voice.install()}
+                  className="rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+                >
+                  {install?.phase === "error"
+                    ? t("settings.capabilities.install.retry")
+                    : t("settings.capabilities.install.download")}
+                </button>
+              )
+            )
+          }
+        />
+      )}
+
+      {enabled && busy && (
+        <InstallProgress
+          percent={install?.percent ?? 0}
+          testId="voice-install-progress"
+        />
+      )}
+
+      {enabled && (
+        <SettingsRow
+          testId="voice-shortcut"
+          sub
+          title={t("settings.capabilities.voice.shortcut")}
+          note={t("settings.capabilities.voice.shortcutFnHint")}
+          control={
+            <SettingsSelect
+              label={t("settings.capabilities.voice.shortcut")}
+              value={engine?.shortcut ?? "AltRight"}
+              options={VOICE_SHORTCUTS.map((shortcut) => ({
+                value: shortcut,
+                label: t(SHORTCUT_LABEL_KEYS[shortcut]),
+              }))}
+              onChange={(next) => void save({ shortcut: next })}
             />
           }
         />
-
-        {enabled && (
-          <SettingsRow
-            testId="voice-engine"
-            title={statusText}
-            note={
-              install?.phase === "error"
-                ? t("settings.capabilities.voice.installFailed")
-                : t("settings.capabilities.voice.memoryNote")
-            }
-            control={
-              installed ? (
-                <button
-                  type="button"
-                  data-testid="voice-remove"
-                  disabled={removing}
-                  onClick={() => void remove()}
-                  className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
-                >
-                  {t("settings.capabilities.voice.remove")}
-                </button>
-              ) : (
-                !busy && (
-                  <button
-                    type="button"
-                    data-testid="voice-install"
-                    onClick={() => void window.electronAPI?.voice.install()}
-                    className="rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
-                  >
-                    {t("settings.capabilities.voice.install")}
-                  </button>
-                )
-              )
-            }
-          />
-        )}
-
-        {/* 进度条不是一行内容，所以直接放在卡片里而不是塞进 SettingsRow 的 control。 */}
-        {enabled && busy && (
-          <div className="px-4 pb-3" data-testid="voice-install-progress">
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover">
-              <div
-                className="h-full bg-accent transition-all"
-                style={{ width: `${install?.percent ?? 0}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {enabled && (
-          <SettingsRow
-            testId="voice-shortcut"
-            title={t("settings.capabilities.voice.shortcut")}
-            note={t("settings.capabilities.voice.shortcutFnHint")}
-            control={
-              <SettingsSelect
-                label={t("settings.capabilities.voice.shortcut")}
-                value={engine?.shortcut ?? "AltRight"}
-                options={VOICE_SHORTCUTS.map((shortcut) => ({
-                  value: shortcut,
-                  label: t(SHORTCUT_LABEL_KEYS[shortcut]),
-                }))}
-                onChange={(next) => void save({ shortcut: next })}
-              />
-            }
-          />
-        )}
-      </SettingsCard>
-    </SettingsSection>
+      )}
+      {/* 权限行等子行由调用方注入：它们属于这张卡，但不属于这个组件。 */}
+      {children}
+    </SettingsCard>
   );
 }

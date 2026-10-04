@@ -86,8 +86,7 @@
     "tools": "Tools",
     "toolsDesc": "Configure built-in agent tools",
     "capabilitiesTitle": "Capabilities",
-    "capabilitiesDesc": "Capabilities that ship with the app and need system permissions",
-    "capabilitiesIntro": "Capabilities that ship with the app. When on, they load with your sessions.",
+    "capabilitiesDesc": "On-device capabilities that ship with the app",
     "capabilities": {
       "pendingActivation": "Takes effect in your next chat",
       "permission": {
@@ -96,39 +95,40 @@
         "screen-recording": "Screen recording",
         "screen-recordingHint": "Not granted: cannot take screenshots",
         "screenRecordingRestart": "After granting it in System Settings, restart the app",
-        "openSettings": "Open System Settings",
-        "recheck": "Check again"
+        "openSettings": "Open System Settings"
       },
       "loadFailed": "Could not load capabilities",
+      "sessionToolNote": "Loads with your sessions as a tool.",
       "actionFailed": "Could not change this capability",
-      "localFeatures": "On-device features",
-      "voice": {
-        "title": "Voice input",
-        "desc": "Offline and free to use. Needs a ~140MB download and keeps ~300MB in memory.",
-        "install": "Install voice engine",
-        "installing": "Installing… {{percent}}%",
+      "memoryNote": "After you turn the switch off, a loaded model keeps its memory until you restart the app.",
+      "install": {
+        "download": "Download",
+        "downloading": "Downloading {{percent}}%",
         "installed": "Installed",
         "notInstalled": "Not installed",
-        "remove": "Delete voice model",
-        "installFailed": "Installation failed — you can retry",
+        "failed": "Download failed",
+        "delete": "Delete",
+        "retry": "Retry"
+      },
+      "voice": {
+        "title": "Voice input",
+        "desc": "Hold a key and speak; the text lands in the input box. Needs microphone access; a ~140MB download and ~300MB in memory.",
+        "model": "Voice model",
+        "download": "Download the voice model",
+        "remove": "Delete the voice model",
         "shortcut": "Push to talk",
         "shortcutAltRight": "Right Option (recommended)",
         "shortcutAltSpace": "⌥ + Space",
         "shortcutMetaShiftSpace": "⌘ + ⇧ + Space",
         "shortcutDisabled": "No shortcut",
-        "shortcutFnHint": "The Fn key cannot be observed inside the app, so right Option is the default (matching WeChat desktop’s hold-right-Alt).",
-        "memoryNote": "After you turn the switch off, a loaded model keeps its memory until you restart the app."
+        "shortcutFnHint": "The Fn key cannot be observed inside the app, so right Option is the default (matching WeChat desktop’s hold-right-Alt)."
       },
       "readAloud": {
         "title": "Read aloud",
-        "desc": "Read assistant replies out loud. Runs fully on this machine; your text is not uploaded. Needs a ~157MB download and ~324MB of memory while loaded.",
-        "install": "Download voice model",
-        "installing": "Downloading… {{percent}}%",
-        "installed": "Installed · MeloTTS zh_en",
-        "notInstalled": "Not installed",
-        "remove": "Delete read-aloud model",
-        "installFailed": "Download failed — you can retry",
-        "memoryNote": "After you turn the switch off, a loaded model keeps its memory until you restart the app."
+        "desc": "Reads assistant replies out loud. Your text stays on this machine. A ~157MB download and ~324MB in memory.",
+        "model": "Read-aloud model",
+        "download": "Download the read-aloud model",
+        "remove": "Delete the read-aloud model"
       }
     },
     "groupGeneral": "General",

@@ -86,8 +86,7 @@
     "tools": "工具",
     "toolsDesc": "配置内置智能体工具",
     "capabilitiesTitle": "能力",
-    "capabilitiesDesc": "应用自带、需要系统权限的能力",
-    "capabilitiesIntro": "应用自带的能力。开启后该能力会随会话加载。",
+    "capabilitiesDesc": "应用自带的本地能力",
     "capabilities": {
       "pendingActivation": "下次对话生效",
       "permission": {
@@ -96,39 +95,40 @@
         "screen-recording": "屏幕录制",
         "screen-recordingHint": "未授予：无法截图",
         "screenRecordingRestart": "在系统设置中授予后，需重启应用才生效",
-        "openSettings": "打开系统设置",
-        "recheck": "重新检查"
+        "openSettings": "打开系统设置"
       },
       "loadFailed": "加载能力失败",
+      "sessionToolNote": "开启后作为工具随会话加载。",
       "actionFailed": "操作失败",
-      "localFeatures": "本机功能",
-      "voice": {
-        "title": "语音输入",
-        "desc": "离线识别、不计费。需要下载约 140MB，并在内存中常驻约 300MB。",
-        "install": "安装语音引擎",
-        "installing": "正在安装… {{percent}}%",
+      "memoryNote": "关掉开关后，已加载的模型要重启应用才释放内存。",
+      "install": {
+        "download": "下载",
+        "downloading": "下载中 {{percent}}%",
         "installed": "已安装",
         "notInstalled": "未安装",
+        "failed": "下载失败",
+        "delete": "删除",
+        "retry": "重试"
+      },
+      "voice": {
+        "title": "语音输入",
+        "desc": "按住说话，转成文字写进输入框。需要麦克风权限；模型约 140MB，常驻内存约 300MB。",
+        "model": "语音模型",
+        "download": "下载语音模型",
         "remove": "删除语音模型",
-        "installFailed": "安装失败，可以重试",
         "shortcut": "按住说话",
         "shortcutAltRight": "右 Option（推荐）",
         "shortcutAltSpace": "⌥ + 空格",
         "shortcutMetaShiftSpace": "⌘ + ⇧ + 空格",
         "shortcutDisabled": "不使用快捷键",
-        "shortcutFnHint": "Fn 键无法在应用内监听，所以默认用右 Option（对齐微信电脑端的「长按右 Alt」）",
-        "memoryNote": "关掉开关后，已加载的模型要重启应用才释放内存。"
+        "shortcutFnHint": "Fn 键无法在应用内监听，所以默认用右 Option（对齐微信电脑端的「长按右 Alt」）"
       },
       "readAloud": {
         "title": "朗读",
-        "desc": "把助手回复读出来。完全本机，不上传文字。需要下载约 157MB，并在内存中常驻约 324MB。",
-        "install": "下载语音模型",
-        "installing": "正在下载… {{percent}}%",
-        "installed": "已安装 · MeloTTS zh_en",
-        "notInstalled": "未安装",
-        "remove": "删除朗读模型",
-        "installFailed": "下载失败，可以重试",
-        "memoryNote": "关掉开关后，已加载的模型要重启应用才释放内存。"
+        "desc": "把助手回复读出来，文字不离开本机。模型约 157MB，常驻内存约 324MB。",
+        "model": "朗读模型",
+        "download": "下载朗读模型",
+        "remove": "删除朗读模型"
       }
     },
     "groupGeneral": "常规",

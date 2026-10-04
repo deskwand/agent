@@ -107,7 +107,7 @@ describe("VoiceCapabilitySettings", () => {
     await mount();
 
     expect(container.textContent).toContain(
-      "settings.capabilities.voice.installed",
+      "settings.capabilities.install.installed",
     );
     expect(byTestId("voice-remove")).not.toBeNull();
     expect(byTestId("voice-install")).toBeNull();
@@ -125,9 +125,7 @@ describe("VoiceCapabilitySettings", () => {
     });
     await mount();
 
-    expect(container.textContent).toContain(
-      "settings.capabilities.voice.memoryNote",
-    );
+    expect(container.textContent).toContain("settings.capabilities.memoryNote");
   });
 
   it("未安装时给安装按钮，点了就装", async () => {
@@ -150,13 +148,18 @@ describe("VoiceCapabilitySettings", () => {
     await mount();
 
     expect(byTestId("voice-install-progress")).not.toBeNull();
+    expect(
+      byTestId("voice-install-progress")!.querySelector('[role="progressbar"]'),
+    ).not.toBeNull();
+    // 状态自己会变，所以它是 live region：下载期间读屏用户要听得到。
+    expect(byTestId("voice-engine-badge")!.getAttribute("role")).toBe("status");
     expect(byTestId("voice-install")).toBeNull();
     expect(container.textContent).toContain(
-      "settings.capabilities.voice.installing",
+      "settings.capabilities.install.downloading",
     );
   });
 
-  it("安装失败时给出错误行", async () => {
+  it("状态进徽标，标题槽只放名词（失败态给重试）", async () => {
     setEngine({ enabled: true, shortcut: "AltRight" });
     api.voice.getInstallState.mockResolvedValue({
       phase: "error",
@@ -166,8 +169,22 @@ describe("VoiceCapabilitySettings", () => {
     });
     await mount();
 
-    expect(container.textContent).toContain(
-      "settings.capabilities.voice.installFailed",
+    const row = byTestId("voice-engine")!;
+    const titleNode = (row.firstElementChild as HTMLElement)
+      .firstElementChild as HTMLElement;
+
+    expect(titleNode.firstChild?.textContent).toBe(
+      "settings.capabilities.voice.model",
+    );
+    expect(byTestId("voice-engine-badge")!.textContent).toContain(
+      "settings.capabilities.install.failed",
+    );
+    expect(byTestId("voice-install")!.textContent).toContain(
+      "settings.capabilities.install.retry",
+    );
+    // 快捷键行也是子行
+    expect(byTestId("voice-shortcut")!.firstElementChild!.className).toContain(
+      "pl-4",
     );
   });
 
@@ -201,9 +218,25 @@ describe("VoiceCapabilitySettings", () => {
     await mount();
 
     expect(container.textContent).toContain(
-      "settings.capabilities.voice.notInstalled",
+      "settings.capabilities.install.notInstalled",
     );
 
     (window as unknown as { electronAPI: unknown }).electronAPI = original;
+  });
+  it("children 渲染在卡片里，且开关关闭时也在", async () => {
+    setEngine({ enabled: false, shortcut: "AltRight" });
+    await act(async () => {
+      root.render(
+        <VoiceCapabilitySettings>
+          <div data-testid="injected-child" />
+        </VoiceCapabilitySettings>,
+      );
+    });
+
+    const parent = byTestId("capability-voice")!;
+    expect(byTestId("injected-child")).not.toBeNull();
+    expect(parent.closest(".rounded-container")).toBe(
+      byTestId("injected-child")!.closest(".rounded-container"),
+    );
   });
 });
