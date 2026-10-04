@@ -15,6 +15,10 @@
  * 会把 `read` 加回来。
  */
 import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import {
+  normalizeSessionKind,
+  type SessionKind,
+} from "../../shared/session-kind";
 import type { TurnProfileName } from "../../shared/voice-mode";
 
 export type { TurnProfileName };
@@ -84,4 +88,32 @@ export function createTurnProfileExtension(
       return { systemPrompt: appendVoiceSection(event.systemPrompt, profile) };
     });
   };
+}
+
+export function resolveSessionTurnPolicy(
+  session: { kind?: SessionKind; allowedTools: readonly string[] },
+  requestedProfile: TurnProfileName | undefined,
+  availableTools: readonly string[],
+): { profile: TurnProfile | undefined; activeToolNames: string[] } {
+  if (normalizeSessionKind(session.kind) !== "voice") {
+    return { profile: undefined, activeToolNames: [...availableTools] };
+  }
+  return {
+    profile: requestedProfile === "voice" ? VOICE_TURN : undefined,
+    activeToolNames: VOICE_TURN.tools.filter(
+      (name) =>
+        availableTools.includes(name) && session.allowedTools.includes(name),
+    ),
+  };
+}
+
+/**
+ * 本轮生效的思考档位。语音档案要求关掉思考：思考不朗读也不上字幕，只贡献延迟；
+ * 其余轮次沿用会话偏好。
+ */
+export function resolveTurnThinkingLevel<T extends string>(
+  profile: TurnProfile | undefined,
+  sessionThinkingLevel: T,
+): T {
+  return (profile?.thinkingLevel as T | undefined) ?? sessionThinkingLevel;
 }

@@ -16,6 +16,11 @@ import { entriesToMessages, locateForkEntryId } from "./entries-to-messages";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import type { ElementSelectionRef } from "../../shared/ipc-types";
 import type { TurnProfileName } from "../../shared/voice-mode";
+import {
+  normalizeSessionKind,
+  type SessionKind,
+} from "../../shared/session-kind";
+import { VOICE_TURN } from "../agent/turn-profiles";
 import { v4 as uuidv4 } from "uuid";
 import { createHash } from "crypto";
 import * as fs from "fs";
@@ -90,6 +95,7 @@ import { modelResolutionService } from "../model/model-resolution-service";
 import { getLocale, t } from "../i18n";
 import { buildScheduledTaskTitle } from "../../shared/schedule/task-title";
 import {
+  DEFAULT_SESSION_TITLE,
   normalizeSessionTitle,
   type RenameSessionResult,
 } from "../../shared/session-title";
@@ -472,8 +478,29 @@ export class SessionManager {
     });
   }
 
-  createSessionRecord(title: string, cwd?: string): Session {
-    const session = this.createSession(title, cwd);
+  createVoiceSessionRecord(): Session {
+    return this.createSessionRecord(DEFAULT_SESSION_TITLE, undefined, {
+      kind: "voice",
+      allowedTools: [...VOICE_TURN.tools],
+    });
+  }
+
+  createSessionRecord(
+    title: string,
+    cwd?: string,
+    options?: { kind?: SessionKind; allowedTools?: string[] },
+  ): Session {
+    const session = this.createSession(
+      title,
+      cwd,
+      options?.allowedTools,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      options?.kind,
+    );
     // 这条记录没排 prompt，不该是 running（forkSession 同样置 idle）：否则
     // 扩展建完就不管时它会永远「在跑」——渲染层停止按钮常亮、状态栏一直
     // 「思考中…」。真的开始跑时 processQueue 会自己改成 running。
@@ -568,6 +595,7 @@ export class SessionManager {
       source.providerProfileKey,
       source.model,
       source.mountedPaths,
+      normalizeSessionKind(source.kind),
     );
     newSession.status = "idle";
 
@@ -623,6 +651,7 @@ export class SessionManager {
     providerProfileKey?: Session["providerProfileKey"],
     model?: string,
     mountedPaths?: Session["mountedPaths"],
+    kind: SessionKind = "ordinary",
   ): Session {
     const now = Date.now();
     // Prefer frontend-provided cwd; fallback to app config, then external env vars,
@@ -641,6 +670,7 @@ export class SessionManager {
           : configStore.get("memoryEnabled") !== false;
     return {
       id: uuidv4(),
+      kind,
       title,
       status: "running",
       cwd: effectiveCwd,
@@ -677,6 +707,7 @@ export class SessionManager {
   private saveSession(session: Session) {
     this.db.sessions.create({
       id: session.id,
+      session_kind: normalizeSessionKind(session.kind),
       title: session.title,
       deskwand_session_id: session.deskWandSessionId || null,
       openai_thread_id: session.openaiThreadId || null,
@@ -720,6 +751,7 @@ export class SessionManager {
 
     return {
       id: row.id,
+      kind: normalizeSessionKind(row.session_kind),
       title: row.title,
       deskWandSessionId: row.deskwand_session_id || undefined,
       openaiThreadId: row.openai_thread_id || undefined,
@@ -771,6 +803,7 @@ export class SessionManager {
 
       return {
         id: row.id,
+        kind: normalizeSessionKind(row.session_kind),
         title: row.title,
         deskWandSessionId: row.deskwand_session_id || undefined,
         openaiThreadId: row.openai_thread_id || undefined,

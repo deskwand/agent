@@ -20,7 +20,7 @@ import {
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { usePushToTalk } from "../hooks/usePushToTalk";
-import { useVoiceModeShortcut } from "../hooks/useVoiceModeShortcut";
+
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { attachmentKeySet } from "../utils/attached-files";
@@ -322,20 +322,10 @@ export function ChatView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
-  // 浮层开关在 store 里：欢迎页也能用语音模式，创建会话后应用切到本视图，
-  // 状态留在 store 里。**浮层本体挂在 App 层**（子视图会被卸载重挂，
-  // 重挂会把第一轮的回复丢掉）。“切会话关浮层”也在 App 里统一处理。
+  const [useTextInput, setUseTextInput] = useState(false);
+  useEffect(() => setUseTextInput(false), [activeSessionId]);
   const voiceModeOpen = useAppStore((s) => s.voiceModeOpen);
-  const setVoiceModeOpen = useAppStore((s) => s.setVoiceModeOpen);
-  // 切会话就关掉浮层（设计 §4）：语音会话绑在某个 sessionId 上，
-  // 不关的话浮层会带着旧会话继续采集 —— useVoiceMode 的 effect 是空依赖，
-  // 换 sessionId 不会重建，麦克风与 ASR 会话都还连着上一个会话。
-  const voiceModeSessionRef = useRef<string | null>(activeSessionId ?? null);
-  useEffect(() => {
-    if (voiceModeSessionRef.current === (activeSessionId ?? null)) return;
-    voiceModeSessionRef.current = activeSessionId ?? null;
-    setVoiceModeOpen(false);
-  }, [activeSessionId]);
+  const openVoiceMode = useAppStore((s) => s.openVoiceMode);
   useEffect(() => {
     if (!activeSessionId || !compactionResult) return;
     const timeoutMs = compactionResult === "success" ? 3000 : 5000;
@@ -508,12 +498,9 @@ export function ChatView() {
       },
     },
     // 浮层打开时禁用按住说话：两处采集同一支麦克风会互相打架（设计 §4 互斥）。
-    Boolean(voiceEngineConfig?.enabled) && !voiceModeOpen,
-  );
-
-  useVoiceModeShortcut(
-    () => setVoiceModeOpen(!useAppStore.getState().voiceModeOpen),
-    Boolean(activeSessionId),
+    Boolean(voiceEngineConfig?.enabled) &&
+      !voiceModeOpen &&
+      (activeSession?.kind !== "voice" || useTextInput),
   );
 
   const hasActiveTurn = Boolean(activeTurn);
@@ -2060,123 +2047,148 @@ export function ChatView() {
           />
         </div>
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">
-          <ChatInput
-            ref={chatInputRef}
-            // activeSessionId 在 ChatView 里必定非空（App 只在有会话时渲染它），
-            // `??` 只是为了满足类型，不构成真实分支。
-            draftKey={activeSessionId ?? NEW_SESSION_DRAFT_KEY}
-            onSubmit={handleSubmit}
-            onCompact={handleCompact}
-            onCommand={handleCommand}
-            disabled={isSubmitting}
-            submitDisabled={submitBlocked}
-            isExpanded={isInputExpanded}
-            onToggleExpand={() => setIsInputExpanded((v) => !v)}
-            onContentChange={setHasInputContent}
-            onAttachmentsChange={handleAttachmentsChange}
-            voiceRecording={voice.status === "recording"}
-            placeholder={t("chat.typeMessage")}
-            cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
-            textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
-            bottomSlot={
-              <ChatInputBottomBar
-                onAttach={() => chatInputRef.current?.selectFiles()}
-                cwd={activeSessionCwd}
-                onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
-                attachedKeys={attachedKeys}
-                onAttachMenuDismiss={() => chatInputRef.current?.focus()}
-                onCommandEntry={(command) => {
-                  if (command === "compact") {
-                    // 复用既有压缩路径（handleCompact 内部已守无会话/压缩中/有活跃回合）
-                    handleCommand("compact");
-                    return;
-                  }
-                  chatInputRef.current?.insertCommandChip("goal");
-                }}
-                onInsertPromptCommand={(name) =>
-                  chatInputRef.current?.insertCommandChip(name)
-                }
-                onInsertSkill={(name) =>
-                  chatInputRef.current?.insertSkillChip(name)
-                }
-                model={activeModel}
-                modelOptions={modelOptions}
-                activeProviderProfileKey={activeProviderProfileKey}
-                onSelectModel={(profileKey, modelId) => {
-                  if (!activeSession) return;
-                  // Validate modelId exists in modelOptions before applying
-                  const group = modelOptions.find(
-                    (g) => g.profileKey === profileKey,
-                  );
-                  if (!group?.items.some((i) => i.id === modelId)) return;
-                  setSessionProviderModel(
-                    activeSession.id,
-                    profileKey,
-                    modelId,
-                  );
-                  // ponytail: project → localStorage only, global → electron-store
-                  if (activeSessionCwd) {
-                    try {
-                      localStorage.setItem(
-                        "deskwand.pm." + encodeURIComponent(activeSessionCwd),
-                        JSON.stringify({
-                          p: profileKey,
-                          m: modelId,
-                          t: thinkingLevel,
-                        }),
-                      );
-                    } catch {
-                      /* ignore */
+          {activeSession?.kind === "voice" && activeSessionId ? (
+            <div className="flex items-center justify-center gap-3 py-3">
+              <button
+                type="button"
+                onClick={() => openVoiceMode(activeSessionId)}
+                className="rounded-2xl bg-accent px-4 py-2 text-accent-foreground hover:opacity-90"
+              >
+                {t(
+                  messages.length > 0 ? "voiceMode.resume" : "voiceMode.start",
+                )}
+              </button>
+              {!useTextInput ? (
+                <button
+                  type="button"
+                  onClick={() => setUseTextInput(true)}
+                  className="rounded-2xl px-3 py-2 text-text-secondary hover:bg-surface-hover"
+                >
+                  {t("voiceMode.useText")}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {activeSession?.kind !== "voice" || useTextInput ? (
+            <ChatInput
+              ref={chatInputRef}
+              // activeSessionId 在 ChatView 里必定非空（App 只在有会话时渲染它），
+              // `??` 只是为了满足类型，不构成真实分支。
+              draftKey={activeSessionId ?? NEW_SESSION_DRAFT_KEY}
+              onSubmit={handleSubmit}
+              onCompact={handleCompact}
+              onCommand={handleCommand}
+              disabled={isSubmitting}
+              submitDisabled={submitBlocked}
+              isExpanded={isInputExpanded}
+              onToggleExpand={() => setIsInputExpanded((v) => !v)}
+              onContentChange={setHasInputContent}
+              onAttachmentsChange={handleAttachmentsChange}
+              voiceRecording={voice.status === "recording"}
+              placeholder={t("chat.typeMessage")}
+              cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
+              textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
+              bottomSlot={
+                <ChatInputBottomBar
+                  onAttach={() => chatInputRef.current?.selectFiles()}
+                  cwd={activeSessionCwd}
+                  onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
+                  attachedKeys={attachedKeys}
+                  onAttachMenuDismiss={() => chatInputRef.current?.focus()}
+                  onCommandEntry={(command) => {
+                    if (command === "compact") {
+                      // 复用既有压缩路径（handleCompact 内部已守无会话/压缩中/有活跃回合）
+                      handleCommand("compact");
+                      return;
                     }
-                  } else {
-                    window.electronAPI.config.setActiveProvider({
+                    chatInputRef.current?.insertCommandChip("goal");
+                  }}
+                  onInsertPromptCommand={(name) =>
+                    chatInputRef.current?.insertCommandChip(name)
+                  }
+                  onInsertSkill={(name) =>
+                    chatInputRef.current?.insertSkillChip(name)
+                  }
+                  model={activeModel}
+                  modelOptions={modelOptions}
+                  activeProviderProfileKey={activeProviderProfileKey}
+                  onSelectModel={(profileKey, modelId) => {
+                    if (!activeSession) return;
+                    // Validate modelId exists in modelOptions before applying
+                    const group = modelOptions.find(
+                      (g) => g.profileKey === profileKey,
+                    );
+                    if (!group?.items.some((i) => i.id === modelId)) return;
+                    setSessionProviderModel(
+                      activeSession.id,
                       profileKey,
-                      defaultModel: modelId,
-                    });
-                  }
-                }}
-                modelMenuDisabled={!activeSession || modelOptions.length === 0}
-                thinkingLevel={thinkingLevel}
-                thinkingLevelOptions={thinkingLevelOptions}
-                onSelectThinkingLevel={(level) => {
-                  setSessionThinkingLevel(activeSession.id, level);
-                  // ponytail: project → localStorage only, global → electron-store
-                  if (activeSessionCwd) {
-                    try {
-                      localStorage.setItem(
-                        "deskwand.pm." + encodeURIComponent(activeSessionCwd),
-                        JSON.stringify({
-                          p: activeProviderProfileKey,
-                          m: activeModel,
-                          t: level,
-                        }),
-                      );
-                    } catch {
-                      /* ignore */
+                      modelId,
+                    );
+                    // ponytail: project → localStorage only, global → electron-store
+                    if (activeSessionCwd) {
+                      try {
+                        localStorage.setItem(
+                          "deskwand.pm." + encodeURIComponent(activeSessionCwd),
+                          JSON.stringify({
+                            p: profileKey,
+                            m: modelId,
+                            t: thinkingLevel,
+                          }),
+                        );
+                      } catch {
+                        /* ignore */
+                      }
+                    } else {
+                      window.electronAPI.config.setActiveProvider({
+                        profileKey,
+                        defaultModel: modelId,
+                      });
                     }
-                  } else {
-                    window.electronAPI.config.save({ thinkingLevel: level });
+                  }}
+                  modelMenuDisabled={
+                    !activeSession || modelOptions.length === 0
                   }
-                }}
-                contextUsagePercentage={contextUsagePercentage}
-                contextRingColorClass={contextRingColorClass}
-                contextStatusDetails={contextStatusDetails}
-                canStop={canStop}
-                onStop={handleStop}
-                isSubmitting={isSubmitting}
-                submitDisabled={submitBlocked}
-                isExpanded={isInputExpanded}
-                onToggleExpand={() => setIsInputExpanded((v) => !v)}
-                hasInputContent={hasInputContent}
-                onOpenVoiceMode={() => setVoiceModeOpen(true)}
-                voice={toMicButtonProps(voice, voiceEngine.install, {
-                  config: voiceEngineConfig,
-                  platform: window.electronAPI?.platform,
-                  t,
-                })}
-              />
-            }
-          />
+                  thinkingLevel={thinkingLevel}
+                  thinkingLevelOptions={thinkingLevelOptions}
+                  onSelectThinkingLevel={(level) => {
+                    setSessionThinkingLevel(activeSession.id, level);
+                    // ponytail: project → localStorage only, global → electron-store
+                    if (activeSessionCwd) {
+                      try {
+                        localStorage.setItem(
+                          "deskwand.pm." + encodeURIComponent(activeSessionCwd),
+                          JSON.stringify({
+                            p: activeProviderProfileKey,
+                            m: activeModel,
+                            t: level,
+                          }),
+                        );
+                      } catch {
+                        /* ignore */
+                      }
+                    } else {
+                      window.electronAPI.config.save({ thinkingLevel: level });
+                    }
+                  }}
+                  contextUsagePercentage={contextUsagePercentage}
+                  contextRingColorClass={contextRingColorClass}
+                  contextStatusDetails={contextStatusDetails}
+                  canStop={canStop}
+                  onStop={handleStop}
+                  isSubmitting={isSubmitting}
+                  submitDisabled={submitBlocked}
+                  isExpanded={isInputExpanded}
+                  onToggleExpand={() => setIsInputExpanded((v) => !v)}
+                  hasInputContent={hasInputContent}
+                  voice={toMicButtonProps(voice, voiceEngine.install, {
+                    config: voiceEngineConfig,
+                    platform: window.electronAPI?.platform,
+                    t,
+                  })}
+                />
+              }
+            />
+          ) : null}
         </div>
       </div>
       <MessageNavRail

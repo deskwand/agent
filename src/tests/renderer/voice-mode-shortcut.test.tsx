@@ -74,3 +74,10 @@ describe("useVoiceModeShortcut", () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 });
+
+it("ignores repeated keydown", () => {
+  const onToggle = vi.fn();
+  render(onToggle);
+  press({ code: "Space", metaKey: true, shiftKey: true, repeat: true });
+  expect(onToggle).not.toHaveBeenCalled();
+});

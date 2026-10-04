@@ -4264,7 +4264,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
 
   // Check if configured before starting sessions
   if (
-    event.type === "session.start" &&
+    (event.type === "session.start" ||
+      event.type === "session.createVoiceRecord") &&
     !configStore.hasAnyUsableCredentials()
   ) {
     sendToRenderer({
@@ -4286,6 +4287,9 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
   const sm = sessionManager!;
 
   switch (event.type) {
+    case "session.createVoiceRecord": {
+      return sm.createVoiceSessionRecord();
+    }
     case "session.start": {
       if (getWorkspacePathUnsupportedReason(event.payload.cwd)) {
         sendToRenderer({

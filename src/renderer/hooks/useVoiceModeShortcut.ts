@@ -23,6 +23,7 @@ export function useVoiceModeShortcut(
   useEffect(() => {
     if (!enabled) return;
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return;
       // macOS 用 Cmd，其它平台用 Ctrl：两个都收，省一套平台判断。
       if (!(event.metaKey || event.ctrlKey)) return;
       if (!event.shiftKey) return;

@@ -13,17 +13,10 @@ import { useVoiceMode } from "../hooks/useVoiceMode";
 import type { ConversationState } from "../hooks/useVoiceConversation";
 
 export interface VoiceModeOverlayProps {
-  /**
-   * 当前会话 id。**可以为 null**：欢迎页还没有会话，第一句语音负责创建它
-   * （由宿主注入的 onSendQuestion 决定用 startSession 还是 continueSession）。
-   */
-  sessionId: string | null;
+  sessionId: string;
   onClose(): void;
   isCompacting: boolean;
-  /**
-   * 把一轮问题发出去。由宿主注入：聊天视图用 continueSession（带只读白名单），
-   * 欢迎页用 startSession 建会话。
-   */
+  /** Submit to the bound voice session. */
   onSendQuestion(text: string): void;
 }
 

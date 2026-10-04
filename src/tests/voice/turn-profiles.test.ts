@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import {
   appendVoiceSection,
+  resolveTurnThinkingLevel,
   VOICE_PROMPT_SECTION,
   VOICE_TURN,
 } from "../../main/agent/turn-profiles";
@@ -82,12 +83,14 @@ describe("AgentRunner wiring", () => {
   );
 
   it("takes the turn profile from the new flag, not the old boolean", () => {
-    expect(src).toContain('turnProfile === "voice" ? VOICE_TURN : undefined');
+    expect(src).toContain("resolveSessionTurnPolicy(");
+    expect(src).toContain("applySessionTurnPolicyToSdk(");
     expect(src).not.toContain("resolveActiveTools");
   });
 
   it("derives the effective thinking level from the profile", () => {
-    expect(src).toContain("profile?.thinkingLevel ?? sessionThinkingLevel");
+    expect(resolveTurnThinkingLevel(VOICE_TURN, "high")).toBe("off");
+    expect(resolveTurnThinkingLevel(undefined, "high")).toBe("high");
   });
 
   it("registers the turn profile extension once per session", () => {

@@ -10,6 +10,7 @@ import {
 } from "node:sqlite";
 import { app } from "electron";
 import { join } from "path";
+import type { SessionKind } from "../../shared/session-kind";
 import {
   existsSync,
   mkdirSync,
@@ -64,6 +65,7 @@ export interface DatabaseInstance {
 }
 
 export interface SessionRow {
+  session_kind?: SessionKind;
   id: string;
   title: string;
   deskwand_session_id: string | null;
@@ -300,6 +302,12 @@ function initializeSchema(database: DatabaseSync): void {
     ensureColumn(
       database,
       "sessions",
+      "session_kind",
+      "session_kind TEXT NOT NULL DEFAULT 'ordinary'",
+    );
+    ensureColumn(
+      database,
+      "sessions",
       "thinking_level",
       "thinking_level TEXT NOT NULL DEFAULT 'medium'",
     );
@@ -518,8 +526,8 @@ export function initDatabase(): DatabaseInstance {
   // Prepare statements for better performance
   const insertSession = rawDb.prepare(`
     INSERT OR REPLACE INTO sessions
-    (id, title, deskwand_session_id, openai_thread_id, status, cwd, mounted_paths, allowed_tools, memory_enabled, provider_profile_key, model, thinking_level, is_project_mode, archived, archived_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (id, title, deskwand_session_id, openai_thread_id, status, cwd, mounted_paths, allowed_tools, memory_enabled, provider_profile_key, model, thinking_level, is_project_mode, archived, archived_at, created_at, updated_at, session_kind)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   // Note: Dynamic update queries are built in sessions.update() for flexibility
@@ -616,6 +624,7 @@ export function initDatabase(): DatabaseInstance {
           session.archived_at,
           session.created_at,
           session.updated_at,
+          session.session_kind ?? "ordinary",
         );
       },
 

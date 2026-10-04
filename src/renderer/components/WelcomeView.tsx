@@ -71,7 +71,6 @@ export function WelcomeView() {
   // 浮层开关放 store：欢迎页的第一句语音会创建会话，随后应用切到聊天视图，
   // 状态留着，浮层就能跟着过去接着用，而不是随本视图卸载而关掉。
   const voiceModeOpen = useAppStore((state) => state.voiceModeOpen);
-  const setVoiceModeOpen = useAppStore((state) => state.setVoiceModeOpen);
   const isConfigured = useAppStore((state) => state.isConfigured);
   const workingDir = useAppStore((state) => state.workingDir);
   const setShowSettings = useAppStore((state) => state.setShowSettings);
@@ -512,7 +511,6 @@ export function WelcomeView() {
           bottomSlot={
             showConnectCards ? undefined : (
               <ChatInputBottomBar
-                onOpenVoiceMode={() => setVoiceModeOpen(true)}
                 onAttach={() => chatInputRef.current?.selectFiles()}
                 onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
                 attachedKeys={attachedKeys}

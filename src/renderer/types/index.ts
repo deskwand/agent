@@ -26,6 +26,8 @@ import type {
 import type { VoiceShortcut } from "../../shared/voice-shortcuts";
 
 // Session types
+import type { SessionKind } from "../../shared/session-kind";
+
 export interface Session {
   id: string;
   title: string;
@@ -43,6 +45,7 @@ export interface Session {
   archived?: boolean;
   archivedAt?: number;
   piSessionFile?: string;
+  kind?: SessionKind;
   createdAt: number;
   updatedAt: number;
 }
@@ -431,6 +434,7 @@ export interface PermissionRule {
 
 // IPC Event types
 export type ClientEvent =
+  | { type: "session.createVoiceRecord"; payload: Record<string, never> }
   | {
       type: "session.start";
       payload: {

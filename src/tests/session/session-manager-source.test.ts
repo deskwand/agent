@@ -83,9 +83,7 @@ describe("background-agent auto-continue", () => {
 describe("stale running sessions", () => {
   it("createSessionRecord persists an idle session (no prompt yet)", () => {
     const src = readSrc();
-    const start = src.indexOf(
-      "createSessionRecord(title: string, cwd?: string): Session {",
-    );
+    const start = src.indexOf("\n  createSessionRecord(");
     const end = src.indexOf("async startSession(", start);
     expect(start).toBeGreaterThan(-1);
     expect(end).toBeGreaterThan(start);

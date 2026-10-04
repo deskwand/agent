@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { createVoiceConversation } from "../../renderer/hooks/useVoiceConversation";
-import type { VadEdge, VadProfile, VoiceEvent } from "../../shared/ipc-types";
+import type {
+  VadEdge,
+  VadProfile,
+  VoiceEvent,
+  VoiceStartResult,
+} from "../../shared/ipc-types";
 import type { StreamingSpeech } from "../../renderer/hooks/useStreamingSpeech";
 
 /**
@@ -8,7 +13,7 @@ import type { StreamingSpeech } from "../../renderer/hooks/useStreamingSpeech";
  * 喂电平。原来那些"150ms 才触发""回答期阈值更高"的用例已经作废 —— 那些判定
  * 搬进主进程了，这里只验"收到边沿之后状态机怎么走"。
  */
-function harness() {
+function harness(start?: () => Promise<VoiceStartResult>) {
   let samplesCb: ((pcm: Int16Array, level: number) => void) | null = null;
   let voiceCb: ((event: VoiceEvent) => void) | null = null;
   const pushed: ArrayBuffer[] = [];
@@ -39,20 +44,21 @@ function harness() {
     failedCount: () => 0,
   } as unknown as StreamingSpeech;
 
+  const cancel = vi.fn(async (_id: string) => {});
   const conv = createVoiceConversation({
     startCapture: async (cb) => {
       samplesCb = cb;
       return { stop: () => {} };
     },
     voice: {
-      start: async () => ({ ok: true, sessionId: "s1" }),
+      start: start ?? (async () => ({ ok: true, sessionId: "s1" })),
       pushAudio: async (_id, pcm) => {
         pushed.push(pcm);
       },
       stop: async (id) => {
         voiceStops.push(id);
       },
-      cancel: async () => {},
+      cancel,
       onEvent: (cb) => {
         voiceCb = cb;
         return () => {};
@@ -89,6 +95,7 @@ function harness() {
 
   return {
     conv,
+    cancel,
     pushed,
     states,
     questions,
@@ -440,3 +447,29 @@ describe("createVoiceConversation", () => {
     });
   });
 });
+
+it.each([true, false])(
+  "cleans up a late ASR start (success=%s)",
+  async (ok) => {
+    let resolve!: (value: VoiceStartResult) => void;
+    const h = harness(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    await h.conv.start();
+    h.vad("speech-start");
+    h.conv.stop();
+    resolve(
+      ok
+        ? { ok: true, sessionId: "late-asr" }
+        : { ok: false, code: "VOICE_CAPTURE_FAILED" },
+    );
+    await Promise.resolve();
+    if (ok) expect(h.cancel).toHaveBeenCalledExactlyOnceWith("late-asr");
+    else expect(h.cancel).not.toHaveBeenCalled();
+    expect(h.pushed).toEqual([]);
+    expect(h.questions).toEqual([]);
+  },
+);

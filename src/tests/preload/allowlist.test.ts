@@ -12,6 +12,7 @@ type ExposedElectronApi = {
 // would widen the element type to the whole union, making the exhaustiveness
 // check below compare the union against itself (always true).
 const ALL_CLIENT_EVENT_TYPES = [
+  "session.createVoiceRecord",
   "session.start",
   "session.continue",
   "session.fork",

@@ -20,7 +20,7 @@ describe("Main process window/config behavior", () => {
     const source = fs.readFileSync(indexPath, "utf8");
     const sessionStartGuard =
       source.match(
-        /if \(\s*event\.type === "session\.start"[\s\S]*?return null;\n  }/,
+        /if \(\s*\(?\s*event\.type === "session\.start"[\s\S]*?return null;\n  }/,
       )?.[0] || "";
 
     expect(sessionStartGuard).toContain("hasAnyUsableCredentials");

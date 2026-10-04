@@ -19,9 +19,9 @@ import {
   usePendingDialogs,
 } from "./store/selectors";
 import { useIPC } from "./hooks/useIPC";
-import { getInitialSessionTitle } from "../shared/session-title";
+import { useVoiceModeShortcut } from "./hooks/useVoiceModeShortcut";
 import { VoiceModeOverlay } from "./components/VoiceModeOverlay";
-import { useCurrentSession } from "./store/selectors";
+
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
 import { AppRail } from "./components/AppRail";
@@ -153,72 +153,124 @@ function App() {
   const setBrowserWidthManual = useAppStore((s) => s.setBrowserWidthManual);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
 
-  const { listSessions, isElectron, continueSession, startSession } = useIPC();
-  // 语音模式浮层。**挂在 App 层，不放子视图里**：欢迎页的第一句话会创建会话
-  // 并让 App 切到聊天视图，挂在子视图里会被卸载重挂 —— 新实例的 answering
-  // 是 false，第一轮的回复就不会被朗读，麦克风与标定也得重来一遍。
+  const { listSessions, isElectron, continueSession, createVoiceSession } =
+    useIPC();
   const voiceModeOpen = useAppStore((s) => s.voiceModeOpen);
-  const setVoiceModeOpen = useAppStore((s) => s.setVoiceModeOpen);
-  const workingDir = useAppStore((s) => s.workingDir);
-  const currentSession = useCurrentSession();
+  const voiceModeSessionId = useAppStore((s) => s.voiceModeSessionId);
+  const sessions = useAppStore((s) => s.sessions);
+  const closeVoiceMode = useAppStore((s) => s.closeVoiceMode);
+  const [voiceCreating, setVoiceCreating] = useState(false);
+  const voiceCreateLock = useRef(false);
+  const voiceNavigationEpoch = useRef(0);
+  const appLive = useRef(true);
   const voiceIsCompacting = useAppStore((s) =>
-    s.activeSessionId
-      ? s.sessionStates[s.activeSessionId]?.compaction.status === "running"
+    voiceModeSessionId
+      ? s.sessionStates[voiceModeSessionId]?.compaction.status === "running"
       : false,
   );
   useWindowSize();
   const initialized = useRef(false);
 
-  /**
-   * 切会话时的浮层处置。
-   *
-   * 从“没有会话”变成“有会话”是**语音模式自己刚建了会话**（欢迎页的第一句），
-   * 这种情况必须把浮层留着，否则用户刚说完话浮层就没了。其余切换
-   * （换会话、会话消失）都要关：浮层带着旧会话继续采集是错的。
-   */
-  const voiceSessionRef = useRef<string | null>(activeSessionId ?? null);
   useEffect(() => {
-    const previous = voiceSessionRef.current;
-    voiceSessionRef.current = activeSessionId ?? null;
-    if (previous === (activeSessionId ?? null)) return;
-    if (previous === null && activeSessionId) return;
-    setVoiceModeOpen(false);
-  }, [activeSessionId, setVoiceModeOpen]);
+    appLive.current = true;
+    const unsubscribe = useAppStore.subscribe((state, previous) => {
+      if (
+        state.activeView !== previous.activeView ||
+        state.activeSessionId !== previous.activeSessionId
+      ) {
+        voiceNavigationEpoch.current += 1;
+      }
+    });
+    return () => {
+      appLive.current = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const targetExists = sessions.some(
+      (s) => s.id === voiceModeSessionId && s.kind === "voice",
+    );
+    if (
+      voiceModeOpen &&
+      (activeView !== "chat" ||
+        !voiceModeSessionId ||
+        activeSessionId !== voiceModeSessionId ||
+        !targetExists)
+    )
+      closeVoiceMode();
+  }, [
+    activeView,
+    activeSessionId,
+    voiceModeSessionId,
+    voiceModeOpen,
+    sessions,
+    closeVoiceMode,
+  ]);
+
+  const handleCreateVoiceSession = useCallback(async () => {
+    if (voiceCreateLock.current) return;
+    voiceCreateLock.current = true;
+    setVoiceCreating(true);
+    const epoch = voiceNavigationEpoch.current;
+    try {
+      const record = await createVoiceSession();
+      // 主进程已经发过「需要配置」提示，返回 null 不再叠加第二条。
+      if (!record) return;
+      if (!appLive.current || epoch !== voiceNavigationEpoch.current) return;
+      const store = useAppStore.getState();
+      if (!store.sessions.some((s) => s.id === record.id && s.kind === "voice"))
+        return;
+      store.setActiveView("chat");
+      store.setActiveSession(record.id);
+      store.openVoiceMode(record.id);
+    } catch {
+      if (appLive.current)
+        useAppStore.getState().setGlobalNotice({
+          id: `voice-create-${Date.now()}`,
+          message: "",
+          messageKey: "voiceMode.createFailed",
+          type: "error",
+        });
+    } finally {
+      voiceCreateLock.current = false;
+      if (appLive.current) setVoiceCreating(false);
+    }
+  }, [createVoiceSession]);
+
+  useVoiceModeShortcut(
+    () => {
+      if (useAppStore.getState().voiceModeOpen) closeVoiceMode();
+      else void handleCreateVoiceSession();
+    },
+    voiceModeOpen || activeView === "chat",
+  );
 
   const handleVoiceQuestion = useCallback(
     (text: string) => {
-      // 有会话就续，没有就是欢迎页的第一句：建一个。
-      // **两条路都要带 turnProfile** —— 第一轮不受限的话，语音模式就不是
-      // 精简问答了。
-      if (activeSessionId) {
-        void continueSession(
-          activeSessionId,
-          text,
-          currentSession?.providerProfileKey,
-          currentSession?.model,
-          undefined,
-          "voice",
-        );
+      const store = useAppStore.getState();
+      const target = store.sessions.find(
+        (s) => s.id === voiceModeSessionId && s.kind === "voice",
+      );
+      if (
+        !voiceModeSessionId ||
+        !target ||
+        !store.voiceModeOpen ||
+        store.voiceModeSessionId !== voiceModeSessionId ||
+        store.activeSessionId !== voiceModeSessionId ||
+        store.activeView !== "chat"
+      )
         return;
-      }
-      void startSession(
-        getInitialSessionTitle(text, undefined),
+      void continueSession(
+        voiceModeSessionId,
         text,
-        workingDir || undefined,
-        undefined,
-        undefined,
-        undefined,
+        target.providerProfileKey,
+        target.model,
         undefined,
         "voice",
       );
     },
-    [
-      activeSessionId,
-      currentSession,
-      workingDir,
-      continueSession,
-      startSession,
-    ],
+    [voiceModeSessionId, continueSession],
   );
 
   useEffect(() => {
@@ -482,7 +534,10 @@ function App() {
       ) : (
         <div className="flex-1 min-h-0 flex overflow-hidden">
           {/* 图标栏：常驻，跨所有视图提供导航 */}
-          <AppRail />
+          <AppRail
+            onCreateVoiceSession={() => void handleCreateVoiceSession()}
+            voiceCreating={voiceCreating}
+          />
 
           {/* 会话列表只在聊天视图出现：其余视图由图标栏承担导航，侧栏连同
               它的拖拽柄一起收起 */}
@@ -749,11 +804,18 @@ function App() {
       {/* Image Lightbox */}
       <ImageLightbox {...lightboxState} />
 
-      {voiceModeOpen ? (
+      {voiceModeOpen &&
+      activeView === "chat" &&
+      voiceModeSessionId &&
+      activeSessionId === voiceModeSessionId &&
+      sessions.some(
+        (s) => s.id === voiceModeSessionId && s.kind === "voice",
+      ) ? (
         <VoiceModeOverlay
-          sessionId={activeSessionId}
+          key={voiceModeSessionId}
+          sessionId={voiceModeSessionId}
           isCompacting={voiceIsCompacting}
-          onClose={() => setVoiceModeOpen(false)}
+          onClose={closeVoiceMode}
           onSendQuestion={handleVoiceQuestion}
         />
       ) : null}

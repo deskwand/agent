@@ -2,6 +2,7 @@ import type { ClientEvent } from "../renderer/types";
 
 export function eventRequiresSessionManager(event: ClientEvent): boolean {
   switch (event.type) {
+    case "session.createVoiceRecord":
     case "session.start":
     case "session.continue":
     case "session.fork":

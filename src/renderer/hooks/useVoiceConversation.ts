@@ -202,7 +202,10 @@ export function createVoiceConversation(
       sessionId = null;
     }
     const started = await deps.voice.start();
-    if (disposed) return;
+    if (disposed) {
+      if (started.ok) void deps.voice.cancel(started.sessionId);
+      return;
+    }
     if (!started.ok) {
       failRound(started.code);
       return;
@@ -343,6 +346,7 @@ export function createVoiceConversation(
       try {
         capture = await deps.startCapture(onSamples);
       } catch (error) {
+        if (disposed) return;
         deps.onError("VOICE_CAPTURE_FAILED");
         setState("blocked");
         return;

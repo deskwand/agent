@@ -10,7 +10,7 @@ const app = read("App.tsx");
 
 describe("AppRail", () => {
   it("is mounted in App.tsx next to the sidebar", () => {
-    expect(app).toContain("<AppRail />");
+    expect(app).toMatch(/<AppRail[\s/>]/);
     expect(app).toContain('from "./components/AppRail"');
   });
 

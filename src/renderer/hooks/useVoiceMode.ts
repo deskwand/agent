@@ -35,11 +35,7 @@ export interface VoiceModeView {
 }
 
 export interface UseVoiceModeOptions {
-  /**
-   * 当前会话 id。**可以为 null**：欢迎页还没有会话，第一句语音会用
-   * startSession 建一个（由 VoiceModeOverlay 注入的 onSendQuestion 决定）。
-   */
-  sessionId: string | null;
+  sessionId: string;
   isCompacting: boolean;
   /**
    * 把一轮问题发出去。由宿主注入 —— `continueSession` 是 useIPC 的返回值，
@@ -90,8 +86,11 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
   const conversationRef = useRef<VoiceConversation | null>(null);
 
   useEffect(() => {
-    const patch = (next: Partial<VoiceModeView>) =>
-      setView((prev) => ({ ...prev, ...next }));
+    let live = true;
+    const sessionId = options.sessionId;
+    const patch = (next: Partial<VoiceModeView>) => {
+      if (live) setView((prev) => ({ ...prev, ...next }));
+    };
 
     // AudioContext 由这里创建并持有：`createStreamingSpeech` 的默认依赖每次都 new
     // 一个，而浮层每开一次就挂载一次 —— 不 close 就会一直漏。Chromium 对同时存在
@@ -142,7 +141,18 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
         },
       },
       speech,
-      sendQuestion: (text) => optionsRef.current.sendQuestion(text),
+      sendQuestion: (text) => {
+        const store = useAppStore.getState();
+        if (
+          live &&
+          store.voiceModeOpen &&
+          store.voiceModeSessionId === sessionId &&
+          store.activeSessionId === sessionId &&
+          store.activeView === "chat" &&
+          store.sessions.some((s) => s.id === sessionId && s.kind === "voice")
+        )
+          optionsRef.current.sendQuestion(text);
+      },
       silenceMs:
         useAppStore.getState().appConfig?.voiceMode?.silenceMs ??
         DEFAULT_VOICE_MODE.silenceMs,
@@ -173,9 +183,7 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
     void conversation.start();
 
     const timer = window.setInterval(() => {
-      const sessionId = optionsRef.current.sessionId;
-      // 会话还没建起来（欢迎页的第一轮）：没有 partial 可读，也没有轮次要收尾。
-      if (!sessionId) return;
+      if (!live) return;
       const text = readAnswer(sessionId);
 
       if (text !== lastAnswer) {
@@ -216,12 +224,13 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
     }, POLL_MS);
 
     return () => {
+      live = false;
       window.clearInterval(timer);
       conversationRef.current = null;
       conversation.stop();
       void audioContext.close();
     };
-  }, []);
+  }, [options.sessionId]);
 
   useEffect(() => {
     conversationRef.current?.setBlocked(options.isCompacting);

@@ -66,10 +66,6 @@ export interface ChatInputBottomBarProps {
    * 而不是静默不显示麦克风（与 hasInputContent 同一套约定）。
    */
   voice: VoiceMicButtonProps;
-  /**
-   * 打开语音对话浮层。可选：没有会话的路径（欢迎页）不提供入口。
-   */
-  onOpenVoiceMode?: () => void;
 }
 
 export function ChatInputBottomBar({
@@ -101,7 +97,6 @@ export function ChatInputBottomBar({
   onToggleExpand,
   hasInputContent,
   voice,
-  onOpenVoiceMode,
 }: ChatInputBottomBarProps) {
   const { t } = useTranslation();
 
@@ -144,22 +139,6 @@ export function ChatInputBottomBar({
         )}
 
         <VoiceMicButton {...voice} />
-
-        {onOpenVoiceMode ? (
-          <Tooltip label={t("voiceMode.entry")}>
-            <button
-              type="button"
-              onClick={onOpenVoiceMode}
-              aria-label={t("voiceMode.entry")}
-              data-testid="voice-mode-entry"
-              className="flex h-9 w-9 items-center justify-center rounded-2xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
-            >
-              {/* 发光球，不是第二个麦克风：左邻是实心麦克风，两个语音类按钮
-                  必须一眼分得开（设计 §3）。 */}
-              <span className="h-4 w-4 rounded-full [background:radial-gradient(circle_at_40%_38%,#fff_0%,#9dc0ff_38%,#3f6fd8_72%,#16213f_100%)]" />
-            </button>
-          </Tooltip>
-        ) : null}
       </div>
 
       <div className="flex min-w-0 items-center justify-end gap-2">

@@ -1159,7 +1159,11 @@
     "toggle": "产物面板"
   },
   "voiceMode": {
-    "entry": "进入语音对话",
+    "start": "开始语音",
+    "resume": "继续语音",
+    "useText": "改用打字",
+    "sessionLabel": "语音会话",
+    "createFailed": "无法创建语音会话。",
     "exit": "退出语音对话",
     "stateCalibrating": "正在启动…",
     "stateListening": "我在听",
@@ -2156,6 +2160,7 @@
     "connected": "已连接 {{provider}} · {{model}}"
   },
   "navRail": {
+    "newVoiceSession": "新建语音会话",
     "label": "主导航",
     "chat": "聊天"
   },

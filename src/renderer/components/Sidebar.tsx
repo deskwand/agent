@@ -15,6 +15,7 @@ import {
   SquarePen,
   Pin,
   PinOff,
+  Mic,
 } from "lucide-react";
 import { panelWidthTransitionClass } from "../utils/panel-width";
 import {
@@ -760,6 +761,12 @@ export function Sidebar({
       >
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1 flex items-center gap-2">
+            {session.kind === "voice" ? (
+              <Mic
+                className="h-3.5 w-3.5 shrink-0 text-text-muted"
+                aria-label={t("voiceMode.sessionLabel")}
+              />
+            ) : null}
             {editingSessionId === session.id ? (
               <input
                 autoFocus

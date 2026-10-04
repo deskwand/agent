@@ -1160,7 +1160,11 @@
     "toggle": "Artifact Panel"
   },
   "voiceMode": {
-    "entry": "Start voice conversation",
+    "start": "Start voice",
+    "resume": "Resume voice",
+    "useText": "Use text",
+    "sessionLabel": "Voice session",
+    "createFailed": "Could not create the voice session.",
     "exit": "Exit voice conversation",
     "stateCalibrating": "Starting…",
     "stateListening": "I'm listening",
@@ -2159,6 +2163,7 @@
     "connected": "Connected to {{provider}} · {{model}}"
   },
   "navRail": {
+    "newVoiceSession": "New voice session",
     "label": "Main navigation",
     "chat": "Chat"
   },

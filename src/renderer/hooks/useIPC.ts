@@ -15,6 +15,7 @@ import type {
 } from "../types";
 import i18n from "../i18n/config";
 import {
+  DEFAULT_SESSION_TITLE,
   normalizeSessionTitle,
   type RenameSessionResult,
 } from "../../shared/session-title";
@@ -754,6 +755,39 @@ export function useIPC() {
     return window.electronAPI.invoke<T>(event);
   }, []);
 
+  const createVoiceSession = useCallback(async (): Promise<Session | null> => {
+    const now = Date.now();
+    const session = isElectron
+      ? await invoke<Session | null>({
+          type: "session.createVoiceRecord",
+          payload: {},
+        })
+      : {
+          id: `mock-voice-${crypto.randomUUID()}`,
+          title: DEFAULT_SESSION_TITLE,
+          kind: "voice" as const,
+          status: "idle" as const,
+          mountedPaths: [],
+          allowedTools: ["web_search", "fetch_content", "get_search_content"],
+          memoryEnabled: true,
+          isProjectMode: false,
+          thinkingLevel: "medium" as const,
+          createdAt: now,
+          updatedAt: now,
+        };
+    if (
+      !session ||
+      typeof session.id !== "string" ||
+      session.kind !== "voice" ||
+      session.status !== "idle"
+    )
+      return null;
+    const store = useAppStore.getState();
+    if (!store.sessions.some((item) => item.id === session.id))
+      store.addSession(session);
+    return session;
+  }, [invoke]);
+
   // Start a new session
   const startSession = useCallback(
     async (
@@ -1414,6 +1448,7 @@ export function useIPC() {
     send,
     invoke,
     startSession,
+    createVoiceSession,
     continueSession,
     forkSession,
     setSessionThinkingLevel,

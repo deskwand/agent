@@ -88,6 +88,7 @@ let ipcListener:
 // itself (always passes). The element type must be inferred from the literal
 // array via `as const`.
 const ALLOWED_CLIENT_EVENTS = new Set([
+  "session.createVoiceRecord",
   "session.start",
   "session.continue",
   "session.fork",

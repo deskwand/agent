@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { Fragment, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
@@ -6,6 +6,7 @@ import {
   Clock3,
   LayoutGrid,
   MessageSquare,
+  Mic,
 } from "lucide-react";
 import type { ActiveView } from "../store";
 import { useAppStore } from "../store";
@@ -24,7 +25,13 @@ const RAIL_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   usage: BarChart3,
 };
 
-export function AppRail() {
+export function AppRail({
+  onCreateVoiceSession,
+  voiceCreating = false,
+}: {
+  onCreateVoiceSession?: () => void;
+  voiceCreating?: boolean;
+}) {
   const { t } = useTranslation();
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
@@ -47,21 +54,36 @@ export function AppRail() {
         const Icon = RAIL_ICONS[item.key];
         const isActive = activeKey === item.key;
         return (
-          <Tooltip key={item.key} label={t(item.labelKey)} placement="right">
-            <button
-              type="button"
-              onClick={() => handleItemClick(item.view)}
-              aria-label={t(item.labelKey)}
-              aria-current={isActive ? "page" : undefined}
-              className={`${RAIL_BUTTON_CLASS} ${
-                isActive
-                  ? "bg-overlay-on text-accent"
-                  : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
-              }`}
-            >
-              {Icon ? <Icon className="w-4 h-4" /> : null}
-            </button>
-          </Tooltip>
+          <Fragment key={item.key}>
+            <Tooltip label={t(item.labelKey)} placement="right">
+              <button
+                type="button"
+                onClick={() => handleItemClick(item.view)}
+                aria-label={t(item.labelKey)}
+                aria-current={isActive ? "page" : undefined}
+                className={`${RAIL_BUTTON_CLASS} ${
+                  isActive
+                    ? "bg-overlay-on text-accent"
+                    : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
+                }`}
+              >
+                {Icon ? <Icon className="w-4 h-4" /> : null}
+              </button>
+            </Tooltip>
+            {item.key === "chat" ? (
+              <Tooltip label={t("navRail.newVoiceSession")} placement="right">
+                <button
+                  type="button"
+                  aria-label={t("navRail.newVoiceSession")}
+                  disabled={voiceCreating || !onCreateVoiceSession}
+                  onClick={onCreateVoiceSession}
+                  className={`${RAIL_BUTTON_CLASS} text-text-muted hover:bg-overlay-hover hover:text-text-primary disabled:opacity-50`}
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
+              </Tooltip>
+            ) : null}
+          </Fragment>
         );
       })}
 
