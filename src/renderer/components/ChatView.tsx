@@ -21,7 +21,6 @@ import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { usePushToTalk } from "../hooks/usePushToTalk";
 import { useVoiceModeShortcut } from "../hooks/useVoiceModeShortcut";
-import { VoiceModeOverlay } from "./VoiceModeOverlay";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { attachmentKeySet } from "../utils/attached-files";
@@ -323,8 +322,9 @@ export function ChatView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
-  // 浮层开关放 store：欢迎页也能用语音模式，创建会话后应用切到本视图，
-  // 状态留在 store 里浮层才能跟着过来。
+  // 浮层开关在 store 里：欢迎页也能用语音模式，创建会话后应用切到本视图，
+  // 状态留在 store 里。**浮层本体挂在 App 层**（子视图会被卸载重挂，
+  // 重挂会把第一轮的回复丢掉）。“切会话关浮层”也在 App 里统一处理。
   const voiceModeOpen = useAppStore((s) => s.voiceModeOpen);
   const setVoiceModeOpen = useAppStore((s) => s.setVoiceModeOpen);
   // 切会话就关掉浮层（设计 §4）：语音会话绑在某个 sessionId 上，
@@ -2185,24 +2185,6 @@ export function ChatView() {
         onTickSelect={handleDockTickSelect}
       />
       <VoiceDownloadConfirm engine={voiceEngine} />
-      {voiceModeOpen && activeSessionId ? (
-        <VoiceModeOverlay
-          sessionId={activeSessionId}
-          isCompacting={isCompacting}
-          onClose={() => setVoiceModeOpen(false)}
-          onSendQuestion={(text) => {
-            // 只读工具白名单（设计 §2.5）：语音里没法做审批、也没法看 diff。
-            void continueSession(
-              activeSessionId,
-              text,
-              activeSession?.providerProfileKey,
-              activeSession?.model,
-              undefined,
-              true,
-            );
-          }}
-        />
-      ) : null}
     </div>
   );
 }

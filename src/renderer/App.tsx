@@ -19,6 +19,9 @@ import {
   usePendingDialogs,
 } from "./store/selectors";
 import { useIPC } from "./hooks/useIPC";
+import { getInitialSessionTitle } from "../shared/session-title";
+import { VoiceModeOverlay } from "./components/VoiceModeOverlay";
+import { useCurrentSession } from "./store/selectors";
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
 import { AppRail } from "./components/AppRail";
@@ -150,9 +153,73 @@ function App() {
   const setBrowserWidthManual = useAppStore((s) => s.setBrowserWidthManual);
   const toggleBrowserPanel = useAppStore((s) => s.toggleBrowserPanel);
 
-  const { listSessions, isElectron } = useIPC();
+  const { listSessions, isElectron, continueSession, startSession } = useIPC();
+  // 语音模式浮层。**挂在 App 层，不放子视图里**：欢迎页的第一句话会创建会话
+  // 并让 App 切到聊天视图，挂在子视图里会被卸载重挂 —— 新实例的 answering
+  // 是 false，第一轮的回复就不会被朗读，麦克风与标定也得重来一遍。
+  const voiceModeOpen = useAppStore((s) => s.voiceModeOpen);
+  const setVoiceModeOpen = useAppStore((s) => s.setVoiceModeOpen);
+  const workingDir = useAppStore((s) => s.workingDir);
+  const currentSession = useCurrentSession();
+  const voiceIsCompacting = useAppStore((s) =>
+    s.activeSessionId
+      ? s.sessionStates[s.activeSessionId]?.compaction.status === "running"
+      : false,
+  );
   useWindowSize();
   const initialized = useRef(false);
+
+  /**
+   * 切会话时的浮层处置。
+   *
+   * 从“没有会话”变成“有会话”是**语音模式自己刚建了会话**（欢迎页的第一句），
+   * 这种情况必须把浮层留着，否则用户刚说完话浮层就没了。其余切换
+   * （换会话、会话消失）都要关：浮层带着旧会话继续采集是错的。
+   */
+  const voiceSessionRef = useRef<string | null>(activeSessionId ?? null);
+  useEffect(() => {
+    const previous = voiceSessionRef.current;
+    voiceSessionRef.current = activeSessionId ?? null;
+    if (previous === (activeSessionId ?? null)) return;
+    if (previous === null && activeSessionId) return;
+    setVoiceModeOpen(false);
+  }, [activeSessionId, setVoiceModeOpen]);
+
+  const handleVoiceQuestion = useCallback(
+    (text: string) => {
+      // 有会话就续，没有就是欢迎页的第一句：建一个。
+      // **两条路都要带 readonlyTools** —— 第一轮不受限的话，语音模式就不是
+      // “只读问答”了。
+      if (activeSessionId) {
+        void continueSession(
+          activeSessionId,
+          text,
+          currentSession?.providerProfileKey,
+          currentSession?.model,
+          undefined,
+          true,
+        );
+        return;
+      }
+      void startSession(
+        getInitialSessionTitle(text, undefined),
+        text,
+        workingDir || undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      );
+    },
+    [
+      activeSessionId,
+      currentSession,
+      workingDir,
+      continueSession,
+      startSession,
+    ],
+  );
 
   useEffect(() => {
     // Only run once on mount
@@ -681,6 +748,15 @@ function App() {
 
       {/* Image Lightbox */}
       <ImageLightbox {...lightboxState} />
+
+      {voiceModeOpen ? (
+        <VoiceModeOverlay
+          sessionId={activeSessionId}
+          isCompacting={voiceIsCompacting}
+          onClose={() => setVoiceModeOpen(false)}
+          onSendQuestion={handleVoiceQuestion}
+        />
+      ) : null}
     </div>
   );
 }

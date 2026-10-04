@@ -79,7 +79,8 @@ export function thresholdFromNoiseFloor(floor: number): number {
 export function createVad(config: VadConfig): Vad {
   let speechMs = config.speechMs ?? DEFAULT_SPEECH_MS;
   let threshold = config.threshold;
-  const silenceMs = config.silenceMs ?? 800;
+  // 与 shared/voice-mode 的默认值一致；调用方一般都会显式传，这里只是防御。
+  const silenceMs = config.silenceMs ?? 1200;
   let aboveMs = 0;
   let belowMs = 0;
   let speaking = false;

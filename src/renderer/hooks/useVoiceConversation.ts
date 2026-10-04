@@ -301,6 +301,9 @@ export function createVoiceConversation(
       if (next) {
         deps.speech.stop();
         answering = false;
+        // 压缩期也要把打断门槛收回去：不收的话，压缩结束后用户接话还得
+        // 按“打断朗读”的严格标准才被听见。
+        setBargeIn(false);
         setState("blocked");
         return;
       }

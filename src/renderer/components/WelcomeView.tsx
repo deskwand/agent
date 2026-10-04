@@ -39,7 +39,6 @@ import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { toMicButtonProps } from "./VoiceMicButton";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
-import { VoiceModeOverlay } from "./VoiceModeOverlay";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { usePushToTalk } from "../hooks/usePushToTalk";
@@ -604,25 +603,6 @@ export function WelcomeView() {
         />
       </div>
       <VoiceDownloadConfirm engine={voiceEngine} />
-      {voiceModeOpen && !showConnectCards ? (
-        <VoiceModeOverlay
-          // 欢迎页还没有会话：第一句语音负责把它建起来。建完之后 App 会切到
-          // 聊天视图，而开关在 store 里，浮层跟着过去接着用。
-          sessionId={null}
-          isCompacting={false}
-          onClose={() => setVoiceModeOpen(false)}
-          onSendQuestion={(text) => {
-            void startSession(
-              getInitialSessionTitle(text, undefined),
-              text,
-              workingDir || undefined,
-              selectedThinkingLevel,
-              selectedProviderProfileKey,
-              selectedModel,
-            );
-          }}
-        />
-      ) : null}
     </div>
   );
 }

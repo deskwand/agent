@@ -10,9 +10,14 @@
  *  - 文档与图片：`office_read_*` / `vision_describe`
  *  - 刻意排除：tts（会让模型自己朗读，与流式朗读撞双声）、ask_user（弹框）、
  *    todo_write（写操作）、bash / edit / write
+ *
+ * **也刻意不含 `read`**：pi 只当 `read` 或 `bash` 被激活时才把技能段落写进
+ * 系统提示词（`system-prompt.js`: `const skillFileReadTool = ["read","bash"]
+ * .find((tool) => selectedTools.includes(tool))`）。留着 `read` 就等于把技能
+ * 一起带回来 —— 而那正是用户要求拿掉的东西。代价是语音模式读不了本地代码
+ * 文件；查资料靠 `web_search` / `fetch_content`，读文档靠 `office_read_*`。
  */
 export const READONLY_TOOLS: readonly string[] = [
-  "read",
   "web_search",
   "fetch_content",
   "get_search_content",
