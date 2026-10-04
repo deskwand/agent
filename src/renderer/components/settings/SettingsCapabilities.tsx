@@ -8,6 +8,7 @@ import {
 } from "../../../shared/capabilities";
 import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
 import { ReadAloudSettings } from "./ReadAloudSettings";
+import { VoiceModeSettings } from "./VoiceModeSettings";
 import { VoiceCapabilitySettings } from "./VoiceCapabilitySettings";
 
 const isElectron =
@@ -210,6 +211,7 @@ export function SettingsCapabilities({
 
       <VoiceCapabilitySettings>{voicePermissions}</VoiceCapabilitySettings>
       <ReadAloudSettings />
+      <VoiceModeSettings />
     </div>
   );
 }

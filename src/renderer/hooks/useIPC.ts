@@ -990,6 +990,7 @@ export function useIPC() {
       providerProfileKey?: ProviderProfileKey,
       model?: string,
       elSelections?: ElementSelection[],
+      readonlyTools?: boolean,
     ) => {
       setLoading(true);
       console.log("[useIPC] Continuing session:", sessionId);
@@ -1082,6 +1083,7 @@ export function useIPC() {
             model,
             turnId,
             elSelections: elSelections?.length ? elSelections : undefined,
+            readonlyTools,
           },
         });
         // Loading will be reset when we receive session.status event

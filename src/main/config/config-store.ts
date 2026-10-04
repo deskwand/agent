@@ -21,6 +21,11 @@ import {
 } from "../../shared/web-access";
 import { type SubagentConfig } from "../../shared/subagent-config";
 import {
+  DEFAULT_VOICE_MODE,
+  normalizeVoiceModeConfig,
+  type VoiceModeConfig,
+} from "../../shared/voice-mode";
+import {
   normalizeCodemodeConfig,
   type CodemodeConfig,
 } from "../../shared/codemode-config";
@@ -154,6 +159,7 @@ export interface AppConfig {
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
   readAloud?: ReadAloudConfig;
+  voiceMode?: VoiceModeConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
@@ -183,6 +189,7 @@ export interface StoredConfig {
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
   readAloud?: ReadAloudConfig;
+  voiceMode?: VoiceModeConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
@@ -300,6 +307,7 @@ export function defaultStoredConfig(): StoredConfig {
     visionModel: undefined,
     voiceEngine: { enabled: false, shortcut: DEFAULT_VOICE_SHORTCUT },
     readAloud: { enabled: false },
+    voiceMode: { ...DEFAULT_VOICE_MODE },
     webAccess: normalizeWebAccessConfig(undefined),
     codemode: normalizeCodemodeConfig(undefined),
   };
@@ -950,6 +958,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     visionModel: stored.visionModel,
     voiceEngine: normalizeVoiceEngineConfig(stored.voiceEngine),
     readAloud: normalizeReadAloudConfig(stored.readAloud),
+    voiceMode: normalizeVoiceModeConfig(stored.voiceMode),
     webAccess: normalizeWebAccessConfig(stored.webAccess),
     codemode: normalizeCodemodeConfig(stored.codemode),
     subagent: stored.subagent,
@@ -1114,6 +1123,8 @@ export class ConfigStore {
       stored.voiceEngine = updates.voiceEngine;
     if (updates.readAloud !== undefined)
       stored.readAloud = normalizeReadAloudConfig(updates.readAloud);
+    if (updates.voiceMode !== undefined)
+      stored.voiceMode = normalizeVoiceModeConfig(updates.voiceMode);
     if (updates.webAccess !== undefined)
       stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
     // 注意：删掉 `codemode.enabled` 时**不能连这个分支一起删** —— 少了它

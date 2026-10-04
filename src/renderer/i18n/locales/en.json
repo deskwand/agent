@@ -136,6 +136,12 @@
         "removeZh": "Remove the Chinese voice model",
         "removeEn": "Remove the English voice model",
         "enNote": "Fully English sentences use a native voice, about 152MB. Once enabled, the English engine stays in memory (roughly +230MB) until restart."
+      },
+      "voiceMode": {
+        "title": "Voice conversation",
+        "desc": "How long a pause counts as end of speech. Too short cuts people off mid-sentence; too long feels sluggish.",
+        "silenceLabel": "End-of-speech silence",
+        "silenceValue": "{{ms}} ms"
       }
     },
     "groupGeneral": "General",
@@ -1152,6 +1158,19 @@
   "artifactPanel": {
     "title": "Artifacts",
     "toggle": "Artifact Panel"
+  },
+  "voiceMode": {
+    "entry": "Start voice conversation",
+    "exit": "Exit voice conversation",
+    "stateCalibrating": "Listening to the room…",
+    "stateListening": "I'm listening",
+    "stateCapturing": "Transcribing",
+    "stateThinking": "Thinking",
+    "stateSpeaking": "Speaking",
+    "stateBlocked": "Organising context",
+    "stateStopped": "Voice conversation ended",
+    "toolSearching": "Searching",
+    "toolReading": "Reading files"
   },
   "messageCard": {
     "request": "Request",

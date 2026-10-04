@@ -4332,6 +4332,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.model,
         event.payload.turnId,
         elementRefsOf(event.payload.elSelections),
+        event.payload.readonlyTools,
       );
     }
 

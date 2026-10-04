@@ -1,5 +1,6 @@
 import type { ThemePreset } from "../../shared/theme";
 import type { CodemodeConfig } from "../../shared/codemode-config";
+import type { VoiceModeConfig } from "../../shared/voice-mode";
 import type {
   WebAccessConfig,
   WebAccessErrorCode,
@@ -456,6 +457,8 @@ export type ClientEvent =
         model?: string;
         turnId?: string;
         elSelections?: ElementSelection[];
+        /** 语音模式：本轮只激活只读工具（设计 §2.5）。 */
+        readonlyTools?: boolean;
       };
     }
   | {
@@ -969,6 +972,7 @@ export interface AppConfig {
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
   readAloud?: ReadAloudConfig;
+  voiceMode?: VoiceModeConfig;
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports

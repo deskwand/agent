@@ -25,8 +25,10 @@ describe("element refs reach the host user message (for SDK details)", () => {
   });
 
   it("入口两个方法都把引用转发给 enqueuePrompt", () => {
+    // 尾参允许继续增长（例如语音模式的 readonlyTools）：这里的意图是"这两处
+    // 都带上了 elSelections"，不是"参数列表到此为止"。
     const forwards = SESSION_MANAGER.match(
-      /this\.enqueuePrompt\(\s*session,\s*prompt,\s*content,\s*turnId,\s*undefined,\s*elSelections,?\s*\)/g,
+      /this\.enqueuePrompt\(\s*session,\s*prompt,\s*content,\s*turnId,\s*undefined,\s*elSelections,[^)]*\)/g,
     );
     expect(forwards).toHaveLength(2);
   });
