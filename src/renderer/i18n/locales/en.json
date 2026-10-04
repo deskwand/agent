@@ -133,6 +133,12 @@
         "model": "Read-aloud model",
         "download": "Download the read-aloud model",
         "remove": "Delete the read-aloud model"
+      },
+      "voiceMode": {
+        "title": "Voice conversation",
+        "desc": "How long a pause counts as end of speech. Too short cuts people off mid-sentence; too long feels sluggish.",
+        "silenceLabel": "End-of-speech silence",
+        "silenceValue": "{{ms}} ms"
       }
     },
     "groupGeneral": "General",
@@ -1149,6 +1155,19 @@
   "artifactPanel": {
     "title": "Artifacts",
     "toggle": "Artifact Panel"
+  },
+  "voiceMode": {
+    "entry": "Start voice conversation",
+    "exit": "Exit voice conversation",
+    "stateCalibrating": "Listening to the room…",
+    "stateListening": "I'm listening",
+    "stateCapturing": "Transcribing",
+    "stateThinking": "Thinking",
+    "stateSpeaking": "Speaking",
+    "stateBlocked": "Organising context",
+    "stateStopped": "Voice conversation ended",
+    "toolSearching": "Searching",
+    "toolReading": "Reading files"
   },
   "messageCard": {
     "request": "Request",

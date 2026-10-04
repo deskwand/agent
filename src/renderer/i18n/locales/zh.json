@@ -133,6 +133,12 @@
         "model": "朗读模型",
         "download": "下载朗读模型",
         "remove": "删除朗读模型"
+      },
+      "voiceMode": {
+        "title": "语音对话",
+        "desc": "静音多久算说完。停顿时长太短会把人话里的停顿当结尾，太长则等得心焦。",
+        "silenceLabel": "静音结束时长",
+        "silenceValue": "{{ms}} 毫秒"
       }
     },
     "groupGeneral": "常规",
@@ -1148,6 +1154,19 @@
   "artifactPanel": {
     "title": "产物",
     "toggle": "产物面板"
+  },
+  "voiceMode": {
+    "entry": "进入语音对话",
+    "exit": "退出语音对话",
+    "stateCalibrating": "正在听环境…",
+    "stateListening": "我在听",
+    "stateCapturing": "识别中",
+    "stateThinking": "正在思考",
+    "stateSpeaking": "朗读中",
+    "stateBlocked": "正在整理上下文",
+    "stateStopped": "已退出语音对话",
+    "toolSearching": "正在搜索",
+    "toolReading": "正在读文件"
   },
   "messageCard": {
     "request": "请求",

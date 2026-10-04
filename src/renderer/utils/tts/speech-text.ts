@@ -32,7 +32,7 @@ export interface SpeechSegment {
 }
 
 /** 句末标点。分号算句末 —— 长列表读起来更顺，也更容易跟读。 */
-const HARD_END = new Set(["。", "！", "？", "；", "!", "?", ";", "…"]);
+export const HARD_END = new Set(["。", "！", "？", "；", "!", "?", ";", "…"]);
 
 /**
  * 常见缩写：句点后面即使跟空白也不切。

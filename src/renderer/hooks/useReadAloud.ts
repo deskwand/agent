@@ -207,3 +207,8 @@ export function useReadAloud(): ReadAloudState & {
     stop: controller().stop,
   };
 }
+
+/** 停掉正在播的整段朗读。浮层打开前调用，避免两路音频同时出声。 */
+export function stopReadAloud(): void {
+  controller().stop();
+}

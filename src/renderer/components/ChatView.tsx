@@ -20,6 +20,8 @@ import {
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { usePushToTalk } from "../hooks/usePushToTalk";
+import { useVoiceModeShortcut } from "../hooks/useVoiceModeShortcut";
+import { VoiceModeOverlay } from "./VoiceModeOverlay";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { attachmentKeySet } from "../utils/attached-files";
@@ -321,6 +323,17 @@ export function ChatView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
+  // 只在这里用，不进 store：浮层开关没有第二个消费者。
+  const [voiceModeOpen, setVoiceModeOpen] = useState(false);
+  // 切会话就关掉浮层（设计 §4）：语音会话绑在某个 sessionId 上，
+  // 不关的话浮层会带着旧会话继续采集 —— useVoiceMode 的 effect 是空依赖，
+  // 换 sessionId 不会重建，麦克风与 ASR 会话都还连着上一个会话。
+  const voiceModeSessionRef = useRef<string | null>(activeSessionId ?? null);
+  useEffect(() => {
+    if (voiceModeSessionRef.current === (activeSessionId ?? null)) return;
+    voiceModeSessionRef.current = activeSessionId ?? null;
+    setVoiceModeOpen(false);
+  }, [activeSessionId]);
   useEffect(() => {
     if (!activeSessionId || !compactionResult) return;
     const timeoutMs = compactionResult === "success" ? 3000 : 5000;
@@ -492,7 +505,13 @@ export function ChatView() {
         if (voice.status === "recording") voice.toggle();
       },
     },
-    Boolean(voiceEngineConfig?.enabled),
+    // 浮层打开时禁用按住说话：两处采集同一支麦克风会互相打架（设计 §4 互斥）。
+    Boolean(voiceEngineConfig?.enabled) && !voiceModeOpen,
+  );
+
+  useVoiceModeShortcut(
+    () => setVoiceModeOpen((open) => !open),
+    Boolean(activeSessionId),
   );
 
   const hasActiveTurn = Boolean(activeTurn);
@@ -2147,6 +2166,7 @@ export function ChatView() {
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
+                onOpenVoiceMode={() => setVoiceModeOpen(true)}
                 voice={toMicButtonProps(voice, voiceEngine.install, {
                   config: voiceEngineConfig,
                   platform: window.electronAPI?.platform,
@@ -2163,6 +2183,24 @@ export function ChatView() {
         onTickSelect={handleDockTickSelect}
       />
       <VoiceDownloadConfirm engine={voiceEngine} />
+      {voiceModeOpen && activeSessionId ? (
+        <VoiceModeOverlay
+          sessionId={activeSessionId}
+          isCompacting={isCompacting}
+          onClose={() => setVoiceModeOpen(false)}
+          onSendQuestion={(text) => {
+            // 只读工具白名单（设计 §2.5）：语音里没法做审批、也没法看 diff。
+            void continueSession(
+              activeSessionId,
+              text,
+              activeSession?.providerProfileKey,
+              activeSession?.model,
+              undefined,
+              true,
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }
