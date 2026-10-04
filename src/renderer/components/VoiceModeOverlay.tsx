@@ -66,12 +66,19 @@ export function VoiceModeOverlay({
     : t(CAPTION_KEY[view.state]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+      // 固定深色底，不跟主题走：星空球是按深色底定稿的（设计 §3.1 的原型就是
+      // #050507）。浅色主题下粒子与光晕会糊成一块脏斑 —— 沉浸式场景固定深底是
+      // 常规做法，这里不是漏了主题适配。
+      style={{ backgroundColor: "#050507" }}
+    >
       <button
         type="button"
         onClick={onClose}
         aria-label={t("voiceMode.exit")}
-        className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-2xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+        className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-2xl transition-colors hover:bg-white/10"
+        style={{ color: "#8f8f9b" }}
       >
         <X className="h-4 w-4" />
       </button>
@@ -80,9 +87,14 @@ export function VoiceModeOverlay({
         <StarOrb state={ORB_STATE[view.state]} level={view.level} />
       </div>
 
-      <p className="mt-2 text-sm text-text-secondary">{caption}</p>
+      <p className="mt-2 text-sm" style={{ color: "#8f8f9b" }}>
+        {caption}
+      </p>
 
-      <div className="mt-6 min-h-[4rem] max-w-[46rem] px-8 text-center text-lg leading-relaxed text-text-primary">
+      <div
+        className="mt-6 min-h-[4rem] max-w-[46rem] px-8 text-center text-lg leading-relaxed"
+        style={{ color: "#e7e7ea" }}
+      >
         {view.state === "capturing" || view.state === "thinking"
           ? view.transcript
           : view.answer}

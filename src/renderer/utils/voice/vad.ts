@@ -14,7 +14,7 @@
 export const MIN_THRESHOLD = 0.12;
 /** 阈值超出噪声底的余量。 */
 export const NOISE_MARGIN = 0.12;
-/** 说话起点需要持续超阈的时长。 */
+/** 说话起点需要持续超阈的时长（主动开口用）。 */
 export const DEFAULT_SPEECH_MS = 150;
 
 export type VadEvent = "speech-start" | "silence" | null;
@@ -31,6 +31,14 @@ export interface Vad {
   push(level: number, deltaMs: number): VadEvent;
   reset(): void;
   isSpeaking(): boolean;
+  /**
+   * 改「说话起点」的确认时长。
+   *
+   * 打断朗读时要调高：打断的代价（念到一半被掐断）比晚 150ms 响应更高，
+   * 而咳嗽、关门、椅子声这些突发噪声的持续时长往往刚过 150ms —— 用它当
+   * 起点阈值刚好会被误触发。
+   */
+  setSpeechMs(ms: number): void;
 }
 
 /**
@@ -51,7 +59,7 @@ export function thresholdFromNoiseFloor(floor: number): number {
 }
 
 export function createVad(config: VadConfig): Vad {
-  const speechMs = config.speechMs ?? DEFAULT_SPEECH_MS;
+  let speechMs = config.speechMs ?? DEFAULT_SPEECH_MS;
   const silenceMs = config.silenceMs ?? 800;
   let aboveMs = 0;
   let belowMs = 0;
@@ -85,6 +93,9 @@ export function createVad(config: VadConfig): Vad {
     },
     isSpeaking() {
       return speaking;
+    },
+    setSpeechMs(ms) {
+      speechMs = ms;
     },
   };
 }

@@ -134,13 +134,29 @@ describe("createVoiceConversation", () => {
     expect(h.pushed.length).toBeGreaterThan(before);
   });
 
+  // 打断朗读比主动开口更需要确认：咳嗽、关门、拖椅子这类噪声常常刚过 150ms。
+  it("needs a longer confirmation to interrupt while answering", async () => {
+    const h = await calibrated();
+    await h.feed(0.9, 3);
+    await h.feed(0.02, 8);
+    h.voice({ type: "done", sessionId: "s1", text: "问题", discarded: false });
+    h.conv.sendAnswerDelta("第一句。", false); // 进入回答期
+    vi.mocked(h.speech.stop).mockClear(); // 前面建会话时也 stop 过，这里只看打断
+
+    await h.feed(0.9, 2); // 200ms：过了 150ms 的开口阈值，但没过 300ms 的打断阈值
+    expect(h.speech.stop).not.toHaveBeenCalled();
+
+    await h.feed(0.9, 2); // 累计 400ms → 这时才该打断
+    expect(h.speech.stop).toHaveBeenCalled();
+  });
+
   it("interrupts playback when the user speaks during speaking", async () => {
     const h = await calibrated();
     await h.feed(0.9, 3);
     await h.feed(0.02, 8);
     h.voice({ type: "done", sessionId: "s1", text: "问题", discarded: false });
     h.conv.sendAnswerDelta("第一句。", false);
-    await h.feed(0.9, 2);
+    await h.feed(0.9, 3); // 打断按 300ms 判定，不是开口的 150ms
     expect(h.speech.stop).toHaveBeenCalled();
     expect(h.states.at(-1)).toBe("capturing");
   });

@@ -75,6 +75,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("startMicCapture — 采集约束", () => {
+  // 没有回声消除时，朗读从扬声器出来会被麦克风收回，VAD 把它当成用户开口，
+  // 一出声就自我打断 —— 这是「开口打断」最容易被漏掉的前提条件。
+  it("要求回声消除与噪声抑制，否则朗读会打断自己", async () => {
+    await startMicCapture(() => {});
+
+    const constraints = getUserMedia.mock.calls[0][0] as {
+      audio: Record<string, unknown>;
+    };
+    expect(constraints.audio.echoCancellation).toBe(true);
+    expect(constraints.audio.noiseSuppression).toBe(true);
+    expect(constraints.audio.autoGainControl).toBe(true);
+  });
+});
+
 describe("startMicCapture — worklet 加载方式（这条守着真机那个 bug）", () => {
   it("从同源真文件加载 worklet，不用 blob: URL", async () => {
     await startMicCapture(() => {});

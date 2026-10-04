@@ -15,6 +15,7 @@ import type {
 } from "../../shared/ipc-types";
 import {
   createVad,
+  DEFAULT_SPEECH_MS,
   estimateNoiseFloor,
   thresholdFromNoiseFloor,
   type Vad,
@@ -69,6 +70,15 @@ export const FRAME_MS = 100;
 export const CALIBRATION_MS = 800;
 /** 说话起点回补的音频长度：避免切掉开头的半个字。 */
 export const PREFETCH_MS = 500;
+
+/**
+ * 回答期的「说话起点」确认时长，比默认的 150ms 高一倍。
+ *
+ * 这一时期开口的后果是把朗读掐断：念到一半被截断比晚 150ms 响应更伤。
+ * 而咳嗽、关门、拖椅子这类突发噪声的持续时长常常刚过 150ms ——
+ * 拿主动开口的阈值去判打断，必然过度触发。
+ */
+export const BARGE_IN_SPEECH_MS = 300;
 const PREFETCH_BYTES = 16000 * 2 * (PREFETCH_MS / 1000);
 
 export function createVoiceConversation(
@@ -95,6 +105,11 @@ export function createVoiceConversation(
   const idleState = (): ConversationState =>
     blocked ? "blocked" : "listening";
 
+  /** 回答期用更长的起点确认；回到接收期就恢复。 */
+  const setBargeIn = (on: boolean) => {
+    vad?.setSpeechMs(on ? BARGE_IN_SPEECH_MS : DEFAULT_SPEECH_MS);
+  };
+
   const clearPrefetch = () => {
     prefetch.length = 0;
     prefetchBytes = 0;
@@ -117,6 +132,7 @@ export function createVoiceConversation(
     deps.sendQuestion(transcript);
     deps.speech.begin();
     answering = true;
+    setBargeIn(true);
     setState("thinking");
   };
 
@@ -124,6 +140,7 @@ export function createVoiceConversation(
     deps.onError(code);
     endRound();
     answering = false;
+    setBargeIn(false);
     setState(idleState());
   };
 
@@ -147,6 +164,7 @@ export function createVoiceConversation(
     sessionId = started.sessionId;
     deps.speech.stop();
     answering = false;
+    setBargeIn(false);
     setState("capturing");
     for (const frame of prefetch)
       void deps.voice.pushAudio(started.sessionId, frame);

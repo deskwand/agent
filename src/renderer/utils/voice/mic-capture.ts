@@ -50,7 +50,15 @@ export async function startMicCapture(
   let stream: MediaStream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1 },
+      audio: {
+        channelCount: 1,
+        // 回声消除是「开口打断朗读」能成立的前提：朗读从扬声器出来会被麦克风
+        // 收回去，没有它 VAD 就把它当成用户开口 —— 一出声就自我打断。
+        // 噪声抑制与自动增益同理（风扇、远处键盘声会顶掉说话起点阈值）。
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
     });
   } catch (error) {
     throw new MicError(classifyMicError(error));

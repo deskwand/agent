@@ -231,10 +231,22 @@ export function StarOrb({
           ? 1 + lv * cfg.gain
           : 1 + Math.sin(t * 0.62) * 0.022 + lv * cfg.gain * 0.4;
 
-      const halo = ctx.createRadialGradient(CX, CY, 0, CX, CY, R * 2.6 * pulse);
+      // 光晕半径必须落在画布的内切圆里。渐变一旦超出画布边界，边缘处还没走到
+      // 透明，四条边就会显出一个矩形色块 —— 浅色主题下尤其刺眼（深色底上 4.7%
+      // 的蓝白看不出来，白底上就是一块斑）。内切圆半径是 min(W,H)/2，所以这里
+      // 直接用 0.5 倍，且**不乘 pulse**：呼吸放大同样会让它越界。
+      const halo = ctx.createRadialGradient(
+        CX,
+        CY,
+        0,
+        CX,
+        CY,
+        Math.min(W, H) * 0.5,
+      );
       halo.addColorStop(0, `rgba(${cfg.hue},0.235)`);
       halo.addColorStop(0.32, `rgba(${cfg.hue},0.075)`);
-      halo.addColorStop(1, "rgba(0,0,0,0)");
+      // 终点用同色透明，不用 rgba(0,0,0,0)：透明黑的插值会在浅色底上留下灰调。
+      halo.addColorStop(1, `rgba(${cfg.hue},0)`);
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, W, H);
 
