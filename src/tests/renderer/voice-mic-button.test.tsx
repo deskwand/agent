@@ -26,6 +26,7 @@ function render(
         status="idle"
         level={0}
         seconds={0}
+        install={null}
         onToggle={() => {}}
         onCancel={() => {}}
         canPolish={false}
@@ -101,5 +102,36 @@ describe("VoiceMicButton", () => {
       render({ status });
       expect(button().disabled).toBe(true);
     }
+  });
+
+  it("下载中：麦克风锁住，旁边给出百分比进度", () => {
+    render({
+      install: { phase: "downloading", percent: 45, installed: false },
+    });
+
+    const mic = buttonByLabel("chat.voiceInstalling")!;
+    expect(mic.disabled).toBe(true);
+    expect(container.textContent).toContain("45%");
+  });
+
+  it("解压中也算忙（第二阶段，百分比接着走）", () => {
+    render({ install: { phase: "extracting", percent: 92, installed: false } });
+
+    expect(buttonByLabel("chat.voiceInstalling")!.disabled).toBe(true);
+    expect(container.textContent).toContain("92%");
+  });
+
+  it("安装失败：给一行错误，麦克风仍可点（再点一次重试）", () => {
+    render({ install: { phase: "error", percent: 0, installed: false } });
+
+    expect(container.textContent).toContain("chat.voiceInstallFailed");
+    expect(buttonByLabel("chat.voiceStart")!.disabled).toBe(false);
+  });
+
+  it("装好之后那一格不占地方", () => {
+    render({ install: { phase: "ready", percent: 100, installed: true } });
+
+    expect(container.textContent).not.toContain("%");
+    expect(buttonByLabel("chat.voiceStart")!.disabled).toBe(false);
   });
 });

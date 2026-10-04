@@ -1,5 +1,6 @@
 import { Loader2, Mic, Sparkles, Undo2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { VoiceInstallState } from "../../shared/ipc-types";
 import { Tooltip } from "./Tooltip";
 import type { VoiceInputController, VoiceStatus } from "../hooks/useVoiceInput";
 
@@ -8,6 +9,13 @@ export interface VoiceMicButtonProps {
   /** 0..1，录音时的实时响度。 */
   level: number;
   seconds: number;
+  /**
+   * 安装态。null / 缺省 = 没在装（或还没读到）。
+   *
+   * 可选：既有几个宿主替身只填了录音那几项，不该为了一个进度条去改它们。
+   * 真正要守的是**接线**漏传 —— 那一条由`toMicButtonProps` 的必传参数拦下。
+   */
+  install?: VoiceInstallState | null;
   onToggle: () => void;
   onCancel: () => void;
   canPolish: boolean;
@@ -24,6 +32,7 @@ export function VoiceMicButton({
   status,
   level,
   seconds,
+  install,
   onToggle,
   onCancel,
   canPolish,
@@ -34,11 +43,19 @@ export function VoiceMicButton({
   const { t } = useTranslation();
   // 转圈只用于「真的在跑」的两个态；整理中不转麦克风（麦克风并没在干活）。
   const busy = status === "requesting" || status === "finishing";
+  const installing =
+    install?.phase === "downloading" || install?.phase === "extracting";
+  const installFailed = install?.phase === "error";
+  const percent = install?.percent ?? 0;
   // 但整理中也要锁住麦克风：hook 里 toggle() 只认 idle/recording，
-  // 不锁的话用户会点一个没反应的按钮。
-  const micDisabled = busy || status === "polishing";
+  // 不锁的话用户会点一个没反应的按钮。下载中同理：这一次点击不该被解释成录音。
+  const micDisabled = busy || status === "polishing" || installing;
   const recording = status === "recording";
-  const label = recording ? t("chat.voiceStop") : t("chat.voiceStart");
+  const label = installing
+    ? t("chat.voiceInstalling", { percent })
+    : recording
+      ? t("chat.voiceStop")
+      : t("chat.voiceStart");
 
   return (
     <div className="flex shrink-0 items-center gap-1">
@@ -60,6 +77,30 @@ export function VoiceMicButton({
             {formatSeconds(seconds)}
           </span>
         </>
+      )}
+
+      {!recording && installing && (
+        <>
+          {/* 下载进度占的正是录音电平条、计时器那一格（原地，不加浮层） */}
+          <div
+            className="h-1 w-10 overflow-hidden rounded-full bg-border-muted"
+            aria-hidden
+          >
+            <div
+              className="h-full rounded-full bg-accent transition-all"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <span className="text-xs tabular-nums text-text-muted">
+            {percent}%
+          </span>
+        </>
+      )}
+
+      {!recording && installFailed && (
+        <span className="px-1 text-xs text-error">
+          {t("chat.voiceInstallFailed")}
+        </span>
       )}
 
       {!recording && (canPolish || canRevert) && (
@@ -102,7 +143,7 @@ export function VoiceMicButton({
               : "text-text-muted hover:bg-surface-hover hover:text-text-primary"
           }`}
         >
-          {busy ? (
+          {busy || installing ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <Mic className={`h-4 w-4 ${recording ? "animate-pulse" : ""}`} />
@@ -135,11 +176,14 @@ export function VoiceMicButton({
  */
 export function toMicButtonProps(
   voice: VoiceInputController,
+  // 不给默认值：宿主漏传时要是编译错误，而不是「底栏一直不显示进度」这种没人会发现的状态。
+  install: VoiceInstallState | null,
 ): VoiceMicButtonProps {
   return {
     status: voice.status,
     level: voice.level,
     seconds: voice.seconds,
+    install,
     canPolish: voice.canPolish,
     canRevert: voice.canRevert,
     onToggle: voice.toggle,

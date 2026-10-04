@@ -5,6 +5,11 @@ interface ConfirmDialogProps {
   isOpen: boolean;
   title: string;
   confirmLabel?: string;
+  /**
+   * 确认键的语气。默认 `danger`：这个原语最早只服务「删除」，
+   * 既有调用点不该因为新用法换样子。
+   */
+  tone?: "danger" | "primary";
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -13,6 +18,7 @@ export function ConfirmDialog({
   isOpen,
   title,
   confirmLabel,
+  tone = "danger",
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -36,7 +42,11 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            className="px-3 py-1.5 rounded-lg bg-error/10 text-error hover:bg-error/20 text-sm font-medium transition-colors"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              tone === "primary"
+                ? "bg-accent/10 text-accent hover:bg-accent/20"
+                : "bg-error/10 text-error hover:bg-error/20"
+            }`}
           >
             {confirmLabel ?? t("common.delete")}
           </button>

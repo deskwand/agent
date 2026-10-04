@@ -13,15 +13,15 @@
  * 布局用 `./shared` 的卡片原语（与 9fe760f「设置页对齐卡片行布局」那次重构一致），
  * 不手搓容器。
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { VoiceInstallState } from "../../../shared/ipc-types";
 import {
   VOICE_SHORTCUTS,
   type VoiceShortcut,
 } from "../../../shared/voice-shortcuts";
 import type { VoiceEngineConfig } from "../../types";
 import { useAppStore } from "../../store";
+import { useVoiceEngine } from "../../hooks/useVoiceEngine";
 import {
   SettingsCard,
   SettingsRow,
@@ -41,28 +41,12 @@ export function VoiceCapabilitySettings() {
   const { t } = useTranslation();
   const appConfig = useAppStore((s) => s.appConfig);
   const setAppConfig = useAppStore((s) => s.setAppConfig);
-  const [install, setInstall] = useState<VoiceInstallState | null>(null);
   const [removing, setRemoving] = useState(false);
+  // 安装态与聊天页共用一份订阅（见 useVoiceEngine）。
+  const { install } = useVoiceEngine();
 
   const engine = appConfig?.voiceEngine;
   const enabled = engine?.enabled === true;
-
-  useEffect(() => {
-    // 浏览器模式与测试里 preload 可能不完整：取不到就停在「未安装」，
-    // 安装按钮仍然可用，用户能自愈。
-    const voice = window.electronAPI?.voice;
-    if (!voice) return;
-    const unsubscribe = voice.onEvent((event) => {
-      if (event.type === "install") setInstall(event.state);
-    });
-    void voice
-      .getInstallState()
-      .then(setInstall)
-      .catch(() => {
-        /* 读不到就按「未知」显示 */
-      });
-    return unsubscribe;
-  }, []);
 
   /** 与 SettingsGeneral 的 codemode 同一条管线：写 AppConfig，再同步 store。 */
   const save = async (patch: Partial<VoiceEngineConfig>) => {
@@ -83,10 +67,8 @@ export function VoiceCapabilitySettings() {
   const remove = async () => {
     setRemoving(true);
     try {
-      const result = await window.electronAPI?.voice.removeInstall();
-      // 只在真删掉时才本地落定。删失败（Windows 上原生模型文件被映射占用）时
-      // 留着原状态，否则界面会声称「已删除」而磁盘上还在。
-      if (result?.ok) setInstall({ phase: "idle", percent: 0, installed: false });
+      // 不本地猜结果：主进程成功推 idle、失败推 error（失败时还带真实的已装状态）。
+      await window.electronAPI?.voice.removeInstall();
     } finally {
       setRemoving(false);
     }

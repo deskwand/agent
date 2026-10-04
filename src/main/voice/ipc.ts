@@ -204,6 +204,14 @@ export function registerVoiceIpc({
   }));
 
   ipcMain.handle("voice.install", async () => {
+    // 重入保护：两段下载都往同一个目标路径写，第二遍还会各自跑一遍清单判断
+    // （两边都读到「没装」）。已经在下就并进第一次，直接回成功。
+    // 渲染侧靠事件隐藏按钮，但那要等一个来回 —— 连点两下能赶在它前面。
+    if (
+      installState.phase === "downloading" ||
+      installState.phase === "extracting"
+    )
+      return { ok: true };
     pushInstallState({ phase: "downloading", percent: 0, error: undefined });
     try {
       const spec = readRuntimeSpec();

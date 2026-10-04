@@ -25,8 +25,14 @@ export type VoiceStatus =
   | "polishing";
 
 export interface UseVoiceInputOptions {
-  /** 引擎已启用且已安装。false 时点按钮只提示，不碰麦克风。 */
-  enabled: boolean;
+  /**
+   * 开始录音前的就绪检查。返回 false = 这次不录。
+   *
+   * 这一句会 **await**：宿主可能在写配置、起下载、甚至弹一个确认等用户回答。
+   * 放在钩子外面是因为只有宿主知道「刚写完配置」这件事 —— 钩子手里的 enabled
+   * 是渲染时的快照，写配置的回调回来时它可能还是旧的，会把自己挡回去。
+   */
+  ensureReady: () => Promise<boolean>;
   /**
    * 输入框当前是否有内容（宿主用 `ChatInput` 的 `onContentChange` 喂进来）。
    *
@@ -43,7 +49,6 @@ export interface UseVoiceInputOptions {
   onText: (text: string) => void;
   /** 回滚到录音开始前的快照（取消 / 误触丢弃）。 */
   onRestore: (snapshot: string) => void;
-  onBlocked: () => void;
   onError: (code: VoiceErrorCode) => void;
   /**
    * 整理真的失败了才调（不含“用户改过字所以丢弃结果”那种）。
@@ -130,18 +135,29 @@ export function useVoiceInput(
   }, [clearPending]);
 
   const start = useCallback(async () => {
-    const { enabled, onBlocked, onError, getSnapshot } = optionsRef.current;
+    const { ensureReady, onError, getSnapshot } = optionsRef.current;
     const api = window.electronAPI?.voice;
     if (!api) return;
-    if (!enabled) {
-      onBlocked();
-      return;
-    }
 
+    // 先占住 requesting，再等就绪门。
+    //
+    // 顺序不能反：`ensureReady` 要 await（一次 IPC；开引擎时还要落一次配置），
+    // 而 `toggle()` 只拿 status 当互斥。等待期间若还停在 idle，同一颗按钮会被
+    // 再点一次 —— 两条采集流（两个 getUserMedia）、两个会话，而第一条采集没任何
+    // 人停它（系统录音灯会一直亮），它的帧还会被写进后建的那个会话。
     sessionRef.current = null;
     clearPending();
     setStatus("requesting");
     const attempt = attemptRef.current;
+
+    // 就绪门：没启用、没装模型都在这一句里收口（写配置 / 起下载 / 弹确认）。
+    if (!(await ensureReady())) {
+      setStatus("idle");
+      return;
+    }
+    // 等待期间被取消（Esc）：别再把采集拉起来。
+    if (attempt !== attemptRef.current) return;
+
     const snapshot = getSnapshot();
 
     let capture: MicCapture;

@@ -81,18 +81,18 @@ function installStates(): VoiceInstallState[] {
     .map((e) => e.state);
 }
 
-function run() {
+/** 注册一次，拿到 handler。重入保护对着这一份 installState，所以不能每次重注册。 */
+function register(): (event: unknown) => unknown {
   mocks.handlers.clear();
   events.length = 0;
   registerVoiceIpc({
     userDataPath: "/tmp/voice-install-orchestration",
     sendEvent: (e: VoiceEvent) => events.push(e),
   } as never);
-  return mocks.handlers.get("voice.install")!(null) as Promise<{
-    ok: boolean;
-    error?: string;
-  }>;
+  return mocks.handlers.get("voice.install")!;
 }
+
+const run = () => register()(null) as Promise<{ ok: boolean; error?: string }>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -176,6 +176,29 @@ describe("voice.install", () => {
     expect(percents.every((p, i) => i === 0 || p >= percents[i - 1])).toBe(
       true,
     );
+  });
+
+  it("已经在下时再调一次：不启动第二遍（两遍会并发写同一个目标路径）", async () => {
+    const install = register();
+    let release: () => void = () => {};
+    // 第一遍卡在运行时那一段，露出第二次调用的窗口。
+    mocks.installRuntime.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    const first = install(null) as Promise<{ ok: boolean }>;
+    const second = (await install(null)) as { ok: boolean };
+
+    expect(second.ok).toBe(true);
+
+    release();
+    await first;
+
+    expect(mocks.installRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.installModel).toHaveBeenCalledTimes(1);
   });
 
   it("安装失败时报错，且不落「已安装」", async () => {
