@@ -74,6 +74,11 @@ describe("mail source", () => {
     expect(entry.avatarMark).toBe("QQ");
   });
 
+  it("透传 providerId —— 渲染层靠它查厂商图标", () => {
+    const [entry] = buildMailEntries(ctx, [account("zhangsan@qq.com")], true);
+    expect(entry.providerId).toBe("qq");
+  });
+
   it("falls back to a neutral mark for an unknown provider id", () => {
     const [entry] = buildMailEntries(
       ctx,

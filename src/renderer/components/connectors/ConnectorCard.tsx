@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { FirstPartyServiceIcon, serviceIconFor } from "./brand-icons";
+import { mailProviderIconUrl } from "./mail-provider-icons";
 import type {
   ConnectorEntry,
   ConnectorInstance,
@@ -98,8 +99,13 @@ export function ConnectorCard({
   const name = t(entry.nameKey);
   /** 头像画什么：厂商 logo / 自研图形 / 首字母兜底。名字匹配全在 brand-icons 里，卡片不写名字常量。 */
   const icon = serviceIconFor(entry.serverName);
-  /** 厂商 logo 的 url —— 白底只给这一支，不是厂商时为 null（见下方头像处）。 */
-  const brandIconUrl = icon?.kind === "brand" ? icon.url : null;
+  /** 厂商 logo 的 url —— 白底只给这一支，不是厂商时为 null（见下方头像处）。
+   *  MCP 条目按 server 名查（brand-icons），邮箱条目按 `providerId` 查 ——
+   *  邮箱条目的 serverName 全是 "Mail"，按服务名只会让每个邮箱画出同一个图标。
+   *  查不到就回落到下面的 `avatarMark` / 首字母分支。 */
+  const brandIconUrl =
+    (icon?.kind === "brand" ? icon.url : null) ??
+    mailProviderIconUrl(entry.providerId);
 
   /** 传输层状态文案；能力开关卡片也用它（开关卡片没有 OAuth 流程，不看 authorizing）。 */
   const instanceStatus = instance

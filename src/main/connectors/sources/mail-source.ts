@@ -48,6 +48,7 @@ export function buildMailEntries(
       nameKey: account.email,
       descriptionKey: provider?.nameKey,
       avatarMark: provider?.mark ?? FALLBACK_MARK,
+      providerId: account.providerId,
       instances: [
         {
           id: account.email,
