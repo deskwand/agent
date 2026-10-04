@@ -24,6 +24,14 @@ export interface SherpaOfflineTts {
     speed: number;
     generationConfig: unknown;
     onProgress: (info: { samples: Float32Array }) => void;
+    /**
+     * 必须传 false，不能省。默认 true 时 addon 用 V8 的**外部缓冲区**包住音频采样
+     * 返回，而 Electron 的 V8 不允许外部缓冲区：同步调用报
+     * `External buffers are not allowed`，异步调用连 promise 都 settle 不了，报
+     * `TTS settlement failed` —— 自检就是死在这句上。纯 Node 下两种写法都正常，
+     * 所以这个坑只有在 Electron 里才看得见。
+     */
+    enableExternalBuffer: boolean;
   }): Promise<SynthesizedAudio>;
 }
 
@@ -85,6 +93,7 @@ export function createLocalTtsEngine(opts: LocalTtsOptions): TtsEngine {
           speed: SPEED,
         }),
         onProgress: () => {},
+        enableExternalBuffer: false,
       });
     },
   };

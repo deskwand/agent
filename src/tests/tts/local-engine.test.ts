@@ -70,6 +70,8 @@ describe("local tts engine", () => {
       speed: 1.0,
       generationConfig: { wrapped: { sid: 0, speed: 1.0 } },
       onProgress: expect.any(Function),
+      // 缺了它 Electron 下必然失败（外部缓冲区），见 local-engine 注释
+      enableExternalBuffer: false,
     });
   });
 });

@@ -6,7 +6,11 @@
  * 加载不起来 = 这个功能在那台机器上完全不存在。所以三个平台各跑一次它是验收硬条件。
  *
  * 用法：
- *   node scripts/tts-smoke.mjs --runtime <runtime根> --model <模型目录> [--text "…"] [--out out.wav]
+ *   npx electron scripts/tts-smoke.mjs --runtime <runtime根> --model <模型目录> [--text "…"]
+ *   node scripts/tts-smoke.mjs …（同上参数）
+ *
+ * **以 Electron 那次为准。** 生产环境是 Electron；纯 Node 允许 V8 外部缓冲区，
+ * 会掩掉一类只在 Electron 出现的失败（详见下面 enableExternalBuffer 处的注释）。
  */
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -62,7 +66,14 @@ const loadMs = Date.now() - started;
 const rssLoaded = process.memoryUsage().rss;
 
 started = Date.now();
-const audio = tts.generate({ text, sid: 0, speed: 1.0 });
+const audio = tts.generate({
+  text,
+  sid: 0,
+  speed: 1.0,
+  // 与生产同形。默认 true 会让 addon 用 V8 外部缓冲区包住采样，Electron 不允许 ——
+  // 同步报 `External buffers are not allowed`，异步报 `TTS settlement failed`。
+  enableExternalBuffer: false,
+});
 const synthMs = Date.now() - started;
 const seconds = audio.samples.length / audio.sampleRate;
 
@@ -95,3 +106,6 @@ console.log(
     2,
   ),
 );
+
+// Electron 下进程不会自己退出；Node 下显式 exit 反而可能截断管道里的 stdout。
+if (process.versions.electron) process.exit(0);
