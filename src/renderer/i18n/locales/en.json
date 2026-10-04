@@ -129,10 +129,14 @@
       },
       "readAloud": {
         "title": "Read aloud",
-        "desc": "Reads assistant replies out loud. Your text stays on this machine. A ~157MB download and ~324MB in memory.",
-        "model": "Read-aloud model",
-        "download": "Download the read-aloud model",
-        "remove": "Delete the read-aloud model"
+        "desc": "Read assistant replies aloud — the text never leaves this machine. The Chinese voice is about 157MB and holds roughly 324MB in memory.",
+        "modelZh": "Chinese voice (with English terms)",
+        "modelEn": "English voice (native pronunciation)",
+        "downloadZh": "Download the Chinese voice model",
+        "downloadEn": "Download the English voice model",
+        "removeZh": "Remove the Chinese voice model",
+        "removeEn": "Remove the English voice model",
+        "enNote": "Fully English sentences use a native voice, about 152MB. Once enabled, the English engine stays in memory (roughly +230MB) until restart."
       }
     },
     "groupGeneral": "General",

@@ -5,16 +5,19 @@
  * 与 `voice-capability-settings.test.tsx` 同构：同一条安装器、同一套三段式状态行
  * （未安装 / 下载中 / 已安装 + 删除）。`t` 回键名，所以断言只看 testid 与调用，
  * 不看中文文案。
+ *
+ * 两个模型（中文 zh / 英文 en）各占一行，各自有状态、按钮与进度条。
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { TtsEvent, TtsInstallState } from "../../shared/ipc-types";
 import type { AppConfig } from "../../renderer/types";
 
 const api = vi.hoisted(() => {
   const tts = {
     getInstallState: vi.fn(),
-    onEvent: vi.fn(() => () => {}),
+    onEvent: vi.fn(),
     install: vi.fn(),
     removeInstall: vi.fn(),
   };
@@ -36,10 +39,34 @@ import { useAppStore } from "../../renderer/store";
 
 let container: HTMLDivElement;
 let root: Root;
+/** 组件注册的事件回调：测试用它推安装进度。 */
+let emit: ((event: TtsEvent) => void) | null = null;
+
+const IDLE: TtsInstallState = { phase: "idle", percent: 0, installed: false };
+const READY: TtsInstallState = {
+  phase: "ready",
+  percent: 100,
+  installed: true,
+};
+const DOWNLOADING: TtsInstallState = {
+  phase: "downloading",
+  percent: 42,
+  installed: false,
+};
+const FAILED: TtsInstallState = {
+  phase: "error",
+  percent: 0,
+  installed: false,
+  error: "boom",
+};
 
 /** 只填本组件会读的字段；setAppConfig 不做校验。 */
 function setReadAloud(enabled: boolean): void {
   useAppStore.getState().setAppConfig({ readAloud: { enabled } } as AppConfig);
+}
+
+function setStates(zh: TtsInstallState, en: TtsInstallState): void {
+  api.tts.getInstallState.mockResolvedValue({ zh, en });
 }
 
 async function mount(): Promise<void> {
@@ -57,11 +84,12 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   vi.clearAllMocks();
-  api.tts.getInstallState.mockResolvedValue({
-    phase: "idle",
-    percent: 0,
-    installed: false,
+  emit = null;
+  api.tts.onEvent.mockImplementation((callback: (event: TtsEvent) => void) => {
+    emit = callback;
+    return () => {};
   });
+  setStates(IDLE, IDLE);
   api.config.save.mockImplementation(async (input: unknown) => ({
     config: input,
   }));
@@ -82,6 +110,8 @@ describe("ReadAloudSettings", () => {
     expect(byTestId("read-aloud-card")).not.toBeNull();
     expect(byTestId("read-aloud-state")).toBeNull();
     expect(byTestId("read-aloud-install")).toBeNull();
+    expect(byTestId("read-aloud-en-state")).toBeNull();
+    expect(byTestId("read-aloud-en-install")).toBeNull();
   });
 
   it("打开但未安装时给下载入口，并说明内存代价", async () => {
@@ -97,7 +127,7 @@ describe("ReadAloudSettings", () => {
     expect(byTestId("read-aloud-remove")).toBeNull();
   });
 
-  it("打开开关写配置并立刻开始下载", async () => {
+  it("打开开关写配置并立刻开始下载中文模型", async () => {
     setReadAloud(false);
     await mount();
 
@@ -109,7 +139,8 @@ describe("ReadAloudSettings", () => {
     expect(api.config.save).toHaveBeenCalledWith({
       readAloud: { enabled: true },
     });
-    expect(api.tts.install).toHaveBeenCalledTimes(1);
+    // 开关只装中文（已是发布行为）；英文行由用户显式点
+    expect(api.tts.install).toHaveBeenCalledExactlyOnceWith("zh");
   });
 
   it("未安装时点下载只调 install，不动配置", async () => {
@@ -118,17 +149,13 @@ describe("ReadAloudSettings", () => {
 
     await act(async () => byTestId("read-aloud-install")!.click());
 
-    expect(api.tts.install).toHaveBeenCalledTimes(1);
+    expect(api.tts.install).toHaveBeenCalledExactlyOnceWith("zh");
     expect(api.config.save).not.toHaveBeenCalled();
   });
 
   it("已安装时不再自动 install，只给删除入口", async () => {
     setReadAloud(true);
-    api.tts.getInstallState.mockResolvedValue({
-      phase: "ready",
-      percent: 100,
-      installed: true,
-    });
+    setStates(READY, IDLE);
     await mount();
 
     expect(container.textContent).toContain(
@@ -138,14 +165,10 @@ describe("ReadAloudSettings", () => {
     expect(byTestId("read-aloud-install")).toBeNull();
 
     // 删除后重新读一次状态：删掉的模型不该继续显示「已安装」。
-    api.tts.getInstallState.mockResolvedValue({
-      phase: "idle",
-      percent: 0,
-      installed: false,
-    });
+    setStates(IDLE, IDLE);
     await act(async () => byTestId("read-aloud-remove")!.click());
 
-    expect(api.tts.removeInstall).toHaveBeenCalledTimes(1);
+    expect(api.tts.removeInstall).toHaveBeenCalledExactlyOnceWith("zh");
     expect(container.textContent).toContain(
       "settings.capabilities.install.notInstalled",
     );
@@ -153,11 +176,7 @@ describe("ReadAloudSettings", () => {
 
   it("下载中显示进度、不给按钮", async () => {
     setReadAloud(true);
-    api.tts.getInstallState.mockResolvedValue({
-      phase: "downloading",
-      percent: 42,
-      installed: false,
-    });
+    setStates(DOWNLOADING, IDLE);
     await mount();
 
     expect(container.textContent).toContain(
@@ -169,12 +188,7 @@ describe("ReadAloudSettings", () => {
 
   it("下载失败时如实说失败", async () => {
     setReadAloud(true);
-    api.tts.getInstallState.mockResolvedValue({
-      phase: "error",
-      percent: 0,
-      installed: false,
-      error: "boom",
-    });
+    setStates(FAILED, IDLE);
     await mount();
 
     expect(container.textContent).toContain(
@@ -185,11 +199,7 @@ describe("ReadAloudSettings", () => {
 
   it("下载中进度条与语音卡同款", async () => {
     setReadAloud(true);
-    api.tts.getInstallState.mockResolvedValue({
-      phase: "downloading",
-      percent: 42,
-      installed: false,
-    });
+    setStates(DOWNLOADING, IDLE);
     await mount();
 
     expect(byTestId("read-aloud-progress")).not.toBeNull();
@@ -201,12 +211,7 @@ describe("ReadAloudSettings", () => {
 
   it("失败态用徽标 + 重试按钮，标题槽只放名词", async () => {
     setReadAloud(true);
-    api.tts.getInstallState.mockResolvedValue({
-      phase: "error",
-      percent: 0,
-      installed: false,
-      error: "boom",
-    });
+    setStates(FAILED, IDLE);
     await mount();
 
     const row = byTestId("read-aloud-state")!;
@@ -214,7 +219,7 @@ describe("ReadAloudSettings", () => {
       .firstElementChild as HTMLElement;
 
     expect(titleNode.firstChild?.textContent).toBe(
-      "settings.capabilities.readAloud.model",
+      "settings.capabilities.readAloud.modelZh",
     );
     expect(byTestId("read-aloud-badge")!.textContent).toContain(
       "settings.capabilities.install.failed",
@@ -238,5 +243,79 @@ describe("ReadAloudSettings", () => {
     );
 
     (window as unknown as { electronAPI: unknown }).electronAPI = original;
+  });
+});
+
+describe("two voice model rows", () => {
+  it("shows two independent rows with their own buttons", async () => {
+    setReadAloud(true);
+    setStates(READY, IDLE);
+    await mount();
+
+    expect(byTestId("read-aloud-state")).not.toBeNull();
+    expect(byTestId("read-aloud-install")).toBeNull(); // 中文已装 → 删除按钮
+    expect(byTestId("read-aloud-remove")).not.toBeNull();
+    expect(byTestId("read-aloud-en-state")).not.toBeNull();
+    expect(byTestId("read-aloud-en-install")).not.toBeNull(); // 英文未装 → 下载按钮
+    expect(byTestId("read-aloud-en-remove")).toBeNull();
+    // 英文行的说明是它自己的（内存代价不同）
+    expect(container.textContent).toContain(
+      "settings.capabilities.readAloud.enNote",
+    );
+  });
+
+  it("installs the model whose button was clicked", async () => {
+    setReadAloud(true);
+    setStates(READY, IDLE);
+    await mount();
+
+    await act(async () => byTestId("read-aloud-en-install")!.click());
+
+    expect(api.tts.install).toHaveBeenCalledExactlyOnceWith("en");
+  });
+
+  it("updates only the row the event names", async () => {
+    setReadAloud(true);
+    setStates(READY, IDLE);
+    await mount();
+
+    await act(async () =>
+      emit!({ type: "install", model: "en", state: DOWNLOADING }),
+    );
+
+    expect(byTestId("read-aloud-en-progress")).not.toBeNull();
+    expect(byTestId("read-aloud-progress")).toBeNull();
+    expect(byTestId("read-aloud-badge")!.textContent).toContain(
+      "settings.capabilities.install.installed",
+    );
+    expect(byTestId("read-aloud-en-badge")!.textContent).toContain(
+      "settings.capabilities.install.downloading",
+    );
+  });
+
+  it("gives the two download buttons different accessible names", async () => {
+    setReadAloud(true);
+    setStates(IDLE, IDLE);
+    await mount();
+
+    const zh = byTestId("read-aloud-install")!.getAttribute("aria-label");
+    const en = byTestId("read-aloud-en-install")!.getAttribute("aria-label");
+    expect(zh).toBe("settings.capabilities.readAloud.downloadZh");
+    expect(en).toBe("settings.capabilities.readAloud.downloadEn");
+    expect(zh).not.toBe(en);
+  });
+
+  it("removes only the row that was clicked", async () => {
+    setReadAloud(true);
+    setStates(READY, READY);
+    await mount();
+
+    setStates(READY, IDLE);
+    await act(async () => byTestId("read-aloud-en-remove")!.click());
+
+    expect(api.tts.removeInstall).toHaveBeenCalledExactlyOnceWith("en");
+    expect(container.textContent).toContain(
+      "settings.capabilities.install.installed",
+    );
   });
 });

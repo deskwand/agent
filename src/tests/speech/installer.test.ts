@@ -13,6 +13,7 @@ import { gzipSync } from "node:zlib";
 import {
   MODEL_ID,
   RUNTIME_VERSION,
+  TTS_ENGLISH_MODEL_ID,
   TTS_MODEL_ID,
   installModel,
   installTtsModel,
@@ -144,6 +145,7 @@ describe("installTtsModel", () => {
 
     await installTtsModel({
       userDataPath: root,
+      model: TTS_MODEL_ID,
       url: "https://example.test/tts.tar.gz",
       sha256: createHash("sha256").update(archive).digest("hex"),
       onProgress: () => {},
@@ -184,7 +186,7 @@ describe("removal", () => {
     });
     mkdirSync(join(voiceRoot(root), "models", MODEL_ID), { recursive: true });
 
-    removeTtsModel(root);
+    removeTtsModel(root, TTS_MODEL_ID);
 
     expect(existsSync(join(voiceRoot(root), "models", TTS_MODEL_ID))).toBe(
       false,
@@ -205,6 +207,58 @@ describe("removal", () => {
 
     expect(existsSync(join(voiceRoot(root), "models", MODEL_ID))).toBe(false);
     expect(existsSync(join(voiceRoot(root), "runtime", RUNTIME_VERSION))).toBe(
+      true,
+    );
+  });
+});
+
+describe("english model install and removal", () => {
+  it("writes the English model into its own manifest field", async () => {
+    const archive = tarGz("tokens.txt", "hello");
+    const digest = createHash("sha256").update(archive).digest("hex");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(new Uint8Array(archive), { status: 200 })),
+    );
+
+    await installTtsModel({
+      userDataPath: root,
+      url: "https://example.test/en.tar.gz",
+      sha256: digest,
+      model: TTS_ENGLISH_MODEL_ID,
+      onProgress: () => {},
+    });
+
+    expect(readManifest(root)?.ttsEnglishModel).toBe(TTS_ENGLISH_MODEL_ID);
+    expect(readManifest(root)?.ttsModel).toBeUndefined();
+  });
+
+  it("removes only the requested model", () => {
+    mkdirSync(join(voiceRoot(root), "models", TTS_MODEL_ID), {
+      recursive: true,
+    });
+    mkdirSync(join(voiceRoot(root), "models", TTS_ENGLISH_MODEL_ID), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(voiceRoot(root), "install.json"),
+      JSON.stringify({
+        runtimeVersion: RUNTIME_VERSION,
+        model: MODEL_ID,
+        ttsModel: TTS_MODEL_ID,
+        ttsEnglishModel: TTS_ENGLISH_MODEL_ID,
+        installedAt: "x",
+      }),
+    );
+
+    removeTtsModel(root, TTS_ENGLISH_MODEL_ID);
+
+    expect(readManifest(root)?.ttsEnglishModel).toBeUndefined();
+    expect(readManifest(root)?.ttsModel).toBe(TTS_MODEL_ID);
+    expect(
+      existsSync(join(voiceRoot(root), "models", TTS_ENGLISH_MODEL_ID)),
+    ).toBe(false);
+    expect(existsSync(join(voiceRoot(root), "models", TTS_MODEL_ID))).toBe(
       true,
     );
   });

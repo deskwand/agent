@@ -16,6 +16,9 @@ export interface VoiceRuntimeSpec {
   /** 朗读模型。Task 0 产出。 */
   ttsModelUrl: string;
   ttsModelSha256: string;
+  /** 英文音色模型（vits-melo-tts-en）。 */
+  ttsEnglishModelUrl: string;
+  ttsEnglishModelSha256: string;
 }
 
 /** 打包后 resources/ 是 extraResources 的根；开发时在仓库根目录。 */

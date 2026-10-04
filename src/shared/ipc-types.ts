@@ -506,6 +506,9 @@ export type VoiceEvent =
 // TTS / read aloud（朗读）
 // ---------------------------------------------------------------------------
 
+/** 两个语音模型的键。主进程与渲染层共用这一个名字。 */
+export type TtsModelKey = "zh" | "en";
+
 export type TtsInstallPhase =
   | "idle"
   | "downloading"
@@ -522,8 +525,19 @@ export interface TtsInstallState {
   error?: string;
 }
 
+/** 两个模型各自的状态。渲染层两行各读一行。 */
+export interface TtsInstallStates {
+  zh: TtsInstallState;
+  en: TtsInstallState;
+}
+
 export type TtsSpeakResult =
   | { ok: true; samples: Float32Array; sampleRate: number }
   | { ok: false; error: string };
 
-export type TtsEvent = { type: "install"; state: TtsInstallState };
+export type TtsEvent = {
+  type: "install";
+  /** 哪个模型。两行各自更新，不能只更新第一行。 */
+  model: TtsModelKey;
+  state: TtsInstallState;
+};

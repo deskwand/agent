@@ -8,5 +8,7 @@
     "linux-x64": "13291bcd825da5858ca27a35443e9a2c229a40616c0910086de2db12c5c9312c"
   },
   "ttsModelUrl": "https://file.deskwand.com/voice-models/vits-melo-tts-zh_en-7bab2690.tar.gz",
-  "ttsModelSha256": "7bab269000d966e73c33e78409254ffb3394cf557c7fde004ff5c256c4d3f45f"
+  "ttsModelSha256": "7bab269000d966e73c33e78409254ffb3394cf557c7fde004ff5c256c4d3f45f",
+  "ttsEnglishModelUrl": "https://file.deskwand.com/voice-models/vits-melo-tts-en-e265040a.tar.gz",
+  "ttsEnglishModelSha256": "e265040a1477020688118380a270dec78d06675d21b161a0d07671385442a0f2"
 }

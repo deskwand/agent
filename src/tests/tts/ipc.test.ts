@@ -10,9 +10,15 @@ vi.mock("../../main/config/config-store", () => ({
     getAll: () => ({ readAloud: { enabled: config.readAloudEnabled } }),
   },
 }));
-import { TTS_MODEL_ID, voiceRoot } from "../../main/speech/installer";
+import {
+  TTS_ENGLISH_MODEL_ID,
+  TTS_MODEL_ID,
+  voiceRoot,
+} from "../../main/speech/installer";
+import type { TtsModelId } from "../../main/speech/installer";
 import { registerTtsIpc } from "../../main/tts/ipc";
 import type { TtsService } from "../../main/tts/service";
+import type { TtsEvent, TtsModelKey } from "../../shared/ipc-types";
 
 /** 极简的 ipcMain 替身：只记 handler，由测试自己调用。 */
 function fakeIpcMain() {
@@ -49,15 +55,92 @@ function installedUserData(): string {
 
 function serviceStub(overrides: Partial<TtsService> = {}): TtsService {
   return {
-    isInstalled: () => true,
+    isInstalled: (engine: TtsModelKey = "zh") => engine === "zh",
     load: vi.fn(async () => {}),
-    speak: vi.fn(async () => ({
-      ok: true,
+    speak: vi.fn(async (_text: string, opts?: { engine?: TtsModelKey }) => ({
+      ok: true as const,
       samples: new Float32Array([0.1, 0.2]),
       sampleRate: 44100,
+      engine: opts?.engine ?? "zh",
     })),
     ...overrides,
   } as TtsService;
+}
+
+const specFixture = () => ({
+  modelUrl: "u",
+  modelSha256: "h",
+  nodeSha256: "h",
+  runtimeSha256: { "darwin-arm64": "h" },
+  ttsModelUrl: "u",
+  ttsModelSha256: "h",
+  ttsEnglishModelUrl: "u",
+  ttsEnglishModelSha256: "h",
+});
+
+/**
+ * 按模型安装要写 7 条用例，逐条手搭 registerTtsIpc 的参数太啰嗦。
+ * `installed` 用集合模拟磁盘状态：装/删会改它，`service.isInstalled` 读它。
+ */
+function harness(
+  options: {
+    installed?: TtsModelKey[];
+    selfCheck?: Partial<Record<TtsModelKey, "ok" | "fail">>;
+    runtimeInstalled?: boolean;
+  } = {},
+) {
+  const installed = new Set<TtsModelKey>(options.installed ?? []);
+  const userDataPath = mkdtempSync(join(tmpdir(), "tts-ipc-"));
+  const events: TtsEvent[] = [];
+
+  const installRuntime = vi.fn(async () => {});
+  const installTtsModel = vi.fn(async (opts: { model: TtsModelId }) => {
+    installed.add(opts.model === TTS_ENGLISH_MODEL_ID ? "en" : "zh");
+  });
+  const removeTtsModel = vi.fn((_path: string, model: TtsModelId) => {
+    installed.delete(model === TTS_ENGLISH_MODEL_ID ? "en" : "zh");
+  });
+  const speak = vi.fn(async (_text: string, opts?: { engine?: TtsModelKey }) =>
+    options.selfCheck?.[opts?.engine ?? "zh"] === "fail"
+      ? { ok: false as const, error: "self check failed" }
+      : {
+          ok: true as const,
+          samples: new Float32Array(1),
+          sampleRate: 44100,
+        },
+  );
+  const service: TtsService = {
+    isInstalled: (engine: TtsModelKey = "zh") => installed.has(engine),
+    load: vi.fn(async () => {}),
+    speak,
+  };
+
+  const ipc = fakeIpcMain();
+  const handle = registerTtsIpc({
+    ipcMain: ipc as never,
+    deps: {
+      userDataPath,
+      // 收**整个事件**：断言要看 model
+      sendEvent: (event) => events.push(event),
+      service,
+      installDeps: {
+        readSpec: specFixture,
+        installRuntime,
+        installTtsModel,
+        removeTtsModel,
+      },
+    },
+  });
+  return {
+    ipc,
+    events,
+    speak,
+    installRuntime,
+    installTtsModel,
+    removeTtsModel,
+    userDataPath,
+    dispose: () => handle.dispose(),
+  };
 }
 
 describe("registerTtsIpc", () => {
@@ -65,7 +148,7 @@ describe("registerTtsIpc", () => {
     config.readAloudEnabled = true;
   });
 
-  it("reports the model as installed when the manifest says so", async () => {
+  it("reports each model's state separately", async () => {
     const ipc = fakeIpcMain();
     registerTtsIpc({
       ipcMain: ipc as never,
@@ -75,10 +158,12 @@ describe("registerTtsIpc", () => {
         service: serviceStub(),
       },
     });
-    const state = (await ipc.invoke("tts.getInstallState")) as {
-      installed: boolean;
+    const states = (await ipc.invoke("tts.getInstallState")) as {
+      zh: { installed: boolean };
+      en: { installed: boolean };
     };
-    expect(state.installed).toBe(true);
+    expect(states.zh.installed).toBe(true);
+    expect(states.en.installed).toBe(false);
   });
 
   it("synthesizes through the injected service", async () => {
@@ -122,7 +207,7 @@ describe("registerTtsIpc", () => {
     expect(result.error).toContain("missing");
   });
 
-  it("removes only the read-aloud model", async () => {
+  it("removes only the requested model", async () => {
     const userData = installedUserData();
     mkdirSync(join(voiceRoot(userData), "runtime", "1.13.8"), {
       recursive: true,
@@ -137,7 +222,7 @@ describe("registerTtsIpc", () => {
       },
     });
 
-    await ipc.invoke("tts.removeInstall");
+    await ipc.invoke("tts.removeInstall", "zh");
 
     expect(existsSync(join(voiceRoot(userData), "models", TTS_MODEL_ID))).toBe(
       false,
@@ -151,45 +236,17 @@ describe("registerTtsIpc", () => {
   it("fails the install when the engine cannot load (install-time self check)", async () => {
     // 装完立刻自检：平台不兼容要让用户在下完 157MB 的那一刻就知道，
     // 而不是点朗读时才发现。
-    const ipc = fakeIpcMain();
-    const events: { phase: string; error?: string }[] = [];
-    const userData = mkdtempSync(join(tmpdir(), "tts-selfcheck-"));
-    const removeTtsModel = vi.fn();
-    registerTtsIpc({
-      ipcMain: ipc as never,
-      deps: {
-        userDataPath: userData,
-        sendEvent: (event) => events.push(event.state),
-        service: serviceStub({
-          isInstalled: () => false,
-          speak: vi.fn(async () => ({
-            ok: false as const,
-            error: "dlopen failed",
-          })),
-        }),
-        installDeps: {
-          readSpec: () => ({
-            modelUrl: "u",
-            modelSha256: "h",
-            nodeSha256: "h",
-            runtimeSha256: { "darwin-arm64": "h" },
-            ttsModelUrl: "u",
-            ttsModelSha256: "h",
-          }),
-          installRuntime: vi.fn(async () => {}),
-          installTtsModel: vi.fn(async () => {}),
-          removeTtsModel,
-        },
-      },
+    const { ipc, events, removeTtsModel, userDataPath } = harness({
+      selfCheck: { zh: "fail" },
     });
 
-    await ipc.invoke("tts.install");
+    await ipc.invoke("tts.install", "zh");
 
-    expect(events.at(-1)?.phase).toBe("error");
-    expect(events.at(-1)?.error).toContain("dlopen");
+    expect(events.at(-1)?.state.phase).toBe("error");
+    expect(events.at(-1)?.state.error).toContain("self check");
     // 自检失败要把刚装的东西撤掉：留着清单会让重试被 isInstalled() 挡住，
     // 用户既用不了也修不了。
-    expect(removeTtsModel).toHaveBeenCalledWith(userData);
+    expect(removeTtsModel).toHaveBeenCalledWith(userDataPath, TTS_MODEL_ID);
   });
 
   it("refuses to speak when the capability is switched off", async () => {
@@ -232,5 +289,95 @@ describe("registerTtsIpc", () => {
     });
     handle.dispose();
     expect(() => ipc.invoke("tts.getInstallState")).toThrow("no handler");
+  });
+});
+
+describe("per-model install channels", () => {
+  beforeEach(() => {
+    config.readAloudEnabled = true;
+  });
+
+  it("installs each model independently and reports per-model state", async () => {
+    const { ipc, events } = harness();
+    await ipc.invoke("tts.install", "en");
+    expect(events.at(-1)).toMatchObject({
+      model: "en",
+      state: { phase: "ready" },
+    });
+    const states = (await ipc.invoke("tts.getInstallState")) as {
+      zh: { installed: boolean };
+      en: { installed: boolean };
+    };
+    expect(states.en.installed).toBe(true);
+    expect(states.zh.installed).toBe(false);
+  });
+
+  it("does not let the Chinese model block the English install", async () => {
+    // 今天的守卫会直接 return（静默无反应），这条就是防它
+    const { ipc, installTtsModel } = harness({ installed: ["zh"] });
+    await ipc.invoke("tts.install", "en");
+    expect(installTtsModel).toHaveBeenCalledTimes(1);
+  });
+
+  it("installs the shared runtime once when both models start together", async () => {
+    // 首次使用两行都点：两次 installRuntime 会往同一目录解包、还会互删临时文件
+    const { ipc, installRuntime } = harness();
+    await Promise.all([
+      ipc.invoke("tts.install", "zh"),
+      ipc.invoke("tts.install", "en"),
+    ]);
+    expect(installRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it("guards concurrent installs per model", async () => {
+    const { ipc, installTtsModel } = harness();
+    await Promise.all([
+      ipc.invoke("tts.install", "en"),
+      ipc.invoke("tts.install", "en"),
+    ]);
+    expect(installTtsModel).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an unknown model key", async () => {
+    const { ipc, installTtsModel } = harness();
+    await ipc.invoke("tts.install", "fr");
+    expect(installTtsModel).not.toHaveBeenCalled();
+  });
+
+  it("rolls back only the model whose self-check failed", async () => {
+    const { ipc, removeTtsModel } = harness({ selfCheck: { en: "fail" } });
+    await ipc.invoke("tts.install", "en");
+    expect(removeTtsModel).toHaveBeenCalledWith(
+      expect.any(String),
+      TTS_ENGLISH_MODEL_ID,
+    );
+    expect(removeTtsModel).not.toHaveBeenCalledWith(
+      expect.any(String),
+      TTS_MODEL_ID,
+    );
+  });
+
+  it("uses an explicit engine for each self-check", async () => {
+    const first = harness();
+    await first.ipc.invoke("tts.install", "en");
+    expect(first.speak).toHaveBeenCalledWith("This is a test.", {
+      engine: "en",
+    });
+    first.dispose();
+
+    const second = harness();
+    await second.ipc.invoke("tts.install", "zh");
+    expect(second.speak).toHaveBeenCalledWith("语音引擎自检。", {
+      engine: "zh",
+    });
+  });
+
+  it("treats a legacy manifest with no English field as not installed", async () => {
+    // 老用户的 install.json 里没有 ttsEnglishModel：缺字段 = 未装
+    const { ipc } = harness({ installed: ["zh"] });
+    const states = (await ipc.invoke("tts.getInstallState")) as {
+      en: { installed: boolean };
+    };
+    expect(states.en.installed).toBe(false);
   });
 });

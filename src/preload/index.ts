@@ -46,7 +46,8 @@ import type {
 } from "../shared/ipc-types";
 import type {
   TtsEvent,
-  TtsInstallState,
+  TtsInstallStates,
+  TtsModelKey,
   TtsSpeakResult,
 } from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
@@ -961,9 +962,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   tts: {
     speak: (text: string): Promise<TtsSpeakResult> =>
       ipcRenderer.invoke("tts.speak", text),
-    install: (): Promise<void> => ipcRenderer.invoke("tts.install"),
-    removeInstall: (): Promise<void> => ipcRenderer.invoke("tts.removeInstall"),
-    getInstallState: (): Promise<TtsInstallState> =>
+    install: (model: TtsModelKey): Promise<void> =>
+      ipcRenderer.invoke("tts.install", model),
+    removeInstall: (model: TtsModelKey): Promise<void> =>
+      ipcRenderer.invoke("tts.removeInstall", model),
+    getInstallState: (): Promise<TtsInstallStates> =>
       ipcRenderer.invoke("tts.getInstallState"),
     // 与 voice.event 同理：独立通道，不走 server-event 总线。
     onEvent: (callback: (event: TtsEvent) => void) => {
@@ -1639,9 +1642,9 @@ declare global {
       };
       tts: {
         speak: (text: string) => Promise<TtsSpeakResult>;
-        install: () => Promise<void>;
-        removeInstall: () => Promise<void>;
-        getInstallState: () => Promise<TtsInstallState>;
+        install: (model: TtsModelKey) => Promise<void>;
+        removeInstall: (model: TtsModelKey) => Promise<void>;
+        getInstallState: () => Promise<TtsInstallStates>;
         onEvent: (callback: (event: TtsEvent) => void) => () => void;
       };
     };

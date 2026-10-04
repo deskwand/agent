@@ -30,6 +30,19 @@ export const RUNTIME_VERSION = "1.13.8";
 export const MODEL_ID = "x-asr-480ms-zh-en-punct-int8";
 /** 朗读的模型。目录名跟随上游模型 id。 */
 export const TTS_MODEL_ID = "vits-melo-tts-zh_en";
+/** 英文音色模型。它读不了中文（词表里没有汉字），所以只用在拉丁文本上。 */
+export const TTS_ENGLISH_MODEL_ID = "vits-melo-tts-en";
+
+export type TtsModelId = typeof TTS_MODEL_ID | typeof TTS_ENGLISH_MODEL_ID;
+
+/** 模型 → 清单字段。两个模型各自记自己的，删一个不动另一个。 */
+const MANIFEST_KEY_BY_MODEL: Record<
+  TtsModelId,
+  "ttsModel" | "ttsEnglishModel"
+> = {
+  [TTS_MODEL_ID]: "ttsModel",
+  [TTS_ENGLISH_MODEL_ID]: "ttsEnglishModel",
+};
 
 const RUNTIME_URL = (platform: string, arch: string) =>
   `https://registry.npmmirror.com/sherpa-onnx-${platform}-${arch}/-/sherpa-onnx-${platform}-${arch}-${RUNTIME_VERSION}.tgz`;
@@ -43,6 +56,11 @@ export interface VoiceManifest {
    * 里没有这个键，所以不能要求它存在，也不需要写迁移。
    */
   ttsModel?: string;
+  /**
+   * 英文音色模型 id。同样**缺字段 = 未装**（与 ttsModel 同一条约定）。
+   * 两个模型各自记自己的，删一个不动另一个。
+   */
+  ttsEnglishModel?: string;
   installedAt: string;
 }
 
@@ -214,22 +232,33 @@ export function removeVoiceModel(userDataPath: string): void {
  * 朗读模型。包是我们自己打的，顶层没有包装目录 → strip 0（与 installModel 同理）。
  * 失败时把半成品目录删掉：留着半份模型，下次「已安装」会误判。
  */
-export async function installTtsModel(opts: InstallOptions): Promise<void> {
-  const dir = join(voiceRoot(opts.userDataPath), "models", TTS_MODEL_ID);
+export async function installTtsModel(
+  opts: InstallOptions & { model: TtsModelId },
+): Promise<void> {
+  const dir = join(voiceRoot(opts.userDataPath), "models", opts.model);
   try {
     await downloadAndExtract(opts, dir, 0);
-    writeManifest(opts.userDataPath, { ttsModel: TTS_MODEL_ID });
-    log("[Tts] model installed");
+    writeManifest(opts.userDataPath, {
+      [MANIFEST_KEY_BY_MODEL[opts.model]]: opts.model,
+    });
+    log(`[Tts] model installed: ${opts.model}`);
   } catch (error) {
     rmSync(dir, { recursive: true, force: true });
     throw error;
   }
 }
 
-export function removeTtsModel(userDataPath: string): void {
-  rmSync(join(voiceRoot(userDataPath), "models", TTS_MODEL_ID), {
+/**
+ * 只删指定的那个模型：运行时被两个功能共享，另一个模型是别人装的东西，都不动。
+ *
+ * `writeManifest` 用 `{...旧, ...新}` 合并后 `JSON.stringify`，undefined 值的键
+ * 天然被丢掉，所以 `{[key]: undefined}` 就等于删字段，不需要另写一个删除接口。
+ */
+export function removeTtsModel(userDataPath: string, model: TtsModelId): void {
+  rmSync(join(voiceRoot(userDataPath), "models", model), {
     recursive: true,
     force: true,
   });
-  writeManifest(userDataPath, { ttsModel: "" });
+  writeManifest(userDataPath, { [MANIFEST_KEY_BY_MODEL[model]]: undefined });
+  log(`[Tts] model removed: ${model}`);
 }

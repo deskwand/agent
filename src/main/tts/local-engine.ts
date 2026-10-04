@@ -5,10 +5,13 @@
  */
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import type { TtsModelKey } from "../../shared/ipc-types";
 import type { SynthesizedAudio, TtsEngine } from "./tts-engine";
 
-/** 只有一个音色（模型 README 写明），也不是给用户调的 —— 固定住，免得散落各处。 */
+/** 中文模型只有一个音色（模型 README 写明），也不是给用户调的 —— 固定住。 */
 const SPEAKER_ID = 0;
+/** 英文模型有 5 个音色，0 = EN-US（其余：1 EN-BR / 2 EN-IN / 3 EN-AU / 4 EN-Default）。 */
+export const ENGLISH_SPEAKER_ID = 0;
 const SPEED = 1.0;
 
 /** 只声明用到的那一小块。名字照 sherpa-onnx 1.13.8 的 node 包装核对过。 */
@@ -46,6 +49,8 @@ export interface LocalTtsOptions {
   createTts: (config: unknown) => SherpaOfflineTts;
   createGenerationConfig: (options: { sid: number; speed: number }) => unknown;
   numThreads?: number;
+  /** 哪一套模型。默认 "zh"。 */
+  variant?: TtsModelKey;
 }
 
 /**
@@ -54,28 +59,37 @@ export interface LocalTtsOptions {
  * 放进 `model.vits` 里不报错、也不生效 —— 实测那时 `12` / `3.14` / `2026` 全部走
  * `OOV ... Ignore it!`，读出来是断的。带上之后不再有 OOV（时长 2.6s → 4.3s）。
  * 助手回复里到处是数字，所以这条不是小事。
+ *
+ * 英文模型（vits-melo-tts-en）包里**没有 dict/ 也没有任何 .fst**（实测），所以它
+ * 既不该带 dictDir、也不该带 ruleFsts；那一路的数字由 english-numbers.ts 先转写成词。
  */
-export function buildLocalTtsConfig(opts: LocalTtsOptions): unknown {
-  const { modelDir } = opts;
-  return {
-    model: {
-      vits: {
-        model: join(modelDir, "model.onnx"),
-        lexicon: join(modelDir, "lexicon.txt"),
-        tokens: join(modelDir, "tokens.txt"),
-        dictDir: modelDir,
-      },
-    },
-    ruleFsts: ["date.fst", "number.fst", "phone.fst"]
-      .map((name) => join(modelDir, name))
-      .join(","),
+export function buildLocalTtsConfig(
+  opts: Pick<LocalTtsOptions, "modelDir" | "numThreads" | "variant">,
+): unknown {
+  const { modelDir, variant = "zh" } = opts;
+  const vits: Record<string, string> = {
+    model: join(modelDir, "model.onnx"),
+    lexicon: join(modelDir, "lexicon.txt"),
+    tokens: join(modelDir, "tokens.txt"),
+  };
+  if (variant !== "en") vits.dictDir = modelDir;
+
+  const config: Record<string, unknown> = {
+    model: { vits },
     numThreads: opts.numThreads ?? 4,
     provider: "cpu",
   };
+  if (variant !== "en") {
+    config.ruleFsts = ["date.fst", "number.fst", "phone.fst"]
+      .map((name) => join(modelDir, name))
+      .join(",");
+  }
+  return config;
 }
 
 export function createLocalTtsEngine(opts: LocalTtsOptions): TtsEngine {
   let tts: SherpaOfflineTts | null = null;
+  const sid = opts.variant === "en" ? ENGLISH_SPEAKER_ID : SPEAKER_ID;
   return {
     isLoaded: () => tts !== null,
     async load() {
@@ -86,12 +100,9 @@ export function createLocalTtsEngine(opts: LocalTtsOptions): TtsEngine {
       if (!tts) throw new Error("tts engine not loaded");
       return await tts.generateAsync({
         text,
-        sid: SPEAKER_ID,
+        sid,
         speed: SPEED,
-        generationConfig: opts.createGenerationConfig({
-          sid: SPEAKER_ID,
-          speed: SPEED,
-        }),
+        generationConfig: opts.createGenerationConfig({ sid, speed: SPEED }),
         onProgress: () => {},
         enableExternalBuffer: false,
       });

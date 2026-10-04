@@ -1,21 +1,35 @@
 #!/usr/bin/env bash
 #
-# 把 MeloTTS 的中英模型打成只含必需文件的 .tar.gz，并打印 sha256。
+# 把 MeloTTS 的模型打成只含必需文件的 .tar.gz，并打印 sha256。
 #
 # 为什么自己重打：上游发的是 .tar.bz2，而 Node 的 zlib 不解 bzip2（实测用 Node 侧
 # 解包会解出同长度但内容错的模型）。顺便去掉 README 与 133 字节的 model.int8.onnx 占位文件。
 #
-# 三个 .fst 是必需的：engine 的 `ruleFsts` 指向它们，缺了会把回复里所有数字丢光
-# （12 / 3.14 / 2026 全走 OOV）。dict/ 是分词词表，上游自带，删掉是未经验证的质量赌博。
+# 中文模型（vits-melo-tts-zh_en）：
+#   三个 .fst 是必需的：engine 的 `ruleFsts` 指向它们，缺了会把回复里所有数字丢光
+#   （12 / 3.14 / 2026 全走 OOV）。dict/ 是分词词表，上游自带，删掉是未经验证的质量赌博。
+# 英文模型（vits-melo-tts-en）：包里没有 dict/ 也没有任何 .fst（实测），所以清单就这些。
+#   数字改由 src/main/tts/english-numbers.ts 在送引擎前转写。
 #
-# 用法：bash scripts/package-tts-model.sh <上游解开的模型目录> <输出目录>
+# 用法：bash scripts/package-tts-model.sh <上游解开的模型目录> <输出目录> [模型名]
 set -euo pipefail
 
-SRC="${1:?用法: package-tts-model.sh <模型目录> <输出目录>}"
-OUT="${2:?用法: package-tts-model.sh <模型目录> <输出目录>}"
-NAME="vits-melo-tts-zh_en"
+SRC="${1:?用法: package-tts-model.sh <模型目录> <输出目录> [模型名]}"
+OUT="${2:?用法: package-tts-model.sh <模型目录> <输出目录> [模型名]}"
+NAME="${3:-vits-melo-tts-zh_en}"
 
-FILES=(model.onnx lexicon.txt tokens.txt dict date.fst number.fst phone.fst LICENSE)
+case "$NAME" in
+  vits-melo-tts-zh_en)
+    FILES=(model.onnx lexicon.txt tokens.txt dict date.fst number.fst phone.fst LICENSE)
+    ;;
+  vits-melo-tts-en)
+    FILES=(model.onnx lexicon.txt tokens.txt LICENSE)
+    ;;
+  *)
+    echo "未知模型: $NAME" >&2
+    exit 1
+    ;;
+esac
 for f in "${FILES[@]}"; do
   [ -e "$SRC/$f" ] || { echo "缺少 $SRC/$f" >&2; exit 1; }
 done
