@@ -4313,7 +4313,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.model,
         event.payload.turnId,
         elementRefsOf(event.payload.elSelections),
-        event.payload.readonlyTools,
+        event.payload.turnProfile,
       );
       void trackEvent("session_start");
       return startedSession;
@@ -4333,7 +4333,7 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         event.payload.model,
         event.payload.turnId,
         elementRefsOf(event.payload.elSelections),
-        event.payload.readonlyTools,
+        event.payload.turnProfile,
       );
     }
 

@@ -188,8 +188,8 @@ function App() {
   const handleVoiceQuestion = useCallback(
     (text: string) => {
       // 有会话就续，没有就是欢迎页的第一句：建一个。
-      // **两条路都要带 readonlyTools** —— 第一轮不受限的话，语音模式就不是
-      // “只读问答”了。
+      // **两条路都要带 turnProfile** —— 第一轮不受限的话，语音模式就不是
+      // 精简问答了。
       if (activeSessionId) {
         void continueSession(
           activeSessionId,
@@ -197,7 +197,7 @@ function App() {
           currentSession?.providerProfileKey,
           currentSession?.model,
           undefined,
-          true,
+          "voice",
         );
         return;
       }
@@ -209,7 +209,7 @@ function App() {
         undefined,
         undefined,
         undefined,
-        true,
+        "voice",
       );
     },
     [

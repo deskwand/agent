@@ -30,3 +30,9 @@ export function normalizeVoiceModeConfig(value: unknown): VoiceModeConfig {
     ),
   };
 }
+
+/**
+ * 轮次档案名。目前只有语音一种；跨进程传值，所以要有一个共享类型。
+ * 档案本体在 `src/main/agent/turn-profiles.ts`（渲染层用不到它）。
+ */
+export type TurnProfileName = "voice";

@@ -20,6 +20,7 @@ import {
 } from "../../shared/session-title";
 import { DEFAULT_WORKDIR_DIRNAME } from "../../shared/workspace-path";
 import type { ElementSelection } from "../../shared/ipc-types";
+import type { TurnProfileName } from "../../shared/voice-mode";
 import { toElementSelectionRefs } from "../../shared/element-selection-ref";
 
 // Check if running in Electron
@@ -763,7 +764,7 @@ export function useIPC() {
       providerProfileKey?: ProviderProfileKey,
       model?: string,
       elSelections?: ElementSelection[],
-      readonlyTools?: boolean,
+      turnProfile?: TurnProfileName,
     ) => {
       setLoading(true);
       console.log("[useIPC] Starting session:", title);
@@ -861,7 +862,7 @@ export function useIPC() {
             model,
             turnId,
             elSelections: elSelections?.length ? elSelections : undefined,
-            readonlyTools,
+            turnProfile,
           },
         });
         if (session) {
@@ -992,7 +993,7 @@ export function useIPC() {
       providerProfileKey?: ProviderProfileKey,
       model?: string,
       elSelections?: ElementSelection[],
-      readonlyTools?: boolean,
+      turnProfile?: TurnProfileName,
     ) => {
       setLoading(true);
       console.log("[useIPC] Continuing session:", sessionId);
@@ -1085,7 +1086,7 @@ export function useIPC() {
             model,
             turnId,
             elSelections: elSelections?.length ? elSelections : undefined,
-            readonlyTools,
+            turnProfile,
           },
         });
         // Loading will be reset when we receive session.status event

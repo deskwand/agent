@@ -1,6 +1,6 @@
 import type { ThemePreset } from "../../shared/theme";
 import type { CodemodeConfig } from "../../shared/codemode-config";
-import type { VoiceModeConfig } from "../../shared/voice-mode";
+import type { VoiceModeConfig, TurnProfileName } from "../../shared/voice-mode";
 import type {
   WebAccessConfig,
   WebAccessErrorCode,
@@ -445,8 +445,8 @@ export type ClientEvent =
         model?: string;
         turnId?: string;
         elSelections?: ElementSelection[];
-        /** 语音模式：本轮只激活只读工具（设计 §2.5）。 */
-        readonlyTools?: boolean;
+        /** 本轮档案（设计 §3.1）：语音轮走精简工具集、关思考、口播化输出。 */
+        turnProfile?: TurnProfileName;
       };
     }
   | {
@@ -459,8 +459,8 @@ export type ClientEvent =
         model?: string;
         turnId?: string;
         elSelections?: ElementSelection[];
-        /** 语音模式：本轮只激活只读工具（设计 §2.5）。 */
-        readonlyTools?: boolean;
+        /** 本轮档案（设计 §3.1）：语音轮走精简工具集、关思考、口播化输出。 */
+        turnProfile?: TurnProfileName;
       };
     }
   | {
