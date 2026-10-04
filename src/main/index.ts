@@ -117,7 +117,7 @@ import { registerConnectorsIpc } from "./connectors";
 import { registerCapabilitiesIpc } from "./capabilities";
 import { initStatusStore } from "./connectors/status-store";
 import { registerVoiceIpc } from "./voice/ipc";
-import { allowMediaRequest } from "./media-permission";
+import { allowPermissionRequest } from "./media-permission";
 import type { VoiceIpcHandle } from "./voice/ipc";
 import { registerTtsIpc } from "./tts/ipc";
 import type { TtsIpcHandle } from "./tts/ipc";
@@ -1011,13 +1011,13 @@ app
     installFileDownloadFallback();
 
     // 这个 handler 一旦存在就替代了 Electron 的默认策略：不显式放行等于全部拒绝。
-    // 只放行自身窗口的「纯音频」请求 —— 摄像头一律拒。
+    // 只放行自身窗口的「纯音频」和剪贴板请求 —— 摄像头一律拒。
     session.defaultSession.setPermissionRequestHandler(
       (webContents, permission, callback, details) => {
         // 判定抽到 ./media-permission 是为了能测 —— 这段原本内联在这里，
         // 而 index.ts import 就会启动应用，单测够不到（见该模块的注释）。
         callback(
-          allowMediaRequest({
+          allowPermissionRequest({
             isOwnWindow:
               mainWindow !== null && webContents === mainWindow.webContents,
             permission,
