@@ -305,7 +305,11 @@ export function defaultStoredConfig(): StoredConfig {
     telemetryEnabled: true,
     isConfigured: false,
     visionModel: undefined,
-    voiceEngine: { enabled: false, shortcut: DEFAULT_VOICE_SHORTCUT },
+    voiceEngine: {
+      enabled: false,
+      shortcut: DEFAULT_VOICE_SHORTCUT,
+      autoPolish: true,
+    },
     readAloud: { enabled: false },
     voiceMode: { ...DEFAULT_VOICE_MODE },
     webAccess: normalizeWebAccessConfig(undefined),
@@ -1360,6 +1364,11 @@ export function setOnConfiguredHook(fn: (() => void) | null): void {
 export interface VoiceEngineConfig {
   enabled: boolean;
   shortcut: VoiceShortcut;
+  /**
+   * 说完之后自动整理转写。默认开 —— 它是这个特性的唯一闸（手动「整理」按钮已删）。
+   * 关掉 = 完全不整理。
+   */
+  autoPolish: boolean;
 }
 
 /**
@@ -1377,6 +1386,8 @@ export function normalizeVoiceEngineConfig(raw: unknown): VoiceEngineConfig {
     shortcut: isVoiceShortcut(value.shortcut)
       ? value.shortcut
       : DEFAULT_VOICE_SHORTCUT,
+    // 与 enabled 相反：唯一的默认是「开」，只有显式 false 才算关。
+    autoPolish: value.autoPolish !== false,
   };
 }
 

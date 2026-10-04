@@ -458,20 +458,14 @@ export function ChatView() {
   const voice = useVoiceInput({
     // 没启用 / 没装模型都在这一句里收口：可能写配置、起下载、弹确认。
     ensureReady: voiceEngine.ensureReady,
-    // 「整理 / 还原」作用在输入框里的文字上，而宿主是唯一知道框里有没有内容的地方
-    hasInputContent,
+    // 读不到配置时按「开」处理：录音本身要求 enabled === true，而那个值来自同一份
+    // 配置，所以不存在「配置还没到就整理」的窗口。
+    autoPolish: appConfig?.voiceEngine?.autoPolish !== false,
     // getSnapshot 是**实时读取**输入框，不是一次性快照。不要缓存它。
     getSnapshot: () => chatInputRef.current?.getPrompt() ?? "",
     onText: (text) => chatInputRef.current?.setPrompt(text),
     onRestore: (snapshot) => chatInputRef.current?.setPrompt(snapshot),
     onError: (code) => notify(VOICE_MESSAGE_KEYS[code], "error"),
-    onPolishFailed: (reason) =>
-      notify(
-        reason === "suspicious"
-          ? "chat.voicePolishSuspicious"
-          : "chat.voicePolishFailed",
-        "warning",
-      ),
   });
 
   // 记住这次录音是不是「按住说话」启动的。

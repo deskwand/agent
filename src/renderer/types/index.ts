@@ -889,6 +889,8 @@ export interface VisionModelConfig {
 export interface VoiceEngineConfig {
   enabled: boolean;
   shortcut: VoiceShortcut;
+  /** 说完之后自动整理转写。默认开；关掉 = 完全不整理。 */
+  autoPolish: boolean;
 }
 
 export interface ReadAloudConfig {

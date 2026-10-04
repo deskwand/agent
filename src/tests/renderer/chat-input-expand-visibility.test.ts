@@ -72,10 +72,6 @@ const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
     seconds: 0,
     onToggle: () => {},
     onCancel: () => {},
-    canPolish: false,
-    canRevert: false,
-    onPolish: () => {},
-    onRevert: () => {},
   },
 };
 
@@ -275,10 +271,6 @@ describe("ChatInputBottomBar expand button", () => {
             seconds: 0,
             onToggle: () => {},
             onCancel: () => {},
-            canPolish: false,
-            canRevert: false,
-            onPolish: () => {},
-            onRevert: () => {},
           },
           ...props,
         }),

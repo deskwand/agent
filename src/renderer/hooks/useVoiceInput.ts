@@ -7,7 +7,7 @@
  * 拼接语义集中在这里：录音开始取一次草稿快照，之后每次 `partial`（全量文本）
  * 都写成「快照 + 文本」。输入框只负责读写，不认识语音这件事。
  *
- * 「整理」的范围也由这里界定：**本次语音产生的那段** = 当前文本去掉快照前缀。
+ * 自动整理的作用范围也由这里界定：**连续几次语音写进框里的那段文字**。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VoiceErrorCode, VoiceEvent } from "../../shared/ipc-types";
@@ -17,12 +17,7 @@ import {
   type MicCapture,
 } from "../utils/voice/mic-capture";
 
-export type VoiceStatus =
-  | "idle"
-  | "requesting"
-  | "recording"
-  | "finishing"
-  | "polishing";
+export type VoiceStatus = "idle" | "requesting" | "recording" | "finishing";
 
 export interface UseVoiceInputOptions {
   /**
@@ -34,12 +29,10 @@ export interface UseVoiceInputOptions {
    */
   ensureReady: () => Promise<boolean>;
   /**
-   * 输入框当前是否有内容（宿主用 `ChatInput` 的 `onContentChange` 喂进来）。
-   *
-   * 「整理 / 还原」操作的是框里的东西，框空的时候它们没有意义。
-   * 必填：漏接线要变成编译错误，而不是静默留两个按钮在空输入框旁边。
+   * 自动整理（配置 `voiceEngine.autoPolish`，默认开）。
+   * 关掉 = 完全不整理 —— 手动入口已经删了，这是唯一的闸。
    */
-  hasInputContent: boolean;
+  autoPolish: boolean;
   /**
    * 读当前草稿。**这是一个实时读取，不是快照**：录音开始时调一次取基线，
    * 整理结果回来时再调一次比对该不该写入（用户可能刚刚手改过）。
@@ -50,12 +43,6 @@ export interface UseVoiceInputOptions {
   /** 回滚到录音开始前的快照（取消 / 误触丢弃）。 */
   onRestore: (snapshot: string) => void;
   onError: (code: VoiceErrorCode) => void;
-  /**
-   * 整理真的失败了才调（不含“用户改过字所以丢弃结果”那种）。
-   * 放在这里而不是适配层：`polish()` 返回的是个 boolean，四种情况都是 false，
-   * 只有钩子内部分得清哪一种是真失败 —— 在外面统一报“整理失败”会误报。
-   */
-  onPolishFailed?: (reason: "failed" | "suspicious") => void;
 }
 
 export interface VoiceInputController {
@@ -65,12 +52,6 @@ export interface VoiceInputController {
   seconds: number;
   toggle: () => void;
   cancel: () => void;
-  /** 整理本次语音产生的文本。返回是否成功。 */
-  polish: () => Promise<boolean>;
-  /** 还原成整理前的原文。 */
-  revert: () => void;
-  canPolish: boolean;
-  canRevert: boolean;
 }
 
 export const VOICE_MESSAGE_KEYS: Record<VoiceErrorCode, string> = {
@@ -90,15 +71,21 @@ export const VOICE_MESSAGE_KEYS: Record<VoiceErrorCode, string> = {
  */
 const MAX_PENDING_BYTES = 16000 * 2 * 4;
 
+/**
+ * 收尾之后等这么久才发起整理。
+ *
+ * 短于它视为「同一次思路里的两段」，合并成一次调用；长于它才单独整理。
+ * 900 是待调的经验值，不是测出来的：太短会退化成每一段调一次模型，太长会让
+ * 整理明显迟到。所以它是个常量，不做成配置项。
+ */
+export const POLISH_DEBOUNCE_MS = 900;
+
 export function useVoiceInput(
   options: UseVoiceInputOptions,
 ): VoiceInputController {
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [level, setLevel] = useState(0);
   const [seconds, setSeconds] = useState(0);
-  const [voiceText, setVoiceText] = useState("");
-  const [originalText, setOriginalText] = useState<string | null>(null);
-  const hasInputContent = options.hasInputContent;
 
   const sessionRef = useRef<string | null>(null);
   const captureRef = useRef<MicCapture | null>(null);
@@ -121,6 +108,107 @@ export function useVoiceInput(
   }, []);
   const optionsRef = useRef(options);
   optionsRef.current = options;
+
+  // ── 自动整理 ────────────────────────────────────────────────────
+  /**
+   * 连续段：`base` 是这段语音之前草稿里的前缀，`text` 是本段累积的原始转写。
+   * 不变式 `base + text === 草稿`（逐字）成立，这段才可整理。
+   */
+  const runRef = useRef({ base: "", text: "" });
+  const polishTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 在飞任务记的是「发出去的那段文本」，用来判断结果过期没有。 */
+  const polishInFlightRef = useRef<string | null>(null);
+  /**
+   * 事件订阅 effect 只建一次，它的闭包里读不到新的 status，只能镜像一份
+   * （与上面 `optionsRef.current = options` 同款做法）。
+   */
+  const statusRef = useRef<VoiceStatus>("idle");
+  statusRef.current = status;
+
+  const clearPolishTimer = useCallback(() => {
+    if (polishTimerRef.current === null) return;
+    clearTimeout(polishTimerRef.current);
+    polishTimerRef.current = null;
+  }, []);
+
+  /**
+   * 「能不能发这次整理 / 能不能把结果写进去」。
+   *
+   * 三件事其实是一件事：开关开着、现在没有录音在写这个框（录音收尾写的是它开始时
+   * 的快照，比整理稿旧的字更旧）、草稿逐字没变（用户打字 / 发送 / 清空都算他接管了文字）。
+   * 发起前与落地前各判一次，两处用同一个谓词，条件只维护这一份。
+   */
+  const canApply = useCallback((base: string, text: string): boolean => {
+    return (
+      optionsRef.current.autoPolish &&
+      statusRef.current === "idle" &&
+      optionsRef.current.getSnapshot() === base + text
+    );
+  }, []);
+
+  /**
+   * 跑一次整理：作用范围就是当前连续段。
+   *
+   * 结果落地与否只看 `canApply`。这段已经死了（用户改了字 / 发送了 / 正在录音）
+   * 就静默放弃；这段还活着但长出了新内容（又说了新的一段）就按合并后的文本补跑一次。
+   */
+  const runPolish = useCallback(async (): Promise<void> => {
+    const api = window.electronAPI?.voice;
+    if (!api) return;
+    if (polishInFlightRef.current !== null) return;
+
+    const run = runRef.current;
+    const source = run.text;
+    if (!source.trim()) return;
+    if (!canApply(run.base, source)) return;
+
+    polishInFlightRef.current = source;
+    // sessionId 传 null：这里手上只有语音会话 id，而 recordAuxUsage 要的是聊天会话 id。
+    // handler 抛错会让 invoke 直接 reject（同 voice.start 那条），所以接住并记日志，
+    // 不能让一个未处理的 rejection 冒到全局。
+    const result = await api.polish(source, null).catch((error: unknown) => {
+      console.error("[voice] polish rejected:", error);
+      return null;
+    });
+    polishInFlightRef.current = null;
+
+    if (result?.ok && result.text && canApply(run.base, source)) {
+      optionsRef.current.onText(run.base + result.text);
+      return;
+    }
+
+    // 没落地。这段又长出新内容了就补跑一次（canApply 会在里面再判一次）；
+    // 否则是用户改了字 / 发送了 / 正在录音，什么都不做。
+    if (runRef.current.text !== source) void runPolish();
+  }, [canApply]);
+
+  /** 收尾之后（重）起防抖：连说多段合并成一次调用。 */
+  const schedulePolish = useCallback(() => {
+    clearPolishTimer();
+    polishTimerRef.current = setTimeout(() => {
+      polishTimerRef.current = null;
+      void runPolish();
+    }, POLISH_DEBOUNCE_MS);
+  }, [clearPolishTimer, runPolish]);
+
+  /**
+   * 把「到点了却被录音挡回去」的那次整理补回来。
+   *
+   * 计时器到点时若正有一次录音在写这个框，这次发起必然白花（见 `canApply` 的
+   * status 条），于是计时器被消费掉。而那次录音结束时**不一定**会重起计时器：
+   * 它可能一个字都没吐（Esc 取消 / 误触丢弃 / 空结果 / 引擎报错）—— 已经写进框里的
+   * 那段转写就永远等不到整理。四种收尾都汇到 `teardown()`，所以在那里补一次。
+   *
+   * 不会死循环：真的落地了就不变式破了，下一次 `canApply` 自然为假；用户改了字同理。
+   */
+  const reschedulePolishIfDue = useCallback(() => {
+    if (polishTimerRef.current !== null) return;
+    if (polishInFlightRef.current !== null) return;
+    const run = runRef.current;
+    if (!run.text.trim()) return;
+    if (!canApply(run.base, run.text)) return;
+    schedulePolish();
+  }, [canApply, schedulePolish]);
 
   const teardown = useCallback(() => {
     captureRef.current?.stop();
@@ -229,8 +317,6 @@ export function useVoiceInput(
     }
     clearPending();
     captureRef.current = capture;
-    setVoiceText("");
-    setOriginalText(null);
     setSeconds(0);
     setStatus("recording");
   }, [clearPending]);
@@ -262,7 +348,6 @@ export function useVoiceInput(
     // 只有真的开始过才回滚：requesting 期间被取消时，输入框里是用户自己的草稿，
     // 而快照还是初始的空串 —— 回滚等于替他清空。
     if (hadSession) optionsRef.current.onRestore(snapshotRef.current);
-    setVoiceText("");
     teardown();
   }, [teardown]);
 
@@ -281,28 +366,46 @@ export function useVoiceInput(
         if (event.sessionId !== sessionRef.current) return;
 
         if (event.type === "partial") {
-          setVoiceText(event.text);
           optionsRef.current.onText(snapshotRef.current + event.text);
           return;
         }
         if (event.type === "done") {
           if (event.discarded) {
             optionsRef.current.onRestore(snapshotRef.current);
-            setVoiceText("");
           } else {
-            setVoiceText(event.text);
             optionsRef.current.onText(snapshotRef.current + event.text);
+            // 连续段记账：这次录音的起点仍等于本段起点（中间没人打字）就往后接，
+            // 否则以这次录音的起点重新开一段。两个分支都满足 base + text === 草稿。
+            const run = runRef.current;
+            runRef.current =
+              snapshotRef.current === run.base + run.text
+                ? { base: run.base, text: run.text + event.text }
+                : { base: snapshotRef.current, text: event.text };
+            if (event.text.trim()) schedulePolish();
           }
           teardown();
           return;
         }
         optionsRef.current.onError(event.code);
-        setVoiceText("");
         teardown();
       },
     );
     return unsubscribe;
-  }, [teardown]);
+  }, [teardown, schedulePolish]);
+
+  // 卸载时清掉待跑的计时器。在飞的任务不用管：能不能落地只看实时草稿，
+  // 而宿主卸载后输入框 ref 已是 null，写入自然落成空操作。
+  useEffect(() => clearPolishTimer, [clearPolishTimer]);
+
+  // 每次回到 idle 都看一眼：到点被录音挡下的那次整理还在不在等。
+  //
+  // 挂在状态上而不挂在 `teardown()` 里：回到 idle 的路径不止一条（收尾、Esc 取消、
+  // 误触丢弃、引擎报错、voice.start 被拒、就绪检查没过），而这些路径里只有一部分
+  // 会吐出新文字、只有那部分会重起计时器。漏一条，那段已经写进框里的转写就永远
+  // 得不到整理（手动按钮和失败提示都已经删了，用户看不出少了什么）。
+  useEffect(() => {
+    if (status === "idle") reschedulePolishIfDue();
+  }, [status, reschedulePolishIfDue]);
 
   // 录音计时（只为了显示秒数）
   useEffect(() => {
@@ -324,70 +427,11 @@ export function useVoiceInput(
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [status, cancel]);
 
-  // 把输入框清空要连「可还原」的记忆一起丢掉。
-  //
-  // 不丢的话：删光 → 再打一段新话，「还原」会冒出来，而它拿回来的是一段
-  // 用户早就不记得的语音原文。
-  useEffect(() => {
-    if (!hasInputContent) setOriginalText(null);
-  }, [hasInputContent]);
-
-  const polish = useCallback(async () => {
-    const api = window.electronAPI?.voice;
-    if (!api || !voiceText.trim() || status !== "idle") return false;
-
-    const sent = voiceText;
-    setStatus("polishing");
-    try {
-      // sessionId 传 null：这里手上只有**语音会话**的 id，而 recordAuxUsage 要的是
-      // **聊天会话** id。两者混用会往用量表里写一个指不到任何会话的悬空引用，
-      // 比诚实的不归属更糟。
-      const result = await api.polish(sent, null);
-      if (!result.ok || !result.text) {
-        // 对调用方只分两种：「结果可疑」与「其他失败」。"empty" 归到后者。
-        optionsRef.current.onPolishFailed?.(
-          result.reason === "suspicious" ? "suspicious" : "failed",
-        );
-        return false;
-      }
-      // 整理期间输入框**不是只读**的，用户可能已经在改字了。
-      // 那就丢掉结果，别把他的修改盖回去。
-      // （比「整理期间锁死输入框」好：1~3 秒的等待里不让改字很碍事）
-      //
-      // 比的是**实时草稿**，不是 voiceText：用户手改走的是输入框自己的路径，
-      // 根本不经过 voice.event，所以只盯状态永远发现不了。
-      if (optionsRef.current.getSnapshot() !== snapshotRef.current + sent) {
-        return false;
-      }
-      setOriginalText(sent);
-      setVoiceText(result.text);
-      optionsRef.current.onText(snapshotRef.current + result.text);
-      return true;
-    } finally {
-      setStatus("idle");
-    }
-  }, [voiceText, status]);
-
-  const revert = useCallback(() => {
-    if (originalText === null) return;
-    setVoiceText(originalText);
-    optionsRef.current.onText(snapshotRef.current + originalText);
-    setOriginalText(null);
-  }, [originalText]);
-
   return {
     status,
     level,
     seconds,
     toggle,
     cancel,
-    polish,
-    revert,
-    canPolish:
-      status === "idle" &&
-      hasInputContent &&
-      voiceText.trim().length > 0 &&
-      originalText === null,
-    canRevert: hasInputContent && originalText !== null,
   };
 }

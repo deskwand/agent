@@ -59,10 +59,6 @@ const baseProps: ChatInputBottomBarProps = {
     seconds: 0,
     onToggle: () => {},
     onCancel: () => {},
-    canPolish: false,
-    canRevert: false,
-    onPolish: () => {},
-    onRevert: () => {},
   },
 };
 

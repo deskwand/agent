@@ -173,6 +173,22 @@ export function VoiceCapabilitySettings({
           }
         />
       )}
+      {enabled && (
+        <SettingsRow
+          testId="voice-auto-polish"
+          sub
+          title={t("settings.capabilities.voice.autoPolish")}
+          note={t("settings.capabilities.voice.autoPolishDesc")}
+          control={
+            <SettingsSwitch
+              checked={engine?.autoPolish !== false}
+              label={t("settings.capabilities.voice.autoPolish")}
+              testId="voice-auto-polish-switch"
+              onChange={(next) => void save({ autoPolish: next })}
+            />
+          }
+        />
+      )}
       {/* 权限行等子行由调用方注入：它们属于这张卡，但不属于这个组件。 */}
       {children}
     </SettingsCard>

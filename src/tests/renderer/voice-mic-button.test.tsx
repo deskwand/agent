@@ -45,10 +45,6 @@ function render(
         install={null}
         onToggle={() => {}}
         onCancel={() => {}}
-        canPolish={false}
-        canRevert={false}
-        onPolish={() => {}}
-        onRevert={() => {}}
         {...props}
       />,
     );
@@ -71,6 +67,8 @@ describe("VoiceMicButton", () => {
     const onToggle = vi.fn();
     render({ onToggle });
 
+    // 手动「整理 / 还原」删了：空闲态这一排只有麦克风一颗
+    expect(container.querySelectorAll("button")).toHaveLength(1);
     expect(button().getAttribute("aria-label")).toBe("chat.voiceStart");
     act(() => button().click());
     expect(onToggle).toHaveBeenCalled();
@@ -82,35 +80,6 @@ describe("VoiceMicButton", () => {
     expect(container.textContent).toContain("0:07");
     expect(buttonByLabel("chat.voiceStop")).toBeDefined();
     expect(buttonByLabel("chat.voiceCancel")).toBeDefined();
-  });
-
-  it("有转写文本时出现「整理」，整理后变成「还原」", () => {
-    const onPolish = vi.fn();
-    render({ canPolish: true, onPolish });
-    act(() => buttonByLabel("chat.voicePolish")!.click());
-    expect(onPolish).toHaveBeenCalled();
-  });
-
-  it("整理中：转圈在「整理」按钮上，而不是麦克风上；但麦克风要锁住", () => {
-    // 踩过的坑：把 polishing 并进 busy，会让麦克风转圈 —— 但麦克风并没在干活，
-    // 用户会以为还在录音。反过来完全不锁也不行：toggle() 只认 idle/recording，
-    // 用户会点一个没反应的按钮。
-    //
-    // 用 aria-label 取麦克风，不用「第一个 button」：整理态下「整理」按钮渲染在
-    // 麦克风**前面**，取第一个拿到的是它，断言就失去了意义。
-    render({ status: "polishing", canPolish: true });
-
-    const mic = buttonByLabel("chat.voiceStart")!;
-    expect(mic.querySelector(".animate-spin")).toBeNull();
-    expect(mic.disabled).toBe(true);
-    expect(buttonByLabel("chat.voicePolish")!.disabled).toBe(true);
-  });
-
-  it("可还原时显示「还原」而不是「整理」", () => {
-    render({ canPolish: false, canRevert: true });
-
-    expect(buttonByLabel("chat.voiceRevert")).toBeDefined();
-    expect(buttonByLabel("chat.voicePolish")).toBeUndefined();
   });
 
   it("请求权限与收尾中不允许再点", () => {
@@ -162,10 +131,6 @@ const stubVoice: VoiceInputController = {
   seconds: 0,
   toggle: () => {},
   cancel: () => {},
-  polish: async () => true,
-  revert: () => {},
-  canPolish: false,
-  canRevert: false,
 };
 
 // 桩返回键名：断言的是「取了哪个键」，不是中文文案。
@@ -176,7 +141,11 @@ const HOLD_KEY = "chat.voiceHoldKeyAltRightMac";
 
 describe("toMicButtonProps 的快捷键条件", () => {
   it("引擎开着 + 有快捷键 → 键名按平台取", () => {
-    const config = { enabled: true, shortcut: "AltSpace" } as const;
+    const config = {
+      enabled: true,
+      shortcut: "AltSpace",
+      autoPolish: true,
+    } as const;
     expect(
       toMicButtonProps(stubVoice, null, {
         config,
@@ -197,14 +166,14 @@ describe("toMicButtonProps 的快捷键条件", () => {
     // 这三条与 usePushToTalk 的 enabled 条件同源：写了就是骗人。
     expect(
       toMicButtonProps(stubVoice, null, {
-        config: { enabled: false, shortcut: "AltRight" },
+        config: { enabled: false, shortcut: "AltRight", autoPolish: true },
         platform: "darwin",
         t: keyT,
       }).shortcutKeys,
     ).toBeUndefined();
     expect(
       toMicButtonProps(stubVoice, null, {
-        config: { enabled: true, shortcut: "disabled" },
+        config: { enabled: true, shortcut: "disabled", autoPolish: true },
         platform: "darwin",
         t: keyT,
       }).shortcutKeys,
@@ -272,20 +241,18 @@ describe("气泡文案（聚焦可见）", () => {
     );
   });
 
-  it("收尾 / 整理时麦克风锁着，气泡不报快捷键", async () => {
-    // 这两个态下 usePushToTalk 的 onStart 只认 idle：那颗键按下去没反应，
+  it("收尾时麦克风锁着，气泡不报快捷键", async () => {
+    // 这个态下 usePushToTalk 的 onStart 只认 idle：那颗键按下去没反应，
     // 写了就是假的。麦克风是 disabled，jsdom 里 focus() 不触发，只能直接派事件。
-    for (const status of ["polishing", "requesting"] as const) {
-      render({ status, canPolish: true, shortcutKeys: HOLD_KEY });
-      const mic = buttonByLabel("chat.voiceStart")!;
-      expect(mic.disabled).toBe(true);
-      await act(async () => {
-        mic.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
-      });
+    render({ status: "requesting", shortcutKeys: HOLD_KEY });
+    const mic = buttonByLabel("chat.voiceStart")!;
+    expect(mic.disabled).toBe(true);
+    await act(async () => {
+      mic.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+    });
 
-      expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
-        "chat.voiceStart",
-      );
-    }
+    expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
+      "chat.voiceStart",
+    );
   });
 });

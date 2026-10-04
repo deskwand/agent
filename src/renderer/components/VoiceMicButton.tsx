@@ -1,4 +1,4 @@
-import { Loader2, Mic, Sparkles, Undo2, X } from "lucide-react";
+import { Loader2, Mic, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { VoiceInstallState } from "../../shared/ipc-types";
@@ -26,10 +26,6 @@ export interface VoiceMicButtonProps {
   shortcutKeys?: string;
   onToggle: () => void;
   onCancel: () => void;
-  canPolish: boolean;
-  canRevert: boolean;
-  onPolish: () => void;
-  onRevert: () => void;
 }
 
 function formatSeconds(total: number): string {
@@ -44,21 +40,16 @@ export function VoiceMicButton({
   shortcutKeys,
   onToggle,
   onCancel,
-  canPolish,
-  canRevert,
-  onPolish,
-  onRevert,
 }: VoiceMicButtonProps) {
   const { t } = useTranslation();
-  // 转圈只用于「真的在跑」的两个态；整理中不转麦克风（麦克风并没在干活）。
   const busy = status === "requesting" || status === "finishing";
   const installing =
     install?.phase === "downloading" || install?.phase === "extracting";
   const installFailed = install?.phase === "error";
   const percent = install?.percent ?? 0;
-  // 但整理中也要锁住麦克风：hook 里 toggle() 只认 idle/recording，
+  // 但收尾中也要锁住麦克风：hook 里 toggle() 只认 idle/recording，
   // 不锁的话用户会点一个没反应的按钮。下载中同理：这一次点击不该被解释成录音。
-  const micDisabled = busy || status === "polishing" || installing;
+  const micDisabled = busy || installing;
   const recording = status === "recording";
   // 下载中 / 录音中麦克风在忙别的事，气泡与可访问名都报那个状态。
   const activeLabel = installing
@@ -68,7 +59,7 @@ export function VoiceMicButton({
       : null;
   // 可访问名只说动作：屏幕阅读器念一串按键是噪音。
   const ariaLabel = activeLabel ?? t("chat.voiceStart");
-  // 气泡在空闲且麦克风可用时才多报一句快捷键。收尾 / 整理 / 下载时那颗键按下去
+  // 气泡在空闲且麦克风可用时才多报一句快捷键。收尾 / 下载时那颗键按下去
   // 没反应（usePushToTalk 的 onStart 只认 idle），写了就是假的。
   const idleTooltip =
     micDisabled || !shortcutKeys
@@ -122,34 +113,6 @@ export function VoiceMicButton({
         </span>
       )}
 
-      {!recording && (canPolish || canRevert) && (
-        <Tooltip
-          label={canRevert ? t("chat.voiceRevert") : t("chat.voicePolish")}
-        >
-          <button
-            type="button"
-            aria-label={
-              canRevert ? t("chat.voiceRevert") : t("chat.voicePolish")
-            }
-            disabled={status === "polishing"}
-            onClick={canRevert ? onRevert : onPolish}
-            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-              canRevert
-                ? "bg-surface-hover text-text-secondary hover:text-text-primary"
-                : "bg-accent/10 text-accent hover:bg-accent/20"
-            }`}
-          >
-            {status === "polishing" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : canRevert ? (
-              <Undo2 className="h-4 w-4" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
-          </button>
-        </Tooltip>
-      )}
-
       <Tooltip label={tooltipLabel}>
         <button
           type="button"
@@ -190,8 +153,7 @@ export function VoiceMicButton({
  * 把 `useVoiceInput` 的控制器适配成按钮的 props。
  *
  * 放在这里而不是两个宿主各写一份：ChatView 与 WelcomeView 都要这一层。
- * 控制器的方法返回 Promise，按钮只要 `() => void`，所以在这里丢掉返回值 ——
- * 整理失败的通知由钩子自己发（见 `UseVoiceInputOptions.onPolishFailed`）。
+ * 控制器的方法返回 Promise，按钮只要 `() => void`，所以在这里丢掉返回值。
  */
 export function toMicButtonProps(
   voice: VoiceInputController,
@@ -221,11 +183,7 @@ export function toMicButtonProps(
     seconds: voice.seconds,
     install,
     shortcutKeys: keyNameKey ? shortcut.t(keyNameKey) : undefined,
-    canPolish: voice.canPolish,
-    canRevert: voice.canRevert,
     onToggle: voice.toggle,
     onCancel: () => void voice.cancel(),
-    onPolish: () => void voice.polish(),
-    onRevert: voice.revert,
   };
 }

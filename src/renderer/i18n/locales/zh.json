@@ -124,7 +124,9 @@
         "shortcutMetaShiftSpaceMac": "⌘ + ⇧ + 空格",
         "shortcutMetaShiftSpaceWin": "Win + Shift + 空格",
         "shortcutDisabled": "不使用快捷键",
-        "shortcutHint": "按住选中的键说话，松开结束。"
+        "shortcutHint": "按住选中的键说话，松开结束。",
+        "autoPolish": "自动整理",
+        "autoPolishDesc": "说完后自动把口语转写整理成书面文字。"
       },
       "readAloud": {
         "title": "朗读",
@@ -1072,8 +1074,6 @@
     "voiceHoldKeyMetaShiftSpaceWin": "Win Shift 空格",
     "voiceStop": "停止录音",
     "voiceCancel": "取消这次语音输入",
-    "voicePolish": "整理",
-    "voiceRevert": "还原",
     "voiceEngineOff": "语音输入还没启用",
     "voiceNotInstalled": "语音引擎还没装好，再点一次麦克风可以重新下载",
     "voiceEngineFailed": "语音引擎启动失败，可以试试重装",
@@ -1085,9 +1085,7 @@
     "voiceDownloadConfirmOk": "下载并开启",
     "voiceReady": "语音输入已就绪，点麦克风开始说话",
     "voiceEnableFailed": "没能开启语音输入，请再试一次",
-    "voiceInstalling": "正在下载语音模型 {{percent}}%",
-    "voicePolishFailed": "整理失败，已保留原文",
-    "voicePolishSuspicious": "整理结果看起来不太对，已保留原文"
+    "voiceInstalling": "正在下载语音模型 {{percent}}%"
   },
   "steer": {
     "label": "引导",

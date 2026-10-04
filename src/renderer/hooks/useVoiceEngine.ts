@@ -71,7 +71,11 @@ export function useVoiceEngine(
     try {
       const saved = await window.electronAPI?.config.save({
         voiceEngine: {
-          ...(engine ?? { enabled: false, shortcut: "AltRight" as const }),
+          ...(engine ?? {
+            enabled: false,
+            shortcut: "AltRight" as const,
+            autoPolish: true,
+          }),
           enabled: true,
         },
       });

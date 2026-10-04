@@ -124,7 +124,9 @@
         "shortcutMetaShiftSpaceMac": "⌘ + ⇧ + Space",
         "shortcutMetaShiftSpaceWin": "Win + Shift + Space",
         "shortcutDisabled": "No shortcut",
-        "shortcutHint": "Hold the key you pick to talk; release to stop."
+        "shortcutHint": "Hold the key you pick to talk; release to stop.",
+        "autoPolish": "Auto clean-up",
+        "autoPolishDesc": "Tidy the transcript into written text after you speak."
       },
       "readAloud": {
         "title": "Read aloud",
@@ -1073,8 +1075,6 @@
     "voiceHoldKeyMetaShiftSpaceWin": "Win Shift Space",
     "voiceStop": "Stop recording",
     "voiceCancel": "Cancel this voice input",
-    "voicePolish": "Clean up",
-    "voiceRevert": "Undo",
     "voiceEngineOff": "Voice input is not enabled yet",
     "voiceNotInstalled": "The voice engine is not ready — tap the mic again to download it",
     "voiceEngineFailed": "The voice engine failed to start — try reinstalling it",
@@ -1086,9 +1086,7 @@
     "voiceDownloadConfirmOk": "Download and turn on",
     "voiceReady": "Voice input is ready — tap the mic to start",
     "voiceEnableFailed": "Could not turn voice input on — please try again",
-    "voiceInstalling": "Downloading the voice model — {{percent}}%",
-    "voicePolishFailed": "Clean-up failed, keeping the original text",
-    "voicePolishSuspicious": "The clean-up result looked wrong, keeping the original text"
+    "voiceInstalling": "Downloading the voice model — {{percent}}%"
   },
   "steer": {
     "label": "Steer",

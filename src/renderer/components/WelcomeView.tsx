@@ -100,19 +100,13 @@ export function WelcomeView() {
   });
   const voice = useVoiceInput({
     ensureReady: voiceEngine.ensureReady,
-    // 「整理 / 还原」作用在输入框里的文字上，而宿主是唯一知道框里有没有内容的地方
-    hasInputContent,
+    // 读不到配置时按「开」处理：录音本身要求 enabled === true，而那个值来自同一份
+    // 配置，所以不存在「配置还没到就整理」的窗口。
+    autoPolish: appConfig?.voiceEngine?.autoPolish !== false,
     getSnapshot: () => chatInputRef.current?.getPrompt() ?? "",
     onText: (text) => chatInputRef.current?.setPrompt(text),
     onRestore: (snapshot) => chatInputRef.current?.setPrompt(snapshot),
     onError: (code) => notifyVoice(VOICE_MESSAGE_KEYS[code], "error"),
-    onPolishFailed: (reason) =>
-      notifyVoice(
-        reason === "suspicious"
-          ? "chat.voicePolishSuspicious"
-          : "chat.voicePolishFailed",
-        "warning",
-      ),
   });
   // 记住这次录音是不是「按住说话」启动的，否则手滑按一下 Option 会把按钮启动的录音停掉。
   const pushToTalkOwns = useRef(false);

@@ -37,9 +37,13 @@ import { useAppStore } from "../../renderer/store";
 let container: HTMLDivElement;
 let root: Root;
 
-/** 只填本组件会读的字段；setAppConfig 不做校验。 */
-function setEngine(engine: AppConfig["voiceEngine"]): void {
-  useAppStore.getState().setAppConfig({ voiceEngine: engine } as AppConfig);
+/** 只填本组件会读的字段；其余给一份最小默认值（归一化保证运行时有 autoPolish）。 */
+function setEngine(
+  engine: Partial<NonNullable<AppConfig["voiceEngine"]>>,
+): void {
+  useAppStore.getState().setAppConfig({
+    voiceEngine: { autoPolish: true, ...engine },
+  } as AppConfig);
 }
 
 async function mount(): Promise<void> {
@@ -89,6 +93,7 @@ describe("VoiceCapabilitySettings", () => {
     expect(byTestId("capability-voice")).not.toBeNull();
     expect(byTestId("voice-engine")).toBeNull();
     expect(byTestId("voice-shortcut")).toBeNull();
+    expect(byTestId("voice-auto-polish")).toBeNull();
   });
 
   it("打开时写配置并立刻开始安装", async () => {
@@ -101,7 +106,7 @@ describe("VoiceCapabilitySettings", () => {
     await act(async () => toggle.click());
 
     expect(api.config.save).toHaveBeenCalledWith({
-      voiceEngine: { enabled: true, shortcut: "AltRight" },
+      voiceEngine: { autoPolish: true, enabled: true, shortcut: "AltRight" },
     });
     expect(api.voice.install).toHaveBeenCalledTimes(1);
   });
@@ -213,7 +218,11 @@ describe("VoiceCapabilitySettings", () => {
     });
 
     expect(api.config.save).toHaveBeenCalledWith({
-      voiceEngine: { enabled: true, shortcut: "MetaShiftSpace" },
+      voiceEngine: {
+        autoPolish: true,
+        enabled: true,
+        shortcut: "MetaShiftSpace",
+      },
     });
   });
 
@@ -232,6 +241,27 @@ describe("VoiceCapabilitySettings", () => {
 
     (window as unknown as { electronAPI: unknown }).electronAPI = original;
   });
+  it("自动整理默认开，点一下关掉并写进配置", async () => {
+    setEngine({ enabled: true, shortcut: "AltRight" });
+    await mount();
+
+    const row = byTestId("voice-auto-polish")!;
+    expect(row.textContent).toContain(
+      "settings.capabilities.voice.autoPolishDesc",
+    );
+
+    const toggle = row.querySelector<HTMLButtonElement>(
+      '[data-testid="voice-auto-polish-switch"]',
+    )!;
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+
+    await act(async () => toggle.click());
+
+    expect(api.config.save).toHaveBeenCalledWith({
+      voiceEngine: { autoPolish: false, enabled: true, shortcut: "AltRight" },
+    });
+  });
+
   it("children 渲染在卡片里，且开关关闭时也在", async () => {
     setEngine({ enabled: false, shortcut: "AltRight" });
     await act(async () => {

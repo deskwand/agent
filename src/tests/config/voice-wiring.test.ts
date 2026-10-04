@@ -56,3 +56,21 @@ describe("normalizeVoiceEngineConfig", () => {
     expect(normalizeVoiceEngineConfig(null).enabled).toBe(false);
   });
 });
+
+describe("autoPolish 的默认值", () => {
+  it("默认开启 —— 这个特性是「默认开、可关」，不是「默认关」", () => {
+    expect(defaultStoredConfig().voiceEngine?.autoPolish).toBe(true);
+  });
+
+  it("显式的 false 保持 false", () => {
+    expect(normalizeVoiceEngineConfig({ autoPolish: false }).autoPolish).toBe(
+      false,
+    );
+  });
+
+  it("脏值（手改过的 config 文件）回退成 true", () => {
+    expect(
+      normalizeVoiceEngineConfig({ autoPolish: "banana" }).autoPolish,
+    ).toBe(true);
+  });
+});

@@ -2,7 +2,10 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useVoiceInput } from "../../renderer/hooks/useVoiceInput";
+import {
+  POLISH_DEBOUNCE_MS,
+  useVoiceInput,
+} from "../../renderer/hooks/useVoiceInput";
 
 const { micMock } = vi.hoisted(() => ({ micMock: { start: vi.fn() } }));
 vi.mock("../../renderer/utils/voice/mic-capture", () => ({
@@ -25,9 +28,9 @@ let api: ReturnType<typeof useVoiceInput>;
 // `onText` / `onRestore` 就是输入框的写入，`getSnapshot` 就是读它的当前内容。
 // 早先的版本把 `getSnapshot` 写成常量 `() => "草稿"`，于是“用户手改输入框”根本
 // 表达不出来 —— 静态的替身会把真实的竞态藏起来。
+/** 自动整理开关的替身（对应配置 `voiceEngine.autoPolish`，默认开）。 */
+let autoPolishOn = true;
 let draft = "";
-/** 输入框当前是否有内容 —— 宿主用 ChatInput 的 onContentChange 喂进来。 */
-let inputHasContent = true;
 const calls = {
   onText: vi.fn((text: string) => {
     draft = text;
@@ -37,7 +40,6 @@ const calls = {
   }),
   ensureReady: vi.fn(),
   onError: vi.fn(),
-  onPolishFailed: vi.fn(),
   getSnapshot: vi.fn(() => draft),
 };
 
@@ -45,7 +47,7 @@ let onSamplesRef: ((pcm: Int16Array, level: number) => void) | null = null;
 
 function Probe() {
   api = useVoiceInput({
-    hasInputContent: inputHasContent,
+    autoPolish: autoPolishOn,
     ...calls,
   });
   return React.createElement("span", null, api.status);
@@ -84,7 +86,7 @@ beforeEach(() => {
   // 用 clear 的话它会泄漏到后面的用例里去。
   for (const spy of Object.values(calls)) spy.mockReset();
   draft = "草稿";
-  inputHasContent = true;
+  autoPolishOn = true;
   calls.onText.mockImplementation((text: string) => {
     draft = text;
   });
@@ -145,108 +147,16 @@ describe("useVoiceInput", () => {
     expect(container.textContent).toBe("idle");
   });
 
-  it("整理只替换本次语音那段，并记下原文以便还原", async () => {
+  it("控制器不再暴露手动整理接口", async () => {
     await render();
-    await act(async () => api.toggle());
-    await act(async () =>
-      emit({
-        type: "done",
-        sessionId: "s1",
-        text: "嗯那个今天天气不错",
-        discarded: false,
-      }),
-    );
 
-    const polished = await act(async () => api.polish());
-
-    expect(voice.polish).toHaveBeenCalledWith("嗯那个今天天气不错", null);
-    expect(polished).toBe(true);
-  });
-
-  it("整理期间用户改了输入框 → 丢弃结果，不覆盖他的编辑", async () => {
-    await render();
-    await act(async () => api.toggle());
-    await act(async () =>
-      emit({ type: "done", sessionId: "s1", text: "原文", discarded: false }),
-    );
-
-    // 发起整理，但在它返回前用户直接在输入框里改了字。
-    // 注意是改 `getSnapshot` 的返回值，不是发语音事件 —— 用户手改走的是输入框
-    // 自己的路径，永远不会经过 voice.event；用 partial 事件模拟的话，
-    // 守着的是一个不可能发生的场景，真 bug 照样漏。
-    let resolvePolish: (v: unknown) => void = () => {};
-    voice.polish.mockImplementation(
-      () =>
-        new Promise((r) => {
-          resolvePolish = r;
-        }),
-    );
-    // 发起整理：它会挂着不返回，所以**不能 await** —— 把结果用 .then 接住。
-    // 绝不在一个 act 里去 await 另一个 act() 的 promise：嵌套 act 会搞乱 act 队列，
-    // 后面的用例就看不到状态刷新了（这两个用例的失败就是这么来的）。
-    let polishedResult: boolean | undefined;
-    await act(async () => {
-      void api.polish().then((r) => {
-        polishedResult = r;
-      });
-      await Promise.resolve();
-    });
-
-    // 用户手改输入框：直接把框里的内容换掉（不是发语音事件）
-    draft = "草稿用户手改的";
-
-    // 放行整理结果
-    await act(async () => {
-      resolvePolish({ ok: true, text: "整理后的文本" });
-      await Promise.resolve();
-    });
-
-    expect(polishedResult).toBe(false);
-    // 没把整理结果写进去（最后一次写入仍是 done 那次的「草稿原文」）
-    expect(calls.onText).toHaveBeenLastCalledWith("草稿原文");
-    expect(calls.onText).not.toHaveBeenCalledWith("草稿整理后的文本");
-  });
-
-  it("整理失败时保持原文", async () => {
-    voice.polish.mockResolvedValue({ ok: false, reason: "suspicious" });
-    await render();
-    await act(async () => api.toggle());
-    await act(async () =>
-      emit({ type: "done", sessionId: "s1", text: "原文", discarded: false }),
-    );
-
-    const polished = await act(async () => api.polish());
-
-    expect(polished).toBe(false);
-    expect(calls.onText).toHaveBeenLastCalledWith("草稿原文");
-  });
-
-  it("整理失败时把原因报出去（但「用户改过字」不算失败）", async () => {
-    // 钩子的 polish() 四种情况都返回 false，只有它分得清哪一种是真失败：
-    // 在外面统一报「整理失败」会在用户自己打字时误报。
-    voice.polish.mockResolvedValue({ ok: false, reason: "suspicious" });
-    await render();
-    await act(async () => api.toggle());
-    await act(async () =>
-      emit({ type: "done", sessionId: "s1", text: "原文", discarded: false }),
-    );
-
-    await act(async () => api.polish());
-
-    expect(calls.onPolishFailed).toHaveBeenCalledWith("suspicious");
-  });
-
-  it("整理失败但原因不是 suspicious 时，报成 failed", async () => {
-    voice.polish.mockResolvedValue({ ok: false, reason: "failed" });
-    await render();
-    await act(async () => api.toggle());
-    await act(async () =>
-      emit({ type: "done", sessionId: "s1", text: "原文", discarded: false }),
-    );
-
-    await act(async () => api.polish());
-
-    expect(calls.onPolishFailed).toHaveBeenCalledWith("failed");
+    expect(Object.keys(api).sort()).toEqual([
+      "cancel",
+      "level",
+      "seconds",
+      "status",
+      "toggle",
+    ]);
   });
 
   it("录音中按 Esc 取消：中断会话并还原快照", async () => {
@@ -412,54 +322,6 @@ describe("useVoiceInput — 采集帧到 IPC 的真实通路", () => {
 });
 
 /**
- * 「整理 / 还原」操作的是**输入框里的东西**，所以输入框空的时候它们不该存在。
- *
- * 判据以前只看钩子自己的 `voiceText` / `originalText`：用户把字删光，那两个值
- * 不会变，按钮就留在空输入框旁边。宿主早就知道「框里有没有内容」
- * （`ChatInput` 的 `onContentChange`，展开按钮用的就是它），所以把它喂进来。
- */
-describe("输入框为空时的语音动作", () => {
-  it("输入框为空 → 整理与还原都不可用", async () => {
-    inputHasContent = false;
-    await render();
-    await act(async () => api.toggle());
-    await act(async () =>
-      emit({ type: "done", sessionId: "s1", text: "你好", discarded: false }),
-    );
-
-    // 钩子里确实记着这段语音，但框是空的，没什么可整理的
-    expect(api.canPolish).toBe(false);
-    expect(api.canRevert).toBe(false);
-  });
-
-  it("输入框被清空后丢掉原文 —— 重新打字不会复活一个早已不相干的「还原」", async () => {
-    await render();
-    await act(async () => api.toggle());
-    await act(async () =>
-      emit({
-        type: "done",
-        sessionId: "s1",
-        text: "嗯那个今天天气不错",
-        discarded: false,
-      }),
-    );
-    await act(async () => api.polish());
-    expect(api.canRevert).toBe(true);
-
-    // 用户把刚整理好的文字删干净
-    draft = "";
-    inputHasContent = false;
-    await render();
-    expect(api.canRevert).toBe(false);
-
-    // 他接着打了一段新话。还原若在这时出现，还原回去的是一段他不认识的旧文本。
-    inputHasContent = true;
-    await render();
-    expect(api.canRevert).toBe(false);
-  });
-});
-
-/**
  * `requesting` 是这条特性里最长的一段窗口：首次要加载 162MB 模型，实测 2.2~2.4 秒，
  * 首次用还要过系统权限弹窗。这段时间里 `sessionRef` 与 `captureRef` 都还是 null
  * （两者要等 await 回来才赋值），所以取消必须靠别的东西作废那次 start()。
@@ -535,5 +397,286 @@ describe("voice.stop 被拒", () => {
 
     expect(container.textContent).toBe("idle");
     expect(calls.onError).toHaveBeenCalledWith("VOICE_ENGINE_FAILED");
+  });
+});
+
+/**
+ * 自动整理：收尾 900ms 后后台跑一次，草稿逐字没变才落地。
+ * 手动「整理 / 还原」已删，所以这里断言的全是「输入框最后变成了什么」。
+ */
+describe("自动整理", () => {
+  // 只伪造这两种定时器：录音计时用的 setInterval 与 promise 微任务不受影响。
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const sayDone = (text: string) =>
+    act(async () =>
+      emit({ type: "done", sessionId: "s1", text, discarded: false }),
+    );
+
+  /** 推进到防抖到点，并把整理请求的 promise 链跑完（两拍微任务）。 */
+  const fireDebounce = () =>
+    act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+  /** 让下一次 polish 挂着不返回，用来观察「在飞 / 正在录音 / 已发送」这些窗口。 */
+  const hangPolish = () => {
+    let resolve: (value: unknown) => void = () => {};
+    voice.polish.mockImplementationOnce(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
+    return (value: unknown) => resolve(value);
+  };
+
+  const flush = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+
+  it("说完 900ms 后自动整理，原地换成整理稿，麦克风全程可用", async () => {
+    voice.polish.mockResolvedValue({
+      ok: true,
+      text: "我想想，明天下午三点开会吧。",
+    });
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("嗯那个我想想明天下午三点开会吧");
+
+    await act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS - 1);
+    });
+    expect(voice.polish).not.toHaveBeenCalled();
+
+    await fireDebounce();
+
+    expect(voice.polish).toHaveBeenCalledWith(
+      "嗯那个我想想明天下午三点开会吧",
+      null,
+    );
+    expect(draft).toBe("草稿我想想，明天下午三点开会吧。");
+    // 整理期间 status 仍是 idle：麦克风没被锁
+    expect(container.textContent).toBe("idle");
+  });
+
+  it("两段间隔小于防抖窗口时合并成一次调用", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+
+    await act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS - 500);
+    });
+    await act(async () => api.toggle());
+    await sayDone("第二段");
+
+    await fireDebounce();
+
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+    expect(voice.polish).toHaveBeenCalledWith("第一段第二段", null);
+    expect(draft).toBe("草稿整理后的文本");
+  });
+
+  it("在飞期间又说了新的一段：旧结果不落地，按合并文本补跑一次", async () => {
+    const resolveFirst = hangPolish();
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+    await fireDebounce();
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+
+    // 用户马上又说了一句（第一次请求还挂在半路）
+    await act(async () => api.toggle());
+    await sayDone("第二段");
+    expect(draft).toBe("草稿第一段第二段");
+
+    await act(async () => {
+      resolveFirst({ ok: true, text: "只盖住第一段的整理稿" });
+      await flush();
+    });
+
+    // 旧结果作废（草稿已经不是它认得的那一份），并按合并后的文本补跑了一次
+    expect(voice.polish).toHaveBeenCalledTimes(2);
+    expect(voice.polish).toHaveBeenLastCalledWith("第一段第二段", null);
+    expect(draft).toBe("草稿整理后的文本");
+  });
+
+  it("整理期间用户动手打字：结果丢弃，也不再补跑", async () => {
+    const resolvePolish = hangPolish();
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("嗯那个原文");
+    await fireDebounce();
+
+    // 用户手改输入框：走的是输入框自己的路径，永远不经过 voice.event
+    draft = "草稿我自己改的";
+    await act(async () => {
+      resolvePolish({ ok: true, text: "整理稿" });
+      await flush();
+    });
+
+    expect(draft).toBe("草稿我自己改的");
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+  });
+
+  it("结果回来时正在录音：不落地（否则会被这次录音的收尾覆盖），收尾后整段重跑", async () => {
+    const resolvePolish = hangPolish();
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+    await fireDebounce();
+
+    await act(async () => api.toggle()); // 用户紧接着又开录
+    await act(async () => {
+      resolvePolish({ ok: true, text: "整理稿" });
+      await flush();
+    });
+    expect(draft).toBe("草稿第一段");
+
+    await sayDone("第二段");
+    await fireDebounce();
+
+    expect(voice.polish).toHaveBeenLastCalledWith("第一段第二段", null);
+    expect(draft).toBe("草稿整理后的文本");
+  });
+
+  it("发送先于落地：草稿被清空，结果不落地也不补跑", async () => {
+    const resolvePolish = hangPolish();
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("原文");
+    await fireDebounce();
+
+    draft = ""; // 宿主发送成功后清空输入框
+    await act(async () => {
+      resolvePolish({ ok: true, text: "整理稿" });
+      await flush();
+    });
+
+    expect(draft).toBe("");
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+  });
+
+  it("开关关掉之后一次都不整理", async () => {
+    autoPolishOn = false;
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("嗯那个原文");
+
+    await fireDebounce();
+
+    expect(voice.polish).not.toHaveBeenCalled();
+    expect(draft).toBe("草稿嗯那个原文");
+  });
+
+  it("整理失败静默：保留原文，不报错也不再重跑", async () => {
+    voice.polish.mockResolvedValue({ ok: false, reason: "suspicious" });
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("原文");
+
+    await fireDebounce();
+
+    expect(draft).toBe("草稿原文");
+    expect(calls.onError).not.toHaveBeenCalled();
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+  });
+  it("到点时正在录音、这次录音又没吐出文字：整理不丢，收尾后补跑", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+
+    // 计时器到点前又按了一下麦克风
+    await act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS - 300);
+    });
+    await act(async () => api.toggle());
+    await fireDebounce();
+    expect(voice.polish).not.toHaveBeenCalled();
+
+    // 这次是误触（一个字都没吐）—— 它自己不会重起计时器
+    await act(async () =>
+      emit({ type: "done", sessionId: "s1", text: "", discarded: true }),
+    );
+    await fireDebounce();
+
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+    expect(voice.polish).toHaveBeenCalledWith("第一段", null);
+    expect(draft).toBe("草稿整理后的文本");
+  });
+
+  it("到点时正在录音、这次被 Esc 取消：整理同样补跑", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+
+    await act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS - 300);
+    });
+    await act(async () => api.toggle());
+    await fireDebounce();
+    expect(voice.polish).not.toHaveBeenCalled();
+
+    await act(async () => api.cancel());
+    await fireDebounce();
+
+    expect(voice.polish).toHaveBeenCalledWith("第一段", null);
+    expect(draft).toBe("草稿整理后的文本");
+  });
+
+  it("卸载后到点不再发起整理", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+
+    await act(async () => root.unmount());
+    await act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS);
+      await flush();
+    });
+
+    expect(voice.polish).not.toHaveBeenCalled();
+  });
+  it("两段之间用户改了字：重新锚定，只整理新的一段", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+
+    // 用户在下一段之前自己改了这个框 —— 连续段的不变式破了
+    draft = "草稿第一段我自己补的字";
+    await act(async () => api.toggle());
+    await sayDone("第二段");
+    await fireDebounce();
+
+    // 不以「草稿 + 第一段」为范围重发：那段文字里已经有用户的字
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+    expect(voice.polish).toHaveBeenCalledWith("第二段", null);
+    expect(draft).toBe("草稿第一段我自己补的字整理后的文本");
+  });
+
+  it("在飞期间关掉开关：结果不落地", async () => {
+    const resolvePolish = hangPolish();
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("原文");
+    await fireDebounce();
+
+    autoPolishOn = false;
+    await render(); // 让 optionsRef 拿到新值（渲染期同步）
+    await act(async () => {
+      resolvePolish({ ok: true, text: "整理稿" });
+      await flush();
+    });
+
+    expect(draft).toBe("草稿原文");
   });
 });
