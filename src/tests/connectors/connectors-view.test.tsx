@@ -399,12 +399,19 @@ describe("「添加」接线", () => {
     });
   }
 
-  it("点「添加」打开弹窗，成功后重新拉列表", async () => {
+  it("点「添加」→「外部服务」打开弹窗，成功后重新拉列表", async () => {
     api.addCustomServer.mockResolvedValue({ ok: true });
     await mount();
     expect(container.querySelector('[data-testid="add-payload"]')).toBeNull();
 
+    // 「添加」现在先开一个两项菜单（外部服务 / 邮箱），不是一个直通弹窗的按钮。
     await act(async () => byKey("connectors.action.add")!.click());
+    expect(container.querySelector('[data-testid="add-payload"]')).toBeNull();
+    await act(async () =>
+      container
+        .querySelector('[data-testid="add-mcp"]')!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true })),
+    );
     expect(
       container.querySelector('[data-testid="add-payload"]'),
     ).not.toBeNull();

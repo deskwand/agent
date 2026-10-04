@@ -2114,6 +2114,8 @@
       "authorizedHint": "connects in your next chat"
     },
     "action": {
+      "test": "Test",
+      "removeMailbox": "Remove",
       "connect": "Connect",
       "disconnect": "Disconnect",
       "reauthorize": "Re-authorize",
@@ -2254,6 +2256,7 @@
       "computerUseDesc": "See the screen and drive the mouse and keyboard"
     },
     "summary": {
+      "mailbox": "Mailbox",
       "remote": "Remote service",
       "local": "Local stdio"
     },
@@ -2278,6 +2281,7 @@
       "storageHint": "The credential is stored in plain text in the local mcp.json."
     },
     "category": {
+      "mail": "Mailboxes",
       "all": "All",
       "dev": "Development",
       "collab": "Collaboration",
@@ -2285,6 +2289,17 @@
       "ai": "AI & research",
       "life": "Life",
       "other": "Yours"
+    },
+    "mail": {
+      "testFailed": "Test failed",
+      "removeConfirmTitle": "Remove this mailbox?",
+      "removeConfirmBody": "{{email}} authorization code will be deleted too. Adding it back means fetching a new code from your provider."
+    },
+    "addMenu": {
+      "server": "External service (MCP)",
+      "serverHint": "Paste an mcp.json snippet, or enter a remote URL",
+      "mailboxHint": "QQ / 163 / Gmail / iCloud and more",
+      "mailbox": "Mailbox"
     },
     "filter": {
       "added": "Added",
@@ -2297,5 +2312,62 @@
       "plugins": "Plugins"
     },
     "removeFailed": "Failed to remove connector"
+  },
+  "mail": {
+    "provider": {
+      "qq": {
+        "name": "QQ Mail / Foxmail",
+        "credential": "16-digit authorization code",
+        "hint": "QQ Mail rejects your QQ password for third-party clients. Open Settings · Account & Security, enable the POP3/IMAP/SMTP service, then generate an authorization code."
+      },
+      "netease-163": {
+        "name": "NetEase 163 Mail",
+        "credential": "16-digit authorization code",
+        "hint": "Open Settings · POP3/SMTP/IMAP, enable the service, then generate an authorization code. Put the code in the password field, not your login password."
+      },
+      "netease-126": {
+        "name": "NetEase 126 Mail",
+        "credential": "16-digit authorization code",
+        "hint": "Same as 163: enable the service under Settings · POP3/SMTP/IMAP first, then generate an authorization code."
+      },
+      "exmail": {
+        "name": "Tencent Exmail",
+        "credential": "Client-specific password",
+        "hint": "Two steps are required: an admin must enable the IMAP/SMTP service scope for you in the WeCom console; then you enable secure login under Settings · Mailbox Binding and generate a 16-digit password."
+      },
+      "aliyun": {
+        "name": "Alibaba Mail",
+        "credential": "Client security password",
+        "hint": "An admin must first enable third-party client access. If a client security password is enabled, use that instead of your login password."
+      },
+      "gmail": {
+        "name": "Gmail",
+        "credential": "App password (16 characters)",
+        "hint": "Google no longer accepts your normal password. Turn on 2-Step Verification in your Google Account, then generate an app password."
+      },
+      "icloud": {
+        "name": "iCloud Mail",
+        "credential": "App-specific password",
+        "hint": "Generate an app-specific password in your Apple Account (two-factor authentication required). The IMAP username may be the part before the @ in your address; both forms are tried automatically."
+      },
+      "custom": {
+        "name": "Custom IMAP/SMTP",
+        "credential": "Password / authorization code",
+        "hint": "Enter the IMAP and SMTP hosts from your provider. Most providers require an authorization code rather than your login password."
+      }
+    },
+    "dialog": {
+      "title": "Add a mailbox",
+      "providerHint": "Choose your mail provider",
+      "back": "Back",
+      "email": "Email address",
+      "credentialPlaceholder": "Authorization code / app password",
+      "imapHost": "IMAP host",
+      "smtpHost": "SMTP host",
+      "consoleLink": "Get a credential from the provider",
+      "submit": "Connect and add",
+      "failed": "Could not add this mailbox",
+      "customHostsRequired": "A custom provider needs both an IMAP and an SMTP host"
+    }
   }
 }

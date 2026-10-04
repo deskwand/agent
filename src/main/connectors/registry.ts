@@ -10,6 +10,9 @@
  *  - `removeServer`     —— 卡片点「断开」（两步清理，见 spec §7.2）
  *  - `setEnabled`       —— 本机能力开关
  *  - `authorize`        —— 卡片点「重新授权」
+ *
+ * 邮箱条目插在**最前**：邮箱是用户**已经拥有**的账号，目录段是「可以加的服务」——
+ * 发现与拥有不是一回事。视图还会再按分组排序，这里只是让列表顺序稳定。
  */
 import type {
   ActionResult,
@@ -26,6 +29,8 @@ import type { ConnectorStatus } from "../../shared/connectors";
 import { buildRemoteEntries } from "./sources/mcp-remote-source";
 import { buildBuiltinEntries } from "./sources/mcp-builtin-source";
 import { buildCustomEntries } from "./sources/mcp-custom-source";
+import { buildMailEntries } from "./sources/mail-source";
+import type { MailAccountView } from "../../shared/mail-accounts";
 
 export interface RegistryDeps {
   loadConfig: () => LoadedMcpConfig;
@@ -57,6 +62,16 @@ export interface RegistryDeps {
    * 未添加的预设要能一键打开，所以得有办法从名字造出配置。
    */
   builtinConfigFor: (serverName: string) => McpServerConfig | undefined;
+  /**
+   * 邮箱账号（**不含凭据** —— 用 toAccountView 转过的）。
+   *
+   * 可选：目前没有调用方提供它（`src/main/connectors/index.ts` 的接线与
+   * 既有的 registry 测试都还没接邮箱）。设成必填会让这些既有调用点在运行时抛错；
+   * 接线完成后应改成必填。
+   */
+  loadMailAccounts?: () => MailAccountView[];
+  /** `Mail` 是否已在 mcp.json 里且没被停用。与 `loadMailAccounts` 同样可选，理由同上。 */
+  isMailServerEnabled?: () => boolean;
 }
 
 export interface Registry {
@@ -146,6 +161,11 @@ export function buildRegistry(deps: RegistryDeps): Registry {
       hasCredentials: deps.hasCredentials,
     };
     return [
+      ...buildMailEntries(
+        ctx,
+        deps.loadMailAccounts?.() ?? [],
+        deps.isMailServerEnabled?.() ?? false,
+      ),
       ...buildRemoteEntries(ctx, deps.catalog),
       ...buildBuiltinEntries(ctx),
       ...buildCustomEntries(ctx, deps.catalog),

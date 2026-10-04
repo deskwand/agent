@@ -30,6 +30,8 @@ import {
   startSignIn,
 } from "./mcp-signin";
 import { findBuiltinPresetByName } from "./builtin-presets";
+import { readMailAccounts } from "../mail/account-store";
+import { toAccountView } from "../../shared/mail-accounts";
 import { cleanupRetiredPresets } from "./retired-presets";
 import { log, logError } from "../utils/logger";
 
@@ -66,6 +68,21 @@ export function registerConnectorsIpc({
     loadConfig: () => readMcpConfig(agentDir),
     statusFor: getConnectorStatus,
     catalog: MCP_CATALOG,
+
+    // 邮箱条目。`Mail` 是**一个** server 扛全部邮箱，所以卡片是账号级的：
+    // 每个账号一条 entry，`entry.serverName` 都是 "Mail"（见 mail-source.ts）。
+    loadMailAccounts: () =>
+      Object.entries(readMailAccounts(agentDir)).map(([email, account]) =>
+        toAccountView(email, account),
+      ),
+    // `Mail` 不在 mcp.json 里（还没加过邮箱）或已启用 ⇒ 可用；
+    // 只有明确 `enabled === false` 才算停用。
+    isMailServerEnabled: () => {
+      const server = readMcpConfig(agentDir).servers.find(
+        (entry) => entry.name === "Mail",
+      );
+      return server === undefined || server.config.enabled !== false;
+    },
 
     addServer: async (name, config) => {
       try {

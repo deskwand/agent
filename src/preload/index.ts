@@ -26,6 +26,10 @@ import type {
   ConnectorEntry,
 } from "../shared/connectors";
 import type {
+  AddMailAccountInput,
+  MailAccountView,
+} from "../shared/mail-accounts";
+import type {
   CapabilityPermissions,
   PermissionKind,
 } from "../shared/capabilities";
@@ -462,6 +466,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
       return () =>
         ipcRenderer.removeListener("connectors.statusChanged", handler);
     },
+  },
+  // Mailboxes. 账号级动作，与 `connectors` 分开：一个邮箱不是一条 MCP server，
+  // 删除它绝不能按 server 名路由（会连整个 `Mail` server 一起删掉）。
+  mail: {
+    listAccounts: (): Promise<MailAccountView[]> =>
+      ipcRenderer.invoke("mail.listAccounts"),
+    addAccount: (input: AddMailAccountInput): Promise<ActionResult> =>
+      ipcRenderer.invoke("mail.addAccount", input),
+    removeAccount: (email: string): Promise<ActionResult> =>
+      ipcRenderer.invoke("mail.removeAccount", email),
+    updateCredential: (
+      email: string,
+      credential: string,
+    ): Promise<ActionResult> =>
+      ipcRenderer.invoke("mail.updateCredential", email, credential),
+    testAccount: (email: string): Promise<ActionResult> =>
+      ipcRenderer.invoke("mail.testAccount", email),
   },
   capabilities: {
     permissions: (): Promise<CapabilityPermissions> =>
@@ -1063,6 +1084,16 @@ declare global {
         cancelSignIn: (name: string) => Promise<ActionResult>;
         addCustomServer: (input: AddCustomServerInput) => Promise<ActionResult>;
         onStatusChanged: (cb: () => void) => () => void;
+      };
+      mail: {
+        listAccounts: () => Promise<MailAccountView[]>;
+        addAccount: (input: AddMailAccountInput) => Promise<ActionResult>;
+        removeAccount: (email: string) => Promise<ActionResult>;
+        updateCredential: (
+          email: string,
+          credential: string,
+        ) => Promise<ActionResult>;
+        testAccount: (email: string) => Promise<ActionResult>;
       };
       capabilities: {
         permissions: () => Promise<CapabilityPermissions>;

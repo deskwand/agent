@@ -20,6 +20,11 @@ interface Props {
   /** 中止正在进行的授权 —— 否则用户只能干等回调超时。 */
   onCancel: (instanceId: string) => void;
   onToggle: (instanceId: string, enabled: boolean) => void;
+  /** 邮箱卡片：跑一次连通性测试（账号级 —— 收到的 id 是邮箱地址）。 */
+  /** 仅邮箱卡片需要；其它来源的卡片不传，所以是可选的。 */
+  onTestMailbox?: (email: string) => void;
+  /** 邮箱卡片：请求删除这个账号。视图负责弹确认框，卡片不发 IPC。 */
+  onRemoveMailbox?: (email: string) => void;
 }
 
 /**
@@ -76,13 +81,18 @@ export function ConnectorCard({
   onAuthorize,
   onCancel,
   onToggle,
+  onTestMailbox,
+  onRemoveMailbox,
 }: Props) {
   const { t } = useTranslation();
   const instance = entry.instances[0];
+  // 邮箱卡片画「测试/删除」，不是能力开关：邮箱条目的 transport 也是 stdio，
+  // 但它的动作是**账号级**的 —— 开关会去启停整台 Mail server。
+  const isMailbox = entry.source === "mail";
   // 本机（stdio）卡片画开关，远程（http）画连接/移除。
   // 判据用 **entry 级** 的 transport —— 未添加的内置条目 instances 为空，
   // 那时也要画对动作。
-  const isCapability = entry.transport === "stdio";
+  const isCapability = entry.transport === "stdio" && !isMailbox;
   /** 没有实例 = 还没添加过，视为关闭；开关照样可点。 */
   const capabilityOn = !!instance && instance.status.kind !== "off";
   const name = t(entry.nameKey);
@@ -163,6 +173,8 @@ export function ConnectorCard({
       onAuthorize,
       onCancel,
       onToggle,
+      onTestMailbox,
+      onRemoveMailbox,
     })
   );
 
@@ -202,8 +214,14 @@ export function ConnectorCard({
             <FirstPartyServiceIcon />
           </span>
         ) : (
-          <span className="text-sm font-bold text-accent">
-            {name.slice(0, 1).toUpperCase()}
+          // `avatarMark` 是厂商标记（163 / 126 / iC），最多 3 个字符，**不能截断**；
+          // 3 个字符按 text-sm 会溢出 24px 的图形区，所以这一支用小一号字。
+          // 没有标记时才回退显示名首字母 —— 邮箱条目的显示名就是邮箱地址，
+          // 首字母只会让每个邮箱看起来一样。
+          <span
+            className={`${entry.avatarMark ? "text-[11px]" : "text-sm"} font-bold text-accent`}
+          >
+            {entry.avatarMark ?? name.slice(0, 1).toUpperCase()}
           </span>
         )}
       </div>
@@ -236,6 +254,8 @@ function renderAction(
     onAuthorize: (id: string) => void;
     onCancel: (id: string) => void;
     onToggle: (instanceId: string, enabled: boolean) => void;
+    onTestMailbox?: (email: string) => void;
+    onRemoveMailbox?: (email: string) => void;
   },
 ) {
   // **stdio（本机进程）只给「启用/停用」**，不给「连接/移除」：
@@ -245,6 +265,32 @@ function renderAction(
     "px-2.5 py-1 text-xs rounded-control bg-accent text-white hover:bg-accent-hover transition-colors whitespace-nowrap";
   const ghost =
     "px-2.5 py-1 text-xs rounded-control border border-border text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap";
+
+  // **邮箱的动作是账号级的**：所有邮箱条目共用 `serverName: "Mail"`，
+  // 走 registry 的「移除」会把整台 Mail server（连同其它邮箱）一起删掉。
+  // 删除也不在这里直接发 IPC —— 先由视图弹确认框（重新添加得去服务商网站
+  // 重新生成授权码，不能像目录条目那样一键加回）。
+  if (entry.source === "mail") {
+    const account = instance?.id ?? entry.serverName;
+    return (
+      <>
+        <button
+          type="button"
+          className={ghost}
+          onClick={() => handlers.onTestMailbox?.(account)}
+        >
+          {t("connectors.action.test")}
+        </button>
+        <button
+          type="button"
+          className={ghost}
+          onClick={() => handlers.onRemoveMailbox?.(account)}
+        >
+          {t("connectors.action.removeMailbox")}
+        </button>
+      </>
+    );
+  }
 
   // 规则：只要已添加，就保留删除配置和已存凭据的入口（「移除」）。
   // 之前 `connecting` 只给一个禁用按钮 —— 用户不能取消、不能重试、不能断开，

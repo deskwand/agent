@@ -47,6 +47,16 @@ const MSG: Record<Locale, MessageTable> = {
     "goal.hoursMinutes": "{{h}} 小时 {{m}} 分钟",
     "goal.tokensTenThousands": "{{n}}万 tokens",
 
+    // ── mail connections ──
+    "mail.unsafeLogin": "服务端拒绝了登录（Unsafe Login）。请更新应用后重试。",
+    "mail.imapAuthFailed":
+      "认证失败。{{host}} 的密码栏要填授权码或应用专用密码，不是登录密码。",
+    "mail.imapUnreachable":
+      "连不上 {{host}}:{{port}}，请检查网络或服务商是否关闭了 IMAP 服务。",
+    "mail.imapTlsFailed": "与 {{host}} 的 TLS 握手失败，请联系支持。",
+    "mail.smtpAuthFailed":
+      "发信认证失败。{{host}} 用的密码应与收信相同（授权码 / 应用专用密码）。",
+
     // ── model error messages ──
     "errors.modelTimeout": "模型响应超时，请稍后重试或检查模型/网关负载。",
     "errors.emptyResult":
@@ -146,6 +156,18 @@ const MSG: Record<Locale, MessageTable> = {
     "goal.hoursOne": "1 hour",
     "goal.hoursMinutes": "{{h}}h {{m}}m",
     "goal.tokensTenThousands": "{{k}}K tokens",
+
+    // ── mail connections ──
+    "mail.unsafeLogin":
+      "The server refused the login (Unsafe Login). Update the app and try again.",
+    "mail.imapAuthFailed":
+      "Authentication failed. The password field for {{host}} needs an authorization code or app password, not your login password.",
+    "mail.imapUnreachable":
+      "Cannot reach {{host}}:{{port}}. Check your network, or whether the provider disabled IMAP.",
+    "mail.imapTlsFailed":
+      "The TLS handshake with {{host}} failed. Please contact support.",
+    "mail.smtpAuthFailed":
+      "Sending authentication failed. {{host}} expects the same password as receiving (an authorization code or app password).",
 
     // ── model error messages ──
     "errors.modelTimeout":

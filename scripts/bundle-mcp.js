@@ -31,6 +31,11 @@ const servers = [
     entry: 'software-dev-server-example.ts',
     description: 'Software Development MCP Server',
   },
+  {
+    name: 'mail-server',
+    entry: 'mail-server.ts',
+    description: 'Mail MCP Server',
+  },
 ];
 
 const NODE_EXTERNALS = [

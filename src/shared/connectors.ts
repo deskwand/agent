@@ -12,7 +12,11 @@
 
 import type { CatalogAuth, CatalogCategory } from "./mcp-catalog";
 
-export type ConnectorSourceId = "mcp-remote" | "mcp-builtin" | "mcp-custom";
+export type ConnectorSourceId =
+  | "mcp-remote"
+  | "mcp-builtin"
+  | "mcp-custom"
+  | "mail";
 
 export type ConnectorStatus =
   | { kind: "ready" }
@@ -74,6 +78,13 @@ export interface ConnectorEntry {
    */
   auth?: CatalogAuth;
   instances: ConnectorInstance[];
+  /**
+   * 头像上画的两字标记（目前只有邮箱用它）。
+   *
+   * **为什么不能靠 `serverName`**：所有邮箱条目的 `serverName` 都是 `"Mail"` ——
+   * 按 server 名去取厂商图标只会让每个邮箱长得一样。留空则回退到名字首字母。
+   */
+  avatarMark?: string;
 }
 
 export interface ActionResult {

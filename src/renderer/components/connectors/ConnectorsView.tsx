@@ -6,6 +6,7 @@ import {
   type CatalogCategory,
 } from "../../../shared/mcp-catalog";
 import { AddServerDialog } from "./AddServerDialog";
+import { MailAccountDialog } from "./MailAccountDialog";
 import { ConnectorCard } from "./ConnectorCard";
 import { KeyDialog } from "./KeyDialog";
 import { SettingsSkills } from "../settings/SettingsSkills";
@@ -15,12 +16,16 @@ import { useAppStore } from "../../store";
 
 type TabId = "connect" | "skills" | "plugins";
 
-/** 分段与 chip 的分组 id：目录的 5 个分类 + 视图层的 `other`（用户自建）。
+/** 分段与 chip 的分组 id：目录的 5 个分类 + 邮箱 + 视图层的 `other`（用户自建）。
  *  放在模块级 —— 类型与顺序都是常量，放进组件体会每次渲染重建。 */
-type GroupId = CatalogCategory | "other";
-const GROUP_ORDER: readonly GroupId[] = [...CATEGORY_ORDER, "other"];
+type GroupId = CatalogCategory | "mail" | "other";
+/** `mail` 在最前：邮箱是**你自己的账号**，目录段是「可以加的服务」——发现与拥有不是一回事。 */
+const GROUP_ORDER: readonly GroupId[] = ["mail", ...CATEGORY_ORDER, "other"];
+/** 邮箱条目没有 `category`，若只按 `entry.category ?? "other"` 分组，
+ *  张三的 QQ 邮箱会和用户手搓的 `my-tools` 一起躺进「自建服务」段 —— 页面不报错，
+ *  只是位置错了。所以这里按 `source` 再分流一次。 */
 const groupKeyOf = (entry: ConnectorEntry): GroupId =>
-  entry.category ?? "other";
+  entry.category ?? (entry.source === "mail" ? "mail" : "other");
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -40,8 +45,13 @@ export function ConnectorsView() {
   const entriesRef = useRef(entries);
   entriesRef.current = entries;
   const [addOpen, setAddOpen] = useState(false);
+  /** 「添加」下面的两项菜单（MCP / 邮箱）。false = 菜单收起。 */
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
+  const [mailOpen, setMailOpen] = useState(false);
   /** 正在填凭据的 key 型条目。null = 对话框关闭。 */
   const [keyEntry, setKeyEntry] = useState<ConnectorEntry | null>(null);
+  /** 等用户在确认框里点头的待删除邮箱（邮箱地址）。null = 没有确认框。 */
+  const [pendingRemove, setPendingRemove] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   /**
@@ -121,6 +131,16 @@ export function ConnectorsView() {
       void refresh();
     });
   }, [refresh]);
+
+  // 菜单收起要能用 Esc —— 它盖在列表上，没有键盘出口时只能靠再点一次「添加」。
+  useEffect(() => {
+    if (!addMenuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAddMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [addMenuOpen]);
 
   // 连接页只装**外部服务**（目录条目 + 用户自建）。应用自带的能力（Computer Use）
   // 住在设置的「能力」里 —— 它的数据仍由 registry.list() 产出，只是不在这里渲染。
@@ -286,6 +306,52 @@ export function ConnectorsView() {
     [refresh, t, reportIfPending],
   );
 
+  /**
+   * 邮箱的「删除」只开确认框，**不在这里发 IPC**。
+   * 目录条目删了能一键加回，邮箱不行 —— 重新添加要去服务商网站再捞一个
+   * 16 位授权码。所以删除必须先过用户那关。
+   */
+  const onRemoveMailbox = useCallback((email: string) => {
+    setError("");
+    setNotice("");
+    setPendingRemove(email);
+  }, []);
+
+  /** 确认后才会走到这里 —— 删的是账号，不是 `Mail` 这台 server。 */
+  const confirmRemoveMailbox = useCallback(
+    async (email: string) => {
+      setPendingRemove(null);
+      setError("");
+      setNotice("");
+      try {
+        const res = await window.electronAPI.mail.removeAccount(email);
+        if (!res.ok) setError(res.error ?? t("connectors.removeFailed"));
+      } catch {
+        setError(t("connectors.removeFailed"));
+      } finally {
+        await refresh();
+      }
+    },
+    [refresh, t],
+  );
+
+  /** 测试写回 `lastCheck`，所以跑完刷新列表 —— 卡片状态行就是它的结果。 */
+  const onTestMailbox = useCallback(
+    async (email: string) => {
+      setError("");
+      setNotice("");
+      try {
+        const res = await window.electronAPI.mail.testAccount(email);
+        if (!res.ok) setError(res.error ?? t("connectors.mail.testFailed"));
+      } catch {
+        setError(t("connectors.mail.testFailed"));
+      } finally {
+        await refresh();
+      }
+    },
+    [refresh, t],
+  );
+
   const tabs: Array<[TabId, string]> = [
     ["connect", t("connectors.tab.connect")],
     ["skills", t("connectors.tab.skills")],
@@ -386,13 +452,60 @@ export function ConnectorsView() {
                     {added.length}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAddOpen(true)}
-                  className="px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
-                >
-                  {t("connectors.action.add")}
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={addMenuOpen}
+                    onClick={() => setAddMenuOpen((v) => !v)}
+                    className="px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
+                  >
+                    {t("connectors.action.add")}
+                  </button>
+                  {/* 菜单**绝对定位**在按钮下方：工具栏是 flex-wrap，
+                      参与布局的菜单会把 chip 挤到下一行（工具栏自己会跳一下）。 */}
+                  {addMenuOpen && (
+                    <div
+                      role="menu"
+                      className="absolute right-0 top-full mt-1 z-20 w-[210px] bg-surface border border-border rounded-xl shadow-elevated overflow-hidden"
+                    >
+                      <button
+                        type="button"
+                        role="menuitem"
+                        data-testid="add-mcp"
+                        onClick={() => {
+                          setAddMenuOpen(false);
+                          setAddOpen(true);
+                        }}
+                        className="w-full text-left px-3 py-2.5 hover:bg-surface-hover transition-colors"
+                      >
+                        <span className="block text-sm font-semibold text-text-primary">
+                          {t("connectors.addMenu.server")}
+                        </span>
+                        <span className="block text-xs text-text-muted">
+                          {t("connectors.addMenu.serverHint")}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        data-testid="add-mail"
+                        onClick={() => {
+                          setAddMenuOpen(false);
+                          setMailOpen(true);
+                        }}
+                        className="w-full text-left px-3 py-2.5 border-t border-border-muted hover:bg-surface-hover transition-colors"
+                      >
+                        <span className="block text-sm font-semibold text-text-primary">
+                          {t("connectors.addMenu.mailbox")}
+                        </span>
+                        <span className="block text-xs text-text-muted">
+                          {t("connectors.addMenu.mailboxHint")}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 筛选开着且一条都没有：必须给出口 —— 此时既没有卡片可点，
@@ -437,6 +550,8 @@ export function ConnectorsView() {
                         onAuthorize={onAuthorize}
                         onCancel={onCancel}
                         onToggle={onToggle}
+                        onTestMailbox={onTestMailbox}
+                        onRemoveMailbox={onRemoveMailbox}
                       />
                     ))}
                   </div>
@@ -455,11 +570,50 @@ export function ConnectorsView() {
         onClose={() => setAddOpen(false)}
         onAdded={() => void refresh()}
       />
+      <MailAccountDialog
+        isOpen={mailOpen}
+        onClose={() => setMailOpen(false)}
+        onAdded={() => void refresh()}
+      />
       <KeyDialog
         entry={keyEntry}
         onClose={() => setKeyEntry(null)}
         onConnected={onKeyConnected}
       />
+
+      {/* 删除邮箱的确认框。内联渲染在这里（而不是卡片里）——
+          一个页面同时只会有一个待删邮箱，状态放视图层就不会有多份。 */}
+      {pendingRemove && (
+        <div
+          data-testid="mail-remove-confirm"
+          className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in"
+        >
+          <div className="card w-full max-w-sm p-5 m-4 shadow-elevated animate-slide-up">
+            <p className="text-sm font-medium text-text-primary">
+              {t("connectors.mail.removeConfirmTitle")}
+            </p>
+            <p className="text-xs text-text-muted mt-1">
+              {t("connectors.mail.removeConfirmBody", { email: pendingRemove })}
+            </p>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setPendingRemove(null)}
+                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmRemoveMailbox(pendingRemove)}
+                className="px-3 py-1.5 rounded-lg bg-error/10 text-error hover:bg-error/20 text-sm font-medium transition-colors"
+              >
+                {t("connectors.action.removeMailbox")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

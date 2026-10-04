@@ -2111,6 +2111,8 @@
       "authorizedHint": "下次对话时连接"
     },
     "action": {
+      "test": "测试",
+      "removeMailbox": "删除",
       "connect": "连接",
       "disconnect": "断开",
       "reauthorize": "重新授权",
@@ -2251,6 +2253,7 @@
       "computerUseDesc": "看屏幕并操作鼠标键盘"
     },
     "summary": {
+      "mailbox": "邮箱",
       "remote": "远端服务",
       "local": "本机 stdio"
     },
@@ -2275,6 +2278,7 @@
       "storageHint": "凭据会以明文存在本机 mcp.json 里。"
     },
     "category": {
+      "mail": "邮箱",
       "all": "全部",
       "dev": "开发与运维",
       "collab": "团队协作",
@@ -2282,6 +2286,17 @@
       "ai": "AI 与检索",
       "life": "生活",
       "other": "自建服务"
+    },
+    "mail": {
+      "testFailed": "测试失败",
+      "removeConfirmTitle": "删除这个邮箱？",
+      "removeConfirmBody": "{{email}} 的授权码会一并删除。重新添加需要回服务商网页再取一次授权码。"
+    },
+    "addMenu": {
+      "server": "外部服务（MCP）",
+      "serverHint": "粘贴 mcp.json 片段，或填一个远端 URL",
+      "mailboxHint": "QQ / 163 / Gmail / iCloud 等",
+      "mailbox": "邮箱"
     },
     "filter": {
       "added": "已接入",
@@ -2294,5 +2309,62 @@
       "plugins": "插件"
     },
     "removeFailed": "移除失败"
+  },
+  "mail": {
+    "provider": {
+      "qq": {
+        "name": "QQ 邮箱 / Foxmail",
+        "credential": "16 位授权码",
+        "hint": "第三方客户端不能用 QQ 密码。去邮箱「设置 · 账号与安全」开启 POP3/IMAP/SMTP 服务并生成授权码。"
+      },
+      "netease-163": {
+        "name": "网易 163 邮箱",
+        "credential": "16 位授权码",
+        "hint": "去邮箱「设置 · POP3/SMTP/IMAP」开启服务并生成授权码，密码栏填授权码而不是登录密码。"
+      },
+      "netease-126": {
+        "name": "网易 126 邮箱",
+        "credential": "16 位授权码",
+        "hint": "与 163 相同：先去「设置 · POP3/SMTP/IMAP」开启服务，再生成授权码。"
+      },
+      "exmail": {
+        "name": "腾讯企业邮",
+        "credential": "客户端专用密码",
+        "hint": "需要两步：管理员在企业微信后台开「IMAP/SMTP 服务范围」并把你加进去；然后你在邮箱「设置 · 邮箱绑定」开启安全登录并生成 16 位专用密码。"
+      },
+      "aliyun": {
+        "name": "阿里云邮",
+        "credential": "客户端安全密码",
+        "hint": "先让管理员在后台开启「三方客户端登录权限」。若管理员开了三方客户端安全密码，密码栏要填专用密码而不是登录密码。"
+      },
+      "gmail": {
+        "name": "Gmail",
+        "credential": "应用专用密码（16 位）",
+        "hint": "Gmail 已停用普通密码登录。先在 Google 账号里开启两步验证，再生成应用专用密码。"
+      },
+      "icloud": {
+        "name": "iCloud 邮件",
+        "credential": "App 专用密码",
+        "hint": "在 Apple 账号里生成 App 专用密码（需先开双重认证）。iCloud 的收信用户名可能是地址 @ 前的部分，连接时会自动两种都试。"
+      },
+      "custom": {
+        "name": "自定义 IMAP/SMTP",
+        "credential": "密码 / 授权码",
+        "hint": "填服务商给的 IMAP 与 SMTP 主机。多数服务商要求用授权码而不是登录密码。"
+      }
+    },
+    "dialog": {
+      "title": "添加邮箱",
+      "providerHint": "选择你的邮箱服务商",
+      "back": "返回",
+      "email": "邮箱地址",
+      "credentialPlaceholder": "授权码 / 应用专用密码",
+      "imapHost": "IMAP 主机",
+      "smtpHost": "SMTP 主机",
+      "consoleLink": "去服务商页面获取凭据",
+      "submit": "连接并添加",
+      "failed": "添加失败",
+      "customHostsRequired": "自定义服务商必须填 IMAP 与 SMTP 主机"
+    }
   }
 }

@@ -114,6 +114,10 @@ import {
   setMcpAgentDir,
 } from "./mcp/mcp-client-extension";
 import { registerConnectorsIpc } from "./connectors";
+import { registerMailIpc } from "./mail/ipc";
+import { connectAndTest } from "./mail/connect";
+import { removeServer, upsertServer } from "./connectors/mcp-config-file";
+import { resolveMcpServerPath } from "./connectors/builtin-presets";
 import { registerCapabilitiesIpc } from "./capabilities";
 import { initStatusStore } from "./connectors/status-store";
 import { registerVoiceIpc } from "./voice/ipc";
@@ -2902,6 +2906,23 @@ registerConnectorsIpc({
     }
   },
   activateMcpServer: (name, config) => activateDeskwandMcpServer(name, config),
+});
+
+// 邮箱：账号级 IPC。与连接页共用 `mcp.json`，但删一个邮箱走的是账号通道 ——
+// 按 server 名路由会把整个 `Mail` server 一起删掉。
+registerMailIpc({
+  ipcMain,
+  agentDir: piAgentDir,
+  activateMcpServer: (name, config) => activateDeskwandMcpServer(name, config),
+  connect: connectAndTest,
+  upsertServer,
+  removeServer,
+  resolveServerScript: () => resolveMcpServerPath("mail-server.ts"),
+  sendToRenderer: (channel, ...args) => {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(channel, ...args);
+    }
+  },
 });
 
 // 能力的 IPC：目前只有 Computer Use 的 macOS 权限查询与跳转系统设置。
