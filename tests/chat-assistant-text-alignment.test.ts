@@ -25,6 +25,20 @@ describe("assistant text alignment with tool-call groups", () => {
     expect(source).toContain("message-user-text text-text-primary");
   });
 
+  // 元数据行（时间戳 / 复制 / 朗读 / 分叉）原本顶到列的 0 位，比正文左 4px。
+  // 独立成行的 tool_use / thinking 与卡片边框仍停在 0 位，属另一件事。
+  it("keeps the assistant action bar on the same 4px step", () => {
+    const source = readRendererSource("components/MessageCard.tsx");
+
+    expect(source).toContain('{renderActionBar("pl-1")}');
+    // 用户气泡里的操作栏靠右对齐，不参与这条左边缘台阶。
+    expect(source).toContain('{renderActionBar("mt-0.5")}');
+    // 两个调用点都在时还要看顺序：把它们对调（用户气泡拿 pl-1）也必须是红的。
+    expect(source.indexOf('{renderActionBar("pl-1")}')).toBeGreaterThan(
+      source.indexOf('{renderActionBar("mt-0.5")}'),
+    );
+  });
+
   it("keeps the tool-call group headers on the same 4px step", () => {
     const sources = [
       "components/message/ProcessSummaryBlock.tsx",

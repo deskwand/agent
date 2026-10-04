@@ -583,7 +583,8 @@ export const MessageCard = memo(function MessageCard({
               isLatestRound={isLatestRound}
             />
           ) : null}
-          {renderActionBar()}
+          {/* 与正文同一个 4px 台阶：元数据行不能伸出正文左边缘。 */}
+          {renderActionBar("pl-1")}
         </div>
       )}
     </div>
