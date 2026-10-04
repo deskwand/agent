@@ -86,6 +86,10 @@ win:
     # Voice runtime/model download coordinates (URL + sha256 only).
     - from: resources/voice-runtime.json
       to: voice-runtime.json
+    # Silero VAD 模型（643KB，MIT）。随包而非下载：见 runtime-spec.ts 的注释。
+    # sha256: 9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6
+    - from: resources/silero_vad.onnx
+      to: silero_vad.onnx
     - from: .deskwand/skills
       to: skills
 mac:
@@ -117,6 +121,10 @@ mac:
     # Voice runtime/model download coordinates (URL + sha256 only).
     - from: resources/voice-runtime.json
       to: voice-runtime.json
+    # Silero VAD 模型（643KB，MIT）。随包而非下载：见 runtime-spec.ts 的注释。
+    # sha256: 9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6
+    - from: resources/silero_vad.onnx
+      to: silero_vad.onnx
     - from: .deskwand/skills
       to: skills
 
@@ -140,6 +148,10 @@ linux:
     # Voice runtime/model download coordinates (URL + sha256 only).
     - from: resources/voice-runtime.json
       to: voice-runtime.json
+    # Silero VAD 模型（643KB，MIT）。随包而非下载：见 runtime-spec.ts 的注释。
+    # sha256: 9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6
+    - from: resources/silero_vad.onnx
+      to: silero_vad.onnx
     - from: .deskwand/skills
       to: skills
 

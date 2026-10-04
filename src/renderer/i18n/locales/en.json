@@ -139,8 +139,8 @@
       },
       "voiceMode": {
         "title": "Voice conversation",
-        "desc": "How long a pause counts as end of speech. Too short cuts people off mid-sentence; too long feels sluggish.",
-        "silenceLabel": "End-of-speech silence",
+        "desc": "After you stop speaking, wait up to this long. If the sentence looks unfinished, keep waiting.",
+        "silenceLabel": "Wait up to",
         "silenceValue": "{{ms}} ms"
       }
     },
@@ -1162,7 +1162,7 @@
   "voiceMode": {
     "entry": "Start voice conversation",
     "exit": "Exit voice conversation",
-    "stateCalibrating": "Listening to the room…",
+    "stateCalibrating": "Starting…",
     "stateListening": "I'm listening",
     "stateCapturing": "Transcribing",
     "stateThinking": "Thinking",

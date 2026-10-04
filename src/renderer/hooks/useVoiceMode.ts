@@ -105,6 +105,8 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
 
     let lastAnswer = "";
     let idleTicks = 0;
+    /** 本轮 ASR 的实时 partial。轮次判定要读它，而它只在本次 effect 里活着。 */
+    let latestTranscript = "";
     /** 已就"本轮没有文本"收过尾，避免每 120ms 重复收一次。 */
     let closedEmpty = false;
 
@@ -117,20 +119,50 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
         cancel: (id) => window.electronAPI.voice.cancel(id),
         onEvent: (cb) => window.electronAPI.voice.onEvent(cb),
       },
+      monitor: {
+        start: () => {
+          void window.electronAPI.voice.monitorStart();
+        },
+        audio: (pcm) => {
+          void window.electronAPI.voice.monitorAudio(
+            pcm.buffer.slice(
+              pcm.byteOffset,
+              pcm.byteOffset + pcm.byteLength,
+            ) as ArrayBuffer,
+          );
+        },
+        profile: (profile) => {
+          void window.electronAPI.voice.monitorProfile(profile);
+        },
+        reset: () => {
+          void window.electronAPI.voice.monitorReset();
+        },
+        stop: () => {
+          void window.electronAPI.voice.monitorStop();
+        },
+      },
       speech,
       sendQuestion: (text) => optionsRef.current.sendQuestion(text),
       silenceMs:
         useAppStore.getState().appConfig?.voiceMode?.silenceMs ??
         DEFAULT_VOICE_MODE.silenceMs,
+      // ASR partial 不存在 store 里（store 的 partialByTurn 是**回答**的流式
+      // 文本，readAnswer 读的就是它）。问题的 partial 只经过 onTranscript
+      // 落在本 hook 的 state 里，所以用一个闭包变量回喂。
+      currentPartial: () => latestTranscript,
       onState: (state) => patch({ state }),
       onLevel: (level) => patch({ level }),
-      onTranscript: (transcript) => patch({ transcript }),
+      onTranscript: (transcript) => {
+        latestTranscript = transcript;
+        patch({ transcript });
+      },
       onQuestion: () => {
         // 新一轮开始：清掉上一轮的字幕与错误，解除"空轮次已收尾"。
         patch({ transcript: "", answer: "", error: null });
         lastAnswer = "";
         idleTicks = 0;
         closedEmpty = false;
+        latestTranscript = "";
       },
       onSentence: () => {},
       onError: (error) => patch({ error }),

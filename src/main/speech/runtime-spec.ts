@@ -35,3 +35,19 @@ export function readRuntimeSpec(): VoiceRuntimeSpec {
 export function runtimeKey(): string {
   return `${process.platform}-${process.arch}`;
 }
+
+/**
+ * 随包发布的模型文件（`resources/` 下的二进制）。
+ *
+ * 与 `specPath()` 用同一个路径锚点：打包后 `process.resourcesPath` 是
+ * extraResources 的根，开发时是仓库根。区别是前者读 JSON 坐标，这里读二进制。
+ *
+ * 为什么 VAD 模型随包而 ASR/TTS 模型走下载：前者实测 643KB，后者 128MB 起。
+ * 几百 KB 换掉一整条「装没装」的状态判断，以及「ASR 装了但 VAD 没装」这个
+ * 失败态，划算。
+ */
+export function readBundledModelPath(name: string): string {
+  return app.isPackaged
+    ? join(process.resourcesPath, name)
+    : join(app.getAppPath(), "resources", name);
+}

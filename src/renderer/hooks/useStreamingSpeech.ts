@@ -20,7 +20,14 @@ export interface StreamingSpeechDeps {
 }
 
 export interface StreamingSpeech {
-  begin(): void;
+  /**
+   * 开始一轮朗读。
+   *
+   * `fromCharOffset` 是**累计全量文本**里的字符偏移：打断后恢复朗读时用它
+   * 跳过已经念过的部分。句子流只看偏移之后的内容，所以索引从 0 重新排也不
+   * 影响外部 —— 调用方只认 `onSentence` 回传的文本。
+   */
+  begin(fromCharOffset?: number): void;
   push(fullText: string): void;
   end(): void;
   stop(): void;
@@ -46,6 +53,8 @@ export function createStreamingSpeech(
   let waitingTail = false;
   let nextToEnqueue = 0;
   let failures = 0;
+  /** 本轮忽略前多少个字符。见 begin 的说明。 */
+  let offset = 0;
 
   const ready = new Map<
     number,
@@ -121,7 +130,7 @@ export function createStreamingSpeech(
   };
 
   return {
-    begin() {
+    begin(fromCharOffset = 0) {
       generation += 1;
       queue.stop();
       stream = createSentenceStream();
@@ -132,10 +141,14 @@ export function createStreamingSpeech(
       waitingTail = false;
       nextToEnqueue = 0;
       failures = 0;
+      offset = fromCharOffset;
     },
     push(fullText) {
       if (ended) return;
-      for (const text of stream.push(fullText)) addSentence(text);
+      // 偏移在这里切，不在调用方：调用方永远交**累计全文**，一个入口一个语义。
+      // 句子流的 consumed 是单调的，而 `slice(offset)` 对同一份前缀也单调，
+      // 两者一致。
+      for (const text of stream.push(fullText.slice(offset))) addSentence(text);
     },
     end() {
       if (ended) return;

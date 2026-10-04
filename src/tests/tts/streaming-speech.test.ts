@@ -108,4 +108,45 @@ describe("createStreamingSpeech", () => {
     fireDrained();
     expect(onDrained).toHaveBeenCalledTimes(1);
   });
+  // 打断后恢复朗读：已经念过的部分不能重念。"第一句。" 占 4 个字符，
+  // 所以从偏移 4 恢复应当只念第二句。
+  it("begin 带偏移时只念偏移之后的部分", async () => {
+    const { queue } = fakeQueue();
+    const spoken: string[] = [];
+    const speech = createStreamingSpeech({
+      speak: async (t: string): Promise<TtsSpeakResult> => {
+        spoken.push(t);
+        return ok(t);
+      },
+      createQueue: () => queue,
+    });
+
+    speech.begin(4);
+    speech.push("第一句。第二句。");
+    speech.end();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(spoken).toEqual(["第二句。"]);
+  });
+
+  it("不带偏移时从头念（默认行为不变）", async () => {
+    const { queue } = fakeQueue();
+    const spoken: string[] = [];
+    const speech = createStreamingSpeech({
+      speak: async (t: string): Promise<TtsSpeakResult> => {
+        spoken.push(t);
+        return ok(t);
+      },
+      createQueue: () => queue,
+    });
+
+    speech.begin();
+    speech.push("第一句。第二句。");
+    speech.end();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(spoken).toEqual(["第一句。", "第二句。"]);
+  });
 });

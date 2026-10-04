@@ -39,6 +39,7 @@ import type {
   PickerStartResult,
 } from "../shared/ipc-types";
 import type {
+  VadProfile,
   VoiceEvent,
   VoiceInstallState,
   VoicePolishedResult,
@@ -938,6 +939,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("voice.stop", sessionId),
     cancel: (sessionId: string): Promise<void> =>
       ipcRenderer.invoke("voice.cancel", sessionId),
+    // ── 语音活动监测（无 sessionId）──────────────────────────────
+    // 与 pushAudio 分开：VAD 在朗读期也要跑，那时没有 ASR 会话。
+    monitorStart: (): Promise<void> => ipcRenderer.invoke("voice.monitorStart"),
+    monitorAudio: (pcm: ArrayBuffer): Promise<void> =>
+      ipcRenderer.invoke("voice.monitorAudio", pcm),
+    monitorProfile: (profile: VadProfile): Promise<void> =>
+      ipcRenderer.invoke("voice.monitorProfile", profile),
+    monitorReset: (): Promise<void> => ipcRenderer.invoke("voice.monitorReset"),
+    monitorStop: (): Promise<void> => ipcRenderer.invoke("voice.monitorStop"),
     polish: (
       text: string,
       sessionId: string | null,
@@ -1631,6 +1641,11 @@ declare global {
         pushAudio: (sessionId: string, pcm: ArrayBuffer) => Promise<void>;
         stop: (sessionId: string) => Promise<void>;
         cancel: (sessionId: string) => Promise<void>;
+        monitorStart: () => Promise<void>;
+        monitorAudio: (pcm: ArrayBuffer) => Promise<void>;
+        monitorProfile: (profile: VadProfile) => Promise<void>;
+        monitorReset: () => Promise<void>;
+        monitorStop: () => Promise<void>;
         polish: (
           text: string,
           sessionId: string | null,

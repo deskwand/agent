@@ -11,6 +11,7 @@
 import { ipcMain, systemPreferences } from "electron";
 import { randomUUID } from "node:crypto";
 import type {
+  VadProfile,
   VoiceEvent,
   VoiceInstallState,
   VoicePolishedResult,
@@ -33,8 +34,14 @@ import {
   removeVoiceModel,
   voiceRoot,
 } from "../speech/installer";
-import { readRuntimeSpec, runtimeKey } from "../speech/runtime-spec";
+import {
+  readRuntimeSpec,
+  readBundledModelPath,
+  runtimeKey,
+} from "../speech/runtime-spec";
 import { polishTranscriptWithAgentSdk } from "./transcript-polish";
+import { createVadEngine, type VadEngine } from "./vad-engine";
+import { loadSherpaWrapper, type SherpaWrapper } from "./sherpa-wrapper";
 
 export interface VoiceIpcOptions {
   sendEvent: (event: VoiceEvent) => void;
@@ -90,6 +97,13 @@ export function registerVoiceIpc({
    * 重建它就会把每条录音的延迟打回两秒多。
    */
   let engine: LocalTranscriptionEngine | null = null;
+
+  /**
+   * VAD 引擎。生命周期是**语音模式**，不是 ASR 会话 —— 朗读期没有会话，
+   * 而那时正是要判断"用户开口没有"的时刻。所以它不放进 `sessions` 表。
+   */
+  let vadEngine: VadEngine | null = null;
+  let vadWrapper: SherpaWrapper | null = null;
 
   const pushInstallState = (next: Partial<VoiceInstallState>): void => {
     installState = { ...installState, ...next };
@@ -171,6 +185,54 @@ export function registerVoiceIpc({
 
   ipcMain.handle("voice.cancel", (_event, sessionId: string) => {
     drop(sessionId)?.abort();
+  });
+
+  // ── 语音活动监测（无 sessionId）────────────────────────────────────────
+  // 与上面的会话通道分开：VAD 在朗读期也要跑，那时没有 ASR 会话。
+
+  ipcMain.handle("voice.monitorStart", () => {
+    if (vadEngine) return;
+    try {
+      vadWrapper ??= loadSherpaWrapper(
+        voiceRoot(userDataPath),
+        RUNTIME_VERSION,
+      );
+      const wrapper = vadWrapper;
+      vadEngine = createVadEngine({
+        modelPath: readBundledModelPath("silero_vad.onnx"),
+        createVad: (config) => new wrapper.Vad(config, 5),
+        onEdge: (edge) => sendEvent({ type: "vad", edge }),
+      });
+    } catch (error) {
+      // 模型随包发布，所以不存在"缺失"这个状态；这里唯一能失败的是**加载**
+      // （运行时版本不匹配、文件损坏）。失败就让它保持 null，后续 monitorAudio
+      // 变成空操作，用户看到的是"说了没反应"。细节只进日志 —— 渲染层没有
+      // 对应错误码，新增一个要动 VoiceErrorCode 与两份 locale，而这是个
+      // 启动期一次性失败，不值得为它开路。
+      logWarn("[Voice] vad engine init failed:", error);
+      vadEngine = null;
+    }
+  });
+
+  ipcMain.handle("voice.monitorAudio", (_event, pcm: ArrayBuffer) => {
+    if (!vadEngine) return;
+    if (!(pcm instanceof ArrayBuffer)) return;
+    vadEngine.push(new Int16Array(pcm));
+  });
+
+  ipcMain.handle("voice.monitorProfile", (_event, profile: VadProfile) => {
+    if (!vadEngine) return;
+    if (profile !== "interactive" && profile !== "barge-in") return;
+    vadEngine.setProfile(profile);
+  });
+
+  ipcMain.handle("voice.monitorReset", () => {
+    vadEngine?.reset();
+  });
+
+  ipcMain.handle("voice.monitorStop", () => {
+    vadEngine?.reset();
+    vadEngine = null;
   });
 
   ipcMain.handle(
@@ -279,6 +341,7 @@ export function registerVoiceIpc({
     dispose: () => {
       for (const session of sessions.values()) session.abort();
       sessions.clear();
+      vadEngine = null;
     },
   };
 }

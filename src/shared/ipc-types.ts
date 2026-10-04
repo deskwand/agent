@@ -469,6 +469,12 @@ export type VoiceStartResult =
   | { ok: true; sessionId: string }
   | { ok: false; code: VoiceErrorCode };
 
+/** VAD 边沿。主进程报，渲染层消费。 */
+export type VadEdge = "speech-start" | "speech-end";
+
+/** VAD 的灵敏度档位。`barge-in` 用于回答期，对抗扬声器残留。 */
+export type VadProfile = "interactive" | "barge-in";
+
 export type VoiceInstallPhase =
   | "idle"
   | "downloading"
@@ -500,7 +506,12 @@ export type VoiceEvent =
   | { type: "partial"; sessionId: string; text: string }
   | { type: "done"; sessionId: string; text: string; discarded: boolean }
   | { type: "error"; sessionId: string; code: VoiceErrorCode; message: string }
-  | { type: "install"; state: VoiceInstallState };
+  | { type: "install"; state: VoiceInstallState }
+  /**
+   * VAD 边沿。**不带 sessionId** —— 朗读期没有 ASR 会话，而那时正是最需要
+   * 它的时刻（判断用户有没有开口打断）。渲染层的 sessionId 过滤器要为它让路。
+   */
+  | { type: "vad"; edge: VadEdge };
 
 // ---------------------------------------------------------------------------
 // TTS / read aloud（朗读）

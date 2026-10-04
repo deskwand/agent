@@ -139,8 +139,8 @@
       },
       "voiceMode": {
         "title": "语音对话",
-        "desc": "静音多久算说完。停顿时长太短会把人话里的停顿当结尾，太长则等得心焦。",
-        "silenceLabel": "静音结束时长",
+        "desc": "停下说话后最多等你这么久。判定你没说完就继续等，直到你接上话或到点收尾。",
+        "silenceLabel": "最多等待",
         "silenceValue": "{{ms}} 毫秒"
       }
     },
@@ -1161,7 +1161,7 @@
   "voiceMode": {
     "entry": "进入语音对话",
     "exit": "退出语音对话",
-    "stateCalibrating": "正在听环境…",
+    "stateCalibrating": "正在启动…",
     "stateListening": "我在听",
     "stateCapturing": "识别中",
     "stateThinking": "正在思考",

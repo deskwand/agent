@@ -1,8 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { createVoiceConversation } from "../../renderer/hooks/useVoiceConversation";
-import type { VoiceEvent } from "../../shared/ipc-types";
+import type { VadEdge, VadProfile, VoiceEvent } from "../../shared/ipc-types";
 import type { StreamingSpeech } from "../../renderer/hooks/useStreamingSpeech";
 
+/**
+ * VAD 的边沿由**主进程**给（`main/voice/vad-engine.ts`），所以测试推事件而不是
+ * 喂电平。原来那些"150ms 才触发""回答期阈值更高"的用例已经作废 —— 那些判定
+ * 搬进主进程了，这里只验"收到边沿之后状态机怎么走"。
+ */
 function harness() {
   let samplesCb: ((pcm: Int16Array, level: number) => void) | null = null;
   let voiceCb: ((event: VoiceEvent) => void) | null = null;
@@ -10,7 +15,18 @@ function harness() {
   const states: string[] = [];
   const questions: string[] = [];
   const errors: string[] = [];
+  const monitorCalls = {
+    started: 0,
+    stopped: 0,
+    resets: 0,
+    profiles: [] as VadProfile[],
+    frames: 0,
+  };
   let drainedCb: (() => void) | null = null;
+  /** 本轮 ASR 的 partial。判"说完了吗"读它。 */
+  let partial = "";
+  /** 被关闭的会话。用来验证"没说完就不关"。 */
+  const voiceStops: string[] = [];
   const speech = {
     begin: vi.fn(),
     push: vi.fn(),
@@ -33,16 +49,36 @@ function harness() {
       pushAudio: async (_id, pcm) => {
         pushed.push(pcm);
       },
-      stop: async () => {},
+      stop: async (id) => {
+        voiceStops.push(id);
+      },
       cancel: async () => {},
       onEvent: (cb) => {
         voiceCb = cb;
         return () => {};
       },
     },
+    monitor: {
+      start: () => {
+        monitorCalls.started += 1;
+      },
+      audio: () => {
+        monitorCalls.frames += 1;
+      },
+      profile: (p) => {
+        monitorCalls.profiles.push(p);
+      },
+      reset: () => {
+        monitorCalls.resets += 1;
+      },
+      stop: () => {
+        monitorCalls.stopped += 1;
+      },
+    },
     speech,
     sendQuestion: (t) => questions.push(t),
-    silenceMs: 800,
+    silenceMs: 1200,
+    currentPartial: () => partial,
     onState: (s) => states.push(s),
     onLevel: () => {},
     onTranscript: () => {},
@@ -55,10 +91,12 @@ function harness() {
     conv,
     pushed,
     states,
-    fireDrained: () => drainedCb?.(),
     questions,
     errors,
+    monitorCalls,
     speech,
+    voiceStops,
+    fireDrained: () => drainedCb?.(),
     // 每帧之间让出一个微任务：真实世界里帧间隔 100ms，会话建立（voice.start）
     // 的 await 早就完成了；测试若同步连发，会在 sessionId 还没设上时就判定静音。
     feed: async (level: number, frames = 1) => {
@@ -68,34 +106,58 @@ function harness() {
       }
     },
     voice: (event: VoiceEvent) => voiceCb?.(event),
+    /** 推一个 VAD 边沿。它不带 sessionId，与 ASR 事件走同一条通道。 */
+    vad: (edge: VadEdge) => voiceCb?.({ type: "vad", edge }),
+    /** 模拟 ASR 吐 partial。 */
+    setPartial: (text: string) => {
+      partial = text;
+    },
   };
 }
 
-async function calibrated() {
+async function started() {
   const h = harness();
   await h.conv.start();
-  await h.feed(0.02, 8); // 800ms 噪声底
   return h;
 }
 
+/** 走完一轮「开口 → 静音 → 识别出问题」，停在 answering。 */
+async function answeringRound(h: ReturnType<typeof harness>, text = "问题") {
+  h.vad("speech-start");
+  await h.feed(0.5, 1);
+  h.vad("speech-end");
+  h.voice({ type: "done", sessionId: "s1", text, discarded: false });
+}
+
 describe("createVoiceConversation", () => {
-  it("calibrates for 800ms then listens", async () => {
-    const h = await calibrated();
+  it("start 之后直接进 listening，不再有标定期", async () => {
+    const h = await started();
     expect(h.states.at(-1)).toBe("listening");
+    expect(h.monitorCalls.started).toBe(1);
   });
 
-  it("starts a round only after 150ms of speech", async () => {
-    const h = await calibrated();
-    await h.feed(0.9, 1);
+  it("speech-start 才开会话，不是听到声音就开", async () => {
+    const h = await started();
+    await h.feed(0.9, 3);
+    // 渲染层不再判电平：没有边沿就不该开会话
     expect(h.states.at(-1)).toBe("listening");
+
+    h.vad("speech-start");
     await h.feed(0.9, 1);
     expect(h.states.at(-1)).toBe("capturing");
   });
 
-  it("sends the transcript after silence and enters thinking", async () => {
-    const h = await calibrated();
+  it("每一片音频都转发给主进程的 VAD，安静时也转", async () => {
+    const h = await started();
+    await h.feed(0.02, 3);
+    expect(h.monitorCalls.frames).toBe(3);
+  });
+
+  it("静音后把问题发出去并进入 thinking", async () => {
+    const h = await started();
+    h.vad("speech-start");
     await h.feed(0.9, 3);
-    await h.feed(0.02, 8);
+    h.vad("speech-end");
     h.voice({
       type: "done",
       sessionId: "s1",
@@ -107,10 +169,11 @@ describe("createVoiceConversation", () => {
     expect(h.states.at(-1)).toBe("thinking");
   });
 
-  it("goes back to listening when nothing was recognised", async () => {
-    const h = await calibrated();
+  it("什么都没识别出来就回到 listening", async () => {
+    const h = await started();
+    h.vad("speech-start");
     await h.feed(0.9, 3);
-    await h.feed(0.02, 8);
+    h.vad("speech-end");
     h.voice({ type: "done", sessionId: "s1", text: "", discarded: false });
     expect(h.questions).toEqual([]);
     expect(h.speech.begin).not.toHaveBeenCalled();
@@ -118,84 +181,262 @@ describe("createVoiceConversation", () => {
   });
 
   // 回补缓冲是"不切掉开头半个字"的唯一保障，而它很容易被提前清掉还不报错。
-  it("prefills the new session with audio captured before speech started", async () => {
-    const h = await calibrated();
-    await h.feed(0.02, 4); // 说话前的 400ms 静音：应当进回补缓冲
-    await h.feed(0.9, 2); // 说话起点
+  it("新会话带上说话之前采到的音频", async () => {
+    const h = await started();
+    await h.feed(0.02, 4); // 说话前的 400ms：应当进回补缓冲
+    h.vad("speech-start");
+    await h.feed(0.9, 1);
     await Promise.resolve();
     expect(h.pushed.length).toBeGreaterThan(0);
   });
 
   // 上一轮 stop 已发、done 未到时用户又开口：新音频不能推进那条已 closed 的流。
-  it("starts a fresh round when speech resumes before the previous done arrives", async () => {
-    const h = await calibrated();
+  it("上一轮 done 未到就又开口时开一条新会话", async () => {
+    const h = await started();
+    h.vad("speech-start");
     await h.feed(0.9, 3);
-    await h.feed(0.02, 8); // 静音 → stop(s1)，等 done
+    h.vad("speech-end"); // 静音 → stop(s1)，等 done
     const before = h.pushed.length;
-    await h.feed(0.9, 2);
+    h.vad("speech-start");
+    await h.feed(0.9, 1);
     await Promise.resolve();
     expect(h.states.at(-1)).toBe("capturing");
     expect(h.pushed.length).toBeGreaterThan(before);
   });
 
-  // 打断朗读比主动开口更需要确认：咳嗽、关门、拖椅子这类噪声常常刚过 150ms。
-  // 时长挡的是短促噪声，阈值挡的是识别不出内容的弱信号（扬声器残留、混响）。
-  // 只调其中一个，另一种照样会打断朗读 —— 而打断后 ASR 又什么都识别不出来。
-  it("raises the level threshold while answering, not just the duration", async () => {
-    const h = await calibrated();
-    // 静音室标定：噪声底 0.02 → 阈值取下限 0.25
-    await h.feed(0.9, 3);
-    await h.feed(0.02, 8);
-    h.voice({ type: "done", sessionId: "s1", text: "问题", discarded: false });
+  it("回答期切到 barge-in profile，朗读播完切回来", async () => {
+    const h = await started();
+    await answeringRound(h);
+    expect(h.monitorCalls.profiles).toContain("barge-in");
+
+    h.conv.sendAnswerDelta("第一句。", false);
+    h.fireDrained();
+    expect(h.monitorCalls.profiles.at(-1)).toBe("interactive");
+  });
+
+  it("回答期开口打断朗读", async () => {
+    const h = await started();
+    await answeringRound(h);
+    h.conv.sendAnswerDelta("第一句。", false);
     vi.mocked(h.speech.stop).mockClear();
 
-    // 回答期阈值是 0.25 + 0.15 = 0.40。0.30 在接收期够触发，在回答期不够。
-    await h.feed(0.3, 6);
-    expect(h.speech.stop).not.toHaveBeenCalled();
-
-    // 朗读播完 → 回到接收期，同样的电平又能触发（说明是阈值在变，不是永久失灵）
-    h.fireDrained();
-    await h.feed(0.3, 3);
+    h.vad("speech-start");
+    await h.feed(0.9, 1);
+    expect(h.speech.stop).toHaveBeenCalled();
     expect(h.states.at(-1)).toBe("capturing");
   });
 
-  it("needs a longer confirmation to interrupt while answering", async () => {
-    const h = await calibrated();
-    await h.feed(0.9, 3);
-    await h.feed(0.02, 8);
-    h.voice({ type: "done", sessionId: "s1", text: "问题", discarded: false });
-    h.conv.sendAnswerDelta("第一句。", false); // 进入回答期
-    vi.mocked(h.speech.stop).mockClear(); // 前面建会话时也 stop 过，这里只看打断
-
-    await h.feed(0.9, 2); // 200ms：过了 150ms 的开口阈值，但没过 300ms 的打断阈值
-    expect(h.speech.stop).not.toHaveBeenCalled();
-
-    await h.feed(0.9, 2); // 累计 400ms → 这时才该打断
-    expect(h.speech.stop).toHaveBeenCalled();
-  });
-
-  it("interrupts playback when the user speaks during speaking", async () => {
-    const h = await calibrated();
-    await h.feed(0.9, 3);
-    await h.feed(0.02, 8);
-    h.voice({ type: "done", sessionId: "s1", text: "问题", discarded: false });
+  // 朗读期没有 ASR 会话，而那时正是最需要判断"用户开口没有"的时刻。
+  it("朗读期的 VAD 事件照样送达（无会话也要打断）", async () => {
+    const h = await started();
+    await answeringRound(h);
     h.conv.sendAnswerDelta("第一句。", false);
-    await h.feed(0.9, 3); // 打断按 300ms 判定，不是开口的 150ms
+    vi.mocked(h.speech.stop).mockClear();
+
+    // 会话已随 done 收尾，此时并没有打开的 ASR 会话
+    h.vad("speech-start");
     expect(h.speech.stop).toHaveBeenCalled();
-    expect(h.states.at(-1)).toBe("capturing");
   });
 
-  it("blocked state refuses new questions", async () => {
-    const h = await calibrated();
+  // 固定静音阈值在"停顿被切"与"响应太慢"之间只能二选一。标点判据把这两端
+  // 分开：句中停顿不关会话，句末标点立即关。
+  describe("轮次判定", () => {
+    it("partial 停在句中标点时不关会话", async () => {
+      const h = await started();
+      h.vad("speech-start");
+      await h.feed(0.5, 1);
+      h.setPartial("我想想，");
+      h.vad("speech-end");
+      h.setPartial("我想想，");
+      expect(h.voiceStops).toEqual([]);
+    });
+
+    it("partial 以句末标点结尾时立即关会话", async () => {
+      const h = await started();
+      h.vad("speech-start");
+      await h.feed(0.5, 1);
+      h.setPartial("就这样吧。");
+      h.vad("speech-end");
+      expect(h.voiceStops).toEqual(["s1"]);
+    });
+
+    it("一直没说完时，硬上限强制关会话", async () => {
+      vi.useFakeTimers();
+      try {
+        const h = await started();
+        h.vad("speech-start");
+        await h.feed(0.5, 1);
+        h.setPartial("那个……");
+        h.vad("speech-end");
+        expect(h.voiceStops).toEqual([]);
+
+        vi.advanceTimersByTime(1200);
+        expect(h.voiceStops).toEqual(["s1"]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("继续说会重置硬上限计时", async () => {
+      vi.useFakeTimers();
+      try {
+        const h = await started();
+        h.vad("speech-start");
+        await h.feed(0.5, 1);
+        h.setPartial("那个……");
+        h.vad("speech-end");
+        vi.advanceTimersByTime(900);
+        expect(h.voiceStops).toEqual([]);
+
+        // 用户又开口了：计时从头算
+        h.vad("speech-start");
+        await h.feed(0.5, 1);
+        h.vad("speech-end");
+        vi.advanceTimersByTime(900);
+        expect(h.voiceStops).toEqual([]);
+
+        vi.advanceTimersByTime(400);
+        expect(h.voiceStops).toEqual(["s1"]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // 压缩期就是不该发新问题。计时器不停的话，它到期会关掉会话、把问题发出去。
+    it("进入压缩期会停掉硬上限计时", async () => {
+      vi.useFakeTimers();
+      try {
+        const h = await started();
+        h.vad("speech-start");
+        await h.feed(0.5, 1);
+        h.setPartial("那个……");
+        h.vad("speech-end");
+
+        h.conv.setBlocked(true);
+        vi.advanceTimersByTime(5000);
+        expect(h.voiceStops).toEqual([]);
+        expect(h.states.at(-1)).toBe("blocked");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  it("压缩期拒绝新问题", async () => {
+    const h = await started();
     h.conv.setBlocked(true);
     expect(h.states.at(-1)).toBe("blocked");
+    h.vad("speech-start");
     await h.feed(0.9, 3);
     expect(h.states.at(-1)).toBe("blocked");
   });
 
-  it("stop releases the microphone", async () => {
-    const h = await calibrated();
+  it("解封会复位 VAD 并回到接收期", async () => {
+    const h = await started();
+    h.conv.setBlocked(true);
+    const before = h.monitorCalls.resets;
+    h.conv.setBlocked(false);
+    expect(h.monitorCalls.resets).toBe(before + 1);
+    expect(h.states.at(-1)).toBe("listening");
+  });
+
+  it("stop 释放麦克风与 VAD", async () => {
+    const h = await started();
     h.conv.stop();
-    expect(h.states.at(-1)).toBe("stopped"); // 收尾态：不再监听
+    expect(h.states.at(-1)).toBe("stopped");
+    expect(h.monitorCalls.stopped).toBe(1);
+  });
+
+  // 打断是单程票：说一声"嗯"、或被扬声器泄漏触发一次，答案就永久丢失。
+  // 这两条用例盯的就是"能回头"。
+  describe("打断可恢复", () => {
+    it("识别出附和：恢复朗读，不发送问题", async () => {
+      const h = await started();
+      await answeringRound(h, "打开设置");
+      h.conv.sendAnswerDelta("答案第一句。答案第二句。", false);
+      expect(h.questions).toEqual(["打开设置"]);
+
+      const beginsBefore = vi.mocked(h.speech.begin).mock.calls.length;
+
+      // 打断，然后这一轮只识别出"嗯"
+      h.vad("speech-start");
+      await h.feed(0.5, 1);
+      h.vad("speech-end");
+      h.voice({ type: "done", sessionId: "s1", text: "嗯", discarded: false });
+
+      // 没有第二个问题发出去
+      expect(h.questions).toEqual(["打开设置"]);
+      // 又调了一次 begin：恢复朗读
+      expect(vi.mocked(h.speech.begin).mock.calls.length).toBe(
+        beginsBefore + 1,
+      );
+      expect(h.states.at(-1)).toBe("speaking");
+    });
+
+    it("什么都没识别出来也恢复（扬声器泄漏走的就是这条）", async () => {
+      const h = await started();
+      await answeringRound(h, "打开设置");
+      h.conv.sendAnswerDelta("答案第一句。", false);
+      const beginsBefore = vi.mocked(h.speech.begin).mock.calls.length;
+
+      h.vad("speech-start");
+      await h.feed(0.5, 1);
+      h.vad("speech-end");
+      h.voice({ type: "done", sessionId: "s1", text: "", discarded: true });
+
+      expect(h.questions).toEqual(["打开设置"]);
+      expect(vi.mocked(h.speech.begin).mock.calls.length).toBe(
+        beginsBefore + 1,
+      );
+    });
+
+    it("识别出真内容：发送问题，答案作废", async () => {
+      const h = await started();
+      await answeringRound(h, "打开设置");
+      h.conv.sendAnswerDelta("答案第一句。答案第二句。", false);
+
+      h.vad("speech-start");
+      await h.feed(0.5, 1);
+      h.vad("speech-end");
+      h.voice({
+        type: "done",
+        sessionId: "s1",
+        text: "帮我换个说法",
+        discarded: false,
+      });
+
+      expect(h.questions).toEqual(["打开设置", "帮我换个说法"]);
+      expect(h.states.at(-1)).toBe("thinking");
+    });
+
+    it("没打断过的一轮不因为短文本而被当成附和", async () => {
+      // 「嗯」在没有打断的上下文里就是一句正常提问，应当发出去。
+      const h = await started();
+      h.vad("speech-start");
+      await h.feed(0.5, 1);
+      h.vad("speech-end");
+      h.voice({ type: "done", sessionId: "s1", text: "嗯", discarded: false });
+      expect(h.questions).toEqual(["嗯"]);
+    });
+
+    // 打断标记必须按轮生命周期，不能跨轮。跨轮的效果是：下一轮的一句"嗯"
+    // 会去恢复念一段早就作废的答案，而这一轮的真问题被丢掉。
+    it("打断后没等到 done 又开一轮，标记不跨轮生效", async () => {
+      const h = await started();
+      await answeringRound(h, "打开设置");
+      h.conv.sendAnswerDelta("旧答案。", false);
+
+      // 1）打断
+      h.vad("speech-start");
+      await h.feed(0.5, 1);
+      // 2）还没等到 done，用户又说了一句 → 新的一轮
+      h.vad("speech-start");
+      await h.feed(0.5, 1);
+      h.vad("speech-end");
+      h.voice({ type: "done", sessionId: "s1", text: "嗯", discarded: false });
+
+      // 这一轮没被打断过，所以"嗯"就是一句正常提问，不该去恢复念旧答案
+      expect(h.questions).toEqual(["打开设置", "嗯"]);
+    });
   });
 });
