@@ -482,20 +482,28 @@ export class SessionManager {
     return this.createSessionRecord(DEFAULT_SESSION_TITLE, undefined, {
       kind: "voice",
       allowedTools: [...VOICE_TURN.tools],
+      // 语音会话默认关思考：语音轮本来就是 `off`，打字轮跟着会话设置走。
+      // 默认值如果是 `medium`，芯片会显示「中」，用户看到的就是一个假状态。
+      // 用户仍可在底栏芯片里改，改的是这个会话的打字轮。
+      thinkingLevel: "off",
     });
   }
 
   createSessionRecord(
     title: string,
     cwd?: string,
-    options?: { kind?: SessionKind; allowedTools?: string[] },
+    options?: {
+      kind?: SessionKind;
+      allowedTools?: string[];
+      thinkingLevel?: Session["thinkingLevel"];
+    },
   ): Session {
     const session = this.createSession(
       title,
       cwd,
       options?.allowedTools,
       undefined,
-      undefined,
+      options?.thinkingLevel,
       undefined,
       undefined,
       undefined,

@@ -37,6 +37,8 @@ it("adds an empty persisted voice record exactly once without activating it", as
     status: "idle",
     mountedPaths: [],
     allowedTools: ["web_search"],
+    // 与生产一致：语音会话建记录时存 off（见 createVoiceSessionRecord）。
+    thinkingLevel: "off",
     memoryEnabled: false,
     isProjectMode: false,
     createdAt: 1,

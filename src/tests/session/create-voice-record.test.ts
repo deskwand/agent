@@ -26,10 +26,17 @@ it("persists an idle voice record before notifying without a prompt", () => {
   expect(session.kind).toBe("voice");
   expect(session.status).toBe("idle");
   expect(session.allowedTools).toEqual(VOICE_TURN.tools);
+  // 语音轮本来就是 off；默认 medium 会让底栏芯片显示一个假状态。
+  expect(session.thinkingLevel).toBe("off");
+  expect(rows.get(session.id)?.thinking_level).toBe("off");
   expect(rows.get(session.id)?.session_kind).toBe("voice");
   expect(
     sm.listSessions().sessions.find((s) => s.id === session.id)?.kind,
   ).toBe("voice");
+  // 读路径单独断言：芯片读的就是这里返回的值，重启后走的也是这条。
+  expect(
+    sm.listSessions().sessions.find((s) => s.id === session.id)?.thinkingLevel,
+  ).toBe("off");
   expect(send).toHaveBeenCalledExactlyOnceWith({
     type: "session.create",
     payload: { session },
@@ -39,6 +46,7 @@ it("keeps ordinary creation compatible", () => {
   const { sm, rows } = setup();
   const session = sm.createSessionRecord("ordinary");
   expect(session.kind).toBe("ordinary");
+  expect(session.thinkingLevel).toBe("medium");
   expect(rows.get(session.id)?.session_kind).toBe("ordinary");
 });
 it("does not announce records when persistence fails", () => {

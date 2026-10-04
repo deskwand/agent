@@ -771,7 +771,7 @@ export function useIPC() {
           allowedTools: ["web_search", "fetch_content", "get_search_content"],
           memoryEnabled: true,
           isProjectMode: false,
-          thinkingLevel: "medium" as const,
+          thinkingLevel: "off" as const,
           createdAt: now,
           updatedAt: now,
         };
