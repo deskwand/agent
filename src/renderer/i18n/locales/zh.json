@@ -1430,7 +1430,28 @@
     "downloading": "下载中 {{percent}}%",
     "readyToInstall": "下载完成，可安装",
     "restartNow": "立即重启",
-    "updateFailed": "更新失败"
+    "updateFailed": "更新失败",
+    "intro": "基于 Pi Agent SDK 构建的桌面 AI Agent。与聊天机器人不同，DeskWand 能理解目标、规划任务、使用工具、委托子 Agent 协同工作，并在你的电脑上执行复杂任务。它从成功的任务中学习，把经验沉淀为可复用技能，越用越顺手。",
+    "features": {
+      "goalDriven": "目标驱动",
+      "goalDrivenDesc": "给出目标，Agent 自动规划并执行",
+      "subagents": "子 Agent",
+      "subagentsDesc": "复杂任务拆分给专业 Agent，并行协作",
+      "desktopNative": "桌面原生",
+      "desktopNativeDesc": "直接操作本地文件、项目和开发环境",
+      "officeNative": "Agent 原生 Office",
+      "officeNativeDesc": "直接写出真正的 Word、Excel、PPT 文件",
+      "selfImprovingSkills": "自进化技能",
+      "selfImprovingSkillsDesc": "成功执行的任务转化为可复用技能",
+      "multiModel": "多模型支持",
+      "multiModelDesc": "自由选择最适合你的 AI 模型"
+    },
+    "links": {
+      "website": "官网",
+      "source": "GitHub 仓库",
+      "releases": "更新日志",
+      "license": "MIT 开源协议"
+    }
   },
   "tool": {
     "sectionInput": "输入",

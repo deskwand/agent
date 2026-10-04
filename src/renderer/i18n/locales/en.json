@@ -1431,7 +1431,28 @@
     "downloading": "Downloading {{percent}}%",
     "readyToInstall": "Ready to install",
     "restartNow": "Restart Now",
-    "updateFailed": "Update failed"
+    "updateFailed": "Update failed",
+    "intro": "A desktop AI agent built on the Pi Agent SDK. Unlike a chatbot, DeskWand understands goals, plans tasks, uses tools, delegates work to subagents, and executes complex tasks on your computer. It learns from successful tasks and turns them into reusable skills, so it gets better over time.",
+    "features": {
+      "goalDriven": "Goal-driven agents",
+      "goalDrivenDesc": "Give it a goal and the agent plans and executes",
+      "subagents": "Subagents",
+      "subagentsDesc": "Break complex tasks into specialized agents that work in parallel",
+      "desktopNative": "Desktop native",
+      "desktopNativeDesc": "Work with your local files, projects, and environment",
+      "officeNative": "Agent-native Office",
+      "officeNativeDesc": "Ask for a report, spreadsheet, or deck — the agent writes the real Word, Excel, or PowerPoint file",
+      "selfImprovingSkills": "Self-improving skills",
+      "selfImprovingSkillsDesc": "Successful tasks can become reusable skills",
+      "multiModel": "Multi-model support",
+      "multiModelDesc": "Use the AI models that work best for you"
+    },
+    "links": {
+      "website": "Website",
+      "source": "GitHub",
+      "releases": "Releases",
+      "license": "MIT License"
+    }
   },
   "tool": {
     "sectionInput": "Input",
