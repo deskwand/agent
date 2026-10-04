@@ -124,8 +124,7 @@
         "shortcutMetaShiftSpaceMac": "⌘ + ⇧ + 空格",
         "shortcutMetaShiftSpaceWin": "Win + Shift + 空格",
         "shortcutDisabled": "不使用快捷键",
-        "shortcutFnHintMac": "Fn 键无法在应用内监听，所以默认用右 Option（对齐微信电脑端的「长按右 Alt」）",
-        "shortcutFnHintWin": "Fn 键无法在应用内监听，所以默认用右 Alt。"
+        "shortcutHint": "按住选中的键说话，松开结束。"
       },
       "readAloud": {
         "title": "朗读",

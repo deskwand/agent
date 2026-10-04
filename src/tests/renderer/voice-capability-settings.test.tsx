@@ -249,7 +249,7 @@ describe("VoiceCapabilitySettings", () => {
     );
   });
 
-  it("快捷键选项与行内提示按平台取键（darwin）", async () => {
+  it("快捷键选项按平台取键，行内提示两平台共用（darwin）", async () => {
     setEngine({ enabled: true, shortcut: "AltRight" });
     await mount();
 
@@ -260,12 +260,25 @@ describe("VoiceCapabilitySettings", () => {
       "settings.capabilities.voice.shortcutMetaShiftSpaceMac",
       "settings.capabilities.voice.shortcutDisabled",
     ]);
-    expect(container.textContent).toContain(
-      "settings.capabilities.voice.shortcutFnHintMac",
+    expect(byTestId("voice-shortcut")!.textContent).toContain(
+      "settings.capabilities.voice.shortcutHint",
     );
   });
 
-  it("win32 换成 Alt / Win 那套，行内提示一起换", async () => {
+  it("选「不使用快捷键」时不给行提示：那时没有键在监听", async () => {
+    setEngine({ enabled: true, shortcut: "disabled" });
+    await mount();
+
+    const row = byTestId("voice-shortcut")!;
+    expect(row.textContent).toContain(
+      "settings.capabilities.voice.shortcutDisabled",
+    );
+    expect(row.textContent).not.toContain(
+      "settings.capabilities.voice.shortcutHint",
+    );
+  });
+
+  it("win32 换成 Alt / Win 那套，行内提示不变", async () => {
     setPlatform("win32");
     setEngine({ enabled: true, shortcut: "AltRight" });
     await mount();
@@ -277,12 +290,8 @@ describe("VoiceCapabilitySettings", () => {
     expect(select.options[1].textContent).toBe(
       "settings.capabilities.voice.shortcutAltSpaceWin",
     );
-    expect(container.textContent).toContain(
-      "settings.capabilities.voice.shortcutFnHintWin",
-    );
-    // 同一张卡不许同时出现两套说法
-    expect(container.textContent).not.toContain(
-      "settings.capabilities.voice.shortcutFnHintMac",
+    expect(byTestId("voice-shortcut")!.textContent).toContain(
+      "settings.capabilities.voice.shortcutHint",
     );
   });
 });

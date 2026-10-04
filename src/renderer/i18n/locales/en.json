@@ -124,8 +124,7 @@
         "shortcutMetaShiftSpaceMac": "⌘ + ⇧ + Space",
         "shortcutMetaShiftSpaceWin": "Win + Shift + Space",
         "shortcutDisabled": "No shortcut",
-        "shortcutFnHintMac": "The Fn key cannot be observed inside the app, so right Option is the default (matching WeChat desktop’s hold-right-Alt).",
-        "shortcutFnHintWin": "The Fn key cannot be observed inside the app, so right Alt is the default."
+        "shortcutHint": "Hold the key you pick to talk; release to stop."
       },
       "readAloud": {
         "title": "Read aloud",

@@ -18,7 +18,7 @@ import { useTranslation } from "react-i18next";
 import { VOICE_SHORTCUTS } from "../../../shared/voice-shortcuts";
 import {
   settingsShortcutLabelKey,
-  shortcutHintKey,
+  SHORTCUT_HINT_KEY,
   shortcutPlatform,
 } from "../../voice-shortcut-labels";
 import type { VoiceEngineConfig } from "../../types";
@@ -49,7 +49,8 @@ export function VoiceCapabilitySettings({
 
   const engine = appConfig?.voiceEngine;
   const enabled = engine?.enabled === true;
-  // 键名与行内提示都带物理键名（「右 Option」在 Windows 上叫「右 Alt」），
+  const selectedShortcut = engine?.shortcut ?? "AltRight";
+  // 选项文案带物理键名（「右 Option」在 Windows 上叫「右 Alt」），
   // 所以整张卡共用一次平台判断。
   const platform = shortcutPlatform(window.electronAPI?.platform);
 
@@ -155,11 +156,14 @@ export function VoiceCapabilitySettings({
           testId="voice-shortcut"
           sub
           title={t("settings.capabilities.voice.shortcut")}
-          note={t(shortcutHintKey(platform))}
+          // 选「不使用快捷键」时没有键在监听，这句会成为假话（同 VoiceMicButton 的规矩）。
+          note={
+            selectedShortcut === "disabled" ? undefined : t(SHORTCUT_HINT_KEY)
+          }
           control={
             <SettingsSelect
               label={t("settings.capabilities.voice.shortcut")}
-              value={engine?.shortcut ?? "AltRight"}
+              value={selectedShortcut}
               options={VOICE_SHORTCUTS.map((shortcut) => ({
                 value: shortcut,
                 label: t(settingsShortcutLabelKey(shortcut, platform)),

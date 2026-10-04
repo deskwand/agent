@@ -4,7 +4,7 @@ import zh from "../../renderer/i18n/locales/zh.json";
 import {
   holdKeyNameKey,
   settingsShortcutLabelKey,
-  shortcutHintKey,
+  SHORTCUT_HINT_KEY,
   shortcutPlatform,
   type ShortcutPlatform,
 } from "../../renderer/voice-shortcut-labels";
@@ -95,11 +95,11 @@ describe("设置页文案的 i18n 覆盖", () => {
     ).toEqual([]);
   });
 
-  it("行内提示两个平台的键都在", () => {
-    const keys = PLATFORMS.map((platform) => shortcutHintKey(platform));
+  it("行内提示的键在 zh 与 en 里都存在", () => {
+    const missing = [ZH_KEYS, EN_KEYS].filter(
+      (keys) => !keys.has(SHORTCUT_HINT_KEY),
+    );
 
-    expect(
-      keys.filter((key) => !ZH_KEYS.has(key) || !EN_KEYS.has(key)),
-    ).toEqual([]);
+    expect(missing).toEqual([]);
   });
 });

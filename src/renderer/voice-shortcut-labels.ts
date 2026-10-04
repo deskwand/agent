@@ -48,15 +48,8 @@ export function settingsShortcutLabelKey(
   return SETTINGS_LABEL_KEYS[shortcut][platform];
 }
 
-/** 设置页那行提示的键。两个平台各一句（Windows 那句不提微信，见设计 §5）。 */
-const SHORTCUT_HINT_KEYS: Record<ShortcutPlatform, string> = {
-  mac: "settings.capabilities.voice.shortcutFnHintMac",
-  win: "settings.capabilities.voice.shortcutFnHintWin",
-};
-
-export function shortcutHintKey(platform: ShortcutPlatform): string {
-  return SHORTCUT_HINT_KEYS[platform];
-}
+/** 设置页那行提示的键。两平台共用一句：这句话只说这个键做什么，不说平台差异。 */
+export const SHORTCUT_HINT_KEY = "settings.capabilities.voice.shortcutHint";
 
 /** 气泡里的键名：紧凑写法（不带 `+`），因为它嵌在句子里。`disabled` = 不提。 */
 const HOLD_KEY_NAME_KEYS: Record<
