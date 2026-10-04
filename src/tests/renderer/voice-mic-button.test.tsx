@@ -2,11 +2,19 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { VoiceMicButton } from "../../renderer/components/VoiceMicButton";
+import type { TFunction } from "i18next";
+import {
+  toMicButtonProps,
+  VoiceMicButton,
+} from "../../renderer/components/VoiceMicButton";
+import type { VoiceInputController } from "../../renderer/hooks/useVoiceInput";
 
 vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, unknown>) =>
+      values ? `${key}|${JSON.stringify(values)}` : key,
+  }),
 }));
 
 let container: HTMLDivElement;
@@ -15,6 +23,14 @@ const button = () => container.querySelector("button")!;
 const buttonByLabel = (label: string) =>
   [...container.querySelectorAll("button")].find(
     (b) => b.getAttribute("aria-label") === label,
+  );
+/**
+ * 带参数的文案在 `t` 桩里会多带一段 `|{...}`（见上面的 mock），所以按前缀取。
+ * 安装态的 aria-label 就是带百分比的（`chat.voiceInstalling`），不能用全等。
+ */
+const buttonByLabelPrefix = (prefix: string) =>
+  [...container.querySelectorAll("button")].find((b) =>
+    b.getAttribute("aria-label")?.startsWith(prefix),
   );
 
 function render(
@@ -109,15 +125,19 @@ describe("VoiceMicButton", () => {
       install: { phase: "downloading", percent: 45, installed: false },
     });
 
-    const mic = buttonByLabel("chat.voiceInstalling")!;
+    const mic = buttonByLabelPrefix("chat.voiceInstalling")!;
     expect(mic.disabled).toBe(true);
     expect(container.textContent).toContain("45%");
+    // 进度也进可访问名：读到的是「正在下载语音模型 45%」，不只是一个转圈。
+    expect(mic.getAttribute("aria-label")).toBe(
+      'chat.voiceInstalling|{"percent":45}',
+    );
   });
 
   it("解压中也算忙（第二阶段，百分比接着走）", () => {
     render({ install: { phase: "extracting", percent: 92, installed: false } });
 
-    expect(buttonByLabel("chat.voiceInstalling")!.disabled).toBe(true);
+    expect(buttonByLabelPrefix("chat.voiceInstalling")!.disabled).toBe(true);
     expect(container.textContent).toContain("92%");
   });
 
@@ -133,5 +153,139 @@ describe("VoiceMicButton", () => {
 
     expect(container.textContent).not.toContain("%");
     expect(buttonByLabel("chat.voiceStart")!.disabled).toBe(false);
+  });
+});
+
+const stubVoice: VoiceInputController = {
+  status: "idle",
+  level: 0,
+  seconds: 0,
+  toggle: () => {},
+  cancel: () => {},
+  polish: async () => true,
+  revert: () => {},
+  canPolish: false,
+  canRevert: false,
+};
+
+// 桩返回键名：断言的是「取了哪个键」，不是中文文案。
+// i18next 的 TFunction 带 brand，测试桩只能显式断言（同 tool-helpers-web-access.test.ts）。
+const keyT = ((key: string) => key) as unknown as TFunction;
+
+const HOLD_KEY = "chat.voiceHoldKeyAltRightMac";
+
+describe("toMicButtonProps 的快捷键条件", () => {
+  it("引擎开着 + 有快捷键 → 键名按平台取", () => {
+    const config = { enabled: true, shortcut: "AltSpace" } as const;
+    expect(
+      toMicButtonProps(stubVoice, null, {
+        config,
+        platform: "darwin",
+        t: keyT,
+      }).shortcutKeys,
+    ).toBe("chat.voiceHoldKeyAltSpaceMac");
+    expect(
+      toMicButtonProps(stubVoice, null, {
+        config,
+        platform: "win32",
+        t: keyT,
+      }).shortcutKeys,
+    ).toBe("chat.voiceHoldKeyAltSpaceWin");
+  });
+
+  it("引擎关 / 快捷键 disabled / 配置未加载 → 不提快捷键", () => {
+    // 这三条与 usePushToTalk 的 enabled 条件同源：写了就是骗人。
+    expect(
+      toMicButtonProps(stubVoice, null, {
+        config: { enabled: false, shortcut: "AltRight" },
+        platform: "darwin",
+        t: keyT,
+      }).shortcutKeys,
+    ).toBeUndefined();
+    expect(
+      toMicButtonProps(stubVoice, null, {
+        config: { enabled: true, shortcut: "disabled" },
+        platform: "darwin",
+        t: keyT,
+      }).shortcutKeys,
+    ).toBeUndefined();
+    expect(
+      toMicButtonProps(stubVoice, null, {
+        config: undefined,
+        platform: "darwin",
+        t: keyT,
+      }).shortcutKeys,
+    ).toBeUndefined();
+  });
+});
+
+describe("可访问名不带键名", () => {
+  it("带 shortcutKeys 时空闲态 aria-label 仍是纯动作", () => {
+    render({ shortcutKeys: "chat.voiceHoldKeyAltRightMac" });
+    expect(buttonByLabel("chat.voiceStart")!.getAttribute("aria-label")).toBe(
+      "chat.voiceStart",
+    );
+  });
+
+  it("不带 shortcutKeys 时同样是纯动作", () => {
+    render();
+    expect(buttonByLabel("chat.voiceStart")).toBeDefined();
+  });
+});
+
+describe("气泡文案（聚焦可见）", () => {
+  it("聚焦时把键名带出来，可访问名不变", async () => {
+    render({ shortcutKeys: "chat.voiceHoldKeyAltRightMac" });
+    const mic = buttonByLabel("chat.voiceStart")!;
+    await act(async () => {
+      mic.focus();
+    });
+
+    // 气泡走 portal 挂在 body 上，不在 container 里
+    expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
+      'chat.voiceStartWithShortcut|{"keys":"chat.voiceHoldKeyAltRightMac"}',
+    );
+    expect(mic.getAttribute("aria-label")).toBe("chat.voiceStart");
+  });
+
+  it("没有键名时停在名称", async () => {
+    render();
+    const mic = buttonByLabel("chat.voiceStart")!;
+    await act(async () => {
+      mic.focus();
+    });
+
+    expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
+      "chat.voiceStart",
+    );
+  });
+
+  it("录音中报「停止录音」，不提快捷键", async () => {
+    render({ status: "recording", seconds: 3, shortcutKeys: HOLD_KEY });
+    const mic = buttonByLabel("chat.voiceStop")!;
+    await act(async () => {
+      mic.focus();
+    });
+
+    expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
+      "chat.voiceStop",
+    );
+  });
+
+  it("收尾 / 整理时麦克风锁着，气泡不报快捷键", async () => {
+    // 这两个态下 usePushToTalk 的 onStart 只认 idle：那颗键按下去没反应，
+    // 写了就是假的。麦克风是 disabled，jsdom 里 focus() 不触发，只能直接派事件。
+    for (const status of ["polishing", "requesting"] as const) {
+      render({ status, canPolish: true, shortcutKeys: HOLD_KEY });
+      const mic = buttonByLabel("chat.voiceStart")!;
+      expect(mic.disabled).toBe(true);
+      await act(async () => {
+        mic.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+      });
+
+      expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
+        "chat.voiceStart",
+      );
+    }
   });
 });

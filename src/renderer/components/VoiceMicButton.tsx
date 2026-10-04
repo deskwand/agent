@@ -1,8 +1,11 @@
 import { Loader2, Mic, Sparkles, Undo2, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { VoiceInstallState } from "../../shared/ipc-types";
 import { Tooltip } from "./Tooltip";
 import type { VoiceInputController, VoiceStatus } from "../hooks/useVoiceInput";
+import type { VoiceEngineConfig } from "../types";
+import { holdKeyNameKey, shortcutPlatform } from "../voice-shortcut-labels";
 
 export interface VoiceMicButtonProps {
   status: VoiceStatus;
@@ -16,6 +19,11 @@ export interface VoiceMicButtonProps {
    * 真正要守的是**接线**漏传 —— 那一条由`toMicButtonProps` 的必传参数拦下。
    */
   install?: VoiceInstallState | null;
+  /**
+   * 「按住说话」的键名（已 i18n，如「右 Option」）。缺省 = 本气泡不提快捷键：
+   * 引擎没启用，或用户在设置里选了「不使用快捷键」。
+   */
+  shortcutKeys?: string;
   onToggle: () => void;
   onCancel: () => void;
   canPolish: boolean;
@@ -33,6 +41,7 @@ export function VoiceMicButton({
   level,
   seconds,
   install,
+  shortcutKeys,
   onToggle,
   onCancel,
   canPolish,
@@ -51,11 +60,21 @@ export function VoiceMicButton({
   // 不锁的话用户会点一个没反应的按钮。下载中同理：这一次点击不该被解释成录音。
   const micDisabled = busy || status === "polishing" || installing;
   const recording = status === "recording";
-  const label = installing
+  // 下载中 / 录音中麦克风在忙别的事，气泡与可访问名都报那个状态。
+  const activeLabel = installing
     ? t("chat.voiceInstalling", { percent })
     : recording
       ? t("chat.voiceStop")
-      : t("chat.voiceStart");
+      : null;
+  // 可访问名只说动作：屏幕阅读器念一串按键是噪音。
+  const ariaLabel = activeLabel ?? t("chat.voiceStart");
+  // 气泡在空闲且麦克风可用时才多报一句快捷键。收尾 / 整理 / 下载时那颗键按下去
+  // 没反应（usePushToTalk 的 onStart 只认 idle），写了就是假的。
+  const idleTooltip =
+    micDisabled || !shortcutKeys
+      ? t("chat.voiceStart")
+      : t("chat.voiceStartWithShortcut", { keys: shortcutKeys });
+  const tooltipLabel = activeLabel ?? idleTooltip;
 
   return (
     <div className="flex shrink-0 items-center gap-1">
@@ -131,10 +150,10 @@ export function VoiceMicButton({
         </Tooltip>
       )}
 
-      <Tooltip label={label}>
+      <Tooltip label={tooltipLabel}>
         <button
           type="button"
-          aria-label={label}
+          aria-label={ariaLabel}
           disabled={micDisabled}
           onClick={onToggle}
           className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -178,12 +197,30 @@ export function toMicButtonProps(
   voice: VoiceInputController,
   // 不给默认值：宿主漏传时要是编译错误，而不是「底栏一直不显示进度」这种没人会发现的状态。
   install: VoiceInstallState | null,
+  // 快捷键那一组打成一个对象：三个都是字符串/函数，位置传错了类型也拦不住。
+  shortcut: {
+    /** 引擎配置。缺省 = 还没读到配置，按「没启用」处理。 */
+    config: VoiceEngineConfig | undefined;
+    platform: string | undefined;
+    t: TFunction;
+  },
 ): VoiceMicButtonProps {
+  // 与 usePushToTalk 的 enabled 同源：引擎没启用时快捷键不监听，气泡也就不提它。
+  // `disabled` 由 holdKeyNameKey 自己吞掉，这里不用再判一次。
+  const keyNameKey =
+    shortcut.config?.enabled === true
+      ? holdKeyNameKey(
+          shortcut.config.shortcut,
+          shortcutPlatform(shortcut.platform),
+        )
+      : undefined;
+
   return {
     status: voice.status,
     level: voice.level,
     seconds: voice.seconds,
     install,
+    shortcutKeys: keyNameKey ? shortcut.t(keyNameKey) : undefined,
     canPolish: voice.canPolish,
     canRevert: voice.canRevert,
     onToggle: voice.toggle,

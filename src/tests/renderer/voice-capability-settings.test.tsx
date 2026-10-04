@@ -21,6 +21,7 @@ const api = vi.hoisted(() => {
   (window as unknown as { electronAPI: unknown }).electronAPI = {
     voice,
     config,
+    platform: "darwin",
   };
   return { voice, config };
 });
@@ -50,6 +51,13 @@ async function mount(): Promise<void> {
 const byTestId = (id: string) =>
   container.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
+/** 改渲染层看到的平台。默认 darwin，每个用例前会被重置。 */
+function setPlatform(platform: string): void {
+  (
+    window as unknown as { electronAPI: { platform: string } }
+  ).electronAPI.platform = platform;
+}
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   container = document.createElement("div");
@@ -64,6 +72,7 @@ beforeEach(() => {
   api.config.save.mockImplementation(async (input: unknown) => ({
     config: input,
   }));
+  setPlatform("darwin");
 });
 
 afterEach(async () => {
@@ -237,6 +246,43 @@ describe("VoiceCapabilitySettings", () => {
     expect(byTestId("injected-child")).not.toBeNull();
     expect(parent.closest(".rounded-container")).toBe(
       byTestId("injected-child")!.closest(".rounded-container"),
+    );
+  });
+
+  it("快捷键选项与行内提示按平台取键（darwin）", async () => {
+    setEngine({ enabled: true, shortcut: "AltRight" });
+    await mount();
+
+    const select = container.querySelector<HTMLSelectElement>("select")!;
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "settings.capabilities.voice.shortcutAltRightMac",
+      "settings.capabilities.voice.shortcutAltSpaceMac",
+      "settings.capabilities.voice.shortcutMetaShiftSpaceMac",
+      "settings.capabilities.voice.shortcutDisabled",
+    ]);
+    expect(container.textContent).toContain(
+      "settings.capabilities.voice.shortcutFnHintMac",
+    );
+  });
+
+  it("win32 换成 Alt / Win 那套，行内提示一起换", async () => {
+    setPlatform("win32");
+    setEngine({ enabled: true, shortcut: "AltRight" });
+    await mount();
+
+    const select = container.querySelector<HTMLSelectElement>("select")!;
+    expect(select.options[0].textContent).toBe(
+      "settings.capabilities.voice.shortcutAltRightWin",
+    );
+    expect(select.options[1].textContent).toBe(
+      "settings.capabilities.voice.shortcutAltSpaceWin",
+    );
+    expect(container.textContent).toContain(
+      "settings.capabilities.voice.shortcutFnHintWin",
+    );
+    // 同一张卡不许同时出现两套说法
+    expect(container.textContent).not.toContain(
+      "settings.capabilities.voice.shortcutFnHintMac",
     );
   });
 });

@@ -15,10 +15,12 @@
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { VOICE_SHORTCUTS } from "../../../shared/voice-shortcuts";
 import {
-  VOICE_SHORTCUTS,
-  type VoiceShortcut,
-} from "../../../shared/voice-shortcuts";
+  settingsShortcutLabelKey,
+  shortcutHintKey,
+  shortcutPlatform,
+} from "../../voice-shortcut-labels";
 import type { VoiceEngineConfig } from "../../types";
 import { useAppStore } from "../../store";
 import { useVoiceEngine } from "../../hooks/useVoiceEngine";
@@ -32,13 +34,6 @@ import {
   SettingsStatusBadge,
   SettingsSwitch,
 } from "./shared";
-
-const SHORTCUT_LABEL_KEYS: Record<VoiceShortcut, string> = {
-  AltRight: "settings.capabilities.voice.shortcutAltRight",
-  AltSpace: "settings.capabilities.voice.shortcutAltSpace",
-  MetaShiftSpace: "settings.capabilities.voice.shortcutMetaShiftSpace",
-  disabled: "settings.capabilities.voice.shortcutDisabled",
-};
 
 export function VoiceCapabilitySettings({
   children,
@@ -54,6 +49,9 @@ export function VoiceCapabilitySettings({
 
   const engine = appConfig?.voiceEngine;
   const enabled = engine?.enabled === true;
+  // 键名与行内提示都带物理键名（「右 Option」在 Windows 上叫「右 Alt」），
+  // 所以整张卡共用一次平台判断。
+  const platform = shortcutPlatform(window.electronAPI?.platform);
 
   /** 与 SettingsGeneral 的 codemode 同一条管线：写 AppConfig，再同步 store。 */
   const save = async (patch: Partial<VoiceEngineConfig>) => {
@@ -157,14 +155,14 @@ export function VoiceCapabilitySettings({
           testId="voice-shortcut"
           sub
           title={t("settings.capabilities.voice.shortcut")}
-          note={t("settings.capabilities.voice.shortcutFnHint")}
+          note={t(shortcutHintKey(platform))}
           control={
             <SettingsSelect
               label={t("settings.capabilities.voice.shortcut")}
               value={engine?.shortcut ?? "AltRight"}
               options={VOICE_SHORTCUTS.map((shortcut) => ({
                 value: shortcut,
-                label: t(SHORTCUT_LABEL_KEYS[shortcut]),
+                label: t(settingsShortcutLabelKey(shortcut, platform)),
               }))}
               onChange={(next) => void save({ shortcut: next })}
             />

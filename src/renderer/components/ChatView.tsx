@@ -2147,7 +2147,11 @@ export function ChatView() {
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
-                voice={toMicButtonProps(voice, voiceEngine.install)}
+                voice={toMicButtonProps(voice, voiceEngine.install, {
+                  config: voiceEngineConfig,
+                  platform: window.electronAPI?.platform,
+                  t,
+                })}
               />
             }
           />
