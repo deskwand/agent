@@ -35,7 +35,7 @@ const calls = {
   onRestore: vi.fn((text: string) => {
     draft = text;
   }),
-  onBlocked: vi.fn(),
+  ensureReady: vi.fn(),
   onError: vi.fn(),
   onPolishFailed: vi.fn(),
   getSnapshot: vi.fn(() => draft),
@@ -45,7 +45,6 @@ let onSamplesRef: ((pcm: Int16Array, level: number) => void) | null = null;
 
 function Probe() {
   api = useVoiceInput({
-    enabled: true,
     hasInputContent: inputHasContent,
     ...calls,
   });
@@ -93,6 +92,7 @@ beforeEach(() => {
     draft = text;
   });
   calls.getSnapshot.mockImplementation(() => draft);
+  calls.ensureReady.mockImplementation(async () => true);
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -282,23 +282,55 @@ describe("useVoiceInput", () => {
     expect(calls.onText).not.toHaveBeenCalledWith("草稿最终加料");
   });
 
-  it("未启用时点按钮只提示，不碰麦克风", async () => {
-    await act(async () => root.render(React.createElement(Probe2)));
+  it("就绪检查期间算 requesting：手快连点不会起第二条采集", async () => {
+    await render();
+    let release: (ok: boolean) => void = () => {};
+    calls.ensureReady.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          release = resolve;
+        }),
+    );
+
+    await act(async () => api.toggle());
+    expect(container.textContent).toBe("requesting");
+
+    // 第二次点击（按钮这时是禁用的，但快捷键旁路还能走到 toggle）。
     await act(async () => api.toggle());
 
-    expect(calls.onBlocked).toHaveBeenCalled();
+    await act(async () => release(true));
+
+    expect(micMock.start).toHaveBeenCalledTimes(1);
+    expect(voice.start).toHaveBeenCalledTimes(1);
+  });
+
+  it("没装模型（ensureReady 返回 false）：不碰麦克风，状态留在 idle", async () => {
+    await render();
+    calls.ensureReady.mockImplementation(async () => false);
+
+    await act(async () => api.toggle());
+
     expect(micMock.start).not.toHaveBeenCalled();
+    expect(container.textContent).toBe("idle");
+  });
+
+  it("先等 ensureReady（它可能在写配置、起下载），通过了才碰麦克风", async () => {
+    await render();
+    const order: string[] = [];
+    calls.ensureReady.mockImplementation(async () => {
+      order.push("ensureReady");
+      return true;
+    });
+    micMock.start.mockImplementation(async () => {
+      order.push("mic");
+      return { stop: stopCapture };
+    });
+
+    await act(async () => api.toggle());
+
+    expect(order).toEqual(["ensureReady", "mic"]);
   });
 });
-
-function Probe2() {
-  api = useVoiceInput({
-    enabled: false,
-    hasInputContent: inputHasContent,
-    ...calls,
-  });
-  return React.createElement("span", null, api.status);
-}
 
 /**
  * 补一个真实存在的盲区：以前的替身从不调 `onSamples`，所以

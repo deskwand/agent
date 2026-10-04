@@ -20,6 +20,7 @@ import {
 import { useAppStore } from "../store";
 import { useIPC } from "../hooks/useIPC";
 import { usePushToTalk } from "../hooks/usePushToTalk";
+import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { attachmentKeySet } from "../utils/attached-files";
 import { profileKeyToProvider } from "../hooks/useApiConfigState";
@@ -78,6 +79,7 @@ import {
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { toMicButtonProps } from "./VoiceMicButton";
+import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
 import { ChatInputQueueBar } from "./ChatInputQueueBar";
 import {
   ChatInputStatusBar,
@@ -428,9 +430,12 @@ export function ChatView() {
   const sessionGenerationRef = useRef(0);
 
   // --- 语音输入 ---
-  const voiceEngine = appConfig?.voiceEngine;
+  const voiceEngineConfig = appConfig?.voiceEngine;
   const voiceNoticeSeqRef = useRef(0);
-  const notify = (messageKey: string, type: "warning" | "error") => {
+  const notify = (
+    messageKey: string,
+    type: "warning" | "error" | "success",
+  ) => {
     voiceNoticeSeqRef.current += 1;
     setGlobalNotice({
       id: `voice-${Date.now()}-${voiceNoticeSeqRef.current}`,
@@ -440,15 +445,20 @@ export function ChatView() {
       messageKey,
     });
   };
+  // 就绪判定、安装态、下载确认都在这里（定义见 hooks/useVoiceEngine.ts）。
+  const voiceEngine = useVoiceEngine({
+    onReady: () => notify("chat.voiceReady", "success"),
+    onEnableFailed: () => notify("chat.voiceEnableFailed", "error"),
+  });
   const voice = useVoiceInput({
-    enabled: Boolean(voiceEngine?.enabled),
+    // 没启用 / 没装模型都在这一句里收口：可能写配置、起下载、弹确认。
+    ensureReady: voiceEngine.ensureReady,
     // 「整理 / 还原」作用在输入框里的文字上，而宿主是唯一知道框里有没有内容的地方
     hasInputContent,
     // getSnapshot 是**实时读取**输入框，不是一次性快照。不要缓存它。
     getSnapshot: () => chatInputRef.current?.getPrompt() ?? "",
     onText: (text) => chatInputRef.current?.setPrompt(text),
     onRestore: (snapshot) => chatInputRef.current?.setPrompt(snapshot),
-    onBlocked: () => notify("chat.voiceEngineOff", "warning"),
     onError: (code) => notify(VOICE_MESSAGE_KEYS[code], "error"),
     onPolishFailed: (reason) =>
       notify(
@@ -469,7 +479,7 @@ export function ChatView() {
   const submitBlocked = isCompacting || voice.status === "recording";
 
   usePushToTalk(
-    voiceEngine?.shortcut ?? "disabled",
+    voiceEngineConfig?.shortcut ?? "disabled",
     {
       onStart: () => {
         if (voice.status !== "idle") return;
@@ -482,7 +492,7 @@ export function ChatView() {
         if (voice.status === "recording") voice.toggle();
       },
     },
-    Boolean(voiceEngine?.enabled),
+    Boolean(voiceEngineConfig?.enabled),
   );
 
   const hasActiveTurn = Boolean(activeTurn);
@@ -2137,7 +2147,7 @@ export function ChatView() {
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
-                voice={toMicButtonProps(voice)}
+                voice={toMicButtonProps(voice, voiceEngine.install)}
               />
             }
           />
@@ -2148,6 +2158,7 @@ export function ChatView() {
         scrollContainerRef={scrollContainerRef}
         onTickSelect={handleDockTickSelect}
       />
+      <VoiceDownloadConfirm engine={voiceEngine} />
     </div>
   );
 }

@@ -38,6 +38,8 @@ import {
 import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { toMicButtonProps } from "./VoiceMicButton";
+import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
+import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { usePushToTalk } from "../hooks/usePushToTalk";
 import { ConnectCards } from "./welcome/connect-cards";
@@ -75,10 +77,10 @@ export function WelcomeView() {
   const appConfig = useAppConfig();
 
   // 语音输入。与 ChatView 同一套接线；注意 getSnapshot 是**实时读取**输入框。
-  const voiceEngine = appConfig?.voiceEngine;
+  const voiceEngineConfig = appConfig?.voiceEngine;
   const voiceNoticeSeqRef = useRef(0);
   const notifyVoice = useCallback(
-    (messageKey: string, type: "warning" | "error") => {
+    (messageKey: string, type: "warning" | "error" | "success") => {
       voiceNoticeSeqRef.current += 1;
       setGlobalNotice({
         id: `voice-${Date.now()}-${voiceNoticeSeqRef.current}`,
@@ -89,14 +91,17 @@ export function WelcomeView() {
     },
     [setGlobalNotice, t],
   );
+  const voiceEngine = useVoiceEngine({
+    onReady: () => notifyVoice("chat.voiceReady", "success"),
+    onEnableFailed: () => notifyVoice("chat.voiceEnableFailed", "error"),
+  });
   const voice = useVoiceInput({
-    enabled: Boolean(voiceEngine?.enabled),
+    ensureReady: voiceEngine.ensureReady,
     // 「整理 / 还原」作用在输入框里的文字上，而宿主是唯一知道框里有没有内容的地方
     hasInputContent,
     getSnapshot: () => chatInputRef.current?.getPrompt() ?? "",
     onText: (text) => chatInputRef.current?.setPrompt(text),
     onRestore: (snapshot) => chatInputRef.current?.setPrompt(snapshot),
-    onBlocked: () => notifyVoice("chat.voiceEngineOff", "warning"),
     onError: (code) => notifyVoice(VOICE_MESSAGE_KEYS[code], "error"),
     onPolishFailed: (reason) =>
       notifyVoice(
@@ -109,7 +114,7 @@ export function WelcomeView() {
   // 记住这次录音是不是「按住说话」启动的，否则手滑按一下 Option 会把按钮启动的录音停掉。
   const pushToTalkOwns = useRef(false);
   usePushToTalk(
-    voiceEngine?.shortcut ?? "disabled",
+    voiceEngineConfig?.shortcut ?? "disabled",
     {
       onStart: () => {
         if (voice.status !== "idle") return;
@@ -122,7 +127,7 @@ export function WelcomeView() {
         if (voice.status === "recording") voice.toggle();
       },
     },
-    Boolean(voiceEngine?.enabled),
+    Boolean(voiceEngineConfig?.enabled),
   );
   const showConnectCards = appConfig !== null && !isConfigured;
   const projectName = (() => {
@@ -582,12 +587,13 @@ export function WelcomeView() {
                 isExpanded={isInputExpanded}
                 onToggleExpand={() => setIsInputExpanded((v) => !v)}
                 hasInputContent={hasInputContent}
-                voice={toMicButtonProps(voice)}
+                voice={toMicButtonProps(voice, voiceEngine.install)}
               />
             )
           }
         />
       </div>
+      <VoiceDownloadConfirm engine={voiceEngine} />
     </div>
   );
 }
