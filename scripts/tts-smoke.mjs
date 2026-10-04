@@ -10,7 +10,11 @@
  *   node scripts/tts-smoke.mjs …（同上参数）
  *
  * **以 Electron 那次为准。** 生产环境是 Electron；纯 Node 允许 V8 外部缓冲区，
- * 会掩掉一类只在 Electron 出现的失败（详见下面 enableExternalBuffer 处的注释）。
+ * 会掩掉一类只在 Electron 出现的失败（详见 src/main/tts/local-engine.ts 的注释）。
+ *
+ * **升级 RUNTIME_VERSION 前必须在 macOS 与 Windows 各重跑一次**：
+ * `enableExternalBuffer` 靠 addon 透传给原生代码，版本一变可能被静默忽略，症状就是
+ * Electron 下合成失败（见上）。老用户不会重装运行时，所以那次自检也不会重跑。
  */
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -66,12 +70,12 @@ const loadMs = Date.now() - started;
 const rssLoaded = process.memoryUsage().rss;
 
 started = Date.now();
-const audio = tts.generate({
+const audio = await tts.generateAsync({
   text,
   sid: 0,
   speed: 1.0,
-  // 与生产同形。默认 true 会让 addon 用 V8 外部缓冲区包住采样，Electron 不允许 ——
-  // 同步报 `External buffers are not allowed`，异步报 `TTS settlement failed`。
+  // 必须与生产同形：生产走的就是 generateAsync（同步版会让主进程事件循环停摆），
+  // 而两条路的失败方式不同 —— 只测同步就漏得掉生产那一种。
   enableExternalBuffer: false,
 });
 const synthMs = Date.now() - started;
