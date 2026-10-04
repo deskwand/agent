@@ -79,7 +79,8 @@ it("stops audio and polling, and rejects callbacks from an older run even when t
       old.sendQuestion("old run");
       runtime.runs[1].sendQuestion("new run");
     });
-    expect(send).toHaveBeenCalledExactlyOnceWith("new run");
+    // 宿主还会收到这一轮分配到的 turnId：回答按它归属。
+    expect(send).toHaveBeenCalledExactlyOnceWith("new run", expect.any(String));
     store.removeSession("V");
     await act(async () => runtime.runs[1].sendQuestion("deleted"));
     expect(send).toHaveBeenCalledTimes(1);

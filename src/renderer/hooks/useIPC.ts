@@ -1028,6 +1028,8 @@ export function useIPC() {
       model?: string,
       elSelections?: ElementSelection[],
       turnProfile?: TurnProfileName,
+      /** 调用方指定的轮次标识（语音模式按它归属回答）。缺省时自己生成。 */
+      requestedTurnId?: string,
     ) => {
       setLoading(true);
       console.log("[useIPC] Continuing session:", sessionId);
@@ -1052,7 +1054,7 @@ export function useIPC() {
       const hasActiveTurn = Boolean(ss?.activeTurn);
       const hasPending = (ss?.pendingTurns?.length ?? 0) > 0;
       const shouldQueue = isSessionRunning || hasActiveTurn || hasPending;
-      const turnId = `turn-${Date.now()}`;
+      const turnId = requestedTurnId ?? `turn-${Date.now()}`;
       const userMessage: Message = {
         id: `msg-user-${Date.now()}`,
         sessionId,

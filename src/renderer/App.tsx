@@ -247,7 +247,7 @@ function App() {
   );
 
   const handleVoiceQuestion = useCallback(
-    (text: string) => {
+    (text: string, turnId: string): boolean => {
       const store = useAppStore.getState();
       const target = store.sessions.find(
         (s) => s.id === voiceModeSessionId && s.kind === "voice",
@@ -260,7 +260,11 @@ function App() {
         store.activeSessionId !== voiceModeSessionId ||
         store.activeView !== "chat"
       )
-        return;
+        // 宿主收不下这一轮：状态机据此回到接收期，而不是挂在一个
+        // 永远不会到来的回答上。
+        return false;
+      // turnId 由语音侧分配，宿主只负责原样带上：回答按它归属，
+      // 不然新旧两轮的增量会串台。
       void continueSession(
         voiceModeSessionId,
         text,
@@ -268,7 +272,9 @@ function App() {
         target.model,
         undefined,
         "voice",
+        turnId,
       );
+      return true;
     },
     [voiceModeSessionId, continueSession],
   );

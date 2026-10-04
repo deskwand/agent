@@ -18,7 +18,6 @@ import type {
   VoiceStartResult,
 } from "../../shared/ipc-types";
 import { isBackchannel } from "../utils/voice/backchannel";
-import { isTurnComplete } from "../utils/voice/turn-heuristic";
 import type { MicCapture } from "../utils/voice/mic-capture";
 import type { StreamingSpeech } from "./useStreamingSpeech";
 
@@ -61,11 +60,13 @@ export interface ConversationDeps {
   voice: VoiceBridge;
   monitor: VoiceMonitor;
   speech: StreamingSpeech;
-  sendQuestion(text: string): void;
-  /** 硬上限：静音这么久就放弃等，直接收尾。不再当"说完了"的判据。 */
+  /**
+   * 把识别出来的问题发出去。返回 false = 宿主没收下（例如语音模式已关），
+   * 这时不能再开一条没人铺答案的朗读。
+   */
+  sendQuestion(text: string): boolean;
+  /** 静音这么久就认为这一轮说完了，收尾。 */
   silenceMs: number;
-  /** 本轮 ASR 的实时 partial。判"说完了吗"用。 */
-  currentPartial(): string;
   onState(state: ConversationState): void;
   onLevel(level: number): void;
   onTranscript(text: string): void;
@@ -100,16 +101,12 @@ export function createVoiceConversation(
   /** VAD 说了算。渲染层不再自己算。 */
   let speaking = false;
   /**
-   * 「本轮被我们打断过」的标记。判决在 `done` 到达时做（见 `finishRound`）。
+   * 「这一轮的 ASR 是在回答播放期间开的」——也就是打断候选。
    *
-   * 只存一个布尔值，不存偏移：偏移在判决那一刻从 `lastSentenceStart` 取
-   * ——那才是精确值。在打断的那一瞬间还不知道当前句是哪句。
+   * 候选身份只看**开口时**播放有没有在进行：持续说话（一次次 speech-start）
+   * 不改变它。判决在 `done` 到达时做（见 `finishRound`）。
    */
-  let interrupted = false;
-  /** 本轮已收到的累计文本。恢复时以它为准，因为 LLM 可能已经说完了。 */
-  let answerText = "";
-  /** 当前正在念的那一句在 `answerText` 里的起始偏移。 */
-  let lastSentenceStart = 0;
+  let candidate = false;
   /**
    * 静音之后的等待计时器。
    *
@@ -117,6 +114,17 @@ export function createVoiceConversation(
    * 挂在 `done` 上。多一个计时器就是多一个和 `done` 赛跑的选手。
    */
   let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 静音等待的截止时刻。会话还在启动时也要记住它，否则启动完成就没人收尾了。 */
+  let silenceDeadline: number | null = null;
+  /** stop 已发、done 未到。这段时间里音频送进去也没人收，用户再开口要换会话。 */
+  let closing = false;
+  /** voice.start 还没解析。重复的起点不能开两条会话。 */
+  let starting = false;
+  /**
+   * 轮次代次。停止和压缩会让它自增，用来作废迟到的启动结果：
+   * 那个会话已经没人认领，必须由它自己取消掉。
+   */
+  let roundGeneration = 0;
 
   const setState = (next: ConversationState) => {
     if (state === next) return;
@@ -144,39 +152,42 @@ export function createVoiceConversation(
 
   const endRound = () => {
     sessionId = null;
+    closing = false;
     clearPrefetch();
   };
 
   const finishRound = (text: string, discarded: boolean) => {
     const transcript = text.trim();
+    const wasCandidate = candidate;
+    candidate = false;
     endRound();
 
-    // 打断之后：识别出的是附和（或什么都没识别出）就撤销这次打断。
-    // 判决放在这里而不是另设计时器：done 是本轮唯一的终点，等它到就有了
-    // 全部输入，不需要第三个计时器去和它赛跑。
-    if (interrupted) {
-      interrupted = false;
-      if (discarded || transcript.length === 0 || isBackchannel(transcript)) {
-        // 该句重头念：重念几个字比丢字好。
-        deps.speech.begin(lastSentenceStart);
-        deps.speech.push(answerText);
-        answering = true;
-        setBargeIn(true);
-        setState("speaking");
-        return;
-      }
+    // 候选被否：说话声（咳嗽、键盘、附和词）不该影响正在播的回答。
+    // 什么都不用恢复 —— 播放从来没被打断过。
+    if (
+      wasCandidate &&
+      (discarded || transcript.length === 0 || isBackchannel(transcript))
+    ) {
+      if (answering) return; // 还在播：状态和播放都别动
+      setBargeIn(false);
+      setState(idleState());
+      return;
     }
 
     if (discarded || transcript.length === 0) {
       setState(idleState());
       return;
     }
+    // 确认打断：旧回答的播放到此为止，它后面的增量也不再出声。
+    deps.speech.stop();
+    if (!deps.sendQuestion(transcript)) {
+      answering = false;
+      setBargeIn(false);
+      setState(idleState());
+      return;
+    }
     deps.onQuestion(transcript);
-    deps.sendQuestion(transcript);
     deps.speech.begin();
-    // 答案作废：累计文本与断点一起归零，否则下一次打断会拿旧值恢复。
-    answerText = "";
-    lastSentenceStart = 0;
     answering = true;
     setBargeIn(true);
     setState("thinking");
@@ -184,25 +195,33 @@ export function createVoiceConversation(
 
   const failRound = (code: VoiceErrorCode) => {
     deps.onError(code);
+    const wasCandidate = candidate;
+    candidate = false;
     endRound();
+    if (wasCandidate && answering) return; // 候选失败，播放照旧
     answering = false;
     setBargeIn(false);
     setState(idleState());
   };
 
+  /**
+   * 回补缓冲送进某条会话。它是"不切掉开头半个字"的唯一保障，
+   * 而新会话和复用会话两条路都要走它。
+   */
+  const replayPrefetch = (id: string) => {
+    for (const frame of prefetch) void deps.voice.pushAudio(id, frame);
+    clearPrefetch();
+  };
+
   const beginRound = async () => {
-    if (sessionId) {
-      // 上一轮还在收尾（stop 已发、done 未到）。用户又开口说明这是新的一轮：
-      // 丢掉那条未完成的收尾，重开一条会话。不这么做的话，新音频会推给一条
-      // 已经 closed 的流（静默丢弃），这一轮的话就白说了。
-      //
-      // 这里**只清 sessionId**：不动 vad、不清回补缓冲 —— 用户已经在说话了，
-      // vad 的 speaking 状态是对的，而回补缓冲里正是这句话的开头。
-      void deps.voice.cancel(sessionId);
-      sessionId = null;
-    }
+    if (starting) return;
+    starting = true;
+    const generation = roundGeneration;
     const started = await deps.voice.start();
-    if (disposed) {
+    starting = false;
+    if (disposed || generation !== roundGeneration) {
+      // 停止或压缩让这次启动作废：那条会话已经没人认领，
+      // 不取消的话它会一直挂着等音频。
       if (started.ok) void deps.voice.cancel(started.sessionId);
       return;
     }
@@ -211,13 +230,25 @@ export function createVoiceConversation(
       return;
     }
     sessionId = started.sessionId;
-    deps.speech.stop();
-    answering = false;
-    setBargeIn(false);
-    setState("capturing");
-    for (const frame of prefetch)
-      void deps.voice.pushAudio(started.sessionId, frame);
-    clearPrefetch();
+    closing = false;
+    if (candidate) {
+      // 候选收音只是同时在听：播放、音量档位和状态都不动。
+      // 回答已经播完的候选才需要一个收音态。
+      if (!answering) setState("capturing");
+    } else {
+      deps.speech.stop();
+      answering = false;
+      setBargeIn(false);
+      setState("capturing");
+    }
+    replayPrefetch(started.sessionId);
+    // 启动期间用户已经说完了：按剩下的静音时长收尾，
+    // 不能等他再开一次口才发现这句话没交出去。
+    if (!speaking && silenceDeadline !== null) {
+      const remaining = silenceDeadline - Date.now();
+      if (remaining <= 0) closeTurn();
+      else scheduleSilenceClose(remaining);
+    }
   };
 
   /**
@@ -233,10 +264,23 @@ export function createVoiceConversation(
     }
   };
 
-  /** 本轮到此为止：关会话，等 ASR 的 done。 */
+  const scheduleSilenceClose = (delay: number) => {
+    clearSilenceTimer();
+    // 用全局 setTimeout 而不是 window.setTimeout：本模块的测试跑在 Node 环境
+    // （没有 window），而它的设计原则就是"不碰 DOM"。
+    silenceTimer = setTimeout(() => {
+      silenceTimer = null;
+      closeTurn();
+    }, delay);
+  };
+
+  /** 本轮到此为止：关会话，等 ASR 的 done。重复调用只关一次。 */
   const closeTurn = () => {
     clearSilenceTimer();
-    if (sessionId) void deps.voice.stop(sessionId);
+    silenceDeadline = null;
+    if (!sessionId || closing || disposed || blocked) return;
+    closing = true;
+    void deps.voice.stop(sessionId);
   };
 
   const onVadEdge = (edge: VadEdge) => {
@@ -245,35 +289,40 @@ export function createVoiceConversation(
     if (edge === "speech-start") {
       // 继续说：等待计时重置，会话接着用。
       clearSilenceTimer();
-      if (answering) {
-        deps.speech.stop();
-        // 只立标记，不算偏移：当前句是哪句要到判决时才知道。
-        interrupted = true;
-      } else {
-        // 上一轮可能留下了一个标记（比如打断之后那一轮报错收尾，没走到判决）。
-        // 不清的话，这一轮的 done 会被当成"刚被打断"，去恢复念一段早就作废的
-        // 答案。
-        interrupted = false;
+      silenceDeadline = null;
+      if (sessionId && !closing) {
+        // 续说：同一条会话接着收音频。停顿里的那些片只进了回补缓冲
+        // （speaking 已是 false），补不进去就等于把这句话的开头丢掉。
+        //
+        // **候选身份在这里不变**：它由"这一轮开口时播放有没有在进行"定，
+        // 中途播放播完也不改判 —— 否则一句说到一半就变成普通提问，
+        // 后面的"嗯"会被当成新问题发出去。
+        replayPrefetch(sessionId);
+        return;
       }
-      answering = false;
+      // 会话还在启动：它建立后自己会把回补缓冲补上。
+      if (starting) return;
+      // 新的一轮：开口时播放进行中 = 打断候选，判决等最终识别结果；
+      // 播放已经结束就是普通一轮。
+      candidate = answering;
+      if (sessionId) {
+        // stop 已发、done 未到。用户又开口说明这是一轮新的话：
+        // 丢掉那条未完成的收尾，重开一条会话。不这么做的话，新音频会推给一条
+        // 已经 closed 的流（静默丢弃），这一轮的话就白说了。
+        void deps.voice.cancel(sessionId);
+        sessionId = null;
+      }
       void beginRound();
       return;
     }
 
-    // 静音了。先问一句"说完了吗"再决定关不关。
-    if (!sessionId) return;
-    if (isTurnComplete(deps.currentPartial())) {
-      closeTurn();
-      return;
-    }
-    // 还没说完：保持会话打开，等继续说；最多等到硬上限。
-    clearSilenceTimer();
-    // 用全局 setTimeout 而不是 window.setTimeout：本模块的测试跑在 Node 环境
-    // （没有 window），而它的设计原则就是"不碰 DOM"。
-    silenceTimer = setTimeout(() => {
-      silenceTimer = null;
-      closeTurn();
-    }, deps.silenceMs);
+    // 静音了。统一等一个完整的静音时长：句末标点只说明这一句说完了，
+    // 而"用户说完了"得由停顿来证明。
+    if (!sessionId && !starting) return;
+    silenceDeadline = Date.now() + deps.silenceMs;
+    // 会话还没建立：等启动完成，再按剩余时间安排收尾。
+    if (!sessionId || closing) return;
+    scheduleSilenceClose(deps.silenceMs);
   };
 
   const toArrayBuffer = (pcm: Int16Array): ArrayBuffer =>
@@ -325,18 +374,19 @@ export function createVoiceConversation(
     failRound(event.code);
   });
 
-  deps.speech.onSentence((index, text) => {
-    // 当前句的起始偏移 = 它在累计文本里的位置。到下一句开始时，本句就算念完了。
-    const at = answerText.indexOf(text);
-    if (at >= 0) lastSentenceStart = at;
-    deps.onSentence(index, text);
-  });
+  deps.speech.onSentence((index, text) => deps.onSentence(index, text));
   deps.speech.onDrained(() => {
     if (!answering) return;
     answering = false;
     // 朗读播完就回到接收期：阈值与确认时长都要恢复，否则用户接话时
     // 还要按"打断朗读"的严格门槛才被听见。
     setBargeIn(false);
+    // 候选会话还开着：播完不等于这一轮结束 —— 识别结果还没到，
+    // 这时收尾等于把用户刚说的那句话扔掉。
+    if (sessionId) {
+      if (!closing) setState("capturing");
+      return;
+    }
     setState(idleState());
   });
 
@@ -361,8 +411,10 @@ export function createVoiceConversation(
     },
     stop() {
       disposed = true;
+      roundGeneration += 1;
       unsubscribe();
       clearSilenceTimer();
+      silenceDeadline = null;
       capture?.stop();
       capture = null;
       // 在 unsubscribe 之后：monitor.stop 可能报一个 speech-end，
@@ -372,6 +424,7 @@ export function createVoiceConversation(
       deps.speech.stop();
       endRound();
       answering = false;
+      candidate = false;
       setState("stopped");
     },
     setBlocked(next) {
@@ -380,12 +433,15 @@ export function createVoiceConversation(
       if (next) {
         deps.speech.stop();
         answering = false;
+        candidate = false;
         // 压缩期也要把打断门槛收回去：不收的话，压缩结束后用户接话还得
         // 按“打断朗读”的严格标准才被听见。
         setBargeIn(false);
-        // 硬上限计时也必须停：不停的话它到期会关掉会话、把问题发出去，
-        // 而压缩期就是不该发新问题。
+        // 计时也必须停：不停的话它到期会关掉会话、把问题发出去，
+        // 而压缩期就是不该发新问题。代次同时作废在途的启动。
+        roundGeneration += 1;
         clearSilenceTimer();
+        silenceDeadline = null;
         setState("blocked");
         return;
       }
@@ -398,7 +454,6 @@ export function createVoiceConversation(
     },
     sendAnswerDelta(fullText, ended) {
       if (!answering) return;
-      answerText = fullText;
       // 空文本只用于「本轮没有可读内容」的收尾，不该让球切到朗读态。
       if (fullText.length > 0 && state === "thinking") setState("speaking");
       deps.speech.push(fullText);

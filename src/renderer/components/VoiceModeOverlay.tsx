@@ -16,8 +16,13 @@ export interface VoiceModeOverlayProps {
   sessionId: string;
   onClose(): void;
   isCompacting: boolean;
-  /** Submit to the bound voice session. */
-  onSendQuestion(text: string): void;
+  /**
+   * 把一轮问题发出去。由宿主注入：提交到当前绑定的语音会话。
+   *
+   * `turnId` 必须原样交给后端 —— 回答只按它归属。返回 false 表示宿主没收下
+   * 这一轮（例如语音模式已经被关掉）。
+   */
+  onSendQuestion(text: string, turnId: string): boolean;
 }
 
 const ORB_STATE: Record<ConversationState, OrbState> = {
