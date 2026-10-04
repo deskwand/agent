@@ -503,6 +503,7 @@ export class SessionManager {
     model?: string,
     turnId?: string,
     elSelections?: ElementSelectionRef[],
+    readonlyTools?: boolean,
   ): Promise<Session> {
     log("[SessionManager] Starting new session:", title);
 
@@ -527,6 +528,7 @@ export class SessionManager {
       turnId,
       undefined,
       elSelections,
+      readonlyTools,
     );
 
     return session;

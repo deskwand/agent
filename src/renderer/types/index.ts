@@ -445,6 +445,8 @@ export type ClientEvent =
         model?: string;
         turnId?: string;
         elSelections?: ElementSelection[];
+        /** 语音模式：本轮只激活只读工具（设计 §2.5）。 */
+        readonlyTools?: boolean;
       };
     }
   | {

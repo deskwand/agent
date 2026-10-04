@@ -14,6 +14,7 @@ import type {
   VoiceStartResult,
 } from "../../shared/ipc-types";
 import {
+  BARGE_IN_THRESHOLD_MARGIN,
   createVad,
   DEFAULT_SPEECH_MS,
   estimateNoiseFloor,
@@ -105,9 +106,22 @@ export function createVoiceConversation(
   const idleState = (): ConversationState =>
     blocked ? "blocked" : "listening";
 
-  /** 回答期用更长的起点确认；回到接收期就恢复。 */
+  /** 标定得出的阈值。回答期要在它之上再加一档。 */
+  let calibratedThreshold = 0;
+
+  /**
+   * 回答期：起点确认更长、阈值更高。**两个都要调** ——
+   * 时长挡的是"咳嗽、关门"这类短促噪声，阈值挡的是"扬声器残留、混响"
+   * 这类识别不出内容的弱信号。只调其中一个，另一种照样会打断朗读。
+   */
   const setBargeIn = (on: boolean) => {
-    vad?.setSpeechMs(on ? BARGE_IN_SPEECH_MS : DEFAULT_SPEECH_MS);
+    if (!vad) return;
+    vad.setSpeechMs(on ? BARGE_IN_SPEECH_MS : DEFAULT_SPEECH_MS);
+    vad.setThreshold(
+      on
+        ? calibratedThreshold + BARGE_IN_THRESHOLD_MARGIN
+        : calibratedThreshold,
+    );
   };
 
   const clearPrefetch = () => {
@@ -178,10 +192,11 @@ export function createVoiceConversation(
       calibrationMs += FRAME_MS;
       calibrationLevels.push(level);
       if (calibrationMs >= CALIBRATION_MS) {
+        calibratedThreshold = thresholdFromNoiseFloor(
+          estimateNoiseFloor(calibrationLevels),
+        );
         vad = createVad({
-          threshold: thresholdFromNoiseFloor(
-            estimateNoiseFloor(calibrationLevels),
-          ),
+          threshold: calibratedThreshold,
           silenceMs: deps.silenceMs,
         });
         setState(idleState());
@@ -252,6 +267,9 @@ export function createVoiceConversation(
   deps.speech.onDrained(() => {
     if (!answering) return;
     answering = false;
+    // 朗读播完就回到接收期：阈值与确认时长都要恢复，否则用户接话时
+    // 还要按"打断朗读"的严格门槛才被听见。
+    setBargeIn(false);
     setState(idleState());
   });
 

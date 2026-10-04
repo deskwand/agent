@@ -516,6 +516,15 @@ interface AppState {
 
   // Read aloud actions
   readAloud: ReadAloudState;
+  /**
+   * 语音模式浮层是否打开。
+   *
+   * 放 store 而不是组件 state：欢迎页也可以用语音模式，而创建会话后
+   * 应用会切到聊天视图 —— 状态留在 store 里，浮层才能跟着过去，
+   * 不会随欢迎页卸载而关掉。
+   */
+  voiceModeOpen: boolean;
+  setVoiceModeOpen: (open: boolean) => void;
   setReadAloud: (patch: Partial<ReadAloudState>) => void;
 }
 
@@ -642,6 +651,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     rightPanelMode: "files" | "browser" | "preview" | "review" | null;
     contextPanelWidth: number;
   } | null,
+  voiceModeOpen: false,
   readAloud: {
     messageId: null,
     status: "idle",
@@ -1779,6 +1789,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       browserOcclusionIds.delete(id);
       return { browserOcclusionIds };
     }),
+
+  // 语音模式浮层开关。放这里而不是组件 state：欢迎页也能用语音模式，
+  // 创建会话后应用切到聊天视图，状态得跟着过去。
+  setVoiceModeOpen: (open: boolean) => set({ voiceModeOpen: open }),
 
   // Read aloud actions：每次都是新对象，zustand 的引用比较才能触发重渲染。
   setReadAloud: (patch) =>

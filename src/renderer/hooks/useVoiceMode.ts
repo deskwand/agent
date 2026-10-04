@@ -14,6 +14,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { VoiceErrorCode } from "../../shared/ipc-types";
+import { DEFAULT_VOICE_MODE } from "../../shared/voice-mode";
 import { useAppStore } from "../store";
 import { createAudioQueue } from "../utils/tts/audio-queue";
 import { startMicCapture } from "../utils/voice/mic-capture";
@@ -34,7 +35,11 @@ export interface VoiceModeView {
 }
 
 export interface UseVoiceModeOptions {
-  sessionId: string;
+  /**
+   * 当前会话 id。**可以为 null**：欢迎页还没有会话，第一句语音会用
+   * startSession 建一个（由 VoiceModeOverlay 注入的 onSendQuestion 决定）。
+   */
+  sessionId: string | null;
   isCompacting: boolean;
   /**
    * 把一轮问题发出去。由宿主注入 —— `continueSession` 是 useIPC 的返回值，
@@ -114,7 +119,9 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
       },
       speech,
       sendQuestion: (text) => optionsRef.current.sendQuestion(text),
-      silenceMs: useAppStore.getState().appConfig?.voiceMode?.silenceMs ?? 800,
+      silenceMs:
+        useAppStore.getState().appConfig?.voiceMode?.silenceMs ??
+        DEFAULT_VOICE_MODE.silenceMs,
       onState: (state) => patch({ state }),
       onLevel: (level) => patch({ level }),
       onTranscript: (transcript) => patch({ transcript }),
@@ -135,6 +142,8 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
 
     const timer = window.setInterval(() => {
       const sessionId = optionsRef.current.sessionId;
+      // 会话还没建起来（欢迎页的第一轮）：没有 partial 可读，也没有轮次要收尾。
+      if (!sessionId) return;
       const text = readAnswer(sessionId);
 
       if (text !== lastAnswer) {

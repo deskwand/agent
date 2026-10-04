@@ -39,6 +39,7 @@ import { NEW_SESSION_DRAFT_KEY, removeDraft } from "../utils/chat-draft-store";
 import { ChatInputBottomBar } from "./ChatInputBottomBar";
 import { toMicButtonProps } from "./VoiceMicButton";
 import { VoiceDownloadConfirm } from "./VoiceDownloadConfirm";
+import { VoiceModeOverlay } from "./VoiceModeOverlay";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 import { useVoiceInput, VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import { usePushToTalk } from "../hooks/usePushToTalk";
@@ -68,6 +69,10 @@ export function WelcomeView() {
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
   const { startSession } = useIPC();
+  // 浮层开关放 store：欢迎页的第一句语音会创建会话，随后应用切到聊天视图，
+  // 状态留着，浮层就能跟着过去接着用，而不是随本视图卸载而关掉。
+  const voiceModeOpen = useAppStore((state) => state.voiceModeOpen);
+  const setVoiceModeOpen = useAppStore((state) => state.setVoiceModeOpen);
   const isConfigured = useAppStore((state) => state.isConfigured);
   const workingDir = useAppStore((state) => state.workingDir);
   const setShowSettings = useAppStore((state) => state.setShowSettings);
@@ -127,7 +132,7 @@ export function WelcomeView() {
         if (voice.status === "recording") voice.toggle();
       },
     },
-    Boolean(voiceEngineConfig?.enabled),
+    Boolean(voiceEngineConfig?.enabled) && !voiceModeOpen,
   );
   const showConnectCards = appConfig !== null && !isConfigured;
   const projectName = (() => {
@@ -508,6 +513,7 @@ export function WelcomeView() {
           bottomSlot={
             showConnectCards ? undefined : (
               <ChatInputBottomBar
+                onOpenVoiceMode={() => setVoiceModeOpen(true)}
                 onAttach={() => chatInputRef.current?.selectFiles()}
                 onAddFiles={(files) => chatInputRef.current?.addFiles(files)}
                 attachedKeys={attachedKeys}
@@ -598,6 +604,25 @@ export function WelcomeView() {
         />
       </div>
       <VoiceDownloadConfirm engine={voiceEngine} />
+      {voiceModeOpen && !showConnectCards ? (
+        <VoiceModeOverlay
+          // 欢迎页还没有会话：第一句语音负责把它建起来。建完之后 App 会切到
+          // 聊天视图，而开关在 store 里，浮层跟着过去接着用。
+          sessionId={null}
+          isCompacting={false}
+          onClose={() => setVoiceModeOpen(false)}
+          onSendQuestion={(text) => {
+            void startSession(
+              getInitialSessionTitle(text, undefined),
+              text,
+              workingDir || undefined,
+              selectedThinkingLevel,
+              selectedProviderProfileKey,
+              selectedModel,
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }

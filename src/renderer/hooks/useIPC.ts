@@ -763,6 +763,7 @@ export function useIPC() {
       providerProfileKey?: ProviderProfileKey,
       model?: string,
       elSelections?: ElementSelection[],
+      readonlyTools?: boolean,
     ) => {
       setLoading(true);
       console.log("[useIPC] Starting session:", title);
@@ -860,6 +861,7 @@ export function useIPC() {
             model,
             turnId,
             elSelections: elSelections?.length ? elSelections : undefined,
+            readonlyTools,
           },
         });
         if (session) {

@@ -10,13 +10,16 @@ function harness() {
   const states: string[] = [];
   const questions: string[] = [];
   const errors: string[] = [];
+  let drainedCb: (() => void) | null = null;
   const speech = {
     begin: vi.fn(),
     push: vi.fn(),
     end: vi.fn(),
     stop: vi.fn(),
     onSentence: vi.fn(),
-    onDrained: vi.fn(),
+    onDrained: (cb: () => void) => {
+      drainedCb = cb;
+    },
     failedCount: () => 0,
   } as unknown as StreamingSpeech;
 
@@ -52,6 +55,7 @@ function harness() {
     conv,
     pushed,
     states,
+    fireDrained: () => drainedCb?.(),
     questions,
     errors,
     speech,
@@ -135,6 +139,26 @@ describe("createVoiceConversation", () => {
   });
 
   // 打断朗读比主动开口更需要确认：咳嗽、关门、拖椅子这类噪声常常刚过 150ms。
+  // 时长挡的是短促噪声，阈值挡的是识别不出内容的弱信号（扬声器残留、混响）。
+  // 只调其中一个，另一种照样会打断朗读 —— 而打断后 ASR 又什么都识别不出来。
+  it("raises the level threshold while answering, not just the duration", async () => {
+    const h = await calibrated();
+    // 静音室标定：噪声底 0.02 → 阈值取下限 0.25
+    await h.feed(0.9, 3);
+    await h.feed(0.02, 8);
+    h.voice({ type: "done", sessionId: "s1", text: "问题", discarded: false });
+    vi.mocked(h.speech.stop).mockClear();
+
+    // 回答期阈值是 0.25 + 0.15 = 0.40。0.30 在接收期够触发，在回答期不够。
+    await h.feed(0.3, 6);
+    expect(h.speech.stop).not.toHaveBeenCalled();
+
+    // 朗读播完 → 回到接收期，同样的电平又能触发（说明是阈值在变，不是永久失灵）
+    h.fireDrained();
+    await h.feed(0.3, 3);
+    expect(h.states.at(-1)).toBe("capturing");
+  });
+
   it("needs a longer confirmation to interrupt while answering", async () => {
     const h = await calibrated();
     await h.feed(0.9, 3);

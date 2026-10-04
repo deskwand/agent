@@ -8,7 +8,11 @@ export interface VoiceModeConfig {
   silenceMs: number;
 }
 
-export const DEFAULT_VOICE_MODE: VoiceModeConfig = { silenceMs: 800 };
+/**
+ * 1200ms 而不是 800ms：800 会把人说话中间的正常停顿（尤其长句、边想边说）
+ * 判成"说完了"，话还没说完就发出去。
+ */
+export const DEFAULT_VOICE_MODE: VoiceModeConfig = { silenceMs: 1200 };
 
 export const MIN_SILENCE_MS = 400;
 export const MAX_SILENCE_MS = 2000;

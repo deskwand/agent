@@ -323,8 +323,10 @@ export function ChatView() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [hasInputContent, setHasInputContent] = useState(false);
-  // 只在这里用，不进 store：浮层开关没有第二个消费者。
-  const [voiceModeOpen, setVoiceModeOpen] = useState(false);
+  // 浮层开关放 store：欢迎页也能用语音模式，创建会话后应用切到本视图，
+  // 状态留在 store 里浮层才能跟着过来。
+  const voiceModeOpen = useAppStore((s) => s.voiceModeOpen);
+  const setVoiceModeOpen = useAppStore((s) => s.setVoiceModeOpen);
   // 切会话就关掉浮层（设计 §4）：语音会话绑在某个 sessionId 上，
   // 不关的话浮层会带着旧会话继续采集 —— useVoiceMode 的 effect 是空依赖，
   // 换 sessionId 不会重建，麦克风与 ASR 会话都还连着上一个会话。
@@ -510,7 +512,7 @@ export function ChatView() {
   );
 
   useVoiceModeShortcut(
-    () => setVoiceModeOpen((open) => !open),
+    () => setVoiceModeOpen(!useAppStore.getState().voiceModeOpen),
     Boolean(activeSessionId),
   );
 
