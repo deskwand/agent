@@ -47,6 +47,10 @@
 | `webflow.svg`     | `webflow`      |
 | `wix.svg`         | `wix`          |
 | `zapier.svg`      | `zapier`       |
+| `qq.svg`          | `qq`           |
+| `gmail.svg`       | `gmail`        |
+| `icloud.svg`      | `icloud`       |
+| `alibabacloud.svg`| `alibabacloud` |
 
 ## 2. 许可证
 
@@ -76,3 +80,10 @@ Google Chrome 的名称与图形标志归各自厂商所有。
 
 `src/renderer/components/connectors/brand-icons.tsx` 里的 `FirstPartyServiceIcon`
 （窗口轮廓 + 光标箭头）是本项目自绘的，版权归本项目，不受上面几条约束。
+
+## 6. `alibabacloud.svg` 与阿里云邮
+
+`src/shared/mail-providers.ts` 里的 `aliyun` 预设指向 `mail.aliyun.com`，i18n 显示名是「阿里云邮」。
+阿里邮箱没有独立的品牌图标，上游只有母公司 Alibaba Cloud 的标，所以用它 —— 这是**指称「哪一家的服务」**，
+不是把阿里云标当我们的品牌元素。163 / 126 / 腾讯企业邮在上游没有对应图标（`neteasecloudmusic` 是
+网易云音乐，另一个产品），那三家继续用预设表里的字母标记。

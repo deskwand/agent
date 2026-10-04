@@ -477,6 +477,61 @@ describe("头像", () => {
     expect(avatar()!.className).not.toContain("bg-white");
   });
 
+  it("邮箱条目按 providerId 画厂商图标", () => {
+    render(
+      <ConnectorCard
+        entry={entry({
+          source: "mail",
+          serverName: "Mail",
+          nameKey: "zhangsan@qq.com",
+          avatarMark: "QQ",
+          providerId: "qq",
+          instances: [
+            {
+              id: "zhangsan@qq.com",
+              label: "zhangsan@qq.com",
+              status: { kind: "ready" },
+              summary: "connectors.summary.mailbox",
+            },
+          ],
+        })}
+        {...handlers()}
+      />,
+    );
+    expect(avatar()!.querySelector("img")).not.toBeNull();
+    // 白底只给厂商 logo 这一支
+    expect(avatar()!.className).toContain("bg-white");
+    // 字母标记必须让位给图标，否则图后面还压着「QQ」两个字
+    expect(avatar()!.textContent?.trim()).toBe("");
+  });
+
+  it("没有图标的服务商仍画预设表里的字母标记", () => {
+    render(
+      <ConnectorCard
+        entry={entry({
+          source: "mail",
+          serverName: "Mail",
+          nameKey: "zhangsan@163.com",
+          avatarMark: "163",
+          providerId: "netease-163",
+          instances: [
+            {
+              id: "zhangsan@163.com",
+              label: "zhangsan@163.com",
+              status: { kind: "ready" },
+              summary: "connectors.summary.mailbox",
+            },
+          ],
+        })}
+        {...handlers()}
+      />,
+    );
+    expect(avatar()!.querySelector("img")).toBeNull();
+    expect(avatar()!.textContent?.trim()).toBe("163");
+    expect(avatar()!.className).toContain("bg-accent-muted");
+    expect(avatar()!.className).not.toContain("bg-white");
+  });
+
   it("认不出的仍画首字母，底色与自研支一致", () => {
     // ⚠ 首字母来自**显示名**（name = t(nameKey)，测试里 t 是恒等函数），
     //   不是 serverName。所以必须同时覆盖 nameKey，否则拿到的是默认 key 的首字母。

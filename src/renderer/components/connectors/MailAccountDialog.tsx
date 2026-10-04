@@ -7,6 +7,7 @@ import {
   type MailProviderId,
 } from "../../../shared/mail-providers";
 import { useBrowserOcclusion } from "../../hooks/useBrowserOcclusion";
+import { mailProviderIconUrl } from "./mail-provider-icons";
 
 /**
  * 「添加邮箱」对话框。两屏：先选服务商，再填地址与凭据。
@@ -133,25 +134,40 @@ export function MailAccountDialog({
               {t("mail.dialog.providerHint")}
             </p>
             <div className="grid grid-cols-2 gap-2 mt-3">
-              {MAIL_PROVIDERS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  data-testid={`mail-provider-${p.id}`}
-                  onClick={() => {
-                    setProviderId(p.id);
-                    setError("");
-                  }}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-left hover:bg-surface-hover transition-colors"
-                >
-                  <span className="w-7 h-7 flex-none flex items-center justify-center rounded-md bg-surface-hover text-[11px] font-semibold text-text-secondary">
-                    {p.mark}
-                  </span>
-                  <span className="text-xs text-text-primary">
-                    {t(p.nameKey)}
-                  </span>
-                </button>
-              ))}
+              {MAIL_PROVIDERS.map((p) => {
+                const iconUrl = mailProviderIconUrl(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    data-testid={`mail-provider-${p.id}`}
+                    onClick={() => {
+                      setProviderId(p.id);
+                      setError("");
+                    }}
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-left hover:bg-surface-hover transition-colors"
+                  >
+                    {/* 有厂商图标就画图标（厂商只发布浅底版 logo，必须白底）；
+                        没有的仍画预设表里的字母标记。 */}
+                    <span
+                      className={`w-7 h-7 flex-none flex items-center justify-center rounded-md ${
+                        iconUrl
+                          ? "bg-white border border-border"
+                          : "bg-surface-hover text-[11px] font-semibold text-text-secondary"
+                      }`}
+                    >
+                      {iconUrl ? (
+                        <img src={iconUrl} alt="" className="w-5 h-5" />
+                      ) : (
+                        p.mark
+                      )}
+                    </span>
+                    <span className="text-xs text-text-primary">
+                      {t(p.nameKey)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             <div className="flex justify-end mt-4">
               <button

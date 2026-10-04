@@ -11,6 +11,7 @@
  */
 
 import type { CatalogAuth, CatalogCategory } from "./mcp-catalog";
+import type { MailProviderId } from "./mail-providers";
 
 export type ConnectorSourceId =
   | "mcp-remote"
@@ -85,6 +86,16 @@ export interface ConnectorEntry {
    * 按 server 名去取厂商图标只会让每个邮箱长得一样。留空则回退到名字首字母。
    */
   avatarMark?: string;
+  /**
+   * 邮箱条目的服务商 id（目前只有邮箱用它）。渲染层靠它查厂商图标。
+   *
+   * **为什么不能靠 `serverName`**：所有邮箱条目的 `serverName` 都是 `"Mail"` ——
+   * 按 server 名去取厂商图标只会让每个邮箱长得一样。
+   *
+   * 与 `avatarMark` 的分工：这个是**身份**（查图标），`avatarMark` 是**兜底图形**
+   * （没有图标的那几家画它）。
+   */
+  providerId?: MailProviderId;
 }
 
 export interface ActionResult {

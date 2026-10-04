@@ -9,6 +9,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MailAccountDialog } from "../../renderer/components/connectors/MailAccountDialog";
+import { mailProviderIconUrl } from "../../renderer/components/connectors/mail-provider-icons";
+import type { MailProviderId } from "../../shared/mail-providers";
 
 const api = vi.hoisted(() => {
   const mail = { addAccount: vi.fn() };
@@ -96,6 +98,33 @@ describe("MailAccountDialog", () => {
     ];
     for (const id of ids) {
       expect(byTestId(`mail-provider-${id}`)).toBeTruthy();
+    }
+  });
+
+  it("有厂商图标的服务商画图标，没有的仍画字母标记", () => {
+    render();
+    // 四家有图：simple-icons 里有 QQ / Gmail / iCloud / Alibaba Cloud
+    for (const id of ["qq", "aliyun", "gmail", "icloud"]) {
+      const img = byTestId(`mail-provider-${id}`).querySelector("img");
+      expect(img, `${id} 应该有图标`).not.toBeNull();
+      // 画的是这家自己的图，不是随手一张
+      expect(img!.getAttribute("src"), id).toBe(
+        mailProviderIconUrl(id as MailProviderId),
+      );
+    }
+    // 三家 + 自定义没有图：仍画预设表里的字母标记（这里的字面量就是用户看到的字）
+    const letters: Array<[string, string]> = [
+      ["netease-163", "163"],
+      ["netease-126", "126"],
+      ["exmail", "企"],
+      ["custom", "＋"],
+    ];
+    for (const [id, mark] of letters) {
+      const row = byTestId(`mail-provider-${id}`);
+      expect(row.querySelector("img"), `${id} 不该有图标`).toBeNull();
+      // 断言必须落在**图标框**上：整行的 textContent 里本来就有 i18n key
+      // （`mail.provider.netease-163.name` 自身就含 "163"），在行级断言等于没断言。
+      expect(row.firstElementChild?.textContent, id).toBe(mark);
     }
   });
 
