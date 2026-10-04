@@ -2,11 +2,11 @@ import { Fragment, type ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
+  AudioLines,
   BarChart3,
   Clock3,
   LayoutGrid,
   MessageSquare,
-  Mic,
 } from "lucide-react";
 import type { ActiveView } from "../store";
 import { useAppStore } from "../store";
@@ -72,6 +72,8 @@ export function AppRail({
             </Tooltip>
             {item.key === "chat" ? (
               <Tooltip label={t("navRail.newVoiceSession")} placement="right">
+                {/* 刻意不用麦克风：输入框那个 Mic 是听写，两个语音类按钮
+                    必须一眼分得开。声波条在栏内的线性图标里也不突兀。 */}
                 <button
                   type="button"
                   aria-label={t("navRail.newVoiceSession")}
@@ -79,7 +81,7 @@ export function AppRail({
                   onClick={onCreateVoiceSession}
                   className={`${RAIL_BUTTON_CLASS} text-text-muted hover:bg-overlay-hover hover:text-text-primary disabled:opacity-50`}
                 >
-                  <Mic className="w-4 h-4" />
+                  <AudioLines className="w-4 h-4" />
                 </button>
               </Tooltip>
             ) : null}
