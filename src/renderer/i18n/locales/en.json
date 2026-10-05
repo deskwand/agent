@@ -145,9 +145,9 @@
         "silenceLabel": "Wait up to",
         "silenceValue": "{{ms}} ms",
         "voiceFast": "Fast voice (Matcha)",
-        "voiceFastDesc": "About 1 second to first sound (16 kHz). One 123 MB download, about 260 MB in memory, plus about 320 MB more if you also read aloud; a restart frees both. Falls back to the read-aloud voice, which needs read aloud switched on.",
-        "voiceFastDownload": "Download fast voice",
-        "voiceFastRemove": "Remove fast voice"
+        "voiceFastDesc": "About 1 second to first sound (16 kHz). One 123 MB download, about 260 MB in memory, plus about 320 MB more if you also read aloud; a restart frees both. With the switch off, voice mode uses the read-aloud voice, which needs read aloud switched on.",
+        "voiceFastRemove": "Remove fast voice",
+        "voiceFastToggle": "Use the fast voice in voice conversation"
       }
     },
     "groupGeneral": "General",

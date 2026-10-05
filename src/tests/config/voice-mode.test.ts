@@ -16,4 +16,38 @@ describe("normalizeVoiceModeConfig", () => {
     expect(normalizeVoiceModeConfig({ silenceMs: 99999 }).silenceMs).toBe(2000);
     expect(normalizeVoiceModeConfig({ silenceMs: 900 }).silenceMs).toBe(900);
   });
+
+  it("defaults the fast voice to on for configs written before it existed", () => {
+    // 老配置里没有这个字段。默认必须是 true —— 默认成 false 会让已装音色的人
+    // 悄悄从 1 秒变回 10 秒。
+    expect(normalizeVoiceModeConfig({ silenceMs: 800 }).fastVoice).toBe(true);
+    expect(normalizeVoiceModeConfig(undefined).fastVoice).toBe(true);
+    expect(normalizeVoiceModeConfig({}).fastVoice).toBe(true);
+  });
+
+  it("keeps fastVoice false even when silenceMs is junk", () => {
+    // 两个字段各自归一化。老实现是"silenceMs 不合法就整体返回默认值"，
+    // 那样这一句会把用户关掉的开关打回 true。
+    const out = normalizeVoiceModeConfig({
+      silenceMs: "nope",
+      fastVoice: false,
+    });
+    expect(out.fastVoice).toBe(false);
+    expect(out.silenceMs).toBe(DEFAULT_VOICE_MODE.silenceMs);
+  });
+
+  it("keeps an explicit fastVoice either way", () => {
+    expect(
+      normalizeVoiceModeConfig({ silenceMs: 900, fastVoice: false }).fastVoice,
+    ).toBe(false);
+    expect(
+      normalizeVoiceModeConfig({ silenceMs: 900, fastVoice: true }).fastVoice,
+    ).toBe(true);
+  });
+
+  it("drops an unknown fastVoice value back to the default", () => {
+    expect(
+      normalizeVoiceModeConfig({ silenceMs: 900, fastVoice: "yes" }).fastVoice,
+    ).toBe(true);
+  });
 });

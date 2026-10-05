@@ -11,6 +11,10 @@
  * store 就清它，而工具调用之间会落好几条；也不看"文本静止 N 毫秒" —— 模型思考
  * 时会静很久。真正的结束信号是：目标轮不在 `activeTurn` / `pendingTurns`，且
  * 会话不再 `running`。宁可尾句晚读几句，也不要拿半句话当结束。
+ *
+ * **高速音色开关只在渲染层生效**：`speak` 每句读一次 `voiceMode.fastVoice`，决定要不要
+ * 传 `{ prefer: "matcha" }`。主进程那道门控（上游设计 D7）因此不用改 —— 关掉时不传 prefer，
+ * 于是回退到朗读的模型，而它本来就归朗读开关管。
  */
 import { useEffect, useRef, useState } from "react";
 import type { VoiceErrorCode } from "../../shared/ipc-types";
@@ -106,8 +110,17 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
     // 的 AudioContext 有上限，攒够了连 `new AudioContext` 都会抛。
     const audioContext = new AudioContext();
     const speech = createStreamingSpeech({
-      speak: (text: string) =>
-        window.electronAPI.tts.speak(text, { prefer: "matcha" }),
+      speak: (text: string) => {
+        // **每次调用**读一次：拨开关要能对下一句生效（`silenceMs` 不同，它只在
+        // createVoiceConversation 时读一次就够，因为只影响状态机）。
+        const fast =
+          useAppStore.getState().appConfig?.voiceMode?.fastVoice ??
+          DEFAULT_VOICE_MODE.fastVoice;
+        return window.electronAPI.tts.speak(
+          text,
+          fast ? { prefer: "matcha" } : undefined,
+        );
+      },
       createQueue: () =>
         createAudioQueue({ createContext: () => audioContext }),
     });
