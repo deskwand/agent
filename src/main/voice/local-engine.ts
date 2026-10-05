@@ -73,6 +73,30 @@ export interface LocalEngineOptions {
   numThreads?: number;
 }
 
+/**
+ * 收尾时补的静音长度（秒）。
+ *
+ * 流式 zipformer 要有**右上下文**才能定稿最后几个 token，而
+ * `inputFinished()` 只冲刷特征帧、不管右上下文（见 sherpa-onnx 的
+ * `csrc/online-stream.h` 注释）。录音在最后一个字上结束时，最后这截没有
+ * 右上下文，永远进不了可解码状态。
+ *
+ * 短句里**整句**都落在这一截里 —— 实测「你好」（0.54s）不补时一个字都不出，
+ * 补 0.6s 才出「你好」；长句只是丢尾巴一两个词，所以这个 bug 长句测不出来。
+ *
+ * 取 1.5s 而不是实测需求的最大值 1.0s：需求在 0.6~1.0s 之间波动，而这个方向上
+ * 「差一点」的代价是**空文本** —— 正是本次要修的那个失败模式。代价是 `finish()`
+ * 在主进程上同步多阻塞约 75~90ms（实测短句 90ms / 长句 74ms，含必须的那 1.0s），
+ * 而这发生在用户说完之后。
+ *
+ * **这个值会触发虚假端点，但那是惰性的**：`finish()` 不查 `isEndpoint`、
+ * 不调 `reset`，所以端点信号没人消费。实证：同一段音频补 1s/2s/3s 输出完全相同。
+ *
+ * ⚠️ **这个值与分块大小正相关，换分块必须重测**：官方示例补 0.3~0.66s，是因为
+ * 它们用 160ms 分块的模型；我们 480ms 实测约 1.0s；1920ms 档实测要 1.6s。
+ */
+export const TAIL_PAD_SECONDS = 1.5;
+
 export class LocalTranscriptionEngine implements TranscriptionEngine {
   /**
    * 建一次就复用。这一步把模型读进内存（实测约 2.2s），而它曾经在
@@ -154,6 +178,23 @@ export class LocalTranscriptionEngine implements TranscriptionEngine {
       async finish(): Promise<TranscriptionResult> {
         if (closed) return { text: "" };
         closed = true;
+
+        // 先补静音，再 inputFinished —— 跟官方示例的顺序一致。
+        // （实测在 sherpa-onnx 1.13.8 上把两者对调，输出完全相同，所以顺序不是
+        //   当下的承重墙；保留它是为了跟随官方约定。）
+        // 一次性喂完即可 —— sherpa 的 AcceptWaveform 只是往内部缓冲追加，
+        // 不要求分片（官方 Python 示例也是整段一次喂）。
+        //
+        // `Math.round` 是结构性保证，不是防御式编程：`Float32Array` 的长度必须
+        // 是整数，而改常量时手滑（例如 1.001）会抛 RangeError —— 那个异常会被
+        // `session.stop()` 的 catch 吞掉，退化成「静默空文本」，正是本次要修的
+        // 那个失败模式。取整后，任何常量值都不会把这个路径打回原形。
+        addon.acceptWaveformOnline(stream, {
+          sampleRate: SAMPLE_RATE,
+          samples: new Float32Array(Math.round(SAMPLE_RATE * TAIL_PAD_SECONDS)),
+        });
+        drain();
+
         addon.inputFinished(stream);
         drain();
         return { text: readPartial().trim() };
