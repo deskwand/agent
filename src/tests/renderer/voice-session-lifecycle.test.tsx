@@ -27,6 +27,9 @@ vi.mock("../../renderer/hooks/useVoiceConversation", () => ({
     };
   },
 }));
+vi.mock("../../renderer/utils/voice/voice-sfx", () => ({
+  createVoiceSfx: () => ({ startCue: vi.fn(), exitCue: vi.fn() }),
+}));
 import { useVoiceMode } from "../../renderer/hooks/useVoiceMode";
 afterEach(() => {
   vi.useRealTimers();
@@ -69,6 +72,11 @@ it("stops audio and polling, and rejects callbacks from an older run even when t
     const old = runtime.runs[0];
     await act(async () => root.render(null));
     expect(runtime.stop).toHaveBeenCalledTimes(1);
+    // 退出音要先响完：关闭被延后，不能一卸载就关
+    expect(runtime.close).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(700);
+    });
     expect(runtime.close).toHaveBeenCalledTimes(1);
     await act(async () => {
       vi.advanceTimersByTime(1200);

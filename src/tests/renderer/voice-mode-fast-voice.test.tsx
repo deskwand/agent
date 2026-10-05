@@ -35,6 +35,9 @@ vi.mock("../../renderer/hooks/useVoiceConversation", () => ({
     sendAnswerDelta: vi.fn(),
   }),
 }));
+vi.mock("../../renderer/utils/voice/voice-sfx", () => ({
+  createVoiceSfx: () => ({ startCue: vi.fn(), exitCue: vi.fn() }),
+}));
 
 import { useVoiceMode } from "../../renderer/hooks/useVoiceMode";
 

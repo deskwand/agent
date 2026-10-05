@@ -23,6 +23,7 @@ import { useAppStore } from "../store";
 import type { Message } from "../types";
 import { createAudioQueue } from "../utils/tts/audio-queue";
 import { startMicCapture } from "../utils/voice/mic-capture";
+import { createVoiceSfx } from "../utils/voice/voice-sfx";
 import { stopReadAloud } from "./useReadAloud";
 import { createStreamingSpeech } from "./useStreamingSpeech";
 import {
@@ -61,6 +62,9 @@ const EMPTY: VoiceModeView = {
 };
 
 const POLL_MS = 120;
+
+/** 退出音全长 620ms，留 80ms 余量。 */
+const EXIT_CUE_TAIL_MS = 700;
 
 /**
  * 指定轮次的回答全文 = 已落库的助手消息 + 还没落库的 partial。
@@ -125,6 +129,17 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
         createAudioQueue({ createContext: () => audioContext }),
     });
 
+    // 进入音与退出音：复用同一个 AudioContext，不新建（Chromium 对同时存在的
+    // AudioContext 有上限）。
+    const sfx = createVoiceSfx({ createContext: () => audioContext });
+    /** 进入音只在第一次听的时候响：回到 listening 的后续跳变都不响。 */
+    let entryCuePlayed = false;
+    /**
+     * 采集失败过的会话不再报「我在听」。它之后可能因为解封回到 listening，
+     * 但那时候没有麦克风 —— 状态机把采集失败也归进 blocked，所以这里挡住声音。
+     */
+    let captureFailed = false;
+
     /** 本轮问题分配的轮次标识。只读它的文字，别的轮一概不看。 */
     let expectedTurnId: string | null = null;
     let lastAnswer = "";
@@ -184,7 +199,18 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
       silenceMs:
         useAppStore.getState().appConfig?.voiceMode?.silenceMs ??
         DEFAULT_VOICE_MODE.silenceMs,
-      onState: (state) => patch({ state }),
+      onState: (state) => {
+        if (
+          live &&
+          state === "listening" &&
+          !entryCuePlayed &&
+          !captureFailed
+        ) {
+          entryCuePlayed = true;
+          sfx.startCue();
+        }
+        patch({ state });
+      },
       onLevel: (level) => patch({ level }),
       onTranscript: (transcript) => patch({ transcript }),
       onQuestion: () => {
@@ -195,7 +221,10 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
         answerEnded = false;
       },
       onSentence: () => {},
-      onError: (error) => patch({ error }),
+      onError: (error) => {
+        if (error === "VOICE_CAPTURE_FAILED") captureFailed = true;
+        patch({ error });
+      },
     });
 
     conversationRef.current = conversation;
@@ -240,7 +269,9 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
       window.clearInterval(timer);
       conversationRef.current = null;
       conversation.stop();
-      void audioContext.close();
+      // 退出音要响完：close() 延后到它的尾巴之后（设计文档 §6）。
+      sfx.exitCue();
+      window.setTimeout(() => void audioContext.close(), EXIT_CUE_TAIL_MS);
     };
   }, [options.sessionId]);
 
