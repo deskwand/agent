@@ -136,7 +136,7 @@ function masterGain(gains: Array<FakeNode & { gain: FakeParam }>) {
 }
 
 describe("语音模式音效", () => {
-  it("进入音：两个分音、320ms 打开到 0.21、低通 400→1600、0.76s 收尾", () => {
+  it("进入音：两个分音、320ms 打开到 0.21、低通 400→1600、1.2s 走完尾巴", () => {
     const ctx = fakeContext();
     const sfx = createVoiceSfx({ createContext: () => ctx.context as never });
 
@@ -166,7 +166,7 @@ describe("语音模式音效", () => {
       0.32,
     );
 
-    expect(ctx.oscillators[0].stop).toHaveBeenCalledWith(0.76);
+    expect(ctx.oscillators[0].stop).toHaveBeenCalledWith(1.2);
   });
 
   it("退出音：一个噪声源、280Hz 高通、低通 2200→500、100ms 起音到 0.24", () => {
@@ -241,7 +241,7 @@ describe("语音模式音效", () => {
     expect(
       ctx.filters[0].frequency.linearRampToValueAtTime,
     ).toHaveBeenCalledWith(1600, 12.82);
-    expect(ctx.oscillators[0].stop).toHaveBeenCalledWith(13.26);
+    expect(ctx.oscillators[0].stop).toHaveBeenCalledWith(13.7);
   });
 
   it("退出音播完也断开所有节点", () => {

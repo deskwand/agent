@@ -31,7 +31,11 @@ const START_PARTIALS: ReadonlyArray<readonly [number, number]> = [
 const START_PEAK = 0.21;
 const START_OPEN_SECONDS = 0.32;
 const START_DECAY_SECONDS = 0.22;
-const START_SECONDS = 0.76;
+/**
+ * 总长取到衰减走完：1.2s 时只剩 1.8%（−35dB），收尾听不出"断"。
+ * 原来 0.76s 就停，那时还剩 13.5%（−17dB），耳朵能听见结尾被掉。
+ */
+const START_SECONDS = 1.2;
 const START_LOWPASS_FROM = 400;
 const START_LOWPASS_TO = 1600;
 
