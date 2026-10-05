@@ -218,6 +218,45 @@ describe("语音模式音效", () => {
     for (const node of ctx.nodes) expect(node.disconnect).toHaveBeenCalled();
   });
 
+  it("两个音的收尾都衰减到峰值的 6% 以下才停", () => {
+    // 这不是重中常量，而是重中那条被实发 bug 破坏的关系：
+    // stop 时刻的残余 = exp(-(stop - 峰值时刻) / 时间常数)。
+    // 基线提交（0.76s）在这里是 13.5%，会红 —— 那就是用户听到的「断」。
+    const residualAtStop = (param: FakeParam, stopAt: number) => {
+      const peakAt = param.linearRampToValueAtTime.mock.calls.at(
+        -1,
+      )![1] as number;
+      const calls = param.setTargetAtTime.mock.calls.at(-1) as [
+        number,
+        number,
+        number,
+      ];
+      const [target, , tau] = calls;
+      expect(target).toBe(0);
+      return Math.exp(-(stopAt - peakAt) / tau);
+    };
+
+    const start = fakeContext();
+    const entry = createVoiceSfx({
+      createContext: () => start.context as never,
+    });
+    entry.startCue();
+    const entryStop = start.oscillators[0].stop.mock.calls.at(-1)![0] as number;
+    expect(
+      residualAtStop(masterGain(start.gains), entryStop),
+    ).toBeLessThanOrEqual(0.06);
+
+    const exit = fakeContext();
+    const exitSfx = createVoiceSfx({
+      createContext: () => exit.context as never,
+    });
+    exitSfx.exitCue();
+    const exitStop = exit.bufferSources[0].stop.mock.calls.at(-1)![0] as number;
+    expect(
+      residualAtStop(masterGain(exit.gains), exitStop),
+    ).toBeLessThanOrEqual(0.06);
+  });
+
   it("噪声缓冲只建一次，退出音重复响不重复分配", () => {
     const ctx = fakeContext();
     const sfx = createVoiceSfx({ createContext: () => ctx.context as never });
