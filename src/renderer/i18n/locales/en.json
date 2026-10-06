@@ -1081,6 +1081,7 @@
     "voiceHoldKeyMetaShiftSpaceMac": "⌘ ⇧ Space",
     "voiceHoldKeyMetaShiftSpaceWin": "Win Shift Space",
     "voiceStop": "Stop recording",
+    "voicePolishing": "Cleaning up the text…",
     "voiceCancel": "Cancel this voice input",
     "voiceEngineOff": "Voice input is not enabled yet",
     "voiceNotInstalled": "The voice engine is not ready — tap the mic again to download it",

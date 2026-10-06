@@ -1080,6 +1080,7 @@
     "voiceHoldKeyMetaShiftSpaceMac": "⌘ ⇧ 空格",
     "voiceHoldKeyMetaShiftSpaceWin": "Win Shift 空格",
     "voiceStop": "停止录音",
+    "voicePolishing": "正在整理文字…",
     "voiceCancel": "取消这次语音输入",
     "voiceEngineOff": "语音输入还没启用",
     "voiceNotInstalled": "语音引擎还没装好，再点一次麦克风可以重新下载",

@@ -9,7 +9,13 @@
  *
  * 自动整理的作用范围也由这里界定：**连续几次语音写进框里的那段文字**。
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import type { VoiceErrorCode, VoiceEvent } from "../../shared/ipc-types";
 import {
   MicError,
@@ -50,6 +56,16 @@ export interface VoiceInputController {
   /** 0..1，给音量条。 */
   level: number;
   seconds: number;
+  /**
+   * 这段文字还有一次整理在等（防抖计时中或请求在飞）。
+   *
+   * 它同时覆盖防抖窗口与请求窗口，中间不断开 —— 环一亮到落地，用户看不到「灭一下又亮」。
+   * 只表达「还会不会整理」，不含展示优先级（录音 / 收尾 / 安装时环由按钮自己藏起来）。
+   *
+   * 它不跟着文字的归属走：用户发送或改字后那段文字已经作废，但请求还在飞，环会继续亮到
+   * 请求收敛为止（最长 POLISH_TIMEOUT_MS = 15 秒，那时输入框可能已经空了）。设计 §6 风险 1。
+   */
+  polishing: boolean;
   toggle: () => void;
   cancel: () => void;
 }
@@ -86,6 +102,7 @@ export function useVoiceInput(
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [level, setLevel] = useState(0);
   const [seconds, setSeconds] = useState(0);
+  const [polishing, setPolishing] = useState(false);
 
   const sessionRef = useRef<string | null>(null);
   const captureRef = useRef<MicCapture | null>(null);
@@ -151,16 +168,34 @@ export function useVoiceInput(
    *
    * 结果落地与否只看 `canApply`。这段已经死了（用户改了字 / 发送了 / 正在录音）
    * 就静默放弃；这段还活着但长出了新内容（又说了新的一段）就按合并后的文本补跑一次。
+   *
+   * `polishing` 的收敛规则只有一句：**只有「请求还在飞」与「还要补跑一次」保持 true，
+   * 其余出口一律熄灭**。所以下面五个「不再有下一次尝试」的出口各写一次 false，
+   * 补跑那条在递归之前不许熄 —— 那一下会闪。
+   * **新增提前 return 时必须同时熄灭，否则环会永久亮着，而且没有测试会失败。**
    */
   const runPolish = useCallback(async (): Promise<void> => {
     const api = window.electronAPI?.voice;
-    if (!api) return;
+    // 桥不存在：永远不会再有尝试。
+    if (!api) {
+      setPolishing(false);
+      return;
+    }
+    // 已有在飞任务：这次不发，但那次在飞的任务负责收尾 —— 环保持亮。
     if (polishInFlightRef.current !== null) return;
 
     const run = runRef.current;
     const source = run.text;
-    if (!source.trim()) return;
-    if (!canApply(run.base, source)) return;
+    // 没有内容可整理。
+    if (!source.trim()) {
+      setPolishing(false);
+      return;
+    }
+    // 这段已经死了（用户改了字 / 发送了 / 正在录音）。
+    if (!canApply(run.base, source)) {
+      setPolishing(false);
+      return;
+    }
 
     polishInFlightRef.current = source;
     // sessionId 传 null：这里手上只有语音会话 id，而 recordAuxUsage 要的是聊天会话 id。
@@ -174,17 +209,27 @@ export function useVoiceInput(
 
     if (result?.ok && result.text && canApply(run.base, source)) {
       optionsRef.current.onText(run.base + result.text);
+      setPolishing(false);
       return;
     }
 
-    // 没落地。这段又长出新内容了就补跑一次（canApply 会在里面再判一次）；
-    // 否则是用户改了字 / 发送了 / 正在录音，什么都不做。
-    if (runRef.current.text !== source) void runPolish();
+    // 没落地。这段又长出新内容了就补跑一次（canApply 会在里面再判一次）——
+    // 递归之前不能熄灭，否则环会闪一下再亮。
+    if (runRef.current.text !== source) {
+      void runPolish();
+      return;
+    }
+
+    // 否则是用户改了字 / 发送了 / 正在录音：不会再有一次尝试了。
+    setPolishing(false);
   }, [canApply]);
 
   /** 收尾之后（重）起防抖：连说多段合并成一次调用。 */
   const schedulePolish = useCallback(() => {
     clearPolishTimer();
+    // 开关关着时计时器照样武装（条件只维护在 canApply 一份），但环不亮：
+    // 这次不会有整理发生，亮了就是骗人。
+    setPolishing(optionsRef.current.autoPolish);
     polishTimerRef.current = setTimeout(() => {
       polishTimerRef.current = null;
       void runPolish();
@@ -403,7 +448,10 @@ export function useVoiceInput(
   // 误触丢弃、引擎报错、voice.start 被拒、就绪检查没过），而这些路径里只有一部分
   // 会吐出新文字、只有那部分会重起计时器。漏一条，那段已经写进框里的转写就永远
   // 得不到整理（手动按钮和失败提示都已经删了，用户看不出少了什么）。
-  useEffect(() => {
+  //
+  // 用 layout effect 而不是 effect：环在「到点被录音挡下」那条路上先熄灭过，
+  // 重新点亮必须赶在这一帧绘制之前，否则会先画出一帧「空闲且没有环」。
+  useLayoutEffect(() => {
     if (status === "idle") reschedulePolishIfDue();
   }, [status, reschedulePolishIfDue]);
 
@@ -431,6 +479,7 @@ export function useVoiceInput(
     status,
     level,
     seconds,
+    polishing,
     toggle,
     cancel,
   };

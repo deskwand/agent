@@ -123,12 +123,76 @@ describe("VoiceMicButton", () => {
     expect(container.textContent).not.toContain("%");
     expect(buttonByLabel("chat.voiceStart")!.disabled).toBe(false);
   });
+
+  it("整理中：外圈画呼吸环、可访问名报「正在整理」，麦克风仍可点", () => {
+    render({ polishing: true });
+
+    const ring = container.querySelector('[data-testid="voice-polish-ring"]');
+    expect(ring).not.toBeNull();
+    // 环的观感全靠这两条类名。jsdom 不看样式，而 tailwind 的刻度陷阱
+    // （例如 opacity-55 不在默认刻度里）会让类名照旧存在、CSS 一条都不产出 ——
+    // 断言字符串是这里唯一能拦住那次静默降级的手段。
+    expect(ring!.className).toContain("animate-voice-polish-ring");
+    expect(ring!.className).toContain("opacity-[0.55]");
+    // 状态进可访问名（同安装态的约定）；麦克风没被锁：整理期间仍能按下去说话
+    const mic = buttonByLabel("chat.voicePolishing")!;
+    expect(mic.disabled).toBe(false);
+  });
+
+  const occupiedSlots: Array<
+    [string, Partial<React.ComponentProps<typeof VoiceMicButton>>]
+  > = [
+    ["录音中", { status: "recording" }],
+    ["请求权限中", { status: "requesting" }],
+    ["收尾中", { status: "finishing" }],
+    [
+      "下载模型中",
+      {
+        install: {
+          phase: "downloading" as const,
+          percent: 45,
+          installed: false,
+        },
+      },
+    ],
+    [
+      "解压中",
+      {
+        install: {
+          phase: "extracting" as const,
+          percent: 92,
+          installed: false,
+        },
+      },
+    ],
+    [
+      "安装失败",
+      { install: { phase: "error" as const, percent: 0, installed: false } },
+    ],
+  ];
+
+  it.each(occupiedSlots)("那一格已经有人：%s 时不画环", (_label, props) => {
+    render({ polishing: true, ...props });
+
+    expect(
+      container.querySelector('[data-testid="voice-polish-ring"]'),
+    ).toBeNull();
+  });
+
+  it("不传 polishing 就不画环（替身只填录音那几项）", () => {
+    render();
+
+    expect(
+      container.querySelector('[data-testid="voice-polish-ring"]'),
+    ).toBeNull();
+  });
 });
 
 const stubVoice: VoiceInputController = {
   status: "idle",
   level: 0,
   seconds: 0,
+  polishing: false,
   toggle: () => {},
   cancel: () => {},
 };
@@ -186,6 +250,16 @@ describe("toMicButtonProps 的快捷键条件", () => {
       }).shortcutKeys,
     ).toBeUndefined();
   });
+
+  it("透传 polishing", () => {
+    expect(
+      toMicButtonProps({ ...stubVoice, polishing: true }, null, {
+        config: undefined,
+        platform: "darwin",
+        t: keyT,
+      }).polishing,
+    ).toBe(true);
+  });
 });
 
 describe("可访问名不带键名", () => {
@@ -238,6 +312,18 @@ describe("气泡文案（聚焦可见）", () => {
 
     expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
       "chat.voiceStop",
+    );
+  });
+
+  it("整理中报「正在整理」", async () => {
+    render({ polishing: true });
+    const mic = buttonByLabel("chat.voicePolishing")!;
+    await act(async () => {
+      mic.focus();
+    });
+
+    expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
+      "chat.voicePolishing",
     );
   });
 

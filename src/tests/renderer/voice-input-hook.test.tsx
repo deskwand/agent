@@ -153,6 +153,7 @@ describe("useVoiceInput", () => {
     expect(Object.keys(api).sort()).toEqual([
       "cancel",
       "level",
+      "polishing",
       "seconds",
       "status",
       "toggle",
@@ -557,6 +558,9 @@ describe("自动整理", () => {
     await fireDebounce();
 
     draft = ""; // 宿主发送成功后清空输入框
+    // 发送不叫停环：那次请求还在飞，环一直亮到它收敛为止。
+    // 这就是设计 §6 风险 1 里那条「≤900ms」之外的长尾：请求最长 15 秒（POLISH_TIMEOUT_MS）。
+    expect(api.polishing).toBe(true);
     await act(async () => {
       resolvePolish({ ok: true, text: "整理稿" });
       await flush();
@@ -564,6 +568,7 @@ describe("自动整理", () => {
 
     expect(draft).toBe("");
     expect(voice.polish).toHaveBeenCalledTimes(1);
+    expect(api.polishing).toBe(false);
   });
 
   it("开关关掉之后一次都不整理", async () => {
@@ -678,5 +683,149 @@ describe("自动整理", () => {
     });
 
     expect(draft).toBe("草稿原文");
+  });
+
+  it("说完就亮：防抖还没到点，polishing 已是 true；落地后熄灭", async () => {
+    voice.polish.mockResolvedValue({ ok: true, text: "整理稿" });
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("嗯那个原文");
+
+    expect(api.polishing).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS - 1);
+    });
+    expect(api.polishing).toBe(true);
+
+    await fireDebounce();
+
+    expect(draft).toBe("草稿整理稿");
+    expect(api.polishing).toBe(false);
+  });
+
+  it("开关关着时不亮：这次不会有整理发生", async () => {
+    autoPolishOn = false;
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("原文");
+
+    expect(api.polishing).toBe(false);
+
+    await fireDebounce();
+
+    expect(api.polishing).toBe(false);
+    expect(voice.polish).not.toHaveBeenCalled();
+  });
+
+  it("失败后熄灭：一次机会不重试，环不停留", async () => {
+    voice.polish.mockResolvedValue({ ok: false, reason: "failed" });
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("原文");
+
+    expect(api.polishing).toBe(true);
+
+    await fireDebounce();
+
+    expect(api.polishing).toBe(false);
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+  });
+
+  it("落地前用户动手打字：环随那次作废一起熄灭，不补跑", async () => {
+    const resolvePolish = hangPolish();
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("原文");
+    await fireDebounce();
+    expect(api.polishing).toBe(true);
+
+    // 用户接管文字：不变式破了
+    draft = "我自己写的";
+    await act(async () => {
+      resolvePolish({ ok: true, text: "整理稿" });
+      await flush();
+    });
+
+    expect(draft).toBe("我自己写的");
+    expect(api.polishing).toBe(false);
+    expect(voice.polish).toHaveBeenCalledTimes(1);
+  });
+
+  it("在飞期间又来一段：环一路不灭，直到补跑的那次落地", async () => {
+    const resolveFirst = hangPolish();
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+    await fireDebounce();
+    expect(api.polishing).toBe(true);
+
+    await act(async () => api.toggle());
+    await sayDone("第二段");
+    expect(api.polishing).toBe(true);
+
+    await act(async () => {
+      resolveFirst({ ok: true, text: "只盖住第一段的整理稿" });
+      await flush();
+    });
+
+    expect(voice.polish).toHaveBeenCalledTimes(2);
+    expect(draft).toBe("草稿整理后的文本");
+    expect(api.polishing).toBe(false);
+  });
+
+  it("到点时正在录音、那次又没吐字：收尾补跑时环重新亮起", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+    expect(api.polishing).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS - 300);
+    });
+    await act(async () => api.toggle()); // 又开录
+    await fireDebounce(); // 这次发起被录音挡下
+
+    expect(voice.polish).not.toHaveBeenCalled();
+    expect(api.polishing).toBe(false);
+
+    // 误触（一个字都没吐）：自己的 done 不会重起计时器，靠 reschedulePolishIfDue 补
+    await act(async () =>
+      emit({ type: "done", sessionId: "s1", text: "", discarded: true }),
+    );
+    expect(api.polishing).toBe(true);
+
+    await fireDebounce();
+
+    expect(draft).toBe("草稿整理后的文本");
+    expect(api.polishing).toBe(false);
+  });
+
+  it("Esc 取消这次录音：已进框的那段照旧等整理，环不灭", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("第一段");
+    expect(api.polishing).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(POLISH_DEBOUNCE_MS - 300);
+    });
+    await act(async () => api.toggle()); // 开录
+    await act(async () => api.cancel()); // Esc
+
+    expect(api.polishing).toBe(true);
+
+    await fireDebounce();
+
+    expect(voice.polish).toHaveBeenCalledWith("第一段", null);
+    expect(api.polishing).toBe(false);
+  });
+
+  it("这次一个字都没吐（空结果）：不武装计时器，环也不亮", async () => {
+    await render();
+    await act(async () => api.toggle());
+    await sayDone("");
+
+    expect(api.polishing).toBe(false);
   });
 });

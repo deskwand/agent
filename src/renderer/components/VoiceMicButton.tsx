@@ -20,6 +20,13 @@ export interface VoiceMicButtonProps {
    */
   install?: VoiceInstallState | null;
   /**
+   * 这段文字还有一次整理在等（`useVoiceInput` 的 `polishing`）。
+   *
+   * 可选：既有几个底栏替身只填了录音那几项，不该为一个环去改它们；接线漏传由
+   * `toMicButtonProps` 拦下（那边的 `voice.polishing` 是必填字段）。缺省 = 不画环。
+   */
+  polishing?: boolean;
+  /**
    * 「按住说话」的键名（已 i18n，如「右 Option」）。缺省 = 本气泡不提快捷键：
    * 引擎没启用，或用户在设置里选了「不使用快捷键」。
    */
@@ -37,6 +44,7 @@ export function VoiceMicButton({
   level,
   seconds,
   install,
+  polishing,
   shortcutKeys,
   onToggle,
   onCancel,
@@ -51,12 +59,17 @@ export function VoiceMicButton({
   // 不锁的话用户会点一个没反应的按钮。下载中同理：这一次点击不该被解释成录音。
   const micDisabled = busy || installing;
   const recording = status === "recording";
-  // 下载中 / 录音中麦克风在忙别的事，气泡与可访问名都报那个状态。
+  // 环只在那一格空着的时候画：录音、收尾/请求、安装中、安装失败都各自占着那一格。
+  const showPolishRing =
+    polishing === true && !recording && !busy && !installing && !installFailed;
+  // 下载中 / 录音中 / 整理中，麦克风在忙别的事，气泡与可访问名都报那个状态。
   const activeLabel = installing
     ? t("chat.voiceInstalling", { percent })
     : recording
       ? t("chat.voiceStop")
-      : null;
+      : showPolishRing
+        ? t("chat.voicePolishing")
+        : null;
   // 可访问名只说动作：屏幕阅读器念一串按键是噪音。
   const ariaLabel = activeLabel ?? t("chat.voiceStart");
   // 气泡在空闲且麦克风可用时才多报一句快捷键。收尾 / 下载时那颗键按下去
@@ -119,12 +132,19 @@ export function VoiceMicButton({
           aria-label={ariaLabel}
           disabled={micDisabled}
           onClick={onToggle}
-          className={`inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
             recording
               ? "bg-error/10 text-error"
               : "text-text-muted hover:bg-surface-hover hover:text-text-primary"
           }`}
         >
+          {showPolishRing && (
+            <span
+              aria-hidden
+              data-testid="voice-polish-ring"
+              className="pointer-events-none absolute -inset-[3px] rounded-[11px] border-2 border-accent opacity-[0.55] animate-voice-polish-ring"
+            />
+          )}
           {busy || installing ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -181,6 +201,7 @@ export function toMicButtonProps(
     status: voice.status,
     level: voice.level,
     seconds: voice.seconds,
+    polishing: voice.polishing,
     install,
     shortcutKeys: keyNameKey ? shortcut.t(keyNameKey) : undefined,
     onToggle: voice.toggle,

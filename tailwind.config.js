@@ -119,6 +119,7 @@ module.exports = {
         "slide-up": "slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         "spin-slow": "spin 2s linear infinite",
         expand: "expand 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        "voice-polish-ring": "voicePolishRing 1.6s ease-in-out infinite",
       },
       keyframes: {
         fadeIn: {
@@ -132,6 +133,10 @@ module.exports = {
         expand: {
           "0%": { opacity: "0", maxHeight: "0" },
           "100%": { opacity: "1", maxHeight: "500px" },
+        },
+        voicePolishRing: {
+          "0%,100%": { opacity: "0.25" },
+          "50%": { opacity: "1" },
         },
       },
     },
