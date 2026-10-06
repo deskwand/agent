@@ -375,6 +375,161 @@ describe("ChatView paged older-history loading", () => {
     // prepend 后：内存窗口 12 user → 12 tick（与渲染窗口无关）
     expect(dockTickCount()).toBe(12);
   });
+
+  it("keeps history intact after an empty page and permits the next load", async () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    const tail = turn("tail", 6);
+    useAppStore.getState().setMessagesTail("s1", tail, true);
+    getSessionMessagesPageMock
+      .mockResolvedValueOnce({ messages: [], hasMore: true })
+      .mockResolvedValueOnce({ messages: turn("older", 5), hasMore: false });
+    await act(async () => root.render(React.createElement(ChatView)));
+    const scroller = getScrollContainer();
+    Object.defineProperties(scroller, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 500 },
+    });
+
+    await act(async () => scroller.dispatchEvent(new Event("scroll")));
+    expect(
+      useAppStore
+        .getState()
+        .sessionStates.s1!.messages.map((message) => message.id),
+    ).toEqual(["tail-u6", "tail-a6"]);
+    expect(
+      container.querySelector(".pointer-events-none.absolute.inset-x-0.top-3"),
+    ).toBeNull();
+    await act(async () => scroller.dispatchEvent(new Event("scroll")));
+
+    expect(
+      useAppStore
+        .getState()
+        .sessionStates.s1!.messages.map((message) => message.id),
+    ).toEqual(["older-u5", "older-a5", "tail-u6", "tail-a6"]);
+    expect(
+      scroller.querySelector('[data-message-id="tail-u6"]'),
+    ).not.toBeNull();
+    expect(useAppStore.getState().sessionStates.s1!.hasMoreOlder).toBe(false);
+  });
+
+  it("keeps history intact after a failed page and permits a retry", async () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    useAppStore.getState().setMessagesTail("s1", turn("tail", 6), true);
+    getSessionMessagesPageMock
+      .mockRejectedValueOnce(new Error("page unavailable"))
+      .mockResolvedValueOnce({ messages: turn("older", 5), hasMore: false });
+    await act(async () => root.render(React.createElement(ChatView)));
+    const scroller = getScrollContainer();
+    Object.defineProperties(scroller, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 500 },
+    });
+
+    await act(async () => scroller.dispatchEvent(new Event("scroll")));
+    expect(
+      useAppStore
+        .getState()
+        .sessionStates.s1!.messages.map((message) => message.id),
+    ).toEqual(["tail-u6", "tail-a6"]);
+    expect(
+      container.querySelector(".pointer-events-none.absolute.inset-x-0.top-3"),
+    ).toBeNull();
+    await act(async () => scroller.dispatchEvent(new Event("scroll")));
+
+    expect(
+      scroller.querySelector('[data-message-id="older-u5"]'),
+    ).not.toBeNull();
+    expect(
+      scroller.querySelector('[data-message-id="tail-u6"]'),
+    ).not.toBeNull();
+    expect(useAppStore.getState().sessionStates.s1!.hasMoreOlder).toBe(false);
+  });
+
+  it("ignores a stale page without clearing a new session's in-flight load", async () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    useAppStore.getState().setMessagesTail("s1", turn("tail", 6), true);
+    type Page = { messages: Message[]; hasMore: boolean };
+    let resolveOld!: (page: Page) => void;
+    let resolveNew!: (page: Page) => void;
+    getSessionMessagesPageMock
+      .mockReturnValueOnce(
+        new Promise<Page>((resolve) => {
+          resolveOld = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise<Page>((resolve) => {
+          resolveNew = resolve;
+        }),
+      );
+    await act(async () => root.render(React.createElement(ChatView)));
+    const scroller = getScrollContainer();
+    Object.defineProperties(scroller, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 500 },
+    });
+    await act(async () => scroller.dispatchEvent(new Event("scroll")));
+    await act(async () => {
+      useAppStore.getState().addSession({ ...makeSession(), id: "s2" });
+      useAppStore.getState().setMessagesTail(
+        "s2",
+        turn("new-tail", 6).map((message) => ({ ...message, sessionId: "s2" })),
+        true,
+      );
+      useAppStore.getState().setActiveSession("s2");
+    });
+    await act(async () => {
+      scroller.scrollTop = 0;
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+    expect(
+      container.querySelector(".pointer-events-none.absolute.inset-x-0.top-3"),
+    ).not.toBeNull();
+
+    await act(async () =>
+      resolveOld({ messages: turn("stale", 5), hasMore: false }),
+    );
+
+    expect(
+      useAppStore
+        .getState()
+        .sessionStates.s1!.messages.map((message) => message.id),
+    ).toEqual(["tail-u6", "tail-a6"]);
+    expect(
+      useAppStore
+        .getState()
+        .sessionStates.s2!.messages.map((message) => message.id),
+    ).toEqual(["new-tail-u6", "new-tail-a6"]);
+    expect(
+      container.querySelector(".pointer-events-none.absolute.inset-x-0.top-3"),
+    ).not.toBeNull();
+    // The zero-start success path clears its loading flag on the next frame.
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
+    await act(async () =>
+      resolveNew({
+        messages: turn("new-older", 5).map((message) => ({
+          ...message,
+          sessionId: "s2",
+        })),
+        hasMore: false,
+      }),
+    );
+
+    expect(
+      useAppStore
+        .getState()
+        .sessionStates.s2!.messages.map((message) => message.id),
+    ).toEqual(["new-older-u5", "new-older-a5", "new-tail-u6", "new-tail-a6"]);
+    expect(
+      scroller.querySelector('[data-message-id="new-older-u5"]'),
+    ).not.toBeNull();
+    expect(
+      container.querySelector(".pointer-events-none.absolute.inset-x-0.top-3"),
+    ).toBeNull();
+  });
 });
 
 describe("ChatView dock tick navigation", () => {

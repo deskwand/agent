@@ -10,15 +10,22 @@ function readChatView(): string {
 }
 
 describe("ChatView incremental history wiring", () => {
-  it("renders from a fixed-size message window instead of the full history", () => {
+  it("renders from a bounded message window instead of the full history", () => {
     const source = readChatView();
     expect(source).toContain("const MAX_RENDER_MESSAGES = 400;");
     expect(source).toContain(
       "const [visibleMessageStartIndex, setVisibleMessageStartIndex] = useState(0);",
     );
     expect(source).toContain(
-      "displayedMessages.slice(\n        visibleMessageStartIndex,\n        visibleMessageStartIndex + MAX_RENDER_MESSAGES,",
+      "displayedMessages.slice(visibleMessageStartIndex, visibleMessageEndIndex)",
     );
+    expect(source).toContain(
+      "const visibleMessageEndIndex = getVisibleMessageEndIndex(",
+    );
+    expect(source).toContain(
+      "let end = Math.min(messages.length, start + capacity);",
+    );
+    expect(source).toContain("if (messages[index].turnId === retainedTurnId)");
     expect(source).toContain("mergedTurnEntries.map(");
   });
 

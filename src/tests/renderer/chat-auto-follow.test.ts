@@ -13,12 +13,15 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+const getSessionMessagesPageMock = vi.fn();
+
 vi.mock("../../renderer/hooks/useIPC", () => ({
   useIPC: () => ({
     continueSession: vi.fn(),
     stopSession: vi.fn(),
     setSessionThinkingLevel: vi.fn(),
     setSessionProviderModel: vi.fn(),
+    getSessionMessagesPage: getSessionMessagesPageMock,
     isElectron: false,
   }),
 }));
@@ -26,7 +29,10 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
 vi.mock("../../renderer/components/ChatInput", async () => {
   const ReactModule = await import("react");
   return {
-    ChatInput: ReactModule.forwardRef(function MockChatInput(_props, ref) {
+    ChatInput: ReactModule.forwardRef(function MockChatInput(
+      props: { onToggleExpand?: () => void },
+      ref,
+    ) {
       ReactModule.useImperativeHandle(ref, () => ({
         clear: () => {},
         focus: () => {},
@@ -35,7 +41,10 @@ vi.mock("../../renderer/components/ChatInput", async () => {
         isEmpty: () => true,
         selectFiles: () => {},
       }));
-      return ReactModule.createElement("div");
+      return ReactModule.createElement("button", {
+        "aria-label": "test.expandInput",
+        onClick: props.onToggleExpand,
+      });
     }),
   };
 });
@@ -72,6 +81,20 @@ function makeMessage(id: string, role: Message["role"]): Message {
     timestamp: Date.now(),
     content: [{ type: "text", text: id }],
   };
+}
+
+function makeReplies(count: number, turnId = "turn-1"): Message[] {
+  return Array.from({ length: count }, (_, i) => ({
+    ...makeMessage(`reply-${i}`, "assistant"),
+    turnId,
+    content: [{ type: "text", text: `answer-${i}` }],
+  }));
+}
+
+function renderedIds(scroller: HTMLElement, prefix = ""): string[] {
+  return Array.from(scroller.querySelectorAll<HTMLElement>("[data-message-id]"))
+    .map((node) => node.dataset.messageId!)
+    .filter((id) => id.startsWith(prefix));
 }
 
 function setInitialState(): void {
@@ -113,6 +136,7 @@ describe("ChatView auto-follow", () => {
   let root: Root;
   let resizeCallbacks: Map<Element, ResizeObserverCallback>;
   let scrollToDescriptor: PropertyDescriptor | undefined;
+  let scrollIntoViewDescriptor: PropertyDescriptor | undefined;
 
   beforeEach(() => {
     (
@@ -120,6 +144,7 @@ describe("ChatView auto-follow", () => {
     ).IS_REACT_ACT_ENVIRONMENT = true;
     useAppStore.setState(useAppStore.getInitialState());
     setInitialState();
+    getSessionMessagesPageMock.mockReset();
 
     resizeCallbacks = new Map();
     class ResizeObserverMock {
@@ -173,6 +198,16 @@ describe("ChatView auto-follow", () => {
       },
     });
 
+    scrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
+      Element.prototype,
+      "scrollIntoView",
+    );
+    Object.defineProperty(Element.prototype, "scrollIntoView", {
+      configurable: true,
+      writable: true,
+      value: () => {},
+    });
+
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -182,6 +217,7 @@ describe("ChatView auto-follow", () => {
     await act(async () => root.unmount());
     container.remove();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     vi.useRealTimers();
     if (scrollToDescriptor) {
       Object.defineProperty(
@@ -196,7 +232,127 @@ describe("ChatView auto-follow", () => {
         }
       ).scrollTo;
     }
+    if (scrollIntoViewDescriptor) {
+      Object.defineProperty(
+        Element.prototype,
+        "scrollIntoView",
+        scrollIntoViewDescriptor,
+      );
+    } else {
+      delete (
+        Element.prototype as unknown as {
+          scrollIntoView?: Element["scrollIntoView"];
+        }
+      ).scrollIntoView;
+    }
   });
+
+  async function renderStreamingWindow(historyCount = 500, replyCount = 35) {
+    // jsdom has no layout. Suppress auto-fill and model message heights only.
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    const history = Array.from({ length: historyCount }, (_, i) =>
+      makeMessage(`history-${i}`, i % 2 === 0 ? "user" : "assistant"),
+    );
+    useAppStore.setState((state) => ({
+      sessionStates: {
+        ...state.sessionStates,
+        s1: {
+          ...state.sessionStates.s1!,
+          messages: [
+            ...history,
+            makeMessage("u1", "user"),
+            ...makeReplies(replyCount),
+          ],
+          activeTurn: {
+            turnId: "turn-1",
+            userMessageId: "u1",
+            startedAt: Date.now(),
+          },
+          partialMessage: "streaming tail",
+        },
+      },
+    }));
+    await act(async () => root.render(React.createElement(ChatView)));
+    const scroller =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto")!;
+    installMessageHeights(scroller);
+    await act(async () => {
+      scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight;
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+    expect(scroller.textContent).toContain(`answer-${replyCount - 1}`);
+    return scroller;
+  }
+
+  function installMessageHeights(
+    scroller: HTMLDivElement,
+    heightFor: (id: string) => number = (id) =>
+      id.startsWith("partial-") ? 350 : id.startsWith("reply-") ? 30 : 10,
+  ) {
+    let top = scroller.scrollTop;
+    Object.defineProperties(scroller, {
+      scrollHeight: {
+        configurable: true,
+        get: () =>
+          renderedIds(scroller).reduce((sum, id) => sum + heightFor(id), 0),
+      },
+      clientHeight: { configurable: true, value: 500 },
+      scrollTop: {
+        configurable: true,
+        get: () => top,
+        set: (value: number) => {
+          top = Math.min(
+            Math.max(0, value),
+            Math.max(0, scroller.scrollHeight - 500),
+          );
+        },
+      },
+    });
+  }
+
+  function installMessageRects(
+    scroller: HTMLDivElement,
+    heightFor: (id: string) => number,
+  ) {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        let top = 0;
+        if (this.dataset.messageId) {
+          for (
+            let sibling = this.previousElementSibling;
+            sibling;
+            sibling = sibling.previousElementSibling
+          ) {
+            const id = (sibling as HTMLElement).dataset.messageId;
+            if (id) top += heightFor(id);
+          }
+          top -= scroller.scrollTop;
+        }
+        const height = this.dataset.messageId
+          ? heightFor(this.dataset.messageId)
+          : 500;
+        return {
+          x: 0,
+          y: top,
+          top,
+          bottom: top + height,
+          left: 0,
+          right: 500,
+          width: 500,
+          height,
+          toJSON: () => ({}),
+        };
+      },
+    );
+  }
+
+  async function stopFollowing(scroller: HTMLElement) {
+    await act(async () => {
+      scroller.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -4 }),
+      );
+    });
+  }
 
   it("keeps an idle conversation pinned after content grows during programmatic scrolling", async () => {
     vi.useFakeTimers();
@@ -1018,6 +1174,479 @@ describe("ChatView auto-follow", () => {
     ).not.toBeNull();
     expect(scroller.scrollTop).toBe(1000);
   });
+
+  it("retains the completed turn without follow", async () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    const history = Array.from({ length: 500 }, (_, i) =>
+      makeMessage(`history-${i}`, i % 2 === 0 ? "user" : "assistant"),
+    );
+    const replies = Array.from({ length: 35 }, (_, i) => ({
+      ...makeMessage(`reply-${i}`, "assistant"),
+      turnId: "turn-1",
+      content: [{ type: "text" as const, text: `answer-${i}` }],
+    }));
+    useAppStore.setState((state) => ({
+      sessionStates: {
+        ...state.sessionStates,
+        s1: {
+          ...state.sessionStates.s1!,
+          messages: [...history, makeMessage("u1", "user"), ...replies],
+          activeTurn: {
+            turnId: "turn-1",
+            userMessageId: "u1",
+            startedAt: Date.now(),
+          },
+          partialMessage: "streaming tail",
+        },
+      },
+    }));
+    await act(async () => root.render(React.createElement(ChatView)));
+    const scroller =
+      container.querySelector<HTMLDivElement>(".overflow-y-auto")!;
+    let scrollTop = 500;
+    Object.defineProperties(scroller, {
+      scrollHeight: {
+        configurable: true,
+        get: () =>
+          scroller.querySelector('[data-message-id="reply-34"]') ? 1500 : 1000,
+      },
+      clientHeight: { configurable: true, value: 500 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (top: number) => {
+          scrollTop = Math.min(Math.max(0, top), scroller.scrollHeight - 500);
+        },
+      },
+    });
+    await act(async () => scroller.dispatchEvent(new Event("scroll")));
+    expect(scroller.textContent).toContain("answer-34");
+    const historyNodes = Array.from(
+      scroller.querySelectorAll<HTMLElement>('[data-message-id^="history-"]'),
+    );
+    const historyIds = historyNodes.map((node) => node.dataset.messageId);
+    expect(historyIds[0]).toBe("history-102");
+    expect(historyIds).toHaveLength(398);
+
+    await act(async () => {
+      scroller.dispatchEvent(
+        new WheelEvent("wheel", { bubbles: true, deltaY: -4 }),
+      );
+    });
+    const beforeTop = scroller.scrollTop;
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+
+    expect(
+      scroller.querySelector('[data-message-id="reply-34"]'),
+    ).not.toBeNull();
+    expect(
+      scroller.querySelectorAll('[data-message-id^="reply-"]'),
+    ).toHaveLength(35);
+    expect(scroller.scrollTop).toBe(beforeTop);
+    expect(scroller.querySelector('[data-message-id="history-102"]')).toBe(
+      historyNodes[0],
+    );
+    expect(
+      Array.from(
+        scroller.querySelectorAll<HTMLElement>('[data-message-id^="history-"]'),
+      ).map((node) => node.dataset.messageId),
+    ).toEqual(historyIds);
+  });
+
+  it("preserves the history window when completion happens while reading history", async () => {
+    const scroller = await renderStreamingWindow();
+    await stopFollowing(scroller);
+    await act(async () => {
+      scroller.scrollTop = 300;
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+    const firstHistoryNode = scroller.querySelector(
+      '[data-message-id="history-102"]',
+    );
+    const historyIds = renderedIds(scroller, "history-");
+    expect(firstHistoryNode).not.toBeNull();
+    expect(historyIds).toHaveLength(398);
+
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+
+    expect(
+      scroller.querySelector('[data-message-id="reply-34"]'),
+    ).not.toBeNull();
+    expect(scroller.scrollTop).toBe(300);
+    expect(scroller.querySelector('[data-message-id="history-102"]')).toBe(
+      firstHistoryNode,
+    );
+    expect(renderedIds(scroller, "history-")).toEqual(historyIds);
+  });
+
+  it("gives an older-window scroll priority over completion in the same batch", async () => {
+    const scroller = await renderStreamingWindow();
+    await stopFollowing(scroller);
+
+    await act(async () => {
+      scroller.scrollTop = 100;
+      scroller.dispatchEvent(new Event("scroll"));
+      useAppStore.getState().clearActiveTurn("s1");
+    });
+
+    expect(renderedIds(scroller)).toEqual(
+      Array.from({ length: 400 }, (_, i) => `history-${i}`),
+    );
+    expect(scroller.querySelector('[data-message-id="reply-34"]')).toBeNull();
+    expect(scroller.scrollTop).toBeLessThan(
+      scroller.scrollHeight - scroller.clientHeight,
+    );
+  });
+
+  it("gives a dock window jump priority over completion in the same batch", async () => {
+    const scroller = await renderStreamingWindow();
+    const firstTick = container.querySelector<HTMLElement>(
+      '.absolute.top-0.bottom-0.z-10 [role="button"]',
+    )!;
+
+    await act(async () => {
+      firstTick.click();
+      useAppStore.getState().clearActiveTurn("s1");
+    });
+
+    expect(renderedIds(scroller)).toEqual(
+      Array.from({ length: 400 }, (_, i) => `history-${i}`),
+    );
+    expect(scroller.querySelector('[data-message-id="reply-34"]')).toBeNull();
+  });
+
+  it("does not expand for a streaming card outside the history window", async () => {
+    const scroller = await renderStreamingWindow();
+    await stopFollowing(scroller);
+    await act(async () => {
+      scroller.scrollTop = 100;
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+    expect(
+      scroller.querySelector('[data-message-id="partial-s1-turn-1"]'),
+    ).toBeNull();
+    const firstHistoryNode = scroller.querySelector(
+      '[data-message-id="history-0"]',
+    );
+    const historyIds = renderedIds(scroller, "history-");
+    const beforeTop = scroller.scrollTop;
+
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+
+    expect(scroller.querySelector('[data-message-id="reply-34"]')).toBeNull();
+    expect(scroller.querySelector('[data-message-id="history-0"]')).toBe(
+      firstHistoryNode,
+    );
+    expect(renderedIds(scroller, "history-")).toEqual(historyIds);
+    expect(scroller.scrollTop).toBe(beforeTop);
+  });
+
+  it("keeps same-turn late replies visible without another scroll", async () => {
+    const scroller = await renderStreamingWindow(500, 34);
+    await stopFollowing(scroller);
+    const historyIds = renderedIds(scroller, "history-");
+    const beforeTop = scroller.scrollTop;
+
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+    await act(async () =>
+      useAppStore.getState().addMessage("s1", makeReplies(35)[34]),
+    );
+
+    expect(
+      scroller.querySelector('[data-message-id="reply-34"]'),
+    ).not.toBeNull();
+    expect(renderedIds(scroller, "reply-")).toHaveLength(35);
+    expect(renderedIds(scroller, "history-")).toEqual(historyIds);
+    expect(scroller.scrollTop).toBe(beforeTop);
+  });
+
+  it("does not accumulate coverage for a new turn outside the retained window", async () => {
+    const scroller = await renderStreamingWindow();
+    await stopFollowing(scroller);
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            messages: [
+              ...state.sessionStates.s1!.messages,
+              { ...makeMessage("auto-u2", "user"), autoGenerated: true },
+              ...makeReplies(35, "turn-2").map((message, i) => ({
+                ...message,
+                id: `next-reply-${i}`,
+              })),
+            ],
+            activeTurn: {
+              turnId: "turn-2",
+              userMessageId: "auto-u2",
+              startedAt: Date.now(),
+            },
+            partialMessage: "new streaming tail",
+          },
+        },
+      }));
+    });
+    expect(
+      scroller.querySelector('[data-message-id="partial-s1-turn-2"]'),
+    ).toBeNull();
+    const beforeTop = scroller.scrollTop;
+
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+
+    expect(
+      scroller.querySelector('[data-message-id="next-reply-34"]'),
+    ).toBeNull();
+    expect(renderedIds(scroller).length).toBeLessThanOrEqual(434);
+    expect(scroller.scrollTop).toBe(beforeTop);
+  });
+
+  it("discards old coverage on a session switch even when turn IDs repeat", async () => {
+    const scroller = await renderStreamingWindow();
+    await stopFollowing(scroller);
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+    await act(async () => {
+      useAppStore.getState().addSession({ ...makeSession(), id: "s2" });
+      useAppStore.getState().setMessagesTail(
+        "s2",
+        Array.from({ length: 600 }, (_, i) => ({
+          ...makeMessage(
+            `other-history-${i}`,
+            i % 2 === 0 ? "user" : "assistant",
+          ),
+          sessionId: "s2",
+        })),
+        false,
+      );
+      useAppStore.getState().setActiveSession("s2");
+    });
+    await act(async () => {
+      scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight;
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+    await stopFollowing(scroller);
+    await act(async () => {
+      scroller.scrollTop = 100;
+      scroller.dispatchEvent(new Event("scroll"));
+    });
+    const historyIds = renderedIds(scroller);
+    expect(historyIds[0]).toBe("other-history-0");
+    expect(historyIds).toHaveLength(400);
+
+    await act(async () => {
+      useAppStore.getState().addMessage("s2", {
+        ...makeMessage("other-late-reply", "assistant"),
+        sessionId: "s2",
+        turnId: "turn-1",
+      });
+    });
+
+    expect(
+      scroller.querySelector('[data-message-id="other-late-reply"]'),
+    ).toBeNull();
+    expect(renderedIds(scroller)).toEqual(historyIds);
+    expect(scroller.querySelector('[data-message-id="reply-34"]')).toBeNull();
+  });
+
+  it.each([false, true])(
+    "keeps a visible history anchor when prepend removes an uneven expanded tail (late reply: %s)",
+    async (addLateReply) => {
+      const scroller = await renderStreamingWindow();
+      const heightFor = (id: string) => {
+        if (id.startsWith("history-"))
+          return Number(id.slice(8)) < 102 ? 15 : 10;
+        return id.startsWith("reply-")
+          ? 30
+          : id.startsWith("partial-")
+            ? 350
+            : 10;
+      };
+      installMessageHeights(scroller, heightFor);
+      installMessageRects(scroller, heightFor);
+      await stopFollowing(scroller);
+      await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+      expect(
+        scroller.querySelector('[data-message-id="reply-34"]'),
+      ).not.toBeNull();
+
+      scroller.scrollTop = 100;
+      const historyNode = scroller.querySelector<HTMLElement>(
+        '[data-message-id="history-114"]',
+      )!;
+      const beforeOffset = historyNode.getBoundingClientRect().top;
+      expect(beforeOffset).toBe(20);
+      await act(async () => {
+        scroller.dispatchEvent(new Event("scroll"));
+        if (addLateReply) {
+          useAppStore.getState().addMessage("s1", {
+            ...makeMessage("late-reply", "assistant"),
+            turnId: "turn-1",
+          });
+        }
+      });
+
+      expect(scroller.querySelector('[data-message-id="history-114"]')).toBe(
+        historyNode,
+      );
+      expect(historyNode.getBoundingClientRect().top).toBe(beforeOffset);
+      expect(renderedIds(scroller)).toEqual(
+        Array.from({ length: 400 }, (_, i) => `history-${i}`),
+      );
+      expect(scroller.querySelector('[data-message-id="reply-34"]')).toBeNull();
+    },
+  );
+
+  it("keeps an expanded-window anchor when a short fetched page leaves the start at zero", async () => {
+    const scroller = await renderStreamingWindow(398);
+    const heightFor = (id: string) =>
+      id.startsWith("older-")
+        ? 15
+        : id.startsWith("reply-")
+          ? 30
+          : id.startsWith("partial-")
+            ? 350
+            : 10;
+    installMessageHeights(scroller, heightFor);
+    installMessageRects(scroller, heightFor);
+    await act(async () => {
+      useAppStore.setState((state) => ({
+        sessionStates: {
+          ...state.sessionStates,
+          s1: {
+            ...state.sessionStates.s1!,
+            hasMoreOlder: true,
+            oldestMessageId: "history-0",
+          },
+        },
+      }));
+    });
+    getSessionMessagesPageMock.mockResolvedValue({
+      messages: Array.from({ length: 100 }, (_, i) =>
+        makeMessage(`older-${i}`, i % 2 === 0 ? "user" : "assistant"),
+      ),
+      hasMore: false,
+    });
+    await stopFollowing(scroller);
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+    expect(
+      scroller.querySelector('[data-message-id="reply-34"]'),
+    ).not.toBeNull();
+    scroller.scrollTop = 100;
+    const historyNode = scroller.querySelector<HTMLElement>(
+      '[data-message-id="history-12"]',
+    )!;
+    const beforeOffset = historyNode.getBoundingClientRect().top;
+    expect(beforeOffset).toBe(20);
+
+    await act(async () => scroller.dispatchEvent(new Event("scroll")));
+
+    expect(scroller.querySelector('[data-message-id="history-12"]')).toBe(
+      historyNode,
+    );
+    expect(historyNode.getBoundingClientRect().top).toBe(beforeOffset);
+    expect(renderedIds(scroller)).toEqual([
+      ...Array.from({ length: 100 }, (_, i) => `older-${i}`),
+      ...Array.from({ length: 300 }, (_, i) => `history-${i}`),
+    ]);
+    expect(scroller.querySelector('[data-message-id="reply-34"]')).toBeNull();
+    expect(
+      container.querySelector(".pointer-events-none.absolute.inset-x-0.top-3"),
+    ).toBeNull();
+  });
+
+  it("restores the latest tail when an input-expansion frame runs after completion", async () => {
+    const scroller = await renderStreamingWindow();
+    await stopFollowing(scroller);
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="test.expandInput"]',
+        )!
+        .click();
+    });
+    await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+    expect(
+      scroller.querySelector('[data-message-id="reply-34"]'),
+    ).not.toBeNull();
+
+    await act(async () => {
+      for (const callback of frames.splice(0)) callback(0);
+    });
+
+    expect(
+      scroller.querySelector('[data-message-id="reply-34"]'),
+    ).not.toBeNull();
+    expect(renderedIds(scroller)).toHaveLength(400);
+    expect(renderedIds(scroller)[0]).toBe("history-136");
+    expect(
+      scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop,
+    ).toBeLessThanOrEqual(1);
+  });
+
+  it.each(["button", "scroll", "wheel"] as const)(
+    "restores the tail immediately through %s when the old start is zero",
+    async (entry) => {
+      // 398 history + user + synthetic card = exactly 400 displayed messages.
+      const scroller = await renderStreamingWindow(398);
+      expect(renderedIds(scroller)).toHaveLength(400);
+      expect(renderedIds(scroller)[0]).toBe("history-0");
+      await stopFollowing(scroller);
+      await act(async () => useAppStore.getState().clearActiveTurn("s1"));
+
+      // Do not assert completion coverage here: isolate recovery from retention.
+      // This is also a valid recovery gesture against the old fixed-size window.
+      await act(async () => {
+        if (entry === "button") {
+          container
+            .querySelector<HTMLButtonElement>(
+              'button[aria-label="Scroll to bottom"]',
+            )!
+            .click();
+        } else if (entry === "scroll") {
+          scroller.scrollTop = 300;
+          scroller.dispatchEvent(new Event("scroll"));
+          scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight;
+          scroller.dispatchEvent(new Event("scroll"));
+        } else {
+          scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight;
+          scroller.dispatchEvent(
+            new WheelEvent("wheel", { bubbles: true, deltaY: 4 }),
+          );
+        }
+      });
+
+      expect(
+        scroller.querySelector('[data-message-id="reply-34"]'),
+      ).not.toBeNull();
+      expect(renderedIds(scroller)).toHaveLength(400);
+      expect(renderedIds(scroller)[0]).toBe("history-34");
+      expect(
+        scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop,
+      ).toBeLessThanOrEqual(1);
+
+      await act(async () =>
+        useAppStore.getState().addMessage("s1", {
+          ...makeMessage("reply-35", "assistant"),
+          turnId: "turn-1",
+        }),
+      );
+
+      expect(
+        scroller.querySelector('[data-message-id="reply-35"]'),
+      ).not.toBeNull();
+      expect(renderedIds(scroller)).toHaveLength(400);
+      expect(renderedIds(scroller)[0]).toBe("history-35");
+      expect(
+        scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop,
+      ).toBeLessThanOrEqual(1);
+    },
+  );
 
   it("does not pin the final assistant message after the user scrolls up", async () => {
     useAppStore.setState((state) => ({

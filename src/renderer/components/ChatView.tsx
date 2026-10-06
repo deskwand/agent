@@ -422,11 +422,21 @@ export function ChatView() {
   const stopRequestedRef = useRef(false);
   const prevMessageCountRef = useRef(0);
   const chatInputRef = useRef<ChatInputHandle>(null);
+  const scrollToBottomByButtonRef = useRef<() => void>(() => {});
   const previousSessionIdRef = useRef<string | null>(null);
   const initializedSessionIdRef = useRef<string | null>(null);
   const pendingPrependAnchorRef = useRef<{
     scrollHeight: number;
     scrollTop: number;
+    targetStart: number | null;
+    message?: { id: string; offset: number };
+  } | null>(null);
+  const committedMessageWindowRef = useRef<{
+    sessionId: string;
+    start: number;
+    end: number;
+    streamingTurnId: string | null;
+    retainedTurnId: string | null;
   } | null>(null);
   const pendingDockJumpRef = useRef<string | null>(null);
   const isLoadingOlderRef = useRef(false);
@@ -802,15 +812,52 @@ export function ChatView() {
     );
   }, [activeSessionId, displayedMessages.length]);
 
-  // Fixed-size sliding window: [start, start + MAX_RENDER_MESSAGES).
+  const committedWindow = committedMessageWindowRef.current;
+  const retainedTurnId =
+    !isAtBottomRef.current &&
+    committedWindow?.sessionId === activeSessionId &&
+    committedWindow.start === visibleMessageStartIndex
+      ? committedWindow.streamingTurnId &&
+        committedWindow.streamingTurnId !== activeTurn?.turnId
+        ? committedWindow.streamingTurnId
+        : committedWindow.retainedTurnId
+      : null;
+  const visibleMessageEndIndex = getVisibleMessageEndIndex(
+    displayedMessages,
+    visibleMessageStartIndex,
+    MAX_RENDER_MESSAGES,
+    retainedTurnId,
+  );
   const visibleMessages = useMemo(
     () =>
-      displayedMessages.slice(
-        visibleMessageStartIndex,
-        visibleMessageStartIndex + MAX_RENDER_MESSAGES,
-      ),
-    [displayedMessages, visibleMessageStartIndex],
+      displayedMessages.slice(visibleMessageStartIndex, visibleMessageEndIndex),
+    [displayedMessages, visibleMessageStartIndex, visibleMessageEndIndex],
   );
+
+  // Only committed windows can retain a previously visible streaming card.
+  useLayoutEffect(() => {
+    committedMessageWindowRef.current = activeSessionId
+      ? {
+          sessionId: activeSessionId,
+          start: visibleMessageStartIndex,
+          end: visibleMessageEndIndex,
+          streamingTurnId:
+            visibleMessages.find(
+              (message) =>
+                message.id ===
+                `partial-${activeSessionId}-${activeTurn?.turnId}`,
+            )?.turnId ?? null,
+          retainedTurnId,
+        }
+      : null;
+  });
+
+  const restoreTailWindow = useCallback(() => {
+    committedMessageWindowRef.current = null;
+    setVisibleMessageStartIndex(
+      Math.max(0, displayedMessages.length - MAX_RENDER_MESSAGES),
+    );
+  }, [displayedMessages.length]);
 
   // Merge pure-tool messages (no text blocks) into the preceding assistant
   // message so buildToolDisplayBlocks can group all tool_use/tool_result together.
@@ -1064,6 +1111,7 @@ export function ChatView() {
         (m) => String(m.id) === messageId,
       );
       if (idx === -1) return;
+      committedMessageWindowRef.current = null;
       pendingDockJumpRef.current = messageId;
       setVisibleMessageStartIndex(Math.max(0, idx - PREPEND_MESSAGES));
     },
@@ -1148,6 +1196,27 @@ export function ChatView() {
       return;
     }
 
+    const committedWindow = committedMessageWindowRef.current;
+    let messageAnchor: { id: string; offset: number } | undefined;
+    if (
+      committedWindow?.sessionId === activeSessionId &&
+      committedWindow.start === visibleMessageStartIndex &&
+      committedWindow.end > visibleMessageStartIndex + MAX_RENDER_MESSAGES
+    ) {
+      // Expanded-tail removal makes the total-height delta unsuitable.
+      const containerTop = container.getBoundingClientRect().top;
+      const firstVisibleMessage = Array.from(
+        container.querySelectorAll<HTMLElement>("[data-message-id]"),
+      ).find((node) => node.getBoundingClientRect().bottom > containerTop);
+      if (firstVisibleMessage) {
+        messageAnchor = {
+          id: firstVisibleMessage.dataset.messageId!,
+          offset:
+            firstVisibleMessage.getBoundingClientRect().top - containerTop,
+        };
+      }
+    }
+
     if (visibleMessageStartIndex > 0) {
       // Stage 1: slide the render window further into older history.
       const nextStart = Math.max(
@@ -1158,7 +1227,10 @@ export function ChatView() {
       pendingPrependAnchorRef.current = {
         scrollHeight: container.scrollHeight,
         scrollTop: container.scrollTop,
+        targetStart: nextStart,
+        message: messageAnchor,
       };
+      committedMessageWindowRef.current = null;
       setIsLoadingOlder(true);
       setVisibleMessageStartIndex(nextStart);
       if (nextStart === visibleMessageStartIndex) {
@@ -1182,7 +1254,10 @@ export function ChatView() {
     pendingPrependAnchorRef.current = {
       scrollHeight: container.scrollHeight,
       scrollTop: container.scrollTop,
+      targetStart: null,
+      message: messageAnchor,
     };
+    committedMessageWindowRef.current = null;
     setIsLoadingOlder(true);
 
     let prependApplied = false;
@@ -1215,19 +1290,11 @@ export function ChatView() {
       // above the window (message-granularity, no turn math needed).
       const boundary = page.messages.filter((m) => !m.autoGenerated).length;
       const newStart = Math.max(0, boundary - trimmed - PREPEND_MESSAGES);
+      committedMessageWindowRef.current = null;
       setVisibleMessageStartIndex(newStart);
       prependApplied = true;
-      if (newStart === 0) {
-        // Extreme case: the page still contains fewer than two user
-        // messages after alignment, so the render window start cannot
-        // move — the anchor effect never fires and the spinner would
-        // spin forever. Clear the flags here; the window stays intact
-        // and shows the whole merged list, which is correct content.
-        requestAnimationFrame(() => {
-          pendingPrependAnchorRef.current = null;
-          isLoadingOlderRef.current = false;
-          setIsLoadingOlder(false);
-        });
+      if (pendingPrependAnchorRef.current) {
+        pendingPrependAnchorRef.current.targetStart = newStart;
       }
     } catch {
       // Keep the current window intact; the spinner clears below and
@@ -1244,8 +1311,7 @@ export function ChatView() {
         isLoadingOlderRef.current = false;
         setIsLoadingOlder(false);
       }
-      // Success path: the anchor effect (deps: [visibleMessageStartIndex])
-      // applies the anchor and clears isLoadingOlder after commit.
+      // The anchor effect runs after the page or window changes.
     }
   }, [
     activeSessionId,
@@ -1281,20 +1347,18 @@ export function ChatView() {
     if (!container) return;
     syncFollowFromScroll();
     const onScroll = () => {
+      const wasFollowing = isAtBottomRef.current;
       syncFollowFromScroll();
       if (
         isAtBottomRef.current &&
-        visibleMessageStartIndex > 0 &&
-        activeSessionId
+        activeSessionId &&
+        (visibleMessageStartIndex > 0 || !wasFollowing)
       ) {
-        // Returned to the bottom after loading history: collapse the
-        // render window to the tail and reclaim the in-memory window.
-        // Safe to re-run: same start index bails out and trim is a no-op
-        // once the window is within the cap.
-        setVisibleMessageStartIndex(
-          Math.max(0, displayedMessages.length - MAX_RENDER_MESSAGES),
-        );
-        trimMessagesToWindow(activeSessionId, MAX_MEMORY_WINDOW_MESSAGES);
+        // Restore the tail even when the expanded window starts at zero.
+        restoreTailWindow();
+        if (visibleMessageStartIndex > 0) {
+          trimMessagesToWindow(activeSessionId, MAX_MEMORY_WINDOW_MESSAGES);
+        }
       }
       if (container.scrollTop <= LOAD_OLDER_THRESHOLD_PX) {
         loadOlderTurns();
@@ -1344,6 +1408,7 @@ export function ChatView() {
         // bottom, so follow resumes here (not via a scroll event — a short
         // tail cannot scroll and would never fire one).
         isAtBottomRef.current = true;
+        restoreTailWindow();
         setShowScrollToBottom(false);
       }
     };
@@ -1357,6 +1422,7 @@ export function ChatView() {
     activeSessionId,
     displayedMessages.length,
     loadOlderTurns,
+    restoreTailWindow,
     syncFollowFromScroll,
     trimMessagesToWindow,
     visibleMessageStartIndex,
@@ -1365,17 +1431,37 @@ export function ChatView() {
   useEffect(() => {
     const anchor = pendingPrependAnchorRef.current;
     const container = scrollContainerRef.current;
-    if (!anchor || !container) return;
+    // A store update can commit before the requested window move.
+    if (
+      !anchor ||
+      anchor.targetStart !== visibleMessageStartIndex ||
+      !container
+    ) {
+      return;
+    }
 
-    container.scrollTop = getAnchoredScrollTop(
-      anchor.scrollTop,
-      anchor.scrollHeight,
-      container.scrollHeight,
-    );
+    const message = anchor.message;
+    const anchorNode = message
+      ? container.querySelector<HTMLElement>(
+          `[data-message-id="${message.id}"]`,
+        )
+      : null;
+    if (message && anchorNode) {
+      container.scrollTop +=
+        anchorNode.getBoundingClientRect().top -
+        container.getBoundingClientRect().top -
+        message.offset;
+    } else {
+      container.scrollTop = getAnchoredScrollTop(
+        anchor.scrollTop,
+        anchor.scrollHeight,
+        container.scrollHeight,
+      );
+    }
     pendingPrependAnchorRef.current = null;
     isLoadingOlderRef.current = false;
     setIsLoadingOlder(false);
-  }, [visibleMessageStartIndex]);
+  }, [visibleMessageStartIndex, displayedMessages]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -1471,7 +1557,7 @@ export function ChatView() {
   useEffect(() => {
     if (!isInputExpanded) return;
     const raf = requestAnimationFrame(() => {
-      scrollToBottomByButton();
+      scrollToBottomByButtonRef.current();
     });
     return () => cancelAnimationFrame(raf);
   }, [isInputExpanded]);
@@ -1835,10 +1921,16 @@ export function ChatView() {
 
   const scrollToBottomByButton = () => {
     isAtBottomRef.current = true;
+    restoreTailWindow();
     setShowScrollToBottom(false);
     const c = scrollContainerRef.current;
     c?.scrollTo({ top: c.scrollHeight, behavior: "smooth" });
   };
+
+  // An expansion frame must restore the latest committed tail window.
+  useLayoutEffect(() => {
+    scrollToBottomByButtonRef.current = scrollToBottomByButton;
+  });
 
   if (!activeSession) {
     return (
@@ -2199,4 +2291,20 @@ function formatTokenCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
   return String(n);
+}
+
+export function getVisibleMessageEndIndex(
+  messages: Message[],
+  start: number,
+  capacity: number,
+  retainedTurnId: string | null,
+): number {
+  let end = Math.min(messages.length, start + capacity);
+  if (!retainedTurnId) return end;
+  for (let index = start; index < messages.length; index += 1) {
+    if (messages[index].turnId === retainedTurnId) {
+      end = Math.max(end, index + 1);
+    }
+  }
+  return end;
 }
