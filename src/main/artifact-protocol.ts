@@ -11,10 +11,10 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
-import { basename, dirname, join, normalize } from "node:path";
+import { basename, dirname, isAbsolute, join, normalize } from "node:path";
 import { protocol } from "electron";
 import { isPathWithinRoot } from "./tools/path-containment";
-import { logError } from "./utils/logger";
+import { logError, logWarn } from "./utils/logger";
 
 export const ARTIFACT_PROTOCOL_SCHEME = "deskwand-artifact";
 export const MAX_INLINE_ARTIFACT_BYTES = 5 * 1024 * 1024;
@@ -159,6 +159,16 @@ export function resolveArtifactFilePath(
 export async function resolveArtifactRenderUrl(
   filePath: string,
 ): Promise<string | null> {
+  // 渲染层负责把相对工作区的路径解析成绝对路径（见 ArtifactInlineFrame）。
+  // 这里再拦一道：主进程的 cwd 是应用启动目录（打包后从 Dock 启动就是 `/`），
+  // 相对路径会解析到那里——cwd 下恰好有同名文件就会静默伺服无关文件。
+  if (!isAbsolute(filePath)) {
+    logWarn(
+      "[ArtifactProtocol] Refusing a non-absolute artifact path:",
+      filePath,
+    );
+    return null;
+  }
   if (!isInlineArtifactPath(filePath)) return null;
   try {
     const info = await stat(filePath);

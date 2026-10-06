@@ -196,7 +196,9 @@ describe("serveArtifactFile", () => {
   it("serves the file with csp and hardening headers", async () => {
     const dir = makeDir();
     writeFileSync(join(dir, "report.html"), "<h1>hi</h1>");
-    const { rootRef, sig, relativePath } = signedParts(join(dir, "report.html"));
+    const { rootRef, sig, relativePath } = signedParts(
+      join(dir, "report.html"),
+    );
 
     const response = await serveArtifactFile(rootRef, sig, relativePath);
     expect(response.status).toBe(200);
@@ -225,7 +227,10 @@ describe("serveArtifactFile", () => {
   it("serves a sibling png so a reported chart loads", async () => {
     const dir = makeDir();
     writeFileSync(join(dir, "report.html"), "<h1>hi</h1>");
-    writeFileSync(join(dir, "chart.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    writeFileSync(
+      join(dir, "chart.png"),
+      Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+    );
     const { rootRef, sig } = signedParts(join(dir, "report.html"));
 
     const response = await serveArtifactFile(rootRef, sig, "chart.png");
@@ -282,5 +287,21 @@ describe("serveArtifactFile", () => {
 
     const response = await serveArtifactFile(rootRef, sig, "big.html");
     expect(response.status).toBe(413);
+  });
+});
+
+describe("resolveArtifactRenderUrl requires an absolute path", () => {
+  it("refuses a relative path even when a file of that name exists in cwd", async () => {
+    // 打包应用从 Dock 启动时 cwd 是 `/`；渲染层必须给绝对路径。
+    // 若这里不设防，cwd 下恰好存在同名文件时就会静默伺服那个无关文件。
+    const dir = makeDir();
+    writeFileSync(join(dir, "report.html"), "<h1>wrong file</h1>");
+    const previousCwd = process.cwd();
+    process.chdir(dir);
+    try {
+      expect(await resolveArtifactRenderUrl("report.html")).toBeNull();
+    } finally {
+      process.chdir(previousCwd);
+    }
   });
 });

@@ -12,6 +12,9 @@ import {
 } from "lucide-react";
 import { openFilePathInBrowser } from "../../utils/open-in-browser";
 import { Tooltip } from "../Tooltip";
+import { useAppStore } from "../../store";
+import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
+import type { Session } from "../../types";
 import type { InlineArtifactInfo } from "../../utils/inline-artifacts";
 
 /** 每次展开都重新取 URL：签名是进程内的，应用重启后就失效了。 */
@@ -37,6 +40,20 @@ export function ArtifactInlineFrame({
   const [reloadToken, setReloadToken] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
+  // 模型给的是相对工作区的路径（<file_references> 规则要求如此），而主进程的 cwd 是
+  // 应用启动目录（打包后从 Dock 启动就是 `/`）——不解析就是 stat(ENOENT) → null → 失败行。
+  // 解析方式与 ArtifactCard 保持一致。
+  const activeSessionCwd = useAppStore((s) => {
+    const sid = s.activeSessionId;
+    if (!sid) return undefined;
+    const session = (s.sessions as Session[]).find((ses) => ses.id === sid);
+    return session?.cwd || undefined;
+  });
+  const resolvedPath = resolvePathAgainstWorkspace(
+    artifact.path,
+    activeSessionCwd,
+  );
+
   const label =
     artifact.name ?? artifact.path.split(/[/\\]/).pop() ?? artifact.path;
 
@@ -54,7 +71,7 @@ export function ArtifactInlineFrame({
       return;
     }
     api
-      .getRenderUrl(artifact.path)
+      .getRenderUrl(resolvedPath)
       .then((url) => {
         if (cancelled) return;
         setState(url ? { kind: "ready", url } : { kind: "failed" });
@@ -65,11 +82,11 @@ export function ArtifactInlineFrame({
     return () => {
       cancelled = true;
     };
-  }, [artifact.path, expanded, reloadToken]);
+  }, [resolvedPath, expanded, reloadToken]);
 
   const handleOpenInBrowser = useCallback(() => {
-    openFilePathInBrowser(artifact.path);
-  }, [artifact.path]);
+    openFilePathInBrowser(resolvedPath);
+  }, [resolvedPath]);
 
   if (!expanded) {
     return (
