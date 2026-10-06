@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * 语音模式要按设置里的音色档位决定传不传 `prefer`，并且两种档位都带 `purpose: "voice"`。
+ * 语音模式要按设置里的音色档位决定传哪个 `tone`，并且两种档位都带 `purpose: "voice"`。
  *
  * 这是把档位接上引擎的**唯一**一处接线，而且断了不会报错：服务层会安静地回退到
  * 朗读的模型，症状只有"又变慢了"。所以把它钉住。
@@ -60,7 +60,7 @@ afterEach(() => {
 });
 
 /** 每个用例的脚手架：stub AudioContext 与流式 tts、建一个语音会话并打开浮层。 */
-async function mount(opts: { fastVoice?: boolean } = {}) {
+async function mount(opts: { fastVoice?: boolean; tone?: string } = {}) {
   // speakStream 现在才是真入口：语音模式走 speakStream（块事件），不再调 tts.speak。
   const speakStream = vi.fn(async () => ({ streamId: 1 }));
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -77,7 +77,7 @@ async function mount(opts: { fastVoice?: boolean } = {}) {
 
   // 这一句会把 appConfig 清掉，所以要设开关必须在它**之后**（或走 opts）
   useAppStore.setState(useAppStore.getInitialState(), true);
-  if (opts.fastVoice !== undefined) setFastVoice(opts.fastVoice);
+  if (opts.fastVoice !== undefined) setFastVoice(opts.fastVoice, opts.tone);
   const store = useAppStore.getState();
   store.addSession({
     id: "V",
@@ -115,9 +115,9 @@ const say = (text: string) =>
   );
 
 /** 只填本用例会读的字段。 */
-const setFastVoice = (fastVoice: boolean) =>
+const setFastVoice = (fastVoice: boolean, tone?: string) =>
   useAppStore.getState().setAppConfig({
-    voiceMode: { silenceMs: 1200, fastVoice },
+    voiceMode: { silenceMs: 1200, fastVoice, ...(tone ? { tone } : {}) },
   } as AppConfig);
 
 it("asks for the fast voice while 快速 is selected", async () => {
@@ -127,21 +127,22 @@ it("asks for the fast voice while 快速 is selected", async () => {
     await say("你好。");
     expect(speak).toHaveBeenCalledExactlyOnceWith("你好。", {
       purpose: "voice",
-      prefer: "matcha",
+      tone: "fast",
     });
   } finally {
     await unmount();
   }
 });
 
-it("sends no prefer while 均衡 is selected, but still says who is talking", async () => {
+it("asks for the balanced tier while 均衡 is selected, but still says who is talking", async () => {
   const { speak, unmount } = await mount({ fastVoice: false });
   try {
     await say("你好。");
-    // 不传 prefer：让服务层按文本路由到朗读的中文 / 英文音色。
+    // tone: "balanced"：让服务层按文本路由到朗读的中文 / 英文音色。
     // purpose 必须在：均衡那份模型与朗读共用，但语音对话是自己选了它（见 ipc 门控）。
     expect(speak).toHaveBeenCalledExactlyOnceWith("你好。", {
       purpose: "voice",
+      tone: "balanced",
     });
   } finally {
     await unmount();
@@ -155,7 +156,10 @@ it("reads the setting on every sentence, so switching takes effect at once", asy
     await say("第一句。");
     setFastVoice(false);
     await say("第二句。");
-    expect(speak).toHaveBeenLastCalledWith("第二句。", { purpose: "voice" });
+    expect(speak).toHaveBeenLastCalledWith("第二句。", {
+      purpose: "voice",
+      tone: "balanced",
+    });
   } finally {
     await unmount();
   }

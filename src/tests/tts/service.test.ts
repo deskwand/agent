@@ -8,7 +8,11 @@ import {
   TTS_MODEL_ID,
   voiceRoot,
 } from "../../main/speech/installer";
-import { getTtsService, resetTtsServiceCache } from "../../main/tts/service";
+import {
+  getTtsService,
+  resetTtsServiceCache,
+  resolveTtsEngine,
+} from "../../main/tts/service";
 import type { TtsEngine } from "../../main/tts/tts-engine";
 import type { TtsModelKey } from "../../shared/ipc-types";
 
@@ -307,5 +311,72 @@ describe("prefer (语音模式的高速音色)", () => {
       prefer: "matcha",
     });
     expect(seen).toEqual(["en:The build failed."]);
+  });
+});
+
+/**
+ * 三档音色的解析规则。`tone` 是设置页那一栏的语义；`prefer` 是它的前身，
+ * 两者并存（老调用点还在传 prefer）。
+ */
+describe("tone 解析", () => {
+  const installedAll = () => true;
+  const installedNone = () => false;
+
+  it("fast → matcha（装了才用，没装回落到路由）", () => {
+    expect(resolveTtsEngine("你好", { tone: "fast" }, installedAll)).toBe(
+      "matcha",
+    );
+    // 没装 matcha 就不硬点它，交给按文本路由
+    const onlyEnglishInstalled = (engine?: TtsModelKey) => engine === "en";
+    expect(
+      resolveTtsEngine("hello there", { tone: "fast" }, onlyEnglishInstalled),
+    ).toBe("en");
+    // 路由到的也没装 → 退回 zh，由调用方报"未安装"（不在这里悄悄降级）
+    expect(
+      resolveTtsEngine("hello there", { tone: "fast" }, installedNone),
+    ).toBe("zh");
+  });
+
+  it("balanced → 按文本路由（与不传 tone 等价）", () => {
+    expect(resolveTtsEngine("你好", { tone: "balanced" }, installedAll)).toBe(
+      "zh",
+    );
+    expect(
+      resolveTtsEngine("hello there", { tone: "balanced" }, installedAll),
+    ).toBe("en");
+  });
+
+  it("best → engine（不是 sherpa 的模型键）", () => {
+    expect(resolveTtsEngine("你好", { tone: "best" }, installedAll)).toBe(
+      "engine",
+    );
+    // 引擎是流式专属：整句那条路不支持，直接说明白，不假装能跑
+    expect(resolveTtsEngine("你好", { tone: "best" }, installedNone)).toBe(
+      "engine",
+    );
+  });
+
+  it("engine 硬指定优先于 tone（自检要钉死自己那份）", () => {
+    expect(
+      resolveTtsEngine("你好", { engine: "en", tone: "best" }, installedAll),
+    ).toBe("en");
+  });
+
+  it("tone 优先于 prefer（新的语义赢）", () => {
+    expect(
+      resolveTtsEngine("你好", { tone: "fast", prefer: "zh" }, installedAll),
+    ).toBe("matcha");
+  });
+});
+
+describe("整句 API 与引擎档", () => {
+  it("tone=best 走整句 API 时报错，而不是假装支持", async () => {
+    const userDataPath = installedUserData();
+    const service = getTtsService({ userDataPath, createEngine: engineStub });
+    const result = await service.speak("你好", { tone: "best" });
+    expect(result).toEqual({
+      ok: false,
+      error: "engine requires streaming",
+    });
   });
 });

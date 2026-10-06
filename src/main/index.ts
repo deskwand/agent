@@ -128,6 +128,7 @@ import { registerVoiceIpc } from "./voice/ipc";
 import { allowPermissionRequest } from "./media-permission";
 import type { VoiceIpcHandle } from "./voice/ipc";
 import { registerTtsIpc } from "./tts/ipc";
+import { disposeEngineHost } from "./engine/engine-host";
 import type { OcrIpcHandle } from "./ocr/ipc";
 import { registerOcrIpc } from "./ocr/ipc";
 import type { TtsIpcHandle } from "./tts/ipc";
@@ -1561,6 +1562,8 @@ app.on("before-quit", async (event) => {
     // In dev mode, exit quickly — no need for async sandbox cleanup
     if (process.env.VITE_DEV_SERVER_URL) {
       stopNavServer();
+      // 引擎是常驻 2.7GB 的子进程：退出前必须杀掉，否则它会活过应用
+      disposeEngineHost();
       try {
         closeDatabase();
       } catch {
@@ -1572,6 +1575,7 @@ app.on("before-quit", async (event) => {
       return;
     }
     event.preventDefault();
+    disposeEngineHost();
     try {
       await cleanupSandboxResources();
       browserViewManager?.destroy();

@@ -9,7 +9,11 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TtsEvent, TtsInstallState } from "../../shared/ipc-types";
+import type {
+  TtsEvent,
+  TtsInstallState,
+  TtsModelKey,
+} from "../../shared/ipc-types";
 import type { AppConfig } from "../../renderer/types";
 
 const api = vi.hoisted(() => {
@@ -57,7 +61,7 @@ const byTestId = (id: string) =>
   container.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
 /** 主进程在装 / 删之后会推一条事件给**所有**订阅者。 */
-const publish = (model: TtsEvent["model"], state: TtsInstallState) =>
+const publish = (model: TtsModelKey, state: TtsInstallState) =>
   act(async () => {
     for (const listener of listeners)
       listener({ type: "install", model, state });

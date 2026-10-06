@@ -29,6 +29,7 @@ import type {
   AddMailAccountInput,
   MailAccountView,
 } from "../shared/mail-accounts";
+import type { EngineInstallState } from "../shared/engine-install";
 import type {
   CapabilityPermissions,
   PermissionKind,
@@ -55,6 +56,7 @@ import type {
   TtsSpeakResult,
   TtsSpeakStreamResult,
   TtsStreamEvent,
+  TtsTone,
 } from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
 import type {
@@ -1007,6 +1009,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.on("tts.stream", handler);
       return () => ipcRenderer.removeListener("tts.stream", handler);
     },
+    // 试听：三档通用，返回整句音频（不是流式）
+    preview: (tone: TtsTone): Promise<TtsSpeakResult> =>
+      ipcRenderer.invoke("tts.preview", tone),
+    // 「最佳音质」档的引擎（本地大模型，约 900MB，按平台下载）
+    getEngineState: (): Promise<EngineInstallState> =>
+      ipcRenderer.invoke("tts.getEngineState"),
+    installEngine: (): Promise<void> => ipcRenderer.invoke("tts.installEngine"),
+    removeEngine: (): Promise<void> => ipcRenderer.invoke("tts.removeEngine"),
   },
   ocr: {
     getInstallState: (): Promise<OcrInstallState> =>
@@ -1705,6 +1715,10 @@ declare global {
         ) => Promise<TtsSpeakStreamResult>;
         cancelStream: (streamId: number) => Promise<void>;
         onStream: (callback: (event: TtsStreamEvent) => void) => () => void;
+        preview: (tone: TtsTone) => Promise<TtsSpeakResult>;
+        getEngineState: () => Promise<EngineInstallState>;
+        installEngine: () => Promise<void>;
+        removeEngine: () => Promise<void>;
       };
       ocr: {
         getInstallState: () => Promise<OcrInstallState>;
