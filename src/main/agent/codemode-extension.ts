@@ -35,6 +35,10 @@ export function createDeskwandCodemodeExtension(): ExtensionFactory {
     // 固定 0：不内联工具签名，模型在脚本里用 searchTools() 现场找
     //（见 shared/codemode-config.ts）。
     inlineBudget: CODEMODE_INLINE_BUDGET,
+    // 刻意不传 `models`：pi 默认 true，即把模型目录/分类器 API（`models.classify` 等）
+    // 声明进 codemode 描述、并注入脚本沙盒。**这两千字符是留着的**，因为后续要接分类器
+    // （脚本里把数据丢给分类器模型批量打标，不占主对话上下文）。
+    // 体检数据与取舍见 design-docs/2026-10-06-tool-exposure-slim-design.md 的「codemode 描述体检」。
   });
 
   log(`[codemode] registered (mode=${config.mode})`);
