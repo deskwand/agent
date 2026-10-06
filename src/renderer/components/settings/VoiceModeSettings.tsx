@@ -133,7 +133,20 @@ export function VoiceModeSettings() {
   ) as SilenceChoice;
 
   // `tone` 是事实来源（老配置只有 fastVoice，由 resolveVoiceTone 归一化）
-  const tone = resolveVoiceTone(appConfig?.voiceMode);
+  const storedTone = resolveVoiceTone(appConfig?.voiceMode);
+  /**
+   * 平台不支持（清单里没有这一平台的产物）时**整档都不出现** —— 拿一个永远装不了的
+   * 东西勾人只会制造"我为什么不能装"。
+   *
+   * 与"磁盘/内存不够"区别对待：那是用户能改的，所以保留档位并说明原因。
+   * 只在**确知**平台不支持时才藏（判据来自主进程的预检）；读状态失败时照旧显示，
+   * 免得一次瞬时错误把能用的功能藏起来。
+   */
+  const platformUnsupported =
+    (engine?.blockedReason ?? undefined) === "platform";
+  // 老配置写着 best、但这台机器装不了 → 按实际会发生的行为显示（主进程也会回退均衡）
+  const tone =
+    platformUnsupported && storedTone === "best" ? "balanced" : storedTone;
   const entry = TONE[tone];
   const isBest = entry.kind === "engine";
   /** 前两档的模型。best 时这一行不显示 sherpa 的状态，取 zh 只是为了让类型收敛。 */
@@ -315,7 +328,11 @@ export function VoiceModeSettings() {
             label={badgeLabel}
           />
         }
-        note={t(`${VOICE_MODE_KEY}.toneDesc`)}
+        note={t(
+          platformUnsupported
+            ? `${VOICE_MODE_KEY}.toneDescNoBest`
+            : `${VOICE_MODE_KEY}.toneDesc`,
+        )}
         control={
           <>
             <SettingsSelect<TtsTone>
@@ -328,7 +345,14 @@ export function VoiceModeSettings() {
                   value: "balanced",
                   label: t(`${VOICE_MODE_KEY}.toneBalanced`),
                 },
-                { value: "best", label: t(`${VOICE_MODE_KEY}.toneBest`) },
+                ...(platformUnsupported
+                  ? []
+                  : [
+                      {
+                        value: "best" as const,
+                        label: t(`${VOICE_MODE_KEY}.toneBest`),
+                      },
+                    ]),
               ]}
               onChange={(next) => void changeTone(next)}
             />
@@ -377,7 +401,7 @@ export function VoiceModeSettings() {
         }
       />
 
-      {isBest && (
+      {isBest && !platformUnsupported && (
         <SettingsRow
           sub
           testId="voice-engine-row"

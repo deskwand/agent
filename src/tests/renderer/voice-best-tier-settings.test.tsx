@@ -212,6 +212,37 @@ describe("最佳音质档", () => {
     expect(api.tts.installEngine).toHaveBeenCalledOnce();
   });
 
+  it("平台不支持（Windows/Linux 没产物）→ 整档都不出现", async () => {
+    await mount({
+      tone: "best",
+      engine: { ...ENGINE_IDLE, blockedReason: "platform" },
+    });
+
+    // 下拉里只有两档，引擎行完全不渲染 —— 不是"灰着勾人"
+    expect(optionValues("voice-voice-tone")).toEqual(["fast", "balanced"]);
+    expect(queryTestId("voice-engine-row")).toBeNull();
+    expect(queryTestId("voice-engine-install")).toBeNull();
+    // 说明文案也不该再提第三档
+    expect(byTestId("voice-voice-row")?.textContent).toContain(
+      "settings.capabilities.voiceMode.toneDescNoBest",
+    );
+    // 老配置写着 best、但这台机器装不了：按实际行为显示均衡（主进程也会回退）
+    expect((byTestId("voice-voice-tone") as HTMLSelectElement).value).toBe(
+      "balanced",
+    );
+  });
+
+  it("磁盘/内存不够时仍然显示这一档，只是说明原因（用户能改）", async () => {
+    await mount({
+      tone: "best",
+      engine: { ...ENGINE_IDLE, blockedReason: "disk" },
+    });
+
+    expect(optionValues("voice-voice-tone")).toContain("best");
+    expect(queryTestId("voice-engine-row")).not.toBeNull();
+    expect(queryTestId("voice-engine-install")).toBeNull();
+  });
+
   it("硬件不支持时不出现安装按钮（不能装着装着才发现跑不动）", async () => {
     await mount({
       tone: "best",
