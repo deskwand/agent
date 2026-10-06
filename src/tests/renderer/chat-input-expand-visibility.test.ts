@@ -71,7 +71,6 @@ const baseBarProps: Omit<BarProps, "hasInputContent" | "onToggleExpand"> = {
     level: 0,
     seconds: 0,
     onToggle: () => {},
-    onCancel: () => {},
   },
 };
 
@@ -270,7 +269,6 @@ describe("ChatInputBottomBar expand button", () => {
             level: 0,
             seconds: 0,
             onToggle: () => {},
-            onCancel: () => {},
           },
           ...props,
         }),

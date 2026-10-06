@@ -44,7 +44,6 @@ function render(
         seconds={0}
         install={null}
         onToggle={() => {}}
-        onCancel={() => {}}
         {...props}
       />,
     );
@@ -74,12 +73,86 @@ describe("VoiceMicButton", () => {
     expect(onToggle).toHaveBeenCalled();
   });
 
-  it("录音态显示计时、音量条与取消", () => {
+  it("录音态只剩一粒胶囊：波形 + 计时，没有取消按钮", () => {
     render({ status: "recording", seconds: 7, level: 0.5 });
 
     expect(container.textContent).toContain("0:07");
+    // 那一格只有一个控件，它就是停止按钮
+    expect(container.querySelectorAll("button")).toHaveLength(1);
     expect(buttonByLabel("chat.voiceStop")).toBeDefined();
-    expect(buttonByLabel("chat.voiceCancel")).toBeDefined();
+    expect(
+      container.querySelectorAll('[data-testid="voice-level-bar"]'),
+    ).toHaveLength(5);
+  });
+
+  it("波形取最近 5 个电平采样：最左最旧，空槽与静音都落在保底高度", () => {
+    const heights = () =>
+      [...container.querySelectorAll('[data-testid="voice-level-bar"]')].map(
+        (el) => (el as HTMLElement).style.height,
+      );
+
+    // 每调一次 render 就是一次重渲染，电平推进一格
+    render({ status: "recording", seconds: 4, level: 0.2 });
+    render({ status: "recording", seconds: 4, level: 0.6 });
+    render({ status: "recording", seconds: 4, level: 0.9 });
+
+    // 三个采样按时间序落在最右三根；左边两根是还没填满的空槽 → 保底 12%
+    expect(heights()).toEqual(["12%", "12%", "20%", "60%", "90%"]);
+  });
+
+  it("回到空闲后采样清空：下一次录音从平地起步", () => {
+    render({ status: "recording", seconds: 4, level: 0.9 });
+    render({ status: "idle" });
+    render({ status: "recording", seconds: 0, level: 0 });
+
+    const heights = [
+      ...container.querySelectorAll('[data-testid="voice-level-bar"]'),
+    ].map((el) => (el as HTMLElement).style.height);
+    expect(heights).toEqual(["12%", "12%", "12%", "12%", "12%"]);
+  });
+
+  it("波形只留最近 5 个采样：第 6 个进来时最老的那个被挤掉", () => {
+    for (const level of [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]) {
+      render({ status: "recording", seconds: 4, level });
+    }
+
+    const heights = [
+      ...container.querySelectorAll('[data-testid="voice-level-bar"]'),
+    ].map((el) => (el as HTMLElement).style.height);
+    // 0.1 已经被挤出去；没有上限的话这里会一直钉在最早那五格，波形看着是冻住的
+    expect(heights).toEqual(["20%", "30%", "40%", "50%", "60%"]);
+  });
+
+  it("收尾期间胶囊还在：条冻住、整粒不可点", () => {
+    render({ status: "finishing", seconds: 4, level: 0.7 });
+
+    const pill = buttonByLabel("chat.voiceStop")!;
+    expect(pill.disabled).toBe(true);
+    expect(
+      container.querySelectorAll('[data-testid="voice-level-bar"]'),
+    ).toHaveLength(5);
+    // 胶囊在时麦克风不能也在：那一格任何时候只有一个控件
+    expect(container.querySelectorAll("button")).toHaveLength(1);
+  });
+
+  it("录音开始/结束都不把键盘焦点甩掉（同一个按钮原地变形）", () => {
+    render();
+    act(() => button().focus());
+    expect(document.activeElement).toBe(button());
+
+    // 换成胶囊也不能是另一个元素：键盘用户按空格开始录音后，焦点得留在原地
+    render({ status: "recording", seconds: 0, level: 0.3 });
+    expect(document.activeElement).toBe(container.querySelector("button"));
+    expect(button().getAttribute("aria-label")).toBe("chat.voiceStop");
+
+    render({ status: "idle" });
+    expect(document.activeElement).toBe(container.querySelector("button"));
+  });
+
+  it("录满 10 分钟：时间变 5 位也照样显示", () => {
+    render({ status: "recording", seconds: 601, level: 0.5 });
+
+    expect(container.textContent).toContain("10:01");
   });
 
   it("请求权限与收尾中不允许再点", () => {
@@ -303,7 +376,7 @@ describe("气泡文案（聚焦可见）", () => {
     );
   });
 
-  it("录音中报「停止录音」，不提快捷键", async () => {
+  it("录音中报「停止录音 · Esc 取消」，不提快捷键", async () => {
     render({ status: "recording", seconds: 3, shortcutKeys: HOLD_KEY });
     const mic = buttonByLabel("chat.voiceStop")!;
     await act(async () => {
@@ -311,7 +384,7 @@ describe("气泡文案（聚焦可见）", () => {
     });
 
     expect(document.body.querySelector('[role="tooltip"]')!.textContent).toBe(
-      "chat.voiceStop",
+      "chat.voiceStopWithEsc",
     );
   });
 

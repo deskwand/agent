@@ -57,7 +57,6 @@ const baseProps: ChatInputBottomBarProps = {
     level: 0,
     seconds: 0,
     onToggle: () => {},
-    onCancel: () => {},
   },
 };
 

@@ -1,4 +1,5 @@
-import { Loader2, Mic, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Mic } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { VoiceInstallState } from "../../shared/ipc-types";
@@ -32,11 +33,49 @@ export interface VoiceMicButtonProps {
    */
   shortcutKeys?: string;
   onToggle: () => void;
-  onCancel: () => void;
 }
 
 function formatSeconds(total: number): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** 波形槽位。固定 5 根，槽位号本身是常量，所以 key 不用数组序号。 */
+const LEVEL_SLOTS = [0, 1, 2, 3, 4] as const;
+
+/** 静音与空槽的保底高度（百分比）。不保底的话胶囊会半截空着。 */
+const LEVEL_FLOOR = 12;
+
+/**
+ * 把最近 5 个电平采样摊成波形，最左最旧、最右最新，返回值是百分比高度。
+ *
+ * 电平每 100ms 才跳一次（采集 worklet 每 100ms 交一片音频），要读出「波形」只能靠
+ * 时间差：5 根条各代表一个 100ms 采样。用同一个值乘 5 个系数只会让整块一起缩放 ——
+ * 那是柱状图在抖，不是波形。
+ */
+function useLevelBars(level: number, active: boolean): number[] {
+  const [samples, setSamples] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (!active) {
+      // 采样是这一次录音的产物，回 idle 就清空，下一轮从平地起步。
+      setSamples((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+    setSamples((prev) =>
+      // 与上一个相同就不推：StrictMode 下 effect 会双跑，静止时也不该刷帧。
+      // 代价是完全恒定的电平不会填满 5 根条 —— 真实 RMS 不会逐帧一模一样，够不着。
+      prev[prev.length - 1] === level
+        ? prev
+        : [...prev, level].slice(-LEVEL_SLOTS.length),
+    );
+  }, [level, active]);
+
+  const missing = Math.max(0, LEVEL_SLOTS.length - samples.length);
+  const padded: number[] = [
+    ...Array.from({ length: missing }, () => 0),
+    ...samples,
+  ];
+  return padded.map((value) => Math.max(LEVEL_FLOOR, Math.round(value * 100)));
 }
 
 export function VoiceMicButton({
@@ -47,7 +86,6 @@ export function VoiceMicButton({
   polishing,
   shortcutKeys,
   onToggle,
-  onCancel,
 }: VoiceMicButtonProps) {
   const { t } = useTranslation();
   const busy = status === "requesting" || status === "finishing";
@@ -59,52 +97,52 @@ export function VoiceMicButton({
   // 不锁的话用户会点一个没反应的按钮。下载中同理：这一次点击不该被解释成录音。
   const micDisabled = busy || installing;
   const recording = status === "recording";
-  // 环只在那一格空着的时候画：录音、收尾/请求、安装中、安装失败都各自占着那一格。
+  /** 胶囊占那一格的两种状态：录音与收尾。收尾期间条冻住、整粒不可点。 */
+  const pillVisible = recording || status === "finishing";
+  const bars = useLevelBars(level, pillVisible);
+  // 环只在那一格空着的时候画：胶囊（录音/收尾）、请求权限、安装中、安装失败都各自占着那一格。
   const showPolishRing =
-    polishing === true && !recording && !busy && !installing && !installFailed;
-  // 下载中 / 录音中 / 整理中，麦克风在忙别的事，气泡与可访问名都报那个状态。
+    polishing === true &&
+    !pillVisible &&
+    !busy &&
+    !installing &&
+    !installFailed;
+  // 下载中 / 整理中，麦克风在忙别的事，气泡与可访问名都报那个状态。
   const activeLabel = installing
     ? t("chat.voiceInstalling", { percent })
-    : recording
-      ? t("chat.voiceStop")
-      : showPolishRing
-        ? t("chat.voicePolishing")
-        : null;
-  // 可访问名只说动作：屏幕阅读器念一串按键是噪音。
-  const ariaLabel = activeLabel ?? t("chat.voiceStart");
+    : showPolishRing
+      ? t("chat.voicePolishing")
+      : null;
   // 气泡在空闲且麦克风可用时才多报一句快捷键。收尾 / 下载时那颗键按下去
   // 没反应（usePushToTalk 的 onStart 只认 idle），写了就是假的。
   const idleTooltip =
     micDisabled || !shortcutKeys
       ? t("chat.voiceStart")
       : t("chat.voiceStartWithShortcut", { keys: shortcutKeys });
-  const tooltipLabel = activeLabel ?? idleTooltip;
+  // 这一格只有一个按钮，它按时序变形：录音时是一粒胶囊（停止键），其余时候是麦克风。
+  // 三样东西（可访问名 / 气泡 / 禁用）都按“它现在是什么”报，而不是各报各的。
+  const ariaLabel = pillVisible
+    ? t("chat.voiceStop")
+    : (activeLabel ?? t("chat.voiceStart"));
+  const tooltipLabel = pillVisible
+    ? status === "finishing"
+      ? // 收尾期间 Esc 不再取消（hook 的监听只认 recording / requesting），
+        // 气泡不能许诺一个按下去没反应的键。
+        t("chat.voiceStop")
+      : t("chat.voiceStopWithEsc")
+    : (activeLabel ?? idleTooltip);
+  const buttonDisabled = pillVisible ? status === "finishing" : micDisabled;
+  // 焦点不能丢：键盘用户用空格开始录音后，按钮一旦换成另一个元素，焦点就掉到 body，
+  // 故事就停了（既没被告知录上了，也无法再按空格停下）。所以只换类名与内容。
+  const buttonClassName = pillVisible
+    ? "flex h-8 shrink-0 items-center gap-2 rounded-full bg-surface-hover px-2.5 transition-colors hover:bg-surface-active disabled:cursor-not-allowed"
+    : "relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {recording && (
+      {!pillVisible && installing && (
         <>
-          {/* 音量条：让用户知道麦克风在工作（对齐微信） */}
-          <div className="flex h-4 w-10 items-end gap-[2px]" aria-hidden>
-            {[0.15, 0.3, 0.45, 0.6].map((threshold) => (
-              <span
-                key={threshold}
-                className={`w-[3px] rounded-full transition-all ${
-                  level >= threshold ? "bg-error" : "bg-border-muted"
-                }`}
-                style={{ height: `${Math.max(20, threshold * 100)}%` }}
-              />
-            ))}
-          </div>
-          <span className="text-xs tabular-nums text-error">
-            {formatSeconds(seconds)}
-          </span>
-        </>
-      )}
-
-      {!recording && installing && (
-        <>
-          {/* 下载进度占的正是录音电平条、计时器那一格（原地，不加浮层） */}
+          {/* 下载进度占的正是录音胶囊那一格（原地，不加浮层） */}
           <div
             className="h-1 w-10 overflow-hidden rounded-full bg-border-muted"
             aria-hidden
@@ -120,7 +158,7 @@ export function VoiceMicButton({
         </>
       )}
 
-      {!recording && installFailed && (
+      {!pillVisible && installFailed && (
         <span className="px-1 text-xs text-error">
           {t("chat.voiceInstallFailed")}
         </span>
@@ -130,41 +168,46 @@ export function VoiceMicButton({
         <button
           type="button"
           aria-label={ariaLabel}
-          disabled={micDisabled}
+          disabled={buttonDisabled}
           onClick={onToggle}
-          className={`relative inline-flex h-8 w-8 items-center justify-center rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-            recording
-              ? "bg-error/10 text-error"
-              : "text-text-muted hover:bg-surface-hover hover:text-text-primary"
-          }`}
+          className={buttonClassName}
         >
-          {showPolishRing && (
-            <span
-              aria-hidden
-              data-testid="voice-polish-ring"
-              className="pointer-events-none absolute -inset-[3px] rounded-[11px] border-2 border-accent opacity-[0.55] animate-voice-polish-ring"
-            />
-          )}
-          {busy || installing ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+          {pillVisible ? (
+            <>
+              {/* 波形条 `aria-hidden`：它的含义已经在按钮的可访问名（「停止录音」）里。
+                  高度走 inline style —— 电平是运行时数据，Tailwind 不能穷举。 */}
+              <span className="flex h-4 items-end gap-[2px]" aria-hidden>
+                {LEVEL_SLOTS.map((slot) => (
+                  <span
+                    key={slot}
+                    data-testid="voice-level-bar"
+                    className="w-[3px] rounded-full bg-text-muted transition-[height] duration-150 ease-out"
+                    style={{ height: `${bars[slot]}%` }}
+                  />
+                ))}
+              </span>
+              <span className="text-xs tabular-nums text-text-muted">
+                {formatSeconds(seconds)}
+              </span>
+            </>
           ) : (
-            <Mic className={`h-4 w-4 ${recording ? "animate-pulse" : ""}`} />
+            <>
+              {showPolishRing && (
+                <span
+                  aria-hidden
+                  data-testid="voice-polish-ring"
+                  className="pointer-events-none absolute -inset-[3px] rounded-[11px] border-2 border-accent opacity-[0.55] animate-voice-polish-ring"
+                />
+              )}
+              {busy || installing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
+            </>
           )}
         </button>
       </Tooltip>
-
-      {recording && (
-        <Tooltip label={t("chat.voiceCancel")}>
-          <button
-            type="button"
-            aria-label={t("chat.voiceCancel")}
-            onClick={onCancel}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </Tooltip>
-      )}
     </div>
   );
 }
@@ -205,6 +248,5 @@ export function toMicButtonProps(
     install,
     shortcutKeys: keyNameKey ? shortcut.t(keyNameKey) : undefined,
     onToggle: voice.toggle,
-    onCancel: () => void voice.cancel(),
   };
 }
