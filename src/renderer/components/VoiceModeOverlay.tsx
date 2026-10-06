@@ -127,11 +127,18 @@ export function VoiceModeOverlay({
       // 常规做法，这里不是漏了主题适配。
       style={{ backgroundColor: "#050507" }}
     >
+      {/* `titlebar-no-drag` 不是装饰：凡是压在顶部 40px 拖窗区里的控件都得带它。
+          拖窗命中是矩形，且不看 z-index —— 浮层盖在标题栏上不等于把这块从拖窗区里
+          抠出来。按钮上边距 16px、高 36px，跨在拖窗区里；以前能点全靠标题栏右簇
+          自己那块 no-drag 恰好盖到 y=34，y=34–40 这 6px 仍是拖窗区：点击落在✕中间
+          就被当成拖窗吞掉（悬停照常亮，所以看起来像时灵时不灵）。
+          计划里的「最小化」按钮挨着它，同样需要这个类。 */}
       <button
         type="button"
         onClick={onClose}
         aria-label={t("voiceMode.exit")}
-        className="absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-2xl transition-colors hover:bg-white/10"
+        data-testid="voice-close"
+        className="titlebar-no-drag absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/10"
         style={{ color: "#8f8f9b" }}
       >
         <X className="h-4 w-4" />

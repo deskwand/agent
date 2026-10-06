@@ -3,6 +3,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VoiceModeOverlay } from "../../renderer/components/VoiceModeOverlay";
+import { cssFlat } from "./theme-css-helpers";
 
 // 浮层一挂载就会开麦、起朗读。这里只测 UI 行为，把整条语音链路挡掉。
 // 用可变对象而不是字面量：每个用例要摆不同的状态。
@@ -91,12 +92,30 @@ describe("VoiceModeOverlay", () => {
         onSendQuestion={vi.fn()}
       />,
     );
-    const button = container.querySelector("button");
+    const button = container.querySelector('[data-testid="voice-close"]');
     expect(button).not.toBeNull();
     act(() => {
-      button!.click();
+      (button as HTMLButtonElement).click();
     });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("关闭按钮不在标题栏拖窗区里（否则点不动）", () => {
+    // 按钮上边距 16px、高 36px，跨在标题栏 40px 高的拖窗区里。拖窗命中是矩形、
+    // 不看 z-index，没有 no-drag 的话落在拖窗区那几像素会被当成拖窗吞掉 ——
+    // jsdom 里点得到、真窗口里点不到，所以这条只能锁类名。
+    renderOverlay();
+    const button = container.querySelector('[data-testid="voice-close"]');
+    expect(button).not.toBeNull();
+    expect(button?.className).toContain("titlebar-no-drag");
+  });
+
+  it("titlebar-no-drag 这个工具类还在声明 no-drag", () => {
+    // 上一条只锁住 JSX 那一半：类名被改名或删掉时它照样绿，按钮却重新变死。
+    // 只查声明，不查任何提及 —— globals.css 注释多，子串匹配会假红。
+    expect(cssFlat).toMatch(
+      /\.titlebar-no-drag \{[^}]*;\s*app-region:\s*no-drag\s*;/,
+    );
   });
 
   it("没有文字时文字区仍然占位", () => {
