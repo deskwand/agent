@@ -130,7 +130,8 @@ describe("VoiceCapabilitySettings", () => {
     expect(api.voice.removeInstall).toHaveBeenCalledTimes(1);
   });
 
-  it("内存要重启才归还，这一句两个本机功能都要有", async () => {
+  it("内存要重启才归还这句，在语音模型这一行", async () => {
+    // 反向断言（朗读卡里没有这句）在 read-aloud-settings.test.tsx
     setEngine({ enabled: true, shortcut: "AltRight" });
     api.voice.getInstallState.mockResolvedValue({
       phase: "ready",

@@ -464,12 +464,28 @@ describe("speak 与朗读开关", () => {
   it("still refuses when the fast voice is missing", async () => {
     // 没装 matcha 时这次调用会回退到朗读的模型 —— 那就该被开关拦住，
     // 不然"关掉开关就不加载引擎"的承诺就空了。
+    // （语音对话选「均衡」时不会走到这里：它带 purpose，见下一个用例。）
     const { ipc, speak } = harness({ installed: ["zh"] });
     const result = await ipc.invoke("tts.speak", "你好", {
       prefer: "matcha",
     });
     expect(result).toEqual({ ok: false, error: "read aloud disabled" });
     expect(speak).not.toHaveBeenCalled();
+  });
+
+  it("lets voice mode use the read-aloud voice while 朗读 is switched off", async () => {
+    // 「均衡」用的是中文音色，与朗读共用同一份模型。但语音对话是自己在设置里
+    // 选了它 —— 再拿朗读开关拦，等于用户要为了在语音对话里出声，先去另一张卡
+    // 打开一个跟语音对话无关的开关。
+    //
+    // purpose 只豁免开关，不豁免"模型在不在"：那是 service.speak 的判断
+    // （`model not installed`），这里只测门控，不重测服务层。
+    const { ipc, speak } = harness({ installed: ["zh"] });
+    const result = await ipc.invoke("tts.speak", "你好", {
+      purpose: "voice",
+    });
+    expect(result).toMatchObject({ ok: true });
+    expect(speak).toHaveBeenCalled();
   });
 
   it("gates on the engine that will really be used, not on prefer alone", async () => {

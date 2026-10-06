@@ -100,7 +100,7 @@
       "loadFailed": "加载能力失败",
       "sessionToolNote": "开启后作为工具随会话加载。",
       "actionFailed": "操作失败",
-      "memoryNote": "关掉开关后，已加载的模型要重启应用才释放内存。",
+      "memoryNote": "关掉开关后，重启应用才释放内存。",
       "install": {
         "download": "下载",
         "downloading": "下载中 {{percent}}%",
@@ -112,7 +112,7 @@
       },
       "voice": {
         "title": "语音输入",
-        "desc": "按住说话，转成文字写进输入框。需要麦克风权限；模型约 140MB，常驻内存约 300MB。",
+        "desc": "按住说话，文字写进输入框。需要麦克风权限，模型约 140MB。",
         "model": "语音模型",
         "download": "下载语音模型",
         "remove": "删除语音模型",
@@ -124,30 +124,37 @@
         "shortcutMetaShiftSpaceMac": "⌘ + ⇧ + 空格",
         "shortcutMetaShiftSpaceWin": "Win + Shift + 空格",
         "shortcutDisabled": "不使用快捷键",
-        "shortcutHint": "按住选中的键说话，松开结束。",
+        "shortcutHint": "按住说话，松开结束。",
         "autoPolish": "自动整理",
-        "autoPolishDesc": "说完后自动把口语转写整理成书面文字。"
+        "autoPolishDesc": "把口语转写整理成书面文字。"
       },
       "readAloud": {
         "title": "朗读",
-        "desc": "把助手回复读出来，文字不离开本机。中文音色约 157MB，常驻内存约 324MB。",
-        "modelZh": "中文音色（含英文术语）",
-        "modelEn": "英文音色（母语发音）",
+        "desc": "朗读助手回复，文字不离开本机。",
+        "modelZh": "中文",
+        "modelEn": "英文",
         "downloadZh": "下载中文音色模型",
         "downloadEn": "下载英文音色模型",
         "removeZh": "删除中文音色模型",
         "removeEn": "删除英文音色模型",
-        "enNote": "整句英文会用母语音色朗读，模型约 152MB。启用后英文引擎常驻内存（约 +230MB），重启才归还。"
+        "zhNote": "模型约 157MB。",
+        "enNote": "整句英文用它朗读，模型约 152MB。"
       },
       "voiceMode": {
         "title": "语音对话",
-        "desc": "停下说话后最多等你这么久。判定你没说完就继续等，直到你接上话或到点收尾。",
+        "desc": "你说完后最多等这么久；判定没说完，就继续等。",
         "silenceLabel": "最多等待",
         "silenceValue": "{{ms}} 毫秒",
-        "voiceFast": "高速音色（Matcha）",
-        "voiceFastDesc": "首声约 1 秒（16kHz）。包 123MB，常驻内存约 260MB；同时用朗读再加约 320MB，两者都要重启应用才归还。关掉开关时用朗读的音色（需开启朗读）。",
-        "voiceFastRemove": "删除高速音色",
-        "voiceFastToggle": "在语音对话里使用高速音色"
+        "tone": "音色",
+        "toneDesc": "快速用高速音色（123MB），首声约 1 秒；均衡用中文音色（157MB），音质更好、稍慢。",
+        "toneFast": "快速",
+        "toneBalanced": "均衡",
+        "toneRemoveFast": "删除高速音色",
+        "toneRemoveZh": "删除中文音色",
+        "toneDownloadFast": "下载高速音色",
+        "toneDownloadZh": "下载中文音色",
+        "toneRetryFast": "重试下载高速音色",
+        "toneRetryZh": "重试下载中文音色"
       }
     },
     "groupGeneral": "常规",

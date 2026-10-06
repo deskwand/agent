@@ -12,6 +12,9 @@
  *
  * 现在是**三个**：再加上语音模式的高速音色（`matcha`）。它同样各管各的，但它不归
  * 朗读开关管 —— 那道门控的判据见 `tts.speak` 里的注释与设计 D7。
+ *
+ * D7 后来被 `design-docs/2026-10-06-语音对话音色两档.md` 放宽了一处：语音对话选
+ * 「均衡」时用的是中文音色（与朗读共用同一份），它不该被朗读开关拦在门外。
  */
 import type { IpcMain } from "electron";
 import type {
@@ -239,20 +242,23 @@ export function registerTtsIpc({
       text: string,
       opts?: TtsSpeakOptions,
     ): Promise<TtsSpeakResult> => {
-      // 每个模型有自己的归属：zh / en 属于朗读，那个开关就是朗读的总闸；
-      // matcha 属于语音模式（它的开关就是浮层本身），音色也是用户单独下的。
+      // 每个模型有自己的归属：zh / en 属于朗读，那个开关是**朗读那条路**的总闸；
+      // matcha 属于语音模式，音色也是用户单独下的。
       //
-      // 所以：开关关掉时，**只有真的会用高速音色的那一次**能继续出声。否则语音模式
-      // 会连回退到朗读模型的机会都没有 —— 而那条回退正是"没开朗读的语音模式"的常态。
+      // 语音对话（purpose === "voice"）是例外：它在设置里明确选了音色，那份模型
+      // 就是为它而下的。再拿朗读开关拦它，等于让用户为了在语音对话里听到声音，
+      // 先去另一张卡打开一个跟语音对话无关的开关。
       //
-      // 问的是"这次最终用哪个引擎"，而那个规则在 resolveTtsEngine 里（只有一处）：
-      // 这里自己再写一遍 `prefer === "matcha"` 就会在 engine/prefer 同时给出时判错。
+      // 其余调用仍然问的是"这次最终用哪个引擎"，而那个规则在 resolveTtsEngine 里
+      // （只有一处）：这里自己再写一遍 `prefer === "matcha"` 就会在 engine/prefer
+      // 同时给出时判错。
       const engineForCall = resolveTtsEngine(text, opts, (engine) =>
         service.isInstalled(engine),
       );
       if (
         !configStore.getAll().readAloud?.enabled &&
-        engineForCall !== "matcha"
+        engineForCall !== "matcha" &&
+        opts?.purpose !== "voice"
       ) {
         return { ok: false, error: "read aloud disabled" };
       }

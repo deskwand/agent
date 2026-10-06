@@ -150,9 +150,10 @@ export function ReadAloudSettings() {
             label={status.label}
           />
         }
+        // 两行各报自己的体积；重启那句只留在语音输入那张卡。
         note={t(
           zh
-            ? "settings.capabilities.memoryNote"
+            ? "settings.capabilities.readAloud.zhNote"
             : "settings.capabilities.readAloud.enNote",
         )}
         control={

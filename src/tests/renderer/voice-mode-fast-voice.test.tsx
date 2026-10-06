@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 /**
- * 语音模式要按设置里的「高速音色」开关决定传不传 `prefer`。
+ * 语音模式要按设置里的音色档位决定传不传 `prefer`，并且两种档位都带 `purpose: "voice"`。
  *
- * 这是把开关接上引擎的**唯一**一处接线，而且断了不会报错：服务层会安静地回退到
+ * 这是把档位接上引擎的**唯一**一处接线，而且断了不会报错：服务层会安静地回退到
  * 朗读的模型，症状只有"又变慢了"。所以把它钉住。
  *
- * 与设置卡那个开关的分工：那个开关管写入与显示，这里只管**读**（每句读一次）。
+ * `purpose` 断了的症状更隐性：朗读关着时整句直接没声音（主进程门控拦掉）。
+ *
+ * 与设置卡那个下拉的分工：那个下拉管写入与显示，这里只管**读**（每句读一次）。
  */
 import { act } from "react";
 import { createRoot } from "react-dom/client";
@@ -107,12 +109,13 @@ const setFastVoice = (fastVoice: boolean) =>
     voiceMode: { silenceMs: 1200, fastVoice },
   } as AppConfig);
 
-it("asks for the fast voice while the switch is on", async () => {
-  // 默认就是开（DEFAULT_VOICE_MODE.fastVoice === true）
+it("asks for the fast voice while 快速 is selected", async () => {
+  // 默认就是快速（DEFAULT_VOICE_MODE.fastVoice === true）
   const { speak, unmount } = await mount();
   try {
     await say("你好。");
     expect(speak).toHaveBeenCalledExactlyOnceWith("你好。", {
+      purpose: "voice",
       prefer: "matcha",
     });
   } finally {
@@ -120,25 +123,28 @@ it("asks for the fast voice while the switch is on", async () => {
   }
 });
 
-it("sends no options while the switch is off", async () => {
+it("sends no prefer while 均衡 is selected, but still says who is talking", async () => {
   const { speak, unmount } = await mount({ fastVoice: false });
   try {
     await say("你好。");
-    // 实现里保持两参调用形状（speak(text, opts)），所以这里断言第二个参数是 undefined
-    expect(speak).toHaveBeenCalledExactlyOnceWith("你好。", undefined);
+    // 不传 prefer：让服务层按文本路由到朗读的中文 / 英文音色。
+    // purpose 必须在：均衡那份模型与朗读共用，但语音对话是自己选了它（见 ipc 门控）。
+    expect(speak).toHaveBeenCalledExactlyOnceWith("你好。", {
+      purpose: "voice",
+    });
   } finally {
     await unmount();
   }
 });
 
-it("reads the switch on every sentence, so flipping it takes effect at once", async () => {
-  // 打开浮层之后才关掉开关：下一句就得换回朗读音色（不用重开浮层）
+it("reads the setting on every sentence, so switching takes effect at once", async () => {
+  // 打开浮层之后才切到均衡：下一句就得换回朗读音色（不用重开浮层）
   const { speak, unmount } = await mount();
   try {
     await say("第一句。");
     setFastVoice(false);
     await say("第二句。");
-    expect(speak).toHaveBeenLastCalledWith("第二句。", undefined);
+    expect(speak).toHaveBeenLastCalledWith("第二句。", { purpose: "voice" });
   } finally {
     await unmount();
   }

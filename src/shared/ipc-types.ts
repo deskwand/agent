@@ -559,6 +559,15 @@ export interface TtsInstallStates {
 export interface TtsSpeakOptions {
   engine?: TtsModelKey;
   prefer?: TtsModelKey;
+  /**
+   * 谁在说话。`"voice"` 是语音对话。它点名要的音色不该再被朗读开关拦住：
+   * 语音对话的音色是用户在这张卡里单独选的（快速 / 均衡），与聊天里的朗读无关。
+   *
+   * **它不放宽任何权限**：渲染层本来就能写 `readAloud.enabled`（`config.save`），
+   * 也能直接指定 `engine`。门控只是一道一致性守卫，不是安全边界 —— `purpose`
+   * 在线上也没有校验。
+   */
+  purpose?: "voice";
 }
 
 export type TtsSpeakResult =

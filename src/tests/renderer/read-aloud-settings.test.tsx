@@ -114,7 +114,7 @@ describe("ReadAloudSettings", () => {
     expect(byTestId("read-aloud-en-install")).toBeNull();
   });
 
-  it("打开但未安装时给下载入口，并说明内存代价", async () => {
+  it("打开但未安装时给下载入口", async () => {
     setReadAloud(true);
     await mount();
 
@@ -122,7 +122,10 @@ describe("ReadAloudSettings", () => {
     expect(container.textContent).toContain(
       "settings.capabilities.install.notInstalled",
     );
-    expect(container.textContent).toContain("settings.capabilities.memoryNote");
+    // 重启释放内存那句只出现在语音输入那张卡，这里不再重复
+    expect(container.textContent).not.toContain(
+      "settings.capabilities.memoryNote",
+    );
     expect(byTestId("read-aloud-install")).not.toBeNull();
     expect(byTestId("read-aloud-remove")).toBeNull();
   });
@@ -258,7 +261,10 @@ describe("two voice model rows", () => {
     expect(byTestId("read-aloud-en-state")).not.toBeNull();
     expect(byTestId("read-aloud-en-install")).not.toBeNull(); // 英文未装 → 下载按钮
     expect(byTestId("read-aloud-en-remove")).toBeNull();
-    // 英文行的说明是它自己的（内存代价不同）
+    // 两行各报自己的体积，卡头不再带数字
+    expect(container.textContent).toContain(
+      "settings.capabilities.readAloud.zhNote",
+    );
     expect(container.textContent).toContain(
       "settings.capabilities.readAloud.enNote",
     );

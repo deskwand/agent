@@ -255,15 +255,18 @@ export function SettingsSelect<T extends string>({
   options,
   onChange,
   label,
+  testId,
 }: {
   value: T;
   options: Array<{ value: T; label: string }>;
   onChange: (next: T) => void;
   label: string;
+  testId?: string;
 }) {
   return (
     <select
       aria-label={label}
+      data-testid={testId}
       value={value}
       onChange={(event) => onChange(event.target.value as T)}
       className="rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none hover:bg-surface-hover"

@@ -100,7 +100,7 @@
       "loadFailed": "Could not load capabilities",
       "sessionToolNote": "Loads with your sessions as a tool.",
       "actionFailed": "Could not change this capability",
-      "memoryNote": "After you turn the switch off, a loaded model keeps its memory until you restart the app.",
+      "memoryNote": "After you turn the switch off, a restart frees the memory.",
       "install": {
         "download": "Download",
         "downloading": "Downloading {{percent}}%",
@@ -112,7 +112,7 @@
       },
       "voice": {
         "title": "Voice input",
-        "desc": "Hold a key and speak; the text lands in the input box. Needs microphone access; a ~140MB download and ~300MB in memory.",
+        "desc": "Hold to talk; the text lands in the input box. Needs microphone access; a ~140MB model.",
         "model": "Voice model",
         "download": "Download the voice model",
         "remove": "Delete the voice model",
@@ -124,30 +124,37 @@
         "shortcutMetaShiftSpaceMac": "⌘ + ⇧ + Space",
         "shortcutMetaShiftSpaceWin": "Win + Shift + Space",
         "shortcutDisabled": "No shortcut",
-        "shortcutHint": "Hold the key you pick to talk; release to stop.",
+        "shortcutHint": "Hold to talk, release to stop.",
         "autoPolish": "Auto clean-up",
-        "autoPolishDesc": "Tidy the transcript into written text after you speak."
+        "autoPolishDesc": "Turn the transcript into written text."
       },
       "readAloud": {
         "title": "Read aloud",
-        "desc": "Read assistant replies aloud — the text never leaves this machine. The Chinese voice is about 157MB and holds roughly 324MB in memory.",
-        "modelZh": "Chinese voice (with English terms)",
-        "modelEn": "English voice (native pronunciation)",
+        "desc": "Read assistant replies aloud — the text never leaves this machine.",
+        "modelZh": "Chinese",
+        "modelEn": "English",
         "downloadZh": "Download the Chinese voice model",
         "downloadEn": "Download the English voice model",
         "removeZh": "Remove the Chinese voice model",
         "removeEn": "Remove the English voice model",
-        "enNote": "Fully English sentences use a native voice, about 152MB. Once enabled, the English engine stays in memory (roughly +230MB) until restart."
+        "zhNote": "A ~157MB model.",
+        "enNote": "Reads full English sentences; a ~152MB model."
       },
       "voiceMode": {
         "title": "Voice conversation",
-        "desc": "After you stop speaking, wait up to this long. If the sentence looks unfinished, keep waiting.",
+        "desc": "Wait this long after you stop speaking; keep waiting if the sentence looks unfinished.",
         "silenceLabel": "Wait up to",
         "silenceValue": "{{ms}} ms",
-        "voiceFast": "Fast voice (Matcha)",
-        "voiceFastDesc": "About 1 second to first sound (16 kHz). One 123 MB download, about 260 MB in memory, plus about 320 MB more if you also read aloud; a restart frees both. With the switch off, voice mode uses the read-aloud voice, which needs read aloud switched on.",
-        "voiceFastRemove": "Remove fast voice",
-        "voiceFastToggle": "Use the fast voice in voice conversation"
+        "tone": "Voice style",
+        "toneDesc": "Fast: high-speed voice (123MB), about a second to first sound. Balanced: Chinese voice (157MB), better quality, a little slower.",
+        "toneFast": "Fast",
+        "toneBalanced": "Balanced",
+        "toneRemoveFast": "Remove the fast voice",
+        "toneRemoveZh": "Remove the Chinese voice",
+        "toneDownloadFast": "Download the fast voice",
+        "toneDownloadZh": "Download the Chinese voice",
+        "toneRetryFast": "Retry downloading the fast voice",
+        "toneRetryZh": "Retry downloading the Chinese voice"
       }
     },
     "groupGeneral": "General",

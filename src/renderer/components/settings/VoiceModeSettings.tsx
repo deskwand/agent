@@ -8,16 +8,28 @@
  * 数值与档位刻意没动（400–2000ms、默认 1200），只改文案：改下限会造出一条
  * 静默迁移，而症状集并不要求放宽范围。
  *
- * 「音色」行是**高速音色唯一的安装入口**（语音模式浮层里不做提示，见设计 D4）：
- * 与朗读那两行同构 —— 状态徽标 + 下载 / 删除 + 进度条，共用同一套
- * `installStatusLabel` / `InstallProgress`。
+ * 「音色」行是**两档模式，各带自己那份模型**：
+ * - 快速 → 高速音色（matcha，123MB），只在语音对话里用；
+ * - 均衡 → 中文音色（zh，157MB），与「朗读」共用同一份。
  *
- * 用下拉而不是滑杆：设置区没有滑杆控件，六档选择更好点中，也不必为一项设置
- * 引入新控件。
+ * 所以徽标、下载、删除都跟**当前选中的模式**走：选谁就显示谁那份模型的状态。
+ * 与朗读卡不是两份 157MB，而是一份模型的两个视图 —— 在任一边删掉，两边都会变成
+ * 「未安装」（两边都订阅同一批安装事件）。
+ *
+ * 旧版是一个「高速音色」开关，只有 matcha 一条路。它逼出一个前置条件：关掉时改用
+ * 朗读音色，而那条路要先把朗读开关打开。两档模式没有这个前置条件 —— 主进程现在
+ * 放行 `purpose: "voice"` 的调用（见 `src/main/tts/ipc.ts`）。
+ *
+ * 等待时长用下拉而不是滑杆：设置区没有滑杆控件，六档选择更好点中，也不必为一项设置
+ * 引入新控件。音色也用下拉：两档各有名字（快速 / 均衡），而开关只能表达「是 / 否」。
  */
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { TtsInstallState } from "../../../shared/ipc-types";
+import type {
+  TtsInstallState,
+  TtsInstallStates,
+  TtsModelKey,
+} from "../../../shared/ipc-types";
 import { useAppStore } from "../../store";
 import { DEFAULT_VOICE_MODE } from "../../../shared/voice-mode";
 import type { VoiceModeConfig } from "../../../shared/voice-mode";
@@ -29,7 +41,6 @@ import {
   SettingsRow,
   SettingsSelect,
   SettingsStatusBadge,
-  SettingsSwitch,
 } from "./shared";
 
 const isElectron =
@@ -41,25 +52,61 @@ const SILENCE_CHOICES = ["400", "600", "800", "1000", "1500", "2000"] as const;
 type SilenceChoice = (typeof SILENCE_CHOICES)[number];
 
 const IDLE: TtsInstallState = { phase: "idle", percent: 0, installed: false };
+const IDLE_STATES: TtsInstallStates = { zh: IDLE, en: IDLE, matcha: IDLE };
+
+/** 两档模式。`fast` 用高速音色，`balanced` 用中文音色。 */
+type Tone = "fast" | "balanced";
+
+/**
+ * 每档的三件事：用哪份模型，以及三个按钮的无障碍名称。
+ *
+ * 名称都要含住可见文字（「下载」/「重试」/「删除」），否则语音控制用户念不出这个
+ * 按钮的名字（WCAG 2.5.3 Label in Name）。
+ */
+const TONE = {
+  fast: {
+    model: "matcha",
+    download: "settings.capabilities.voiceMode.toneDownloadFast",
+    retry: "settings.capabilities.voiceMode.toneRetryFast",
+    remove: "settings.capabilities.voiceMode.toneRemoveFast",
+  },
+  balanced: {
+    model: "zh",
+    download: "settings.capabilities.voiceMode.toneDownloadZh",
+    retry: "settings.capabilities.voiceMode.toneRetryZh",
+    remove: "settings.capabilities.voiceMode.toneRemoveZh",
+  },
+} as const satisfies Record<
+  Tone,
+  { model: TtsModelKey; download: string; retry: string; remove: string }
+>;
 
 export function VoiceModeSettings() {
   const { t } = useTranslation();
   const appConfig = useAppStore((s) => s.appConfig);
   const setAppConfig = useAppStore((s) => s.setAppConfig);
-  const [fastVoice, setFastVoice] = useState<TtsInstallState>(IDLE);
+  const [states, setStates] = useState<TtsInstallStates | null>(null);
   const [removing, setRemoving] = useState(false);
 
   const current = String(
     appConfig?.voiceMode?.silenceMs ?? DEFAULT_VOICE_MODE.silenceMs,
   ) as SilenceChoice;
 
+  const fastVoice =
+    appConfig?.voiceMode?.fastVoice ?? DEFAULT_VOICE_MODE.fastVoice;
+  const tone: Tone = fastVoice ? "fast" : "balanced";
+  /** 徽标、下载、删除都看当前这一档的模型。 */
+  const { model } = TONE[tone];
+  const state = states?.[model] ?? IDLE;
+
   const refresh = useCallback(async () => {
     if (!isElectron) return;
     try {
-      const states = await window.electronAPI?.tts?.getInstallState();
-      if (states?.matcha) setFastVoice(states.matcha);
+      // preload 在浏览器模式与测试里可能只有一部分字段：取不到就停在「未安装」，
+      // 下载按钮仍然可用，用户能自愈。
+      setStates((await window.electronAPI?.tts?.getInstallState()) ?? null);
     } catch {
-      // 读不到就停在原地：下载按钮仍然可用，用户能自愈
+      setStates(null);
     }
   }, []);
 
@@ -67,34 +114,25 @@ export function VoiceModeSettings() {
     if (!isElectron) return;
     void refresh();
     return window.electronAPI?.tts?.onEvent((event) => {
-      // 只认高速音色：朗读那两个模型的进度不归这一行
-      if (event.type !== "install" || event.model !== "matcha") return;
-      setFastVoice(event.state);
+      // 三个模型都收：当前显示哪一个由 `tone` 决定，切换时不必重读磁盘。
+      if (event.type !== "install") return;
+      setStates((prev) => ({
+        ...(prev ?? IDLE_STATES),
+        [event.model]: event.state,
+      }));
     });
   }, [refresh]);
 
-  const removeFastVoice = async () => {
+  const removeModel = async () => {
     setRemoving(true);
     try {
-      await window.electronAPI?.tts?.removeInstall("matcha");
+      await window.electronAPI?.tts?.removeInstall(model);
       // 删完重新读一次：删失败时留着原状态，界面才不会声称「已删除」
       await refresh();
     } finally {
       setRemoving(false);
     }
   };
-
-  /**
-   * 开关显示的是什么：**装了（或正在装）才看偏好**。
-   *
-   * 不能写成 `checked = fastVoice`：默认偏好是 true，而新用户没装模型 ——
-   * 那样开关会一开始就显示为开，而一个已经开着的开关没法启动下载
-   * （新用户只能靠 off→on 才猜得到）。
-   * `|| busy` 那半是为了下载期间不把开关弹回关。
-   */
-  const fastVoicePref =
-    appConfig?.voiceMode?.fastVoice ?? DEFAULT_VOICE_MODE.fastVoice;
-
   /**
    * 写 `voiceMode` 是**整体替换**，所以每次写入都必须带上另一个字段。
    * 只发 `{ silenceMs }` 会把 `fastVoice` 归一化成默认值 —— 也就是这个下拉会
@@ -119,31 +157,22 @@ export function VoiceModeSettings() {
   };
 
   /**
-   * 开关就是下载入口（与朗读那个开关同一行为）。已装时不调 install：
-   * 装好的调用只会白推一条进度事件。
+   * 切模式就是下载入口（与朗读那个开关同一行为）：切到哪一档，缺那份模型就开始下。
+   * 已装时不调 install：装好的调用只会白推一条进度事件。
    */
-  const toggleFastVoice = async (next: boolean) => {
-    await saveVoiceMode({ fastVoice: next });
-    if (next && !fastVoice.installed) {
-      void window.electronAPI?.tts?.install("matcha");
-    }
+  const changeTone = async (next: Tone) => {
+    if (!isElectron) return;
+    await saveVoiceMode({ fastVoice: next === "fast" });
+    const nextModel = TONE[next].model;
+    if ((states?.[nextModel] ?? IDLE).installed) return;
+    void window.electronAPI?.tts?.install(nextModel);
+    // 主进程看到已装会**静默返回**、不推事件（`tts.install` 的按模型守卫）。
+    // 两边状态不一致时，不重读的话这个按钮会一直停在「下载」上不动。
+    void refresh();
   };
 
-  const status = installStatusLabel(t, fastVoice);
-  const busy = isInstalling(fastVoice);
-  /**
-   * 开关是下载入口，所以"模型不在、也没在装、也没装失败"时它必须是关的 ——
-   * 否则一个已经开着的开关没法启动下载（新用户只能靠 off→on 才猜得到）。
-   *
-   * 三个项各有理由：
-   * - `installed`：装好了，开关就代表"用不用"（注意 `getInstallState` 在应用刚启动时
-   *   `phase` 是 `idle`，所以这里不能用 `phase !== "idle"` 代替它）；
-   * - `busy`：正在装，不把刚拨开的开关弹回去；
-   * - `error`：装失败，意图还在，而且下面那个「重试」就是它的前提。
-   */
-  const switchReflectsPreference =
-    fastVoice.installed || busy || fastVoice.phase === "error";
-  const fastVoiceOn = switchReflectsPreference && fastVoicePref;
+  const status = installStatusLabel(t, state);
+  const busy = isInstalling(state);
 
   return (
     <SettingsCard>
@@ -153,6 +182,7 @@ export function VoiceModeSettings() {
         description={t("settings.capabilities.voiceMode.desc")}
         control={
           <SettingsSelect<SilenceChoice>
+            testId="voice-mode-silence"
             label={t("settings.capabilities.voiceMode.silenceLabel")}
             value={current}
             options={SILENCE_CHOICES.map((value) => ({
@@ -169,7 +199,7 @@ export function VoiceModeSettings() {
       <SettingsRow
         sub
         testId="voice-voice-row"
-        title={t("settings.capabilities.voiceMode.voiceFast")}
+        title={t("settings.capabilities.voiceMode.tone")}
         badge={
           <SettingsStatusBadge
             testId="voice-voice-badge"
@@ -177,46 +207,66 @@ export function VoiceModeSettings() {
             label={status.label}
           />
         }
-        note={t("settings.capabilities.voiceMode.voiceFastDesc")}
+        note={t("settings.capabilities.voiceMode.toneDesc")}
         control={
-          <div className="flex items-center gap-2">
-            <SettingsSwitch
-              testId="voice-voice-toggle"
-              label={t("settings.capabilities.voiceMode.voiceFastToggle")}
-              checked={fastVoiceOn}
-              onChange={(next) => void toggleFastVoice(next)}
+          <>
+            <SettingsSelect<Tone>
+              testId="voice-voice-tone"
+              label={t("settings.capabilities.voiceMode.tone")}
+              value={tone}
+              options={[
+                {
+                  value: "fast",
+                  label: t("settings.capabilities.voiceMode.toneFast"),
+                },
+                {
+                  value: "balanced",
+                  label: t("settings.capabilities.voiceMode.toneBalanced"),
+                },
+              ]}
+              onChange={(next) => void changeTone(next)}
             />
-            {fastVoice.phase === "error" && fastVoicePref && (
-              <button
-                type="button"
-                data-testid="voice-voice-retry"
-                onClick={() => void window.electronAPI?.tts?.install("matcha")}
-                className="rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
-              >
-                {t("settings.capabilities.install.retry")}
-              </button>
-            )}
-            {fastVoice.installed && (
+            {state.installed ? (
               <button
                 type="button"
                 data-testid="voice-voice-remove"
-                aria-label={t(
-                  "settings.capabilities.voiceMode.voiceFastRemove",
-                )}
+                aria-label={t(TONE[tone].remove)}
                 disabled={removing}
-                onClick={() => void removeFastVoice()}
+                onClick={() => void removeModel()}
                 className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
               >
                 {t("settings.capabilities.install.delete")}
               </button>
+            ) : (
+              !busy && (
+                <button
+                  type="button"
+                  data-testid={
+                    state.phase === "error"
+                      ? "voice-voice-retry"
+                      : "voice-voice-install"
+                  }
+                  aria-label={t(
+                    state.phase === "error"
+                      ? TONE[tone].retry
+                      : TONE[tone].download,
+                  )}
+                  onClick={() => void window.electronAPI?.tts?.install(model)}
+                  className="rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+                >
+                  {state.phase === "error"
+                    ? t("settings.capabilities.install.retry")
+                    : t("settings.capabilities.install.download")}
+                </button>
+              )
             )}
-          </div>
+          </>
         }
       />
 
       {busy && (
         <InstallProgress
-          percent={fastVoice.percent}
+          percent={state.percent}
           testId="voice-voice-progress"
         />
       )}
