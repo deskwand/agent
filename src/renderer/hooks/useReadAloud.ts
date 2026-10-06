@@ -16,7 +16,10 @@ import {
   type SpeechTarget,
 } from "../utils/tts/speech-text";
 import { createAudioQueue, type AudioQueue } from "../utils/tts/audio-queue";
-import type { TtsSpeakResult } from "../../shared/ipc-types";
+import {
+  speakStream,
+  type SpeakStreamHandlers,
+} from "../utils/tts/speak-stream";
 
 export interface ReadAloudState {
   messageId: string | null;
@@ -27,7 +30,8 @@ export interface ReadAloudState {
 }
 
 export interface ReadAloudDeps {
-  speak: (text: string) => Promise<TtsSpeakResult>;
+  /** 发一次流式合成，返回取消函数。块按引擎的标点分段到达。 */
+  speak: (text: string, handlers: SpeakStreamHandlers) => () => void;
   createQueue: () => AudioQueue;
   /** 注入以便测试。默认写进 `useAppStore`（仓库约定：跨组件状态用 zustand）。 */
   setState?: (patch: Partial<ReadAloudState>) => void;
@@ -76,6 +80,8 @@ export function createReadAloudController(
    * 没有它，「读 A 时点 B」会让 A 的旧结果把 B 的队列弄乱。
    */
   let generation = 0;
+  /** 在飞的取消函数。reset 时逐个调 —— 否则打断后那段会在主进程里白合成完。 */
+  const cancels = new Set<() => void>();
 
   const set = (patch: Partial<ReadAloudState>) => {
     state = { ...state, ...patch };
@@ -88,6 +94,8 @@ export function createReadAloudController(
 
   const reset = () => {
     generation++;
+    for (const cancel of cancels) cancel();
+    cancels.clear();
     queue?.stop();
     queue = null;
     segments = [];
@@ -112,31 +120,58 @@ export function createReadAloudController(
     return queue;
   };
 
-  const pump = async (index: number, token: number): Promise<void> => {
+  const pump = (index: number, token: number): void => {
     const segment = segments[index];
     if (!segment) return;
+    const isLastSegment = index + 1 >= segments.length;
+    let sawChunk = false;
+    /**
+     * 先声明再赋值：桥缺失时 `speak` 会**同步**回调 `onError`，那时 `cancel`
+     * 还在 TDZ 里，`cancels.delete(cancel)` 会抛 ReferenceError，把一次优雅降级
+     * 变成崩溃。
+     */
+    let cancel: (() => void) | null = null;
+    const forget = () => {
+      if (cancel) cancels.delete(cancel);
+    };
 
-    const result = await deps.speak(segment.text);
-    // 回到主线程时可能已经被 start / stop 作废 —— 旧结果直接丢
-    if (token !== generation) return;
+    const endSegment = () => {
+      if (isLastSegment) ensureQueue().markLast();
+      // 流水线：不等这一句播完就发下一句
+      else pump(index + 1, token);
+    };
 
-    if (!result.ok) {
-      queue?.stop();
-      highlight(null); // 别把上一次的高亮留在屏幕上
-      set({ status: "error", error: result.error });
-      return;
-    }
-
-    ensureQueue().enqueue({
-      index,
-      samples: result.samples,
-      sampleRate: result.sampleRate,
-      // 最后一句要打标：队列靠它区分「读完」与「合成还没跟上」
-      isLast: index + 1 >= segments.length,
+    cancel = deps.speak(segment.text, {
+      onChunk: (chunk) => {
+        // 回来时可能已经被 start / stop 作废 —— 旧块直接丢
+        if (token !== generation) return;
+        sawChunk = true;
+        ensureQueue().enqueue({
+          sentenceIndex: index,
+          samples: chunk.samples,
+          sampleRate: chunk.sampleRate,
+        });
+        if (state.status === "preparing") set({ status: "playing" });
+      },
+      onDone: () => {
+        forget();
+        if (token !== generation) return;
+        endSegment();
+      },
+      onError: (error) => {
+        forget();
+        if (token !== generation) return;
+        // 已经出过声的段：保留已播部分，当这一段结束（不弹错误 —— 用户已经听到了）。
+        if (sawChunk) {
+          endSegment();
+          return;
+        }
+        queue?.stop();
+        highlight(null); // 别把上一次的高亮留在屏幕上
+        set({ status: "error", error });
+      },
     });
-    if (state.status === "preparing") set({ status: "playing" });
-    // 流水线：不等这一句播完就发下一句
-    if (index + 1 < segments.length) void pump(index + 1, token);
+    cancels.add(cancel);
   };
 
   return {
@@ -154,7 +189,7 @@ export function createReadAloudController(
         currentIndex: 0,
         total: segments.length,
       });
-      void pump(0, token);
+      pump(0, token);
     },
     toggle() {
       if (state.status === "playing") {
@@ -180,7 +215,7 @@ function pushToStore(patch: Partial<ReadAloudState>): void {
 
 function defaultDeps(): ReadAloudDeps {
   return {
-    speak: (text) => window.electronAPI.tts.speak(text),
+    speak: (text, handlers) => speakStream(text, undefined, handlers),
     createQueue: () =>
       createAudioQueue({ createContext: () => new AudioContext() }),
   };

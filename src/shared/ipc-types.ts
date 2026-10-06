@@ -580,3 +580,23 @@ export type TtsEvent = {
   model: TtsModelKey;
   state: TtsInstallState;
 };
+
+/**
+ * 流式朗读的块事件。块 = 引擎的一个**标点分段**（不是音频级流式）；分块拼接
+ * 起来与整句音频逐样本相同。
+ */
+export type TtsStreamEvent =
+  | {
+      streamId: number;
+      type: "chunk";
+      /** 自增序号，从 0 开始。 */
+      seq: number;
+      samples: Float32Array;
+      sampleRate: number;
+    }
+  | { streamId: number; type: "done" }
+  | { streamId: number; type: "error"; error: string };
+
+export interface TtsSpeakStreamResult {
+  streamId: number;
+}

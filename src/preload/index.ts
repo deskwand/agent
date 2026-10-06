@@ -51,6 +51,8 @@ import type {
   TtsModelKey,
   TtsSpeakOptions,
   TtsSpeakResult,
+  TtsSpeakStreamResult,
+  TtsStreamEvent,
 } from "../shared/ipc-types";
 import type { QuotaSnapshot } from "../shared/quota";
 import type {
@@ -987,6 +989,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.on("tts.event", handler);
       return () => ipcRenderer.removeListener("tts.event", handler);
     },
+    // 流式朗读：先 invoke 拿 streamId，块走 tts.stream 事件。
+    speakStream: (
+      text: string,
+      opts?: TtsSpeakOptions,
+    ): Promise<TtsSpeakStreamResult> =>
+      ipcRenderer.invoke("tts.speakStream", text, opts),
+    cancelStream: (streamId: number): Promise<void> =>
+      ipcRenderer.invoke("tts.cancelStream", streamId),
+    onStream: (callback: (event: TtsStreamEvent) => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: TtsStreamEvent,
+      ) => callback(data);
+      ipcRenderer.on("tts.stream", handler);
+      return () => ipcRenderer.removeListener("tts.stream", handler);
+    },
   },
 });
 
@@ -1666,6 +1684,12 @@ declare global {
         removeInstall: (model: TtsModelKey) => Promise<void>;
         getInstallState: () => Promise<TtsInstallStates>;
         onEvent: (callback: (event: TtsEvent) => void) => () => void;
+        speakStream: (
+          text: string,
+          opts?: TtsSpeakOptions,
+        ) => Promise<TtsSpeakStreamResult>;
+        cancelStream: (streamId: number) => Promise<void>;
+        onStream: (callback: (event: TtsStreamEvent) => void) => () => void;
       };
     };
   }

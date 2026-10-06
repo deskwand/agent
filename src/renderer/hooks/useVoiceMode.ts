@@ -23,6 +23,7 @@ import { DEFAULT_VOICE_MODE } from "../../shared/voice-mode";
 import { useAppStore } from "../store";
 import type { Message } from "../types";
 import { createAudioQueue } from "../utils/tts/audio-queue";
+import { speakStream } from "../utils/tts/speak-stream";
 import { startMicCapture } from "../utils/voice/mic-capture";
 import { createVoiceSfx } from "../utils/voice/voice-sfx";
 import { stopReadAloud } from "./useReadAloud";
@@ -117,16 +118,20 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
     // 的 AudioContext 有上限，攒够了连 `new AudioContext` 都会抛。
     const audioContext = new AudioContext();
     const speech = createStreamingSpeech({
-      speak: (text: string) => {
+      speak: (text, handlers) => {
         // **每次调用**读一次：换模式要能对下一句生效（`silenceMs` 不同，它只在
         // createVoiceConversation 时读一次就够，因为只影响状态机）。
         const fast =
           useAppStore.getState().appConfig?.voiceMode?.fastVoice ??
           DEFAULT_VOICE_MODE.fastVoice;
-        return window.electronAPI.tts.speak(text, {
-          purpose: "voice",
-          ...(fast ? { prefer: "matcha" as const } : {}),
-        });
+        return speakStream(
+          text,
+          {
+            purpose: "voice",
+            ...(fast ? { prefer: "matcha" as const } : {}),
+          },
+          handlers,
+        );
       },
       createQueue: () =>
         createAudioQueue({ createContext: () => audioContext }),

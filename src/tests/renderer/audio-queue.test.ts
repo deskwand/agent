@@ -7,6 +7,7 @@ function fakeContext() {
   const started: number[] = [];
   const sources: Array<{
     onended: (() => void) | null;
+    start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
   }> = [];
   const context = {
@@ -34,47 +35,69 @@ function fakeContext() {
   return { context, sources, started };
 }
 
-const item = (index: number) => ({
-  index,
-  samples: new Float32Array(4410),
+const item = (sentenceIndex: number) => ({
+  sentenceIndex,
+  samples: new Float32Array(4410), // 0.1s @44.1kHz
   sampleRate: 44100,
 });
 
 describe("播放队列", () => {
-  it("按入队顺序播，每句开始时通知一次", () => {
+  it("同一句的多个块首尾相接：第二块的 start 等于第一块的结束时刻", () => {
     const { context, sources } = fakeContext();
     const queue = createAudioQueue({ createContext: () => context as never });
-    const onStart = vi.fn();
-    queue.onSentenceStart(onStart);
-
     queue.enqueue(item(0));
-    expect(onStart).toHaveBeenLastCalledWith(0);
-    expect(sources).toHaveLength(1);
+    queue.enqueue(item(0));
 
-    // 第一句播完才起第二句
-    sources[0].onended?.();
-    queue.enqueue(item(1));
-    expect(onStart).toHaveBeenLastCalledWith(1);
+    expect(sources[0].start).toHaveBeenCalledWith(0.02); // LOOKAHEAD
+    expect(sources[1].start).toHaveBeenCalledWith(0.02 + 0.1);
   });
 
-  it("上一句还没播完时入队，不会打断它", () => {
+  it("跨句也首尾相接，且不打断正在播的那一块", () => {
     const { context, sources } = fakeContext();
     const queue = createAudioQueue({ createContext: () => context as never });
     queue.enqueue(item(0));
     queue.enqueue(item(1));
-    expect(sources).toHaveLength(1); // 第二句排队等着
-    sources[0].onended?.();
-    expect(sources).toHaveLength(2);
+
+    expect(sources[0].stop).not.toHaveBeenCalled();
+    expect(sources[1].start).toHaveBeenCalledWith(0.02 + 0.1);
   });
 
-  it("最后一句播完才通知 drained", () => {
+  it("高亮按句触发一次，且与播放时刻对齐（不是入队时刻）", () => {
+    vi.useFakeTimers();
+    try {
+      const { context } = fakeContext();
+      const queue = createAudioQueue({ createContext: () => context as never });
+      const started: number[] = [];
+      queue.onSentenceStart((i) => started.push(i));
+
+      queue.enqueue(item(0));
+      queue.enqueue(item(0)); // 同句第二块
+      queue.enqueue(item(1));
+      expect(started).toEqual([]); // 还没到播放时刻
+
+      context.currentTime = 0.03;
+      vi.advanceTimersByTime(25);
+      expect(started).toEqual([0]);
+
+      context.currentTime = 0.23;
+      vi.advanceTimersByTime(25);
+      expect(started).toEqual([0, 1]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("markLast 之后、最后一块播完才通知 drained", () => {
     const { context, sources } = fakeContext();
     const queue = createAudioQueue({ createContext: () => context as never });
     const drained = vi.fn();
     queue.onDrained(drained);
 
     queue.enqueue(item(0));
-    queue.enqueue({ ...item(1), isLast: true });
+    queue.enqueue(item(0));
+    queue.markLast();
+    expect(drained).not.toHaveBeenCalled(); // 还没播完
+
     sources[0].onended?.();
     expect(drained).not.toHaveBeenCalled();
     sources[1].onended?.();
@@ -82,7 +105,7 @@ describe("播放队列", () => {
   });
 
   it("合成比播放慢时，队列播空不算读完", () => {
-    // MeloTTS 的 RTF 是 0.71：慢机器上合成会跟不上播放，队列会短暂播空。
+    // MeloTTS 的 RTF 是 0.69：慢机器上合成会跟不上播放，队列会短暂播空。
     // 那一刻**不能**判定为读完，否则朗读会在句子之间被中途切断。
     const { context, sources } = fakeContext();
     const queue = createAudioQueue({ createContext: () => context as never });
@@ -93,8 +116,21 @@ describe("播放队列", () => {
     sources[0].onended?.();
     expect(drained).not.toHaveBeenCalled();
 
-    queue.enqueue({ ...item(1), isLast: true });
+    queue.enqueue(item(1));
+    queue.markLast();
     sources[1].onended?.();
+    expect(drained).toHaveBeenCalledTimes(1);
+  });
+
+  it("音频早就播完后才 markLast，也要补一次 drained", () => {
+    const { context, sources } = fakeContext();
+    const queue = createAudioQueue({ createContext: () => context as never });
+    const drained = vi.fn();
+    queue.onDrained(drained);
+
+    queue.enqueue(item(0));
+    sources[0].onended?.();
+    queue.markLast();
     expect(drained).toHaveBeenCalledTimes(1);
   });
 
@@ -103,23 +139,23 @@ describe("播放队列", () => {
     const queue = createAudioQueue({ createContext: () => context as never });
     const drained = vi.fn();
     queue.onDrained(drained);
-    queue.enqueue({ ...item(0), isLast: true });
+    queue.enqueue(item(0));
+    queue.markLast();
 
     queue.stop();
     sources[0].onended?.(); // stop() 触发的 onended 是异步到的
     expect(drained).not.toHaveBeenCalled();
   });
 
-  it("停止后清空队列，并且不再播", () => {
+  it("停止会逐个停掉已排期的块（打断后不能还在出声）", () => {
     const { context, sources } = fakeContext();
     const queue = createAudioQueue({ createContext: () => context as never });
+    queue.enqueue(item(0));
     queue.enqueue(item(0));
     queue.enqueue(item(1));
 
     queue.stop();
-    expect(sources[0].stop).toHaveBeenCalled();
-    sources[0].onended?.(); // stop 触发的 ended 不能被当成「播完了」
-    expect(sources).toHaveLength(1);
+    expect(sources.every((s) => s.stop.mock.calls.length === 1)).toBe(true);
     expect(queue.playing()).toBe(false);
   });
 

@@ -14,7 +14,7 @@ import type {
   TtsSpeakOptions,
   TtsSpeakResult,
 } from "../../shared/ipc-types";
-import type { TtsEngine } from "./tts-engine";
+import type { TtsEngine, SynthesizedAudio } from "./tts-engine";
 import { createLocalTtsEngine, loadSherpaTts } from "./local-engine";
 import { expandEnglishNumbers } from "./english-numbers";
 import { pickEngine } from "./route";
@@ -38,7 +38,14 @@ export interface TtsService {
   isInstalled(engine?: TtsModelKey): boolean;
   /** 加载模型（幂等）。安装后自检也用它。 */
   load(engine?: TtsModelKey): Promise<void>;
-  speak(text: string, opts?: TtsSpeakOptions): Promise<TtsSpeakResult>;
+  /**
+   * 合成一句。给了 `onChunk` 就把引擎的分段块交给它（返回 `false` 中止后续分段）。
+   */
+  speak(
+    text: string,
+    opts?: TtsSpeakOptions,
+    onChunk?: (chunk: SynthesizedAudio) => boolean | void,
+  ): Promise<TtsSpeakResult>;
 }
 
 const MODEL_ID_BY_ENGINE: Record<TtsModelKey, string> = {
@@ -133,7 +140,7 @@ export function getTtsService(deps: TtsServiceDeps): TtsService {
       log(`[Tts] loading model (cold start): ${engine}`);
       await tts.load();
     },
-    async speak(text, opts) {
+    async speak(text, opts, onChunk) {
       if (!text.trim()) return { ok: false, error: "empty text" };
 
       // 引擎选择只有一处规则，见 resolveTtsEngine 的注释。
@@ -147,7 +154,7 @@ export function getTtsService(deps: TtsServiceDeps): TtsService {
 
       try {
         await service.load(engine);
-        const audio = await getEngine(engine).synthesize(spoken);
+        const audio = await getEngine(engine).synthesize(spoken, onChunk);
         return {
           ok: true,
           samples: audio.samples,

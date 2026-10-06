@@ -24,6 +24,8 @@ import type {
   TtsModelKey,
   TtsSpeakOptions,
   TtsSpeakResult,
+  TtsSpeakStreamResult,
+  TtsStreamEvent,
 } from "../../shared/ipc-types";
 import type { TtsService } from "./service";
 import { getTtsService, resolveTtsEngine } from "./service";
@@ -44,6 +46,11 @@ import { logError } from "../utils/logger";
 export interface TtsIpcDeps {
   userDataPath: string;
   sendEvent: (event: TtsEvent) => void;
+  /**
+   * 流式朗读的块事件。与 sendEvent 分开：块频率高、载荷大，不该吵醒安装进度的订阅者。
+   * 目标窗口由接线方决定（照抄 sendEvent 的做法）。
+   */
+  sendStream: (event: TtsStreamEvent) => void;
   /** 注入以便测试。默认 getTtsService(...)。 */
   service?: TtsService;
   /** 注入以便测试。默认：读随包清单 + 真实下载。 */
@@ -64,6 +71,8 @@ const CHANNELS = [
   "tts.install",
   "tts.removeInstall",
   "tts.speak",
+  "tts.speakStream",
+  "tts.cancelStream",
 ] as const;
 
 const MODELS: TtsModelKey[] = ["zh", "en", "matcha"];
@@ -98,7 +107,7 @@ export function registerTtsIpc({
   ipcMain: IpcMain;
   deps: TtsIpcDeps;
 }): TtsIpcHandle {
-  const { userDataPath, sendEvent } = deps;
+  const { userDataPath, sendEvent, sendStream } = deps;
   const service = deps.service ?? getTtsService({ userDataPath });
   const installer = {
     readSpec: readRuntimeSpec,
@@ -123,6 +132,32 @@ export function registerTtsIpc({
   const publish = (model: TtsModelKey, next: TtsInstallState) => {
     states[model] = next;
     sendEvent({ type: "install", model, state: next });
+  };
+
+  /**
+   * 朗读开关的门控。**两个 handler 共用**，不许各写一份：判据必须与
+   * `resolveTtsEngine` 的最终结果一致，否则 `{ prefer: "matcha", engine: "zh" }`
+   * 这类入参会判错。返回错误字符串表示拦下。
+   *
+   * 每个模型有自己的归属：zh / en 属于朗读，那个开关是**朗读那条路**的总闸；
+   * matcha 属于语音模式。语音对话（`purpose === "voice"`）是例外：它在设置里
+   * 明确选了音色，那份模型就是为它而下的，不该被朗读开关拦在门外。
+   */
+  const readAloudGate = (
+    text: string,
+    opts?: TtsSpeakOptions,
+  ): string | null => {
+    const engineForCall = resolveTtsEngine(text, opts, (engine) =>
+      service.isInstalled(engine),
+    );
+    if (
+      !configStore.getAll().readAloud?.enabled &&
+      engineForCall !== "matcha" &&
+      opts?.purpose !== "voice"
+    ) {
+      return "read aloud disabled";
+    }
+    return null;
   };
 
   /**
@@ -242,29 +277,63 @@ export function registerTtsIpc({
       text: string,
       opts?: TtsSpeakOptions,
     ): Promise<TtsSpeakResult> => {
-      // 每个模型有自己的归属：zh / en 属于朗读，那个开关是**朗读那条路**的总闸；
-      // matcha 属于语音模式，音色也是用户单独下的。
-      //
-      // 语音对话（purpose === "voice"）是例外：它在设置里明确选了音色，那份模型
-      // 就是为它而下的。再拿朗读开关拦它，等于让用户为了在语音对话里听到声音，
-      // 先去另一张卡打开一个跟语音对话无关的开关。
-      //
-      // 其余调用仍然问的是"这次最终用哪个引擎"，而那个规则在 resolveTtsEngine 里
-      // （只有一处）：这里自己再写一遍 `prefer === "matcha"` 就会在 engine/prefer
-      // 同时给出时判错。
-      const engineForCall = resolveTtsEngine(text, opts, (engine) =>
-        service.isInstalled(engine),
-      );
-      if (
-        !configStore.getAll().readAloud?.enabled &&
-        engineForCall !== "matcha" &&
-        opts?.purpose !== "voice"
-      ) {
-        return { ok: false, error: "read aloud disabled" };
-      }
+      const blocked = readAloudGate(text, opts);
+      if (blocked) return { ok: false, error: blocked };
       return service.speak(text, opts);
     },
   );
+
+  let nextStreamId = 1;
+  /** 已请求取消的流。`onProgress` **同步**查它 —— 那儿不能 await IPC。 */
+  const cancelled = new Set<number>();
+  /** 在飞的流。用它把「取消一个不存在的流」挡在外面：`cancelled` 的清理挂在流
+   *  自己的 finally 上，给一个不存在的 id 登记就是永不回收的一项。 */
+  const live = new Set<number>();
+
+  const runStream = async (
+    streamId: number,
+    text: string,
+    opts?: TtsSpeakOptions,
+  ): Promise<void> => {
+    const blocked = readAloudGate(text, opts);
+    if (blocked) {
+      sendStream({ streamId, type: "error", error: blocked });
+      return;
+    }
+    let seq = 0;
+    const result = await service.speak(text, opts, (chunk) => {
+      if (cancelled.has(streamId)) return false;
+      sendStream({ streamId, type: "chunk", seq: seq++, ...chunk });
+      return true;
+    });
+    // 取消后**既不发块也不发 done**：调用方已经丢弃这个流，收到 done 会把它当成
+    // 一次正常结束（设计 §3.5）。取消时 generateAsync 仍会正常 resolve（截断音频）。
+    if (cancelled.has(streamId)) return;
+    if (result.ok) sendStream({ streamId, type: "done" });
+    else sendStream({ streamId, type: "error", error: result.error });
+  };
+
+  ipcMain.handle(
+    "tts.speakStream",
+    async (
+      _event,
+      text: string,
+      opts?: TtsSpeakOptions,
+    ): Promise<TtsSpeakStreamResult> => {
+      const streamId = nextStreamId++;
+      live.add(streamId);
+      // 不 await：handler 必须立刻返回，块随后以事件推送。
+      void runStream(streamId, text, opts).finally(() => {
+        live.delete(streamId);
+        cancelled.delete(streamId);
+      });
+      return { streamId };
+    },
+  );
+
+  ipcMain.handle("tts.cancelStream", (_event, streamId: number) => {
+    if (live.has(streamId)) cancelled.add(streamId);
+  });
 
   return {
     dispose() {

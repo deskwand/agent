@@ -4,18 +4,23 @@
  * 流式朗读：模型还在生成时就把完整句送去合成并排队。
  *
  * 两个必须做对的地方：
- *  1. **入队顺序**。合成是并发的，回来的顺序不保证；乱序入队会让朗读跳句。
- *     所以用一个 ready 表按句号顺序出队。
- *  2. **「读完了」的判定**。audio-queue 靠 isLast 标记认结尾，而流式文本在
- *     end() 之前没人知道哪句是最后一句。所以 end() 时补一个 1 采样的静音哨兵，
- *     并等所有合成回来后才能入队它 —— 否则哨兵会插到句子前面，提前触发 drained。
+ *  1. **入队顺序**。合成是并发的，块回来的顺序不保证；乱序入队会让朗读跳句。
+ *     所以有一个**发布指针**：只有轮到的那一句的块能进队列，后句的块先缓存 ——
+ *     等前一句的块全部排完（`done`）才放行。
+ *  2. **「读完了」的判定**。流式文本在 end() 之前没人知道哪句是最后一句，而且
+ *     每句的块是分批到的。所以等**所有在飞的流都结束**之后才调
+ *     `queue.markLast()` —— 队列靠它区分「读完」与「合成还没跟上」。
  */
-import type { TtsSpeakResult } from "../../shared/ipc-types";
 import type { AudioQueue } from "../utils/tts/audio-queue";
+import type {
+  SpeakStreamChunk,
+  SpeakStreamHandlers,
+} from "../utils/tts/speak-stream";
 import { createSentenceStream } from "../utils/tts/stream-sentences";
 
 export interface StreamingSpeechDeps {
-  speak: (text: string) => Promise<TtsSpeakResult>;
+  /** 发一次流式合成，返回取消函数。块按引擎的标点分段到达。 */
+  speak: (text: string, handlers: SpeakStreamHandlers) => () => void;
   createQueue: () => AudioQueue;
 }
 
@@ -37,10 +42,6 @@ export interface StreamingSpeech {
   failedCount(): number;
 }
 
-/** 1 采样的静音：只为了让队列知道「后面没有了」。 */
-const TAIL_SAMPLES = new Float32Array(1);
-const TAIL_RATE = 24000;
-
 export function createStreamingSpeech(
   deps: StreamingSpeechDeps,
 ): StreamingSpeech {
@@ -50,22 +51,29 @@ export function createStreamingSpeech(
   let generation = 0;
   let ended = false;
   let inFlight = 0;
-  let waitingTail = false;
-  let nextToEnqueue = 0;
+  let waitingLast = false;
   let failures = 0;
   /** 本轮忽略前多少个字符。见 begin 的说明。 */
   let offset = 0;
 
-  const ready = new Map<
+  /**
+   * 每句的块缓冲。块按到达顺序进这里；**只有发布指针轮到这一句时**才搬进队列。
+   * 后句先到是常态（不同句是各自独立的流），所以这是必需的，不是防御性代码。
+   * 缓存有界：只缓存「还没轮到」的句子，上界是一整句音频。
+   */
+  const buffers = new Map<
     number,
-    { samples: Float32Array; sampleRate: number }
+    { chunks: SpeakStreamChunk[]; done: boolean }
   >();
+  /** 在飞的取消函数。只用 values/clear，所以是 Set 不是 Map。 */
+  const cancels = new Set<() => void>();
+  let nextToPublish = 0;
   const sentenceCbs = new Set<(index: number, text: string) => void>();
   const drainedCbs = new Set<() => void>();
 
   queue.onSentenceStart((index) => {
     const text = sentences[index];
-    if (text === undefined) return; // 哨兵
+    if (text === undefined) return;
     for (const cb of sentenceCbs) cb(index, text);
   });
   queue.onDrained(() => {
@@ -73,54 +81,79 @@ export function createStreamingSpeech(
     for (const cb of drainedCbs) cb();
   });
 
-  const enqueueReady = () => {
+  /**
+   * 按句序把块搬进队列：句子 i 的块要全部排完，才允许 i+1 的块入队 ——
+   * 否则后句的音频会排到前句前面。
+   */
+  const publish = () => {
     for (;;) {
-      const item = ready.get(nextToEnqueue);
-      if (!item) break;
-      ready.delete(nextToEnqueue);
-      queue.enqueue({
-        index: nextToEnqueue,
-        samples: item.samples,
-        sampleRate: item.sampleRate,
-        isLast: false,
-      });
-      nextToEnqueue += 1;
+      const buffer = buffers.get(nextToPublish);
+      if (!buffer) break;
+      for (const chunk of buffer.chunks) {
+        queue.enqueue({
+          sentenceIndex: nextToPublish,
+          samples: chunk.samples,
+          sampleRate: chunk.sampleRate,
+        });
+      }
+      buffer.chunks = [];
+      if (!buffer.done) break; // 这一句还没合成完，等它
+      buffers.delete(nextToPublish);
+      nextToPublish += 1;
     }
-    if (waitingTail && inFlight === 0) {
-      waitingTail = false;
-      queue.enqueue({
-        index: -1,
-        samples: TAIL_SAMPLES,
-        sampleRate: TAIL_RATE,
-        isLast: true,
-      });
+    // 所有在飞的流都结束之后，才允许宣布「读完」（markLast）。这替代了改造前
+    // 那个 1 采样静音哨兵：时机一样，只是不再需要假音频。
+    if (waitingLast && inFlight === 0) {
+      waitingLast = false;
+      queue.markLast();
     }
   };
 
   const synthesize = (index: number, text: string) => {
     const token = generation;
     inFlight += 1;
-    void deps
-      .speak(text)
-      .then((result) => {
+    /**
+     * 必须**先声明再赋值**：桥缺失时 `speak` 会同步回调 `onError`，那时
+     * `cancel` 还在 TDZ 里，直接读会抛 ReferenceError。
+     */
+    let cancel: (() => void) | null = null;
+    const forget = () => {
+      if (cancel) cancels.delete(cancel);
+    };
+
+    const bufferFor = () => {
+      const existing = buffers.get(index);
+      if (existing) return existing;
+      const created = { chunks: [] as SpeakStreamChunk[], done: false };
+      buffers.set(index, created);
+      return created;
+    };
+
+    cancel = deps.speak(text, {
+      onChunk: (chunk) => {
         if (token !== generation) return;
-        if (result.ok) {
-          ready.set(index, {
-            samples: result.samples,
-            sampleRate: result.sampleRate,
-          });
-        } else {
-          failures += 1;
-        }
-      })
-      .catch(() => {
-        if (token === generation) failures += 1;
-      })
-      .finally(() => {
+        bufferFor().chunks.push(chunk);
+        if (index === nextToPublish) publish();
+      },
+      onDone: () => {
+        forget();
         if (token !== generation) return;
+        bufferFor().done = true;
         inFlight -= 1;
-        enqueueReady();
-      });
+        publish();
+      },
+      onError: () => {
+        forget();
+        if (token !== generation) return;
+        // 首块前失败与出过声后失败走同一条：**补出 buffer 再标 done**，否则发布
+        // 指针会永远卡在这一句上。已经入队的块留着（已播部分不收回）。
+        failures += 1;
+        bufferFor().done = true;
+        inFlight -= 1;
+        publish();
+      },
+    });
+    cancels.add(cancel);
   };
 
   const addSentence = (text: string) => {
@@ -132,14 +165,16 @@ export function createStreamingSpeech(
   return {
     begin(fromCharOffset = 0) {
       generation += 1;
+      for (const cancel of cancels) cancel();
+      cancels.clear();
       queue.stop();
       stream = createSentenceStream();
       sentences = [];
-      ready.clear();
+      buffers.clear();
       ended = false;
       inFlight = 0;
-      waitingTail = false;
-      nextToEnqueue = 0;
+      waitingLast = false;
+      nextToPublish = 0;
       failures = 0;
       offset = fromCharOffset;
     },
@@ -154,17 +189,19 @@ export function createStreamingSpeech(
       if (ended) return;
       ended = true;
       for (const text of stream.flush()) addSentence(text);
-      waitingTail = true;
-      enqueueReady();
+      waitingLast = true;
+      publish();
     },
     stop() {
       generation += 1;
+      for (const cancel of cancels) cancel();
+      cancels.clear();
       queue.stop();
-      ready.clear();
+      buffers.clear();
       ended = false;
       inFlight = 0;
-      waitingTail = false;
-      nextToEnqueue = 0;
+      waitingLast = false;
+      nextToPublish = 0;
     },
     onSentence(cb) {
       sentenceCbs.add(cb);

@@ -59,13 +59,10 @@ afterEach(() => {
   runtime.speechDeps.length = 0;
 });
 
-/** 每个用例的脚手架：stub AudioContext 与 tts.speak、建一个语音会话并打开浮层。 */
+/** 每个用例的脚手架：stub AudioContext 与流式 tts、建一个语音会话并打开浮层。 */
 async function mount(opts: { fastVoice?: boolean } = {}) {
-  const speak = vi.fn(async () => ({
-    ok: true as const,
-    samples: new Float32Array(1),
-    sampleRate: 16000,
-  }));
+  // speakStream 现在才是真入口：语音模式走 speakStream（块事件），不再调 tts.speak。
+  const speakStream = vi.fn(async () => ({ streamId: 1 }));
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   vi.stubGlobal(
     "AudioContext",
@@ -74,7 +71,9 @@ async function mount(opts: { fastVoice?: boolean } = {}) {
     },
   );
   vi.stubGlobal("electronAPI", undefined);
-  window.electronAPI = { tts: { speak } } as never;
+  window.electronAPI = {
+    tts: { speakStream, cancelStream: vi.fn(), onStream: () => () => {} },
+  } as never;
 
   // 这一句会把 appConfig 清掉，所以要设开关必须在它**之后**（或走 opts）
   useAppStore.setState(useAppStore.getInitialState(), true);
@@ -98,7 +97,7 @@ async function mount(opts: { fastVoice?: boolean } = {}) {
   const root = createRoot(document.createElement("div"));
   await act(async () => root.render(<Harness />));
   return {
-    speak,
+    speak: speakStream,
     unmount: async () => {
       await act(async () => root.unmount());
     },
@@ -107,7 +106,13 @@ async function mount(opts: { fastVoice?: boolean } = {}) {
 
 /** 说一句：走 useVoiceMode 交给 createStreamingSpeech 的那个 speak。 */
 const say = (text: string) =>
-  act(async () => runtime.speechDeps[0].speak(text));
+  act(async () =>
+    runtime.speechDeps[0].speak(text, {
+      onChunk: () => {},
+      onDone: () => {},
+      onError: () => {},
+    }),
+  );
 
 /** 只填本用例会读的字段。 */
 const setFastVoice = (fastVoice: boolean) =>

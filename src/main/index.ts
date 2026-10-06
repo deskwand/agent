@@ -2948,6 +2948,12 @@ ttsIpc = registerTtsIpc({
         mainWindow.webContents.send("tts.event", event);
       }
     },
+    // 只发主窗口：音频块不该推给 OAuth 窗口与桌宠窗口。
+    sendStream: (event) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("tts.stream", event);
+      }
+    },
   },
 });
 

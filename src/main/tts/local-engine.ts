@@ -17,6 +17,11 @@ const SPEED = 1.0;
 /** 只声明用到的那一小块。名字照 sherpa-onnx 1.13.8 的 node 包装核对过。 */
 export interface SherpaOfflineTts {
   /**
+   * 输出采样率。包装在构造时就把它挂在实例上（`non-streaming-tts.js`）。
+   * **分块回调的载荷里没有采样率**，所以只能从这里取。
+   */
+  sampleRate: number;
+  /**
    * 异步合成。**不要换回同步的 `generate`**：实测一句 4.45 秒的音频里，同步版
    * 让主进程事件循环 0 次 tick（聊天流、文件、遥测 IPC 全部停摆），而
    * generateAsync 的最大停顿是 7ms，总耗时一样。
@@ -137,14 +142,19 @@ export function createLocalTtsEngine(opts: LocalTtsOptions): TtsEngine {
           : buildLocalTtsConfig(opts),
       );
     },
-    async synthesize(text) {
+    async synthesize(text, onChunk) {
       if (!tts) throw new Error("tts engine not loaded");
-      return await tts.generateAsync({
+      const engine = tts;
+      return await engine.generateAsync({
         text,
         sid,
         speed: SPEED,
         generationConfig: opts.createGenerationConfig({ sid, speed: SPEED }),
-        onProgress: () => {},
+        // 不传 onChunk 时恒为 true —— 那就是今天的行为（消费方不需要分块）。
+        onProgress: (info) =>
+          onChunk
+            ? onChunk({ samples: info.samples, sampleRate: engine.sampleRate })
+            : true,
         enableExternalBuffer: false,
       });
     },

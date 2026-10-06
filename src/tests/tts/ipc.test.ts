@@ -19,7 +19,11 @@ import {
 import type { TtsModelId } from "../../main/speech/installer";
 import { registerTtsIpc } from "../../main/tts/ipc";
 import type { TtsService } from "../../main/tts/service";
-import type { TtsEvent, TtsModelKey } from "../../shared/ipc-types";
+import type {
+  TtsEvent,
+  TtsModelKey,
+  TtsStreamEvent,
+} from "../../shared/ipc-types";
 
 /** 极简的 ipcMain 替身：只记 handler，由测试自己调用。 */
 function fakeIpcMain() {
@@ -100,11 +104,14 @@ function harness(
     installed?: TtsModelKey[];
     selfCheck?: Partial<Record<TtsModelKey, "ok" | "fail">>;
     runtimeInstalled?: boolean;
+    /** 流式用例自带一个会吐块的 speak。不给就用下面那个普通替身。 */
+    speak?: TtsService["speak"];
   } = {},
 ) {
   const installed = new Set<TtsModelKey>(options.installed ?? []);
   const userDataPath = mkdtempSync(join(tmpdir(), "tts-ipc-"));
   const events: TtsEvent[] = [];
+  const streamEvents: TtsStreamEvent[] = [];
 
   const installRuntime = vi.fn(async () => {});
   const installTtsModel = vi.fn(async (opts: { model: TtsModelId }) => {
@@ -113,15 +120,17 @@ function harness(
   const removeTtsModel = vi.fn((_path: string, model: TtsModelId) => {
     installed.delete(MODEL_ID_TO_KEY[model]);
   });
-  const speak = vi.fn(async (_text: string, opts?: { engine?: TtsModelKey }) =>
-    options.selfCheck?.[opts?.engine ?? "zh"] === "fail"
-      ? { ok: false as const, error: "self check failed" }
-      : {
-          ok: true as const,
-          samples: new Float32Array(1),
-          sampleRate: 44100,
-        },
-  );
+  const speak: TtsService["speak"] =
+    options.speak ??
+    vi.fn(async (_text: string, opts?: { engine?: TtsModelKey }) =>
+      options.selfCheck?.[opts?.engine ?? "zh"] === "fail"
+        ? { ok: false as const, error: "self check failed" }
+        : {
+            ok: true as const,
+            samples: new Float32Array(1),
+            sampleRate: 44100,
+          },
+    );
   const service: TtsService = {
     isInstalled: (engine: TtsModelKey = "zh") => installed.has(engine),
     load: vi.fn(async () => {}),
@@ -135,6 +144,7 @@ function harness(
       userDataPath,
       // 收**整个事件**：断言要看 model
       sendEvent: (event) => events.push(event),
+      sendStream: (event) => streamEvents.push(event),
       service,
       installDeps: {
         readSpec: specFixture,
@@ -147,6 +157,7 @@ function harness(
   return {
     ipc,
     events,
+    streamEvents,
     speak,
     installRuntime,
     installTtsModel,
@@ -168,6 +179,7 @@ describe("registerTtsIpc", () => {
       deps: {
         userDataPath: installedUserData(),
         sendEvent: vi.fn(),
+        sendStream: vi.fn(),
         service: serviceStub(),
       },
     });
@@ -186,6 +198,7 @@ describe("registerTtsIpc", () => {
       deps: {
         userDataPath: installedUserData(),
         sendEvent: vi.fn(),
+        sendStream: vi.fn(),
         service: serviceStub(),
       },
     });
@@ -204,6 +217,7 @@ describe("registerTtsIpc", () => {
       deps: {
         userDataPath: installedUserData(),
         sendEvent: vi.fn(),
+        sendStream: vi.fn(),
         service: serviceStub({
           speak: vi.fn(async () => ({
             ok: false as const,
@@ -231,6 +245,7 @@ describe("registerTtsIpc", () => {
       deps: {
         userDataPath: userData,
         sendEvent: vi.fn(),
+        sendStream: vi.fn(),
         service: serviceStub(),
       },
     });
@@ -276,6 +291,7 @@ describe("registerTtsIpc", () => {
       deps: {
         userDataPath: installedUserData(),
         sendEvent: vi.fn(),
+        sendStream: vi.fn(),
         service: serviceStub({ speak }),
       },
     });
@@ -297,6 +313,7 @@ describe("registerTtsIpc", () => {
       deps: {
         userDataPath: installedUserData(),
         sendEvent: vi.fn(),
+        sendStream: vi.fn(),
         service: serviceStub(),
       },
     });
@@ -505,5 +522,83 @@ describe("speak 与朗读开关", () => {
     const result = await ipc.invoke("tts.speak", "你好");
     expect(result).toEqual({ ok: false, error: "read aloud disabled" });
     expect(speak).not.toHaveBeenCalled();
+  });
+  it("speakStream: 立刻返回 streamId，按序推块，最后推 done", async () => {
+    const speak = vi.fn(
+      async (
+        _text: string,
+        _opts?: unknown,
+        onChunk?: (chunk: {
+          samples: Float32Array;
+          sampleRate: number;
+        }) => boolean | void,
+      ) => {
+        onChunk?.({ samples: new Float32Array([1]), sampleRate: 24000 });
+        onChunk?.({ samples: new Float32Array([2, 3]), sampleRate: 24000 });
+        return {
+          ok: true as const,
+          samples: new Float32Array([1, 2, 3]),
+          sampleRate: 24000,
+        };
+      },
+    ) as TtsService["speak"];
+    const { ipc, streamEvents } = harness({ installed: ["zh"], speak });
+
+    const { streamId } = (await ipc.invoke("tts.speakStream", "文本", {
+      purpose: "voice",
+    })) as { streamId: number };
+    await vi.waitFor(() => expect(streamEvents.length).toBe(3));
+
+    expect(streamEvents.map((e) => e.type)).toEqual(["chunk", "chunk", "done"]);
+    expect(
+      streamEvents
+        .filter((e) => e.type === "chunk")
+        .map((e) => (e as { seq: number }).seq),
+    ).toEqual([0, 1]);
+    expect(streamEvents.every((e) => e.streamId === streamId)).toBe(true);
+  });
+
+  it("cancelStream: 取消后不再推块，也不推 done", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const speak = vi.fn(
+      async (
+        _text: string,
+        _opts?: unknown,
+        onChunk?: (chunk: {
+          samples: Float32Array;
+          sampleRate: number;
+        }) => boolean | void,
+      ) => {
+        onChunk?.({ samples: new Float32Array([1]), sampleRate: 24000 });
+        await gate; // 模拟「后续分段还在合成」
+        const keepGoing = onChunk?.({
+          samples: new Float32Array([2]),
+          sampleRate: 24000,
+        });
+        return keepGoing === false
+          ? {
+              ok: true as const,
+              samples: new Float32Array([1]),
+              sampleRate: 24000,
+            }
+          : {
+              ok: true as const,
+              samples: new Float32Array([1, 2]),
+              sampleRate: 24000,
+            };
+      },
+    ) as TtsService["speak"];
+    const { ipc, streamEvents } = harness({ installed: ["zh"], speak });
+
+    const { streamId } = (await ipc.invoke("tts.speakStream", "文本", {
+      purpose: "voice",
+    })) as { streamId: number };
+    await ipc.invoke("tts.cancelStream", streamId);
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(streamEvents.filter((e) => e.type === "chunk").length).toBe(1);
+    expect(streamEvents.some((e) => e.type === "done")).toBe(false);
   });
 });

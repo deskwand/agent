@@ -16,7 +16,16 @@ export interface SynthesizedAudio {
 export interface TtsEngine {
   /** 加载模型。幂等：已加载就直接返回。 */
   load(): Promise<void>;
-  /** 合成一句。抛错即失败，由调用方决定重试还是报错。 */
-  synthesize(text: string): Promise<SynthesizedAudio>;
+  /**
+   * 合成一句。抛错即失败，由调用方决定重试还是报错。
+   *
+   * `onChunk` 是引擎自己的**标点分段**回调（不是音频级流式）。**返回 `false` 即请求
+   * 中止**后续分段 —— 这是 sherpa-onnx 的原生语义，node 包装已把它映射成 0/1。
+   * 分块拼接起来与整句音频逐样本相同（实测）。
+   */
+  synthesize(
+    text: string,
+    onChunk?: (chunk: SynthesizedAudio) => boolean | void,
+  ): Promise<SynthesizedAudio>;
   isLoaded(): boolean;
 }

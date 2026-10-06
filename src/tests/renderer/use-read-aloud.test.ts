@@ -4,23 +4,30 @@ import {
   createReadAloudController,
   type ReadAloudDeps,
 } from "../../renderer/hooks/useReadAloud";
+import type { SpeakStreamHandlers } from "../../renderer/utils/tts/speak-stream";
 
 function fakeDeps() {
   const requested: string[] = [];
-  const resolvers: Array<(value: unknown) => void> = [];
-  const enqueued: Array<{ index: number; samples: Float32Array }> = [];
+  const streams: SpeakStreamHandlers[] = [];
+  const cancelled: string[] = [];
+  const enqueued: Array<{ sentenceIndex: number; samples: Float32Array }> = [];
+  let markLastCalls = 0;
   let onDrained: (() => void) | null = null;
 
   const deps: ReadAloudDeps = {
     setState: vi.fn(),
-    speak: (text) => {
+    speak: (text, handlers) => {
       requested.push(text);
-      return new Promise((resolve) => {
-        resolvers.push((value) => resolve(value as never));
-      }) as never;
+      streams.push(handlers);
+      return () => {
+        cancelled.push(text);
+      };
     },
     createQueue: () => ({
       enqueue: (item) => enqueued.push(item),
+      markLast: () => {
+        markLastCalls += 1;
+      },
       // 高亮回调这里不关心 —— controller 只靠它更新 currentIndex
       onSentenceStart: () => {},
       onDrained: (cb) => {
@@ -36,16 +43,17 @@ function fakeDeps() {
     deps,
     requested,
     enqueued,
-    resolveNext: () =>
-      resolvers.shift()?.({
-        ok: true,
-        samples: new Float32Array(10),
-        sampleRate: 44100,
-      }),
-    failNext: (error: string) => resolvers.shift()?.({ ok: false, error }),
+    cancelled,
+    streamAt: (i: number) => streams[i],
+    markLastCalls: () => markLastCalls,
     drain: () => onDrained?.(),
   };
 }
+
+const chunk = (length = 10) => ({
+  samples: new Float32Array(length),
+  sampleRate: 44100,
+});
 
 function messageRoot() {
   const root = document.createElement("div");
@@ -62,7 +70,7 @@ describe("朗读会话", () => {
     controller.start("m1", messageRoot());
     expect(controller.getState().status).toBe("preparing");
 
-    harness.resolveNext();
+    harness.streamAt(0).onChunk(chunk());
     await vi.waitFor(() =>
       expect(controller.getState().status).toBe("playing"),
     );
@@ -74,7 +82,8 @@ describe("朗读会话", () => {
     const controller = createReadAloudController(harness.deps);
 
     controller.start("m1", messageRoot());
-    harness.resolveNext();
+    harness.streamAt(0).onChunk(chunk());
+    harness.streamAt(0).onDone();
     await vi.waitFor(() => expect(harness.requested).toHaveLength(2));
     // 第二句还没播（第一句没结束），但已经发出去了
     expect(harness.enqueued).toHaveLength(1);
@@ -86,11 +95,13 @@ describe("朗读会话", () => {
     controller.start("m1", messageRoot());
 
     for (let i = 0; i < 3; i++) {
-      harness.resolveNext();
+      harness.streamAt(i).onChunk(chunk());
       await vi.waitFor(() =>
         expect(harness.enqueued.length).toBeGreaterThan(i),
       );
+      harness.streamAt(i).onDone();
     }
+    expect(harness.markLastCalls()).toBe(1); // 只有最后一段打标
     harness.drain();
     expect(controller.getState().status).toBe("idle");
     expect(controller.getState().messageId).toBeNull();
@@ -101,7 +112,7 @@ describe("朗读会话", () => {
     const controller = createReadAloudController(harness.deps);
     controller.start("m1", messageRoot());
 
-    harness.failNext("model file missing");
+    harness.streamAt(0).onError("model file missing");
     await vi.waitFor(() => expect(controller.getState().status).toBe("error"));
     expect(controller.getState().error).toContain("missing");
   });
@@ -129,14 +140,17 @@ describe("朗读会话", () => {
     expect(controller.getState().messageId).toBe("mB");
 
     // A 的第 1 句迟到了：它现在属于上一个场次，必须被丢弃
-    harness.resolveNext();
+    harness.streamAt(0).onChunk(chunk());
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(harness.enqueued).toHaveLength(0);
+    expect(harness.cancelled).toEqual(["第一句。"]); // 切换时要取消在飞的流
+    harness.drain(); // 清掉 B 之前那段旧队列
+    harness.enqueued.length = 0;
 
     // 而 B 的第 1 句仍然要正常入队 —— 这条才是「切换没把新会话弄坏」的证据
-    harness.resolveNext();
+    harness.streamAt(1).onChunk(chunk());
     await vi.waitFor(() => expect(harness.enqueued).toHaveLength(1));
-    expect(harness.enqueued[0].index).toBe(0);
+    expect(harness.enqueued[0].sentenceIndex).toBe(0);
     expect(controller.getState().messageId).toBe("mB");
   });
 
@@ -146,7 +160,7 @@ describe("朗读会话", () => {
     controller.start("m1", messageRoot());
 
     controller.stop();
-    harness.resolveNext();
+    harness.streamAt(0).onChunk(chunk());
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(harness.enqueued).toHaveLength(0);
     expect(controller.getState().status).toBe("idle");

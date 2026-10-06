@@ -29,8 +29,11 @@ describe("local tts config", () => {
 });
 
 describe("local tts engine", () => {
+  /** 新用例记录引擎对 onChunk 返回值的处置（1 = 继续，0 = 中止）。 */
+  const verdicts: number[] = [];
+
   it("loads once and stays loaded", async () => {
-    const instance = { generateAsync: vi.fn() };
+    const instance = { generateAsync: vi.fn(), sampleRate: 44100 };
     const createTts = vi.fn(() => instance);
     const engine = createLocalTtsEngine({
       modelDir: MODEL_DIR,
@@ -48,7 +51,7 @@ describe("local tts engine", () => {
   it("refuses to synthesize before load", async () => {
     const engine = createLocalTtsEngine({
       modelDir: MODEL_DIR,
-      createTts: () => ({ generateAsync: vi.fn() }),
+      createTts: () => ({ generateAsync: vi.fn(), sampleRate: 44100 }),
       createGenerationConfig: (options) => options,
     });
     await expect(engine.synthesize("你好")).rejects.toThrow("not loaded");
@@ -59,7 +62,7 @@ describe("local tts engine", () => {
     const generateAsync = vi.fn(async () => audio);
     const engine = createLocalTtsEngine({
       modelDir: MODEL_DIR,
-      createTts: () => ({ generateAsync }),
+      createTts: () => ({ generateAsync, sampleRate: 44100 }),
       createGenerationConfig: (options) => ({ wrapped: options }),
     });
     await engine.load();
@@ -75,6 +78,37 @@ describe("local tts engine", () => {
       // 缺了它 Electron 下必然失败（外部缓冲区），见 local-engine 注释
       enableExternalBuffer: false,
     });
+  });
+
+  it("forwards engine chunks to onChunk and passes its verdict back", async () => {
+    const generateAsync = vi.fn(
+      async (options: {
+        onProgress: (i: { samples: Float32Array }) => unknown;
+      }) => {
+        const first = options.onProgress({ samples: new Float32Array([1, 2]) });
+        const second = options.onProgress({ samples: new Float32Array([3]) });
+        verdicts.push(first === false ? 0 : 1, second === false ? 0 : 1);
+        return { samples: new Float32Array([1, 2, 3]), sampleRate: 44100 };
+      },
+    );
+    const engine = createLocalTtsEngine({
+      modelDir: MODEL_DIR,
+      createTts: () => ({ generateAsync, sampleRate: 44100 }),
+      createGenerationConfig: (options) => ({ wrapped: options }),
+    });
+    await engine.load();
+
+    const chunks: Array<{ samples: Float32Array; sampleRate: number }> = [];
+    const audio = await engine.synthesize("你好", (chunk) => {
+      chunks.push(chunk);
+      return chunks.length < 2; // 第二块之后请求中止
+    });
+
+    expect(chunks.map((c) => c.samples.length)).toEqual([2, 1]);
+    // 分块回调不带采样率，必须从实例上取
+    expect(chunks.every((c) => c.sampleRate === 44100)).toBe(true);
+    expect(verdicts).toEqual([1, 0]);
+    expect(audio.samples.length).toBe(3);
   });
 });
 
@@ -147,7 +181,7 @@ describe("voice id contract", () => {
     const engine = createLocalTtsEngine({
       modelDir: MODEL_DIR,
       variant: "en",
-      createTts: () => ({ generateAsync }),
+      createTts: () => ({ generateAsync, sampleRate: 44100 }),
       createGenerationConfig: (options) => ({ wrapped: options }),
     });
     await engine.load();
