@@ -214,7 +214,7 @@ describe("设置 →「关于」页", () => {
     expect(container.textContent ?? "").not.toMatch(/about\.[a-zA-Z]/);
   });
 
-  it("四个链接逐个用正确的 URL 调 openExternal", async () => {
+  it("六个链接逐个用正确的 URL 调 openExternal", async () => {
     await render(<SettingsAbout appVersion="1.0.47" />);
 
     for (const [label, url] of [
@@ -222,12 +222,16 @@ describe("设置 →「关于」页", () => {
       ["GitHub 仓库", "https://github.com/deskwand/agent"],
       ["更新日志", "https://github.com/deskwand/agent/releases"],
       ["MIT 开源协议", "https://github.com/deskwand/agent/blob/main/LICENSE"],
+      // 2026-10-06：图标栏的「?」在有更新时会让位给升级按钮，菜单进不去。
+      // 这两条是那段时间里手册与反馈的唯一入口（见 rail-update-icon-design §5）。
+      ["使用手册", "https://www.deskwand.com/manual"],
+      ["反馈问题", "https://github.com/deskwand/agent/issues"],
     ] as const) {
       openExternal.mockClear();
       await act(async () => {
         buttonByText(label)?.click();
       });
-      expect(openExternal).toHaveBeenCalledWith(url);
+      expect(openExternal, label).toHaveBeenCalledWith(url);
     }
   });
 });

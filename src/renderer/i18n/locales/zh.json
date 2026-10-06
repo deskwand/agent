@@ -1762,7 +1762,8 @@
     "description": "DeskWand v{{version}} 已下载完毕，重启应用即可完成更新",
     "later": "稍后再说",
     "restart": "立即重启",
-    "notesLabel": "更新说明"
+    "notesLabel": "更新说明",
+    "railLabel": "新版本 {{version}} 已就绪，点击查看"
   },
   "artifactCard": {
     "revert": "撤销",
