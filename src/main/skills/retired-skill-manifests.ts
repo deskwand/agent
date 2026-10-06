@@ -373,4 +373,12 @@ export const RETIRED_SKILL_MANIFESTS: Record<string, Record<string, string>> = {
     "scripts/recalc.py":
       "cf419d15e02965aeaec17773c05b61303f7f520f67fa2696547e7da07502eac7",
   },
+  "skill-market": {
+    "SKILL.md":
+      "b6999994ae88b2b01268b5ed44b9c5270e991468af9cd62192557fcd1a730e3e",
+  },
+  "web-search": {
+    "SKILL.md":
+      "d41aff34a99cac2a7f466973a2f763247cfbc0d3ec4b23f7b38263e63aa00079",
+  },
 };

@@ -1141,7 +1141,7 @@ export class ConfigStore {
     if (updates.webAccess !== undefined)
       stored.webAccess = normalizeWebAccessConfig(updates.webAccess);
     // 注意：删掉 `codemode.enabled` 时**不能连这个分支一起删** —— 少了它
-    // `mode` / `inlineBudget` 永远存不进去，设置界面一改就被无声回滚。
+    // `mode` 永远存不进去、设置界面一改就被无声回滚。
     if (updates.codemode !== undefined)
       stored.codemode = normalizeCodemodeConfig(updates.codemode);
     if (updates.subagent !== undefined) stored.subagent = updates.subagent;

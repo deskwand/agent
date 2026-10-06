@@ -38,6 +38,7 @@ import type {
 } from "../../renderer/types";
 import type { DatabaseInstance, TraceStepRow } from "../db/database";
 import { PathResolver } from "../sandbox/path-resolver";
+import type { SkillsAdapter } from "../skills/skills-adapter";
 import type { SandboxAdapter } from "../sandbox/sandbox-adapter";
 import {
   getSandboxAdapter,
@@ -117,6 +118,7 @@ interface IAgentRunner {
   ): Promise<AgentTurnOutcome>;
   onSessionFileCreated?: (sessionId: string, path: string) => void;
   cancel(sessionId: string): void;
+  setSkillsAdapter(adapter: SkillsAdapter | undefined): void;
   clearSdkSession?(sessionId: string): void;
   clearAllSdkSessions?(): void;
   getSessionEntries?(sessionId: string): SessionEntry[] | null;
@@ -180,6 +182,8 @@ export class SessionManager {
   private extensionManager?: AgentRuntimeExtensionManager;
   private _userSkillsPath: string;
   private browserViewManager: BrowserViewManager | null = null;
+  /** 见 `setSkillsAdapter()`：必须活过 `setBrowserViewManager()` 的 runner 重建。 */
+  private skillsAdapter?: SkillsAdapter;
   private activeSessions: Map<string, AbortController> = new Map();
   private promptQueues: Map<
     string,
@@ -328,7 +332,7 @@ export class SessionManager {
         },
       },
       this.pathResolver,
-      undefined, // skillsAdapter
+      this.skillsAdapter,
       this.extensionManager,
       this.browserViewManager ?? undefined,
     );
@@ -369,6 +373,17 @@ export class SessionManager {
     log(
       "[SessionManager] BrowserViewManager injected, AgentRunner recreated with internal browser tools",
     );
+  }
+
+  /**
+   * 技能来源由 main 在 `SkillsManager` 建好之后注入。
+   *
+   * 存到字段上而不只是转发：`setBrowserViewManager()` 会重建 `AgentRunner`，
+   * 字段是它重建时能拿回适配器的唯一途径。
+   */
+  setSkillsAdapter(adapter: SkillsAdapter | undefined): void {
+    this.skillsAdapter = adapter;
+    this.agentRunner.setSkillsAdapter(adapter);
   }
 
   /**

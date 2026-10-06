@@ -38,14 +38,14 @@ describe('欢迎页快捷入口数据', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('5 个入口，4 技能 1 工具', () => {
+  it('5 个入口，3 技能 2 工具', () => {
     expect(WELCOME_QUICK_ENTRIES.length).toBe(5);
     expect(
       WELCOME_QUICK_ENTRIES.filter((e) => e.kind === 'skill').length,
-    ).toBe(4);
+    ).toBe(3);
     expect(
       WELCOME_QUICK_ENTRIES.filter((e) => e.kind === 'tool').length,
-    ).toBe(1);
+    ).toBe(2);
   });
 
   // 图标是这 5 个入口唯一的「它们不是同一件事」的视觉信号。两个入口共用同一个
@@ -111,13 +111,16 @@ describe('visibleQuickEntries 过滤', () => {
 
   it('被禁用的技能，它的入口不出现 —— 否则会插入 pi 不展开的令牌', () => {
     const enabled = allSkillNames();
-    // allSkillNames 收的是技能名（brainstorming / systematic-debugging / officecli /
-    // web-search），不是入口 id。名字写错时 delete 会安静地返回 false，这条守卫就
+    // allSkillNames 收的是技能名（brainstorming / systematic-debugging / officecli），
+    // 不是入口 id。名字写错时 delete 会安静地返回 false，这条守卫就
     // 退化成恒真 —— 所以断言 delete 真的命中过。
-    expect(enabled.delete('web-search')).toBe(true);
+    expect(enabled.delete('officecli')).toBe(true);
     const visible = visibleQuickEntries(WELCOME_QUICK_ENTRIES, enabled, true);
-    expect(visible.some((e) => e.id === 'web')).toBe(false);
-    expect(visible.some((e) => e.id === 'office')).toBe(true);
+    expect(visible.some((e) => e.id === 'office')).toBe(false);
+    expect(visible.some((e) => e.id === 'brainstorm')).toBe(true);
+    // 「联网搜索」是提示词入口（web-search 技能已退役），不依赖技能开关：
+    // 禁用技能不该把它一起带走。
+    expect(visible.some((e) => e.id === 'web')).toBe(true);
   });
 
   it('视觉不可用时只隐藏「看图」，其余 4 个仍在', () => {
@@ -134,21 +137,20 @@ describe('visibleQuickEntries 过滤', () => {
     ]);
   });
 
-  it('技能全禁用时只剩「看图」', () => {
+  it('技能全禁用时只剩两个提示词入口', () => {
     const visible = visibleQuickEntries(WELCOME_QUICK_ENTRIES, new Set(), true);
-    expect(visible.map((e) => e.id)).toEqual(['vision']);
+    expect(visible.map((e) => e.id)).toEqual(['web', 'vision']);
   });
 
-  // 行为变化：收敛前 browser 是无条件存在的兜底，任何状态下 chip 行都至少有 1 个
-  // 入口；现在没有了。这一态（用户禁掉全部相关技能且没配视觉模型）极罕见，且
-  // WelcomeView 用 `visibleEntries.length > 0` 兜住了空数组 —— 整行不渲染，页面
-  // 其余部分照旧。硬塞一个入口比留白更乱。
-  it('技能全禁用且视觉不可用时没有入口', () => {
+  // 行为变化：以前「全部相关技能被禁用」会让 chip 行一个入口都不剩（web-search
+  // 那时是技能入口）。web 改成提示词入口后，这一态由它兜底，chip 行不会再空。
+  // WelcomeView 的 `visibleEntries.length > 0` 兜底保留不动。
+  it('技能全禁用且视觉不可用时仍有「联网搜索」', () => {
     const visible = visibleQuickEntries(
       WELCOME_QUICK_ENTRIES,
       new Set(),
       false,
     );
-    expect(visible).toEqual([]);
+    expect(visible.map((e) => e.id)).toEqual(['web']);
   });
 });
