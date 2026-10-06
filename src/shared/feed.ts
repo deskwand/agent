@@ -106,3 +106,9 @@ export function parseRunReasons(queries: string | null): FeedRunReason[] {
     return [];
   }
 }
+
+/** `feed.getBody` 的返回：右栏选中时才取，`bodyStatus` 决定要不要显示「只抓到片段」。 */
+export interface FeedBodyPayload {
+  body: string | null;
+  bodyStatus: FeedBodyStatus;
+}

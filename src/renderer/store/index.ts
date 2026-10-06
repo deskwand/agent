@@ -186,6 +186,7 @@ function isSessionRunning(sessions: Session[], sessionId: string): boolean {
 }
 
 import type {
+  FeedBodyPayload,
   FeedItemWithMeta,
   FeedPhase,
   FeedRunSummary,
@@ -226,7 +227,7 @@ interface AppState {
   feedGenPhase: FeedPhase | null;
   feedLastRun: FeedRunSummary | null;
   feedOpenId: string | null;
-  feedBody: { body: string | null; bodyStatus: string } | null;
+  feedBody: FeedBodyPayload | null;
   feedBlockedTopics: string[];
   /** 用量页显示货币（ISO 4217）；金额本位永远是 USD。 */
   currency: CurrencyCode;
@@ -1377,9 +1378,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     await get().refreshFeed();
   },
   openFeedItem: async (id) => {
+    // 整行都是点击区，重复点已打开的条目很常见：直接早退，省掉三次 IPC 与重复标记已读
+    if (get().feedOpenId === id) return;
     set({ feedOpenId: id, feedBody: null });
     const unread = await window.electronAPI.feed.markRead(id);
     const body = await window.electronAPI.feed.getBody(id);
+    // 两次取数期间用户可能又点了别的条目：丢掉过期结果，
+    // 否则右栏会出现「B 的标题 + A 的正文」（未读计数由随后的 refreshFeed 拉回）
+    if (get().feedOpenId !== id) return;
     set({ feedBody: body, feedUnread: unread });
     await get().refreshFeed();
   },

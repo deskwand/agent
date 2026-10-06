@@ -177,15 +177,34 @@ describe("已启用且有条目", () => {
     expect(refreshNow).toHaveBeenCalled();
   });
 
-  it("点条目右栏出现（两栏），且右栏渲染的是选中条目", async () => {
+  it("两栏常驻：未选中时右栏是占位，点条目后换成正文摘录", async () => {
     setWindowApi(snapshot(true, [makeItem()], makeRun()));
     await render();
+    // 右栏从默一就在，不靠选中才出现 —— 否则点一下列表会突然变窄
+    expect(container.querySelector('[data-testid="feed-reader"]')).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="feed-reader-empty"]'),
+    ).toBeTruthy();
+    expect(container.textContent).toContain("feed.readerEmpty");
+
     await act(async () => {
       (
         container.querySelector('[data-testid="feed-title"]') as HTMLElement
       ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
-    expect(container.querySelector('[data-testid="feed-reader"]')).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="feed-reader-empty"]'),
+    ).toBeNull();
+    expect(container.textContent).toContain("正文");
+    expect(
+      container.querySelector('[data-testid="feed-open-browser"]'),
+    ).toBeTruthy();
+  });
+
+  it("没条目时不摆右栏（避免两边都是空状态）", async () => {
+    setWindowApi(snapshot(true, [], makeRun()));
+    await render();
+    expect(container.querySelector('[data-testid="feed-reader"]')).toBeNull();
   });
 
   it("最近一次 run 是失败时，头部出现错误条与「重试」", async () => {
@@ -317,5 +336,10 @@ describe("筛选后的空列表不能说成「还没有内容」", () => {
     });
     expect(container.textContent).toContain("feed.filterEmpty");
     expect(container.textContent).not.toContain("feed.emptyTitle");
+    // §8.4：有条目就不能把右栏收起来（否则筛一下布局就跳）
+    expect(container.querySelector('[data-testid="feed-reader"]')).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="feed-reader-empty"]'),
+    ).toBeTruthy();
   });
 });

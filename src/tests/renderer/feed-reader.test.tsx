@@ -100,6 +100,23 @@ describe("FeedReaderPane", () => {
     expect(container.querySelector('[data-testid="feed-hero"]')).toBeNull();
   });
 
+  it("字号用 token：标题 text-lg、正文 text-base、大图高度写 rem", async () => {
+    await render();
+    const title = container.querySelector("h2") as HTMLElement;
+    const body = container.querySelector(
+      '[data-testid="feed-body"]',
+    ) as HTMLElement;
+    const hero = container.querySelector(
+      '[data-testid="feed-hero"]',
+    ) as HTMLElement;
+    expect(title.className).toContain("text-lg");
+    expect(body.className).toContain("text-base");
+    // 正文是右栏里唯一要真读的段落：浅色主题下 muted 在 background-secondary 上只有 4.06:1
+    expect(body.className).toContain("text-text-primary");
+    expect(hero.className).not.toMatch(/h-\[\d+px\]/);
+    expect(container.innerHTML).not.toMatch(/text-\[[0-9.]+px\]/);
+  });
+
   it("「在浏览器中打开完整页面」把 url 交给调用方", async () => {
     const onOpenInBrowser = vi.fn();
     await render({ onOpenInBrowser });

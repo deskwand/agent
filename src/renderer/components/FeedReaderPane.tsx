@@ -1,18 +1,38 @@
 import { useTranslation } from "react-i18next";
 
-import type { FeedItemWithMeta } from "../../shared/feed";
+import type { FeedBodyPayload, FeedItemWithMeta } from "../../shared/feed";
 
 export interface FeedReaderPaneProps {
   item: FeedItemWithMeta;
-  body: { body: string | null; bodyStatus: string } | null;
+  body: FeedBodyPayload | null;
   onOpenInBrowser: (url: string) => void;
 }
 
 /**
  * 右栏：顶部大图 → 标题 → 元信息 → 摘要块 → 相关性 → 正文摘录。
  * 正文限宽 34em（≈40 个中文字符），这是 WCAG 1.4.8 对 CJK 的上限（设计 §8.8）。
+ * 字号用应用 token：标题 text-lg、正文 text-base（与聊天正文同档）、其余 text-xs；
+ * 大图高度也写 rem（6.5rem = 104px），否则字号调大后限宽 34em 变宽而高度不变，图就被拉成横条。
+ * 正文用 text-primary 而不是 muted：浅色主题下 muted 在 background-secondary 上只有 4.06:1，
+ * 低于 WCAG AA 对正文的 4.5:1，而这是右栏里唯一要真读的一段字。
  * 文案必须是「摘录」：库里的 body 是截到 3000 字符的稿子，写成「原文」是骗人。
  */
+
+/** 无选中条目时的占位（设计 §8.3：两栏常驻，右栏不为空）。 */
+export function FeedReaderPlaceholder(): JSX.Element {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      data-testid="feed-reader-empty"
+      className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted"
+      style={{ lineHeight: 1.8 }}
+    >
+      {t("feed.readerEmpty")}
+    </div>
+  );
+}
+
 export function FeedReaderPane({
   item,
   body,
@@ -22,11 +42,11 @@ export function FeedReaderPane({
   const text = body?.body ?? null;
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-background-secondary px-[18px] py-[14px]">
+    <div className="flex h-full flex-col overflow-y-auto bg-background-secondary px-5 py-3.5">
       {item.imageUrl ? (
         <div
           data-testid="feed-hero"
-          className="mb-[11px] h-[104px] w-full overflow-hidden rounded-md bg-surface"
+          className="mb-3 h-[6.5rem] w-full overflow-hidden rounded-md bg-surface"
           style={{ maxWidth: "34em" }}
         >
           <img
@@ -38,13 +58,13 @@ export function FeedReaderPane({
       ) : null}
 
       <h2
-        className="mb-[5px] text-[15px] font-semibold leading-[1.4]"
+        className="mb-1.5 text-lg font-semibold leading-[1.4]"
         style={{ maxWidth: "30em" }}
       >
         {item.title}
       </h2>
 
-      <div className="mb-[11px] text-[10px] leading-[1.6] text-text-muted">
+      <div className="mb-3 text-xs leading-[1.75] text-text-muted">
         <span>{item.source_host}</span>
         <span className="px-1.5 opacity-45">·</span>
         <span className="tabular-nums">
@@ -59,7 +79,7 @@ export function FeedReaderPane({
 
       {item.summary ? (
         <div
-          className="mb-[10px] border-l-2 border-accent pl-[10px] text-[12px] text-text-primary"
+          className="mb-3 border-l-2 border-accent pl-3 text-sm text-text-primary"
           style={{ maxWidth: "34em", lineHeight: 1.8 }}
         >
           {item.summary}
@@ -68,7 +88,7 @@ export function FeedReaderPane({
 
       {item.relevance ? (
         <div
-          className="mb-[12px] text-[11px] text-accent"
+          className="mb-3 text-xs text-accent"
           style={{ maxWidth: "34em", lineHeight: 1.75 }}
         >
           {item.relevance}
@@ -76,7 +96,7 @@ export function FeedReaderPane({
       ) : null}
 
       {body?.bodyStatus === "snippet_only" ? (
-        <div className="mb-[10px] text-[11px] text-text-muted">
+        <div className="mb-3 text-xs text-text-muted">
           {t("feed.readerSnippetOnly")}
         </div>
       ) : null}
@@ -84,7 +104,7 @@ export function FeedReaderPane({
       {text ? (
         <div
           data-testid="feed-body"
-          className="text-[12.5px] text-text-muted"
+          className="text-base text-text-primary"
           style={{ maxWidth: "34em", lineHeight: 1.8 }}
         >
           {text.split(/\n{2,}/).map((paragraph, index) => (
@@ -95,7 +115,7 @@ export function FeedReaderPane({
         </div>
       ) : null}
 
-      <div className="mt-2 flex items-center justify-between gap-2.5 border-t border-border-subtle pt-2 text-[10px] leading-[1.6] text-text-muted">
+      <div className="mt-2 flex items-center justify-between gap-2.5 border-t border-border-subtle pt-2 text-xs leading-[1.75] text-text-muted">
         <span>{t("feed.readerExcerpt")}</span>
         <button
           type="button"

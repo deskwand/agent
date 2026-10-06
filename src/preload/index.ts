@@ -18,7 +18,7 @@ import type {
   MemoryReadResult,
   MemorySearchScope,
 } from "../renderer/types";
-import type { FeedSnapshot } from "../shared/feed";
+import type { FeedBodyPayload, FeedSnapshot } from "../shared/feed";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
 import type {
@@ -704,9 +704,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   feed: {
     list: (): Promise<FeedSnapshot | null> => ipcRenderer.invoke("feed.list"),
-    getBody: (
-      id: string,
-    ): Promise<{ body: string | null; bodyStatus: string } | null> =>
+    getBody: (id: string): Promise<FeedBodyPayload | null> =>
       ipcRenderer.invoke("feed.getBody", id),
     setEnabled: (
       enabled: boolean,
@@ -1765,9 +1763,7 @@ declare global {
       };
       feed: {
         list: () => Promise<FeedSnapshot | null>;
-        getBody: (
-          id: string,
-        ) => Promise<{ body: string | null; bodyStatus: string } | null>;
+        getBody: (id: string) => Promise<FeedBodyPayload | null>;
         setEnabled: (
           enabled: boolean,
         ) => Promise<{ enabled: boolean; started: boolean }>;
