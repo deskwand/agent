@@ -5,6 +5,8 @@ export type ArtifactInfo = {
   path: string;
   name?: string;
   type?: string;
+  /** 模型显式要求内联渲染。只认 "inline"，其余值一律忽略。 */
+  render?: "inline";
 };
 
 export type ArtifactParseResult = {
@@ -40,7 +42,9 @@ export function extractArtifactsFromText(text: string): ArtifactParseResult {
             typeof record.name === "string" ? record.name : undefined;
           const type =
             typeof record.type === "string" ? record.type : undefined;
-          artifacts.push({ path, name, type });
+          const render =
+            record.render === "inline" ? ("inline" as const) : undefined;
+          artifacts.push({ path, name, type, render });
         }
       } catch {
         // 忽略无效的 JSON 块

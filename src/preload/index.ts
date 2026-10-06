@@ -352,6 +352,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openPath: (filePath: string): Promise<{ error: string | null }> =>
     ipcRenderer.invoke("shell.openPath", filePath),
 
+  // 内联产物：把本地产物路径换成可渲染的内部 URL（主进程签名，渲染层不碰 fs）
+  artifact: {
+    getRenderUrl: (filePath: string): Promise<string | null> =>
+      ipcRenderer.invoke("artifact:get-render-url", filePath),
+  },
+
   // Review / diff
   review: {
     getDiffFiles: (
@@ -1058,6 +1064,9 @@ declare global {
         Array<{ name: string; isDir: boolean; size: number; ext: string }>
       >;
       openPath: (filePath: string) => Promise<{ error: string | null }>;
+      artifact: {
+        getRenderUrl: (filePath: string) => Promise<string | null>;
+      };
       readFile: (
         filePath: string,
       ) => Promise<

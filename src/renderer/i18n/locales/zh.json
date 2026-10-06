@@ -2476,5 +2476,15 @@
       "failed": "添加失败",
       "customHostsRequired": "自定义服务商必须填 IMAP 与 SMTP 主机"
     }
+  },
+  "artifact": {
+    "inline": {
+      "reload": "重新加载",
+      "openInBrowser": "在浏览器打开",
+      "collapse": "折叠",
+      "expand": "展开",
+      "failed": "产物未能加载",
+      "retry": "重试"
+    }
   }
 }

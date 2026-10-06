@@ -52,3 +52,33 @@ describe('artifact parser', () => {
     ]);
   });
 });
+
+describe('extractArtifactsFromText render field', () => {
+  it('passes through render: inline', () => {
+    const text = [
+      '已生成：',
+      '```artifact',
+      '{"path":"out/report.html","name":"report.html","render":"inline"}',
+      '```',
+    ].join('\n');
+    const { artifacts } = extractArtifactsFromText(text);
+    expect(artifacts).toHaveLength(1);
+    expect(artifacts[0].render).toBe('inline');
+  });
+
+  it('leaves render undefined when absent', () => {
+    const text = ['```artifact', '{"path":"out/report.html"}', '```'].join('\n');
+    const { artifacts } = extractArtifactsFromText(text);
+    expect(artifacts[0].render).toBeUndefined();
+  });
+
+  it('ignores an unknown render value', () => {
+    const text = [
+      '```artifact',
+      '{"path":"out/report.html","render":"weird"}',
+      '```',
+    ].join('\n');
+    const { artifacts } = extractArtifactsFromText(text);
+    expect(artifacts[0].render).toBeUndefined();
+  });
+});

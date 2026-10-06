@@ -31,6 +31,8 @@ import { stripSyntheticBlocks } from "../utils/synthetic-blocks";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
 import { ArtifactCard } from "./message/ArtifactCard";
+import { ArtifactInlineFrame } from "./message/ArtifactInlineFrame";
+import type { InlineArtifactInfo } from "../utils/inline-artifacts";
 import { useAppStore } from "../store";
 import { useReadAloud } from "../hooks/useReadAloud";
 import { Tooltip } from "./Tooltip";
@@ -53,12 +55,63 @@ interface MessageCardProps {
   isTurnEnd?: boolean;
   /** Files changed in this turn (aggregated by ChatView) */
   artifactFiles?: ResultFileEntry[];
+  /** 本轮标记为内联渲染的产物（由 ChatView 聚合） */
+  inlineArtifacts?: InlineArtifactInfo[];
   /** Local videos referenced by assistant text in this turn. */
   videoReferences?: VideoReference[];
   /** Hide process summaries when ChatView renders a turn-level summary. */
   suppressProcessSummaries?: boolean;
   /** 分叉入口：仅助手消息显示（tool_result 行/流式中/排队中/已取消除外） */
   onForkMessage?: (message: Message) => void;
+}
+
+/**
+ * 一轮里的内联产物。只展开最新的一个，历史轮次默认全折叠。
+ *
+ * "展开哪个"放在这里而不是 MessageCard：展开会重渲染，没必要把整张消息卡带上。
+ * 也不用 useEffect 同步默认值：`artifacts` 的数组身份会随每次 trace step 更新而变，
+ * 用 effect 会在流式过程中反复把用户刚折叠的动作弹回去。改成"用户的选择带上集合键"，
+ * 键变了才回落到默认值。
+ */
+function InlineArtifactList({
+  artifacts,
+  isLatestRound,
+}: {
+  artifacts: InlineArtifactInfo[];
+  isLatestRound: boolean;
+}) {
+  const artifactKey = artifacts.map((artifact) => artifact.path).join("|");
+  const [expandedOverride, setExpandedOverride] = useState<{
+    key: string;
+    path: string | null;
+  } | null>(null);
+
+  const defaultExpandedPath =
+    isLatestRound && artifacts.length > 0
+      ? artifacts[artifacts.length - 1].path
+      : null;
+  const expandedPath =
+    expandedOverride && expandedOverride.key === artifactKey
+      ? expandedOverride.path
+      : defaultExpandedPath;
+
+  return (
+    <div className="space-y-1.5">
+      {artifacts.map((artifact) => (
+        <ArtifactInlineFrame
+          key={artifact.path}
+          artifact={artifact}
+          expanded={expandedPath === artifact.path}
+          onToggle={(path) =>
+            setExpandedOverride({
+              key: artifactKey,
+              path: expandedPath === path ? null : path,
+            })
+          }
+        />
+      ))}
+    </div>
+  );
 }
 
 function formatRelativeTime(timestamp: number, locale: string): string {
@@ -94,6 +147,7 @@ export const MessageCard = memo(function MessageCard({
   isLatestRound = false,
   isTurnEnd = true,
   artifactFiles = [],
+  inlineArtifacts = [],
   videoReferences = [],
   suppressProcessSummaries = false,
   toolBlocksProjected = false,
@@ -578,6 +632,12 @@ export const MessageCard = memo(function MessageCard({
               );
             })}
           </div>
+          {inlineArtifacts.length > 0 ? (
+            <InlineArtifactList
+              artifacts={inlineArtifacts}
+              isLatestRound={isLatestRound}
+            />
+          ) : null}
           {artifactFiles.length > 0 || videoReferences.length > 0 ? (
             <ArtifactCard
               files={artifactFiles}

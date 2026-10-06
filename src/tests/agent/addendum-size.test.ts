@@ -86,9 +86,10 @@ describe("memory-policy 的三条约束与长度", () => {
       blocks.reduce((sum, block) => sum + runtimeLength(block), 0) +
       MEMORY_POLICY_PROMPT.length +
       110;
-    // 实测 2,712（含评审要求补回的三处从句）。上限留 ~90 字符余量：
-    // 它要拦的是「再塞一整块」（当年那段 bundled_executables 就有 569 字符），不是逼着抠字。
-    expect(total).toBeLessThanOrEqual(2800);
+    // 实测 2,968（包含为内联产物新增的 artifacts 协议块 256 字符）。上限 3,050：
+    // 它要拦的是「再塞一整块」（当年那段 bundled_executables 就有 569 字符），
+    // 新增一个模型必须知道的产品协议不算在内。
+    expect(total).toBeLessThanOrEqual(3050);
   });
 
   it("单块长度上限（每请求固定成本）", () => {

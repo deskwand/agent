@@ -221,8 +221,14 @@ import {
   installVideoProtocol,
   registerVideoProtocolScheme,
 } from "./video-protocol";
+import {
+  installArtifactProtocol,
+  registerArtifactProtocolScheme,
+  resolveArtifactRenderUrl,
+} from "./artifact-protocol";
 
 registerVideoProtocolScheme();
+registerArtifactProtocolScheme();
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -1022,6 +1028,7 @@ app
   .whenReady()
   .then(async () => {
     await installVideoProtocol();
+    await installArtifactProtocol();
     installFileDownloadFallback();
 
     // 这个 handler 一旦存在就替代了 Electron 的默认策略：不显式放行等于全部拒绝。
@@ -2243,6 +2250,11 @@ ipcMain.handle("shell.openPath", async (_event, filePath: string) => {
   if (!err) void trackEvent("feature_use", { feature: "file_op" });
   return { error: err || null };
 });
+
+// 内联产物：渲染层拿不到 fs，只能经这里换一个已签名的安全 URL
+ipcMain.handle("artifact:get-render-url", async (_event, filePath: string) =>
+  resolveArtifactRenderUrl(filePath),
+);
 
 // --- Review / Diff IPC handlers ---
 

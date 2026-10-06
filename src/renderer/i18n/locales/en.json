@@ -2479,5 +2479,15 @@
       "failed": "Could not add this mailbox",
       "customHostsRequired": "A custom provider needs both an IMAP and an SMTP host"
     }
+  },
+  "artifact": {
+    "inline": {
+      "reload": "Reload",
+      "openInBrowser": "Open in browser",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "failed": "Artifact failed to load",
+      "retry": "Retry"
+    }
   }
 }

@@ -2980,6 +2980,13 @@ Tool routing:\n
         `<subagent_naming>
 调用 Agent 工具时，用一个历史人物名作为它的 name 参数（拉丁字母或拼音，例如 turing、curie、lovelace），每次尽量换一个不同的人。这个名字会成为该子代理的标识，之后可以用 @名字 找到它。
 </subagent_naming>`,
+        `<artifacts>
+用户会看、会点的 HTML/SVG 产物，加一个 artifact 块并带 "render":"inline"，它就会在对话里当场渲染成可交互内容：
+\u0060\u0060\u0060artifact
+{"path":"out/report.html","render":"inline"}
+\u0060\u0060\u0060
+产物必须自包含：不引外部 CDN、不发网络请求；CSS 内联，同目录图片可以引用。报告、笔记、代码、数据文件不要标 inline。
+</artifacts>`,
       ].filter((section): section is string =>
         Boolean(section && section.trim()),
       );
