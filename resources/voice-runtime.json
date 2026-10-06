@@ -19,10 +19,10 @@
       "darwin-arm64": "https://file.deskwand.com/voice-engines/qwentts-server-6fae929-darwin-arm64.tar.gz"
     },
     "artifactSha256": {
-      "darwin-arm64": "515aee34afc63428474b4d6d46c8880256c39fe27319838912e009f2fab30d2c"
+      "darwin-arm64": "8163c669cbfa74000382bad19f168f7c6efaa4e4b435c911a1b5ff09d9639b97"
     },
     "artifactBytes": {
-      "darwin-arm64": 1845912
+      "darwin-arm64": 1846941
     },
     "talkerUrl": "https://file.deskwand.com/voice-engines/qwen-talker-0.6b-customvoice-Q4_K_M.gguf",
     "talkerSha256": "b3a7e6613d80f8a703c06267fc1e94d48ce91932ab82ab6e31c50f4ca4868e1e",
