@@ -37,7 +37,8 @@
       "web": "Search the web"
     },
     "quickPrompt": {
-      "vision": "I'll attach an image. Describe what's in it, and if it's a screenshot, extract the visible text and any error messages. If this message has no image attached yet, remind me to drop one into the input box first."
+      "vision": "I'll attach an image. Describe what's in it, and if it's a screenshot, extract the visible text and any error messages. If this message has no image attached yet, remind me to drop one into the input box first.",
+      "web": "Search the web for the latest on [topic]: search first, then fetch two or three promising sources, and summarize the key points with links."
     },
     "createFile": "Create a file",
     "crunchData": "Crunch data",
@@ -314,8 +315,6 @@
     "codemodeMode_on": "Keep direct calls too",
     "codemodeMode_only": "Scripts only",
     "codemodeModeNote": "\"Keep direct calls too\" lets the model call tools directly and script them; \"Scripts only\" removes declared tools from the model's view so everything goes through a script — lighter context, one extra step.",
-    "codemodeInlineBudget": "Tool-declaration token budget",
-    "codemodeInlineBudgetNote": "Limits which tools the codemode description lists (the non-direct ones — mostly MCP); applies in both modes, estimated as characters ÷ 4. Tools that do not fit stay callable via searchTools() inside a script.",
     "autoSkillLearningDesc": "When enabled, the AI can automatically discover and learn new skills during conversations, and periodically curate existing ones. Turning this off stops all automatic learning and curation.",
     "autoSkillLearningProjectNote": "Not supported in project mode.",
     "telemetry": "Anonymous Usage Statistics",

@@ -209,24 +209,6 @@ export function SettingsGeneral() {
             }
           />
           <SettingsRow
-            title={t("general.codemodeInlineBudget")}
-            description={t("general.codemodeInlineBudgetNote")}
-            control={
-              <input
-                type="number"
-                min={0}
-                aria-label={t("general.codemodeInlineBudget")}
-                value={appConfig?.codemode?.inlineBudget ?? 3000}
-                onChange={(e) => {
-                  const value = Number(e.target.value);
-                  if (!Number.isFinite(value) || value < 0) return;
-                  void saveCodemode({ inlineBudget: Math.floor(value) });
-                }}
-                className="w-24 rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none"
-              />
-            }
-          />
-          <SettingsRow
             title={t("general.telemetry")}
             description={t("general.telemetryDesc")}
             control={

@@ -500,6 +500,11 @@ export class AgentRunner {
   /** 本会话激活时登记进插件全局列表的条目；必须由我们主动摘掉（见 releaseSubagentSession）。 */
   private subagentRegistryEntries = new Map<string, TapRegistryEntry>();
   private _skillsAdapter?: SkillsAdapter;
+
+  /** 技能来源可后置注入（`SkillsManager` 在 `SessionManager` 之后才建）。 */
+  setSkillsAdapter(adapter: SkillsAdapter | undefined): void {
+    this._skillsAdapter = adapter;
+  }
   private extensionManager?: AgentRuntimeExtensionManager;
   private _browserViewManager: BrowserViewManager | null = null;
   private _browser: Browser | null = null;
@@ -837,7 +842,7 @@ ${hints.join("\n")}
     extensionPaths: string[];
   }> {
     const basePaths = this._skillsAdapter
-      ? this._skillsAdapter.getSkillPaths()
+      ? await this._skillsAdapter.getSkillPaths()
       : this.legacySkillPaths();
     const mergedPaths = new Set(
       basePaths.filter((item): item is string =>

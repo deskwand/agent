@@ -33,12 +33,18 @@ describe("codemode wiring guards", () => {
     );
   });
 
-  it("stored defaults carry only the two upstream knobs, no global enable switch", () => {
-    // 守的是「别再加回一个会被派生激活静默盖过的全局开关」。
-    expect(defaultStoredConfig().codemode).toEqual({
-      mode: "on",
-      inlineBudget: 3000,
-    });
+  it("stored defaults carry only the mode knob, no global enable switch", () => {
+    // 守的是「别再加回一个会被派生激活静默盖过的全局开关」，以及
+    // 「inlineBudget 不再回落到配置」。
+    expect(defaultStoredConfig().codemode).toEqual({ mode: "on" });
     expect(defaultStoredConfig().codemode).not.toHaveProperty("enabled");
+    expect(defaultStoredConfig().codemode).not.toHaveProperty("inlineBudget");
+  });
+
+  it("no longer renders the inline budget row in the settings page", () => {
+    // 旋钮下线的接线守卫：删了字段却忘了删 UI，用户就会看着一个改了没反应的输入框。
+    expect(
+      read("src/renderer/components/settings/SettingsGeneral.tsx"),
+    ).not.toContain("codemodeInlineBudget");
   });
 });

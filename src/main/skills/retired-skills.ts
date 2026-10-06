@@ -31,7 +31,16 @@ import * as path from "path";
 import { RETIRED_SKILL_MANIFESTS } from "./retired-skill-manifests";
 
 /** Built-in skills that earlier releases shipped and that we no longer do. */
-export const RETIRED_SKILL_NAMES = ["docx", "pptx", "xlsx", "image-ocr"];
+export const RETIRED_SKILL_NAMES = [
+  "docx",
+  "pptx",
+  "xlsx",
+  "image-ocr",
+  // 1.0.x：模型侧技能市场与「联网搜索」技能退役 —— 前者与 UI 里的 /api/marketplace
+  // 重复，后者与 web_search / fetch_content / get_search_content 三个工具重叠。
+  "skill-market",
+  "web-search",
+];
 
 /**
  * 技能**运行时自己长出来**的目录（不随包发布）。

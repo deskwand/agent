@@ -1134,6 +1134,8 @@ app
     // Recover goals that were active before last shutdown
     sessionManager.recoverGoals();
     skillsManager = new SkillsManager(db);
+    // 技能开关要对模型生效：pi 拿到的是「每个已启用技能自己的目录」。
+    sessionManager.setSkillsAdapter(skillsManager);
     // 技能密库是一个独立的只读技能来源：目录不存在时 loadVaultSkills 直接返回 []，
     // 因此这里不必判断存在性。加载失败也不该拦住启动 —— 但要留下线索。
     try {

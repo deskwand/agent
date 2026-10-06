@@ -2,17 +2,18 @@
  * codemode（模型写 JS 调用工具）的开关与旋钮。
  *
  * **默认关**，跟随参考实现：pi 的内置扩展 `builtin:codemode` 虽然默认加载，但**未激活**，
- * 要手动 `+codemode`（`docs/settings.md`）。DeskBend 照做 —— 装上但不主动激活：
+ * 要手动 `+codemode`（`docs/settings.md`）。DeskWand 照做 —— 装上但不主动激活：
  * 激活由 MCP 的 exposure 派生（见下），没有 MCP 服务时它就不激活。
  *
- * 两个旋钮直接透传给 `createCodemodeExtension(options)`（它**覆盖**同名 SDK 设置，
- * 所以不需要碰 `PiSettingsManager`）：
+ * **只剩 `mode` 一个旋钮**，透传给 `createCodemodeExtension(options)`（它**覆盖**同名 SDK
+ * 设置，所以不需要碰 `PiSettingsManager`）：
  *  - `mode`：`on` = 已声明的工具在自己描述里追加一份自己的 TS 签名，codemode 只列未声明的工具；
  *           `only` = 已声明工具从请求里整个撤掉，模型只能经 codemode 到达它们。
- *  - `inlineBudget`：codemode 描述里最多花多少估算 token（字符/4）列工具声明；
- *           放不下的仍可调，用 `searchTools()` 现场找。它约束的是 `listed`
- *           （非 `direct` 的可调工具，主要是 MCP），**与 `mode` 无关，两种模式都生效**；
- *           `on` 下 `direct` 工具走「在自己描述里追加签名」那条路，不受它约束。
+ *
+ * **`inlineBudget` 已下线**：codemode 描述里内联的工具签名（非 `direct` 的那些，主要是 MCP）
+ * 实测吃掉 14.5k 字符（3.6k token），而 268 个 MCP 工具当时也只列出了 13 个。产品固定传
+ * `CODEMODE_INLINE_BUDGET = 0`（只列 namespace 与工具数），模型在脚本里用 `searchTools()` /
+ * `describeTool()` / `ALL_TOOLS` 现场找。要改就改本文件的常量，不再回落到用户配置。
  *
  * 不传 `models` —— 跟随上游默认（`true`，脚本可访问模型目录/分类器）。
  * 若将来要关掉，那是**显式偏离**，必须在此处与 design doc 写明理由。
@@ -21,7 +22,7 @@ export const CODEMODE_MODES = ["on", "only"] as const;
 export type CodemodeMode = (typeof CODEMODE_MODES)[number];
 
 /**
- * 只有 pi 真实存在的两个旋钮。
+ * 只有 pi 真实存在的旋钮。
  *
  * **没有 `enabled`** —— pi 没有这个字段。codemode 的激活是**派生**的：有 `exposure: "codemode"`
  * 的 MCP server 连上时由上游激活（`ensureDiscoveryActive`），或用 `defaultTools: ["+codemode"]`。
@@ -30,25 +31,14 @@ export type CodemodeMode = (typeof CODEMODE_MODES)[number];
  */
 export interface CodemodeConfig {
   mode: CodemodeMode;
-  inlineBudget: number;
 }
 
-export const DEFAULT_CODEMODE_INLINE_BUDGET = 3000;
-export const MIN_CODEMODE_INLINE_BUDGET = 0;
-export const MAX_CODEMODE_INLINE_BUDGET = 100_000;
+/** MCP 工具声明内联预算：0 = codemode 描述里只列 namespace 与工具数。 */
+export const CODEMODE_INLINE_BUDGET = 0;
 
 export function normalizeCodemodeConfig(raw: unknown): CodemodeConfig {
   const value =
     raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const mode = CODEMODE_MODES.find((candidate) => candidate === value.mode);
-  const budget = Number(value.inlineBudget);
-  return {
-    mode: mode ?? "on",
-    inlineBudget: Number.isFinite(budget)
-      ? Math.min(
-          MAX_CODEMODE_INLINE_BUDGET,
-          Math.max(MIN_CODEMODE_INLINE_BUDGET, Math.floor(budget)),
-        )
-      : DEFAULT_CODEMODE_INLINE_BUDGET,
-  };
+  return { mode: mode ?? "on" };
 }

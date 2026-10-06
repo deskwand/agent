@@ -24,6 +24,7 @@ import {
   createCodemodeExtension,
   type ExtensionFactory,
 } from "@earendil-works/pi-coding-agent";
+import { CODEMODE_INLINE_BUDGET } from "../../shared/codemode-config";
 import { configStore } from "../config/config-store";
 import { log } from "../utils/logger";
 
@@ -31,7 +32,9 @@ export function createDeskwandCodemodeExtension(): ExtensionFactory {
   const config = configStore.get("codemode");
   const inner = createCodemodeExtension({
     mode: config.mode,
-    inlineBudget: config.inlineBudget,
+    // 固定 0：不内联工具签名，模型在脚本里用 searchTools() 现场找
+    //（见 shared/codemode-config.ts）。
+    inlineBudget: CODEMODE_INLINE_BUDGET,
   });
 
   log(`[codemode] registered (mode=${config.mode})`);

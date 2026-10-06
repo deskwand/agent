@@ -19,6 +19,7 @@ import type { DatabaseInstance } from "../db/database";
 import { log, logError, logWarn } from "../utils/logger";
 import { isPathWithinRoot } from "../tools/path-containment";
 import { isAgentCreated, removeManifestEntry } from "./agent-manifest";
+import { resolveBuiltinSkillEnabled } from "./default-disabled-skills";
 import { getGlobalSkillsRoot, getVaultSkillsRoot } from "../vault/paths";
 
 /**
@@ -97,6 +98,9 @@ interface SkillsManagerOptions {
 export class SkillsManager {
   private db: DatabaseInstance;
   private loadedSkills: Map<string, Skill> = new Map();
+
+  /** skill id → 该技能自己的目录。pi 拿到的是这些目录，不再是三个父目录。 */
+  private skillDirs: Map<string, string> = new Map();
   private runningServers: Map<string, { process: unknown; skill: Skill }> =
     new Map();
   private _globalInitialized = false;
@@ -115,6 +119,12 @@ export class SkillsManager {
     if (builtinSkillsPath) {
       try {
         const skillDirs = fs.readdirSync(builtinSkillsPath);
+
+        // Prepared statement for restoring persisted enabled state (hot path —
+        // hoisted outside the loop to avoid re-compiling SQL for every skill).
+        const getEnabledStmt = this.db.prepare(
+          "SELECT enabled FROM skills WHERE id = ?",
+        );
 
         for (const dir of skillDirs) {
           const skillPath = path.join(builtinSkillsPath, dir);
@@ -146,15 +156,28 @@ export class SkillsManager {
           const metadata = this.getSkillMetadata(skillPath);
           if (!metadata) continue;
 
+          // 内置技能的默认值来自 curated 名单；只有用户手动切换过才有 DB 行，
+          // 且那一行优先（行存在 = 用户选过）。
+          let persistedEnabled: boolean | undefined;
+          try {
+            const row = getEnabledStmt.get(`builtin-${dir}`) as
+              | { enabled: number }
+              | undefined;
+            if (row !== undefined) persistedEnabled = row.enabled === 1;
+          } catch {
+            // DB read can fail during CLI install — fall back to the default
+          }
+
           const skill: Skill = {
             id: `builtin-${dir}`,
             name: metadata.name,
             description: metadata.description,
             type: "builtin",
-            enabled: true,
+            enabled: resolveBuiltinSkillEnabled(dir, persistedEnabled),
             createdAt: Date.now(),
           };
 
+          this.skillDirs.set(skill.id, skillPath);
           this.loadedSkills.set(skill.id, skill);
           log(`Loaded built-in skill: ${skill.name}`);
         }
@@ -232,6 +255,9 @@ export class SkillsManager {
     for (const key of Array.from(this.loadedSkills.keys())) {
       if (key.startsWith(prefix)) {
         this.loadedSkills.delete(key);
+        // 目录记录跟着走：`getSkillPaths()` 每条消息都要重载 global/vault，
+        // 不清理就是无界增长（旧 key 永远不会再被读到）。
+        this.skillDirs.delete(key);
       }
     }
   }
@@ -469,6 +495,7 @@ export class SkillsManager {
             };
 
             skills.push(skill);
+            this.skillDirs.set(skill.id, entryPath);
             this.loadedSkills.set(skill.id, skill);
           }
         }
@@ -620,6 +647,34 @@ export class SkillsManager {
    */
   getAllSkills(): Skill[] {
     return this.deduplicateSkills(Array.from(this.loadedSkills.values()));
+  }
+
+  /**
+   * 交给 pi 的技能目录列表：每个已启用技能各自的目录。
+   *
+   * 与 `listSkills()` 一样「读取即刷新」global 与 vault 两个来源：不刷新的话，
+   * 启动后尚未加载过的全局技能会从模型视野里静默消失。刷新失败不让会话建不起来 ——
+   * 保住已经加载的部分，把错误写进日志。
+   *
+   * 代价（未做优化的已知项）：这条路径每**一条**消息跑一次，代价是重扫 global
+   * 与 vault 两个目录树（含每个候选的 stat 与 SKILL.md 读取）加一次 DB prepare。
+   * 目录数在百量级，与技能页 `listSkills()` 同款；将来若变慢，再加失效钩子缓存
+   * （`setSkillEnabled` / `installSkill` / `uninstallSkill`）。
+   *
+   * 调用约定：`buildSkillPaths()` 只按目录去重，**按名去重是这里的责任**
+   * （`deduplicateSkills()`）；本方法是它唯一的生产调用方。
+   */
+  async getSkillPaths(): Promise<string[]> {
+    try {
+      await this.loadGlobalSkills();
+      await this.loadVaultSkills();
+    } catch (error) {
+      logError("[Skills] refresh before handing paths to pi failed:", error);
+    }
+    return buildSkillPaths(
+      this.deduplicateSkills(Array.from(this.loadedSkills.values())),
+      this.skillDirs,
+    );
   }
 
   /**
@@ -1149,4 +1204,27 @@ export class SkillsManager {
 
     log(`Uninstalled skill: ${skill.name} (${skillId})`);
   }
+}
+
+/**
+ * 把「已加载的技能」折成交给 pi 的技能目录列表。
+ *
+ * 三条规则：只取启用项；没有记录目录的跳过；同一目录只出现一次（不同 id 可能指向同一目录）。
+ * **同名技能不在这里去重**：调用方 `getSkillPaths()` 先过 `deduplicateSkills()`，
+ * 它才是「同名只留一份」那条规则的唯一归属地。
+ */
+export function buildSkillPaths(
+  skills: readonly Pick<Skill, "id" | "enabled">[],
+  dirs: ReadonlyMap<string, string>,
+): string[] {
+  const paths: string[] = [];
+  const seen = new Set<string>();
+  for (const skill of skills) {
+    if (!skill.enabled) continue;
+    const dir = dirs.get(skill.id);
+    if (!dir || seen.has(dir)) continue;
+    seen.add(dir);
+    paths.push(dir);
+  }
+  return paths;
 }

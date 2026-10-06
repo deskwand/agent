@@ -70,16 +70,18 @@ export const WELCOME_QUICK_ENTRIES: readonly WelcomeQuickEntry[] = [
     labelKey: "welcome.quick.office",
     icon: "file-text",
   },
-  // 网络
+  // 网络。以前是 `/skill:web-search` 令牌，但技能内容与 web_search / fetch_content /
+  // get_search_content 三个工具高度重叠，技能已退役；入口改成示例提示词（与「看图」同型），
+  // 点一下得到一句话，用户补上主题即可发送。
   {
     id: "web",
-    kind: "skill",
-    skill: "web-search",
+    kind: "tool",
     labelKey: "welcome.quick.web",
+    promptKey: "welcome.quickPrompt.web",
     icon: "globe",
   },
-  // 多模态。放末位是因为它是唯一有前置条件的入口：前 4 个点一下技能令牌就进输入
-  // 框，用户补一句话即可发送；这个点完得到一段长提示词、还得自己把图拖进来。
+  // 多模态。放末位是因为它是唯一有前置条件的入口：其余几个点完就能发送，
+  // 这个点完得到一段长提示词、还得自己把图拖进来。
   {
     id: "vision",
     kind: "tool",
