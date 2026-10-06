@@ -360,3 +360,27 @@ export function useImageLightboxState(): {
     })),
   );
 }
+
+// ---------------------------------------------------------------------------
+// Theme
+// ---------------------------------------------------------------------------
+
+/**
+ * 应用真正生效的深浅主题。
+ *
+ * App 用它挂 `light` 类，后台小球用它选画笔 —— 只此一处推导，免得两处各算一份、
+ * 迟早出现「界面是浅色、球却按深色画」这种不一致。
+ */
+export function selectEffectiveTheme(
+  theme: Settings["theme"],
+  systemDarkMode: boolean,
+): "dark" | "light" {
+  if (theme === "system") return systemDarkMode ? "dark" : "light";
+  return theme;
+}
+
+export function useEffectiveTheme(): "dark" | "light" {
+  return useAppStore((s) =>
+    selectEffectiveTheme(s.settings.theme, s.systemDarkMode),
+  );
+}

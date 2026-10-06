@@ -9,6 +9,7 @@
 import { useTranslation } from "react-i18next";
 import { Mic, MicOff, X } from "lucide-react";
 import { StarOrb } from "./star-orb";
+import type { OrbBrush } from "./star-orb";
 import { CAPTION_KEY, ORB_STATE } from "./orb-state";
 import { stripVoiceMarkers } from "../../utils/voice/voice-caption";
 import { VOICE_MESSAGE_KEYS } from "../../hooks/useVoiceInput";
@@ -18,6 +19,8 @@ import type { VoiceModeView } from "../../hooks/useVoiceMode";
 export interface VoiceMiniBarProps {
   view: VoiceModeView;
   muted: boolean;
+  /** 画笔由宿主按主题选：浅底星点 / 深底星点。 */
+  brush: OrbBrush;
   onExpand(): void;
   onToggleMute(): void;
   onEnd(): void;
@@ -37,6 +40,7 @@ export function miniBarText(view: VoiceModeView): string {
 export function VoiceMiniBar({
   view,
   muted,
+  brush,
   onExpand,
   onToggleMute,
   onEnd,
@@ -62,7 +66,7 @@ export function VoiceMiniBar({
           className="h-10 w-10 shrink-0 rounded-full transition-transform hover:scale-105"
         >
           <StarOrb
-            variant="mini"
+            brush={brush}
             state={ORB_STATE[view.state]}
             level={view.level}
           />

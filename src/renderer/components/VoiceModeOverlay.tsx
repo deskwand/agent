@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Minus, X } from "lucide-react";
-import { StarOrb } from "./voice-mode/star-orb";
+import { GLOW_BRUSH, StarOrb } from "./voice-mode/star-orb";
 import { CAPTION_KEY, ORB_STATE } from "./voice-mode/orb-state";
 import { isNearBottom, stripVoiceMarkers } from "../utils/voice/voice-caption";
 import { VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
@@ -127,7 +127,11 @@ export function VoiceModeOverlay({
       </div>
 
       <div className="h-[min(620px,62vh)] w-[min(620px,86vw)]">
-        <StarOrb state={ORB_STATE[view.state]} level={view.level} />
+        <StarOrb
+          brush={GLOW_BRUSH}
+          state={ORB_STATE[view.state]}
+          level={view.level}
+        />
       </div>
 
       <p className="mt-2 text-sm" style={{ color: "#8f8f9b" }}>

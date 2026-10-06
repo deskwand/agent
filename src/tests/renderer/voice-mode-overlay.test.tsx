@@ -5,6 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VoiceModeOverlay } from "../../renderer/components/VoiceModeOverlay";
 import { cssFlat } from "./theme-css-helpers";
 import type { VoiceModeView } from "../../renderer/hooks/useVoiceMode";
+import { GLOW_BRUSH } from "../../renderer/components/voice-mode/star-orb";
+
+// 球是 canvas，jsdom 里画不了 —— 这里只关心全屏拿到的是哪支画笔。
+const orb = vi.hoisted(() => ({ brushes: [] as unknown[] }));
+vi.mock("../../renderer/components/voice-mode/star-orb", () => ({
+  GLOW_BRUSH: { kind: "glow" },
+  STARS_BRUSH_LIGHT: { kind: "stars", tag: "light" },
+  STARS_BRUSH_DARK: { kind: "stars", tag: "dark" },
+  StarOrb: ({ brush }: { brush: unknown }) => {
+    orb.brushes.push(brush);
+    return <canvas />;
+  },
+}));
 
 // 浮层是纯展示：运行时在 VoiceModeHost 里。这里只摆状态、看它画什么。
 const VIEW: VoiceModeView = {
@@ -19,6 +32,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  orb.brushes.length = 0;
   container = document.createElement("div");
   document.body.appendChild(container);
 });
@@ -154,5 +168,13 @@ describe("VoiceModeOverlay", () => {
     expect(region.parentElement?.className).toContain(
       "h-[clamp(6rem,22vh,12rem)]",
     );
+  });
+
+  it("浮层不读主题：挂载时永远用发光画笔", () => {
+    // 浮层是纯展示也不订阅 store —— 切主题不会让它重渲染，它自己硬编码 GLOW_BRUSH。
+    // 所以这里只钉「渲染过、且每次都是 GLOW_BRUSH」；“小球要避开发光画笔”由宿主测试守。
+    renderOverlay();
+    expect(orb.brushes.length).toBeGreaterThan(0);
+    for (const brush of orb.brushes) expect(brush).toBe(GLOW_BRUSH);
   });
 });

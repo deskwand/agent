@@ -51,7 +51,23 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// 球是 canvas，jsdom 里画不了 —— 这里只关心宿主给了它哪支画笔。
+const orb = vi.hoisted(() => ({ brushes: [] as unknown[] }));
+vi.mock("../../renderer/components/voice-mode/star-orb", () => ({
+  GLOW_BRUSH: { kind: "glow" },
+  STARS_BRUSH_LIGHT: { kind: "stars", tag: "light" },
+  STARS_BRUSH_DARK: { kind: "stars", tag: "dark" },
+  StarOrb: ({ brush }: { brush: unknown }) => {
+    orb.brushes.push(brush);
+    return <canvas />;
+  },
+}));
+
 import { VoiceModeHost } from "../../renderer/components/voice-mode/VoiceModeHost";
+import {
+  STARS_BRUSH_DARK,
+  STARS_BRUSH_LIGHT,
+} from "../../renderer/components/voice-mode/star-orb";
 
 function session(id: string, kind: Session["kind"] = "voice"): Session {
   return {
@@ -72,6 +88,7 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  orb.brushes.length = 0;
   globalThis.IS_REACT_ACT_ENVIRONMENT = true;
   vi.stubGlobal(
     "AudioContext",
@@ -193,6 +210,50 @@ describe("VoiceModeHost", () => {
 
     act(() => muteButton().click());
     expect(runtime.convs[0].setMuted).toHaveBeenLastCalledWith(false);
+  });
+
+  it("主题变化时小球的画笔跟着主题走", () => {
+    renderHost();
+    // 人在别的会话 → 宿主画小球（在语音会话上时画的是全屏，那支是 GLOW_BRUSH）
+    act(() => {
+      useAppStore.getState().setActiveSession("O");
+    });
+    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_LIGHT);
+
+    act(() => {
+      useAppStore.setState((s) => ({
+        settings: { ...s.settings, theme: "dark" },
+      }));
+    });
+    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_DARK);
+
+    act(() => {
+      useAppStore.setState((s) => ({
+        settings: { ...s.settings, theme: "light" },
+      }));
+    });
+    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_LIGHT);
+  });
+
+  it("system 主题跟随 systemDarkMode", () => {
+    renderHost();
+    act(() => {
+      useAppStore.getState().setActiveSession("O");
+    });
+    act(() => {
+      useAppStore.setState((s) => ({
+        settings: { ...s.settings, theme: "system" },
+      }));
+    });
+    act(() => {
+      useAppStore.getState().setSystemDarkMode(true);
+    });
+    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_DARK);
+
+    act(() => {
+      useAppStore.getState().setSystemDarkMode(false);
+    });
+    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_LIGHT);
   });
 
   it("换语音会话时旧运行时被卸载：停麦、换新", () => {

@@ -12,9 +12,11 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useAppStore } from "../../store";
+import { useEffectiveTheme } from "../../store/selectors";
 import { useVoiceMode } from "../../hooks/useVoiceMode";
 import { VoiceModeOverlay } from "../VoiceModeOverlay";
 import { VoiceMiniBar } from "./VoiceMiniBar";
+import { STARS_BRUSH_DARK, STARS_BRUSH_LIGHT } from "./star-orb";
 
 export interface VoiceModeHostProps {
   sessionId: string;
@@ -29,6 +31,8 @@ export function VoiceModeHost({
   const activeView = useAppStore((s) => s.activeView);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const minimized = useAppStore((s) => s.voiceModeMinimized);
+  // 小球要按主题换画笔：浅底用深色粒子。全屏那颗不受主题影响（永远深底）。
+  const isDark = useEffectiveTheme() === "dark";
   const setMinimized = useAppStore((s) => s.setVoiceModeMinimized);
   const closeVoiceMode = useAppStore((s) => s.closeVoiceMode);
   // 静音是本地的运行时 UI 状态：宿主跨最小化 / 展开不卸载，所以活得下来；
@@ -66,6 +70,7 @@ export function VoiceModeHost({
     <VoiceMiniBar
       view={view}
       muted={muted}
+      brush={isDark ? STARS_BRUSH_DARK : STARS_BRUSH_LIGHT}
       onExpand={() => setMinimized(false)}
       onToggleMute={() => setMuted((prev) => !prev)}
       onEnd={closeVoiceMode}

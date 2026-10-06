@@ -10,8 +10,8 @@ import {
 import { useAppStore } from "./store";
 import {
   useActiveSessionId,
+  useEffectiveTheme,
   useSettings,
-  useSystemDarkMode,
   useConfigModalState,
   useGlobalNotice,
   useSandboxSetupState,
@@ -113,7 +113,6 @@ function App() {
   // --- Store state via selectors (each subscription is minimally scoped) ---
   const activeSessionId = useActiveSessionId();
   const settings = useSettings();
-  const systemDarkMode = useSystemDarkMode();
   const activeView = useAppStore((state) => state.activeView);
   const { showConfigModal, isConfigured, appConfig } = useConfigModalState();
   const lightboxState = useImageLightboxState();
@@ -303,14 +302,8 @@ function App() {
 
   // Apply theme to document root (useLayoutEffect ensures paint-before-render,
   // fixing the issue where theme change on Settings page doesn't take effect until navigating away)
+  const effectiveTheme = useEffectiveTheme();
   useLayoutEffect(() => {
-    const effectiveTheme =
-      settings.theme === "system"
-        ? systemDarkMode
-          ? "dark"
-          : "light"
-        : settings.theme;
-
     if (effectiveTheme === "light") {
       document.documentElement.classList.add("light");
     } else {
@@ -321,7 +314,7 @@ function App() {
       "data-theme-preset",
       settings.themePreset,
     );
-  }, [settings.theme, settings.themePreset, systemDarkMode]);
+  }, [effectiveTheme, settings.themePreset]);
 
   // Apply UI font scale to root: scale = uiFontSize / 14 (14 = unchanged baseline).
   // Settings.uiFontSize is non-optional (default 14), so it is always a number.
