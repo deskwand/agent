@@ -100,3 +100,15 @@ describe("createDeskWandVisionTool", () => {
     expect(result.content[0].text).toContain("upstream boom");
   });
 });
+
+/** A1：vision_describe（云模式变体）同样降到 codemode 层。 */
+describe("deskwand vision exposure", () => {
+  it("is exposed through codemode", () => {
+    const tool = createDeskWandVisionTool(
+      "https://api.deskwand.com/",
+      "tok-123",
+      os.tmpdir(),
+    );
+    expect(tool.exposure).toBe("codemode");
+  });
+});

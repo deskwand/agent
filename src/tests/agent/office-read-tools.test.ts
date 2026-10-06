@@ -595,3 +595,13 @@ describe("createOfficeTools", () => {
     expect(asText(result.content[0]).text).toContain("Unsupported file type");
   });
 });
+
+/** A1：office 工具降到 codemode 层（见 design-docs/2026-10-06-tool-exposure-slim-design.md）。 */
+describe("office tools exposure", () => {
+  it("every office tool is exposed through codemode", async () => {
+    const { createOfficeTools } =
+      await import("../../main/agent/tools/office/office-tools");
+    const tools = createOfficeTools(process.cwd());
+    for (const tool of tools) expect(tool.exposure).toBe("codemode");
+  });
+});

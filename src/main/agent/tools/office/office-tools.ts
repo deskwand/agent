@@ -5,6 +5,7 @@
  * and returns them as pi-coding-agent ToolDefinition objects.
  */
 import { Type } from "@sinclair/typebox";
+import { codemodeOnly } from "../tool-exposure";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { readXlsx } from "./xlsx-reader";
 import { readDocx } from "./docx-reader";
@@ -284,5 +285,5 @@ export function createOfficeTools(workspaceDir: string): ToolDefinition[] {
     },
   });
 
-  return [xlsxTool, docxTool, pptxTool, pdfTool];
+  return codemodeOnly([xlsxTool, docxTool, pptxTool, pdfTool]);
 }

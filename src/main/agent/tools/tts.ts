@@ -9,6 +9,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Type } from "@sinclair/typebox";
+import { CODEMODE_EXPOSURE } from "./tool-exposure";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { encodeWav } from "../../tts/wav";
 import type { TtsService } from "../../tts/service";
@@ -33,6 +34,7 @@ export function createTtsTool({
   const td = (t: any): any => t;
 
   return td({
+    ...CODEMODE_EXPOSURE,
     name: "tts",
     label: "Text To Speech",
     description:

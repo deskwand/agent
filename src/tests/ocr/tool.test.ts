@@ -130,3 +130,17 @@ describe("shouldRegisterOcrTool", () => {
     );
   });
 });
+
+/** A1：ocr 降到 codemode 层（见 design-docs/2026-10-06-tool-exposure-slim-design.md）。 */
+describe("ocr tool exposure", () => {
+  it("is exposed through codemode", async () => {
+    const { createOcrTool } = await import("../../main/agent/tools/ocr");
+    const tool = createOcrTool({
+      workspaceDir: process.cwd(),
+      getEngine: async () => {
+        throw new Error("unused");
+      },
+    });
+    expect(tool.exposure).toBe("codemode");
+  });
+});

@@ -9,6 +9,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Type } from "@sinclair/typebox";
+import { CODEMODE_EXPOSURE } from "./tool-exposure";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { detectImageMimeType } from "./vision-describe";
 import type { OcrEngine, OcrLine } from "../../ocr/engine";
@@ -52,6 +53,7 @@ export function createOcrTool(opts: {
   const td = (t: any): any => t;
 
   return td({
+    ...CODEMODE_EXPOSURE,
     name: "ocr",
     label: "Read image text",
     description:

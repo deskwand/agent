@@ -7,6 +7,7 @@
  * "see" an image but lacks multimodal support.
  */
 import { Type } from "@sinclair/typebox";
+import { CODEMODE_EXPOSURE } from "./tool-exposure";
 import type { ToolDefinition } from "@earendil-works/pi-coding-agent";
 import * as fs from "fs";
 import * as path from "path";
@@ -364,6 +365,7 @@ export function createVisionDescribeTool(
   const td = (t: any): any => t;
 
   return td({
+    ...CODEMODE_EXPOSURE,
     name: "vision_describe",
     label: "Describe Image",
     description:
@@ -531,6 +533,7 @@ export function createDeskWandVisionTool(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const td = (t: any): any => t;
   return td({
+    ...CODEMODE_EXPOSURE,
     name: "vision_describe",
     label: "Describe Image",
     description:

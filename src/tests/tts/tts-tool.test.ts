@@ -62,3 +62,20 @@ describe("tts tool", () => {
     expect(text).toContain("Settings");
   });
 });
+
+/** A1：tts 降到 codemode 层（见 design-docs/2026-10-06-tool-exposure-slim-design.md）。 */
+describe("tts tool exposure", () => {
+  it("is exposed through codemode", () => {
+    const tool = createTtsTool({
+      workspaceDir: tmpdir(),
+      service: service(
+        vi.fn(async () => ({
+          ok: true as const,
+          samples: new Float32Array([0]),
+          sampleRate: 44100,
+        })),
+      ),
+    });
+    expect(tool.exposure).toBe("codemode");
+  });
+});

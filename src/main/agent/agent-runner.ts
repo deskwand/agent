@@ -19,6 +19,7 @@ import {
   createCodingTools,
   type AgentSession as PiAgentSession,
   type ToolDefinition,
+  type ToolExposure,
   type BashToolOptions,
   type InlineExtension,
   type ExtensionFactory,
@@ -144,6 +145,7 @@ import {
 import { createTtsTool } from "./tools/tts";
 import { getTtsService } from "../tts/service";
 import { createOfficeTools } from "./tools/office/office-tools";
+import { codemodeOnly } from "./tools/tool-exposure";
 import { createTodoTools } from "./tools/todo-tools";
 import { createAskUserTools } from "./tools/ask-user-tools";
 import { webAccessCache } from "./tools/web-access/cache";
@@ -1777,7 +1779,7 @@ export class AgentRunner {
       },
     };
 
-    return [
+    return codemodeOnly([
       td(navigate),
       td(screenshot),
       td(clickTool),
@@ -1790,7 +1792,7 @@ export class AgentRunner {
       td(evaluateTool),
       td(waitForTool),
       td(getStateTool),
-    ];
+    ]);
   }
   /**
    * Wrap the bash tool in the coding tools array to intercept sudo commands.
@@ -2969,8 +2971,8 @@ If your answer uses linkable content from Web Access or MCP tools, include a "So
 \u003c/citation_requirements>`,
         `\u003ctool_behavior\u003e\n
 Tool routing:\n
-- internal_browser_*: Use for all web browsing, interactive page operations, screenshots, form filling, and JS evaluation. The browser panel opens automatically. If it doesn't, the user may have dismissed it — they can reopen it by clicking the globe icon \ud83c\udf10 in the top toolbar. Defaults to opening local files and links in the internal browser instead of the system browser.\n
-- web_search and fetch_content: Use for quick research and readable content retrieval when interactive browsing is unnecessary. Use get_search_content when a result was truncated.\n
+- web_search and fetch_content: call them directly for quick research and readable pages; use get_search_content when a result was truncated.\n
+- Browser, document (office_read_*), vision, OCR and TTS tools come through codemode: await tools.<name>({...}). Use searchTools("<what you need>") to find the tool, then describeTool(name) for its arguments. Links and local files open in the in-app browser by default; its panel opens on its own, and the globe icon in the top toolbar reopens it if the user closed it.\n
 \u003c/tool_behavior\u003e`,
         `<file_references>
 引用工作区内的文件时，给出相对工作区的路径或完整路径，不要只给文件名（例如写 \u0060test_docs/report.docx\u0060 而不是 \u0060report.docx\u0060）。这条对表格单元格、代码块、列表里的文件名同样适用——最容易漏的正是表格：上文已经写了目录、表格里却只填裸名，用户点不到。
@@ -3147,7 +3149,9 @@ Tool routing:\n
       logCtx(
         `[AgentRunner] Model=${piModel.id}, thinkingLevel=${thinkingLevel}`,
       );
-      log(`[AgentRunner] Active tools: read, bash, edit, write`);
+      log(
+        `[AgentRunner] Coding tools are direct; occasional tools (browser/office/vision/ocr/tts) are reached through codemode`,
+      );
       log(
         `[AgentRunner] Custom tools (${allCustomTools.length}): ${allCustomTools.map((t) => t.name).join(", ")}`,
       );
@@ -5299,11 +5303,27 @@ export class TurnOutcomeTracker {
 }
 
 /** Reset SDK capabilities and cached output format before each prompt. */
+/**
+ * 每轮的 active 集合 = 策略算出的名单，**按 exposure 过滤**后交给 SDK。
+ *
+ * 为什么要过滤：`setActiveToolsByName()` 是按名字声明工具、**绕过 exposure** 的
+ * （SDK 的 `_applyToolLoadout` 只过滤 `hidden`）。降到 codemode 层的工具
+ * （A1：浏览器 / office / 视觉 / OCR / TTS）一旦被这样重新声明，就又回到了提示里，
+ * 降级收益当场归零 —— 实测：`setActiveToolsByName([...所有名字])` 之后，
+ * `getActiveToolNames()` 里又出现了 codemode 暴露的工具。
+ *
+ * 为什么还要保证 `codemode` 活跃：它是这些工具唯一的入口（模型在脚本里
+ * `tools.<name>({...})` 调用）。pi 的 codemode 激活原本是「派生」的（有 codemode 暴露的
+ * MCP server 连上时由上游激活），`mode: "on"` 并不会自己激活它；A1 之后 codemode
+ * 成为常驻网关，这里显式加进 active，否则浏览器 / 文档 / 看图 / OCR / TTS 会集体失联。
+ */
 export function applySessionTurnPolicyToSdk(
   session: Session,
   requestedProfile: TurnProfileName | undefined,
   availableTools: readonly string[],
-  piSession: Pick<PiAgentSession, "setActiveToolsByName">,
+  piSession: Pick<PiAgentSession, "setActiveToolsByName"> & {
+    getAllTools: () => readonly { name: string; exposure: ToolExposure }[];
+  },
   sessionRecord?: { turnProfile?: TurnProfile },
 ): void {
   const { activeToolNames, profile } = resolveSessionTurnPolicy(
@@ -5311,6 +5331,23 @@ export function applySessionTurnPolicyToSdk(
     requestedProfile,
     availableTools,
   );
-  piSession.setActiveToolsByName(activeToolNames);
+  const exposureByName = new Map(
+    piSession.getAllTools().map((tool) => [tool.name, tool.exposure]),
+  );
+  const next = activeToolNames.filter((name) => {
+    const exposure = exposureByName.get(name);
+    return exposure === "direct" || exposure === "model-only";
+  });
+  const hasCodemodeOnlyTools = [...exposureByName.values()].some(
+    (exposure) => exposure === "codemode" || exposure === "deferred",
+  );
+  if (
+    hasCodemodeOnlyTools &&
+    exposureByName.has("codemode") &&
+    !next.includes("codemode")
+  ) {
+    next.push("codemode");
+  }
+  piSession.setActiveToolsByName(next);
   if (sessionRecord) sessionRecord.turnProfile = profile;
 }

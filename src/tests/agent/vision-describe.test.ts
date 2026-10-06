@@ -421,3 +421,21 @@ describe("vision-describe protocol mapping", () => {
     expect(protocolForProvider("custom")).toBe("anthropic");
   });
 });
+
+/** A1：vision_describe（本地模型变体）降到 codemode 层。 */
+describe("vision_describe exposure", () => {
+  it("is exposed through codemode", async () => {
+    const { createVisionDescribeTool } =
+      await import("../../main/agent/tools/vision-describe");
+    const tool = createVisionDescribeTool(
+      {
+        enabled: true,
+        provider: "openai" as const,
+        apiKey: "sk-test",
+        model: "gpt-4o",
+      },
+      process.cwd(),
+    );
+    expect(tool.exposure).toBe("codemode");
+  });
+});
