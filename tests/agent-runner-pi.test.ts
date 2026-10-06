@@ -129,13 +129,9 @@ describe("AgentRunner pi-coding-agent integration", () => {
   });
 
   it("nudges the model to proceed with reasonable assumptions", () => {
-    expect(agentRunnerContent).toContain(
-      "proceed immediately with reasonable assumptions",
-    );
-    expect(agentRunnerContent).toContain("within two days");
-    expect(agentRunnerContent).toContain(
-      "most recent two relevant publication days",
-    );
+    expect(agentRunnerContent).toContain("act on reasonable assumptions");
+    expect(agentRunnerContent).toContain('"Within N days"');
+    expect(agentRunnerContent).toContain("most recent N publication days");
   });
 
   it("routes tool results through structured helpers instead of stringifying base64 into text", () => {
@@ -162,11 +158,11 @@ describe("AgentRunner pi-coding-agent integration", () => {
   });
 
   it("chat-first behavioral rules are present", () => {
-    expect(agentRunnerContent).toContain("CHAT FIRST");
+    expect(agentRunnerContent).toContain("Default to chat");
     expect(agentRunnerContent).toContain(
-      "Do NOT create, write, or edit files unless the user explicitly asks",
+      "write or edit files only when the user asks",
     );
-    expect(agentRunnerContent).toContain("START DOING IT");
+    expect(agentRunnerContent).toContain("Start the task");
   });
 
   it("does not gate thinking display by thinkingLevel off in renderer events or final message blocks", () => {

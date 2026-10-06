@@ -37,9 +37,7 @@ describe("MemoryExtension", () => {
 
     expect(result?.promptPrefix).toBeUndefined();
     expect(result?.systemPromptSuffix).toContain("<memory-policy>");
-    expect(result?.systemPromptSuffix).toContain(
-      "No saved memory has been loaded",
-    );
+    expect(result?.systemPromptSuffix).toContain("No saved memory is loaded");
     expect(result?.systemPromptSuffix).toContain("memory-policy-v2");
     expect(result?.systemPromptSuffix).toContain("memory_upsert");
     expect(result?.systemPromptSuffix).toContain("memory_delete");
