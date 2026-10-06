@@ -276,4 +276,13 @@ const ABOUT_LINKS = [
     labelKey: "about.links.license",
     url: "https://github.com/deskwand/agent/blob/main/LICENSE",
   },
+  // 2026-10-06：图标栏那颗「?」在有更新时会让位给升级按钮，帮助菜单在那段时间里
+  // 点不开（见 design-docs/2026-10-06-rail-update-icon-design.md §5）。
+  // 手册与反馈必须在这页还有入口，否则一段待重启的窗口期内无处可点。
+  // 文案直接复用 help.*，与弹出菜单里那两条同名——它们是同一个目的地。
+  { labelKey: "help.docs", url: "https://www.deskwand.com/manual" },
+  {
+    labelKey: "help.feedback",
+    url: "https://github.com/deskwand/agent/issues",
+  },
 ];

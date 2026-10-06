@@ -66,14 +66,17 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
     expect(line).not.toMatch(/\bborder-b\b/);
   });
 
-  it("图标栏上的未读点：挖坑环等于图标栏自己的底色", () => {
-    // HelpMenu.tsx 那行自己写着这条不变量：“挖坑环必须等于图标栏自己的底色”。
-    // 它已经破过一次（2026-09-27 图标栏 secondary → background，reviewer 抓的），
-    // 2026-09-29 图标栏 background → background-chrome，同一个不变量必须跟着走。
-    // 会话栏里那颗（sidebar-disclosure-motion.tsx）仍在 secondary 上，不在本文件范围。
-    expect(read("components/HelpMenu.tsx")).toMatch(
-      /shadow-\[0_0_0_2px_var\(--color-background-chrome\)\]/,
-    );
+  it("升级按钮的配色与圆点：hover 底用 overlay-hover，圆点不许回来", () => {
+    // 替代本文件原「图标栏上的未读点：挖坑环等于图标栏自己的底色」那条：圆点已删，
+    // 新的不变量是验证按钮的配色选择。这条守的是实测结论——accent 图标压在 accent 12%
+    // 上，亮色 ember 只有 2.97:1，低于 WCAG 1.4.11 的 3:1
+    // （实测脚本：design-docs/mockups/2026-10-06-rail-contrast-check.mjs）。
+    // 只匹带引号的 class 串，不扫全文：本文件旁边就有「accent-muted」这样的解释性
+    // 注释，全文 not.toContain 会被注释误触（本文件 §9 已记过这条教训）。
+    const helpMenu = read("components/HelpMenu.tsx");
+    expect(helpMenu).toContain('"text-accent hover:bg-overlay-hover"');
+    expect(helpMenu).not.toContain("hover:bg-accent-muted");
+    expect(helpMenu).not.toContain("rounded-full bg-accent");
   });
 
   it("外圈更暗：图标栏与标题栏用 background-chrome，会话栏仍是唯一被抬起的 secondary", () => {

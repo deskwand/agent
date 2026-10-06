@@ -4,8 +4,8 @@ import {
   ArrowUpRight,
   BookOpen,
   Bug,
+  CircleArrowUp,
   CircleHelp,
-  Download,
   Info,
   RefreshCw,
 } from "lucide-react";
@@ -56,33 +56,51 @@ export function HelpMenu() {
 
   const hasUpdate = updateReady && Boolean(updateVersion);
 
+  // 更新就绪后菜单必须收起：否则它会停在「检查更新」那一行上，
+  // 而更新已经在硬盘上了（设计文档 §3.4）。
+  const menuVisible = menuOpen && !hasUpdate;
+
+  // 有更新时这颗按钮不再是「帮助」，而是「升级」：文案与可访问名同源。
+  // store 存裸 semver，前缀 v 在这里补 —— 与弹窗版本徽标的拼法一致。
+  const railLabel = hasUpdate
+    ? t("update.railLabel", { version: `v${updateVersion}` })
+    : t("help.label");
+
   return (
     <div className="relative flex flex-col items-center">
-      <Tooltip label={t("help.label")} placement="right">
+      <Tooltip label={railLabel} placement="right">
         <button
           type="button"
-          aria-label={t("help.label")}
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((v) => !v)}
-          className={`${RAIL_BUTTON_CLASS} relative text-text-muted hover:bg-overlay-hover hover:text-text-primary`}
+          aria-label={railLabel}
+          // 有更新时它是直接动作按钮，不是菜单按钮：两个菜单属性必须一起撤掉
+          aria-haspopup={hasUpdate ? undefined : "menu"}
+          aria-expanded={hasUpdate ? undefined : menuOpen}
+          onClick={() => {
+            if (hasUpdate) {
+              // 菜单可能正开着：假状态被清掉时它不该自己冒出来
+              setMenuOpen(false);
+              setShowUpdateDialog(true);
+              return;
+            }
+            setMenuOpen((v) => !v);
+          }}
+          className={`${RAIL_BUTTON_CLASS} relative ${
+            hasUpdate
+              ? // hover 底用 overlay-hover：accent 压在 accent-muted 上时，
+                // 亮色 ember 只有 2.97:1（低于 3:1），实测见设计文档 §5
+                "text-accent hover:bg-overlay-hover"
+              : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
+          }`}
         >
-          <CircleHelp className="w-4 h-4" />
-          {hasUpdate && (
-            <span
-              aria-hidden="true"
-              // 挖坑环必须等于图标栏自己的底色：这颗点长在图标栏（外圈，background-chrome）上。
-              // 2026-09-27 图标栏从 secondary 改入 background 时这里漏改过一次（reviewer 抓的），
-              // 2026-09-29 外圈再改成 background-chrome 时又漏了一次（同一个 reviewer 又抓到）——
-              // 图标栏换底色时，这一行是必须跟着改的地方之一。
-              // 会话栏里那颗（sidebar-disclosure-motion.tsx）仍在 secondary 上，别一起改。
-              className="absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_0_2px_var(--color-background-chrome)]"
-            />
+          {hasUpdate ? (
+            <CircleArrowUp className="w-4 h-4" />
+          ) : (
+            <CircleHelp className="w-4 h-4" />
           )}
         </button>
       </Tooltip>
 
-      {menuOpen && (
+      {menuVisible && (
         <>
           <div
             className="fixed inset-0 z-40"
@@ -127,35 +145,17 @@ export function HelpMenu() {
 
             <div className={MENU_SEPARATOR_CLASS} />
 
-            {hasUpdate ? (
-              <MenuItem
-                icon={<Download className="w-4 h-4" />}
-                label={t("update.title")}
-                trailing={
-                  // store 里存的是裸 semver（electron-updater 的 info.version），
-                  // 前缀 v 由界面补 —— 与上面「关于」行的 v1.0.41 保持一致
-                  <span className="inline-block max-w-[96px] truncate text-xs">
-                    v{updateVersion}
-                  </span>
-                }
-                onClick={() => {
-                  setShowUpdateDialog(true);
-                  setMenuOpen(false);
-                }}
-              />
-            ) : (
-              <MenuItem
-                icon={<RefreshCw className="w-4 h-4" />}
-                label={t("about.checkUpdate")}
-                onClick={() => {
-                  window.electronAPI?.send({
-                    type: "update.check",
-                    payload: {},
-                  });
-                  setMenuOpen(false);
-                }}
-              />
-            )}
+            <MenuItem
+              icon={<RefreshCw className="w-4 h-4" />}
+              label={t("about.checkUpdate")}
+              onClick={() => {
+                window.electronAPI?.send({
+                  type: "update.check",
+                  payload: {},
+                });
+                setMenuOpen(false);
+              }}
+            />
           </div>
         </>
       )}

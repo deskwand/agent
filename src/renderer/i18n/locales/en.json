@@ -1763,7 +1763,8 @@
     "description": "DeskWand v{{version}} has been downloaded. Restart to complete the update.",
     "later": "Later",
     "restart": "Restart Now",
-    "notesLabel": "What's new"
+    "notesLabel": "What's new",
+    "railLabel": "{{version}} is ready — click to view"
   },
   "artifactCard": {
     "revert": "Revert",
