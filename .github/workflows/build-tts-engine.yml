@@ -1,0 +1,207 @@
+name: build-tts-engine
+
+# 「最佳音质」档的引擎产物。上游 0 release（只有 Docker 镜像），所以引擎得我们
+# 自己编一次、打包、上传到 file.deskwand.com（设计 §4.2）。
+#
+# 默认流水线只做**链接自检**（`--help`）：证明动态库都找得到、能链接。
+# 重量级的"能出声"自检要下 896MB 模型，走 workflow_dispatch 手动触发。
+on:
+  workflow_dispatch:
+    inputs:
+      smoke:
+        description: "也跑一次真实合成自检（下载 896MB 模型，约 5 分钟）"
+        type: boolean
+        default: false
+  push:
+    paths:
+      - "scripts/package-tts-engine.mjs"
+      - "scripts/check-engine-link.mjs"
+      - "scripts/smoke-tts-server.mjs"
+      - ".github/workflows/build-tts-engine.yml"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin-arm64
+          - os: windows-2022
+            platform: win32-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # 上游**按 commit 临时克隆**，不进应用仓库的 submodule：上游含 ggml 约 42MB，
+      # 而它只服务于这一个 CI 任务，不该让每个克隆应用仓库的人都付这份成本。
+      - name: fetch upstream (pinned)
+        shell: bash
+        run: |
+          git clone https://github.com/ServeurpersoCom/qwentts.cpp.git "$GITHUB_WORKSPACE/engine-src"
+          git -C "$GITHUB_WORKSPACE/engine-src" checkout 6fae929
+          git -C "$GITHUB_WORKSPACE/engine-src" submodule update --init --recursive --depth 1
+          # 上游没有 Windows CI。若需最小修补：补丁放 patches/qwentts/，在这里应用
+          # （同时必须开着给上游的 PR —— 不维护平行分叉）。
+          #
+          # 只 glob 这个子目录，**不要**用 patches/*.patch：仓库根那个 patches/ 里
+          # 放的是 pi SDK 的补丁，喂给 git apply 会直接报错退出（踩过一次）。
+          shopt -s nullglob
+          for f in patches/qwentts/*.patch; do
+            echo "applying $f"
+            git -C "$GITHUB_WORKSPACE/engine-src" apply "$f"
+          done
+          exit 0
+
+      - name: engine (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cmake -S "$GITHUB_WORKSPACE/engine-src" -B "$GITHUB_WORKSPACE/engine-src/build" \
+            -DGGML_METAL=ON -DGGML_BLAS=ON -DCMAKE_BUILD_TYPE=Release
+          cmake --build "$GITHUB_WORKSPACE/engine-src/build" -j 4
+
+      # Windows 这一条**故意不加 shell: bash**：cmake 直接跑在 pwsh 里，
+      # 路径用工作区（两种 shell 都认）。先前用 /tmp/qwentts 时，bash 把它映射到
+      # 用户临时目录，而 pwsh 里的 /tmp 不是同一个地方 —— cmake 报"源目录不存在"。
+      # Vulkan SDK：镜像里不一定有（实测 windows-2022 上没有，cmake 报
+      # `Could NOT find Vulkan (missing: Vulkan_LIBRARY Vulkan_INCLUDE_DIR glslc)`）。
+      # 有就直接用，没有就按 LunarG 官方安装器静默装一个 —— 版本锁死，避免哪天 SDK 变了
+      # 构建结果跟着变。
+      - name: Vulkan SDK (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $existing = Get-ChildItem -Directory 'C:\VulkanSDK' -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending | Select-Object -First 1
+          if ($existing) {
+            $sdk = $existing.FullName
+            Write-Host "using preinstalled Vulkan SDK: $sdk"
+          } else {
+            $ver = '1.3.296.0'
+            $exe = Join-Path $env:RUNNER_TEMP 'VulkanSDK.exe'
+            Invoke-WebRequest "https://sdk.lunarg.com/sdk/download/$ver/windows/VulkanSDK-$ver-Installer.exe" -OutFile $exe
+            Start-Process $exe -ArgumentList '--accept-licenses','--default-answer','--confirm-command','install' -Wait
+            $sdk = (Get-ChildItem -Directory 'C:\VulkanSDK' | Sort-Object Name -Descending | Select-Object -First 1).FullName
+            Write-Host "installed Vulkan SDK: $sdk"
+          }
+          "VULKAN_SDK=$sdk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # ggml 的 Vulkan 后端还要 SPIRV-Headers 的 cmake 配置（Vulkan SDK 里只有
+      # glslc / glslangValidator，没有它）—— 装上再把手记进 CMAKE_PREFIX_PATH。
+      - name: SPIRV-Headers (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $src = Join-Path $env:RUNNER_TEMP 'spirv-headers'
+          $prefix = Join-Path $env:RUNNER_TEMP 'spirv'
+          git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers.git $src
+          # 显式打开安装开关：它的默认值是 PROJECT_IS_TOP_LEVEL，别依赖默认。
+          cmake -S $src -B "$src/build" -DCMAKE_INSTALL_PREFIX=$prefix `
+            -DSPIRV_HEADERS_ENABLE_INSTALL=ON -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_INSTALL_DATADIR=share
+          # **必须带 --config Release**：Windows 默认生成器是 Visual Studio（多配置），
+          # 不带就是装 Debug —— 什么都没编，于是配置目录是空的（踩过：prefix 里一个文件都没有）。
+          cmake --install "$src/build" --config Release
+          # 装了什么打进日志：这个包找不到时，先看它到底有没有生成 cmake 配置
+          Get-ChildItem -Recurse -File $prefix | ForEach-Object { Write-Host "  installed: $($_.FullName)" }
+          "CMAKE_PREFIX_PATH=$prefix" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: engine (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          # GGML_CPU_ALL_VARIANTS + BACKEND_DL：把 CPU 后端按指令集编成多个可加载模块，
+          # 运行时挑一个能用的。这对分发是必要的 —— 构建机是 AVX2+，只用 NATIVE 编出来的
+          # 版本在老 CPU 上会直接崩。ggml 自己也要求 BACKEND_DL 必须配 ALL_VARIANTS
+          # （NATIVE 与 BACKEND_DL 互斥，第一次就是这么红的）。
+          cmake -S "$env:GITHUB_WORKSPACE/engine-src" -B "$env:GITHUB_WORKSPACE/engine-src/build" -DGGML_VULKAN=ON -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON
+          cmake --build "$env:GITHUB_WORKSPACE/engine-src/build" --config Release -j 4
+
+      # 「能编」与「能链接」的分界。**不能看退出码**：上游 --help 打印完用法就
+      # 退出 1（实测），所以判据交给脚本（没有 dyld/LoadLibrary 错 + 有 Usage 横幅）。
+      - name: link check
+        shell: bash
+        env:
+          BIN: ${{ runner.os == 'Windows' && format('{0}/engine-src/build/Release/tts-server.exe', github.workspace) || format('{0}/engine-src/build/tts-server', github.workspace) }}
+        run: node scripts/check-engine-link.mjs
+
+      - name: package
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          BUILD_DIR: ${{ github.workspace }}/engine-src/build
+          ENGINE_SRC: ${{ github.workspace }}/engine-src
+          UPSTREAM_COMMIT: 6fae929
+        run: node scripts/package-tts-engine.mjs
+
+      # **产物必须在没有构建树时也能跑**。这条是踩出来的：
+      # 上游 CMake 给可执行文件写的是构建机的绝对 rpath，版本链接也是绝对路径 ——
+      # 打出来的包在别的机器上 dyld 找不到库，引擎根本起不来。而构建目录还在时
+      # 一切都"正常"（dyld 悄悄从那里取库），所以必须在删掉构建树之后再验一次。
+      - name: artifact must run without the build tree
+        shell: bash
+        env:
+          BIN: ${{ runner.os == 'Windows' && format('{0}/relo/bin/tts-server.exe', runner.temp) || format('{0}/relo/bin/tts-server', runner.temp) }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/relo"
+          tar -xzf dist/*.tar.gz -C "$RUNNER_TEMP/relo" --strip-components=1
+          rm -rf "$GITHUB_WORKSPACE/engine-src/build"
+          node scripts/check-engine-link.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: engine-${{ matrix.platform }}
+          path: dist/*.tar.gz*
+
+  # 「能出声」自检：只在手动触发时跑。CPU 上合成一句，断言收到 PCM。
+  smoke:
+    if: ${{ inputs.smoke == true }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: darwin-arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: engine-${{ matrix.platform }}
+          path: dist
+
+      - name: unpack engine
+        shell: bash
+        run: |
+          mkdir -p /tmp/engine
+          tar -xzf dist/*.tar.gz -C /tmp/engine --strip-components=1
+
+      # 两个模型加起来 896MB：缓存住，别每次重下
+      - uses: actions/cache@v4
+        id: models
+        with:
+          path: /tmp/models
+          key: qwen3-tts-gguf-6fae929
+
+      - name: fetch models
+        if: steps.models.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          mkdir -p /tmp/models
+          base=https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF/resolve/main
+          curl -sL -o /tmp/models/talker.gguf \
+            "$base/qwen-talker-0.6b-customvoice-Q4_K_M.gguf"
+          curl -sL -o /tmp/models/tokenizer.gguf \
+            "$base/qwen-tokenizer-12hz-Q8_0.gguf"
+
+      - name: smoke (synthesize one sentence)
+        env:
+          BIN: /tmp/engine/bin/tts-server
+          MODEL: /tmp/models/talker.gguf
+          CODEC: /tmp/models/tokenizer.gguf
+        run: node scripts/smoke-tts-server.mjs

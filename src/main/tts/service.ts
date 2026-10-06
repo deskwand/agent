@@ -70,18 +70,24 @@ const MANIFEST_KEY_BY_ENGINE: Record<
  * 就会各写一遍地错：`{ prefer: "matcha", engine: "zh" }` 时门控以为要用 matcha
  * 而实际用的是 zh，于是关着开关也照念朗读模型。
  */
+/** 解析结果：sherpa 的模型键，或"最佳音质"档的引擎（它不是 sherpa 模型）。 */
+export type ResolvedTtsEngine = TtsModelKey | "engine";
+
 export function resolveTtsEngine(
   text: string,
   opts: TtsSpeakOptions | undefined,
   isInstalled: (engine?: TtsModelKey) => boolean,
-): TtsModelKey {
+): ResolvedTtsEngine {
   // 1) 先按**原始文本**路由。数字转写会改变字母集合，必须先路由再转写
   //    （否则 "12" 变成 "twelve" 之后就成英文了）。
   const routed = pickEngine(text);
   // 2) engine 是硬指定（自检）：没装也会返回它，由调用方报错，绝不回退。
   if (opts?.engine) return opts.engine;
-  // 3) prefer 是软偏好（语音模式）：装了才用，没装就走路由。
-  if (opts?.prefer && isInstalled(opts.prefer)) return opts.prefer;
+  // 3) tone 是设置页那三档（新）：best 不是模型键，直接交给引擎那一路
+  if (opts?.tone === "best") return "engine";
+  // 4) tone 的 fast 等价于 prefer matcha；balanced 等于不偏好（按文本路由）
+  const prefer = opts?.tone === "fast" ? "matcha" : opts?.prefer;
+  if (prefer && isInstalled(prefer)) return prefer;
   // 4) 路由的那个也没装就退回 "zh" —— 同样由调用方那道 isInstalled 报错。
   return isInstalled(routed) ? routed : "zh";
 }
@@ -145,6 +151,10 @@ export function getTtsService(deps: TtsServiceDeps): TtsService {
 
       // 引擎选择只有一处规则，见 resolveTtsEngine 的注释。
       const engine = resolveTtsEngine(text, opts, isInstalled);
+      // 最佳音质档只在流式通道上存在：整句 API 的调用方（朗读、给模型的工具）
+      // 拿不到分块，硬走引擎会把"首声"退回到整句时长。不假装支持。
+      if (engine === "engine")
+        return { ok: false, error: "engine requires streaming" };
       if (!isInstalled(engine))
         return { ok: false, error: "model not installed" };
 

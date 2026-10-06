@@ -256,20 +256,24 @@ export function SettingsSelect<T extends string>({
   onChange,
   label,
   testId,
+  disabled = false,
 }: {
   value: T;
   options: Array<{ value: T; label: string }>;
   onChange: (next: T) => void;
   label: string;
   testId?: string;
+  /** 未安装时音色不可选：选了也没用，还会让人以为已经生效。 */
+  disabled?: boolean;
 }) {
   return (
     <select
       aria-label={label}
       data-testid={testId}
       value={value}
+      disabled={disabled}
       onChange={(event) => onChange(event.target.value as T)}
-      className="rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none hover:bg-surface-hover"
+      className="rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none hover:bg-surface-hover disabled:opacity-50"
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -338,14 +342,30 @@ export function SettingsStatusBadge({
 
 /** 安装状态的最小形状。语音与朗读两套 state 结构相同，共用一条判定。 */
 export interface InstallStateLike {
-  phase: VoiceInstallPhase;
+  /**
+   * 阶段名。**故意收成 string**：朗读/语音输入那份与「最佳音质」引擎那份的阶段
+   * 词汇不同（引擎有 checking / installing，sherpa 有 extracting），两边共用这一条
+   * 徽标规则比维护两套近乎相同的 helper 更不容易分叉。
+   */
+  phase: VoiceInstallPhase | string;
   percent: number;
   installed: boolean;
 }
 
-/** 下载中/解压中都算「进行中」——两卡共用，避免一处只写 downloading 而漏掉 extracting。 */
+/**
+ * 进行中的阶段。两卡共用，避免一处只写 downloading 而漏掉 extracting。
+ * `checking`（引擎预检：磁盘/内存）与 `installing`（引擎解包 + 预热）是
+ * 「最佳音质」档那边独有的阶段。
+ */
+const BUSY_PHASES: readonly string[] = [
+  "downloading",
+  "extracting",
+  "checking",
+  "installing",
+];
+
 export function isInstalling(state: InstallStateLike | null): boolean {
-  return state?.phase === "downloading" || state?.phase === "extracting";
+  return state !== null && BUSY_PHASES.includes(state.phase);
 }
 
 /**

@@ -19,7 +19,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { VoiceErrorCode } from "../../shared/ipc-types";
-import { DEFAULT_VOICE_MODE } from "../../shared/voice-mode";
+import { DEFAULT_VOICE_MODE, resolveVoiceTone } from "../../shared/voice-mode";
 import { useAppStore } from "../store";
 import type { Message } from "../types";
 import { createAudioQueue } from "../utils/tts/audio-queue";
@@ -121,17 +121,11 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
       speak: (text, handlers) => {
         // **每次调用**读一次：换模式要能对下一句生效（`silenceMs` 不同，它只在
         // createVoiceConversation 时读一次就够，因为只影响状态机）。
-        const fast =
-          useAppStore.getState().appConfig?.voiceMode?.fastVoice ??
-          DEFAULT_VOICE_MODE.fastVoice;
-        return speakStream(
-          text,
-          {
-            purpose: "voice",
-            ...(fast ? { prefer: "matcha" as const } : {}),
-          },
-          handlers,
-        );
+        // 三档都在 `voiceMode.tone` 里（旧的 `fastVoice` 仍然读得到：
+        // 没有 tone 的老配置按 fastVoice 归一化成 fast / balanced）
+        const voiceMode = useAppStore.getState().appConfig?.voiceMode;
+        const tone = resolveVoiceTone(voiceMode);
+        return speakStream(text, { purpose: "voice", tone }, handlers);
       },
       createQueue: () =>
         createAudioQueue({ createContext: () => audioContext }),

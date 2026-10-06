@@ -26,6 +26,7 @@ import type {
   TtsSpeakResult,
   TtsSpeakStreamResult,
   TtsStreamEvent,
+  TtsTone,
 } from "../../shared/ipc-types";
 import type { TtsService } from "./service";
 import { getTtsService, resolveTtsEngine } from "./service";
@@ -41,7 +42,13 @@ import {
 } from "../speech/installer";
 import { readRuntimeSpec, runtimeKey } from "../speech/runtime-spec";
 import { configStore } from "../config/config-store";
-import { logError } from "../utils/logger";
+import { log, logError } from "../utils/logger";
+import type { EngineHost } from "../engine/engine-host";
+import { getEngineHost } from "../engine/engine-host";
+import {
+  ENGINE_VOICE_DEFAULT,
+  type EngineInstallState,
+} from "../../shared/engine-install";
 
 export interface TtsIpcDeps {
   userDataPath: string;
@@ -53,6 +60,8 @@ export interface TtsIpcDeps {
   sendStream: (event: TtsStreamEvent) => void;
   /** 注入以便测试。默认 getTtsService(...)。 */
   service?: TtsService;
+  /** 注入以便测试。默认 getEngineHost(userDataPath)（最佳音质档的引擎门面）。 */
+  engine?: EngineHost;
   /** 注入以便测试。默认：读随包清单 + 真实下载。 */
   installDeps?: {
     readSpec: typeof readRuntimeSpec;
@@ -73,9 +82,17 @@ const CHANNELS = [
   "tts.speak",
   "tts.speakStream",
   "tts.cancelStream",
+  "tts.preview",
+  "tts.getEngineState",
+  "tts.installEngine",
+  "tts.removeEngine",
 ] as const;
 
+/** 试听句：三档都是中文音色，所以一句话够用。产物只播不落盘。 */
+const PREVIEW_TEXT = "你好，我是本地语音入口。"; // i18n-allow-cjk 试听用语
+
 const MODELS: TtsModelKey[] = ["zh", "en", "matcha"];
+const TONES: TtsTone[] = ["fast", "balanced", "best"];
 
 const MODEL_ID_BY_KEY: Record<TtsModelKey, TtsModelId> = {
   zh: TTS_MODEL_ID,
@@ -109,6 +126,7 @@ export function registerTtsIpc({
 }): TtsIpcHandle {
   const { userDataPath, sendEvent, sendStream } = deps;
   const service = deps.service ?? getTtsService({ userDataPath });
+  const engine = deps.engine ?? getEngineHost(userDataPath);
   const installer = {
     readSpec: readRuntimeSpec,
     installRuntime,
@@ -116,6 +134,21 @@ export function registerTtsIpc({
     removeTtsModel,
     ...deps.installDeps,
   };
+
+  const engineIdle: EngineInstallState = {
+    phase: "idle",
+    percent: 0,
+    installed: false,
+  };
+  let engineState: EngineInstallState = { ...engineIdle };
+  let engineInstalling = false;
+  const publishEngine = (next: EngineInstallState) => {
+    engineState = next;
+    sendEvent({ type: "engine", state: next });
+  };
+  /** 音色取自配置（设置页写入），缺省 vivian —— 没选过也要有声音。 */
+  const engineVoice = () =>
+    configStore.getAll().voiceMode?.voiceEngineVoice ?? ENGINE_VOICE_DEFAULT;
 
   const idle: TtsInstallState = { phase: "idle", percent: 0, installed: false };
   const states: TtsInstallStates = {
@@ -290,6 +323,9 @@ export function registerTtsIpc({
    *  自己的 finally 上，给一个不存在的 id 登记就是永不回收的一项。 */
   const live = new Set<number>();
 
+  /** 在飞的引擎流：`tts.cancelStream` 要能 abort 掉对应的那次 fetch。 */
+  const engineAborts = new Map<number, AbortController>();
+
   const runStream = async (
     streamId: number,
     text: string,
@@ -300,8 +336,50 @@ export function registerTtsIpc({
       sendStream({ streamId, type: "error", error: blocked });
       return;
     }
+
+    // 「最佳音质」档：先判可用性，再走引擎。不可用就**落到下面的 sherpa 路由**
+    // （回退到均衡档）—— 未装、平台不支持、连崩被标记 failed，这三种都必须还有声音。
+    if (opts?.tone === "best" && engine.available()) {
+      const controller = new AbortController();
+      engineAborts.set(streamId, controller);
+      try {
+        const result = await engine.speak({
+          text,
+          voiceId: engineVoice(),
+          streamId,
+          send: sendStream,
+          signal: controller.signal,
+        });
+        // 取消后**既不发块也不发 done**（与 §3.5 同一条教训）。成功时 done 由
+        // 桥接层发出，这里再发一次就是两个 done。
+        if (cancelled.has(streamId)) return;
+        if (!result.ok) {
+          sendStream({ streamId, type: "error", error: result.error });
+        }
+      } catch (error) {
+        // 引擎门面自身抛错（清单缺项、监督器构造失败）在这里兜住：不兜的话它会
+        // 变成未处理拒绝，渲染层那边只看到一个永远不结束的流。
+        if (!cancelled.has(streamId)) {
+          sendStream({
+            streamId,
+            type: "error",
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      } finally {
+        engineAborts.delete(streamId);
+      }
+      return;
+    }
+    if (opts?.tone === "best") {
+      log("[Tts] best tier unavailable, falling back to balanced");
+    }
+
     let seq = 0;
-    const result = await service.speak(text, opts, (chunk) => {
+    // 回退与"均衡"档走同一条路：把 tone 换成 balanced，别让 service 再解析回引擎
+    const effective =
+      opts?.tone === "best" ? { ...opts, tone: "balanced" as const } : opts;
+    const result = await service.speak(text, effective, (chunk) => {
       if (cancelled.has(streamId)) return false;
       sendStream({ streamId, type: "chunk", seq: seq++, ...chunk });
       return true;
@@ -332,7 +410,112 @@ export function registerTtsIpc({
   );
 
   ipcMain.handle("tts.cancelStream", (_event, streamId: number) => {
-    if (live.has(streamId)) cancelled.add(streamId);
+    if (!live.has(streamId)) return;
+    cancelled.add(streamId);
+    // 引擎那一路还要**真的断开**：上游只有看到连接断开才会中止合成
+    // （实测服务端日志出现 `aborted the synthesis`）。不 abort 的话，打断后引擎
+    // 会把整句合成完，而它是串行的 —— 下一句要排队等着。
+    engineAborts.get(streamId)?.abort();
+  });
+
+  /**
+   * 试听：三档通用。返回**整句**音频（不流式）—— 只有一两秒，设置页那边
+   * 一个短命 AudioContext 就够。
+   *
+   * 它**不查朗读门控**：试听是设置页的动作，不是朗读那条路。
+   */
+  ipcMain.handle(
+    "tts.preview",
+    async (_event, tone: TtsTone): Promise<TtsSpeakResult> => {
+      if (!TONES.includes(tone)) return { ok: false, error: "unknown tone" };
+      if (tone !== "best") return service.speak(PREVIEW_TEXT, { tone });
+
+      if (!engine.available()) {
+        // 不静默：用户点了按钮，就要知道为什么没声音
+        return {
+          ok: false,
+          error: engine.installed()
+            ? "engine unavailable"
+            : "engine not installed",
+        };
+      }
+      const chunks: Float32Array[] = [];
+      let sampleRate = 24_000;
+      const result = await engine.speak({
+        text: PREVIEW_TEXT,
+        voiceId: engineVoice(),
+        streamId: -1, // 负数：与真实流不碰撞（cancelStream 的 live 守卫也会忽略它）
+        send: (event) => {
+          if (event.type === "chunk") {
+            chunks.push(event.samples);
+            sampleRate = event.sampleRate;
+          }
+        },
+      });
+      if (!result.ok) return { ok: false, error: result.error };
+      const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+      const samples = new Float32Array(total);
+      let at = 0;
+      for (const chunk of chunks) {
+        samples.set(chunk, at);
+        at += chunk.length;
+      }
+      return { ok: true, samples, sampleRate };
+    },
+  );
+
+  ipcMain.handle("tts.getEngineState", (): EngineInstallState => {
+    // 磁盘上的事实优先于内存里的状态：用户可能手动删了目录
+    const installed = engine.installed();
+    const blocked = engine.blockedReason();
+    return {
+      ...engineState,
+      installed,
+      ...(installed
+        ? { phase: "ready" as const, percent: 100, error: undefined }
+        : {}),
+      ...(blocked ? { blockedReason: blocked } : {}),
+    };
+  });
+
+  ipcMain.handle("tts.installEngine", async () => {
+    // 守卫与 sherpa 那边同形：已装 / 已在装都静默返回（渲染层会重读状态）
+    if (engineInstalling || engine.installed()) return;
+    const blocked = engine.blockedReason();
+    if (blocked) {
+      publishEngine({ ...engineIdle, blockedReason: blocked });
+      return;
+    }
+    engineInstalling = true;
+    try {
+      publishEngine({ phase: "checking", percent: 0, installed: false });
+      await engine.install({
+        onProgress: (percent) =>
+          publishEngine({
+            phase: "downloading",
+            percent: Math.round(percent * 100),
+            installed: false,
+          }),
+        onPhase: (phase) =>
+          publishEngine({ phase, percent: 100, installed: false }),
+      });
+      publishEngine({ phase: "ready", percent: 100, installed: true });
+    } catch (error) {
+      logError("[TtsEngine] install failed:", error);
+      publishEngine({
+        phase: "error",
+        percent: 0,
+        installed: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      engineInstalling = false;
+    }
+  });
+
+  ipcMain.handle("tts.removeEngine", () => {
+    engine.remove();
+    publishEngine({ ...engineIdle });
   });
 
   return {

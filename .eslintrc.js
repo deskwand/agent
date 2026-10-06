@@ -43,5 +43,12 @@ module.exports = {
       parserOptions: { project: null },
       env: { browser: true },
     },
+    {
+      // `scripts/` 下的 .mjs（CI 打包脚本、一键自检）同样不在 tsconfig 的 include 里。
+      // 与其把它们排除在 lint 之外，不如关掉类型化规则 —— 语法与常见错误仍然查得到。
+      files: ['scripts/**/*.mjs'],
+      parserOptions: { project: null },
+      env: { node: true },
+    },
   ],
 };

@@ -1,3 +1,4 @@
+import type { EngineInstallState } from "./engine-install";
 /**
  * IPC type definitions shared between the main process and the renderer/preload.
  *
@@ -556,6 +557,16 @@ export interface TtsInstallStates {
  * 一个参数两种期望 = 迟早改错一个：自检需要"没装就报错"才能把半装的模型撤掉，
  * 语音模式需要"没装就照旧出声"。
  */
+/**
+ * 语音模式的三档音色。
+ *
+ * - `fast`：高速音色（matcha）
+ * - `balanced`：按文本路由到朗读的中文 / 英文音色
+ * - `best`：本地引擎（大模型，走流式）—— 与 `prefer` 不同，它**不是**模型键，
+ *   因为它不是 sherpa 的模型；引擎是否可用由主进程单独判（见 engine-host）。
+ */
+export type TtsTone = "fast" | "balanced" | "best";
+
 export interface TtsSpeakOptions {
   engine?: TtsModelKey;
   prefer?: TtsModelKey;
@@ -568,18 +579,26 @@ export interface TtsSpeakOptions {
    * 在线上也没有校验。
    */
   purpose?: "voice";
+  /**
+   * 语音模式的三档音色。**与 `prefer` 并存**：`prefer` 是给老调用点的软偏好，
+   * `tone` 是设置页那一栏的三档语义。两者都给时以 `tone` 为准。
+   */
+  tone?: TtsTone;
 }
 
 export type TtsSpeakResult =
   | { ok: true; samples: Float32Array; sampleRate: number }
   | { ok: false; error: string };
 
-export type TtsEvent = {
-  type: "install";
-  /** 哪个模型。两行各自更新，不能只更新第一行。 */
-  model: TtsModelKey;
-  state: TtsInstallState;
-};
+export type TtsEvent =
+  | {
+      type: "install";
+      /** 哪个模型。两行各自更新，不能只更新第一行。 */
+      model: TtsModelKey;
+      state: TtsInstallState;
+    }
+  /** 引擎（最佳音质档）的安装进度。与上面那个分开：它没有 model 键。 */
+  | { type: "engine"; state: EngineInstallState };
 
 /**
  * 流式朗读的块事件。块 = 引擎的一个**标点分段**（不是音频级流式）；分块拼接

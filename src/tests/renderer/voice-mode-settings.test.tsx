@@ -13,6 +13,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  TtsModelKey,
   TtsEvent,
   TtsInstallState,
   TtsInstallStates,
@@ -97,7 +98,7 @@ const pickTone = (next: "fast" | "balanced") =>
     select.dispatchEvent(new Event("change", { bubbles: true }));
   });
 
-const emitInstall = (model: TtsEvent["model"], state: TtsInstallState) =>
+const emitInstall = (model: TtsModelKey, state: TtsInstallState) =>
   act(async () => {
     emit?.({ type: "install", model, state });
   });
@@ -145,7 +146,7 @@ describe("VoiceModeSettings 的音色行", () => {
     await pickTone("balanced");
 
     expect(api.config.save).toHaveBeenCalledWith({
-      voiceMode: { silenceMs: 1200, fastVoice: false },
+      voiceMode: { silenceMs: 1200, fastVoice: false, tone: "balanced" },
     });
     expect(api.tts.install).toHaveBeenCalledExactlyOnceWith("zh");
   });
@@ -156,7 +157,8 @@ describe("VoiceModeSettings 的音色行", () => {
     await pickTone("fast");
 
     expect(api.config.save).toHaveBeenCalledWith({
-      voiceMode: { silenceMs: 1200, fastVoice: true },
+      // tone 是事实来源，fastVoice 是它的镜像（老配置、老读者还认那个布尔值）
+      voiceMode: { silenceMs: 1200, fastVoice: true, tone: "fast" },
     });
     expect(api.tts.install).toHaveBeenCalledExactlyOnceWith("matcha");
   });
@@ -169,7 +171,8 @@ describe("VoiceModeSettings 的音色行", () => {
     await pickTone("fast");
 
     expect(api.config.save).toHaveBeenCalledWith({
-      voiceMode: { silenceMs: 1200, fastVoice: true },
+      // tone 是事实来源，fastVoice 是它的镜像（老配置、老读者还认那个布尔值）
+      voiceMode: { silenceMs: 1200, fastVoice: true, tone: "fast" },
     });
     expect(api.tts.install).not.toHaveBeenCalled();
   });
