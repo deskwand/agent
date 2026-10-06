@@ -159,6 +159,13 @@ export function VoiceModeSettings() {
   const engineVoice =
     appConfig?.voiceMode?.voiceEngineVoice ?? ENGINE_VOICE_DEFAULT;
   const engineBlocked = isBest ? engineState.blockedReason : undefined;
+  /**
+   * 连续崩到上限被标记 failed：装是装了，但要**说出来并给一条路**（设计 §6）。
+   * 没有这个的话，用户看到"已安装/就绪"、听到的是均衡音色，除了删掉重下 900MB
+   * 没有任何入口能修。
+   */
+  const engineFailed =
+    isBest && engineState.installed && engineState.status === "failed";
 
   const refresh = useCallback(async () => {
     if (!isElectron) return;
@@ -207,6 +214,11 @@ export function VoiceModeSettings() {
     } finally {
       setRemoving(false);
     }
+  };
+
+  const retryEngine = async () => {
+    await window.electronAPI?.tts?.retryEngine();
+    await refreshEngine();
   };
 
   const removeEngine = async () => {
@@ -268,9 +280,20 @@ export function VoiceModeSettings() {
   };
 
   const status = installStatusLabel(t, active);
-  const badgeLabel = engineBlocked
-    ? t(`${VOICE_MODE_KEY}.toneBestBlocked`)
-    : status.label;
+  /**
+   * 徽标文案。`installStatusLabel` 先判 `installed`，所以"装了但被判 failed"会显示成
+   * 「已安装」—— 那是在说谎（用户听到的是均衡音色）。这两档失败状态在这里覆盖它。
+   */
+  const badgeLabel = engineFailed
+    ? t("settings.capabilities.install.failed")
+    : engineBlocked
+      ? t(`${VOICE_MODE_KEY}.toneBestBlocked`)
+      : status.label;
+  const badgeTone = engineFailed
+    ? ("error" as const)
+    : engineBlocked
+      ? ("muted" as const)
+      : status.tone;
 
   /** 试听：三档共用一颗按钮，标签随播放状态变。 */
   const previewButton = (which: TtsTone) => (
@@ -324,7 +347,7 @@ export function VoiceModeSettings() {
         badge={
           <SettingsStatusBadge
             testId="voice-voice-badge"
-            tone={engineBlocked ? "muted" : status.tone}
+            tone={badgeTone}
             label={badgeLabel}
           />
         }
@@ -414,19 +437,21 @@ export function VoiceModeSettings() {
             />
           }
           note={
-            engineBlocked
-              ? t(`${VOICE_MODE_KEY}.toneBestBlockedNote`, {
-                  reason: t(
-                    `${VOICE_MODE_KEY}.${
-                      engineBlocked === "disk"
-                        ? "toneBestBlockedDisk"
-                        : engineBlocked === "memory"
-                          ? "toneBestBlockedMemory"
-                          : "toneBestBlockedPlatform"
-                    }`,
-                  ),
-                })
-              : t(`${VOICE_MODE_KEY}.toneBestNote`)
+            engineFailed
+              ? t(`${VOICE_MODE_KEY}.toneBestFailedNote`)
+              : engineBlocked
+                ? t(`${VOICE_MODE_KEY}.toneBestBlockedNote`, {
+                    reason: t(
+                      `${VOICE_MODE_KEY}.${
+                        engineBlocked === "disk"
+                          ? "toneBestBlockedDisk"
+                          : engineBlocked === "memory"
+                            ? "toneBestBlockedMemory"
+                            : "toneBestBlockedPlatform"
+                      }`,
+                    ),
+                  })
+                : t(`${VOICE_MODE_KEY}.toneBestNote`)
           }
           control={
             <>
@@ -457,6 +482,18 @@ export function VoiceModeSettings() {
                 }
               />
               {engineState.installed && previewButton("best")}
+              {engineState.installed && engineFailed && (
+                <button
+                  type="button"
+                  data-testid="voice-engine-reset"
+                  aria-label={t(`${VOICE_MODE_KEY}.toneBestRetryFailed`)}
+                  disabled={removing}
+                  onClick={() => void retryEngine()}
+                  className={PRIMARY_BUTTON}
+                >
+                  {t("settings.capabilities.install.retry")}
+                </button>
+              )}
               {engineState.installed ? (
                 <button
                   type="button"

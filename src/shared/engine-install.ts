@@ -23,6 +23,9 @@ export type EngineInstallPhase =
  */
 export type EngineBlockedReason = "disk" | "memory" | "platform";
 
+/** 引擎进程的状态（与安装阶段正交：装好了也可能判 failed）。 */
+export type EngineRunStatus = "stopped" | "starting" | "ready" | "failed";
+
 export interface EngineInstallState {
   phase: EngineInstallPhase;
   /** 0-100。 */
@@ -30,6 +33,12 @@ export interface EngineInstallState {
   installed: boolean;
   error?: string;
   blockedReason?: EngineBlockedReason;
+  /**
+   * 进程状态。**连续崩到上限会变成 `failed`** —— 那时界面必须让用户看得见、并且
+   * 有重试入口（设计 §6）。只报安装状态的话，用户会看到"已安装/就绪"、听到的却是
+   * 均衡音色，而且除了删掉重下 900MB 没有别的路。
+   */
+  status?: EngineRunStatus;
 }
 
 /**

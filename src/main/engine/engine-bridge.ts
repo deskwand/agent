@@ -59,6 +59,9 @@ export async function speakViaEngine(
   // 2387ms）就是从发请求到那一刻量的。若从首块起算，第一块到达时 elapsed 恒为 0，
   // 判据永远成立 —— 那等于没有门限，第一块之后就断续。
   const firstAt = now();
+  // 请求一开始就续命：只在结束时 touch 的话，刚好卡在 10 分钟边界上的那句会被
+  // 空闲回收杀掉（armIdle 到点就 kill，正在合成也照杀）。
+  supervisor.touch();
 
   const res = await doFetch(`http://127.0.0.1:${ready.port}/v1/audio/speech`, {
     method: "POST",
@@ -131,8 +134,6 @@ export async function speakViaEngine(
   // 极短句：流结束了都没到门限 —— 那就直接给出去，不吞音频
   if (!started) for (const block of held) emit(block);
 
-  // 有请求就有活动：重置空闲回收计时器
-  supervisor.touch();
   opts.send({ streamId: opts.streamId, type: "done" });
   return { ok: true };
 }

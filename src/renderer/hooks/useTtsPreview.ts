@@ -29,10 +29,20 @@ export function useTtsPreview(): TtsPreview {
   const [error, setError] = useState<string | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  /**
+   * 代数：每次 stop / 卸载都 +1。`play()` 在 await 之后核对它。
+   *
+   * 为什么必须有：`stop()` 只能停**已经建好**的 source，管不到还在飞的
+   * `tts.preview()`。没有这道守卫，切档或离开设置页后 1–2 秒，旧档的声音会自己
+   * 冒出来；卸载后那次 `new AudioContext()` 还会漏一个上下文（本文件头部警告的
+   * Chromium 上限就是被这种漏法撞到的）。
+   */
+  const generation = useRef(0);
   /** 在飞的次数：用它挡住"连点"，也用它忽略迟到的响应。 */
   const inFlight = useRef(0);
 
   const stop = useCallback(() => {
+    generation.current += 1; // 在飞的那次请求就此作废
     const source = sourceRef.current;
     sourceRef.current = null;
     if (source) {
@@ -47,6 +57,7 @@ export function useTtsPreview(): TtsPreview {
 
   useEffect(
     () => () => {
+      generation.current += 1; // 卸载同样作废在飞请求
       const source = sourceRef.current;
       if (source) {
         try {
@@ -66,11 +77,14 @@ export function useTtsPreview(): TtsPreview {
     async (tone: TtsTone) => {
       if (inFlight.current > 0) return; // 一次只允许一个在飞
       stop();
+      const myGeneration = generation.current;
       setError(null);
       inFlight.current += 1;
       setState("busy");
       try {
         const result = await window.electronAPI?.tts?.preview(tone);
+        // 期间被停掉 / 切了档 / 组件已卸载 → 丢掉这次结果（别再建 AudioContext）
+        if (generation.current !== myGeneration) return;
         if (!result) {
           setState("idle");
           return;

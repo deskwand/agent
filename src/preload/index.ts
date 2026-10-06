@@ -1017,6 +1017,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("tts.getEngineState"),
     installEngine: (): Promise<void> => ipcRenderer.invoke("tts.installEngine"),
     removeEngine: (): Promise<void> => ipcRenderer.invoke("tts.removeEngine"),
+    retryEngine: (): Promise<void> => ipcRenderer.invoke("tts.retryEngine"),
   },
   ocr: {
     getInstallState: (): Promise<OcrInstallState> =>
@@ -1719,6 +1720,7 @@ declare global {
         getEngineState: () => Promise<EngineInstallState>;
         installEngine: () => Promise<void>;
         removeEngine: () => Promise<void>;
+        retryEngine: () => Promise<void>;
       };
       ocr: {
         getInstallState: () => Promise<OcrInstallState>;

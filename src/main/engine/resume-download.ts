@@ -12,8 +12,8 @@
  * 发现它，代价是白下 900MB。所以这里看状态码，不看我们发了什么请求头。
  */
 import { createHash } from "node:crypto";
-import { createWriteStream } from "node:fs";
-import { readFile, rename, rm, stat } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { rename, rm, stat } from "node:fs/promises";
 
 export async function downloadResumable(opts: {
   url: string;
@@ -31,11 +31,22 @@ export async function downloadResumable(opts: {
   } catch {
     from = 0; // 没有半成品，从零开始
   }
+  // 半成品比目标还长（换过清单 / 上次写坏）：它只会让 Range 永远 416，删了重来
+  if (opts.bytes !== undefined && from > opts.bytes) {
+    await rm(partial, { force: true });
+    from = 0;
+  }
 
   const res = await fetch(opts.url, {
     headers: from > 0 ? { range: `bytes=${from}-` } : {},
     signal: opts.signal,
   });
+  if (res.status === 416 && from > 0) {
+    // 服务端说"你要的范围不存在" —— 半成品不可用，清掉重来一次（只重来一次，
+    // 否则清单写错时会变成死循环）
+    await rm(partial, { force: true });
+    return downloadResumable({ ...opts, bytes: undefined });
+  }
   if (!res.ok || !res.body) {
     throw new Error(`download failed: HTTP ${res.status}`);
   }
@@ -45,7 +56,10 @@ export async function downloadResumable(opts: {
   if (!append) from = 0;
 
   const hash = createHash("sha256");
-  if (from > 0) hash.update(await readFile(partial));
+  // 用流而不是 readFile：续传时半成品可能已经是 600MB，整块读进主进程不值得
+  if (from > 0) {
+    for await (const chunk of createReadStream(partial)) hash.update(chunk);
+  }
 
   const out = createWriteStream(partial, { flags: append ? "a" : "w" });
   let done = from;
