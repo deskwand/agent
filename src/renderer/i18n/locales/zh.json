@@ -148,6 +148,7 @@
         "silenceValue": "{{ms}} 毫秒",
         "tone": "音色",
         "toneDesc": "快速用高速音色（123MB），首声约 1 秒；均衡用中文音色（157MB），音质更好、稍慢；最佳音质在本机跑大模型（约 900MB，需单独安装）。",
+        "toneDescNoBest": "快速用高速音色（123MB），首声约 1 秒；均衡用中文音色（157MB），音质更好、稍慢。",
         "toneFast": "快速",
         "toneBalanced": "均衡",
         "toneRemoveFast": "删除高速音色",

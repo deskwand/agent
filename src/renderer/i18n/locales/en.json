@@ -148,6 +148,7 @@
         "silenceValue": "{{ms}} ms",
         "tone": "Voice style",
         "toneDesc": "Fast: high-speed voice (123MB), about a second to first sound. Balanced: Chinese voice (157MB), better quality, a little slower. Best: a local model on this machine (~900MB, installs separately).",
+        "toneDescNoBest": "Fast: high-speed voice (123MB), about a second to first sound. Balanced: Chinese voice (157MB), better quality, a little slower.",
         "toneFast": "Fast",
         "toneBalanced": "Balanced",
         "toneRemoveFast": "Remove the fast voice",
