@@ -158,6 +158,8 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  /** 本地 OCR 能力。只存开关：装没装看 userData/ocr/install.json。 */
+  ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
   voiceMode?: VoiceModeConfig;
   webAccess: WebAccessConfig;
@@ -188,6 +190,8 @@ export interface StoredConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  /** 本地 OCR 能力。只存开关：装没装看 userData/ocr/install.json。 */
+  ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
   voiceMode?: VoiceModeConfig;
   webAccess: WebAccessConfig;
@@ -310,6 +314,7 @@ export function defaultStoredConfig(): StoredConfig {
       shortcut: DEFAULT_VOICE_SHORTCUT,
       autoPolish: true,
     },
+    ocr: { enabled: false },
     readAloud: { enabled: false },
     voiceMode: { ...DEFAULT_VOICE_MODE },
     webAccess: normalizeWebAccessConfig(undefined),
@@ -961,6 +966,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     isConfigured: stored.isConfigured,
     visionModel: stored.visionModel,
     voiceEngine: normalizeVoiceEngineConfig(stored.voiceEngine),
+    ocr: normalizeOcrConfig(stored.ocr),
     readAloud: normalizeReadAloudConfig(stored.readAloud),
     voiceMode: normalizeVoiceModeConfig(stored.voiceMode),
     webAccess: normalizeWebAccessConfig(stored.webAccess),
@@ -1125,6 +1131,9 @@ export class ConfigStore {
       stored.visionModel = updates.visionModel;
     if (updates.voiceEngine !== undefined)
       stored.voiceEngine = updates.voiceEngine;
+    // ⚠️ 每一个 AppConfig 字段都要在这里有自己的分支 —— 这个函数不铺开 unknown key，
+    // 漏一个就是「界面上点得动、落不了盘」。OCR 就踩过这个坑。
+    if (updates.ocr !== undefined) stored.ocr = normalizeOcrConfig(updates.ocr);
     if (updates.readAloud !== undefined)
       stored.readAloud = normalizeReadAloudConfig(updates.readAloud);
     if (updates.voiceMode !== undefined)
@@ -1404,4 +1413,15 @@ export interface ReadAloudConfig {
 export function normalizeReadAloudConfig(raw: unknown): ReadAloudConfig {
   const enabled = (raw as { enabled?: unknown } | undefined)?.enabled;
   return { enabled: enabled === true };
+}
+
+/** 本地 OCR 能力的配置。只有开关：安装状态在 userData/ocr/install.json 里。 */
+export interface OcrConfig {
+  enabled: boolean;
+}
+
+/** 脏数据回退成关，不抛错。与其余能力开关同一条规矩。 */
+export function normalizeOcrConfig(raw: unknown): OcrConfig {
+  const value = (raw ?? {}) as Partial<OcrConfig>;
+  return { enabled: value.enabled === true };
 }

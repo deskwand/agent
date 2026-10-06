@@ -124,6 +124,8 @@ import { registerVoiceIpc } from "./voice/ipc";
 import { allowPermissionRequest } from "./media-permission";
 import type { VoiceIpcHandle } from "./voice/ipc";
 import { registerTtsIpc } from "./tts/ipc";
+import type { OcrIpcHandle } from "./ocr/ipc";
+import { registerOcrIpc } from "./ocr/ipc";
 import type { TtsIpcHandle } from "./tts/ipc";
 import { mcpToolsSnapshotStatusSource } from "./mcp/mcp-status-source";
 import { getSandboxAdapter, shutdownSandbox } from "./sandbox/sandbox-adapter";
@@ -273,6 +275,7 @@ let scheduledTaskManager: ScheduledTaskManager | null = null;
 let petWindowController: PetWindowController | null = null;
 let voiceIpc: VoiceIpcHandle | null = null;
 let ttsIpc: TtsIpcHandle | null = null;
+let ocrIpc: OcrIpcHandle | null = null;
 
 function sanitizeDiagnosticBaseUrl(value: string | undefined): string | null {
   if (!value) {
@@ -760,6 +763,8 @@ function createWindow() {
     voiceIpc = null;
     ttsIpc?.dispose();
     ttsIpc = null;
+    ocrIpc?.dispose();
+    ocrIpc = null;
   });
 
   // Notify renderer of fullscreen state changes (for macOS titlebar spacer)
@@ -2954,6 +2959,17 @@ ttsIpc = registerTtsIpc({
         mainWindow.webContents.send("tts.stream", event);
       }
     },
+  },
+});
+
+// 本地 OCR：三个 invoke 通道 + 独立的 ocr.event 推送通道。
+ocrIpc = registerOcrIpc({
+  ipcMain,
+  userDataPath: app.getPath("userData"),
+  sendEvent: (event) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("ocr.event", event);
+    }
   },
 });
 

@@ -31,7 +31,20 @@ import * as path from "path";
 import { RETIRED_SKILL_MANIFESTS } from "./retired-skill-manifests";
 
 /** Built-in skills that earlier releases shipped and that we no longer do. */
-export const RETIRED_SKILL_NAMES = ["docx", "pptx", "xlsx"];
+export const RETIRED_SKILL_NAMES = ["docx", "pptx", "xlsx", "image-ocr"];
+
+/**
+ * 技能**运行时自己长出来**的目录（不随包发布）。
+ *
+ * 退役时它们不算「用户的改动」：它们是被退役技能自己的运行过程撑出来的，而技能已经没了。
+ * `image-ocr` 就是例子 —— 首次运行时下 94MB 语言包、`npm install` 50MB 引擎，
+ * 于是一份本该被清掉的拷贝会因为「多出文件」而被判成用户自己的东西，永久留在磁盘上。
+ *
+ * 逐技能声明，不是全局规则：没列在这里的技能，多出任何文件都照样保留。
+ */
+export const RETIRED_SKILL_RUNTIME_DIRS: Record<string, string[]> = {
+  "image-ocr": ["models", "node_modules"],
+};
 
 export interface CleanupOptions {
   skillsDir: string;
@@ -39,6 +52,8 @@ export interface CleanupOptions {
   retiredNames?: string[];
   /** Overridable for tests; defaults to the real shipped manifests. */
   manifests?: Record<string, Record<string, string>>;
+  /** Overridable for tests; defaults to the real per-skill runtime dirs. */
+  runtimeDirs?: Record<string, string[]>;
 }
 
 export interface CleanupReport {
@@ -96,6 +111,7 @@ function sha256OfFile(filePath: string): string | null {
 function isUnmodifiedCopy(
   dirPath: string,
   manifest: Record<string, string> | undefined,
+  runtimeDirs: readonly string[],
 ): boolean {
   if (!manifest) return false;
 
@@ -106,13 +122,17 @@ function isUnmodifiedCopy(
     return false;
   }
 
-  const expected = Object.keys(manifest).sort();
-  if (actual.length !== expected.length) return false;
-  if (actual.some((file, i) => file !== expected[i])) return false;
+  // 随包发布过的文件都要在，且哈希一致 —— 用户改过一个字节就不算我们的了。
+  for (const [file, hash] of Object.entries(manifest)) {
+    if (!actual.includes(file)) return false;
+    if (sha256OfFile(path.join(dirPath, file)) !== hash) return false;
+  }
 
-  return actual.every(
-    (file) => sha256OfFile(path.join(dirPath, file)) === manifest[file],
-  );
+  // 多出来的文件只能长在技能的运行时目录里（见 RETIRED_SKILL_RUNTIME_DIRS）。
+  // 其余任何多余文件都说明用户在改它，保留 —— 留在磁盘上的死技能远比删掉别人的东西好。
+  return actual
+    .filter((file) => !(file in manifest))
+    .every((file) => runtimeDirs.includes(file.split("/")[0]));
 }
 
 export function cleanupRetiredSkillLinks(
@@ -123,6 +143,7 @@ export function cleanupRetiredSkillLinks(
     builtinSkillsDir,
     retiredNames = RETIRED_SKILL_NAMES,
     manifests = RETIRED_SKILL_MANIFESTS,
+    runtimeDirs = RETIRED_SKILL_RUNTIME_DIRS,
   } = options;
   const report: CleanupReport = { removed: [], kept: [] };
 
@@ -140,7 +161,7 @@ export function cleanupRetiredSkillLinks(
       ? // Dangling means the built-in directory it pointed at is gone; otherwise
         // it is only ours to remove if it resolves into our own directory.
         !fs.existsSync(entryPath) || isInside(builtinSkillsDir, entryPath)
-      : isUnmodifiedCopy(entryPath, manifests[name]);
+      : isUnmodifiedCopy(entryPath, manifests[name], runtimeDirs[name] ?? []);
 
     if (!appManaged) {
       report.kept.push(entryPath);

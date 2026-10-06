@@ -8,7 +8,7 @@ import type { ContentBlock } from "../../renderer/types";
 
 /**
  * 主会话中注册的自定义工具：agent-runner.ts 的 allCustomTools（web ×3、browser ×11、
- * office ×4、vision_describe（条件注册））+ pi-subagents（Agent / get_subagent_result /
+ * office ×4、vision_describe 与 ocr（都是条件注册））+ pi-subagents（Agent / get_subagent_result /
  * steer_subagent）+ memory 四件套 + goal 三件套。
  * 新增工具时必须同步加入此清单，并保证被摘要分组识别（`isGrouped`）——
  * 对应 AGENTS.md「不得默认作为未分组工具展示」规则。
@@ -19,6 +19,7 @@ const MAIN_SESSION_TOOLS = [
   "steer_subagent",
   "SubagentWorkflow",
   "vision_describe",
+  "ocr",
   "office_read_xlsx",
   "office_read_docx",
   "office_read_pptx",

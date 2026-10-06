@@ -1,0 +1,7 @@
+PostProcess:
+  name: CTCLabelDecode
+  character_dict:
+    - "!"
+    - "a"
+    - "中"
+  use_space_char: true

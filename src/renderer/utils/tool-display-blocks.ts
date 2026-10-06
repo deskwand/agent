@@ -234,13 +234,15 @@ function buildProcessSummary(
       scriptCount += 1;
       continue;
     }
-    // read / read_file / vision_describe / office_read_* all count as "read files"
+    // read / read_file / vision_describe / ocr / office_read_* all count as "read files"
     // in the process summary. Using startsWith for office_read_ means future
-    // formats (csv, md, etc.) are automatically covered.
+    // formats (csv, md, etc.) are automatically covered. `ocr` 读的也是文件 ——
+    // 用户看到「读取了 N 个文件」与它实际干的事一致。
     if (
       lower === "read" ||
       lower === "read_file" ||
       lower === "vision_describe" ||
+      lower === "ocr" ||
       lower.startsWith("office_read_")
     ) {
       calledRead = true;

@@ -111,6 +111,9 @@ function isVisionDescribeTool(name: string): boolean {
   return name.toLowerCase() === "vision_describe";
 }
 
+// `ocr` 刻意不在这里特判：它的输出就是文本行，走默认分支（短输出取首行、长输出报行数）
+// 已经是对的结果。特判只会多一处要维护的分支。
+
 function getFirstContentLine(text: string, maxLen = 80): string {
   const firstLine = text.split(/\r?\n/)[0] ?? "";
   if (firstLine.length > maxLen) {

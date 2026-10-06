@@ -979,6 +979,7 @@ export interface AppConfig {
   isConfigured: boolean;
   visionModel?: VisionModelConfig;
   voiceEngine?: VoiceEngineConfig;
+  ocr?: OcrConfig;
   readAloud?: ReadAloudConfig;
   voiceMode?: VoiceModeConfig;
   webAccess: WebAccessConfig;
@@ -1208,4 +1209,8 @@ export interface ToolTraceUi {
   argumentsBytes?: number;
   cancelled?: boolean;
   script?: { id: string; input: Record<string, unknown> };
+}
+
+export interface OcrConfig {
+  enabled: boolean;
 }
