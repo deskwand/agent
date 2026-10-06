@@ -108,12 +108,7 @@ import {
   RETIRED_SKILL_NAMES,
 } from "../skills/retired-skills";
 import { getVaultSkillsRoot } from "../vault/paths";
-import {
-  resolveBundledBinDir,
-  resolveBundledBinDirs,
-  resolveBundledNodePaths,
-  resolveBundledPythonBinDir,
-} from "./bundled-paths";
+import { resolveBundledBinDir, resolveBundledBinDirs } from "./bundled-paths";
 import { registerDeskWandProviders } from "./subagent/provider-bridge";
 import { createDeskwandToolsExtension } from "./subagent/deskwand-tools-extension";
 import { createDeskwandMcpExtension } from "../mcp/mcp-client-extension";
@@ -764,68 +759,8 @@ export class AgentRunner {
   // method was removed to eliminate credential leakage risk.
 
   /**
-   * Generate bundled executable path hints for the system prompt.
-   * Runs in dev mode too — bundled helpers such as officecli are not on the
-   * developer's own PATH, so both the hint and the PATH injection are needed.
-   * This is a defense-in-depth layer — even if PATH enrichment works, explicit
-   * paths help the model avoid ambiguity when Skills reference bare commands.
+   * Fallback skill path resolution when SkillsAdapter is not provided.
    */
-  private getBundledPathHints(): string {
-    const hints: string[] = [];
-
-    const nodePaths = resolveBundledNodePaths(bundleContext());
-    if (nodePaths) {
-      hints.push(`- node: ${nodePaths.node}`);
-      hints.push(`- npx: ${nodePaths.npx}`);
-    }
-
-    const pythonBinDir = resolveBundledPythonBinDir(bundleContext());
-    if (pythonBinDir) {
-      const pythonExe = process.platform === "win32" ? "python.exe" : "python3";
-      const pipExe = process.platform === "win32" ? "pip.exe" : "pip3";
-      hints.push(`- python3: ${path.join(pythonBinDir, pythonExe)}`);
-      if (fs.existsSync(path.join(pythonBinDir, pipExe))) {
-        hints.push(`- pip3: ${path.join(pythonBinDir, pipExe)}`);
-      }
-    }
-
-    // Enumerate rather than hardcode: adding a helper binary to
-    // resources/bin/<platform>-<arch>/ makes it appear here automatically.
-    const binDir = resolveBundledBinDir(bundleContext());
-    if (binDir) {
-      try {
-        // withFileTypes + a per-entry guard: one bad entry (dangling symlink,
-        // permission error) must not abandon the rest of the listing.
-        for (const entry of fs
-          .readdirSync(binDir, { withFileTypes: true })
-          .sort((a, b) => a.name.localeCompare(b.name))) {
-          // Only plain names go into the prompt verbatim — a local process could
-          // otherwise plant a filename containing a newline or a closing tag.
-          if (!/^[A-Za-z0-9._-]+$/.test(entry.name)) continue;
-          // Dotfiles (.DS_Store, .gitkeep, ...) are not executables.
-          if (entry.name.startsWith(".")) continue;
-          // `foo.part` is a half-written download, not a usable binary.
-          if (entry.name.endsWith(".part")) continue;
-          if (!entry.isFile()) continue;
-          hints.push(`- ${entry.name}: ${path.join(binDir, entry.name)}`);
-        }
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        logWarn(
-          `[AgentRunner] Could not enumerate bundled bin dir: ${message}`,
-        );
-      }
-    }
-
-    if (hints.length === 0) return "";
-
-    return `<bundled_executables>
-This application bundles its own executables. When executing commands, prefer these absolute paths:
-${hints.join("\n")}
-</bundled_executables>`;
-  }
-
-  /** Fallback skill path resolution when SkillsAdapter is not provided. */
   private legacySkillPaths(): string[] {
     const paths: string[] = [];
     const builtin = this.getBuiltinSkillsPath();
@@ -3022,12 +2957,12 @@ This is an isolated sandbox environment. Use ${VIRTUAL_WORKSPACE_PATH} as the ro
 
       const coworkAppendPrompt = [
         "You are an DeskWand assistant. Be concise, accurate, and tool-capable.",
-        `CRITICAL BEHAVIORAL RULES:\n
-1. CHAT FIRST: By default, respond to the user in plain text within the conversation. Do NOT create, write, or edit files unless the user explicitly asks you to (e.g., "create a file", "write this to...", "edit the code", "save as...", mentions a specific file path, or describes code changes they want applied). For questions, summaries, explanations, analysis, and general conversation — always reply directly in chat text.\n
-2. When a request is actionable, proceed immediately with reasonable assumptions. If you need clarification, ask briefly in plain text.\n
-3. For relative time windows like "within two days" in browsing or research tasks, assume the most recent two relevant publication days unless the user explicitly defines another date range.\n
-4. For bracketed placeholders like [Agent], [Topic], etc., treat the word inside brackets as the literal search keyword unless the user says otherwise.\n
-5. When given a task, START DOING IT. Do not restate the task, do not list what you will do, do not ask for confirmation. Just execute.`,
+        `CRITICAL RULES:\n
+1. Default to chat: reply in text; write or edit files only when the user asks.\n
+2. If a request is actionable, act on reasonable assumptions; ask briefly if clarification is needed.\n
+3. "Within N days" in browsing or research means the most recent N publication days, unless the user defines the range.\n
+4. Treat bracketed placeholders ([Agent], [Topic]) as the literal search keyword unless the user says otherwise.\n
+5. Start the task: do not restate it, list a plan, or ask for confirmation.`,
         workspaceInfoPrompt,
         `\u003ccitation_requirements>\n
 If your answer uses linkable content from Web Access or MCP tools, include a "Sources:" section and otherwise use standard Markdown links: [Title](https://deskwand.ai/chat/URL).\n
@@ -3037,7 +2972,6 @@ Tool routing:\n
 - internal_browser_*: Use for all web browsing, interactive page operations, screenshots, form filling, and JS evaluation. The browser panel opens automatically. If it doesn't, the user may have dismissed it — they can reopen it by clicking the globe icon \ud83c\udf10 in the top toolbar. Defaults to opening local files and links in the internal browser instead of the system browser.\n
 - web_search and fetch_content: Use for quick research and readable content retrieval when interactive browsing is unnecessary. Use get_search_content when a result was truncated.\n
 \u003c/tool_behavior\u003e`,
-        this.getBundledPathHints(),
         `<file_references>
 引用工作区内的文件时，给出相对工作区的路径或完整路径，不要只给文件名（例如写 \u0060test_docs/report.docx\u0060 而不是 \u0060report.docx\u0060）。这条对表格单元格、代码块、列表里的文件名同样适用——最容易漏的正是表格：上文已经写了目录、表格里却只填裸名，用户点不到。
 </file_references>`,
