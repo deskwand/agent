@@ -259,6 +259,8 @@ export const MessageCard = memo(function MessageCard({
   const readAloudEnabled = useAppStore(
     (s) => s.appConfig?.readAloud?.enabled === true,
   );
+  // 语音运行时独占音频：全屏在放回答、后台也在听，两路声音不能同时响。
+  const voiceRuntimeActive = useAppStore((s) => s.voiceModeOpen);
   const readingThis = reader.messageId === message.id;
   // 「有没有可读的文字」用已有的 visibleBlocks 判断，不去读 DOM ——
   // 正文一律是 text 块（代码块也是 text，会被念成「代码块，共 N 行」），
@@ -371,19 +373,23 @@ export const MessageCard = memo(function MessageCard({
               <>
                 <Tooltip
                   label={
-                    readingThis && reader.status === "playing"
-                      ? t("messageCard.pauseReading")
-                      : readingThis && reader.status === "paused"
-                        ? t("messageCard.resumeReading")
-                        : !readingThis && !speechAvailable
-                          ? t("messageCard.readAloudEmpty")
-                          : t("messageCard.readAloud")
+                    voiceRuntimeActive
+                      ? t("messageCard.readAloudBusy")
+                      : readingThis && reader.status === "playing"
+                        ? t("messageCard.pauseReading")
+                        : readingThis && reader.status === "paused"
+                          ? t("messageCard.resumeReading")
+                          : !readingThis && !speechAvailable
+                            ? t("messageCard.readAloudEmpty")
+                            : t("messageCard.readAloud")
                   }
                 >
                   <button
                     type="button"
                     data-testid="read-aloud-button"
-                    disabled={!readingThis && !speechAvailable}
+                    disabled={
+                      voiceRuntimeActive || (!readingThis && !speechAvailable)
+                    }
                     aria-label={t("messageCard.readAloud")}
                     onClick={() => {
                       if (readingThis) {

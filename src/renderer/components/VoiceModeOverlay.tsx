@@ -1,67 +1,38 @@
 /**
  * @module renderer/components/VoiceModeOverlay
  *
- * 全屏浮层：球居中，胶囊在顶，字幕在球下，右上角关闭。
+ * 全屏浮层：球居中，胶囊在顶，字幕在球下，右上角最小化 + 关闭。
  * 浮层不拖历史 —— 那是文字界面的活（设计 §3.1）。当轮文字自己滚动，
  * 见 `design-docs/2026-10-06-voice-caption-text-design.md`。
+ *
+ * **纯展示**：运行时在 `voice-mode/VoiceModeHost` 里，这里只画它给的状态，
+ * 所以最小化 / 回到全屏都不会重启麦克风。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { X } from "lucide-react";
-import { StarOrb, type OrbState } from "./voice-mode/star-orb";
+import { Minus, X } from "lucide-react";
+import { StarOrb } from "./voice-mode/star-orb";
+import { CAPTION_KEY, ORB_STATE } from "./voice-mode/orb-state";
 import { isNearBottom, stripVoiceMarkers } from "../utils/voice/voice-caption";
 import { VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
-import { useVoiceMode } from "../hooks/useVoiceMode";
-import type { ConversationState } from "../hooks/useVoiceConversation";
+import type { VoiceModeView } from "../hooks/useVoiceMode";
 
 export interface VoiceModeOverlayProps {
-  sessionId: string;
+  /** 运行时给出的视图状态。浮层只画，不管。 */
+  view: VoiceModeView;
   onClose(): void;
-  isCompacting: boolean;
-  /**
-   * 把一轮问题发出去。由宿主注入：提交到当前绑定的语音会话。
-   *
-   * `turnId` 必须原样交给后端 —— 回答只按它归属。返回 false 表示宿主没收下
-   * 这一轮（例如语音模式已经被关掉）。
-   */
-  onSendQuestion(text: string, turnId: string): boolean;
+  onMinimize(): void;
 }
-
-const ORB_STATE: Record<ConversationState, OrbState> = {
-  calibrating: "calibrating",
-  listening: "listening",
-  capturing: "capturing",
-  thinking: "thinking",
-  speaking: "speaking",
-  blocked: "blocked",
-  stopped: "listening",
-};
-
-const CAPTION_KEY: Record<ConversationState, string> = {
-  calibrating: "voiceMode.stateCalibrating",
-  listening: "voiceMode.stateListening",
-  capturing: "voiceMode.stateCapturing",
-  thinking: "voiceMode.stateThinking",
-  speaking: "voiceMode.stateSpeaking",
-  blocked: "voiceMode.stateBlocked",
-  stopped: "voiceMode.stateStopped",
-};
 
 /** 顶部渐隐只在真的能往上滚时出现（留一点余量，避免像素抖动）。 */
 const TOP_FADE_AT_PX = 8;
 
 export function VoiceModeOverlay({
-  sessionId,
+  view,
   onClose,
-  isCompacting,
-  onSendQuestion,
+  onMinimize,
 }: VoiceModeOverlayProps): JSX.Element {
   const { t } = useTranslation();
-  const view = useVoiceMode({
-    sessionId,
-    isCompacting,
-    sendQuestion: onSendQuestion,
-  });
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -127,22 +98,33 @@ export function VoiceModeOverlay({
       // 常规做法，这里不是漏了主题适配。
       style={{ backgroundColor: "#050507" }}
     >
-      {/* `titlebar-no-drag` 不是装饰：凡是压在顶部 40px 拖窗区里的控件都得带它。
-          拖窗命中是矩形，且不看 z-index —— 浮层盖在标题栏上不等于把这块从拖窗区里
-          抠出来。按钮上边距 16px、高 36px，跨在拖窗区里；以前能点全靠标题栏右簇
-          自己那块 no-drag 恰好盖到 y=34，y=34–40 这 6px 仍是拖窗区：点击落在✕中间
-          就被当成拖窗吞掉（悬停照常亮，所以看起来像时灵时不灵）。
-          计划里的「最小化」按钮挨着它，同样需要这个类。 */}
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label={t("voiceMode.exit")}
-        data-testid="voice-close"
-        className="titlebar-no-drag absolute top-4 right-4 flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/10"
-        style={{ color: "#8f8f9b" }}
-      >
-        <X className="h-4 w-4" />
-      </button>
+      {/* `titlebar-no-drag` 不是装饰：按钮上边距 16px、高 36px，跨在标题栏 40px 高的
+          拖窗区里。拖窗命中是矩形，也不看 z-index —— 浮层盖在标题栏上不等于把这块
+          从拖窗区里抠出来：以前能点全靠标题栏右簇自己那块 no-drag 恰好盖到 y=34，
+          y=34–40 这 6px 仍是拖窗区，点击落在✕中间就被当成拖窗吞掉（悬停照常亮）。
+          两个按钮现在都在这里，都得带这个类。 */}
+      <div className="absolute top-4 right-4 flex items-center gap-1">
+        <button
+          type="button"
+          data-testid="voice-minimize"
+          onClick={onMinimize}
+          aria-label={t("voiceMode.minimize")}
+          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/10"
+          style={{ color: "#8f8f9b" }}
+        >
+          <Minus className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          data-testid="voice-close"
+          onClick={onClose}
+          aria-label={t("voiceMode.exit")}
+          className="titlebar-no-drag flex h-9 w-9 items-center justify-center rounded-md transition-colors hover:bg-white/10"
+          style={{ color: "#8f8f9b" }}
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
 
       <div className="h-[min(620px,62vh)] w-[min(620px,86vw)]">
         <StarOrb state={ORB_STATE[view.state]} level={view.level} />

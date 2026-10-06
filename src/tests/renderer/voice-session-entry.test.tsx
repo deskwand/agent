@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   continue: vi.fn(),
   captures: vi.fn(),
-  question: undefined as ((text: string) => void) | undefined,
+  question: undefined as ((text: string, turnId: string) => void) | undefined,
 }));
 vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
@@ -25,13 +25,13 @@ vi.mock("../../renderer/hooks/useIPC", () => ({
 vi.mock("../../renderer/hooks/useWindowSize", () => ({
   useWindowSize: () => {},
 }));
-vi.mock("../../renderer/components/VoiceModeOverlay", () => ({
-  VoiceModeOverlay: ({
+vi.mock("../../renderer/components/voice-mode/VoiceModeHost", () => ({
+  VoiceModeHost: ({
     sessionId,
     onSendQuestion,
   }: {
     sessionId: string;
-    onSendQuestion: (text: string) => void;
+    onSendQuestion: (text: string, turnId: string) => void;
   }) => {
     mocks.captures(sessionId);
     mocks.question = onSendQuestion;
@@ -164,7 +164,7 @@ it("creates from ordinary X, keeps new V open after effects, and never sends a f
   expect(entry().hasAttribute("aria-current")).toBe(false);
   expect(mocks.continue).not.toHaveBeenCalled();
 });
-it("resumes another historical voice record, then rejects stale callbacks after switching", async () => {
+it("resumes another historical voice record, then keeps it running after switching", async () => {
   const store = useAppStore.getState();
   store.addSession(session("historical"));
   await act(async () => {
@@ -177,14 +177,88 @@ it("resumes another historical voice record, then rejects stale callbacks after 
   expect(
     container.querySelector('[data-voice-target="historical"]'),
   ).not.toBeNull();
+
   const old = mocks.question!;
   await act(async () => {
     useAppStore.getState().setActiveSession("ordinary");
   });
   await act(async () => {
-    old("late");
+    old("late", "turn-1");
   });
-  expect(mocks.continue).not.toHaveBeenCalled();
+
+  // 后台运行：这一轮照样属于 voice 会话，不是被丢掉
+  expect(mocks.continue).toHaveBeenCalledWith(
+    "historical",
+    "late",
+    undefined,
+    undefined,
+    undefined,
+    "voice",
+    "turn-1",
+  );
+  expect(useAppStore.getState().voiceModeOpen).toBe(true);
+});
+
+it("stops the runtime when the voice session is deleted", async () => {
+  const store = useAppStore.getState();
+  store.addSession(session("V"));
+  await act(async () => {
+    store.setActiveSession("V");
+  });
+  await act(async () => {
+    store.openVoiceMode("V");
+  });
+  expect(useAppStore.getState().voiceModeOpen).toBe(true);
+  await act(async () => {
+    useAppStore.getState().removeSession("V");
+  });
+  expect(useAppStore.getState().voiceModeOpen).toBe(false);
+  expect(container.querySelector("[data-voice-target]")).toBeNull();
+});
+
+it("notices the user when a voice session replaces another", async () => {
+  const store = useAppStore.getState();
+  store.addSession(session("V"));
+  await act(async () => {
+    store.setActiveSession("V");
+  });
+  await act(async () => {
+    store.openVoiceMode("V");
+  });
+  await act(async () => {
+    useAppStore.getState().addSession(session("W"));
+    useAppStore.getState().openVoiceMode("W");
+  });
+  expect(useAppStore.getState().globalNotice?.messageKey).toBe(
+    "voiceMode.endedPreviousSession",
+  );
+});
+
+it("brings the user back to the voice session on the shortcut while minimized", async () => {
+  const store = useAppStore.getState();
+  store.addSession(session("V"));
+  await act(async () => {
+    store.setActiveSession("V");
+  });
+  await act(async () => {
+    store.openVoiceMode("V");
+  });
+  // 人去了别的会话，宿主把语音收进小球（宿主本身在 voice-mode-host 里测）
+  await act(async () => {
+    store.setActiveSession("ordinary");
+    store.setVoiceModeMinimized(true);
+  });
+  await act(async () => {
+    press();
+  });
+  expect(useAppStore.getState().voiceModeOpen).toBe(true);
+  expect(useAppStore.getState().voiceModeMinimized).toBe(false);
+  expect(useAppStore.getState().activeSessionId).toBe("V");
+  expect(useAppStore.getState().activeView).toBe("chat");
+
+  await act(async () => {
+    press();
+  });
   expect(useAppStore.getState().voiceModeOpen).toBe(false);
 });
 it("locks duplicate clicks and preserves records without stealing focus after navigation", async () => {

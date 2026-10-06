@@ -20,7 +20,7 @@ import {
 } from "./store/selectors";
 import { useIPC } from "./hooks/useIPC";
 import { useVoiceModeShortcut } from "./hooks/useVoiceModeShortcut";
-import { VoiceModeOverlay } from "./components/VoiceModeOverlay";
+import { VoiceModeHost } from "./components/voice-mode/VoiceModeHost";
 
 import { useWindowSize } from "./hooks/useWindowSize";
 import { Sidebar } from "./components/Sidebar";
@@ -163,11 +163,6 @@ function App() {
   const voiceCreateLock = useRef(false);
   const voiceNavigationEpoch = useRef(0);
   const appLive = useRef(true);
-  const voiceIsCompacting = useAppStore((s) =>
-    voiceModeSessionId
-      ? s.sessionStates[voiceModeSessionId]?.compaction.status === "running"
-      : false,
-  );
   useWindowSize();
   const initialized = useRef(false);
 
@@ -188,25 +183,28 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // 切会话、切视图都不再结束语音 —— 那是最小化的事，由宿主决定。
+    // 只有会话真的没了，运行时才必须消失。
+    if (!voiceModeOpen || !voiceModeSessionId) return;
     const targetExists = sessions.some(
       (s) => s.id === voiceModeSessionId && s.kind === "voice",
     );
-    if (
-      voiceModeOpen &&
-      (activeView !== "chat" ||
-        !voiceModeSessionId ||
-        activeSessionId !== voiceModeSessionId ||
-        !targetExists)
-    )
-      closeVoiceMode();
-  }, [
-    activeView,
-    activeSessionId,
-    voiceModeSessionId,
-    voiceModeOpen,
-    sessions,
-    closeVoiceMode,
-  ]);
+    if (!targetExists) closeVoiceMode();
+  }, [voiceModeSessionId, voiceModeOpen, sessions, closeVoiceMode]);
+
+  // 顶掉旧会话要说一声：旧运行时的麦克风换了人。关闭再开不算顶掉。
+  const previousVoiceSession = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousVoiceSession.current;
+    previousVoiceSession.current = voiceModeSessionId;
+    if (!voiceModeOpen || !previous || previous === voiceModeSessionId) return;
+    useAppStore.getState().setGlobalNotice({
+      id: `voice-switch-${voiceModeSessionId}`,
+      message: "",
+      messageKey: "voiceMode.endedPreviousSession",
+      type: "info",
+    });
+  }, [voiceModeOpen, voiceModeSessionId]);
 
   const handleCreateVoiceSession = useCallback(async () => {
     if (voiceCreateLock.current) return;
@@ -240,25 +238,39 @@ function App() {
 
   useVoiceModeShortcut(
     () => {
-      if (useAppStore.getState().voiceModeOpen) closeVoiceMode();
-      else void handleCreateVoiceSession();
+      const store = useAppStore.getState();
+      if (store.voiceModeOpen) {
+        // 后台时先把人带回语音会话再展开。只把 minimized 翻回 false 是空操作：
+        // 全屏需要「正在看这条会话」，人在设置页时界面什么也不会变，而再按一次
+        // 就落到 else 把语音结了 —— 正是要避免的。
+        if (store.voiceModeMinimized) {
+          if (store.voiceModeSessionId) {
+            useAppStore.getState().setActiveView("chat");
+            useAppStore.getState().setActiveSession(store.voiceModeSessionId);
+          }
+          store.setVoiceModeMinimized(false);
+        } else {
+          store.closeVoiceMode();
+        }
+        return;
+      }
+      void handleCreateVoiceSession();
     },
     voiceModeOpen || activeView === "chat",
   );
 
   const handleVoiceQuestion = useCallback(
-    (text: string, turnId: string): boolean => {
+    (targetSessionId: string, text: string, turnId: string): boolean => {
       const store = useAppStore.getState();
       const target = store.sessions.find(
-        (s) => s.id === voiceModeSessionId && s.kind === "voice",
+        (s) => s.id === targetSessionId && s.kind === "voice",
       );
+      // 会话标识由宿主按自己的 sessionId 绑好再传进来：后台运行时换过会话的话，
+      // 旧运行时手里的回调绝不能把问题发给新会话。
       if (
-        !voiceModeSessionId ||
         !target ||
         !store.voiceModeOpen ||
-        store.voiceModeSessionId !== voiceModeSessionId ||
-        store.activeSessionId !== voiceModeSessionId ||
-        store.activeView !== "chat"
+        store.voiceModeSessionId !== targetSessionId
       )
         // 宿主收不下这一轮：状态机据此回到接收期，而不是挂在一个
         // 永远不会到来的回答上。
@@ -266,7 +278,7 @@ function App() {
       // turnId 由语音侧分配，宿主只负责原样带上：回答按它归属，
       // 不然新旧两轮的增量会串台。
       void continueSession(
-        voiceModeSessionId,
+        targetSessionId,
         text,
         target.providerProfileKey,
         target.model,
@@ -276,7 +288,7 @@ function App() {
       );
       return true;
     },
-    [voiceModeSessionId, continueSession],
+    [continueSession],
   );
 
   useEffect(() => {
@@ -811,18 +823,16 @@ function App() {
       <ImageLightbox {...lightboxState} />
 
       {voiceModeOpen &&
-      activeView === "chat" &&
       voiceModeSessionId &&
-      activeSessionId === voiceModeSessionId &&
       sessions.some(
         (s) => s.id === voiceModeSessionId && s.kind === "voice",
       ) ? (
-        <VoiceModeOverlay
+        <VoiceModeHost
           key={voiceModeSessionId}
           sessionId={voiceModeSessionId}
-          isCompacting={voiceIsCompacting}
-          onClose={closeVoiceMode}
-          onSendQuestion={handleVoiceQuestion}
+          onSendQuestion={(text, turnId) =>
+            handleVoiceQuestion(voiceModeSessionId, text, turnId)
+          }
         />
       ) : null}
     </div>

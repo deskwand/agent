@@ -30,6 +30,8 @@ function harness(start?: () => Promise<VoiceStartResult>) {
       }),
   );
   const states: string[] = [];
+  /** 每次上报的音量。用来盯住「静音时球不该还在跟环境声闪」。 */
+  const levels: number[] = [];
   const questions: string[] = [];
   const errors: string[] = [];
   const monitorCalls = {
@@ -104,7 +106,7 @@ function harness(start?: () => Promise<VoiceStartResult>) {
     },
     silenceMs: 1200,
     onState: (s) => states.push(s),
-    onLevel: () => {},
+    onLevel: (level) => levels.push(level),
     onTranscript: () => {},
     onQuestion: () => {},
     onSentence: () => {},
@@ -128,6 +130,7 @@ function harness(start?: () => Promise<VoiceStartResult>) {
     feedPcm: (pcm: Int16Array) => samplesCb?.(pcm, 0.5),
     pushed,
     states,
+    levels,
     questions,
     errors,
     monitorCalls,
@@ -780,5 +783,45 @@ describe("createVoiceConversation", () => {
       });
       expect(h.questions).toEqual(["嗯"]);
     });
+  });
+
+  it("静音后不再送音频给 VAD 与 ASR，在收的一轮被丢掉", async () => {
+    const h = await started();
+    h.vad("speech-start");
+    await h.feed(0.5, 1);
+    const framesBefore = h.pushedFrames.length;
+    expect(framesBefore).toBeGreaterThan(0);
+    const monitorBefore = h.monitorCalls.frames;
+
+    const stopsBefore = vi.mocked(h.speech.stop).mock.calls.length;
+
+    h.conv.setMuted(true);
+
+    expect(h.states.at(-1)).toBe("muted");
+    expect(h.cancel).toHaveBeenCalledTimes(1);
+    // 静音只关麦克风：正在播的回答不停
+    expect(vi.mocked(h.speech.stop).mock.calls.length).toBe(stopsBefore);
+
+    await h.feed(0.5, 3);
+    expect(h.monitorCalls.frames).toBe(monitorBefore);
+    expect(h.pushedFrames.length).toBe(framesBefore);
+    expect(h.questions).toEqual([]);
+    // 音量也归零：否则球还在跟着环境声闪，看着就像还在听
+    expect(h.levels.at(-1)).toBe(0);
+  });
+
+  it("解除静音先复位 VAD，随后的第一句立刻进 ASR", async () => {
+    const h = await started();
+    h.conv.setMuted(true);
+    const resets = h.monitorCalls.resets;
+
+    h.conv.setMuted(false);
+
+    expect(h.monitorCalls.resets).toBe(resets + 1);
+    expect(h.states.at(-1)).toBe("listening");
+
+    h.vad("speech-start");
+    await h.feed(0.5, 1);
+    expect(h.pushedFrames.length).toBeGreaterThan(0);
   });
 });

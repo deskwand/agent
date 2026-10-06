@@ -517,14 +517,17 @@ interface AppState {
   // Read aloud actions
   readAloud: ReadAloudState;
   /**
-   * 语音模式浮层是否打开。
+   * 语音运行时是否开启（浮层打开或最小化成小球）。
    *
    * 放 store 而不是组件 state：欢迎页也可以用语音模式，而创建会话后
-   * 应用会切到聊天视图 —— 状态留在 store 里，浮层才能跟着过去，
+   * 应用会切到聊天视图 —— 状态留在 store 里，运行时才能跟着过去，
    * 不会随欢迎页卸载而关掉。
    */
   voiceModeOpen: boolean;
   voiceModeSessionId: string | null;
+  /** 最小化到悬浮小球：运行时仍在，只是不占满屏。 */
+  voiceModeMinimized: boolean;
+  setVoiceModeMinimized: (minimized: boolean) => void;
   openVoiceMode: (sessionId: string) => void;
   closeVoiceMode: () => void;
   setReadAloud: (patch: Partial<ReadAloudState>) => void;
@@ -655,6 +658,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   } | null,
   voiceModeOpen: false,
   voiceModeSessionId: null,
+  voiceModeMinimized: false,
   readAloud: {
     messageId: null,
     status: "idle",
@@ -1793,12 +1797,23 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { browserOcclusionIds };
     }),
 
+  setVoiceModeMinimized: (minimized) => set({ voiceModeMinimized: minimized }),
+
   openVoiceMode: (sessionId) => {
     if (!get().sessions.some((s) => s.id === sessionId && s.kind === "voice"))
       return;
-    set({ voiceModeOpen: true, voiceModeSessionId: sessionId });
+    set({
+      voiceModeOpen: true,
+      voiceModeSessionId: sessionId,
+      voiceModeMinimized: false,
+    });
   },
-  closeVoiceMode: () => set({ voiceModeOpen: false, voiceModeSessionId: null }),
+  closeVoiceMode: () =>
+    set({
+      voiceModeOpen: false,
+      voiceModeSessionId: null,
+      voiceModeMinimized: false,
+    }),
 
   // Read aloud actions：每次都是新对象，zustand 的引用比较才能触发重渲染。
   setReadAloud: (patch) =>

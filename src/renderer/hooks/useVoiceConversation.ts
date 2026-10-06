@@ -28,6 +28,8 @@ export type ConversationState =
   | "thinking"
   | "speaking"
   | "blocked"
+  /** 用户把麦克风关了。与 blocked 的区别：blocked 是系统在忙，muted 是用户的选择。 */
+  | "muted"
   /** 已收尾：麦克风已释放。与 blocked（压缩中）是两回事，别混。 */
   | "stopped";
 
@@ -79,6 +81,7 @@ export interface VoiceConversation {
   start(): Promise<void>;
   stop(): void;
   setBlocked(blocked: boolean): void;
+  setMuted(muted: boolean): void;
   sendAnswerDelta(fullText: string, ended: boolean): void;
   state(): ConversationState;
 }
@@ -95,6 +98,8 @@ export function createVoiceConversation(
   let sessionId: string | null = null;
   let disposed = false;
   let blocked = false;
+  /** 静音：只关麦克风。朗读与在播的回答都不受影响。 */
+  let muted = false;
   let answering = false;
   const prefetch: ArrayBuffer[] = [];
   let prefetchBytes = 0;
@@ -133,7 +138,7 @@ export function createVoiceConversation(
   };
 
   const idleState = (): ConversationState =>
-    blocked ? "blocked" : "listening";
+    blocked ? "blocked" : muted ? "muted" : "listening";
 
   /**
    * 换回答期的灵敏度档。
@@ -285,7 +290,7 @@ export function createVoiceConversation(
 
   const onVadEdge = (edge: VadEdge) => {
     speaking = edge === "speech-start";
-    if (blocked) return;
+    if (blocked || muted) return;
     if (edge === "speech-start") {
       // 继续说：等待计时重置，会话接着用。
       clearSilenceTimer();
@@ -332,7 +337,10 @@ export function createVoiceConversation(
     ) as ArrayBuffer;
 
   const onSamples = (pcm: Int16Array, level: number) => {
-    deps.onLevel(level);
+    // 静音：VAD 与 ASR 都不收音频，音量也归零 —— 否则球还在跟着环境声闪，
+    // 看着就像还在听。
+    deps.onLevel(muted ? 0 : level);
+    if (muted) return;
     // 每一片都送给主进程的 VAD —— 包括安静的时候。它要连续地看音频，
     // 而且朗读期也在跑（那时没有 ASR 会话，正是要判断打断的时刻）。
     deps.monitor.audio(pcm);
@@ -448,6 +456,29 @@ export function createVoiceConversation(
       // 解封要把 VAD 一起复位：压缩期间的事件被丢掉，但主进程那边内部的
       // speaking 状态还留着 —— 不复位的话用户得先静音满一个窗口，
       // 才能再次触发说话起点。
+      deps.monitor.reset();
+      speaking = false;
+      setState(idleState());
+    },
+    setMuted(next) {
+      if (muted === next) return;
+      muted = next;
+      if (muted) {
+        // 正在收的一轮直接丢掉：不发问。代次顺带作废在途的启动。
+        roundGeneration += 1;
+        clearSilenceTimer();
+        silenceDeadline = null;
+        if (sessionId) void deps.voice.cancel(sessionId);
+        sessionId = null;
+        closing = false;
+        speaking = false;
+        candidate = false;
+        clearPrefetch();
+        setState(idleState());
+        return;
+      }
+      // 与 setBlocked(false) 同款：不复位主进程的 speaking，用户要等一个
+      // 静音窗口才能再触发说话起点。
       deps.monitor.reset();
       speaking = false;
       setState(idleState());

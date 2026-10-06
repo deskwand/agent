@@ -76,6 +76,37 @@ export function resolveOrbParams(state: OrbState): OrbParams {
   return TABLE[state];
 }
 
+export interface OrbScale {
+  haze: number;
+  stars: number;
+  sparks: number;
+  size: number;
+}
+
+/** 全屏档：粒子数与尺寸都不缩。 */
+export const FULL_ORB_SCALE: OrbScale = {
+  haze: 80,
+  stars: 5200,
+  sparks: 150,
+  size: 1,
+};
+
+/**
+ * 小球档（40px 的悬浮球）。
+ *
+ * 直接复用全屏参数是纯白实心盘 —— 5200 颗粒子塞进 40px；按面积等比缩比又只剩
+ * 22 颗不成球。这组数字在 40px 下是「一球带星点」，取自
+ * `design-docs/voice-background-preview/mini-orb.html` 的 C 档。
+ *
+ * 写死而不用公式：小球是固定 40px 的装饰，公式只会多一层没人用的灵活度。
+ */
+export const MINI_ORB_SCALE: OrbScale = {
+  haze: 4,
+  stars: 200,
+  sparks: 6,
+  size: 0.25,
+};
+
 const PALETTE: Array<[string, string]> = [
   ["255,255,255", "0.9"],
   ["204,224,255", "0.8"],
@@ -130,16 +161,16 @@ function rnd(a: number, b: number): number {
   return a + Math.random() * (b - a);
 }
 
-function buildParticles(): Particle[] {
+function buildParticles(scale: OrbScale): Particle[] {
   const sprites = PALETTE.map(([rgb]) => makeSprite(rgb));
   const pick = () => sprites[Math.floor(Math.random() * sprites.length)];
   const out: Particle[] = [];
 
-  for (let i = 0; i < 80; i += 1) {
+  for (let i = 0; i < scale.haze; i += 1) {
     const p = sphere(rnd(0.25, 0.95));
     out.push({
       ...p,
-      size: rnd(16, 44),
+      size: rnd(16, 44) * scale.size,
       a: rnd(0.009, 0.024),
       sprite: pick(),
       ph: rnd(0, 6.283),
@@ -147,13 +178,13 @@ function buildParticles(): Particle[] {
       haze: true,
     });
   }
-  for (let i = 0; i < 5200; i += 1) {
+  for (let i = 0; i < scale.stars; i += 1) {
     const rr =
       Math.random() < 0.7 ? rnd(0.8, 1.0) : Math.pow(Math.random(), 0.5) * 0.8;
     const p = sphere(rr);
     out.push({
       ...p,
-      size: rnd(0.9, 2.5),
+      size: rnd(0.9, 2.5) * scale.size,
       a: rnd(0.26, 0.8),
       sprite: pick(),
       ph: rnd(0, 6.283),
@@ -161,11 +192,11 @@ function buildParticles(): Particle[] {
       haze: false,
     });
   }
-  for (let i = 0; i < 150; i += 1) {
+  for (let i = 0; i < scale.sparks; i += 1) {
     const p = sphere(rnd(0.9, 1.0));
     out.push({
       ...p,
-      size: rnd(3.2, 8.5),
+      size: rnd(3.2, 8.5) * scale.size,
       a: rnd(0.5, 1),
       sprite: pick(),
       ph: rnd(0, 6.283),
@@ -179,15 +210,20 @@ function buildParticles(): Particle[] {
 export function StarOrb({
   state,
   level,
+  variant = "full",
 }: {
   state: OrbState;
   level: number;
+  /** 小球用 "mini"：换一组粒子参数，其他都不变。 */
+  variant?: "full" | "mini";
 }): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef(state);
   const levelRef = useRef(level);
+  const variantRef = useRef(variant);
   stateRef.current = state;
   levelRef.current = level;
+  variantRef.current = variant;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -195,7 +231,9 @@ export function StarOrb({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const particles = buildParticles();
+    const particles = buildParticles(
+      variantRef.current === "mini" ? MINI_ORB_SCALE : FULL_ORB_SCALE,
+    );
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     let W = 0;
     let H = 0;

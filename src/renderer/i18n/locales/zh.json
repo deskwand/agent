@@ -1183,7 +1183,14 @@
     "stateBlocked": "正在整理上下文",
     "stateStopped": "已退出语音对话",
     "toolSearching": "正在搜索",
-    "toolReading": "正在读文件"
+    "toolReading": "正在读文件",
+    "expand": "回到语音界面",
+    "minimize": "最小化到后台",
+    "muteMic": "静音麦克风",
+    "unmuteMic": "恢复麦克风",
+    "endVoice": "结束语音",
+    "stateMuted": "已静音",
+    "endedPreviousSession": "已结束上一个语音会话"
   },
   "messageCard": {
     "request": "请求",
@@ -1211,7 +1218,8 @@
     "stopReading": "停止",
     "readAloudProgress": "第 {{current}} / {{total}} 句",
     "readAloudEmpty": "这条没有可读的文字",
-    "readAloudFailed": "朗读失败，去设置 → 能力里检查语音模型"
+    "readAloudFailed": "朗读失败，去设置 → 能力里检查语音模型",
+    "readAloudBusy": "语音会话正在运行，先结束语音再朗读"
   },
   "schedule": {
     "createTitle": "新建定时任务",

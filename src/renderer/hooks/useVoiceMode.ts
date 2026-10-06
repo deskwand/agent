@@ -44,6 +44,8 @@ export interface VoiceModeView {
 export interface UseVoiceModeOptions {
   sessionId: string;
   isCompacting: boolean;
+  /** 用户把麦克风关了。只影响收音，不影响朗读。 */
+  muted: boolean;
   /**
    * 把一轮问题发出去。由宿主注入 —— `continueSession` 是 useIPC 的返回值，
    * 不是 store action，放进 store 要多一层转发。
@@ -181,12 +183,12 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
       speech,
       sendQuestion: (text) => {
         const store = useAppStore.getState();
+        // 不再要求「正在看这个会话」：后台运行就是为此。仍然只认这条会话 ——
+        // 会话被删、运行时被换掉或结束，这一轮就作废。
         if (
           !live ||
           !store.voiceModeOpen ||
           store.voiceModeSessionId !== sessionId ||
-          store.activeSessionId !== sessionId ||
-          store.activeView !== "chat" ||
           !store.sessions.some((s) => s.id === sessionId && s.kind === "voice")
         )
           return false;
@@ -279,6 +281,10 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
   useEffect(() => {
     conversationRef.current?.setBlocked(options.isCompacting);
   }, [options.isCompacting]);
+
+  useEffect(() => {
+    conversationRef.current?.setMuted(options.muted);
+  }, [options.muted]);
 
   return view;
 }

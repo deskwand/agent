@@ -23,6 +23,7 @@ vi.mock("../../renderer/hooks/useVoiceConversation", () => ({
       start: async () => {},
       stop: runtime.stop,
       setBlocked: vi.fn(),
+      setMuted: vi.fn(),
       sendAnswerDelta: runtime.answer,
     };
   },
@@ -63,7 +64,12 @@ it("stops audio and polling, and rejects callbacks from an older run even when t
   store.openVoiceMode("V");
   const send = vi.fn();
   function Harness() {
-    useVoiceMode({ sessionId: "V", isCompacting: false, sendQuestion: send });
+    useVoiceMode({
+      sessionId: "V",
+      isCompacting: false,
+      muted: false,
+      sendQuestion: send,
+    });
     return null;
   }
   const root = createRoot(document.createElement("div"));

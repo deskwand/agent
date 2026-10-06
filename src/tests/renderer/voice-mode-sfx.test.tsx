@@ -37,6 +37,7 @@ vi.mock("../../renderer/hooks/useVoiceConversation", () => ({
       start: async () => {},
       stop: runtime.stop,
       setBlocked: vi.fn(),
+      setMuted: vi.fn(),
       sendAnswerDelta: vi.fn(),
       state: () => "calibrating" as const,
     };
@@ -46,7 +47,12 @@ vi.mock("../../renderer/hooks/useVoiceConversation", () => ({
 import { useVoiceMode } from "../../renderer/hooks/useVoiceMode";
 
 function Harness({ sessionId }: { sessionId: string }) {
-  useVoiceMode({ sessionId, isCompacting: false, sendQuestion: vi.fn() });
+  useVoiceMode({
+    sessionId,
+    isCompacting: false,
+    muted: false,
+    sendQuestion: vi.fn(),
+  });
   return null;
 }
 

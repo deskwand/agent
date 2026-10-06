@@ -35,6 +35,7 @@ vi.mock("../../renderer/hooks/useVoiceConversation", () => ({
       start: captured.start,
       stop: captured.stop,
       setBlocked: vi.fn(),
+      setMuted: vi.fn(),
       sendAnswerDelta: captured.sendAnswerDelta,
       state: () => "listening",
     };
@@ -108,6 +109,7 @@ describe("useVoiceMode 回答轮次路由", () => {
           useVoiceMode({
             sessionId: SESSION,
             isCompacting: false,
+            muted: false,
             sendQuestion,
           });
           return null;

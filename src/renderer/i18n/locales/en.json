@@ -1184,7 +1184,14 @@
     "stateBlocked": "Organising context",
     "stateStopped": "Voice conversation ended",
     "toolSearching": "Searching",
-    "toolReading": "Reading files"
+    "toolReading": "Reading files",
+    "expand": "Back to the voice view",
+    "minimize": "Minimize to the background",
+    "muteMic": "Mute the microphone",
+    "unmuteMic": "Unmute the microphone",
+    "endVoice": "End the voice session",
+    "stateMuted": "Muted",
+    "endedPreviousSession": "Ended the previous voice session"
   },
   "messageCard": {
     "request": "Request",
@@ -1212,7 +1219,8 @@
     "stopReading": "Stop",
     "readAloudProgress": "Sentence {{current}} / {{total}}",
     "readAloudEmpty": "No readable text in this message",
-    "readAloudFailed": "Read aloud failed. Check the speech model in Settings → Capabilities"
+    "readAloudFailed": "Read aloud failed. Check the speech model in Settings → Capabilities",
+    "readAloudBusy": "The voice session is running. End it before reading a message"
   },
   "schedule": {
     "createTitle": "Create Schedule",
