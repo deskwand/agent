@@ -14,6 +14,7 @@ import {
   Loader2,
   Download,
   ShieldCheck,
+  FolderOpen,
 } from "lucide-react";
 import type { Skill, CloudSkill, SkillType } from "../../types";
 import { Tooltip } from "../Tooltip";
@@ -62,7 +63,8 @@ export type SkillSource =
   | "team"
   | "builtin"
   | "marketplace"
-  | "vault";
+  | "vault"
+  | "external";
 
 export const SKILL_ICON_MAP: Record<
   SkillSource,
@@ -110,6 +112,12 @@ export const SKILL_ICON_MAP: Record<
     iconClass: "text-accent-foreground",
     strokeWidth: 2,
   },
+  external: {
+    icon: FolderOpen,
+    bgClass: "bg-surface-muted",
+    iconClass: "text-text-muted",
+    strokeWidth: 2,
+  },
 };
 
 function getSkillIcon(source: SkillSource) {
@@ -119,6 +127,8 @@ function getSkillIcon(source: SkillSource) {
 /* ─── unified display type ─── */
 
 export interface DisplaySkill {
+  /** 第三方技能与已启用的产品技能同名 ⇒ 当前不生效（产品名优先）。 */
+  shadowedByProduct?: boolean;
   id: string;
   name: string;
   description: string;

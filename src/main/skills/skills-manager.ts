@@ -20,6 +20,10 @@ import { log, logError, logWarn } from "../utils/logger";
 import { isPathWithinRoot } from "../tools/path-containment";
 import { isAgentCreated, removeManifestEntry } from "./agent-manifest";
 import { resolveBuiltinSkillEnabled } from "./default-disabled-skills";
+import type {
+  ExternalSkillRecord,
+  SkillPromptPolicy,
+} from "./external-skill-policy";
 import { getGlobalSkillsRoot, getVaultSkillsRoot } from "../vault/paths";
 
 /**
@@ -101,6 +105,15 @@ export class SkillsManager {
 
   /** skill id → 该技能自己的目录。pi 拿到的是这些目录，不再是三个父目录。 */
   private skillDirs: Map<string, string> = new Map();
+
+  /**
+   * 第三方技能（pi 自动发现的那些）。**不进 `loadedSkills`** —— 它们不参与
+   * `getSkillPaths()`，pi 自己会发现它们；这里只保存"有哪些 + 用户开没开"。
+   */
+  private externalSkills: Map<string, Skill> = new Map();
+  private externalEnabledNames: Set<string> = new Set();
+  /** 最近一次 `getSkillPaths()` 的结果，供同步的策略读取（override 不能 await）。 */
+  private lastSkillPaths: string[] = [];
   private runningServers: Map<string, { process: unknown; skill: Skill }> =
     new Map();
   private _globalInitialized = false;
@@ -108,6 +121,7 @@ export class SkillsManager {
   constructor(db: DatabaseInstance, _options: SkillsManagerOptions = {}) {
     this.db = db;
     this.loadBuiltinSkills();
+    this.loadExternalSkillRows();
   }
 
   /**
@@ -628,6 +642,25 @@ export class SkillsManager {
    * Enable or disable a skill
    */
   setSkillEnabled(skillId: string, enabled: boolean): void {
+    if (skillId.startsWith("external-")) {
+      const name = skillId.slice("external-".length);
+      if (enabled) this.externalEnabledNames.add(name);
+      else this.externalEnabledNames.delete(name);
+      const existing = this.externalSkills.get(skillId);
+      this.saveSkill(
+        existing
+          ? { ...existing, enabled }
+          : {
+              id: skillId,
+              name,
+              type: "external",
+              enabled,
+              createdAt: Date.now(),
+            },
+      );
+      return;
+    }
+
     const skill = this.loadedSkills.get(skillId);
     if (skill) {
       skill.enabled = enabled;
@@ -664,6 +697,87 @@ export class SkillsManager {
    * 调用约定：`buildSkillPaths()` 只按目录去重，**按名去重是这里的责任**
    * （`deduplicateSkills()`）；本方法是它唯一的生产调用方。
    */
+  /** 启动时预载第三方技能的开启状态：override 是同步函数，只能读内存。 */
+  private loadExternalSkillRows(): void {
+    this.externalEnabledNames = new Set();
+    try {
+      const rows = this.db
+        .prepare("SELECT id, enabled FROM skills WHERE id LIKE 'external-%'")
+        .all() as Array<{ id: string; enabled: number }>;
+      for (const row of rows) {
+        if (row.enabled === 1) {
+          this.externalEnabledNames.add(row.id.slice("external-".length));
+        }
+      }
+    } catch {
+      // DB 不可用（CLI 安装等场景）时按"全部默认关"处理
+    }
+  }
+
+  /**
+   * 以本轮上报为准**替换**第三方技能集合（目录被删/改名后列表要能收缩）。
+   * 启用名集合不动：那是用户意图，不该因为某次没上报就悄悄丢掉。
+   */
+  recordExternalSkills(records: readonly ExternalSkillRecord[]): void {
+    const next = new Map<string, Skill>();
+    for (const record of records) {
+      const id = `external-${record.name}`;
+      next.set(id, {
+        id,
+        name: record.name,
+        description: record.description,
+        type: "external",
+        enabled: this.externalEnabledNames.has(record.name),
+        createdAt: Date.now(),
+      });
+    }
+    this.externalSkills = next;
+  }
+
+  getExternalSkills(): Skill[] {
+    return Array.from(this.externalSkills.values());
+  }
+
+  /** 交给 `skillsOverride` 的策略对象。 */
+  getSkillPolicy(): SkillPromptPolicy {
+    return {
+      productRoots: this.getProductSkillRoots(),
+      // 必须查实时状态：策略对象会被 `PiExtensionHost.getOrCreate` 按 cwd **缓存**，
+      // 快照（例如提前算好的 Set）会把后来的技能开关冻住。
+      isProductSkillEnabled: (name) =>
+        Array.from(this.loadedSkills.values()).some(
+          (s) => s.type !== "external" && s.enabled && s.name === name,
+        ),
+      isExternalSkillEnabled: (name) => this.externalEnabledNames.has(name),
+      enabledExternalSkillNames: () => [...this.externalEnabledNames].sort(),
+      enabledProductSkillDirs: () => this.lastSkillPaths,
+      recordExternalSkills: (records) => this.recordExternalSkills(records),
+    };
+  }
+
+  /**
+   * 产品自己的技能根目录：出货内置目录、全局目录、密库目录。
+   *
+   * 过一遍 `realpathSync`：分类是与 pi 报上来的路径做前缀比较，符号链接
+   * （例如 macOS 的 `/var` → `/private/var`）会让产品技能被误判成第三方。
+   */
+  private getProductSkillRoots(): string[] {
+    const roots = [
+      this.getBuiltinSkillsPath(),
+      this.getGlobalSkillsPath(),
+      this.getVaultSkillsPath(),
+    ];
+    return roots
+      .filter((root): root is string => Boolean(root))
+      .map((root) => {
+        try {
+          return fs.realpathSync(root);
+        } catch {
+          return root;
+        }
+      });
+  }
+
   async getSkillPaths(): Promise<string[]> {
     try {
       await this.loadGlobalSkills();
@@ -671,10 +785,12 @@ export class SkillsManager {
     } catch (error) {
       logError("[Skills] refresh before handing paths to pi failed:", error);
     }
-    return buildSkillPaths(
+    const paths = buildSkillPaths(
       this.deduplicateSkills(Array.from(this.loadedSkills.values())),
       this.skillDirs,
     );
+    this.lastSkillPaths = paths;
+    return paths;
   }
 
   /**
@@ -718,7 +834,7 @@ export class SkillsManager {
    * List all skills with optional filters
    */
   async listSkills(filter?: {
-    type?: "builtin" | "mcp" | "custom" | "agent";
+    type?: "builtin" | "mcp" | "custom" | "agent" | "external";
     enabled?: boolean;
   }): Promise<Skill[]> {
     // Load global skills first to ensure they're in loadedSkills
@@ -728,6 +844,8 @@ export class SkillsManager {
     await this.loadVaultSkills();
 
     let skills = this.deduplicateSkills(Array.from(this.loadedSkills.values()));
+    // 第三方技能不参与 loadedSkills（不交给 pi），但要出现在技能页里。
+    skills.push(...this.getExternalSkills());
 
     if (filter) {
       if (filter.type !== undefined) {

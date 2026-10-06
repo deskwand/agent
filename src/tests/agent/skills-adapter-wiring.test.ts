@@ -59,6 +59,14 @@ function createDbMock(): DatabaseInstance {
 
 const adapter: SkillsAdapter = {
   getSkillPaths: async () => ["/skills/officecli"],
+  getSkillPolicy: () => ({
+    productRoots: [],
+    isProductSkillEnabled: () => true,
+    isExternalSkillEnabled: () => false,
+    enabledExternalSkillNames: () => [],
+    enabledProductSkillDirs: () => [],
+    recordExternalSkills: () => {},
+  }),
 };
 
 describe("SessionManager 把技能适配器交给 AgentRunner", () => {

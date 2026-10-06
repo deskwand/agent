@@ -320,7 +320,13 @@ export interface Skill {
   createdAt: number;
 }
 
-export type SkillType = "builtin" | "mcp" | "custom" | "agent" | "vault";
+export type SkillType =
+  | "builtin"
+  | "mcp"
+  | "custom"
+  | "agent"
+  | "vault"
+  | "external";
 
 export interface PluginInstallResult {
   pluginName: string;

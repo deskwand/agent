@@ -14,7 +14,14 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-const SKILL_TYPES: SkillType[] = ["builtin", "mcp", "custom", "agent", "vault"];
+const SKILL_TYPES: SkillType[] = [
+  "builtin",
+  "mcp",
+  "custom",
+  "agent",
+  "vault",
+  "external",
+];
 
 /** 徽章文案走 i18n：枚举值只用于数据层，界面显示的是这些 key 的译文。 */
 const SKILL_TYPE_LABEL_KEY: Record<SkillType, string> = {
@@ -23,6 +30,7 @@ const SKILL_TYPE_LABEL_KEY: Record<SkillType, string> = {
   custom: "skillMarket.sourceCustom",
   agent: "skillMarket.sourceAI",
   vault: "skillMarket.sourceVault",
+  external: "skillMarket.sourceExternal",
 };
 
 const skills: Skill[] = SKILL_TYPES.map((type, index) => ({
@@ -261,6 +269,7 @@ describe("SlashMenu skill type labels are localized", () => {
       custom: "自定义",
       agent: "AI 生成",
       vault: "密库",
+      external: "pi 目录",
     },
     en: {
       builtin: "Built-in",
@@ -268,6 +277,7 @@ describe("SlashMenu skill type labels are localized", () => {
       custom: "Custom",
       agent: "AI Generated",
       vault: "Vault",
+      external: "pi dirs",
     },
   };
 

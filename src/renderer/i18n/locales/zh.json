@@ -250,7 +250,9 @@
     "sourceTeam": "团队",
     "sourceBuiltin": "内置",
     "sourceVault": "密库",
+    "sourceExternal": "pi 目录",
     "filterVault": "密库",
+    "filterExternal": "pi 目录",
     "sourceMcp": "MCP",
     "loginPrompt": "登录即可使用云端技能市场，与团队分享技能",
     "search": "搜索技能...",
@@ -809,6 +811,8 @@
   },
   "skills": {
     "builtinSkillsDesc": "内置技能随应用提供，可按需启用或停用。",
+    "externalSkillsDesc": "这些技能放在 pi 的技能目录里，默认不送进模型；要用就在卡片上打开，打开后下一条消息生效。",
+    "externalShadowed": "与同名内置技能冲突，当前不生效；那份已启用。",
     "pluginsTitle": "插件与导入",
     "pluginsDesc": "浏览插件市场，或从本地文件夹导入自定义技能。",
     "title": "📦 技能",

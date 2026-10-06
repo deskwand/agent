@@ -59,7 +59,11 @@ import {
   type ElementSelectionRef,
 } from "../shared/element-selection-ref";
 import { AgentRuntimeExtensionManager } from "./extensions/agent-runtime-extension-manager";
-import { PiExtensionHost } from "./extensions/pi-extension-host";
+import {
+  PiExtensionHost,
+  setSkillsPolicyProvider,
+  warmUpExternalSkillScan,
+} from "./extensions/pi-extension-host";
 import { mergeCommandEntries } from "./extensions/pi-command-registry";
 import {
   deletePromptCommand,
@@ -1134,8 +1138,19 @@ app
     // Recover goals that were active before last shutdown
     sessionManager.recoverGoals();
     skillsManager = new SkillsManager(db);
+    const skillsManagerForScan = skillsManager;
     // 技能开关要对模型生效：pi 拿到的是「每个已启用技能自己的目录」。
     sessionManager.setSkillsAdapter(skillsManager);
+    // 技能策略走模块级 provider：host 按 cwd 缓存，构造参数只在首次生效，
+    // 插件页/信任弹窗那条路会先建 host 并把策略吞掉。
+    setSkillsPolicyProvider(() => skillsManagerForScan.getSkillPolicy());
+    // 第三方技能名单来自 loader 的 override（首个会话才构造），这里空跑一次，
+    // 让技能页在首个会话之前就能列出它们；await 掉，省得刚重启就打开技能页时
+    // 撞上竞态。失败不影响启动。
+    await warmUpExternalSkillScan({
+      cwd: getDefaultWorkingDirPath(app.getPath("userData")),
+      agentDir: piAgentDir,
+    });
     // 技能密库是一个独立的只读技能来源：目录不存在时 loadVaultSkills 直接返回 []，
     // 因此这里不必判断存在性。加载失败也不该拦住启动 —— 但要留下线索。
     try {

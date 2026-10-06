@@ -338,5 +338,7 @@ function skillTypeLabel(
       return t("skillMarket.sourceAI");
     case "vault":
       return t("skillMarket.sourceVault");
+    case "external":
+      return t("skillMarket.sourceExternal");
   }
 }
