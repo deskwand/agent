@@ -86,6 +86,7 @@ const CHANNELS = [
   "tts.getEngineState",
   "tts.installEngine",
   "tts.removeEngine",
+  "tts.retryEngine",
 ] as const;
 
 /** 试听句：三档都是中文音色，所以一句话够用。产物只播不落盘。 */
@@ -337,42 +338,64 @@ export function registerTtsIpc({
       return;
     }
 
-    // 「最佳音质」档：先判可用性，再走引擎。不可用就**落到下面的 sherpa 路由**
-    // （回退到均衡档）—— 未装、平台不支持、连崩被标记 failed，这三种都必须还有声音。
-    if (opts?.tone === "best" && engine.available()) {
-      const controller = new AbortController();
-      engineAborts.set(streamId, controller);
-      try {
-        const result = await engine.speak({
-          text,
-          voiceId: engineVoice(),
-          streamId,
-          send: sendStream,
-          signal: controller.signal,
-        });
-        // 取消后**既不发块也不发 done**（与 §3.5 同一条教训）。成功时 done 由
-        // 桥接层发出，这里再发一次就是两个 done。
-        if (cancelled.has(streamId)) return;
-        if (!result.ok) {
-          sendStream({ streamId, type: "error", error: result.error });
-        }
-      } catch (error) {
-        // 引擎门面自身抛错（清单缺项、监督器构造失败）在这里兜住：不兜的话它会
-        // 变成未处理拒绝，渲染层那边只看到一个永远不结束的流。
-        if (!cancelled.has(streamId)) {
-          sendStream({
-            streamId,
-            type: "error",
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      } finally {
-        engineAborts.delete(streamId);
-      }
-      return;
-    }
+    // 「最佳音质」档：先判可用性，再走引擎。**两种失败都要落到下面的 sherpa 路由**
+    // （回退到均衡档），因为设计的不变量是"绝不让用户没声音"：
+    //
+    //   1. 进门时状态不可用：未装、平台不支持、连崩被标记 failed；
+    //   2. 进门时可用，但**这一次请求**失败：崩溃后的退避窗口（"engine restarting"）、
+    //      健康检查超时、HTTP 请求失败。
+    //
+    // 只看状态是不够的 —— 退避窗口有 1–5 秒，正好覆盖一句正常的话；那时若只发一条
+    // error，用户这一句就是没声音，而设计 §10.5 明确要求"kill 掉引擎 → 下一次说话
+    // 自动重启并出声"。
     if (opts?.tone === "best") {
-      log("[Tts] best tier unavailable, falling back to balanced");
+      if (!engine.available()) {
+        log("[Tts] best tier unavailable, falling back to balanced");
+      } else {
+        const controller = new AbortController();
+        engineAborts.set(streamId, controller);
+        // 出过声就不能重来：回退会让半句话重念一遍、还换了音色。那时只报断流。
+        let sentChunks = false;
+        try {
+          const result = await engine.speak({
+            text,
+            voiceId: engineVoice(),
+            streamId,
+            send: (event) => {
+              if (event.type === "chunk") sentChunks = true;
+              sendStream(event);
+            },
+            signal: controller.signal,
+          });
+          // 取消后**既不发块也不发 done**（与 §3.5 同一条教训）。成功时 done 由
+          // 桥接层发出，这里再发一次就是两个 done。
+          if (cancelled.has(streamId)) return;
+          if (result.ok) return;
+          if (sentChunks) {
+            sendStream({ streamId, type: "error", error: result.error });
+            return;
+          }
+          log(
+            `[Tts] engine failed before any audio (${result.error}), falling back to balanced`,
+          );
+        } catch (error) {
+          // 引擎门面自身抛错（清单缺项、监督器构造失败）也在这里兜住：不兜的话它会
+          // 变成未处理拒绝，渲染层那边只看到一个永远不结束的流。
+          if (cancelled.has(streamId)) return;
+          const message =
+            error instanceof Error ? error.message : String(error);
+          if (sentChunks) {
+            sendStream({ streamId, type: "error", error: message });
+            return;
+          }
+          log(
+            `[Tts] engine threw before any audio (${message}), falling back to balanced`,
+          );
+        } finally {
+          engineAborts.delete(streamId);
+        }
+      }
+      // 走到这里 = 该回退（下面那段会把 tone 换成 balanced）
     }
 
     let seq = 0;
@@ -468,12 +491,17 @@ export function registerTtsIpc({
     // 磁盘上的事实优先于内存里的状态：用户可能手动删了目录
     const installed = engine.installed();
     const blocked = engine.blockedReason();
+    const status = engine.status();
     return {
       ...engineState,
       installed,
-      ...(installed
-        ? { phase: "ready" as const, percent: 100, error: undefined }
-        : {}),
+      status,
+      // 连续崩溃被标记 failed：**装是装了，但要说出来**（设计 §6、验收 §10.6）
+      ...(installed && status === "failed"
+        ? { phase: "error" as const, percent: 0, error: "engine failed" }
+        : installed
+          ? { phase: "ready" as const, percent: 100, error: undefined }
+          : {}),
       ...(blocked ? { blockedReason: blocked } : {}),
     };
   });
@@ -506,6 +534,41 @@ export function registerTtsIpc({
         phase: "error",
         percent: 0,
         installed: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      engineInstalling = false;
+    }
+  });
+
+  /**
+   * 重试：清掉 failed 与崩溃计数，然后**真的合成一句**自检。
+   * 不重下模型 —— 用户遇到的是"进程起不来"，不是"文件没了"。
+   */
+  ipcMain.handle("tts.retryEngine", async () => {
+    if (engineInstalling || !engine.installed()) return;
+    engineInstalling = true;
+    try {
+      publishEngine({
+        phase: "installing",
+        percent: 100,
+        installed: true,
+        status: "starting",
+      });
+      await engine.warmup(); // 内部会 supervisor.reset() + 真自检
+      publishEngine({
+        phase: "ready",
+        percent: 100,
+        installed: true,
+        status: "ready",
+      });
+    } catch (error) {
+      logError("[TtsEngine] retry failed:", error);
+      publishEngine({
+        phase: "error",
+        percent: 0,
+        installed: true,
+        status: "failed",
         error: error instanceof Error ? error.message : String(error),
       });
     } finally {

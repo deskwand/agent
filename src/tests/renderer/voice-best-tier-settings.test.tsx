@@ -28,6 +28,7 @@ const api = vi.hoisted(() => {
     getEngineState: vi.fn(),
     installEngine: vi.fn(),
     removeEngine: vi.fn(),
+    retryEngine: vi.fn(),
     preview: vi.fn(),
   };
   const config = { save: vi.fn(async (patch: unknown) => ({ config: patch })) };
@@ -342,6 +343,53 @@ describe("试听", () => {
 
     await pickTone("fast");
     expect(created[0].stopped).toBe(true);
+  });
+
+  it("引擎被判 failed → 说明写清 + 有重试入口（不逼用户删了重下 900MB）", async () => {
+    await mount({
+      tone: "best",
+      engine: { ...ENGINE_READY, status: "failed", phase: "error" },
+    });
+
+    expect(byTestId("voice-engine-badge")?.textContent).toContain(
+      "settings.capabilities.install.failed",
+    );
+    expect(byTestId("voice-engine-row")?.textContent).toContain(
+      "settings.capabilities.voiceMode.toneBestFailedNote",
+    );
+
+    await act(async () => {
+      byTestId("voice-engine-reset").click();
+    });
+    expect(api.tts.retryEngine).toHaveBeenCalledOnce();
+    expect(api.tts.installEngine).not.toHaveBeenCalled();
+  });
+
+  it("试听还在飞的时候切档 → 那次结果被丢掉，不播旧档的声音", async () => {
+    let resolvePreview: ((value: unknown) => void) | null = null;
+    api.tts.preview.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePreview = resolve;
+      }),
+    );
+    await mount({ tone: "balanced", states: { zh: READY } });
+
+    await act(async () => {
+      byTestId("voice-preview-balanced").click(); // 进入 busy，请求还挂着
+    });
+    await pickTone("fast"); // 切档 → stop() 作废在飞请求
+
+    await act(async () => {
+      resolvePreview?.({
+        ok: true,
+        samples: new Float32Array([0.1]),
+        sampleRate: 24000,
+      });
+      await Promise.resolve();
+    });
+
+    // 没有任何 source 被建出来 —— 旧档的声音没有冒出来
+    expect(created).toHaveLength(0);
   });
 
   it("试听失败时给出可见的失败提示，而不是静默", async () => {

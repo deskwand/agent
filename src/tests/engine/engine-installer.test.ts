@@ -228,6 +228,42 @@ describe("installEngine", () => {
     expect(existsSync(engineRoot(userDataPath, spec.version))).toBe(false);
   });
 
+  it("新版装失败只回滚新版：旧版目录原封不动（版本化的意义）", async () => {
+    const userDataPath = tempDir("ud-");
+    const { spec } = await makeSpec();
+    const installed = { ...spec, version: "v1" };
+
+    // 先装好 v1
+    await installEngine({
+      userDataPath,
+      spec: installed,
+      platformKey: "darwin-arm64",
+      onProgress: () => {},
+      ...preflightOk,
+    });
+    expect(isEngineInstalled(userDataPath, installed)).toBe(true);
+
+    // 再装 v2，让它失败（sha 对不上）
+    const broken = {
+      ...spec,
+      version: "v2",
+      artifactSha256: { "darwin-arm64": "00" },
+    };
+    await expect(
+      installEngine({
+        userDataPath,
+        spec: broken,
+        platformKey: "darwin-arm64",
+        onProgress: () => {},
+        ...preflightOk,
+      }),
+    ).rejects.toThrow();
+
+    // v1 还在、还能用；v2 不留半成品
+    expect(existsSync(engineRoot(userDataPath, "v2"))).toBe(false);
+    expect(isEngineInstalled(userDataPath, installed)).toBe(true);
+  });
+
   it("清单里 sha256 留空 = 还没发布，直接报错不装", async () => {
     const userDataPath = tempDir("ud-");
     const { spec } = await makeSpec();

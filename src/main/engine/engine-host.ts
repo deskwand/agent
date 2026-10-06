@@ -80,8 +80,17 @@ export function createEngineHost(
       if (!installed()) return false;
       return supervisor().status() !== "failed";
     },
-    status: () => supervisor().status(),
+    status: () => {
+      // 清单缺 ttsEngine 时 getEngineSupervisor() 会抛；状态查询不该因此炸掉设置页
+      try {
+        return supervisor().status();
+      } catch {
+        return "stopped" as const;
+      }
+    },
     blockedReason() {
+      // 已经装好了就别再拿磁盘/内存吓人：那是**安装**的前置条件，不是运行条件
+      if (installed()) return undefined;
       const pre = preflightEngine({ userDataPath, spec, platformKey });
       return pre.ok ? undefined : pre.reason;
     },

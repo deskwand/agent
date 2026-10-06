@@ -170,6 +170,8 @@
         "toneBestBlockedDisk": "not enough free disk space (3GB required)",
         "toneBestBlockedMemory": "not enough memory (16GB required)",
         "toneBestBlockedPlatform": "this platform is not supported yet",
+        "toneBestFailedNote": "The engine crashed repeatedly, so voice falls back to the balanced voice for now. Use Retry to start it again.",
+        "toneBestRetryFailed": "Retry starting the best-quality engine",
         "sichuan_dialect": "Sichuan",
         "beijing_dialect": "Beijing",
         "tonePreview": "Preview",

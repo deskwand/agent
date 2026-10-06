@@ -1,0 +1,41 @@
+「最佳音质」档的第三方组件声明
+Third-party notices for the "best quality" voice tier
+
+本目录下的引擎产物（qwentts-server-*.tar.gz）里包含从上游编译出来的可执行文件与
+动态库；安装时还会一并下载两个模型文件。三者的许可证如下。
+
+The engine artifact (qwentts-server-*.tar.gz) contains binaries built from the
+upstream project listed below. Two model files are downloaded alongside it at
+install time. Their licenses are:
+
+---
+
+qwentts.cpp（引擎本体 / the engine)
+  https://github.com/ServeurpersoCom/qwentts.cpp
+  License: MIT
+  版权归上游作者所有；我们只编译并分发，未修改其源码。
+  Copyright the upstream authors. We build and redistribute it unmodified.
+
+  ggml（作为子模块包含 / included as a submodule）
+  https://github.com/ggml-org/ggml
+  License: MIT
+
+---
+
+Qwen3-TTS 0.6B（模型权重，安装时下载 / model weights, downloaded at install time）
+  https://huggingface.co/Qwen/Qwen3-TTS
+  License: Apache-2.0
+  Copyright Alibaba Group / Qwen Team
+
+  GGUF 量化与转换 / GGUF quantization and conversion:
+  https://huggingface.co/Serveurperso/Qwen3-TTS-GGUF
+
+---
+
+模型文件（本应用安装时下载，与本产物同目录落盘）：
+Model files (downloaded by this app at install time, written next to this file):
+  qwen-talker-0.6b-customvoice-Q4_K_M.gguf
+  qwen-tokenizer-12hz-Q8_0.gguf
+
+两个文件都来自上面那个 Apache-2.0 的模型，由第三方完成 GGUF 转换。分发时保留
+Apache-2.0 声明即可；本文件随引擎产物一起落到安装目录，用它作为随附声明。

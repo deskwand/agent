@@ -41,6 +41,12 @@ for (const file of readdirSync(build)) {
   }
 }
 cpSync(join(upstream, "LICENSE"), join(out, "LICENSE"));
+// 除了上游 LICENSE 还要带上第三方声明：安装时还会下发两个 Apache-2.0 的模型权重，
+// 声明要跟着产物一起落到用户的安装目录里（设计 §4.2）。
+cpSync(
+  join("resources", "tts-engine", "THIRD_PARTY_LICENSES.txt"),
+  join(out, "THIRD_PARTY_LICENSES.txt"),
+);
 
 /**
  * 把符号链接改成**同目录的相对链接**。

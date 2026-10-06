@@ -10,8 +10,7 @@
  * 失败**整体回滚**：删掉本次版本目录。半装的引擎比没装更糟 —— 它会让
  * `isEngineInstalled()` 说"装了"，然后每次说话都失败。
  */
-import { mkdirSync, rmSync, statSync } from "node:fs";
-import { statfsSync } from "node:fs";
+import { mkdirSync, rmSync, statSync, statfsSync } from "node:fs";
 import { chmod } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -86,7 +85,19 @@ export function isEngineInstalled(
   return true;
 }
 
-/** 删掉整个 `qwen3-tts` 目录（所有版本）。卸载与回滚都用它。 */
+/**
+ * 只删**某一个版本**的目录。回滚用它 —— 版本化目录的意义就是"新版装失败不影响
+ * 旧版还能用"，回滚顺手删掉所有版本会让这条保证作废（换版本时一次失败就把旧目录
+ * 也清掉，用户从 900MB 从头再来）。
+ */
+export function removeEngineVersion(
+  userDataPath: string,
+  version: string,
+): void {
+  rmSync(engineRoot(userDataPath, version), { recursive: true, force: true });
+}
+
+/** 删掉整个 `qwen3-tts` 目录（所有版本）。**只给显式卸载用。** */
 export function removeEngine(userDataPath: string): void {
   rmSync(join(voiceRoot(userDataPath), "engines", "qwen3-tts"), {
     recursive: true,
@@ -232,7 +243,7 @@ export async function installEngine(opts: {
     opts.onProgress(1);
   } catch (error) {
     log("[TtsEngine] install failed, rolling back", error);
-    removeEngine(opts.userDataPath);
+    removeEngineVersion(opts.userDataPath, opts.spec.version);
     throw error;
   }
 }

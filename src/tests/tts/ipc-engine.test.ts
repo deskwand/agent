@@ -63,6 +63,11 @@ function engineStub(
     installed?: boolean;
     blocked?: "disk" | "memory" | "platform";
     hang?: boolean;
+    status?: "stopped" | "starting" | "ready" | "failed";
+    /** 一块都没吐就失败（退避窗口 / 健康超时 / HTTP 失败都是这一种）。 */
+    failBeforeAudio?: string;
+    /** 吐过一块再失败（已经出声，不能重念）。 */
+    failAfterChunk?: string;
   } = {},
 ) {
   const calls: EngineStreamOptions[] = [];
@@ -78,6 +83,13 @@ function engineStub(
         },
       );
     }
+    if (opts.failBeforeAudio) {
+      // 一块都没吐就失败：退避窗口 / 健康超时 / HTTP 失败都是这一种
+      return Promise.resolve({
+        ok: false as const,
+        error: opts.failBeforeAudio,
+      });
+    }
     o.send({
       streamId: o.streamId,
       type: "chunk",
@@ -85,6 +97,12 @@ function engineStub(
       samples: new Float32Array([1, 2]),
       sampleRate: 24000,
     });
+    if (opts.failAfterChunk) {
+      return Promise.resolve({
+        ok: false as const,
+        error: opts.failAfterChunk,
+      });
+    }
     o.send({ streamId: o.streamId, type: "done" });
     return Promise.resolve({ ok: true as const });
   });
@@ -103,7 +121,8 @@ function engineStub(
   const host = {
     installed: () => opts.installed ?? true,
     available: () => opts.available ?? true,
-    status: () => (opts.available === false ? "failed" : "ready"),
+    status: () =>
+      opts.status ?? (opts.available === false ? "failed" : "ready"),
     blockedReason: () => opts.blocked,
     install,
     remove,
@@ -183,6 +202,94 @@ describe("最佳音质档的 IPC 行为", () => {
     await vi.waitFor(() =>
       expect(streamEvents.some((e) => e.type === "done")).toBe(true),
     );
+  });
+
+  it("引擎在**这次请求**里失败（还没出声）→ 同样回退均衡，不是没声音", async () => {
+    const tones: (string | undefined)[] = [];
+    const { ipc, streamEvents } = harness(
+      { failBeforeAudio: "engine restarting" },
+      (opts) => tones.push(opts?.tone),
+    );
+
+    await ipc.invoke("tts.speakStream", "你好", {
+      purpose: "voice",
+      tone: "best",
+    });
+
+    await vi.waitFor(() => expect(tones.length).toBe(1));
+    expect(tones[0]).toBe("balanced");
+    // 回退这一路要出块 + 恰好一个 done，且**没有 error**
+    await vi.waitFor(() =>
+      expect(streamEvents.some((e) => e.type === "done")).toBe(true),
+    );
+    expect(streamEvents.some((e) => e.type === "error")).toBe(false);
+  });
+
+  it("已经出过声再失败 → 只报断流，不重念半句", async () => {
+    const tones: (string | undefined)[] = [];
+    const { ipc, streamEvents } = harness(
+      { failAfterChunk: "connection reset" },
+      (opts) => tones.push(opts?.tone),
+    );
+
+    await ipc.invoke("tts.speakStream", "你好", {
+      purpose: "voice",
+      tone: "best",
+    });
+
+    await vi.waitFor(() =>
+      expect(streamEvents.some((e) => e.type === "error")).toBe(true),
+    );
+    expect(streamEvents.filter((e) => e.type === "chunk")).toHaveLength(1);
+    expect(streamEvents.some((e) => e.type === "done")).toBe(false);
+    // 没有回退：重念一遍会换音色，比断流更难受
+    expect(tones).toHaveLength(0);
+  });
+
+  it("连续崩溃被标记 failed → 状态查得出来（phase=error + status=failed）", async () => {
+    const { ipc } = harness({
+      installed: true,
+      available: false,
+      status: "failed",
+    });
+    expect(await ipc.invoke("tts.getEngineState")).toMatchObject({
+      installed: true,
+      status: "failed",
+      phase: "error",
+    });
+  });
+
+  it("retryEngine：不重下模型，重置失败状态并真自检", async () => {
+    const { ipc, engine, events } = harness({
+      installed: true,
+      status: "failed",
+    });
+
+    await ipc.invoke("tts.retryEngine");
+
+    expect(engine.host.warmup).toHaveBeenCalledOnce();
+    expect(engine.install).not.toHaveBeenCalled(); // 不重下 900MB
+    const phases = events
+      .filter((e) => e.type === "engine")
+      .map((e) => (e as { state: { phase: string } }).state.phase);
+    expect(phases.at(-1)).toBe("ready");
+  });
+
+  it("retryEngine 失败 → 状态回到 error（用户还能再点一次）", async () => {
+    const { ipc, engine, events } = harness({
+      installed: true,
+      status: "failed",
+    });
+    (
+      engine.host.warmup as unknown as ReturnType<typeof vi.fn>
+    ).mockRejectedValueOnce(new Error("still broken"));
+
+    await ipc.invoke("tts.retryEngine");
+
+    expect(events.at(-1)).toMatchObject({
+      type: "engine",
+      state: { phase: "error", installed: true },
+    });
   });
 
   it("不带 purpose 的 best 仍受朗读开关门控（引擎不是后门）", async () => {

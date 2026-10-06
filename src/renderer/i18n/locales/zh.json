@@ -170,6 +170,8 @@
         "toneBestBlockedDisk": "磁盘剩余空间不足（需要 3GB）",
         "toneBestBlockedMemory": "本机内存不足（需要 16GB）",
         "toneBestBlockedPlatform": "当前平台暂不支持这一档",
+        "toneBestFailedNote": "引擎连续崩溃，已暂时回退到均衡音色。可以点「重试」再启动一次。",
+        "toneBestRetryFailed": "重试启动最佳音质引擎",
         "sichuan_dialect": "四川话",
         "beijing_dialect": "北京话",
         "tonePreview": "试听",

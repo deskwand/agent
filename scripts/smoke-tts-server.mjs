@@ -25,6 +25,10 @@ const child = spawn(
     "127.0.0.1",
     "--port",
     String(port),
+    // 与监督器（src/main/engine/engine-supervisor.ts）的 argv 保持一致：
+    // 自检要验的就是生产那一组参数，少一个 "--lang" 就等于没验到它
+    "--lang",
+    "chinese",
   ],
   { stdio: ["ignore", "pipe", "pipe"] },
 );
