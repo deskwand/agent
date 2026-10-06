@@ -213,6 +213,25 @@ describe("buildToolDisplayBlocks", () => {
     });
   });
 
+  it("counts an ocr call as a file read", () => {
+    // 归类是**语义**决定，不是覆盖勒线：覆盖测试只能证明 ocr 拿到了摘要，
+    // 证明不了它算作「读文件」。所以这里单独钉一条。
+    const blocks = buildToolDisplayBlocks([
+      toolUse("ocr-1", "ocr", { path: "shot.png" }),
+      toolResult("ocr-1", { content: "识别到的文字" }),
+    ]);
+
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toMatchObject({
+      type: "process-summary",
+      summary: {
+        readCount: 1,
+        calledRead: true,
+        usedToolCount: 0,
+      },
+    });
+  });
+
   it("includes failed tools in grouped summaries", () => {
     const blocks = buildToolDisplayBlocks([
       toolUse("read-1", "read", { path: "src/a.ts" }),

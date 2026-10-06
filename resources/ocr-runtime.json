@@ -1,0 +1,14 @@
+{
+  "modelUrl": "https://file.deskwand.com/ocr-models/ppocrv6-small-d73e0058.tar.gz",
+  "modelSha256": "72a40622ec44ff84fddda5a980080b531e7292267e623a24a3f8e03c242bef64",
+  "runtimeUrl": {
+    "darwin-arm64": "https://file.deskwand.com/ocr-runtime/ocr-runtime-darwin-arm64-1.30.0-189e462c.tar.gz",
+    "win32-x64": "https://file.deskwand.com/ocr-runtime/ocr-runtime-win32-x64-1.30.0-d0aa207e.tar.gz",
+    "linux-x64": "https://file.deskwand.com/ocr-runtime/ocr-runtime-linux-x64-1.30.0-62debbbd.tar.gz"
+  },
+  "runtimeSha256": {
+    "darwin-arm64": "189e462cd9a885fe5b7745b38385f6cdedd1fc8d58884acf7a09b2afaf6cbc42",
+    "win32-x64": "d0aa207e37c7b7d749073bb1db3bc345ee67ec0008207420fdf4fce23a780eec",
+    "linux-x64": "62debbbdbcaa23888888201d64f762a4d6136b35ca6111fd55ebfee535677bf5"
+  }
+}

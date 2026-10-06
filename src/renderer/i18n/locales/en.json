@@ -155,6 +155,13 @@
         "toneDownloadZh": "Download the Chinese voice",
         "toneRetryFast": "Retry downloading the fast voice",
         "toneRetryZh": "Retry downloading the Chinese voice"
+      },
+      "ocr": {
+        "title": "Text recognition",
+        "desc": "Read text from images and screenshots on this machine. The image never leaves it. First use downloads about 65 MB (engine and model).",
+        "model": "Recognition model (Chinese, English, Japanese)",
+        "download": "Download the text recognition model",
+        "remove": "Remove the text recognition model"
       }
     },
     "groupGeneral": "General",

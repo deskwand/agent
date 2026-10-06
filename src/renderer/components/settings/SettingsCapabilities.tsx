@@ -10,6 +10,7 @@ import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
 import { ReadAloudSettings } from "./ReadAloudSettings";
 import { VoiceModeSettings } from "./VoiceModeSettings";
 import { VoiceCapabilitySettings } from "./VoiceCapabilitySettings";
+import { OcrCapabilitySettings } from "./OcrCapabilitySettings";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -210,6 +211,7 @@ export function SettingsCapabilities({
       {notice && <p className="text-xs text-text-secondary">{notice}</p>}
 
       <VoiceCapabilitySettings>{voicePermissions}</VoiceCapabilitySettings>
+      <OcrCapabilitySettings />
       <ReadAloudSettings />
       <VoiceModeSettings />
     </div>

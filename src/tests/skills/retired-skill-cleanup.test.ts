@@ -6,6 +6,7 @@ import * as path from "path";
 import {
   cleanupRetiredSkillLinks,
   RETIRED_SKILL_NAMES,
+  RETIRED_SKILL_RUNTIME_DIRS,
 } from "../../main/skills/retired-skills";
 import { RETIRED_SKILL_MANIFESTS } from "../../main/skills/retired-skill-manifests";
 
@@ -218,6 +219,72 @@ describe("cleanupRetiredSkillLinks", () => {
     expect(cleanupRetiredSkillLinks(opts()).removed).toHaveLength(1);
     expect(cleanupRetiredSkillLinks(opts())).toEqual({ removed: [], kept: [] });
   });
+
+  // --- 运行时目录：技能自己跑出来的 models/ 与 node_modules/ --------------
+
+  const RUNTIME_DIRS = { docx: ["models", "node_modules"] };
+
+  it("removes a copy whose only extras sit in the skill's runtime dirs", () => {
+    const dir = placeShippedCopy();
+    fs.mkdirSync(path.join(dir, "models"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "models/pack.traineddata"),
+      "downloaded at runtime",
+    );
+    fs.mkdirSync(path.join(dir, "node_modules/tesseract.js"), {
+      recursive: true,
+    });
+    fs.writeFileSync(
+      path.join(dir, "node_modules/tesseract.js/index.js"),
+      "npm install",
+    );
+
+    const report = cleanupRetiredSkillLinks(
+      opts({ runtimeDirs: RUNTIME_DIRS }),
+    );
+
+    expect(report.removed).toEqual([dir]);
+    expect(fs.existsSync(dir)).toBe(false);
+  });
+
+  it("keeps a copy with an extra file outside the runtime dirs", () => {
+    const dir = placeShippedCopy();
+    fs.mkdirSync(path.join(dir, "models"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "models/keep.txt"), "x");
+    fs.writeFileSync(path.join(dir, "NOTES.md"), "mine");
+
+    const report = cleanupRetiredSkillLinks(
+      opts({ runtimeDirs: RUNTIME_DIRS }),
+    );
+
+    expect(report.removed).toEqual([]);
+    expect(report.kept).toEqual([dir]);
+  });
+
+  it("a runtime dir does not hide an edited shipped file", () => {
+    const dir = placeShippedCopy();
+    fs.writeFileSync(path.join(dir, "SKILL.md"), "edited by me");
+    fs.mkdirSync(path.join(dir, "models"), { recursive: true });
+
+    const report = cleanupRetiredSkillLinks(
+      opts({ runtimeDirs: RUNTIME_DIRS }),
+    );
+
+    expect(report.removed).toEqual([]);
+    expect(report.kept).toEqual([dir]);
+  });
+
+  it("runtime dirs are declared per skill, not as a blanket rule", () => {
+    const dir = placeShippedCopy();
+    // 目录里有文件才算「多出来的东西」—— 空目录本来就看不见
+    fs.mkdirSync(path.join(dir, "models"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "models/pack.traineddata"), "x");
+
+    // 没给这个技能声明运行时目录 → 仍然当作用户的东西留着
+    const report = cleanupRetiredSkillLinks(opts());
+
+    expect(report.kept).toEqual([dir]);
+  });
 });
 
 describe("RETIRED_SKILL_MANIFESTS", () => {
@@ -241,5 +308,17 @@ describe("RETIRED_SKILL_MANIFESTS", () => {
     expect(RETIRED_SKILL_MANIFESTS.pptx["LICENSE.txt"]).toBe(
       crypto.createHash("sha256").update(license).digest("hex"),
     );
+  });
+
+  it("covers image-ocr, whose runtime grows models/ and node_modules/", () => {
+    expect(RETIRED_SKILL_NAMES).toContain("image-ocr");
+    expect(Object.keys(RETIRED_SKILL_MANIFESTS["image-ocr"]).sort()).toEqual([
+      "SKILL.md",
+      "scripts/ocr.js",
+    ]);
+    expect(RETIRED_SKILL_RUNTIME_DIRS["image-ocr"].sort()).toEqual([
+      "models",
+      "node_modules",
+    ]);
   });
 });

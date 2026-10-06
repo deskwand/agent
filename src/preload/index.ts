@@ -47,6 +47,8 @@ import type {
 } from "../shared/ipc-types";
 import type {
   TtsEvent,
+  OcrEvent,
+  OcrInstallState,
   TtsInstallStates,
   TtsModelKey,
   TtsSpeakOptions,
@@ -1006,6 +1008,19 @@ contextBridge.exposeInMainWorld("electronAPI", {
       return () => ipcRenderer.removeListener("tts.stream", handler);
     },
   },
+  ocr: {
+    getInstallState: (): Promise<OcrInstallState> =>
+      ipcRenderer.invoke("ocr.getInstallState"),
+    install: (): Promise<void> => ipcRenderer.invoke("ocr.install"),
+    removeInstall: (): Promise<void> => ipcRenderer.invoke("ocr.removeInstall"),
+    // 与 voice.event / tts.event 同理：独立通道，不走 server-event 总线。
+    onEvent: (callback: (event: OcrEvent) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: OcrEvent) =>
+        callback(data);
+      ipcRenderer.on("ocr.event", handler);
+      return () => ipcRenderer.removeListener("ocr.event", handler);
+    },
+  },
 });
 
 // Type declaration for the renderer process
@@ -1690,6 +1705,12 @@ declare global {
         ) => Promise<TtsSpeakStreamResult>;
         cancelStream: (streamId: number) => Promise<void>;
         onStream: (callback: (event: TtsStreamEvent) => void) => () => void;
+      };
+      ocr: {
+        getInstallState: () => Promise<OcrInstallState>;
+        install: () => Promise<void>;
+        removeInstall: () => Promise<void>;
+        onEvent: (callback: (event: OcrEvent) => void) => () => void;
       };
     };
   }

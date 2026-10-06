@@ -4,7 +4,7 @@
  * Reads .pdf files using pdfjs-dist (Mozilla).
  * - Text pages: extracts text content with CMap support for Chinese/CJK.
  * - Image-only pages: renders to PNG, saves to temp files, returns file paths
- *   so the LLM can delegate to vision_describe or image-ocr as needed.
+ *   so the LLM can delegate to vision_describe or ocr as needed.
  *
  * pdfjs-dist is loaded lazily (dynamic import inside readPdf) to avoid a
  * startup crash on Windows when @napi-rs/canvas native binary is missing

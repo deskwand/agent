@@ -10,6 +10,15 @@
  */
 
 export const RETIRED_SKILL_MANIFESTS: Record<string, Record<string, string>> = {
+  // image-ocr：随 1.0.48（81624636）发布，本地 OCR 能力接管后退役。
+  // 它首跑会下 94MB 语言包、npm install 50MB 引擎，所以配套声明运行时目录：
+  // 见 retired-skills.ts 的 RETIRED_SKILL_RUNTIME_DIRS。
+  "image-ocr": {
+    "SKILL.md":
+      "65c09682f991b9cd59f9014e8643747b64ff3b30aa41b0a95c06746ee7866be5",
+    "scripts/ocr.js":
+      "8db7bbac66e7604da8090adedc3a82e7ad46efe4390673602ea9e00bb37d4aa8",
+  },
   docx: {
     "LICENSE.txt":
       "79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa",

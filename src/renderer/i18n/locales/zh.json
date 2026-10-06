@@ -155,6 +155,13 @@
         "toneDownloadZh": "下载中文音色",
         "toneRetryFast": "重试下载高速音色",
         "toneRetryZh": "重试下载中文音色"
+      },
+      "ocr": {
+        "title": "文字识别",
+        "desc": "从图片与截图里取文字。本机识别，图像不出本机。首次要下载约 65MB（引擎 + 模型）。",
+        "model": "识别模型（中英日）",
+        "download": "下载文字识别模型",
+        "remove": "删除文字识别模型"
       }
     },
     "groupGeneral": "常规",

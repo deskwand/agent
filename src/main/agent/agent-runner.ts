@@ -138,6 +138,13 @@ import {
   createVisionDescribeTool,
   createDeskWandVisionTool,
 } from "./tools/vision-describe";
+import { createOcrTool, shouldRegisterOcrTool } from "./tools/ocr";
+import { getOcrEngine } from "../ocr/engine";
+import {
+  isInstalled as isOcrInstalled,
+  modelDir as ocrModelDir,
+  runtimeDir as ocrRuntimeDir,
+} from "../ocr/installer";
 import { createTtsTool } from "./tools/tts";
 import { getTtsService } from "../tts/service";
 import { createOfficeTools } from "./tools/office/office-tools";
@@ -3151,6 +3158,29 @@ Tool routing:\n
         }
       }
 
+      // 本地 OCR 工具：与视觉模型无关，装了就有。工具列表随配置变、不随会话变
+      // （提示词缓存要求），所以这里读一次配置就定下来。
+      const ocrConfig = configStore.get("ocr") as
+        | { enabled?: boolean }
+        | undefined;
+      let ocrTool: ToolDefinition | undefined;
+      if (
+        shouldRegisterOcrTool({
+          enabled: ocrConfig?.enabled,
+          installed: isOcrInstalled(app.getPath("userData")),
+        })
+      ) {
+        ocrTool = createOcrTool({
+          workspaceDir: effectiveCwd,
+          getEngine: () =>
+            getOcrEngine({
+              runtimeDir: ocrRuntimeDir(app.getPath("userData")),
+              modelDir: ocrModelDir(app.getPath("userData")),
+            }),
+        });
+        log("[AgentRunner] Local OCR tool registered");
+      }
+
       // 朗读工具：与界面朗读共用同一个引擎实例（getTtsService 自带单例缓存，
       // 不要再包一层）。模型未安装时只返回指向设置的文案，不在工具里触发下载。
       const ttsTool = createTtsTool({
@@ -3169,6 +3199,7 @@ Tool routing:\n
         ...this._customTools, // background review tools
         ...(wrappedBashTool ? [wrappedBashTool] : []),
         ...(visionTool ? [visionTool] : []),
+        ...(ocrTool ? [ocrTool] : []),
         ttsTool,
         // Add office tools (always registered, no config required)
         ...officeTools,

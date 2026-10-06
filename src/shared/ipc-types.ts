@@ -600,3 +600,15 @@ export type TtsStreamEvent =
 export interface TtsSpeakStreamResult {
   streamId: number;
 }
+
+export type OcrInstallState = {
+  phase: "idle" | "downloading" | "extracting" | "ready" | "error";
+  percent: number;
+  installed: boolean;
+  error?: string;
+};
+
+export type OcrEvent = {
+  type: "install";
+  state: OcrInstallState;
+};
