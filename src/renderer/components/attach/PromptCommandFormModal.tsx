@@ -51,6 +51,7 @@ const SKILL_TYPE_BADGE_KEY: Record<Skill["type"], string> = {
   custom: "skillMarket.sourceCustom",
   agent: "skillMarket.sourceAI",
   vault: "skillMarket.sourceVault",
+  external: "skillMarket.sourceExternal",
 };
 
 export function PromptCommandFormModal({

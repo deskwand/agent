@@ -94,6 +94,7 @@ import { getDefaultShell } from "../utils/shell-resolver";
 import type { SkillsAdapter } from "../skills/skills-adapter";
 import type { AgentRuntimeExtensionManager } from "../extensions/agent-runtime-extension-manager";
 import { PiExtensionHost } from "../extensions/pi-extension-host";
+import { buildSkillsSignature } from "../skills/external-skill-policy";
 import { buildInterceptedPrompt } from "../extensions/pi-command-registry";
 import { getPiUiBridge, resetUiState } from "../extensions/ui/pi-ui-runtime";
 import {
@@ -2801,19 +2802,11 @@ ${hints.join("\n")}
         apiKey,
       });
       const { skillPaths } = await this.resolveSkillPaths();
-      const skillsSignature = JSON.stringify(
-        skillPaths.map((p) => {
-          try {
-            return `${p}:[${fs
-              .readdirSync(p, { withFileTypes: true })
-              .filter((d) => d.isDirectory())
-              .map((d) => d.name)
-              .sort()
-              .join(",")}]`;
-          } catch {
-            return p;
-          }
-        }),
+      // 签名=技能路径 + 已启用的第三方技能名：第三方不进 skillPaths，
+      // 少了一半就出现"技能页开关切了、当前会话却没变"。
+      const skillsSignature = buildSkillsSignature(
+        skillPaths,
+        this._skillsAdapter?.getSkillPolicy().enabledExternalSkillNames() ?? [],
       );
       log("[AgentRunner] Skill paths for pi ResourceLoader:", skillPaths);
 

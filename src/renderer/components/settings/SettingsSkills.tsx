@@ -224,7 +224,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     | "builtin"
     | "marketplace"
     | "installed"
-    | "vault";
+    | "vault"
+    | "external";
   const [filterKey, setFilterKey] = useState<FilterKey>("marketplace");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -370,6 +371,12 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
 
   const displaySkills = useMemo((): DisplaySkill[] => {
     const result: DisplaySkill[] = [];
+    // 与已启用的产品技能同名 ⇒ 这条第三方技能当前不生效（产品名优先）。
+    const enabledProductSkillNames = new Set(
+      skills
+        .filter((s) => s.type !== "external" && s.enabled)
+        .map((s) => s.name.toLowerCase()),
+    );
 
     // 1. Local skills
     for (const s of skills) {
@@ -384,6 +391,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       if (s.type === "builtin") source = "builtin";
       else if (s.type === "agent") source = "ai";
       else if (s.type === "vault") source = "vault";
+      else if (s.type === "external") source = "external";
       else source = "custom";
 
       let cloudMembership: "mycloud" | "team" | undefined;
@@ -416,6 +424,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         isCloudOnly: false,
         cloudData,
         createdAt: s.createdAt,
+        shadowedByProduct:
+          s.type === "external" &&
+          enabledProductSkillNames.has(s.name.toLowerCase()),
       });
     }
 
@@ -468,6 +479,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     return result.sort((a, b) => {
       if (a.type === "builtin" && b.type !== "builtin") return 1;
       if (a.type !== "builtin" && b.type === "builtin") return -1;
+      if (a.type === "external" && b.type !== "external") return 1;
+      if (a.type !== "external" && b.type === "external") return -1;
       return a.name.localeCompare(b.name);
     });
   }, [skills, cloudSkills, teamCloudSkills, activeTeamName, localSkillNames]);
@@ -486,6 +499,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       list = list.filter((s) => s.source === "vault");
     else if (filterKey === "builtin")
       list = list.filter((s) => s.source === "builtin");
+    else if (filterKey === "external")
+      list = list.filter((s) => s.source === "external");
     else if (filterKey === "marketplace") list = [];
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
@@ -986,6 +1001,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
     chips.push({ key: "ai", label: t("skillMarket.filterAI") });
     chips.push({ key: "builtin", label: t("skillMarket.filterBuiltin") });
     chips.push({ key: "vault", label: t("skillMarket.filterVault") });
+    chips.push({ key: "external", label: t("skillMarket.filterExternal") });
     chips.push({ key: "installed", label: t("skillMarket.filterInstalled") });
     return chips;
   }, [t, activeTeamId]);
@@ -1014,6 +1030,9 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         break;
       case "marketplace":
         label = t("skillMarket.sourceMarketplace");
+        break;
+      case "external":
+        label = t("skillMarket.sourceExternal");
         break;
     }
     // Append cloud membership for installed (non-cloud-only) skills
@@ -1252,6 +1271,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
           </div>
         )}
 
+      {/* 第三方技能默认不进模型：给一句说明，省得用户以为技能丢了 */}
+      {filterKey === "external" && (
+        <p className="text-xs text-text-muted">
+          {t("skills.externalSkillsDesc")}
+        </p>
+      )}
+
       {/* Unified skill list — hidden for marketplace or when login prompt shown */}
       {filterKey !== "marketplace" &&
         !(
@@ -1355,9 +1381,11 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                       skill={skill}
                       isLoading={isLoading}
                       onToggle={() => handleToggle(skill)}
-                      footer={
-                        skill.description || formatTimeAgo(skill.createdAt, t)
-                      }
+                      footer={`${skill.description || formatTimeAgo(skill.createdAt, t)}${
+                        ds.shadowedByProduct
+                          ? ` · ${t("skills.externalShadowed")}`
+                          : ""
+                      }`}
                       t={t}
                       onDelete={
                         supportsLocalFileActions(ds.type)

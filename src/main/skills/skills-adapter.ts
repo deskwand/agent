@@ -7,6 +7,10 @@
  * 异步是刻意的：global 与 vault 两个来源要「读取即刷新」（与 `listSkills()` 同款），
  * 同步接口会让启动后尚未加载的全局技能静默消失。
  */
+import type { SkillPromptPolicy } from "./external-skill-policy";
+
 export interface SkillsAdapter {
   getSkillPaths(): Promise<string[]>;
+  /** 技能进提示的策略；子代理会话用它保持与主会话一致的第三方默认关。 */
+  getSkillPolicy(): SkillPromptPolicy;
 }

@@ -11,6 +11,8 @@ import type { PiTrustResolver } from "./pi-trust-resolver";
 import * as path from "node:path";
 import { log, logError, logWarn } from "../utils/logger";
 import { buildAgentsFilesOverride } from "../config/global-agents-md";
+import type { SkillPromptPolicy } from "../skills/external-skill-policy";
+import { createSkillsOverride } from "../skills/skills-prompt-override";
 
 export interface PiHostOptions {
   cwd: string;
@@ -23,6 +25,47 @@ export interface PiHostOptions {
 export interface PiReloadOptions {
   /** 是否在 reload 前解析项目信任（通过 onTrustPrompt + PiTrustResolver）。 */
   resolveProjectTrust?: boolean;
+}
+
+/**
+ * 启动时空跑一次资源装配，只为让 skillsOverride 上报第三方技能名单 ——
+ * 技能页在首个会话之前也要能列出它们。
+ *
+ * 刻意用一次性 loader：不往 registry 里塞条目，免得抢在真实会话之前替某个 cwd
+ * 决定信任状态（`PiExtensionHost.getOrCreate` 是 per-cwd 缓存）。失败不影响启动。
+ */
+export async function warmUpExternalSkillScan(options: {
+  cwd: string;
+  agentDir: string;
+}): Promise<void> {
+  try {
+    const loader = new DefaultResourceLoader({
+      cwd: options.cwd,
+      agentDir: options.agentDir,
+      settingsManager: SettingsManager.create(options.cwd, options.agentDir),
+      agentsFilesOverride: buildAgentsFilesOverride(),
+      extensionFactories: [],
+      skillsOverride: createSkillsOverride(() => skillsPolicyProvider?.()),
+    });
+    await loader.reload();
+  } catch (error) {
+    logError("[PiExtensionHost] third-party skill scan failed:", error);
+  }
+}
+
+/**
+ * 技能进提示的策略由应用在启动时注入（与 `setMcpAgentDir` 同款做法）。
+ *
+ * 刻意放在模块级而不是 host 构造参数：`PiExtensionHost.getOrCreate` 是按 cwd 缓存的，
+ * 构造参数只在首次创建时生效 —— 插件页 / 信任弹窗那条路先建 host 时还拿不到策略，
+ * 会把它整条吞掉（表现为第三方技能照旧进提示）。
+ */
+let skillsPolicyProvider: (() => SkillPromptPolicy | undefined) | undefined;
+
+export function setSkillsPolicyProvider(
+  provider: (() => SkillPromptPolicy | undefined) | undefined,
+): void {
+  skillsPolicyProvider = provider;
 }
 
 export interface PiRegisteredCommand {
@@ -84,6 +127,7 @@ export class PiExtensionHost {
       appendSystemPrompt: options.appendSystemPrompt,
       agentsFilesOverride: buildAgentsFilesOverride(),
       extensionFactories: [],
+      skillsOverride: createSkillsOverride(() => skillsPolicyProvider?.()),
     });
   }
 
@@ -127,6 +171,7 @@ export class PiExtensionHost {
         overrides?.appendSystemPrompt ?? this.appendSystemPrompt,
       agentsFilesOverride: buildAgentsFilesOverride(),
       extensionFactories: extraFactories,
+      skillsOverride: createSkillsOverride(() => skillsPolicyProvider?.()),
     });
     await loader.reload();
     return loader;

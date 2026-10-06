@@ -250,7 +250,9 @@
     "sourceTeam": "Team",
     "sourceBuiltin": "Built-in",
     "sourceVault": "Vault",
+    "sourceExternal": "pi dirs",
     "filterVault": "Vault",
+    "filterExternal": "pi dirs",
     "sourceMcp": "MCP",
     "loginPrompt": "Log in to use the cloud skill marketplace and share skills with your team",
     "search": "Search skills...",
@@ -809,6 +811,8 @@
   },
   "skills": {
     "builtinSkillsDesc": "Built-in skills ship with the app and can be toggled when needed.",
+    "externalSkillsDesc": "These skills live in pi’s skill directories and are kept out of the model by default. Turn one on here and it applies from your next message.",
+    "externalShadowed": "A built-in skill of the same name is enabled, so this one has no effect.",
     "pluginsTitle": "Plugins & Imports",
     "pluginsDesc": "Browse marketplace plugins or import custom skills from a local folder.",
     "title": "📦 Skills",
