@@ -58,6 +58,32 @@ async function readResponseWithLimit(
   return output.buffer as ArrayBuffer;
 }
 
+/**
+ * 从已解析的 document 里取首图：og:image → twitter:image。
+ * 只接受**绝对** http(s) 地址 —— 相对路径无法保证跟原文同源，调用方（动态）只下载绝对图。
+ */
+export function extractLeadImageUrl(document: Document): string | undefined {
+  const selectors = [
+    'meta[property="og:image"]',
+    'meta[name="twitter:image"]',
+    'meta[property="twitter:image"]',
+  ];
+  for (const selector of selectors) {
+    const content = document.querySelector(selector)?.getAttribute("content");
+    const value = content?.trim();
+    if (!value) continue;
+    try {
+      const url = new URL(value);
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        return url.toString();
+      }
+    } catch {
+      // 相对路径与非法值一律丢弃
+    }
+  }
+  return undefined;
+}
+
 export interface ExtractOptions {
   forceClone?: boolean;
   workspaceDir: string;
@@ -263,24 +289,39 @@ async function extractViaHttp(
       return { url, title: textTitle(text, url), content: text, error: null };
 
     const { document } = parseHTML(text);
+    // 在 turndown 之前把首图 URL 取出来：HTML 丢掉了就再也拿不到了（动态的配图靠它）
+    const imageUrl = extractLeadImageUrl(document as unknown as Document);
     // linkedom provides the DOM surface Readability uses at runtime, but its
     // Document declaration is intentionally separate from lib.dom's type.
     const article = new Readability(document as unknown as Document).parse();
     if (article?.content) {
       const content = turndown.turndown(article.content);
       if (content.length >= MIN_USEFUL_CONTENT) {
-        return { url, title: article.title || "", content, error: null };
+        return {
+          url,
+          title: article.title || "",
+          content,
+          error: null,
+          imageUrl,
+        };
       }
     }
     const rsc = extractRSCContent(text);
     if (rsc?.content && rsc.content.length >= MIN_USEFUL_CONTENT) {
-      return { url, title: rsc.title, content: rsc.content, error: null };
+      return {
+        url,
+        title: rsc.title,
+        content: rsc.content,
+        error: null,
+        imageUrl,
+      };
     }
     return {
       url,
       title: article?.title || "",
       content: article?.content ? turndown.turndown(article.content) : "",
       error: "Could not extract complete readable content",
+      imageUrl,
     };
   } catch (error) {
     if (signal?.aborted) return aborted(url);

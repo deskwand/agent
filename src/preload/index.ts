@@ -18,6 +18,7 @@ import type {
   MemoryReadResult,
   MemorySearchScope,
 } from "../renderer/types";
+import type { FeedSnapshot } from "../shared/feed";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
 import type {
@@ -699,6 +700,31 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("remote.getChannelPairings"),
     getChannelLogs: (instanceId: string): Promise<ChannelInstanceLog[]> =>
       ipcRenderer.invoke("remote.getChannelLogs", instanceId),
+  },
+
+  feed: {
+    list: (): Promise<FeedSnapshot | null> => ipcRenderer.invoke("feed.list"),
+    getBody: (
+      id: string,
+    ): Promise<{ body: string | null; bodyStatus: string } | null> =>
+      ipcRenderer.invoke("feed.getBody", id),
+    setEnabled: (
+      enabled: boolean,
+    ): Promise<{ enabled: boolean; started: boolean }> =>
+      ipcRenderer.invoke("feed.setEnabled", enabled),
+    markRead: (id: string): Promise<number> =>
+      ipcRenderer.invoke("feed.markRead", id),
+    markAllRead: (): Promise<number> => ipcRenderer.invoke("feed.markAllRead"),
+    dismiss: (id: string): Promise<number> =>
+      ipcRenderer.invoke("feed.dismiss", id),
+    clearAll: (): Promise<{ unreadCount: number }> =>
+      ipcRenderer.invoke("feed.clearAll"),
+    refreshNow: (): Promise<{ started: boolean; reason?: string }> =>
+      ipcRenderer.invoke("feed.refreshNow"),
+    setBlockedTopics: (
+      topics: string[],
+    ): Promise<{ blockedTopics: string[] }> =>
+      ipcRenderer.invoke("feed.setBlockedTopics", topics),
   },
 
   schedule: {
@@ -1736,6 +1762,23 @@ declare global {
         install: () => Promise<void>;
         removeInstall: () => Promise<void>;
         onEvent: (callback: (event: OcrEvent) => void) => () => void;
+      };
+      feed: {
+        list: () => Promise<FeedSnapshot | null>;
+        getBody: (
+          id: string,
+        ) => Promise<{ body: string | null; bodyStatus: string } | null>;
+        setEnabled: (
+          enabled: boolean,
+        ) => Promise<{ enabled: boolean; started: boolean }>;
+        markRead: (id: string) => Promise<number>;
+        markAllRead: () => Promise<number>;
+        dismiss: (id: string) => Promise<number>;
+        clearAll: () => Promise<{ unreadCount: number }>;
+        refreshNow: () => Promise<{ started: boolean; reason?: string }>;
+        setBlockedTopics: (
+          topics: string[],
+        ) => Promise<{ blockedTopics: string[] }>;
       };
     };
   }

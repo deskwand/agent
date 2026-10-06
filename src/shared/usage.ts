@@ -6,7 +6,13 @@
  */
 
 export type UsageSource = "chat" | "subagent" | "aux";
-export type UsagePurpose = "title" | "memory" | "vision" | "probe" | "polish";
+export type UsagePurpose =
+  | "title"
+  | "memory"
+  | "vision"
+  | "probe"
+  | "polish"
+  | "feed";
 export type UsageRange = "1d" | "7d" | "30d" | "90d" | "all";
 
 export interface UsageTokens {

@@ -39,6 +39,7 @@ import {
 import { WelcomeView } from "./components/WelcomeView";
 import { VaultView } from "./components/VaultView";
 import { UsageView } from "./components/UsageView";
+import { FeedView } from "./components/FeedView";
 import { ScheduleView } from "./components/ScheduleView";
 import { AppsView } from "./components/AppsView";
 import { PermissionDialog } from "./components/PermissionDialog";
@@ -585,6 +586,8 @@ function App() {
               <Suspense fallback={<MainPanelFallback />}>
                 <SettingsPanel onClose={() => setActiveView("chat")} />
               </Suspense>
+            ) : activeView === "feed" ? (
+              <FeedView />
             ) : activeView === "apps" ? (
               <AppsView />
             ) : activeView === "automation" ? (

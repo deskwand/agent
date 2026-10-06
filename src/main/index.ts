@@ -28,6 +28,7 @@ import {
   session,
   Tray,
 } from "electron";
+import { randomUUID } from "node:crypto";
 import { join, resolve, dirname, isAbsolute, basename, extname } from "path";
 import * as fs from "fs";
 import { writeFile, mkdir, readFile, unlink, rm } from "fs/promises";
@@ -222,6 +223,22 @@ import {
   registerVideoProtocolScheme,
 } from "./video-protocol";
 import {
+  installFeedImageProtocol,
+  registerFeedImageProtocolScheme,
+} from "./feed/feed-image-protocol";
+import { FeedService } from "./feed/feed-service";
+import { FeedScheduler } from "./feed/feed-scheduler";
+import { fetchWebContent, searchWeb } from "./agent/tools/web-access/web-tools";
+import { resolveWebAccessProviderAuth } from "./agent/tools/web-access/config-adapter";
+import { fetchRemoteUrl } from "./agent/tools/web-access/ssrf-protection";
+import { RESULTS_PER_QUERY } from "./feed/feed-collect";
+import { runPiAiOneShot, recordAuxUsage } from "./agent/agent-sdk-one-shot";
+import {
+  buildUtilityAppConfig,
+  resolveUtilityModelConfig,
+} from "./memory/memory-llm-client";
+import { getFeedConfig } from "./config/config-store";
+import {
   installArtifactProtocol,
   registerArtifactProtocolScheme,
   resolveArtifactRenderUrl,
@@ -229,6 +246,7 @@ import {
 
 registerVideoProtocolScheme();
 registerArtifactProtocolScheme();
+registerFeedImageProtocolScheme();
 
 // Current working directory (persisted between sessions)
 let currentWorkingDir: string | null = null;
@@ -282,6 +300,8 @@ let browserViewManager: BrowserViewManager | null = null;
 let sessionManager: SessionManager | null = null;
 let skillsManager: SkillsManager | null = null;
 let memoryService: MemoryService | null = null;
+let feedService: FeedService | null = null;
+let feedScheduler: FeedScheduler | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
 let petWindowController: PetWindowController | null = null;
 let voiceIpc: VoiceIpcHandle | null = null;
@@ -1028,6 +1048,9 @@ app
   .whenReady()
   .then(async () => {
     await installVideoProtocol();
+    await installFeedImageProtocol(
+      join(app.getPath("userData"), "feed-images"),
+    );
     await installArtifactProtocol();
     installFileDownloadFallback();
 
@@ -1337,6 +1360,123 @@ app
       now: () => Date.now(),
     });
     scheduledTaskManager.start();
+
+    // ---- 动态（feed）：后台生成 + 未读计数，默认关闭 ----
+    const feedImagesDir = join(app.getPath("userData"), "feed-images");
+    const feedTempDir = join(app.getPath("temp"), "deskwand-feed");
+    feedService = new FeedService({
+      db,
+      getConfig: () => getFeedConfig(),
+      setFeedConfig: (patch) => {
+        const current = getFeedConfig();
+        configStore.update({ feed: { ...current, ...patch } });
+      },
+      fetchSignalsSources: () => ({
+        readCoreMemory: () => memoryService?.getCoreMemoryRaw() ?? {},
+        listRecentSessions: (since) =>
+          (sessionManager?.listSessions().sessions ?? [])
+            .filter((session) => (session.updatedAt ?? 0) >= since)
+            .map((session) => ({
+              id: session.id,
+              title: session.title,
+              updatedAt: session.updatedAt ?? 0,
+            })),
+        readUserMessages: (sessionId) =>
+          (sessionManager?.getMessages(sessionId) ?? []).map((message) => ({
+            role: message.role,
+            text: (message.content ?? [])
+              .map((block) => (block.type === "text" ? block.text : ""))
+              .join("\n"),
+          })),
+      }),
+      locale: () => getLocale(),
+      complete: async ({ systemPrompt, userPrompt }) => {
+        const appConfig = configStore.getAll();
+        const utility = resolveUtilityModelConfig(
+          appConfig,
+          appConfig.model || "",
+        );
+        const result = await runPiAiOneShot(
+          userPrompt,
+          systemPrompt,
+          buildUtilityAppConfig(appConfig, utility),
+          { temperature: 0, maxTokens: 4000 },
+        );
+        recordAuxUsage(
+          result.usage,
+          "feed",
+          utility.model,
+          utility.provider,
+          null,
+        );
+        return result.text;
+      },
+      searchWeb: ({ queries }) =>
+        searchWeb(queries, {
+          getConfig: () => configStore.getAll().webAccess,
+          resolveProviderAuth: (providerName, credential) =>
+            resolveWebAccessProviderAuth(
+              providerName,
+              credential,
+              configStore.getAll(),
+            ),
+          numResults: RESULTS_PER_QUERY,
+          recencyFilter: "week",
+        }),
+      fetchPages: (urls) =>
+        fetchWebContent(urls, {
+          getConfig: () => configStore.getAll().webAccess,
+          resolveProviderAuth: (providerName, credential) =>
+            resolveWebAccessProviderAuth(
+              providerName,
+              credential,
+              configStore.getAll(),
+            ),
+          workspaceDir: app.getPath("userData"),
+          tempDir: feedTempDir,
+        }),
+      downloadImage: async (url) => {
+        // fetchRemoteUrl(url, init, options)：超时只能靠 signal，没有 timeoutMs
+        const response = await fetchRemoteUrl(url, {
+          signal: AbortSignal.timeout(8000),
+        });
+        if (!response.ok) return null;
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        return {
+          bytes,
+          contentType: response.headers.get("content-type") ?? "",
+        };
+      },
+      imagesDir: feedImagesDir,
+      now: () => Date.now(),
+      id: () => randomUUID(),
+      onPhase: (phase) =>
+        sendToRenderer({
+          type: "feed.updated",
+          payload: {
+            unreadCount: db.feedItems.unreadCount(),
+            runId: db.feedRuns.latest()?.id ?? null,
+            status: db.feedRuns.latest()?.status ?? "running",
+            phase,
+          },
+        }),
+      onUpdated: (payload) => sendToRenderer({ type: "feed.updated", payload }),
+    });
+
+    await feedService.recover();
+
+    feedScheduler = new FeedScheduler({
+      isEnabled: () => getFeedConfig().enabled === true,
+      isBusy: () =>
+        db.sessions.getAll().some((row) => row.status === "running"),
+      lastSuccessAt: () => db.feedRuns.lastSuccessAt(),
+      lastAttemptAt: () => feedService?.lastAttemptAt() ?? null,
+      exceedsFailureBudget: () =>
+        feedService?.hasExceededFailureBudget() ?? false,
+      refresh: (trigger) => feedService!.refresh(trigger),
+      now: () => Date.now(),
+    });
+    feedScheduler.start();
 
     // 初始化远程管理器
     remoteManager.setRendererCallback(sendToRenderer);
@@ -3885,6 +4025,39 @@ ipcMain.handle(
     ];
   },
 );
+
+ipcMain.handle("feed.list", () => feedService?.list() ?? null);
+ipcMain.handle(
+  "feed.getBody",
+  (_e, id: string) => feedService?.getBody(id) ?? null,
+);
+ipcMain.handle("feed.setEnabled", async (_e, enabled: boolean) => {
+  await feedService?.setEnabled(enabled === true);
+  return {
+    enabled: getFeedConfig().enabled === true,
+    started: true,
+  };
+});
+ipcMain.handle(
+  "feed.markRead",
+  (_e, id: string) => feedService?.markRead(id) ?? 0,
+);
+ipcMain.handle("feed.markAllRead", () => feedService?.markAllRead() ?? 0);
+ipcMain.handle(
+  "feed.dismiss",
+  (_e, id: string) => feedService?.dismiss(id) ?? 0,
+);
+ipcMain.handle("feed.clearAll", async () => ({
+  unreadCount: (await feedService?.clearAll()) ?? 0,
+}));
+ipcMain.handle("feed.refreshNow", async () => {
+  const result = await feedService?.refresh("manual");
+  return result ?? { started: false };
+});
+ipcMain.handle("feed.setBlockedTopics", (_e, topics: string[]) => {
+  feedService?.setBlockedTopics(Array.isArray(topics) ? topics : []);
+  return { blockedTopics: getFeedConfig().blockedTopics };
+});
 
 ipcMain.handle("schedule.list", () => {
   try {

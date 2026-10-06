@@ -57,10 +57,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import type {
-  DatabaseInstance,
-  SessionRow,
-} from "../../main/db/database";
+import type { DatabaseInstance, SessionRow } from "../../main/db/database";
 import type {
   MemoryCompletionRequest,
   MemoryLLMClientLike,
@@ -231,6 +228,33 @@ function createDatabaseInstance(db: DatabaseSync): DatabaseInstance {
       get: vi.fn(),
       getAll: vi.fn(() => []),
       delete: vi.fn(),
+    },
+    feedItems: {
+      insert: vi.fn(),
+      get: vi.fn(() => null),
+      listVisible: vi.fn(() => []),
+      unreadCount: vi.fn(() => 0),
+      markRead: vi.fn(),
+      markAllRead: vi.fn(),
+      dismiss: vi.fn(),
+      countAll: vi.fn(() => 0),
+      deleteAll: vi.fn(),
+      deleteOlderThan: vi.fn(() => 0),
+      pruneToMax: vi.fn(() => 0),
+      listImageFileNames: vi.fn(() => []),
+      listUrlKeys: vi.fn(() => []),
+    },
+    feedRuns: {
+      insert: vi.fn(),
+      finish: vi.fn(),
+      setMeta: vi.fn(),
+      delete: vi.fn(),
+      latest: vi.fn(() => null),
+      lastSuccessAt: vi.fn(() => null),
+      lastAttemptAt: vi.fn(() => null),
+      markInterrupted: vi.fn(() => 0),
+      countConsecutiveFailures: vi.fn(() => 0),
+      pruneOlderThan: vi.fn(() => 0),
     },
     prepare: (sql: string) => db.prepare(sql),
     exec: (sql: string) => db.exec(sql),

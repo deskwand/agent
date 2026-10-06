@@ -590,3 +590,109 @@ export function createWebAccessTools(
 
   return [webSearch, fetchContent, getSearchContent];
 }
+
+export interface FeedWebSearchOptions {
+  getConfig: () => WebAccessConfig;
+  resolveProviderAuth: ResolveWebAccessProviderAuth;
+  numResults?: number;
+  recencyFilter?: "day" | "week" | "month" | "year";
+  signal?: AbortSignal;
+}
+
+/**
+ * 供后台任务（动态/feed）复用同一套 provider 选择与鉴权。
+ * 与 web_search 工具的区别：逐 query 返回结果与错误，**永不抛** ——
+ * 调用方要能区分「部分失败」与「全失败」两种状态。
+ */
+export async function searchWeb(
+  queries: string[],
+  options: FeedWebSearchOptions,
+): Promise<QueryResultData[]> {
+  const config = options.getConfig();
+  let runtime: WebSearchRuntime;
+  try {
+    runtime = await buildRuntime(
+      config,
+      options.resolveProviderAuth,
+      { openai: true, gemini: true, deepseek: true },
+      false,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return queries.map((query) => ({
+      query,
+      answer: "",
+      results: [],
+      error: message,
+    }));
+  }
+
+  const searchOptions: FullSearchOptions = {
+    numResults: options.numResults ?? 6,
+    recencyFilter: options.recencyFilter ?? "week",
+    signal: options.signal,
+  };
+
+  const out: QueryResultData[] = [];
+  for (const query of queries) {
+    try {
+      const result = await search(query, searchOptions, runtime);
+      out.push({
+        query,
+        answer: result.answer,
+        results: result.results,
+        error: null,
+        provider: result.provider,
+      });
+    } catch (error) {
+      out.push({
+        query,
+        answer: "",
+        results: [],
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+  return out;
+}
+
+export interface FetchWebContentOptions {
+  getConfig: () => WebAccessConfig;
+  resolveProviderAuth: ResolveWebAccessProviderAuth;
+  workspaceDir: string;
+  tempDir: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * 供后台任务抓正文。`buildRuntime` 是私有的，外部拿不到 WebSearchRuntime，
+ * 所以这里自己建一次再交给 fetchAllContent。失败时返回带 error 的条目，不抛。
+ */
+export async function fetchWebContent(
+  urls: string[],
+  options: FetchWebContentOptions,
+): Promise<ExtractedContent[]> {
+  const config = options.getConfig();
+  try {
+    const runtime = await buildRuntime(
+      config,
+      options.resolveProviderAuth,
+      { openai: true, gemini: true, deepseek: true },
+      false,
+    );
+    return await fetchAllContent(urls, options.signal, {
+      workspaceDir: options.workspaceDir,
+      tempDir: options.tempDir,
+      runtime,
+      ssrfEnabled: config.ssrfEnabled,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return urls.map((url) => ({
+      url,
+      title: "",
+      content: "",
+      error: message,
+    }));
+  }
+}

@@ -23,6 +23,8 @@ export interface ExtractedContent {
   content: string;
   error: string | null;
   errorCode?: WebAccessErrorCode;
+  /** og:image / twitter:image；抽不到或不是绝对 http(s) 时为 undefined。 */
+  imageUrl?: string;
 }
 
 export interface SearchResponse {

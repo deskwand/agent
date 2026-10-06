@@ -177,6 +177,10 @@ function registerSharedIpcListener(): () => void {
 
     try {
       switch (event.type) {
+        case "feed.updated":
+          store.setFeedPhase(event.payload.phase ?? null);
+          void store.refreshFeed();
+          break;
         case "session.list":
           store.setSessions(event.payload.sessions);
           // Sync goal states restored by the main process at startup so the

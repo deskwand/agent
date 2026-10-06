@@ -165,6 +165,8 @@ export interface AppConfig {
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
+  /** 动态（feed）：默认关闭；打开后每 24 小时生成一次。 */
+  feed?: FeedConfig;
 }
 
 // ── StoredConfig: what actually hits disk (no root projection dupes) ─
@@ -197,6 +199,8 @@ export interface StoredConfig {
   webAccess: WebAccessConfig;
   codemode: CodemodeConfig;
   subagent?: SubagentConfig;
+  /** 动态（feed）：默认关闭；打开后每 24 小时生成一次。 */
+  feed?: FeedConfig;
 }
 
 export interface LegacyEnvBridgeSnapshot {
@@ -315,6 +319,7 @@ export function defaultStoredConfig(): StoredConfig {
       autoPolish: true,
     },
     ocr: { enabled: false },
+    feed: { enabled: false, blockedTopics: [] },
     readAloud: { enabled: false },
     voiceMode: { ...DEFAULT_VOICE_MODE },
     webAccess: normalizeWebAccessConfig(undefined),
@@ -972,6 +977,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     webAccess: normalizeWebAccessConfig(stored.webAccess),
     codemode: normalizeCodemodeConfig(stored.codemode),
     subagent: stored.subagent,
+    feed: normalizeFeedConfig(stored.feed),
   };
 }
 
@@ -1145,6 +1151,8 @@ export class ConfigStore {
     if (updates.codemode !== undefined)
       stored.codemode = normalizeCodemodeConfig(updates.codemode);
     if (updates.subagent !== undefined) stored.subagent = updates.subagent;
+    if (updates.feed !== undefined)
+      stored.feed = normalizeFeedConfig(updates.feed);
 
     stored.isConfigured =
       updates.isConfigured ??
@@ -1424,4 +1432,34 @@ export interface OcrConfig {
 export function normalizeOcrConfig(raw: unknown): OcrConfig {
   const value = (raw ?? {}) as Partial<OcrConfig>;
   return { enabled: value.enabled === true };
+}
+
+/** 动态（feed）的配置。只有开关与屏蔽主题。 */
+export interface FeedConfig {
+  enabled: boolean;
+  blockedTopics: string[];
+}
+
+/**
+ * 归一化。注意 `enabled` 必须判 `=== true`：写成 `!== false` 会把升级上来
+ * 的用户（配置里根本没有这个字段）当成「开着」，直接违背默认关闭这条决定。
+ */
+export function normalizeFeedConfig(raw: unknown): FeedConfig {
+  const value = (raw ?? {}) as Partial<FeedConfig>;
+  const rawTopics = Array.isArray(value.blockedTopics)
+    ? value.blockedTopics
+    : [];
+  const blockedTopics: string[] = [];
+  for (const entry of rawTopics) {
+    if (typeof entry !== "string") continue;
+    const trimmed = entry.trim();
+    if (!trimmed || blockedTopics.includes(trimmed)) continue;
+    blockedTopics.push(trimmed);
+  }
+  return { enabled: value.enabled === true, blockedTopics };
+}
+
+/** 读处用这个；永远返回完整对象，调用方不用写 ?. 兜底。 */
+export function getFeedConfig(): FeedConfig {
+  return normalizeFeedConfig(configStore.getAll().feed);
 }

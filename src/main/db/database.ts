@@ -58,11 +58,62 @@ export interface DatabaseInstance {
     delete: (sessionId: string) => void;
   };
 
+  feedItems: {
+    insert: (row: FeedItemRow) => void;
+    get: (id: string) => FeedItemRow | null;
+    listVisible: (limit: number) => FeedItemRow[];
+    unreadCount: () => number;
+    markRead: (id: string, ts: number) => void;
+    markAllRead: (ts: number) => void;
+    dismiss: (id: string, ts: number) => void;
+    countAll: () => number;
+    deleteAll: () => void;
+    deleteOlderThan: (ts: number) => number;
+    pruneToMax: (count: number) => number;
+    listImageFileNames: () => string[];
+    /** 全表的 url_key（**含已移除的**）—— 跨天去重靠它（设计 §6.3）。 */
+    listUrlKeys: () => string[];
+  };
+
+  feedRuns: {
+    insert: (row: FeedRunRow) => void;
+    finish: (id: string, patch: FeedRunPatch) => void;
+    setMeta: (
+      id: string,
+      meta: { queries: string; topics: string; candidate_count: number },
+    ) => void;
+    delete: (id: string) => void;
+    latest: () => FeedRunRow | null;
+    lastSuccessAt: () => number | null;
+    /** 任何状态的最后一次尝试时间；连续失败封顶后靠它算间隔。 */
+    lastAttemptAt: () => number | null;
+    markInterrupted: (ts: number) => number;
+    countConsecutiveFailures: () => number;
+    pruneOlderThan: (ts: number) => number;
+  };
+
   // For compatibility with old interface
   prepare: (sql: string) => StatementSync;
   exec: (sql: string) => void;
   close: () => void;
 }
+
+import type {
+  FeedItemRow,
+  FeedRunPatch,
+  FeedRunRow,
+  FeedRunStatus,
+} from "../../shared/feed";
+
+export type {
+  FeedBodyStatus,
+  FeedImageStatus,
+  FeedItemRow,
+  FeedRunPatch,
+  FeedRunRow,
+  FeedRunStatus,
+  FeedTrigger,
+} from "../../shared/feed";
 
 export interface SessionRow {
   session_kind?: SessionKind;
@@ -417,6 +468,51 @@ function initializeSchema(database: DatabaseSync): void {
     ON scheduled_tasks(enabled, next_run_at)
   `);
 
+    // Feed（动态）：条目与每次生成的记录
+    database.exec(`
+    CREATE TABLE IF NOT EXISTS feed_items (
+      id            TEXT PRIMARY KEY,
+      run_id        TEXT NOT NULL,
+      title         TEXT NOT NULL,
+      summary       TEXT,
+      url           TEXT NOT NULL,
+      url_key       TEXT NOT NULL,
+      source_host   TEXT NOT NULL,
+      topic         TEXT,
+      relevance     TEXT,
+      body          TEXT,
+      body_status   TEXT NOT NULL,
+      image_url     TEXT,
+      image_file    TEXT,
+      image_status  TEXT NOT NULL DEFAULT 'none',
+      created_at    INTEGER NOT NULL,
+      read_at       INTEGER,
+      dismissed_at  INTEGER,
+      unprocessed   INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+    database.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_feed_items_url_key ON feed_items(url_key)",
+    );
+    database.exec(
+      "CREATE INDEX IF NOT EXISTS idx_feed_items_created ON feed_items(created_at DESC)",
+    );
+
+    database.exec(`
+    CREATE TABLE IF NOT EXISTS feed_runs (
+      id              TEXT PRIMARY KEY,
+      started_at      INTEGER NOT NULL,
+      finished_at     INTEGER,
+      status          TEXT NOT NULL,
+      trigger         TEXT NOT NULL,
+      error           TEXT,
+      queries         TEXT,
+      topics          TEXT,
+      candidate_count INTEGER NOT NULL DEFAULT 0,
+      item_count      INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
     // Create goals table
     database.exec(`
     CREATE TABLE IF NOT EXISTS goals (
@@ -506,10 +602,10 @@ function ensureColumn(
 /**
  * Initialize the database
  */
-export function initDatabase(): DatabaseInstance {
+export function initDatabase(dbPathOverride?: string): DatabaseInstance {
   if (db) return db;
 
-  const dbPath = getDatabasePath();
+  const dbPath = dbPathOverride ?? getDatabasePath();
   log("[Database] Opening database at:", dbPath);
 
   let rawDb: DatabaseSync;
@@ -546,6 +642,78 @@ export function initDatabase(): DatabaseInstance {
   const deleteSessionStmt = rawDb.prepare(`
     DELETE FROM sessions WHERE id = ?
   `);
+
+  const feedItemInsert = rawDb.prepare(`
+    INSERT INTO feed_items (
+      id, run_id, title, summary, url, url_key, source_host, topic, relevance,
+      body, body_status, image_url, image_file, image_status, created_at,
+      read_at, dismissed_at, unprocessed
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const feedItemGet = rawDb.prepare("SELECT * FROM feed_items WHERE id = ?");
+  const feedItemListVisible = rawDb.prepare(
+    "SELECT * FROM feed_items WHERE dismissed_at IS NULL ORDER BY created_at DESC LIMIT ?",
+  );
+  const feedItemUnread = rawDb.prepare(
+    "SELECT COUNT(*) AS n FROM feed_items WHERE read_at IS NULL AND dismissed_at IS NULL",
+  );
+  const feedItemMarkRead = rawDb.prepare(
+    "UPDATE feed_items SET read_at = ? WHERE id = ? AND read_at IS NULL",
+  );
+  const feedItemMarkAllRead = rawDb.prepare(
+    "UPDATE feed_items SET read_at = ? WHERE read_at IS NULL",
+  );
+  const feedItemDismiss = rawDb.prepare(
+    "UPDATE feed_items SET dismissed_at = ?, read_at = COALESCE(read_at, ?) WHERE id = ?",
+  );
+  const feedItemCount = rawDb.prepare("SELECT COUNT(*) AS n FROM feed_items");
+  const feedItemDeleteAll = rawDb.prepare("DELETE FROM feed_items");
+  const feedItemDeleteOlder = rawDb.prepare(
+    "DELETE FROM feed_items WHERE created_at < ?",
+  );
+  const feedItemImageFiles = rawDb.prepare(
+    "SELECT image_file FROM feed_items WHERE image_file IS NOT NULL",
+  );
+  const feedItemUrlKeys = rawDb.prepare("SELECT url_key FROM feed_items");
+  const feedItemPrune = rawDb.prepare(
+    `DELETE FROM feed_items WHERE id IN (
+       SELECT id FROM feed_items ORDER BY created_at DESC LIMIT -1 OFFSET ?
+     )`,
+  );
+  const feedRunInsert = rawDb.prepare(`
+    INSERT INTO feed_runs (
+      id, started_at, finished_at, status, trigger, error, queries, topics,
+      candidate_count, item_count
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const feedRunFinish = rawDb.prepare(`
+    UPDATE feed_runs
+    SET status = ?, finished_at = ?, error = ?, candidate_count = ?, item_count = ?
+    WHERE id = ?
+  `);
+  const feedRunSetMeta = rawDb.prepare(
+    "UPDATE feed_runs SET queries = ?, topics = ?, candidate_count = ? WHERE id = ?",
+  );
+  const feedRunDelete = rawDb.prepare("DELETE FROM feed_runs WHERE id = ?");
+  const feedRunLatest = rawDb.prepare(
+    "SELECT * FROM feed_runs ORDER BY started_at DESC LIMIT 1",
+  );
+  const feedRunLastSuccess = rawDb.prepare(
+    "SELECT MAX(started_at) AS ts FROM feed_runs WHERE status IN ('ok','partial')",
+  );
+  const feedRunLastAttempt = rawDb.prepare(
+    "SELECT MAX(started_at) AS ts FROM feed_runs",
+  );
+  const feedRunMarkInterrupted = rawDb.prepare(
+    "UPDATE feed_runs SET status = 'failed', finished_at = ?, error = 'interrupted' WHERE finished_at IS NULL",
+  );
+  // SQLite 没有「连续」这个概念：取最近的若干行，在 JS 里数
+  const feedRunRecentStatuses = rawDb.prepare(
+    "SELECT status FROM feed_runs ORDER BY started_at DESC LIMIT 10",
+  );
+  const feedRunPrune = rawDb.prepare(
+    "DELETE FROM feed_runs WHERE started_at < ?",
+  );
 
   const insertTraceStep = rawDb.prepare(`
     INSERT OR REPLACE INTO trace_steps (
@@ -809,6 +977,123 @@ export function initDatabase(): DatabaseInstance {
       delete: (sessionId: string) => {
         deleteGoalStmt.run(sessionId);
       },
+    },
+
+    feedItems: {
+      insert: (row: FeedItemRow) => {
+        feedItemInsert.run(
+          row.id,
+          row.run_id,
+          row.title,
+          row.summary,
+          row.url,
+          row.url_key,
+          row.source_host,
+          row.topic,
+          row.relevance,
+          row.body,
+          row.body_status,
+          row.image_url,
+          row.image_file,
+          row.image_status,
+          row.created_at,
+          row.read_at,
+          row.dismissed_at,
+          row.unprocessed,
+        );
+      },
+      get: (id: string) =>
+        (feedItemGet.get(id) as unknown as FeedItemRow | undefined) ?? null,
+      listVisible: (limit: number) =>
+        (feedItemListVisible.all(limit) as unknown as FeedItemRow[]) ?? [],
+      unreadCount: () =>
+        Number((feedItemUnread.get() as { n: number } | undefined)?.n ?? 0),
+      markRead: (id: string, ts: number) => {
+        feedItemMarkRead.run(ts, id);
+      },
+      markAllRead: (ts: number) => {
+        feedItemMarkAllRead.run(ts);
+      },
+      dismiss: (id: string, ts: number) => {
+        feedItemDismiss.run(ts, ts, id);
+      },
+      countAll: () =>
+        Number((feedItemCount.get() as { n: number } | undefined)?.n ?? 0),
+      deleteAll: () => {
+        feedItemDeleteAll.run();
+      },
+      deleteOlderThan: (ts: number) =>
+        Number(feedItemDeleteOlder.run(ts).changes),
+      pruneToMax: (count: number) => Number(feedItemPrune.run(count).changes),
+      listImageFileNames: () =>
+        (feedItemImageFiles.all() as unknown as { image_file: string }[]).map(
+          (row) => row.image_file,
+        ),
+      listUrlKeys: () =>
+        (feedItemUrlKeys.all() as unknown as { url_key: string }[]).map(
+          (row) => row.url_key,
+        ),
+    },
+
+    feedRuns: {
+      insert: (row: FeedRunRow) => {
+        feedRunInsert.run(
+          row.id,
+          row.started_at,
+          row.finished_at,
+          row.status,
+          row.trigger,
+          row.error,
+          row.queries,
+          row.topics,
+          row.candidate_count,
+          row.item_count,
+        );
+      },
+      finish: (id: string, patch: FeedRunPatch) => {
+        feedRunFinish.run(
+          patch.status,
+          patch.finished_at,
+          patch.error,
+          patch.candidate_count,
+          patch.item_count,
+          id,
+        );
+      },
+      setMeta: (id, meta) => {
+        feedRunSetMeta.run(meta.queries, meta.topics, meta.candidate_count, id);
+      },
+      delete: (id: string) => {
+        feedRunDelete.run(id);
+      },
+      latest: () =>
+        (feedRunLatest.get() as unknown as FeedRunRow | undefined) ?? null,
+      lastSuccessAt: () => {
+        const row = feedRunLastSuccess.get() as
+          | { ts: number | null }
+          | undefined;
+        return row?.ts ?? null;
+      },
+      lastAttemptAt: () => {
+        const row = feedRunLastAttempt.get() as
+          | { ts: number | null }
+          | undefined;
+        return row?.ts ?? null;
+      },
+      markInterrupted: (ts: number) =>
+        Number(feedRunMarkInterrupted.run(ts).changes),
+      countConsecutiveFailures: () => {
+        const rows = feedRunRecentStatuses.all() as unknown as {
+          status: FeedRunStatus;
+        }[];
+        let count = 0;
+        for (const row of rows) {
+          if (row.status !== "failed") break;
+          count += 1;
+        }
+        return count;
+      },
+      pruneOlderThan: (ts: number) => Number(feedRunPrune.run(ts).changes),
     },
 
     // Compatibility layer for old interface

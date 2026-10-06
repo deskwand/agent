@@ -185,8 +185,15 @@ function isSessionRunning(sessions: Session[], sessionId: string): boolean {
   );
 }
 
+import type {
+  FeedItemWithMeta,
+  FeedPhase,
+  FeedRunSummary,
+} from "../../shared/feed";
+
 export type ActiveView =
   | "chat"
+  | "feed"
   | "apps"
   | "automation"
   | "vault"
@@ -212,6 +219,15 @@ interface AppState {
   contextPanelWidth: number;
   browserWidthManual: boolean;
   activeView: ActiveView;
+  // ---- 动态（feed）----
+  feedEnabled: boolean;
+  feedItems: FeedItemWithMeta[];
+  feedUnread: number;
+  feedGenPhase: FeedPhase | null;
+  feedLastRun: FeedRunSummary | null;
+  feedOpenId: string | null;
+  feedBody: { body: string | null; bodyStatus: string } | null;
+  feedBlockedTopics: string[];
   /** 用量页显示货币（ISO 4217）；金额本位永远是 USD。 */
   currency: CurrencyCode;
   /** 当前货币对 USD 的汇率；null = 未取到，界面静默回退美元显示。 */
@@ -408,6 +424,14 @@ interface AppState {
   setSidebarWidth: (width: number) => void;
   setContextPanelWidth: (width: number) => void;
   setActiveView: (view: ActiveView) => void;
+  refreshFeed: () => Promise<void>;
+  setFeedEnabled: (enabled: boolean) => Promise<void>;
+  markFeedRead: (id: string) => Promise<void>;
+  markAllFeedRead: () => Promise<void>;
+  dismissFeedItem: (id: string) => Promise<void>;
+  openFeedItem: (id: string) => Promise<void>;
+  setFeedBlockedTopics: (topics: string[]) => Promise<void>;
+  setFeedPhase: (phase: FeedPhase | null) => void;
   setCurrency: (currency: CurrencyCode) => void;
   setCurrencyRate: (currencyRate: number | null) => void;
   setShowSettings: (show: boolean) => void;
@@ -605,6 +629,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   contextPanelWidth: 288,
   browserWidthManual: false,
   activeView: "chat",
+  feedEnabled: false,
+  feedItems: [],
+  feedUnread: 0,
+  feedGenPhase: null,
+  feedLastRun: null,
+  feedOpenId: null,
+  feedBody: null,
+  feedBlockedTopics: [],
   currency: readStoredCurrency(),
   currencyRate: null,
   settingsTab: null,
@@ -1316,6 +1348,46 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSidebarWidth: (width) => set({ sidebarWidth: width }),
   setContextPanelWidth: (width) => set({ contextPanelWidth: width }),
   setActiveView: (activeView) => set({ activeView }),
+  refreshFeed: async () => {
+    const snapshot = await window.electronAPI.feed.list();
+    if (!snapshot) return;
+    set({
+      feedEnabled: snapshot.enabled,
+      // imageUrl 由主进程签好，渲染层不拼 scheme
+      feedItems: snapshot.items,
+      feedUnread: snapshot.unreadCount,
+      feedLastRun: snapshot.lastRun,
+    });
+  },
+  setFeedEnabled: async (enabled) => {
+    const result = await window.electronAPI.feed.setEnabled(enabled);
+    set({ feedEnabled: result.enabled });
+    await get().refreshFeed();
+  },
+  markFeedRead: async (id) => {
+    set({ feedUnread: await window.electronAPI.feed.markRead(id) });
+    await get().refreshFeed();
+  },
+  markAllFeedRead: async () => {
+    set({ feedUnread: await window.electronAPI.feed.markAllRead() });
+    await get().refreshFeed();
+  },
+  dismissFeedItem: async (id) => {
+    set({ feedUnread: await window.electronAPI.feed.dismiss(id) });
+    await get().refreshFeed();
+  },
+  openFeedItem: async (id) => {
+    set({ feedOpenId: id, feedBody: null });
+    const unread = await window.electronAPI.feed.markRead(id);
+    const body = await window.electronAPI.feed.getBody(id);
+    set({ feedBody: body, feedUnread: unread });
+    await get().refreshFeed();
+  },
+  setFeedBlockedTopics: async (topics) => {
+    const result = await window.electronAPI.feed.setBlockedTopics(topics);
+    set({ feedBlockedTopics: result.blockedTopics });
+  },
+  setFeedPhase: (phase) => set({ feedGenPhase: phase }),
   setCurrency: (currency) => {
     // 同一货币早退：setCurrency 会清汇率，而汇率只按 currency 变化重新拉取，
     // 重复设置同一货币会清掉汇率却不再取回来（金额退回美元显示）

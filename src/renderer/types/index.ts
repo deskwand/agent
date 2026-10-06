@@ -26,6 +26,7 @@ import type {
 import type { VoiceShortcut } from "../../shared/voice-shortcuts";
 
 // Session types
+import type { FeedPhase, FeedRunStatus } from "../../shared/feed";
 import type { SessionKind } from "../../shared/session-kind";
 
 export interface Session {
@@ -738,6 +739,15 @@ export type ServerEvent =
   | { type: "new-session" }
   | { type: "navigate"; payload: string }
   | { type: "scheduled-task.error"; payload: { taskId: string; error: string } }
+  | {
+      type: "feed.updated";
+      payload: {
+        unreadCount: number;
+        runId: string | null;
+        status: FeedRunStatus;
+        phase?: FeedPhase;
+      };
+    }
   | { type: "update.available"; payload: { version: string } }
   | {
       type: "update.progress";

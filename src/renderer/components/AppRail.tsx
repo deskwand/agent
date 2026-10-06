@@ -7,6 +7,7 @@ import {
   Clock3,
   LayoutGrid,
   MessageSquare,
+  Newspaper,
 } from "lucide-react";
 import type { ActiveView } from "../store";
 import { useAppStore } from "../store";
@@ -19,6 +20,7 @@ import { AccountCluster } from "./AccountCluster";
 /** 图标只在这里映射：nav-rail.ts 保持纯数据，不引入 React。 */
 const RAIL_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   chat: MessageSquare,
+  feed: Newspaper,
   automation: Clock3,
   apps: LayoutGrid,
   vault: Archive,
@@ -35,6 +37,7 @@ export function AppRail({
   const { t } = useTranslation();
   const activeView = useAppStore((s) => s.activeView);
   const setActiveView = useAppStore((s) => s.setActiveView);
+  const feedUnread = useAppStore((s) => s.feedUnread);
 
   const activeKey = resolveRailActiveKey(activeView);
 
@@ -53,21 +56,39 @@ export function AppRail({
       {RAIL_ITEMS.map((item) => {
         const Icon = RAIL_ICONS[item.key];
         const isActive = activeKey === item.key;
+        // 未读角标只属于动态；未读为 0 时**不渲染**（不是渲染成透明）
+        const unread = item.key === "feed" ? feedUnread : 0;
+        const label =
+          unread > 0
+            ? t("feed.railLabelUnread", { count: unread })
+            : t(item.labelKey);
         return (
           <Fragment key={item.key}>
             <Tooltip label={t(item.labelKey)} placement="right">
               <button
                 type="button"
                 onClick={() => handleItemClick(item.view)}
-                aria-label={t(item.labelKey)}
+                aria-label={label}
                 aria-current={isActive ? "page" : undefined}
-                className={`${RAIL_BUTTON_CLASS} ${
+                className={`${RAIL_BUTTON_CLASS} relative ${
                   isActive
                     ? "bg-overlay-on text-accent"
                     : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
                 }`}
               >
                 {Icon ? <Icon className="w-4 h-4" /> : null}
+                {unread > 0 ? (
+                  <span
+                    data-testid="feed-badge"
+                    aria-hidden
+                    className="absolute -right-0.5 -top-0.5 min-w-[15px] rounded-full bg-accent px-1 text-center text-[9px] font-bold leading-[15px] text-accent-foreground"
+                    style={{
+                      boxShadow: "0 0 0 2px var(--color-background-chrome)",
+                    }}
+                  >
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                ) : null}
               </button>
             </Tooltip>
             {item.key === "chat" ? (

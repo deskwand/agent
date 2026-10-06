@@ -182,6 +182,11 @@ export class MemoryService {
     );
   }
 
+  /** 只读：core memory 的 "category:key" → value。动态的兴趣信号用它（设计 §6.1）。 */
+  getCoreMemoryRaw(): Record<string, string> {
+    return this.getCoreStore().getRaw();
+  }
+
   deleteCoreMemory(key: string): Promise<AppliedCoreMemoryAction[]> {
     return this.queue.enqueue(MemoryService.GLOBAL_WRITE_QUEUE_KEY, async () =>
       this.getCoreStore().applyActions([{ op: "delete", key }]),

@@ -13,6 +13,7 @@ export interface RailItem {
  */
 export const RAIL_ITEMS: readonly RailItem[] = [
   { key: "chat", view: "chat", labelKey: "navRail.chat" },
+  { key: "feed", view: "feed", labelKey: "navRail.feed" },
   { key: "automation", view: "automation", labelKey: "sidebar.automation" },
   { key: "apps", view: "apps", labelKey: "sidebar.apps" },
   { key: "vault", view: "vault", labelKey: "sidebar.vault" },

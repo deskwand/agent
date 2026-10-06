@@ -22,6 +22,7 @@ import { normalizeTokenUsage } from "../usage/normalize-usage";
 import { buildAuxUsageRecord } from "../usage/usage-records";
 import { recordUsage } from "../usage/usage-store";
 import type { TokenUsage } from "../../renderer/types";
+import type { UsagePurpose } from "../../shared/usage";
 import { normalizeGeneratedTitle } from "../session/session-title-utils";
 import { resolveProviderApiKey } from "./shared-model-runtime";
 import { extractOAuthProviderId } from "../../shared/oauth-utils";
@@ -375,7 +376,7 @@ export async function runPiAiOneShot(
  */
 function recordAuxUsage(
   usage: TokenUsage | undefined,
-  purpose: "title" | "memory" | "probe" | "polish",
+  purpose: UsagePurpose,
   model: string,
   provider: string,
   sessionId: string | null,
