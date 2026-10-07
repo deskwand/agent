@@ -135,7 +135,8 @@ describe("VoiceModeOverlay", () => {
   it("识别中显示转写", () => {
     renderOverlay({ state: "capturing", transcript: "杭州两天怎么玩" });
     expect(captionRegion().textContent).toBe("杭州两天怎么玩");
-    expect(captionSpan().className).toContain("text-center");
+    // 居中不在这里锁：转写与回答共用同一个 span，几何契约统一由下面那条
+    // 「定高一行、可横向滚、不折行」守。
   });
 
   it("回答为空时回落到转写（兜底，当前链路到不了）", () => {
@@ -179,7 +180,18 @@ describe("VoiceModeOverlay", () => {
     expect(region.className).toContain("overflow-x-auto");
     expect(region.className).toContain("overflow-y-hidden");
     expect(region.parentElement?.className).toContain("h-10");
-    expect(captionSpan().className).toContain("whitespace-nowrap");
+
+    const span = captionSpan();
+    expect(span.className).toContain("whitespace-nowrap");
+    // 这一行必须「撑满容器」：任何比容器窄的宽度上限都会让 nowrap 文本从窄盒子的
+    // 左沿往右溢出，于是放得下也不居中（曾经是 max-w-[34rem]，真机实测 1560px 窗口里
+    // 975px 那行偏 431px）。jsdom 不做布局，只能锁写法 —— 所以锁**不变量**而不是
+    // 某个拼写：`max-w-full`/`max-w-none`/`w-full`/`w-auto` 等价于撑满，不在限内；
+    // 而 max-w-[34rem]、max-w-2xl、w-1/2 与内联 style 会重新引入缺陷。
+    expect(span.className).toContain("text-center");
+    expect(span.className).not.toMatch(/\bmax-w-(?!full\b|none\b)/);
+    expect(span.className).not.toMatch(/\bw-(?!full\b|auto\b)/);
+    expect(span.getAttribute("style")).toBeNull();
   });
 
   it("纵向滚轮映射成横向滚动", () => {

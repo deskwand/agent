@@ -124,10 +124,13 @@ export function VoiceModeOverlay({
       {/*
         只显示正在念的那个合成单元（规则在 `voiceCaptionLine` 里）。定高一行：高度恒定，
         所以球不会随文字增减上下跳 —— 以前靠一个高框占位，现在一条线就够。
-        放不下就横向滚（不折行）：`max-w-[34rem]` 限的是盒子、不是可见行宽 ——
-        超长文本从盒子右边缘溢出，而盒子仍保持居中，所以句首始终在左边、尾部靠滚动
-        拿到（四档窗口宽度在本机 Chrome 实测过）。`margin: auto` 塌成 0 是另一回事，
-        只在容器本身窄于 34rem 时发生。
+
+        居中只靠 `text-center`，别给这一行加**比容器窄**的宽度上限：`whitespace-nowrap`
+        下超长文本是从盒子右边缘溢出的，盒子一旦被卡窄（曾经是 `max-w-[34rem]`），文字
+        就被钉在窄盒子的左沿、整行不居中（真机实测：1560px 窗口里 975px 那行左 509 / 右 78，
+        偏 431px，一个字也没裁）；窗口再窄一截尾部就真滚不到了。
+        现在：放得下就居中（左右间距相等），比容器还长才从左边溢出、靠横向滚看尾部。
+        `max-w-full` / `max-w-none` / `w-full` 等价于撑满，不在限内。
       */}
       <div className="mt-6 h-10 w-full">
         <div
@@ -137,9 +140,7 @@ export function VoiceModeOverlay({
           className="h-full overflow-x-auto overflow-y-hidden px-8 text-lg leading-relaxed [scrollbar-width:none]"
           style={{ color: "#e7e7ea" }}
         >
-          <span className="mx-auto block max-w-[34rem] text-center whitespace-nowrap">
-            {text}
-          </span>
+          <span className="block text-center whitespace-nowrap">{text}</span>
         </div>
       </div>
     </div>
