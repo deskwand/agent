@@ -390,6 +390,30 @@ describe("试听", () => {
     await openMenu(container, "voice-engine-voice"); // 关掉
   });
 
+  it("滚动菜单内部列表不会把菜单关掉（捕获监听的坑）", async () => {
+    await mount({ tone: "best", engine: ENGINE_READY });
+    await openMenu(container, "voice-engine-voice");
+    const panel = document.body.querySelector<HTMLElement>(
+      '[data-testid="voice-engine-voice-menu"]',
+    )!;
+
+    // 面板自己 overflow-y-auto：滚它会在捕获阶段被 window 看到
+    await act(async () => {
+      panel.dispatchEvent(new Event("scroll"));
+    });
+    expect(
+      document.body.querySelector('[data-testid="voice-engine-voice-menu"]'),
+    ).not.toBeNull();
+
+    // 真·页面滚动仍然要关（坐标是打开那一刻量的，跟着滚会飘）
+    await act(async () => {
+      document.body.dispatchEvent(new Event("scroll"));
+    });
+    expect(
+      document.body.querySelector('[data-testid="voice-engine-voice-menu"]'),
+    ).toBeNull();
+  });
+
   it("试听按钮三态同宽：点一下不该把整行推得左右跳", async () => {
     // jsdom 量不了布局，所以钉住那条不变量本身：三种文案（试听/生成中/停止）下
     // 宽度 class 必须一致 —— 宽度一变就会挤动说明文字那列并让它重新折行。

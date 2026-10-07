@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, useState, type ReactNode } from "react";
-import { menuTrigger, pickOption } from "./settings-menu-helper";
+import { menuTrigger, openMenu, pickOption } from "./settings-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -125,6 +125,57 @@ describe("设置行原语", () => {
     expect(onChange).toHaveBeenCalledWith("en");
     // 受控值真的回流了：只看 onChange 被调用，抓不到「组件是失控的」这种毛病。
     expect(menuTrigger(container, "language").textContent).toContain("English");
+  });
+
+  it("贴着底部打开时按**实际需要的高度**翻转，短菜单不白跳一大截", async () => {
+    // 触发按钮贴底：下方只剩 62px，而两项的菜单只要 ~70px。
+    // 若拿面板上限（264px）去判断，会把它白翻到 264px 之上 —— 一打开就"跳一下"。
+    const rect = {
+      top: 600,
+      bottom: 630,
+      left: 100,
+      right: 200,
+      width: 100,
+      height: 30,
+      x: 100,
+      y: 600,
+      toJSON: () => ({}),
+    } as DOMRect;
+    const spy = vi
+      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+      .mockReturnValue(rect);
+    Object.defineProperty(window, "innerHeight", {
+      value: 700,
+      configurable: true,
+    });
+    // 自带一个两选项的 harness：上面那个 Harness 是局部的，这里拿不到
+    function TwoOptionSelect() {
+      const [value, setValue] = useState<"zh" | "en">("zh");
+      return (
+        <SettingsSelect
+          testId="language"
+          label="语言"
+          value={value}
+          options={[
+            { value: "zh", label: "简体中文" },
+            { value: "en", label: "English" },
+          ]}
+          onChange={setValue}
+        />
+      );
+    }
+
+    try {
+      await render(<TwoOptionSelect />);
+      await openMenu(container, "language");
+      const panel = document.body.querySelector<HTMLElement>(
+        '[data-testid="language-menu"]',
+      )!;
+      // 600 - 6 - 70 = 524（按上限算会是 330，差出小半屏）
+      expect(panel.style.top).toBe("524px");
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("行渲染标题与说明，没有说明就不占那一层", async () => {
