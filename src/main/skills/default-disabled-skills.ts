@@ -4,10 +4,13 @@
  * 名单里的技能**默认禁用**：不交给 pi、不进系统提示，但仍在技能页里可见，
  * 用户点一下就能打开（打开会写一行 DB 记录，从此以那一行为准）。
  *
- * 名单只放「典型办公用户用不上、但要时能在技能页找到」的技能：
- * 开发流程链、开发工具、小众创作。产品耦合（officecli 有 13 处代码引用）与
- * 欢迎页入口对应的技能（brainstorming / systematic-debugging / officecli）
- * 一律保留默认启用。
+ * 名单只放「默认不送进模型、但要在技能页找得到」的技能：开发流程链、开发工具、
+ * 小众创作、办公输出（图表 / 文档协作 / 内部沟通 / 会议纪要 —— 默认关是为了压
+ * 系统提示开销，要用时去技能页点开）。superpowers pack 的 15 个技能里只有
+ * writing-plans、requesting-code-review、executing-plans 与
+ * subagent-driven-development 不在本名单；产品耦合（officecli 系列有
+ * 大量代码引用）与欢迎页入口对应的技能（brainstorming / systematic-debugging /
+ * officecli）一律保留默认启用。
  *
  * 取值口径：没有 DB 行 ⇒ 用这里；有 DB 行 ⇒ 用行里的值（行只由 `setSkillEnabled()`
  * 写入，见 `skills-manager.ts`）。
@@ -15,11 +18,7 @@
 export const DEFAULT_DISABLED_BUILTINS: ReadonlySet<string> = new Set([
   // 开发流程链
   "using-superpowers",
-  "writing-plans",
-  "executing-plans",
-  "subagent-driven-development",
   "test-driven-development",
-  "requesting-code-review",
   "receiving-code-review",
   "verification-before-completion",
   "using-git-worktrees",
@@ -47,6 +46,11 @@ export const DEFAULT_DISABLED_BUILTINS: ReadonlySet<string> = new Set([
   "theme-factory",
   "brand-guidelines",
   "slack-gif-creator",
+  // 办公输出（图表 / 文档协作 / 内部沟通 / 会议纪要）
+  "data-chart",
+  "doc-coauthoring",
+  "internal-comms",
+  "meeting-notes",
 ]);
 
 /**
