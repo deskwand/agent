@@ -16,6 +16,7 @@ import {
   type SpeechTarget,
 } from "../utils/tts/speech-text";
 import { createAudioQueue, type AudioQueue } from "../utils/tts/audio-queue";
+import { readAloudToneOverride } from "../../shared/voice-mode";
 import {
   speakStream,
   type SpeakStreamHandlers,
@@ -30,8 +31,17 @@ export interface ReadAloudState {
 }
 
 export interface ReadAloudDeps {
-  /** 发一次流式合成，返回取消函数。块按引擎的标点分段到达。 */
-  speak: (text: string, handlers: SpeakStreamHandlers) => () => void;
+  /**
+   * 发一次流式合成，返回取消函数。块按引擎的标点分段到达。
+   *
+   * `segmentCount` 是**这一整篇**的段数，不是这一次的序号：默认实现用它决定档位
+   * （多段朗读让位给均衡档，见 `readAloudToneOverride`）。
+   */
+  speak: (
+    text: string,
+    handlers: SpeakStreamHandlers,
+    context: { segmentCount: number },
+  ) => () => void;
   createQueue: () => AudioQueue;
   /** 注入以便测试。默认写进 `useAppStore`（仓库约定：跨组件状态用 zustand）。 */
   setState?: (patch: Partial<ReadAloudState>) => void;
@@ -141,36 +151,42 @@ export function createReadAloudController(
       else pump(index + 1, token);
     };
 
-    cancel = deps.speak(segment.text, {
-      onChunk: (chunk) => {
-        // 回来时可能已经被 start / stop 作废 —— 旧块直接丢
-        if (token !== generation) return;
-        sawChunk = true;
-        ensureQueue().enqueue({
-          sentenceIndex: index,
-          samples: chunk.samples,
-          sampleRate: chunk.sampleRate,
-        });
-        if (state.status === "preparing") set({ status: "playing" });
-      },
-      onDone: () => {
-        forget();
-        if (token !== generation) return;
-        endSegment();
-      },
-      onError: (error) => {
-        forget();
-        if (token !== generation) return;
-        // 已经出过声的段：保留已播部分，当这一段结束（不弹错误 —— 用户已经听到了）。
-        if (sawChunk) {
+    // 整篇的段数：默认实现据此决定档位（多段朗读让位给均衡档）
+    const context = { segmentCount: segments.length };
+    cancel = deps.speak(
+      segment.text,
+      {
+        onChunk: (chunk) => {
+          // 回来时可能已经被 start / stop 作废 —— 旧块直接丢
+          if (token !== generation) return;
+          sawChunk = true;
+          ensureQueue().enqueue({
+            sentenceIndex: index,
+            samples: chunk.samples,
+            sampleRate: chunk.sampleRate,
+          });
+          if (state.status === "preparing") set({ status: "playing" });
+        },
+        onDone: () => {
+          forget();
+          if (token !== generation) return;
           endSegment();
-          return;
-        }
-        queue?.stop();
-        highlight(null); // 别把上一次的高亮留在屏幕上
-        set({ status: "error", error });
+        },
+        onError: (error) => {
+          forget();
+          if (token !== generation) return;
+          // 已经出过声的段：保留已播部分，当这一段结束（不弹错误 —— 用户已经听到了）。
+          if (sawChunk) {
+            endSegment();
+            return;
+          }
+          queue?.stop();
+          highlight(null); // 别把上一次的高亮留在屏幕上
+          set({ status: "error", error });
+        },
       },
-    });
+      context,
+    );
     cancels.add(cancel);
   };
 
@@ -215,7 +231,17 @@ function pushToStore(patch: Partial<ReadAloudState>): void {
 
 function defaultDeps(): ReadAloudDeps {
   return {
-    speak: (text, handlers) => speakStream(text, undefined, handlers),
+    speak: (text, handlers, { segmentCount }) => {
+      // **每次调用**读一次设置：改档位要对下一次朗读生效。
+      // 只有「选了最佳档 + 多段」才覆盖；其余传 undefined，保持改动前的解析路径。
+      const voiceMode = useAppStore.getState().appConfig?.voiceMode;
+      const override = readAloudToneOverride(voiceMode, segmentCount);
+      return speakStream(
+        text,
+        override ? { tone: override } : undefined,
+        handlers,
+      );
+    },
     createQueue: () =>
       createAudioQueue({ createContext: () => new AudioContext() }),
   };

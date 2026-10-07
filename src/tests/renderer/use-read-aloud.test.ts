@@ -10,14 +10,16 @@ function fakeDeps() {
   const requested: string[] = [];
   const streams: SpeakStreamHandlers[] = [];
   const cancelled: string[] = [];
+  const contexts: Array<{ segmentCount: number }> = [];
   const enqueued: Array<{ sentenceIndex: number; samples: Float32Array }> = [];
   let markLastCalls = 0;
   let onDrained: (() => void) | null = null;
 
   const deps: ReadAloudDeps = {
     setState: vi.fn(),
-    speak: (text, handlers) => {
+    speak: (text, handlers, context) => {
       requested.push(text);
+      contexts.push(context);
       streams.push(handlers);
       return () => {
         cancelled.push(text);
@@ -42,6 +44,7 @@ function fakeDeps() {
   return {
     deps,
     requested,
+    contexts,
     enqueued,
     cancelled,
     streamAt: (i: number) => streams[i],
@@ -63,6 +66,30 @@ function messageRoot() {
 }
 
 describe("朗读会话", () => {
+  it("把整篇段数交给 speak：默认实现据此在多段时让位给均衡档", async () => {
+    const harness = fakeDeps();
+    const controller = createReadAloudController(harness.deps);
+    const root = document.createElement("div");
+    root.innerHTML = "<p>第一段。</p><p>第二段。</p>";
+    document.body.appendChild(root);
+
+    controller.start("m1", root);
+    // 流水线：先发第一段，第一段结束才发第二段 —— 两段拿到的都是"整篇 2 段"
+    expect(harness.contexts.map((c) => c.segmentCount)).toEqual([2]);
+    harness.streamAt(0).onDone();
+    expect(harness.contexts.map((c) => c.segmentCount)).toEqual([2, 2]);
+
+    // 单段时报告 1 —— 没有跨段漂移问题，仍然是用户选的档。
+    // 注意 `extractSpeechSegments` 是**按句**切的：一个 <p> 里三句话就是 3 段，
+    // 所以"一句话"才是单段。
+    const single = fakeDeps();
+    const one = document.createElement("div");
+    one.innerHTML = "<p>只有一句话。</p>";
+    document.body.appendChild(one);
+    createReadAloudController(single.deps).start("m2", one);
+    expect(single.contexts[0].segmentCount).toBe(1);
+  });
+
   it("开始后进入准备态，拿到第一句就开播", async () => {
     const harness = fakeDeps();
     const controller = createReadAloudController(harness.deps);
