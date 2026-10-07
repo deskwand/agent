@@ -278,6 +278,22 @@ interface MenuRect {
   minWidth: number;
 }
 
+/**
+ * 设置项里的下拉。
+ *
+ * **不用原生 `<select>`**：它的展开菜单由操作系统绘制，跟随**系统**外观而不是 app
+ * 主题 —— 浅色主题 + 深色系统会弹出系统深色菜单（选中行是系统高亮色），CSS 够不着。
+ * 做法照 `usage/CurrencySelect`（那边已经踩过一遍并写在注释里）。
+ *
+ * **面板挂到 body**（portal）：设置卡是 `overflow-hidden rounded-container`（圆角靠它切），
+ * 留在行里会被裁成只露第一项。挂到 body 之后没有带 transform 的祖先，`position: fixed`
+ * 的包含块就是视口，所以这里用 fixed + 打开时量好的坐标 —— **坐标必须在渲染前算好**，
+ * 若来自"挂载后再测量"，第一帧没有位置，会先在左上角闪一下。
+ *
+ * **已知缺口**：没有方向键导航与首字母跳转（原生 `<select>` 有）。Tab 能走到选项、
+ * Enter 能选，所以不是不可用，只是慢一点。要补就在这个文件里补 activeIndex +
+ * aria-activedescendant，别去别处再写一套菜单。
+ */
 export function SettingsSelect<T extends string>({
   value,
   options,
@@ -311,12 +327,12 @@ export function SettingsSelect<T extends string>({
     const trigger = triggerRef.current;
     if (!trigger) return;
     const box = trigger.getBoundingClientRect();
-    // 下方放不下就翻到上方（贴底那一行尤其明显）
+    // 这个菜单需要多高：按项数估（约 30px 一项），上限是 MENU_MAX_HEIGHT。
+    // **不能用上限去判断**：两项的菜单下方还有 100px 空间时也会被翻上去，白跳一下。
+    const needed = Math.min(MENU_MAX_HEIGHT, options.length * 30 + 10);
     const spaceBelow = window.innerHeight - box.bottom - 8;
     const top =
-      spaceBelow >= MENU_MAX_HEIGHT
-        ? box.bottom + 6
-        : Math.max(8, box.top - 6 - MENU_MAX_HEIGHT);
+      spaceBelow >= needed ? box.bottom + 6 : Math.max(8, box.top - 6 - needed);
     setRect({
       top,
       right: Math.max(8, window.innerWidth - box.right),
@@ -338,16 +354,22 @@ export function SettingsSelect<T extends string>({
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
-    // 滚动/改窗口就关掉：坐标是打开那一刻量的，不跟着页面走会让面板飘在错位置
+    // 滚动/改窗口就关掉：坐标是打开那一刻量的，不跟着页面走会让面板飘在错位置。
+    // **面板自己内部滚动要放过** —— 捕获阶段监听能看到列表里的 scroll 事件，
+    // 不排除掉的话，滚那 9 个音色就会把菜单滚没了。
+    const closeOnScroll = (event: Event) => {
+      if (panelRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
     const close = () => setOpen(false);
     document.addEventListener("mousedown", handleOutsideClick);
     document.addEventListener("keydown", handleEscape);
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", closeOnScroll, true);
     window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("mousedown", handleOutsideClick);
       document.removeEventListener("keydown", handleEscape);
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", closeOnScroll, true);
       window.removeEventListener("resize", close);
     };
   }, [open]);
