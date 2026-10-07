@@ -38,21 +38,9 @@
 Talk to it. Cut in whenever you want. It answers out loud, and every piece of
 speech work happens on your own machine.
 
-```text
-✦ voice mode ─────────────────────────────────────────────────────────
-
-listening   microphone open · recognition runs on this machine
-thinking    reads the answer as it is written
-> speaking  out loud — captions follow the voice, sentence by sentence
-
-    "Three states now require AI disclosure — California, Colorado
-     and Connecticut. Colorado's rule took effect on 1 July."
-
-✦ interruption ─────────────────────────────────────────────────────
-
-  you say   "wait — expand on the Colorado one"
-  it stops mid-sentence and answers. a filler ("嗯", "对", "好") is not a cut-in.
-```
+<p align="center">
+  <img src="resources/voice-mode-en.webp" alt="Voice mode: the star orb while it speaks, with the state caption and the sentence being read underneath" width="720">
+</p>
 
 **Speak, don't type.** Hold `Right Option` (macOS) or `Right Alt` (Windows) and
 talk. The transcript lands in the input box, cleaned up into written language.
