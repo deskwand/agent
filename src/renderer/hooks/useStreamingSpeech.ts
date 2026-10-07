@@ -12,6 +12,9 @@
  *     `queue.markLast()` —— 队列靠它区分「读完」与「合成还没跟上」。
  */
 import type { AudioQueue } from "../utils/tts/audio-queue";
+
+/** 首句之后每几句合成一次。4 是实测权衡：边界少 4 倍，块的时长仍在几秒级。 */
+const GROUP_SENTENCES = 4;
 import type {
   SpeakStreamChunk,
   SpeakStreamHandlers,
@@ -61,6 +64,17 @@ export function createStreamingSpeech(
    * 后句先到是常态（不同句是各自独立的流），所以这是必需的，不是防御性代码。
    * 缓存有界：只缓存「还没轮到」的句子，上界是一整句音频。
    */
+  /**
+   * 语音对话的合并粒度：**首句单发**（首声优先），之后每 GROUP_SENTENCES 句合成一次。
+   *
+   * 每句一次请求 = 每句一次独立采样，而最佳档（Qwen3-TTS）不保证跨请求同一说话人：
+   * 实测每句一块时约 14% 的边界会换音区（听成换人），合并成 4 句一块后边界从 14 个
+   * 降到 2 个 —— 每个边界的风险没变，变的是边界数量。
+   *
+   * 首声不受影响：第一句仍然立刻发；后面的块是在前面音频**播放**期间攒的，而引擎
+   * 比实时快（实测 1.6–1.9×），攒得住。每次有单元开始播放也会立刻把手上攒的发出去，
+   * 所以生成慢也只会让块变小，不会断音。
+   */
   const buffers = new Map<
     number,
     { chunks: SpeakStreamChunk[]; done: boolean }
@@ -68,10 +82,16 @@ export function createStreamingSpeech(
   /** 在飞的取消函数。只用 values/clear，所以是 Set 不是 Map。 */
   const cancels = new Set<() => void>();
   let nextToPublish = 0;
+  /** 正在攒的单元（还没发出去合成）。 */
+  let pending: { text: string; count: number } | null = null;
+  /** 已经发出去的单元数 —— 用来实现"只有第一句单发"。 */
+  let units = 0;
   const sentenceCbs = new Set<(index: number, text: string) => void>();
   const drainedCbs = new Set<() => void>();
 
   queue.onSentenceStart((index) => {
+    // 有东西开始播了 = 手上的下一块要尽快发出去，否则播放会走到空
+    flushPending();
     const text = sentences[index];
     if (text === undefined) return;
     for (const cb of sentenceCbs) cb(index, text);
@@ -156,10 +176,29 @@ export function createStreamingSpeech(
     cancels.add(cancel);
   };
 
-  const addSentence = (text: string) => {
+  /** 英文句子拼在一起要留空格，中文不要。 */
+  const joinForSpeech = (a: string, b: string): string =>
+    /[A-Za-z0-9]$/.test(a) && /^[A-Za-z0-9]/.test(b) ? `${a} ${b}` : a + b;
+
+  const flushPending = () => {
+    if (!pending) return;
+    const text = pending.text;
+    pending = null;
     const index = sentences.length;
     sentences.push(text);
+    units += 1;
     synthesize(index, text);
+  };
+
+  const addSentence = (text: string) => {
+    if (!pending) {
+      pending = { text, count: 1 };
+    } else {
+      pending.text = joinForSpeech(pending.text, text);
+      pending.count += 1;
+    }
+    // 第一句立刻发（首声），之后攒够再发 —— 边界越少，换音色的机会越少
+    if (units === 0 || pending.count >= GROUP_SENTENCES) flushPending();
   };
 
   return {
@@ -175,6 +214,8 @@ export function createStreamingSpeech(
       inFlight = 0;
       waitingLast = false;
       nextToPublish = 0;
+      pending = null;
+      units = 0;
       failures = 0;
       offset = fromCharOffset;
     },
@@ -189,6 +230,7 @@ export function createStreamingSpeech(
       if (ended) return;
       ended = true;
       for (const text of stream.flush()) addSentence(text);
+      flushPending(); // 尾巴也要发出去，否则永远等不到 markLast
       waitingLast = true;
       publish();
     },
@@ -202,6 +244,8 @@ export function createStreamingSpeech(
       inFlight = 0;
       waitingLast = false;
       nextToPublish = 0;
+      pending = null;
+      units = 0;
     },
     onSentence(cb) {
       sentenceCbs.add(cb);
