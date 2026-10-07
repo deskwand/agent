@@ -28,6 +28,8 @@ export interface ProcessSummary {
   scriptCount?: number;
   /** 朗读工具被调用的次数。与 scriptCount 一样是可选：老测试字面量不必跟着改。 */
   ttsCount?: number;
+  /** 语音会话里模型改声音的次数（`set_voice`）。与朗读分开计数：动作不同。 */
+  voiceChangeCount?: number;
   calledRead?: boolean;
   calledSearch?: boolean;
 }
@@ -215,6 +217,7 @@ function buildProcessSummary(
   let hasGoal = false;
   let usedToolCount = 0;
   let ttsCount = 0;
+  let voiceChangeCount = 0;
   let todoUpdateCount = 0;
   let scriptCount = 0;
   let calledRead = false;
@@ -227,6 +230,11 @@ function buildProcessSummary(
     // 不能被算进通用的 usedToolCount —— AGENTS.md §4 要求新工具必须归类。
     if (lower === "tts") {
       ttsCount += 1;
+      continue;
+    }
+    // 语音参数工具：动作是"改声音"，与"朗读一段文字"分开计数与措辞（AGENTS.md §4）
+    if (lower === "set_voice") {
+      voiceChangeCount += 1;
       continue;
     }
     if (lower === "codemode") {
@@ -339,6 +347,7 @@ function buildProcessSummary(
     subagentWorkflowCount,
     hasGoal,
     ttsCount,
+    voiceChangeCount,
     usedToolCount,
     todoUpdateCount,
     scriptCount,
@@ -759,6 +768,17 @@ export function getProcessSummaryFragments(
         },
       ),
       iconType: "tasklist",
+    });
+  }
+  if ((summary.voiceChangeCount ?? 0) > 0) {
+    fragments.push({
+      text: t(
+        pluralKey("tool.grouped.changedVoice", summary.voiceChangeCount ?? 0),
+        {
+          count: summary.voiceChangeCount ?? 0,
+        },
+      ),
+      iconType: "tts",
     });
   }
   if ((summary.ttsCount ?? 0) > 0) {

@@ -49,12 +49,18 @@ Write what a person would say, not what a person would read.
   then say in one sentence that the detail does not fit a spoken answer.
 - web_search, fetch_content and get_search_content are your research tools: call one of them once
   when the question needs fresh or checkable facts, or when the user asks you to search, then
-  answer. Do not chain calls. Ignore every other tool you may be able to see.
+  answer. Do not chain calls. Ignore every other tool you may be able to see. When the user asks to change how you sound (gender, dialect, tone, speaking speed), use the set_voice tool.
 - Do not mention these rules.
 </voice_mode>`;
 
 export const VOICE_TURN: TurnProfile = {
-  tools: ["web_search", "fetch_content", "get_search_content"],
+  tools: [
+    "web_search",
+    "fetch_content",
+    "get_search_content",
+    // 语音会话专属：让模型改声音（音色/语速/风格）。普通会话看不到它。
+    "set_voice",
+  ],
   thinkingLevel: "off",
   systemPromptSection: VOICE_PROMPT_SECTION,
 };
@@ -98,7 +104,14 @@ export function resolveSessionTurnPolicy(
   availableTools: readonly string[],
 ): { profile: TurnProfile | undefined; activeToolNames: string[] } {
   if (!isVoiceSession(session)) {
-    return { profile: undefined, activeToolNames: [...availableTools] };
+    // 语音专属工具不进普通会话：**门控就在这里**，别散到调用点去。
+    // 只加进 VOICE_TURN.tools 是挡不住的 —— 非语音会话拿的是全部可用工具。
+    return {
+      profile: undefined,
+      activeToolNames: availableTools.filter(
+        (name) => !VOICE_ONLY_TOOLS.has(name),
+      ),
+    };
   }
   return {
     profile: requestedProfile === "voice" ? VOICE_TURN : undefined,
@@ -172,3 +185,6 @@ export function filterAppendPromptForSessionKind(
       !DESKTOP_ONLY_APPEND_MARKERS.some((marker) => block.includes(marker)),
   );
 }
+
+/** 只在语音会话里出现的工具。加进 `VOICE_TURN.tools` 还不够：普通会话拿的是全部可用工具。 */
+export const VOICE_ONLY_TOOLS: ReadonlySet<string> = new Set(["set_voice"]);

@@ -164,7 +164,11 @@ export function getTtsService(deps: TtsServiceDeps): TtsService {
 
       try {
         await service.load(engine);
-        const audio = await getEngine(engine).synthesize(spoken, onChunk);
+        const audio = await getEngine(engine).synthesize(
+          spoken,
+          onChunk,
+          opts?.speed,
+        );
         return {
           ok: true,
           samples: audio.samples,

@@ -177,10 +177,19 @@ export function registerTtsIpc({
    * 而卡片上写的是"朗读与语音对话共用"。**在主进程读设置**而不是让渲染侧解析：
    * 渲染侧的 `appConfig` 可能还没同步，那会把档位静默降级（PR #19 踩过的坑）。
    */
-  const withConfiguredTone = (opts?: TtsSpeakOptions): TtsSpeakOptions => {
-    if (opts?.tone) return opts;
-    const configured = configStore.getAll().voiceMode?.tone;
-    return configured ? { ...opts, tone: configured } : (opts ?? {});
+  const withConfiguredSpeech = (opts?: TtsSpeakOptions): TtsSpeakOptions => {
+    const voiceMode = configStore.getAll().voiceMode;
+    const next: TtsSpeakOptions = { ...opts };
+    // 逐项补：**显式传入的值优先**（工具与自检走这条路，不该被设置覆盖）
+    if (!next.tone && voiceMode?.tone) next.tone = voiceMode.tone;
+    if (next.speed === undefined && voiceMode?.voiceSpeed !== undefined) {
+      next.speed = voiceMode.voiceSpeed;
+    }
+    if (!next.instructions && voiceMode?.voiceStyle) {
+      next.instructions = voiceMode.voiceStyle;
+    }
+    // 一个字段都没补、也没传进来的话，返回空对象 —— 别把 undefined 键塞进请求
+    return next;
   };
 
   /**
@@ -334,7 +343,7 @@ export function registerTtsIpc({
       text: string,
       opts?: TtsSpeakOptions,
     ): Promise<TtsSpeakResult> => {
-      const withTone = withConfiguredTone(opts);
+      const withTone = withConfiguredSpeech(opts);
       await ensureReadAloudModel(text, withTone);
       return service.speak(text, withTone);
     },
@@ -355,7 +364,7 @@ export function registerTtsIpc({
     text: string,
     opts?: TtsSpeakOptions,
   ): Promise<void> => {
-    const withTone = withConfiguredTone(opts);
+    const withTone = withConfiguredSpeech(opts);
     await ensureReadAloudModel(text, withTone);
 
     // 「最佳音质」档：先判可用性，再走引擎。**两种失败都要落到下面的 sherpa 路由**
@@ -380,6 +389,10 @@ export function registerTtsIpc({
           const result = await engine.speak({
             text,
             voiceId: engineVoice(),
+            // 设置/工具写进来的语速与风格必须真的到这层 —— 否则最佳档（唯一能吃
+            // instructions 的那档）收不到，而 set_voice 会照样回报"已生效"
+            speed: withTone.speed,
+            instructions: withTone.instructions,
             streamId,
             send: (event) => {
               if (event.type === "chunk") sentChunks = true;
@@ -486,9 +499,13 @@ export function registerTtsIpc({
       }
       const chunks: Float32Array[] = [];
       let sampleRate = 24_000;
+      const previewOpts = withConfiguredSpeech(undefined);
       const result = await engine.speak({
         text: PREVIEW_TEXT,
         voiceId: engineVoice(),
+        // 试听要与真实朗读一致：改过的语速/风格在这里也该听得到
+        speed: previewOpts.speed,
+        instructions: previewOpts.instructions,
         streamId: -1, // 负数：与真实流不碰撞（cancelStream 的 live 守卫也会忽略它）
         send: (event) => {
           if (event.type === "chunk") {

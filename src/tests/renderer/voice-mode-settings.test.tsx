@@ -41,7 +41,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { VoiceModeSettings } from "../../renderer/components/settings/VoiceModeSettings";
-import { pickOption } from "./settings-menu-helper";
+import { openMenu, optionValues, pickOption } from "./settings-menu-helper";
 import { useAppStore } from "../../renderer/store";
 
 let container: HTMLDivElement;
@@ -287,6 +287,56 @@ describe("VoiceModeSettings 的音色行", () => {
     expect(api.config.save).toHaveBeenCalledWith({
       voiceMode: { silenceMs: 800, fastVoice: false, tone: "best" },
     });
+  });
+
+  it("语速可改、风格可清空，且都不丢其它字段", async () => {
+    useAppStore.getState().setAppConfig({
+      voiceMode: {
+        silenceMs: 1200,
+        fastVoice: false,
+        tone: "best",
+        voiceSpeed: 1.25,
+        voiceStyle: "嗲一点",
+      },
+    } as AppConfig);
+    await mount();
+
+    // 语速行可改：写回时其它字段一个都不能丢（voiceMode 是整体替换）
+    await pickOption(container, "voice-speed", "1.5");
+    expect(api.config.save).toHaveBeenCalledWith({
+      voiceMode: {
+        silenceMs: 1200,
+        fastVoice: false,
+        tone: "best",
+        voiceSpeed: 1.5,
+        voiceStyle: "嗲一点",
+      },
+    });
+
+    // 风格由模型写入，界面只显示 + 提供清空
+    expect(container.textContent).toContain("嗲一点");
+    await act(async () => {
+      byTestId("voice-style-clear")!.click();
+    });
+    expect(api.config.save).toHaveBeenLastCalledWith({
+      voiceMode: {
+        silenceMs: 1200,
+        fastVoice: false,
+        tone: "best",
+        voiceSpeed: 1.5,
+        voiceStyle: "",
+      },
+    });
+  });
+
+  it("语速不在预设里时也显示得出来（模型可以写 0.8）", async () => {
+    useAppStore.getState().setAppConfig({
+      voiceMode: { silenceMs: 1200, fastVoice: false, voiceSpeed: 0.8 },
+    } as AppConfig);
+    await mount();
+
+    await openMenu(container, "voice-speed");
+    expect(optionValues("voice-speed")).toContain("0.8");
   });
 
   it("卡片接的是共用说明；档位行与子行各用各的 key；静音行整行消失", async () => {

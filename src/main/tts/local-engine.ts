@@ -142,14 +142,17 @@ export function createLocalTtsEngine(opts: LocalTtsOptions): TtsEngine {
           : buildLocalTtsConfig(opts),
       );
     },
-    async synthesize(text, onChunk) {
+    async synthesize(text, onChunk, speed) {
       if (!tts) throw new Error("tts engine not loaded");
       const engine = tts;
       return await engine.generateAsync({
         text,
         sid,
-        speed: SPEED,
-        generationConfig: opts.createGenerationConfig({ sid, speed: SPEED }),
+        speed: speed ?? SPEED,
+        generationConfig: opts.createGenerationConfig({
+          sid,
+          speed: speed ?? SPEED,
+        }),
         // 不传 onChunk 时恒为 true —— 那就是今天的行为（消费方不需要分块）。
         onProgress: (info) =>
           onChunk

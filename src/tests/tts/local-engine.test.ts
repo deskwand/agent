@@ -80,6 +80,26 @@ describe("local tts engine", () => {
     });
   });
 
+  it("synthesizes at the speed it was asked for", async () => {
+    const audio = { samples: new Float32Array(4), sampleRate: 44100 };
+    const generateAsync = vi.fn(async () => audio);
+    const engine = createLocalTtsEngine({
+      modelDir: MODEL_DIR,
+      createTts: () => ({ generateAsync, sampleRate: 44100 }),
+      createGenerationConfig: (options) => ({ wrapped: options }),
+    });
+    await engine.load();
+
+    await engine.synthesize("你好", undefined, 1.5);
+
+    expect(generateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        speed: 1.5,
+        generationConfig: { wrapped: { sid: 0, speed: 1.5 } },
+      }),
+    );
+  });
+
   it("forwards engine chunks to onChunk and passes its verdict back", async () => {
     const generateAsync = vi.fn(
       async (options: {

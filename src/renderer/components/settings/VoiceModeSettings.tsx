@@ -74,6 +74,9 @@ const IDLE_ENGINE: EngineInstallState = {
 
 const VOICE_MODE_KEY = "settings.capabilities.voiceMode";
 
+/** 语速预设。边界与夹紧在共享层（`clampSpeechSpeed`），这里只列可选值。 */
+const SPEED_CHOICES = ["0.75", "1", "1.25", "1.5", "2"] as const;
+
 /**
  * 每档的三件事：用哪份模型，以及三个按钮的无障碍名称。
  *
@@ -532,6 +535,60 @@ export function VoiceModeSettings() {
           {t(`${VOICE_MODE_KEY}.tonePreviewFailed`)}
         </div>
       )}
+      <SettingsRow
+        sub
+        testId="voice-speed-row"
+        title={t(`${VOICE_MODE_KEY}.voiceSpeed`)}
+        description={t(`${VOICE_MODE_KEY}.voiceSpeedDesc`)}
+        control={
+          <SettingsSelect<string>
+            testId="voice-speed"
+            label={t(`${VOICE_MODE_KEY}.voiceSpeed`)}
+            value={String(appConfig?.voiceMode?.voiceSpeed ?? 1)}
+            options={(() => {
+              // 模型可以写区间内任意值：当前值不在预设里时也要能显示出来，
+              // 否则界面显示裸数字、而且用户选不动它
+              const current = String(appConfig?.voiceMode?.voiceSpeed ?? 1);
+              const values = SPEED_CHOICES.includes(
+                current as (typeof SPEED_CHOICES)[number],
+              )
+                ? SPEED_CHOICES
+                : ([current, ...SPEED_CHOICES].sort(
+                    (a, b) => Number(a) - Number(b),
+                  ) as readonly string[]);
+              return values.map((value) => ({
+                value,
+                label: t(`${VOICE_MODE_KEY}.voiceSpeedValue`, { value }),
+              }));
+            })()}
+            onChange={(next) =>
+              void saveVoiceMode({ voiceSpeed: Number(next) })
+            }
+          />
+        }
+      />
+
+      <SettingsRow
+        sub
+        testId="voice-style-row"
+        title={t(`${VOICE_MODE_KEY}.voiceStyle`)}
+        description={
+          appConfig?.voiceMode?.voiceStyle ??
+          t(`${VOICE_MODE_KEY}.voiceStyleUnset`)
+        }
+        control={
+          appConfig?.voiceMode?.voiceStyle ? (
+            <button
+              type="button"
+              data-testid="voice-style-clear"
+              onClick={() => void saveVoiceMode({ voiceStyle: "" })}
+              className="rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none hover:bg-surface-hover"
+            >
+              {t(`${VOICE_MODE_KEY}.voiceStyleClear`)}
+            </button>
+          ) : null
+        }
+      />
     </SettingsCard>
   );
 }

@@ -50,4 +50,29 @@ describe("normalizeVoiceModeConfig", () => {
       normalizeVoiceModeConfig({ silenceMs: 900, fastVoice: "yes" }).fastVoice,
     ).toBe(true);
   });
+  it("keeps the speech speed and style, clamping the speed into range", () => {
+    const r = normalizeVoiceModeConfig({
+      voiceSpeed: 9,
+      voiceStyle: "「嗲一点」",
+    });
+    expect(r.voiceSpeed).toBe(2);
+    expect(r.voiceStyle).toBe("「嗲一点」");
+  });
+
+  it("drops junk in the new fields without touching the others", () => {
+    const r = normalizeVoiceModeConfig({
+      tone: "best",
+      voiceSpeed: "fast",
+      voiceStyle: 42,
+    });
+    expect(r.voiceSpeed).toBeUndefined();
+    expect(r.voiceStyle).toBeUndefined();
+    expect(r.tone).toBe("best");
+  });
+
+  it("leaves the new fields absent for configs written before they existed", () => {
+    const r = normalizeVoiceModeConfig({ fastVoice: false });
+    expect(r.voiceSpeed).toBeUndefined();
+    expect(r.voiceStyle).toBeUndefined();
+  });
 });

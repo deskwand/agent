@@ -50,6 +50,8 @@ export function getToolIcon(name: string) {
     return <Globe className="w-3.5 h-3.5" />;
   if (n === "vision_describe") return <Eye className="w-3.5 h-3.5" />;
   if (n === "tts") return <Volume2 className="w-3.5 h-3.5" />;
+  // 改声音（语音会话专属工具）：同域复用音量图标
+  if (n === "set_voice") return <Volume2 className="w-3.5 h-3.5" />;
   if (n === "office_read_xlsx") return <Table className="w-3.5 h-3.5" />;
   if (n === "office_read_docx") return <FileText className="w-3.5 h-3.5" />;
   if (n === "office_read_pptx") return <Presentation className="w-3.5 h-3.5" />;
@@ -248,6 +250,14 @@ export function getToolLabel(
     return p
       ? t("tool.labelReadPdf", { path: shortenPath(p) })
       : t("tool.actionReadPdf");
+  }
+
+  // --- Voice parameters (voice sessions only) ---
+  if (nameLower === "set_voice") {
+    const spoken = [inp.voice, inp.speed ? `${inp.speed}x` : "", inp.instructions]
+      .filter(Boolean)
+      .join(" · ");
+    return spoken ? t("tool.labelSetVoice", { detail: spoken }) : t("tool.actionSetVoice");
   }
 
   // --- Text to speech ---

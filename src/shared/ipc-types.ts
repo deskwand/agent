@@ -575,6 +575,10 @@ export interface TtsSpeakOptions {
    * `tone` 是设置页那一栏的三档语义。两者都给时以 `tone` 为准。
    */
   tone?: TtsTone;
+  /** 语速。缺省 = 1.0（不干预）。所有档位都吃它。 */
+  speed?: number;
+  /** 风格 / 情绪指令（引擎侧字段就叫 `instructions`）。只对最佳音质档生效。 */
+  instructions?: string;
 }
 
 export type TtsSpeakResult =

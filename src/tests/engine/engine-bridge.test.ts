@@ -71,6 +71,47 @@ describe("speakViaEngine", () => {
     expect(events.at(-1)).toEqual({ streamId: 7, type: "done" });
   });
 
+  it("请求体只在被要求时带上语速与风格", async () => {
+    const fetchFn = vi.fn(async () => responseWith([pcm(80)]));
+    const deps = { supervisor: supervisor(), fetch: fetchFn, now: () => 0 };
+
+    await speakViaEngine(
+      {
+        text: "你好",
+        voiceId: "vivian",
+        streamId: 1,
+        send: () => {},
+        speed: 1.5,
+        instructions: "嗲一点",
+      },
+      deps,
+    );
+    // mock 没声明参数，这里按真实 fetch 的元组读（vi.fn 的 calls 是 unknown[]）
+    const calls = fetchFn.mock.calls as unknown as Array<[string, RequestInit]>;
+    const body = JSON.parse(String(calls[0][1]?.body)) as Record<
+      string,
+      unknown
+    >;
+    expect(body.speed).toBe(1.5);
+    expect(body.instructions).toBe("嗲一点");
+
+    // 没要求时不出现这两个键：别让每个请求都被塞进无意义参数
+    fetchFn.mockClear();
+    await speakViaEngine(
+      { text: "你好", voiceId: "vivian", streamId: 2, send: () => {} },
+      deps,
+    );
+    const calls2 = fetchFn.mock.calls as unknown as Array<
+      [string, RequestInit]
+    >;
+    const body2 = JSON.parse(String(calls2[0]?.[1]?.body)) as Record<
+      string,
+      unknown
+    >;
+    expect("speed" in body2).toBe(false);
+    expect("instructions" in body2).toBe(false);
+  });
+
   it("极短句：整条流结束都没到门限，也不能吞掉音频", async () => {
     const ticks = [10, 20];
     let i = 0;

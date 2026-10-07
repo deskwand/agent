@@ -6,6 +6,7 @@ import {
   DESKTOP_ONLY_APPEND_MARKERS,
   filterAppendPromptForSessionKind,
   isVoiceSession,
+  resolveSessionTurnPolicy,
   resolveTurnThinkingLevel,
   VOICE_KEPT_APPEND_MARKERS,
   VOICE_PROMPT_SECTION,
@@ -13,11 +14,12 @@ import {
 } from "../../main/agent/turn-profiles";
 
 describe("voice turn profile", () => {
-  it("keeps exactly the three search tools", () => {
+  it("keeps the search tools plus the voice-only ones", () => {
     expect(VOICE_TURN.tools).toEqual([
       "web_search",
       "fetch_content",
       "get_search_content",
+      "set_voice",
     ]);
   });
 
@@ -84,6 +86,7 @@ describe("voice turn profile", () => {
       "get_search_content",
       "vision_describe",
       "tts",
+      "set_voice",
       "ask_user",
       "todo_write",
       "office_read_docx",
@@ -217,5 +220,23 @@ describe("语音会话不下发桌面区块", () => {
     expect(isVoiceSession({ kind: "voice" })).toBe(true);
     expect(isVoiceSession({ kind: "ordinary" })).toBe(false);
     expect(isVoiceSession({})).toBe(false);
+  });
+
+  it("keeps voice-only tools out of ordinary sessions", () => {
+    const available = ["set_voice", "web_search"];
+    const ordinary = resolveSessionTurnPolicy(
+      { kind: "ordinary", allowedTools: available },
+      undefined,
+      available,
+    );
+    expect(ordinary.activeToolNames).not.toContain("set_voice");
+    expect(ordinary.activeToolNames).toContain("web_search");
+
+    const voice = resolveSessionTurnPolicy(
+      { kind: "voice", allowedTools: [...VOICE_TURN.tools] },
+      "voice",
+      available,
+    );
+    expect(voice.activeToolNames).toContain("set_voice");
   });
 });

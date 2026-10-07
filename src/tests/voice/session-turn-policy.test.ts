@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import { normalizeSessionKind } from "../../shared/session-kind";
 import {
   resolveSessionTurnPolicy,
+  VOICE_ONLY_TOOLS,
   VOICE_TURN,
   appendVoiceSection,
 } from "../../main/agent/turn-profiles";
@@ -31,10 +32,14 @@ it("restricts voice input and typed continuation independently of output format"
 it.each([undefined, "ordinary" as const])(
   "ignores voice requests for %s sessions",
   (kind) => {
+    // 语音专属工具（set_voice）不进普通会话：白名单之外还有一道按会话类型的过滤。
     const available = ["read", "bash", ...VOICE_TURN.tools];
+    const ordinaryAvailable = available.filter(
+      (name) => !VOICE_ONLY_TOOLS.has(name),
+    );
     expect(
       resolveSessionTurnPolicy({ kind, allowedTools: [] }, "voice", available),
-    ).toEqual({ profile: undefined, activeToolNames: available });
+    ).toEqual({ profile: undefined, activeToolNames: ordinaryAvailable });
   },
 );
 it("never expands a voice record's stored tool restriction", () => {

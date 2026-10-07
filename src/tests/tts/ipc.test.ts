@@ -5,11 +5,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const config = vi.hoisted(() => ({
   tone: "balanced" as "fast" | "balanced" | "best",
+  voiceSpeed: undefined as number | undefined,
+  voiceStyle: undefined as string | undefined,
 }));
 
 vi.mock("../../main/config/config-store", () => ({
   configStore: {
-    getAll: () => ({ voiceMode: { tone: config.tone } }),
+    getAll: () => ({
+      voiceMode: {
+        tone: config.tone,
+        voiceSpeed: config.voiceSpeed,
+        voiceStyle: config.voiceStyle,
+      },
+    }),
   },
 }));
 import {
@@ -286,6 +294,44 @@ describe("registerTtsIpc", () => {
     await ipc.invoke("tts.speak", "你好");
 
     expect(speak).toHaveBeenCalledWith("你好", { tone: "fast" });
+  });
+
+  it("语速与风格也由配置补进 opts；显式值优先；没配就不出现", async () => {
+    const { ipc, speak } = harness({ installed: ["zh"] });
+    config.tone = "balanced";
+    config.voiceSpeed = 0.8;
+    config.voiceStyle = "严肃低沉";
+
+    await ipc.invoke("tts.speak", "你好");
+    expect(speak).toHaveBeenCalledWith(
+      "你好",
+      expect.objectContaining({
+        tone: "balanced",
+        speed: 0.8,
+        instructions: "严肃低沉",
+      }),
+    );
+
+    // 显式传入优先：工具与自检走这条路，不该被设置覆盖
+    const speakMock = vi.mocked(speak);
+    speakMock.mockClear();
+    await ipc.invoke("tts.speak", "你好", {
+      speed: 1.5,
+      instructions: "别的风格",
+    });
+    expect(speak).toHaveBeenCalledWith(
+      "你好",
+      expect.objectContaining({ speed: 1.5, instructions: "别的风格" }),
+    );
+
+    // 没配就不该出现这两个键，否则每个请求都被塞进无意义参数
+    config.voiceSpeed = undefined;
+    config.voiceStyle = undefined;
+    speakMock.mockClear();
+    await ipc.invoke("tts.speak", "你好");
+    const opts = speakMock.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect("speed" in opts).toBe(false);
+    expect("instructions" in opts).toBe(false);
   });
 
   it("朗读档位必须到合成分支（stream 路径 —— 朗读唯一走的那条）", async () => {

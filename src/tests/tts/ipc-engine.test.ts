@@ -6,13 +6,17 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const config = vi.hoisted(() => ({ readAloudEnabled: true }));
+const config = vi.hoisted(() => ({ voiceSpeed: undefined as number | undefined, voiceStyle: undefined as string | undefined, readAloudEnabled: true }));
 
 vi.mock("../../main/config/config-store", () => ({
   configStore: {
     getAll: () => ({
       readAloud: { enabled: config.readAloudEnabled },
-      voiceMode: { voiceEngineVoice: "ryan" },
+      voiceMode: {
+        voiceEngineVoice: "ryan",
+        voiceSpeed: config.voiceSpeed,
+        voiceStyle: config.voiceStyle,
+      },
     }),
   },
 }));
@@ -407,5 +411,21 @@ describe("最佳音质档的 IPC 行为", () => {
     const { ipc, engine } = harness({ installed: true });
     await ipc.invoke("tts.installEngine");
     expect(engine.install).not.toHaveBeenCalled();
+  });
+
+  it("最佳档的引擎调用带上设置里的语速与风格", async () => {
+    // 评审抓到的 Critical：这两行没传 → 最佳档（唯一吃 instructions 的那档）
+    // 收不到参数，而 set_voice 会照样回报「已生效」。
+    const h = harness();
+    config.voiceSpeed = 0.8;
+    config.voiceStyle = "严肃低沉";
+
+    await h.ipc.invoke("tts.speakStream", "你好", { tone: "best" });
+
+    expect(vi.mocked(h.engine.speak)).toHaveBeenCalledWith(
+      expect.objectContaining({ speed: 0.8, instructions: "严肃低沉" }),
+    );
+    config.voiceSpeed = undefined;
+    config.voiceStyle = undefined;
   });
 });

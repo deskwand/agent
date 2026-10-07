@@ -84,7 +84,7 @@ import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
 import { execFileSync, spawn } from "child_process";
-import { app } from "electron";
+import { app, BrowserWindow } from "electron";
 import { setMaxListeners } from "node:events";
 import { getSandboxAdapter } from "../sandbox/sandbox-adapter";
 import { pathConverter } from "../sandbox/wsl-bridge";
@@ -145,6 +145,9 @@ import {
   runtimeDir as ocrRuntimeDir,
 } from "../ocr/installer";
 import { createTtsTool } from "./tools/tts";
+import { createSetVoiceTool } from "./tools/set-voice";
+import { getEngineHost } from "../engine/engine-host";
+import { DEFAULT_VOICE_MODE } from "../../shared/voice-mode";
 import { getTtsService } from "../tts/service";
 import { createOfficeTools } from "./tools/office/office-tools";
 import { codemodeOnly } from "./tools/tool-exposure";
@@ -3141,6 +3144,32 @@ Tool routing:\n
         service: getTtsService({ userDataPath: app.getPath("userData") }),
       });
 
+      // 语音会话专属：让模型改声音（音色/语速/风格）。只在语音会话可见 ——
+      // 白名单在 turn-profiles 的 VOICE_TURN，门控在 resolveSessionTurnPolicy。
+      // 它只写配置：不写工作区文件、不触发下载（与 ttsTool 同一条原则）。
+      const setVoiceTool = createSetVoiceTool({
+        readVoiceMode: () => configStore.getAll().voiceMode,
+        saveVoiceMode: async (patch) => {
+          const current = configStore.getAll().voiceMode ?? DEFAULT_VOICE_MODE;
+          configStore.update({ voiceMode: { ...current, ...patch } });
+          // **必须通知渲染侧**：不通知的话设置卡还显示旧值（「清空」都不出现，
+          // 用户没法撤销），而且它下一次整体写入会把这些字段抹掉。
+          for (const win of BrowserWindow.getAllWindows()) {
+            win.webContents.send("server-event", {
+              type: "config.status",
+              payload: {
+                isConfigured: configStore.isConfigured(),
+                config: configStore.getAll(),
+              },
+            });
+          }
+        },
+        // 用 available() 而不是 installed()：引擎在 failed 状态时合成会回退均衡，
+        // 那时若回报"音色/风格已生效"就是对用户撒谎（评审 Minor 6）。
+        isBestTierAvailable: () =>
+          getEngineHost(app.getPath("userData")).available(),
+      });
+
       // Register built-in office document read tools (zero-dependency, pure JS)
       const officeTools = createOfficeTools(effectiveCwd);
       log(
@@ -3154,6 +3183,7 @@ Tool routing:\n
         ...(visionTool ? [visionTool] : []),
         ...(ocrTool ? [ocrTool] : []),
         ttsTool,
+        setVoiceTool,
         // Add office tools (always registered, no config required)
         ...officeTools,
         ...createTodoTools(),

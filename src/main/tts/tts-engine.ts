@@ -26,6 +26,8 @@ export interface TtsEngine {
   synthesize(
     text: string,
     onChunk?: (chunk: SynthesizedAudio) => boolean | void,
+    /** 语速；缺省 = 引擎默认（1.0）。目前只有 sherpa 两档用它。 */
+    speed?: number,
   ): Promise<SynthesizedAudio>;
   isLoaded(): boolean;
 }

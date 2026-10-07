@@ -30,6 +30,10 @@ export interface EngineStreamOptions {
    */
   send(event: TtsStreamEvent): void;
   signal?: AbortSignal;
+  /** 语速。缺省 = 1.0（引擎默认）。 */
+  speed?: number;
+  /** 风格 / 情绪指令。custom_voice 变体可选。 */
+  instructions?: string;
 }
 
 /**
@@ -71,6 +75,9 @@ export async function speakViaEngine(
       voice: opts.voiceId,
       language: "chinese",
       response_format: "pcm",
+      // 只在有值时带上：引擎对缺省字段有自己的默认，塞 undefined 没意义
+      ...(opts.speed !== undefined ? { speed: opts.speed } : {}),
+      ...(opts.instructions ? { instructions: opts.instructions } : {}),
     }),
     signal: opts.signal,
   }).catch((error: unknown) => {

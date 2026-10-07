@@ -23,6 +23,13 @@ export interface VoiceModeConfig {
    * `fastVoice` 从此只是它的镜像（老读者、老配置都还认那个布尔值）。
    */
   tone?: TtsTone;
+  /** 语速。缺省 = 1.0，也就是"不干预"。所有档位都吃它，界面上可改。 */
+  voiceSpeed?: number;
+  /**
+   * 风格 / 情绪的自然语言指令（引擎侧叫 `instructions`）。**只对最佳音质档生效** ——
+   * 快速与均衡是 sherpa，没有这条通路。它由语音会话里的模型写入（工具 `set_voice`）。
+   */
+  voiceStyle?: string;
 }
 
 /**
@@ -70,6 +77,8 @@ export function normalizeVoiceModeConfig(value: unknown): VoiceModeConfig {
     fastVoice?: unknown;
     voiceEngineVoice?: unknown;
     tone?: unknown;
+    voiceSpeed?: unknown;
+    voiceStyle?: unknown;
   };
   // tone 是事实来源；没有它才看老布尔值。两个都脏就用默认。
   const tone: TtsTone =
@@ -94,6 +103,14 @@ export function normalizeVoiceModeConfig(value: unknown): VoiceModeConfig {
       ? { voiceEngineVoice: raw.voiceEngineVoice }
       : {}),
     tone,
+    // 语速：有限数字才收，且夹进区间 —— 上下界只在这一处定义，工具那边也用它
+    ...(typeof raw.voiceSpeed === "number" && Number.isFinite(raw.voiceSpeed)
+      ? { voiceSpeed: clampSpeechSpeed(raw.voiceSpeed) }
+      : {}),
+    // 风格：空串 / 非字符串都当"没设过"，与 voiceEngineVoice 同一条理由
+    ...(typeof raw.voiceStyle === "string" && raw.voiceStyle.trim()
+      ? { voiceStyle: raw.voiceStyle }
+      : {}),
   };
 }
 
@@ -102,3 +119,12 @@ export function normalizeVoiceModeConfig(value: unknown): VoiceModeConfig {
  * 档案本体在 `src/main/agent/turn-profiles.ts`（渲染层用不到它）。
  */
 export type TurnProfileName = "voice";
+
+/** 语速区间。引擎对 `speed` 没有任何校验或上下界（查过源码），这里是我们的产品选择。 */
+export const MIN_SPEECH_SPEED = 0.5;
+export const MAX_SPEECH_SPEED = 2;
+
+/** 把语速夹进区间。归一化与语音工具都走它，避免两处各写一份边界。 */
+export function clampSpeechSpeed(value: number): number {
+  return Math.min(MAX_SPEECH_SPEED, Math.max(MIN_SPEECH_SPEED, value));
+}
