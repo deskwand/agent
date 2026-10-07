@@ -229,7 +229,11 @@ function pushToStore(patch: Partial<ReadAloudState>): void {
   useAppStore.getState().setReadAloud(patch);
 }
 
-function defaultDeps(): ReadAloudDeps {
+/**
+ * 生产用的依赖。**导出只为测试**：override 有没有真的送到 `speakStream` 手上，
+ * 只有在这一层能验（`createReadAloudController` 已经导出，理由相同）。
+ */
+export function defaultDeps(): ReadAloudDeps {
   return {
     speak: (text, handlers, { segmentCount }) => {
       // **每次调用**读一次设置：改档位要对下一次朗读生效。
