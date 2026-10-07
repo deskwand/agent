@@ -1,6 +1,6 @@
 // Shared types, constants, and components used across settings tab files.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import type { TFunction } from "i18next";
@@ -290,9 +290,9 @@ interface MenuRect {
  * 的包含块就是视口，所以这里用 fixed + 打开时量好的坐标 —— **坐标必须在渲染前算好**，
  * 若来自"挂载后再测量"，第一帧没有位置，会先在左上角闪一下。
  *
- * **已知缺口**：没有方向键导航与首字母跳转（原生 `<select>` 有）。Tab 能走到选项、
- * Enter 能选，所以不是不可用，只是慢一点。要补就在这个文件里补 activeIndex +
- * aria-activedescendant，别去别处再写一套菜单。
+ * **键盘**：触发按钮上 ↓/↑ 打开菜单，焦点落在当前值那一项；菜单内 ↓/↑ 移动（回绕）、
+ * Enter/Space 选中（浏览器把聚焦按钮上的回车翻成 click）、Esc 或 Tab 关闭并把焦点
+ * 还给触发按钮。没有首字母跳转（原生 `<select>` 有），补的话也在这个文件里补。
  */
 export function SettingsSelect<T extends string>({
   value,
@@ -314,16 +314,27 @@ export function SettingsSelect<T extends string>({
   const [rect, setRect] = useState<MenuRect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  /** 打开时把焦点送进菜单只做一次：面板开着时父组件重渲染（装包进度事件很勤）
+   *  不该把焦点从用户正在移动的那一项抢回去。 */
+  const focusedOnOpen = useRef(false);
 
   /**
    * 开合。**坐标在打开之前就量好**放进 state，面板第一次渲染就带着位置 ——
    * 位置若来自"挂载后再测量"，第一帧没有坐标，会先在左上角闪一下。
    */
-  const toggle = () => {
-    if (open) {
-      setOpen(false);
-      return;
-    }
+  // 这几个都用 useCallback 钉住：下面的关闭 effect 依赖它们，不稳定就会每帧重挂监听
+  const closeMenu = useCallback(() => {
+    focusedOnOpen.current = false;
+    setOpen(false);
+  }, []);
+
+  /** 关掉并把焦点还给触发按钮：焦点留在已卸载的菜单上会掉到 body，键盘用户就丢了位置。 */
+  const closeAndFocusTrigger = useCallback(() => {
+    closeMenu();
+    triggerRef.current?.focus();
+  }, [closeMenu]);
+
+  const openMenu = useCallback(() => {
     const trigger = triggerRef.current;
     if (!trigger) return;
     const box = trigger.getBoundingClientRect();
@@ -339,7 +350,28 @@ export function SettingsSelect<T extends string>({
       minWidth: box.width,
     });
     setOpen(true);
+  }, [options.length]);
+
+  const toggle = () => {
+    if (open) closeMenu();
+    else openMenu();
   };
+
+  /** 打开后把焦点放到当前值那一项，方向键才有起点。 */
+  useEffect(() => {
+    if (!open) {
+      focusedOnOpen.current = false;
+      return;
+    }
+    if (focusedOnOpen.current) return;
+    focusedOnOpen.current = true;
+    const items = panelRef.current?.querySelectorAll<HTMLButtonElement>(
+      '[role="menuitemradio"]',
+    );
+    if (!items?.length) return;
+    const index = options.findIndex((option) => option.value === value);
+    items[index >= 0 ? index : 0].focus();
+  }, [open, options, value]);
 
   useEffect(() => {
     if (!open) return;
@@ -352,7 +384,7 @@ export function SettingsSelect<T extends string>({
       setOpen(false);
     };
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") closeAndFocusTrigger();
     };
     // 滚动/改窗口就关掉：坐标是打开那一刻量的，不跟着页面走会让面板飘在错位置。
     // **面板自己内部滚动要放过** —— 捕获阶段监听能看到列表里的 scroll 事件，
@@ -372,7 +404,7 @@ export function SettingsSelect<T extends string>({
       window.removeEventListener("scroll", closeOnScroll, true);
       window.removeEventListener("resize", close);
     };
-  }, [open]);
+  }, [open, closeAndFocusTrigger]);
 
   const current = options.find((option) => option.value === value);
 
@@ -384,6 +416,12 @@ export function SettingsSelect<T extends string>({
         data-testid={testId}
         disabled={disabled}
         onClick={toggle}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+          if (open) return;
+          event.preventDefault(); // 否则方向键会去滚动页面
+          openMenu();
+        }}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
@@ -407,6 +445,27 @@ export function SettingsSelect<T extends string>({
         createPortal(
           <div
             ref={panelRef}
+            onKeyDown={(event) => {
+              if (event.key === "Tab") {
+                // 面板在 body 末尾，让它自己 Tab 会把焦点带出应用；先收回来
+                event.preventDefault();
+                closeAndFocusTrigger();
+                return;
+              }
+              if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+              event.preventDefault();
+              const items = Array.from(
+                panelRef.current?.querySelectorAll<HTMLButtonElement>(
+                  '[role="menuitemradio"]',
+                ) ?? [],
+              );
+              if (!items.length) return;
+              const current = items.indexOf(
+                document.activeElement as HTMLButtonElement,
+              );
+              const step = event.key === "ArrowDown" ? 1 : -1;
+              items[(current + step + items.length) % items.length].focus();
+            }}
             role="menu"
             aria-label={label}
             data-testid={testId ? `${testId}-menu` : undefined}
@@ -423,13 +482,13 @@ export function SettingsSelect<T extends string>({
               <button
                 key={option.value}
                 type="button"
-                role="option"
-                aria-selected={option.value === value}
+                role="menuitemradio"
+                aria-checked={option.value === value}
                 data-testid={
                   testId ? `${testId}-option-${option.value}` : undefined
                 }
                 onClick={() => {
-                  setOpen(false);
+                  closeMenu();
                   if (option.value !== value) onChange(option.value);
                 }}
                 className={`${MENU_ITEM_CLASS} ${
