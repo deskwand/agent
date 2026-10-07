@@ -159,7 +159,7 @@
         "toneRetryZh": "Retry downloading the Chinese voice",
         "toneBest": "Best quality",
         "toneBestTitle": "Best quality · local model",
-        "toneBestNote": "Runs on this machine and works offline. The best voice quality, with the first sound in about 1-2 seconds. It uses about 3GB of memory while speaking and releases it after 10 idle minutes.",
+        "toneBestNote": "Runs on this machine and works offline. The best voice quality, with the first sound in about 1-2 seconds. It uses about 3GB of memory while speaking and releases it after 10 idle minutes. Read-aloud switches to Balanced once there is more than one sentence, so the voice does not change midway.",
         "toneBestInstall": "Install · ~900MB",
         "toneBestRetry": "Retry installing best quality",
         "toneBestRemove": "Remove best quality",

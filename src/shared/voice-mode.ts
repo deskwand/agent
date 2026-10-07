@@ -102,3 +102,23 @@ export function normalizeVoiceModeConfig(value: unknown): VoiceModeConfig {
  * 档案本体在 `src/main/agent/turn-profiles.ts`（渲染层用不到它）。
  */
 export type TurnProfileName = "voice";
+
+/**
+ * 朗读要**覆盖**档位时返回覆盖值，否则返回 undefined。
+ *
+ * 只覆盖一种情况：用户选了「最佳音质」且这次朗读不止一段。最佳档每段一次独立请求、
+ * 各自重新采样，段落之间音色会跳（实测：偶发整段高八度，听成换了个人）；均衡档是
+ * 固定音色模型，结构上不会换人。单段朗读没有跨段漂移问题，不动它。
+ *
+ * **其余情况一律返回 undefined，而不是把解析出来的档位传下去** —— 朗读原本不传 tone，
+ * 由主进程按设置解析；渲染侧若自己解析，`appConfig` 尚未同步时会把档位静默降级。
+ *
+ * 语音对话不受这条影响：它走 `purpose: "voice"`，短句听不出漂移，音色也在 ipc 里另选。
+ */
+export function readAloudToneOverride(
+  value: unknown,
+  segmentCount: number,
+): TtsTone | undefined {
+  const tone = resolveVoiceTone(value);
+  return tone === "best" && segmentCount > 1 ? "balanced" : undefined;
+}
