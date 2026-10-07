@@ -8,6 +8,10 @@
  */
 import { act } from "react";
 
+/**
+ * 触发按钮在容器里，**面板不在** —— 它走 `createPortal` 挂到 `document.body`（设置卡是
+ * `overflow-hidden`，留在行里会被裁成只露第一项）。所以下面读选项一律查 document。
+ */
 export function menuTrigger(
   container: HTMLElement,
   testId: string,
@@ -31,7 +35,7 @@ export async function openMenu(
 /** 菜单打开时，当前列出的选项值（按显示顺序）。 */
 export function optionValues(container: HTMLElement, testId: string): string[] {
   return Array.from(
-    container.querySelectorAll<HTMLButtonElement>(
+    document.querySelectorAll<HTMLButtonElement>(
       `[data-testid^="${testId}-option-"]`,
     ),
   ).map((option) => option.dataset.testid!.slice(`${testId}-option-`.length));
@@ -40,7 +44,7 @@ export function optionValues(container: HTMLElement, testId: string): string[] {
 /** 菜单打开时，当前列出的选项**显示文字**（断言文案用它，值用 optionValues）。 */
 export function optionLabels(container: HTMLElement, testId: string): string[] {
   return Array.from(
-    container.querySelectorAll<HTMLButtonElement>(
+    document.querySelectorAll<HTMLButtonElement>(
       `[data-testid^="${testId}-option-"]`,
     ),
   ).map((option) => option.textContent ?? "");
@@ -53,7 +57,7 @@ export async function pickOption(
   value: string,
 ): Promise<void> {
   await openMenu(container, testId);
-  const option = container.querySelector<HTMLButtonElement>(
+  const option = document.querySelector<HTMLButtonElement>(
     `[data-testid="${testId}-option-${value}"]`,
   );
   if (!option) throw new Error(`missing option ${value} for ${testId}`);
