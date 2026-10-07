@@ -2,7 +2,9 @@
 import { describe, expect, it } from "vitest";
 import {
   extractSpeechSegments,
+  groupSpeechSegments,
   splitSentences,
+  type SpeechSegment,
 } from "../../renderer/utils/tts/speech-text";
 
 function body(html: string): HTMLElement {
@@ -140,5 +142,49 @@ describe("抽口播文本", () => {
     expect(extractSpeechSegments(root).map((s) => s.text)).toEqual([
       "代码块，共 1 行",
     ]);
+  });
+});
+
+describe("朗读分块", () => {
+  const segs = (html: string): SpeechSegment[] =>
+    extractSpeechSegments(body(html));
+
+  it("每 4 句一块，块内文本拼好", () => {
+    const blocks = groupSpeechSegments(segs("<p>一。二。三。四。五。</p>"));
+    expect(blocks.map((b) => b.text)).toEqual(["一。二。三。四。", "五。"]);
+    expect(blocks.map((b) => b.sentenceStart)).toEqual([0, 4]);
+  });
+
+  it("块边界落在句子边界上，不会把一句劈开", () => {
+    const blocks = groupSpeechSegments(
+      segs("<p>Alpha. Beta. Gamma. Delta. Epsilon.</p>"),
+    );
+    expect(blocks).toHaveLength(2);
+    // 拼接规则由 joinSpeechTexts 决定（未改）：句末是标点时两段之间**不**补空格
+    expect(blocks[0]!.text).toBe("Alpha.Beta.Gamma.Delta.");
+    expect(blocks[1]!.text).toBe("Epsilon.");
+  });
+
+  it("加上下一句会超过 600 字就提前分块", () => {
+    const long = `${"甲".repeat(319)}。`; // 320 字
+    const blocks = groupSpeechSegments(
+      segs(`<p>${long}${long}${long}丙。</p>`),
+    );
+    // 320 + 320 = 640 > 600 → 前两句不能同块；最后一句 320 + 2 ≤ 600 → 可以同块
+    expect(blocks.map((b) => b.text.length)).toEqual([320, 320, 322]);
+    expect(blocks.map((b) => b.sentenceStart)).toEqual([0, 1, 2]);
+  });
+
+  it("单句超过 600 字被硬切，一片都不丢、共用这句的高亮目标", () => {
+    const huge = `${"乙".repeat(1300)}。`; // 通篇没有标点的长段落 = 1 句
+    const blocks = groupSpeechSegments(segs(`<p>${huge}</p>`));
+    expect(blocks.map((b) => b.text.length)).toEqual([600, 600, 101]);
+    expect(blocks.map((b) => b.text).join("")).toBe(huge);
+    expect(blocks.map((b) => b.sentenceStart)).toEqual([0, 0, 0]);
+    expect(blocks.every((b) => b.target === blocks[0]!.target)).toBe(true);
+  });
+
+  it("没有句子就没有块", () => {
+    expect(groupSpeechSegments([])).toEqual([]);
   });
 });

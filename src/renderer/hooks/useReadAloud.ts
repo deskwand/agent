@@ -1,20 +1,22 @@
 /**
  * @module renderer/hooks/useReadAloud
  *
- * 一次朗读的会话：抽文本 → 逐句要音频 → 排队播放 → 高亮当前句。
+ * 一次朗读的会话：抽文本 → 分块（每 4 句一块，≤600 字）要音频 → 排队播放 → 高亮当前块。
  *
  * 状态放在模块级的 controller 上，hook 只订阅：每条消息各持一个 AudioContext
  * 与一条队列是浪费，也会让「同时读两条」变成可能。
  *
- * 「合成下一句」在**当前句还在播**的时候就发起（流水线）。MeloTTS 的 RTF 是 0.71，
- * 慢机器上合成可能跟不上播放 —— 那时队列会短暂播空，恢复后接着播，不卡界面。
+ * **抢跑**：当前块**合成结束**就发下一块（不等它播完），一次只有一个请求在飞。
+ * 串行是有意的：并发在飞会让后块的音频先到，那就得给每块加缓冲、按序发布。而串行
+ * 本身就无缝：只要合成比实时快（RTF < 1），下一块的首块音频总在上一块播完前到达 ——
+ * 形式化一点是 ρ·a ≤ (1-ρ)·ΣA + ρ·a₀（ρ = 合成/音频耗时比 0.67、a = 首块音频 2.8s、
+ * A = 每块音频，本机实测代入得 1.88 ≤ 6.93 + 1.88）。
  */
 import { useAppStore } from "../store";
 import {
   extractSpeechSegments,
-  joinSpeechTexts,
-  spanSpeechTargets,
-  type SpeechSegment,
+  groupSpeechSegments,
+  type SpeechBlock,
   type SpeechTarget,
 } from "../utils/tts/speech-text";
 import { createAudioQueue, type AudioQueue } from "../utils/tts/audio-queue";
@@ -75,7 +77,8 @@ export function createReadAloudController(
     currentIndex: 0,
     total: 0,
   };
-  let segments: SpeechSegment[] = [];
+  /** 分块。一块 = 一次合成请求 = 队列里的"一句"（高亮与进度的粒度）。 */
+  let blocks: SpeechBlock[] = [];
   let queue: AudioQueue | null = null;
   /**
    * 场次号。start / stop / 播完都 +1；每个异步回调回来先比对它。
@@ -100,7 +103,7 @@ export function createReadAloudController(
     cancels.clear();
     queue?.stop();
     queue = null;
-    segments = [];
+    blocks = [];
     highlight(null);
     set({
       messageId: null,
@@ -114,17 +117,20 @@ export function createReadAloudController(
   const ensureQueue = (): AudioQueue => {
     if (queue) return queue;
     queue = deps.createQueue();
-    queue.onSentenceStart((index) => {
-      set({ currentIndex: index });
-      highlight(segments[index]?.target ?? null);
+    queue.onSentenceStart((blockIndex) => {
+      const block = blocks[blockIndex];
+      // currentIndex 是**句号**：UI 文案是「第 X / Y 句」，报块号会读成「第 2/5 句」
+      set({ currentIndex: block?.sentenceStart ?? 0 });
+      highlight(block?.target ?? null);
     });
     queue.onDrained(() => reset());
     return queue;
   };
 
   const pump = (index: number, token: number): void => {
-    const segment = segments[index];
-    if (!segment) return;
+    const block = blocks[index];
+    if (!block) return;
+    const isLastBlock = index + 1 >= blocks.length;
     let sawChunk = false;
     /**
      * 先声明再赋值：桥缺失时 `speak` 会**同步**回调 `onError`，那时 `cancel`
@@ -136,12 +142,13 @@ export function createReadAloudController(
       if (cancel) cancels.delete(cancel);
     };
 
-    const endSegment = () => {
-      // 分组后每块都是「最后一块」：流水线分支已不存在（合并的代价就是不抢跑下一块）
-      ensureQueue().markLast();
+    const endBlock = () => {
+      if (isLastBlock) ensureQueue().markLast();
+      // 抢跑：不等这一块播完就发下一块（串行 —— 下一块要等这一块合成结束）
+      else pump(index + 1, token);
     };
 
-    cancel = deps.speak(segment.text, {
+    cancel = deps.speak(block.text, {
       onChunk: (chunk) => {
         // 回来时可能已经被 start / stop 作废 —— 旧块直接丢
         if (token !== generation) return;
@@ -156,14 +163,14 @@ export function createReadAloudController(
       onDone: () => {
         forget();
         if (token !== generation) return;
-        endSegment();
+        endBlock();
       },
       onError: (error) => {
         forget();
         if (token !== generation) return;
-        // 已经出过声的段：保留已播部分，当这一段结束（不弹错误 —— 用户已经听到了）。
+        // 已经出过声的块：保留已播部分，当这一块结束（不弹错误 —— 用户已经听到了）。
         if (sawChunk) {
-          endSegment();
+          endBlock();
           return;
         }
         queue?.stop();
@@ -174,65 +181,21 @@ export function createReadAloudController(
     cancels.add(cancel);
   };
 
-  /**
-   * 把整条消息编成**少数几次请求**。
-   *
-   * 为什么要合并：最佳档每次请求都重新采样，切得越碎、句子之间越容易换音色
-   * （实测每句一次请求时约 14% 的边界会跳音区）。首声只多 ~30ms（174 → 181ms 实测）。
-   *
-   * 为什么还要有上限：引擎 `max_new_tokens` 默认 2048，那是**声学帧数**
-   * （`pipeline-tts.cpp`：`step >= max_new_tokens` 就停），codec 是 12Hz
-   * → 约 170 秒音频 ≈ 760 个汉字。整条不切会让超长回复被**静默截断**。
-   */
-  const MAX_CHARS_PER_REQUEST = 600;
-
-  const groupSegments = (raw: SpeechSegment[]): SpeechSegment[] => {
-    const groups: SpeechSegment[][] = [];
-    let current: SpeechSegment[] = [];
-    let length = 0;
-    for (const segment of raw) {
-      if (
-        current.length > 0 &&
-        length + segment.text.length > MAX_CHARS_PER_REQUEST
-      ) {
-        groups.push(current);
-        current = [];
-        length = 0;
-      }
-      current.push(segment);
-      length += segment.text.length;
-    }
-    if (current.length > 0) groups.push(current);
-    return groups.map((group) => ({
-      text: joinSpeechTexts(group.map((segment) => segment.text)),
-      target:
-        spanSpeechTargets(group.map((segment) => segment.target)) ??
-        group[0]!.target,
-    }));
-  };
-
   return {
     getState: () => state,
     start(messageId, root) {
       reset();
       const token = generation;
-      const raw = extractSpeechSegments(root).filter(
+      const segments = extractSpeechSegments(root).filter(
         (segment) => segment.text.trim().length > 0,
       );
-      if (raw.length === 0) return; // 没有可读的文字：不开播，按钮那边已置灰
-      /**
-       * **整条消息一次请求**：最佳档每次请求都重新采样，切得越碎、句子之间越容易
-       * 换音色（实测每句一次请求时约 14% 的边界会跳音区）。首声只多 ~30ms
-       * （实测 174 → 181ms，引擎本来就是流式的）。
-       *
-       * 代价：逐句高亮退化为**整段高亮** —— 目标由首尾两段拼出来（见
-       * `spanSpeechTargets`），播放中不再逐句推进。
-       */
-      segments = groupSegments(raw);
+      if (segments.length === 0) return; // 没有可读的文字：不开播，按钮那边已置灰
+      blocks = groupSpeechSegments(segments);
       set({
         messageId,
         status: "preparing",
         currentIndex: 0,
+        // 按**句**上报，不是块数：UI 文案是「第 X / Y 句」
         total: segments.length,
       });
       pump(0, token);

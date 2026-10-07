@@ -277,3 +277,90 @@ export function spanSpeechTargets(
   }
   return first;
 }
+
+export interface SpeechBlock {
+  /** 一次合成请求的文本：块内各句已按「英文补空格、中文不补」拼好。 */
+  text: string;
+  /** 高亮目标。块内首尾句都是 range 时取两端；否则退回首句目标。 */
+  target: SpeechTarget;
+  /** 这一块从整条消息的第几句开始（0 起）—— UI 的「第 X / Y 句」按句上报，不按块。 */
+  sentenceStart: number;
+}
+
+/**
+ * 一块最多几句。**这是"高亮粒度 vs 音色连续"的旋钮，不是速度旋钮**（首声与请求
+ * 长度基本无关，实测）。
+ *
+ * 调大：最佳档每次请求重采样，换音色的边界越少（实测逐句时约 14% 的边界跳音区）；
+ * 但高亮越久才跳一次 —— 600 字一块 ≈ 100s 音频，观感就是"整条一次亮"。
+ * 调小：高亮更跟读，边界更多。
+ *
+ * 4 是沿用语音模式 `GROUP_SENTENCES`（useStreamingSpeech）的实测值。两个常量各自
+ * 定义是刻意的：那边的分组发生在流式文本上，受"句子还没到齐"的约束。
+ */
+export const SENTENCES_PER_BLOCK = 4;
+
+/**
+ * 一块的字符上限。引擎 `max_new_tokens` 默认 2048 是**声学帧数**（codec 12Hz）
+ * → 约 170 秒音频 ≈ 760 个汉字，超了会**静默截断**（不是报错）。600 是留了余量的值，
+ * 别调大。
+ */
+export const MAX_CHARS_PER_BLOCK = 600;
+
+/**
+ * 把句子编成「一次合成请求一块」的块序列。
+ *
+ * 两种收口条件：句子数到 `sentencesPerBlock`，或再加一句会超过 `maxChars`。
+ * 单句自己就超过 `maxChars`（通篇没标点的长段落）时按字符硬切，每片单独成块并
+ * **共用这一句的高亮目标** —— 高亮粗一点可以接受，被引擎吞掉后半句不可以。
+ */
+export function groupSpeechSegments(
+  segments: readonly SpeechSegment[],
+  opts: { sentencesPerBlock?: number; maxChars?: number } = {},
+): SpeechBlock[] {
+  const perBlock = opts.sentencesPerBlock ?? SENTENCES_PER_BLOCK;
+  const maxChars = opts.maxChars ?? MAX_CHARS_PER_BLOCK;
+  const blocks: SpeechBlock[] = [];
+  let current: SpeechSegment[] = [];
+  let currentStart = 0;
+  let length = 0;
+
+  const flush = () => {
+    if (current.length === 0) return;
+    blocks.push({
+      text: joinSpeechTexts(current.map((segment) => segment.text)),
+      target:
+        spanSpeechTargets(current.map((segment) => segment.target)) ??
+        current[0]!.target,
+      sentenceStart: currentStart,
+    });
+    current = [];
+    length = 0;
+  };
+
+  for (let index = 0; index < segments.length; index++) {
+    const segment = segments[index]!;
+    if (segment.text.length > maxChars) {
+      flush();
+      for (let at = 0; at < segment.text.length; at += maxChars) {
+        blocks.push({
+          text: segment.text.slice(at, at + maxChars),
+          target: segment.target,
+          sentenceStart: index,
+        });
+      }
+      continue;
+    }
+    if (
+      current.length > 0 &&
+      (current.length >= perBlock || length + segment.text.length > maxChars)
+    ) {
+      flush();
+    }
+    if (current.length === 0) currentStart = index;
+    current.push(segment);
+    length += segment.text.length;
+  }
+  flush();
+  return blocks;
+}
