@@ -4,6 +4,10 @@
  * 语音模式的主角：一个粒子球。几何、自转、呼吸与三态视觉对应设计 §3.1，
  * 参数取自 design-docs/2026-10-04-voice-only-mode-orb-prototype.html。
  *
+ * **球界半径恒定**：原型把音量驱动的伸缩乘进了 `scale`，球会跟着音量胀缩；这里
+ * 刻意不乘 —— 半径恒为 `R`，能量只走亮度 / 湍流 / 核心，见 `orbEnergy`。
+ * 对比预览：design-docs/2026-10-07-star-orb-fixed-radius-preview.html。
+ *
  * 颜色是画笔值，不是主题色。谁用谁选画笔：全屏那颗永远 GLOW_BRUSH（在 `#050507`
  * 深底上发光）；后台小球按主题拿两套星点画笔（浅底深粒子、深底浅粒子）—— 见
  * design-docs/2026-10-06-mini-orb-theme-brush-design.md。
@@ -331,17 +335,15 @@ export function StarOrb({
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, W, H);
 
-      const pulse =
-        stateRef.current === "speaking"
-          ? 1 + lv * cfg.gain
-          : 1 + Math.sin(t * 0.62) * 0.022 + lv * cfg.gain * 0.4;
+      // 能量不进几何：半径恒定，球界才不会跟着音量一大一小地跳。
+      const energy = orbEnergy(stateRef.current, t, lv);
 
       // 光晕只属于发光档：星点档靠粒子与描边读球。颜色仍取自状态（三档 hue 不同），
       // 画笔不管它 —— 写进画笔就等于把状态色定死。
       // 光晕半径必须落在画布的内切圆里。渐变一旦超出画布边界，边缘处还没走到
       // 透明，四条边就会显出一个矩形色块 —— 浅色主题下尤其刺眼（深色底上 4.7%
       // 的蓝白看不出来，白底上就是一块斑）。内切圆半径是 min(W,H)/2，所以这里
-      // 直接用 0.5 倍，且**不乘 pulse**：呼吸放大同样会让它越界。
+      // 直接用 0.5 倍。光晕本来就不进几何，半径恒定之后它更没越界的余地了。
       if (skin.kind === "glow") {
         const halo = ctx.createRadialGradient(
           CX,
@@ -360,7 +362,9 @@ export function StarOrb({
       }
       ctx.globalCompositeOperation = brush.composite;
 
-      const scale = R * pulse;
+      // 半径恒定，不再被音量驱动地伸缩。粒子坐标、白热核心、小球那条球界描边
+      // 全用这一个变量——三处都不许再乘任何随音量变的东西。
+      const scale = R;
       const rotY = t * cfg.spin;
       const cosY = Math.cos(rotY);
       const sinY = Math.sin(rotY);
@@ -369,7 +373,8 @@ export function StarOrb({
       const sinX = Math.sin(tilt);
 
       for (const p of particles) {
-        const turb = cfg.turb * (p.haze ? 0.4 : 1);
+        // 出口二：能量不推球界，改推球内的游动——星点更躁，轮廓不动。
+        const turb = cfg.turb * (p.haze ? 0.4 : 1) * (1 + energy * 2);
         const x = p.x + Math.sin(t * 1.35 * p.sp + p.ph) * turb;
         const y = p.y + Math.cos(t * 1.05 * p.sp + p.ph * 1.6) * turb;
         const x1 = x * cosY - p.z * sinY;
@@ -381,7 +386,15 @@ export function StarOrb({
         const rn = Math.min(1, Math.sqrt(x1 * x1 + y1 * y1));
         const falloff = 1 - 0.8 * Math.pow(rn, 2.4);
         const band = 1 - cfg.band * (0.5 + 0.5 * Math.sin(x1 * 4.6 + t * 0.85));
-        const a = p.a * Math.pow(depth, 1.2) * falloff * band * cfg.bright;
+        // 出口一：亮度。alpha 下面会被 globalAlpha 钳到 1，说话档的 bright 本来
+        // 就是 1.62，所以这条路一部分是白给的——读得出动静的是湍流和核心。
+        const a =
+          p.a *
+          Math.pow(depth, 1.2) *
+          falloff *
+          band *
+          cfg.bright *
+          (1 + energy);
         if (a <= 0.004) continue;
 
         // 0.35 设备像素的下限照原型：星点档最暗的那些粒子本来会落到亚像素，
@@ -399,7 +412,8 @@ export function StarOrb({
 
       // 白热核心也只属于发光档：星点档的焦点是「核心簇更密」，不是一块发光盘。
       if (skin.kind === "glow") {
-        const coreR = scale * 0.78;
+        // 出口三：核心在球内涨缩。倍数由 orbCoreRadiusFactor 保证 < 1，碰不到球界描边。
+        const coreR = R * orbCoreRadiusFactor(stateRef.current, t, lv);
         const core = ctx.createRadialGradient(CX, CY, 0, CX, CY, coreR);
         core.addColorStop(
           0,
@@ -433,7 +447,7 @@ export function StarOrb({
         ctx.stroke();
       }
 
-      // 球界描边：跟着呼吸（同一个 scale），否则球胀缩时圈会错位。
+      // 球界描边：半径恒定，圈也就不会跟球错位（以前它得跟着乘同一个变量）。
       if (skin.kind === "stars") {
         ctx.strokeStyle = skin.edge;
         ctx.lineWidth = 1 * dpr;
@@ -462,4 +476,42 @@ export function StarOrb({
       className="block h-full w-full"
     />
   );
+}
+
+// —— 能量从几何里出走后，只走三个出口 ——
+//
+// 球界半径恒定是硬约束（半径一涨一缩，整块布局看着就在跳）。能量于是只走三处，
+// 系数按 2026-10-07 的对比预览定：粒子亮度 ×(1 + energy)、球内湍流 ×(1 + 2 ×
+// energy)、白热核心半径 ×(1 + 0.6 × energy)。观感要调就调这三个数，别去动几何。
+
+/**
+ * 能量标量（旧代码里「伸缩倍数 − 1」那一份，渲染循环里叫 `energy`）。
+ *
+ * 说话档只吃音量，不吃时间——球面不再呼吸；其余状态保留那点缓慢的
+ * `sin(t * 0.62) * 0.022`，它现在只推核心，不推球界。
+ *
+ * 不夹 `level`：源头 `utils/voice/mic-capture.ts` 已经夹到 `[0, 1]`，越界既不可达
+ * 也无害——CSS 颜色对越界 alpha 是夹取不是判无效（`rgba(…,3.25)` 就是纯白）。
+ */
+export function orbEnergy(state: OrbState, t: number, level: number): number {
+  const cfg = TABLE[state];
+  return state === "speaking"
+    ? level * cfg.gain
+    : Math.sin(t * 0.62) * 0.022 + level * cfg.gain * 0.4;
+}
+
+/**
+ * 白热核心半径占球界 `R` 的比例：基准 0.78，随能量最多再涨 0.6 倍。
+ *
+ * 契约：**在 `level ∈ [0, 1]` 下恒 `< 1`**——核心只属于球内，碰不到那圈球界描边。
+ * 说话峰值（level = 1、gain = 0.3）时是 0.92，留了余量。`level` 的上游
+ * `utils/voice/mic-capture.ts` 就把它夹在 `[0,1]`；要越过 1.28 核心才会压到描边上，
+ * 而那条路不可达。0.78 与 0.6 只在这里出现一次。
+ */
+export function orbCoreRadiusFactor(
+  state: OrbState,
+  t: number,
+  level: number,
+): number {
+  return 0.78 * (1 + orbEnergy(state, t, level) * 0.6);
 }
