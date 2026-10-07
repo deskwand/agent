@@ -103,3 +103,31 @@ describe('publish-local version guard', () => {
     expect(result.stderr).toContain('do not match package.json version 1.0.35');
   });
 });
+
+describe('electron-builder top-level files', () => {
+  const EXPECTED = [
+    '!**/node_modules/@esbuild/android-*/**/*',
+    '!**/node_modules/@esbuild/openharmony-*/**/*',
+  ];
+
+  /** 顶层 files 段里所有与 @esbuild 相关的条目（去掉 `- ` 与引号）。 */
+  function esbuildNegations(): string[] {
+    return readBuilderSection('files')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('- ') && line.includes('@esbuild'))
+      .map((line) => line.replace(/^- /, '').replace(/^["']|["']$/g, ''));
+  }
+
+  // 这三份 android / openharmony 目录的数据在 asar 内部（smartUnpack 不解包 .wasm），
+  // afterPack 只能清 app.asar.unpacked，所以必须在打包期排除（≈40MB）。
+  // 用平台无关的负向模式而不是 ${platform}/${arch} 宏：这两个包任何桌面目标都不会用到，
+  // 交叉打包（在 macOS 上打 win/linux）也安全。详见
+  // design-docs/2026-10-07-installer-size-trim-plan.md「背景与证据」D。
+  it('excludes exactly the android and openharmony platform packages', () => {
+    // 断言「集合相等」而不是「包含」：「包含」拦不住有人把它放宽成
+    // `!**/node_modules/@esbuild/**/*`（连目标平台二进制一起排掉，chord 的 bundler 静默失效），
+    // 也拦不住再加一条吞掉目标平台的反向模式。
+    expect(esbuildNegations()).toEqual(EXPECTED);
+  });
+});

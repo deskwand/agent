@@ -41,6 +41,13 @@ files:
   - "!**/.npmignore"
   - "!**/.eslintrc*"
   - "!**/tsconfig.json"
+  # esbuild 的 android-* / openharmony-* 包各带一份 14MB 的 esbuild.wasm（三份内容相同）。
+  # 它们的字节在 asar 内部（smartUnpack 不解包 .wasm），afterPack 的 app.asar.unpacked
+  # 清理碰不到，所以在这里按平台无关的模式排除（≈40MB）。没有用 ${arch} 宏是有意的：
+  # 这两个平台任何桌面目标都不会加载，交叉打包也安全。目标平台的 @esbuild/<platform>-<arch>
+  # 仍由 after-pack.js 保留，不要删那一段。
+  - "!**/node_modules/@esbuild/android-*/**/*"
+  - "!**/node_modules/@esbuild/openharmony-*/**/*"
 
 # MCP servers and platform-specific resources are declared in each platform's
 # extraResources section below (win/mac/linux).
