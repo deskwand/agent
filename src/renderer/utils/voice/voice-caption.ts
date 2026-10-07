@@ -1,16 +1,16 @@
 /**
  * @module renderer/utils/voice/voice-caption
  *
- * 语音浮层文字区的两个纯函数。浮层用纯文本显示回答（`whitespace-pre-wrap`），
+ * 语音浮层文字区的两个纯函数：`voiceCaptionLine` 决定显示什么，
+ * `stripVoiceMarkers` 负责去掉 markdown 标记（浮层用纯文本显示回答，
  * 不做 markdown 渲染 —— 理由与取舍见
- * `design-docs/2026-10-06-voice-caption-text-design.md` §2.4。
+ * `design-docs/2026-10-06-voice-caption-text-design.md` §2.4）。
  *
  * 抽成纯函数是为了能单测：`VoiceModeOverlay` 一挂载就开麦、起朗读，
  * 组件测试必须把整条语音链路 mock 掉。
  */
 
-/** 滚动区离底多少像素以内算「贴底」。 */
-const BOTTOM_EPSILON_PX = 24;
+import type { VoiceModeView } from "../../hooks/useVoiceMode";
 
 /**
  * 去掉 markdown 标记，只动**配对**的记号。
@@ -56,14 +56,31 @@ function stripInlineMarkers(line: string): string {
 }
 
 /**
- * 滚动区是否贴着底部。用来决定要不要跟随新文字：
- * 用户上翻过（离底超过阈值）就不再跟随，免得把正在读的人拽走。
+ * 浮层那一行显示什么。**规则只在这里定义**：全屏浮层与后台小球共用它，
+ * 「两个视图是同一个会话的两种呈现」才不会两边改跑偏。
+ *
+ * `spoken` 是**正在念的那个合成单元**（`speech.onSentence` 给的）——
+ * **不是一句**：朗读层首句单发，之后每 `GROUP_SENTENCES`（4）句并成一次请求
+ * （`useStreamingSpeech` 的 `addSentence`），`onSentence` 只在单元开始播时触发一次。
+ * 所以这一行可能是一串几句连在一起、在整段播放期间不动的文字，最长可到一两百字。
+ * 这是拿音色一致换来的（每句一次请求时约 14% 的边界会跳音区），不要在字幕层
+ * 用时长去猜句界——猜出来的边界只会和声音对不上。
+ *
+ * 念完不立刻清，留到下一轮开始：听的人还能回看一眼最后说了什么；清空在
+ * `useVoiceMode` 的 `onQuestion`。
+ *
+ * 回落到 `answer` 不是兜底而是必须：整轮无可朗读文本时（纯代码块回答）
+ * `onSentence` 一次都不触发，没这条回落那一行会整轮空着。
+ *
+ * 去标记只走回答侧：转写是用户自己说的话，原样显示。
  */
-export function isNearBottom(
-  scrollTop: number,
-  clientHeight: number,
-  scrollHeight: number,
-  threshold = BOTTOM_EPSILON_PX,
-): boolean {
-  return scrollHeight - scrollTop - clientHeight <= threshold;
+export function voiceCaptionLine(
+  view: Pick<VoiceModeView, "state" | "transcript" | "answer" | "spoken">,
+): string {
+  if (view.state === "capturing") return view.transcript;
+  const spoken = stripVoiceMarkers(view.spoken);
+  if (spoken.trim() !== "") return spoken;
+  const answer = stripVoiceMarkers(view.answer);
+  if (answer.trim() !== "") return answer;
+  return view.transcript;
 }

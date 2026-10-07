@@ -33,6 +33,7 @@ const VIEW: VoiceModeView = {
   level: 0.2,
   transcript: "",
   answer: "",
+  spoken: "",
   error: null,
 };
 
@@ -107,6 +108,15 @@ describe("VoiceMiniBar", () => {
   it("想和说的时候显示回答，并去掉 markdown 标记", () => {
     render({ state: "thinking", transcript: "问题", answer: "**上午** 10 点" });
     expect(caption()).toBe("上午 10 点");
+  });
+
+  it("正在念的那个合成单元优先 —— 与全屏浮层同一份规则", () => {
+    render({
+      state: "speaking",
+      answer: "第一句。第二句。",
+      spoken: "第二句。",
+    });
+    expect(caption()).toBe("第二句。");
   });
 
   it("识别中优先显示正在说的话", () => {

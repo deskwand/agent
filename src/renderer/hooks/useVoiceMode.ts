@@ -39,6 +39,11 @@ export interface VoiceModeView {
   level: number;
   transcript: string;
   answer: string;
+  /**
+   * 正在念的那个合成单元（`speech.onSentence` 给的，**不是一句**，见
+   * `voiceCaptionLine`）。念完留到下一轮开始。
+   */
+  spoken: string;
   error: VoiceErrorCode | null;
 }
 
@@ -62,6 +67,7 @@ const EMPTY: VoiceModeView = {
   level: 0,
   transcript: "",
   answer: "",
+  spoken: "",
   error: null,
 };
 
@@ -218,11 +224,13 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
       onQuestion: () => {
         // 新一轮被收下了：清掉上一轮的字幕与错误。绑定不动 ——
         // 它就是这个新轮的标识。
-        patch({ transcript: "", answer: "", error: null });
+        patch({ transcript: "", answer: "", spoken: "", error: null });
         lastAnswer = "";
         answerEnded = false;
       },
-      onSentence: () => {},
+      // 一个合成单元开念：那一行跟着换。只认回传的文本，索引不用 ——
+      // 打断后恢复时句子索引会从 0 重新排。
+      onSentence: (_index, text) => patch({ spoken: text }),
       onError: (error) => {
         if (error === "VOICE_CAPTURE_FAILED") captureFailed = true;
         patch({ error });

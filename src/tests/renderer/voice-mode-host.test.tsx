@@ -132,6 +132,18 @@ describe("VoiceModeHost", () => {
     ).toBeNull();
   });
 
+  it("朗读开始念下一段，字幕就跟着换", () => {
+    // 锁的是**接线**：朗读层回传 onSentence → 宿主 patch({ spoken }) → 浮层那一行。
+    // 只测浮层渲染（voice-mode-overlay.test）看不出这条线断没断 —— 把
+    // useVoiceMode 的 onSentence 改回空实现，那边的测试会全绿而字幕静默地死掉。
+    renderHost();
+    const line = () =>
+      container.querySelector('[data-testid="voice-caption-text"]')
+        ?.textContent;
+    act(() => runtime.runs[0]!.onSentence(0, "这是正在念的那一段。"));
+    expect(line()).toBe("这是正在念的那一段。");
+  });
+
   it("切到别的会话只换成小球，运行时一个也不重启、不停止", () => {
     renderHost();
     expect(runtime.runs.length).toBe(1);

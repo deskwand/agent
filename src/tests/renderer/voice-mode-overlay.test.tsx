@@ -25,6 +25,7 @@ const VIEW: VoiceModeView = {
   level: 0.2,
   transcript: "",
   answer: "",
+  spoken: "",
   error: null,
 };
 
@@ -66,6 +67,13 @@ function captionRegion(): HTMLElement {
     '[data-testid="voice-caption-text"]',
   );
   if (!el) throw new Error("文字区没渲染出来");
+  return el;
+}
+
+/** 文字本身在里层的 span 上（外层只管横滚）。 */
+function captionSpan(): HTMLElement {
+  const el = captionRegion().querySelector<HTMLElement>("span");
+  if (!el) throw new Error("文字行没渲染出来");
   return el;
 }
 
@@ -124,11 +132,10 @@ describe("VoiceModeOverlay", () => {
     expect(captionRegion().textContent).toBe("");
   });
 
-  it("识别中显示转写并居中", () => {
+  it("识别中显示转写", () => {
     renderOverlay({ state: "capturing", transcript: "杭州两天怎么玩" });
-    const region = captionRegion();
-    expect(region.textContent).toBe("杭州两天怎么玩");
-    expect(region.className).toContain("text-center");
+    expect(captionRegion().textContent).toBe("杭州两天怎么玩");
+    expect(captionSpan().className).toContain("text-center");
   });
 
   it("回答为空时回落到转写（兜底，当前链路到不了）", () => {
@@ -138,14 +145,21 @@ describe("VoiceModeOverlay", () => {
     expect(captionRegion().textContent).toBe("杭州两天怎么玩");
   });
 
-  it("回答非空时显示回答、去掉标记、左对齐", () => {
+  it("回答非空时显示回答、去掉标记", () => {
     renderOverlay({
       state: "speaking",
       answer: "**第一天**\n- 断桥\n- 苏堤",
     });
-    const region = captionRegion();
-    expect(region.textContent).toBe("第一天\n- 断桥\n- 苏堤");
-    expect(region.className).toContain("text-left");
+    expect(captionRegion().textContent).toBe("第一天\n- 断桥\n- 苏堤");
+  });
+
+  it("正在念的那个合成单元优先于整段回答", () => {
+    renderOverlay({
+      state: "speaking",
+      answer: "第一句。第二句。",
+      spoken: "第二句。",
+    });
+    expect(captionRegion().textContent).toBe("第二句。");
   });
 
   // 评审指出：用 state="listening" 测不出行为变化（旧代码在那个状态也显示 answer）。
@@ -156,18 +170,61 @@ describe("VoiceModeOverlay", () => {
       transcript: "杭州两天怎么玩",
       answer: "```\nconst a = 1;\n```",
     });
-    const region = captionRegion();
-    expect(region.textContent).toContain("const a = 1;");
-    expect(region.className).toContain("text-left");
+    expect(captionRegion().textContent).toContain("const a = 1;");
   });
 
-  it("文字区定高且可滚动", () => {
+  it("文字区定高一行、可横向滚、不折行", () => {
     renderOverlay();
     const region = captionRegion();
-    expect(region.className).toContain("overflow-y-auto");
-    expect(region.parentElement?.className).toContain(
-      "h-[clamp(6rem,22vh,12rem)]",
-    );
+    expect(region.className).toContain("overflow-x-auto");
+    expect(region.className).toContain("overflow-y-hidden");
+    expect(region.parentElement?.className).toContain("h-10");
+    expect(captionSpan().className).toContain("whitespace-nowrap");
+  });
+
+  it("纵向滚轮映射成横向滚动", () => {
+    // 只能横滚的一行上，鼠标用户不该滚不动。
+    renderOverlay({ state: "speaking", spoken: "一句很长的话" });
+    const region = captionRegion();
+    act(() => {
+      region.dispatchEvent(
+        new WheelEvent("wheel", { deltaY: 40, bubbles: true }),
+      );
+    });
+    expect(region.scrollLeft).toBe(40);
+  });
+
+  it("斜向手势按主轴走，不把纵向分量丢掉", () => {
+    // 触控板斜向手势两个轴同时非零。只判 `deltaX !== 0` 会把大半个纵向分量丢掉。
+    renderOverlay({ state: "speaking", spoken: "一段很长的话" });
+    const region = captionRegion();
+    act(() => {
+      region.dispatchEvent(
+        new WheelEvent("wheel", { deltaX: 30, deltaY: 120, bubbles: true }),
+      );
+    });
+    expect(region.scrollLeft).toBe(120);
+  });
+
+  it("横向为主的触控板手势交给浏览器", () => {
+    renderOverlay({ state: "speaking", spoken: "一段很长的话" });
+    const region = captionRegion();
+    act(() => {
+      region.dispatchEvent(
+        new WheelEvent("wheel", { deltaX: 120, deltaY: 30, bubbles: true }),
+      );
+    });
+    expect(region.scrollLeft).toBe(0);
+  });
+
+  it("换句时横向位置复位到句首", () => {
+    renderOverlay({ state: "speaking", spoken: "第一句" });
+    const region = captionRegion();
+    act(() => {
+      region.scrollLeft = 120;
+    });
+    renderOverlay({ state: "speaking", spoken: "第二句" });
+    expect(captionRegion().scrollLeft).toBe(0);
   });
 
   it("浮层不读主题：挂载时永远用发光画笔", () => {

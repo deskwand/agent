@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  isNearBottom,
   stripVoiceMarkers,
+  voiceCaptionLine,
 } from "../../renderer/utils/voice/voice-caption";
 
 describe("stripVoiceMarkers", () => {
@@ -66,16 +66,68 @@ describe("stripVoiceMarkers", () => {
   });
 });
 
-describe("isNearBottom", () => {
-  it("贴底为真", () => {
-    expect(isNearBottom(100, 100, 200)).toBe(true);
+describe("voiceCaptionLine", () => {
+  const base = {
+    state: "listening" as const,
+    transcript: "",
+    answer: "",
+    spoken: "",
+  };
+
+  it("识别中显示转写", () => {
+    expect(
+      voiceCaptionLine({
+        ...base,
+        state: "capturing",
+        transcript: "说到一半",
+        answer: "上一轮的回答",
+      }),
+    ).toBe("说到一半");
   });
 
-  it("离底 24px 以内仍算贴底", () => {
-    expect(isNearBottom(76, 100, 200)).toBe(true);
+  it("正在念的那个合成单元优先于整段回答", () => {
+    expect(
+      voiceCaptionLine({
+        ...base,
+        state: "speaking",
+        answer: "第一句。第二句。",
+        spoken: "第二句。",
+      }),
+    ).toBe("第二句。");
   });
 
-  it("离底超过 24px 为假", () => {
-    expect(isNearBottom(75, 100, 200)).toBe(false);
+  it("去标记只作用于回答侧，不动转写", () => {
+    expect(voiceCaptionLine({ ...base, spoken: "**重点**" })).toBe("重点");
+    // 转写是用户自己说的话，原样显示 —— 里面写了 ** 就让它原样出现。
+    expect(
+      voiceCaptionLine({
+        ...base,
+        state: "capturing",
+        transcript: "他说 **这个词**",
+      }),
+    ).toBe("他说 **这个词**");
+  });
+
+  it("没在念的时候回落到回答：无可朗读文本的整轮靠它才不空", () => {
+    // 纯代码块回答时 onSentence 一次都不触发，没有这条回落那一行会整轮空着。
+    expect(
+      voiceCaptionLine({ ...base, answer: "```\nconst a = 1;\n```" }),
+    ).toBe("const a = 1;");
+  });
+
+  it("回答也空就回落转写，再空就是空串", () => {
+    expect(voiceCaptionLine({ ...base, transcript: "兜底" })).toBe("兜底");
+    expect(voiceCaptionLine(base)).toBe("");
+  });
+
+  it("只有空白的 spoken / answer 不占屏", () => {
+    expect(
+      voiceCaptionLine({
+        ...base,
+        spoken: "   ",
+        answer: "  \n ",
+        transcript: "兜底",
+      }),
+    ).toBe("兜底");
   });
 });

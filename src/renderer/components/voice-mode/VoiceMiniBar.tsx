@@ -11,7 +11,7 @@ import { Mic, MicOff, X } from "lucide-react";
 import { StarOrb } from "./star-orb";
 import type { OrbBrush } from "./star-orb";
 import { CAPTION_KEY, ORB_STATE } from "./orb-state";
-import { stripVoiceMarkers } from "../../utils/voice/voice-caption";
+import { voiceCaptionLine } from "../../utils/voice/voice-caption";
 import { VOICE_MESSAGE_KEYS } from "../../hooks/useVoiceInput";
 import { useSandboxSyncStatus } from "../../store/selectors";
 import type { VoiceModeView } from "../../hooks/useVoiceMode";
@@ -26,17 +26,6 @@ export interface VoiceMiniBarProps {
   onEnd(): void;
 }
 
-/**
- * 一行字幕取什么字：识别中的话优先，其次本轮回答。
- *
- * 「还没有回答」不只是 thinking 期间：整轮无可朗读文本时状态机会直接回
- * listening，只认状态的话那段回答一次都上不了屏。
- */
-export function miniBarText(view: VoiceModeView): string {
-  const showAnswer = view.state !== "capturing" && view.answer.length > 0;
-  return showAnswer ? stripVoiceMarkers(view.answer) : view.transcript;
-}
-
 export function VoiceMiniBar({
   view,
   muted,
@@ -48,9 +37,11 @@ export function VoiceMiniBar({
   const { t } = useTranslation();
   // 右下角已经有沙箱同步 Toast 时向上让位，别互相盖住。
   const lifted = useSandboxSyncStatus() !== null;
+  // 字幕取什么字由 voiceCaptionLine 定 —— 全屏浮层与它共用同一份规则，
+  // 否则两个视图会各说各的。
   const caption = view.error
     ? t(VOICE_MESSAGE_KEYS[view.error])
-    : miniBarText(view);
+    : voiceCaptionLine(view);
 
   return (
     <div
