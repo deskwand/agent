@@ -46,6 +46,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { VoiceModeSettings } from "../../renderer/components/settings/VoiceModeSettings";
+import { openMenu, optionValues, pickOption } from "./settings-menu-helper";
 import { useAppStore } from "../../renderer/store";
 
 /** jsdom 没有 WebAudio：够用的替身，`stop()` 会触发 onended（真实行为）。 */
@@ -149,14 +150,15 @@ const queryTestId = (id: string) =>
   container.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
 const pickTone = (next: "fast" | "balanced" | "best") =>
-  act(async () => {
-    const select = byTestId("voice-voice-tone") as HTMLSelectElement;
-    select.value = next;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  pickOption(container, "voice-voice-tone", next);
 
-const optionValues = (id: string) =>
-  Array.from(byTestId(id).querySelectorAll("option")).map((o) => o.value);
+/** 打开菜单读一遍选项、再关掉（t 回键名，所以断言看的是 value）。 */
+const readOptions = async (testId: string) => {
+  await openMenu(container, testId);
+  const values = optionValues(container, testId);
+  await openMenu(container, testId);
+  return values;
+};
 
 beforeEach(() => {
   created.length = 0;
@@ -186,7 +188,7 @@ afterEach(async () => {
 describe("最佳音质档", () => {
   it("下拉里有三档；切到 best 不触发下载，只记住选择", async () => {
     await mount({ tone: "balanced", states: { zh: READY } });
-    expect(optionValues("voice-voice-tone")).toEqual([
+    expect(await readOptions("voice-voice-tone")).toEqual([
       "fast",
       "balanced",
       "best",
@@ -203,7 +205,7 @@ describe("最佳音质档", () => {
   it("未安装时：出现引擎行 + 音色下拉置灰 + 安装按钮；点了才装", async () => {
     await mount({ tone: "best" });
 
-    const voice = byTestId("voice-engine-voice") as HTMLSelectElement;
+    const voice = byTestId("voice-engine-voice") as HTMLButtonElement;
     expect(voice.disabled).toBe(true);
     expect(queryTestId("voice-engine-remove")).toBeNull();
 
@@ -220,7 +222,7 @@ describe("最佳音质档", () => {
     });
 
     // 下拉里只有两档，引擎行完全不渲染 —— 不是"灰着勾人"
-    expect(optionValues("voice-voice-tone")).toEqual(["fast", "balanced"]);
+    expect(await readOptions("voice-voice-tone")).toEqual(["fast", "balanced"]);
     expect(queryTestId("voice-engine-row")).toBeNull();
     expect(queryTestId("voice-engine-install")).toBeNull();
     // 说明文案也不该再提第三档
@@ -228,8 +230,8 @@ describe("最佳音质档", () => {
       "settings.capabilities.voiceMode.toneDescNoBest",
     );
     // 老配置写着 best、但这台机器装不了：按实际行为显示均衡（主进程也会回退）
-    expect((byTestId("voice-voice-tone") as HTMLSelectElement).value).toBe(
-      "balanced",
+    expect(byTestId("voice-voice-tone").textContent).toContain(
+      "settings.capabilities.voiceMode.toneBalanced",
     );
   });
 
@@ -239,7 +241,7 @@ describe("最佳音质档", () => {
       engine: { ...ENGINE_IDLE, blockedReason: "disk" },
     });
 
-    expect(optionValues("voice-voice-tone")).toContain("best");
+    expect(await readOptions("voice-voice-tone")).toContain("best");
     expect(queryTestId("voice-engine-row")).not.toBeNull();
     expect(queryTestId("voice-engine-install")).toBeNull();
   });
@@ -263,9 +265,9 @@ describe("最佳音质档", () => {
       voiceEngineVoice: "ryan",
     });
 
-    const voice = byTestId("voice-engine-voice") as HTMLSelectElement;
+    const voice = byTestId("voice-engine-voice") as HTMLButtonElement;
     expect(voice.disabled).toBe(false);
-    expect(optionValues("voice-engine-voice")).toEqual([
+    expect(await readOptions("voice-engine-voice")).toEqual([
       "serena",
       "vivian",
       "uncle_fu",
@@ -276,13 +278,12 @@ describe("最佳音质档", () => {
       "eric",
       "dylan",
     ]);
-    // 方言后缀来自元数据，不是我们编的中文名
-    expect(voice.textContent).toContain("sichuan_dialect");
+    // 方言后缀来自元数据，不是我们编的中文名 —— 在菜单里才看得到
+    await openMenu(container, "voice-engine-voice");
+    expect(container.textContent).toContain("sichuan_dialect");
+    await openMenu(container, "voice-engine-voice");
 
-    await act(async () => {
-      voice.value = "dylan";
-      voice.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await pickOption(container, "voice-engine-voice", "dylan");
     expect(api.config.save).toHaveBeenCalledWith({
       voiceMode: expect.objectContaining({ voiceEngineVoice: "dylan" }),
     });
@@ -363,6 +364,36 @@ describe("试听", () => {
     });
     expect(api.tts.retryEngine).toHaveBeenCalledOnce();
     expect(api.tts.installEngine).not.toHaveBeenCalled();
+  });
+
+  it("试听按钮三态同宽：点一下不该把整行推得左右跳", async () => {
+    // jsdom 量不了布局，所以钉住那条不变量本身：三种文案（试听/生成中/停止）下
+    // 宽度 class 必须一致 —— 宽度一变就会挤动说明文字那列并让它重新折行。
+    let resolvePreview: ((value: unknown) => void) | null = null;
+    api.tts.preview.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePreview = resolve;
+      }),
+    );
+    await mount({ tone: "balanced", states: { zh: READY } });
+
+    const idle = byTestId("voice-preview-balanced").className;
+    expect(idle).toContain("w-20");
+
+    await act(async () => {
+      byTestId("voice-preview-balanced").click(); // → 生成中（还挂着）
+    });
+    expect(byTestId("voice-preview-balanced").className).toContain("w-20");
+
+    await act(async () => {
+      resolvePreview?.({
+        ok: true,
+        samples: new Float32Array([0.1]),
+        sampleRate: 24000,
+      });
+      await Promise.resolve();
+    });
+    expect(byTestId("voice-preview-balanced").className).toContain("w-20"); // → 停止
   });
 
   it("试听还在飞的时候切档 → 那次结果被丢掉，不播旧档的声音", async () => {

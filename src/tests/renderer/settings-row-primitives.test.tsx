@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, useState, type ReactNode } from "react";
+import { menuTrigger, pickOption } from "./settings-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -98,6 +99,7 @@ describe("设置行原语", () => {
       const [value, setValue] = useState<"zh" | "en">("zh");
       return (
         <SettingsSelect
+          testId="language"
           label="语言"
           value={value}
           options={[
@@ -113,18 +115,16 @@ describe("设置行原语", () => {
     }
 
     await render(<Harness />);
-    const select = container.querySelector<HTMLSelectElement>("select")!;
-    expect(select.getAttribute("aria-label")).toBe("语言");
-    expect(select.value).toBe("zh");
-    await act(async () => {
-      select.value = "en";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    // **不是原生 select**：原生展开菜单由系统绘制，主题跟不了 app（用量页踩过一次）
+    expect(container.querySelector("select")).toBeNull();
+    const trigger = menuTrigger(container, "language");
+    expect(trigger.getAttribute("aria-label")).toBe("语言");
+    expect(trigger.textContent).toContain("简体中文");
+
+    await pickOption(container, "language", "en");
     expect(onChange).toHaveBeenCalledWith("en");
     // 受控值真的回流了：只看 onChange 被调用，抓不到「组件是失控的」这种毛病。
-    expect(container.querySelector<HTMLSelectElement>("select")!.value).toBe(
-      "en",
-    );
+    expect(menuTrigger(container, "language").textContent).toContain("English");
   });
 
   it("行渲染标题与说明，没有说明就不占那一层", async () => {

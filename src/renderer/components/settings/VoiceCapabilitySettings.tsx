@@ -162,6 +162,7 @@ export function VoiceCapabilitySettings({
           }
           control={
             <SettingsSelect
+              testId="voice-shortcut-select"
               label={t("settings.capabilities.voice.shortcut")}
               value={selectedShortcut}
               options={VOICE_SHORTCUTS.map((shortcut) => ({

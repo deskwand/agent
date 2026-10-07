@@ -295,7 +295,13 @@ export function VoiceModeSettings() {
       ? ("muted" as const)
       : status.tone;
 
-  /** 试听：三档共用一颗按钮，标签随播放状态变。 */
+  /**
+   * 试听：三档共用一颗按钮，标签随播放状态变。
+   *
+   * **宽度必须固定**（`w-20`）：文案在 试听 / 生成中 / 停止 之间切换，宽度一变就会
+   * 推着整行的控制列左右移动，旁边那列说明文字也跟着重新折行 —— 点一下按钮整行跳一下。
+   * 宽度按两种语言里最长的那个（英文 Generating）留够。
+   */
   const previewButton = (which: TtsTone) => (
     <button
       type="button"
@@ -310,7 +316,7 @@ export function VoiceModeSettings() {
         if (preview.state === "playing") preview.stop();
         else void preview.play(which);
       }}
-      className={GHOST_BUTTON}
+      className={`${GHOST_BUTTON} w-20 whitespace-nowrap text-center`}
     >
       {preview.state === "busy"
         ? t(`${VOICE_MODE_KEY}.tonePreviewBusy`)

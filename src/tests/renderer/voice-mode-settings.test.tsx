@@ -41,6 +41,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { VoiceModeSettings } from "../../renderer/components/settings/VoiceModeSettings";
+import { pickOption } from "./settings-menu-helper";
 import { useAppStore } from "../../renderer/store";
 
 let container: HTMLDivElement;
@@ -90,13 +91,9 @@ async function mount(opts: { fastVoice?: boolean } = {}): Promise<void> {
 const byTestId = (id: string) =>
   container.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
-/** 拨到某一档。下拉是受控的，直接派发 change。 */
+/** 拨到某一档。自绘下拉：点开触发按钮再点选项。 */
 const pickTone = (next: "fast" | "balanced") =>
-  act(async () => {
-    const select = byTestId("voice-voice-tone") as HTMLSelectElement;
-    select.value = next;
-    select.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  pickOption(container, "voice-voice-tone", next);
 
 const emitInstall = (model: TtsModelKey, state: TtsInstallState) =>
   act(async () => {
@@ -284,11 +281,7 @@ describe("VoiceModeSettings 的音色行", () => {
     } as AppConfig);
     await mount();
 
-    const select = byTestId("voice-mode-silence") as HTMLSelectElement;
-    await act(async () => {
-      select.value = "2000";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await pickOption(container, "voice-mode-silence", "2000");
 
     expect(api.config.save).toHaveBeenCalledWith({
       voiceMode: { silenceMs: 2000, fastVoice: false },
