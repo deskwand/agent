@@ -1,6 +1,14 @@
 // Shared types, constants, and components used across settings tab files.
 
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronDown } from "lucide-react";
 import type { TFunction } from "i18next";
+import {
+  MENU_ITEM_CLASS,
+  MENU_ITEM_DEFAULT_CLASS,
+  MENU_ITEM_SELECTED_CLASS,
+  MENU_PANEL_PADDED_CLASS,
+} from "../menu-styles";
 import type { VoiceInstallPhase } from "../../../shared/ipc-types";
 import type { ScheduleWeekday } from "../../types";
 
@@ -250,6 +258,15 @@ export function SettingsSwitch({
   );
 }
 
+/**
+ * 设置项里的下拉。
+ *
+ * **不用原生 `<select>`**：它的展开菜单由操作系统绘制，跟随**系统**外观而不是 app
+ * 主题 —— 浅色主题 + 深色系统会弹出系统深色菜单（选中行是系统高亮色），CSS 够不着；
+ * 菜单还会被行容器裁掉。做法照 `usage/CurrencySelect`（那边已经踩过一遍并写在注释里）。
+ *
+ * 菜单开合与面板样式都用仓库共享的那套（menu-styles + 外点关闭 + Esc），不新造样式。
+ */
 export function SettingsSelect<T extends string>({
   value,
   options,
@@ -266,21 +283,84 @@ export function SettingsSelect<T extends string>({
   /** 未安装时音色不可选：选了也没用，还会让人以为已经生效。 */
   disabled?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [open]);
+
+  const current = options.find((option) => option.value === value);
+
   return (
-    <select
-      aria-label={label}
-      data-testid={testId}
-      value={value}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value as T)}
-      className="rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none hover:bg-surface-hover disabled:opacity-50"
-    >
-      {options.map((option) => (
-        <option key={option.value} value={option.value}>
-          {option.label}
-        </option>
-      ))}
-    </select>
+    <span ref={containerRef} className="relative inline-flex items-center">
+      <button
+        type="button"
+        data-testid={testId}
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={label}
+        className="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none hover:bg-surface-hover disabled:opacity-50"
+      >
+        <span className="whitespace-nowrap">{current?.label ?? value}</span>
+        <ChevronDown
+          className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          aria-label={label}
+          className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-down absolute top-[calc(100%_+_6px)] right-0 z-30 min-w-full`}
+        >
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              data-testid={
+                testId ? `${testId}-option-${option.value}` : undefined
+              }
+              onClick={() => {
+                setOpen(false);
+                if (option.value !== value) onChange(option.value);
+              }}
+              className={`${MENU_ITEM_CLASS} ${
+                option.value === value
+                  ? MENU_ITEM_SELECTED_CLASS
+                  : MENU_ITEM_DEFAULT_CLASS
+              }`}
+            >
+              <span className="truncate">{option.label}</span>
+              {option.value === value && <Check className="h-4 w-4 shrink-0" />}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
   );
 }
 

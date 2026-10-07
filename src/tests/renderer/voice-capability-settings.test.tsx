@@ -32,6 +32,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { VoiceCapabilitySettings } from "../../renderer/components/settings/VoiceCapabilitySettings";
+import { openMenu, optionLabels, pickOption } from "./settings-menu-helper";
 import { useAppStore } from "../../renderer/store";
 
 let container: HTMLDivElement;
@@ -212,11 +213,7 @@ describe("VoiceCapabilitySettings", () => {
     });
     await mount();
 
-    const select = container.querySelector<HTMLSelectElement>("select")!;
-    await act(async () => {
-      select.value = "MetaShiftSpace";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
-    });
+    await pickOption(container, "voice-shortcut-select", "MetaShiftSpace");
 
     expect(api.config.save).toHaveBeenCalledWith({
       voiceEngine: {
@@ -284,13 +281,14 @@ describe("VoiceCapabilitySettings", () => {
     setEngine({ enabled: true, shortcut: "AltRight" });
     await mount();
 
-    const select = container.querySelector<HTMLSelectElement>("select")!;
-    expect([...select.options].map((option) => option.textContent)).toEqual([
+    await openMenu(container, "voice-shortcut-select");
+    expect(optionLabels(container, "voice-shortcut-select")).toEqual([
       "settings.capabilities.voice.shortcutAltRightMac",
       "settings.capabilities.voice.shortcutAltSpaceMac",
       "settings.capabilities.voice.shortcutMetaShiftSpaceMac",
       "settings.capabilities.voice.shortcutDisabled",
     ]);
+    await openMenu(container, "voice-shortcut-select"); // 关掉，免得影响后面的断言
     expect(byTestId("voice-shortcut")!.textContent).toContain(
       "settings.capabilities.voice.shortcutHint",
     );
@@ -314,13 +312,11 @@ describe("VoiceCapabilitySettings", () => {
     setEngine({ enabled: true, shortcut: "AltRight" });
     await mount();
 
-    const select = container.querySelector<HTMLSelectElement>("select")!;
-    expect(select.options[0].textContent).toBe(
-      "settings.capabilities.voice.shortcutAltRightWin",
-    );
-    expect(select.options[1].textContent).toBe(
-      "settings.capabilities.voice.shortcutAltSpaceWin",
-    );
+    await openMenu(container, "voice-shortcut-select");
+    const labels = optionLabels(container, "voice-shortcut-select");
+    expect(labels[0]).toBe("settings.capabilities.voice.shortcutAltRightWin");
+    expect(labels[1]).toBe("settings.capabilities.voice.shortcutAltSpaceWin");
+    await openMenu(container, "voice-shortcut-select"); // 关掉
     expect(byTestId("voice-shortcut")!.textContent).toContain(
       "settings.capabilities.voice.shortcutHint",
     );
