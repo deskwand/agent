@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { QueryResultData } from "../../main/agent/tools/web-access/types";
 import {
   CANDIDATE_LIMIT,
+  clampPublished,
   collectCandidates,
   normalizeTitle,
   normalizeUrlKey,
 } from "../../main/feed/feed-collect";
+import type { SourceItem } from "../../main/feed/sources/catalog";
 import type { FeedQuery } from "../../main/feed/feed-queries";
 
 const queries: FeedQuery[] = [
@@ -154,5 +156,160 @@ describe("collectCandidates", () => {
       knownUrlKeys: new Set(),
     });
     expect(candidates).toEqual([]);
+  });
+});
+
+describe("源候选", () => {
+  const sourceItem = (index: number): SourceItem => ({
+    title: `源标题 ${index}`,
+    url: `https://s.com/${index}`,
+    snippet: "片段",
+    publishedAt: null,
+  });
+
+  it("桶数相等时各占一半名额", () => {
+    const results = [
+      result("q1", [
+        "https://a.com/1",
+        "https://a.com/2",
+        "https://a.com/3",
+        "https://a.com/4",
+      ]),
+      result("q2", [
+        "https://b.com/1",
+        "https://b.com/2",
+        "https://b.com/3",
+        "https://b.com/4",
+      ]),
+    ];
+    const candidates = collectCandidates({
+      results,
+      queries,
+      knownUrlKeys: new Set(),
+      sourceBuckets: [
+        Array.from({ length: 8 }, (_, index) => sourceItem(index)),
+        Array.from({ length: 8 }, (_, index) => sourceItem(index + 100)),
+      ],
+    });
+    const fromSource = candidates.filter((item) =>
+      item.url.startsWith("https://s.com/"),
+    );
+    expect(candidates).toHaveLength(CANDIDATE_LIMIT);
+    expect(fromSource).toHaveLength(6);
+  });
+
+  it("搜索桶比源桶少时仍然各占一半名额（非对称输入）", () => {
+    // 真实形状：查询词是 3-6 个（设计 §4），而 20 个源里健康的往往有 8 个以上
+    const threeQueries: FeedQuery[] = [
+      { q: "q1", topic: "T1", reason: "r1" },
+      { q: "q2", topic: "T2", reason: "r2" },
+      { q: "q3", topic: "T3", reason: "r3" },
+    ];
+    const results = [
+      result("q1", ["https://a.com/1", "https://a.com/2"]),
+      result("q2", ["https://b.com/1", "https://b.com/2"]),
+      result("q3", ["https://c.com/1", "https://c.com/2"]),
+    ];
+    const candidates = collectCandidates({
+      results,
+      queries: threeQueries,
+      knownUrlKeys: new Set(),
+      sourceBuckets: Array.from({ length: 8 }, (_, bucketIndex) =>
+        Array.from({ length: 3 }, (_, itemIndex) =>
+          sourceItem(bucketIndex * 100 + itemIndex),
+        ),
+      ),
+    });
+    expect(candidates).toHaveLength(CANDIDATE_LIMIT);
+    const fromSource = candidates.filter((item) =>
+      item.url.startsWith("https://s.com/"),
+    );
+    expect(fromSource).toHaveLength(6);
+  });
+
+  it("源条目的 URL 非法时被丢弃，不抛异常（Review Focus 1）", () => {
+    const candidates = collectCandidates({
+      results: [result("q1", ["https://a.com/1"])],
+      queries,
+      knownUrlKeys: new Set(),
+      sourceBuckets: [
+        [
+          { title: "相对路径", url: "/a/b", snippet: "", publishedAt: null },
+          {
+            title: "非 http",
+            url: "javascript:alert(1)",
+            snippet: "",
+            publishedAt: null,
+          },
+          {
+            title: "好的",
+            url: "https://s.com/ok",
+            snippet: "",
+            publishedAt: null,
+          },
+        ],
+      ],
+    });
+    expect(candidates.map((item) => item.title)).toEqual(["q1 标题 0", "好的"]);
+  });
+
+  it("源条目带上 publishedAt，搜索条目为 null", () => {
+    const candidates = collectCandidates({
+      results: [result("q1", ["https://a.com/1"])],
+      queries,
+      knownUrlKeys: new Set(),
+      sourceBuckets: [
+        [
+          {
+            title: "有时间的",
+            url: "https://s.com/t",
+            snippet: "",
+            publishedAt: 1_700_000_000_000,
+          },
+        ],
+      ],
+    });
+    expect(candidates[0].publishedAt).toBeNull();
+    expect(candidates[1].publishedAt).toBe(1_700_000_000_000);
+  });
+
+  it("源条目与搜索条目共用去重：同一个 URL 只留先出现的那个", () => {
+    const candidates = collectCandidates({
+      results: [result("q1", ["https://same.com/x", "https://a.com/1"])],
+      queries,
+      knownUrlKeys: new Set(),
+      sourceBuckets: [
+        [
+          {
+            title: "重复",
+            url: "https://same.com/x",
+            snippet: "",
+            publishedAt: null,
+          },
+          {
+            title: "源独有",
+            url: "https://s.com/only",
+            snippet: "",
+            publishedAt: null,
+          },
+        ],
+      ],
+    });
+    expect(candidates.map((item) => item.url)).toEqual([
+      "https://same.com/x",
+      "https://a.com/1",
+      "https://s.com/only",
+    ]);
+  });
+});
+
+describe("clampPublished", () => {
+  it("未来时间钳到 now（Review Focus 4）", () => {
+    expect(clampPublished(2_000, 1_000)).toBe(1_000);
+  });
+
+  it("过去的时间与 null 原样返回", () => {
+    expect(clampPublished(500, 1_000)).toBe(500);
+    expect(clampPublished(null, 1_000)).toBeNull();
   });
 });

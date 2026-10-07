@@ -31,8 +31,13 @@ export function FeedItemRow({
   onDismiss,
   showActionsAlways = false,
 }: FeedItemRowProps): JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const unread = item.read_at === null;
+  const publishedLabel = relativeTime(
+    item.published_at ?? item.created_at,
+    Date.now(),
+    i18n.resolvedLanguage ?? "en",
+  );
 
   return (
     <div
@@ -77,7 +82,17 @@ export function FeedItemRow({
           {unread ? (
             <span className="sr-only">{t("feed.itemUnread")}</span>
           ) : null}
-          <span className="min-w-0">{item.title}</span>
+          <span
+            className="min-w-0"
+            style={{
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
+            {item.title}
+          </span>
           {item.unprocessed === 1 ? (
             <span className="shrink-0 rounded-sm bg-surface-active px-1 text-xs text-text-muted">
               {t("feed.itemUnprocessed")}
@@ -113,6 +128,8 @@ export function FeedItemRow({
           ) : null}
           <span className="opacity-45">·</span>
           <span className="min-w-0 truncate">{item.source_host}</span>
+          <span className="opacity-45">·</span>
+          <span className="shrink-0 tabular-nums">{publishedLabel}</span>
           <span className="flex-1" />
           <span
             data-testid="feed-actions"
@@ -160,6 +177,20 @@ export function FeedItemRow({
       ) : null}
     </div>
   );
+}
+
+/**
+ * 相对时间：优先用源自带的发布时间，没有就回退到生成时间（设计 §8.1 第 3 条）。
+ * 用 Intl 而不是 i18n key：语言由 i18n 决定，但不新增文案条目。
+ * now 是参数而不是内部 Date.now()：测试才能钉住结果。
+ */
+function relativeTime(value: number, now: number, locale: string): string {
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  const minutes = Math.round((value - now) / 60_000);
+  if (Math.abs(minutes) < 60) return formatter.format(minutes, "minute");
+  const hours = Math.round(minutes / 60);
+  if (Math.abs(hours) < 24) return formatter.format(hours, "hour");
+  return formatter.format(Math.round(hours / 24), "day");
 }
 
 /**

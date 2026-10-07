@@ -170,78 +170,88 @@ export function FeedView(): JSX.Element {
     <div data-testid="feed-view" className="flex h-full flex-col bg-background">
       <style>{`.feed-row:hover [data-testid="feed-actions"],.feed-row:focus-within [data-testid="feed-actions"]{opacity:1 !important}`}</style>
 
-      <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2.5">
+      <div className="flex items-start gap-3 border-b border-border-subtle px-4 pb-2.5 pt-3.5">
         <button
           type="button"
           data-testid="feed-back"
           onClick={() => setActiveView("chat")}
           aria-label={t("common.back")}
-          className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+          className="-ml-1.5 mt-0.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
         >
           <ArrowLeft className="h-5 w-5 text-text-secondary" />
         </button>
-        <span className="text-base font-semibold">{t("feed.railLabel")}</span>
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-text-primary">
+            {t("feed.railLabel")}
+          </h1>
+          <p className="text-xs leading-[1.75] tabular-nums text-text-muted">
+            {phase
+              ? t("feed.progress", { phase: t(phaseKey(phase)) })
+              : enabled
+                ? t("feed.nextUpdate", { time: nextUpdateText })
+                : t("feed.autoOff")}
+          </p>
+        </div>
         <span className="flex-1" />
-        <span className="text-xs tabular-nums text-text-muted">
-          {phase ? t("feed.progress", { phase: t(phaseKey(phase)) }) : null}
-          {!phase && !enabled ? t("feed.autoOff") : null}
-          {!phase && enabled
-            ? t("feed.nextUpdate", { time: nextUpdateText })
-            : null}
-        </span>
-        <button
-          type="button"
-          onClick={() => void markAllFeedRead()}
-          className="text-xs text-text-muted"
-        >
-          {t("feed.markAllRead")}
-        </button>
-        <button
-          type="button"
-          data-testid="feed-refresh"
-          disabled={Boolean(phase)}
-          onClick={() => void refreshNow()}
-          className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-foreground disabled:opacity-50"
-        >
-          {t("feed.refresh")}
-        </button>
-        <div className="relative">
+        <div className="flex items-center gap-2 pt-0.5">
           <button
             type="button"
-            data-testid="feed-more"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
-            className="px-1 text-xs text-text-muted"
+            data-testid="feed-refresh"
+            disabled={Boolean(phase)}
+            onClick={() => void refreshNow()}
+            className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-foreground disabled:opacity-50"
           >
-            ⋯
+            {t("feed.refresh")}
           </button>
-          {menuOpen ? (
-            <div className="absolute right-0 top-6 z-10 w-[154px] rounded-md border border-border bg-surface p-1 shadow-elevated">
-              <button
-                type="button"
-                data-testid="feed-toggle-auto"
-                onClick={() => {
-                  setMenuOpen(false);
-                  void setFeedEnabled(!enabled);
-                }}
-                className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
-              >
-                {enabled ? t("feed.pauseAuto") : t("feed.resumeAuto")}
-              </button>
-              <button
-                type="button"
-                data-testid="feed-clear-all"
-                onClick={() => {
-                  setMenuOpen(false);
-                  setConfirmClear(true);
-                }}
-                className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
-              >
-                {t("feed.clearAll")}
-              </button>
-            </div>
-          ) : null}
+          <div className="relative">
+            <button
+              type="button"
+              data-testid="feed-more"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+              className="px-1 text-xs text-text-muted"
+            >
+              ⋯
+            </button>
+            {menuOpen ? (
+              <div className="absolute right-0 top-6 z-10 w-[154px] rounded-md border border-border bg-surface p-1 shadow-elevated">
+                <button
+                  type="button"
+                  data-testid="feed-mark-all-read"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void markAllFeedRead();
+                  }}
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
+                >
+                  {t("feed.markAllRead")}
+                </button>
+                <button
+                  type="button"
+                  data-testid="feed-toggle-auto"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    void setFeedEnabled(!enabled);
+                  }}
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
+                >
+                  {enabled ? t("feed.pauseAuto") : t("feed.resumeAuto")}
+                </button>
+                <button
+                  type="button"
+                  data-testid="feed-clear-all"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setConfirmClear(true);
+                  }}
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
+                >
+                  {t("feed.clearAll")}
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -297,7 +307,7 @@ export function FeedView(): JSX.Element {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <div className="min-w-0 flex-1 overflow-y-auto">
+        <div className="w-[400px] shrink-0 overflow-y-auto">
           {visible.length === 0 ? (
             <div
               className="px-6 py-6 text-sm text-text-muted"
@@ -356,7 +366,7 @@ export function FeedView(): JSX.Element {
         {items.length > 0 ? (
           <div
             data-testid="feed-reader"
-            className="min-w-0 flex-[1.02] border-l border-border-subtle"
+            className="min-w-0 flex-1 border-l border-border-subtle"
           >
             {selected ? (
               <FeedReaderPane

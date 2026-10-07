@@ -19,6 +19,7 @@ function draft(overrides: Partial<FeedItemDraft> = {}): FeedItemDraft {
       snippet: "片段",
       topic: "主题",
       reason: "理由",
+      publishedAt: null,
       body: "页面正文，约有几百字。".repeat(20),
       bodyStatus: "ok",
     },

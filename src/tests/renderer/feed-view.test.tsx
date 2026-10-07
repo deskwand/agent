@@ -8,6 +8,7 @@ vi.mock("react-i18next", () => ({
     // 把插值参数拼进文本，否则「nextUpdate 传了空串」这种错断言不出来
     t: (key: string, options?: Record<string, unknown>) =>
       options ? `${key}:${JSON.stringify(options)}` : key,
+    i18n: { resolvedLanguage: "en" },
   }),
 }));
 
@@ -35,6 +36,7 @@ function makeItem(overrides: Partial<FeedItemWithMeta> = {}): FeedItemWithMeta {
     image_file: null,
     image_status: "none",
     created_at: Date.now(),
+    published_at: null,
     read_at: null,
     dismissed_at: null,
     unprocessed: 0,
@@ -188,6 +190,64 @@ describe("已启用且有条目", () => {
       container.querySelector('[data-testid="feed-refresh"]'),
     ).toBeTruthy();
     expect(container.textContent).toContain("第一条");
+  });
+
+  it("「全部已读」收进 ⋯ 菜单，不在顶栏（顶栏只留一个主操作）", async () => {
+    const markAllRead = vi.fn(async () => 0);
+    setWindowApi(snapshot(true, [makeItem()], makeRun()), { markAllRead });
+    await render();
+    // 菜单没打开时它不在 DOM 里
+    expect(
+      container.querySelector('[data-testid="feed-mark-all-read"]'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain("feed.markAllRead");
+
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="feed-more"]') as HTMLElement
+      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const entry = container.querySelector(
+      '[data-testid="feed-mark-all-read"]',
+    ) as HTMLElement;
+    expect(entry).not.toBeNull();
+    await act(async () => {
+      entry.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(markAllRead).toHaveBeenCalled();
+  });
+
+  it("右栏底部：相关性与出口同排，且不再重复摘录标签", async () => {
+    setWindowApi(
+      snapshot(
+        true,
+        [makeItem({ relevance: "因为你上周问过这个" })],
+        makeRun(),
+      ),
+      {
+        getBody: vi.fn(async () => ({
+          body: "正文",
+          bodyStatus: "ok",
+          excerpt: "摘录",
+        })),
+      },
+    );
+    await render();
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="feed-title"]') as HTMLElement
+      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const reader = container.querySelector('[data-testid="feed-reader"]');
+    // 「正文摘录 · 本地化」只出现在元信息行，底部那次已删
+    const occurrences =
+      reader?.textContent?.split("feed.readerExcerptLocalized").length ?? 0;
+    expect(occurrences - 1).toBe(1);
+    // 相关性与「打开原文」同在一个底部行里
+    const open = reader?.querySelector(
+      '[data-testid="feed-open-browser"]',
+    ) as HTMLElement;
+    expect(open.parentElement?.textContent).toContain("因为你上周问过这个");
   });
 
   it("点「立即更新」调 refreshNow", async () => {

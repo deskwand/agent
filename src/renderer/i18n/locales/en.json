@@ -2257,7 +2257,7 @@
     "readerExcerpt": "Excerpt",
     "readerExcerptLocalized": "Excerpt · localized",
     "readerSnippetOnly": "Only a snippet — the article body could not be fetched",
-    "readerOpenInBrowser": "Open the full page in your browser",
+    "readerOpenInBrowser": "Open original",
     "reasonsTitle": "Why these",
     "reasonsSummary": "{{queries}} queries · {{candidates}} candidates · {{items}} kept · {{images}} images",
     "reasonsBlockTopic": "Stop following",

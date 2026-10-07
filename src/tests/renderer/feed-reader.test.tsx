@@ -32,6 +32,7 @@ const item: FeedItemWithMeta = {
   image_file: null,
   image_status: "none",
   created_at: 1,
+  published_at: null,
   read_at: null,
   dismissed_at: null,
   unprocessed: 0,
@@ -79,25 +80,33 @@ describe("FeedReaderPane", () => {
     expect(container.textContent).not.toContain("原文");
   });
 
-  it("正文容器限宽（不是通栏），行高 ≥ 1.75", async () => {
+  it("正文限宽（不是通栏）：宽度归居中列管，正文只负责排版", async () => {
     await render();
+    // 限宽从正文自身收上到列（宽屏下多出来的宽度由列两侧均分，见「居中列」那条）
+    const column = container.querySelector(
+      '[data-testid="feed-reader-column"]',
+    ) as HTMLElement;
+    expect(column.style.maxWidth).toBe("34em");
     const body = container.querySelector(
       '[data-testid="feed-body"]',
     ) as HTMLElement;
-    expect(body.style.maxWidth).toBe("34em");
+    expect(body.style.maxWidth).toBe("");
     // 行高不再写在元素上，改由 .prose-feed 规则给（数值由 feed-prose.test.ts 守）
     expect(body.className).toContain("prose-feed");
   });
 
-  it("有本地化摘录时渲染摘录，元信息行与底部两处都是「· 本地化」", async () => {
+  it("有本地化摘录时渲染摘录，元信息行标「· 本地化」", async () => {
     await render({ body: withExcerpt });
     expect(container.textContent).toContain("这是本地化摘录。");
     expect(container.querySelector('[data-testid="feed-raw-note"]')).toBeNull();
-    // 两处标签都得变（元信息行 + 底部）—— 只改一处会在同一屏自相矛盾
+    // 标签只在元信息行出现一次 —— 底部那次已删（设计 §8.1 第 4 条：同一屏不标两遍）
     expect(
       (container.textContent?.match(/feed\.readerExcerptLocalized/g) ?? [])
         .length,
-    ).toBe(2);
+    ).toBe(1);
+    expect(
+      container.querySelector('[data-testid="feed-open-browser"]'),
+    ).toBeTruthy();
   });
 
   it("没有摘录时渲染抓来的正文，并显示一行说明（标签退回「正文摘录」）", async () => {
@@ -110,10 +119,10 @@ describe("FeedReaderPane", () => {
       (container.textContent?.match(/feed\.readerExcerptLocalized/g) ?? [])
         .length,
     ).toBe(0);
-    // 不加 (?![A-Za-z])：底部那个标签后面紧跟着按钮的 key，加了会把那一处排掉
+    // 只在元信息行出现一次
     expect(
       (container.textContent?.match(/feed\.readerExcerpt/g) ?? []).length,
-    ).toBe(2);
+    ).toBe(1);
   });
 
   it("markdown 标记不再以字面出现（截图那个 bug 的回归锁）", async () => {
@@ -194,5 +203,36 @@ describe("FeedReaderPane", () => {
       ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(onOpenInBrowser).toHaveBeenCalledWith("https://a.com/1");
+  });
+});
+
+describe("底部那一行", () => {
+  it("被截断的相关性有 title 兜底 —— 右栏是这句话唯一出现的地方", async () => {
+    await render();
+    const rel = container.querySelector(
+      '[data-testid="feed-relevance"]',
+    ) as HTMLElement | null;
+    expect(rel).not.toBeNull();
+    // 列宽 476 里还要让出「打开原文」，这条 span 只剩约 320px：截掉的尾巴必须能拿回来
+    expect(rel?.className).toContain("truncate");
+    expect(rel?.getAttribute("title")).toBe("为什么和你相关");
+  });
+});
+
+describe("居中列", () => {
+  it("大图、标题、正文与出口都在同一个居中列里（宽屏下空白一分为二）", async () => {
+    await render({ body: withExcerpt });
+    const column = container.querySelector(
+      '[data-testid="feed-reader-column"]',
+    ) as HTMLElement | null;
+    expect(column).not.toBeNull();
+    // 居中：宽屏下多出来的宽度两侧均分，而不是全堆在右边（改前右栏 1104px 里空 588px）
+    expect(column?.className).toContain("mx-auto");
+    // 一条列管住全部内容 —— 漏掉任何一个，它就会贴回左边缘
+    for (const testid of ["feed-hero", "feed-body", "feed-open-browser"]) {
+      expect(column?.querySelector(`[data-testid="${testid}"]`)).not.toBeNull();
+    }
+    expect(column?.textContent).toContain("这是本地化摘录。");
+    expect(column?.textContent).toContain("标题");
   });
 });

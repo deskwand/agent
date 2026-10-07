@@ -59,6 +59,7 @@ function makeService(overrides: Record<string, unknown> = {}) {
         results: [{ url: "https://a.com/1", title: "A", snippet: "片段" }],
       },
     ]),
+    fetchSources: vi.fn(async () => []),
     fetchPages: vi.fn(async () => [
       {
         url: "https://a.com/1",
@@ -383,5 +384,90 @@ describe("FeedService.cleanup", () => {
     const later = makeService({ now: () => NOW + 31 * 24 * 60 * 60 * 1000 });
     await later.service.cleanup();
     expect(db.feedItems.countAll()).toBe(0);
+  });
+});
+
+describe("源接进管线", () => {
+  it("源来的条目会入库，并带上 published_at", async () => {
+    const { service } = makeService({
+      fetchSources: vi.fn(async () => [
+        {
+          id: "arxiv",
+          items: [
+            {
+              title: "源标题",
+              url: "https://arxiv.org/abs/1",
+              snippet: "片段",
+              publishedAt: 1_600_000_000_000,
+            },
+          ],
+        },
+      ]),
+      // 搜索这次空手，全靠源
+      searchWeb: vi.fn(async () => [
+        { query: "tokio", answer: "", error: "search failed", results: [] },
+      ]),
+    });
+    await service.refresh("manual");
+    const items = db.feedItems.listVisible(10);
+    expect(items).toHaveLength(1);
+    expect(items[0].published_at).toBe(1_600_000_000_000);
+  });
+
+  it("源给的未来时间被钳到本次 run 的时间（Review Focus 4）", async () => {
+    const { service } = makeService({
+      fetchSources: vi.fn(async () => [
+        {
+          id: "arxiv",
+          items: [
+            {
+              title: "源标题",
+              url: "https://arxiv.org/abs/2",
+              snippet: "片段",
+              publishedAt: NOW + 86_400_000,
+            },
+          ],
+        },
+      ]),
+      searchWeb: vi.fn(async () => [
+        { query: "tokio", answer: "", error: "search failed", results: [] },
+      ]),
+    });
+    await service.refresh("manual");
+    expect(db.feedItems.listVisible(10)[0].published_at).toBe(NOW);
+  });
+
+  it("搜索与源都空手才算 failed", async () => {
+    const { service } = makeService({
+      fetchSources: vi.fn(async () => [{ id: "arxiv", items: [] }]),
+      searchWeb: vi.fn(async () => [
+        { query: "tokio", answer: "", error: "search failed", results: [] },
+      ]),
+    });
+    await service.refresh("manual");
+    expect(db.feedRuns.latest()?.status).toBe("failed");
+  });
+
+  it("搜索失败但源有货：照常 ok，不退化成失败", async () => {
+    const { service } = makeService({
+      fetchSources: vi.fn(async () => [
+        {
+          id: "arxiv",
+          items: [
+            {
+              title: "源标题",
+              url: "https://arxiv.org/abs/3",
+              snippet: "片段",
+              publishedAt: null,
+            },
+          ],
+        },
+      ]),
+      searchWeb: vi.fn(async () => [
+        { query: "tokio", answer: "", error: "search failed", results: [] },
+      ]),
+    });
+    await service.refresh("manual");
+    expect(db.feedRuns.latest()?.status).toBe("ok");
   });
 });

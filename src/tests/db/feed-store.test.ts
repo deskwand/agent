@@ -36,6 +36,7 @@ function item(overrides: Partial<FeedItemRow> = {}): FeedItemRow {
     read_at: null,
     dismissed_at: null,
     unprocessed: 0,
+    published_at: null,
     ...overrides,
   };
 }
@@ -67,6 +68,28 @@ afterEach(() => {
 });
 
 describe("feed_items", () => {
+  it("published_at 写进去再读出来，null 也保得住", () => {
+    db.feedItems.insert(item({ id: "t", published_at: 1_700_000_000_000 }));
+    db.feedItems.insert(
+      item({ id: "n", url_key: "example.com/n", published_at: null }),
+    );
+    expect(db.feedItems.get("t")?.published_at).toBe(1_700_000_000_000);
+    expect(db.feedItems.get("n")?.published_at).toBeNull();
+  });
+
+  it("老库升级：已存在的表会被 ensureColumn 补上 published_at", () => {
+    const file = join(dir, "upgrade.db");
+    const first = initDatabase(file);
+    expect(first.feedItems.get("i1")).toBeNull();
+    closeDatabase();
+
+    const second = initDatabase(file);
+    expect(() =>
+      second.feedItems.insert(item({ published_at: 7 })),
+    ).not.toThrow();
+    expect(second.feedItems.get("i1")?.published_at).toBe(7);
+  });
+
   it("插入后能按 id 取回，未读计数与已读动作一致", () => {
     db.feedItems.insert(item());
     expect(db.feedItems.unreadCount()).toBe(1);

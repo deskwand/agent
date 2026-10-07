@@ -6,7 +6,10 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { resolvedLanguage: "en" },
+  }),
 }));
 
 import { FeedItemRow } from "../../renderer/components/FeedItemRow";
@@ -27,6 +30,7 @@ const item: FeedItemWithMeta = {
   image_file: "f.jpg",
   image_status: "ok",
   created_at: 1,
+  published_at: null,
   read_at: null,
   dismissed_at: null,
   unprocessed: 0,
@@ -260,4 +264,31 @@ describe("动态页排版不写死 px 字号", () => {
       expect(source).not.toMatch(/fontSize:\s*"?\d/);
     });
   }
+});
+
+describe("相对时间", () => {
+  const metaText = () =>
+    container.querySelector('[data-testid="feed-meta"]')?.textContent ?? "";
+
+  it("有 published_at 就用它算相对时间", async () => {
+    const now = Date.now();
+    await render({
+      item: {
+        ...item,
+        published_at: now - 2 * 60 * 60 * 1000,
+        created_at: now,
+      },
+    });
+    expect(metaText()).toContain("2 hours ago");
+  });
+
+  it("published_at 为 null 时回退到 created_at，不出现 Invalid Date（Review Focus 3）", async () => {
+    const now = Date.now();
+    await render({
+      item: { ...item, published_at: null, created_at: now - 30 * 60 * 1000 },
+    });
+    expect(metaText()).toContain("30 minutes ago");
+    expect(metaText()).not.toContain("Invalid");
+    expect(metaText()).not.toContain("NaN");
+  });
 });

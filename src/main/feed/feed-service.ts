@@ -18,7 +18,12 @@ import {
   type FeedSignals,
 } from "./feed-signals";
 import { planQueries, type FeedComplete } from "./feed-queries";
-import { collectCandidates, normalizeUrlKey } from "./feed-collect";
+import {
+  clampPublished,
+  collectCandidates,
+  normalizeUrlKey,
+} from "./feed-collect";
+import type { SourceBucket } from "./sources/index";
 import { fetchCandidateBodies, type FeedFetchPage } from "./feed-fetch";
 import { composeItems } from "./feed-compose";
 import { writeExcerpts } from "./feed-excerpt";
@@ -58,6 +63,8 @@ export interface FeedServiceDeps {
   locale: () => string;
   complete: FeedComplete;
   searchWeb: (payload: { queries: string[] }) => Promise<QueryResultData[]>;
+  /** 固定消息源；与搜索并行，谁失败都不影响对方。 */
+  fetchSources: () => Promise<SourceBucket[]>;
   fetchPages: FeedFetchPage;
   downloadImage: FeedImageDownloader;
   imagesDir: string;
@@ -182,11 +189,18 @@ export class FeedService {
     }
 
     this.deps.onPhase("collect");
-    const searchResults = await this.deps.searchWeb({
-      queries: planned.queries.map((query) => query.q),
-    });
+    const [searchResults, sourceBuckets] = await Promise.all([
+      this.deps.searchWeb({
+        queries: planned.queries.map((query) => query.q),
+      }),
+      this.deps.fetchSources(),
+    ]);
     const succeeded = searchResults.filter((result) => !result.error);
-    if (succeeded.length === 0) {
+    const hasSourceItems = sourceBuckets.some(
+      (bucket) => bucket.items.length > 0,
+    );
+    // 搜索与源都空手才算这次什么都没拿到（设计 §9）
+    if (succeeded.length === 0 && !hasSourceItems) {
       this.finish(
         runId,
         "failed",
@@ -201,6 +215,7 @@ export class FeedService {
       results: searchResults,
       queries: planned.queries,
       knownUrlKeys: this.knownUrlKeys(),
+      sourceBuckets: sourceBuckets.map((bucket) => bucket.items),
     });
     this.writeRunMeta(runId, planned, candidates.length);
     if (candidates.length === 0) {
@@ -261,6 +276,7 @@ export class FeedService {
         read_at: null,
         dismissed_at: null,
         unprocessed: draft.unprocessed,
+        published_at: clampPublished(draft.candidate.publishedAt, now),
       };
       try {
         this.deps.db.feedItems.insert(row);

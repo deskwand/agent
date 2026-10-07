@@ -38,6 +38,8 @@ export interface FeedItemRow {
   image_file: string | null;
   image_status: FeedImageStatus;
   created_at: number;
+  /** 源自带的真实发布时间（epoch ms）；搜索结果没有则 null。 */
+  published_at: number | null;
   read_at: number | null;
   dismissed_at: number | null;
   unprocessed: number;

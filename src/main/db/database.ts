@@ -489,7 +489,8 @@ function initializeSchema(database: DatabaseSync): void {
       created_at    INTEGER NOT NULL,
       read_at       INTEGER,
       dismissed_at  INTEGER,
-      unprocessed   INTEGER NOT NULL DEFAULT 0
+      unprocessed   INTEGER NOT NULL DEFAULT 0,
+      published_at  INTEGER
     )
   `);
     database.exec(
@@ -501,6 +502,12 @@ function initializeSchema(database: DatabaseSync): void {
 
     // 动态已经发布过，用户的库里是旧结构：CREATE TABLE IF NOT EXISTS 不会改已存在的表
     ensureColumn(database, "feed_items", "excerpt", "excerpt TEXT");
+    ensureColumn(
+      database,
+      "feed_items",
+      "published_at",
+      "published_at INTEGER",
+    );
 
     database.exec(`
     CREATE TABLE IF NOT EXISTS feed_runs (
@@ -651,8 +658,8 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
     INSERT INTO feed_items (
       id, run_id, title, summary, url, url_key, source_host, topic, relevance,
       body, body_status, excerpt, image_url, image_file, image_status, created_at,
-      read_at, dismissed_at, unprocessed
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      read_at, dismissed_at, unprocessed, published_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const feedItemGet = rawDb.prepare("SELECT * FROM feed_items WHERE id = ?");
   const feedItemListVisible = rawDb.prepare(
@@ -1005,6 +1012,7 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
           row.read_at,
           row.dismissed_at,
           row.unprocessed,
+          row.published_at,
         );
       },
       get: (id: string) =>

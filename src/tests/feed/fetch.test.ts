@@ -16,6 +16,7 @@ const candidates: FeedCandidate[] = [
     snippet: "片段 A",
     topic: "T",
     reason: "r",
+    publishedAt: null,
   },
   {
     id: 1,
@@ -26,10 +27,15 @@ const candidates: FeedCandidate[] = [
     snippet: "片段 B",
     topic: "T",
     reason: "r",
+    publishedAt: null,
   },
 ];
 
-function page(url: string, content: string, imageUrl?: string): ExtractedContent {
+function page(
+  url: string,
+  content: string,
+  imageUrl?: string,
+): ExtractedContent {
   return { url, title: "t", content, error: null, imageUrl };
 }
 

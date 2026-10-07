@@ -16,6 +16,7 @@ const candidates: FeedFetchedCandidate[] = [
     snippet: "s",
     topic: "T",
     reason: "r",
+    publishedAt: null,
     body: "正文 A",
     bodyStatus: "ok",
   },
@@ -28,6 +29,7 @@ const candidates: FeedFetchedCandidate[] = [
     snippet: "s",
     topic: "T",
     reason: "r",
+    publishedAt: null,
     body: "正文 B",
     bodyStatus: "ok",
   },
@@ -66,9 +68,30 @@ describe("parseComposeResponse", () => {
   it("candidateId 越界或不是数字时丢弃该条（防幻觉第一道）", () => {
     const parsed = parseComposeResponse(
       reply([
-        { candidateId: 99, title: "x", summary: "y", topic: "T", relevance: "r", keep: true },
-        { candidateId: "abc", title: "x", summary: "y", topic: "T", relevance: "r", keep: true },
-        { candidateId: 0, title: "ok", summary: "y", topic: "T", relevance: "r", keep: true },
+        {
+          candidateId: 99,
+          title: "x",
+          summary: "y",
+          topic: "T",
+          relevance: "r",
+          keep: true,
+        },
+        {
+          candidateId: "abc",
+          title: "x",
+          summary: "y",
+          topic: "T",
+          relevance: "r",
+          keep: true,
+        },
+        {
+          candidateId: 0,
+          title: "ok",
+          summary: "y",
+          topic: "T",
+          relevance: "r",
+          keep: true,
+        },
       ]),
       candidates,
     );
@@ -78,7 +101,14 @@ describe("parseComposeResponse", () => {
   it("keep:false 的丢弃", () => {
     const parsed = parseComposeResponse(
       reply([
-        { candidateId: 0, title: "x", summary: "y", topic: "T", relevance: "r", keep: false },
+        {
+          candidateId: 0,
+          title: "x",
+          summary: "y",
+          topic: "T",
+          relevance: "r",
+          keep: false,
+        },
       ]),
       candidates,
     );
@@ -105,7 +135,9 @@ describe("parseComposeResponse", () => {
       relevance: "r",
       keep: true,
     }));
-    expect(parseComposeResponse(reply(many), candidates)).toHaveLength(MAX_ITEMS);
+    expect(parseComposeResponse(reply(many), candidates)).toHaveLength(
+      MAX_ITEMS,
+    );
   });
 
   it("非 JSON 返回 null；items 不是数组也返回 null", () => {
@@ -134,9 +166,13 @@ describe("composeItems", () => {
   });
 
   it("标题与摘要取模型给的值，topic/relevance 缺省时回落到候选上的值", async () => {
-    const complete = vi.fn().mockResolvedValue(
-      reply([{ candidateId: 0, title: "新标题", summary: "新摘要", keep: true }]),
-    );
+    const complete = vi
+      .fn()
+      .mockResolvedValue(
+        reply([
+          { candidateId: 0, title: "新标题", summary: "新摘要", keep: true },
+        ]),
+      );
     const drafts = await composeItems({ candidates, locale: "zh", complete });
     expect(drafts[0].title).toBe("新标题");
     expect(drafts[0].summary).toBe("新摘要");
@@ -154,10 +190,14 @@ describe("composeItems", () => {
   });
 
   it("模型全标 keep:false 时返回空数组（不是退化）", async () => {
-    const complete = vi.fn().mockResolvedValue(
-      reply([{ candidateId: 0, title: "x", summary: "y", keep: false }]),
+    const complete = vi
+      .fn()
+      .mockResolvedValue(
+        reply([{ candidateId: 0, title: "x", summary: "y", keep: false }]),
+      );
+    expect(await composeItems({ candidates, locale: "zh", complete })).toEqual(
+      [],
     );
-    expect(await composeItems({ candidates, locale: "zh", complete })).toEqual([]);
   });
 
   it("prompt 里带序号，并要求只回 candidateId", async () => {
@@ -170,9 +210,9 @@ describe("composeItems", () => {
 
   it("候选为空时直接返回空，不调模型", async () => {
     const complete = vi.fn();
-    expect(await composeItems({ candidates: [], locale: "zh", complete })).toEqual(
-      [],
-    );
+    expect(
+      await composeItems({ candidates: [], locale: "zh", complete }),
+    ).toEqual([]);
     expect(complete).not.toHaveBeenCalled();
   });
 });

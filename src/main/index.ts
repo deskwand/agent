@@ -232,6 +232,12 @@ import { fetchWebContent, searchWeb } from "./agent/tools/web-access/web-tools";
 import { resolveWebAccessProviderAuth } from "./agent/tools/web-access/config-adapter";
 import { fetchRemoteUrl } from "./agent/tools/web-access/ssrf-protection";
 import { RESULTS_PER_QUERY } from "./feed/feed-collect";
+import {
+  createTextFetcher,
+  fetchSourceBuckets,
+  SOURCE_MAX_BYTES,
+  SOURCE_TIMEOUT_MS,
+} from "./feed/sources/index";
 import { runPiAiOneShot, recordAuxUsage } from "./agent/agent-sdk-one-shot";
 import {
   buildUtilityAppConfig,
@@ -1422,6 +1428,14 @@ app
             ),
           numResults: RESULTS_PER_QUERY,
           recencyFilter: "week",
+        }),
+      fetchSources: () =>
+        fetchSourceBuckets({
+          // fetchRemoteUrl(url, init, options)：超时只能靠 signal，没有 timeoutMs
+          fetchText: createTextFetcher(fetchRemoteUrl, {
+            timeoutMs: SOURCE_TIMEOUT_MS,
+            maxBytes: SOURCE_MAX_BYTES,
+          }),
         }),
       fetchPages: (urls) =>
         fetchWebContent(urls, {
