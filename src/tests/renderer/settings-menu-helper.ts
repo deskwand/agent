@@ -33,7 +33,7 @@ export async function openMenu(
 }
 
 /** 菜单打开时，当前列出的选项值（按显示顺序）。 */
-export function optionValues(container: HTMLElement, testId: string): string[] {
+export function optionValues(testId: string): string[] {
   return Array.from(
     document.querySelectorAll<HTMLButtonElement>(
       `[data-testid^="${testId}-option-"]`,
@@ -42,7 +42,7 @@ export function optionValues(container: HTMLElement, testId: string): string[] {
 }
 
 /** 菜单打开时，当前列出的选项**显示文字**（断言文案用它，值用 optionValues）。 */
-export function optionLabels(container: HTMLElement, testId: string): string[] {
+export function optionLabels(testId: string): string[] {
   return Array.from(
     document.querySelectorAll<HTMLButtonElement>(
       `[data-testid^="${testId}-option-"]`,

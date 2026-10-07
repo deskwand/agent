@@ -282,7 +282,7 @@ describe("VoiceCapabilitySettings", () => {
     await mount();
 
     await openMenu(container, "voice-shortcut-select");
-    expect(optionLabels(container, "voice-shortcut-select")).toEqual([
+    expect(optionLabels("voice-shortcut-select")).toEqual([
       "settings.capabilities.voice.shortcutAltRightMac",
       "settings.capabilities.voice.shortcutAltSpaceMac",
       "settings.capabilities.voice.shortcutMetaShiftSpaceMac",
@@ -313,7 +313,7 @@ describe("VoiceCapabilitySettings", () => {
     await mount();
 
     await openMenu(container, "voice-shortcut-select");
-    const labels = optionLabels(container, "voice-shortcut-select");
+    const labels = optionLabels("voice-shortcut-select");
     expect(labels[0]).toBe("settings.capabilities.voice.shortcutAltRightWin");
     expect(labels[1]).toBe("settings.capabilities.voice.shortcutAltSpaceWin");
     await openMenu(container, "voice-shortcut-select"); // 关掉

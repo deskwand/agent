@@ -1,15 +1,8 @@
 // Shared types, constants, and components used across settings tab files.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
-import {
-  autoUpdate,
-  flip,
-  offset,
-  shift,
-  useFloating,
-} from "@floating-ui/react";
 import type { TFunction } from "i18next";
 import {
   MENU_ITEM_CLASS,
@@ -275,6 +268,16 @@ export function SettingsSwitch({
  *
  * 菜单开合与面板样式都用仓库共享的那套（menu-styles + 外点关闭 + Esc），不新造样式。
  */
+/** 菜单面板的最大高度：9 个音色要滚，别顶出屏幕。 */
+const MENU_MAX_HEIGHT = 264;
+
+/** 打开时量好的坐标（视口坐标，配合 portal 里的 `position: fixed`）。 */
+interface MenuRect {
+  top: number;
+  right: number;
+  minWidth: number;
+}
+
 export function SettingsSelect<T extends string>({
   value,
   options,
@@ -292,21 +295,35 @@ export function SettingsSelect<T extends string>({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<MenuRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
   /**
-   * 面板**必须挂到 body**（portal），不能留在行里绝对定位：设置卡是
-   * `overflow-hidden rounded-container` —— 为了圆角它把溢出裁掉了，面板会只露出第一项。
-   *
-   * 定位用 floating-ui 的默认 absolute 策略 + autoUpdate，跟 `Tooltip` 里实测过的结论
-   * 一致：**不要用 `fixed`** —— 祖先带 transform 时（本站点动画会动态写 transform）
-   * fixed 的包含块会变成那个祖先，而 floating-ui 给的是视口坐标，会整体偏移。
-   * portal 同时也让祖先的 overflow: hidden 再也裁不到它。
+   * 开合。**坐标在打开之前就量好**放进 state，面板第一次渲染就带着位置 ——
+   * 位置若来自"挂载后再测量"，第一帧没有坐标，会先在左上角闪一下。
    */
-  const { refs, floatingStyles } = useFloating({
-    open,
-    placement: "bottom-end",
-    whileElementsMounted: autoUpdate,
-    middleware: [offset(6), flip(), shift({ padding: 8 })],
-  });
+  const toggle = () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const box = trigger.getBoundingClientRect();
+    // 下方放不下就翻到上方（贴底那一行尤其明显）
+    const spaceBelow = window.innerHeight - box.bottom - 8;
+    const top =
+      spaceBelow >= MENU_MAX_HEIGHT
+        ? box.bottom + 6
+        : Math.max(8, box.top - 6 - MENU_MAX_HEIGHT);
+    setRect({
+      top,
+      right: Math.max(8, window.innerWidth - box.right),
+      minWidth: box.width,
+    });
+    setOpen(true);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -314,34 +331,37 @@ export function SettingsSelect<T extends string>({
       const target = event.target as Node;
       // 面板在 portal 里、不在触发按钮的子树里 —— 两个都要判，
       // 否则点选项会先被当成"点了外面"，菜单还没触发 onChange 就关了。
-      const reference = refs.reference.current;
-      const floating = refs.floating.current;
-      if (reference instanceof HTMLElement && reference.contains(target))
-        return;
-      if (floating instanceof HTMLElement && floating.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
       setOpen(false);
     };
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
+    // 滚动/改窗口就关掉：坐标是打开那一刻量的，不跟着页面走会让面板飘在错位置
+    const close = () => setOpen(false);
     document.addEventListener("mousedown", handleOutsideClick);
     document.addEventListener("keydown", handleEscape);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
     return () => {
       document.removeEventListener("mousedown", handleOutsideClick);
       document.removeEventListener("keydown", handleEscape);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
     };
-  }, [open, refs.reference, refs.floating]);
+  }, [open]);
 
   const current = options.find((option) => option.value === value);
 
   return (
     <>
       <button
-        ref={refs.setReference}
+        ref={triggerRef}
         type="button"
         data-testid={testId}
         disabled={disabled}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={toggle}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={label}
@@ -355,14 +375,27 @@ export function SettingsSelect<T extends string>({
         />
       </button>
 
+      {/*
+        面板挂到 body：设置卡是 `overflow-hidden rounded-container`（圆角靠它切），
+        留在行里会被裁成只露第一项。位置用打开时量好的视口坐标 + fixed ——
+        portal 到 body 之后没有带 transform 的祖先，fixed 的包含块就是视口，安全。
+      */}
       {open &&
+        rect &&
         createPortal(
           <div
-            ref={refs.setFloating}
-            style={floatingStyles}
+            ref={panelRef}
             role="menu"
             aria-label={label}
-            className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-down z-50 max-h-64 overflow-y-auto`}
+            data-testid={testId ? `${testId}-menu` : undefined}
+            style={{
+              position: "fixed",
+              top: rect.top,
+              right: rect.right,
+              minWidth: rect.minWidth,
+              maxHeight: MENU_MAX_HEIGHT,
+            }}
+            className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-down z-50 overflow-y-auto`}
           >
             {options.map((option) => (
               <button

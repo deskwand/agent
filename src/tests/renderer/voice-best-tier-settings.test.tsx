@@ -155,7 +155,7 @@ const pickTone = (next: "fast" | "balanced" | "best") =>
 /** 打开菜单读一遍选项、再关掉（t 回键名，所以断言看的是 value）。 */
 const readOptions = async (testId: string) => {
   await openMenu(container, testId);
-  const values = optionValues(container, testId);
+  const values = optionValues(testId);
   await openMenu(container, testId);
   return values;
 };
@@ -378,7 +378,14 @@ describe("试听", () => {
       before + 1,
     );
     // 九个音色都渲染出来了，不是被裁掉的那种"只有第一个"
-    expect(optionValues(container, "voice-engine-voice")).toHaveLength(9);
+    expect(optionValues("voice-engine-voice")).toHaveLength(9);
+    // 而且要**第一帧就带坐标**：坐标若来自"挂载后再测量"，会先在左上角闪一下
+    const panel = document.body.querySelector<HTMLElement>(
+      '[data-testid="voice-engine-voice-menu"]',
+    )!;
+    expect(panel.style.position).toBe("fixed");
+    expect(panel.style.top).not.toBe("");
+    expect(panel.style.right).not.toBe("");
 
     await openMenu(container, "voice-engine-voice"); // 关掉
   });
