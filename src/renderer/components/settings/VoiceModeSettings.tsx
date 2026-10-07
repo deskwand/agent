@@ -567,28 +567,6 @@ export function VoiceModeSettings() {
           />
         }
       />
-
-      <SettingsRow
-        sub
-        testId="voice-style-row"
-        title={t(`${VOICE_MODE_KEY}.voiceStyle`)}
-        description={
-          appConfig?.voiceMode?.voiceStyle ??
-          t(`${VOICE_MODE_KEY}.voiceStyleUnset`)
-        }
-        control={
-          appConfig?.voiceMode?.voiceStyle ? (
-            <button
-              type="button"
-              data-testid="voice-style-clear"
-              onClick={() => void saveVoiceMode({ voiceStyle: "" })}
-              className="rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none hover:bg-surface-hover"
-            >
-              {t(`${VOICE_MODE_KEY}.voiceStyleClear`)}
-            </button>
-          ) : null
-        }
-      />
     </SettingsCard>
   );
 }

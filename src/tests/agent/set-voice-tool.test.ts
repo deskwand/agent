@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createSetVoiceTool } from "../../main/agent/tools/set-voice";
 import type { VoiceModeConfig } from "../../shared/voice-mode";
@@ -114,5 +115,67 @@ describe("set_voice", () => {
       instructions: "嗲一点",
       effective: { voice: false, speed: true, instructions: false },
     });
+  });
+});
+
+/**
+ * 说明本身就是功能的一部分：模型能用的能力，只有写清楚才会用。
+ * 探针实测（正式装的 1.7B CustomVoice）：同一句话、同一音色，只换 instructions
+ * 就出现 F0 +24.7% / 能量 +77.5%（嗲）与更长更慢（严肃）—— 所以说明要"敢用"，
+ * 并交代持久语义（否则模型会当成只生效一句）。
+ */
+describe("set_voice 说明", () => {
+  const source = readFileSync(
+    new URL("../../main/agent/tools/set-voice.ts", import.meta.url),
+    "utf-8",
+  );
+
+  it("把 instructions 讲成表达力杠杆，并给中文风格例子", () => {
+    expect(source).toContain("prompt-injected speaking style");
+    for (const example of ["嗲声嗲气", "严肃低沉", "轻快、兴奋", "温柔一点"]) {
+      expect(source).toContain(example);
+    }
+  });
+
+  it("写明持久与清空语义", () => {
+    expect(source).toContain("persists across later replies");
+    expect(source).toContain("empty string to clear");
+  });
+});
+
+/**
+ * 空串是**显式清空**：设置里的清空按钮已删，这条路径就是唯一的撤销方式
+ * （模型自己设的口吻也得能自己收回去）。原实现把空串当"没提到"丢掉，
+ * 于是说明承诺的清空其实不存在。
+ */
+describe("set_voice 清空口吻", () => {
+  it("instructions 传空串 → 写空，而不是当作没提到", async () => {
+    const h = harness({
+      silenceMs: 1200,
+      fastVoice: false,
+      voiceStyle: "嗲一点",
+    });
+    await h.call({ instructions: "" });
+    expect(h.saved).toEqual([{ voiceStyle: "" }]);
+  });
+
+  it("纯空白同样算清空", async () => {
+    const h = harness({
+      silenceMs: 1200,
+      fastVoice: false,
+      voiceStyle: "嗲一点",
+    });
+    await h.call({ instructions: "   " });
+    expect(h.saved).toEqual([{ voiceStyle: "" }]);
+  });
+
+  it("清空可与其它字段同传，互不影响", async () => {
+    const h = harness({
+      silenceMs: 1200,
+      fastVoice: false,
+      voiceStyle: "嗲一点",
+    });
+    await h.call({ instructions: "", speed: 1.5 });
+    expect(h.saved).toEqual([{ voiceSpeed: 1.5, voiceStyle: "" }]);
   });
 });

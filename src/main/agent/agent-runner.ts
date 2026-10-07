@@ -3152,8 +3152,8 @@ Tool routing:\n
         saveVoiceMode: async (patch) => {
           const current = configStore.getAll().voiceMode ?? DEFAULT_VOICE_MODE;
           configStore.update({ voiceMode: { ...current, ...patch } });
-          // **必须通知渲染侧**：不通知的话设置卡还显示旧值（「清空」都不出现，
-          // 用户没法撤销），而且它下一次整体写入会把这些字段抹掉。
+          // **必须通知渲染侧**：不通知的话，界面还按旧值显示，而且设置页下一次
+          // 整体写入（voiceMode 是整体替换）会把这些字段抹掉。
           for (const win of BrowserWindow.getAllWindows()) {
             win.webContents.send("server-event", {
               type: "config.status",

@@ -60,15 +60,20 @@ export function createSetVoiceTool(opts: SetVoiceToolOptions): ToolDefinition {
     label: "Set Voice",
     description:
       "Change how the assistant's own voice sounds (used by read-aloud and voice chat). " +
-      "Use it only when the user explicitly asks to change the voice: gender, dialect, " +
-      "tone, or speaking speed. To *produce an audio file* instead, use the `tts` tool. " +
+      "Use it when the user asks to change the voice (gender, dialect, tone, speed), or when a " +
+      "different speaking manner genuinely fits what you are about to say. To *produce an audio " +
+      "file* instead, use the `tts` tool. " +
       `Available voices: ${voiceCatalogue()}. ` +
       `Only Beijing and Sichuan dialects exist locally — do not promise others. ` +
       `speed is ${MIN_SPEECH_SPEED}-${MAX_SPEECH_SPEED} (out-of-range values are clamped). ` +
-      "instructions is free-form style/emotion text, e.g. " +
-      "'speak with a coquettish, playful tone' or 'very serious and slow, as if announcing bad news' " +
-      "— note that instructions and the chosen voice only take effect on the best-quality tier; " +
-      "on the fast/balanced tiers only speed applies.",
+      "instructions is the expressive lever — prompt-injected speaking style, which moves pitch and " +
+      "energy a lot (measured on the shipped model: up to +25% pitch, +78% energy on the same voice). " +
+      "Reach for it when a manner of speaking is wanted, in the language of the conversation, e.g. " +
+      "'用嗲声嗲气、撒娇的语气说', '用严肃低沉、像在播报坏消息的语气', '轻快、兴奋一点', '温柔一点，放慢语速'. " + // i18n-allow-cjk
+      "It persists across later replies (survives restarts) until changed; pass an empty string to clear it. " +
+      "instructions and the chosen voice only take effect on the best-quality tier; " +
+      "on the fast/balanced tiers only speed applies. " +
+      "Prefer the user's lead: change the voice when they ask for it, not on your own initiative.",
     parameters: Type.Object({
       voice: Type.Optional(
         Type.String({
@@ -83,7 +88,9 @@ export function createSetVoiceTool(opts: SetVoiceToolOptions): ToolDefinition {
       instructions: Type.Optional(
         Type.String({
           description:
-            "Free-form style/emotion description, in the language of the conversation.",
+            "Free-form speaking style, in the language of the conversation " +
+            "(e.g. '嗲一点、撒娇', '严肃低沉', '轻快兴奋', '温柔放慢'). " + // i18n-allow-cjk
+            "Persists until changed; an empty string clears it.",
         }),
       ),
     }),
@@ -123,8 +130,10 @@ export function createSetVoiceTool(opts: SetVoiceToolOptions): ToolDefinition {
         patch.voiceSpeed = clamped;
       }
 
-      if (typeof raw.instructions === "string" && raw.instructions.trim()) {
-        patch.voiceStyle = raw.instructions;
+      if (typeof raw.instructions === "string") {
+        // 空串（或纯空白）是**显式清空**，不是"没提到"：说明就是这么承诺的，
+        // 而且设置里已经没有清空按钮 —— 这里不认空串，用户就再无撤销路径。
+        patch.voiceStyle = raw.instructions.trim() ? raw.instructions : "";
       }
 
       if (Object.keys(patch).length === 0) {

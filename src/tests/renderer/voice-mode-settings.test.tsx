@@ -289,7 +289,7 @@ describe("VoiceModeSettings 的音色行", () => {
     });
   });
 
-  it("语速可改、风格可清空，且都不丢其它字段", async () => {
+  it("语速可改且不丢其它字段；风格不再出现在设置里（只由模型注入）", async () => {
     useAppStore.getState().setAppConfig({
       voiceMode: {
         silenceMs: 1200,
@@ -313,20 +313,11 @@ describe("VoiceModeSettings 的音色行", () => {
       },
     });
 
-    // 风格由模型写入，界面只显示 + 提供清空
-    expect(container.textContent).toContain("嗲一点");
-    await act(async () => {
-      byTestId("voice-style-clear")!.click();
-    });
-    expect(api.config.save).toHaveBeenLastCalledWith({
-      voiceMode: {
-        silenceMs: 1200,
-        fastVoice: false,
-        tone: "best",
-        voiceSpeed: 1.5,
-        voiceStyle: "",
-      },
-    });
+    // 风格没有设置项：模型写进去的值不由设置页暴露（用户改口吻就找助手说）
+    expect(
+      container.querySelector('[data-testid="voice-style-row"]'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain("嗲一点");
   });
 
   it("语速不在预设里时也显示得出来（模型可以写 0.8）", async () => {
