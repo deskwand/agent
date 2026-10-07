@@ -1,11 +1,10 @@
 /**
- * 把 `artifact` trace step 归属到轮次。
+ * 内联产物的展示辅助。
  *
- * `TraceStep` 没有 `turnId`，只有 `timestamp`，所以轮次边界只能用 user 消息的
- * 时间戳来推：一个 step 属于"它之前最近的那条 user 消息"开启的轮次。
- * 产物 step 在助手回复过程中产生，必然早于下一条 user 消息，因此这个归属是稳的。
+ * 模型写在正文里的 ```artifact 围栏由渲染层拆成内容块（按它在原文中的位置渲染），
+ * 文件卡过滤与渲染共用同一份解析。
  */
-import type { Message, TraceStep } from "../types";
+import type { ArtifactContentBlock, ContentBlock } from "../types";
 
 export interface InlineArtifactInfo {
   path: string;
@@ -18,71 +17,107 @@ export function normalizeArtifactKey(filePath: string): string {
   return filePath.replace(/\\/g, "/").replace(/^\.\//, "");
 }
 
-interface InlineArtifactPayload {
+const ARTIFACT_FENCE_RE = /```artifact[ \t]*\r?\n([\s\S]*?)```/g;
+
+interface ArtifactPayload {
   path?: unknown;
   name?: unknown;
-  type?: unknown;
   render?: unknown;
 }
 
-function parseInlineArtifact(step: TraceStep): InlineArtifactInfo | null {
-  if (step.type !== "tool_result" || step.toolName !== "artifact") return null;
-  if (!step.toolOutput) return null;
-
-  let parsed: InlineArtifactPayload;
+function parseFencePayload(raw: string): ArtifactPayload | null {
   try {
-    parsed = JSON.parse(step.toolOutput) as InlineArtifactPayload;
+    const parsed: unknown = JSON.parse(raw.trim());
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed as ArtifactPayload;
   } catch {
     return null;
   }
-  if (parsed.render !== "inline") return null;
-  if (typeof parsed.path !== "string" || !parsed.path.trim()) return null;
+}
 
+function toArtifactBlock(
+  payload: ArtifactPayload,
+): ArtifactContentBlock | null {
+  if (payload.render !== "inline") return null;
+  if (typeof payload.path !== "string" || !payload.path.trim()) return null;
   return {
-    path: parsed.path,
-    name: typeof parsed.name === "string" ? parsed.name : undefined,
-    type: typeof parsed.type === "string" ? parsed.type : undefined,
+    type: "artifact",
+    path: payload.path,
+    name: typeof payload.name === "string" ? payload.name : undefined,
+    render: "inline",
   };
 }
 
-export function collectInlineArtifactsByTurn(
-  messages: Message[],
-  steps: TraceStep[],
-): Map<string, InlineArtifactInfo[]> {
-  const turnStarts = messages
-    .filter((message) => message.role === "user")
-    .map((message) => message.timestamp);
-  if (turnStarts.length === 0) return new Map();
-
-  const turnStartFor = (timestamp: number): number | undefined => {
-    for (let index = turnStarts.length - 1; index >= 0; index -= 1) {
-      if (turnStarts[index] <= timestamp) return turnStarts[index];
-    }
-    return undefined;
+function splitTextBlock(
+  block: Extract<ContentBlock, { type: "text" }>,
+  streaming: boolean,
+): ContentBlock[] {
+  const text = block.text;
+  const pieces: ContentBlock[] = [];
+  // 累积尚未产出的文字：只有遇到产物块才 flush，
+  // 因此被丢掉的围栏（没有 render 标记）两侧的文字会合并成一个块，
+  // 而不是碎成相邻的两个 text 块（那样 markdown 会被切成两段）。
+  let buffer = "";
+  const flush = (): void => {
+    if (!buffer) return;
+    pieces.push({ ...block, text: buffer });
+    buffer = "";
   };
 
-  const result = new Map<string, InlineArtifactInfo[]>();
-
-  for (let index = 0; index < messages.length; index += 1) {
-    const message = messages[index];
-    if (message.role !== "assistant") continue;
-    const next = messages[index + 1];
-    if (next && next.role !== "user") continue; // 只看轮次末尾那条助手消息
-
-    const start = turnStartFor(message.timestamp);
-    if (start === undefined) continue;
-    const end = next ? next.timestamp : Number.POSITIVE_INFINITY;
-
-    const artifacts: InlineArtifactInfo[] = [];
-    for (const step of steps) {
-      if (step.timestamp < start || step.timestamp >= end) continue;
-      const artifact = parseInlineArtifact(step);
-      if (artifact) artifacts.push(artifact);
+  ARTIFACT_FENCE_RE.lastIndex = 0;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = ARTIFACT_FENCE_RE.exec(text)) !== null) {
+    const payload = parseFencePayload(match[1]);
+    if (!payload) continue; // JSON 坏掉：不碰它，留给末尾的 buffer 原样带出
+    buffer += text.slice(cursor, match.index);
+    const artifact = toArtifactBlock(payload);
+    if (artifact) {
+      flush();
+      pieces.push(artifact);
     }
-    if (artifacts.length > 0) result.set(String(message.id), artifacts);
+    cursor = match.index + match[0].length;
   }
 
-  return result;
+  let tail = text.slice(cursor);
+  if (streaming) {
+    // 围栏还没闭合时先不显示，否则会“冒出半截 JSON 再变成产物”
+    const openIndex = tail.lastIndexOf("```artifact");
+    if (openIndex >= 0) tail = tail.slice(0, openIndex);
+  }
+  buffer += tail;
+  flush();
+
+  // 什么都没变：把原对象原样返回（保引用，调用方的 memo 靠它稳定）
+  if (pieces.length === 1) {
+    const only = pieces[0];
+    if (only.type === "text" && (only as { text: string }).text === text) {
+      return [block];
+    }
+  }
+  return pieces;
+}
+
+/**
+ * 把文本块里的 ```artifact 围栏拆成独立内容块，**位置与顺序保持原样**。
+ * - 带 `"render":"inline"` → 产物块
+ * - 不带 / 值不对 → 整段围栏从正文里去掉（与今天流式路径的表现一致）
+ * - JSON 坏掉、或围栏未闭合且不在流式中 → 原样留在正文
+ */
+export function splitArtifactBlocks(
+  blocks: ContentBlock[],
+  options: { streaming?: boolean } = {},
+): ContentBlock[] {
+  const streaming = Boolean(options.streaming);
+  const out: ContentBlock[] = [];
+  for (const block of blocks) {
+    if (block.type !== "text") {
+      out.push(block);
+      continue;
+    }
+    out.push(...splitTextBlock(block, streaming));
+  }
+  return out;
 }
 
 /**

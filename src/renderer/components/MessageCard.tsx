@@ -31,8 +31,8 @@ import { stripSyntheticBlocks } from "../utils/synthetic-blocks";
 import { ProcessSummaryBlock } from "./message/ProcessSummaryBlock";
 import { ResultSummaryBlock } from "./message/ResultSummaryBlock";
 import { ArtifactCard } from "./message/ArtifactCard";
-import { ArtifactInlineFrame } from "./message/ArtifactInlineFrame";
-import type { InlineArtifactInfo } from "../utils/inline-artifacts";
+import { splitArtifactBlocks } from "../utils/inline-artifacts";
+import type { ArtifactExpansion } from "../types";
 import { useAppStore } from "../store";
 import { useReadAloud } from "../hooks/useReadAloud";
 import { Tooltip } from "./Tooltip";
@@ -55,8 +55,6 @@ interface MessageCardProps {
   isTurnEnd?: boolean;
   /** Files changed in this turn (aggregated by ChatView) */
   artifactFiles?: ResultFileEntry[];
-  /** 本轮标记为内联渲染的产物（由 ChatView 聚合） */
-  inlineArtifacts?: InlineArtifactInfo[];
   /** Local videos referenced by assistant text in this turn. */
   videoReferences?: VideoReference[];
   /** Hide process summaries when ChatView renders a turn-level summary. */
@@ -73,47 +71,6 @@ interface MessageCardProps {
  * 用 effect 会在流式过程中反复把用户刚折叠的动作弹回去。改成"用户的选择带上集合键"，
  * 键变了才回落到默认值。
  */
-function InlineArtifactList({
-  artifacts,
-  isLatestRound,
-}: {
-  artifacts: InlineArtifactInfo[];
-  isLatestRound: boolean;
-}) {
-  const artifactKey = artifacts.map((artifact) => artifact.path).join("|");
-  const [expandedOverride, setExpandedOverride] = useState<{
-    key: string;
-    path: string | null;
-  } | null>(null);
-
-  const defaultExpandedPath =
-    isLatestRound && artifacts.length > 0
-      ? artifacts[artifacts.length - 1].path
-      : null;
-  const expandedPath =
-    expandedOverride && expandedOverride.key === artifactKey
-      ? expandedOverride.path
-      : defaultExpandedPath;
-
-  return (
-    <div className="space-y-1.5">
-      {artifacts.map((artifact) => (
-        <ArtifactInlineFrame
-          key={artifact.path}
-          artifact={artifact}
-          expanded={expandedPath === artifact.path}
-          onToggle={(path) =>
-            setExpandedOverride({
-              key: artifactKey,
-              path: expandedPath === path ? null : path,
-            })
-          }
-        />
-      ))}
-    </div>
-  );
-}
-
 function formatRelativeTime(timestamp: number, locale: string): string {
   const now = Date.now();
   const diffMs = now - timestamp;
@@ -147,7 +104,6 @@ export const MessageCard = memo(function MessageCard({
   isLatestRound = false,
   isTurnEnd = true,
   artifactFiles = [],
-  inlineArtifacts = [],
   videoReferences = [],
   suppressProcessSummaries = false,
   toolBlocksProjected = false,
@@ -168,7 +124,44 @@ export const MessageCard = memo(function MessageCard({
   const contentBlocks = Array.isArray(rawContent)
     ? (rawContent as ContentBlock[])
     : [{ type: "text", text: String(rawContent ?? "") } as ContentBlock];
-  const rawVisibleBlocks = stripSyntheticBlocks(contentBlocks);
+  const rawVisibleBlocks = splitArtifactBlocks(
+    stripSyntheticBlocks(contentBlocks),
+    {
+      streaming: Boolean(isStreaming),
+    },
+  );
+
+  // 只有最新的展开，历史默认折叠。产物块来自消息自身的内容，所以"集合键"就是这条消息的产物路径串，
+  // 键变了才回落到默认值——用户手动折叠不会被无关重渲染弹回去。
+  const artifactPaths = useMemo(
+    () =>
+      rawVisibleBlocks
+        .filter((block) => block.type === "artifact")
+        .map((block) => (block as { path: string }).path),
+    [rawVisibleBlocks],
+  );
+  const artifactKey = artifactPaths.join("|");
+  const [expandedOverride, setExpandedOverride] = useState<{
+    key: string;
+    path: string | null;
+  } | null>(null);
+  const expandedArtifactPath =
+    expandedOverride && expandedOverride.key === artifactKey
+      ? expandedOverride.path
+      : isLatestRound && artifactPaths.length > 0
+        ? artifactPaths[artifactPaths.length - 1]
+        : null;
+  const artifactExpansion = useMemo<ArtifactExpansion>(
+    () => ({
+      expandedPath: expandedArtifactPath,
+      onToggle: (path) =>
+        setExpandedOverride({
+          key: artifactKey,
+          path: expandedArtifactPath === path ? null : path,
+        }),
+    }),
+    [expandedArtifactPath, artifactKey],
+  );
   const sessionMessages = useAppStore(
     (s) => s.sessionStates[message.sessionId]?.messages ?? EMPTY_MESSAGES,
   );
@@ -554,6 +547,7 @@ export const MessageCard = memo(function MessageCard({
                         : `block-${block.type}-${index}`
                     }
                     block={block}
+                    artifactExpansion={artifactExpansion}
                     isUser={isUser}
                     isStreaming={
                       isStreaming &&
@@ -621,6 +615,7 @@ export const MessageCard = memo(function MessageCard({
                       : `block-${block.type}-${gi}`
                   }
                   block={block}
+                  artifactExpansion={artifactExpansion}
                   isUser={isUser}
                   isStreaming={
                     isStreaming &&
@@ -632,12 +627,6 @@ export const MessageCard = memo(function MessageCard({
               );
             })}
           </div>
-          {inlineArtifacts.length > 0 ? (
-            <InlineArtifactList
-              artifacts={inlineArtifacts}
-              isLatestRound={isLatestRound}
-            />
-          ) : null}
           {artifactFiles.length > 0 || videoReferences.length > 0 ? (
             <ArtifactCard
               files={artifactFiles}

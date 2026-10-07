@@ -1,127 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
-  collectInlineArtifactsByTurn,
   filterInlineArtifactFiles,
   normalizeArtifactKey,
+  splitArtifactBlocks,
 } from "../../renderer/utils/inline-artifacts";
-import type { Message, TraceStep } from "../../renderer/types";
+import type { ContentBlock } from "../../renderer/types";
 
-function userMsg(id: string, timestamp: number): Message {
-  return { id, sessionId: "s", role: "user", content: [], timestamp };
-}
+const FENCE =
+  '```artifact\n{"path":"out/a.html","name":"a.html","render":"inline"}\n```';
 
-function assistantMsg(id: string, timestamp: number, turnId?: string): Message {
-  return {
-    id,
-    sessionId: "s",
-    role: "assistant",
-    content: [],
-    timestamp,
-    turnId,
-  };
-}
-
-function artifactStep(
-  id: string,
-  timestamp: number,
-  payload: Record<string, unknown>,
-): TraceStep {
-  return {
-    id,
-    type: "tool_result",
-    status: "completed",
-    title: "artifact",
-    toolName: "artifact",
-    toolOutput: JSON.stringify(payload),
-    timestamp,
-  };
+function text(value: string): ContentBlock {
+  return { type: "text", text: value };
 }
 
 describe("normalizeArtifactKey", () => {
   it("unifies separators and strips a leading ./", () => {
     expect(normalizeArtifactKey(".\\out\\report.html")).toBe("out/report.html");
     expect(normalizeArtifactKey("./out/report.html")).toBe("out/report.html");
-  });
-});
-
-describe("collectInlineArtifactsByTurn", () => {
-  it("assigns a step to the turn whose user message precedes it", () => {
-    const messages = [userMsg("u1", 100), assistantMsg("a1", 200)];
-    const steps = [
-      artifactStep("s1", 150, { path: "out/a.html", render: "inline" }),
-    ];
-
-    const result = collectInlineArtifactsByTurn(messages, steps);
-    expect(result.get("a1")).toEqual([
-      { path: "out/a.html", name: undefined, type: undefined },
-    ]);
-    expect(result.size).toBe(1);
-  });
-
-  it("keeps two turns apart", () => {
-    const messages = [
-      userMsg("u1", 100),
-      assistantMsg("a1", 200),
-      userMsg("u2", 300),
-      assistantMsg("a2", 400),
-    ];
-    const steps = [
-      artifactStep("s1", 150, { path: "first.html", render: "inline" }),
-      artifactStep("s2", 350, { path: "second.html", render: "inline" }),
-    ];
-
-    const result = collectInlineArtifactsByTurn(messages, steps);
-    expect(result.get("a1")?.[0].path).toBe("first.html");
-    expect(result.get("a2")?.[0].path).toBe("second.html");
-  });
-
-  it("skips steps without the inline marker", () => {
-    const messages = [userMsg("u1", 100), assistantMsg("a1", 200)];
-    const steps = [artifactStep("s1", 150, { path: "out/a.html" })];
-    expect(collectInlineArtifactsByTurn(messages, steps).size).toBe(0);
-  });
-
-  it("skips non-artifact steps and malformed payloads", () => {
-    const messages = [userMsg("u1", 100), assistantMsg("a1", 200)];
-    const steps: TraceStep[] = [
-      {
-        id: "t1",
-        type: "tool_result",
-        status: "completed",
-        title: "read_file",
-        toolName: "read_file",
-        timestamp: 150,
-      },
-      {
-        id: "t2",
-        type: "tool_result",
-        status: "completed",
-        title: "artifact",
-        toolName: "artifact",
-        toolOutput: "not json",
-        timestamp: 160,
-      },
-      artifactStep("t3", 170, { render: "inline" }),
-    ];
-    expect(collectInlineArtifactsByTurn(messages, steps).size).toBe(0);
-  });
-
-  it("keeps model order when a turn has several artifacts", () => {
-    const messages = [userMsg("u1", 100), assistantMsg("a1", 200)];
-    const steps = [
-      artifactStep("s1", 150, { path: "b.html", render: "inline" }),
-      artifactStep("s2", 160, { path: "a.html", render: "inline" }),
-    ];
-    const result = collectInlineArtifactsByTurn(messages, steps);
-    expect(result.get("a1")?.map((a) => a.path)).toEqual(["b.html", "a.html"]);
-  });
-
-  it("ignores steps that arrive before any user message", () => {
-    const messages = [userMsg("u1", 100), assistantMsg("a1", 200)];
-    const steps = [
-      artifactStep("s1", 50, { path: "early.html", render: "inline" }),
-    ];
-    expect(collectInlineArtifactsByTurn(messages, steps).size).toBe(0);
   });
 });
 
@@ -154,5 +49,68 @@ describe("filterInlineArtifactFiles", () => {
 
   it("returns the same array when nothing is inline", () => {
     expect(filterInlineArtifactFiles(files, [])).toBe(files);
+  });
+});
+
+describe("splitArtifactBlocks", () => {
+  it("把围栏换成产物块，位置和顺序不变", () => {
+    const out = splitArtifactBlocks([text(`前\n${FENCE}\n后`)]);
+    expect(out.map((b) => b.type)).toEqual(["text", "artifact", "text"]);
+    expect(out[0]).toMatchObject({ text: "前\n" });
+    expect(out[1]).toMatchObject({
+      path: "out/a.html",
+      name: "a.html",
+      render: "inline",
+    });
+    expect(out[2]).toMatchObject({ text: "\n后" });
+  });
+
+  it("一段里有两个围栏", () => {
+    const second = '```artifact\n{"path":"out/b.html","render":"inline"}\n```';
+    const out = splitArtifactBlocks([text(`${FENCE}中间${second}`)]);
+    expect(out.map((b) => b.type)).toEqual(["artifact", "text", "artifact"]);
+    expect(
+      out
+        .filter((b) => b.type === "artifact")
+        .map((b) => (b as { path: string }).path),
+    ).toEqual(["out/a.html", "out/b.html"]);
+  });
+
+  it("没有 render 标记的围栏从正文里去掉，但不产生产物块", () => {
+    const fence = '```artifact\n{"path":"out/a.html"}\n```';
+    const out = splitArtifactBlocks([text(`前${fence}后`)]);
+    expect(out.map((b) => b.type)).toEqual(["text"]);
+    expect(out[0]).toMatchObject({ text: "前后" });
+  });
+
+  it("JSON 坏掉时原样留在正文", () => {
+    const broken = "```artifact\n{not json}\n```";
+    const out = splitArtifactBlocks([text(broken)]);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({ text: broken });
+  });
+
+  it("坏 JSON 后面跟一个合法围栏：坏的那段仍是文本", () => {
+    const broken = "```artifact\n{not json}\n```";
+    const out = splitArtifactBlocks([text(broken + FENCE)]);
+    expect(out.map((b) => b.type)).toEqual(["text", "artifact"]);
+    expect((out[0] as { text: string }).text).toBe(broken);
+  });
+
+  it("流式时丢掉未闭合的围栏尾巴，非流式时留着", () => {
+    const open = '前\n```artifact\n{"path":"out/a.html","render":"inl';
+    const streamed = splitArtifactBlocks([text(open)], { streaming: true });
+    expect(streamed.map((b) => b.type)).toEqual(["text"]);
+    expect((streamed[0] as { text: string }).text).toBe("前\n");
+    const settled = splitArtifactBlocks([text(open)], { streaming: false });
+    expect(settled).toHaveLength(1);
+    expect((settled[0] as { text: string }).text).toBe(open);
+  });
+
+  it("非文本块原样穿过", () => {
+    const tool: ContentBlock = { type: "thinking", thinking: "x" };
+    const out = splitArtifactBlocks([tool, text(FENCE)]);
+    expect(out[0]).toBe(tool);
+    expect(out[1]).toMatchObject({ type: "artifact" });
   });
 });

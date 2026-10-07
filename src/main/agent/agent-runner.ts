@@ -3983,13 +3983,15 @@ Tool routing:\n
                 const contentBlocks: ContentBlock[] = [];
                 for (const block of resolvedPayload.effectiveContent) {
                   if (block.type === "text") {
-                    const { cleanText, artifacts } = extractArtifactsFromText(
-                      block.text,
-                    );
-                    if (cleanText) {
+                    // 围栏保留在正文里：渲染层要按它在原文中的位置拆成产物块。
+                    // 这里仍然解析一次，只为给右侧产物面板发 trace step。
+                    // 注意：sanitizeOutputPaths 在沙箱模式下会把容器路径改写成 `/workspace/...`，
+                    // 而渲染层的 resolvePathAgainstWorkspace 正好认这个前缀——不要“顺手修”它。
+                    const { artifacts } = extractArtifactsFromText(block.text);
+                    if (block.text) {
                       contentBlocks.push({
                         type: "text",
-                        text: sanitizeOutputPaths(cleanText),
+                        text: sanitizeOutputPaths(block.text),
                       });
                     }
                     if (artifacts.length > 0) {

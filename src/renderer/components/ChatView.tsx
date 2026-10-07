@@ -46,12 +46,10 @@ import type {
   QueuedInput,
   ImageContent,
   FileAttachmentContent,
-  TraceStep,
 } from "../types";
 import {
-  collectInlineArtifactsByTurn,
   filterInlineArtifactFiles,
-  type InlineArtifactInfo,
+  splitArtifactBlocks,
 } from "../utils/inline-artifacts";
 import { mergeSteerEntries, resolveAnchorMessageId } from "../steer-entries";
 import {
@@ -244,8 +242,6 @@ const LOAD_OLDER_THRESHOLD_PX = 160;
 const EMPTY_NESTED_CALLS = {};
 const EMPTY_RESULT_FILES: ResultFileEntry[] = [];
 const EMPTY_VIDEO_REFERENCES: VideoReference[] = [];
-const EMPTY_TRACE_STEPS: TraceStep[] = [];
-const EMPTY_INLINE_ARTIFACTS: InlineArtifactInfo[] = [];
 
 export function ChatView() {
   const { t, i18n } = useTranslation();
@@ -267,8 +263,6 @@ export function ChatView() {
   const sessionState = useAppStore((s) =>
     activeSessionId ? s.sessionStates[activeSessionId] : undefined,
   );
-  // 内联产物的归属靠 trace step 的时间戳，所以要订这一份。
-  const traceSteps = sessionState?.traceSteps ?? EMPTY_TRACE_STEPS;
   const compaction = sessionState?.compaction ?? { status: "idle" as const };
   const retry = sessionState?.retry ?? { active: false, attempt: 0 };
   // 状态栏入口的面板行：只收后台型，运行中在前。
@@ -925,10 +919,6 @@ export function ChatView() {
     // collect artifact files, and build one turn-level process summary anchor.
     const turnEndIds = new Set<string>();
     const turnArtifactFiles = new Map<string, ResultFileEntry[]>();
-    const turnInlineArtifacts = collectInlineArtifactsByTurn(
-      mergedMessages,
-      traceSteps,
-    );
     const turnVideoReferences = new Map<string, VideoReference[]>();
     const turnProcessSummaries = new Map<string, ProcessSummaryDisplayBlock>();
     const turnsWithProcessSummary = new Set<string>();
@@ -973,11 +963,14 @@ export function ChatView() {
           );
           const processItems = summaryItems.filter(isProcessToolUse);
           if (summaryItems.length > 0) {
+            const inlinePaths = splitArtifactBlocks(summaryBlocks)
+              .filter((block) => block.type === "artifact")
+              .map((block) => ({ path: (block as { path: string }).path }));
             turnArtifactFiles.set(
               msgId,
               filterInlineArtifactFiles(
                 collectResultFiles(summaryItems, summaryBlocks),
-                turnInlineArtifacts.get(msgId) ?? EMPTY_INLINE_ARTIFACTS,
+                inlinePaths,
               ),
             );
           }
@@ -1020,8 +1013,6 @@ export function ChatView() {
         isLatestRound:
           msgId.startsWith("partial-") || msgId === latestAssistantId,
         artifactFiles: turnArtifactFiles.get(msgId) ?? EMPTY_RESULT_FILES,
-        inlineArtifacts:
-          turnInlineArtifacts.get(msgId) ?? EMPTY_INLINE_ARTIFACTS,
         videoReferences:
           turnVideoReferences.get(msgId) ?? EMPTY_VIDEO_REFERENCES,
         turnProcessSummary:
@@ -1042,7 +1033,6 @@ export function ChatView() {
     hoistedProcessSummaryTurnIds,
     activeSessionCwd,
     turnBlocksById,
-    traceSteps,
   ]);
 
   // Dock ticks are anchored to the IN-MEMORY window (all loaded history),
@@ -2015,7 +2005,6 @@ export function ChatView() {
                       isTurnEnd,
                       isLatestRound,
                       artifactFiles,
-                      inlineArtifacts,
                       videoReferences,
                       turnProcessSummary,
                       suppressProcessSummaries,
@@ -2049,7 +2038,6 @@ export function ChatView() {
                           isTurnEnd={isTurnEnd}
                           isLatestRound={isLatestRound}
                           artifactFiles={artifactFiles}
-                          inlineArtifacts={inlineArtifacts}
                           videoReferences={videoReferences}
                           suppressProcessSummaries={suppressProcessSummaries}
                           onForkMessage={handleForkMessage}

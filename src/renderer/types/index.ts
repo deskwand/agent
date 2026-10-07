@@ -87,13 +87,28 @@ export interface Message {
 
 export type MessageRole = "user" | "assistant" | "system";
 
+/** 模型在正文里标了 `render:"inline"` 的产物。渲染层拆围栏时生成，不参与持久化。 */
+export interface ArtifactContentBlock {
+  type: "artifact";
+  path: string;
+  name?: string;
+  render: "inline";
+}
+
+/** 一条消息里产物的展开态（只有最新的一个展开）。 */
+export interface ArtifactExpansion {
+  expandedPath: string | null;
+  onToggle: (path: string) => void;
+}
+
 export type ContentBlock =
   | TextContent
   | ImageContent
   | FileAttachmentContent
   | ToolUseContent
   | ToolResultContent
-  | ThinkingContent;
+  | ThinkingContent
+  | ArtifactContentBlock;
 
 export interface TextContent {
   type: "text";

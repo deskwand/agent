@@ -29,6 +29,7 @@ import type {
   ImageContent,
 } from "../../types";
 import { FileText } from "lucide-react";
+import { ArtifactInlineFrame } from "./ArtifactInlineFrame";
 import { CodeBlock } from "./CodeBlock";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { UserTextWithTokens } from "./UserTextWithTokens";
@@ -75,6 +76,7 @@ export const ContentBlockView = memo(function ContentBlockView({
   isStreaming,
   allBlocks,
   message,
+  artifactExpansion,
 }: ContentBlockViewProps) {
   const { t } = useTranslation();
   const activeSessionId = useAppStore((s) => s.activeSessionId);
@@ -417,6 +419,16 @@ export const ContentBlockView = memo(function ContentBlockView({
 
   const content = (() => {
     switch (block.type) {
+      case "artifact": {
+        return (
+          <ArtifactInlineFrame
+            artifact={{ path: block.path, name: block.name }}
+            expanded={artifactExpansion?.expandedPath === block.path}
+            onToggle={artifactExpansion?.onToggle ?? (() => {})}
+          />
+        );
+      }
+
       case "text": {
         const textBlock = block as { type: "text"; text: string };
         const text = textBlock.text || "";

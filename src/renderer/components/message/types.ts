@@ -1,12 +1,19 @@
 // Shared types for MessageCard sub-components
 import type {
+  ArtifactExpansion,
   Message,
   ContentBlock,
   ToolUseContent,
   ToolResultContent,
 } from "../../types";
 
-export type { Message, ContentBlock, ToolUseContent, ToolResultContent };
+export type {
+  ArtifactExpansion,
+  Message,
+  ContentBlock,
+  ToolUseContent,
+  ToolResultContent,
+};
 
 export interface ContentBlockViewProps {
   block: ContentBlock;
@@ -16,6 +23,8 @@ export interface ContentBlockViewProps {
   allBlocks?: ContentBlock[];
   /** The full message, used to search across all session messages */
   message?: Message;
+  /** 产物块的展开态（由 MessageCard 持有）。缺省时产物渲染为折叠态。 */
+  artifactExpansion?: ArtifactExpansion;
 }
 
 export interface ToolBlockBaseProps {
