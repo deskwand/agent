@@ -1709,7 +1709,7 @@ app.on("before-quit", async (event) => {
     // In dev mode, exit quickly — no need for async sandbox cleanup
     if (process.env.VITE_DEV_SERVER_URL) {
       stopNavServer();
-      // 引擎是常驻 2.7GB 的子进程：退出前必须杀掉，否则它会活过应用
+      // 引擎是常驻 3.8GB 的子进程：退出前必须杀掉，否则它会活过应用
       disposeEngineHost();
       try {
         closeDatabase();

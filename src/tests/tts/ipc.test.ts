@@ -361,7 +361,7 @@ describe("registerTtsIpc", () => {
       model: TTS_ENGLISH_MODEL_ID,
     });
 
-    // 900MB 的最佳档是用户显式安装的东西，任何路径都不许静默下载
+    // 1.5GB 的最佳档是用户显式安装的东西，任何路径都不许静默下载
     installTtsModel.mockClear();
     await ipc.invoke("tts.speakStream", "随便一句中文。", { tone: "best" });
     expect(installTtsModel).not.toHaveBeenCalled();

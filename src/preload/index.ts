@@ -1042,7 +1042,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     // 试听：三档通用，返回整句音频（不是流式）
     preview: (tone: TtsTone): Promise<TtsSpeakResult> =>
       ipcRenderer.invoke("tts.preview", tone),
-    // 「最佳音质」档的引擎（本地大模型，约 900MB，按平台下载）
+    // 「最佳音质」档的引擎（本地大模型，约 1.5GB，按平台下载）
     getEngineState: (): Promise<EngineInstallState> =>
       ipcRenderer.invoke("tts.getEngineState"),
     installEngine: (): Promise<void> => ipcRenderer.invoke("tts.installEngine"),

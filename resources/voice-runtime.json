@@ -24,9 +24,9 @@
     "artifactBytes": {
       "darwin-arm64": 1846941
     },
-    "talkerUrl": "https://file.deskwand.com/voice-engines/qwen-talker-0.6b-customvoice-Q4_K_M.gguf",
-    "talkerSha256": "b3a7e6613d80f8a703c06267fc1e94d48ce91932ab82ab6e31c50f4ca4868e1e",
-    "talkerBytes": 604878080,
+    "talkerUrl": "https://file.deskwand.com/voice-engines/qwen-talker-1.7b-customvoice-Q4_K_M.gguf",
+    "talkerSha256": "cc328834a631bc08bf9f43e62fa23f8a1383d9b429864ce6690cfb172077fc4a",
+    "talkerBytes": 1182631296,
     "tokenizerUrl": "https://file.deskwand.com/voice-engines/qwen-tokenizer-12hz-Q8_0.gguf",
     "tokenizerSha256": "1883beeed99348fc35e23dd225e9082f93f6f8c109330a33d935baa8acdbfd94",
     "tokenizerBytes": 291150624

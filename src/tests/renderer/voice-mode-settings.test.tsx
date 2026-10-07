@@ -276,7 +276,7 @@ describe("VoiceModeSettings 的音色行", () => {
   it("改档不会丢掉配置里的其它字段（voiceMode 是整体替换）", async () => {
     // 写 voiceMode 是**整体替换**：写入方必须带上另一个字段，否则会把它打回默认。
     // 原用例挂在静音行上，那一行已删除 —— 同一条守卫改挂档位行。
-    // 选第三档正好不需要伪造引擎安装状态：900MB 不该被下拉静默触发，它只记住选择。
+    // 选第三档正好不需要伪造引擎安装状态：1.5GB 不该被下拉静默触发，它只记住选择。
     useAppStore.getState().setAppConfig({
       voiceMode: { silenceMs: 800, fastVoice: false, tone: "balanced" },
     } as AppConfig);

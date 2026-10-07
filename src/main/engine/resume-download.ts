@@ -4,12 +4,12 @@
  * 单文件**断点续传**下载：Range 续传 + 整文件 sha256 + 成功后原子改名。
  *
  * 为什么不用 `speech/installer.ts` 的 `downloadAndExtract`：那个的临时文件名按
- * 毫秒生成，中断即丢 —— 对 157MB 的模型可以接受，对 900MB 不行（用户拔一次
+ * 毫秒生成，中断即丢 —— 对 157MB 的模型可以接受，对 1.5GB 不行（用户拔一次
  * 网线就得从零重来）。这里固定 `.partial`，它本身就是续传的凭据。
  *
  * 服务端**忽略 Range** 时（返回 200）必须能从零覆盖写：不是所有 CDN 都支持
  * 断点，把 200 当成 206 会拼出一段"半新半旧"的坏文件 —— 而 sha256 会在最后
- * 发现它，代价是白下 900MB。所以这里看状态码，不看我们发了什么请求头。
+ * 发现它，代价是白下 1.5GB。所以这里看状态码，不看我们发了什么请求头。
  */
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
@@ -66,7 +66,7 @@ export async function downloadResumable(opts: {
   try {
     for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
       const buf = Buffer.from(chunk);
-      // 等 write 回调：不等的话 900MB 会积在内存里
+      // 等 write 回调：不等的话 1.5GB 会积在内存里
       await new Promise<void>((resolve, reject) => {
         out.write(buf, (error) => (error ? reject(error) : resolve()));
       });

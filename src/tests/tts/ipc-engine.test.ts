@@ -272,7 +272,7 @@ describe("最佳音质档的 IPC 行为", () => {
     await ipc.invoke("tts.retryEngine");
 
     expect(engine.host.warmup).toHaveBeenCalledOnce();
-    expect(engine.install).not.toHaveBeenCalled(); // 不重下 900MB
+    expect(engine.install).not.toHaveBeenCalled(); // 不重下 1.5GB
     const phases = events
       .filter((e) => e.type === "engine")
       .map((e) => (e as { state: { phase: string } }).state.phase);

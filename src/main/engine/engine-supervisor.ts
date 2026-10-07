@@ -8,7 +8,7 @@
  *
  * 1. **只监听 127.0.0.1**，端口每次现取（先 bind :0 再释放）。不写死 8080：
  *    用户机器上那端口很可能被占，而"起不来"要比"换个端口"难查得多。
- * 2. **空闲 10 分钟就 kill**。它常驻 2.7GB —— 用户没说十句话却要一直占着，
+ * 2. **空闲 10 分钟就 kill**。它常驻 3.8GB —— 用户没说十句话却要一直占着，
  *    是这个方案最容易被骂的地方。下次说话热启动 0.5–0.8s，代价可接受。
  * 3. **崩溃退避而不是死等**：崩过之后 `ensureReady()` 在退避窗口内直接返回失败，
  *    让调用方回退到「均衡」档出声（有声音、稍差），而不是让用户干等 20 秒。
@@ -285,7 +285,7 @@ export function getEngineSupervisor(): EngineSupervisor {
   return singleton;
 }
 
-/** 退出清理：主进程 before-quit 调它，别把 2.7GB 的进程留在用户机器上。 */
+/** 退出清理：主进程 before-quit 调它，别把 3.8GB 的进程留在用户机器上。 */
 export function disposeEngineSupervisor(): void {
   singleton?.stop();
   singleton = null;

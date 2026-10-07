@@ -46,10 +46,10 @@ describe("语音卡文案", () => {
 
   it("最佳档说明去掉同义反复", () => {
     expect(zhCopy.toneBestNote).toBe(
-      "装完离线可用；首声约 1–2 秒，说话时约 3GB 内存，空闲 10 分钟自动释放。",
+      "装完离线可用；首声约 1–2 秒，说话时约 3.8GB 内存，空闲 10 分钟自动释放。",
     );
     expect(enCopy.toneBestNote).toBe(
-      "Works offline once installed; first sound in about 1-2 seconds, about 3GB of memory while speaking, released after 10 idle minutes.",
+      "Works offline once installed; first sound in about 1-2 seconds, about 3.8GB of memory while speaking, released after 10 idle minutes.",
     );
   });
 });

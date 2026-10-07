@@ -129,7 +129,7 @@ export function getEngineHost(userDataPath: string): EngineHost {
   return (singleton ??= createEngineHost(userDataPath));
 }
 
-/** 应用退出时调用：别把 2.7GB 的进程留在用户机器上。 */
+/** 应用退出时调用：别把 3.8GB 的进程留在用户机器上。 */
 export function disposeEngineHost(): void {
   disposeEngineSupervisor();
   singleton = null;

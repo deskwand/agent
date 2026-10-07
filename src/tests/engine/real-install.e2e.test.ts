@@ -1,7 +1,7 @@
 /**
  * 真环境安装验收：从 CDN 装一次真的，再从装好的目录合成一句。
  *
- * **默认跳过**（要下 ~900MB）：`ENGINE_E2E=1 npx vitest run src/tests/engine/real-install.e2e.test.ts`
+ * **默认跳过**（要下 ~1.5GB）：`ENGINE_E2E=1 npx vitest run src/tests/engine/real-install.e2e.test.ts`
  *
  * 它验的是应用真正的安装路径 —— 清单坐标、续传下载器、sha256 校验、解包、
  * 版本化目录，最后**在安装目录里起进程出声**。最后这步同时证明产物是**可迁移**的

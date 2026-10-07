@@ -3,9 +3,14 @@
  *
  * 「最佳音质」档的安装器：预检 → 引擎产物 → 两个 GGUF → 预热。
  *
- * 装到**版本化目录** `~/.deskwand/voice/engines/qwen3-tts/<version>/`：
- * 应用升级不会让已装好的引擎失效，也不需要每次升级重下 900MB。版本目录由
+ * 装到**版本化目录** `~/.deskwand/voice/engines/qwen3-tts/<version>/`，版本目录由
  * 清单里的 `ttsEngine.version`（= 上游 commit）决定。
+ *
+ * 注意版本目录**只跟引擎产物走，不跟模型坐标走**：引擎不变、只换模型时（如 2026-10-07
+ * 的 0.6B → 1.7B），已装用户会被判 `isEngineInstalled() === false` 并重下一次；而
+ * `installEngine` 开头就删掉整个版本目录，所以**装失败不会退回旧模型** ——"新版装失败
+ * 不影响旧版还能用"那条保证只对换引擎版本成立。见
+ * `design-docs/2026-10-07-语音最佳音质档换1.7B-design.md` §5/§6。
  *
  * 失败**整体回滚**：删掉本次版本目录。半装的引擎比没装更糟 —— 它会让
  * `isEngineInstalled()` 说"装了"，然后每次说话都失败。
@@ -21,9 +26,12 @@ import type { TtsEngineSpec } from "../speech/runtime-spec";
 import type { EngineBlockedReason } from "../../shared/engine-install";
 import { log } from "../utils/logger";
 
-/** 引擎 + 两个模型 + 解包时的峰值：要 3GB 才敢开始。 */
+/** 引擎产物 + 两个模型的和，约 1.48GB（非实测值，是三个字节数相加）；留到 3GB 才敢开始。 */
 const MIN_FREE_DISK_BYTES = 3 * 1024 * 1024 * 1024;
-/** 实测峰值 2739MB；16GB 以下的机器跑不动（会换页到卡死）。 */
+/**
+ * 实测峰值 3841MB（1.7B CustomVoice Q4_K_M + tokenizer Q8_0，M3 Air，跑三句后的稳态）。
+ * 16GB 以下的机器跑不动（会换页到卡死）。换 1.7B 前用的是 0.6B，那时是 2737MB。
+ */
 const MIN_TOTAL_MEM_BYTES = 16 * 1024 * 1024 * 1024;
 
 export function engineRoot(userDataPath: string, version: string): string {
@@ -88,7 +96,7 @@ export function isEngineInstalled(
 /**
  * 只删**某一个版本**的目录。回滚用它 —— 版本化目录的意义就是"新版装失败不影响
  * 旧版还能用"，回滚顺手删掉所有版本会让这条保证作废（换版本时一次失败就把旧目录
- * 也清掉，用户从 900MB 从头再来）。
+ * 也清掉，用户从 1.5GB 从头再来）。
  */
 export function removeEngineVersion(
   userDataPath: string,
