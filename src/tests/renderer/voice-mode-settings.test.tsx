@@ -273,18 +273,39 @@ describe("VoiceModeSettings 的音色行", () => {
     expect(byTestId("voice-voice-remove")).not.toBeNull();
   });
 
-  it("改等待时长不会把音色打回默认", async () => {
-    // 写 voiceMode 是**整体替换**：只发 { silenceMs } 会把 fastVoice 打回默认 true，
-    // 也就是旁边的下拉会悄悄替用户换档。
+  it("改档不会丢掉配置里的其它字段（voiceMode 是整体替换）", async () => {
+    // 写 voiceMode 是**整体替换**：写入方必须带上另一个字段，否则会把它打回默认。
+    // 原用例挂在静音行上，那一行已删除 —— 同一条守卫改挂档位行。
+    // 选第三档正好不需要伪造引擎安装状态：900MB 不该被下拉静默触发，它只记住选择。
     useAppStore.getState().setAppConfig({
-      voiceMode: { silenceMs: 800, fastVoice: false },
+      voiceMode: { silenceMs: 800, fastVoice: false, tone: "balanced" },
     } as AppConfig);
     await mount();
 
-    await pickOption(container, "voice-mode-silence", "2000");
+    await pickOption(container, "voice-voice-tone", "best");
 
     expect(api.config.save).toHaveBeenCalledWith({
-      voiceMode: { silenceMs: 2000, fastVoice: false },
+      voiceMode: { silenceMs: 800, fastVoice: false, tone: "best" },
     });
+  });
+
+  it("卡片接的是共用说明；档位行与子行各用各的 key；静音行整行消失", async () => {
+    // 这个 harness 不加载 i18n（渲染出来是 key 原文），所以这里只断**结构**：
+    // 用了哪个 key、哪一行在不在。文案**值**由 src/tests/i18n/voice-card-copy.test.ts 保证。
+    await mount();
+    const text = container.textContent ?? "";
+
+    expect(text).toContain("settings.capabilities.voiceMode.title");
+    expect(text).toContain("settings.capabilities.voiceMode.desc");
+    // 两行各接自己的 key（此前它们的中文值都叫「音色」，所以撞名）
+    expect(text).toContain("settings.capabilities.voiceMode.tone");
+    // 子行（最佳档音色）只在装了引擎时渲染，它的文案值由 T1 的 i18n 用例保证，
+    // 这里不伪造引擎安装状态。
+
+    // 静音判停行整行删除：DOM 上没有它，也没有它那两个字面量 key
+    expect(
+      container.querySelector('[data-testid="voice-mode-silence"]'),
+    ).toBeNull();
+    expect(text).not.toContain("settings.capabilities.voiceMode.silenceLabel");
   });
 });

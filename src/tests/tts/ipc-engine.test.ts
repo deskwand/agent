@@ -292,20 +292,6 @@ describe("最佳音质档的 IPC 行为", () => {
     });
   });
 
-  it("不带 purpose 的 best 仍受朗读开关门控（引擎不是后门）", async () => {
-    config.readAloudEnabled = false;
-    const { ipc, engine, streamEvents } = harness();
-
-    await ipc.invoke("tts.speakStream", "你好", { tone: "best" });
-
-    await vi.waitFor(() => expect(streamEvents.length).toBe(1));
-    expect(streamEvents[0]).toMatchObject({
-      type: "error",
-      error: "read aloud disabled",
-    });
-    expect(engine.speak).not.toHaveBeenCalled();
-  });
-
   it("打断：cancelStream 会 abort 那次引擎请求，且不再发 done/error", async () => {
     const { ipc, engine, streamEvents } = harness({ hang: true });
     const { streamId } = (await ipc.invoke("tts.speakStream", "你好", {

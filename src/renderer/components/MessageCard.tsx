@@ -255,10 +255,6 @@ export const MessageCard = memo(function MessageCard({
   // 朗读：正文容器的 ref。切句与高亮都只读这份 DOM，不改 markdown。
   const bodyRef = useRef<HTMLDivElement>(null);
   const reader = useReadAloud();
-  // 能力开关关掉就不渲染按钮 —— 与语音输入同一条（ChatView 也是先看 voiceEngine.enabled）。
-  const readAloudEnabled = useAppStore(
-    (s) => s.appConfig?.readAloud?.enabled === true,
-  );
   // 语音运行时独占音频：全屏在放回答、后台也在听，两路声音不能同时响。
   const voiceRuntimeActive = useAppStore((s) => s.voiceModeOpen);
   const readingThis = reader.messageId === message.id;
@@ -368,8 +364,8 @@ export const MessageCard = memo(function MessageCard({
             </Tooltip>
             {/* 朗读只给助手回复 —— showActions 对用户消息也为真（上面的
                 `message.role !== "assistant"` 分支），所以这里必须自己挡一道。
-                开关关掉时整个按钮不出现：与语音输入一致，不是「点了没反应」。 */}
-            {!isUser && readAloudEnabled ? (
+                朗读已无能力开关：只要有可读文字就出现按钮，没文字时按钮置灰。 */}
+            {!isUser ? (
               <>
                 <Tooltip
                   label={

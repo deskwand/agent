@@ -50,15 +50,11 @@ describe("speakStream", () => {
     install(bridge);
     const chunks: number[] = [];
     const onDone = vi.fn();
-    speakStream(
-      "文本",
-      { purpose: "voice" },
-      {
-        onChunk: (c) => chunks.push(c.samples.length),
-        onDone,
-        onError: () => {},
-      },
-    );
+    speakStream("文本", undefined, {
+      onChunk: (c) => chunks.push(c.samples.length),
+      onDone,
+      onError: () => {},
+    });
     await vi.waitFor(() => expect(bridge.speakStream).toHaveBeenCalled());
 
     emit(chunk(999, 0, 9)); // 别的流

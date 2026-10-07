@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 /**
- * 语音模式要按设置里的音色档位决定传哪个 `tone`，并且两种档位都带 `purpose: "voice"`。
+ * 语音模式要按设置里的音色档位决定传哪个 `tone`。音质与音色只有一处配置（设置里的「语音」），
  *
  * 这是把档位接上引擎的**唯一**一处接线，而且断了不会报错：服务层会安静地回退到
  * 朗读的模型，症状只有"又变慢了"。所以把它钉住。
  *
- * `purpose` 断了的症状更隐性：朗读关着时整句直接没声音（主进程门控拦掉）。
+ * 朗读与它共用同一份配置；朗读那边不再有开关，也不需要任何绕过门控的例外。
  *
  * 与设置卡那个下拉的分工：那个下拉管写入与显示，这里只管**读**（每句读一次）。
  */
@@ -126,7 +126,6 @@ it("asks for the fast voice while 快速 is selected", async () => {
   try {
     await say("你好。");
     expect(speak).toHaveBeenCalledExactlyOnceWith("你好。", {
-      purpose: "voice",
       tone: "fast",
     });
   } finally {
@@ -134,14 +133,13 @@ it("asks for the fast voice while 快速 is selected", async () => {
   }
 });
 
-it("asks for the balanced tier while 均衡 is selected, but still says who is talking", async () => {
+it("asks for the balanced tier while 均衡 is selected", async () => {
   const { speak, unmount } = await mount({ fastVoice: false });
   try {
     await say("你好。");
     // tone: "balanced"：让服务层按文本路由到朗读的中文 / 英文音色。
-    // purpose 必须在：均衡那份模型与朗读共用，但语音对话是自己选了它（见 ipc 门控）。
+    // 档位必须传下去：均衡那份模型与朗读共用，而语音对话按同一份设置选它。
     expect(speak).toHaveBeenCalledExactlyOnceWith("你好。", {
-      purpose: "voice",
       tone: "balanced",
     });
   } finally {
@@ -157,7 +155,6 @@ it("reads the setting on every sentence, so switching takes effect at once", asy
     setFastVoice(false);
     await say("第二句。");
     expect(speak).toHaveBeenLastCalledWith("第二句。", {
-      purpose: "voice",
       tone: "balanced",
     });
   } finally {

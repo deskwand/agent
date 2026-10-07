@@ -54,6 +54,14 @@ function readAloudButton() {
 }
 
 describe("语音运行时朗读互斥", () => {
+  it("朗读不再有开关：没配 readAloud 也能读", () => {
+    // 旧行为是「能力开关关掉就不渲染按钮」；开关已删除，可用性只由文字与模型决定。
+    useAppStore.getState().setAppConfig({} as AppConfig);
+    render();
+    expect(readAloudButton()).not.toBeNull();
+    expect(readAloudButton()!.disabled).toBe(false);
+  });
+
   it("语音运行时朗读按钮禁用", () => {
     render();
     expect(readAloudButton()).not.toBeNull();
