@@ -89,6 +89,67 @@ describe("ArtifactInlineFrame", () => {
     expect(frame?.getAttribute("src")).toContain("deskwand-artifact://");
   });
 
+  it("展开后只变一次高度：骨架屏是覆盖层，容器先占住成品高度", async () => {
+    getRenderUrl.mockResolvedValue(
+      "deskwand-artifact://local/root/sig/report.html",
+    );
+    await act(async () => {
+      root.render(
+        <ArtifactInlineFrame
+          artifact={ARTIFACT}
+          expanded={true}
+          onToggle={() => {}}
+        />,
+      );
+      await Promise.resolve();
+    });
+
+    const body = container.querySelector(
+      '[data-testid="artifact-inline-body"]',
+    );
+    // onLoad 之前就要占住与 iframe 等高的位置：不然 onLoad 时骨架屏撤掉会掉 100px
+    expect(body?.className).toContain("min-h-[320px]");
+
+    const skeleton = container.querySelector(
+      '[data-testid="artifact-inline-skeleton"]',
+    );
+    // 骨架屏必须脱离布局（盖在 iframe 上）。与 iframe 并存时内容高 448px，
+    // 被 max-h-[420px] 裁一次、onLoad 后再掉回 320 —— 展开后还能看见两次跳高
+    expect(skeleton?.className).toContain("absolute");
+
+    // iframe 必须仍然挂载：改成「骨架替换 iframe」就永远不会触发 onLoad
+    expect(container.querySelector("iframe")).not.toBeNull();
+  });
+
+  it("折叠态与展开态的头部是同一档高度，切换时这一行不跳", () => {
+    getRenderUrl.mockResolvedValue(
+      "deskwand-artifact://local/root/sig/report.html",
+    );
+    act(() => {
+      root.render(
+        <ArtifactInlineFrame
+          artifact={ARTIFACT}
+          expanded={false}
+          onToggle={() => {}}
+        />,
+      );
+    });
+    expect(container.querySelector("button")?.className).toContain("min-h-9");
+
+    act(() => {
+      root.render(
+        <ArtifactInlineFrame
+          artifact={ARTIFACT}
+          expanded={true}
+          onToggle={() => {}}
+        />,
+      );
+    });
+    expect(container.querySelector(".border-b")?.className).toContain(
+      "min-h-9",
+    );
+  });
+
   it("shows the failure row when no url can be minted", async () => {
     getRenderUrl.mockResolvedValue(null);
     await act(async () => {

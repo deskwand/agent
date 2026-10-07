@@ -1,6 +1,10 @@
 /**
  * 内联产物的沙箱框架。高度固定 320px——iframe 无法自动量高（除非产物配合
- * postMessage 报高度，v1 不做），外层容器上限 420px，超出那么在容器内滚动。
+ * postMessage 报高度，v1 不做）。
+ * 两个高度约束是为了「展开只变一次高度」：
+ *   1. 折叠与展开的头部用同一档 min-height（两态同高，切换时这一行不跳）；
+ *   2. 内容区在 onLoad 之前就先占住 320px，骨架屏作为覆盖层盖在 iframe 上
+ *      —— 两者并存会把内容擑到 448px，被 max-h-[420px] 裁一次、onLoad 后再掉回 320。
  */
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -93,7 +97,7 @@ export function ArtifactInlineFrame({
       <button
         type="button"
         onClick={() => onToggle(artifact.path)}
-        className="flex w-full items-center gap-2 rounded-md border border-border bg-surface-muted px-2 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover"
+        className="flex min-h-9 w-full items-center gap-2 rounded-md border border-border bg-surface-muted px-2 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover"
       >
         <ChevronRight className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate font-medium">{label}</span>
@@ -103,7 +107,7 @@ export function ArtifactInlineFrame({
 
   return (
     <div className="overflow-hidden rounded-md border border-border bg-card">
-      <div className="flex items-center gap-2 border-b border-border bg-surface-muted px-2 py-1.5">
+      <div className="flex min-h-9 items-center gap-2 border-b border-border bg-surface-muted px-2 py-1.5">
         <button
           type="button"
           onClick={() => onToggle(artifact.path)}
@@ -151,9 +155,17 @@ export function ArtifactInlineFrame({
           </button>
         </div>
       ) : (
-        <div className="relative max-h-[420px] overflow-auto">
+        <div
+          data-testid="artifact-inline-body"
+          className={`relative max-h-[420px] overflow-auto ${
+            loaded ? "" : "min-h-[320px]"
+          }`}
+        >
           {!loaded ? (
-            <div className="h-32 animate-pulse bg-surface-muted" />
+            <div
+              data-testid="artifact-inline-skeleton"
+              className="absolute inset-x-0 top-0 h-[320px] animate-pulse bg-surface-muted"
+            />
           ) : null}
           {state.kind === "ready" ? (
             <iframe
