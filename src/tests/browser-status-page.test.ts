@@ -38,10 +38,23 @@ describe("displayUrlFor", () => {
     ).toBe("file:///tmp/preview.html");
   });
 
-  it("does not treat a stale status url as the status page", () => {
-    // 状态页字段已清空时，任何 data: 页都按真实页面看待
+  it("normalises a foreign data: page", () => {
+    // 外部 CDP 客户端（E2E、chrome-devtools-mcp）会把面板页导航到自己的临时页，
+    // 那同样不是"用户在看的那一页"。
+    expect(
+      displayUrlFor(
+        "data:text/html,%0A%20%20%3Cbutton%3EOK%3C/button%3E",
+        false,
+        null,
+      ),
+    ).toBe("about:blank");
+  });
+
+  it("no longer treats a stale data: url as a real page", () => {
+    // 旧语义是"状态页字段已清空 → data: 页按真实页面看待"，于是地址栏里会挂一整页
+    // 别人跑测试留下的 HTML。现在任何 data: 页都算内部页。
     expect(displayUrlFor("data:text/html;base64,OTHER", false, null)).toBe(
-      "data:text/html;base64,OTHER",
+      "about:blank",
     );
   });
 });

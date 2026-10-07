@@ -50,7 +50,10 @@ export class BrowserViewManager {
   private _blankPageBgColor = "#ffffff";
   private _isOnBlankPage = false;
   private _statusPageDataUrl: string | null = null;
-  /** 最近一次确认"用户真的在看"的页面（既不是空白页也不是我们的状态页）。 */
+  /**
+   * 最近一次确认"用户真的在看"的页面：任何内部 data: 页都不算 —— 空白页、我们的状态页，
+   * 以及外部 CDP 客户端（E2E、chrome-devtools-mcp）写进来的临时页。
+   */
   private _lastRealPageUrl: string | null = null;
   private _loadError: string | undefined;
 
@@ -94,13 +97,18 @@ export class BrowserViewManager {
       },
     );
     wc.on("did-navigate", (_event, url) => {
-      // Detect navigation away from the blank page
-      if (url !== this._blankPageUrl()) {
-        this._isOnBlankPage = false;
-      }
-      // 记住"用户真的在看"的那一页：空白页与我们的状态页都不算。
+      // 双向派生，不要只置 false：外部客户端把面板页导航回空白页之后（E2E 的归还、
+      // 手工 CDP 导航），只置 false 会让 setTheme 不再重绘空白页、拾取门禁失真。
+      this._isOnBlankPage = url === this._blankPageUrl();
+      // 记住"用户真的在看"的那一页：内部页都不算（空白页、我们的状态页，
+      // 以及任何别的 data: 页 —— 外部 CDP 客户端会把面板页当草稿纸用）。
+      // `!data:` 已经涵盖前两条比较，显式写出来只为读得清楚。
       // 跨调用保留——恢复要用的正是"上一条真实页面"，而它在被状态页顶掉之后就问不到了。
-      if (url !== this._blankPageUrl() && url !== this._statusPageDataUrl) {
+      if (
+        url !== this._blankPageUrl() &&
+        url !== this._statusPageDataUrl &&
+        !url.startsWith("data:")
+      ) {
         this._lastRealPageUrl = url;
       }
       this._pushStatus();
@@ -235,13 +243,17 @@ export class BrowserViewManager {
     this.view.setVisible(false);
     this._removeFromWindow();
     this.visible = false;
-    // 关面板时若还停在我们自己写的状态页上，就换回空白页：视图与已加载的页面是留着的，
-    // 不换的话下次打开面板会看到一屏永远转下去的 spinner（没有任何事件能结束它）。
+    // 关面板时若还停在内部页上（我们自己的状态页，或外部 CDP 客户端写进来的临时 data: 页），
+    // 就换回空白页：视图与已加载的页面是留着的，不换的话下次打开面板会看到一屏永远转下去的
+    // spinner（没有任何事件能结束它），或者一页别人跑测试留下的残留。
+    // 代价（有意接受）：agent 若自己把面板停在 data: 页（internal_browser_navigate 走 CDP，
+    // 非 file:// 一律 page.goto），也会在这里被收掉 —— 它该用 file:// 或 http(s)。
     // 面板关掉之后"用户原本在看哪一页"就不再是上下文了，别让下次失败把它拉回来。
     this._lastRealPageUrl = null;
+    const leftoverUrl = this.view.webContents.getURL();
     if (
-      this._statusPageDataUrl &&
-      this.view.webContents.getURL() === this._statusPageDataUrl
+      leftoverUrl.startsWith("data:") &&
+      leftoverUrl !== this._blankPageUrl()
     ) {
       this._statusPageDataUrl = null;
       this._isOnBlankPage = true;
@@ -959,9 +971,10 @@ export function installFileDownloadFallback(): void {
 }
 
 /**
- * 状态页与空白页都不该把内部 URL 暴露给渲染层：前者是主进程构造的
+ * 内部页都不该把内部 URL 暴露给渲染层：状态页与空白页是主进程构造的
  * `data:text/html;base64,…`（地址栏会显示一大串 base64，还会点亮"用外部浏览器打开"），
- * 后者是既有的空白页。两者统一归一化成 `about:blank`。
+ * 而**任何**别的 `data:` 页同样是内部内容——外部 CDP 客户端会把面板页导航到自己的临时页，
+ * 那也不是"用户在看的那一页"。一律归一化成 `about:blank`。
  */
 export function displayUrlFor(
   rawUrl: string,
@@ -970,6 +983,8 @@ export function displayUrlFor(
 ): string {
   if (isOnBlankPage) return "about:blank";
   if (statusPageUrl && rawUrl === statusPageUrl) return "about:blank";
+  // 空白页与状态页都是 data:，上面两条先命中；这条兜住其余内部页。
+  if (rawUrl.startsWith("data:")) return "about:blank";
   return rawUrl;
 }
 

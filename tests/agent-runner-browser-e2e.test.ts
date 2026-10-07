@@ -8,6 +8,10 @@
  *   flattenA11y() — produces @eN lines + _snapshotRefMap
  *   _resolveLocator() — resolves @eN / CSS / text → Playwright Locator
  *   _invalidateSnapshotRefs() — clears ref map on navigate
+ *
+ * They drive the developer's *live* app over its CDP port (9224): the page they
+ * borrow is the app's own browser panel, and every case navigates it away — so
+ * failures are visible on screen while the suite runs. afterAll puts it back.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { chromium, type Browser, type Page } from 'playwright-core';
@@ -16,6 +20,9 @@ const CDP_URL = 'http://127.0.0.1:9224';
 
 let browser: Browser;
 let page: Page;
+// The page we borrow from the running app — its internal browser panel.
+// Every test below navigates it away, so afterAll puts it back.
+let borrowedUrl = '';
 
 // ---- Mirror of AgentRunner._snapshotRefMap + flattenA11y ----
 
@@ -132,9 +139,22 @@ beforeAll(async () => {
         && !u.includes('app.asar');
     })!;
   if (!page) throw new Error('No usable browser page found via CDP');
+  borrowedUrl = page.url();
 });
 
 afterAll(async () => {
+  // 借的是应用自己的内置浏览器面板，不是一次性页面：跑完得还回去。
+  // 不还的话，面板会一直停在最后一条用例的临时页上（用户在应用里打开内置浏览器就看到它），
+  // 地址栏也会挂着一串 data: URL。
+  // `commit` 而不是 `domcontentloaded`：要还原的是"面板停在哪一页"，不必等它加载完；
+  // 失败要出声——静默失败正好会把这个 bug 放回来。
+  if (borrowedUrl) {
+    await page
+      .goto(borrowedUrl, { waitUntil: 'commit', timeout: 5000 })
+      .catch((error: unknown) => {
+        console.warn('borrowed browser page restore failed:', error);
+      });
+  }
   await browser?.close().catch(() => {});
 });
 
