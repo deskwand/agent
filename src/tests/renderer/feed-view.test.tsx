@@ -13,6 +13,7 @@ vi.mock("react-i18next", () => ({
 
 import { FeedView } from "../../renderer/components/FeedView";
 import { useAppStore } from "../../renderer/store";
+import { FEED_PHASES } from "../../shared/feed";
 import type { FeedItemWithMeta, FeedRunSummary } from "../../shared/feed";
 
 let container: HTMLDivElement;
@@ -318,6 +319,39 @@ describe("已启用且有条目", () => {
       ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(clearAll).toHaveBeenCalled();
+  });
+
+  it("生成中能显示「写摘录」这个阶段名", async () => {
+    setWindowApi(snapshot(true, [makeItem()], makeRun()));
+    await render();
+    await act(async () => {
+      useAppStore.setState({ feedGenPhase: "excerpt" });
+    });
+    expect(container.textContent).toContain("feed.phaseExcerpt");
+  });
+
+  it("每个阶段都与自己的文案一一对应（忘了加 case 的会静默显示成「配图」）", async () => {
+    setWindowApi(snapshot(true, [makeItem()], makeRun()));
+    await render();
+    const expected: Record<string, string> = {
+      signals: "feed.phaseSignals",
+      queries: "feed.phaseQueries",
+      collect: "feed.phaseCollect",
+      fetch: "feed.phaseFetch",
+      compose: "feed.phaseCompose",
+      excerpt: "feed.phaseExcerpt",
+      image: "feed.phaseImage",
+    };
+    for (const phase of FEED_PHASES) {
+      await act(async () => {
+        useAppStore.setState({ feedGenPhase: phase });
+      });
+      const matched = /feed\.phase[A-Za-z]+/.exec(container.textContent ?? "");
+      // 断言精确配对，而不是「互不相同」—— 只证明互不相同的话，把两个 case 的返回写反了照样绿
+      expect(matched?.[0] ?? null, `阶段 ${phase} 的文案`).toBe(
+        expected[phase],
+      );
+    }
   });
 });
 

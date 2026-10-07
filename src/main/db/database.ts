@@ -482,6 +482,7 @@ function initializeSchema(database: DatabaseSync): void {
       relevance     TEXT,
       body          TEXT,
       body_status   TEXT NOT NULL,
+      excerpt       TEXT,
       image_url     TEXT,
       image_file    TEXT,
       image_status  TEXT NOT NULL DEFAULT 'none',
@@ -497,6 +498,9 @@ function initializeSchema(database: DatabaseSync): void {
     database.exec(
       "CREATE INDEX IF NOT EXISTS idx_feed_items_created ON feed_items(created_at DESC)",
     );
+
+    // 动态已经发布过，用户的库里是旧结构：CREATE TABLE IF NOT EXISTS 不会改已存在的表
+    ensureColumn(database, "feed_items", "excerpt", "excerpt TEXT");
 
     database.exec(`
     CREATE TABLE IF NOT EXISTS feed_runs (
@@ -646,9 +650,9 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
   const feedItemInsert = rawDb.prepare(`
     INSERT INTO feed_items (
       id, run_id, title, summary, url, url_key, source_host, topic, relevance,
-      body, body_status, image_url, image_file, image_status, created_at,
+      body, body_status, excerpt, image_url, image_file, image_status, created_at,
       read_at, dismissed_at, unprocessed
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const feedItemGet = rawDb.prepare("SELECT * FROM feed_items WHERE id = ?");
   const feedItemListVisible = rawDb.prepare(
@@ -993,6 +997,7 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
           row.relevance,
           row.body,
           row.body_status,
+          row.excerpt,
           row.image_url,
           row.image_file,
           row.image_status,

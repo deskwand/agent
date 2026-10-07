@@ -8,7 +8,14 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { FeedReaderPane } from "../../renderer/components/FeedReaderPane";
-import type { FeedItemWithMeta } from "../../shared/feed";
+import type { FeedBodyPayload, FeedItemWithMeta } from "../../shared/feed";
+
+/** 有本地化摘录的那条路径 */
+const withExcerpt: FeedBodyPayload = {
+  body: "# 抓来的 markdown",
+  bodyStatus: "ok",
+  excerpt: "这是本地化摘录。",
+};
 
 const item: FeedItemWithMeta = {
   id: "i1",
@@ -53,7 +60,7 @@ async function render(
     root.render(
       React.createElement(FeedReaderPane, {
         item,
-        body: { body: "正文第一段。", bodyStatus: "ok" },
+        body: { body: "正文第一段。", bodyStatus: "ok", excerpt: null },
         onOpenInBrowser: noop,
         ...props,
       } as React.ComponentProps<typeof FeedReaderPane>),
@@ -78,18 +85,77 @@ describe("FeedReaderPane", () => {
       '[data-testid="feed-body"]',
     ) as HTMLElement;
     expect(body.style.maxWidth).toBe("34em");
-    expect(Number.parseFloat(body.style.lineHeight)).toBeGreaterThanOrEqual(
-      1.75,
-    );
+    // 行高不再写在元素上，改由 .prose-feed 规则给（数值由 feed-prose.test.ts 守）
+    expect(body.className).toContain("prose-feed");
+  });
+
+  it("有本地化摘录时渲染摘录，元信息行与底部两处都是「· 本地化」", async () => {
+    await render({ body: withExcerpt });
+    expect(container.textContent).toContain("这是本地化摘录。");
+    expect(container.querySelector('[data-testid="feed-raw-note"]')).toBeNull();
+    // 两处标签都得变（元信息行 + 底部）—— 只改一处会在同一屏自相矛盾
+    expect(
+      (container.textContent?.match(/feed\.readerExcerptLocalized/g) ?? [])
+        .length,
+    ).toBe(2);
+  });
+
+  it("没有摘录时渲染抓来的正文，并显示一行说明（标签退回「正文摘录」）", async () => {
+    await render();
+    expect(
+      container.querySelector('[data-testid="feed-raw-note"]'),
+    ).toBeTruthy();
+    expect(container.textContent).toContain("feed.readerRawFallback");
+    expect(
+      (container.textContent?.match(/feed\.readerExcerptLocalized/g) ?? [])
+        .length,
+    ).toBe(0);
+    // 不加 (?![A-Za-z])：底部那个标签后面紧跟着按钮的 key，加了会把那一处排掉
+    expect(
+      (container.textContent?.match(/feed\.readerExcerpt/g) ?? []).length,
+    ).toBe(2);
+  });
+
+  it("markdown 标记不再以字面出现（截图那个 bug 的回归锁）", async () => {
+    await render({
+      body: {
+        body: "## 小标题\n\n**粗体**内容",
+        bodyStatus: "ok",
+        excerpt: null,
+      },
+    });
+    const text = container.textContent ?? "";
+    expect(text).not.toContain("##");
+    expect(text).not.toContain("**");
+    // 只断言 strong（`##` 变成的标题元素与面板自己的标题 h2 撞车，那个断言等于没断言）
+    expect(container.querySelector("strong")).toBeTruthy();
+  });
+
+  it("摘录里的 $ 不会被当成公式吃掉", async () => {
+    await render({
+      body: {
+        body: null,
+        bodyStatus: "ok",
+        excerpt: "标准版 $95.4/百万字符，最新版 $139.92/百万字符。",
+      },
+    });
+    const text = container.textContent ?? "";
+    expect(text).toContain("$95.4");
+    expect(text).toContain("$139.92");
+    expect(container.querySelector(".katex")).toBeNull();
   });
 
   it("snippet_only 时给出「只抓到片段」提示", async () => {
-    await render({ body: { body: "片段", bodyStatus: "snippet_only" } });
+    await render({
+      body: { body: "片段", bodyStatus: "snippet_only", excerpt: null },
+    });
     expect(container.textContent).toContain("feed.readerSnippetOnly");
   });
 
   it("没有正文时只显示摘要，不显示空正文块", async () => {
-    await render({ body: { body: null, bodyStatus: "snippet_only" } });
+    await render({
+      body: { body: null, bodyStatus: "snippet_only", excerpt: null },
+    });
     expect(container.querySelector('[data-testid="feed-body"]')).toBeNull();
   });
 

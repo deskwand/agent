@@ -20,6 +20,8 @@ function phaseKey(phase: string): string {
       return "feed.phaseFetch";
     case "compose":
       return "feed.phaseCompose";
+    case "excerpt":
+      return "feed.phaseExcerpt";
     default:
       return "feed.phaseImage";
   }

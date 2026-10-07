@@ -26,6 +26,7 @@ export interface FeedItemDraft {
   summary: string | null;
   topic: string | null;
   relevance: string | null;
+  excerpt: string | null;
   unprocessed: number;
 }
 
@@ -115,9 +116,7 @@ export function parseComposeResponse(
 }
 
 /** 两次都拿不到合法 JSON 时的确定性兜底：候选前 8 条原样入库并标记未加工。 */
-function fallbackDrafts(
-  candidates: FeedFetchedCandidate[],
-): FeedItemDraft[] {
+function fallbackDrafts(candidates: FeedFetchedCandidate[]): FeedItemDraft[] {
   return candidates.slice(0, MAX_ITEMS).map((candidate) => ({
     candidate,
     title: candidate.title,
@@ -125,6 +124,7 @@ function fallbackDrafts(
     topic: candidate.topic,
     relevance: candidate.reason,
     unprocessed: 1,
+    excerpt: null,
   }));
 }
 
@@ -156,6 +156,7 @@ export async function composeItems(input: {
           topic: item.topic || candidate.topic,
           relevance: item.relevance || candidate.reason,
           unprocessed: 0,
+          excerpt: null,
         };
       });
     } catch (error) {

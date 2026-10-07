@@ -33,6 +33,7 @@ const modelReply = JSON.stringify({
 
 function makeService(overrides: Record<string, unknown> = {}) {
   let counter = 0;
+  let modelCall = 0;
   const phases: FeedPhase[] = [];
   const events: unknown[] = [];
   const service = new FeedService({
@@ -45,7 +46,11 @@ function makeService(overrides: Record<string, unknown> = {}) {
       readUserMessages: () => [],
     }),
     locale: () => "zh",
-    complete: vi.fn(async () => modelReply),
+    // 1 = 挑查询词，2 = 挑条目（两者共用 modelReply 这份 JSON），3 起 = 逐条写摘录
+    complete: vi.fn(async () => {
+      modelCall += 1;
+      return modelCall <= 2 ? modelReply : `第 ${modelCall} 段本地化摘录。`;
+    }),
     searchWeb: vi.fn(async () => [
       {
         query: "tokio",
@@ -94,12 +99,17 @@ describe("FeedService.refresh", () => {
     expect(db.feedItems.unreadCount()).toBe(1);
     expect(db.feedRuns.latest()?.status).toBe("ok");
     expect(db.feedRuns.latest()?.item_count).toBe(1);
+    // 列表快照不能带正文：feed.list() 的载荷不能因此变大
+    const snapshot = service.list();
+    expect(snapshot.items[0]).not.toHaveProperty("body");
+    expect(snapshot.items[0]).not.toHaveProperty("excerpt");
     expect(phases).toEqual([
       "signals",
       "queries",
       "collect",
       "fetch",
       "compose",
+      "excerpt",
       "image",
     ]);
   });
@@ -318,6 +328,50 @@ describe("FeedService 读与改", () => {
     await service.refresh("schedule");
     expect(service.consecutiveFailures()).toBe(3);
     expect(service.hasExceededFailureBudget()).toBe(true);
+  });
+
+  it("入库行带本地化摘录，getBody 也把它交给右栏", async () => {
+    const { service } = makeService();
+    await service.refresh("manual");
+    const id = db.feedItems.listVisible(10)[0]!.id;
+    expect(db.feedItems.get(id)?.excerpt).toBe("第 3 段本地化摘录。");
+    // 右栏读的是 getBody：这里漏了 excerpt，界面会永远静默回退到抓来的正文
+    const payload = service.getBody(id);
+    expect(payload?.excerpt).toBe("第 3 段本地化摘录。");
+    expect(payload?.body).toBeTruthy();
+  });
+
+  it("摘录整批失败时，条目照常入库且 run 仍是 ok", async () => {
+    let modelCall = 0;
+    const complete = vi.fn(async () => {
+      modelCall += 1;
+      // 前两次（挑查询词、挑条目）正常；之后每次都抛：模型挂了，但条目已经挑出来了
+      if (modelCall > 2) throw new Error("excerpt model down");
+      return modelReply;
+    });
+    const { service } = makeService({ complete });
+    const result = await service.refresh("manual");
+    expect(result.started).toBe(true);
+    // refresh() 故意不外泄 status（feed-service.ts:119-121 把它剥掉了），
+    // 所以状态要从 run 行上读
+    expect(db.feedRuns.latest()?.status).toBe("ok");
+    expect(db.feedItems.countAll()).toBe(1);
+    expect(db.feedItems.listVisible(10)[0]?.excerpt).toBeNull();
+  });
+
+  it("compose 兜底产物不触发摘录调用", async () => {
+    let modelCall = 0;
+    const complete = vi.fn(async () => {
+      modelCall += 1;
+      // 1 = 挑查询词；2、3 = 挑条目的两次尝试都返回不可解析的文本 → 走 fallbackDrafts
+      return modelCall === 1 ? modelReply : "not json at all";
+    });
+    const { service } = makeService({ complete });
+    await service.refresh("manual");
+    const row = db.feedItems.listVisible(10)[0];
+    expect(row?.unprocessed).toBe(1);
+    expect(row?.excerpt).toBeNull();
+    expect(complete).toHaveBeenCalledTimes(3); // 查询词 1 次 + compose 2 次，摘录 0 次
   });
 });
 

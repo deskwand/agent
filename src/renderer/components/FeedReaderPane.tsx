@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import type { FeedBodyPayload, FeedItemWithMeta } from "../../shared/feed";
+import { MessageMarkdown } from "./MessageMarkdown";
 
 export interface FeedReaderPaneProps {
   item: FeedItemWithMeta;
@@ -39,7 +40,20 @@ export function FeedReaderPane({
   onOpenInBrowser,
 }: FeedReaderPaneProps): JSX.Element {
   const { t } = useTranslation();
-  const text = body?.body ?? null;
+  const excerpt = body?.excerpt ?? null;
+  const raw = body?.body ?? null;
+  // 两处标签（元信息行与底部）用同一个值：只改一处会在同一屏上自相矛盾。
+  // body 还没到时（刚点开、正在取）先不显示：否则会先写「正文摘录」再翻成「· 本地化」
+  const excerptLabel =
+    body === null
+      ? null
+      : excerpt
+        ? t("feed.readerExcerptLocalized")
+        : t("feed.readerExcerpt");
+  // 摘录是「纯文字」契约，而 MessageMarkdown 带 remark-math：一段里出现两个 $
+  // （价格类内容很常见）会被当成公式、把文字吃掉。markdown 里 \$ 就是字面 $，
+  // 渲染输出不留痕迹。回退态的 body 不转义 —— 那是页面 markdown，里面可能真有数学。
+  const rendered = excerpt ? excerpt.replace(/\$/g, "\\$") : (raw ?? "");
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-background-secondary px-5 py-3.5">
@@ -74,7 +88,7 @@ export function FeedReaderPane({
           })}
         </span>
         <span className="px-1.5 opacity-45">·</span>
-        <span>{t("feed.readerExcerpt")}</span>
+        <span>{excerptLabel}</span>
       </div>
 
       {item.summary ? (
@@ -101,22 +115,26 @@ export function FeedReaderPane({
         </div>
       ) : null}
 
-      {text ? (
+      {excerpt || raw ? (
         <div
           data-testid="feed-body"
-          className="text-base text-text-primary"
-          style={{ maxWidth: "34em", lineHeight: 1.8 }}
+          className="prose-feed text-base text-text-primary"
+          style={{ maxWidth: "34em" }}
         >
-          {text.split(/\n{2,}/).map((paragraph, index) => (
-            <p key={index} style={{ margin: "0 0 1.8em" }}>
-              {paragraph}
+          {excerpt ? null : (
+            <p
+              data-testid="feed-raw-note"
+              className="mb-2 text-xs text-text-muted"
+            >
+              {t("feed.readerRawFallback")}
             </p>
-          ))}
+          )}
+          <MessageMarkdown normalizedText={rendered} />
         </div>
       ) : null}
 
       <div className="mt-2 flex items-center justify-between gap-2.5 border-t border-border-subtle pt-2 text-xs leading-[1.75] text-text-muted">
-        <span>{t("feed.readerExcerpt")}</span>
+        <span>{excerptLabel}</span>
         <button
           type="button"
           data-testid="feed-open-browser"

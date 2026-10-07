@@ -14,6 +14,7 @@ export const FEED_PHASES = [
   "collect",
   "fetch",
   "compose",
+  "excerpt",
   "image",
 ] as const;
 
@@ -31,6 +32,8 @@ export interface FeedItemRow {
   relevance: string | null;
   body: string | null;
   body_status: FeedBodyStatus;
+  /** 模型写的本地化摘录；NULL = 写失败或 compose 兜底产物。 */
+  excerpt: string | null;
   image_url: string | null;
   image_file: string | null;
   image_status: FeedImageStatus;
@@ -73,8 +76,8 @@ export interface FeedRunSummary {
   item_count: number;
 }
 
-/** 对外（IPC / store / 组件）的条目：**不带 body**，带主进程签好的配图 URL。 */
-export type FeedItemWithMeta = Omit<FeedItemRow, "body"> & {
+/** 对外（IPC / store / 组件）的条目：**不带 body 与 excerpt**，带主进程签好的配图 URL。 */
+export type FeedItemWithMeta = Omit<FeedItemRow, "body" | "excerpt"> & {
   imageUrl: string | null;
 };
 
@@ -111,4 +114,6 @@ export function parseRunReasons(queries: string | null): FeedRunReason[] {
 export interface FeedBodyPayload {
   body: string | null;
   bodyStatus: FeedBodyStatus;
+  /** 本地化摘录；为 null 时右栏回退显示 body。 */
+  excerpt: string | null;
 }

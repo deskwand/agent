@@ -6,7 +6,6 @@
  */
 import type {
   DatabaseInstance,
-  FeedBodyStatus,
   FeedItemRow,
   FeedRunStatus,
   FeedTrigger,
@@ -22,13 +21,18 @@ import { planQueries, type FeedComplete } from "./feed-queries";
 import { collectCandidates, normalizeUrlKey } from "./feed-collect";
 import { fetchCandidateBodies, type FeedFetchPage } from "./feed-fetch";
 import { composeItems } from "./feed-compose";
+import { writeExcerpts } from "./feed-excerpt";
 import {
   downloadFeedImage,
   pruneOrphanImages,
   type FeedImageDownloader,
 } from "./feed-image";
 import { buildFeedImageUrl } from "./feed-image-protocol";
-import type { FeedPhase, FeedSnapshot } from "../../shared/feed";
+import type {
+  FeedBodyPayload,
+  FeedPhase,
+  FeedSnapshot,
+} from "../../shared/feed";
 import { logError, logWarn } from "../utils/logger";
 
 export const REFRESH_THROTTLE_MS = 10 * 60 * 1000;
@@ -150,7 +154,10 @@ export class FeedService {
       this.finish(runId, "failed", String(error), 0, 0);
       return { started: false, reason: "skipped", status: "failed" };
     }
-    if (signals.interests.length === 0 && signals.recentQuestions.length === 0) {
+    if (
+      signals.interests.length === 0 &&
+      signals.recentQuestions.length === 0
+    ) {
       // 没有信号不是失败：删掉刚写下的 run 行，保持「从未成功过」的语义
       this.deps.db.feedRuns.delete(runId);
       // 这一条没有留下任何 run 行（信号为空不是失败）
@@ -208,16 +215,23 @@ export class FeedService {
     });
 
     this.deps.onPhase("compose");
-    const drafts = await composeItems({
+    const composed = await composeItems({
       candidates: fetched.filter((candidate) => candidate.body !== null),
       locale: this.deps.locale(),
       complete: this.deps.complete,
     });
 
-    if (drafts.length === 0) {
+    if (composed.length === 0) {
       this.finish(runId, "partial", null, candidates.length, 0);
       return { started: false, status: "partial" };
     }
+
+    this.deps.onPhase("excerpt");
+    const drafts = await writeExcerpts({
+      drafts: composed,
+      locale: this.deps.locale(),
+      complete: this.deps.complete,
+    });
 
     this.deps.onPhase("image");
     const inserted: FeedItemRow[] = [];
@@ -235,6 +249,7 @@ export class FeedService {
         relevance: draft.relevance,
         body: draft.candidate.body,
         body_status: draft.candidate.bodyStatus,
+        excerpt: draft.excerpt,
         image_url: draft.candidate.imageUrl ?? null,
         image_file: image?.fileName ?? null,
         image_status: image
@@ -316,13 +331,11 @@ export class FeedService {
     const items = this.deps.db.feedItems
       .listVisible(MAX_ITEMS_KEPT)
       .map((row) => {
-        const { body: _body, ...rest } = row;
+        const { body: _body, excerpt: _excerpt, ...rest } = row;
         // DB 里存的是文件名，对外给签名 URL：渲染层无法自造 URL
         return {
           ...rest,
-          imageUrl: row.image_file
-            ? buildFeedImageUrl(row.image_file)
-            : null,
+          imageUrl: row.image_file ? buildFeedImageUrl(row.image_file) : null,
         };
       });
     return {
@@ -333,12 +346,14 @@ export class FeedService {
     };
   }
 
-  getBody(
-    id: string,
-  ): { body: string | null; bodyStatus: FeedBodyStatus } | null {
+  getBody(id: string): FeedBodyPayload | null {
     const row = this.deps.db.feedItems.get(id);
     if (!row) return null;
-    return { body: row.body, bodyStatus: row.body_status };
+    return {
+      body: row.body,
+      bodyStatus: row.body_status,
+      excerpt: row.excerpt,
+    };
   }
 
   markRead(id: string): number {

@@ -1631,3 +1631,23 @@
 ::highlight(tts) {
   background-color: color-mix(in oklab, var(--color-accent) 22%, transparent);
 }
+
+/* 动态右栏正文：与 chat 共用渲染器（MessageMarkdown），但中文密排的行高与段距
+   按设计 §8.8 放大。胜负由特异性决定 —— .prose-feed .prose-chat 是 (0,2,0)，
+   .prose-chat 是 (0,1,0)；Tailwind 在产物里会把 @layer 拍平（见本文件 1607 行
+   那段注释），所以这里不靠层级，靠多一个类。 */
+.prose-feed .prose-chat {
+  line-height: 1.8;
+  letter-spacing: 0.01em;
+}
+
+.prose-feed .prose-chat p {
+  margin-bottom: 1.8em;
+}
+
+/* 不补这条，正文与底部之间会多出 1.8em 的空隙：
+   上面那条 `.prose-feed .prose-chat p`（0,2,1）与 `.prose-chat p:last-child`
+   （0,2,1）同特异性且写在后面，会把最后一段的 0 覆盖回 1.8em */
+.prose-feed .prose-chat p:last-child {
+  margin-bottom: 0;
+}

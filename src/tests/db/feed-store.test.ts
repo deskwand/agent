@@ -2,6 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 import {
   closeDatabase,
@@ -27,6 +28,7 @@ function item(overrides: Partial<FeedItemRow> = {}): FeedItemRow {
     relevance: "理由",
     body: null,
     body_status: "snippet_only",
+    excerpt: null,
     image_url: null,
     image_file: null,
     image_status: "none",
@@ -143,6 +145,53 @@ describe("feed_items", () => {
     db.feedItems.insert(item({ id: "a" }));
     db.feedItems.deleteAll();
     expect(db.feedItems.countAll()).toBe(0);
+  });
+
+  it("excerpt 列能写能读，且与 body 互不干扰", () => {
+    db.feedItems.insert(
+      item({ body: "# 抓来的 markdown", excerpt: "本地化之后的摘录。" }),
+    );
+    const row = db.feedItems.get("i1");
+    expect(row?.excerpt).toBe("本地化之后的摘录。");
+    expect(row?.body).toBe("# 抓来的 markdown");
+  });
+
+  it("旧库（feed_items 没有 excerpt 列）启动后自动补列，并能正常入库", () => {
+    // 先放掉 beforeEach 建的那个库，手写一张「旧结构」的表，再走真实的初始化路径
+    closeDatabase();
+    const legacyPath = join(dir, "legacy.db");
+    const raw = new DatabaseSync(legacyPath);
+    raw.exec(`
+      CREATE TABLE feed_items (
+        id            TEXT PRIMARY KEY,
+        run_id        TEXT NOT NULL,
+        title         TEXT NOT NULL,
+        summary       TEXT,
+        url           TEXT NOT NULL,
+        url_key       TEXT NOT NULL,
+        source_host   TEXT NOT NULL,
+        topic         TEXT,
+        relevance     TEXT,
+        body          TEXT,
+        body_status   TEXT NOT NULL,
+        image_url     TEXT,
+        image_file    TEXT,
+        image_status  TEXT NOT NULL DEFAULT 'none',
+        created_at    INTEGER NOT NULL,
+        read_at       INTEGER,
+        dismissed_at  INTEGER,
+        unprocessed   INTEGER NOT NULL DEFAULT 0
+      )
+    `);
+    raw.close();
+
+    db = initDatabase(legacyPath);
+
+    // 迁移真的生效的证据不是「列存在」，而是「补完列之后写入能跑通」
+    expect(() =>
+      db.feedItems.insert(item({ excerpt: "补列之后写的" })),
+    ).not.toThrow();
+    expect(db.feedItems.get("i1")?.excerpt).toBe("补列之后写的");
   });
 });
 
