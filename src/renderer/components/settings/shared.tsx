@@ -1,7 +1,15 @@
 // Shared types, constants, and components used across settings tab files.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
+import {
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  useFloating,
+} from "@floating-ui/react";
 import type { TFunction } from "i18next";
 import {
   MENU_ITEM_CLASS,
@@ -284,17 +292,34 @@ export function SettingsSelect<T extends string>({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef<HTMLSpanElement>(null);
+  /**
+   * 面板**必须挂到 body**（portal），不能留在行里绝对定位：设置卡是
+   * `overflow-hidden rounded-container` —— 为了圆角它把溢出裁掉了，面板会只露出第一项。
+   *
+   * 定位用 floating-ui 的默认 absolute 策略 + autoUpdate，跟 `Tooltip` 里实测过的结论
+   * 一致：**不要用 `fixed`** —— 祖先带 transform 时（本站点动画会动态写 transform）
+   * fixed 的包含块会变成那个祖先，而 floating-ui 给的是视口坐标，会整体偏移。
+   * portal 同时也让祖先的 overflow: hidden 再也裁不到它。
+   */
+  const { refs, floatingStyles } = useFloating({
+    open,
+    placement: "bottom-end",
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(6), flip(), shift({ padding: 8 })],
+  });
 
   useEffect(() => {
     if (!open) return;
     const handleOutsideClick = (event: MouseEvent) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        setOpen(false);
-      }
+      const target = event.target as Node;
+      // 面板在 portal 里、不在触发按钮的子树里 —— 两个都要判，
+      // 否则点选项会先被当成"点了外面"，菜单还没触发 onChange 就关了。
+      const reference = refs.reference.current;
+      const floating = refs.floating.current;
+      if (reference instanceof HTMLElement && reference.contains(target))
+        return;
+      if (floating instanceof HTMLElement && floating.contains(target)) return;
+      setOpen(false);
     };
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
@@ -305,13 +330,14 @@ export function SettingsSelect<T extends string>({
       document.removeEventListener("mousedown", handleOutsideClick);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [open]);
+  }, [open, refs.reference, refs.floating]);
 
   const current = options.find((option) => option.value === value);
 
   return (
-    <span ref={containerRef} className="relative inline-flex items-center">
+    <>
       <button
+        ref={refs.setReference}
         type="button"
         data-testid={testId}
         disabled={disabled}
@@ -329,38 +355,44 @@ export function SettingsSelect<T extends string>({
         />
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          aria-label={label}
-          className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-down absolute top-[calc(100%_+_6px)] right-0 z-30 min-w-full`}
-        >
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={option.value === value}
-              data-testid={
-                testId ? `${testId}-option-${option.value}` : undefined
-              }
-              onClick={() => {
-                setOpen(false);
-                if (option.value !== value) onChange(option.value);
-              }}
-              className={`${MENU_ITEM_CLASS} ${
-                option.value === value
-                  ? MENU_ITEM_SELECTED_CLASS
-                  : MENU_ITEM_DEFAULT_CLASS
-              }`}
-            >
-              <span className="truncate">{option.label}</span>
-              {option.value === value && <Check className="h-4 w-4 shrink-0" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </span>
+      {open &&
+        createPortal(
+          <div
+            ref={refs.setFloating}
+            style={floatingStyles}
+            role="menu"
+            aria-label={label}
+            className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-down z-50 max-h-64 overflow-y-auto`}
+          >
+            {options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={option.value === value}
+                data-testid={
+                  testId ? `${testId}-option-${option.value}` : undefined
+                }
+                onClick={() => {
+                  setOpen(false);
+                  if (option.value !== value) onChange(option.value);
+                }}
+                className={`${MENU_ITEM_CLASS} ${
+                  option.value === value
+                    ? MENU_ITEM_SELECTED_CLASS
+                    : MENU_ITEM_DEFAULT_CLASS
+                }`}
+              >
+                <span className="truncate">{option.label}</span>
+                {option.value === value && (
+                  <Check className="h-4 w-4 shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

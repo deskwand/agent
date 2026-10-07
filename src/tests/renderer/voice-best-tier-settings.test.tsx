@@ -280,7 +280,7 @@ describe("最佳音质档", () => {
     ]);
     // 方言后缀来自元数据，不是我们编的中文名 —— 在菜单里才看得到
     await openMenu(container, "voice-engine-voice");
-    expect(container.textContent).toContain("sichuan_dialect");
+    expect(document.body.textContent).toContain("sichuan_dialect");
     await openMenu(container, "voice-engine-voice");
 
     await pickOption(container, "voice-engine-voice", "dylan");
@@ -364,6 +364,23 @@ describe("试听", () => {
     });
     expect(api.tts.retryEngine).toHaveBeenCalledOnce();
     expect(api.tts.installEngine).not.toHaveBeenCalled();
+  });
+
+  it("面板挂在 body 上，不在卡片里（卡片是 overflow-hidden，留在行里会被裁）", async () => {
+    await mount({ tone: "best", engine: ENGINE_READY });
+
+    const before = document.body.querySelectorAll('[role="menu"]').length;
+    await openMenu(container, "voice-engine-voice");
+
+    // 关键：面板**不在**行容器内 —— 在的话会被设置卡的圆角裁剪裁掉（截图里只露第一项）
+    expect(container.querySelector('[role="menu"]')).toBeNull();
+    expect(document.body.querySelectorAll('[role="menu"]').length).toBe(
+      before + 1,
+    );
+    // 九个音色都渲染出来了，不是被裁掉的那种"只有第一个"
+    expect(optionValues(container, "voice-engine-voice")).toHaveLength(9);
+
+    await openMenu(container, "voice-engine-voice"); // 关掉
   });
 
   it("试听按钮三态同宽：点一下不该把整行推得左右跳", async () => {
