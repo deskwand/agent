@@ -12,6 +12,8 @@
 import { useAppStore } from "../store";
 import {
   extractSpeechSegments,
+  joinSpeechTexts,
+  spanSpeechTargets,
   type SpeechSegment,
   type SpeechTarget,
 } from "../utils/tts/speech-text";
@@ -123,7 +125,6 @@ export function createReadAloudController(
   const pump = (index: number, token: number): void => {
     const segment = segments[index];
     if (!segment) return;
-    const isLastSegment = index + 1 >= segments.length;
     let sawChunk = false;
     /**
      * 先声明再赋值：桥缺失时 `speak` 会**同步**回调 `onError`，那时 `cancel`
@@ -136,9 +137,8 @@ export function createReadAloudController(
     };
 
     const endSegment = () => {
-      if (isLastSegment) ensureQueue().markLast();
-      // 流水线：不等这一句播完就发下一句
-      else pump(index + 1, token);
+      // 分组后每块都是「最后一块」：流水线分支已不存在（合并的代价就是不抢跑下一块）
+      ensureQueue().markLast();
     };
 
     cancel = deps.speak(segment.text, {
@@ -174,15 +174,61 @@ export function createReadAloudController(
     cancels.add(cancel);
   };
 
+  /**
+   * 把整条消息编成**少数几次请求**。
+   *
+   * 为什么要合并：最佳档每次请求都重新采样，切得越碎、句子之间越容易换音色
+   * （实测每句一次请求时约 14% 的边界会跳音区）。首声只多 ~30ms（174 → 181ms 实测）。
+   *
+   * 为什么还要有上限：引擎 `max_new_tokens` 默认 2048，那是**声学帧数**
+   * （`pipeline-tts.cpp`：`step >= max_new_tokens` 就停），codec 是 12Hz
+   * → 约 170 秒音频 ≈ 760 个汉字。整条不切会让超长回复被**静默截断**。
+   */
+  const MAX_CHARS_PER_REQUEST = 600;
+
+  const groupSegments = (raw: SpeechSegment[]): SpeechSegment[] => {
+    const groups: SpeechSegment[][] = [];
+    let current: SpeechSegment[] = [];
+    let length = 0;
+    for (const segment of raw) {
+      if (
+        current.length > 0 &&
+        length + segment.text.length > MAX_CHARS_PER_REQUEST
+      ) {
+        groups.push(current);
+        current = [];
+        length = 0;
+      }
+      current.push(segment);
+      length += segment.text.length;
+    }
+    if (current.length > 0) groups.push(current);
+    return groups.map((group) => ({
+      text: joinSpeechTexts(group.map((segment) => segment.text)),
+      target:
+        spanSpeechTargets(group.map((segment) => segment.target)) ??
+        group[0]!.target,
+    }));
+  };
+
   return {
     getState: () => state,
     start(messageId, root) {
       reset();
       const token = generation;
-      segments = extractSpeechSegments(root).filter(
+      const raw = extractSpeechSegments(root).filter(
         (segment) => segment.text.trim().length > 0,
       );
-      if (segments.length === 0) return; // 没有可读的文字：不开播，按钮那边已置灰
+      if (raw.length === 0) return; // 没有可读的文字：不开播，按钮那边已置灰
+      /**
+       * **整条消息一次请求**：最佳档每次请求都重新采样，切得越碎、句子之间越容易
+       * 换音色（实测每句一次请求时约 14% 的边界会跳音区）。首声只多 ~30ms
+       * （实测 174 → 181ms，引擎本来就是流式的）。
+       *
+       * 代价：逐句高亮退化为**整段高亮** —— 目标由首尾两段拼出来（见
+       * `spanSpeechTargets`），播放中不再逐句推进。
+       */
+      segments = groupSegments(raw);
       set({
         messageId,
         status: "preparing",

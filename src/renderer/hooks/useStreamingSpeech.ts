@@ -12,6 +12,7 @@
  *     `queue.markLast()` —— 队列靠它区分「读完」与「合成还没跟上」。
  */
 import type { AudioQueue } from "../utils/tts/audio-queue";
+import { joinSpeechTexts } from "../utils/tts/speech-text";
 
 /** 首句之后每几句合成一次。4 是实测权衡：边界少 4 倍，块的时长仍在几秒级。 */
 const GROUP_SENTENCES = 4;
@@ -176,10 +177,6 @@ export function createStreamingSpeech(
     cancels.add(cancel);
   };
 
-  /** 英文句子拼在一起要留空格，中文不要。 */
-  const joinForSpeech = (a: string, b: string): string =>
-    /[A-Za-z0-9]$/.test(a) && /^[A-Za-z0-9]/.test(b) ? `${a} ${b}` : a + b;
-
   const flushPending = () => {
     if (!pending) return;
     const text = pending.text;
@@ -194,7 +191,7 @@ export function createStreamingSpeech(
     if (!pending) {
       pending = { text, count: 1 };
     } else {
-      pending.text = joinForSpeech(pending.text, text);
+      pending.text = joinSpeechTexts([pending.text, text]);
       pending.count += 1;
     }
     // 第一句立刻发（首声），之后攒够再发 —— 边界越少，换音色的机会越少

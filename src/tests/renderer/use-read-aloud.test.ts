@@ -77,16 +77,19 @@ describe("朗读会话", () => {
     expect(harness.enqueued).toHaveLength(1);
   });
 
-  it("第一句还在播时就请求第二句（流水线）", async () => {
+  it("整条消息一次请求：一次合成覆盖全部句子（换音色的边界归零）", async () => {
     const harness = fakeDeps();
     const controller = createReadAloudController(harness.deps);
 
     controller.start("m1", messageRoot());
+
+    // 关键：只发一次，且文本是拼好的整条 —— 最佳档每次请求都重新采样，
+    // 请求越少、句子之间换音色的机会越少。
+    expect(harness.requested).toEqual(["第一句。第二句。第三句。"]);
+
     harness.streamAt(0).onChunk(chunk());
     harness.streamAt(0).onDone();
-    await vi.waitFor(() => expect(harness.requested).toHaveLength(2));
-    // 第二句还没播（第一句没结束），但已经发出去了
-    expect(harness.enqueued).toHaveLength(1);
+    await vi.waitFor(() => expect(harness.enqueued).toHaveLength(1));
   });
 
   it("全部播完回到 idle 并清掉消息归属", async () => {
@@ -94,14 +97,11 @@ describe("朗读会话", () => {
     const controller = createReadAloudController(harness.deps);
     controller.start("m1", messageRoot());
 
-    for (let i = 0; i < 3; i++) {
-      harness.streamAt(i).onChunk(chunk());
-      await vi.waitFor(() =>
-        expect(harness.enqueued.length).toBeGreaterThan(i),
-      );
-      harness.streamAt(i).onDone();
-    }
-    expect(harness.markLastCalls()).toBe(1); // 只有最后一段打标
+    // 现在是整条一次请求：一条流走完就该收尾
+    harness.streamAt(0).onChunk(chunk());
+    await vi.waitFor(() => expect(harness.enqueued.length).toBeGreaterThan(0));
+    harness.streamAt(0).onDone();
+    expect(harness.markLastCalls()).toBe(1); // 整条打一次标
     harness.drain();
     expect(controller.getState().status).toBe("idle");
     expect(controller.getState().messageId).toBeNull();
@@ -143,7 +143,7 @@ describe("朗读会话", () => {
     harness.streamAt(0).onChunk(chunk());
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(harness.enqueued).toHaveLength(0);
-    expect(harness.cancelled).toEqual(["第一句。"]); // 切换时要取消在飞的流
+    expect(harness.cancelled).toEqual(["第一句。第二句。第三句。"]); // 切换时取消在飞的流（现在是整条）
     harness.drain(); // 清掉 B 之前那段旧队列
     harness.enqueued.length = 0;
 

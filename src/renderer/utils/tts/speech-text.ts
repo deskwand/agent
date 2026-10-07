@@ -247,3 +247,33 @@ export function extractSpeechSegments(root: HTMLElement): SpeechSegment[] {
   flush();
   return segments;
 }
+
+/**
+ * 把多段文字拼成一次合成用的文本。**规则只在这里定义**：英文句子之间补空格，
+ * 中文不补（中文补空格会在合成里多出停顿）。
+ */
+export function joinSpeechTexts(parts: readonly string[]): string {
+  return parts.reduce((acc, next) =>
+    /[A-Za-z0-9]$/.test(acc) && /^[A-Za-z0-9]/.test(next)
+      ? `${acc} ${next}`
+      : acc + next,
+  );
+}
+
+/** 整条消息的高亮目标：range 两端相接；block 类型退回第一条（跨块合并意义不大）。 */
+export function spanSpeechTargets(
+  targets: readonly SpeechTarget[],
+): SpeechTarget | undefined {
+  const first = targets[0];
+  const last = targets[targets.length - 1];
+  if (first?.kind === "range" && last?.kind === "range") {
+    return {
+      kind: "range",
+      startNode: first.startNode,
+      startOffset: first.startOffset,
+      endNode: last.endNode,
+      endOffset: last.endOffset,
+    };
+  }
+  return first;
+}
