@@ -70,13 +70,6 @@ function captionRegion(): HTMLElement {
   return el;
 }
 
-/** 文字本身在里层的 span 上（外层只管横滚）。 */
-function captionSpan(): HTMLElement {
-  const el = captionRegion().querySelector<HTMLElement>("span");
-  if (!el) throw new Error("文字行没渲染出来");
-  return el;
-}
-
 describe("VoiceModeOverlay", () => {
   it("closes on Escape", () => {
     const { onClose } = renderOverlay();
@@ -174,69 +167,54 @@ describe("VoiceModeOverlay", () => {
     expect(captionRegion().textContent).toContain("const a = 1;");
   });
 
-  it("文字区定高一行、可横向滚、不折行", () => {
+  it("文字区：定宽、折行、居中、定高、纵向可滚", () => {
     renderOverlay();
     const region = captionRegion();
-    expect(region.className).toContain("overflow-x-auto");
-    expect(region.className).toContain("overflow-y-hidden");
-    expect(region.parentElement?.className).toContain("h-10");
+    const cls = region.className;
+    const style = region.getAttribute("style") ?? "";
 
-    const span = captionSpan();
-    expect(span.className).toContain("whitespace-nowrap");
-    // 这一行必须「撑满容器」：任何比容器窄的宽度上限都会让 nowrap 文本从窄盒子的
-    // 左沿往右溢出，于是放得下也不居中（曾经是 max-w-[34rem]，真机实测 1560px 窗口里
-    // 975px 那行偏 431px）。jsdom 不做布局，只能锁写法 —— 所以锁**不变量**而不是
-    // 某个拼写：`max-w-full`/`max-w-none`/`w-full`/`w-auto` 等价于撑满，不在限内；
-    // 而 max-w-[34rem]、max-w-2xl、w-1/2 与内联 style 会重新引入缺陷。
-    expect(span.className).toContain("text-center");
-    expect(span.className).not.toMatch(/\bmax-w-(?!full\b|none\b)/);
-    expect(span.className).not.toMatch(/\bw-(?!full\b|auto\b)/);
-    expect(span.getAttribute("style")).toBeNull();
+    expect(cls).toContain("max-w-[34rem]"); // 不限宽就是一行铺满整个窗口
+    expect(cls).toContain("mx-auto");
+    expect(cls).toContain("whitespace-pre-wrap");
+    expect(cls).toContain("break-words"); // 长 URL 不横向溢出：横滚条是藏着的
+    expect(cls).toContain("text-center");
+    expect(cls).toContain("h-12"); // 定高：浮层是 justify-center 的列，高度一变球就跳
+    expect(cls).toContain("leading-6"); // 且 24×2=48 整除，否则第三条线会被切出字头
+    expect(cls).toContain("overflow-y-auto");
+
+    // 定宽与不折行**不能共存**：nowrap 让超长文本从盒子左沿往右溢出，于是放得下也不居中
+    // （真机实测 1560px 窗口里 975px 那行左 509 / 右 78，偏 431px）。
+    // 守卫必须**同时看类名与内联样式**：只看类名时，`max-w-[34rem]` 配内联
+    // `white-space: nowrap` 正好复现旧缺陷却会放行（实测过）。
+    expect(/\bmax-w-(?!full\b|none\b)/.test(cls)).toBe(true); // 限宽在
+    expect(/nowrap/.test(`${cls} ${style}`)).toBe(false); // 不折行不在
+    // 类名按 token 判而不是正则：`max-w-[34rem]` 自身也含 "w-"，正则会误伤它。
+    expect(
+      cls
+        .split(/\s+/)
+        .filter((c) => c.startsWith("w-") && c !== "w-full" && c !== "w-auto"),
+    ).toEqual([]);
   });
 
-  it("纵向滚轮映射成横向滚动", () => {
-    // 只能横滚的一行上，鼠标用户不该滚不动。
-    renderOverlay({ state: "speaking", spoken: "一句很长的话" });
-    const region = captionRegion();
+  it("换单元时滚动位置复位到顶", () => {
+    // 靠 `key={text}` 重挂载而不是 ref + effect：换单元就是新节点，scrollTop 自然是 0。
+    renderOverlay({ state: "speaking", spoken: "第一段" });
+    const first = captionRegion();
     act(() => {
-      region.dispatchEvent(
-        new WheelEvent("wheel", { deltaY: 40, bubbles: true }),
+      first.scrollTop = 120;
+    });
+    act(() => {
+      root.render(
+        <VoiceModeOverlay
+          view={{ ...VIEW, state: "speaking", spoken: "第二段" }}
+          onClose={vi.fn()}
+          onMinimize={vi.fn()}
+        />,
       );
     });
-    expect(region.scrollLeft).toBe(40);
-  });
-
-  it("斜向手势按主轴走，不把纵向分量丢掉", () => {
-    // 触控板斜向手势两个轴同时非零。只判 `deltaX !== 0` 会把大半个纵向分量丢掉。
-    renderOverlay({ state: "speaking", spoken: "一段很长的话" });
-    const region = captionRegion();
-    act(() => {
-      region.dispatchEvent(
-        new WheelEvent("wheel", { deltaX: 30, deltaY: 120, bubbles: true }),
-      );
-    });
-    expect(region.scrollLeft).toBe(120);
-  });
-
-  it("横向为主的触控板手势交给浏览器", () => {
-    renderOverlay({ state: "speaking", spoken: "一段很长的话" });
-    const region = captionRegion();
-    act(() => {
-      region.dispatchEvent(
-        new WheelEvent("wheel", { deltaX: 120, deltaY: 30, bubbles: true }),
-      );
-    });
-    expect(region.scrollLeft).toBe(0);
-  });
-
-  it("换句时横向位置复位到句首", () => {
-    renderOverlay({ state: "speaking", spoken: "第一句" });
-    const region = captionRegion();
-    act(() => {
-      region.scrollLeft = 120;
-    });
-    renderOverlay({ state: "speaking", spoken: "第二句" });
-    expect(captionRegion().scrollLeft).toBe(0);
+    const second = captionRegion();
+    expect(second).not.toBe(first); // 换了 key 就是新节点
+    expect(second.scrollTop).toBe(0);
   });
 
   it("浮层不读主题：挂载时永远用发光画笔", () => {

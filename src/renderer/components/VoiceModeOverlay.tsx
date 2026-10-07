@@ -8,8 +8,7 @@
  * **纯展示**：运行时在 `voice-mode/VoiceModeHost` 里，这里只画它给的状态，
  * 所以最小化 / 回到全屏都不会重启麦克风。
  */
-import { useEffect, useMemo, useRef } from "react";
-import type { WheelEvent } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Minus, X } from "lucide-react";
 import { GLOW_BRUSH, StarOrb } from "./voice-mode/star-orb";
@@ -52,26 +51,6 @@ export function VoiceModeOverlay({
     () => voiceCaptionLine({ state, transcript, answer, spoken }),
     [state, transcript, answer, spoken],
   );
-
-  const lineRef = useRef<HTMLDivElement | null>(null);
-
-  // 换一个合成单元就把横向位置复位到句首：上一段滑到一半的位置留给下一段没有意义。
-  useEffect(() => {
-    const el = lineRef.current;
-    if (el) el.scrollLeft = 0;
-  }, [text]);
-
-  /**
-   * 纵向滚轮横着用：一块只能横滚的区域，滚轮落在上面不该毫无反应。
-   * 比主轴而不是判 deltaX !== 0：触控板斜向手势两个轴同时非零，只认 deltaX 会把
-   * 大半的纵向分量丢掉（实测 (30,120) 只横移 30px）。
-   */
-  const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
-    const el = lineRef.current;
-    if (!el) return;
-    if (Math.abs(event.deltaX) >= Math.abs(event.deltaY)) return; // 横向为主：交给浏览器
-    el.scrollLeft += event.deltaY;
-  };
 
   return (
     <div
@@ -122,26 +101,33 @@ export function VoiceModeOverlay({
       </p>
 
       {/*
-        只显示正在念的那个合成单元（规则在 `voiceCaptionLine` 里）。定高一行：高度恒定，
-        所以球不会随文字增减上下跳 —— 以前靠一个高框占位，现在一条线就够。
+        只显示正在念的那个合成单元（规则在 `voiceCaptionLine` 里）。定宽、居中、折行、定高，
+        四条都是必需的，不是风格选择：
+        · 定宽 `max-w-[34rem]`（约 36 汉字/行）：不限宽就是一行铺满整个窗口。
+        · 折行：定宽之后就**必须**折行。`whitespace-nowrap` 会把超长文本从盒子左沿往右溢出，
+          于是放得下也不居中（实测：1560px 窗口里 975px 那行左 509 / 右 78，偏 431px）。
+          「卡窄盒子」与「不折行」不能共存，这是同一个不变量的两面。
+        · 定高：浮层是 justify-center 的列，高度一变球就跳。`h-12` 必须配 `leading-6`
+          （24 × 2 = 48 整除）：高度不是行高的整数倍时，第三条线会在盒子下沿切出一条
+          2–3px 的字头（`h-14` 配 `leading-relaxed` 的 24.375 就切）。
+        · key 用 `spoken` 而**不是** `text`：换单元重挂载 → 滚动位置自然回顶；而 `answer`
+          回落那一路 `text` 每 token 都变，拿它当 key 会把用户正在滚的位置每 100ms 拽回顶部。
+        `break-words` 也是承重的：没它时长 URL / 长 ASCII 会横向溢出（实测 200 字 URL
+          溢出 61px），而 `[scrollbar-width:none]` 又把横滚条藏了。
 
-        居中只靠 `text-center`，别给这一行加**比容器窄**的宽度上限：`whitespace-nowrap`
-        下超长文本是从盒子右边缘溢出的，盒子一旦被卡窄（曾经是 `max-w-[34rem]`），文字
-        就被钉在窄盒子的左沿、整行不居中（真机实测：1560px 窗口里 975px 那行左 509 / 右 78，
-        偏 431px，一个字也没裁）；窗口再窄一截尾部就真滚不到了。
-        现在：放得下就居中（左右间距相等），比容器还长才从左边溢出、靠横向滚看尾部。
-        `max-w-full` / `max-w-none` / `w-full` 等价于撑满，不在限内。
+        超出定高的超长单元（合成单元上限 600 字 ≈ 17 行）在框内纵向滚。不加顶部渐隐：
+        它只是「下面还有」的提示，内容本来就滚得到。
       */}
-      <div className="mt-6 h-10 w-full">
-        <div
-          ref={lineRef}
-          onWheel={handleWheel}
-          data-testid="voice-caption-text"
-          className="h-full overflow-x-auto overflow-y-hidden px-8 text-lg leading-relaxed [scrollbar-width:none]"
-          style={{ color: "#e7e7ea" }}
-        >
-          <span className="block text-center whitespace-nowrap">{text}</span>
-        </div>
+      <div
+        key={spoken}
+        data-testid="voice-caption-text"
+        className="mx-auto mt-6 h-12 max-w-[34rem] overflow-y-auto whitespace-pre-wrap break-words text-center text-lg leading-6 [scrollbar-width:none]"
+        // pre-wrap 对常见路径是空的（合成单元里的空白已被 `speech-text.ts` 的
+        // `replace(/\s+/g, " ")` 压成单空格），但对 `answer` 回落分支是必需的：
+        // 那里是 markdown 原文，段落靠 \n 分（实测 pre-wrap 6 行 vs 折行版 1 行）。
+        style={{ color: "#e7e7ea", lineBreak: "strict" }}
+      >
+        {text}
       </div>
     </div>
   );
