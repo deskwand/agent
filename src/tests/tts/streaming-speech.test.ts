@@ -236,3 +236,61 @@ describe("createStreamingSpeech", () => {
     expect([...speaker.streams.keys()]).toEqual(["第一句。", "第二句。"]);
   });
 });
+
+describe("语音对话的合并粒度（首句单发，之后攒 4 句）", () => {
+  const setup = () => {
+    const harness = fakeQueue();
+    const speaker = fakeSpeak();
+    const speech = createStreamingSpeech({
+      speak: speaker.speak,
+      createQueue: () => harness.queue,
+    });
+    speech.begin();
+    return { ...harness, speaker, speech };
+  };
+
+  it("首句立刻发；之后攒够 4 句才合成一个请求", () => {
+    const { speaker, speech } = setup();
+
+    speech.push("甲。");
+    expect([...speaker.streams.keys()]).toEqual(["甲。"]);
+
+    speech.push("甲。乙。");
+    speech.push("甲。乙。丙。");
+    speech.push("甲。乙。丙。丁。");
+    // 才 3 句，还没攒够 —— 这时**不该**多出请求（多一个请求就多一次换音色的机会）
+    expect([...speaker.streams.keys()]).toEqual(["甲。"]);
+
+    speech.push("甲。乙。丙。丁。戊。");
+    expect([...speaker.streams.keys()]).toEqual(["甲。", "乙。丙。丁。戊。"]);
+  });
+
+  it("有一段开始播放，就立刻把手上攒着的发出去 —— 所以生成慢也不会断音", () => {
+    const { fireStart, speaker, speech } = setup();
+    speech.push("甲。");
+    speech.push("甲。乙。");
+    expect([...speaker.streams.keys()]).toEqual(["甲。"]);
+
+    fireStart(0);
+    expect([...speaker.streams.keys()]).toEqual(["甲。", "乙。"]);
+  });
+
+  it("结束时把尾巴发出去", () => {
+    const { speaker, speech } = setup();
+    speech.push("甲。");
+    speech.push("甲。乙。");
+    speech.end();
+    expect([...speaker.streams.keys()]).toEqual(["甲。", "乙。"]);
+  });
+
+  it("英文句子之间补空格，中文不补", () => {
+    const { speaker, speech } = setup();
+    speech.push("Hello there.");
+    speech.push("Hello there. General Kenobi.");
+    speech.end();
+    expect([...speaker.streams.keys()]).toEqual([
+      "Hello there.",
+      "General Kenobi.",
+    ]);
+  });
+});
