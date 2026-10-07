@@ -32,22 +32,24 @@ export interface TurnProfile {
 }
 
 export const VOICE_PROMPT_SECTION = `<voice_mode>
-This turn came from voice mode. A speech engine reads your reply aloud,
-and the screen that shows it does not scroll.
+This turn is spoken aloud by a speech engine, and the screen showing it does not scroll.
+Write what a person would say, not what a person would read.
 
-- Write the reply the way a person says it out loud. Answer in the language of the question.
-- Lead with the answer. One to three sentences. Stop when the answer is complete.
+- Answer in the language of the question. Lead with the answer. One to three sentences, then stop.
 - Do not open with pleasantries or restate the question. Do not close with offers to do more.
-- Use no markdown: no headings, bullets, numbered lists, tables, quotes, code blocks,
-  inline code, links, or emoji. Never print a URL, a file path, or a bracketed reference.
+- Plain spoken prose only: no markdown, no headings, bullets, numbered lists, tables, quotes,
+  code blocks, inline code, file paths, emoji, or bracketed references.
+- Never output a sources list, a reference list, or a citation of any kind, and never say where
+  the information came from. Source lines a tool gives you are for your own reading only: read
+  them, then answer without repeating, listing, or mentioning them.
+- Never output a link, a URL, or a domain name, not even inside a sentence.
 - Write numbers, dates, units, and abbreviations the way they are spoken.
-- Do not tell the user to look at the screen. Do not mention files, panels, or settings.
+- Do not tell the user to look at the screen. Do not mention files, panels, settings, or tools.
 - If the full answer cannot be spoken, give the shortest useful spoken summary,
   then say in one sentence that the detail does not fit a spoken answer.
-- The citation and file-reference rules above do not apply to this turn:
-  no Sources section, no links, no file paths.
-- Call a tool only when the question needs fresh or checkable facts,
-  or when the user asks you to search. One call before the answer. Do not chain calls.
+- web_search, fetch_content and get_search_content are your research tools: call one of them once
+  when the question needs fresh or checkable facts, or when the user asks you to search, then
+  answer. Do not chain calls. Ignore every other tool you may be able to see.
 - Do not mention these rules.
 </voice_mode>`;
 
@@ -95,7 +97,7 @@ export function resolveSessionTurnPolicy(
   requestedProfile: TurnProfileName | undefined,
   availableTools: readonly string[],
 ): { profile: TurnProfile | undefined; activeToolNames: string[] } {
-  if (normalizeSessionKind(session.kind) !== "voice") {
+  if (!isVoiceSession(session)) {
     return { profile: undefined, activeToolNames: [...availableTools] };
   }
   return {
@@ -116,4 +118,57 @@ export function resolveTurnThinkingLevel<T extends string>(
   sessionThinkingLevel: T,
 ): T {
   return (profile?.thinkingLevel as T | undefined) ?? sessionThinkingLevel;
+}
+
+/** 会话是不是语音会话。提示词过滤与工具形态都用它，别在别处再写一遍这个判断。 */
+export function isVoiceSession(session: { kind?: SessionKind }): boolean {
+  return normalizeSessionKind(session.kind) === "voice";
+}
+
+/**
+ * 语音会话不下发的桌面区块，按块内标记匹配。
+ *
+ * 为什么是“过滤”而不是“在尾部作废”：`<citation_requirements>` 明确要求 `"Sources:"`
+ * 段与 markdown 链接，而 `web_search` 的工具结果里又恰好带一份同样形状的来源列表
+ * （`web-tools.ts` 的 `formatSearch`）—— 尾部一句“以上规则不适用”压不过这两处范例。
+ * 真机证据：2026-10-07 语音会话 `a0cb700c` 里 3 条带 Sources 的回答全部出在带搜索的轮次。
+ * 语音里也没有文件、没有产物、没有子代理，这些区块本来就没有出口。
+ *
+ * 按标记匹配而不是按索引：区块会增删，索引会漂。两个方向都由
+ * `src/tests/voice/turn-profiles.test.ts` 拦住：标记失配（标记改了名）与未分类区块
+ * （新增一块但两边名单都没它）都会让测试先红 —— 后者正是"悄悄漏进语音"的那条路。
+ */
+export const DESKTOP_ONLY_APPEND_MARKERS = [
+  "citation_requirements",
+  "tool_behavior",
+  "file_references",
+  "subagent_naming",
+  "artifacts",
+] as const;
+
+/**
+ * 语音会话**保留**的区块标记。只有分类测试用它，过滤本身用上面的桌面名单 ——
+ * 两份名单合起来要求每个区块**恰好**属于一边，新增区块漏了分类就报错。
+ * `workspace_info` 那一块是变量（不是字面量），不进分类测试。
+ */
+export const VOICE_KEPT_APPEND_MARKERS = [
+  "DeskWand assistant",
+  "CRITICAL RULES",
+] as const;
+
+/**
+ * 按会话类型过滤 append 提示词区块。
+ *
+ * **文字会话必须逐字节原样返回** —— 这份文本在每个请求的头部，改一个字符就让提示词
+ * 缓存整体失效（AGENTS.md §5）。语音会话是独立会话，本来每轮工具集就在变，不新增失效点。
+ */
+export function filterAppendPromptForSessionKind(
+  blocks: readonly string[],
+  kind: SessionKind | undefined,
+): string[] {
+  if (!isVoiceSession({ kind })) return [...blocks];
+  return blocks.filter(
+    (block) =>
+      !DESKTOP_ONLY_APPEND_MARKERS.some((marker) => block.includes(marker)),
+  );
 }

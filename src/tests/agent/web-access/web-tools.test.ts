@@ -31,18 +31,23 @@ import {
   getWebAccessSessionTempDir,
 } from "../../../main/agent/tools/web-access/web-tools";
 
-function createTools() {
+function createTools(spoken = false) {
   return createWebAccessTools({
     workspaceDir: process.cwd(),
     sessionId: "session-1",
     getConfig: () => normalizeWebAccessConfig(undefined),
     resolveProviderAuth: async () => undefined,
     cache: new WebAccessCache(),
+    spoken,
   });
 }
 
-async function executeTool(name: string, params: Record<string, unknown>) {
-  const tool = createTools().find((item) => item.name === name);
+async function executeTool(
+  name: string,
+  params: Record<string, unknown>,
+  spoken = false,
+) {
+  const tool = createTools(spoken).find((item) => item.name === name);
   if (!tool) throw new Error(`Missing tool ${name}`);
   return tool.execute(
     "call-1",
@@ -96,6 +101,52 @@ describe("createWebAccessTools", () => {
     expect(text).toContain("https://example.com");
     expect(details(result)).toMatchObject({ provider: "exa", queryCount: 1 });
     expect(details(result).responseId).toEqual(expect.any(String));
+  });
+
+  // 真机漏点的源头：文字轮的来源列表是一份 "### Sources" + markdown 链接的样板，
+  // 语音轮把它拿掉（a0cb700c 里 3 条带搜索的回答全部照抄了这份样板）。
+  // 裸 URL 保留：语音会话里打字问"把链接发我"要答得出来（用户 2026-10-07 选定）。
+  it("keeps the spoken search output free of a sources block", async () => {
+    mocks.search.mockResolvedValueOnce({
+      provider: "exa",
+      answer: "Answer",
+      results: [
+        { title: "Source", url: "https://example.com", snippet: "Snippet" },
+      ],
+    });
+    const result = await executeTool("web_search", { query: "question" }, true);
+    const text = resultText(result);
+    expect(text).toContain("Answer");
+    expect(text).toContain("<internal_search_notes>");
+    expect(text).toContain("https://example.com");
+    expect(text).not.toContain("### Sources");
+    expect(text).not.toContain("](");
+  });
+
+  // 文字轮一个字节都不能动（提示词缓存之外，用户是照着链接点进去看的）。
+  // 不写"包含 Sources"那种宽断言，而是把改动前那串精确拼出来对比（尾部 responseId 是随机的）。
+  it("keeps the ordinary search output exactly as before", async () => {
+    mocks.search.mockResolvedValueOnce({
+      provider: "exa",
+      answer: "Answer",
+      results: [
+        { title: "Source", url: "https://example.com", snippet: "Snippet" },
+      ],
+    });
+    const result = await executeTool("web_search", { query: "question" });
+    const expected = [
+      "## Query: question",
+      "",
+      "Provider: exa",
+      "",
+      "Answer",
+      "",
+      "### Sources",
+      "1. [Source](https://example.com) — Snippet",
+    ].join("\n");
+    expect(
+      resultText(result).startsWith(`${expected}\n\n---\nresponseId: `),
+    ).toBe(true);
   });
 
   it("runs batch queries sequentially and reuses one response cache record", async () => {
@@ -188,6 +239,7 @@ describe("createWebAccessTools", () => {
       getConfig: () => normalizeWebAccessConfig(undefined),
       resolveProviderAuth: async () => undefined,
       cache,
+      spoken: true,
     });
     const searchTool = tools.find((tool) => tool.name === "web_search");
     const getTool = tools.find((tool) => tool.name === "get_search_content");
@@ -212,6 +264,7 @@ describe("createWebAccessTools", () => {
       undefined as never,
     );
     expect(resultText(byQuery)).toContain("Answer");
+    expect(resultText(byQuery)).not.toContain("### Sources");
 
     for (const selector of [{ url: "https://example.com" }, { urlIndex: 0 }]) {
       const full = await getTool.execute(

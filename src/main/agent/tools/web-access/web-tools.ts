@@ -55,6 +55,11 @@ export interface CreateWebAccessToolsOptions {
   getConfig: () => WebAccessConfig;
   resolveProviderAuth: ResolveWebAccessProviderAuth;
   cache: WebAccessCache;
+  /**
+   * 语音会话：不给模型看得到的“来源列表”形状（无 `### Sources`、无 markdown 链接）。
+   * 默认 false —— 文字会话输出逐字节不变。
+   */
+  spoken?: boolean;
 }
 
 type ToolResult = {
@@ -161,15 +166,38 @@ function uniqueStrings(
   ).slice(0, maxItems);
 }
 
-function formatSearch(query: QueryResultData): string {
+/**
+ * `spoken` 只给语音会话用：去掉 `### Sources` 标题与 markdown 链接语法。
+ * 原因不是省 token，而是**别给模型一份可以照抄的样板** —— 真机上语音回答里的
+ * Sources 段就是从这里抄过去的。标题、摘要、裸 URL 都保留：有些 provider 的
+ * answer 可以是空的（`tavily.ts` / `perplexity.ts` / `exa.ts` 都是 `|| ""`），
+ * 那些情况下来源列表就是工具结果的全文；裸 URL 则是打字轮里“把链接发我”的唯一凭据。
+ */
+function formatSearch(query: QueryResultData, spoken = false): string {
   if (query.error) return `## Query: ${query.query}\n\nError: ${query.error}`;
+  const provider = query.provider ? `Provider: ${query.provider}\n\n` : "";
+  if (spoken) {
+    const notes = query.results
+      .map((result, index) => {
+        const snippet = result.snippet
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 500);
+        const tail = [snippet, result.url].filter(Boolean).join(" — ");
+        return `${index + 1}. ${result.title}${tail ? ` — ${tail}` : ""}`;
+      })
+      .join("\n");
+    const noteBlock = notes
+      ? `\n\n<internal_search_notes>\nThese lines are for your own reading only. Never quote, list, or mention them in a spoken reply.\n${notes}\n</internal_search_notes>`
+      : "";
+    return `## Query: ${query.query}\n\n${provider}${query.answer}${noteBlock}`;
+  }
   const sources = query.results
     .map((result, index) => {
       const snippet = result.snippet.replace(/\s+/g, " ").trim().slice(0, 500);
       return `${index + 1}. [${result.title}](${result.url})${snippet ? ` — ${snippet}` : ""}`;
     })
     .join("\n");
-  const provider = query.provider ? `Provider: ${query.provider}\n\n` : "";
   return `## Query: ${query.query}\n\n${provider}${query.answer}${sources ? `\n\n### Sources\n${sources}` : ""}`;
 }
 
@@ -379,7 +407,9 @@ export function createWebAccessTools(
       };
       options.cache.set(options.sessionId, record);
       const successful = queryResults.filter((item) => !item.error);
-      const fullText = queryResults.map(formatSearch).join("\n\n");
+      const fullText = queryResults
+        .map((item) => formatSearch(item, options.spoken === true))
+        .join("\n\n");
       const truncated = fullText.length > MAX_INLINE_CONTENT;
       const text = truncated
         ? `${fullText.slice(0, MAX_INLINE_CONTENT)}\n\n[Search output truncated. Use get_search_content with responseId ${responseId} and a query.]`
@@ -548,7 +578,12 @@ export function createWebAccessTools(
           );
         }
         return {
-          content: [{ type: "text", text: formatSearch(query) }],
+          content: [
+            {
+              type: "text",
+              text: formatSearch(query, options.spoken === true),
+            },
+          ],
           details: { responseId: record.id },
         };
       }
