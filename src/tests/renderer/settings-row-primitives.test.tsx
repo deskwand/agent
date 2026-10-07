@@ -127,6 +127,72 @@ describe("设置行原语", () => {
     expect(menuTrigger(container, "language").textContent).toContain("English");
   });
 
+  it("键盘：方向键开菜单与移动、Enter 选中、Esc 关闭并把焦点还回触发按钮", async () => {
+    const onChange = vi.fn();
+    function KeyboardHarness() {
+      const [value, setValue] = useState<"zh" | "en">("zh");
+      return (
+        <SettingsSelect
+          testId="language"
+          label="语言"
+          value={value}
+          options={[
+            { value: "zh", label: "简体中文" },
+            { value: "en", label: "English" },
+          ]}
+          onChange={(next) => {
+            setValue(next);
+            onChange(next);
+          }}
+        />
+      );
+    }
+    const key = (el: Element, k: string) =>
+      act(async () => {
+        el.dispatchEvent(
+          new KeyboardEvent("keydown", { key: k, bubbles: true }),
+        );
+      });
+    const items = () =>
+      Array.from(
+        document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
+      );
+    const trigger = () => menuTrigger(container, "language");
+
+    await render(<KeyboardHarness />);
+
+    // ↓ 打开，焦点落在当前值那一项（zh）
+    await key(trigger(), "ArrowDown");
+    expect(items()).toHaveLength(2);
+    expect(document.activeElement).toBe(items()[0]);
+
+    // ↓ 移到第二项；到底再按回绕到第一项
+    await key(items()[0], "ArrowDown");
+    expect(document.activeElement).toBe(items()[1]);
+    await key(items()[1], "ArrowDown");
+    expect(document.activeElement).toBe(items()[0]);
+
+    // ↓ 再到底，停在 "en" 上；Enter：焦点在原生 <button> 上，浏览器会把它翻成 click
+    // （jsdom 不翻，所以这里直接点）。选当前项不该回传，所以必须点另一项。
+    await key(items()[0], "ArrowDown");
+    expect(document.activeElement).toBe(items()[1]);
+    await act(async () => {
+      items()[1].click();
+    });
+    expect(onChange).toHaveBeenCalledWith("en");
+
+    // 重开：焦点应落在**新值**那一项（en），而不是永远回到第一项
+    await key(trigger(), "ArrowDown");
+    expect(document.activeElement).toBe(items()[1]);
+
+    // Esc 关闭，且焦点回到触发按钮（不回的话键盘用户会掉到 body 上）
+    await key(items()[1], "Escape");
+    expect(
+      document.body.querySelector('[data-testid="language-menu"]'),
+    ).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+  });
+
   it("贴着底部打开时按**实际需要的高度**翻转，短菜单不白跳一大截", async () => {
     // 触发按钮贴底：下方只剩 62px，而两项的菜单只要 ~70px。
     // 若拿面板上限（264px）去判断，会把它白翻到 264px 之上 —— 一打开就"跳一下"。
