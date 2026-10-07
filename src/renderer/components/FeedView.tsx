@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { ArrowLeft } from "lucide-react";
 
 import { parseRunReasons } from "../../shared/feed";
 import { useAppStore } from "../store";
@@ -66,6 +67,8 @@ export function FeedView(): JSX.Element {
   const setFeedBlockedTopics = useAppStore(
     (state) => state.setFeedBlockedTopics,
   );
+  // 返回聊天：与 Vault / 用量 / 连接器页同一套入口（图标、aria-label、类名都一致）
+  const setActiveView = useAppStore((state) => state.setActiveView);
 
   useEffect(() => {
     void refreshFeed();
@@ -121,8 +124,17 @@ export function FeedView(): JSX.Element {
         data-testid="feed-view"
         className="flex h-full flex-col bg-background"
       >
-        <div className="border-b border-border-subtle px-4 py-2.5 text-base font-semibold">
-          {t("feed.railLabel")}
+        <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2.5">
+          <button
+            type="button"
+            data-testid="feed-back"
+            onClick={() => setActiveView("chat")}
+            aria-label={t("common.back")}
+            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+          >
+            <ArrowLeft className="h-5 w-5 text-text-secondary" />
+          </button>
+          <span className="text-base font-semibold">{t("feed.railLabel")}</span>
         </div>
         <div className="max-w-[34em] px-6 py-6">
           <div className="mb-2 text-base font-semibold">
@@ -159,6 +171,15 @@ export function FeedView(): JSX.Element {
       <style>{`.feed-row:hover [data-testid="feed-actions"],.feed-row:focus-within [data-testid="feed-actions"]{opacity:1 !important}`}</style>
 
       <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2.5">
+        <button
+          type="button"
+          data-testid="feed-back"
+          onClick={() => setActiveView("chat")}
+          aria-label={t("common.back")}
+          className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+        >
+          <ArrowLeft className="h-5 w-5 text-text-secondary" />
+        </button>
         <span className="text-base font-semibold">{t("feed.railLabel")}</span>
         <span className="flex-1" />
         <span className="text-xs tabular-nums text-text-muted">

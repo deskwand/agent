@@ -121,6 +121,18 @@ describe("未启用（默认状态）", () => {
     expect(container.querySelector('[data-testid="feed-filters"]')).toBeNull();
   });
 
+  it("引导页也留了返回聊天的入口（与其它整页视图一致）", async () => {
+    setWindowApi(snapshot(false));
+    useAppStore.setState({ activeView: "feed" });
+    await render();
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="feed-back"]') as HTMLElement
+      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(useAppStore.getState().activeView).toBe("chat");
+  });
+
   it("点「打开动态」调 setEnabled(true)", async () => {
     const setEnabled = vi.fn(async () => ({ enabled: true, started: true }));
     setWindowApi(snapshot(false), { setEnabled });
@@ -146,6 +158,18 @@ describe("已启用但没条目", () => {
 });
 
 describe("已启用且有条目", () => {
+  it("头部有返回聊天的入口，点了切回 chat（与 Vault / 用量页同一套）", async () => {
+    setWindowApi(snapshot(true, [makeItem()], makeRun()));
+    useAppStore.setState({ activeView: "feed" });
+    await render();
+    await act(async () => {
+      (
+        container.querySelector('[data-testid="feed-back"]') as HTMLElement
+      ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(useAppStore.getState().activeView).toBe("chat");
+  });
+
   it("显示标题、筛选条与依据区折叠入口", async () => {
     setWindowApi(snapshot(true, [makeItem()], makeRun()));
     await render();
