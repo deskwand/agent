@@ -63,9 +63,6 @@ const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
 
 /** 六档覆盖从"急性子"到"慢条斯理"，两端就是 shared 里的夹取边界。 */
-const SILENCE_CHOICES = ["400", "600", "800", "1000", "1500", "2000"] as const;
-
-type SilenceChoice = (typeof SILENCE_CHOICES)[number];
 
 const IDLE: TtsInstallState = { phase: "idle", percent: 0, installed: false };
 const IDLE_STATES: TtsInstallStates = { zh: IDLE, en: IDLE, matcha: IDLE };
@@ -127,10 +124,6 @@ export function VoiceModeSettings() {
   const [engine, setEngine] = useState<EngineInstallState | null>(null);
   const [removing, setRemoving] = useState(false);
   const preview = useTtsPreview();
-
-  const current = String(
-    appConfig?.voiceMode?.silenceMs ?? DEFAULT_VOICE_MODE.silenceMs,
-  ) as SilenceChoice;
 
   // `tone` 是事实来源（老配置只有 fastVoice，由 resolveVoiceTone 归一化）
   const storedTone = resolveVoiceTone(appConfig?.voiceMode);
@@ -233,8 +226,8 @@ export function VoiceModeSettings() {
   };
   /**
    * 写 `voiceMode` 是**整体替换**，所以每次写入都必须带上另一个字段。
-   * 只发 `{ silenceMs }` 会把 `tone` 归一化成默认值 —— 也就是这个下拉会
-   * 替用户把档位换掉。所有 `voiceMode` 的写入都走这里。
+   * 只发单个字段会把其余字段归一化成默认值 —— 也就是某个控件会替用户换掉档位。
+   * 所有 `voiceMode` 的写入都走这里。
    *
    * 起始值在调用时现读 store（不用渲染时捕获的 `appConfig`）：两个控件连着拨时，
    * 渲染还没跟上，旧快照会把刚写进去的字段盖掉。
@@ -246,12 +239,6 @@ export function VoiceModeSettings() {
       voiceMode: { ...current, ...patch },
     });
     if (saved?.config) setAppConfig(saved.config);
-  };
-
-  /** 与朗读、语音输入同一条管线：写 AppConfig，再同步 store。 */
-  const change = async (next: SilenceChoice) => {
-    if (!isElectron) return;
-    await saveVoiceMode({ silenceMs: Number(next) });
   };
 
   /**
@@ -332,18 +319,6 @@ export function VoiceModeSettings() {
         testId="voice-mode-card"
         title={t(`${VOICE_MODE_KEY}.title`)}
         description={t(`${VOICE_MODE_KEY}.desc`)}
-        control={
-          <SettingsSelect<SilenceChoice>
-            testId="voice-mode-silence"
-            label={t(`${VOICE_MODE_KEY}.silenceLabel`)}
-            value={current}
-            options={SILENCE_CHOICES.map((value) => ({
-              value,
-              label: t(`${VOICE_MODE_KEY}.silenceValue`, { ms: value }),
-            }))}
-            onChange={(next) => void change(next)}
-          />
-        }
       />
 
       <SettingsRow

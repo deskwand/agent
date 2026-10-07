@@ -14,8 +14,8 @@
  *
  * **音色模式只在渲染层读：`speak` 每句读一次 `voiceMode.fastVoice`**。快速传
  * `{ prefer: "matcha" }`；均衡不传 prefer，于是按文本路由到朗读的中文 / 英文音色。
- * 两种都带 `purpose: "voice"` —— 均衡那份模型与朗读共用，但语音对话是自己选的它，
- * 不该再被朗读开关拦住（见 `src/main/tts/ipc.ts` 的门控）。
+ * 均衡那份模型与朗读共用：音质与音色只有一处配置（设置里的「语音」）。
+ * 档位在这里读一次传下去；朗读那边不传，由主进程补齐（见 `withConfiguredTone`）。
  */
 import { useEffect, useRef, useState } from "react";
 import type { VoiceErrorCode } from "../../shared/ipc-types";
@@ -125,7 +125,7 @@ export function useVoiceMode(options: UseVoiceModeOptions): VoiceModeView {
         // 没有 tone 的老配置按 fastVoice 归一化成 fast / balanced）
         const voiceMode = useAppStore.getState().appConfig?.voiceMode;
         const tone = resolveVoiceTone(voiceMode);
-        return speakStream(text, { purpose: "voice", tone }, handlers);
+        return speakStream(text, { tone }, handlers);
       },
       createQueue: () =>
         createAudioQueue({ createContext: () => audioContext }),

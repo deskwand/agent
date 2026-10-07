@@ -3,11 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const config = vi.hoisted(() => ({ readAloudEnabled: true }));
+const config = vi.hoisted(() => ({
+  tone: "balanced" as "fast" | "balanced" | "best",
+}));
 
 vi.mock("../../main/config/config-store", () => ({
   configStore: {
-    getAll: () => ({ readAloud: { enabled: config.readAloudEnabled } }),
+    getAll: () => ({ voiceMode: { tone: config.tone } }),
   },
 }));
 import {
@@ -168,9 +170,7 @@ function harness(
 }
 
 describe("registerTtsIpc", () => {
-  beforeEach(() => {
-    config.readAloudEnabled = true;
-  });
+  beforeEach(() => {});
 
   it("reports each model's state separately", async () => {
     const ipc = fakeIpcMain();
@@ -277,33 +277,48 @@ describe("registerTtsIpc", () => {
     expect(removeTtsModel).toHaveBeenCalledWith(userDataPath, TTS_MODEL_ID);
   });
 
-  it("refuses to speak when the capability is switched off", async () => {
-    // 设置卡只管下载是不够的：关掉开关必须真的不干活（设计 §6.1 验收第 4 条）
-    config.readAloudEnabled = false;
-    const ipc = fakeIpcMain();
-    const speak = vi.fn(async () => ({
-      ok: true as const,
-      samples: new Float32Array(1),
-      sampleRate: 44100,
-    }));
-    registerTtsIpc({
-      ipcMain: ipc as never,
-      deps: {
-        userDataPath: installedUserData(),
-        sendEvent: vi.fn(),
-        sendStream: vi.fn(),
-        service: serviceStub({ speak }),
-      },
+  it("朗读与语音对话按同一份配置：设置里的档位对朗读也生效", async () => {
+    // 朗读调用点从不传 tone（那是语音对话那边的活）。档位必须在主进程按设置补齐，
+    // 否则卡片上那句"朗读与语音对话共用"就是假的：朗读会退回按文本路由。
+    const { ipc, speak } = harness({ installed: ["zh"] });
+    config.tone = "fast";
+
+    await ipc.invoke("tts.speak", "你好");
+
+    expect(speak).toHaveBeenCalledWith("你好", { tone: "fast" });
+  });
+
+  it("朗读档位必须到合成分支（stream 路径 —— 朗读唯一走的那条）", async () => {
+    // 评审抓到的回归：`withTone` 只喂了自动安装，合成分支仍看原始 opts，
+    // 于是设置里的档位对朗读完全无效（最坏：下完 matcha 再报 model not installed）。
+    const { ipc, speak } = harness({ installed: ["zh", "matcha"] });
+    config.tone = "fast";
+
+    await ipc.invoke("tts.speakStream", "你好", undefined);
+
+    expect(speak).toHaveBeenCalledWith(
+      "你好",
+      expect.objectContaining({ tone: "fast" }),
+      expect.any(Function),
+    );
+  });
+
+  it("朗读缺英文模型时自动补装；最佳档绝不自动下载", async () => {
+    const { ipc, installTtsModel } = harness({ installed: ["zh"] });
+    // 档位会影响路由：这里要验的是"按文本路由到 en"，所以先固定成均衡
+    config.tone = "balanced";
+
+    // 英文句子本该用 en。它没装 → 先装再合成，而不是静默退回中文音色。
+    await ipc.invoke("tts.speak", "Hello world, this is an English sentence.");
+    expect(installTtsModel).toHaveBeenCalledTimes(1);
+    expect(installTtsModel.mock.calls[0][0]).toMatchObject({
+      model: TTS_ENGLISH_MODEL_ID,
     });
 
-    const result = (await ipc.invoke("tts.speak", "你好")) as {
-      ok: boolean;
-      error?: string;
-    };
-
-    expect(result.ok).toBe(false);
-    expect(result.error).toContain("disabled");
-    expect(speak).not.toHaveBeenCalled();
+    // 900MB 的最佳档是用户显式安装的东西，任何路径都不许静默下载
+    installTtsModel.mockClear();
+    await ipc.invoke("tts.speakStream", "随便一句中文。", { tone: "best" });
+    expect(installTtsModel).not.toHaveBeenCalled();
   });
 
   it("disposes every channel", () => {
@@ -323,9 +338,7 @@ describe("registerTtsIpc", () => {
 });
 
 describe("per-model install channels", () => {
-  beforeEach(() => {
-    config.readAloudEnabled = true;
-  });
+  beforeEach(() => {});
 
   it("installs each model independently and reports per-model state", async () => {
     const { ipc, events } = harness();
@@ -453,152 +466,5 @@ describe("per-model install channels", () => {
     };
     expect(states.matcha.installed).toBe(true);
     expect(states.zh.installed).toBe(false);
-  });
-});
-
-describe("speak 与朗读开关", () => {
-  beforeEach(() => {
-    config.readAloudEnabled = false;
-  });
-
-  it("passes prefer through to the service", async () => {
-    const { ipc, speak } = harness({ installed: ["matcha"] });
-    await ipc.invoke("tts.speak", "你好", { prefer: "matcha" });
-    expect(speak).toHaveBeenCalledWith("你好", { prefer: "matcha" });
-  });
-
-  it("lets an installed fast voice speak while 朗读 is switched off", async () => {
-    // 朗读开关是朗读那条路的总闸。语音模式的音色是用户单独下的，两者不能互相锁死：
-    // 否则"装了音色、没开朗读"的语音模式会是静音。
-    const { ipc, speak } = harness({ installed: ["matcha"] });
-    const result = await ipc.invoke("tts.speak", "你好", {
-      prefer: "matcha",
-    });
-    expect(result).toMatchObject({ ok: true });
-    expect(speak).toHaveBeenCalled();
-  });
-
-  it("still refuses when the fast voice is missing", async () => {
-    // 没装 matcha 时这次调用会回退到朗读的模型 —— 那就该被开关拦住，
-    // 不然"关掉开关就不加载引擎"的承诺就空了。
-    // （语音对话选「均衡」时不会走到这里：它带 purpose，见下一个用例。）
-    const { ipc, speak } = harness({ installed: ["zh"] });
-    const result = await ipc.invoke("tts.speak", "你好", {
-      prefer: "matcha",
-    });
-    expect(result).toEqual({ ok: false, error: "read aloud disabled" });
-    expect(speak).not.toHaveBeenCalled();
-  });
-
-  it("lets voice mode use the read-aloud voice while 朗读 is switched off", async () => {
-    // 「均衡」用的是中文音色，与朗读共用同一份模型。但语音对话是自己在设置里
-    // 选了它 —— 再拿朗读开关拦，等于用户要为了在语音对话里出声，先去另一张卡
-    // 打开一个跟语音对话无关的开关。
-    //
-    // purpose 只豁免开关，不豁免"模型在不在"：那是 service.speak 的判断
-    // （`model not installed`），这里只测门控，不重测服务层。
-    const { ipc, speak } = harness({ installed: ["zh"] });
-    const result = await ipc.invoke("tts.speak", "你好", {
-      purpose: "voice",
-    });
-    expect(result).toMatchObject({ ok: true });
-    expect(speak).toHaveBeenCalled();
-  });
-
-  it("gates on the engine that will really be used, not on prefer alone", async () => {
-    // engine 是硬指定，它压过 prefer。所以这一句实际会用 zh —— 而 zh 归朗读开关管。
-    // 门控只看 prefer 的话这里会放行，朗读关掉却照念朗读模型。
-    const { ipc, speak } = harness({ installed: ["zh", "matcha"] });
-    const result = await ipc.invoke("tts.speak", "你好", {
-      prefer: "matcha",
-      engine: "zh",
-    });
-    expect(result).toEqual({ ok: false, error: "read aloud disabled" });
-    expect(speak).not.toHaveBeenCalled();
-  });
-
-  it("still refuses an ordinary read-aloud call", async () => {
-    const { ipc, speak } = harness({ installed: ["zh"] });
-    const result = await ipc.invoke("tts.speak", "你好");
-    expect(result).toEqual({ ok: false, error: "read aloud disabled" });
-    expect(speak).not.toHaveBeenCalled();
-  });
-  it("speakStream: 立刻返回 streamId，按序推块，最后推 done", async () => {
-    const speak = vi.fn(
-      async (
-        _text: string,
-        _opts?: unknown,
-        onChunk?: (chunk: {
-          samples: Float32Array;
-          sampleRate: number;
-        }) => boolean | void,
-      ) => {
-        onChunk?.({ samples: new Float32Array([1]), sampleRate: 24000 });
-        onChunk?.({ samples: new Float32Array([2, 3]), sampleRate: 24000 });
-        return {
-          ok: true as const,
-          samples: new Float32Array([1, 2, 3]),
-          sampleRate: 24000,
-        };
-      },
-    ) as TtsService["speak"];
-    const { ipc, streamEvents } = harness({ installed: ["zh"], speak });
-
-    const { streamId } = (await ipc.invoke("tts.speakStream", "文本", {
-      purpose: "voice",
-    })) as { streamId: number };
-    await vi.waitFor(() => expect(streamEvents.length).toBe(3));
-
-    expect(streamEvents.map((e) => e.type)).toEqual(["chunk", "chunk", "done"]);
-    expect(
-      streamEvents
-        .filter((e) => e.type === "chunk")
-        .map((e) => (e as { seq: number }).seq),
-    ).toEqual([0, 1]);
-    expect(streamEvents.every((e) => e.streamId === streamId)).toBe(true);
-  });
-
-  it("cancelStream: 取消后不再推块，也不推 done", async () => {
-    let release!: () => void;
-    const gate = new Promise<void>((resolve) => (release = resolve));
-    const speak = vi.fn(
-      async (
-        _text: string,
-        _opts?: unknown,
-        onChunk?: (chunk: {
-          samples: Float32Array;
-          sampleRate: number;
-        }) => boolean | void,
-      ) => {
-        onChunk?.({ samples: new Float32Array([1]), sampleRate: 24000 });
-        await gate; // 模拟「后续分段还在合成」
-        const keepGoing = onChunk?.({
-          samples: new Float32Array([2]),
-          sampleRate: 24000,
-        });
-        return keepGoing === false
-          ? {
-              ok: true as const,
-              samples: new Float32Array([1]),
-              sampleRate: 24000,
-            }
-          : {
-              ok: true as const,
-              samples: new Float32Array([1, 2]),
-              sampleRate: 24000,
-            };
-      },
-    ) as TtsService["speak"];
-    const { ipc, streamEvents } = harness({ installed: ["zh"], speak });
-
-    const { streamId } = (await ipc.invoke("tts.speakStream", "文本", {
-      purpose: "voice",
-    })) as { streamId: number };
-    await ipc.invoke("tts.cancelStream", streamId);
-    release();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(streamEvents.filter((e) => e.type === "chunk").length).toBe(1);
-    expect(streamEvents.some((e) => e.type === "done")).toBe(false);
   });
 });

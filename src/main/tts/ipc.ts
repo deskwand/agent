@@ -3,18 +3,19 @@
  *
  * 朗读的通道：**按模型**安装 + 按句合成。
  *
- * 与语音输入**分开注册**（`voice.*` / `tts.*`）：开关、安装状态、引擎生命周期各自
+ * 与语音输入**分开注册**（`voice.*` / `tts.*`）：安装状态、引擎生命周期各自
  * 独立，只有磁盘上的目录与运行时是共享的。合成一个模块会让「关掉语音」与
  * 「关掉朗读」纠缠在一起。
  *
  * 两个模型（中文 zh / 英文 en）各有各的状态与守卫：中文已装**不能**把英文的安装
  * 挡在门外（否则英文行的按钮会静默无反应），英文自检失败也只撤英文那一个。
  *
- * 现在是**三个**：再加上语音模式的高速音色（`matcha`）。它同样各管各的，但它不归
- * 朗读开关管 —— 那道门控的判据见 `tts.speak` 里的注释与设计 D7。
+ * 现在是**三个**：再加上语音模式的高速音色（`matcha`）。
  *
- * D7 后来被 `design-docs/2026-10-06-语音对话音色两档.md` 放宽了一处：语音对话选
- * 「均衡」时用的是中文音色（与朗读共用同一份），它不该被朗读开关拦在门外。
+ * 朗读原先还有一道"开关没开就拒读"的门控（读 `readAloud.enabled`）以及为语音对话
+ * 开的 `purpose: "voice"` 例外 —— 两者都已删除：音质与音色只有一处配置，朗读不再
+ * 需要单独开启。现在这里只剩一件事：**缺的 sherpa 小模型先补上再合成**（见
+ * `ensureReadAloudModel`，它只对已装了任一模型的用户生效）。
  */
 import type { IpcMain } from "electron";
 import type {
@@ -169,29 +170,43 @@ export function registerTtsIpc({
   };
 
   /**
-   * 朗读开关的门控。**两个 handler 共用**，不许各写一份：判据必须与
-   * `resolveTtsEngine` 的最终结果一致，否则 `{ prefer: "matcha", engine: "zh" }`
-   * 这类入参会判错。返回错误字符串表示拦下。
+   * 把设置里的档位补进这次朗读请求。
    *
-   * 每个模型有自己的归属：zh / en 属于朗读，那个开关是**朗读那条路**的总闸；
-   * matcha 属于语音模式。语音对话（`purpose === "voice"`）是例外：它在设置里
-   * 明确选了音色，那份模型就是为它而下的，不该被朗读开关拦在门外。
+   * 朗读调用点从不传 `tone`（那是语音对话那边的活），所以不补的话朗读会按**文本路由**
+   * （中文 zh / 英文 en / 短句 matcha），用户在设置里选的档位对它无效 ——
+   * 而卡片上写的是"朗读与语音对话共用"。**在主进程读设置**而不是让渲染侧解析：
+   * 渲染侧的 `appConfig` 可能还没同步，那会把档位静默降级（PR #19 踩过的坑）。
    */
-  const readAloudGate = (
+  const withConfiguredTone = (opts?: TtsSpeakOptions): TtsSpeakOptions => {
+    if (opts?.tone) return opts;
+    const configured = configStore.getAll().voiceMode?.tone;
+    return configured ? { ...opts, tone: configured } : (opts ?? {});
+  };
+
+  /**
+   * 朗读前的模型准备。
+   *
+   * 原先是"朗读开关没开就拒读"的门控 —— 那道开关已经删除，朗读不再需要单独开启。
+   * 现在只剩一件事：**缺的 sherpa 小模型先补上再合成**（英文模型就是这样自动装上的）。
+   *
+   * `engine`（900MB 的最佳档）**永不自动下载**：它是用户在设置里显式安装的东西，
+   * 带着磁盘/内存预检，不该被一次朗读静默拉下来。
+   *
+   * 并发时 `installModel` 的按模型守卫会让这里立刻返回 —— 那一句会退回中文音色，
+   * 下一句就用上英文模型：不失败、不卡住，也不重复下载。
+   */
+  const ensureReadAloudModel = async (
     text: string,
     opts?: TtsSpeakOptions,
-  ): string | null => {
-    const engineForCall = resolveTtsEngine(text, opts, (engine) =>
-      service.isInstalled(engine),
-    );
-    if (
-      !configStore.getAll().readAloud?.enabled &&
-      engineForCall !== "matcha" &&
-      opts?.purpose !== "voice"
-    ) {
-      return "read aloud disabled";
-    }
-    return null;
+  ): Promise<void> => {
+    // 用「假设都装了」来问出**文本本来该用哪一档**：真实解析会在缺模型时退回 zh，
+    // 那样就永远补不上英文模型了。
+    // 只在**已经装了任意一份**模型时才自动补装：这既对应用户那句"装了任意模式就自动开"，
+    // 也避免新用户点一下朗读就静默拉 123–157MB（那种情况请去设置里挑一档，那里有体积与进度）。
+    if (!MODELS.some((model) => service.isInstalled(model))) return;
+    const intended = resolveTtsEngine(text, opts, () => true);
+    if (intended === "engine" || service.isInstalled(intended)) return;
+    await installModel(intended);
   };
 
   /**
@@ -233,7 +248,11 @@ export function registerTtsIpc({
     matcha: { ...states.matcha, installed: service.isInstalled("matcha") },
   }));
 
-  ipcMain.handle("tts.install", async (_event, model: TtsModelKey) => {
+  /**
+   * 装一份 sherpa 模型：按模型的并发守卫、进度事件、装后自检、失败清理。
+   * `tts.install`（用户在设置里点）与朗读前的自动准备共用这一份。
+   */
+  const installModel = async (model: TtsModelKey): Promise<void> => {
     // 守卫**按模型**：中文已装不能把英文的安装挡在门外
     if (
       !MODELS.includes(model) ||
@@ -294,6 +313,10 @@ export function registerTtsIpc({
     } finally {
       installing[model] = false;
     }
+  };
+
+  ipcMain.handle("tts.install", async (_event, model: TtsModelKey) => {
+    await installModel(model);
   });
 
   ipcMain.handle("tts.removeInstall", (_event, model: TtsModelKey) => {
@@ -311,9 +334,9 @@ export function registerTtsIpc({
       text: string,
       opts?: TtsSpeakOptions,
     ): Promise<TtsSpeakResult> => {
-      const blocked = readAloudGate(text, opts);
-      if (blocked) return { ok: false, error: blocked };
-      return service.speak(text, opts);
+      const withTone = withConfiguredTone(opts);
+      await ensureReadAloudModel(text, withTone);
+      return service.speak(text, withTone);
     },
   );
 
@@ -332,11 +355,8 @@ export function registerTtsIpc({
     text: string,
     opts?: TtsSpeakOptions,
   ): Promise<void> => {
-    const blocked = readAloudGate(text, opts);
-    if (blocked) {
-      sendStream({ streamId, type: "error", error: blocked });
-      return;
-    }
+    const withTone = withConfiguredTone(opts);
+    await ensureReadAloudModel(text, withTone);
 
     // 「最佳音质」档：先判可用性，再走引擎。**两种失败都要落到下面的 sherpa 路由**
     // （回退到均衡档），因为设计的不变量是"绝不让用户没声音"：
@@ -348,7 +368,7 @@ export function registerTtsIpc({
     // 只看状态是不够的 —— 退避窗口有 1–5 秒，正好覆盖一句正常的话；那时若只发一条
     // error，用户这一句就是没声音，而设计 §10.5 明确要求"kill 掉引擎 → 下一次说话
     // 自动重启并出声"。
-    if (opts?.tone === "best") {
+    if (withTone.tone === "best") {
       if (!engine.available()) {
         log("[Tts] best tier unavailable, falling back to balanced");
       } else {
@@ -401,7 +421,9 @@ export function registerTtsIpc({
     let seq = 0;
     // 回退与"均衡"档走同一条路：把 tone 换成 balanced，别让 service 再解析回引擎
     const effective =
-      opts?.tone === "best" ? { ...opts, tone: "balanced" as const } : opts;
+      withTone.tone === "best"
+        ? { ...withTone, tone: "balanced" as const }
+        : withTone;
     const result = await service.speak(text, effective, (chunk) => {
       if (cancelled.has(streamId)) return false;
       sendStream({ streamId, type: "chunk", seq: seq++, ...chunk });

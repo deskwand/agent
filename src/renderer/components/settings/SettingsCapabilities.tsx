@@ -7,7 +7,6 @@ import {
   type PermissionKind,
 } from "../../../shared/capabilities";
 import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
-import { ReadAloudSettings } from "./ReadAloudSettings";
 import { VoiceModeSettings } from "./VoiceModeSettings";
 import { VoiceCapabilitySettings } from "./VoiceCapabilitySettings";
 import { OcrCapabilitySettings } from "./OcrCapabilitySettings";
@@ -212,7 +211,6 @@ export function SettingsCapabilities({
 
       <VoiceCapabilitySettings>{voicePermissions}</VoiceCapabilitySettings>
       <OcrCapabilitySettings />
-      <ReadAloudSettings />
       <VoiceModeSettings />
     </div>
   );

@@ -66,9 +66,9 @@ const MANIFEST_KEY_BY_ENGINE: Record<
 /**
  * 一次调用最终会用哪个引擎。**只有这一处**。
  *
- * ipc 那道日志开关的门控也要问同一个问题（"这次会用朗读的模型吗"），两处各写一遍
- * 就会各写一遍地错：`{ prefer: "matcha", engine: "zh" }` 时门控以为要用 matcha
- * 而实际用的是 zh，于是关着开关也照念朗读模型。
+ * ipc 那两个入口也要问同一个问题（"这次会用哪个模型，缺不缺"），两处各写一遍就会
+ * 各写一遍地错：`{ prefer: "matcha", engine: "zh" }` 时一边以为要用 matcha，
+ * 另一边实际用 zh，于是给错的模型做自动补装。
  */
 /** 解析结果：sherpa 的模型键，或"最佳音质"档的引擎（它不是 sherpa 模型）。 */
 export type ResolvedTtsEngine = TtsModelKey | "engine";
