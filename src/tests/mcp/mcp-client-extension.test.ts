@@ -139,6 +139,9 @@ describe("immediate MCP activation", () => {
         if (event === "session_shutdown") shutdown.push(handler);
       },
       registerCommand: vi.fn(),
+      // pi-coding-agent 1.0.1 新增；上游内置 MCP 扩展在注册时就会调它
+      // （`dist/extensions/mcp/index.js:280`），缺了会 TypeError。
+      registerToolRenderer: vi.fn(),
       getAllTools: () => [],
       registerMcpServer: (_name: string, config: McpServerConfig) =>
         registered.push(config),

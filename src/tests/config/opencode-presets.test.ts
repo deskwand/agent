@@ -36,8 +36,15 @@ describe("OpenCode config integration", () => {
     expect(zenModels.some((m) => m.id === "claude-sonnet-4-6")).toBe(true);
     expect(zenModels.some((m) => m.id === "gpt-5.6-luna")).toBe(true);
     expect(goModels.some((m) => m.id === "kimi-k3")).toBe(true);
-    // Go 订阅不含 Claude
-    expect(goModels.some((m) => m.id.startsWith("claude-"))).toBe(false);
+    // Go 订阅不含**高价** Claude 档（opus / sonnet）。
+    // 不再断言「一个 claude 都没有」：0.99.1 的目录里确实没有，但 1.1.0 起上游把
+    // claude-haiku-5-5 也挂进了 opencode-go（该版新增 Haiku 5.5）。那是注册表事实，
+    // 而我们的 opencode 预设本来就走全量注册表（不套 pick 过滤）。
+    expect(
+      goModels.some(
+        (m) => m.id.startsWith("claude-") && !m.id.includes("haiku"),
+      ),
+    ).toBe(false);
   });
 
   it("keeps existing pick-filtered presets unchanged", async () => {

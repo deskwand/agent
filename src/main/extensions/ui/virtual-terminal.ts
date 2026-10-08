@@ -91,6 +91,9 @@ export class VirtualTerminal implements Terminal {
     this.callbacks.onTitleChange(title);
   }
   setProgress(): void {}
+  // pi-tui 1.1.0 新增的必需成员（OSC 7501 程序状态上报）。虚拟终端不是真终端，
+  // 程序状态由宿主 renderer 决定，这里不上报。
+  setProgramStatus(): void {}
 
   /** renderer 按键注入入口 */
   injectInput(data: string): void {

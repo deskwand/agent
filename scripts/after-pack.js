@@ -277,17 +277,34 @@ module.exports = async function afterPack(context) {
     }
   }
 
-  // --- 7. @esbuild: keep only the target platform (~212MB of foreign platform binaries) ---
-  // pi-coding-agent -> chord -> esbuild ships one ~10MB binary per platform (26 dirs), all of
-  // which get installed because pi-coding-agent ships a nested npm-shrinkwrap.json.
+  // --- 7. @esbuild: keep only the target platform (~10MB per foreign platform binary) ---
+  // 裁剪本身没有错：非目标平台的二进制在目标机上永远用不到。错的是两件事。
+  //
+  // ① 日志谎报。旧代码无论在不在目标平台目录，都打印 “kept <target>”。
+  //    这里曾经依赖一个上游事实：`pi-coding-agent -> chord -> esbuild` 把 26 个平台包都
+  //    声明为 optionalDependencies，而 pi-coding-agent 的**嵌套 npm-shrinkwrap.json** 会迫使
+  //    npm 把它们全装下来（共 ~212MB）。1.0.1 起上游移除了 shrinkwrap ⇒ npm 只装宿主平台
+  //    那一个（本机 = darwin-arm64），跨平台构建时目标平台包**根本不存在**。
+  //    实测：win-x64 产物里 `@esbuild/` 是空目录 —— 那本来就是正确结果，只是日志在撒谎。
+  // ② `@earendil-works/chord/node_modules/@esbuild` 这份嵌套副本从来没被扫到过，
+  //    于是每个 Windows / Linux 产物都在白带一个 darwin 二进制。
   // NOTE: do not try this with a per-platform `files` pattern in electron-builder.yml — a
   // platform-level `files` array replaces the top-level `files` list, so the main matcher
   // collapses to `**/*` and local repo junk (.codegraph/codegraph.db, 436MB) gets packed.
-  const esbuildDir = path.join(nmUnpacked, '@esbuild');
-  if (fs.existsSync(esbuildDir)) {
-    const keepDir = `${platform === 'darwin' ? 'darwin' : platform === 'win32' ? 'win32' : 'linux'}-${archName}`;
-    const removed = removeExcept(esbuildDir, [keepDir]);
-    if (removed > 0) console.log(`  ✓ @esbuild: kept ${keepDir}, removed ${removed} other platform dirs (~${removed * 10}MB)`);
+  const esbuildKeepDir = `${platform === 'darwin' ? 'darwin' : platform === 'win32' ? 'win32' : 'linux'}-${archName}`;
+  for (const esbuildDir of [
+    path.join(nmUnpacked, '@esbuild'),
+    path.join(nmUnpacked, '@earendil-works', 'chord', 'node_modules', '@esbuild'),
+  ]) {
+    if (!fs.existsSync(esbuildDir)) continue;
+    const label = path.relative(nmUnpacked, esbuildDir);
+    const hadTarget = fs.existsSync(path.join(esbuildDir, esbuildKeepDir));
+    const removed = removeExcept(esbuildDir, [esbuildKeepDir]);
+    // 没删掉任何东西就什么都不说：空目录是正常状态（npm 只装宿主平台，
+    // 而宿主包已被上一次构建裁掉），不该每次构都刷一行警告。
+    if (removed === 0) continue;
+    if (hadTarget) console.log(`  ✓ @esbuild (${label}): kept ${esbuildKeepDir}, removed ${removed} other platform dirs (~${removed * 10}MB)`);
+    else console.log(`  ⚠ @esbuild (${label}): ${esbuildKeepDir} not installed, removed ${removed} foreign platform dir(s) — npm installs only the host platform since pi-coding-agent dropped its npm-shrinkwrap.json`);
   }
 
   console.log(`✅ after-pack cleanup complete for ${platform}-${archName}\n`);

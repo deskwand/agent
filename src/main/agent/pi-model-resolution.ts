@@ -445,10 +445,32 @@ export function resolvePiRegistryModel(
   // Cross-provider fallback: the same model may appear under multiple
   // providers in the registry (e.g. deepseek-v4-pro is registered under
   // "deepseek", but a custom provider won't match that via candidate lookup).
+  //
+  // 同一个 id 也会被别家“代管”：pi-ai 1.1.0 起目录里同时有
+  // azure/deepseek-v4-pro、opencode/deepseek-v4-pro、qwen-token-plan/... 等 7 份，
+  // 而注册表顺序把 azure（第 4 位）排在 deepseek（第 9 位）前面。它们的 compat
+  // **并不相同** —— azure 那份是 thinkingFormat:"openai" 且没有 maxTokensField，
+  // deepseek 那份是 thinkingFormat:"deepseek" + maxTokensField:"max_tokens"。
+  // 所以“取第一个命中”会静默把请求体方言换掉。
+  // 先找 id 自己点名的那个 provider（deepseek-v4-pro → deepseek），
+  // 找不到才回退到注册表顺序。
   const modelId = modelString.includes("/")
     ? modelString.split("/").slice(1).join("/")
     : modelString;
-  for (const provider of getProviders()) {
+  // 先按「id 自己点名的 provider」找，**长的前缀优先**，全部落空才回退注册表顺序。
+  // 只试第一个前缀命中是不够的：那个 provider 可能并不拥有这个 id，
+  // 而后面某个前缀命中拥有它——那样就会退回「注册表顺序」这个正是本次要消除的
+  // 不确定来源。（当前 1.1.0 目录里没有这种情况，属预防性实现。）
+  const providers = getProviders();
+  for (const provider of providers
+    .filter((provider) => modelId.startsWith(`${provider}-`))
+    .sort((a, b) => b.length - a.length)) {
+    const match = getModels(provider).find((m) => m.id === modelId);
+    if (match) {
+      return applyPiModelRuntimeOverrides(match, options);
+    }
+  }
+  for (const provider of providers) {
     const match = getModels(provider).find((m) => m.id === modelId);
     if (match) {
       return applyPiModelRuntimeOverrides(match, options);

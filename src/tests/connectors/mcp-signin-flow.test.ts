@@ -145,4 +145,46 @@ describe("sign-in lifecycle", () => {
     expect(readCredentials(dir)[URL]?.tokens).toBeUndefined();
     expect(open).not.toHaveBeenCalled();
   });
+
+  it("forwards the authorization response's iss to the code exchange (RFC 9207)", async () => {
+    // 上游 1.1.0 起强制校验 iss：metadata 广告了
+    // authorization_response_iss_parameter_supported 时，iss 为 undefined 会直接抛
+    // OAuthIssuerMismatchError。这里断言我们把回调里的 iss 原样转发过去。
+    vi.spyOn(
+      OAuthCallbackServer.prototype,
+      "waitForCallback",
+    ).mockImplementationOnce(async (state) => ({
+      code: "auth-code-from-as",
+      state,
+      iss: "https://as.example.test",
+    }));
+
+    const result = await begin();
+
+    expect(result).toEqual({ ok: true });
+    expect(vi.mocked(authorizeMcp).mock.calls[1]?.[1]).toMatchObject({
+      authorizationCode: "auth-code-from-as",
+      iss: "https://as.example.test",
+    });
+  });
+
+  it("passes iss through as undefined when the authorization response has none", async () => {
+    // 没发 iss 的服务器：我们传 undefined，上游在自己的 metadata 不支持 RFC 9207 时放行。
+    vi.spyOn(
+      OAuthCallbackServer.prototype,
+      "waitForCallback",
+    ).mockImplementationOnce(async (state) => ({
+      code: "auth-code-from-as",
+      state,
+    }));
+
+    const result = await begin();
+
+    expect(result).toEqual({ ok: true });
+    // 断言「确实发生了第二段调用」且 key 存在值为 undefined —— 只看
+    // `calls[1]?.[1]?.iss` 会在第二段没发生时也通过（可选链吞掉）。
+    const calls = vi.mocked(authorizeMcp).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[1]?.[1]).toHaveProperty("iss", undefined);
+  });
 });

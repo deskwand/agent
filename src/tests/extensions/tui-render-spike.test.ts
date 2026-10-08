@@ -34,6 +34,7 @@ class MemoryTerminal {
   clearScreen() {}
   setTitle() {}
   setProgress() {}
+  setProgramStatus() {}
 }
 
 describe("TUI virtual terminal spike contract", () => {

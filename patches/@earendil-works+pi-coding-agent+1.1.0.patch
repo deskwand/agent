@@ -1,8 +1,8 @@
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-index 07af8cf..7360793 100644
+index c5ad719..1b63076 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/agent-session.js
-@@ -775,7 +775,10 @@ export class AgentSession {
+@@ -798,7 +798,10 @@ export class AgentSession {
          if (this._agentRunAbortRequested)
              return false;
          const settings = this.settingsManager.getRetrySettings();
@@ -14,7 +14,7 @@ index 07af8cf..7360793 100644
              return false;
          }
          for (let i = event.messages.length - 1; i >= 0; i--) {
-@@ -2952,7 +2955,7 @@ export class AgentSession {
+@@ -3031,7 +3034,7 @@ export class AgentSession {
              return false;
          }
          this._retryAttempt++;
@@ -24,7 +24,7 @@ index 07af8cf..7360793 100644
              this._retryAttempt--;
              return false;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
-index 249c082..1392906 100644
+index f9292e8..7947b31 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/loader.js
 @@ -39,16 +39,186 @@ function getAliases() {
@@ -230,7 +230,7 @@ index 249c082..1392906 100644
  }
  let extensionCacheCwd;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
-index 99a2a9b..a1a369c 100644
+index 6f182c2..e8faa04 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.d.ts
 @@ -25,6 +25,8 @@ export interface RetrySettings {
@@ -242,7 +242,7 @@ index 99a2a9b..a1a369c 100644
      provider?: ProviderRetrySettings;
  }
  export type TuiMode = RendererTuiMode;
-@@ -270,6 +272,7 @@ export declare class SettingsManager {
+@@ -285,6 +287,7 @@ export declare class SettingsManager {
          maxRetries: number;
          baseDelayMs: number;
          maxAgentDelayMs: number;
@@ -251,10 +251,10 @@ index 99a2a9b..a1a369c 100644
      getHttpIdleTimeoutMs(): number;
      setHttpIdleTimeoutMs(timeoutMs: number): void;
 diff --git a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
-index 0a2b0f5..4093abb 100644
+index 89bc08c..a9673c8 100644
 --- a/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
 +++ b/node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js
-@@ -662,6 +662,7 @@ export class SettingsManager {
+@@ -686,6 +686,7 @@ export class SettingsManager {
              maxRetries: this.settings.retry?.maxRetries ?? 3,
              baseDelayMs: this.settings.retry?.baseDelayMs ?? 2000,
              maxAgentDelayMs: this.settings.retry?.maxAgentDelayMs ?? DEFAULT_MAX_AGENT_RETRY_DELAY_MS,

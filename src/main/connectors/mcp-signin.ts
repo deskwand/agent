@@ -336,6 +336,10 @@ export async function startSignIn(opts: SignInOptions): Promise<ActionResult> {
     await authorizeMcp(provider, {
       serverUrl: url,
       authorizationCode: callbackResult.code,
+      // RFC 9207：把授权响应里的 iss 原样转发。上游 1.1.0 起
+      // authorization_response_iss_parameter_supported 为 true 时，iss 缺失会抛
+      // OAuthIssuerMismatchError（旧版 0.99.1 完全没有这个校验）。
+      iss: callbackResult.iss,
       fetch: oauthFetch,
     });
     signal.throwIfAborted();
