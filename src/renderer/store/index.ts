@@ -569,6 +569,15 @@ interface AppState {
   /** 最小化到悬浮小球：运行时仍在，只是不占满屏。 */
   voiceModeMinimized: boolean;
   setVoiceModeMinimized: (minimized: boolean) => void;
+  /** 语音静音：从 VoiceModeHost 的局部 state 上移 —— header 卡片要能写回它。 */
+  voiceModeMuted: boolean;
+  setVoiceModeMuted: (muted: boolean) => void;
+  /**
+   * 迷你卡片要显示的那一行字幕（含「已静音」这类状态文案）；null = 没有语音会话。
+   * 存的是**算好的字符串**：字幕规则只留在宿主一处，header 端零规则。
+   */
+  voiceMiniCaption: string | null;
+  setVoiceMiniCaption: (caption: string | null) => void;
   openVoiceMode: (sessionId: string) => void;
   closeVoiceMode: () => void;
   setReadAloud: (patch: Partial<ReadAloudState>) => void;
@@ -715,6 +724,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   voiceModeOpen: false,
   voiceModeSessionId: null,
   voiceModeMinimized: false,
+  voiceModeMuted: false,
+  voiceMiniCaption: null,
   readAloud: {
     messageId: null,
     status: "idle",
@@ -1959,6 +1970,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }),
 
   setVoiceModeMinimized: (minimized) => set({ voiceModeMinimized: minimized }),
+  setVoiceModeMuted: (muted) => set({ voiceModeMuted: muted }),
+  setVoiceMiniCaption: (caption) => set({ voiceMiniCaption: caption }),
 
   openVoiceMode: (sessionId) => {
     if (!get().sessions.some((s) => s.id === sessionId && s.kind === "voice"))
@@ -1967,6 +1980,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       voiceModeOpen: true,
       voiceModeSessionId: sessionId,
       voiceModeMinimized: false,
+      // 换会话即归零：与「宿主重建」的既有语义一致
+      voiceModeMuted: false,
+      voiceMiniCaption: null,
     });
   },
   closeVoiceMode: () =>
@@ -1974,6 +1990,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       voiceModeOpen: false,
       voiceModeSessionId: null,
       voiceModeMinimized: false,
+      voiceMiniCaption: null, // 图标据此消失
     }),
 
   // Read aloud actions：每次都是新对象，zustand 的引用比较才能触发重渲染。

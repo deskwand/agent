@@ -2276,7 +2276,9 @@
     "listenPosition": "{{index}} / {{total}}",
     "listenFailed": "Speech synthesis failed",
     "listenEmpty": "No spoken scripts to play yet",
-    "listenSentence": "Sentence {{current}} / {{total}}"
+    "listenSentence": "Sentence {{current}} / {{total}}",
+    "listenPlayWith": "Play: {{title}}",
+    "listenPauseWith": "Pause: {{title}}"
   },
   "navRail": {
     "newVoiceSession": "New voice session",

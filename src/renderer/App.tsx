@@ -52,7 +52,6 @@ import { SandboxSetupDialog } from "./components/SandboxSetupDialog";
 import { SandboxSyncToast } from "./components/SandboxSyncToast";
 import { GlobalNoticeToast } from "./components/GlobalNoticeToast";
 import { ImageLightbox } from "./components/ImageLightbox";
-import { FeedPlayerBar } from "./components/FeedPlayerBar";
 import { useImageLightboxState } from "./store/selectors";
 import { PanelErrorBoundary } from "./components/PanelErrorBoundary";
 import type { AppConfig } from "./types";
@@ -832,8 +831,6 @@ function App() {
           }
         />
       ) : null}
-
-      <FeedPlayerBar />
     </div>
   );
 }

@@ -15,50 +15,12 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
 import { Tooltip } from "./Tooltip";
+import { TitlebarButton } from "./TitlebarButton";
+import { VoiceMiniButton } from "./voice-mode/VoiceMiniButton";
+import { FeedListenButton } from "./FeedListenButton";
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin";
-
-interface TitlebarButtonProps {
-  /** 气泡文案，同时用作 aria-label。调用方负责 i18n。 */
-  label: string;
-  /** 面板已开启。注意与 CSS :active 伪类（物理按下）不是一回事。 */
-  isOn?: boolean;
-  /** 静止时的图标色。仅未开启时生效。 */
-  tone?: "muted" | "secondary";
-  onClick?: () => void;
-  children: React.ReactNode;
-}
-
-function TitlebarButton({
-  label,
-  isOn = false,
-  tone = "muted",
-  onClick,
-  children,
-}: TitlebarButtonProps) {
-  // 已开启与未开启是两套互斥的 class 组合，不是靠 CSS 优先级叠加：
-  // Tailwind 输出的 hover: 变体晚于无前缀的 bg-overlay-on，同时存在时会把
-  // 已开启背景盖掉。
-  const stateClasses = isOn
-    ? "bg-overlay-on text-accent active:scale-[0.96] active:duration-75"
-    : `hover:bg-overlay-hover hover:text-text-primary active:bg-overlay-press active:scale-[0.96] active:duration-75 ${
-        tone === "secondary" ? "text-text-secondary" : "text-text-muted"
-      }`;
-
-  return (
-    <Tooltip label={label}>
-      <button
-        type="button"
-        onClick={onClick}
-        aria-label={label}
-        className={`w-7 h-7 rounded-control grid place-items-center transition-[background-color,color,transform] duration-150 ${stateClasses}`}
-      >
-        {children}
-      </button>
-    </Tooltip>
-  );
-}
 
 export function Titlebar() {
   const { t } = useTranslation();
@@ -194,6 +156,13 @@ export function Titlebar() {
       </div>
 
       <div className="flex items-center">
+        <div
+          data-testid="titlebar-widgets"
+          className="titlebar-no-drag flex items-center gap-0.5"
+        >
+          <VoiceMiniButton />
+          <FeedListenButton />
+        </div>
         {rightToolbar}
 
         {/* Window Controls (for Windows/Linux - macOS uses native traffic lights) */}

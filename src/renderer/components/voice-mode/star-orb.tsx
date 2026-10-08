@@ -133,6 +133,13 @@ export const GLOW_BRUSH: GlowBrush = {
  * 浅底用深色粒子、深底用浅色粒子。数值取自原型
  * `design-docs/2026-10-06-mini-orb-theme-brush/option2-v2.html` 的 ②-3 档。
  */
+
+/**
+ * 注意：`STARS_BRUSH_*` 目前**没有生产使用者** —— 唯一的那颗迷你球（右下角）已在
+ * 2026-10-08 搬进 header 并改成静态状态点。保留常量与 `brush.kind === "stars"`
+ * 分支是有意的：浮层那颗球永远用 `GLOW_BRUSH`，而 stars 那一支是完整的绘制实现，
+ * 删它要动 500 多行的球体核心，收益只是少几十行不可达代码。
+ */
 export const STARS_BRUSH_LIGHT: StarsBrush = {
   kind: "stars",
   palette: ["22,32,88", "43,60,150", "74,90,192", "52,40,120"],

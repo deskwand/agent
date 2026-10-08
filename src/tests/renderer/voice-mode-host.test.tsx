@@ -64,10 +64,7 @@ vi.mock("../../renderer/components/voice-mode/star-orb", () => ({
 }));
 
 import { VoiceModeHost } from "../../renderer/components/voice-mode/VoiceModeHost";
-import {
-  STARS_BRUSH_DARK,
-  STARS_BRUSH_LIGHT,
-} from "../../renderer/components/voice-mode/star-orb";
+import { VoiceMiniButton } from "../../renderer/components/voice-mode/VoiceMiniButton";
 
 function session(id: string, kind: Session["kind"] = "voice"): Session {
   return {
@@ -121,14 +118,27 @@ function renderHost() {
   });
 }
 
+/** 宿主 + header 里那颗卡片：静音的真实链路要跨这两个组件。 */
+function renderHostWithCard() {
+  act(() => {
+    root.render(
+      <>
+        <VoiceMiniButton />
+        <VoiceModeHost sessionId="V" onSendQuestion={() => true} />
+      </>,
+    );
+  });
+}
+
 describe("VoiceModeHost", () => {
   it("人在语音会话上就画全屏", () => {
     renderHost();
     expect(
       container.querySelector('[data-testid="voice-minimize"]'),
     ).not.toBeNull();
+    // 挂件（小球 + 卡片）不在这里：它们在 header 的 VoiceMiniButton 里
     expect(
-      container.querySelector('[data-testid="voice-mini-bar"]'),
+      container.querySelector('[data-testid="voice-mini-orb"]'),
     ).toBeNull();
   });
 
@@ -144,15 +154,13 @@ describe("VoiceModeHost", () => {
     expect(line()).toBe("这是正在念的那一段。");
   });
 
-  it("切到别的会话只换成小球，运行时一个也不重启、不停止", () => {
+  it("切到别的会话只收进 header 图标，运行时一个也不重启、不停止", () => {
     renderHost();
     expect(runtime.runs.length).toBe(1);
     act(() => {
       useAppStore.getState().setActiveSession("O");
     });
-    expect(
-      container.querySelector('[data-testid="voice-mini-bar"]'),
-    ).not.toBeNull();
+    expect(useAppStore.getState().voiceModeMinimized).toBe(true);
     expect(
       container.querySelector('[data-testid="voice-minimize"]'),
     ).toBeNull();
@@ -184,8 +192,8 @@ describe("VoiceModeHost", () => {
     });
     expect(useAppStore.getState().voiceModeMinimized).toBe(true);
     expect(
-      container.querySelector('[data-testid="voice-mini-bar"]'),
-    ).not.toBeNull();
+      container.querySelector('[data-testid="voice-minimize"]'),
+    ).toBeNull();
   });
 
   it("切到别的视图（设置）也一样收进小球", () => {
@@ -194,9 +202,6 @@ describe("VoiceModeHost", () => {
       useAppStore.getState().setActiveView("settings");
     });
     expect(useAppStore.getState().voiceModeMinimized).toBe(true);
-    expect(
-      container.querySelector('[data-testid="voice-mini-bar"]'),
-    ).not.toBeNull();
     act(() => {
       useAppStore.getState().setActiveView("chat");
     });
@@ -205,8 +210,30 @@ describe("VoiceModeHost", () => {
     ).not.toBeNull();
   });
 
-  it("静音按钮切换运行时，图标跟着变", () => {
+  it("store 里的静音会走到运行时（header 卡片的写入路径）", () => {
     renderHost();
+    act(() => useAppStore.setState({ voiceModeMuted: true }));
+    expect(runtime.convs[0].setMuted).toHaveBeenCalledWith(true);
+    act(() => useAppStore.setState({ voiceModeMuted: false }));
+    expect(runtime.convs[0].setMuted).toHaveBeenLastCalledWith(false);
+  });
+
+  it("宿主把算好的那一行字幕发布到 store（header 卡片据此渲染）", () => {
+    renderHost();
+    expect(useAppStore.getState().voiceMiniCaption).not.toBeNull();
+  });
+
+  it("出错时报错文字优先，盖过正在念的内容", () => {
+    renderHost();
+    act(() => runtime.runs[0]!.onSentence(0, "这是正在念的一段。"));
+    expect(useAppStore.getState().voiceMiniCaption).toBe("这是正在念的一段。");
+
+    act(() => runtime.runs[0]!.onError("VOICE_MIC_DENIED"));
+    expect(useAppStore.getState().voiceMiniCaption).toBe("chat.voiceMicDenied");
+  });
+
+  it("点 header 卡片上的静音，运行时真的被静音（跨组件链路）", () => {
+    renderHostWithCard();
     act(() => {
       useAppStore.getState().setActiveSession("O");
     });
@@ -224,49 +251,9 @@ describe("VoiceModeHost", () => {
     expect(runtime.convs[0].setMuted).toHaveBeenLastCalledWith(false);
   });
 
-  it("主题变化时小球的画笔跟着主题走", () => {
-    renderHost();
-    // 人在别的会话 → 宿主画小球（在语音会话上时画的是全屏，那支是 GLOW_BRUSH）
-    act(() => {
-      useAppStore.getState().setActiveSession("O");
-    });
-    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_LIGHT);
-
-    act(() => {
-      useAppStore.setState((s) => ({
-        settings: { ...s.settings, theme: "dark" },
-      }));
-    });
-    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_DARK);
-
-    act(() => {
-      useAppStore.setState((s) => ({
-        settings: { ...s.settings, theme: "light" },
-      }));
-    });
-    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_LIGHT);
-  });
-
-  it("system 主题跟随 systemDarkMode", () => {
-    renderHost();
-    act(() => {
-      useAppStore.getState().setActiveSession("O");
-    });
-    act(() => {
-      useAppStore.setState((s) => ({
-        settings: { ...s.settings, theme: "system" },
-      }));
-    });
-    act(() => {
-      useAppStore.getState().setSystemDarkMode(true);
-    });
-    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_DARK);
-
-    act(() => {
-      useAppStore.getState().setSystemDarkMode(false);
-    });
-    expect(orb.brushes.at(-1)).toBe(STARS_BRUSH_LIGHT);
-  });
+  // 这里原有两条「小球的画笔跟着主题走」用例：STARS 画笔的最后一个使用者
+  // （右下角那颗星球球）已在本次搬动中消失 —— 它变成 header 里的静态状态点，
+  // 不带画笔。全屏那侧仍由 voice-mode-overlay.test.tsx 锁着 GLOW_BRUSH。
 
   it("换语音会话时旧运行时被卸载：停麦、换新", () => {
     renderHost();

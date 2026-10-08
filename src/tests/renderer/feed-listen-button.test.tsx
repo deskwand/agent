@@ -10,7 +10,7 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-import { FeedPlayerBar } from "../../renderer/components/FeedPlayerBar";
+import { FeedListenButton } from "../../renderer/components/FeedListenButton";
 import { setFeedListenControllerForTests } from "../../renderer/hooks/useFeedListen";
 import { useAppStore } from "../../renderer/store";
 
@@ -48,6 +48,25 @@ function sessionWith(index: number, skipped = 0) {
   };
 }
 
+/** 假控制器：只记录 toggle 之类的调用 —— 不碰 AudioContext。 */
+function fakeController() {
+  const toggle = vi.fn();
+  setFeedListenControllerForTests({
+    getState: () => ({
+      session: null,
+      status: "idle",
+      progress: null,
+      skipped: 0,
+    }),
+    start: vi.fn(),
+    toggle,
+    next: vi.fn(),
+    prev: vi.fn(),
+    stop: vi.fn(),
+  });
+  return { toggle };
+}
+
 function el(testid: string): HTMLElement {
   return container.querySelector(`[data-testid="${testid}"]`) as HTMLElement;
 }
@@ -69,74 +88,64 @@ afterEach(async () => {
 });
 
 function render() {
-  act(() => root.render(<FeedPlayerBar />));
+  act(() => root.render(<FeedListenButton />));
 }
 
-describe("FeedPlayerBar", () => {
-  it("没有会话时不渲染任何东西", () => {
+describe("FeedListenButton", () => {
+  it("没有收听会话时不渲染这个图标", () => {
     render();
     expect(
-      container.querySelector('[data-testid="feed-player-bar"]'),
+      container.querySelector('[data-testid="feed-listen-widget"]'),
     ).toBeNull();
   });
 
-  it("是右下角挂件、不占布局（照语音小球），胶囊只留四个元素", () => {
+  it("是 header 里的图标 + 下拉卡片（不再有右下角浮条）", () => {
     useAppStore.setState({ feedListen: sessionWith(0) });
     render();
-    // 悬浮在右下角：不占布局、不缩短内容区（底部通栏那版已被否决）
-    expect(el("feed-player-bar").className).toContain("fixed");
-    expect(el("feed-player-bar").className).toContain("right-4");
-    expect(el("feed-player-bar").className).toContain("bottom-4");
-    // 胶囊尺寸语言与 VoiceMiniBar 一致
-    const capsule = el("feed-player-title").parentElement as HTMLElement;
-    expect(capsule.className).toContain("max-w-[22rem]");
-    expect(capsule.className).toContain("rounded-full");
-    expect(el("feed-player-title").textContent).toBe("标题 A");
-    expect(el("feed-player-toggle-capsule")).not.toBeNull();
-    expect(el("feed-player-close-capsule")).not.toBeNull();
-  });
+    const widget = el("feed-listen-widget");
+    // 图标容器与卡片自己都在拖拽区之外（否则点不动、还会拖窗）
+    expect(widget.className).toContain("titlebar-no-drag");
+    expect(el("feed-listen-button")).not.toBeNull();
 
-  it("沙箱 Toast 在场时抬到 bottom-20（照 VoiceMiniBar 的让位）", () => {
-    useAppStore.setState({
-      feedListen: sessionWith(0),
-      sandboxSyncStatus: {
-        sessionId: "s1",
-        phase: "error",
-        message: "同步失败",
-      },
-    });
-    render();
-    expect(el("feed-player-bar").className).toContain("bottom-20");
-    expect(el("feed-player-bar").className).not.toContain("bottom-4");
-  });
-
-  it("展开卡片默认不可见（hover / focus 才现）", () => {
-    useAppStore.setState({ feedListen: sessionWith(0) });
-    render();
-    const card = el("feed-player-card");
+    const card = el("feed-listen-card");
+    expect(card.className).toContain("titlebar-no-drag");
     expect(card.className).toContain("invisible");
     expect(card.className).toContain("group-hover:visible");
     expect(card.className).toContain("group-focus-within:visible");
+    expect(card.className).toContain("top-full");
+    // 层级：盖过产物面板（z-50）但不盖灯箱（z-[100]）
+    expect(card.className).toContain("z-[60]");
   });
 
-  it("卡片里放收起态放不下的东西：条目号、逐句进度、跳过提示、上下条", () => {
+  it("点图标会真的暂停（不是只改文案）", () => {
+    const { toggle } = fakeController();
+    useAppStore.setState({ feedListen: sessionWith(0) });
+    render();
+    act(() => {
+      (el("feed-listen-button").closest("button") as HTMLButtonElement).click();
+    });
+    expect(toggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("卡片里放图标放不下的东西：条目号、逐句进度、跳过提示、上下条", () => {
     useAppStore.setState({ feedListen: sessionWith(1, 2) });
     render();
-    const card = el("feed-player-card");
+    const card = el("feed-listen-card");
     expect(card.textContent).toContain("feed.listenPosition");
     expect(card.textContent).toContain('"index":2');
     expect(card.textContent).toContain('"total":2');
     expect(card.textContent).toContain("feed.listenSentence");
     expect(card.textContent).toContain("feed.listenSkipped");
     expect(card.textContent).toContain('"count":2');
-    expect(el("feed-player-progress")).not.toBeNull();
+    expect(el("feed-listen-title").textContent).toBe("标题 B");
+    expect(el("feed-listen-progress")).not.toBeNull();
   });
 
   it("首条时「上一条」禁用、末条时「下一条」禁用", () => {
     useAppStore.setState({ feedListen: sessionWith(0) });
     render();
-    expect((el("feed-player-prev") as HTMLButtonElement).disabled).toBe(true);
-    expect((el("feed-player-next") as HTMLButtonElement).disabled).toBe(false);
+    expect((el("feed-listen-prev") as HTMLButtonElement).disabled).toBe(true);
+    expect((el("feed-listen-next") as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("preparing 期间图标是「暂停」（点下去真的会挂起队列）", () => {
@@ -144,7 +153,7 @@ describe("FeedPlayerBar", () => {
       feedListen: { ...sessionWith(0), status: "preparing" },
     });
     render();
-    expect(el("feed-player-toggle").getAttribute("aria-label")).toBe(
+    expect(el("feed-listen-toggle").getAttribute("aria-label")).toBe(
       "feed.listenPause",
     );
   });

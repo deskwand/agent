@@ -2273,7 +2273,9 @@
     "listenPosition": "第 {{index}} / {{total}} 条",
     "listenFailed": "合成失败",
     "listenEmpty": "暂无可播放的口播稿",
-    "listenSentence": "第 {{current}} / {{total}} 句"
+    "listenSentence": "第 {{current}} / {{total}} 句",
+    "listenPlayWith": "播放：{{title}}",
+    "listenPauseWith": "暂停：{{title}}"
   },
   "navRail": {
     "newVoiceSession": "新建语音会话",

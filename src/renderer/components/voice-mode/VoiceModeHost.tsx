@@ -10,13 +10,14 @@
  * **最小化只在跳变上改**：进入语音会话展开、离开语音会话收起。写成「active
  * 为真就展开」的话，用户显式点了最小化会立刻被撤销。
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
-import { useEffectiveTheme } from "../../store/selectors";
 import { useVoiceMode } from "../../hooks/useVoiceMode";
 import { VoiceModeOverlay } from "../VoiceModeOverlay";
-import { VoiceMiniBar } from "./VoiceMiniBar";
-import { STARS_BRUSH_DARK, STARS_BRUSH_LIGHT } from "./star-orb";
+import { CAPTION_KEY } from "./orb-state";
+import { VOICE_MESSAGE_KEYS } from "../../hooks/useVoiceInput";
+import { voiceCaptionLine } from "../../utils/voice/voice-caption";
 
 export interface VoiceModeHostProps {
   sessionId: string;
@@ -28,16 +29,16 @@ export function VoiceModeHost({
   sessionId,
   onSendQuestion,
 }: VoiceModeHostProps): JSX.Element {
+  const { t } = useTranslation();
   const activeView = useAppStore((s) => s.activeView);
   const activeSessionId = useAppStore((s) => s.activeSessionId);
   const minimized = useAppStore((s) => s.voiceModeMinimized);
-  // 小球要按主题换画笔：浅底用深色粒子。全屏那颗不受主题影响（永远深底）。
-  const isDark = useEffectiveTheme() === "dark";
   const setMinimized = useAppStore((s) => s.setVoiceModeMinimized);
   const closeVoiceMode = useAppStore((s) => s.closeVoiceMode);
-  // 静音是本地的运行时 UI 状态：宿主跨最小化 / 展开不卸载，所以活得下来；
-  // 换语音会话时宿主重建，它自动归零 —— 这正是想要的语义。
-  const [muted, setMuted] = useState(false);
+  // 静音不再挂在这里的局部 state：header 卡片要读它、要写它（两处必须一致）。
+  // 音频帧级的 `view.level` 仍只留在宿主：它是高频值，不进 store。
+  const muted = useAppStore((s) => s.voiceModeMuted);
+  const setMiniCaption = useAppStore((s) => s.setVoiceMiniCaption);
   const isCompacting = useAppStore(
     (s) => s.sessionStates[sessionId]?.compaction.status === "running",
   );
@@ -57,23 +58,27 @@ export function VoiceModeHost({
     setMinimized(!active);
   }, [active, setMinimized]);
 
-  if (active && !minimized)
-    return (
-      <VoiceModeOverlay
-        view={view}
-        onClose={closeVoiceMode}
-        onMinimize={() => setMinimized(true)}
-      />
-    );
+  // header 卡片要显示的那一行（错误 → 消息、否则实时字幕、空则状态文案）。
+  // 浮层那份是既有的第二份拷贝（`VoiceModeOverlay.tsx` 自己算状态行），本次没动它。
+  // 依赖是**字符串本身** —— `view.level` 每 100ms 变一次，但字幕不变就不会写 store。
+  const caption = view.error
+    ? t(VOICE_MESSAGE_KEYS[view.error])
+    : voiceCaptionLine(view) || t(CAPTION_KEY[view.state]);
+  useEffect(() => {
+    setMiniCaption(caption);
+  }, [setMiniCaption, caption]);
+  // 宿主卸载（会话关闭）时清掉：图标据此消失
+  useEffect(() => () => setMiniCaption(null), [setMiniCaption]);
+
+  // 最小化后什么都不画：那颗球与它的卡片在 header 里（`VoiceMiniButton`），
+  // 这里只负责运行时与全屏浮层。
+  if (!active || minimized) return <></>;
 
   return (
-    <VoiceMiniBar
+    <VoiceModeOverlay
       view={view}
-      muted={muted}
-      brush={isDark ? STARS_BRUSH_DARK : STARS_BRUSH_LIGHT}
-      onExpand={() => setMinimized(false)}
-      onToggleMute={() => setMuted((prev) => !prev)}
-      onEnd={closeVoiceMode}
+      onClose={closeVoiceMode}
+      onMinimize={() => setMinimized(true)}
     />
   );
 }
