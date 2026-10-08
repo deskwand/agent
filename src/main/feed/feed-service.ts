@@ -265,6 +265,7 @@ export class FeedService {
         body: draft.candidate.body,
         body_status: draft.candidate.bodyStatus,
         excerpt: draft.excerpt,
+        script: draft.script,
         image_url: draft.candidate.imageUrl ?? null,
         image_file: image?.fileName ?? null,
         image_status: image
@@ -346,14 +347,11 @@ export class FeedService {
   list(): FeedSnapshot {
     const items = this.deps.db.feedItems
       .listVisible(MAX_ITEMS_KEPT)
-      .map((row) => {
-        const { body: _body, excerpt: _excerpt, ...rest } = row;
+      .map((row) => ({
         // DB 里存的是文件名，对外给签名 URL：渲染层无法自造 URL
-        return {
-          ...rest,
-          imageUrl: row.image_file ? buildFeedImageUrl(row.image_file) : null,
-        };
-      });
+        ...stripHeavyFeedFields(row),
+        imageUrl: row.image_file ? buildFeedImageUrl(row.image_file) : null,
+      }));
     return {
       enabled: this.deps.getConfig().enabled === true,
       items,
@@ -369,7 +367,17 @@ export class FeedService {
       body: row.body,
       bodyStatus: row.body_status,
       excerpt: row.excerpt,
+      hasScript: row.script !== null,
     };
+  }
+
+  /** 收听会话开始前一次取回整队稿子；缺稿给 null（键一定在，调用方不必判 undefined）。 */
+  getScripts(ids: string[]): Record<string, string | null> {
+    const out: Record<string, string | null> = {};
+    for (const id of ids) {
+      out[id] = this.deps.db.feedItems.get(id)?.script ?? null;
+    }
+    return out;
   }
 
   markRead(id: string): number {
@@ -431,3 +439,20 @@ export class FeedService {
 
 /** 供调度器与测试复用：把一个候选 URL 变成去重键。 */
 export const toUrlKey = normalizeUrlKey;
+
+/**
+ * 快照的条目：剥掉三个重字段（body / excerpt / script），**不改动入参**。
+ *
+ * 不用解构丢弃（`const { body: _body, ...rest } = row`）：那会解构出三个未使用变量、
+ * 触发 `no-unused-vars`（本文件原先因此背了两个 error）。删键的写法意图也更直接 ——
+ * 这三个字段就是不能出现在快照里（设计 §5）。
+ */
+function stripHeavyFeedFields(
+  row: FeedItemRow,
+): Omit<FeedItemRow, "body" | "excerpt" | "script"> {
+  const copy: Partial<FeedItemRow> = { ...row };
+  delete copy.body;
+  delete copy.excerpt;
+  delete copy.script;
+  return copy as Omit<FeedItemRow, "body" | "excerpt" | "script">;
+}

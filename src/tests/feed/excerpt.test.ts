@@ -28,6 +28,7 @@ function draft(overrides: Partial<FeedItemDraft> = {}): FeedItemDraft {
     topic: "主题",
     relevance: "理由",
     excerpt: null,
+    script: null,
     unprocessed: 0,
     ...overrides,
   };
@@ -79,23 +80,59 @@ describe("cleanExcerpt", () => {
 });
 
 describe("writeExcerpts", () => {
-  it("逐条写，结果填进各自的 excerpt", async () => {
-    const complete = vi.fn(async () => "第一段摘录。");
+  const isScript = (prompt: { systemPrompt: string }) =>
+    prompt.systemPrompt.includes("spoken-word");
+
+  it("逐条写：摘录与稿子各写一次，结果填进各自字段", async () => {
+    const complete = vi.fn(async (prompt: { systemPrompt: string }) =>
+      isScript(prompt) ? "口播稿。" : "第一段摘录。",
+    );
     const out = await writeExcerpts({
       drafts: [draft()],
       locale: "zh-CN",
       complete,
     });
     expect(out[0]?.excerpt).toBe("第一段摘录。");
-    expect(complete).toHaveBeenCalledTimes(1);
+    expect(out[0]?.script).toBe("口播稿。");
+    expect(
+      complete.mock.calls.filter(([prompt]) => !isScript(prompt)),
+    ).toHaveLength(1);
   });
 
-  it("某条抛错只丢那一条，不中断后面的", async () => {
-    let call = 0;
-    const complete = vi.fn(async () => {
-      call += 1;
-      if (call === 2) throw new Error("boom");
-      return `第 ${call} 段摘录。`;
+  it("摘录与口播稿并发写：一方失败不牵连另一方", async () => {
+    const complete = vi.fn(async (prompt: { systemPrompt: string }) => {
+      if (isScript(prompt)) return "口播稿写好了。";
+      throw new Error("excerpt boom");
+    });
+    const [out] = await writeExcerpts({
+      drafts: [draft()],
+      locale: "zh-CN",
+      complete,
+    });
+    expect(out.excerpt).toBeNull();
+    expect(out.script).toBe("口播稿写好了。");
+  });
+
+  it("两个调用是并发的，不是串行", async () => {
+    const order: string[] = [];
+    const complete = vi.fn(async (prompt: { systemPrompt: string }) => {
+      const kind = isScript(prompt) ? "script" : "excerpt";
+      order.push(`${kind}:start`);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      order.push(`${kind}:end`);
+      return "内容";
+    });
+    await writeExcerpts({ drafts: [draft()], locale: "zh-CN", complete });
+    expect(order.slice(0, 2).sort()).toEqual(["excerpt:start", "script:start"]);
+  });
+
+  it("某条抛错只丢那一条，不中断后面的（摘录失败不连坐稿子）", async () => {
+    let excerptCall = 0;
+    const complete = vi.fn(async (prompt: { systemPrompt: string }) => {
+      if (isScript(prompt)) return "口播稿。";
+      excerptCall += 1;
+      if (excerptCall === 2) throw new Error("boom");
+      return `第 ${excerptCall} 段摘录。`;
     });
     const out = await writeExcerpts({
       drafts: [draft(), draft(), draft()],
@@ -107,16 +144,25 @@ describe("writeExcerpts", () => {
       null,
       "第 3 段摘录。",
     ]);
+    expect(out.map((entry) => entry.script)).toEqual([
+      "口播稿。",
+      "口播稿。",
+      "口播稿。",
+    ]);
   });
 
-  it("compose 兜底产物（unprocessed: 1）不写摘录，也不发请求", async () => {
-    const complete = vi.fn(async () => "不该被调用");
+  it("compose 兜底产物（unprocessed: 1）摘录与稿子都不写、不发请求", async () => {
+    const complete = vi.fn(async (prompt: { systemPrompt: string }) =>
+      isScript(prompt) ? "口播稿。" : "摘录。",
+    );
     const out = await writeExcerpts({
       drafts: [draft({ unprocessed: 1 }), draft()],
       locale: "zh-CN",
       complete,
     });
     expect(out[0]?.excerpt).toBeNull();
-    expect(complete).toHaveBeenCalledTimes(1);
+    expect(out[0]?.script).toBeNull();
+    // 只有第二条发了请求：两次（摘录 + 稿子），不是四次
+    expect(complete).toHaveBeenCalledTimes(2);
   });
 });

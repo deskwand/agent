@@ -2264,7 +2264,19 @@
     "reasonsBlockTopic": "Stop following",
     "reasonsBlocked": "Blocked — click to restore",
     "railLabel": "Feed",
-    "railLabelUnread": "Feed, {{count}} unread"
+    "railLabelUnread": "Feed, {{count}} unread",
+    "listenAll": "Listen to all",
+    "listenItem": "Listen to this",
+    "listenPlay": "Play",
+    "listenPause": "Pause",
+    "listenPrev": "Previous",
+    "listenNext": "Next",
+    "listenClose": "Close",
+    "listenSkipped": "Skipped {{count}}",
+    "listenPosition": "{{index}} / {{total}}",
+    "listenFailed": "Speech synthesis failed",
+    "listenEmpty": "No spoken scripts to play yet",
+    "listenSentence": "Sentence {{current}} / {{total}}"
   },
   "navRail": {
     "newVoiceSession": "New voice session",

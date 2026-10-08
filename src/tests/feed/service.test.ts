@@ -7,6 +7,7 @@ import {
   closeDatabase,
   initDatabase,
   type DatabaseInstance,
+  type FeedItemRow,
 } from "../../main/db/database";
 import { FeedService } from "../../main/feed/feed-service";
 import type { FeedPhase } from "../../main/feed/feed-service";
@@ -80,6 +81,36 @@ function makeService(overrides: Record<string, unknown> = {}) {
     ...overrides,
   });
   return { service, phases, events };
+}
+
+/** 直接往库里塞一条：测 getBody / getScripts 这类读路径时不必跑整条管线。 */
+function seedItem(overrides: Partial<FeedItemRow> = {}): FeedItemRow {
+  const row: FeedItemRow = {
+    id: "a",
+    run_id: "r1",
+    title: "标题",
+    summary: null,
+    url: "https://a.com/1",
+    url_key: "a.com/1",
+    source_host: "a.com",
+    topic: null,
+    relevance: null,
+    body: "正文",
+    body_status: "ok",
+    excerpt: "摘录",
+    script: null,
+    image_url: null,
+    image_file: null,
+    image_status: "none",
+    created_at: NOW,
+    read_at: null,
+    dismissed_at: null,
+    unprocessed: 0,
+    published_at: null,
+    ...overrides,
+  };
+  db.feedItems.insert(row);
+  return row;
 }
 
 beforeEach(() => {
@@ -228,6 +259,35 @@ describe("FeedService.refresh", () => {
 });
 
 describe("FeedService 读与改", () => {
+  it("getScripts 批量返回稿子，缺的给 null（不是省略键）", () => {
+    seedItem({ id: "a", script: "稿子 A" });
+    seedItem({ id: "b", url_key: "example.com/b" });
+    const { service } = makeService();
+    expect(service.getScripts(["a", "b", "missing"])).toEqual({
+      a: "稿子 A",
+      b: null,
+      missing: null,
+    });
+  });
+
+  it("getBody 带上 hasScript，右栏据此决定要不要给入口", () => {
+    seedItem({ id: "a", script: "稿子 A" });
+    seedItem({ id: "b", url_key: "example.com/b" });
+    const { service } = makeService();
+    expect(service.getBody("a")?.hasScript).toBe(true);
+    expect(service.getBody("b")?.hasScript).toBe(false);
+  });
+
+  it("快照里没有 script，也不带 body / excerpt", () => {
+    seedItem({ script: "口播稿不该进快照" });
+    const { service } = makeService();
+    const snapshot = service.list();
+    expect(snapshot.items).toHaveLength(1);
+    expect(snapshot.items[0]).not.toHaveProperty("script");
+    expect(snapshot.items[0]).not.toHaveProperty("body");
+    expect(snapshot.items[0]).not.toHaveProperty("excerpt");
+  });
+
   it("list 返回未读数与最近一次 run，且条目不含 body", async () => {
     const { service } = makeService();
     await service.refresh("manual");

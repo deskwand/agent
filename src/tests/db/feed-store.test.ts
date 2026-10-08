@@ -29,6 +29,7 @@ function item(overrides: Partial<FeedItemRow> = {}): FeedItemRow {
     body: null,
     body_status: "snippet_only",
     excerpt: null,
+    script: null,
     image_url: null,
     image_file: null,
     image_status: "none",
@@ -177,6 +178,55 @@ describe("feed_items", () => {
     const row = db.feedItems.get("i1");
     expect(row?.excerpt).toBe("本地化之后的摘录。");
     expect(row?.body).toBe("# 抓来的 markdown");
+  });
+
+  it("script 写进去再读出来，null 也保得住", () => {
+    db.feedItems.insert(
+      item({ id: "s", script: "大家好，今天我们聊一件事。" }),
+    );
+    db.feedItems.insert(
+      item({ id: "n", url_key: "example.com/n", script: null }),
+    );
+    expect(db.feedItems.get("s")?.script).toBe("大家好，今天我们聊一件事。");
+    expect(db.feedItems.get("n")?.script).toBeNull();
+  });
+
+  it("旧库（feed_items 没有 script 列）启动后自动补列，并能正常入库", () => {
+    closeDatabase();
+    const legacyPath = join(dir, "legacy-script.db");
+    const raw = new DatabaseSync(legacyPath);
+    raw.exec(`
+      CREATE TABLE feed_items (
+        id            TEXT PRIMARY KEY,
+        run_id        TEXT NOT NULL,
+        title         TEXT NOT NULL,
+        summary       TEXT,
+        url           TEXT NOT NULL,
+        url_key       TEXT NOT NULL,
+        source_host   TEXT NOT NULL,
+        topic         TEXT,
+        relevance     TEXT,
+        body          TEXT,
+        body_status   TEXT NOT NULL,
+        excerpt       TEXT,
+        image_url     TEXT,
+        image_file    TEXT,
+        image_status  TEXT NOT NULL DEFAULT 'none',
+        created_at    INTEGER NOT NULL,
+        read_at       INTEGER,
+        dismissed_at  INTEGER,
+        unprocessed   INTEGER NOT NULL DEFAULT 0,
+        published_at  INTEGER
+      )
+    `);
+    raw.close();
+
+    db = initDatabase(legacyPath);
+
+    expect(() =>
+      db.feedItems.insert(item({ script: "补列之后写的" })),
+    ).not.toThrow();
+    expect(db.feedItems.get("i1")?.script).toBe("补列之后写的");
   });
 
   it("旧库（feed_items 没有 excerpt 列）启动后自动补列，并能正常入库", () => {

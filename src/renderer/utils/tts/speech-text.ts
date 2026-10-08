@@ -28,7 +28,8 @@ export type SpeechTarget =
 
 export interface SpeechSegment {
   text: string;
-  target: SpeechTarget;
+  /** 高亮目标；纯文本源（口播稿）没有靶子。 */
+  target?: SpeechTarget;
 }
 
 /** 句末标点。分号算句末 —— 长列表读起来更顺，也更容易跟读。 */
@@ -149,8 +150,11 @@ function toRangeTarget(
   };
 }
 
-export function extractSpeechSegments(root: HTMLElement): SpeechSegment[] {
-  const segments: SpeechSegment[] = [];
+/** DOM 提取出来的句**一定**有靶子（映射不上时退化成整块），所以这里收窄类型。 */
+export type DomSpeechSegment = SpeechSegment & { target: SpeechTarget };
+
+export function extractSpeechSegments(root: HTMLElement): DomSpeechSegment[] {
+  const segments: DomSpeechSegment[] = [];
   let buffer = "";
   let spans: Span[] = [];
 
@@ -281,8 +285,8 @@ export function spanSpeechTargets(
 export interface SpeechBlock {
   /** 一次合成请求的文本：块内各句已按「英文补空格、中文不补」拼好。 */
   text: string;
-  /** 高亮目标。块内首尾句都是 range 时取两端；否则退回首句目标。 */
-  target: SpeechTarget;
+  /** 高亮目标。块内首尾句都是 range 时取两端；否则退回首句目标。纯文本源没有靶子时为 undefined。 */
+  target?: SpeechTarget;
   /** 这一块从整条消息的第几句开始（0 起）—— UI 的「第 X / Y 句」按句上报，不按块。 */
   sentenceStart: number;
 }
@@ -330,8 +334,11 @@ export function groupSpeechSegments(
     blocks.push({
       text: joinSpeechTexts(current.map((segment) => segment.text)),
       target:
-        spanSpeechTargets(current.map((segment) => segment.target)) ??
-        current[0]!.target,
+        spanSpeechTargets(
+          current
+            .map((segment) => segment.target)
+            .filter((target): target is SpeechTarget => target !== undefined),
+        ) ?? current[0]!.target,
       sentenceStart: currentStart,
     });
     current = [];
@@ -363,4 +370,13 @@ export function groupSpeechSegments(
   }
   flush();
   return blocks;
+}
+
+/**
+ * 纯文本 → 句。给「口播稿」这类没有 DOM 的文本源用：切句规则与
+ * `extractSpeechSegments` 完全一致（同一个 `splitSentences`），只是没有靶子 ——
+ * 于是不发高亮，其余（分块、抢跑、排队）原样复用。
+ */
+export function textToSpeechSegments(text: string): SpeechSegment[] {
+  return splitSentences(text).map((slice) => ({ text: slice.text }));
 }

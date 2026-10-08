@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import type { FeedBodyPayload, FeedItemWithMeta } from "../../shared/feed";
+import { useAppStore } from "../store";
 import { MessageMarkdown } from "./MessageMarkdown";
 
 export interface FeedReaderPaneProps {
@@ -54,6 +55,7 @@ export function FeedReaderPane({
   onOpenInBrowser,
 }: FeedReaderPaneProps): JSX.Element {
   const { t } = useTranslation();
+  const startFeedListen = useAppStore((s) => s.startFeedListen);
   const excerpt = body?.excerpt ?? null;
   const raw = body?.body ?? null;
   // 标签只在元信息行出现一处（底部那次已删，见设计 §8.1 第 4 条）。
@@ -149,6 +151,16 @@ export function FeedReaderPane({
           >
             {item.relevance}
           </span>
+          {body?.hasScript ? (
+            <button
+              type="button"
+              data-testid="feed-listen-item"
+              onClick={() => void startFeedListen({ fromItemId: item.id })}
+              className="whitespace-nowrap text-accent"
+            >
+              {t("feed.listenItem")}
+            </button>
+          ) : null}
           <button
             type="button"
             data-testid="feed-open-browser"

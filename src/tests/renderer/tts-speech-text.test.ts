@@ -4,6 +4,7 @@ import {
   extractSpeechSegments,
   groupSpeechSegments,
   splitSentences,
+  textToSpeechSegments,
   type SpeechSegment,
 } from "../../renderer/utils/tts/speech-text";
 
@@ -186,5 +187,42 @@ describe("朗读分块", () => {
 
   it("没有句子就没有块", () => {
     expect(groupSpeechSegments([])).toEqual([]);
+  });
+});
+
+describe("textToSpeechSegments（纯文本源）", () => {
+  it("把纯文本切成句子，且不带高亮靶子", () => {
+    const segments = textToSpeechSegments("今天下雨。明天晴！你带伞了吗？");
+    expect(segments.map((s) => s.text)).toEqual([
+      "今天下雨。",
+      "明天晴！",
+      "你带伞了吗？",
+    ]);
+    expect(segments.every((s) => s.target === undefined)).toBe(true);
+  });
+
+  it("没有句末标点的一整段也算一句，不丢字", () => {
+    const segments = textToSpeechSegments("这是一段没有任何句末标点的话");
+    expect(segments).toHaveLength(1);
+    expect(segments[0].text).toBe("这是一段没有任何句末标点的话");
+  });
+
+  it("markdown 残留、表情、括号注释都不丢：拼回去与原文一致", () => {
+    // 这个输入刻意不含连续空白：splitSentences 会把空白折叠成单个空格
+    const text = "**重点**：看这个 😀（见注）。下一句在这。";
+    const joined = textToSpeechSegments(text)
+      .map((s) => s.text)
+      .join("");
+    expect(joined).toBe(text);
+  });
+
+  it("无靶子也能分块：块里 target 是 undefined，sentenceStart 仍然正确", () => {
+    const blocks = groupSpeechSegments(
+      textToSpeechSegments("一。二。三。四。五。"),
+    );
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].target).toBeUndefined();
+    expect(blocks[1].sentenceStart).toBe(4);
+    expect(blocks.map((b) => b.text).join("")).toBe("一。二。三。四。五。");
   });
 });

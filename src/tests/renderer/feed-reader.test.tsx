@@ -8,6 +8,7 @@ vi.mock("react-i18next", () => ({
 }));
 
 import { FeedReaderPane } from "../../renderer/components/FeedReaderPane";
+import { useAppStore } from "../../renderer/store";
 import type { FeedBodyPayload, FeedItemWithMeta } from "../../shared/feed";
 
 /** 有本地化摘录的那条路径 */
@@ -15,6 +16,7 @@ const withExcerpt: FeedBodyPayload = {
   body: "# 抓来的 markdown",
   bodyStatus: "ok",
   excerpt: "这是本地化摘录。",
+  hasScript: false,
 };
 
 const item: FeedItemWithMeta = {
@@ -131,6 +133,7 @@ describe("FeedReaderPane", () => {
         body: "## 小标题\n\n**粗体**内容",
         bodyStatus: "ok",
         excerpt: null,
+        hasScript: false,
       },
     });
     const text = container.textContent ?? "";
@@ -146,6 +149,7 @@ describe("FeedReaderPane", () => {
         body: null,
         bodyStatus: "ok",
         excerpt: "标准版 $95.4/百万字符，最新版 $139.92/百万字符。",
+        hasScript: false,
       },
     });
     const text = container.textContent ?? "";
@@ -156,14 +160,24 @@ describe("FeedReaderPane", () => {
 
   it("snippet_only 时给出「只抓到片段」提示", async () => {
     await render({
-      body: { body: "片段", bodyStatus: "snippet_only", excerpt: null },
+      body: {
+        body: "片段",
+        bodyStatus: "snippet_only",
+        excerpt: null,
+        hasScript: false,
+      },
     });
     expect(container.textContent).toContain("feed.readerSnippetOnly");
   });
 
   it("没有正文时只显示摘要，不显示空正文块", async () => {
     await render({
-      body: { body: null, bodyStatus: "snippet_only", excerpt: null },
+      body: {
+        body: null,
+        bodyStatus: "snippet_only",
+        excerpt: null,
+        hasScript: false,
+      },
     });
     expect(container.querySelector('[data-testid="feed-body"]')).toBeNull();
   });
@@ -207,6 +221,28 @@ describe("FeedReaderPane", () => {
 });
 
 describe("底部那一行", () => {
+  it("有稿时给出「听这条」，无稿时不出现", async () => {
+    const startFeedListen = vi.fn(async () => {});
+    useAppStore.setState({ startFeedListen });
+
+    await render({
+      body: { body: "正文", bodyStatus: "ok", excerpt: null, hasScript: true },
+    });
+    const button = container.querySelector(
+      '[data-testid="feed-listen-item"]',
+    ) as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    await act(async () => button?.click());
+    expect(startFeedListen).toHaveBeenCalledWith({ fromItemId: "i1" });
+
+    await render({
+      body: { body: "正文", bodyStatus: "ok", excerpt: null, hasScript: false },
+    });
+    expect(
+      container.querySelector('[data-testid="feed-listen-item"]'),
+    ).toBeNull();
+  });
+
   it("被截断的相关性有 title 兜底 —— 右栏是这句话唯一出现的地方", async () => {
     await render();
     const rel = container.querySelector(

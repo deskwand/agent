@@ -172,6 +172,19 @@ describe("已启用且有条目", () => {
     expect(useAppStore.getState().activeView).toBe("chat");
   });
 
+  it("顶栏给出「听全部」，按下后走 startFeedListen", async () => {
+    const startFeedListen = vi.fn(async () => {});
+    useAppStore.setState({ startFeedListen });
+    setWindowApi(snapshot(true, [makeItem()], makeRun()));
+    await render();
+    const button = container.querySelector(
+      '[data-testid="feed-listen-all"]',
+    ) as HTMLButtonElement | null;
+    expect(button).not.toBeNull();
+    await act(async () => button?.click());
+    expect(startFeedListen).toHaveBeenCalled();
+  });
+
   it("显示标题、筛选条与依据区折叠入口", async () => {
     setWindowApi(snapshot(true, [makeItem()], makeRun()));
     await render();

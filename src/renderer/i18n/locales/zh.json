@@ -2261,7 +2261,19 @@
     "reasonsBlockTopic": "不再关注",
     "reasonsBlocked": "已屏蔽，点击恢复",
     "railLabel": "动态",
-    "railLabelUnread": "动态，{{count}} 条未读"
+    "railLabelUnread": "动态，{{count}} 条未读",
+    "listenAll": "听全部",
+    "listenItem": "听这条",
+    "listenPlay": "播放",
+    "listenPause": "暂停",
+    "listenPrev": "上一条",
+    "listenNext": "下一条",
+    "listenClose": "关闭",
+    "listenSkipped": "已跳过 {{count}} 条",
+    "listenPosition": "第 {{index}} / {{total}} 条",
+    "listenFailed": "合成失败",
+    "listenEmpty": "暂无可播放的口播稿",
+    "listenSentence": "第 {{current}} / {{total}} 句"
   },
   "navRail": {
     "newVoiceSession": "新建语音会话",

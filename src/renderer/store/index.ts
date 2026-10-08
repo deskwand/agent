@@ -191,6 +191,16 @@ import type {
   FeedPhase,
   FeedRunSummary,
 } from "../../shared/feed";
+import { FEED_LISTEN_MAX_ITEMS } from "../../shared/feed";
+import type { FeedListenItem, FeedListenState } from "../hooks/useFeedListen";
+import { feedListenController } from "../hooks/useFeedListen";
+import { stopReadAloud } from "../hooks/useReadAloud";
+
+/**
+ * 开播请求的令牌（模块级）：只增不减，只有最后一次请求的结果会被采纳。
+ * 动作是闭包，调用时模块早已求值完毕，所以声明在下方也不会有 TDZ 问题。
+ */
+let listenRequestToken = 0;
 
 export type ActiveView =
   | "chat"
@@ -229,6 +239,12 @@ interface AppState {
   feedOpenId: string | null;
   feedBody: FeedBodyPayload | null;
   feedBlockedTopics: string[];
+  // ---- 收听（feed listen）----
+  feedListen: FeedListenState;
+  /** 「按下播放但没有可播条目」的一次性提示。 */
+  feedListenNotice: "empty" | null;
+  setFeedListen: (patch: Partial<FeedListenState>) => void;
+  startFeedListen: (opts?: { fromItemId?: string }) => Promise<void>;
   /** 用量页显示货币（ISO 4217）；金额本位永远是 USD。 */
   currency: CurrencyCode;
   /** 当前货币对 USD 的汇率；null = 未取到，界面静默回退美元显示。 */
@@ -430,7 +446,7 @@ interface AppState {
   markFeedRead: (id: string) => Promise<void>;
   markAllFeedRead: () => Promise<void>;
   dismissFeedItem: (id: string) => Promise<void>;
-  openFeedItem: (id: string) => Promise<void>;
+  openFeedItem: (id: string, opts?: { markRead?: boolean }) => Promise<void>;
   setFeedBlockedTopics: (topics: string[]) => Promise<void>;
   setFeedPhase: (phase: FeedPhase | null) => void;
   setCurrency: (currency: CurrencyCode) => void;
@@ -638,6 +654,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   feedOpenId: null,
   feedBody: null,
   feedBlockedTopics: [],
+  feedListen: {
+    session: null,
+    status: "idle",
+    progress: null,
+    skipped: 0,
+  },
+  feedListenNotice: null,
   currency: readStoredCurrency(),
   currencyRate: null,
   settingsTab: null,
@@ -1377,11 +1400,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     set({ feedUnread: await window.electronAPI.feed.dismiss(id) });
     await get().refreshFeed();
   },
-  openFeedItem: async (id) => {
+  openFeedItem: async (id, opts) => {
     // 整行都是点击区，重复点已打开的条目很常见：直接早退，省掉三次 IPC 与重复标记已读
     if (get().feedOpenId === id) return;
     set({ feedOpenId: id, feedBody: null });
-    const unread = await window.electronAPI.feed.markRead(id);
+    const unread =
+      opts?.markRead === false
+        ? get().feedUnread
+        : await window.electronAPI.feed.markRead(id);
     const body = await window.electronAPI.feed.getBody(id);
     // 两次取数期间用户可能又点了别的条目：丢掉过期结果，
     // 否则右栏会出现「B 的标题 + A 的正文」（未读计数由随后的 refreshFeed 拉回）
@@ -1392,6 +1418,63 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFeedBlockedTopics: async (topics) => {
     const result = await window.electronAPI.feed.setBlockedTopics(topics);
     set({ feedBlockedTopics: result.blockedTopics });
+  },
+  setFeedListen: (patch) =>
+    set((s) => ({ feedListen: { ...s.feedListen, ...patch } })),
+
+  startFeedListen: async (opts) => {
+    const items = get().feedItems;
+    const fromIndex = opts?.fromItemId
+      ? items.findIndex((item) => item.id === opts.fromItemId)
+      : items.findIndex((item) => item.read_at === null);
+    const from = fromIndex >= 0 ? fromIndex : 0;
+    const candidates = items
+      .slice(from, from + FEED_LISTEN_MAX_ITEMS)
+      .map((item) => item.id);
+    // 连点入口（播放中点「听全部」再点右栏「听这条」）只采纳**最后一次**：
+    // 否则起点取决于两次 IPC 谁先回来，而不是用户先点谁。
+    const token = (listenRequestToken += 1);
+    // 消息朗读与收听不共存：先停掉再等 IPC —— 不然往返期间两路音频会叠着出声。
+    stopReadAloud();
+    const scripts = await window.electronAPI.feed.getScripts(candidates);
+    if (token !== listenRequestToken) return; // 被后一次点击取代
+
+    const usable: FeedListenItem[] = [];
+    for (const item of items) {
+      if (!candidates.includes(item.id)) continue;
+      const script = scripts[item.id];
+      if (!script) continue;
+      usable.push({
+        id: item.id,
+        title: item.title,
+        sourceHost: item.source_host,
+        imageUrl: item.imageUrl,
+        script,
+      });
+    }
+    // 「什么叫可播」只由控制器判一次（空稿 / 切句后为空都在那边），
+    // 这里不再复制一套 —— 两套判定的缝隙会让按钮按下去毫无反应。
+    const result = feedListenController().start(usable, {
+      onItemChanged: (id) => {
+        // 跟随不写已读：follow 是「帮你看一眼」，不是「替你读过了」。
+        if (get().feedItems.some((item) => item.id === id)) {
+          void get().openFeedItem(id, { markRead: false });
+        }
+      },
+      onItemFinished: (id) => {
+        void get().markFeedRead(id);
+      },
+      onAborted: () => {
+        // 开场就失败 / 上下文建不起来：用户可能不在动态页，所以走全局提示。
+        get().setGlobalNotice({
+          id: "feed-listen-failed",
+          message: "",
+          messageKey: "feed.listenFailed",
+          type: "error",
+        });
+      },
+    });
+    set({ feedListenNotice: result === "empty" ? "empty" : null });
   },
   setFeedPhase: (phase) => set({ feedGenPhase: phase }),
   setCurrency: (currency) => {

@@ -34,6 +34,8 @@ export interface FeedItemRow {
   body_status: FeedBodyStatus;
   /** 模型写的本地化摘录；NULL = 写失败或 compose 兜底产物。 */
   excerpt: string | null;
+  /** 模型写的口播稿；NULL = 这条不可听。 */
+  script: string | null;
   image_url: string | null;
   image_file: string | null;
   image_status: FeedImageStatus;
@@ -78,8 +80,11 @@ export interface FeedRunSummary {
   item_count: number;
 }
 
-/** 对外（IPC / store / 组件）的条目：**不带 body 与 excerpt**，带主进程签好的配图 URL。 */
-export type FeedItemWithMeta = Omit<FeedItemRow, "body" | "excerpt"> & {
+/** 对外（IPC / store / 组件）的条目：**不带 body / excerpt / script**，带主进程签好的配图 URL。 */
+export type FeedItemWithMeta = Omit<
+  FeedItemRow,
+  "body" | "excerpt" | "script"
+> & {
   imageUrl: string | null;
 };
 
@@ -112,10 +117,15 @@ export function parseRunReasons(queries: string | null): FeedRunReason[] {
   }
 }
 
+/** 一次收听的条目上限：护栏，不是产品语义（设计 §7.7）。主进程用它兜 IPC 边界。 */
+export const FEED_LISTEN_MAX_ITEMS = 20;
+
 /** `feed.getBody` 的返回：右栏选中时才取，`bodyStatus` 决定要不要显示「只抓到片段」。 */
 export interface FeedBodyPayload {
   body: string | null;
   bodyStatus: FeedBodyStatus;
   /** 本地化摘录；为 null 时右栏回退显示 body。 */
   excerpt: string | null;
+  /** 有没有口播稿 —— 右栏据此决定「听这条」出不出现。 */
+  hasScript: boolean;
 }

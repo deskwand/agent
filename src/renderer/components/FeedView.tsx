@@ -58,6 +58,8 @@ export function FeedView(): JSX.Element {
   const openId = useAppStore((state) => state.feedOpenId);
   const body = useAppStore((state) => state.feedBody);
   const blockedTopics = useAppStore((state) => state.feedBlockedTopics);
+  const startFeedListen = useAppStore((state) => state.startFeedListen);
+  const feedListenNotice = useAppStore((state) => state.feedListenNotice);
   const refreshFeed = useAppStore((state) => state.refreshFeed);
   const setFeedEnabled = useAppStore((state) => state.setFeedEnabled);
   const markFeedRead = useAppStore((state) => state.markFeedRead);
@@ -117,6 +119,13 @@ export function FeedView(): JSX.Element {
       setNotice(t("feed.tooSoon", { minutes: 10 }));
     }
   };
+
+  // 「听全部」按下后一条有稿的都没有：就地提示（store 里那个标记是一次性的）
+  useEffect(() => {
+    if (feedListenNotice !== "empty") return;
+    setNotice(t("feed.listenEmpty"));
+    useAppStore.setState({ feedListenNotice: null });
+  }, [feedListenNotice, t]);
 
   if (!enabled && items.length === 0) {
     return (
@@ -202,6 +211,14 @@ export function FeedView(): JSX.Element {
             className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-foreground disabled:opacity-50"
           >
             {t("feed.refresh")}
+          </button>
+          <button
+            type="button"
+            data-testid="feed-listen-all"
+            onClick={() => void startFeedListen()}
+            className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-text-primary"
+          >
+            {t("feed.listenAll")}
           </button>
           <div className="relative">
             <button

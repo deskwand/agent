@@ -133,6 +133,7 @@ import { disposeEngineHost } from "./engine/engine-host";
 import type { OcrIpcHandle } from "./ocr/ipc";
 import { registerOcrIpc } from "./ocr/ipc";
 import type { TtsIpcHandle } from "./tts/ipc";
+import { FEED_LISTEN_MAX_ITEMS } from "../shared/feed";
 import { mcpToolsSnapshotStatusSource } from "./mcp/mcp-status-source";
 import { getSandboxAdapter, shutdownSandbox } from "./sandbox/sandbox-adapter";
 import { SandboxSync } from "./sandbox/sandbox-sync";
@@ -4052,6 +4053,11 @@ ipcMain.handle(
   "feed.getBody",
   (_e, id: string) => feedService?.getBody(id) ?? null,
 );
+ipcMain.handle("feed.getScripts", (_e, ids: string[]) => {
+  // IPC 是安全边界：渲染层有 20 条上限，这里再兜一道，不让一次调用拉上千条。
+  const safe = Array.isArray(ids) ? ids.slice(0, FEED_LISTEN_MAX_ITEMS) : [];
+  return feedService?.getScripts(safe) ?? {};
+});
 ipcMain.handle("feed.setEnabled", async (_e, enabled: boolean) => {
   await feedService?.setEnabled(enabled === true);
   return {

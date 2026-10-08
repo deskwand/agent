@@ -27,6 +27,7 @@ export interface FeedItemDraft {
   topic: string | null;
   relevance: string | null;
   excerpt: string | null;
+  script: string | null;
   unprocessed: number;
 }
 
@@ -125,6 +126,7 @@ function fallbackDrafts(candidates: FeedFetchedCandidate[]): FeedItemDraft[] {
     relevance: candidate.reason,
     unprocessed: 1,
     excerpt: null,
+    script: null,
   }));
 }
 
@@ -157,6 +159,7 @@ export async function composeItems(input: {
           relevance: item.relevance || candidate.reason,
           unprocessed: 0,
           excerpt: null,
+          script: null,
         };
       });
     } catch (error) {

@@ -11,6 +11,7 @@
  * 防幻觉的既有约定照旧：模型只写文字，URL 与来源由代码回填（上游 §6.5）。
  */
 import { logWarn } from "../utils/logger";
+import { writeScript } from "./feed-script";
 import type { FeedItemDraft } from "./feed-compose";
 import type { FeedComplete } from "./feed-queries";
 
@@ -83,17 +84,18 @@ export async function writeExcerpts(input: {
 }): Promise<FeedItemDraft[]> {
   const out: FeedItemDraft[] = [];
   for (const draftItem of input.drafts) {
-    // compose 兜底产物（两次都拿不到合法 JSON）不写摘录：模型刚连续失败两次，
-    // 再为 8 条各打一次注定失败的请求，只是把一次已经死掉的 run 拉长 40–60 秒；
+    // compose 兜底产物（两次都拿不到合法 JSON）不写摘录、也不写稿子：模型刚连续
+    // 失败两次，再为 8 条各打两次注定失败的请求，只是把一次已经死掉的 run 拉长；
     // 而且 unprocessed 的语义本来就是「这条没经过模型加工」。
     if (draftItem.unprocessed === 1) {
       out.push(draftItem);
       continue;
     }
-    out.push({
-      ...draftItem,
-      excerpt: await writeOne(draftItem, input.locale, input.complete),
-    });
+    const [excerpt, script] = await Promise.all([
+      writeOne(draftItem, input.locale, input.complete),
+      writeScript(draftItem, input.locale, input.complete),
+    ]);
+    out.push({ ...draftItem, excerpt, script });
   }
   return out;
 }

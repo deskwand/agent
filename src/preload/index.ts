@@ -706,6 +706,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     list: (): Promise<FeedSnapshot | null> => ipcRenderer.invoke("feed.list"),
     getBody: (id: string): Promise<FeedBodyPayload | null> =>
       ipcRenderer.invoke("feed.getBody", id),
+    getScripts: (ids: string[]): Promise<Record<string, string | null>> =>
+      ipcRenderer.invoke("feed.getScripts", ids),
     setEnabled: (
       enabled: boolean,
     ): Promise<{ enabled: boolean; started: boolean }> =>
@@ -1764,6 +1766,7 @@ declare global {
       feed: {
         list: () => Promise<FeedSnapshot | null>;
         getBody: (id: string) => Promise<FeedBodyPayload | null>;
+        getScripts: (ids: string[]) => Promise<Record<string, string | null>>;
         setEnabled: (
           enabled: boolean,
         ) => Promise<{ enabled: boolean; started: boolean }>;

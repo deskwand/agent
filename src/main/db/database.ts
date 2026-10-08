@@ -483,6 +483,7 @@ function initializeSchema(database: DatabaseSync): void {
       body          TEXT,
       body_status   TEXT NOT NULL,
       excerpt       TEXT,
+      script        TEXT,
       image_url     TEXT,
       image_file    TEXT,
       image_status  TEXT NOT NULL DEFAULT 'none',
@@ -508,6 +509,7 @@ function initializeSchema(database: DatabaseSync): void {
       "published_at",
       "published_at INTEGER",
     );
+    ensureColumn(database, "feed_items", "script", "script TEXT");
 
     database.exec(`
     CREATE TABLE IF NOT EXISTS feed_runs (
@@ -657,9 +659,9 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
   const feedItemInsert = rawDb.prepare(`
     INSERT INTO feed_items (
       id, run_id, title, summary, url, url_key, source_host, topic, relevance,
-      body, body_status, excerpt, image_url, image_file, image_status, created_at,
+      body, body_status, excerpt, script, image_url, image_file, image_status, created_at,
       read_at, dismissed_at, unprocessed, published_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const feedItemGet = rawDb.prepare("SELECT * FROM feed_items WHERE id = ?");
   const feedItemListVisible = rawDb.prepare(
@@ -1005,6 +1007,7 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
           row.body,
           row.body_status,
           row.excerpt,
+          row.script,
           row.image_url,
           row.image_file,
           row.image_status,

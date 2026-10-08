@@ -14,6 +14,7 @@ function read(relative: string): string {
 const CHANNELS = [
   "feed.list",
   "feed.getBody",
+  "feed.getScripts",
   "feed.setEnabled",
   "feed.markRead",
   "feed.markAllRead",
@@ -63,7 +64,9 @@ describe("feed IPC 契约", () => {
 
   it("图像缓存目录只有一处定义，且协议与写入用的是同一个", () => {
     const source = read("src/main/index.ts");
-    const occurrences = source.match(/join\(app\.getPath\("userData"\), "feed-images"\)/g);
+    const occurrences = source.match(
+      /join\(app\.getPath\("userData"\), "feed-images"\)/g,
+    );
     // 一处给协议、一处给 service；两处必须都是同一表达式，不能一处写死别处
     expect(occurrences?.length).toBe(2);
   });
