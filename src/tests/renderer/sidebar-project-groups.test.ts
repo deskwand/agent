@@ -1413,6 +1413,80 @@ describe("Sidebar project groups", () => {
 
     expect(useAppStore.getState().activeSessionId).toBeNull();
   });
+
+  function findSessionRail(sessionId: string): HTMLElement | undefined {
+    // 尾槽靠类名认（`w-[4.5rem]`）：jsdom 的 CSS 解析器对转义过的
+    // 方括号类名支持不稳，按意图找“行里那个固定宽度的尾巴”。
+    return Array.from(sessionRow(sessionId).querySelectorAll("div")).find(
+      (element) => element.className.includes("w-[4.5rem]"),
+    ) as HTMLElement | undefined;
+  }
+
+  it("keeps the project pin on the shared right rail", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarPins",
+      JSON.stringify({ sessionIds: [], projectKeys: ["/work/pinned"] }),
+    );
+    await render([
+      session("pinned-project", {
+        isProjectMode: true,
+        cwd: "/work/pinned",
+        createdAt: 10,
+      }),
+    ]);
+
+    const header = projectHeader("/work/pinned")!;
+    const pin = pinButtonWithin(header);
+    // 常显的 pin 必须是尾部动作里的最后一个：hover 才出现的「新建 / 删除」
+    // 只能落在它左边，否则 pin 的图标中心会停在这一行的中段，
+    // 和会话行的相对时间 / 状态点错开两列。
+    const trailing = Array.from(header.querySelectorAll("button[aria-label]"));
+    expect(trailing[trailing.length - 1]).toBe(pin);
+    expect(header.lastElementChild?.contains(pin)).toBe(true);
+    // 那 2px 内缩才是把 32px 按钮的图标中心推到会话行那条 18px 竖线上的
+    // 机制；jsdom 量不了距离，只能锁类名。
+    expect(header.className).toContain("pr-0.5");
+  });
+
+  it("gives the pinned marker and the relative time the same rail cell", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarPins",
+      JSON.stringify({ sessionIds: ["ordinary"], projectKeys: [] }),
+    );
+    await render([session("ordinary")]);
+
+    const rail = findSessionRail("ordinary");
+    expect(rail).toBeTruthy();
+    const visible = rail!.firstElementChild as HTMLElement;
+    // 一个格子只放一个标记：pin 顶替相对时间，不再各占一列。
+    expect(visible.children).toHaveLength(1);
+    // `justify-end` 是这条右边线的机制本身：掉了它，标记会退回 72px 槽的
+    // 最左边（改动前的样子）。jsdom 量不了布局，只能锁类名。
+    expect(visible.className).toContain("justify-end");
+    const marker = visible.firstElementChild as HTMLElement;
+    // 钉住的行不再有时间文本，标记要对读屏有可说出来的状态。
+    expect(marker.getAttribute("role")).toBe("img");
+    expect(marker.getAttribute("aria-label")).toBe(i18n.t("sidebar.pinned"));
+    expect(marker.querySelector("svg")).toBeTruthy();
+    expect(marker.className).toContain("h-4");
+    expect(marker.className).toContain("w-4");
+  });
+
+  it("prefers the running dot over the pin in that rail cell", async () => {
+    localStorage.setItem(
+      "deskwand.sidebarPins",
+      JSON.stringify({ sessionIds: ["running"], projectKeys: [] }),
+    );
+    await render([session("running", { status: "running" })]);
+
+    const rail = findSessionRail("running");
+    expect(rail).toBeTruthy();
+    const visible = rail!.firstElementChild as HTMLElement;
+    expect(visible.children).toHaveLength(1);
+    const marker = visible.firstElementChild as HTMLElement;
+    expect(marker.getAttribute("role")).toBe("status");
+    expect(marker.querySelector("svg")).toBeNull();
+  });
 });
 
 describe("Sidebar group expansion persistence", () => {

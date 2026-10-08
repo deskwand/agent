@@ -799,18 +799,12 @@ export function Sidebar({
             {showRelativeTime && (
               <div className="ml-auto h-6 w-[4.5rem] flex-shrink-0 relative">
                 <div
-                  className={`absolute inset-0 flex items-center justify-end gap-1 transition-opacity ${
+                  className={`absolute inset-0 flex items-center justify-end transition-opacity ${
                     showSessionActions
                       ? "opacity-0 pointer-events-none"
                       : "opacity-100"
                   }`}
                 >
-                  {isPinned && (
-                    <Pin
-                      aria-hidden="true"
-                      className="mr-auto h-3 w-3 fill-current text-accent"
-                    />
-                  )}
                   {hasStatusIndicator ? (
                     <span
                       className="h-4 w-4 flex items-center justify-center"
@@ -822,6 +816,17 @@ export function Sidebar({
                       )}
                     >
                       <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
+                    </span>
+                  ) : isPinned ? (
+                    <span
+                      className="h-4 w-4 flex items-center justify-center"
+                      role="img"
+                      aria-label={t("sidebar.pinned")}
+                    >
+                      <Pin
+                        aria-hidden="true"
+                        className="h-3 w-3 fill-current text-accent"
+                      />
                     </span>
                   ) : (
                     <span className="text-sm leading-5 text-text-muted whitespace-nowrap">
@@ -1170,8 +1175,11 @@ export function Sidebar({
 
                           return (
                             <section key={group.key} className="pt-1.5">
+                              {/* pr-0.5：会话行尾部那个 16px 图标格的中心距行右缘 18px，
+                                  而 32px 按钮的图标中心距右缘 16px；尾部动作整体内缩 2px，
+                                  常显的 pin 才和会话行的时间 / 状态点落在同一条竖线上。 */}
                               <div
-                                className="group/project flex items-center justify-between"
+                                className="group/project flex items-center justify-between pr-0.5"
                                 title={group.cwd}
                               >
                                 <button
@@ -1229,6 +1237,22 @@ export function Sidebar({
                                     <SquarePen className="h-3.5 w-3.5" />
                                   </button>
                                 </Tooltip>
+                                <Tooltip label={t("common.delete")}>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      handleDeleteProject(group);
+                                    }}
+                                    className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-error/10 hover:text-error transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                    aria-label={t("common.delete")}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </Tooltip>
+                                {/* 钉住的 pin 常显，放最后一个：它的图标中心与
+                                    会话行的状态点/时间同一条右边线，hover 才出现
+                                    的新建/删除从它左边展开，pin 自己不会挪位。 */}
                                 <Tooltip
                                   label={t(
                                     isProjectPinned
@@ -1255,19 +1279,6 @@ export function Sidebar({
                                     <Pin
                                       className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
                                     />
-                                  </button>
-                                </Tooltip>
-                                <Tooltip label={t("common.delete")}>
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      handleDeleteProject(group);
-                                    }}
-                                    className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-error/10 hover:text-error transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                                    aria-label={t("common.delete")}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
                                   </button>
                                 </Tooltip>
                               </div>
