@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { createSetVoiceTool } from "../../main/agent/tools/set-voice";
+import type { SetVoiceToolOptions } from "../../main/agent/tools/set-voice";
 import type { VoiceModeConfig } from "../../shared/voice-mode";
 
 /**
@@ -22,6 +23,7 @@ function harness(
       current = { ...current, ...patch };
     },
     isBestTierAvailable: () => true,
+    instructionsSupported: () => true,
   });
   const call = (args: Record<string, unknown>) =>
     tool.execute("call-1", args, undefined, undefined, undefined as never);
@@ -97,6 +99,7 @@ describe("set_voice", () => {
       readVoiceMode: () => ({ silenceMs: 1200, fastVoice: false }),
       saveVoiceMode: vi.fn(async () => {}),
       isBestTierAvailable: () => false,
+      instructionsSupported: () => true,
     });
     const result = await tool.execute(
       "call-1",
@@ -177,5 +180,77 @@ describe("set_voice 清空口吻", () => {
     });
     await h.call({ instructions: "", speed: 1.5 });
     expect(h.saved).toEqual([{ voiceSpeed: 1.5, voiceStyle: "" }]);
+  });
+});
+
+/**
+ * 云端来源：这个工具的原则是「不许对用户撒谎」，所以云端下**做不到的要说出来**，
+ * 而不是回报一个 effective=true（评审 Critical 2）。
+ */
+describe("set_voice 在云端来源下", () => {
+  const cloudTool = (over: Partial<SetVoiceToolOptions> = {}) => {
+    let current: VoiceModeConfig = {
+      silenceMs: 1200,
+      fastVoice: true,
+      tone: "balanced",
+      source: "cloud",
+    };
+    const saved: Partial<VoiceModeConfig>[] = [];
+    const tool = createSetVoiceTool({
+      readVoiceMode: () => current,
+      saveVoiceMode: async (patch) => {
+        saved.push(patch);
+        current = { ...current, ...patch };
+      },
+      isBestTierAvailable: () => false, // 本机引擎与云端无关
+      instructionsSupported: () => false, // 豆包适配器目前不发风格指令
+      speedSupported: () => false, // 也不发语速
+      ...over,
+    });
+    const call = (args: Record<string, unknown>) =>
+      tool.execute("call-1", args, undefined, undefined, undefined as never);
+    const text = (r: unknown) =>
+      ((r as { content: { text: string }[] }).content[0]?.text ?? "") as string;
+    return { call, text, saved };
+  };
+
+  it("音色：如实回报不支持，且不写 voiceEngineVoice", async () => {
+    const h = cloudTool();
+    const result = await h.call({ voice: "vivian" });
+    const payload = JSON.parse(h.text(result)) as {
+      warnings?: string[];
+      effective: { voice: boolean };
+    };
+    expect(h.text(result)).toContain("not supported");
+    expect(payload.effective.voice).toBe(false);
+    // 一个字段都没写进去 —— 云端音色不是那九个预置 id
+    expect(h.saved).toEqual([]);
+  });
+
+  it("音色不支持不能把同一次调用的 speed 一起丢掉", async () => {
+    const h = cloudTool({ speedSupported: () => true });
+    const payload = JSON.parse(
+      h.text(await h.call({ voice: "vivian", speed: 1.5 })),
+    ) as { warnings?: string[]; effective: { speed: boolean } };
+    expect(h.saved).toEqual([{ voiceSpeed: 1.5 }]);
+    expect(payload.effective.speed).toBe(true);
+    expect(payload.warnings).toHaveLength(1);
+  });
+
+  it("风格不支持：警告 + effective.instructions=false，不写 voiceStyle", async () => {
+    const h = cloudTool({ speedSupported: () => true });
+    const payload = JSON.parse(
+      h.text(await h.call({ instructions: "温柔一点", speed: 1.25 })),
+    ) as { warnings?: string[]; effective: { instructions: boolean } };
+    expect(h.saved).toEqual([{ voiceSpeed: 1.25 }]);
+    expect(payload.effective.instructions).toBe(false);
+    expect(payload.warnings?.[0]).toContain("style");
+  });
+
+  it("只有做不到的诉求时：给出警告而不是「Nothing to change」", async () => {
+    const h = cloudTool();
+    const result = await h.call({ voice: "vivian", instructions: "温柔一点" });
+    expect(h.text(result)).toContain("warnings");
+    expect(h.text(result)).not.toContain("Nothing to change");
   });
 });

@@ -10,6 +10,7 @@
  * 所以这是纯防御）。
  */
 import type {
+  TtsErrorCode,
   TtsSpeakOptions,
   TtsStreamEvent,
 } from "../../../shared/ipc-types";
@@ -22,7 +23,11 @@ export interface SpeakStreamChunk {
 export interface SpeakStreamHandlers {
   onChunk(chunk: SpeakStreamChunk): void;
   onDone(): void;
-  onError(error: string): void;
+  /**
+   * `code` 是主进程给的四类错误之一（拿不到就没有）——渲染层靠它取 i18n 文案，
+   * 只传一句撮合好的字符串的话，UI 就只能把英文原文给用户看。
+   */
+  onError(error: string, code?: TtsErrorCode): void;
 }
 
 /**
@@ -64,7 +69,7 @@ export function speakStream(
     unsubscribe();
     finished = true;
     if (event.type === "done") handlers.onDone();
-    else handlers.onError(event.error);
+    else handlers.onError(event.error, event.code);
   });
 
   void tts

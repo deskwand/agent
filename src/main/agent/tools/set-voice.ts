@@ -21,6 +21,7 @@ import {
   MIN_SPEECH_SPEED,
   type VoiceModeConfig,
 } from "../../../shared/voice-mode";
+import type { TtsTone } from "../../../shared/ipc-types";
 import { ENGINE_VOICES } from "../../../shared/engine-install";
 
 export interface SetVoiceToolOptions {
@@ -29,6 +30,14 @@ export interface SetVoiceToolOptions {
   saveVoiceMode: (patch: Partial<VoiceModeConfig>) => Promise<void>;
   /** 最佳音质档的引擎此刻可用吗 —— 决定 `voice` 与 `instructions` 是否真的生效。 */
   isBestTierAvailable: () => boolean;
+  /**
+   * 当前来源与当前**档位**是否吃风格指令。云端按 provider 的 `capabilities.instructions` 判
+   * （**声明与实现不一致就等于向用户撒谎**），本机侧传 `() => true`（由 `isBestTierAvailable` 兜底）。
+   * 参数带 tone 是给将来“按档能力”留的口子；现在两家都是 provider 级。
+   */
+  instructionsSupported: (tone: TtsTone) => boolean;
+  /** 当前来源是否吃语速（云端按 `capabilities.speed`；缺省 = 支持）。 */
+  speedSupported?: (tone: TtsTone) => boolean;
 }
 
 /** 音色属性写进说明里：模型据此回答「换成女生」「换北京话」。 */
@@ -107,10 +116,20 @@ export function createSetVoiceTool(opts: SetVoiceToolOptions): ToolDefinition {
         instructions?: unknown;
       };
       const patch: Partial<VoiceModeConfig> = {};
+      /** 不能悄悄丢掉的“做不到”：与 patch 一起回报，模型才能对用户说真话。 */
+      const warnings: string[] = [];
+      const currentMode = opts.readVoiceMode();
+      const onCloud = currentMode?.source === "cloud";
+      const tone: TtsTone = currentMode?.tone ?? "balanced";
 
       if (typeof raw.voice === "string" && raw.voice) {
         const wanted = raw.voice.trim();
-        if (!ENGINE_VOICES.some((v) => v.id === wanted)) {
+        if (onCloud) {
+          // 云端音色 id 不是那九个预置音色，写进去也没人读
+          warnings.push(
+            `Voice switching is not supported on the cloud source, so "${wanted}" was not applied. Only speed applies.`,
+          );
+        } else if (!ENGINE_VOICES.some((v) => v.id === wanted)) {
           // 不静默忽略：模型会以为改了，用户则听不出来为什么没变
           return {
             content: [
@@ -120,8 +139,9 @@ export function createSetVoiceTool(opts: SetVoiceToolOptions): ToolDefinition {
               },
             ],
           };
+        } else {
+          patch.voiceEngineVoice = wanted;
         }
-        patch.voiceEngineVoice = wanted;
       }
 
       let clamped: number | undefined;
@@ -131,12 +151,19 @@ export function createSetVoiceTool(opts: SetVoiceToolOptions): ToolDefinition {
       }
 
       if (typeof raw.instructions === "string") {
-        // 空串（或纯空白）是**显式清空**，不是"没提到"：说明就是这么承诺的，
-        // 而且设置里已经没有清空按钮 —— 这里不认空串，用户就再无撤销路径。
-        patch.voiceStyle = raw.instructions.trim() ? raw.instructions : "";
+        if (!opts.instructionsSupported(tone)) {
+          // 风格不支持也要继续把 speed 写下去 —— 一次调用里的两项不能因为一项不行就都丢
+          warnings.push(
+            "Speaking style is not supported by the current voice configuration, so it was not applied.",
+          );
+        } else {
+          // 空串（或纯空白）是**显式清空**，不是“没提到”：说明就是这么承诺的，
+          // 而且设置里已经没有清空按钮 —— 这里不认空串，用户就再无撤销路径。
+          patch.voiceStyle = raw.instructions.trim() ? raw.instructions : "";
+        }
       }
 
-      if (Object.keys(patch).length === 0) {
+      if (Object.keys(patch).length === 0 && warnings.length === 0) {
         return {
           content: [
             {
@@ -148,7 +175,7 @@ export function createSetVoiceTool(opts: SetVoiceToolOptions): ToolDefinition {
       }
 
       // 与设置卡同一条写通道。整体替换的语义由调用方合并，这里只给要改的字段。
-      await opts.saveVoiceMode(patch);
+      if (Object.keys(patch).length > 0) await opts.saveVoiceMode(patch);
 
       const best = opts.isBestTierAvailable();
       const current = { ...(opts.readVoiceMode() ?? {}), ...patch };
@@ -161,10 +188,12 @@ export function createSetVoiceTool(opts: SetVoiceToolOptions): ToolDefinition {
               speed: current.voiceSpeed,
               instructions: current.voiceStyle,
               effective: {
-                voice: best,
-                speed: true,
-                instructions: best,
+                voice: onCloud ? false : best,
+                speed: opts.speedSupported ? opts.speedSupported(tone) : true,
+                instructions:
+                  opts.instructionsSupported(tone) && (onCloud || best),
               },
+              ...(warnings.length ? { warnings } : {}),
             }),
           },
         ],

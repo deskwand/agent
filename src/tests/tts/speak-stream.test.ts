@@ -77,7 +77,23 @@ describe("speakStream", () => {
     await vi.waitFor(() => expect(bridge.speakStream).toHaveBeenCalled());
 
     emit({ streamId: 7, type: "error", error: "read aloud disabled" });
-    expect(onError).toHaveBeenCalledWith("read aloud disabled");
+    // 没有 code 的事件：第二个参数是 undefined（渲染层据此回退到原文）
+    expect(onError).toHaveBeenCalledWith("read aloud disabled", undefined);
+  });
+
+  it("把错误码一并交给 onError（云端四类文案靠它）", async () => {
+    const { bridge, emit } = fakeBridge();
+    install(bridge);
+    const onError = vi.fn();
+    speakStream("文本", undefined, {
+      onChunk: () => {},
+      onDone: () => {},
+      onError,
+    });
+    await vi.waitFor(() => expect(bridge.speakStream).toHaveBeenCalled());
+
+    emit({ streamId: 7, type: "error", error: "quota: balance", code: "quota" });
+    expect(onError).toHaveBeenCalledWith("quota: balance", "quota");
   });
 
   it("done 之后再来的块不再打扰调用方", async () => {

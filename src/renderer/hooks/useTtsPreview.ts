@@ -13,13 +13,15 @@
  * 3. 切档 / 再点 / 离开都先停上一个：试听重叠着播就是一段噪音。
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TtsTone } from "../../shared/ipc-types";
+import type { TtsErrorCode, TtsTone } from "../../shared/ipc-types";
 
 export type TtsPreviewState = "idle" | "busy" | "playing";
 
 export interface TtsPreview {
   state: TtsPreviewState;
   error: string | null;
+  /** 主进程给的四类错误之一：有它就取 i18n 文案，没有才显示 error 原文。 */
+  errorCode: TtsErrorCode | null;
   play(tone: TtsTone): Promise<void>;
   stop(): void;
 }
@@ -27,6 +29,7 @@ export interface TtsPreview {
 export function useTtsPreview(): TtsPreview {
   const [state, setState] = useState<TtsPreviewState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<TtsErrorCode | null>(null);
   const contextRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   /**
@@ -79,6 +82,7 @@ export function useTtsPreview(): TtsPreview {
       stop();
       const myGeneration = generation.current;
       setError(null);
+      setErrorCode(null);
       inFlight.current += 1;
       setState("busy");
       try {
@@ -91,6 +95,7 @@ export function useTtsPreview(): TtsPreview {
         }
         if (!result.ok) {
           setError(result.error);
+          setErrorCode(result.code ?? null);
           setState("idle");
           return;
         }
@@ -126,5 +131,5 @@ export function useTtsPreview(): TtsPreview {
     [stop],
   );
 
-  return { state, error, play, stop };
+  return { state, error, errorCode, play, stop };
 }

@@ -583,7 +583,8 @@ export interface TtsSpeakOptions {
 
 export type TtsSpeakResult =
   | { ok: true; samples: Float32Array; sampleRate: number }
-  | { ok: false; error: string };
+  /** `code` 让渲染层能把失败映射成文案（§6 的四类）；拿不到就退回 `error` 原文。 */
+  | { ok: false; error: string; code?: TtsErrorCode };
 
 export type TtsEvent =
   | {
@@ -609,7 +610,21 @@ export type TtsStreamEvent =
       sampleRate: number;
     }
   | { streamId: number; type: "done" }
-  | { streamId: number; type: "error"; error: string };
+  | { streamId: number; type: "error"; error: string; code?: TtsErrorCode };
+
+/**
+ * 合成失败的五种原因。**四类来自设计 §6**（未配置 / 凭据无效 / 网络不可达 /
+ * 配额不足），`failed` 是「整次失败」的兜底（短读、端点回了非音频、provider 没给结论）。
+ *
+ * 云端模块有一份同名同形的 `CloudErrorCode`（它不许 import shared），
+ * `src/tests/config/voice-mode-cloud.test.ts` 用 `expectTypeOf` 钉住两者相等。
+ */
+export type TtsErrorCode =
+  | "unconfigured"
+  | "auth"
+  | "network"
+  | "quota"
+  | "failed";
 
 export interface TtsSpeakStreamResult {
   streamId: number;

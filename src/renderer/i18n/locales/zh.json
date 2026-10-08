@@ -166,7 +166,51 @@
         "tonePreview": "试听",
         "tonePreviewBusy": "生成中",
         "tonePreviewStop": "停止",
-        "tonePreviewFailed": "试听失败，稍后再试。"
+        "tonePreviewFailed": "试听失败，稍后再试。",
+        "source": "来源",
+        "sourceLocal": "本机",
+        "sourceCloud": "云端",
+        "cloud": {
+          "endpoint": "端点",
+          "providerOpenaiCompatible": "OpenAI 兼容端点",
+          "providerDoubao": "豆包语音（直连）",
+          "apiKey": "API Key",
+          "doubaoKey": "X-Api-Key",
+          "hintOpenaiCompatible": "任何声明 OpenAI 兼容 /audio/speech 的服务都行（聚合端点也走这条）。",
+          "hintDoubao": "⚠ 与火山方舟（ark）的 Key 不通用，需在语音控制台单独创建。",
+          "baseUrl": "Base URL",
+          "voice": "音色",
+          "voicePlaceholder": "音色 ID",
+          "voiceVivi": "Vivi（女声）",
+          "voiceTaozi": "甜美桃子（女声）",
+          "status": "状态",
+          "state": {
+            "ready": "已配置",
+            "unconfigured": "未配置凭据",
+            "noVoice": "未选择音色（该端点需要手填一个音色 ID）"
+          },
+          "advanced": "高级",
+          "advancedShow": "音质映射与模型",
+          "advancedHide": "收起",
+          "tierMap": "音质映射",
+          "tierDeclaredNote": "由该端点的模型阶梯决定，不能单独指定。",
+          "model": "模型",
+          "modelPlaceholder": "端点要求的模型名",
+          "splitTiers": "为三档分别指定",
+          "presetOpenai": "OpenAI",
+          "preset": "端点预设",
+          "presetCustom": "自定义",
+          "presetUnverified": "该端点尚未实测，行为可能不同",
+          "preview": "试听",
+          "error": {
+            "unconfigured": "未配置凭据",
+            "auth": "凭据无效（检查该 Key 是否有语音权限）",
+            "network": "网络不可达（检查代理或稍后重试）",
+            "quota": "配额或余额不足",
+            "failed": "合成失败（端点返回了不支持的内容）"
+          },
+          "voiceYichen": "儒雅逸辰（男声）"
+        }
       },
       "ocr": {
         "title": "文字识别",

@@ -166,7 +166,51 @@
         "tonePreview": "Preview",
         "tonePreviewBusy": "Generating",
         "tonePreviewStop": "Stop",
-        "tonePreviewFailed": "Preview failed. Try again later."
+        "tonePreviewFailed": "Preview failed. Try again later.",
+        "source": "Source",
+        "sourceLocal": "On this device",
+        "sourceCloud": "Cloud",
+        "cloud": {
+          "endpoint": "Endpoint",
+          "providerOpenaiCompatible": "OpenAI-compatible endpoint",
+          "providerDoubao": "Doubao Speech (direct)",
+          "apiKey": "API key",
+          "doubaoKey": "X-Api-Key",
+          "hintOpenaiCompatible": "Any service that exposes an OpenAI-compatible /audio/speech works, aggregators included.",
+          "hintDoubao": "⚠ Not the same key as Volcano Ark (ark) — create one in the speech console.",
+          "baseUrl": "Base URL",
+          "voice": "Voice",
+          "voicePlaceholder": "Voice ID",
+          "voiceVivi": "Vivi (female)",
+          "voiceTaozi": "Sweet Peach (female)",
+          "status": "Status",
+          "state": {
+            "ready": "Configured",
+            "unconfigured": "No credentials yet",
+            "noVoice": "No voice selected (this endpoint needs a voice id)"
+          },
+          "advanced": "Advanced",
+          "advancedShow": "Quality mapping and models",
+          "advancedHide": "Hide",
+          "tierMap": "Quality mapping",
+          "tierDeclaredNote": "Decided by this endpoint's model ladder — not configurable here.",
+          "model": "Model",
+          "modelPlaceholder": "Model name the endpoint expects",
+          "splitTiers": "Specify one per quality",
+          "presetOpenai": "OpenAI",
+          "preset": "Preset",
+          "presetCustom": "Custom",
+          "presetUnverified": "Not measured yet — behavior may differ",
+          "preview": "Preview",
+          "error": {
+            "unconfigured": "Credentials are not configured",
+            "auth": "Invalid credentials (check the key's speech permissions)",
+            "network": "Network unreachable (check the proxy or retry)",
+            "quota": "Quota or balance exhausted",
+            "failed": "Synthesis failed (the endpoint returned unsupported content)"
+          },
+          "voiceYichen": "Yichen (male)"
+        }
       },
       "ocr": {
         "title": "Text recognition",

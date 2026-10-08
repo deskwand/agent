@@ -20,6 +20,7 @@
  * `aborted the synthesis`）—— 引擎是串行的，白烧的 GPU 时间会让下一句排队等着。
  */
 import type { TtsStreamEvent } from "../../shared/ipc-types";
+import { createPcmState, pushPcmBytes } from "../tts/pcm";
 import {
   getEngineSupervisor,
   type EngineSupervisor,
@@ -108,18 +109,13 @@ export async function speakViaEngine(
     });
   };
 
-  // 一个样本两字节，且可能被切在块中间 —— 攒着，别把半样本当样本
-  let carry = Buffer.alloc(0);
+  // 一个样本两字节，且可能被切在块中间 —— carry 逻辑在 `tts/pcm.ts`，
+  // 与云端共用同一段实现（两份实现迟早漂移）。
+  const pcmState = createPcmState();
   try {
     for await (const bytes of res.body as unknown as AsyncIterable<Uint8Array>) {
-      const buf = Buffer.concat([carry, Buffer.from(bytes)]);
-      const usable = buf.length - (buf.length % 2);
-      carry = Buffer.from(buf.subarray(usable));
-      if (usable === 0) continue;
-
-      const pcm = new Float32Array(usable / 2);
-      for (let i = 0; i < pcm.length; i++)
-        pcm[i] = buf.readInt16LE(i * 2) / 32768;
+      const pcm = pushPcmBytes(pcmState, bytes);
+      if (!pcm) continue;
 
       if (!started) {
         held.push(pcm);

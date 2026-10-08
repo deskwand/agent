@@ -30,7 +30,15 @@ import type {
   TtsTone,
 } from "../../shared/ipc-types";
 import type { TtsService } from "./service";
-import { getTtsService, resolveTtsEngine } from "./service";
+import { getTtsService, resolveSpeechPlan } from "./service";
+import {
+  defaultVoiceId,
+  getCloudProvider,
+  runCloudStream,
+  type CloudTtsProvider,
+} from "./cloud";
+import { speakCloudOnce } from "./speak-once";
+import { resolveTtsSource } from "../../shared/voice-mode";
 import {
   TTS_ENGLISH_MODEL_ID,
   TTS_FAST_MODEL_ID,
@@ -70,6 +78,8 @@ export interface TtsIpcDeps {
     installTtsModel: typeof installTtsModel;
     removeTtsModel: typeof removeTtsModel;
   };
+  /** 注入以便测试。默认 getCloudProvider（真实注册表）。 */
+  cloud?: { providerFor?: (id: string) => CloudTtsProvider | null };
 }
 
 export interface TtsIpcHandle {
@@ -213,7 +223,8 @@ export function registerTtsIpc({
     // 只在**已经装了任意一份**模型时才自动补装：这既对应用户那句"装了任意模式就自动开"，
     // 也避免新用户点一下朗读就静默拉 123–157MB（那种情况请去设置里挑一档，那里有体积与进度）。
     if (!MODELS.some((model) => service.isInstalled(model))) return;
-    const intended = resolveTtsEngine(text, opts, () => true);
+    const plan = resolveSpeechPlan(text, opts, () => true);
+    const intended = plan.kind === "sherpa" ? plan.model : "engine";
     if (intended === "engine" || service.isInstalled(intended)) return;
     await installModel(intended);
   };
@@ -344,6 +355,18 @@ export function registerTtsIpc({
       opts?: TtsSpeakOptions,
     ): Promise<TtsSpeakResult> => {
       const withTone = withConfiguredSpeech(opts);
+      // 来源=云端：与流式那条路同一份配置解析，但走整句收集（工具与试听共用）
+      if (resolveTtsSource(configStore.getAll().voiceMode) === "cloud") {
+        return speakCloudOnce(
+          {
+            getVoiceMode: () => configStore.getAll().voiceMode,
+            providerFor: deps.cloud?.providerFor,
+          },
+          text,
+          withTone.tone ?? "balanced",
+          { speed: withTone.speed, instructions: withTone.instructions },
+        );
+      }
       await ensureReadAloudModel(text, withTone);
       return service.speak(text, withTone);
     },
@@ -358,6 +381,8 @@ export function registerTtsIpc({
 
   /** 在飞的引擎流：`tts.cancelStream` 要能 abort 掉对应的那次 fetch。 */
   const engineAborts = new Map<number, AbortController>();
+  /** 在飞的云端流：同样要能 abort 掉对应的 fetch。 */
+  const cloudAborts = new Map<number, AbortController>();
 
   const runStream = async (
     streamId: number,
@@ -365,6 +390,83 @@ export function registerTtsIpc({
     opts?: TtsSpeakOptions,
   ): Promise<void> => {
     const withTone = withConfiguredSpeech(opts);
+
+    // ── 来源=云端：整条本机路径（自动补装 / best 降级 / 崩溃退避 / 数字转写 /
+    //    文本路由 / 安装状态预检）在此旁路（设计 §3.5 的六条）──
+    const voiceMode = configStore.getAll().voiceMode;
+    if (resolveTtsSource(voiceMode) === "cloud") {
+      const cloud = voiceMode?.cloud;
+      const provider =
+        cloud?.provider &&
+        (deps.cloud?.providerFor ?? getCloudProvider)(cloud.provider);
+      const tone = withTone.tone ?? "balanced";
+      const model =
+        cloud?.models?.[tone] ?? (provider ? provider.tierModels(tone) : null);
+      // 音色：配置里的优先，否则用端点的第一个策展音色（与 speak-once 同一规则）
+      const voiceId =
+        cloud?.voiceId || (provider ? defaultVoiceId(provider) : null);
+      if (!provider || !voiceId || !model) {
+        sendStream({
+          streamId,
+          type: "error",
+          error:
+            provider && !voiceId ? "no voice selected" : "cloud not configured",
+          code: "unconfigured",
+        });
+        return;
+      }
+      const controller = new AbortController();
+      cloudAborts.set(streamId, controller);
+      try {
+        await runCloudStream(
+          provider,
+          {
+            text,
+            voiceId,
+            model,
+            credentials: cloud.credentials?.[provider.id] ?? {},
+            baseUrl: cloud.baseUrl,
+            speed: withTone.speed,
+            instructions: withTone.instructions,
+          },
+          {
+            chunk: (samples, sampleRate, seq) => {
+              if (cancelled.has(streamId)) return;
+              sendStream({ streamId, type: "chunk", seq, samples, sampleRate });
+            },
+            done: () => {
+              if (cancelled.has(streamId)) return;
+              sendStream({ streamId, type: "done" });
+            },
+            error: (code, detail) => {
+              if (cancelled.has(streamId)) return;
+              sendStream({
+                streamId,
+                type: "error",
+                error: detail ? `${code}: ${detail}` : code,
+                code,
+              });
+            },
+          },
+          controller.signal,
+        );
+      } catch (error) {
+        // provider 抛错 / 队列 reject：转成一条 error，否则它会变成未处理拒绝，
+        // 而渲染层那一边永远等不到 done/error。
+        if (!cancelled.has(streamId) && !controller.signal.aborted) {
+          sendStream({
+            streamId,
+            type: "error",
+            error: error instanceof Error ? error.message : String(error),
+            code: "failed",
+          });
+        }
+      } finally {
+        cloudAborts.delete(streamId);
+      }
+      return;
+    }
+
     await ensureReadAloudModel(text, withTone);
 
     // 「最佳音质」档：先判可用性，再走引擎。**两种失败都要落到下面的 sherpa 路由**
@@ -474,6 +576,9 @@ export function registerTtsIpc({
     // （实测服务端日志出现 `aborted the synthesis`）。不 abort 的话，打断后引擎
     // 会把整句合成完，而它是串行的 —— 下一句要排队等着。
     engineAborts.get(streamId)?.abort();
+    // 云端那一路同理：不 abort 的话上游会把整句合成完（白花钱），
+    // 而豆包的 HTTP 路径只有断连才能打断。
+    cloudAborts.get(streamId)?.abort();
   });
 
   /**
@@ -486,6 +591,19 @@ export function registerTtsIpc({
     "tts.preview",
     async (_event, tone: TtsTone): Promise<TtsSpeakResult> => {
       if (!TONES.includes(tone)) return { ok: false, error: "unknown tone" };
+      // 来源=云端：试听走同一条 plan（假配置/网络问题都在这里暴露给用户）
+      if (resolveTtsSource(configStore.getAll().voiceMode) === "cloud") {
+        const cloudOpts = withConfiguredSpeech(undefined);
+        return speakCloudOnce(
+          {
+            getVoiceMode: () => configStore.getAll().voiceMode,
+            providerFor: deps.cloud?.providerFor,
+          },
+          PREVIEW_TEXT,
+          tone,
+          { speed: cloudOpts.speed, instructions: cloudOpts.instructions },
+        );
+      }
       if (tone !== "best") return service.speak(PREVIEW_TEXT, { tone });
 
       if (!engine.available()) {

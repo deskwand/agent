@@ -42,13 +42,16 @@ import {
   ENGINE_VOICE_DEFAULT,
   type EngineInstallState,
 } from "../../../shared/engine-install";
+import { PROVIDER_CAPS_FOR_UI } from "./cloud-voice-catalog";
 import { useAppStore } from "../../store";
 import {
   DEFAULT_VOICE_MODE,
+  resolveTtsSource,
   resolveVoiceTone,
 } from "../../../shared/voice-mode";
 import type { VoiceModeConfig } from "../../../shared/voice-mode";
 import { useTtsPreview } from "../../hooks/useTtsPreview";
+import { CloudVoiceSettings } from "./CloudVoiceSettings";
 import {
   InstallProgress,
   installStatusLabel,
@@ -130,6 +133,8 @@ export function VoiceModeSettings() {
 
   // `tone` 是事实来源（老配置只有 fastVoice，由 resolveVoiceTone 归一化）
   const storedTone = resolveVoiceTone(appConfig?.voiceMode);
+  /** 来源：本机（三档）还是云端。缺字段 = 本机（老配置零迁移）。 */
+  const source = resolveTtsSource(appConfig?.voiceMode);
   /**
    * 平台不支持（清单里没有这一平台的产物）时**整档都不出现** —— 拿一个永远装不了的
    * 东西勾人只会制造"我为什么不能装"。
@@ -144,6 +149,15 @@ export function VoiceModeSettings() {
   const tone =
     platformUnsupported && storedTone === "best" ? "balanced" : storedTone;
   const entry = TONE[tone];
+  /**
+   * 云端下「语速」行只在端点声明支持时才显示 —— 豆包的适配器目前不发语速字段，
+   * 显示一个改不动的控件比不显示更糟（设计 §4.3 的「查不到就不显示该行」）。
+   */
+  const cloudProviderId = appConfig?.voiceMode?.cloud?.provider;
+  const speedSupported =
+    !cloudProviderId ||
+    PROVIDER_CAPS_FOR_UI[cloudProviderId as keyof typeof PROVIDER_CAPS_FOR_UI]
+      ?.speed !== false;
   const isBest = entry.kind === "engine";
   /** 前两档的模型。best 时这一行不显示 sherpa 的状态，取 zh 只是为了让类型收敛。 */
   const model: TtsModelKey = entry.kind === "sherpa" ? entry.model : "zh";
@@ -325,248 +339,287 @@ export function VoiceModeSettings() {
       />
 
       <SettingsRow
-        sub
-        testId="voice-voice-row"
-        title={t(`${VOICE_MODE_KEY}.tone`)}
-        badge={
-          <SettingsStatusBadge
-            testId="voice-voice-badge"
-            tone={badgeTone}
-            label={badgeLabel}
+        title={t(`${VOICE_MODE_KEY}.source`)}
+        testId="voice-source"
+        control={
+          <SettingsSelect
+            value={source}
+            label={t(`${VOICE_MODE_KEY}.source`)}
+            testId="voice-source-select"
+            options={[
+              { value: "local", label: t(`${VOICE_MODE_KEY}.sourceLocal`) },
+              { value: "cloud", label: t(`${VOICE_MODE_KEY}.sourceCloud`) },
+            ]}
+            onChange={(next) => void saveVoiceMode({ source: next })}
           />
         }
-        note={t(
-          platformUnsupported
-            ? `${VOICE_MODE_KEY}.toneDescNoBest`
-            : `${VOICE_MODE_KEY}.toneDesc`,
-        )}
-        control={
-          <>
-            <SettingsSelect<TtsTone>
-              testId="voice-voice-tone"
-              label={t(`${VOICE_MODE_KEY}.tone`)}
-              value={tone}
-              options={[
-                { value: "fast", label: t(`${VOICE_MODE_KEY}.toneFast`) },
-                {
-                  value: "balanced",
-                  label: t(`${VOICE_MODE_KEY}.toneBalanced`),
-                },
-                ...(platformUnsupported
-                  ? []
-                  : [
-                      {
-                        value: "best" as const,
-                        label: t(`${VOICE_MODE_KEY}.toneBest`),
-                      },
-                    ]),
-              ]}
-              onChange={(next) => void changeTone(next)}
-            />
-            {/* 第三档的声音选择、试听与安装都在下面它自己那一行 */}
-            {!isBest && state.installed && previewButton(tone)}
-            {!isBest &&
-              (state.installed ? (
-                <button
-                  type="button"
-                  data-testid="voice-voice-remove"
-                  aria-label={t(entry.kind === "sherpa" ? entry.remove : "")}
-                  disabled={removing}
-                  onClick={() => void removeModel()}
-                  className={GHOST_BUTTON}
-                >
-                  {t("settings.capabilities.install.delete")}
-                </button>
-              ) : (
-                !busy && (
-                  <button
-                    type="button"
-                    data-testid={
-                      state.phase === "error"
-                        ? "voice-voice-retry"
-                        : "voice-voice-install"
-                    }
-                    aria-label={t(
-                      state.phase === "error"
-                        ? entry.kind === "sherpa"
-                          ? entry.retry
-                          : ""
-                        : entry.kind === "sherpa"
-                          ? entry.download
-                          : "",
-                    )}
-                    onClick={() => void window.electronAPI?.tts?.install(model)}
-                    className={PRIMARY_BUTTON}
-                  >
-                    {state.phase === "error"
-                      ? t("settings.capabilities.install.retry")
-                      : t("settings.capabilities.install.download")}
-                  </button>
-                )
-              ))}
-          </>
-        }
       />
-
-      {isBest && !platformUnsupported && (
-        <SettingsRow
-          sub
-          testId="voice-engine-row"
-          title={t(`${VOICE_MODE_KEY}.toneBestTitle`)}
-          badge={
-            <SettingsStatusBadge
-              testId="voice-engine-badge"
-              tone={engineBlocked ? "muted" : status.tone}
-              label={badgeLabel}
-            />
-          }
-          note={
-            engineFailed
-              ? t(`${VOICE_MODE_KEY}.toneBestFailedNote`)
-              : engineBlocked
-                ? t(`${VOICE_MODE_KEY}.toneBestBlockedNote`, {
-                    reason: t(
-                      `${VOICE_MODE_KEY}.${
-                        engineBlocked === "disk"
-                          ? "toneBestBlockedDisk"
-                          : engineBlocked === "memory"
-                            ? "toneBestBlockedMemory"
-                            : "toneBestBlockedPlatform"
-                      }`,
-                    ),
-                  })
-                : t(`${VOICE_MODE_KEY}.toneBestNote`)
-          }
-          control={
-            <>
-              <SettingsSelect<string>
-                testId="voice-engine-voice"
-                label={t(`${VOICE_MODE_KEY}.toneBestVoice`)}
-                value={engineVoice}
-                disabled={!engineState.installed}
-                options={
-                  engineState.installed
-                    ? ENGINE_VOICES.map((voice) => ({
-                        value: voice.id,
-                        label: voice.dialect
-                          ? `${voice.id} · ${t(`${VOICE_MODE_KEY}.${voice.dialect}`)}`
-                          : voice.id,
-                      }))
-                    : [
-                        {
-                          value: engineVoice,
-                          label: t(
-                            `${VOICE_MODE_KEY}.toneBestVoicePlaceholder`,
-                          ),
-                        },
-                      ]
-                }
-                onChange={(next) =>
-                  void saveVoiceMode({ voiceEngineVoice: next })
-                }
+      {source === "cloud" ? (
+        <CloudVoiceSettings
+          voiceMode={appConfig?.voiceMode ?? DEFAULT_VOICE_MODE}
+          onPatch={async (update) => {
+            // 起始值**现读 store**（这条教训在文件里已有）：两个控件连着拨时，
+            // 渲染还没跟上，旧快照会把刚写进去的字段盖掉。
+            const current =
+              useAppStore.getState().appConfig?.voiceMode?.cloud ?? {};
+            await saveVoiceMode({ cloud: update(current) });
+          }}
+        />
+      ) : (
+        <>
+          <SettingsRow
+            sub
+            testId="voice-voice-row"
+            title={t(`${VOICE_MODE_KEY}.tone`)}
+            badge={
+              <SettingsStatusBadge
+                testId="voice-voice-badge"
+                tone={badgeTone}
+                label={badgeLabel}
               />
-              {engineState.installed && previewButton("best")}
-              {engineState.installed && engineFailed && (
-                <button
-                  type="button"
-                  data-testid="voice-engine-reset"
-                  aria-label={t(`${VOICE_MODE_KEY}.toneBestRetryFailed`)}
-                  disabled={removing}
-                  onClick={() => void retryEngine()}
-                  className={PRIMARY_BUTTON}
-                >
-                  {t("settings.capabilities.install.retry")}
-                </button>
-              )}
-              {engineState.installed ? (
-                <button
-                  type="button"
-                  data-testid="voice-engine-remove"
-                  aria-label={t(`${VOICE_MODE_KEY}.toneBestRemove`)}
-                  disabled={removing}
-                  onClick={() => void removeEngine()}
-                  className={GHOST_BUTTON}
-                >
-                  {t("settings.capabilities.install.delete")}
-                </button>
-              ) : (
-                !busy &&
-                !engineBlocked && (
-                  <button
-                    type="button"
-                    data-testid={
-                      engineState.phase === "error"
-                        ? "voice-engine-retry"
-                        : "voice-engine-install"
-                    }
-                    aria-label={t(
-                      `${VOICE_MODE_KEY}.${
-                        engineState.phase === "error"
-                          ? "toneBestRetry"
-                          : "toneBestInstall"
-                      }`,
-                    )}
-                    onClick={() => void installEngine()}
-                    className={PRIMARY_BUTTON}
-                  >
-                    {engineState.phase === "error"
-                      ? t("settings.capabilities.install.retry")
-                      : t(`${VOICE_MODE_KEY}.toneBestInstall`)}
-                  </button>
-                )
-              )}
-            </>
-          }
-        />
-      )}
-
-      {busy && (
-        <InstallProgress
-          percent={active.percent}
-          testId={isBest ? "voice-engine-progress" : "voice-voice-progress"}
-        />
-      )}
-
-      {preview.error && (
-        <div
-          className="px-4 pb-3 text-xs text-error"
-          data-testid="voice-preview-error"
-        >
-          {t(`${VOICE_MODE_KEY}.tonePreviewFailed`)}
-        </div>
-      )}
-      <SettingsRow
-        sub
-        testId="voice-speed-row"
-        title={t(`${VOICE_MODE_KEY}.voiceSpeed`)}
-        description={t(`${VOICE_MODE_KEY}.voiceSpeedDesc`)}
-        control={
-          <SettingsSelect<string>
-            testId="voice-speed"
-            label={t(`${VOICE_MODE_KEY}.voiceSpeed`)}
-            value={String(appConfig?.voiceMode?.voiceSpeed ?? 1)}
-            options={(() => {
-              // 模型可以写区间内任意值：当前值不在预设里时也要能显示出来，
-              // 否则界面显示裸数字、而且用户选不动它
-              const current = String(appConfig?.voiceMode?.voiceSpeed ?? 1);
-              const values = SPEED_CHOICES.includes(
-                current as (typeof SPEED_CHOICES)[number],
-              )
-                ? SPEED_CHOICES
-                : ([current, ...SPEED_CHOICES].sort(
-                    (a, b) => Number(a) - Number(b),
-                  ) as readonly string[]);
-              return values.map((value) => ({
-                value,
-                label: t(`${VOICE_MODE_KEY}.voiceSpeedValue`, { value }),
-              }));
-            })()}
-            onChange={(next) =>
-              void saveVoiceMode({ voiceSpeed: Number(next) })
+            }
+            note={t(
+              platformUnsupported
+                ? `${VOICE_MODE_KEY}.toneDescNoBest`
+                : `${VOICE_MODE_KEY}.toneDesc`,
+            )}
+            control={
+              <>
+                <SettingsSelect<TtsTone>
+                  testId="voice-voice-tone"
+                  label={t(`${VOICE_MODE_KEY}.tone`)}
+                  value={tone}
+                  options={[
+                    { value: "fast", label: t(`${VOICE_MODE_KEY}.toneFast`) },
+                    {
+                      value: "balanced",
+                      label: t(`${VOICE_MODE_KEY}.toneBalanced`),
+                    },
+                    ...(platformUnsupported
+                      ? []
+                      : [
+                          {
+                            value: "best" as const,
+                            label: t(`${VOICE_MODE_KEY}.toneBest`),
+                          },
+                        ]),
+                  ]}
+                  onChange={(next) => void changeTone(next)}
+                />
+                {/* 第三档的声音选择、试听与安装都在下面它自己那一行 */}
+                {!isBest && state.installed && previewButton(tone)}
+                {!isBest &&
+                  (state.installed ? (
+                    <button
+                      type="button"
+                      data-testid="voice-voice-remove"
+                      aria-label={t(
+                        entry.kind === "sherpa" ? entry.remove : "",
+                      )}
+                      disabled={removing}
+                      onClick={() => void removeModel()}
+                      className={GHOST_BUTTON}
+                    >
+                      {t("settings.capabilities.install.delete")}
+                    </button>
+                  ) : (
+                    !busy && (
+                      <button
+                        type="button"
+                        data-testid={
+                          state.phase === "error"
+                            ? "voice-voice-retry"
+                            : "voice-voice-install"
+                        }
+                        aria-label={t(
+                          state.phase === "error"
+                            ? entry.kind === "sherpa"
+                              ? entry.retry
+                              : ""
+                            : entry.kind === "sherpa"
+                              ? entry.download
+                              : "",
+                        )}
+                        onClick={() =>
+                          void window.electronAPI?.tts?.install(model)
+                        }
+                        className={PRIMARY_BUTTON}
+                      >
+                        {state.phase === "error"
+                          ? t("settings.capabilities.install.retry")
+                          : t("settings.capabilities.install.download")}
+                      </button>
+                    )
+                  ))}
+              </>
             }
           />
-        }
-      />
+
+          {isBest && !platformUnsupported && (
+            <SettingsRow
+              sub
+              testId="voice-engine-row"
+              title={t(`${VOICE_MODE_KEY}.toneBestTitle`)}
+              badge={
+                <SettingsStatusBadge
+                  testId="voice-engine-badge"
+                  tone={engineBlocked ? "muted" : status.tone}
+                  label={badgeLabel}
+                />
+              }
+              note={
+                engineFailed
+                  ? t(`${VOICE_MODE_KEY}.toneBestFailedNote`)
+                  : engineBlocked
+                    ? t(`${VOICE_MODE_KEY}.toneBestBlockedNote`, {
+                        reason: t(
+                          `${VOICE_MODE_KEY}.${
+                            engineBlocked === "disk"
+                              ? "toneBestBlockedDisk"
+                              : engineBlocked === "memory"
+                                ? "toneBestBlockedMemory"
+                                : "toneBestBlockedPlatform"
+                          }`,
+                        ),
+                      })
+                    : t(`${VOICE_MODE_KEY}.toneBestNote`)
+              }
+              control={
+                <>
+                  <SettingsSelect<string>
+                    testId="voice-engine-voice"
+                    label={t(`${VOICE_MODE_KEY}.toneBestVoice`)}
+                    value={engineVoice}
+                    disabled={!engineState.installed}
+                    options={
+                      engineState.installed
+                        ? ENGINE_VOICES.map((voice) => ({
+                            value: voice.id,
+                            label: voice.dialect
+                              ? `${voice.id} · ${t(`${VOICE_MODE_KEY}.${voice.dialect}`)}`
+                              : voice.id,
+                          }))
+                        : [
+                            {
+                              value: engineVoice,
+                              label: t(
+                                `${VOICE_MODE_KEY}.toneBestVoicePlaceholder`,
+                              ),
+                            },
+                          ]
+                    }
+                    onChange={(next) =>
+                      void saveVoiceMode({ voiceEngineVoice: next })
+                    }
+                  />
+                  {engineState.installed && previewButton("best")}
+                  {engineState.installed && engineFailed && (
+                    <button
+                      type="button"
+                      data-testid="voice-engine-reset"
+                      aria-label={t(`${VOICE_MODE_KEY}.toneBestRetryFailed`)}
+                      disabled={removing}
+                      onClick={() => void retryEngine()}
+                      className={PRIMARY_BUTTON}
+                    >
+                      {t("settings.capabilities.install.retry")}
+                    </button>
+                  )}
+                  {engineState.installed ? (
+                    <button
+                      type="button"
+                      data-testid="voice-engine-remove"
+                      aria-label={t(`${VOICE_MODE_KEY}.toneBestRemove`)}
+                      disabled={removing}
+                      onClick={() => void removeEngine()}
+                      className={GHOST_BUTTON}
+                    >
+                      {t("settings.capabilities.install.delete")}
+                    </button>
+                  ) : (
+                    !busy &&
+                    !engineBlocked && (
+                      <button
+                        type="button"
+                        data-testid={
+                          engineState.phase === "error"
+                            ? "voice-engine-retry"
+                            : "voice-engine-install"
+                        }
+                        aria-label={t(
+                          `${VOICE_MODE_KEY}.${
+                            engineState.phase === "error"
+                              ? "toneBestRetry"
+                              : "toneBestInstall"
+                          }`,
+                        )}
+                        onClick={() => void installEngine()}
+                        className={PRIMARY_BUTTON}
+                      >
+                        {engineState.phase === "error"
+                          ? t("settings.capabilities.install.retry")
+                          : t(`${VOICE_MODE_KEY}.toneBestInstall`)}
+                      </button>
+                    )
+                  )}
+                </>
+              }
+            />
+          )}
+
+          {busy && (
+            <InstallProgress
+              percent={active.percent}
+              testId={isBest ? "voice-engine-progress" : "voice-voice-progress"}
+            />
+          )}
+
+          {preview.error && (
+            <div
+              className="px-4 pb-3 text-xs text-error"
+              data-testid="voice-preview-error"
+            >
+              {t(`${VOICE_MODE_KEY}.tonePreviewFailed`)}
+            </div>
+          )}
+        </>
+      )}
+
+      {(resolveTtsSource(appConfig?.voiceMode) !== "cloud" ||
+        speedSupported) && (
+        <SettingsRow
+          sub
+          testId="voice-speed-row"
+          title={t(`${VOICE_MODE_KEY}.voiceSpeed`)}
+          description={t(`${VOICE_MODE_KEY}.voiceSpeedDesc`)}
+          control={
+            <SettingsSelect<string>
+              testId="voice-speed"
+              label={t(`${VOICE_MODE_KEY}.voiceSpeed`)}
+              value={String(appConfig?.voiceMode?.voiceSpeed ?? 1)}
+              options={(() => {
+                // 模型可以写区间内任意值：当前值不在预设里时也要能显示出来，
+                // 否则界面显示裸数字、而且用户选不动它
+                const current = String(appConfig?.voiceMode?.voiceSpeed ?? 1);
+                const values = SPEED_CHOICES.includes(
+                  current as (typeof SPEED_CHOICES)[number],
+                )
+                  ? SPEED_CHOICES
+                  : ([current, ...SPEED_CHOICES].sort(
+                      (a, b) => Number(a) - Number(b),
+                    ) as readonly string[]);
+                return values.map((value) => ({
+                  value,
+                  label: t(`${VOICE_MODE_KEY}.voiceSpeedValue`, { value }),
+                }));
+              })()}
+              onChange={(next) =>
+                void saveVoiceMode({ voiceSpeed: Number(next) })
+              }
+            />
+          }
+        />
+      )}
     </SettingsCard>
   );
 }

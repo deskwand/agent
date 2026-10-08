@@ -148,8 +148,10 @@ import {
 import { createTtsTool } from "./tools/tts";
 import { createSetVoiceTool } from "./tools/set-voice";
 import { getEngineHost } from "../engine/engine-host";
-import { DEFAULT_VOICE_MODE } from "../../shared/voice-mode";
+import { DEFAULT_VOICE_MODE, resolveTtsSource } from "../../shared/voice-mode";
 import { getTtsService } from "../tts/service";
+import { speakCloudOnce } from "../tts/speak-once";
+import { getCloudProvider } from "../tts/cloud";
 import { createOfficeTools } from "./tools/office/office-tools";
 import { codemodeOnly } from "./tools/tool-exposure";
 import { createTodoTools } from "./tools/todo-tools";
@@ -3153,12 +3155,39 @@ Tool routing:\n
       // 不要再包一层）。模型未安装时只返回指向设置的文案，不在工具里触发下载。
       const ttsTool = createTtsTool({
         workspaceDir: effectiveCwd,
-        service: getTtsService({ userDataPath: app.getPath("userData") }),
+        voiceModeSource: () => resolveTtsSource(configStore.getAll().voiceMode),
+        // 来源=云端时走云端整句入口（与 ipc 的 tts.speak 共用同一个函数）——
+        // 否则工具会静默用本机模型出声，而用户以为自己选的是云端。
+        speak: async (text) => {
+          const voiceMode = configStore.getAll().voiceMode;
+          if (resolveTtsSource(voiceMode) !== "cloud") {
+            return getTtsService({
+              userDataPath: app.getPath("userData"),
+            }).speak(text);
+          }
+          return speakCloudOnce(
+            { getVoiceMode: () => configStore.getAll().voiceMode },
+            text,
+            voiceMode?.tone ?? "balanced",
+            {
+              speed: voiceMode?.voiceSpeed,
+              instructions: voiceMode?.voiceStyle,
+            },
+          );
+        },
       });
 
       // 语音会话专属：让模型改声音（音色/语速/风格）。只在语音会话可见 ——
       // 白名单在 turn-profiles 的 VOICE_TURN，门控在 resolveSessionTurnPolicy。
       // 它只写配置：不写工作区文件、不触发下载（与 ttsTool 同一条原则）。
+      /** 当前生效的云端 provider（本机来源时为 null）。 */
+      const cloudProvider = () => {
+        const voiceMode = configStore.getAll().voiceMode;
+        if (resolveTtsSource(voiceMode) !== "cloud") return null;
+        return voiceMode?.cloud?.provider
+          ? getCloudProvider(voiceMode.cloud.provider)
+          : null;
+      };
       const setVoiceTool = createSetVoiceTool({
         readVoiceMode: () => configStore.getAll().voiceMode,
         saveVoiceMode: async (patch) => {
@@ -3180,6 +3209,11 @@ Tool routing:\n
         // 那时若回报"音色/风格已生效"就是对用户撒谎（评审 Minor 6）。
         isBestTierAvailable: () =>
           getEngineHost(app.getPath("userData")).available(),
+        // 云端能力**只读 provider 的声明**（声明与实现一致是适配器的责任），
+        // 本机交给 isBestTierAvailable 判。别再在这里写死某家的模型名。
+        instructionsSupported: () =>
+          cloudProvider()?.capabilities.instructions ?? true,
+        speedSupported: () => cloudProvider()?.capabilities.speed !== false,
       });
 
       // Register built-in office document read tools (zero-dependency, pure JS)

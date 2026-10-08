@@ -30,6 +30,10 @@ export interface VoiceModeConfig {
    * 快速与均衡是 sherpa，没有这条通路。它由语音会话里的模型写入（工具 `set_voice`）。
    */
   voiceStyle?: string;
+  /** 来源：本机 / 云端。缺字段 = 本机（老配置零迁移）。 */
+  source?: TtsSource;
+  /** 云端来源下的端点、音色、凭据与档位映射。 */
+  cloud?: CloudVoiceConfig;
 }
 
 /**
@@ -79,6 +83,8 @@ export function normalizeVoiceModeConfig(value: unknown): VoiceModeConfig {
     tone?: unknown;
     voiceSpeed?: unknown;
     voiceStyle?: unknown;
+    source?: unknown;
+    cloud?: unknown;
   };
   // tone 是事实来源；没有它才看老布尔值。两个都脏就用默认。
   const tone: TtsTone =
@@ -111,6 +117,12 @@ export function normalizeVoiceModeConfig(value: unknown): VoiceModeConfig {
     ...(typeof raw.voiceStyle === "string" && raw.voiceStyle.trim()
       ? { voiceStyle: raw.voiceStyle }
       : {}),
+    // 来源：只认 "cloud"（其余都当本机），老配置因此零迁移
+    ...(raw.source === "cloud" ? { source: "cloud" as const } : {}),
+    ...(() => {
+      const cloud = normalizeCloud((raw as { cloud?: unknown }).cloud);
+      return cloud ? { cloud } : {};
+    })(),
   };
 }
 
@@ -127,4 +139,67 @@ export const MAX_SPEECH_SPEED = 2;
 /** 把语速夹进区间。归一化与语音工具都走它，避免两处各写一份边界。 */
 export function clampSpeechSpeed(value: number): number {
   return Math.min(MAX_SPEECH_SPEED, Math.max(MIN_SPEECH_SPEED, value));
+}
+
+/** 来源：本机三档 / 云端。缺字段 = 本机（老配置零迁移）。 */
+export type TtsSource = "local" | "cloud";
+
+export interface CloudVoiceConfig {
+  /** 端点或厂商 id（`openai-compatible` / `doubao` / ...）。未知 id 在解析层报 unconfigured。 */
+  provider?: string;
+  /** 自定义 BaseURL（通用端点与豆包的可选覆盖）。 */
+  baseUrl?: string;
+  /** 该端点下选中的音色 id。 */
+  voiceId?: string;
+  /** 三档 → 模型；只有 provider 自己没声明档位时才需要（通用端点）。 */
+  models?: Partial<Record<TtsTone, string>>;
+  /** providerId → { 字段名 → 值 }。与现有供应商 Key 同规格，明文存 config store。 */
+  credentials?: Record<string, Record<string, string>>;
+}
+
+export function resolveTtsSource(value: unknown): TtsSource {
+  const raw = (typeof value === "object" && value !== null ? value : {}) as {
+    source?: unknown;
+  };
+  return raw.source === "cloud" ? "cloud" : "local";
+}
+
+/** 三档键的白名单：脏键写了也没人读，只会让下次归一化再跑一遍。 */
+const TIER_KEYS: readonly TtsTone[] = ["fast", "balanced", "best"];
+
+function normalizeCloud(value: unknown): CloudVoiceConfig | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const raw = value as Record<string, unknown>;
+  const str = (v: unknown) =>
+    typeof v === "string" && v.trim() ? v : undefined;
+  const models: Partial<Record<TtsTone, string>> = {};
+  if (typeof raw.models === "object" && raw.models !== null) {
+    for (const key of TIER_KEYS) {
+      const v = (raw.models as Record<string, unknown>)[key];
+      if (typeof v === "string" && v.trim()) models[key] = v;
+    }
+  }
+  const credentials: Record<string, Record<string, string>> = {};
+  if (typeof raw.credentials === "object" && raw.credentials !== null) {
+    for (const [provider, fields] of Object.entries(
+      raw.credentials as Record<string, unknown>,
+    )) {
+      if (typeof fields !== "object" || fields === null) continue;
+      const clean: Record<string, string> = {};
+      for (const [k, v] of Object.entries(fields as Record<string, unknown>)) {
+        if (typeof v === "string" && v) clean[k] = v;
+      }
+      if (Object.keys(clean).length) credentials[provider] = clean;
+    }
+  }
+  const out: CloudVoiceConfig = {};
+  const provider = str(raw.provider);
+  if (provider) out.provider = provider;
+  const baseUrl = str(raw.baseUrl);
+  if (baseUrl) out.baseUrl = baseUrl;
+  const voiceId = str(raw.voiceId);
+  if (voiceId) out.voiceId = voiceId;
+  if (Object.keys(models).length) out.models = models;
+  if (Object.keys(credentials).length) out.credentials = credentials;
+  return Object.keys(out).length ? out : undefined;
 }

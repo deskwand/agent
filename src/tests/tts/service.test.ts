@@ -11,7 +11,7 @@ import {
 import {
   getTtsService,
   resetTtsServiceCache,
-  resolveTtsEngine,
+  resolveSpeechPlan,
 } from "../../main/tts/service";
 import type { TtsEngine } from "../../main/tts/tts-engine";
 import type { TtsModelKey } from "../../shared/ipc-types";
@@ -300,7 +300,7 @@ describe("prefer (语音模式的高速音色)", () => {
 
   it("lets engine win when both engine and prefer are given", async () => {
     // 优先级也是规则的一部分：ipc 那道日志开关的门控按"最终用哪个引擎"判，
-    // 它读的就是这条规则（resolveTtsEngine）。
+    // 它读的就是这条规则（resolveSpeechPlan）。
     const seen: string[] = [];
     const service = getTtsService({
       userDataPath: installedAllModels(),
@@ -323,49 +323,54 @@ describe("tone 解析", () => {
   const installedNone = () => false;
 
   it("fast → matcha（装了才用，没装回落到路由）", () => {
-    expect(resolveTtsEngine("你好", { tone: "fast" }, installedAll)).toBe(
-      "matcha",
-    );
+    expect(resolveSpeechPlan("你好", { tone: "fast" }, installedAll)).toEqual({
+      kind: "sherpa",
+      model: "matcha",
+      installed: true,
+    });
     // 没装 matcha 就不硬点它，交给按文本路由
     const onlyEnglishInstalled = (engine?: TtsModelKey) => engine === "en";
     expect(
-      resolveTtsEngine("hello there", { tone: "fast" }, onlyEnglishInstalled),
-    ).toBe("en");
+      resolveSpeechPlan("hello there", { tone: "fast" }, onlyEnglishInstalled),
+    ).toEqual({ kind: "sherpa", model: "en", installed: true });
     // 路由到的也没装 → 退回 zh，由调用方报"未安装"（不在这里悄悄降级）
     expect(
-      resolveTtsEngine("hello there", { tone: "fast" }, installedNone),
-    ).toBe("zh");
+      resolveSpeechPlan("hello there", { tone: "fast" }, installedNone),
+    ).toEqual({ kind: "sherpa", model: "zh", installed: false });
   });
 
   it("balanced → 按文本路由（与不传 tone 等价）", () => {
-    expect(resolveTtsEngine("你好", { tone: "balanced" }, installedAll)).toBe(
-      "zh",
-    );
     expect(
-      resolveTtsEngine("hello there", { tone: "balanced" }, installedAll),
-    ).toBe("en");
+      resolveSpeechPlan("你好", { tone: "balanced" }, installedAll),
+    ).toEqual({ kind: "sherpa", model: "zh", installed: true });
+    expect(
+      resolveSpeechPlan("hello there", { tone: "balanced" }, installedAll),
+    ).toEqual({ kind: "sherpa", model: "en", installed: true });
   });
 
   it("best → engine（不是 sherpa 的模型键）", () => {
-    expect(resolveTtsEngine("你好", { tone: "best" }, installedAll)).toBe(
-      "engine",
-    );
+    expect(resolveSpeechPlan("你好", { tone: "best" }, installedAll)).toEqual({
+      kind: "engine",
+    });
     // 引擎是流式专属：整句那条路不支持，直接说明白，不假装能跑
-    expect(resolveTtsEngine("你好", { tone: "best" }, installedNone)).toBe(
-      "engine",
-    );
+    expect(resolveSpeechPlan("你好", { tone: "best" }, installedNone)).toEqual({
+      kind: "engine",
+    });
   });
 
-  it("engine 硬指定优先于 tone（自检要钉死自己那份）", () => {
+  it("engine 硬指定优先于 tone（自检要钉死自己那份），没装也照样返回", () => {
     expect(
-      resolveTtsEngine("你好", { engine: "en", tone: "best" }, installedAll),
-    ).toBe("en");
+      resolveSpeechPlan("你好", { engine: "en", tone: "best" }, installedAll),
+    ).toEqual({ kind: "sherpa", model: "en", installed: true });
+    expect(
+      resolveSpeechPlan("你好", { engine: "en", tone: "best" }, installedNone),
+    ).toEqual({ kind: "sherpa", model: "en", installed: false });
   });
 
   it("tone 优先于 prefer（新的语义赢）", () => {
     expect(
-      resolveTtsEngine("你好", { tone: "fast", prefer: "zh" }, installedAll),
-    ).toBe("matcha");
+      resolveSpeechPlan("你好", { tone: "fast", prefer: "zh" }, installedAll),
+    ).toEqual({ kind: "sherpa", model: "matcha", installed: true });
   });
 });
 
