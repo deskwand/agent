@@ -220,7 +220,7 @@ describe("底部那一行", () => {
 });
 
 describe("居中列", () => {
-  it("大图、标题、正文与出口都在同一个居中列里（宽屏下空白一分为二）", async () => {
+  it("标题、正文与出口都在同一个居中列里（宽屏下空白一分为二）", async () => {
     await render({ body: withExcerpt });
     const column = container.querySelector(
       '[data-testid="feed-reader-column"]',
@@ -228,11 +228,32 @@ describe("居中列", () => {
     expect(column).not.toBeNull();
     // 居中：宽屏下多出来的宽度两侧均分，而不是全堆在右边（改前右栏 1104px 里空 588px）
     expect(column?.className).toContain("mx-auto");
-    // 一条列管住全部内容 —— 漏掉任何一个，它就会贴回左边缘
-    for (const testid of ["feed-hero", "feed-body", "feed-open-browser"]) {
+    // 一条列管住正文类内容 —— 漏掉任何一个，它就会贴回左边缘
+    for (const testid of ["feed-body", "feed-open-browser"]) {
       expect(column?.querySelector(`[data-testid="${testid}"]`)).not.toBeNull();
     }
     expect(column?.textContent).toContain("这是本地化摘录。");
     expect(column?.textContent).toContain("标题");
+  });
+
+  it("大图比正文列宽，且是列外的兄弟节点（breakout：图片允许比正文宽）", async () => {
+    await render();
+    const hero = container.querySelector(
+      '[data-testid="feed-hero"]',
+    ) as HTMLElement | null;
+    const column = container.querySelector(
+      '[data-testid="feed-reader-column"]',
+    ) as HTMLElement;
+    expect(hero).not.toBeNull();
+    // 在列外：否则它会被 34em 一起卡住，breakout 无从谈起
+    expect(column.contains(hero)).toBe(false);
+    expect(hero?.parentElement).toBe(column.parentElement);
+    expect(hero?.className).toContain("mx-auto");
+    // 它现在是 flex 纵列里的一项，默认 flex-shrink:1 —— 长正文会先把它压成横条、再压成 0
+    // （真实浏览器实测：无 shrink-0 时 10 段正文就只剩 4px 高，20 段以上归零）
+    expect(hero?.className).toContain("shrink-0");
+    const heroEm = parseFloat(hero?.style.maxWidth ?? "");
+    const colEm = parseFloat(column.style.maxWidth);
+    expect(heroEm / colEm).toBeCloseTo(1.4, 1);
   });
 });

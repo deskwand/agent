@@ -13,10 +13,16 @@ export interface FeedReaderPaneProps {
  * 右栏：一个居中列，从上到下是 大图 → 标题 → 元信息 → 摘要块 →（只抓到片段时的提示）→ 正文摘录 → 底部行（相关性与出口）。
  *
  * **限宽 34em（= 34 个中文字符，低于 WCAG 1.4.8 给 CJK 的 40 字上限）由列自己承担，且必须在宽屏下居中**：
- * 不能靠加宽正文去填满右栏 —— 但列表固定 400px 之后右栏会涨到 1100px 以上，
+ * 不能靠加宽正文去填满右栏 —— 但列表 520px 之后右栏仍会到 980px 以上，
  * 限宽的内容再左对齐就会把 500-600px 空白全堆在右边。居中让两侧均分。
  * 因此正文类元素不再各自写 maxWidth，一律由列承担；标题另按列内的 30em 行长单独限制。
  * （改前那三处内联 maxWidth 各自按自己的字号解析，实际是 442 与 476 两个宽度，不是同一个。）
+ *
+ * 大图是**列外的兄弟节点**，按 1.4 倍正文宽（48em）居中：图片允许比正文宽是行业惯例，
+ * 给文章一个视觉锚点，也顺带用掉一点宽窗下本会空着的宽度。它若在列内就会被 34em 一起卡住。
+ * **它是 flex 纵列里的一项，必须 `shrink-0`**：默认 flex-shrink:1 时，长正文会先把它压成
+ * 横条、再压成 0（真实浏览器实测：无 shrink-0 时 10 段正文只剩 4px 高，20 段以上图片消失），
+ * 正好废掉上面那句「16:9 不会被拉成横条」。
  *
  * 字号用应用 token：标题 text-lg、正文 text-base（与聊天正文同档）、其余 text-xs；
  * 大图用 16:9 的比例锁而不是固定高度 —— 字号变化时图跟着一起缩放，不会被拉成横条。
@@ -65,25 +71,24 @@ export function FeedReaderPane({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-background-secondary px-5 py-3.5">
+      {item.imageUrl ? (
+        <div
+          data-testid="feed-hero"
+          className="mx-auto mb-3 w-full shrink-0 overflow-hidden rounded-md bg-surface"
+          style={{ maxWidth: "48em", aspectRatio: "16 / 9" }}
+        >
+          <img
+            src={item.imageUrl}
+            alt=""
+            className="h-full w-full object-cover"
+          />
+        </div>
+      ) : null}
       <div
         data-testid="feed-reader-column"
         className="mx-auto w-full min-w-0"
         style={{ maxWidth: "34em" }}
       >
-        {item.imageUrl ? (
-          <div
-            data-testid="feed-hero"
-            className="mb-3 w-full overflow-hidden rounded-md bg-surface"
-            style={{ aspectRatio: "16 / 9" }}
-          >
-            <img
-              src={item.imageUrl}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          </div>
-        ) : null}
-
         <h2
           className="mb-1.5 text-lg font-semibold leading-[1.4]"
           style={{ maxWidth: "30em" }}

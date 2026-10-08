@@ -307,7 +307,23 @@ export function FeedView(): JSX.Element {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <div className="w-[400px] shrink-0 overflow-y-auto">
+        {/*
+          列表列宽：目标 32.5rem（16px 根字号下 = 520px），受「页宽 40%」与「下限 25rem」两重约束。
+          用 rem 而不是 px，是因为字号设置缩放的是根字号 —— 写死 px 的话字号调大后每行装的中文字数会变少。
+
+          **下限也必须带百分比**：min-width 的优先级高于 width，所以下限写死成 25rem 时，
+          字号拉到 20（根字号 22.86px）会让它变成 571px，在 800px 窗口下吃掉 77% 页宽、
+          把右栏正文压到 133px ≈ 6.6 字/行（真实浏览器实测）。写成 min(25rem,50%) 后同样是
+          800px 窗口，右栏能拿回 332px ≈ 16.6 字/行。
+
+          列宽带来的收益：带缩略图时标题列 = 520 − 32(padding) − 88(图) − 12(间距) = 388px ≈ 27 字
+          （未读行再扣 13px 的未读点与间距，≈ 26.8 字）；400px 时只有 268px ≈ 19 字，中文长标题要折三行。
+          窗口窄于约 1356px 时列表吃不满 520，这个数字按比例缩小。
+        */}
+        <div
+          data-testid="feed-list-column"
+          className="w-[min(32.5rem,40%)] min-w-[min(25rem,50%)] shrink-0 overflow-y-auto"
+        >
           {visible.length === 0 ? (
             <div
               className="px-6 py-6 text-sm text-text-muted"

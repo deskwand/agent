@@ -192,6 +192,22 @@ describe("已启用且有条目", () => {
     expect(container.textContent).toContain("第一条");
   });
 
+  it("列表列宽：跟字号缩放、有比例上限，且不低于原来的 400", async () => {
+    setWindowApi(snapshot(true, [makeItem()], makeRun()));
+    await render();
+    const list = container.querySelector(
+      '[data-testid="feed-list-column"]',
+    ) as HTMLElement | null;
+    expect(list).not.toBeNull();
+    // 断整条 utility，不断子串：否则把 floor 与 target 对调（行为完全不同）也照样全绿。
+    // 用 rem 而不是 px：字号调大时列表跟着变宽，每行装的中文字数才不变
+    // （520px 在 16px 根字号下 = 32.5rem）
+    expect(list?.className).toContain("w-[min(32.5rem,40%)]");
+    // 下限也得受比例约束：min-width 赢 width，写死 25rem 的话字号拉大后
+    // 它会吃掉 77% 的页宽、把右栏压到 6.6 字/行（真实浏览器实测）
+    expect(list?.className).toContain("min-w-[min(25rem,50%)]");
+  });
+
   it("「全部已读」收进 ⋯ 菜单，不在顶栏（顶栏只留一个主操作）", async () => {
     const markAllRead = vi.fn(async () => 0);
     setWindowApi(snapshot(true, [makeItem()], makeRun()), { markAllRead });
