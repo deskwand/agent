@@ -89,7 +89,8 @@ learning opportunities.`;
       ];
       // 3. Create a lightweight AgentRunner fork
       //    - no-op sendToRenderer (never leaks to UI)
-      //    - no MCP, no extensions, no browser
+      //    - MCP 扩展仍会注入（`AgentRunner.run()` 无条件 push `createDeskwandMcpExtension()`），
+      //      所以收尾交给下面的 finally：不收就会留下它那个会话拉起的 MCP 子进程。
       //    - no turnFinalizer (prevents recursion)
       //    - only review tools as customTools
       const reviewRunner = new AgentRunner(
@@ -129,9 +130,14 @@ learning opportunities.`;
         },
       ];
 
-      await reviewRunner.run(reviewSession, prompt, messages);
-
-      log(`[BackgroundReview] Completed in ${Date.now() - startTime}ms`);
+      try {
+        await reviewRunner.run(reviewSession, prompt, messages);
+        log(`[BackgroundReview] Completed in ${Date.now() - startTime}ms`);
+      } finally {
+        // fork 的 runner 用完即弃；放 finally 是因为 run() 抛错时也要收尾，
+        // 否则那个会话（连同它的 MCP 子进程）会活到应用退出。
+        reviewRunner.clearAllSdkSessions();
+      }
     } catch (err) {
       logError("[BackgroundReview] Failed:", err);
     }

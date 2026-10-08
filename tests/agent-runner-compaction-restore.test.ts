@@ -27,8 +27,13 @@ describe("AgentRunner cold-start manual compaction", () => {
   });
 
   it("disposes the cold-restored session after compaction", () => {
-    expect(agentRunnerContent).toContain("tempSession === cached.session");
-    expect(agentRunnerContent).toContain("dispose error on cold-start compact");
+    // 收尾走统一入口 `disposeCachedPiSession`（冷启动临时会话没有 runtime，
+    // helper 内部兜底 direct dispose）。断言“身份判断之后紧跟收尾”而不钉日志文案。
+    const start = agentRunnerContent.indexOf("tempSession === cached.session");
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(agentRunnerContent.slice(start, start + 400)).toContain(
+      "this.disposeCachedPiSession(cached)",
+    );
   });
 
   it("reports 'Nothing to compact' as skipped instead of failed", () => {

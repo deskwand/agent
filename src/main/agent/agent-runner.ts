@@ -13,6 +13,7 @@
  * Dependencies: session-manager, mcp-client-extension, config-store, skills-manager
  */
 import {
+  AgentSessionRuntime,
   createAgentSession,
   SessionManager as PiSessionManager,
   SettingsManager as PiSettingsManager,
@@ -454,6 +455,7 @@ interface AgentRunnerOptions {
 
 interface CachedPiSession {
   session: PiAgentSession;
+  runtime?: AgentSessionRuntime;
   modelId: string;
   thinkingLevel: string;
   runtimeSignature: string;
@@ -640,18 +642,14 @@ export class AgentRunner {
       this.sessionModelRuntimes.delete(sessionId);
     }
     if (cached) {
-      try {
-        cached.session.dispose();
-      } catch (e) {
-        logWarn("[AgentRunner] dispose error:", e);
-      }
+      this.disposeCachedPiSession(cached);
       // 会话关闭/淘汰：解绑扩展 UI（关闭 TUI Modal、清终端输入订阅）
       resetUiState();
       this.piSessions.delete(sessionId);
       this.pendingSteerDeliveries.delete(sessionId);
       this.lastSteeringLengths.delete(sessionId);
       this.releaseSubagentSession(sessionId);
-      log("[AgentRunner] Disposed pi session for:", sessionId);
+      log("[AgentRunner] Disposing pi session for:", sessionId);
     }
   }
 
@@ -670,6 +668,41 @@ export class AgentRunner {
       releaseManagerRegistryEntry(entry);
       this.subagentRegistryEntries.delete(sessionId);
     }
+  }
+
+  /**
+   * 收尾一个缓存的 pi 会话。
+   *
+   * 走 `runtime.dispose()`：它先发 `session_shutdown`（内置 MCP 扩展据此关闭该会话的全部
+   * 连接 → 子进程 stdin 关闭 → 自行退出），再 `session.dispose()`。因此**它是异步的**，
+   * 且 `session.dispose()`（含内部的 `agent.abort()`）会比今天晚 1-3s 生效 —— 调用方都已经把
+   * entry 从 map 里摘掉，功能上无影响；不要在这里 await（8 个调用点都是同步上下文）。
+   *
+   * 「晚 1-3s」已核实无影响：中止路径不依赖 dispose —— `cancel()` 在丢弃会话之前已经
+   * 显式调过 `cached.session.abort()`（见本文件 `cancel()`）。
+   */
+  private disposeCachedPiSession(cached: CachedPiSession): void {
+    if (!cached.runtime) {
+      // 唯一没有 runtime 的构造点是冷启动压缩的临时会话：它没有 DeskBand 的 inline MCP 扩展
+      // （SDK 的默认 loader 仍会加载磁盘扩展），所以没有 MCP 连接要关。
+      // 正常路径也留一行日志：将来若有构造点加载了扩展却忘了带 runtime，
+      // 这里会把它暴露出来，而不是静默回到「进程不回收」。
+      logWarn(
+        "[AgentRunner] disposing a cached session without an MCP runtime:",
+        cached.session.sessionFile ?? "(no session file)",
+      );
+      try {
+        cached.session.dispose();
+      } catch (e) {
+        logWarn("[AgentRunner] pi session dispose error:", e);
+      }
+      return;
+    }
+    void cached.runtime
+      .dispose()
+      .catch((e) =>
+        logWarn("[AgentRunner] pi session runtime dispose error:", e),
+      );
   }
 
   clearAllSdkSessions(): void {
@@ -2765,14 +2798,7 @@ export class AgentRunner {
           "[AgentRunner] Runtime changed, recreating cached pi session:",
           session.id,
         );
-        try {
-          cachedSession.session.dispose();
-        } catch (disposeError) {
-          logWarn(
-            "[AgentRunner] dispose error while recreating pi session:",
-            disposeError,
-          );
-        }
+        this.disposeCachedPiSession(cachedSession);
         this.piSessions.delete(session.id);
         this.releaseSubagentSession(session.id);
         cachedSession = undefined;
@@ -2782,14 +2808,7 @@ export class AgentRunner {
           "[AgentRunner] Skills changed, recreating cached pi session:",
           session.id,
         );
-        try {
-          cachedSession.session.dispose();
-        } catch (disposeError) {
-          logWarn(
-            "[AgentRunner] dispose error while recreating pi session for skills:",
-            disposeError,
-          );
-        }
+        this.disposeCachedPiSession(cachedSession);
         this.piSessions.delete(session.id);
         this.releaseSubagentSession(session.id);
         cachedSession = undefined;
@@ -2826,14 +2845,7 @@ export class AgentRunner {
           "[AgentRunner] Extension policy changed, recreating cached pi session:",
           session.id,
         );
-        try {
-          cachedSession.session.dispose();
-        } catch (disposeError) {
-          logWarn(
-            "[AgentRunner] dispose error while recreating pi session for extension policy:",
-            disposeError,
-          );
-        }
+        this.disposeCachedPiSession(cachedSession);
         this.piSessions.delete(session.id);
         this.releaseSubagentSession(session.id);
         cachedSession = undefined;
@@ -3219,14 +3231,7 @@ Tool routing:\n
           "[AgentRunner] Custom tools changed, recreating cached pi session:",
           session.id,
         );
-        try {
-          cachedSession.session.dispose();
-        } catch (disposeError) {
-          logWarn(
-            "[AgentRunner] dispose error while recreating pi session for tools:",
-            disposeError,
-          );
-        }
+        this.disposeCachedPiSession(cachedSession);
         this.piSessions.delete(session.id);
         this.releaseSubagentSession(session.id);
         cachedSession = undefined;
@@ -3517,6 +3522,20 @@ Tool routing:\n
           ? PiSessionManager.open(sessionFileForRun)
           : PiSessionManager.create(effectiveCwd, sessionDir);
 
+        const settingsManager = PiSettingsManager.inMemory({
+          compaction: compactionSettings,
+          retry: {
+            enabled: true,
+            // 压缩 / 分支摘要仍用 2 次预算（见 design-docs/2026-09-22-network-retry-policy.md §4.3）
+            maxRetries: 2,
+            baseDelayMs: 2000,
+            // 退避封顶 60s：0.86.0 起由 pi-ai 的 retryDelayMs() 原生承担
+            maxAgentDelayMs: 60000,
+            // 只有 agent 回合循环无视次数预算
+            unbounded: true,
+          },
+        });
+
         const { session: newPiSession, extensionsResult } =
           await createAgentSession({
             model: piModel,
@@ -3526,23 +3545,30 @@ Tool routing:\n
             // provide their own activation through includeAllExtensionTools.
             customTools: allCustomTools,
             sessionManager: piSessionManager,
-            settingsManager: PiSettingsManager.inMemory({
-              compaction: compactionSettings,
-              retry: {
-                enabled: true,
-                // 压缩 / 分支摘要仍用 2 次预算（见 design-docs/2026-09-22-network-retry-policy.md §4.3）
-                maxRetries: 2,
-                baseDelayMs: 2000,
-                // 退避封顶 60s：0.86.0 起由 pi-ai 的 retryDelayMs() 原生承担
-                maxAgentDelayMs: 60000,
-                // 只有 agent 回合循环无视次数预算
-                unbounded: true,
-              },
-            }),
+            settingsManager,
             resourceLoader,
             cwd: effectiveCwd,
           });
         piSession = newPiSession;
+
+        // 收尾要发 session_shutdown，只有 AgentSessionRuntime 会发；DeskBend 不用它的
+        // 会话替换流程（/new、/resume、/fork 都走自己的桥接），所以只借它的 dispose()。
+        const piSessionRuntime = new AgentSessionRuntime(
+          piSession,
+          {
+            cwd: effectiveCwd,
+            agentDir: piAgentDir,
+            modelRuntime,
+            settingsManager,
+            resourceLoader,
+            diagnostics: [],
+          },
+          () => {
+            throw new Error(
+              "DeskWand does not use AgentSessionRuntime session replacement",
+            );
+          },
+        );
 
         // Persist the pi session file path so cold restarts can recover
         // the full structured conversation history from JSONL.
@@ -3635,11 +3661,7 @@ Tool routing:\n
           if (oldestKey) {
             const oldest = this.piSessions.get(oldestKey);
             if (oldest) {
-              try {
-                oldest.session.dispose();
-              } catch (e) {
-                logWarn("[AgentRunner] dispose error on eviction:", e);
-              }
+              this.disposeCachedPiSession(oldest);
               resetUiState();
             }
             const evictedRuntime = this.sessionModelRuntimes.get(oldestKey);
@@ -3654,6 +3676,7 @@ Tool routing:\n
         }
         this.piSessions.set(session.id, {
           session: piSession,
+          runtime: piSessionRuntime,
           modelId: piModel.id,
           thinkingLevel,
           runtimeSignature: sessionRuntimeSignature,
@@ -4746,11 +4769,7 @@ Tool routing:\n
         if (cached) {
           this.piSessions.delete(session.id);
           this.releaseSubagentSession(session.id);
-          try {
-            cached.session.dispose();
-          } catch (e) {
-            logWarn("[AgentRunner] pi session dispose error:", e);
-          }
+          this.disposeCachedPiSession(cached);
         }
       }
 
@@ -5098,14 +5117,7 @@ Tool routing:\n
       const tempSession = this.coldStartCompactionSessions.get(sessionId);
       if (cached && tempSession === cached.session) {
         this.coldStartCompactionSessions.delete(sessionId);
-        try {
-          cached.session.dispose();
-        } catch (disposeError) {
-          logWarn(
-            "[AgentRunner] dispose error on cold-start compact:",
-            disposeError,
-          );
-        }
+        this.disposeCachedPiSession(cached);
         // Release the ModelRuntime this cold-start created (if any) so
         // repeated cold compacts across many sessions don't accumulate.
         if (cached.createdRuntime) {

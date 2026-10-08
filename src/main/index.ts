@@ -1698,6 +1698,13 @@ for (const sig of ["SIGTERM", "SIGINT"] as const) {
 
 // Handle app quit - before-quit (for macOS Cmd+Q and other quit methods)
 app.on("before-quit", async (event) => {
+  // best-effort：让会话走一次正常收尾（MCP 子进程关闭连接后自行退出）。
+  // 必须在 isCleaningUp 守卫**之前**：window-all-closed → cleanupSandboxResources()
+  // 已经置位它，否则 Windows/Linux 关窗与 dev 退出路径会直接 return 而跳过收尾。
+  // 收尾是异步的，应用可能在它完成前就退出 —— 兜底是 pi-mcp 的进程退出钩子与
+  // 内置 server 认 stdin EOF。
+  sessionManager?.clearAllCachedAgentSessions();
+
   if (isCleaningUp) {
     if (!isCleanupComplete && !isQuittingForUpdate) {
       event.preventDefault();

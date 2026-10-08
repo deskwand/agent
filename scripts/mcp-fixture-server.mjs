@@ -4,9 +4,14 @@
  * 只依赖 @modelcontextprotocol/sdk（DeskBend 已有）。
  * 工具：echo（回显）、boom（总是抛错，用于验证失败路径）。
  */
+import fs from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
+
+// 供门禁脚本拿到子进程号（否则只能靠猜/扫 ps）。
+const pidFile = process.env.DESKWAND_FIXTURE_PID_FILE;
+if (pidFile) fs.writeFileSync(pidFile, String(process.pid));
 
 const server = new McpServer({ name: "deskwand-fixture", version: "1.0.0" });
 

@@ -334,7 +334,13 @@ Be thorough — fewer than 10 actions means you stopped too early.`;
       timestamp: Date.now(),
     };
 
-    await forkRunner.run(forkSession, prompt, [systemMsg]);
+    try {
+      await forkRunner.run(forkSession, prompt, [systemMsg]);
+    } finally {
+      // 同 background-review：fork 的 runner 用完即弃，不收尾会留一组 MCP 子进程；
+      // 放 finally 是因为 run() 抛错时也要收尾。
+      forkRunner.clearAllSdkSessions();
+    }
 
     // 6. Compute diff (what changed)
     const after = this.snapshotAgentSkills();
