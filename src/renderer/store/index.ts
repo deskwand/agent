@@ -37,6 +37,8 @@ import { pruneDrafts, removeDraft } from "../utils/chat-draft-store";
 // 必须是类型 import：hook 那边要真的 import 本模块的 useAppStore，
 // 两边都用真值 import 就是循环依赖。类型 import 编译后会被抹掉，不成环。
 import type { ReadAloudState } from "../hooks/useReadAloud";
+// 同上一条：类型 import 编译后会被抹掉，与 hook 那边的真值 import 不成环。
+import type { ConversationState } from "../hooks/useVoiceConversation";
 
 export type GlobalNoticeType = "info" | "warning" | "error" | "success";
 export type GlobalNoticeAction = "open_api_settings";
@@ -578,6 +580,15 @@ interface AppState {
    */
   voiceMiniCaption: string | null;
   setVoiceMiniCaption: (caption: string | null) => void;
+  /**
+   * 顶栏那颗星球该长什么样（`ConversationState`）；null = 没有语音会话。
+   *
+   * 与 caption 成对写入却各管一头：caption 决定**有没有**这个图标（null 就消失），
+   * 这个决定球**是哪个样**。错误态不做特殊处理 —— 全屏浮层也是拿 `view.state`
+   * 直接查表的（`orb-state.ts` 那张表两个视图共用），两边不许各判一套。
+   */
+  voiceMiniState: ConversationState | null;
+  setVoiceMiniState: (state: ConversationState | null) => void;
   openVoiceMode: (sessionId: string) => void;
   closeVoiceMode: () => void;
   setReadAloud: (patch: Partial<ReadAloudState>) => void;
@@ -726,6 +737,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   voiceModeMinimized: false,
   voiceModeMuted: false,
   voiceMiniCaption: null,
+  voiceMiniState: null,
   readAloud: {
     messageId: null,
     status: "idle",
@@ -1972,6 +1984,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setVoiceModeMinimized: (minimized) => set({ voiceModeMinimized: minimized }),
   setVoiceModeMuted: (muted) => set({ voiceModeMuted: muted }),
   setVoiceMiniCaption: (caption) => set({ voiceMiniCaption: caption }),
+  setVoiceMiniState: (state) => set({ voiceMiniState: state }),
 
   openVoiceMode: (sessionId) => {
     if (!get().sessions.some((s) => s.id === sessionId && s.kind === "voice"))
@@ -1983,6 +1996,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // 换会话即归零：与「宿主重建」的既有语义一致
       voiceModeMuted: false,
       voiceMiniCaption: null,
+      voiceMiniState: null,
     });
   },
   closeVoiceMode: () =>
@@ -1991,6 +2005,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       voiceModeSessionId: null,
       voiceModeMinimized: false,
       voiceMiniCaption: null, // 图标据此消失
+      voiceMiniState: null,
     }),
 
   // Read aloud actions：每次都是新对象，zustand 的引用比较才能触发重渲染。

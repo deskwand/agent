@@ -186,4 +186,32 @@ describe("FeedListenButton", () => {
     act(() => useAppStore.setState({ voiceModeOpen: true }));
     expect(stop).toHaveBeenCalledTimes(2);
   });
+
+  it("播放中：图标是三根音条，不再画 Pause 字形", () => {
+    useAppStore.setState({ feedListen: sessionWith(0) });
+    render();
+    const eq = el("feed-listen-eq");
+    expect(eq.querySelectorAll(".listen-eq-bar").length).toBe(3);
+    // 「动作」字形退出：点下去仍然会暂停（aria-label 那条由上面的用例守着）
+    expect(el("feed-listen-button").querySelector("svg")).toBeNull();
+  });
+
+  it("缓冲中：同一排音条加慢速淡出的修饰类", () => {
+    useAppStore.setState({
+      feedListen: { ...sessionWith(0), status: "preparing" },
+    });
+    render();
+    expect(el("feed-listen-eq").className).toContain("listen-eq--preparing");
+  });
+
+  it("暂停：回到静态字形，音条不渲染", () => {
+    useAppStore.setState({
+      feedListen: { ...sessionWith(0), status: "paused" },
+    });
+    render();
+    expect(
+      container.querySelector('[data-testid="feed-listen-eq"]'),
+    ).toBeNull();
+    expect(el("feed-listen-button").querySelector("svg")).not.toBeNull();
+  });
 });
