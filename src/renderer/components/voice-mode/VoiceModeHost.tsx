@@ -39,6 +39,7 @@ export function VoiceModeHost({
   // 音频帧级的 `view.level` 仍只留在宿主：它是高频值，不进 store。
   const muted = useAppStore((s) => s.voiceModeMuted);
   const setMiniCaption = useAppStore((s) => s.setVoiceMiniCaption);
+  const setMiniState = useAppStore((s) => s.setVoiceMiniState);
   const isCompacting = useAppStore(
     (s) => s.sessionStates[sessionId]?.compaction.status === "running",
   );
@@ -66,9 +67,16 @@ export function VoiceModeHost({
     : voiceCaptionLine(view) || t(CAPTION_KEY[view.state]);
   useEffect(() => {
     setMiniCaption(caption);
-  }, [setMiniCaption, caption]);
-  // 宿主卸载（会话关闭）时清掉：图标据此消失
-  useEffect(() => () => setMiniCaption(null), [setMiniCaption]);
+    setMiniState(view.state);
+  }, [setMiniCaption, setMiniState, caption, view.state]);
+  // 宿主卸载（会话关闭）时两个一起清掉：图标据此消失
+  useEffect(
+    () => () => {
+      setMiniCaption(null);
+      setMiniState(null);
+    },
+    [setMiniCaption, setMiniState],
+  );
 
   // 最小化后什么都不画：那颗球与它的卡片在 header 里（`VoiceMiniButton`），
   // 这里只负责运行时与全屏浮层。

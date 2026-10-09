@@ -57,6 +57,8 @@ vi.mock("../../renderer/components/voice-mode/star-orb", () => ({
   GLOW_BRUSH: { kind: "glow" },
   STARS_BRUSH_LIGHT: { kind: "stars", tag: "light" },
   STARS_BRUSH_DARK: { kind: "stars", tag: "dark" },
+  STARS_BRUSH_ICON_LIGHT: { kind: "stars", tag: "icon-light" },
+  STARS_BRUSH_ICON_DARK: { kind: "stars", tag: "icon-dark" },
   StarOrb: ({ brush }: { brush: unknown }) => {
     orb.brushes.push(brush);
     return <canvas />;
@@ -221,6 +223,22 @@ describe("VoiceModeHost", () => {
   it("宿主把算好的那一行字幕发布到 store（header 卡片据此渲染）", () => {
     renderHost();
     expect(useAppStore.getState().voiceMiniCaption).not.toBeNull();
+  });
+
+  it("宿主把会话状态也发布到 store；卸载时字幕与状态一起清空", () => {
+    renderHost();
+    // 状态不能指望替身自己报：view.state 初值是 "calibrating"，只由 onState
+    // 回调 patch（useVoiceMode.ts:66/210），所以推一下再断言。
+    act(() => runtime.runs[0]!.onState("listening"));
+    expect(useAppStore.getState().voiceMiniState).toBe("listening");
+
+    // 同一个 effect 里一起写：换状态就跟着换，不用等字幕变
+    act(() => runtime.runs[0]!.onState("speaking"));
+    expect(useAppStore.getState().voiceMiniState).toBe("speaking");
+
+    act(() => root.render(<></>));
+    expect(useAppStore.getState().voiceMiniCaption).toBeNull();
+    expect(useAppStore.getState().voiceMiniState).toBeNull();
   });
 
   it("出错时报错文字优先，盖过正在念的内容", () => {
