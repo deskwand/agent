@@ -12,7 +12,7 @@
  * 深底上发光）；后台小球按主题拿两套星点画笔（浅底深粒子、深底浅粒子）—— 见
  * design-docs/2026-10-06-mini-orb-theme-brush-design.md。
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type OrbState =
   | "calibrating"
@@ -337,6 +337,17 @@ export function StarOrb({
   stateRef.current = state;
   levelRef.current = level;
 
+  // 偏好是**活的**：CSS 的媒体查询会瞬间重算，canvas 得自己订阅，否则用户在系统设置里
+  // 中途一改，两条路就走出不一样的行为（顶栏那颗球会继续转）。初始值惰性求值。
+  const [still, setStill] = useState(prefersReducedMotion);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setStill(query.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -365,9 +376,6 @@ export function StarOrb({
     let raf = 0;
     let t = 0;
     let last = 0;
-    // 减少动态：只画一帧，不起循环。球停在一个正常姿态上（静态的一帧本来就是一张
-    // 星空球的画），而顶栏不会留下一直在跑的画布。
-    const still = prefersReducedMotion();
 
     const frame = (now: number) => {
       const dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016;
@@ -513,7 +521,7 @@ export function StarOrb({
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, [brush]);
+  }, [brush, still]);
 
   return (
     <canvas
@@ -568,7 +576,8 @@ export function orbCoreRadiusFactor(
  * `globals.css` 末尾那条 `prefers-reduced-motion` 覆盖**只管得住 CSS 动画**，canvas 得
  * 自己问 —— 不问的话，常驻顶栏会留下一个永远在跑的绘制循环。
  *
- * 不夹缓存：媒体查询本身很便宜，而且用户中途改系统设置时，下一次渲染就该跟上。
+ * 每次调用现问一次媒体查询。`StarOrb` 另订阅了它的 `change` 事件 —— 用户在系统设置里
+ * 中途改动也会立刻生效，与 CSS 那条覆盖的行为保持一致。
  * （`sidebar-disclosure-motion.tsx` 里有同一份判断，各留本地：那是 UI 组件的实现细节，
  * 不值得为三行代码开一个共享模块。）
  */

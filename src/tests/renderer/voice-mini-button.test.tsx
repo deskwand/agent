@@ -191,4 +191,33 @@ describe("VoiceMiniButton", () => {
     });
     expect(card.querySelector('[data-testid="stub-orb"]')).toBeNull();
   });
+
+  it("键盘在卡片内部移动焦点时，球不被拆掉重建（onBlur 会冒泡上来）", () => {
+    renderButton();
+    const card = el("voice-mini-card");
+    act(() => {
+      card.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+    const before = card.querySelector('[data-testid="stub-orb"]');
+    expect(before).not.toBeNull();
+
+    // 焦点从「静音」移到「结束」：relatedTarget 仍在卡片里，球不该重建
+    act(() => {
+      card.dispatchEvent(
+        new FocusEvent("focusout", {
+          bubbles: true,
+          relatedTarget: el("voice-mini-end"),
+        }),
+      );
+    });
+    expect(card.querySelector('[data-testid="stub-orb"]')).toBe(before);
+
+    // 焦点真的离开卡片（relatedTarget 不在里面）→ 卸掉
+    act(() => {
+      card.dispatchEvent(
+        new FocusEvent("focusout", { bubbles: true, relatedTarget: null }),
+      );
+    });
+    expect(card.querySelector('[data-testid="stub-orb"]')).toBeNull();
+  });
 });

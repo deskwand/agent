@@ -98,7 +98,12 @@ export function VoiceMiniButton(): JSX.Element | null {
         onMouseEnter={() => setCardOpen(true)}
         onMouseLeave={() => setCardOpen(false)}
         onFocus={() => setCardOpen(true)}
-        onBlur={() => setCardOpen(false)}
+        onBlur={(event) => {
+          // onBlur 会**冒泡**：焦点在卡片内部从一颗按钮移到另一颗也会走到这里。
+          // 那时球不该被拆掉重建（300 颗粒子白建一次，还可能闪一帧）。
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+            setCardOpen(false);
+        }}
       >
         <div className="rounded-xl border border-border-subtle bg-background/95 p-2.5 shadow-elevated backdrop-blur">
           <div className="flex gap-2.5">

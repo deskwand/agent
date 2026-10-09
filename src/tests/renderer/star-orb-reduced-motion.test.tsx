@@ -56,14 +56,18 @@ function reducedMotion(matches: boolean): void {
 let container: HTMLDivElement;
 let root: Root;
 let framesScheduled = 0;
+let framesCancelled = 0;
 
 beforeEach(() => {
   framesScheduled = 0;
+  framesCancelled = 0;
   vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => {
     framesScheduled += 1;
     return 1;
   });
-  vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+  vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {
+    framesCancelled += 1;
+  });
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() =>
     fakeContext()) as unknown as typeof HTMLCanvasElement.prototype.getContext);
   container = document.createElement("div");
@@ -95,6 +99,33 @@ describe("StarOrb 与「减少动态」", () => {
   it("没这个偏好时：照常起循环（对照组，证明上面的 0 不是因为压根没画）", () => {
     reducedMotion(false);
     mount();
+    expect(framesScheduled).toBe(1);
+  });
+
+  it("系统设置在会话中途改动：循环立刻停，不用等重挂载", () => {
+    // CSS 的媒体查询是瞬间重算的，canvas 得自己订阅 —— 否则两边行为不一致：
+    // 用户刚在系统设置里打开「减少动态」，顶栏那颗球却还在转。
+    const listeners: Array<() => void> = [];
+    let reduce = false;
+    window.matchMedia = ((query: string) => ({
+      get matches() {
+        return reduce && query.includes("prefers-reduced-motion");
+      },
+      media: query,
+      addEventListener: (_: string, fn: () => void) => listeners.push(fn),
+      removeEventListener: () => {},
+    })) as unknown as typeof window.matchMedia;
+
+    mount();
+    expect(framesScheduled).toBe(1);
+
+    reduce = true;
+    act(() => {
+      for (const notify of listeners) notify();
+    });
+
+    expect(framesCancelled).toBeGreaterThanOrEqual(1);
+    // 没有新帧排进来：resize() 那一帧只画不排
     expect(framesScheduled).toBe(1);
   });
 });

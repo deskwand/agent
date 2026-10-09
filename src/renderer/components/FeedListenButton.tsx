@@ -65,7 +65,7 @@ export function FeedListenButton(): JSX.Element | null {
                这三根跳动的条说的是「正在出声」。暂停态才回到 Play 字形（动作）。 */
             <span
               data-testid="feed-listen-eq"
-              className={`listen-eq flex h-[15px] items-center justify-center gap-[2px] ${
+              className={`flex h-[15px] items-center justify-center gap-[2px] ${
                 listen.status === "preparing" ? "listen-eq--preparing" : ""
               }`}
             >
