@@ -22,7 +22,10 @@ const VOICE_SESSION: Session = {
  */
 function makeSdk(
   registered: string[],
-  exposures: Record<string, "codemode" | "direct"> = {},
+  exposures: Record<
+    string,
+    "codemode" | "direct" | "model-only" | "deferred"
+  > = {},
 ) {
   let active: string[] = [];
   return {
@@ -163,7 +166,9 @@ it("普通轮：注册表里的工具不再被策略摘掉，降级工具照旧�
     ...degraded,
   ];
   const sdk = makeSdk(registered, {
-    codemode: "codemode",
+    // 真实的 codemode 工具是 model-only（`createCodemodeToolDefinition`），所以它靠
+    // availableTools 进来，而不是靠"有降级工具"时的那次补挂；补挂分支由上面那个用例守。
+    codemode: "model-only",
     internal_browser_click: "codemode",
     office_read_xlsx: "codemode",
     vision_describe: "codemode",
@@ -181,12 +186,23 @@ it("普通轮：注册表里的工具不再被策略摘掉，降级工具照旧�
   expect(sdk.call("ls")).toBe("ls");
   expect(sdk.call("powershell")).toBe("powershell");
 
-  // 整集合不变量：非语音轮的 active = 注册表里全部可声明工具（减去 set_voice）+ codemode。
-  // 任何静默丢工具都会红 —— 不只盯这次事故里那几个受害者。
-  const expected = new Set(
-    registered.filter((n) => n !== "set_voice" && !degraded.includes(n)),
+  // 整集合不变量：非语音轮的 active = 注册表里全部可声明工具（减去 set_voice），按注册表次序。
+  // 用数组比较 —— 顺序也是请求前缀的一部分，排序/去重都该红；静默丢工具更该红。
+  const expected = registered.filter(
+    (n) => n !== "set_voice" && !degraded.includes(n),
   );
-  expect(new Set(sdk.active)).toEqual(expected);
+  expect(sdk.active).toEqual(expected);
+});
+
+it("空注册表：不抛错，也不写入", () => {
+  const sdk = makeSdk([]);
+  applySessionTurnPolicyToSdk(
+    { ...VOICE_SESSION, kind: "ordinary" },
+    undefined,
+    sdk,
+  );
+  expect(sdk.active).toEqual([]);
+  expect(sdk.setActiveToolsByName).toHaveBeenCalledTimes(0);
 });
 
 it("名单没变时不重建系统提示词", () => {

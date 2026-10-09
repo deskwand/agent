@@ -5403,8 +5403,9 @@ export function applySessionTurnPolicyToSdk(
   sessionRecord?: { turnProfile?: TurnProfile },
 ): void {
   const registry = piSession.getAllTools();
-  // 这个函数是 active 集合**唯一**的写入点：该收窄的只有语音轮；非语音轮只是把集合恢复成
-  // 注册表的默认（= pi 建会话时的那一份）。别在这里再写"策略清单"。
+  // DeskBand 代码里唯一的 per-turn active 集合写入点：该收窄的只有语音轮；非语音轮只是把集合
+  // 恢复成注册表的默认（= pi 建会话时的那一份）。别在这里再写"策略清单"。
+  // （注册事件与 MCP 扩展仍会自己写 active —— 那是 pi 的正常路径，与本函数无关。）
   //
   // 输入必须来自**会话注册表**：用 DeskBand 自有清单（allCustomTools + codingTools）时，
   // 扩展注册的工具（pi-subagents 的 Agent / SubagentWorkflow / get_subagent_result /
@@ -5441,6 +5442,8 @@ export function applySessionTurnPolicyToSdk(
   // setActiveToolsByName() 会无条件重建系统提示词（SDK 的 _rebuildSystemPrompt 没有短路；
   // pi-subagents 的 renarrow() 为此也加了同款守卫）。名单没变就别写 —— 不然稳态每轮白付
   // 一次重建，而"前缀字节稳定"才是 prompt cache 能命中的前提。
+  // 前提：SDK 会把传入的名单原样存下（当前 _applyToolLoadout 就是 [...new Set(names)] 后逐个
+  // 取注册表项，会去重、不改次序）；哪天它开始过滤/重排，这里会退化成每轮重建 —— 无害。
   const current = piSession.getActiveToolNames();
   const unchanged =
     current.length === next.length &&
