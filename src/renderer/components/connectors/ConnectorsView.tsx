@@ -5,10 +5,17 @@ import {
   CATEGORY_ORDER,
   type CatalogCategory,
 } from "../../../shared/mcp-catalog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { AddServerDialog } from "./AddServerDialog";
 import { MailAccountDialog } from "./MailAccountDialog";
 import { ConnectorCard } from "./ConnectorCard";
 import { KeyDialog } from "./KeyDialog";
+import { ConfirmDialog } from "../ConfirmDialog";
 import { SettingsSkills } from "../settings/SettingsSkills";
 import { PiExtensionManagerView } from "../PiExtensionManagerView";
 import { ArrowLeft } from "lucide-react";
@@ -132,15 +139,8 @@ export function ConnectorsView() {
     });
   }, [refresh]);
 
-  // 菜单收起要能用 Esc —— 它盖在列表上，没有键盘出口时只能靠再点一次「添加」。
-  useEffect(() => {
-    if (!addMenuOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAddMenuOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [addMenuOpen]);
+  // ⚠️ 原实现在菜单打开时挂 `window` 的 keydown 来关它（只有 Esc ✓，没有 mousedown ✓）——
+  // 迁到 Radix 后 Esc 由 `DropdownMenuContent` 接管 ✓，这段是**我的改动造成的孤儿** ✓。
 
   // 连接页只装**外部服务**（目录条目 + 用户自建）。应用自带的能力（Computer Use）
   // 住在设置的「能力」里 —— 它的数据仍由 registry.list() 产出，只是不在这里渲染。
@@ -452,60 +452,59 @@ export function ConnectorsView() {
                     {added.length}
                   </span>
                 </button>
-                <div className="relative">
-                  <button
-                    type="button"
-                    aria-haspopup="menu"
-                    aria-expanded={addMenuOpen}
-                    onClick={() => setAddMenuOpen((v) => !v)}
-                    className="px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
-                  >
-                    {t("connectors.action.add")}
-                  </button>
-                  {/* 菜单**绝对定位**在按钮下方：工具栏是 flex-wrap，
-                      参与布局的菜单会把 chip 挤到下一行（工具栏自己会跳一下）。 */}
-                  {addMenuOpen && (
-                    <div
-                      role="menu"
-                      className="absolute right-0 top-full mt-1 z-20 w-[210px] bg-surface border border-border rounded-xl shadow-elevated overflow-hidden"
+                <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
                     >
-                      <button
-                        type="button"
-                        role="menuitem"
-                        data-testid="add-mcp"
-                        onClick={() => {
-                          setAddMenuOpen(false);
-                          setAddOpen(true);
-                        }}
-                        className="w-full text-left px-3 py-2.5 hover:bg-surface-hover transition-colors"
-                      >
-                        <span className="block text-sm font-semibold text-text-primary">
-                          {t("connectors.addMenu.server")}
-                        </span>
-                        <span className="block text-xs text-text-muted">
-                          {t("connectors.addMenu.serverHint")}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        data-testid="add-mail"
-                        onClick={() => {
-                          setAddMenuOpen(false);
-                          setMailOpen(true);
-                        }}
-                        className="w-full text-left px-3 py-2.5 border-t border-border-muted hover:bg-surface-hover transition-colors"
-                      >
-                        <span className="block text-sm font-semibold text-text-primary">
-                          {t("connectors.addMenu.mailbox")}
-                        </span>
-                        <span className="block text-xs text-text-muted">
-                          {t("connectors.addMenu.mailboxHint")}
-                        </span>
-                      </button>
-                    </div>
-                  )}
-                </div>
+                      {t("connectors.action.add")}
+                    </button>
+                  </DropdownMenuTrigger>
+                  {/* ⚠️ 根必须同时包住触发器与内容 ✗（计划 8 ✓）。
+                      原实现手写在 `<div className="relative">` 里并自己绝对定位 ✓
+                      —— 注释里那条「参与布局会把 chip 挤下去」的理由是为了**绝对定位** ✓，
+                      而 Radix 的 content 经 portal 挂 body ✓ 根本不参与布局 ✓，那个 wrapper 已删 ✗。
+                      `align="end"` 保持原来的右对齐 ✓；`w-[210px]` 压回原宽度 ✓（Radix 默认 w-72 ✗）。
+                      `onCloseAutoFocus` 阻止把焦点还给触发器 ✓ —— 两条项都开对话框 ✓，
+                      不阻止就会**抢走对话框输入框的焦点** ✗（本会话在 `Sidebar` 上实测过 ✓）。 */}
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-[210px]"
+                    onCloseAutoFocus={(event) => event.preventDefault()}
+                  >
+                    <DropdownMenuItem
+                      data-testid="add-mcp"
+                      onClick={() => {
+                        setAddMenuOpen(false);
+                        setAddOpen(true);
+                      }}
+                      className="flex-col items-start gap-0 px-3 py-2.5"
+                    >
+                      <span className="block text-sm font-semibold text-text-primary">
+                        {t("connectors.addMenu.server")}
+                      </span>
+                      <span className="block text-xs text-text-muted">
+                        {t("connectors.addMenu.serverHint")}
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      data-testid="add-mail"
+                      onClick={() => {
+                        setAddMenuOpen(false);
+                        setMailOpen(true);
+                      }}
+                      className="flex-col items-start gap-0 rounded-none border-t border-border-muted px-3 py-2.5"
+                    >
+                      <span className="block text-sm font-semibold text-text-primary">
+                        {t("connectors.addMenu.mailbox")}
+                      </span>
+                      <span className="block text-xs text-text-muted">
+                        {t("connectors.addMenu.mailboxHint")}
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {/* 筛选开着且一条都没有：必须给出口 —— 此时既没有卡片可点，
@@ -583,37 +582,28 @@ export function ConnectorsView() {
 
       {/* 删除邮箱的确认框。内联渲染在这里（而不是卡片里）——
           一个页面同时只会有一个待删邮箱，状态放视图层就不会有多份。 */}
-      {pendingRemove && (
-        <div
-          data-testid="mail-remove-confirm"
-          className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in"
-        >
-          <div className="card w-full max-w-sm p-5 m-4 shadow-elevated animate-slide-up">
-            <p className="text-sm font-medium text-text-primary">
-              {t("connectors.mail.removeConfirmTitle")}
-            </p>
-            <p className="text-xs text-text-muted mt-1">
-              {t("connectors.mail.removeConfirmBody", { email: pendingRemove })}
-            </p>
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                type="button"
-                onClick={() => setPendingRemove(null)}
-                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors"
-              >
-                {t("common.cancel")}
-              </button>
-              <button
-                type="button"
-                onClick={() => void confirmRemoveMailbox(pendingRemove)}
-                className="px-3 py-1.5 rounded-lg bg-error/10 text-error hover:bg-error/20 text-sm font-medium transition-colors"
-              >
-                {t("connectors.action.removeMailbox")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 删邮箱的确认框。内联渲染在这里（而不是卡片里）——
+          一个页面同时只会有一个待删邮箱，状态放视图层就不会有多份。
+
+          外壳走已迁移的 ConfirmDialog（计划 4 Task 1 给它加了 description 槽位），
+          不再自己搭 modal-overlay —— 那 28 行本来就是这个原语的重复实现。
+          顺带修掉一个既有缺陷：本组件不调 useBrowserOcclusion，所以这个确认框
+          从来没有遮挡过内置浏览器面板；ConfirmDialog 内部是
+          OccludingAlertDialog，迁过去就遮挡了。 */}
+      <ConfirmDialog
+        isOpen={pendingRemove !== null}
+        title={t("connectors.mail.removeConfirmTitle")}
+        description={
+          pendingRemove
+            ? t("connectors.mail.removeConfirmBody", { email: pendingRemove })
+            : undefined
+        }
+        confirmLabel={t("connectors.action.removeMailbox")}
+        onConfirm={() => {
+          if (pendingRemove) void confirmRemoveMailbox(pendingRemove);
+        }}
+        onCancel={() => setPendingRemove(null)}
+      />
     </div>
   );
 }

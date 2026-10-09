@@ -136,8 +136,12 @@ describe("账号簇在图标栏上", () => {
   });
 
   it("opens the account popover to the right of the rail", () => {
-    expect(accountMenu).toContain("left-full");
-    expect(accountMenu).not.toContain("bottom-full");
+    // 意图不变（账号菜单朝图标栏**右侧**展开），机制换了：原实现靠
+    // `absolute bottom-0 left-full ml-2` 相对父容器定位，迁到 Radix 后由
+    // DropdownMenuContent 的 side="right" 表达（Radix 的锚点是 Trigger，
+    // 没有「相对父容器」这个概念）。
+    expect(accountMenu).toContain('side="right"');
+    expect(accountMenu).not.toContain('side="bottom"');
   });
 });
 

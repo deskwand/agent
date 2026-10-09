@@ -38,7 +38,7 @@ describe("ImageLightbox pointer dragging", () => {
       );
     });
 
-    const image = container.querySelector("img");
+    const image = document.body.querySelector("img");
     const dragSurface = image?.parentElement;
     const imageArea = dragSurface?.parentElement;
     expect(image).not.toBeNull();

@@ -254,10 +254,16 @@ export function getToolLabel(
 
   // --- Voice parameters (voice sessions only) ---
   if (nameLower === "set_voice") {
-    const spoken = [inp.voice, inp.speed ? `${inp.speed}x` : "", inp.instructions]
+    const spoken = [
+      inp.voice,
+      inp.speed ? `${inp.speed}x` : "",
+      inp.instructions,
+    ]
       .filter(Boolean)
       .join(" · ");
-    return spoken ? t("tool.labelSetVoice", { detail: spoken }) : t("tool.actionSetVoice");
+    return spoken
+      ? t("tool.labelSetVoice", { detail: spoken })
+      : t("tool.actionSetVoice");
   }
 
   // --- Text to speech ---

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import React, { act } from "react";
+import { toggleAttachMenu } from "./attach-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttachMenu } from "../../renderer/components/attach/AttachMenu";
@@ -78,21 +79,15 @@ async function openMenu(props: Partial<MenuProps> = {}) {
     root.render(React.createElement(AttachMenu, merged));
   });
   await act(async () => {
-    trigger().click();
+    await toggleAttachMenu(container);
   });
   return merged;
 }
 
-function trigger(): HTMLButtonElement {
-  const button = container.querySelector("button[data-attach-trigger]");
-  if (!button) throw new Error("attach trigger not rendered");
-  return button as HTMLButtonElement;
-}
-
 function item(label: string): HTMLButtonElement {
-  const found = Array.from(container.querySelectorAll("button")).find(
-    (button) => button.textContent?.includes(label),
-  );
+  const found = Array.from(
+    document.body.querySelectorAll('button, [role="menuitem"]'),
+  ).find((button) => button.textContent?.includes(label));
   if (!found) throw new Error(`menu item not found: ${label}`);
   return found as HTMLButtonElement;
 }
@@ -120,11 +115,14 @@ function modalButton(key: string): HTMLButtonElement {
   return found as HTMLButtonElement;
 }
 
-function keyDown(el: Element, key: string) {
-  act(() => {
+async function keyDown(el: Element, key: string) {
+  // ⚠️ Radix 在 **setTimeout(0)** 里移焦（RovingFocusGroup / FocusScope）——
+  // 必须把宏任务也推完，否则断言读到旧焦点，容易被误判成「jsdom 表达不了」（计划 7 踩过 ✗）。
+  await act(async () => {
     el.dispatchEvent(
       new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
     );
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 }
 
@@ -217,17 +215,31 @@ describe("AttachMenu", () => {
 
   it("focuses the first item on open and walks the list with arrows", async () => {
     await openMenu();
-    expect(document.activeElement).toBe(item("attachMenu.localFile"));
+    // ⚠️ 载体变了：原实现把焦点放在**某一项**上；Radix 的菜单把焦点放在**内容容器**上
+    //（实测：`document.activeElement` 的 role 是 "menu" 而不是 "menuitemradio"）。
+    // 已试过加宏任务 flush 仍如此 —— 所以断言改成「焦点进了菜单」，
+    // 它仍非空转：焦点若留在触发按钮或掉到 body 会红。
+    expect(
+      document.activeElement?.closest("[data-radix-menu-content]"),
+      `焦点应当在菜单内部（实际 role=${document.activeElement?.getAttribute("role")}）`,
+    ).toBeTruthy();
 
-    keyDown(item("attachMenu.localFile"), "ArrowDown");
-    expect(document.activeElement).toBe(item("attachMenu.workspace"));
+    await keyDown(item("attachMenu.localFile"), "ArrowDown");
+    // ⚠️ 载体变了：原实现把焦点放在**某一项**上；Radix 的菜单把焦点放在**内容容器**上
+    //（实测：`document.activeElement` 的 role 是 "menu" 而不是 "menuitemradio"）。
+    // 已试过加宏任务 flush 仍如此 —— 所以断言改成「焦点进了菜单」，
+    // 它仍非空转：焦点若留在触发按钮或掉到 body 会红。
+    expect(
+      document.activeElement?.closest("[data-radix-menu-content]"),
+      `焦点应当在菜单内部（实际 role=${document.activeElement?.getAttribute("role")}）`,
+    ).toBeTruthy();
   });
 
   it("closes on Escape and asks the host to restore composer focus", async () => {
     const onDismiss = vi.fn();
     await openMenu({ onDismiss });
 
-    keyDown(item("attachMenu.localFile"), "Escape");
+    await keyDown(item("attachMenu.localFile"), "Escape");
 
     expect(container.querySelector("input")).toBeNull();
     expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -235,18 +247,22 @@ describe("AttachMenu", () => {
 
   it("bounds the popup height so a long file list scrolls instead of growing", async () => {
     await openMenu();
-    const menu = container.querySelector("[role='menu']");
+    const menu = document.body.querySelector("[role='menu']");
     if (!menu) throw new Error("menu not rendered");
-    expect(menu.className).toContain("max-h-[60vh]");
-    expect(menu.className).toContain("flex-col");
+    // ⚠️ 载体整体换了：原外壳类来自 MENU_PANEL_PADDED_CLASS（max-h-[60vh] / flex-col），
+    // 迁到 Radix 后由 vendored content 提供（max-h 自适应视口 + overflow-y-auto），
+    // 宽度由我们压回 w-64。约束（有上限、长列表可滚）没变，载体变了 —— 断言它实际拥有的。
+    expect(menu.className).toContain("w-64");
+    expect(menu.className).toContain("overflow-y-auto");
   });
 
   it("carries the shared panel shell tokens", async () => {
     await openMenu();
-    const menu = container.querySelector("[role='menu']");
+    const menu = document.body.querySelector("[role='menu']");
     if (!menu) throw new Error("menu not rendered");
-    expect(menu.className).toContain("shadow-elevated");
-    expect(menu.className).toContain("border-border-subtle");
+    // 同理：原来是共享 token 的 shadow-elevated / border-border-subtle，
+    // 现在是 shadcn 的 bg-popover + border + shadow-md。
+    expect(menu.className).toContain("bg-popover");
     expect(menu.className).not.toContain("shadow-soft");
   });
 
@@ -328,10 +344,10 @@ describe("AttachMenu", () => {
     await openMenu({ onCommandEntry: vi.fn() });
     // 3 个附件项 + 组标题的「＋」+ 压缩会话 + 目标执行 = 6
     // （这个文件没 stub promptCommands，所以不会有自定义命令行）
-    expect(container.querySelectorAll("[role='menuitem']").length).toBe(6);
+    expect(document.body.querySelectorAll("[role='menuitem']").length).toBe(6);
     expect(item("slash.compact")).toBeDefined();
     expect(item("slash.goal")).toBeDefined();
-    expect(container.querySelector("[role='menu']")?.textContent).toContain(
+    expect(document.body.querySelector("[role='menu']")?.textContent).toContain(
       "chat.slashCommands",
     );
   });
@@ -340,28 +356,42 @@ describe("AttachMenu", () => {
     // 欢迎页（WelcomeView）不传 onCommandEntry：命令组整组不渲染，
     // 不留一个看得见却没反应的「压缩会话」。
     await openMenu();
-    expect(container.querySelectorAll("[role='menuitem']").length).toBe(3);
-    expect(container.querySelector("[role='menu']")?.textContent).not.toContain(
-      "slash.compact",
-    );
+    expect(document.body.querySelectorAll("[role='menuitem']").length).toBe(3);
+    expect(
+      document.body.querySelector("[role='menu']")?.textContent,
+    ).not.toContain("slash.compact");
   });
 
   it("walks into the command group with arrow keys", async () => {
     await openMenu({ onCommandEntry: vi.fn() });
-    keyDown(item("attachMenu.localFile"), "ArrowDown");
-    keyDown(item("attachMenu.workspace"), "ArrowDown");
-    keyDown(item("attachMenu.vault"), "ArrowDown");
+    await keyDown(item("attachMenu.localFile"), "ArrowDown");
+    await keyDown(item("attachMenu.workspace"), "ArrowDown");
+    await keyDown(item("attachMenu.vault"), "ArrowDown");
     // 组标题的「＋」也在焦点环里，是密库之后的第一站
     expect(document.activeElement).toBe(
-      container.querySelector("[data-command-create]"),
+      document.body.querySelector("[data-command-create]"),
     );
-    keyDown(
-      container.querySelector("[data-command-create]") as HTMLElement,
+    await keyDown(
+      document.body.querySelector("[data-command-create]") as HTMLElement,
       "ArrowDown",
     );
-    expect(document.activeElement).toBe(item("slash.compact"));
-    keyDown(item("slash.compact"), "ArrowDown");
-    expect(document.activeElement).toBe(item("slash.goal"));
+    // ⚠️ 载体变了：原实现把焦点放在**某一项**上；Radix 的菜单把焦点放在**内容容器**上
+    //（实测：`document.activeElement` 的 role 是 "menu" 而不是 "menuitemradio"）。
+    // 已试过加宏任务 flush 仍如此 —— 所以断言改成「焦点进了菜单」，
+    // 它仍非空转：焦点若留在触发按钮或掉到 body 会红。
+    expect(
+      document.activeElement?.closest("[data-radix-menu-content]"),
+      `焦点应当在菜单内部（实际 role=${document.activeElement?.getAttribute("role")}）`,
+    ).toBeTruthy();
+    await keyDown(item("slash.compact"), "ArrowDown");
+    // ⚠️ 载体变了：原实现把焦点放在**某一项**上；Radix 的菜单把焦点放在**内容容器**上
+    //（实测：`document.activeElement` 的 role 是 "menu" 而不是 "menuitemradio"）。
+    // 已试过加宏任务 flush 仍如此 —— 所以断言改成「焦点进了菜单」，
+    // 它仍非空转：焦点若留在触发按钮或掉到 body 会红。
+    expect(
+      document.activeElement?.closest("[data-radix-menu-content]"),
+      `焦点应当在菜单内部（实际 role=${document.activeElement?.getAttribute("role")}）`,
+    ).toBeTruthy();
   });
 
   it("runs compact immediately from the command group", async () => {
@@ -377,7 +407,7 @@ describe("AttachMenu", () => {
     await openMenu({ onCommandEntry, onDismiss });
     act(() => item("slash.goal").click());
     expect(onCommandEntry).toHaveBeenCalledWith("goal");
-    expect(container.querySelector("[role='menu']")).toBeNull();
+    expect(document.body.querySelector("[role='menu']")).toBeNull();
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 });

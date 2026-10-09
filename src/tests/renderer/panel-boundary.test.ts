@@ -74,7 +74,11 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
     // 只匹带引号的 class 串，不扫全文：本文件旁边就有「accent-muted」这样的解释性
     // 注释，全文 not.toContain 会被注释误触（本文件 §9 已记过这条教训）。
     const helpMenu = read("components/HelpMenu.tsx");
-    expect(helpMenu).toContain('"text-accent hover:bg-overlay-hover"');
+    // ⚠️ 这条原来只匹**带引号的类串**，以免误触注释（见下面那段说明）。
+    // 迁移后类串写在模板字面量里（`${RAIL_BUTTON_CLASS} relative …`），
+    // 所以引号形状没了 —— 这里改成匹「反引号内的那一串」，
+    // 保住「不扫全文、只匹类串」的性质。
+    expect(helpMenu).toContain("relative text-accent hover:bg-overlay-hover`");
     expect(helpMenu).not.toContain("hover:bg-accent-muted");
     expect(helpMenu).not.toContain("rounded-full bg-accent");
   });

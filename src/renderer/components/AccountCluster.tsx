@@ -9,7 +9,6 @@ import { CloudApiClient } from "../services/cloud-api";
 import { AccountMenu } from "./AccountMenu";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LoginModal } from "./LoginModal";
-import { Tooltip } from "./Tooltip";
 
 /**
  * 图标栏底部的账号簇：头像触发按钮 + 账号弹层 + 它带出的两个弹窗，
@@ -98,25 +97,28 @@ export function AccountCluster() {
 
   return (
     <div className="relative flex flex-col items-center">
-      <Tooltip label={t("sidebar.user")} placement="right">
-        <button
-          type="button"
-          aria-label={t("sidebar.user")}
-          aria-haspopup="menu"
-          aria-expanded={accountMenuOpen}
-          onClick={() => setAccountMenuOpen((v) => !v)}
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/15 text-[10px] font-semibold text-accent transition-colors hover:bg-accent/25"
-        >
-          {identityEmail ? (
-            avatarInitials(identityEmail)
-          ) : (
-            <User className="h-4 w-4" />
-          )}
-        </button>
-      </Tooltip>
-
       <AccountMenu
-        isOpen={accountMenuOpen}
+        trigger={
+          /* ⚠️ 这里必须是**裸 button**，不能包 Tooltip：
+             Radix 的 `asChild` 会 clone 这个子元素并把 onPointerDown / aria-* /
+             data-state / ref 都交给它。本仓的 Tooltip 是个普通函数组件，
+             **既不透传 props 也不 forwardRef** → 包着它这些全会丢，
+             菜单根本打不开（而且不会有任何报错）。
+             Tooltip 由 AccountMenu 自己在 Trigger **外面**加（HelpMenu 同形）。 */
+          <button
+            type="button"
+            aria-label={t("sidebar.user")}
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/15 text-[10px] font-semibold text-accent transition-colors hover:bg-accent/25"
+          >
+            {identityEmail ? (
+              avatarInitials(identityEmail)
+            ) : (
+              <User className="h-4 w-4" />
+            )}
+          </button>
+        }
+        open={accountMenuOpen}
+        onOpenChange={setAccountMenuOpen}
         cloudConfig={cloudConfig}
         cloudRestoring={cloudRestoring}
         onOpenLogin={() => setShowLoginModal(true)}
@@ -128,7 +130,6 @@ export function AccountCluster() {
           setAccountMenuOpen(false);
           setConfirmLogoutOpen(true);
         }}
-        onClose={() => setAccountMenuOpen(false)}
       />
 
       <LoginModal

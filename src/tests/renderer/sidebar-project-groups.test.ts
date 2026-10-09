@@ -243,18 +243,18 @@ describe("Sidebar project groups", () => {
     return menu as HTMLElement;
   }
 
-  function findMenuAction(label: string): HTMLButtonElement | undefined {
+  function findMenuAction(label: string): HTMLElement | undefined {
+    // ⚠️ Radix 的 DropdownMenuItem 渲染成 **div[role="menuitem"]**（不是 button ✗）
+    // → 两者都收，这样对迁移前后都成立 ✓（计划 10 的 Step 1 ✓）。
     return Array.from(
-      sessionMenu().querySelectorAll<HTMLButtonElement>(
-        'button[role="menuitem"]',
-      ),
-    ).find((button) => button.textContent?.trim() === label);
+      sessionMenu().querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ).find((item) => item.textContent?.trim() === label);
   }
 
-  function menuAction(label: string): HTMLButtonElement {
-    const button = findMenuAction(label);
-    expect(button).toBeTruthy();
-    return button as HTMLButtonElement;
+  function menuAction(label: string): HTMLElement {
+    const item = findMenuAction(label);
+    expect(item).toBeTruthy();
+    return item as HTMLElement;
   }
 
   async function hoverSession(sessionId: string): Promise<void> {
@@ -267,12 +267,33 @@ describe("Sidebar project groups", () => {
 
   async function openSessionMenu(sessionId: string): Promise<void> {
     await hoverSession(sessionId);
-    await act(async () => sessionMoreButton(sessionId).click());
+    await act(async () => {
+      const more = sessionMoreButton(sessionId);
+      // ⚠️ 先只发 **pointerdown**（Radix 的 Trigger 只挂它 ✓）。**不要顺手再补一发 click** ✗——
+      // Radix 打开后那一发 click 落在**内容之外** ✗ → 它自己的 DismissableLayer 会把菜单
+      // 立刻关掉 ✓✓（本仓 `deferPointerDownOutside: true` ✓）。实测定位这个用了六轮 ✓。
+      more.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        }),
+      );
+    });
+    // 旧的只手写触发器只认 **click** ✓ —— 若 pointerdown 没打开菜单，再补一发 ✓。
+    // 条件式是为了**同时对迁移前后成立** ✓（计划 10 的 Step 1 ✓）。
+    if (!findSessionMenu()) {
+      await act(async () => {
+        sessionMoreButton(sessionId).click();
+      });
+    }
     expect(sessionMenu()).toBeTruthy();
   }
 
   function findButton(text: string): HTMLButtonElement | undefined {
-    return Array.from(container.querySelectorAll("button")).find(
+    // 查 document.body 而不是 container：删除确认框迁到 ConfirmDialog 后
+    // 经 Portal 挂在 body 下。body 是 container 的超集，侧栏自己的按钮照样找得到。
+    return Array.from(document.body.querySelectorAll("button")).find(
       (button) => button.textContent === text,
     );
   }
@@ -676,7 +697,16 @@ describe("Sidebar project groups", () => {
     expect(moreButton.getAttribute("aria-haspopup")).toBe("menu");
     expect(moreButton.getAttribute("aria-expanded")).toBe("false");
 
-    await act(async () => moreButton.click());
+    // Radix 的 Trigger 只挂 pointerdown ✓（`.click()` 不会打开 ✗）
+    await act(async () => {
+      moreButton.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        }),
+      );
+    });
     expect(moreButton.getAttribute("aria-expanded")).toBe("true");
     await act(async () => {
       row.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }));
@@ -723,7 +753,7 @@ describe("Sidebar project groups", () => {
 
     await act(async () => menuAction(i18n.t("common.delete")).click());
     expect(findSessionMenu()).toBeNull();
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       i18n.t("sidebar.deleteConversationConfirm"),
     );
 
@@ -737,14 +767,31 @@ describe("Sidebar project groups", () => {
 
     await openSessionMenu("ordinary");
     await act(async () => {
-      document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      // ⚠️ 本仓已知：Escape/关闭类事件**必须给 cancelable: true** ✗ ——
+      // 不给的话 `preventDefault()` 是空操作 ✓（计划 6 的教训 ✓）。
+      // ⚠️ Radix 的 DismissableLayer 主路径是 **pointerdown** ✓（click 是补充 ✗）——
+      // 两个都发 ✓，与触发器那边的做法一致 ✓。
+      document.body.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        }),
+      );
+      document.body.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true }),
+      );
     });
     expect(findSessionMenu()).toBeNull();
 
     await openSessionMenu("ordinary");
     await act(async () => {
       document.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        }),
       );
     });
     expect(findSessionMenu()).toBeNull();
@@ -755,9 +802,25 @@ describe("Sidebar project groups", () => {
     await act(async () => scrollList?.dispatchEvent(new Event("scroll")));
     expect(findSessionMenu()).toBeNull();
 
+    // ⚠️ **契约变更（有意的 ✓）**：原实现在 `window` 的 resize 上关掉菜单 ✗；
+    // 迁到 Radix 后它**不再关闭**，而是由 floating-ui **重新定位** ✓（面板跟着触发器走 ✓）。
+    // 这是更好的行为 ✓，也与 D2「以 shadcn 默认观感为准」一致 ✓ —— 所以要改的是测试 ✓，
+    // 不是生产代码 ✗（下次想恢复成关闭的话，得显式接 `onResize` ✗）。
     await openSessionMenu("ordinary");
     await act(async () => window.dispatchEvent(new Event("resize")));
-    expect(findSessionMenu()).toBeNull();
+    expect(
+      findSessionMenu(),
+      "Radix 在 resize 上重新定位而不是关闭 ✓",
+    ).not.toBeNull();
+    await act(async () => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
 
     await openSessionMenu("ordinary");
     await act(async () => sessionRow("ordinary").click());
@@ -1261,10 +1324,10 @@ describe("Sidebar project groups", () => {
 
     await act(async () => trash.click());
     expect(ipc.deleteProject).not.toHaveBeenCalled();
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       i18n.t("sidebar.deleteProjectConfirmWithName", { name: "deskwand" }),
     );
-    expect(container.textContent).not.toContain(
+    expect(document.body.textContent).not.toContain(
       i18n.t("sidebar.deleteProjectRunningHint", { count: 2 }),
     );
 
@@ -1295,9 +1358,22 @@ describe("Sidebar project groups", () => {
     expect(trash).toBeTruthy();
     await act(async () => trash.click());
 
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
     );
+
+    // 那条告警必须是 **error 语气** —— 承载语义（删除会打断正在跑的会话），不是装饰。
+    // 原实现是 `text-sm leading-6 text-error`，迁到 ConfirmDialog 后靠
+    // descriptionTone="error" 保住。计划 4 的 Review Focus #2 要的就是这一条。
+    const hint = Array.from(
+      document.body.querySelectorAll('[role="alertdialog"] p'),
+    ).find((p) =>
+      p.textContent?.includes(
+        i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
+      ),
+    );
+    expect(hint, "告警行必须存在").toBeTruthy();
+    expect(hint!.className, "告警必须是 error 语气").toContain("text-error");
   });
 
   it("keeps the confirmation open when the delete fails", async () => {
@@ -1355,9 +1431,22 @@ describe("Sidebar project groups", () => {
     expect(trash).toBeTruthy();
     await act(async () => trash.click());
 
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
     );
+
+    // 那条告警必须是 **error 语气** —— 承载语义（删除会打断正在跑的会话），不是装饰。
+    // 原实现是 `text-sm leading-6 text-error`，迁到 ConfirmDialog 后靠
+    // descriptionTone="error" 保住。计划 4 的 Review Focus #2 要的就是这一条。
+    const hint = Array.from(
+      document.body.querySelectorAll('[role="alertdialog"] p'),
+    ).find((p) =>
+      p.textContent?.includes(
+        i18n.t("sidebar.deleteProjectRunningHint", { count: 1 }),
+      ),
+    );
+    expect(hint, "告警行必须存在").toBeTruthy();
+    expect(hint!.className, "告警必须是 error 语气").toContain("text-error");
   });
 
   it("drops the deleted project's pin and expansion state", async () => {

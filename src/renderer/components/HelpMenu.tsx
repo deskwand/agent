@@ -10,8 +10,13 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useAppStore } from "../store";
-import { MenuItem } from "./menu-item";
-import { MENU_PANEL_PADDED_CLASS, MENU_SEPARATOR_CLASS } from "./menu-styles";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import { Tooltip } from "./Tooltip";
 import { RAIL_BUTTON_CLASS } from "./rail-styles";
 import { UpdateConfirmDialog } from "./UpdateConfirmDialog";
@@ -58,7 +63,6 @@ export function HelpMenu() {
 
   // 更新就绪后菜单必须收起：否则它会停在「检查更新」那一行上，
   // 而更新已经在硬盘上了（设计文档 §3.4）。
-  const menuVisible = menuOpen && !hasUpdate;
 
   // 有更新时这颗按钮不再是「帮助」，而是「升级」：文案与可访问名同源。
   // store 存裸 semver，前缀 v 在这里补 —— 与弹窗版本徽标的拼法一致。
@@ -68,96 +72,103 @@ export function HelpMenu() {
 
   return (
     <div className="relative flex flex-col items-center">
-      <Tooltip label={railLabel} placement="right">
-        <button
-          type="button"
-          aria-label={railLabel}
-          // 有更新时它是直接动作按钮，不是菜单按钮：两个菜单属性必须一起撤掉
-          aria-haspopup={hasUpdate ? undefined : "menu"}
-          aria-expanded={hasUpdate ? undefined : menuOpen}
-          onClick={() => {
-            if (hasUpdate) {
+      {hasUpdate ? (
+        // 有更新时它是**直接动作按钮**，不是菜单按钮 —— 而 Radix 的
+        // DropdownMenuTrigger 会硬塞 aria-haspopup="menu" 并接管点击，
+        // 所以这条分支不能接 Radix，必须条件渲染（设计 §3.4）。
+        <Tooltip label={railLabel} placement="right">
+          <button
+            type="button"
+            aria-label={railLabel}
+            onClick={() => {
               // 菜单可能正开着：假状态被清掉时它不该自己冒出来
               setMenuOpen(false);
               setShowUpdateDialog(true);
-              return;
-            }
-            setMenuOpen((v) => !v);
-          }}
-          className={`${RAIL_BUTTON_CLASS} relative ${
-            hasUpdate
-              ? // hover 底用 overlay-hover：accent 压在 accent-muted 上时，
-                // 亮色 ember 只有 2.97:1（低于 3:1），实测见设计文档 §5
-                "text-accent hover:bg-overlay-hover"
-              : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
-          }`}
-        >
-          {hasUpdate ? (
-            <CircleArrowUp className="w-4 h-4" />
-          ) : (
-            <CircleHelp className="w-4 h-4" />
-          )}
-        </button>
-      </Tooltip>
-
-      {menuVisible && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setMenuOpen(false)}
-          />
-          <div
-            className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-up absolute bottom-0 left-full z-50 ml-2 w-64`}
+            }}
+            className={`${RAIL_BUTTON_CLASS} relative text-accent hover:bg-overlay-hover`}
           >
-            <MenuItem
-              icon={<BookOpen className="w-4 h-4" />}
-              label={t("help.docs")}
-              trailing={<ArrowUpRight className="w-4 h-4" />}
-              onClick={() => {
-                openExternal(MANUAL_URL);
-                setMenuOpen(false);
-              }}
-            />
-            <MenuItem
-              icon={<Bug className="w-4 h-4" />}
-              label={t("help.feedback")}
-              trailing={<ArrowUpRight className="w-4 h-4" />}
-              onClick={() => {
-                openExternal(FEEDBACK_URL);
-                setMenuOpen(false);
-              }}
-            />
-            <MenuItem
-              icon={<Info className="w-4 h-4" />}
-              label={t("about.title")}
-              trailing={
-                currentAppVersion ? (
-                  <span className="text-xs">v{currentAppVersion}</span>
-                ) : undefined
-              }
+            <CircleArrowUp className="w-4 h-4" />
+          </button>
+        </Tooltip>
+      ) : (
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+          {/* Tooltip 在外、Trigger 在内：本仓的 Tooltip 是**包一层 span** 的，
+              反过来会让 asChild 把 trigger props 传给 Tooltip 而不是 button。 */}
+          <Tooltip label={railLabel} placement="right">
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                aria-label={railLabel}
+                // aria-haspopup / aria-expanded 由 Radix 的 Trigger 管，不要手写
+                className={`${RAIL_BUTTON_CLASS} relative text-text-muted hover:bg-overlay-hover hover:text-text-primary`}
+              >
+                <CircleHelp className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+          </Tooltip>
+
+          <DropdownMenuContent align="start" side="right" className="w-64">
+            <DropdownMenuItem
+              className="h-7 gap-2"
+              onClick={() => openExternal(MANUAL_URL)}
+            >
+              <span className="shrink-0 text-text-muted">
+                <BookOpen className="w-4 h-4" />
+              </span>
+              <span className="truncate">{t("help.docs")}</span>
+              <span className="ml-auto shrink-0 text-text-muted">
+                <ArrowUpRight className="w-4 h-4" />
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="h-7 gap-2"
+              onClick={() => openExternal(FEEDBACK_URL)}
+            >
+              <span className="shrink-0 text-text-muted">
+                <Bug className="w-4 h-4" />
+              </span>
+              <span className="truncate">{t("help.feedback")}</span>
+              <span className="ml-auto shrink-0 text-text-muted">
+                <ArrowUpRight className="w-4 h-4" />
+              </span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="h-7 gap-2"
               onClick={() => {
                 const store = useAppStore.getState();
                 store.setSettingsTab("about");
                 store.setActiveView("settings");
-                setMenuOpen(false);
               }}
-            />
+            >
+              <span className="shrink-0 text-text-muted">
+                <Info className="w-4 h-4" />
+              </span>
+              <span className="truncate">{t("about.title")}</span>
+              {currentAppVersion ? (
+                <span className="ml-auto shrink-0 text-xs text-text-muted">
+                  v{currentAppVersion}
+                </span>
+              ) : null}
+            </DropdownMenuItem>
 
-            <div className={MENU_SEPARATOR_CLASS} />
+            <DropdownMenuSeparator />
 
-            <MenuItem
-              icon={<RefreshCw className="w-4 h-4" />}
-              label={t("about.checkUpdate")}
+            <DropdownMenuItem
+              className="h-7 gap-2"
               onClick={() => {
                 window.electronAPI?.send({
                   type: "update.check",
                   payload: {},
                 });
-                setMenuOpen(false);
               }}
-            />
-          </div>
-        </>
+            >
+              <span className="shrink-0 text-text-muted">
+                <RefreshCw className="w-4 h-4" />
+              </span>
+              <span className="truncate">{t("about.checkUpdate")}</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
       <UpdateConfirmDialog

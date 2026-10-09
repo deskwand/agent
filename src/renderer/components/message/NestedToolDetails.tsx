@@ -6,6 +6,11 @@ import type {
   ToolUseContent,
 } from "../../types";
 import { ToolUseBlock } from "./ToolUseBlock";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 
 interface NestedToolDetailsProps {
   item: ToolUseContent;
@@ -53,39 +58,44 @@ export function NestedToolDetails({
         </p>
       )}
       {needsOwnDetails ? (
-        <details>
-          <summary
-            className={
-              trace.status === "error" ? "text-error" : "text-text-muted"
-            }
-          >
-            {item.name} ·{" "}
-            {trace.cancelled
-              ? t("tool.grouped.cancelledOperation")
-              : trace.status === "unfinished"
-                ? t("tool.grouped.unfinishedOperations")
-                : trace.status === "error"
-                  ? t("tool.grouped.failedOperations")
-                  : t("tool.grouped.outputUnavailable")}
-          </summary>
-          {Object.keys(item.input).length > 0 && (
-            <pre className="whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono text-text-secondary">
-              {JSON.stringify(item.input, null, 2)}
-            </pre>
-          )}
-          {unavailable && trace.status !== "ok" && (
-            <p className="text-xs text-text-muted">
-              {t("tool.grouped.outputUnavailable")}
-            </p>
-          )}
-          {result?.content && (
-            <pre
-              className={`whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono ${trace.status === "error" ? "text-error" : "text-text-secondary"}`}
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              className={`cursor-pointer ${
+                trace.status === "error" ? "text-error" : "text-text-muted"
+              }`}
             >
-              {result.content}
-            </pre>
-          )}
-        </details>
+              {item.name} ·{" "}
+              {trace.cancelled
+                ? t("tool.grouped.cancelledOperation")
+                : trace.status === "unfinished"
+                  ? t("tool.grouped.unfinishedOperations")
+                  : trace.status === "error"
+                    ? t("tool.grouped.failedOperations")
+                    : t("tool.grouped.outputUnavailable")}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            {Object.keys(item.input).length > 0 && (
+              <pre className="whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono text-text-secondary">
+                {JSON.stringify(item.input, null, 2)}
+              </pre>
+            )}
+            {unavailable && trace.status !== "ok" && (
+              <p className="text-xs text-text-muted">
+                {t("tool.grouped.outputUnavailable")}
+              </p>
+            )}
+            {result?.content && (
+              <pre
+                className={`whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono ${trace.status === "error" ? "text-error" : "text-text-secondary"}`}
+              >
+                {result.content}
+              </pre>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
       ) : (
         <ToolUseBlock
           block={item}

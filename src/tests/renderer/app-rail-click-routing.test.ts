@@ -9,7 +9,14 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  // 必须给全 `i18n`（不只是 `t`）：树里会读模块级 i18n 实例的工具（utils/i18n-format.ts）
+  // 以及后续迁移进来的弹窗（UpdateConfirmDialog 取 i18n.language 挑语种）都靠它。
+  // 缺它时 `i18n.language` 会读到 undefined 并炸掉整棵渲染树 ——
+  // 而修法不该是去改生产代码迁就 mock（见 progress.md 的 Task 7 Ruling）。
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: "en", resolvedLanguage: "en" },
+  }),
 }));
 
 import { AppRail } from "../../renderer/components/AppRail";

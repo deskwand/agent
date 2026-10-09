@@ -28,7 +28,25 @@ export async function openMenu(
   testId: string,
 ): Promise<void> {
   await act(async () => {
-    menuTrigger(container, testId).click();
+    // ⚠️ **两种事件都派发**，让本 helper 对「手写触发器」与「Radix 触发器」都有效：
+    //   - 旧实现（手写）：触发器是 `<button onClick={toggle}>` → 只认 **click**
+    //   - 新实现（Radix）：触发器只挂 `onPointerDown`（+ Enter/Space/ArrowDown 的
+    //     keydown），**没有 onClick** ✗（计划 7 读 `@radix-ui/react-dropdown-menu`
+    //     源码核实）→ 只认 **pointerdown**
+    // 迁移期间两种实现并存，只派发一种就会有一半场景打不开菜单，而失败信息表现为
+    // 「选项找不到」，极易误判成渲染错了。
+    // jsdom 没有 PointerEvent，用 MouseEvent 派发同名事件即可（React 按事件名映射）。
+    // 另外：**选项本身仍认 click** ✓（同日核实：MenuItemImpl 有 onClick → handleSelect），
+    // 所以 pickOption 不用改。
+    const trigger = menuTrigger(container, testId);
+    trigger.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+    trigger.click();
   });
 }
 

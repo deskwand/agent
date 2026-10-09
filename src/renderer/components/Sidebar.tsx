@@ -1,9 +1,10 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { OccludingDialog } from "./ui/occluding-dialog";
+import { DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { useIPC } from "../hooks/useIPC";
-import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
 import {
   Trash2,
   Search as SearchIcon,
@@ -35,13 +36,13 @@ import {
 } from "../utils/sidebar-session-groups";
 import { Tooltip } from "./Tooltip";
 import {
-  MENU_ITEM_CLASS,
-  MENU_ITEM_DANGER_CLASS,
-  MENU_ITEM_DEFAULT_CLASS,
-  MENU_LABEL_CLASS,
-  MENU_PANEL_PADDED_CLASS,
-  MENU_SEPARATOR_CLASS,
-} from "./menu-styles";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
@@ -106,7 +107,7 @@ export function Sidebar({
   const [sidebarPins, setSidebarPins] = useState<SidebarPins>(loadSidebarPins);
   const [showProjectActions, setShowProjectActions] = useState(false);
   const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
-  const [sessionMenu, setSessionMenu] = useState<SessionMenuState | null>(null);
+  const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
@@ -119,30 +120,14 @@ export function Sidebar({
     saveGroupExpansion(projectExpansionOverrides);
   }, [projectExpansionOverrides]);
 
-  useEffect(() => {
-    if (!showProjectActions) return;
-    const handler = () => setShowProjectActions(false);
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, [showProjectActions]);
+  // ⚠️ 同一个坑 ✓：原实现在 `showProjectActions` 打开时挂 document 的 click 监听来自关 ✗
+  // —— 迁到 Radix 后由 `DropdownMenuContent` 负责 ✓（否则菜单刚打开就被那次 click 关掉 ✗✗，
+  // 会话菜单那边正是如此，定位花了六轮 ✓）。
 
-  useEffect(() => {
-    if (!sessionMenu) return;
-
-    const closeMenu = () => setSessionMenu(null);
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeMenu();
-    };
-
-    document.addEventListener("click", closeMenu);
-    document.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("resize", closeMenu);
-    return () => {
-      document.removeEventListener("click", closeMenu);
-      document.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("resize", closeMenu);
-    };
-  }, [sessionMenu]);
+  // ⚠️ 原实现在 `sessionMenu` 打开时挂 document 上的 click/Escape/resize 监听来关自己 ✗
+  // —— 迁到 Radix 后这些**全部由 `DropdownMenuContent` 负责** ✓（点外部、Esc、滚动/resize，
+  // 而且还会把焦点还给触发器 ✓）。保留它会让菜单**刚打开就被那次 click 关掉** ✗✗
+  //（实测：`stored=null`、`aria-expanded=false` ✓ —— 定位这个 bug 花了六轮 ✓）。
 
   const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -151,7 +136,11 @@ export function Sidebar({
     onConfirm: () => void;
   } | null>(null);
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
-  useBrowserOcclusion(Boolean(deleteConfirm) || createProjectModalOpen);
+  // occluding 由弹窗各自取用：删除确认走 ConfirmDialog（内部 OccludingAlertDialog），
+  // 新建项目走 OccludingDialog。迁移前这里是一句
+  // `useBrowserOcclusion(Boolean(deleteConfirm) || createProjectModalOpen)` ——
+  // 那种把两个弹窗的可见性 OR 起来喂给一个 hook 的写法，正是设计文档说
+  // 「引用计数会溶解它」的地方。
   const [projectName, setProjectName] = useState("");
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const sessionLoadSeqRef = useRef(0);
@@ -211,9 +200,6 @@ export function Sidebar({
     () => new Set(sidebarPins.projectKeys),
     [sidebarPins.projectKeys],
   );
-  const sessionMenuSession = sessionMenu
-    ? activeSessions.find((session) => session.id === sessionMenu.sessionId)
-    : undefined;
 
   useEffect(() => {
     if (!activeSessionId || normalizedQuery) return;
@@ -738,7 +724,7 @@ export function Sidebar({
     );
     const isPinned = pinnedSessionIds.has(session.id);
     const isHovered = hoveredSessionId === session.id;
-    const isMenuOpen = sessionMenu?.sessionId === session.id;
+    const isMenuOpen = sessionMenu === session.id;
     const showSessionActions = isHovered || isMenuOpen;
 
     return (
@@ -876,35 +862,79 @@ export function Sidebar({
                       )}
                     </button>
                   )}
-                  <Tooltip label={t("sidebar.moreActions")}>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setPendingArchiveId(null);
-                        if (isMenuOpen) {
-                          setSessionMenu(null);
-                          return;
-                        }
-                        const rect =
-                          event.currentTarget.getBoundingClientRect();
-                        setSessionMenu({
-                          sessionId: session.id,
-                          anchor: {
-                            top: rect.top,
-                            bottom: rect.bottom,
-                            right: rect.right,
-                          },
-                        });
-                      }}
-                      className="h-6 w-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
-                      aria-label={t("sidebar.moreActions")}
-                      aria-haspopup="menu"
-                      aria-expanded={isMenuOpen}
+                  <DropdownMenu
+                    open={sessionMenu === session.id}
+                    onOpenChange={(next: boolean) => {
+                      // ⚠️ 原触发器是个纯 onClick 按钮，那个 handler 里还带着
+                      // 「把归档确认态清掉」✗ —— Radix 打开菜单只走 **pointerdown** ✗，
+                      // 所以那件事必须挪到这里 ✓（不然它会永久停在 Confirm 态 ✓）。
+                      setPendingArchiveId(null);
+                      setSessionMenu(next ? session.id : null);
+                    }}
+                  >
+                    <Tooltip label={t("sidebar.moreActions")}>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="h-6 w-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
+                          aria-label={t("sidebar.moreActions")}
+                        >
+                          <MoreHorizontal className="h-3 w-3" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </Tooltip>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-36"
+                      // ⚠️ 同一个坑 ✓：菜单项里有「删除」→ 它打开 `ConfirmDialog` ✓，
+                      // 而 Radix 在菜单关闭时会把焦点**归还给触发器** ✗ → 抢走对话框的焦点 ✓。
+                      //（项目菜单那边实测过 ✓：`activeElement` 是那颗 chevron ✗。）
+                      onCloseAutoFocus={(event) => event.preventDefault()}
                     >
-                      <MoreHorizontal className="h-3 w-3" />
-                    </button>
-                  </Tooltip>
+                      <DropdownMenuItem
+                        className="h-7 gap-2"
+                        onClick={(event) => {
+                          handleToggleSessionPin(event, session.id);
+                          setSessionMenu(null);
+                        }}
+                      >
+                        {pinnedSessionIds.has(session.id) ? (
+                          <PinOff className="h-4 w-4 text-text-muted" />
+                        ) : (
+                          <Pin className="h-4 w-4 text-text-muted" />
+                        )}
+                        <span>
+                          {t(
+                            pinnedSessionIds.has(session.id)
+                              ? "sidebar.unpin"
+                              : "sidebar.pin",
+                          )}
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="h-7 gap-2"
+                        onClick={() => beginRenameSession(session)}
+                      >
+                        <SquarePen className="h-4 w-4 text-text-muted" />
+                        <span>{t("sidebar.rename")}</span>
+                      </DropdownMenuItem>
+                      {session.status !== "running" && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="h-7 gap-2 text-error hover:bg-error/10"
+                            onClick={(event) => {
+                              setSessionMenu(null);
+                              handleDeleteSession(event, session);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>{t("common.delete")}</span>
+                          </DropdownMenuItem>
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             )}
@@ -1010,55 +1040,64 @@ export function Sidebar({
                       <SquarePen className="w-4 h-4" />
                     </button>
                   </Tooltip>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowProjectActions((prev) => !prev);
-                    }}
-                    className="w-5 h-8 rounded-r-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                  <DropdownMenu
+                    open={showProjectActions}
+                    onOpenChange={setShowProjectActions}
                   >
-                    <ChevronDown className="w-3 h-3" />
-                  </button>
-                  {showProjectActions && (
-                    <div
-                      onClick={(e) => e.stopPropagation()}
-                      className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-full z-20 mt-1 w-44 animate-menu-in-down`}
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="w-5 h-8 rounded-r-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                      >
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    {/* ⚠️ 根必须同时包住触发器与内容 ✗（计划 8 ✓）。这里**没有** Tooltip ✓。
+                        宽度压回原值 `w-44` ✓（Radix 默认 `w-72` ✗）。 */}
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-44"
+                      // ⚠️ **实测**（探针）：点菜单项打开对话框时 ✗，Radix 在关闭时会把焦点
+                      // **归还给触发器** ✓ —— 于是它**抢走了对话框输入框的焦点** ✗✗
+                      //（`activeElement` 是那颗 `w-5 h-8 rounded-r-xl` 的 chevron ✓）。
+                      // 阻止它 ✓，对话框自己的 `autoFocus` 才能生效 ✓。
+                      onCloseAutoFocus={(event) => event.preventDefault()}
                     >
                       {projectEntries.length > 0 && (
                         <>
-                          <div className={MENU_LABEL_CLASS}>
+                          <DropdownMenuLabel className="px-2.5 py-1 text-xs text-text-muted">
                             {t("sidebar.newSessionInProject")}
-                          </div>
+                          </DropdownMenuLabel>
                           {projectEntries.map(({ name, cwd }) => (
-                            <button
+                            <DropdownMenuItem
                               key={cwd}
+                              className="h-7 gap-2"
                               onClick={() => {
                                 setShowProjectActions(false);
                                 void handleNewSessionInProject(cwd);
                               }}
-                              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
                             >
                               <Folder className="h-4 w-4 shrink-0 text-text-muted" />
                               <span className="truncate">{name}</span>
-                            </button>
+                            </DropdownMenuItem>
                           ))}
-                          <div className={MENU_SEPARATOR_CLASS} />
+                          <DropdownMenuSeparator />
                         </>
                       )}
-                      <button
+                      <DropdownMenuItem
+                        className="h-7 gap-2"
                         onClick={() => void handleNewProject()}
-                        className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
                       >
                         {t("sidebar.newProject")}
-                      </button>
-                      <button
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="h-7 gap-2"
                         onClick={() => void handleOpenProject()}
-                        className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
                       >
                         {t("sidebar.openProject")}
-                      </button>
-                    </div>
-                  )}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>
@@ -1314,179 +1353,80 @@ export function Sidebar({
               </div>
             </div>
 
-            {deleteConfirm && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center modal-overlay px-4"
-                onClick={() => setDeleteConfirm(null)}
-              >
-                <div
-                  className="w-full max-w-sm rounded-2xl border border-border-muted bg-background shadow-xl"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="px-5 py-4">
-                    <p className="text-sm leading-6 text-text-primary">
-                      {deleteConfirm.message}
-                    </p>
-                    {deleteConfirm.detail && (
-                      <p className="mt-2 text-sm leading-6 text-error">
-                        {deleteConfirm.detail}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-end gap-2 border-t border-border-muted px-4 py-3">
-                    <button
-                      onClick={() => setDeleteConfirm(null)}
-                      className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors"
-                    >
-                      {t("sidebar.cancel")}
-                    </button>
-                    <button
-                      onClick={deleteConfirm.onConfirm}
-                      className="rounded-xl bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 transition-colors"
-                    >
-                      {t("sidebar.confirmDelete")}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* 外壳走已迁移的 ConfirmDialog（计划 4 Task 1 给它加了 description
+                槽位）—— 里圈那段内联 modal-overlay 本来就是这个原语的重复实现，
+                只多一行 detail。注意 onConfirm **不要**在这里 setDeleteConfirm(null)：
+                两个设置点的 onConfirm 各自已经关了自己。 */}
+            <ConfirmDialog
+              isOpen={deleteConfirm !== null}
+              title={deleteConfirm?.message ?? ""}
+              description={deleteConfirm?.detail}
+              // 「还有 N 个会话在跑」是告警，不是说明 —— 原实现用的就是 text-error
+              descriptionTone="error"
+              confirmLabel={t("sidebar.confirmDelete")}
+              onConfirm={() => deleteConfirm?.onConfirm()}
+              onCancel={() => setDeleteConfirm(null)}
+            />
 
-            {createProjectModalOpen && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center modal-overlay px-4"
-                onClick={() => {
-                  if (isCreatingProject) return;
+            <OccludingDialog
+              open={createProjectModalOpen}
+              onOpenChange={(next) => {
+                // busy 时忽略一切关闭请求。
+                // 原实现只挡了遮罩点击（onClick 里 `if (isCreatingProject) return`）；
+                // Radix 又引入 Esc 与 DialogContent 内置的关闭键两条路径，
+                // 所以守卫放在这里统一挡。
+                if (!next && !isCreatingProject)
                   setCreateProjectModalOpen(false);
-                }}
-              >
-                <div
-                  className="w-full max-w-sm rounded-2xl border border-border-muted bg-background shadow-xl"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="px-5 py-4 space-y-3">
-                    <div>
-                      <h3 className="text-sm font-medium text-text-primary">
-                        {t("sidebar.createProjectTitle")}
-                      </h3>
-                    </div>
-                    <input
-                      autoFocus
-                      type="text"
-                      value={projectName}
-                      onChange={(e) => setProjectName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !isCreatingProject) {
-                          void handleCreateProject();
-                        }
-                      }}
-                      placeholder={t("sidebar.projectNamePlaceholder")}
-                      className="w-full rounded-xl border border-border-muted bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border"
-                    />
-                  </div>
-                  <div className="flex items-center justify-end gap-2 border-t border-border-muted px-4 py-3">
-                    <button
-                      onClick={() => setCreateProjectModalOpen(false)}
-                      disabled={isCreatingProject}
-                      className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {t("sidebar.cancel")}
-                    </button>
-                    <button
-                      onClick={() => void handleCreateProject()}
-                      disabled={isCreatingProject}
-                      className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {isCreatingProject
-                        ? t("common.loading")
-                        : t("sidebar.newProject")}
-                    </button>
-                  </div>
+              }}
+            >
+              <DialogContent className="max-w-sm">
+                <DialogTitle className="text-sm font-medium text-text-primary">
+                  {t("sidebar.createProjectTitle")}
+                </DialogTitle>
+                {/* 用已有的占位提示当描述 —— 不要复述标题，那会让读屏经
+                    aria-labelledby 与 aria-describedby 把同一句念两遍。 */}
+                <DialogDescription className="sr-only">
+                  {t("sidebar.projectNamePlaceholder")}
+                </DialogDescription>
+                <input
+                  autoFocus
+                  type="text"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !isCreatingProject) {
+                      void handleCreateProject();
+                    }
+                  }}
+                  placeholder={t("sidebar.projectNamePlaceholder")}
+                  className="w-full rounded-xl border border-border-muted bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border"
+                />
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    onClick={() => setCreateProjectModalOpen(false)}
+                    disabled={isCreatingProject}
+                    className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {t("sidebar.cancel")}
+                  </button>
+                  <button
+                    onClick={() => void handleCreateProject()}
+                    disabled={isCreatingProject}
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isCreatingProject
+                      ? t("common.loading")
+                      : t("sidebar.newProject")}
+                  </button>
                 </div>
-              </div>
-            )}
+              </DialogContent>
+            </OccludingDialog>
           </>
         )}
       </aside>
-      {sessionMenu &&
-        sessionMenuSession &&
-        createPortal(
-          <div
-            role="menu"
-            onClick={(event) => event.stopPropagation()}
-            className={`${MENU_PANEL_PADDED_CLASS} fixed z-50 w-36 ${
-              window.innerHeight - sessionMenu.anchor.bottom >= 88
-                ? "animate-menu-in-down"
-                : "animate-menu-in-up"
-            }`}
-            style={{
-              left: Math.max(8, sessionMenu.anchor.right - 144),
-              ...(window.innerHeight - sessionMenu.anchor.bottom >= 88
-                ? { top: sessionMenu.anchor.bottom + 4 }
-                : { bottom: window.innerHeight - sessionMenu.anchor.top + 4 }),
-            }}
-          >
-            <button
-              type="button"
-              role="menuitem"
-              onClick={(event) => {
-                handleToggleSessionPin(event, sessionMenuSession.id);
-                setSessionMenu(null);
-              }}
-              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-            >
-              {pinnedSessionIds.has(sessionMenuSession.id) ? (
-                <PinOff className="h-4 w-4 text-text-muted" />
-              ) : (
-                <Pin className="h-4 w-4 text-text-muted" />
-              )}
-              <span>
-                {t(
-                  pinnedSessionIds.has(sessionMenuSession.id)
-                    ? "sidebar.unpin"
-                    : "sidebar.pin",
-                )}
-              </span>
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => beginRenameSession(sessionMenuSession)}
-              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-            >
-              <SquarePen className="h-4 w-4 text-text-muted" />
-              <span>{t("sidebar.rename")}</span>
-            </button>
-            {sessionMenuSession.status !== "running" && (
-              <>
-                <div className={MENU_SEPARATOR_CLASS} />
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={(event) => {
-                    setSessionMenu(null);
-                    handleDeleteSession(event, sessionMenuSession);
-                  }}
-                  className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DANGER_CLASS}`}
-                >
-                  <Trash2 className="h-4 w-4" />
-                  <span>{t("common.delete")}</span>
-                </button>
-              </>
-            )}
-          </div>,
-          document.body,
-        )}
+      {/* ⚠️ 共享面板已删 ✗ —— 已改为**每行一个菜单** ✓（见上面那条 `DropdownMenu`）。 */}
     </>
   );
-}
-
-interface SessionMenuState {
-  sessionId: string;
-  anchor: {
-    top: number;
-    bottom: number;
-    right: number;
-  };
 }
 
 function stringArray(value: unknown): string[] {

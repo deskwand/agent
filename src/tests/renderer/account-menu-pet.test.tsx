@@ -26,7 +26,13 @@ describe("AccountMenu desktop pet", () => {
       act(() => {
         root.render(
           <AccountMenu
-            isOpen
+            open
+            onOpenChange={vi.fn()}
+            trigger={
+              <button type="button" aria-label="trigger">
+                T
+              </button>
+            }
             cloudConfig={
               loggedIn
                 ? {
@@ -42,11 +48,10 @@ describe("AccountMenu desktop pet", () => {
             onOpenLogin={vi.fn()}
             onOpenSettings={vi.fn()}
             onLogout={vi.fn()}
-            onClose={vi.fn()}
           />,
         );
       });
-      const toggle = element.querySelector(
+      const toggle = document.body.querySelector(
         '[role="switch"]',
       ) as HTMLButtonElement | null;
       expect(toggle?.getAttribute("aria-checked")).toBe("false");

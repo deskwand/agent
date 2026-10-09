@@ -11,6 +11,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConnectorsView } from "../../renderer/components/connectors/ConnectorsView";
 import type { ConnectorEntry } from "../../shared/connectors";
+import { useAppStore } from "../../renderer/store";
 
 const api = vi.hoisted(() => {
   const connectors = {
@@ -42,10 +43,6 @@ vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
-vi.mock("../../renderer/hooks/useBrowserOcclusion", () => ({
-  useBrowserOcclusion: vi.fn(),
-}));
-
 function mailEntry(email: string): ConnectorEntry {
   return {
     key: `mail:${email}`,
@@ -102,6 +99,10 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  // 迁到 Radix 后确认框经 Portal 挂到 document.body，清掉以免跨用例污染
+  document
+    .querySelectorAll('[role="dialog"], [role="alertdialog"]')
+    .forEach((el) => el.remove());
   vi.unstubAllGlobals();
 });
 
@@ -158,5 +159,47 @@ describe("mail section", () => {
     // 弹确认框，此时还不该发 IPC
     expect(api.mail.removeAccount).not.toHaveBeenCalled();
     expect(api.connectors.removeServer).not.toHaveBeenCalled();
+  });
+
+  it("删邮箱确认走 ConfirmDialog：标题与副行都渲染了【Review Focus #2】", async () => {
+    // 迁移前这是内联的 modal-overlay + .card；迁移后是 shadcn 的 AlertDialog。
+    // 这条钉的是「**副行没丢**」—— 那正是当初没直接复用 ConfirmDialog 的原因
+    //（计划 1 时 ConfirmDialog 还没有 description 槽位）。
+    //
+    // 本文件把 i18n mock 成 t(key) => key，所以断言查的是**两个 key 都在**
+    // —— 这恰好证明「副行节点渲染了、且接对了 key」，插值是 i18next 的事。
+    // 内容经 Portal 挂在 document.body 下，所以查 body（陷阱 4）。
+    await renderView();
+    const remove = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "connectors.action.removeMailbox",
+    );
+    await act(async () => {
+      remove?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const dialog = document.body.querySelector('[role="alertdialog"]');
+    expect(dialog, "确认框必须存在").not.toBeNull();
+    expect(dialog!.textContent).toContain("connectors.mail.removeConfirmTitle");
+    expect(
+      dialog!.textContent,
+      "副行必须渲染（这是 ConfirmDialog 迁移前没有的能力）",
+    ).toContain("connectors.mail.removeConfirmBody");
+  });
+
+  it("删邮箱确认占用 occlusion（迁移前它没有，内置浏览器面板不被遮挡）", async () => {
+    // 这是一处行为改变（变好）：ConnectorsView 自己不调 useBrowserOcclusion，
+    // 所以这个确认框从来没有遮挡过内置浏览器面板。ConfirmDialog 内部是
+    // OccludingAlertDialog，迁过去就有了。
+    useAppStore.setState({ browserOcclusionIds: new Set<string>() });
+    await renderView();
+    expect(useAppStore.getState().browserOcclusionIds.size).toBe(0);
+
+    const remove = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent === "connectors.action.removeMailbox",
+    );
+    await act(async () => {
+      remove?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(useAppStore.getState().browserOcclusionIds.size).toBe(1);
   });
 });

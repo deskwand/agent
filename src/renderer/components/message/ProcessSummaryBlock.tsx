@@ -22,6 +22,11 @@ import {
   type ProcessSummaryFragment,
 } from "../../utils/tool-display-blocks";
 import { ToolUseBlock } from "./ToolUseBlock";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 import { NestedToolDetails } from "./NestedToolDetails";
 import { ToolGroupStatus } from "./ToolGroupStatus";
 import { useAppStore } from "../../store";
@@ -173,22 +178,29 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
               key={script.id}
               ref={failedToolCallId === script.id ? failedItemRef : null}
             >
-              <details>
-                <summary className="cursor-pointer text-xs text-text-muted">
-                  {t("tool.grouped.scriptDetails")}
-                </summary>
-                <ToolUseBlock
-                  block={{
-                    type: "tool_use",
-                    id: script.id,
-                    name: "codemode",
-                    input: script.input,
-                  }}
-                  allBlocks={allBlocks}
-                  message={message}
-                  showIcon={false}
-                />
-              </details>
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="cursor-pointer text-xs text-text-muted"
+                  >
+                    {t("tool.grouped.scriptDetails")}
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <ToolUseBlock
+                    block={{
+                      type: "tool_use",
+                      id: script.id,
+                      name: "codemode",
+                      input: script.input,
+                    }}
+                    allBlocks={allBlocks}
+                    message={message}
+                    showIcon={false}
+                  />
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           ))}
           {visibleItems.map((item) => (

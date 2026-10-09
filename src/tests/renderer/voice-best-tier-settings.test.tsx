@@ -379,13 +379,13 @@ describe("试听", () => {
     );
     // 九个音色都渲染出来了，不是被裁掉的那种"只有第一个"
     expect(optionValues("voice-engine-voice")).toHaveLength(9);
-    // 而且要**第一帧就带坐标**：坐标若来自"挂载后再测量"，会先在左上角闪一下
-    const panel = document.body.querySelector<HTMLElement>(
-      '[data-testid="voice-engine-voice-menu"]',
-    )!;
-    expect(panel.style.position).toBe("fixed");
-    expect(panel.style.top).not.toBe("");
-    expect(panel.style.right).not.toBe("");
+    // ⚠️ 删掉了三条**手写定位**的断言（position === "fixed" / style.top / style.right）。
+    // 它们测的是原实现「打开前先量坐标、再用 fixed 内联样式定位」这套机制 ✗ ——
+    // 迁到 Radix 后定位由 popper 用**自己的**内联样式（transform 等）完成，
+    // `position` 不再是 "fixed"、`right` 会是 ""✗。
+    // 原意「第一帧就带坐标、不会在左上角闪一下」在 jsdom 里**无法表达**（没有布局
+    // 引擎）→ 不是被放弃，而是换了承担者；已列入 ledger 的待目视确认清单。
+    // 上面那条「面板挂在 body 上、不在卡片里」仍然保留 ✓（portal 的事实没变）。
 
     await openMenu(container, "voice-engine-voice"); // 关掉
   });
@@ -405,13 +405,13 @@ describe("试听", () => {
       document.body.querySelector('[data-testid="voice-engine-voice-menu"]'),
     ).not.toBeNull();
 
-    // 真·页面滚动仍然要关（坐标是打开那一刻量的，跟着滚会飘）
-    await act(async () => {
-      document.body.dispatchEvent(new Event("scroll"));
-    });
-    expect(
-      document.body.querySelector('[data-testid="voice-engine-voice-menu"]'),
-    ).toBeNull();
+    // ⚠️ 删掉了「真·页面滚动仍然要关」这一段。
+    // ⚠️ 机制更正：迁到 Radix 后是 **modal 菜单的滚动锁**（Radix 的 dropdown 默认
+    // modal = true，开菜单期间页面滚动被锁住）在起作用，**不是**「popper 跟随重新定位」。
+    // 用户可见结果（滚动时菜单不关）与原先的断言一致 ✓，但理由以滚动锁为准。
+    // 原实现要关是因为它自己算的 fixed 坐标会随滚动飘 ✗ —— 那套代码已整块删除。
+    // 上面「滚面板内部不关」那条仍然保留 ✓（它原本要防的是捕获阶段监听的坑 ✗，
+    // 现在 Radix 根本不监听 scroll，这条自然成立 ✓）。
   });
 
   it("试听按钮三态同宽：点一下不该把整行推得左右跳", async () => {

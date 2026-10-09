@@ -154,8 +154,10 @@ async function clickChip(category: string): Promise<void> {
   });
 }
 
+/** 按文案找按钮。查 `document.body` 而不是 container —— 迁到 Radix 后
+ *  弹窗按钮在 portal 里（body 下），页面按钮在 container 里；body 是超集。 */
 function byKey(key: string): HTMLButtonElement | undefined {
-  return [...container.querySelectorAll("button")].find((b) =>
+  return [...document.body.querySelectorAll("button")].find((b) =>
     (b.textContent ?? "").includes(key),
   );
 }
@@ -202,6 +204,10 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  // 迁到 Radix 后弹窗内容经 Portal 挂到 document.body，清掉以免跨用例污染
+  document
+    .querySelectorAll('[role="dialog"], [role="alertdialog"]')
+    .forEach((el) => el.remove());
   vi.unstubAllGlobals();
 });
 
@@ -377,16 +383,20 @@ describe("授权中移除", () => {
 describe("「添加」接线", () => {
   /** 弹窗里的确认按钮 —— 页头那个「添加」文案相同，必须限定在弹窗内找。 */
   function confirmButton(): HTMLButtonElement {
-    const dialog = container
+    // 面板不再是本仓手写的 .card（那个类随迁移除），而是 Radix 的 DialogContent。
+    // 双保险：先按 add-payload 的最近 dialog 祖先找，找不到就退回页面上唯一的 dialog。
+    const dialog = (document.body
       .querySelector('[data-testid="add-payload"]')!
-      .closest(".card") as HTMLElement;
+      .closest('[role="dialog"]') ??
+      document.body.querySelector('[role="dialog"]')) as HTMLElement;
     return [...dialog.querySelectorAll("button")].find((b) =>
       (b.textContent ?? "").includes("connectors.action.add"),
     ) as HTMLButtonElement;
   }
 
   function typePayload(value: string): void {
-    const box = container.querySelector(
+    // 查 document.body：payload 输入框在 Radix 的 portal 里（body 下），不在 container 里
+    const box = document.body.querySelector(
       '[data-testid="add-payload"]',
     ) as HTMLTextAreaElement;
     const setter = Object.getOwnPropertyDescriptor(
@@ -399,21 +409,56 @@ describe("「添加」接线", () => {
     });
   }
 
+  /** 菜单项查 **document.body**，不是 container —— 菜单迁到 Radix 后内容经 portal
+   *  挂在 body 下；手写那版在 container 里。container 本身就是 body 的孩子，
+   *  body 是两者的超集，所以这一句对迁移前后都成立。 */
+  function addMenuItem(testId: string): HTMLElement | null {
+    return document.body.querySelector(`[data-testid="${testId}"]`);
+  }
+
+  /** 打开页头「添加」菜单。Radix 的 Trigger **只挂 pointerdown** ✗（手写的旧触发器
+   *  只认 click ✗）—— 先发 pointerdown，没打开再补一发 click，条件式写法对迁移前后
+   *  都成立。**不要两发连着派发** ✗：Radix 打开后那一发 click 会被它自己的
+   *  DismissableLayer 当成外部点击，把刚打开的菜单立刻关掉 ✗✗。 */
+  async function openAddMenu(): Promise<void> {
+    const trigger = byKey("connectors.action.add")!;
+    await act(async () => {
+      trigger.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        }),
+      );
+    });
+    if (addMenuItem("add-mcp") === null) {
+      await act(async () => trigger.click());
+    }
+    // Radix 在 setTimeout(0) 里挂内容 / 移动焦点 —— 断言前先推一个宏任务。
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
   it("点「添加」→「外部服务」打开弹窗，成功后重新拉列表", async () => {
     api.addCustomServer.mockResolvedValue({ ok: true });
     await mount();
-    expect(container.querySelector('[data-testid="add-payload"]')).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="add-payload"]'),
+    ).toBeNull();
 
     // 「添加」现在先开一个两项菜单（外部服务 / 邮箱），不是一个直通弹窗的按钮。
-    await act(async () => byKey("connectors.action.add")!.click());
-    expect(container.querySelector('[data-testid="add-payload"]')).toBeNull();
+    await openAddMenu();
+    expect(
+      document.body.querySelector('[data-testid="add-payload"]'),
+    ).toBeNull();
     await act(async () =>
-      container
-        .querySelector('[data-testid="add-mcp"]')!
-        .dispatchEvent(new MouseEvent("click", { bubbles: true })),
+      addMenuItem("add-mcp")!.dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      ),
     );
     expect(
-      container.querySelector('[data-testid="add-payload"]'),
+      document.body.querySelector('[data-testid="add-payload"]'),
     ).not.toBeNull();
 
     const listCallsBefore = api.list.mock.calls.length;
@@ -423,7 +468,9 @@ describe("「添加」接线", () => {
     expect(api.addCustomServer).toHaveBeenCalledTimes(1);
     // onAdded 必须真的去刷新 —— 「加上了但列表没变」是这类接线最容易漏的回归
     expect(api.list.mock.calls.length).toBeGreaterThan(listCallsBefore);
-    expect(container.querySelector('[data-testid="add-payload"]')).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="add-payload"]'),
+    ).toBeNull();
   });
 });
 
@@ -551,7 +598,7 @@ describe("key 型条目：弹框填凭据，绝不走 OAuth", () => {
     await act(async () => {
       byKey(CONNECT)!.click();
     });
-    const box = container.querySelector(
+    const box = document.body.querySelector(
       '[data-testid="key-credential"]',
     ) as HTMLInputElement;
     expect(box).not.toBeNull();
@@ -567,7 +614,7 @@ describe("key 型条目：弹框填凭据，绝不走 OAuth", () => {
       box.dispatchEvent(new Event("input", { bubbles: true }));
     });
     await act(async () => {
-      [...container.querySelectorAll("button")]
+      [...document.body.querySelectorAll("button")]
         .find((b) =>
           (b.textContent ?? "").includes("connectors.keyDialog.submit"),
         )!
@@ -589,7 +636,7 @@ describe("key 型条目：弹框填凭据，绝不走 OAuth", () => {
     // 「重新授权」会去调 signIn，对着一个不需要授权的端点只会报错
     expect(api.authorize).not.toHaveBeenCalled();
     expect(
-      container.querySelector('[data-testid="key-credential"]'),
+      document.body.querySelector('[data-testid="key-credential"]'),
     ).not.toBeNull();
   });
 
@@ -605,7 +652,7 @@ describe("key 型条目：弹框填凭据，绝不走 OAuth", () => {
 
     expect(api.addCatalogServer).toHaveBeenCalledWith("notion");
     expect(
-      container.querySelector('[data-testid="key-credential"]'),
+      document.body.querySelector('[data-testid="key-credential"]'),
     ).toBeNull();
     await act(async () => {
       signIn.resolve({ ok: true });

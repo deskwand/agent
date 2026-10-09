@@ -7,7 +7,8 @@ import {
   useMemo,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
+import { OccludingDialog } from "./ui/occluding-dialog";
+import { DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import {
   X,
   ChevronLeft,
@@ -62,7 +63,6 @@ export function ImageLightbox({
   error = null,
 }: ImageLightboxProps) {
   const { t } = useTranslation();
-  useBrowserOcclusion(isOpen);
 
   const [currentIndex, setCurrentIndex] = useState(startIndex);
   const [zoom, setZoom] = useState(1);
@@ -282,10 +282,12 @@ export function ImageLightbox({
     const handler = (e: KeyboardEvent) => {
       if (e.isComposing) return;
       switch (e.key) {
-        case "Escape":
-          e.preventDefault();
-          onClose();
-          break;
+        // 这里**故意没有** Escape —— Esc 由 Radix 的 Dialog 处理（它监听
+        // document 的捕获阶段），经 onOpenChange(false) 回调 onClose。
+        // 若在这里再加一个 case，一次 Esc 会调**两次** onClose。
+        //
+        // 其余键（←→ 切图、Cmd+0 重置、Cmd± 缩放、Cmd+C 复制）Radix 不管，
+        // 所以这个 window 级映射仍然需要保留。
         case "ArrowLeft":
           e.preventDefault();
           goPrev();
@@ -340,131 +342,158 @@ export function ImageLightbox({
   if (!isOpen || images.length === 0) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] bg-black/50 dark:bg-black/80 flex flex-col"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+    <OccludingDialog
+      // images.length > 0 是 belt-and-braces：下面第 342 行的早退已经保证
+      // 「images 为空时本组件整个返回 null、wrapper 根本不挂载」。
+      // 留着它是防将来有人放宽那个早退（那时这里就是唯一的口子）。
+      open={isOpen && images.length > 0}
+      onOpenChange={(next) => {
+        if (!next) onClose();
       }}
     >
-      {/* ── Image area ── */}
-      <div
-        ref={containerRef}
-        className="flex-1 flex items-center justify-center relative overflow-hidden"
-        onWheel={handleWheel}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) onClose();
-        }}
+      <DialogContent
+        // 这一串是在**逐项压制 vendored DialogContent 的默认类**。
+        // ⚠️ 定位必须用 left-0/top-0 而**不能**用 inset-0：`inset` 与 `left/top`
+        // 在 tailwind-merge 里是**不同的组**，两个都会留下，而编译产物里
+        // `.inset-0` 在字节 30158、`.left-[50%]` 在 30807 —— 后者赢。
+        // 于是 left:50% 生效、translate-x-0 又把回中取消 → 面板跑到右半边之外。
+        // sm:rounded-none 必须带 sm: —— 变体排在后面，裸 rounded-none 压不住。
+        // ⚠️ 背景写 bg-transparent 而不是 bg-black/50 dark:bg-black/80：
+        // DialogContent 总会渲染一层 vendored 的 DialogOverlay（fixed inset-0 z-50 bg-black/80），
+        // 若内容自己也带半透明底，两层会**叠加**（1-(1-0.8)(1-0.5) ≈ 90% 黑），
+        // 那是 jsdom 看不见的观感回归。让 overlay 当唯一背景层即可。
+        // 这带来一处已记录的观感变化：浅色模式下 50% → 80%（与其余 11 个弹窗一致）。
+        className="fixed left-0 top-0 z-[100] flex h-full w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 border-0 bg-transparent p-0 shadow-none sm:rounded-none"
       >
-        {/* Loading */}
-        {loading && (
-          <div className="flex flex-col items-center gap-3 text-white/70">
-            <Loader2 className="w-8 h-8 animate-spin" />
-            <span className="text-sm">{t("common.loading")}</span>
-          </div>
-        )}
+        <DialogTitle className="sr-only">
+          {images[currentIndex]?.name ??
+            t("common.pastedImageAlt", { index: currentIndex + 1 })}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          {t("imageLightbox.imageCount", {
+            current: currentIndex + 1,
+            total: images.length,
+          })}
+        </DialogDescription>
+        {/* ── Image area ── */}
+        <div
+          ref={containerRef}
+          className="flex-1 flex items-center justify-center relative overflow-hidden"
+          onWheel={handleWheel}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
+        >
+          {/* Loading */}
+          {loading && (
+            <div className="flex flex-col items-center gap-3 text-white/70">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <span className="text-sm">{t("common.loading")}</span>
+            </div>
+          )}
 
-        {/* Error */}
-        {!loading && (error || images.every((img) => !img.src)) && (
-          <div className="flex flex-col items-center gap-3 text-white/70">
-            <AlertCircle className="w-8 h-8 text-error" />
-            <span className="text-sm">
-              {error || t("imageLightbox.loadFailed")}
-            </span>
-          </div>
-        )}
+          {/* Error */}
+          {!loading && (error || images.every((img) => !img.src)) && (
+            <div className="flex flex-col items-center gap-3 text-white/70">
+              <AlertCircle className="w-8 h-8 text-error" />
+              <span className="text-sm">
+                {error || t("imageLightbox.loadFailed")}
+              </span>
+            </div>
+          )}
 
-        {/* Image */}
-        {!loading && imageSrc && (
-          <div
-            ref={dragSurfaceRef}
-            className="relative select-none"
-            style={{
-              touchAction: zoom > 1 ? "none" : "auto",
-              cursor:
-                zoom > 1
-                  ? isDragging
-                    ? "grabbing"
-                    : "grab"
-                  : zoom < ZOOM_MAX
-                    ? "zoom-in"
-                    : "default",
-            }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerEnd}
-            onPointerCancel={handlePointerEnd}
-            onDoubleClick={handleDoubleClick}
-          >
-            <img
-              ref={imageRef}
-              src={imageSrc}
-              alt={
-                imageName ||
-                t("common.pastedImageAlt", { index: currentIndex + 1 })
-              }
-              className="max-w-[90vw] max-h-[80vh] object-contain"
-              draggable={false}
-              onLoad={measureToolbarAnchor}
+          {/* Image */}
+          {!loading && imageSrc && (
+            <div
+              ref={dragSurfaceRef}
+              className="relative select-none"
               style={{
-                transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-                transformOrigin: "center center",
-                transition: isDragging
-                  ? "none"
-                  : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                touchAction: zoom > 1 ? "none" : "auto",
+                cursor:
+                  zoom > 1
+                    ? isDragging
+                      ? "grabbing"
+                      : "grab"
+                    : zoom < ZOOM_MAX
+                      ? "zoom-in"
+                      : "default",
               }}
-            />
-          </div>
-        )}
-
-        {/* Prev / Next arrows */}
-        {!isSingle && !loading && (
-          <>
-            {currentIndex > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goPrev();
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerEnd}
+              onPointerCancel={handlePointerEnd}
+              onDoubleClick={handleDoubleClick}
+            >
+              <img
+                ref={imageRef}
+                src={imageSrc}
+                alt={
+                  imageName ||
+                  t("common.pastedImageAlt", { index: currentIndex + 1 })
+                }
+                className="max-w-[90vw] max-h-[80vh] object-contain"
+                draggable={false}
+                onLoad={measureToolbarAnchor}
+                style={{
+                  transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+                  transformOrigin: "center center",
+                  transition: isDragging
+                    ? "none"
+                    : "transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors"
-                aria-label={t("imageLightbox.prev")}
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-            )}
-            {currentIndex < images.length - 1 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goNext();
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors"
-                aria-label={t("imageLightbox.next")}
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            )}
-          </>
-        )}
-      </div>
+              />
+            </div>
+          )}
 
-      {/* ── Floating toolbar ── */}
-      {/* 必须排在图片区**后面**：锚点和图片区都是 positioned、z-index:auto 的兄弟，
+          {/* Prev / Next arrows */}
+          {!isSingle && !loading && (
+            <>
+              {currentIndex > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goPrev();
+                  }}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors"
+                  aria-label={t("imageLightbox.prev")}
+                >
+                  <ChevronLeft className="w-6 h-6" />
+                </button>
+              )}
+              {currentIndex < images.length - 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goNext();
+                  }}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors"
+                  aria-label={t("imageLightbox.next")}
+                >
+                  <ChevronRight className="w-6 h-6" />
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ── Floating toolbar ── */}
+        {/* 必须排在图片区**后面**：锚点和图片区都是 positioned、z-index:auto 的兄弟，
           CSS 按树序绘制，后面那个在上面。图片区铺满整个视口，工具条一旦排在它前面
           就会被盖住 —— 按钮点不到，点下去命中的是图片区，而图片区自己的 onClick
           会直接把弹层关掉。额外给一个 z-10 兜底，别让以后「清理无用类名」把这条
           隐形契约删掉。 */}
-      {/* 放在图片区外面（不是图片区的后代）：滚轮、点击、拖拽就不会经过图片区的
+        {/* 放在图片区外面（不是图片区的后代）：滚轮、点击、拖拽就不会经过图片区的
           onWheel / onClick / onPointerDown，不需要任何 stopPropagation，也不会
           被图片区的 overflow-hidden 裁掉。 */}
-      {/* 有图：锚在图片右上角上方 8px；没图（加载中 / 加载失败 / 图未解码）：
+        {/* 有图：锚在图片右上角上方 8px；没图（加载中 / 加载失败 / 图未解码）：
           退回预览区右上角内缩 12px。两种情况的水平关系都是「右边缘对齐锚点」。 */}
-      <div
-        className="absolute w-0 h-0"
-        style={toolbarAnchor ?? { right: 12, top: 0 }}
-      >
-        {/* w-max 不是装饰，是这个锚点的必要条件：锚点盒子是 0×0，而工具条是它的
+        <div
+          className="absolute w-0 h-0"
+          style={toolbarAnchor ?? { right: 12, top: 0 }}
+        >
+          {/* w-max 不是装饰，是这个锚点的必要条件：锚点盒子是 0×0，而工具条是它的
             绝对定位子元素（left:auto / right:0 / width:auto），按 shrink-to-fit
             规则可用宽度 = 0，宽度会塌成 min-content，而不是内容宽度。子项都是
             shrink-0，塌下去的那部分收不回来，只有能收缩的图片名会顶包，于是在
@@ -476,70 +505,72 @@ export function ImageLightbox({
             min-content 才小于内容宽度；英文 Copy 断不了行，量不到这个塌陷。
             别再换回 w-fit —— 那是 min(max-content, available)，可用宽度 0 时
             又塌回 min-content，等于把这个 bug 装回去。 */}
-        <div
-          data-testid="image-lightbox-toolbar"
-          className={`${toolbarPendingMeasure ? "invisible " : ""}w-max absolute right-0 ${
-            toolbarAnchor ? "bottom-0 mb-2" : "top-0 mt-3"
-          } z-10 flex items-center gap-1 p-1 rounded-lg bg-black/60 dark:bg-black/70 backdrop-blur-md border border-white/10 shadow-lg text-white select-none`}
-          style={{ maxWidth: toolbarMaxWidth }}
-        >
-          {imageName && (
-            <span className="min-w-0 truncate px-1.5 text-sm font-medium">
-              {imageName}
-            </span>
-          )}
-          {!isSingle && (
-            <span className="shrink-0 text-xs text-white/60 dark:text-white/50">
-              {t("imageLightbox.imageCount", {
-                current: currentIndex + 1,
-                total: images.length,
-              })}
-            </span>
-          )}
-          {zoom !== 1 && (
-            <span className="shrink-0 text-xs text-white/40">
-              {displayPercent}%
-            </span>
-          )}
-          {canActOnImage && (Boolean(imageName) || !isSingle || zoom !== 1) && (
-            <span className="shrink-0 w-px h-4 bg-white/20 mx-0.5" />
-          )}
-          {canActOnImage && (
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
-              aria-label={t("imageLightbox.copy")}
-            >
-              {copyFeedback ? (
-                <Check className="w-4 h-4 text-success" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
-              <span>{t("imageLightbox.copy")}</span>
-            </button>
-          )}
-          {canActOnImage && hasFilePath && (
-            <button
-              type="button"
-              onClick={handleOpenExternal}
-              className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
-              aria-label={t("imageLightbox.openExternal")}
-            >
-              <ExternalLink className="w-4 h-4" />
-              <span>{t("imageLightbox.openExternal")}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors"
-            aria-label={t("imageLightbox.close")}
+          <div
+            data-testid="image-lightbox-toolbar"
+            className={`${toolbarPendingMeasure ? "invisible " : ""}w-max absolute right-0 ${
+              toolbarAnchor ? "bottom-0 mb-2" : "top-0 mt-3"
+            } z-10 flex items-center gap-1 p-1 rounded-lg bg-black/60 dark:bg-black/70 backdrop-blur-md border border-white/10 shadow-lg text-white select-none`}
+            style={{ maxWidth: toolbarMaxWidth }}
           >
-            <X className="w-5 h-5" />
-          </button>
+            {imageName && (
+              <span className="min-w-0 truncate px-1.5 text-sm font-medium">
+                {imageName}
+              </span>
+            )}
+            {!isSingle && (
+              <span className="shrink-0 text-xs text-white/60 dark:text-white/50">
+                {t("imageLightbox.imageCount", {
+                  current: currentIndex + 1,
+                  total: images.length,
+                })}
+              </span>
+            )}
+            {zoom !== 1 && (
+              <span className="shrink-0 text-xs text-white/40">
+                {displayPercent}%
+              </span>
+            )}
+            {canActOnImage &&
+              (Boolean(imageName) || !isSingle || zoom !== 1) && (
+                <span className="shrink-0 w-px h-4 bg-white/20 mx-0.5" />
+              )}
+            {canActOnImage && (
+              <button
+                type="button"
+                onClick={handleCopy}
+                className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
+                aria-label={t("imageLightbox.copy")}
+              >
+                {copyFeedback ? (
+                  <Check className="w-4 h-4 text-success" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+                <span>{t("imageLightbox.copy")}</span>
+              </button>
+            )}
+            {canActOnImage && hasFilePath && (
+              <button
+                type="button"
+                onClick={handleOpenExternal}
+                className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
+                aria-label={t("imageLightbox.openExternal")}
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>{t("imageLightbox.openExternal")}</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="shrink-0 flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors"
+              aria-label={t("imageLightbox.close")}
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </OccludingDialog>
   );
 }

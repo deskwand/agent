@@ -65,6 +65,7 @@ import { resolveProviderDisplayName } from "../../utils/model-label";
 import {
   SettingsCard,
   SettingsContentSection,
+  SettingsFormSelect,
   SettingsRow,
   SettingsSection,
   SettingsSwitch,
@@ -1600,24 +1601,22 @@ export function SettingsAPI({
                 <span className="text-xs font-medium text-text-secondary">
                   {t("webAccess.defaultProvider")}
                 </span>
-                <select
+                <SettingsFormSelect
                   value={searchDraft.defaultProvider}
-                  onChange={(event) => {
+                  onChange={(next) => {
                     setSearchDraft({
                       ...searchDraft,
-                      defaultProvider: event.target
-                        .value as WebAccessConfig["defaultProvider"],
+                      defaultProvider: next,
                     });
                     setSearchMessage(null);
                   }}
-                  className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
-                >
-                  {WEB_SEARCH_PROVIDERS.map((provider) => (
-                    <option key={provider} value={provider}>
-                      {t(`webAccess.providers.${provider}`)}
-                    </option>
-                  ))}
-                </select>
+                  label={t("webAccess.defaultProvider")}
+                  testId="web-access-default-provider"
+                  options={WEB_SEARCH_PROVIDERS.map((provider) => ({
+                    value: provider,
+                    label: t(`webAccess.providers.${provider}`),
+                  }))}
+                />
               </label>
 
               {(["openai", "gemini", "deepseek"] as const).map((provider) => {
@@ -1661,72 +1660,77 @@ export function SettingsAPI({
                           <span className="text-xs text-text-muted">
                             {t("webAccess.credentialSource")}
                           </span>
-                          <select
+                          <SettingsFormSelect
                             value={credential.source}
-                            onChange={(event) => {
+                            onChange={(next) => {
                               setSearchDraft((c) =>
                                 c
                                   ? {
                                       ...c,
                                       [provider]: {
                                         ...c[provider],
-                                        source: event.target.value as
-                                          | "inherit"
-                                          | "dedicated",
+                                        source: next as "inherit" | "dedicated",
                                       },
                                     }
                                   : c,
                               );
                               setSearchMessage(null);
                             }}
-                            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
-                          >
-                            <option value="inherit">
-                              {t("webAccess.inherit")}
-                            </option>
-                            <option value="dedicated">
-                              {t("webAccess.dedicated")}
-                            </option>
-                          </select>
+                            label={t("webAccess.credentialSource")}
+                            testId={`web-access-${provider}-source`}
+                            options={[
+                              {
+                                value: "inherit",
+                                label: t("webAccess.inherit"),
+                              },
+                              {
+                                value: "dedicated",
+                                label: t("webAccess.dedicated"),
+                              },
+                            ]}
+                          />
                         </label>
                         {credential.source === "inherit" ? (
                           <label className="block space-y-1">
                             <span className="text-xs text-text-muted">
                               {t("webAccess.profile")}
                             </span>
-                            <select
+                            <SettingsFormSelect
                               value={credential.profileKey}
-                              onChange={(event) => {
+                              onChange={(next) => {
                                 setSearchDraft((c) =>
                                   c
                                     ? {
                                         ...c,
                                         [provider]: {
                                           ...c[provider],
-                                          profileKey: event.target.value,
+                                          profileKey: next,
                                         },
                                       }
                                     : c,
                                 );
                               }}
-                              className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
-                            >
-                              <option value="">
-                                {t("webAccess.unavailable")}
-                              </option>
-                              {searchMatchingProfiles(
-                                appConfig || ({ providers: {} } as AppConfig),
-                                provider,
-                              ).map((profile) => (
-                                <option key={profile.key} value={profile.key}>
-                                  {resolveProviderDisplayName(
-                                    profile.key,
-                                    profile.name,
-                                    t,
-                                  ) || profile.key}
-                                </option>
-                              ))}
-                            </select>
+                              label={t("webAccess.profile")}
+                              testId={`web-access-${provider}-profile`}
+                              options={[
+                                {
+                                  value: "",
+                                  label: t("webAccess.unavailable"),
+                                },
+                                ...searchMatchingProfiles(
+                                  appConfig || ({ providers: {} } as AppConfig),
+                                  provider,
+                                ).map((profile) => ({
+                                  value: profile.key,
+                                  label:
+                                    resolveProviderDisplayName(
+                                      profile.key,
+                                      profile.name,
+                                      t,
+                                    ) || profile.key,
+                                })),
+                              ]}
+                            />
                           </label>
                         ) : (
                           <>
@@ -1931,65 +1935,74 @@ export function SettingsAPI({
                     <span className="text-xs font-medium text-text-secondary">
                       {t("api.utilityProvider")}
                     </span>
-                    <select
+                    <SettingsFormSelect
                       value={utilityDraft.providerProfileKey || ""}
-                      onChange={(e) => {
-                        const key = e.target.value || undefined;
-                        const profile = key
-                          ? appConfig?.providers?.[key]
+                      onChange={(key) => {
+                        const profileKey = key || undefined;
+                        const profile = profileKey
+                          ? appConfig?.providers?.[profileKey]
                           : undefined;
                         setUtilityDraft((prev) => ({
                           ...prev,
-                          providerProfileKey: key,
+                          providerProfileKey: profileKey,
                           model: profile?.defaultModel || "",
                         }));
                         setUtilityMessage(null);
                       }}
-                      className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
-                    >
-                      <option value="">
-                        {t("api.utilityProviderPlaceholder")}
-                      </option>
-                      {Object.entries(appConfig?.providers || {}).map(
-                        ([key, cfg]) =>
-                          cfg ? (
-                            <option key={key} value={key}>
-                              {resolveProviderDisplayName(key, cfg.name, t) ||
-                                key}
-                            </option>
-                          ) : null,
-                      )}
-                    </select>
+                      label={t("api.utilityProvider")}
+                      testId="utility-provider"
+                      options={[
+                        {
+                          value: "",
+                          label: t("api.utilityProviderPlaceholder"),
+                        },
+                        ...Object.entries(appConfig?.providers || {}).flatMap(
+                          ([key, cfg]) =>
+                            cfg
+                              ? [
+                                  {
+                                    value: key,
+                                    label:
+                                      resolveProviderDisplayName(
+                                        key,
+                                        cfg.name,
+                                        t,
+                                      ) || key,
+                                  },
+                                ]
+                              : [],
+                        ),
+                      ]}
+                    />
                   </label>
 
                   <label className="block space-y-1.5">
                     <span className="text-xs font-medium text-text-secondary">
                       {t("api.utilityModel")}
                     </span>
-                    <select
+                    <SettingsFormSelect
                       value={utilityDraft.model || ""}
-                      onChange={(e) => {
+                      onChange={(next) => {
                         setUtilityDraft((prev) => ({
                           ...prev,
-                          model: e.target.value,
+                          model: next,
                         }));
                         setUtilityMessage(null);
                       }}
-                      className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
-                    >
-                      <option value="">
-                        {t("api.utilityModelPlaceholder")}
-                      </option>
-                      {(
-                        appConfig?.providers?.[
-                          utilityDraft.providerProfileKey || ""
-                        ]?.models || []
-                      ).map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.label || m.id}
-                        </option>
-                      ))}
-                    </select>
+                      label={t("api.utilityModel")}
+                      testId="utility-model"
+                      options={[
+                        { value: "", label: t("api.utilityModelPlaceholder") },
+                        ...(
+                          appConfig?.providers?.[
+                            utilityDraft.providerProfileKey || ""
+                          ]?.models || []
+                        ).map((m) => ({
+                          value: m.id,
+                          label: m.label || m.id,
+                        })),
+                      ]}
+                    />
                   </label>
                 </>
               )}

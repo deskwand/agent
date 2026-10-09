@@ -5,6 +5,7 @@ import type {
   ConnectorEntry,
   ConnectorInstance,
 } from "../../../shared/connectors";
+import { Switch } from "../ui/switch";
 
 interface Props {
   entry: ConnectorEntry;
@@ -134,7 +135,7 @@ export function ConnectorCard({
 
   /** 传输标记 —— 固定宽度且**永不条件渲染**，替代被删掉的「本机能力」tab 的区分作用。
    *  它排在动作组的**后面**（标题行的最后一个元素）：徽标位置因此与动作宽度无关，
-   *  「本机」开关（34px）与「连接」（44px）宽窄不同也不会让徽标在列内漂 12px（用户报过）。
+   *  「本机」开关（36px，vendored Switch 的 w-9）与「连接」（44px）宽窄不同也不会让徽标在列内漂 12px（用户报过）。
    *  徽标放左边则反过来：得给动作组写个最小宽度兜底，而两按钮状态会超出它（见下）。 */
   const transportBadge = (
     <span
@@ -153,25 +154,15 @@ export function ConnectorCard({
   // `not a remote server`；**「移除」会从 mcp.json 删掉配置** —— 对目录条目可接受
   // （能一键加回），对手写的自定义 server 是不可恢复的删除。
   const actions = isCapability ? (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={capabilityOn}
+    // 未添加的预设也要能打开：registry 会先把它写进 mcp.json 再启用。
+    // 之前这里是 `disabled={!instance}` + `instance && onToggle(...)`，
+    // 于是开关永远是灰的 —— 后端支持、前端把门堵上了。
+    <Switch
+      checked={capabilityOn}
+      onCheckedChange={(next) => onToggle(entry.serverName, next)}
       aria-label={t(entry.nameKey)}
-      // 未添加的预设也要能打开：registry 会先把它写进 mcp.json 再启用。
-      // 之前这里是 `disabled={!instance}` + `instance && onToggle(...)`，
-      // 于是开关永远是灰的 —— 后端支持、前端把门堵上了。
-      onClick={() => onToggle(entry.serverName, !capabilityOn)}
-      className={`w-[34px] h-5 rounded-full relative transition-colors flex-none ${
-        capabilityOn ? "bg-accent" : "bg-surface-active"
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${
-          capabilityOn ? "left-[18px]" : "left-0.5"
-        }`}
-      />
-    </button>
+      className="flex-none"
+    />
   ) : (
     renderAction(entry, instance, authorizing, t, {
       onConnect,

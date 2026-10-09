@@ -1,17 +1,11 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import type { ProviderProfileKey, ThinkingLevel } from "../types";
 import type { ModelOptionGroup } from "./ChatInputBottomBar";
 import { resolveModelLabel } from "../utils/model-label";
 import { useAppStore } from "../store";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
   MENU_ITEM_CLASS,
   MENU_ITEM_DEFAULT_CLASS,
@@ -35,6 +29,8 @@ export interface MergedInputChipProps {
 // 面板向上展开，顶部需要让开标题栏（h-10）并留一点呼吸空间。
 const MENU_TOP_SAFE_AREA_PX = 48;
 const MODEL_MENU_MAX_HEIGHT_PX = 512;
+/** 面板与触发器之间的间距（与 PopoverContent 的 sideOffset 同源）。 */
+const MENU_PANEL_OFFSET_PX = 8;
 // 可见模型总数超过这个数才渲染搜索框：8 个模型 + 2 个分组标题 ≈ 317px，仍在面板
 // 512px 上限内（单行 28px 来自 MENU_ITEM_CLASS 的 h-7）。这笔账成立的前提是
 // uiFontSize 为默认值、且面板吃到 512px 上限——依据与偏差见
@@ -62,29 +58,46 @@ export function MergedInputChip({
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
   const [panelView, setPanelView] = useState<"list" | "thinking">("list");
-  const containerRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  // ⚠️ 显式标注为**可变** ref ✗ —— React 19 的类型把 `useRef<T>(null)` 的 `current`
+  // 推成只读 ✓，而下面的 callback ref（`attachPanel`）要给它赋值 ✗ ⇒ 会报 TS2540 ✓。
+  const menuRef = useRef<HTMLDivElement | null>(
+    null,
+  ) as React.MutableRefObject<HTMLDivElement | null>;
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [panelNode, setPanelNode] = useState<HTMLDivElement | null>(null);
   const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
 
   // WelcomeView 的输入框垂直居中，芯片上方的可用空间远小于 100vh - 12rem。
   // 超出 main 的 overflow-hidden 的顶部会被裁掉且点不到，因此按面板上方的实际可用高度取上限。
   const updatePanelMaxHeight = useCallback(() => {
-    const menu = menuRef.current;
-    if (!menu) return;
-    const { bottom } = menu.getBoundingClientRect();
+    // Radix 定位是异步的：定位完成前 wrapper 上带着 translate(0, -200%)，那一帧
+    // 量到的 bottom <= 0。此时退回量触发器顶边 —— side="top" + sideOffset=8 时，
+    // 面板底边就等于触发器顶边减 8（与原实现 bottom-[calc(100%_+_8px)] 同源）。
+    const panel = menuRef.current;
+    const anchor = panel ?? triggerRef.current;
+    if (!anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const bottom = panel ? rect.bottom : rect.top - MENU_PANEL_OFFSET_PX;
     // 无布局信息（jsdom 等）时保留 className 上的默认上限
     if (bottom <= 0) return;
     const available = Math.max(0, Math.floor(bottom - MENU_TOP_SAFE_AREA_PX));
     setPanelMaxHeight(Math.min(MODEL_MENU_MAX_HEIGHT_PX, available));
   }, []);
 
+  // 面板经 portal 与 Radix 的 Presence 延后一面挂载，只依赖 menuOpen 会在面板
+  // 还没进 DOM 时量空；把节点本身也当成依赖，面板真正挂载后再量。
+  const attachPanel = useCallback((node: HTMLDivElement | null) => {
+    menuRef.current = node;
+    setPanelNode(node);
+  }, []);
+
   // 打开时先量一次（layout 阶段，避免首帧闪烁），窗口尺寸变化时重量。
   useLayoutEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen || !panelNode) return;
     updatePanelMaxHeight();
     window.addEventListener("resize", updatePanelMaxHeight);
     return () => window.removeEventListener("resize", updatePanelMaxHeight);
-  }, [menuOpen, updatePanelMaxHeight]);
+  }, [menuOpen, panelNode, updatePanelMaxHeight]);
 
   // 云分组只在登录时进入列表：未登录时残留的 custom:deskwand 用的是失效 token。
   // 顺序上云分组排最前：provider 顺序来自配置写入顺序（config-store.saveProvider 追加新
@@ -137,34 +150,14 @@ export function MergedInputChip({
       .filter((group) => group.items.length > 0);
   }, [visibleModelOptions, activeSearch]);
 
-  const closeMenu = useCallback(() => {
-    setMenuOpen(false);
+  // 开关、外部点击关闭、Escape 三样全交给 Radix 的 Popover —— 手写的 document
+  // mousedown/keydown 监听会让面板「刚打开就被关掉」（原实现正是如此，随本次迁移删掉）。
+  // 每次切换都回到列表层；关闭时顺手清掉搜索词，避免下次打开残留一个旧的过滤结果。
+  const handleOpenChange = useCallback((open: boolean) => {
+    setMenuOpen(open);
     setPanelView("list");
-    setModelSearch("");
+    if (!open) setModelSearch("");
   }, []);
-
-  useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target as Node)
-      ) {
-        closeMenu();
-      }
-    }
-
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => document.removeEventListener("mousedown", handleOutsideClick);
-  }, [closeMenu]);
-
-  useEffect(() => {
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape" && menuOpen) closeMenu();
-    }
-
-    document.addEventListener("keydown", handleEscape);
-    return () => document.removeEventListener("keydown", handleEscape);
-  }, [closeMenu, menuOpen]);
 
   const disabled = modelMenuDisabled || modelOptions.length === 0;
   const combinedLabel = `${t("chat.model")}, ${t("chat.thinkingLevel")}`;
@@ -253,92 +246,89 @@ export function MergedInputChip({
   };
 
   return (
-    <div ref={containerRef} className="relative inline-flex">
-      <button
-        type="button"
-        onClick={() => {
-          if (disabled) return;
-          setMenuOpen((open) => {
-            if (open) {
-              setPanelView("list");
-              setModelSearch("");
-              return false;
-            }
-            setPanelView("list");
-            return true;
-          });
-        }}
-        disabled={disabled}
-        className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-2xl border border-border-subtle bg-background/60 px-2 text-xs text-text-primary transition-[width,background-color] duration-150 hover:bg-surface-hover disabled:opacity-50 ${
-          menuOpen ? "w-[15rem] justify-center" : "max-w-[18rem]"
-        }`}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        aria-label={combinedLabel}
-        title={combinedLabel}
-      >
-        <span className="max-w-[11rem] truncate">
-          {currentModelLabel || t("chat.noModel")}
-        </span>
-        <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
-        <ChevronDown
-          className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${
-            menuOpen ? "rotate-180" : ""
-          }`}
-        />
-      </button>
+    <Popover open={menuOpen} onOpenChange={handleOpenChange}>
+      <div className="relative inline-flex">
+        <PopoverTrigger asChild>
+          <button
+            ref={triggerRef}
+            type="button"
+            disabled={disabled}
+            className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-2xl border border-border-subtle bg-background/60 px-2 text-xs text-text-primary transition-[width,background-color] duration-150 hover:bg-surface-hover disabled:opacity-50 ${
+              menuOpen ? "w-[15rem] justify-center" : "max-w-[18rem]"
+            }`}
+            aria-label={combinedLabel}
+            title={combinedLabel}
+          >
+            <span className="max-w-[11rem] truncate">
+              {currentModelLabel || t("chat.noModel")}
+            </span>
+            <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
+            <ChevronDown
+              className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${
+                menuOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+        </PopoverTrigger>
 
-      {menuOpen && (
-        <div
-          ref={menuRef}
-          role="menu"
-          aria-label={t("chat.model")}
-          style={
-            panelMaxHeight === null
-              ? undefined
-              : { maxHeight: `${panelMaxHeight}px` }
-          }
-          className={`${MENU_PANEL_PADDED_CLASS} animate-menu-in-up absolute right-0 bottom-[calc(100%_+_8px)] z-30 ${
-            panelView === "thinking" ? "w-[12rem]" : "w-[20rem]"
-          } max-h-[min(32rem,calc(100vh_+_-12rem))] overflow-y-auto`}
-        >
-          {panelView === "thinking" ? (
-            <>
-              {renderBackRow()}
-              {thinkingLevelOptions.map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => {
-                    onSelectThinkingLevel(level);
-                    setPanelView("list");
-                  }}
-                  className={`${MENU_ITEM_CLASS} justify-between ${
-                    level === thinkingLevel
-                      ? MENU_ITEM_SELECTED_CLASS
-                      : MENU_ITEM_DEFAULT_CLASS
-                  }`}
-                  role="option"
-                  aria-selected={level === thinkingLevel}
-                >
-                  <span className="truncate">
-                    {t(`chat.thinkingLevel.${level}`)}
-                  </span>
-                  {level === thinkingLevel && (
-                    <Check className="h-4 w-4 shrink-0" />
-                  )}
-                </button>
-              ))}
-            </>
-          ) : (
-            <>
-              {showSearch && renderSearchInput()}
-              {renderGroupList()}
-              {renderThinkingRow()}
-            </>
-          )}
-        </div>
-      )}
-    </div>
+        {menuOpen && (
+          <PopoverContent
+            ref={attachPanel}
+            side="top"
+            align="end"
+            sideOffset={MENU_PANEL_OFFSET_PX}
+            // 始终向上展开：原实现固定贴着芯片上沿，max-height 也是按上方空间算的。
+            // Radix 默认的碰撞翻转会在上方放不下时把面板翻到下方，让那笔账失真。
+            avoidCollisions={false}
+            // role="dialog" 由 Radix 的 PopoverContent 提供，不手写（写了会重复）
+            aria-label={t("chat.model")}
+            style={
+              panelMaxHeight === null
+                ? undefined
+                : { maxHeight: `${panelMaxHeight}px` }
+            }
+            className={`${MENU_PANEL_PADDED_CLASS} ${
+              panelView === "thinking" ? "w-[12rem]" : "w-[20rem]"
+            } max-h-[min(32rem,calc(100vh_+_-12rem))] overflow-y-auto`}
+          >
+            {panelView === "thinking" ? (
+              <>
+                {renderBackRow()}
+                {thinkingLevelOptions.map((level) => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => {
+                      onSelectThinkingLevel(level);
+                      setPanelView("list");
+                    }}
+                    className={`${MENU_ITEM_CLASS} justify-between ${
+                      level === thinkingLevel
+                        ? MENU_ITEM_SELECTED_CLASS
+                        : MENU_ITEM_DEFAULT_CLASS
+                    }`}
+                    role="option"
+                    aria-selected={level === thinkingLevel}
+                  >
+                    <span className="truncate">
+                      {t(`chat.thinkingLevel.${level}`)}
+                    </span>
+                    {level === thinkingLevel && (
+                      <Check className="h-4 w-4 shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </>
+            ) : (
+              <>
+                {showSearch && renderSearchInput()}
+                {renderGroupList()}
+                {renderThinkingRow()}
+              </>
+            )}
+          </PopoverContent>
+        )}
+      </div>
+    </Popover>
   );
 }

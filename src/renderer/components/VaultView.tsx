@@ -19,12 +19,12 @@ import { splitRelPath } from "./attach/picker-items";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Tooltip } from "./Tooltip";
 import {
-  MENU_ITEM_CLASS,
-  MENU_ITEM_DANGER_CLASS,
-  MENU_ITEM_DEFAULT_CLASS,
-  MENU_LABEL_CLASS,
-  MENU_PANEL_PADDED_CLASS,
-} from "./menu-styles";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 import type {
   SyncStatus,
   VaultBackupUsage,
@@ -224,7 +224,7 @@ export function VaultView(): JSX.Element {
   const syncLabelTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const advancedMenuBoundaryRef = useRef<HTMLDivElement | null>(null);
   const advancedMenuTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const advancedResetRef = useRef<HTMLButtonElement | null>(null);
+  const advancedResetRef = useRef<HTMLDivElement | null>(null);
   const autoRestoreFired = useRef(false);
   const setupGenerated = useRef(false);
 
@@ -762,54 +762,54 @@ export function VaultView(): JSX.Element {
                 }
               }}
             >
-              <Tooltip label={t("vault.menu.more")}>
-                <button
-                  ref={advancedMenuTriggerRef}
-                  type="button"
-                  aria-label={t("vault.menu.more")}
-                  aria-haspopup="menu"
-                  aria-expanded={advancedMenuOpen}
-                  aria-controls="vault-advanced-menu"
-                  disabled={busy}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={() => setAdvancedMenuOpen((open) => !open)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      setAdvancedMenuOpen(false);
-                      event.currentTarget.focus();
-                    }
-                  }}
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              </Tooltip>
-              {advancedMenuOpen && (
-                <div
+              {/* ⚠️ 根必须**同时**包住触发器与内容 —— 放在触发器之后会直接抛
+                  `DropdownMenuTrigger` must be used within `DropdownMenu`（计划 8 ✓）。
+                  Tooltip 必须在 Trigger **外面**：Radix 的 asChild 只处理它的直接子元素，
+                  而本仓的 Tooltip 是普通函数组件、**既不透传 props 也不 forwardRef** ✗
+                  —— 反过来会让 onPointerDown、aria-* 与 ref 全部静默丢弃，菜单打不开且无报错
+                  （计划 5 真实上线过 ✗）。
+                  触发器上的 aria-haspopup / aria-expanded / aria-controls / onClick /
+                  onKeyDown 五样**全部撤掉** ✗ —— 都由 Radix 的 Trigger 接管 ✓。 */}
+              <DropdownMenu
+                open={advancedMenuOpen}
+                onOpenChange={setAdvancedMenuOpen}
+              >
+                <Tooltip label={t("vault.menu.more")}>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      ref={advancedMenuTriggerRef}
+                      type="button"
+                      aria-label={t("vault.menu.more")}
+                      disabled={busy}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </DropdownMenuTrigger>
+                </Tooltip>
+                <DropdownMenuContent
                   id="vault-advanced-menu"
-                  role="menu"
+                  align="end"
                   aria-label={t("vault.menu.advanced")}
-                  className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-10 z-20 min-w-64 animate-menu-in-down`}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      setAdvancedMenuOpen(false);
-                      advancedMenuTriggerRef.current?.focus();
-                    }
-                  }}
+                  // 宽度压回原值（原为 min-w-64 ✗，Radix 默认 w-72 ✗）
+                  className="min-w-64"
                 >
-                  <div className={MENU_LABEL_CLASS}>
+                  {/* 原 MENU_LABEL_CLASS = px-2.5 py-1 text-xs text-text-muted ✓ */}
+                  <DropdownMenuLabel className="px-2.5 py-1 text-xs text-text-muted">
                     {t("vault.menu.advanced")}
-                  </div>
-                  <button
+                  </DropdownMenuLabel>
+                  {/* 危险动作：vendored 的 DropdownMenuItem **没有** variant prop ✓
+                      （计划 5 已核实它只有 inset ✗）→ 逐字照抄原 MENU_ITEM_DANGER_CLASS
+                      的值 = text-error hover:bg-error/10 ✓ */}
+                  <DropdownMenuItem
                     ref={advancedResetRef}
-                    type="button"
-                    role="menuitem"
-                    className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DANGER_CLASS}`}
+                    className="h-7 gap-2 text-error hover:bg-error/10"
                     onClick={handleAdvancedReset}
                   >
                     {t("vault.reset.discard")}
-                  </button>
-                </div>
-              )}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
@@ -1155,42 +1155,33 @@ export function VaultView(): JSX.Element {
                         >
                           <Download className="h-4 w-4" />
                         </button>
-                        <button
-                          type="button"
-                          aria-label={t("vault.action.more", {
-                            name: item.path,
-                          })}
-                          aria-haspopup="menu"
-                          aria-expanded={openMenu === item.path}
-                          aria-controls={`vault-menu-${item.path}`}
-                          className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
-                          onClick={() =>
-                            setOpenMenu((current) =>
-                              current === item.path ? null : item.path,
-                            )
+                        {/* ⚠️ 「每行各自一个菜单」的原状保留 ✓ —— 只把 open 改成**派生式**
+                            （计划 8 同形 ✓），不要去动「一个共享菜单 + 记坐标」那种重写 ✗。 */}
+                        <DropdownMenu
+                          open={openMenu === item.path}
+                          onOpenChange={(next: boolean) =>
+                            setOpenMenu(next ? item.path : null)
                           }
-                          onKeyDown={(event) => {
-                            if (event.key === "Escape") {
-                              setOpenMenu(null);
-                              event.currentTarget.focus();
-                            }
-                          }}
                         >
-                          <MoreHorizontal className="h-4 w-4" />
-                        </button>
-                        {openMenu === item.path && (
-                          <div
-                            id={`vault-menu-${item.path}`}
-                            role="menu"
-                            className={`${MENU_PANEL_PADDED_CLASS} absolute right-0 top-8 z-10 min-w-32 animate-menu-in-down`}
-                            onKeyDown={(event) => {
-                              if (event.key === "Escape") setOpenMenu(null);
-                            }}
-                          >
+                          <DropdownMenuTrigger asChild>
                             <button
                               type="button"
-                              role="menuitem"
-                              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
+                              aria-label={t("vault.action.more", {
+                                name: item.path,
+                              })}
+                              className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            id={`vault-menu-${item.path}`}
+                            align="end"
+                            // 宽度压回原值（原 min-w-32 ✗，Radix 默认 w-72 ✗）
+                            className="min-w-32"
+                          >
+                            <DropdownMenuItem
+                              className="h-7 gap-2"
                               onClick={() => {
                                 setOpenMenu(null);
                                 void runAction(() =>
@@ -1201,20 +1192,19 @@ export function VaultView(): JSX.Element {
                               }}
                             >
                               {t("vault.action.reveal")}
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DANGER_CLASS}`}
+                            </DropdownMenuItem>
+                            {/* 危险动作：逐字照抄原 MENU_ITEM_DANGER_CLASS ✓ */}
+                            <DropdownMenuItem
+                              className="h-7 gap-2 text-error hover:bg-error/10"
                               onClick={() => {
                                 setOpenMenu(null);
                                 handleDelete(item);
                               }}
                             >
                               {t("vault.action.delete")}
-                            </button>
-                          </div>
-                        )}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </article>
                   ))}

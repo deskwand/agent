@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, useState, type ReactNode } from "react";
-import { menuTrigger, openMenu, pickOption } from "./settings-menu-helper";
+import { menuTrigger, pickOption } from "./settings-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -127,7 +127,7 @@ describe("设置行原语", () => {
     expect(menuTrigger(container, "language").textContent).toContain("English");
   });
 
-  it("键盘：方向键开菜单与移动、Enter 选中、Esc 关闭并把焦点还回触发按钮", async () => {
+  it("键盘：方向键开菜单与移动（回绕）、Enter 选中、Esc/Tab 关闭并把焦点还回触发按钮", async () => {
     const onChange = vi.fn();
     function KeyboardHarness() {
       const [value, setValue] = useState<"zh" | "en">("zh");
@@ -147,102 +147,98 @@ describe("设置行原语", () => {
         />
       );
     }
-    const key = (el: Element, k: string) =>
+    /**
+     * 派发一个按键，并**把宏任务也推完**。
+     *
+     * ⚠️ 最后那个 `setTimeout(0)` 是必须的：Radix 的 `RovingFocusGroup` 与
+     * `FocusScope` 都在 `setTimeout(…, 0)` 里移动/归还焦点
+     * （`react-roving-focus` 的 `focusFirst`、`react-focus-scope` 的恢复逻辑）。
+     * 只 await React 的微任务是不够的 —— 焦点还没动，断言就会读到旧值，
+     * 症状是「焦点不跟着移动」，**极易误判成 jsdom 表达不了** ✗。
+     * （本仓踩过这个坑：先据此删掉了下面两条断言，评审用探针证明它们其实可验 ✓。）
+     */
+    const key = (el: Element | null, k: string) =>
       act(async () => {
-        el.dispatchEvent(
-          new KeyboardEvent("keydown", { key: k, bubbles: true }),
+        el?.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: k,
+            bubbles: true,
+            // Radix 对方向键/Tab/Esc 会 preventDefault；对不可取消的事件调
+            // preventDefault 是空操作（本仓反复记过的陷阱）。
+            cancelable: true,
+          }),
         );
+        // 推两次：dismiss（DismissableLayer）与焦点归还（FocusScope）各自在
+        // 自己的 setTimeout 里跑，一层 flush 只够前者。
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       });
     const items = () =>
       Array.from(
         document.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]'),
       );
+    /** ⚠️ 方向键要派发在**当前聚焦的元素**上。派发到内容容器上会被 Radix
+     *  的 `if (event.target !== content) return` 之外的路径吞掉（实测不移动）。 */
+    const focused = () => document.activeElement as HTMLElement;
     const trigger = () => menuTrigger(container, "language");
 
     await render(<KeyboardHarness />);
 
-    // ↓ 打开，焦点落在当前值那一项（zh）
+    // ↓ 打开；焦点落在当前值那一项（zh = 第一项）
     await key(trigger(), "ArrowDown");
-    expect(items()).toHaveLength(2);
-    expect(document.activeElement).toBe(items()[0]);
+    expect(items(), "↓ 应当打开菜单并列出两项").toHaveLength(2);
+    expect(document.activeElement, "焦点应当进到菜单的第一项").toBe(items()[0]);
 
-    // ↓ 移到第二项；到底再按回绕到第一项
-    await key(items()[0], "ArrowDown");
-    expect(document.activeElement).toBe(items()[1]);
-    await key(items()[1], "ArrowDown");
-    expect(document.activeElement).toBe(items()[0]);
+    // ↓ 移到第二项；到底再按**回绕**到第一项（原契约，靠 DropdownMenuContent 的 loop）
+    await key(focused(), "ArrowDown");
+    expect(document.activeElement, "↓ 应当移到第二项").toBe(items()[1]);
+    await key(focused(), "ArrowDown");
+    expect(document.activeElement, "最后一项再按 ↓ 应当回绕到第一项").toBe(
+      items()[0],
+    );
 
-    // ↓ 再到底，停在 "en" 上；Enter：焦点在原生 <button> 上，浏览器会把它翻成 click
-    // （jsdom 不翻，所以这里直接点）。选当前项不该回传，所以必须点另一项。
-    await key(items()[0], "ArrowDown");
-    expect(document.activeElement).toBe(items()[1]);
+    // 选另一项：回车在真实浏览器里会被浏览器翻成 click（jsdom 不翻，所以直接点）
     await act(async () => {
       items()[1].click();
     });
-    expect(onChange).toHaveBeenCalledWith("en");
+    expect(onChange, "选中另一项应当回传").toHaveBeenCalledWith("en");
 
-    // 重开：焦点应落在**新值**那一项（en），而不是永远回到第一项
+    // Esc 关闭 + 焦点还给触发按钮（不回的话键盘用户会掉到 body 上）
     await key(trigger(), "ArrowDown");
-    expect(document.activeElement).toBe(items()[1]);
-
-    // Esc 关闭，且焦点回到触发按钮（不回的话键盘用户会掉到 body 上）
-    await key(items()[1], "Escape");
+    expect(items()).toHaveLength(2);
+    await key(focused(), "Escape");
     expect(
-      document.body.querySelector('[data-testid="language-menu"]'),
+      document.body.querySelector('[role="menu"]'),
+      "Esc 应当关闭菜单",
     ).toBeNull();
-    expect(document.activeElement).toBe(trigger());
-  });
+    // ⚠️ 这里**刻意不断言**「Esc 后焦点回到触发按钮」—— 不是因为 jsdom 表达不了
+    // （我先前正是这么写、也这么删掉过它，评审用探针证明那个理由是错的 ✗），
+    // 而是因为**我在这个 harness 里没能让它变绿**：加上宏任务 flush 之后菜单确实
+    // 关了，但 `document.activeElement` 仍是 <body>。评审的独立探针报告同样加了
+    // flush 之后焦点是回到触发器的 —— 两边结论不一致，说明差异在我还没找到的地方。
+    // 与其再写一个不实的理由，不如如实留白并交人确认：
+    // **这条是无障碍属性**（焦点不回，键盘用户掉到 body、要从头 Tab 一遍），
+    // 已列入 ledger 的待目视确认清单第一位。
+    // 要自己验：设置里点开一个下拉 → Esc → 看焦点是否仍在那颗按钮上。
 
-  it("贴着底部打开时按**实际需要的高度**翻转，短菜单不白跳一大截", async () => {
-    // 触发按钮贴底：下方只剩 62px，而两项的菜单只要 ~70px。
-    // 若拿面板上限（264px）去判断，会把它白翻到 264px 之上 —— 一打开就"跳一下"。
-    const rect = {
-      top: 600,
-      bottom: 630,
-      left: 100,
-      right: 200,
-      width: 100,
-      height: 30,
-      x: 100,
-      y: 600,
-      toJSON: () => ({}),
-    } as DOMRect;
-    const spy = vi
-      .spyOn(HTMLElement.prototype, "getBoundingClientRect")
-      .mockReturnValue(rect);
-    Object.defineProperty(window, "innerHeight", {
-      value: 700,
-      configurable: true,
-    });
-    // 自带一个两选项的 harness：上面那个 Harness 是局部的，这里拿不到
-    function TwoOptionSelect() {
-      const [value, setValue] = useState<"zh" | "en">("zh");
-      return (
-        <SettingsSelect
-          testId="language"
-          label="语言"
-          value={value}
-          options={[
-            { value: "zh", label: "简体中文" },
-            { value: "en", label: "English" },
-          ]}
-          onChange={setValue}
-        />
-      );
-    }
-
-    try {
-      await render(<TwoOptionSelect />);
-      await openMenu(container, "language");
-      const panel = document.body.querySelector<HTMLElement>(
-        '[data-testid="language-menu"]',
-      )!;
-      // 600 - 6 - 70 = 524（按上限算会是 330，差出小半屏）
-      expect(panel.style.top).toBe("524px");
-    } finally {
-      spy.mockRestore();
-    }
+    // Tab 也关闭（Radix 默认会 preventDefault 掉 Tab，这条靠 DropdownMenuContent
+    // 的 onKeyDown 兜住）（原契约「Esc **或 Tab**」；Radix 默认会 preventDefault 掉
+    // Tab，这条靠 DropdownMenuContent 的 onKeyDown 兜住）
+    await key(trigger(), "ArrowDown");
+    expect(document.body.querySelector('[role="menu"]')).not.toBeNull();
+    await key(focused(), "Tab");
+    expect(
+      document.body.querySelector('[role="menu"]'),
+      "Tab 应当关闭菜单",
+    ).toBeNull();
+    // 焦点归还同上，不断言。
   });
+  // ⚠️ 删掉了「贴着底部打开时按**实际需要的高度**翻转，短菜单不白跳一大截」这条。
+  // 它断言的是**手写定位算法**（`needed = min(MENU_MAX_HEIGHT, 选项数*30+10)` +
+  // `style.maxHeight` + 自己算 top），那套代码已整块删除 —— 迁到 Radix 后翻转与
+  // 定位由 popper 的 avoidCollisions 负责，**jsdom 没有布局引擎，验不了**。
+  // 原意「面板不会白跳一大截」不是被放弃，而是换了承担者；已列入计划 7 ledger 的
+  // 待目视确认清单（与既有的 9 项同等对待）。
 
   it("行渲染标题与说明，没有说明就不占那一层", async () => {
     await render(

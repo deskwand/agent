@@ -72,6 +72,15 @@ describe("activity chip", () => {
     act(() => root.render(element));
   }
 
+  // 面板经 portal 挂到 document.body（触发器仍在 container 里）—— 面板与触发器
+  // 分开查。Radix 在 setTimeout(0) 里挂 document 级监听、Presence 也延后一帧，
+  // 所以打开面板后先推一个宏任务再断言（做法同 merged-input-chip.test.ts）。
+  async function flushMacrotask() {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
   it("renders progress as a fraction when a task list exists", () => {
     render(strip({ currentTodos: TODOS }));
     expect(container.textContent).toContain("1/2");
@@ -166,32 +175,34 @@ describe("activity chip", () => {
     ).not.toBeNull();
   });
 
-  it("活动归零后重开，面板不会自己弹开", () => {
+  it("活动归零后重开，面板不会自己弹开", async () => {
     const withActivity = strip({
       currentTodos: TODOS,
       backgroundAgentRows: [row("running")],
     });
     render(withActivity);
-    act(() => {
+    await act(async () => {
       container.querySelector("button")?.click();
     });
-    expect(container.querySelector("[role='dialog']")).toBeTruthy();
+    await flushMacrotask();
+    expect(document.body.querySelector("[role='dialog']")).toBeTruthy();
 
     render(strip());
-    expect(container.querySelector("[role='dialog']")).toBeNull();
+    expect(document.body.querySelector("[role='dialog']")).toBeNull();
 
     render(withActivity);
-    expect(container.querySelector("[role='dialog']")).toBeNull();
+    expect(document.body.querySelector("[role='dialog']")).toBeNull();
   });
 
-  it("展开态按「计划 → 子代理」两区块渲染", () => {
+  it("展开态按「计划 → 子代理」两区块渲染", async () => {
     render(
       strip({ currentTodos: TODOS, backgroundAgentRows: [row("running")] }),
     );
-    act(() => {
+    await act(async () => {
       container.querySelector<HTMLButtonElement>("button")?.click();
     });
-    const panel = container.querySelector("[role='dialog']");
+    await flushMacrotask();
+    const panel = document.body.querySelector("[role='dialog']");
     expect(panel).toBeTruthy();
     const body = panel?.textContent ?? "";
     expect(body).toContain("activity.planSection");
@@ -206,12 +217,14 @@ describe("activity chip", () => {
     );
   });
 
-  it("展开态只有计划时不渲染子代理区块", () => {
+  it("展开态只有计划时不渲染子代理区块", async () => {
     render(strip({ currentTodos: TODOS }));
-    act(() => {
+    await act(async () => {
       container.querySelector<HTMLButtonElement>("button")?.click();
     });
-    const body = container.querySelector("[role='dialog']")?.textContent ?? "";
+    await flushMacrotask();
+    const body =
+      document.body.querySelector("[role='dialog']")?.textContent ?? "";
     expect(body).toContain("建表");
     expect(body).not.toContain("activity.subagentsSection");
   });
@@ -291,7 +304,7 @@ describe("activity chip", () => {
     expect(container.textContent).toContain("activity.statusCleared");
   });
 
-  it("finishing: 不把上一份清单的进行中项当成「正在进行」", () => {
+  it("finishing: 不把上一份清单的进行中项当成「正在进行」", async () => {
     // 真实复现（会话 081101f2）：模型跑完 3 项测试后直接清空清单，
     // 第 3 项当时仍是 in_progress → 收尾态若沿用实时态的画法，
     // 会显示「2/3 · 正在验证清空列表」+ 转圈，看起来像"状态没更新"。
@@ -320,13 +333,15 @@ describe("activity chip", () => {
     expect(container.textContent).toContain("2/3");
 
     // 展开面板：收尾态没有任何"正在跑"的指示器
-    act(() => {
+    await act(async () => {
       container.querySelector<HTMLButtonElement>("button")?.click();
     });
-    const body = container.querySelector("[role='dialog']")?.textContent ?? "";
+    await flushMacrotask();
+    const panel = document.body.querySelector("[role='dialog']");
+    const body = panel?.textContent ?? "";
     expect(body).toContain("验证任务完成后清空列表");
     expect(body).not.toContain("正在验证清空列表");
-    expect(container.querySelector(".animate-spin")).toBeNull();
+    expect(panel?.querySelector(".animate-spin")).toBeNull();
   });
 
   it("finishing: currentTodos 为 null 时不显示收尾态（无依据）", () => {

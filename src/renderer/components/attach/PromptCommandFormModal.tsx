@@ -8,10 +8,10 @@
  * 这一格对用户是纯额外成本（见设计文档 §4.5）。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Lock, Plus, Search, X } from "lucide-react";
-import { useBrowserOcclusion } from "../../hooks/useBrowserOcclusion";
+import { Lock, Plus, Search } from "lucide-react";
+import { OccludingDialog } from "../ui/occluding-dialog";
+import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 import type { PromptCommandSaveError } from "../../../shared/ipc-types";
 import type { Skill } from "../../types";
 
@@ -72,24 +72,6 @@ export function PromptCommandFormModal({
   const skillSearchRef = useRef<HTMLInputElement>(null);
   /** 光标位置。点「引用技能」按钮会让 textarea 失焦，那时读 selectionStart 可能已是末尾。 */
   const lastCaretRef = useRef<number | null>(null);
-
-  useBrowserOcclusion(true);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      // 两段：搜索框里有东西先清空，再按一次才关表单。
-      // 不走「容器 onKeyDown + stopPropagation」那种靠事件顺序压制的写法 ——
-      // 本组件的 Esc 本来就是 document 级的（弹窗体是 portal 到 body）。
-      if (skillQuery) {
-        setSkillQuery("");
-        return;
-      }
-      onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose, skillQuery]);
 
   const canSave =
     !saving && value.name.trim() !== "" && value.content.trim() !== "";
@@ -163,32 +145,48 @@ export function PromptCommandFormModal({
     });
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in">
-      <div
-        role="dialog"
-        aria-modal="true"
+  return (
+    <OccludingDialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <DialogContent
         aria-label={
           mode === "create"
             ? t("chat.newCommandTitle")
             : t("chat.editCommandTitle")
         }
-        className="mx-4 flex max-h-[88vh] w-full max-w-[560px] flex-col overflow-hidden rounded-6xl border border-border-subtle bg-background shadow-elevated animate-slide-up"
+        className="flex max-h-[88vh] w-full max-w-[560px] flex-col gap-0 overflow-hidden border-border-subtle p-0 shadow-elevated"
+        onInteractOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => {
+          // 两段：搜索框里有东西先清空，再按一次才关表单。
+          //
+          // 为什么必须用这个钩子而不是自己的 document 监听：Radix 的 Esc 监听
+          // 也在 document 上、且在**捕获阶段**，会抢在本组件的处理器之前把表单
+          // 关掉（计划 2 在 AttachPickerModal 上就是这个症状）。这个钩子在 Radix
+          // 决定关闭**之前**被调，preventDefault() 能拦下它。
+          //
+          // 搜索框为空时不拦 —— 让 Radix 关闭，它经 onOpenChange(false) 调 onClose。
+          if (skillQuery) {
+            event.preventDefault();
+            setSkillQuery("");
+          }
+        }}
       >
         <div className="flex items-center gap-3 border-b border-border-muted px-5 py-[14px]">
-          <h2 className="min-w-0 flex-1 text-sm font-semibold text-text-primary">
+          <DialogTitle className="min-w-0 flex-1 text-sm font-semibold text-text-primary">
             {mode === "create"
               ? t("chat.newCommandTitle")
               : t("chat.editCommandTitle")}
-          </h2>
-          <button
-            type="button"
-            aria-label={t("common.close")}
-            onClick={onClose}
-            className="rounded-xl p-2 text-text-secondary transition-colors hover:bg-surface-hover"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          </DialogTitle>
+          {/* Description 供读屏补充一句上下文。这里用表单已有的「命令名」提示
+              （chat.commandNameHint），而不是复述标题 —— 复述会让读屏把同一句话
+              经 aria-labelledby 与 aria-describedby 念两遍。 */}
+          <DialogDescription className="sr-only">
+            {t("chat.commandNameHint")}
+          </DialogDescription>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
@@ -361,13 +359,12 @@ export function PromptCommandFormModal({
             data-form-save
             disabled={!canSave}
             onClick={() => onSave(value)}
-            className="h-9 rounded-xl bg-accent px-4 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:border disabled:border-border-muted disabled:bg-surface-muted disabled:text-text-muted"
+            className="h-9 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:border disabled:border-border-muted disabled:bg-surface-muted disabled:text-text-muted"
           >
             {saving ? t("common.saving") : t("common.save")}
           </button>
         </div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </OccludingDialog>
   );
 }

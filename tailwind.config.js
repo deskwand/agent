@@ -31,6 +31,45 @@ module.exports = {
           muted: token("accent-muted"),
           foreground: token("accent-foreground"),
         },
+        // ——— shadcn 契约映射（spec §5.1）———————————————————————————
+        // 只收录 vendored 文件实际用到的名字（spec §5.2：枚举后定稿，不凭猜）。
+        //
+        // 每个 key 都指向**同名**的 --color-* 变量 —— 这不是偶然：
+        // token-alpha.test.ts 锁定了「键路径 === 变量名」的不变量。
+        // 那些同名变量在 globals.css 顶层 :root 里用 var() 指向本仓既有 token。
+        //
+        // 注意 primary 与 accent 的区别（两阶段改名，设计文档 §5.2）：
+        // --color-primary 与 --color-accent 同值；变的是 **utility** accent 的
+        // 含义，那是计划 7 的独立一步。
+        primary: {
+          DEFAULT: token("primary"),
+          hover: token("primary-hover"),
+          muted: token("primary-muted"),
+          foreground: token("primary-foreground"),
+        },
+        // ⚠️ secondary 是保留给 shadcn 的**表面**名，不是文字色。
+        // 它同时会生成 utility `text-secondary` —— 那个名字看上去像「次级文字」，
+        // 实际渲染成表面色（深色主题下近乎不可见）且不会报错。
+        // 本仓的次级文字是 `text.text.secondary` → `text-text-secondary`。
+        // 两者的语义区别由 shadcn-token-mapping.test.ts 的「陷阱登记」用例钉住。
+        secondary: {
+          DEFAULT: token("secondary"),
+          foreground: token("secondary-foreground"),
+        },
+        destructive: {
+          DEFAULT: token("destructive"),
+          foreground: token("destructive-foreground"),
+        },
+        foreground: token("foreground"),
+        "muted-foreground": token("muted-foreground"),
+        // 计划 5 追加：vendored dropdown-menu.tsx 用到的名字（枚举后定稿）
+        muted: token("muted"),
+        popover: {
+          DEFAULT: token("popover"),
+          foreground: token("popover-foreground"),
+        },
+        input: token("input"),
+        ring: token("ring"),
         mention: token("mention"),
         // 搜索命中 / 高亮的不透明色，声明在 globals.css 顶层 :root（只一次）。
         // 取值理由与 14 个主题块下的实测对比度见
@@ -141,7 +180,19 @@ module.exports = {
       },
     },
   },
-  plugins: [],
+  // tailwindcss-animate 是 shadcn 组件的 v3 伴随插件。
+  //
+  // 为什么需要它：vendored 的 dialog / alert-dialog / sheet 写的是
+  // `data-[state=open]:animate-in … fade-in-0 zoom-in-95 slide-in-from-left-1/2`，
+  // 这一族 utility 全部由该插件提供。不装的话弹窗会硬闪出来（无进出场动画），
+  // 而不只是「没动画」—— 那些类名会变成死类，token-alpha.test.ts 的全仓
+  // 死类不变量会直接报出来。
+  //
+  // 与本仓自带动画不冲突：本仓的是 `animate-fade-in` / `animate-slide-up`
+  //（tailwind.config.js 的 animation/keyframes）与 globals.css 里的
+  // `.animate-toast-in-*` / `.animate-menu-in-*`，名字与本插件的
+  // `animate-in` / `fade-in-0` / `slide-in-from-*` 家族无重叠。
+  plugins: [require("tailwindcss-animate")],
 };
 
 // 语义色 → 可加透明度修饰符的 tailwind 颜色。

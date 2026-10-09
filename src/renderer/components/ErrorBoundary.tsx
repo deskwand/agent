@@ -2,6 +2,12 @@ import { Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import i18n from "../i18n/config";
+import { Button } from "./ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "./ui/collapsible";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -67,25 +73,45 @@ export class ErrorBoundary extends Component<
 
           {/* Error detail (collapsed, non-critical) */}
           {this.state.error && (
-            <details className="text-left rounded-xl border border-border-subtle bg-surface-muted px-4 py-3">
-              <summary className="cursor-pointer text-xs text-text-muted select-none">
-                {t("errorBoundary.details")}
-              </summary>
-              <pre className="mt-2 text-xs text-error/80 whitespace-pre-wrap break-all font-mono">
-                {this.state.error.message}
-              </pre>
-            </details>
+            <Collapsible className="text-left rounded-xl border border-border-subtle bg-surface-muted px-4 py-3">
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="cursor-pointer text-xs text-text-muted select-none"
+                >
+                  {t("errorBoundary.details")}
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <pre className="mt-2 text-xs text-error/80 whitespace-pre-wrap break-all font-mono">
+                  {this.state.error.message}
+                </pre>
+              </CollapsibleContent>
+            </Collapsible>
           )}
 
           {/* Retry button */}
-          <button
+          {/* `.btn .btn-primary` → shadcn `Button`（计划 11 · Task 4）。
+              变体表达不了的差异保留成自定义类：
+              · `size="lg"` 只取高度（h-10 = 2.5rem = 原 py-2.5 + 行高的实际盒高），
+                `px-5` / `rounded-2xl` 覆盖掉 lg 的 px-8 / rounded-md；
+              · `shadow-none` —— `.btn-primary` 没有投影，default 变体自带 `shadow`；
+              · `hover:bg-primary-hover` —— 保住每套主题各自的 hover 色
+                （default 变体的 `hover:bg-primary/90` 是透明度混色，会盖掉主题色）；
+              · `active:scale-[0.97]` + transition 组 —— 保住 .btn 的按压反馈。
+                ⚠️ 原曲线 cubic-bezier(0.34, 1.56, 0.64, 1) 没保住：本仓 tailwind 配置下
+                `ease-[cubic-bezier(…)]` 被判定 ambiguous、**一条规则都不生成**（探针实测），
+                要还原得动 tailwind.config.js —— 不属于本任务。 */}
+          <Button
             type="button"
+            variant="default"
+            size="lg"
             onClick={this.handleReset}
-            className="inline-flex items-center gap-2 btn btn-primary px-5 py-2.5 rounded-2xl"
+            className="px-5 rounded-2xl shadow-none hover:bg-primary-hover active:scale-[0.97] transition-[transform,background-color,color]"
           >
             <RefreshCw className="w-4 h-4" />
             <span>{t("errorBoundary.retry")}</span>
-          </button>
+          </Button>
         </div>
       </div>
     );

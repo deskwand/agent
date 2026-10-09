@@ -108,15 +108,59 @@ describe("MergedInputChip (single-panel)", () => {
     });
   }
 
+  // 触发器：迁移前手写 aria-haspopup="menu"，迁到 Radix 的 Popover 后由 PopoverTrigger
+  // 写 aria-haspopup="dialog" —— 判据只取「有 aria-haspopup」，迁移前后都成立。
   function trigger(): HTMLButtonElement {
-    return container.querySelector('button[aria-haspopup="menu"]')!;
+    return container.querySelector("button[aria-haspopup]")!;
   }
+
+  function isPanelOpen(): boolean {
+    return trigger().getAttribute("aria-expanded") === "true";
+  }
+
+  // Radix 在 setTimeout(0) 里挂 document 级 pointerdown 监听、Presence 也延后一帧，
+  // 需要这类行为生效时先推一个宏任务。
+  async function flushMacrotask() {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
+  // 打开必须条件式：PopoverTrigger 只认 click，DropdownMenuTrigger 只认 pointerdown。
+  // 不能一次派发两个事件 —— 第二个会被第一个的后果消费，Radix 打开后那发 click
+  // 落在内容之外，会被当成外部点击把面板立刻关掉。
+  async function openPanel() {
+    act(() => {
+      trigger().dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    });
+    if (!isPanelOpen()) click(trigger());
+    await flushMacrotask();
+  }
+
+  // 点外部同样条件式，「先 pointerdown、没关再补 click、仍没关再补 mousedown」：
+  // Radix 的 DismissableLayer 靠 document 级 pointerdown，而 Popover 的
+  // deferPointerDownOutside 要等随后那发 click 才真正关闭；旧实现只听 mousedown。
+  async function clickOutside() {
+    act(() => {
+      document.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+    });
+    for (const type of ["click", "mousedown"] as const) {
+      if (!isPanelOpen()) break;
+      act(() => {
+        document.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+      });
+    }
+    await flushMacrotask();
+  }
+
+  // 面板经 portal 挂到 document.body（触发器仍在 container 里）—— 面板与触发器分开查。
 
   // jsdom 没有布局，手动给出面板底部坐标，模拟 WelcomeView 中输入框垂直居中、
   // 面板上方空间不足的场景（真实修复前的值可参考菜单高度 ≈ 100vh - 12rem）。
   function stubPanelBottom(bottom: number) {
     HTMLElement.prototype.getBoundingClientRect = function () {
-      if (this.getAttribute?.("role") === "menu") {
+      const role = this.getAttribute?.("role");
+      if (role === "menu" || role === "dialog") {
         return {
           top: bottom - 100,
           bottom,
@@ -134,7 +178,7 @@ describe("MergedInputChip (single-panel)", () => {
   }
 
   function panel(): HTMLElement {
-    return container.querySelector('[role="menu"]')!;
+    return document.body.querySelector('[role="menu"], [role="dialog"]')!;
   }
 
   function click(el: Element | undefined) {
@@ -157,46 +201,46 @@ describe("MergedInputChip (single-panel)", () => {
     });
   }
 
-  it("renders one trigger chip with model and thinking level", () => {
+  it("renders one trigger chip with model and thinking level", async () => {
     render();
     expect(trigger().textContent).toContain("Model One");
     expect(trigger().textContent).toContain("chat.thinkingLevel.medium");
   });
 
-  it("opens the panel on chip click", () => {
+  it("opens the panel on chip click", async () => {
     render();
     expect(trigger().getAttribute("aria-expanded")).toBe("false");
-    click(trigger());
+    await openPanel();
     expect(trigger().getAttribute("aria-expanded")).toBe("true");
     expect(panel()).toBeDefined();
   });
 
-  it("carries the shared panel shell tokens", () => {
+  it("carries the shared panel shell tokens", async () => {
     render();
-    click(trigger());
+    await openPanel();
     expect(panel().className).toContain("shadow-elevated");
     expect(panel().className).toContain("border-border-subtle");
     expect(panel().className).not.toContain("shadow-soft");
   });
 
-  it("caps the panel to the space available above the chip", () => {
+  it("caps the panel to the space available above the chip", async () => {
     render();
     stubPanelBottom(300);
-    click(trigger());
+    await openPanel();
     // 300 - 48(标题栏安全区)
     expect(panel().style.maxHeight).toBe("252px");
   });
 
-  it("keeps the 32rem ceiling when there is plenty of room", () => {
+  it("keeps the 32rem ceiling when there is plenty of room", async () => {
     render();
     stubPanelBottom(2000);
-    click(trigger());
+    await openPanel();
     expect(panel().style.maxHeight).toBe("512px");
   });
 
-  it("shows every group plus thinking row when logged out", () => {
+  it("shows every group plus thinking row when logged out", async () => {
     render();
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     expect(text).toContain("Provider A");
     expect(text).toContain("Provider B");
@@ -204,7 +248,7 @@ describe("MergedInputChip (single-panel)", () => {
     expect(text).toContain("modelMenu.thinkingWithValue");
   });
 
-  it("shows the cloud group and user providers in the same panel", () => {
+  it("shows the cloud group and user providers in the same panel", async () => {
     loginCloud();
     render({
       model: "deepseek-flash",
@@ -213,7 +257,7 @@ describe("MergedInputChip (single-panel)", () => {
     });
     // 思考档不再由模式锁定，折叠态要显示用户当前档位（非默认档）
     expect(trigger().textContent).toContain("chat.thinkingLevel.xhigh");
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     expect(text).toContain("DeskWand");
     expect(text).toContain("deepseek-flash");
@@ -223,10 +267,10 @@ describe("MergedInputChip (single-panel)", () => {
     expect(text.endsWith("modelMenu.thinkingWithValue")).toBe(true);
   });
 
-  it("shows the cloud group for BYOK providers too", () => {
+  it("shows the cloud group for BYOK providers too", async () => {
     loginCloud();
     render(); // activeProviderProfileKey = "profile-a"（BYOK）
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     expect(text).toContain("DeskWand");
     expect(text).toContain("deepseek-flash");
@@ -234,34 +278,34 @@ describe("MergedInputChip (single-panel)", () => {
     expect(text).toContain("Provider A");
   });
 
-  it("puts the cloud group first regardless of config order", () => {
+  it("puts the cloud group first regardless of config order", async () => {
     loginCloud();
     const cloudLast: ModelOptionGroup[] = [
       ...modelOptions.filter((g) => g.profileKey !== "custom:deskwand"),
       modelOptions.find((g) => g.profileKey === "custom:deskwand")!,
     ];
     render({ modelOptions: cloudLast });
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     // 分组标题按 DOM 顺序出现在 textContent 里，用下标比较断言顺序
     expect(text.indexOf("DeskWand")).toBeGreaterThanOrEqual(0);
     expect(text.indexOf("DeskWand")).toBeLessThan(text.indexOf("Provider A"));
   });
 
-  it("selects a thinking level and returns to the list view", () => {
+  it("selects a thinking level and returns to the list view", async () => {
     loginCloud();
     render({
       model: "deepseek-flash",
       activeProviderProfileKey: "custom:deskwand",
     });
-    click(trigger());
+    await openPanel();
     // 列表层直接可见思考行，不需要先钻进「自定义」视图
-    const thinkingRow = Array.from(container.querySelectorAll("button")).find(
+    const thinkingRow = Array.from(document.body.querySelectorAll("button")).find(
       (b) => b.textContent?.includes("modelMenu.thinkingWithValue"),
     );
     click(thinkingRow);
     expect(panel().textContent).toContain("chat.thinkingLevel.high");
-    const highButton = Array.from(container.querySelectorAll("button")).find(
+    const highButton = Array.from(document.body.querySelectorAll("button")).find(
       (b) => b.textContent?.includes("chat.thinkingLevel.high"),
     );
     click(highButton);
@@ -270,25 +314,23 @@ describe("MergedInputChip (single-panel)", () => {
     expect(panel().textContent).toContain("Provider A");
   });
 
-  it("closes on outside click", () => {
+  it("closes on outside click", async () => {
     render();
-    click(trigger());
+    await openPanel();
     expect(trigger().getAttribute("aria-expanded")).toBe("true");
-    act(() => {
-      document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
-    });
+    await clickOutside();
     expect(trigger().getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("hides the cloud group when not logged in", () => {
+  it("hides the cloud group when not logged in", async () => {
     render(); // cloudConfig 默认 null
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     expect(text).not.toContain("deepseek-flash");
     expect(text).toContain("Provider A");
   });
 
-  it("uses the available-models copy when the list itself is empty", () => {
+  it("uses the available-models copy when the list itself is empty", async () => {
     // 未登录时云分组被过滤掉；列表为空也要给出空态行，且思考行仍在（设计文档已记录的行为偏差）。
     // 这个场景下没有搜索框，文案不能再说「无匹配」——那是筛选语境的话术。
     render({
@@ -296,46 +338,46 @@ describe("MergedInputChip (single-panel)", () => {
         (g) => g.profileKey === "custom:deskwand",
       ),
     });
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     expect(text).toContain("chat.noAvailableModel");
     expect(text).not.toContain("chat.noModelMatch");
     expect(text).toContain("modelMenu.thinkingWithValue");
   });
 
-  it("shows no-match row when search filters everything out", () => {
+  it("shows no-match row when search filters everything out", async () => {
     render({ modelOptions: singleGroupOptions(9) });
-    click(trigger());
+    await openPanel();
     expect(panel().querySelector("input")).not.toBeNull();
     setSearchValue("zzz-nothing");
     expect(panel().textContent).toContain("chat.noModelMatch");
   });
 
-  it("hides the search input while the list is short", () => {
+  it("hides the search input while the list is short", async () => {
     render(); // 默认数据 3 分组 5 模型；未登录下云分组被剔除，可见 2 分组 3 模型
-    click(trigger());
+    await openPanel();
     expect(panel().querySelector("input")).toBeNull();
     expect(panel().textContent).toContain("Model One");
   });
 
-  it("hides the search input at exactly the threshold", () => {
+  it("hides the search input at exactly the threshold", async () => {
     // 8 是阈值本身。`>` 写成 `>=` 的差异只有这一条能守住：
     // 上面那条可见 3 个模型、下面那条 9 个，两者都离边界很远。
     render({ modelOptions: singleGroupOptions(8) });
-    click(trigger());
+    await openPanel();
     expect(panel().querySelector("input")).toBeNull();
     expect(panel().textContent).toContain("Model 7");
   });
 
-  it("shows the search input once the visible models exceed the threshold", () => {
+  it("shows the search input once the visible models exceed the threshold", async () => {
     render({ modelOptions: singleGroupOptions(9) });
-    click(trigger());
+    await openPanel();
     expect(panel().querySelector("input")).not.toBeNull();
   });
 
-  it("drops the filter when the list shrinks below the threshold", () => {
+  it("drops the filter when the list shrinks below the threshold", async () => {
     render({ modelOptions: singleGroupOptions(9) });
-    click(trigger());
+    await openPanel();
     setSearchValue("zzz-nothing");
     expect(panel().textContent).toContain("chat.noModelMatch");
 
@@ -351,23 +393,23 @@ describe("MergedInputChip (single-panel)", () => {
     expect(panel().textContent).not.toContain("chat.noModelMatch");
   });
 
-  it("hides the group label when there is only one group", () => {
+  it("hides the group label when there is only one group", async () => {
     render({ modelOptions: singleGroupOptions(3) }); // 3 个模型、1 个分组
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     expect(text).not.toContain("Provider A");
     expect(text).toContain("Model 0");
   });
 
-  it("keeps group labels when there are several groups", () => {
+  it("keeps group labels when there are several groups", async () => {
     render(); // 默认数据：未登录下可见 2 个分组
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     expect(text).toContain("Provider A");
     expect(text).toContain("Provider B");
   });
 
-  it("counts visible models, not raw props, for both thresholds", () => {
+  it("counts visible models, not raw props, for both thresholds", async () => {
     // 未登录时云分组被 visibleModelOptions 剔除，但它在 props 里仍然在。
     // 这条数据 raw 是 2 分组 9 模型，visible 是 1 分组 7 模型——两个判据都必须按
     // visible 算：按 raw 算会长出搜索框（9 > 8）和分组标题（2 > 1），两个断言都会红。
@@ -384,7 +426,7 @@ describe("MergedInputChip (single-panel)", () => {
         ...singleGroupOptions(7),
       ],
     }); // cloudConfig 默认 null = 未登录
-    click(trigger());
+    await openPanel();
     const text = panel().textContent ?? "";
     expect(panel().querySelector("input")).toBeNull();
     expect(text).not.toContain("DeskWand");

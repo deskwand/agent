@@ -4,9 +4,13 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
+  // 必须给全 `i18n`（不只是 `t`）：树里会读模块级 i18n 实例的工具
+  //（utils/i18n-format.ts 读 resolvedLanguage / language），以及后续迁移进来的
+  // 弹窗（UpdateConfirmDialog 取 i18n.language）。缺它会让整棵渲染树炸掉。
   useTranslation: () => ({
     t: (key: string, options?: Record<string, unknown>) =>
       options ? `${key}:${JSON.stringify(options)}` : key,
+    i18n: { language: "en", resolvedLanguage: "en" },
   }),
 }));
 

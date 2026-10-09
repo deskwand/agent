@@ -55,7 +55,7 @@ describe("ImageLightbox toolbar", () => {
   }
 
   function toolbar(): HTMLElement {
-    const node = container.querySelector<HTMLElement>(
+    const node = document.body.querySelector<HTMLElement>(
       '[data-testid="image-lightbox-toolbar"]',
     );
     if (!node) throw new Error("toolbar not rendered");
@@ -63,7 +63,7 @@ describe("ImageLightbox toolbar", () => {
   }
 
   function button(label: string): HTMLButtonElement | null {
-    return container.querySelector<HTMLButtonElement>(
+    return document.body.querySelector<HTMLButtonElement>(
       `button[aria-label="${label}"]`,
     );
   }
@@ -110,7 +110,7 @@ describe("ImageLightbox toolbar", () => {
     expect(toolbar()).toBeTruthy();
 
     const count = (label: string) =>
-      container.querySelectorAll(`button[aria-label="${label}"]`).length;
+      document.body.querySelectorAll(`button[aria-label="${label}"]`).length;
     expect(count("imageLightbox.close")).toBe(1);
     expect(count("imageLightbox.copy")).toBe(1);
     expect(count("imageLightbox.openExternal")).toBe(1);
@@ -118,7 +118,7 @@ describe("ImageLightbox toolbar", () => {
 
   it("does not zoom the image when the wheel is scrolled over the toolbar", () => {
     render();
-    const image = container.querySelector("img");
+    const image = document.body.querySelector("img");
     const before = image?.style.transform;
 
     act(() => {
@@ -138,7 +138,7 @@ describe("ImageLightbox toolbar", () => {
 
   it("closes on a click on the blank area around the image, not on the image itself", () => {
     render();
-    const image = container.querySelector("img");
+    const image = document.body.querySelector("img");
     const imageArea = image?.parentElement?.parentElement as HTMLElement;
     expect(image).not.toBeNull();
     expect(imageArea).toBeTruthy();
@@ -157,15 +157,29 @@ describe("ImageLightbox toolbar", () => {
 
   it("renders the toolbar after the image area so it paints above it", () => {
     render();
-    const root = container.firstElementChild as HTMLElement;
+    const root = document.body.querySelector('[role="dialog"]') as HTMLElement;
+    expect(root, "查看器内容必须存在").not.toBeNull();
     const imageArea =
-      container.querySelector("img")?.parentElement?.parentElement;
+      document.body.querySelector("img")?.parentElement?.parentElement;
 
     // 两者都是 positioned、z-index:auto 的兄弟节点，所以后面的那个在上面。
     // 图片区铺满整个视口，工具条一旦排在它前面就会被盖住、按钮点不到
     // （点下去命中的是图片区，而图片区自己的 onClick 会关掉弹层）。
-    expect(root.lastElementChild).not.toBe(imageArea);
-    expect(root.lastElementChild).toBe(toolbar().parentElement);
+    //
+    // 断言写成「顺序」而不是「是最后一个子节点」：迁到 shadcn 的 Dialog 后，
+    // DialogContent 会在 children **之后**再渲染一个内置关闭键，所以
+    // lastElementChild 永远是那颗 X —— 它自己是 absolute 定位的，盖在工具条上
+    // 无所谓，但会让「最后一个必须是工具条」这条**机制性**断言失效。
+    // 要守的意图（工具条在图片区之后）没变。
+    const order = Array.from(root.children);
+    const toolbarIndex = order.indexOf(toolbar().parentElement as Element);
+    const imageAreaIndex = order.indexOf(imageArea as Element);
+    expect(imageAreaIndex, "图片区必须存在").toBeGreaterThanOrEqual(0);
+    expect(toolbarIndex, "工具条必须存在").toBeGreaterThanOrEqual(0);
+    expect(
+      toolbarIndex,
+      "工具条必须排在图片区之后，否则会被铺满视口的图片区盖住",
+    ).toBeGreaterThan(imageAreaIndex);
   });
 
   it("hides the toolbar while the image is expected but has not been measured", () => {

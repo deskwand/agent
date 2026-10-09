@@ -134,8 +134,11 @@ describe("usage currency wiring", () => {
     const menu = read("src/renderer/components/usage/CurrencySelect.tsx");
     // 注释里若出现带尖括号的 select 字样会误伤这条；组件注释写的是「原生 select」
     expect(menu).not.toMatch(/<select[\s>]/);
-    expect(menu).toContain("MENU_PANEL_PADDED_CLASS");
-    expect(menu).toContain("MENU_ITEM_SELECTED_CLASS");
+    // ⚠️ 2026-10-09：它已迁到 **vendored `ui/dropdown-menu`** ✗ ⇒ 不再用共享菜单 token ✓。
+    // **意图不变** ✓（「用共享组件、不自己发明一套」✓）—— 只是共享的那一套换了名字 ✓。
+    expect(menu).toContain("./ui/dropdown-menu");
+    expect(menu).toContain("DropdownMenuContent");
+    expect(menu).not.toContain("MENU_PANEL_PADDED_CLASS");
     expect(menu).toContain("USAGE_CURRENCIES.map");
     expect(menu).toContain('t("usage.currency")');
     // 触发按钮照抄输入框模型菜单的形态，不自己发明一套

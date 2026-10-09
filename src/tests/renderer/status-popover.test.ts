@@ -42,6 +42,8 @@ describe("StatusPopover", () => {
   afterEach(() => {
     act(() => root.unmount());
     container.remove();
+    // Radix 经 Portal 挂在 document.body 的弹层节点，清掉以免跨用例污染
+    document.querySelectorAll('[role="dialog"]').forEach((el) => el.remove());
     vi.unstubAllGlobals();
   });
 
@@ -63,7 +65,9 @@ describe("StatusPopover", () => {
   }
 
   function dialog(): HTMLElement | null {
-    return container.querySelector('[role="dialog"]');
+    // 查 document.body 而不是 container：迁到 Radix 的 Popover 后内容经 Portal
+    // 挂到 body 下（陷阱 3）。body 是 container 的超集，本文件 22 处调用一并受益。
+    return document.body.querySelector('[role="dialog"]');
   }
 
   it("默认不渲染面板，点击后渲染", () => {
@@ -103,23 +107,18 @@ describe("StatusPopover", () => {
   });
 
   it("Escape 关闭面板", () => {
+    // ⚠️ KeyboardEvent **必须**显式 cancelable: true —— 否则任何 preventDefault()
+    // 都是空操作（真实浏览器里 Esc 是可取消的）。评审实测：给 PopoverContent 加
+    // `onEscapeKeyDown={(e) => e.preventDefault()}` 后，缺这个字段会让本用例**照样绿**
+    // → 「Esc 被压制」这种真实回归会无声溜过。计划自己列的陷阱 2 就是这条。
     render();
     act(() => trigger().click());
     expect(dialog()).not.toBeNull();
 
     act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
-    });
-
-    expect(dialog()).toBeNull();
-  });
-
-  it("点击面板外部关闭面板", () => {
-    render();
-    act(() => trigger().click());
-
-    act(() => {
-      document.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", cancelable: true }),
+      );
     });
 
     expect(dialog()).toBeNull();
@@ -359,10 +358,13 @@ describe("StatusPopover", () => {
     const panel = dialog()!;
     // 逐 token 用 classList 断言，不用字符串 includes ——
     // `hover:bg-surface-hover` 那类子串会让 toContain 变成恒真。
-    expect(panel.classList.contains("animate-menu-in-up")).toBe(true);
-    expect(panel.classList.contains("border-border-subtle")).toBe(true);
-    expect(panel.classList.contains("shadow-elevated")).toBe(true);
-    expect(panel.classList.contains("z-30")).toBe(true);
+    //
+    // ⚠️ 载体换了：原来这 4 个类来自 MENU_PANEL_CLASS，现在面板是 vendored 的
+    // PopoverContent —— 它的外壳契约是 data-[state=open]:animate-in（入场动画）
+    // 与 bg-popover（实色底），而不是本仓的 shadow-elevated / border-border-subtle。
+    // 约束（面板要有入场动画、不能用回退的阴影/边框）没变，载体变了。
+    expect(panel.classList.contains("data-[state=open]:animate-in")).toBe(true);
+    expect(panel.classList.contains("bg-popover")).toBe(true);
 
     // 旧内联外壳的两个特征必须消失
     expect(panel.classList.contains("shadow-soft")).toBe(false);
@@ -379,5 +381,71 @@ describe("StatusPopover", () => {
     // 面板是只读状态面板、内部没有表单类元素，所以不存在需要 `border-border` 的子元素；
     // 将来若真需要，改成更精确的选择器，而不是放宽这一条。
     expect(panel.querySelectorAll('[class~="border-border"]')).toHaveLength(0);
+  });
+
+  it("打开后焦点仍在环形按钮上【Review Focus 1】", () => {
+    // ⚠️ 这条同时是**证伪工具**：先不写 onOpenAutoFocus 跑它一次。
+    //   红 → Radix 的 Popover 确实会把焦点移进内容 → 加 prop ✓ 此后本用例有牙齿；
+    //   绿 → 不移焦 → **不要加那个 prop**（加了是投机代码，准则 2）。
+    render();
+    // ⚠️ 必须先**显式聚焦**：jsdom 的 `.click()` 不会把焦点给元素（真实浏览器会），
+    // 不先聚焦的话这条测的是「从未聚焦」而不是「焦点被移走」—— 两个方向都会绿/红错。
+    trigger().focus();
+    expect(document.activeElement, "前置条件：焦点先要在按钮上").toBe(
+      trigger(),
+    );
+
+    act(() => trigger().click());
+    expect(document.activeElement, "焦点必须仍在环形按钮上").toBe(trigger());
+  });
+
+  it("面板仍是 role=dialog 且带 aria-label【Review Focus 2】", () => {
+    // 迁移前旧实现就带了这两个 ✓ 它是**特征化用例**：迁移后必须仍绿。
+    // role="dialog" 由 Radix 的 PopoverContent 提供（不手写），aria-label 必须显式传。
+    render();
+    act(() => trigger().click());
+    const panel = dialog();
+    expect(panel, "面板必须存在且是 dialog 角色").not.toBeNull();
+    expect(panel!.getAttribute("aria-label"), "aria-label 不能丢").toBeTruthy();
+  });
+
+  it("点面板外部关闭（带正对照）【Review Focus 4】", async () => {
+    // 原实现是手写 mousedown 监听，迁走后由 Radix 的 DismissableLayer 接管。
+    render();
+    act(() => trigger().click());
+    // ⚠️ 必须让多轮微任务落地再派发：Radix 的 DismissableLayer 是在 **effect** 里
+    // 注册 document 监听的，同一 tick 内派发时它还没装上 —— 症状是「点了没反应」，
+    // 会被误判成「Radix 不支持外部点击」。计划 5 在菜单上踩过同一个坑。
+    await act(async () => {});
+
+    expect(dialog(), "正对照：面板必须确实开着").not.toBeNull();
+
+    act(() => {
+      document.body.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+        }),
+      );
+      document.body.dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }),
+      );
+    });
+    expect(dialog(), "点面板外部应当关闭").toBeNull();
+  });
+
+  it("再点一次环形按钮关闭（切换权从手写 onClick 移到 Radix 的 Trigger）【评审 Important 2】", () => {
+    // 原来按钮上是手写的 `onClick={() => setOpen(v => !v)}`，现在由 Radix 的
+    // PopoverTrigger 管（onOpenToggle）。行为对是「构造使然」，但没有用例钉住它 ——
+    // 而「点第二次还开着」（或反过来一直关）是这类迁移里很容易出现的回归。
+    render();
+    act(() => trigger().click());
+    expect(dialog(), "第一次点击应当打开").not.toBeNull();
+    expect(trigger().getAttribute("aria-expanded")).toBe("true");
+
+    act(() => trigger().click());
+    expect(dialog(), "第二次点击应当关闭").toBeNull();
+    expect(trigger().getAttribute("aria-expanded")).toBe("false");
   });
 });

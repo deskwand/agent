@@ -7,6 +7,7 @@
 // 消失，而那一整个文件的用例仍然全绿。（同类理由见 quota-panel-wiring.test.ts 的文件头。）
 
 import React, { act } from "react";
+import { toggleAttachMenu } from "./attach-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -85,15 +86,9 @@ describe("底栏到命令入口的接线", () => {
     });
   }
 
-  function attachTrigger(): HTMLButtonElement {
-    const button = container.querySelector("button[data-attach-trigger]");
-    if (!button) throw new Error("attach trigger not rendered");
-    return button as HTMLButtonElement;
-  }
-
   function menuItem(label: string): HTMLButtonElement {
     const found = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("[role='menuitem']"),
+      document.body.querySelectorAll<HTMLButtonElement>("[role='menuitem']"),
     ).find((button) => button.textContent?.includes(label));
     if (!found) throw new Error(`menu item not found: ${label}`);
     return found;
@@ -102,19 +97,19 @@ describe("底栏到命令入口的接线", () => {
   it("不传 onCommandEntry 时命令组不出现（欢迎页那一侧）", async () => {
     render();
     await act(async () => {
-      attachTrigger().click();
+      await toggleAttachMenu(container);
     });
-    expect(container.querySelectorAll("[role='menuitem']").length).toBe(3);
+    expect(document.body.querySelectorAll("[role='menuitem']").length).toBe(3);
   });
 
   it("传了 onCommandEntry 时命令组出现，且点击透传到回调", async () => {
     const onCommandEntry = vi.fn();
     render({ onCommandEntry });
     await act(async () => {
-      attachTrigger().click();
+      await toggleAttachMenu(container);
     });
     // 3 个附件项 + 「＋」+ 2 个内置命令（本文件没 stub promptCommands）
-    expect(container.querySelectorAll("[role='menuitem']").length).toBe(6);
+    expect(document.body.querySelectorAll("[role='menuitem']").length).toBe(6);
 
     act(() => menuItem("slash.goal").click());
     expect(onCommandEntry).toHaveBeenCalledWith("goal");
@@ -124,19 +119,19 @@ describe("底栏到命令入口的接线", () => {
     const onInsertPromptCommand = vi.fn();
     render({ onInsertPromptCommand });
     await act(async () => {
-      attachTrigger().click();
+      await toggleAttachMenu(container);
     });
     // 没有 onCommandEntry（欢迎页形态）时命令组也要出现，因为「＋」在里面；
     // 内置两项不渲染，所以 menuitem = 3 个附件项 + 「＋」= 4。
-    expect(container.querySelector("[data-command-create]")).not.toBeNull();
-    expect(container.querySelectorAll("[role='menuitem']").length).toBe(4);
+    expect(document.body.querySelector("[data-command-create]")).not.toBeNull();
+    expect(document.body.querySelectorAll("[role='menuitem']").length).toBe(4);
   });
 
   it("两个能力都不传时命令组不渲染（守住欢迎页旧行为）", async () => {
     render();
     await act(async () => {
-      attachTrigger().click();
+      await toggleAttachMenu(container);
     });
-    expect(container.querySelector("[data-command-create]")).toBeNull();
+    expect(document.body.querySelector("[data-command-create]")).toBeNull();
   });
 });

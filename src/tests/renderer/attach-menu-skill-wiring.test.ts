@@ -7,6 +7,7 @@
 // 静默消失，而直接渲染 AttachMenu 的用例仍然全绿。
 
 import React, { act } from "react";
+import { toggleAttachMenu } from "./attach-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -103,31 +104,25 @@ describe("底栏到技能入口的接线", () => {
     });
   }
 
-  function trigger(): HTMLButtonElement {
-    const button = container.querySelector("button[data-attach-trigger]");
-    if (!button) throw new Error("attach trigger not rendered");
-    return button as HTMLButtonElement;
-  }
-
   it("不传 onInsertSkill 时技能组不出现（没有技能能力的宿主）", async () => {
     render();
     await act(async () => {
-      trigger().click();
+      await toggleAttachMenu(container);
     });
-    expect(container.querySelector("[data-skill-row]")).toBeNull();
+    expect(document.body.querySelector("[data-skill-row]")).toBeNull();
   });
 
   it("透传 onInsertSkill：出现星标技能行，点击把名字交给宿主", async () => {
     const onInsertSkill = vi.fn();
     render({ onInsertSkill });
     await act(async () => {
-      trigger().click();
+      await toggleAttachMenu(container);
     });
     await act(async () => {
       await Promise.resolve();
     });
 
-    const row = container.querySelector<HTMLButtonElement>(
+    const row = document.body.querySelector<HTMLButtonElement>(
       "[data-skill-row='pdf']",
     );
     if (!row) throw new Error("skill row not rendered");

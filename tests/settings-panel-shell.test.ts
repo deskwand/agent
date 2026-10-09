@@ -113,10 +113,16 @@ describe("能力页复用设置外壳的开关", () => {
     const files = readdirSync(path.resolve(process.cwd(), dir)).filter((f) =>
       /\.tsx?$/.test(f),
     );
+    // ⚠️ 2026-10-09：`SettingsSwitch` 已换成 **vendored `ui/switch.tsx`** ✗ ⇒ 目录里
+    // **没有任何文件**再手写 `role="switch"` ✓（那个 role 由 Radix 在组件内部渲染 ✓）。
+    // **意图不变** ✓（原注释：「新加一个文件里自带 role="switch" 也会被判红」✓）——
+    // 所以判据从「恰好 shared.tsx 一个」收紧成「**一个都没有**」✓✓，这是**更强**的不变量 ✓。
     const owners = files
       .filter((f) => read(`${dir}/${f}`).includes('role="switch"'))
       .sort();
-    expect(owners).toEqual(["shared.tsx"]);
+    expect(owners).toEqual([]);
+    // 并钉住「它现在用的是 vendored 组件」✓ —— 否则上一条会在「谁都没实现开关」时假绿 ✗。
+    expect(read(`${dir}/shared.tsx`)).toContain("<Switch");
     expect(capabilities).toContain("<SettingsSwitch");
     expect(capabilities).toContain("<SettingsCard");
   });

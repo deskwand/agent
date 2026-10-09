@@ -89,8 +89,18 @@ const UTILITIES = [
  * 当时就不产出任何规则，却是全绿。现在 token 段用通用形状，断言改成直接问
  * 「这条类到底编译得出来吗」。 */
 function classPattern(): RegExp {
+  // 开头的负向后顾是必要的：它防止正则在**标识符中间**起匹配。
+  //
+  // 实例：shadcn 的 dialog 用 `data-[state=open]:slide-in-from-left-1/2`，
+  // 没有这个后顾时，`from-left-1/2` 会被当成一个 utility- token/alpha 类名提取
+  // 出来（utility=`from`、token=`left-1`、alpha=`2`）—— 它不是一个真类名，
+  // 永远编译不出 CSS，于是报成「死类」。同理 `slide-out-to-left-1/2` → `to-left-1/2`。
+  //
+  // 后顾只排除「前一字符是小写字母或连字符」的情形，即标识符内部；
+  // 真类名总是出现在类串的起始处（前面是空白/引号/反引号/`:`），不受影响。
+  // 因此它只收紧伪阳性，不放松断言。
   return new RegExp(
-    `(?:[a-z-]+:)*(?:${UTILITIES.join("|")})-([a-z][a-z0-9-]*)/(?:\\d{1,3}|\\[[^\\]]+\\])`,
+    `(?<![a-z-])(?:[a-z-]+:)*(?:${UTILITIES.join("|")})-([a-z][a-z0-9-]*)/(?:\\d{1,3}|\\[[^\\]]+\\])`,
     "g",
   );
 }
@@ -105,10 +115,14 @@ const KNOWN_DEAD_CLASSES = new Set([
   // PiExtensionManagerView.tsx —— danger 不存在，看着是 error 的误写
   "bg-danger/10",
   "border-danger/40",
-  // AgentRunContainer.tsx / PiExtensionManagerView.tsx —— muted 不是 colors 的键
-  "bg-muted/30",
-  "bg-muted/50",
-  "hover:bg-muted/50",
+  // ⚠️ 计划 5 移除了这三条（原注释：「AgentRunContainer.tsx / PiExtensionManagerView.tsx
+  // —— muted 不是 colors 的键」）：
+  //   bg-muted/30 / bg-muted/50 / hover:bg-muted/50
+  // 原因：计划 5 vendor 了 dropdown-menu.tsx，它用 **bg-muted**（快捷键提示底），
+  // 所以 muted 进了 tailwind 的 colors 契约映射（globals.css 里配了同名别名变量）。
+  // 于是那三个**一直是死类**的类名现在能编译了 —— 也就是说
+  // AgentRunContainer / PiExtensionManagerView 会开始显示它们**本来想写**的底色。
+  // 这是两处**范围外的视觉变化**（大概率是修复，但已记入计划 5 的 ledger 供目视核对）。
 ]);
 
 function sourceFiles(dir: string): string[] {

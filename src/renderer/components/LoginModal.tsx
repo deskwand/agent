@@ -4,7 +4,8 @@ import { CloudApiClient } from "../services/cloud-api";
 import { DESKWAND_API_URL } from "../../shared/oauth-config";
 import { buildDeskwandProviderPayload } from "../utils/cloud-provider";
 import type { CloudConfig } from "../types";
-import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
+import { OccludingDialog } from "./ui/occluding-dialog";
+import { DialogContent, DialogTitle } from "./ui/dialog";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -100,7 +101,6 @@ export function LoginModal({
   onLoginSuccess,
 }: LoginModalProps) {
   const { t } = useTranslation();
-  useBrowserOcclusion(isOpen);
   const [step, setStep] = useState<LoginStep>("social");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -211,20 +211,21 @@ export function LoginModal({
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in"
-      onClick={onClose}
+    <OccludingDialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
     >
-      <div
-        className="card w-full max-w-sm p-6 m-4 shadow-elevated animate-slide-up"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="text-base font-semibold text-text-primary mb-5 text-center">
+      {/* 关于 DialogContent 自带的那颗关闭 X：原实现**没有**关闭键，所以它是
+          迁移新增的一条关闭路径。**不构成回归** —— 原实现的遮罩上有 onClick={onClose}，
+          也就是说 loading 中途本来就能点遮罩关掉；新路径没有收紧也没有放宽可中断的时机。
+          本弹窗**不加** busy 守卫：原实现也没有（loading 只禁用按钮，不拦关闭）。 */}
+      <DialogContent className="max-w-sm p-6">
+        <DialogTitle className="text-base font-semibold text-text-primary mb-5 text-center">
           {t("auth.loginTitle")}
-        </h2>
+        </DialogTitle>
 
         {error && (
           <div className="mb-4 p-2.5 rounded-lg bg-error/10 border border-error/20 text-xs text-error">
@@ -288,13 +289,13 @@ export function LoginModal({
                 }}
                 placeholder={t("auth.emailPlaceholder")}
                 disabled={loading}
-                className="w-full px-3 py-2 rounded-lg bg-surface-hover border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent disabled:opacity-50"
+                className="w-full px-3 py-2 rounded-lg bg-surface-hover border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary disabled:opacity-50"
               />
             </div>
             <button
               onClick={handleSendCode}
               disabled={loading || !email.trim()}
-              className="w-full py-2.5 rounded-lg bg-accent hover:bg-accent/90 text-accent-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2"
+              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2"
             >
               {loading ? t("auth.loading") : t("auth.nextStep")}
             </button>
@@ -344,13 +345,13 @@ export function LoginModal({
                 placeholder=""
                 maxLength={6}
                 disabled={loading}
-                className="w-full px-3 py-2 rounded-lg bg-surface-hover border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent disabled:opacity-50 text-center tracking-[0.5em]"
+                className="w-full px-3 py-2 rounded-lg bg-surface-hover border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary disabled:opacity-50 text-center tracking-[0.5em]"
               />
             </div>
             <button
               onClick={handleLogin}
               disabled={loading || code.length < 6}
-              className="w-full py-2.5 rounded-lg bg-accent hover:bg-accent/90 text-accent-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2"
+              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2"
             >
               {loading ? t("auth.loading") : t("auth.login")}
             </button>
@@ -363,7 +364,7 @@ export function LoginModal({
             </button>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </OccludingDialog>
   );
 }

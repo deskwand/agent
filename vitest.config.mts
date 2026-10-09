@@ -62,6 +62,15 @@ export default defineConfig({
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
       "/@": path.resolve(import.meta.dirname, "./src"),
+      // 与 tsconfig.json 的 paths 和 vite.config.ts 的 resolve.alias 对齐。
+      //
+      // 此前只有 `@` 与 `/@`，而 shadcn 的 vendored 组件用的是
+      // `@renderer/components/ui/...` / `@renderer/utils/cn`（见根目录
+      // components.json 的 aliases——不能改成 `@`，因为 `@` 在本仓指向 src/，
+      // 会把组件写到错的目录）。缺这一条时 tsc 能过（tsconfig 有）而
+      // vitest 报 Failed to resolve import，报错点还落在 vendored 文件里，
+      // 看上去像是组件本身的问题。
+      "@renderer": path.resolve(import.meta.dirname, "./src/renderer"),
     },
   },
 });

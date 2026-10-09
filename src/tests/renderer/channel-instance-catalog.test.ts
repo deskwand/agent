@@ -152,22 +152,26 @@ describe("ChannelInstanceCatalog status indicators", () => {
 });
 
 describe("ChannelInstanceCatalog enable/disable toggle", () => {
+  // 驱动选择器瞄的是 vendored Switch（Radix）本身：role=switch 由它渲染。
+  const toggleSel = '[role="switch"]';
+  const onSel = '[role="switch"][data-state="checked"]';
+
   it("shows toggle in enabled state when channel is enabled", async () => {
     await render();
     const card = container.querySelector('[data-channel-instance-id="telegram-1"]');
-    expect(card?.querySelector(".toggle-on")).not.toBeNull();
+    expect(card?.querySelector(onSel)).not.toBeNull();
   });
 
   it("shows toggle in disabled state when channel is disabled", async () => {
     await render();
     const card = container.querySelector('[data-channel-instance-id="feishu-1"]');
-    expect(card?.querySelector(".toggle-on")).toBeNull();
+    expect(card?.querySelector(onSel)).toBeNull();
   });
 
   it("calls updateChannel with enabled=false when toggling off", async () => {
     await render();
     const toggle = container.querySelector(
-      '[data-channel-instance-id="telegram-1"] .toggle-track',
+      `[data-channel-instance-id="telegram-1"] ${toggleSel}`,
     ) as HTMLElement | null;
     if (toggle) {
       await act(async () => toggle.click());
@@ -181,7 +185,7 @@ describe("ChannelInstanceCatalog enable/disable toggle", () => {
   it("calls updateChannel with enabled=true when toggling on", async () => {
     await render();
     const toggle = container.querySelector(
-      '[data-channel-instance-id="feishu-1"] .toggle-track',
+      `[data-channel-instance-id="feishu-1"] ${toggleSel}`,
     ) as HTMLElement | null;
     if (toggle) {
       await act(async () => toggle.click());

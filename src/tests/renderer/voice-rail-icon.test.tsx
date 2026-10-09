@@ -13,7 +13,12 @@ import { useAppStore } from "../../renderer/store";
 
 vi.mock("react-i18next", () => ({
   initReactI18next: { type: "3rdParty", init: () => {} },
-  useTranslation: () => ({ t: (key: string) => key }),
+  // 必须给全 `i18n`（不只是 `t`）：树里会读模块级 i18n 实例的工具
+  //（utils/i18n-format.ts）与后续迁移进来的弹窗都靠它。缺它会让整棵渲染树炸掉。
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { language: "en", resolvedLanguage: "en" },
+  }),
 }));
 // 只简化提示气泡本身：它不影响字形，也不影响按钮是否挂载。
 vi.mock("../../renderer/components/Tooltip", () => ({

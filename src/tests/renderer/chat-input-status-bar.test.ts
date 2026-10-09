@@ -40,6 +40,40 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+/**
+ * 点开状态面板。
+ * ⚠️ Radix 的 `PopoverTrigger` **只挂 `pointerdown`** ✗（不是 click ✓）——
+ * 只 `.click()` 面板永远不开，失败信息是「找不到面板」，极易误判成渲染错了 ✗✗
+ *（计划 9 漏了这个，7 条红 ✓）。
+ * ⚠️ **条件式**补 `click` ✓（规则 9 ✗）：无条件补的话，Radix 打开后那发 click
+ * 落在**内容之外** ✗ → 被它自己的 DismissableLayer 当成外部点击 → 立刻关闭 ✓✓。
+ * ⇒ 这样写**对迁移前后都成立** ✓。
+ */
+async function openPanel(scope: HTMLElement): Promise<void> {
+  // ⚠️ **必须传 container，不能在 document.body 里找第一颗按钮** ✗✗ ——
+  // 实测：body 里会有**别的测试残留**的按钮 ✓（当时症状是断言里冒出主题的
+  // `@keyframes gradient-flow` 与桌宠的「霍珀」✗，看起来完全无关 ✓）。
+  const target = scope.querySelector("button") as HTMLButtonElement | null;
+  if (!target) return;
+  await act(async () => {
+    target.dispatchEvent(
+      new MouseEvent("pointerdown", {
+        bubbles: true,
+        cancelable: true,
+        button: 0,
+      }),
+    );
+  });
+  if (!findPanel()) {
+    await act(async () => target.click());
+  }
+}
+
+/** 面板迁移后经 portal 挂在 body 下 ✗ → 查 body ✓。 */
+function findPanel(): HTMLElement | null {
+  return document.body.querySelector('[role="dialog"]');
+}
+
 describe("ChatInputStatusBar goal elapsed ticking", () => {
   let container: HTMLDivElement;
   let root: Root;
@@ -409,20 +443,21 @@ describe("background subagent entry", () => {
     });
   }
 
-  it("rows 非空时 chip 是可点的按钮，点开渲染行，点行回调带 toolCallId", () => {
+  it("rows 非空时 chip 是可点的按钮，点开渲染行，点行回调带 toolCallId", async () => {
     const onSelect = vi.fn();
     renderEntry(rows, onSelect);
 
     const chip = container.querySelector("button");
     expect(chip).not.toBeNull();
     expect(container.textContent).not.toContain("霍珀"); // 面板未开
-    act(() => chip?.click());
+    await openPanel(container);
 
-    expect(container.textContent).toContain("霍珀");
-    expect(container.textContent).toContain("居里");
+    // 面板经 portal 挂在 body 下 → 面板文案只能从 body 读（与下面各行的口径一致）
+    expect(document.body.textContent).toContain("霍珀");
+    expect(document.body.textContent).toContain("居里");
     // 断言限定在该行自己的文本里，避免"页面上随便有个 3"就通过
     const row = Array.from(
-      container.querySelectorAll("[role='dialog'] button"),
+      document.body.querySelectorAll("[role='dialog'] button"),
     ).find((el) => el.textContent?.includes("霍珀"));
     // 三行结构：名字行（带条件性类型后缀，该夹具两行类型不同）
     expect(row?.textContent).toContain("霍珀 · Explore");
@@ -430,7 +465,7 @@ describe("background subagent entry", () => {
     expect(row?.textContent).toContain("4.2s");
 
     act(() => {
-      Array.from(container.querySelectorAll("[role='dialog'] button"))
+      Array.from(document.body.querySelectorAll("[role='dialog'] button"))
         .find((el) => el.textContent?.includes("霍珀"))
         ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -458,11 +493,11 @@ describe("background subagent entry", () => {
     expect(container.textContent).not.toContain("subagent.statusDone");
   });
 
-  it("描述与当前动作同时可见（描述不再被动作顶掉）", () => {
+  it("描述与当前动作同时可见（描述不再被动作顶掉）", async () => {
     renderEntry(rows);
-    act(() => container.querySelector("button")?.click());
+    await openPanel(container);
     const row = Array.from(
-      container.querySelectorAll("[role='dialog'] button"),
+      document.body.querySelectorAll("[role='dialog'] button"),
     ).find((el) => el.textContent?.includes("霍珀"));
     expect(row?.textContent).toContain("find bug"); // 描述
     expect(row?.textContent).toContain("read src/a.ts"); // 动作
@@ -470,11 +505,11 @@ describe("background subagent entry", () => {
 
   // 守卫而非本次的判别用例：base 实现（`type · (currentLabel ?? description)`）下这条也会绿，
   // 它能挡住的是"把动作行写成 currentLabel ?? description"这类回退。
-  it("没有当前动作时不渲染动作行（不与描述重复）", () => {
+  it("没有当前动作时不渲染动作行（不与描述重复）", async () => {
     renderEntry([{ ...rows[0], currentLabel: undefined }]);
-    act(() => container.querySelector("button")?.click());
+    await openPanel(container);
     const row = Array.from(
-      container.querySelectorAll("[role='dialog'] button"),
+      document.body.querySelectorAll("[role='dialog'] button"),
     ).find((el) => el.textContent?.includes("霍珀"));
     // 描述只出现一次：动作行缺席，所以不会再出现第二遍
     expect(row?.textContent?.split("find bug")).toHaveLength(2);
@@ -482,10 +517,10 @@ describe("background subagent entry", () => {
 
   // jsdom 没有布局，这里只能断言 class 与 inline 上限；"锚点上移 + max-w-full = 聊天列宽"
   // 这条架构主张靠父链保证（ChatView.tsx:1911 的 max-w-[920px] ... px-5），不在测试里验证。
-  it("面板宽度按可用宽度限幅、并带滚动上限", () => {
+  it("面板宽度按可用宽度限幅、并带滚动上限", async () => {
     renderEntry(rows);
-    act(() => container.querySelector("button")?.click());
-    const panel = container.querySelector("[role='dialog']");
+    await openPanel(container);
+    const panel = findPanel();
     expect(panel?.className).toContain("w-[32rem]");
     expect(panel?.className).toContain("max-w-full");
     expect(panel?.className).toContain("max-h-[min(70vh,32rem)]");
@@ -496,12 +531,12 @@ describe("background subagent entry", () => {
   // 注意它**不**区分 panelRef 挂在哪——面板在 DOM 上既是外层容器也是 chip span 的后代，
   // 两种挂法 contains() 都成立（实测：把 ref 挪回 span，本用例仍绿）。
   // 它能挡的是更粗的回退：把面板移出锚点子树（例如改成 portal）却忘了同步 contains 检查。
-  it("在面板内按下鼠标不会把面板当成外部点击关掉", () => {
+  it("在面板内按下鼠标不会把面板当成外部点击关掉", async () => {
     const onSelect = vi.fn();
     renderEntry(rows, onSelect);
-    act(() => container.querySelector("button")?.click());
+    await openPanel(container);
     const rowButton = Array.from(
-      container.querySelectorAll("[role='dialog'] button"),
+      document.body.querySelectorAll("[role='dialog'] button"),
     ).find((el) => el.textContent?.includes("霍珀"));
 
     // mousedown 才是外部点击关闭的判据；它在行按钮上按下时不能关面板，
@@ -509,7 +544,7 @@ describe("background subagent entry", () => {
     act(() => {
       rowButton?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
     });
-    expect(container.querySelector("[role='dialog']")).not.toBeNull();
+    expect(findPanel()).not.toBeNull();
 
     act(() => {
       rowButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -517,7 +552,7 @@ describe("background subagent entry", () => {
     expect(onSelect).toHaveBeenCalledWith("call-1");
   });
 
-  it("按锚点上方实测可用高度给面板封顶（矮窗口不裁顶）", () => {
+  it("按锚点上方实测可用高度给面板封顶（矮窗口不裁顶）", async () => {
     const realRect = HTMLElement.prototype.getBoundingClientRect;
     // 模拟锚点距窗口顶部仅 300px：可用高度应被算成 300 - 48 = 252
     HTMLElement.prototype.getBoundingClientRect = function () {
@@ -535,24 +570,24 @@ describe("background subagent entry", () => {
     };
     try {
       renderEntry(rows);
-      act(() => container.querySelector("button")?.click());
-      const panel = container.querySelector<HTMLElement>("[role='dialog']");
+    await openPanel(container);
+      const panel = findPanel();
       expect(panel?.style.maxHeight).toBe("252px");
     } finally {
       HTMLElement.prototype.getBoundingClientRect = realRect;
     }
   });
 
-  it("已完成的整行降透明度，运行中与失败的保持不变", () => {
+  it("已完成的整行降透明度，运行中与失败的保持不变", async () => {
     renderEntry([
       rows[0], // 本来就是 running
       rows[1], // 本来就是 completed
       { ...rows[1], toolCallId: "call-3", name: "欧拉", status: "error" },
     ]);
-    act(() => container.querySelector("button")?.click());
+    await openPanel(container);
 
     const rowFor = (name: string) =>
-      Array.from(container.querySelectorAll("[role='dialog'] button")).find(
+      Array.from(document.body.querySelectorAll("[role='dialog'] button")).find(
         (el) => el.textContent?.includes(name),
       );
     // 用 classList 而不是 className 子串：仓库已吃过"子串断言易恒真"的亏
@@ -562,10 +597,10 @@ describe("background subagent entry", () => {
     expect(rowFor("欧拉")?.classList.contains("opacity-60")).toBe(false);
   });
 
-  it("Escape 关面板；rows 为空时不渲染按钮", () => {
+  it("Escape 关面板；rows 为空时不渲染按钮", async () => {
     renderEntry(rows);
-    act(() => container.querySelector("button")?.click());
-    expect(container.textContent).toContain("霍珀");
+    await openPanel(container);
+    expect(document.body.textContent).toContain("霍珀");
     act(() => {
       document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     });
@@ -591,7 +626,7 @@ describe("background subagent entry single row", () => {
     await act(async () => root.unmount());
   });
 
-  it("只有一行时类型不显示后缀，描述仍单独成行", () => {
+  it("只有一行时类型不显示后缀，描述仍单独成行", async () => {
     act(() => {
       root.render(
         React.createElement(ChatInputStatusBar, {
@@ -611,10 +646,10 @@ describe("background subagent entry single row", () => {
         }),
       );
     });
-    act(() => container.querySelector("button")?.click());
+    await openPanel(container);
     // 该夹具只有一行、类型全为 Explore → showType 为 false，行内不该出现类型
-    expect(container.textContent).toContain("图灵");
-    expect(container.textContent).toContain("find bug");
+    expect(document.body.textContent).toContain("图灵");
+    expect(document.body.textContent).toContain("find bug");
     expect(container.textContent).not.toContain("Explore");
   });
 });

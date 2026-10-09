@@ -19,6 +19,7 @@ import {
   Square,
 } from "lucide-react";
 import { MENU_PANEL_CLASS } from "./menu-styles";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import type { BackgroundAgentRow } from "../utils/subagent-card";
 import type { CurrentTodos } from "../utils/current-todos";
 import type { SessionExecutionClock } from "../store";
@@ -166,24 +167,6 @@ export function ChatInputStatusBar({
     return () => window.removeEventListener("resize", updatePanelMaxHeight);
   }, [panelOpen, updatePanelMaxHeight]);
 
-  useEffect(() => {
-    if (!panelOpen) return;
-    // 与 StatusPopover（:74）保持一致的事件：mousedown
-    const onMouseDown = (event: MouseEvent) => {
-      if (!panelRef.current?.contains(event.target as Node))
-        setPanelOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setPanelOpen(false);
-    };
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [panelOpen]);
-
   // 目标长跑、当前回合运行中、以及回合结束后短暂的收尾窗口内，每秒推进一次。
   // dep 是布尔量而不是 now，所以窗口内不会每秒重建 effect；
   // 窗口到期时它变 false，effect 自行清理。
@@ -267,181 +250,187 @@ export function ChatInputStatusBar({
 
   // 右区（活动库存）：面板 + chip。目标态与普通态共用同一个元素——
   // 目标长跑是本次要修的典型场景，不共用的话它在目标态下会整块消失。
+  // 开关 / 外部点击关闭 / Escape 三样全交给 Radix 的 Popover —— 手写的 document
+  // mousedown/keydown 监听会让面板「刚打开就被关掉」（原实现正是如此，随本次迁移删掉）。
   const rightZone = hasActivity ? (
-    <span className="flex min-w-0 items-center">
-      {panelOpen && (
-        <div
-          role="dialog"
-          aria-label={t("activity.panelTitle")}
-          style={{ maxHeight: panelMaxHeight ?? undefined }}
-          className={`${MENU_PANEL_CLASS} animate-menu-in-up absolute bottom-full left-0 z-30 mb-2 w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs`}
-        >
-          {hasPlan ? (
-            <>
-              <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-text-muted uppercase">
-                <span>{t("activity.planSection")}</span>
-                <span className="ml-auto tracking-normal">
-                  {t("activity.planDone", {
-                    completed: completedCount,
-                    total: todos.length,
-                  })}
-                </span>
-              </div>
-              {todos.map((todo, index) => {
-                // 收尾态里没有任何东西在跑：把当时的 in_progress 按"没做完、已停止"
-                // 渲染（方框 + 常规色），不要转圈也不要强调色 —— 那是实时态的说法。
-                const shown =
-                  finishing && todo.status === "in_progress"
-                    ? "pending"
-                    : todo.status;
-                return (
-                  <div
-                    key={`${index}-${todo.content}`}
-                    className={`flex items-start gap-2 rounded-lg px-2 py-1 ${
-                      shown === "completed" || shown === "cancelled"
-                        ? "opacity-60"
-                        : ""
-                    }`}
-                  >
-                    <span className="mt-0.5 flex-none">
-                      {shown === "completed" ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                      ) : shown === "in_progress" ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
-                      ) : shown === "cancelled" ? (
-                        <XCircle className="h-3.5 w-3.5 text-text-muted" />
-                      ) : (
-                        <Square className="h-3.5 w-3.5 text-text-muted" />
-                      )}
-                    </span>
-                    <span
-                      className={`min-w-0 flex-1 ${
+    <Popover open={panelOpen} onOpenChange={setPanelOpen}>
+      <span className="flex min-w-0 items-center">
+        {panelOpen && (
+          <PopoverContent
+            side="top"
+            align="start"
+            sideOffset={8}
+            // role="dialog" 由 Radix 的 PopoverContent 提供，不手写（写了会重复）
+            aria-label={t("activity.panelTitle")}
+            style={{ maxHeight: panelMaxHeight ?? undefined }}
+            className={`${MENU_PANEL_CLASS} w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs`}
+          >
+            {hasPlan ? (
+              <>
+                <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-text-muted uppercase">
+                  <span>{t("activity.planSection")}</span>
+                  <span className="ml-auto tracking-normal">
+                    {t("activity.planDone", {
+                      completed: completedCount,
+                      total: todos.length,
+                    })}
+                  </span>
+                </div>
+                {todos.map((todo, index) => {
+                  // 收尾态里没有任何东西在跑：把当时的 in_progress 按"没做完、已停止"
+                  // 渲染（方框 + 常规色），不要转圈也不要强调色 —— 那是实时态的说法。
+                  const shown =
+                    finishing && todo.status === "in_progress"
+                      ? "pending"
+                      : todo.status;
+                  return (
+                    <div
+                      key={`${index}-${todo.content}`}
+                      className={`flex items-start gap-2 rounded-lg px-2 py-1 ${
                         shown === "completed" || shown === "cancelled"
-                          ? "text-text-muted line-through"
-                          : shown === "in_progress"
-                            ? "font-medium text-accent"
-                            : "text-text-primary"
+                          ? "opacity-60"
+                          : ""
                       }`}
                     >
-                      {todo.content}
+                      <span className="mt-0.5 flex-none">
+                        {shown === "completed" ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                        ) : shown === "in_progress" ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                        ) : shown === "cancelled" ? (
+                          <XCircle className="h-3.5 w-3.5 text-text-muted" />
+                        ) : (
+                          <Square className="h-3.5 w-3.5 text-text-muted" />
+                        )}
+                      </span>
+                      <span
+                        className={`min-w-0 flex-1 ${
+                          shown === "completed" || shown === "cancelled"
+                            ? "text-text-muted line-through"
+                            : shown === "in_progress"
+                              ? "font-medium text-accent"
+                              : "text-text-primary"
+                        }`}
+                      >
+                        {todo.content}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            ) : null}
+            {rows.length > 0 ? (
+              <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-text-muted uppercase">
+                <span>{t("activity.subagentsSection")}</span>
+              </div>
+            ) : null}
+            {rows.map((row) => (
+              <button
+                key={row.toolCallId}
+                type="button"
+                onClick={() => {
+                  setPanelOpen(false);
+                  onSelectBackgroundAgent?.(row.toolCallId);
+                }}
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60 ${
+                  // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
+                  // `error` 刻意不降 —— 失败是应该被注意到的信号。
+                  row.status === "completed" ? "opacity-60" : ""
+                }`}
+              >
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  {/* ① 名字（只有面板内类型不统一时才带后缀） */}
+                  <span className="truncate text-text-primary">
+                    {row.name ?? row.type ?? row.toolCallId}
+                    {showType && row.name && row.type ? (
+                      <span className="text-text-muted">
+                        {" · "}
+                        {row.type}
+                      </span>
+                    ) : null}
+                  </span>
+                  {/* ② 任务描述：始终显示（之前只在没有步骤时才出现） */}
+                  {row.description ? (
+                    <span className="truncate text-text-secondary">
+                      {row.description}
                     </span>
-                  </div>
-                );
-              })}
-            </>
-          ) : null}
-          {rows.length > 0 ? (
-            <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-text-muted uppercase">
-              <span>{t("activity.subagentsSection")}</span>
-            </div>
-          ) : null}
-          {rows.map((row) => (
-            <button
-              key={row.toolCallId}
-              type="button"
-              onClick={() => {
-                setPanelOpen(false);
-                onSelectBackgroundAgent?.(row.toolCallId);
-              }}
-              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60 ${
-                // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
-                // `error` 刻意不降 —— 失败是应该被注意到的信号。
-                row.status === "completed" ? "opacity-60" : ""
-              }`}
-            >
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                {/* ① 名字（只有面板内类型不统一时才带后缀） */}
-                <span className="truncate text-text-primary">
-                  {row.name ?? row.type ?? row.toolCallId}
-                  {showType && row.name && row.type ? (
-                    <span className="text-text-muted">
-                      {" · "}
-                      {row.type}
+                  ) : null}
+                  {/* ③ 当前动作 / 最后一步：没有就不渲染，避免与描述重复同一句话 */}
+                  {row.currentLabel ? (
+                    <span className="truncate font-mono text-text-muted">
+                      {row.currentLabel}
                     </span>
                   ) : null}
                 </span>
-                {/* ② 任务描述：始终显示（之前只在没有步骤时才出现） */}
-                {row.description ? (
-                  <span className="truncate text-text-secondary">
-                    {row.description}
+                <span className="flex flex-shrink-0 items-center gap-1 text-text-muted">
+                  {row.stepCount > 0 && <span>{row.stepCount}</span>}
+                  {row.durationMs > 0 && (
+                    <span>
+                      {row.durationMs < 1000
+                        ? `${row.durationMs}ms`
+                        : `${(row.durationMs / 1000).toFixed(1)}s`}
+                    </span>
+                  )}
+                  {row.status === "running" ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-accent" />
+                  ) : row.status === "error" ? (
+                    <XCircle className="h-3 w-3 text-error" />
+                  ) : (
+                    <CheckCircle2 className="h-3 w-3" />
+                  )}
+                </span>
+              </button>
+            ))}
+          </PopoverContent>
+        )}
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            // 有可见文案（步骤/计数）时不要设 aria-label —— 它会把内容整个盖掉，
+            // 读屏用户就听不到"3/5 · 正在写迁移"了。只在只剩一个 chevron 时兜底。
+            aria-label={
+              hasPlan || countInChip ? undefined : t("activity.panelTitle")
+            }
+            className="flex min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-background-secondary px-2 py-0.5 text-left text-text-primary transition-colors hover:bg-surface-active"
+          >
+            {hasPlan ? (
+              <>
+                <span
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={todos.length}
+                  aria-valuenow={completedCount}
+                  className="h-1 w-[34px] flex-none overflow-hidden rounded-full bg-surface-active"
+                >
+                  <span
+                    className="block h-full bg-accent"
+                    style={{
+                      width: `${(completedCount / todos.length) * 100}%`,
+                    }}
+                  />
+                </span>
+                <span className="flex-none">
+                  {planDone ? "✓ " : ""}
+                  {completedCount}/{todos.length}
+                </span>
+                {statusLabel ? (
+                  <span className="max-w-[12rem] min-w-0 truncate text-text-muted">
+                    · {statusLabel}
                   </span>
                 ) : null}
-                {/* ③ 当前动作 / 最后一步：没有就不渲染，避免与描述重复同一句话 */}
-                {row.currentLabel ? (
-                  <span className="truncate font-mono text-text-muted">
-                    {row.currentLabel}
-                  </span>
-                ) : null}
-              </span>
-              <span className="flex flex-shrink-0 items-center gap-1 text-text-muted">
-                {row.stepCount > 0 && <span>{row.stepCount}</span>}
-                {row.durationMs > 0 && (
-                  <span>
-                    {row.durationMs < 1000
-                      ? `${row.durationMs}ms`
-                      : `${(row.durationMs / 1000).toFixed(1)}s`}
-                  </span>
-                )}
-                {row.status === "running" ? (
-                  <Loader2 className="h-3 w-3 animate-spin text-accent" />
-                ) : row.status === "error" ? (
-                  <XCircle className="h-3 w-3 text-error" />
-                ) : (
-                  <CheckCircle2 className="h-3 w-3" />
-                )}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-      <button
-        type="button"
-        // 有可见文案（步骤/计数）时不要设 aria-label —— 它会把内容整个盖掉，
-        // 读屏用户就听不到"3/5 · 正在写迁移"了。只在只剩一个 chevron 时兜底。
-        aria-label={
-          hasPlan || countInChip ? undefined : t("activity.panelTitle")
-        }
-        aria-haspopup="dialog"
-        aria-expanded={panelOpen}
-        onClick={() => setPanelOpen((value) => !value)}
-        className="flex min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-background-secondary px-2 py-0.5 text-left text-text-primary transition-colors hover:bg-surface-active"
-      >
-        {hasPlan ? (
-          <>
-            <span
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={todos.length}
-              aria-valuenow={completedCount}
-              className="h-1 w-[34px] flex-none overflow-hidden rounded-full bg-surface-active"
-            >
-              <span
-                className="block h-full bg-accent"
-                style={{
-                  width: `${(completedCount / todos.length) * 100}%`,
-                }}
-              />
-            </span>
-            <span className="flex-none">
-              {planDone ? "✓ " : ""}
-              {completedCount}/{todos.length}
-            </span>
-            {statusLabel ? (
-              <span className="max-w-[12rem] min-w-0 truncate text-text-muted">
-                · {statusLabel}
+              </>
+            ) : null}
+            {countInChip ? (
+              <span className={`flex-none ${hasPlan ? "text-text-muted" : ""}`}>
+                {hasPlan ? "· " : ""}
+                {t("activity.subagents", { count: rows.length })}
               </span>
             ) : null}
-          </>
-        ) : null}
-        {countInChip ? (
-          <span className={`flex-none ${hasPlan ? "text-text-muted" : ""}`}>
-            {hasPlan ? "· " : ""}
-            {t("activity.subagents", { count: rows.length })}
-          </span>
-        ) : null}
-        <ChevronDown className="h-3 w-3 flex-none text-text-muted" />
-      </button>
-    </span>
+            <ChevronDown className="h-3 w-3 flex-none text-text-muted" />
+          </button>
+        </PopoverTrigger>
+      </span>
+    </Popover>
   ) : null;
 
   // ── Goal status rendering ──

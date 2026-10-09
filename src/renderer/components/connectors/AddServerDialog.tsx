@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { useBrowserOcclusion } from "../../hooks/useBrowserOcclusion";
+import { OccludingDialog } from "../ui/occluding-dialog";
+import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 
 /**
  * 「一次加一台」在 **UI 层**保证。
@@ -51,35 +52,62 @@ interface AddServerDialogProps {
   onAdded: () => void;
 }
 
+/**
+ * payload 输入区。
+ *
+ * ⚠️ **为什么它是一个独立组件**：Radix 的 `Presence` 把弹窗内容**延后一帧**挂载，
+ * 所以外层组件 `useEffect(…, [])` 跑的时候 `textareaRef.current` 还是 `null`，
+ * 那时的 `focus()` 是空操作（实测 `document.activeElement` 是 `BODY`）。
+ * 抽成子组件后它的生命周期与内容对齐，ref 在自己的 effect 里一定可用。
+ */
+function PayloadTextarea({
+  textareaRef,
+  value,
+  placeholder,
+  onChange,
+}: {
+  textareaRef: MutableRefObject<HTMLTextAreaElement | null>;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, [textareaRef]);
+
+  return (
+    <textarea
+      ref={textareaRef}
+      data-testid="add-payload"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      spellCheck={false}
+      placeholder={placeholder}
+      className="w-full h-40 mt-3 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+    />
+  );
+}
+
 export function AddServerDialog({
   isOpen,
   onClose,
   onAdded,
 }: AddServerDialogProps) {
   const { t } = useTranslation();
-  useBrowserOcclusion(isOpen);
   const [payload, setPayload] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Esc 的处理注册在 effect 里，读状态要用 ref（否则闭包拿到旧的 busy）
+  // busy 的处理在 onOpenChange 里，读状态要用 ref（否则闭包拿到旧的 busy）
   const busyRef = useRef(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // 打开时聚焦输入框；Esc 与「取消」等效
+  // 打开时清掉上一次的残留错误（输入内容保留，便于改一处重试）。
+  // Esc 的监听已删除：Radix 接手，busy 守卫移到下面的 onOpenChange。
+  // 聚焦也搬进了 PayloadTextarea（见那个组件的文档块）。
   useEffect(() => {
     if (!isOpen) return;
-    // 每次打开都清掉上一次的残留错误（输入内容保留，便于改一处重试）
     setError("");
-    textareaRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      // busy 时不响应 Esc：请求已经在飞，关掉窗口会让「加成功了吗」变得不确定
-      if (event.key === "Escape" && !busyRef.current) onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [isOpen]);
 
   const submit = async () => {
     const checked = validateSingleServerPayload(payload);
@@ -117,24 +145,30 @@ export function AddServerDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in">
-      <div className="card w-full max-w-lg p-5 m-4 shadow-elevated animate-slide-up">
-        <p className="text-sm font-medium text-text-primary">
+    <OccludingDialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        // busy 时忽略一切关闭请求。
+        // 原实现只挡 Esc（window keydown 里查 busyRef）；Radix 引入了另外两条
+        // 关闭路径（遮罩点击、DialogContent 内置的关闭键），所以守卫放在这里统一挡：
+        // 请求已经在飞，关掉窗口会让「加成功了吗」变得不确定。
+        if (!next && !busyRef.current) onClose();
+      }}
+    >
+      <DialogContent className="max-w-lg p-5">
+        <DialogTitle className="text-sm font-medium text-text-primary">
           {t("connectors.add.title")}
-        </p>
-        <p className="text-xs text-text-muted mt-1">
+        </DialogTitle>
+        <DialogDescription className="text-xs text-text-muted mt-1">
           {t("connectors.add.hint")}
-        </p>
-        <textarea
-          ref={textareaRef}
-          data-testid="add-payload"
+        </DialogDescription>
+        <PayloadTextarea
+          textareaRef={textareaRef}
           value={payload}
-          onChange={(event) => setPayload(event.target.value)}
-          spellCheck={false}
           placeholder={
             '{\n  "mcpServers": {\n    "my-tools": { "type": "stdio", "command": "npx", "args": ["-y", "some-mcp"] }\n  }\n}'
           }
-          className="w-full h-40 mt-3 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+          onChange={setPayload}
         />
         {error && (
           <p role="alert" className="text-xs text-error mt-2">
@@ -153,12 +187,12 @@ export function AddServerDialog({
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover text-sm font-medium transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50"
           >
             {t("connectors.action.add")}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </OccludingDialog>
   );
 }

@@ -30,6 +30,10 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  // 迁到 Radix 后弹窗内容经 Portal 挂到 document.body，清掉以免跨用例污染
+  document
+    .querySelectorAll('[role="dialog"], [role="alertdialog"]')
+    .forEach((el) => el.remove());
 });
 
 function render(node: React.ReactElement): void {
@@ -39,7 +43,9 @@ function render(node: React.ReactElement): void {
 }
 
 function textarea(): HTMLTextAreaElement {
-  return container.querySelector('[data-testid="add-payload"]') as HTMLTextAreaElement;
+  return document.body.querySelector(
+    '[data-testid="add-payload"]',
+  ) as HTMLTextAreaElement;
 }
 
 function type(value: string): void {
@@ -55,7 +61,7 @@ function type(value: string): void {
 }
 
 function addButton(): HTMLButtonElement {
-  return [...container.querySelectorAll("button")].find((b) =>
+  return [...document.body.querySelectorAll("button")].find((b) =>
     (b.textContent ?? "").includes("connectors.action.add"),
   ) as HTMLButtonElement;
 }
@@ -63,7 +69,10 @@ function addButton(): HTMLButtonElement {
 describe("validateSingleServerPayload", () => {
   it("接受恰好一台", () => {
     const raw = '{"mcpServers":{"a":{"command":"node"}}}';
-    expect(validateSingleServerPayload(raw)).toEqual({ ok: true, payload: raw });
+    expect(validateSingleServerPayload(raw)).toEqual({
+      ok: true,
+      payload: raw,
+    });
   });
 
   it("多台时回台数（文案由组件走 i18n）", () => {
@@ -100,7 +109,9 @@ describe("AddServerDialog", () => {
   });
 
   it("isOpen 为假时不渲染", () => {
-    render(<AddServerDialog isOpen={false} onClose={vi.fn()} onAdded={vi.fn()} />);
+    render(
+      <AddServerDialog isOpen={false} onClose={vi.fn()} onAdded={vi.fn()} />,
+    );
     expect(textarea()).toBeNull();
   });
 
@@ -110,7 +121,7 @@ describe("AddServerDialog", () => {
     type('{"mcpServers":{}}');
     act(() => addButton().click());
 
-    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="alert"]')).not.toBeNull();
     expect(onClose).not.toHaveBeenCalled();
     expect(addCustomServer).not.toHaveBeenCalled();
     // 内容保留 —— 用户改一处即可重试，不必重贴
@@ -128,13 +139,19 @@ describe("AddServerDialog", () => {
       addButton().click();
     });
 
-    expect(addCustomServer).toHaveBeenCalledWith({ kind: "json", payload: raw });
+    expect(addCustomServer).toHaveBeenCalledWith({
+      kind: "json",
+      payload: raw,
+    });
     expect(onAdded).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("后端报错：内联显示且不关弹窗", async () => {
-    addCustomServer.mockResolvedValue({ ok: false, error: 'invalid server name "My Server"' });
+    addCustomServer.mockResolvedValue({
+      ok: false,
+      error: 'invalid server name "My Server"',
+    });
     const onClose = vi.fn();
     render(<AddServerDialog isOpen onClose={onClose} onAdded={vi.fn()} />);
     type('{"mcpServers":{"My Server":{"command":"npx"}}}');
@@ -142,9 +159,9 @@ describe("AddServerDialog", () => {
       addButton().click();
     });
 
-    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
-      "invalid server name",
-    );
+    expect(
+      document.body.querySelector('[role="alert"]')?.textContent,
+    ).toContain("invalid server name");
     expect(onClose).not.toHaveBeenCalled();
   });
 });

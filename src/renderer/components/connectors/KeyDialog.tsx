@@ -1,7 +1,53 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
-import { useBrowserOcclusion } from "../../hooks/useBrowserOcclusion";
 import type { ActionResult, ConnectorEntry } from "../../../shared/connectors";
+import { OccludingDialog } from "../ui/occluding-dialog";
+import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
+
+/**
+ * 凭据输入框。
+ *
+ * ⚠️ **为什么它是一个独立组件**：Radix 的 `Presence` 把弹窗内容**延后一帧**挂载，
+ * 所以外层组件 `useEffect(…, [])` 跑的时候 `inputRef.current` 还是 `null`，
+ * 那时的 `focus()` 是空操作（实测 `document.activeElement` 是 `BODY`）。
+ * 抽成子组件后它的生命周期与内容对齐，ref 在自己的 effect 里一定可用。
+ */
+function CredentialInput({
+  inputRef,
+  value,
+  disabled,
+  placeholder,
+  onChange,
+  onSubmitKey,
+}: {
+  inputRef: MutableRefObject<HTMLInputElement | null>;
+  value: string;
+  disabled: boolean;
+  placeholder: string;
+  onChange: (value: string) => void;
+  onSubmitKey: () => void;
+}) {
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [inputRef]);
+
+  return (
+    <input
+      ref={inputRef}
+      data-testid="key-credential"
+      type="password"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !disabled) onSubmitKey();
+      }}
+      spellCheck={false}
+      autoComplete="off"
+      placeholder={placeholder}
+      className="w-full mt-3 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+    />
+  );
+}
 
 /**
  * key 型目录条目的「连接」对话框 —— 收一个厂商凭据。
@@ -10,6 +56,12 @@ import type { ActionResult, ConnectorEntry } from "../../../shared/connectors";
  * 所以这里没有「授权中/取消」那套状态，失败就内联报错、保留输入。
  *
  * 前缀（如 `Bearer `）与参数名都来自目录条目的 `auth` —— 组件不认识任何厂商。
+ *
+ * 外壳由 shadcn 的 Dialog 承担，occlusion 由 OccludingDialog 承担
+ *（迁移前是本组件手写的 `useBrowserOcclusion(isOpen)`）。原实现还手写了一个
+ * window keydown 监听来拦 Esc —— 那条已删除（Radix 接手），但 busy 守卫保留，
+ * 只是移进了 `onOpenChange`：Radix 让关闭路径从 1 条变成 3 条
+ *（Esc / 遮罩点击 / 内置关闭键），守卫必须统一挡。
  */
 export function KeyDialog({
   entry,
@@ -24,35 +76,23 @@ export function KeyDialog({
 }) {
   const { t } = useTranslation();
   const isOpen = entry !== null;
-  useBrowserOcclusion(isOpen);
   const [credential, setCredential] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  // Esc 的处理注册在 effect 里，读状态要用 ref（否则闭包拿到旧的 busy）
+  // busy 的处理在 onOpenChange 里，读状态要用 ref（否则闭包拿到旧的 busy）
   const busyRef = useRef(false);
   // onClose 同样走 ref：调用方（ConnectorsView）传的是内联箭头函数，
   // 每次父组件渲染都是新身份 —— 把它放进下面那个「重置输入」的 effect 依赖里，
   // 会把用户**正在粘的凭据清空**（刷新列表、状态推送都会触发父组件渲染）。
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     // 只在**打开那一次**清空：留上一次的值会让人以为已经填过了
     setCredential("");
     setError("");
-    inputRef.current?.focus();
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      // busy 时不响应 Esc：请求已经在飞，关掉窗口会让「加成功了吗」变得不确定
-      if (event.key === "Escape" && !busyRef.current) onCloseRef.current();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOpen]);
 
   if (!entry) return null;
@@ -89,36 +129,39 @@ export function KeyDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in">
-      <div className="card w-full max-w-lg p-5 m-4 shadow-elevated animate-slide-up">
-        <p className="text-sm font-medium text-text-primary">
+    <OccludingDialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        // busy 时忽略一切关闭请求。
+        // 原实现只挡 Esc（window keydown 里查 busyRef）；Radix 引入了另外两条
+        // 关闭路径（遮罩点击、DialogContent 内置的关闭键），所以守卫放在这里统一挡：
+        // 请求已经在飞，关掉窗口会让「加成功了吗」变得不确定。
+        if (!next && !busyRef.current) onCloseRef.current();
+      }}
+    >
+      <DialogContent className="max-w-lg p-5">
+        <DialogTitle className="text-sm font-medium text-text-primary">
           {t("connectors.keyDialog.title", { name: t(entry.nameKey) })}
-        </p>
-        <p className="text-xs text-text-muted mt-1">
+        </DialogTitle>
+        <DialogDescription className="text-xs text-text-muted mt-1">
           {t(auth.credentialLabelKey)}
           {" · "}
           <a
             href={auth.consoleUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-accent hover:underline"
+            className="text-primary hover:underline"
           >
             {t("connectors.keyDialog.consoleLink")}
           </a>
-        </p>
-        <input
-          ref={inputRef}
-          data-testid="key-credential"
-          type="password"
+        </DialogDescription>
+        <CredentialInput
+          inputRef={inputRef}
           value={credential}
-          onChange={(event) => setCredential(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !busy) void submit();
-          }}
-          spellCheck={false}
-          autoComplete="off"
+          disabled={busy}
           placeholder={t("connectors.keyDialog.placeholder")}
-          className="w-full mt-3 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+          onChange={setCredential}
+          onSubmitKey={() => void submit()}
         />
         {error && (
           <p role="alert" className="text-xs text-error mt-2">
@@ -140,12 +183,12 @@ export function KeyDialog({
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover text-sm font-medium transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50"
           >
             {t("connectors.keyDialog.submit")}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </OccludingDialog>
   );
 }

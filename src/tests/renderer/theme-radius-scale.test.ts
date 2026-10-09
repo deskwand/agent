@@ -1,10 +1,7 @@
 // 设计文档 §7：圆角收敛为三档 —— 控制件 8px / 容器 12px / 覆盖层 16px。
 // 数值从 tailwind.config.js 读，不写死在断言里（沿用 theme-css-helpers 的原则）。
 import { describe, expect, it } from "vitest";
-import { css, radiusPx, tailwind } from "./theme-css-helpers";
-
-/** 三档：8（控制件）/ 12（容器）/ 16（覆盖层）。 */
-const ALLOWED = [8, 12, 16];
+import { css, tailwind } from "./theme-css-helpers";
 
 function componentBlock(name: string): string {
   const block = new RegExp(`\\.${name}\\s*\\{[\\s\\S]*?\\n  \\}`).exec(
@@ -19,19 +16,18 @@ describe("圆角尺度", () => {
     expect(tailwind.theme.extend.borderRadius.container).toBe("12px");
   });
 
-  it("§9-7 四个 component 类的圆角属于 {8, 12, 16} 且落在指定档位", () => {
-    const expected: Record<string, number> = {
-      btn: 8,
-      input: 8,
-      tag: 8,
-      card: 12,
-    };
-    for (const [name, px] of Object.entries(expected)) {
-      const block = componentBlock(name);
-      const rounded = /rounded-[\w-]+/.exec(block)?.[0];
-      expect(rounded, `.${name} 里没有 rounded-* 类`).toBeTruthy();
-      expect(ALLOWED, `.${name} 用了三档之外的圆角 ${rounded}`).toContain(px);
-      expect(radiusPx(rounded!), `.${name} 的 ${rounded}`).toBe(px);
+  // ⚠️ 2026-10-09：原判据遍历 `.btn` / `.input` / `.tag` / `.card` 四个类 ✓，断言它们的
+  // `rounded-*` 落在三档里 ✓ —— 而那四个类**已实测零消费者** ✗（渲染层 1 / 0 / 0 / 0 ✓，
+  // spec 估的 22/19 是错的 ✓）⇒ 随批次 6 删掉 ✓ ⇒ **这条的主人公不存在了** ✗✓。
+  // **意图不变** ✓（「圆角只许用受准的三档」✓，由本文件另外两条 + `theme-css-helpers` 保证 ✓）；
+  // 这里改成**反向钉子** ✓：确认那四个类**确实没了** ✗ —— 否则将来有人加回来时，
+  // 「用了三档之外的圆角」这件事会**静默无人看守** ✗✓。
+  it("§9-7 四个 component 类已删除（圆角只许用受准的三档）", () => {
+    for (const name of ["btn", "input", "tag", "card"]) {
+      expect(
+        () => componentBlock(name),
+        `.${name} 不应再存在于 globals.css`,
+      ).toThrow();
     }
   });
 });

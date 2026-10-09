@@ -200,7 +200,7 @@ describe("background panel round scope wiring", () => {
     vi.unstubAllGlobals();
   });
 
-  it("上一轮已完成的被收窄掉，上一轮还在跑的和本轮的都保留", () => {
+  it("上一轮已完成的被收窄掉，上一轮还在跑的和本轮的都保留", async () => {
     act(() => setState());
     act(() => {
       root.render(React.createElement(ChatView));
@@ -212,9 +212,15 @@ describe("background panel round scope wiring", () => {
       "button[aria-haspopup='dialog']",
     );
     expect(chip).toBeTruthy();
-    act(() => chip?.click());
+    // ⚠️ 2026-10-09：`ChatInputStatusBar` 的面板已迁到 Radix `Popover` ✗ ⇒
+    // 面板经 portal 挂 `document.body` ✓，且 Radix 的 `Presence` **延后一帧**挂载 ✓
+    // ⇒ 同步 `act` + 立刻断言看不到它 ✗ —— **推一个宏任务**再断言 ✓（断言一条都没删 ✓）。
+    await act(async () => {
+      chip?.click();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-    const panel = container.querySelector("[role='dialog']");
+    const panel = document.body.querySelector("[role='dialog']");
     expect(panel).toBeTruthy();
     // 本轮完成 + 跨回合仍在跑 → 在
     expect(panel?.textContent).toContain("darwin");

@@ -30,8 +30,20 @@ beforeEach(() => {
       type: "builtin",
       enabled: true,
     },
-    { id: "2", name: "humanizer", description: "去 AI 味", type: "custom", enabled: true },
-    { id: "3", name: "disabled-one", description: "停用的", type: "custom", enabled: false },
+    {
+      id: "2",
+      name: "humanizer",
+      description: "去 AI 味",
+      type: "custom",
+      enabled: true,
+    },
+    {
+      id: "3",
+      name: "disabled-one",
+      description: "停用的",
+      type: "custom",
+      enabled: false,
+    },
   ]);
   (window as unknown as { electronAPI: unknown }).electronAPI = {
     skills: { getAll: getSkills },
@@ -119,7 +131,9 @@ describe("PromptCommandFormModal", () => {
       typeInto(field("body"), "把内容翻译成英文");
       typeInto(field("displayName"), "翻译成英文");
     });
-    act(() => document.querySelector<HTMLButtonElement>("[data-form-save]")!.click());
+    act(() =>
+      document.querySelector<HTMLButtonElement>("[data-form-save]")!.click(),
+    );
     expect(onSave).toHaveBeenCalledWith({
       name: "translate",
       displayName: "翻译成英文",
@@ -156,8 +170,16 @@ describe("PromptCommandFormModal", () => {
     expect(
       document.querySelector<HTMLButtonElement>("[data-form-save]")!.disabled,
     ).toBe(true);
+    // ⚠️ `cancelable: true` 是必须的。迁到 shadcn 的 Dialog 后，两段式 Esc 由
+    // DialogContent 的 onEscapeKeyDown 实现（Radix 的 Esc 监听在 document 的
+    // **捕获阶段**，会抢在组件自己的处理器之前关掉表单，只能用那个钩子拦）。
+    // 而 preventDefault() 只在 cancelable 的事件上生效 —— 不声明的话会红成
+    // 「第一次 Esc 就关了」，看着像两段语义坏了，其实只是事件不可取消。
+    // 真实浏览器的 keydown 是可取消的。
     act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", cancelable: true }),
+      );
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -167,7 +189,9 @@ describe("PromptCommandFormModal · 引用技能", () => {
   it("点按钮列出启用中的技能，不列停用的", async () => {
     render();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     expect(getSkills).toHaveBeenCalledTimes(1);
     const names = Array.from(
@@ -182,11 +206,15 @@ describe("PromptCommandFormModal · 引用技能", () => {
       typeInto(field("body"), "把这次方案过一遍。\n\n$@");
     });
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     await act(async () => {
       document
-        .querySelector<HTMLButtonElement>("[data-skill-option='brainstorming']")!
+        .querySelector<HTMLButtonElement>(
+          "[data-skill-option='brainstorming']",
+        )!
         .click();
     });
     const body = field("body") as HTMLTextAreaElement;
@@ -208,11 +236,15 @@ describe("PromptCommandFormModal · 引用技能", () => {
       body.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true }));
     });
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     await act(async () => {
       document
-        .querySelector<HTMLButtonElement>("[data-skill-option='brainstorming']")!
+        .querySelector<HTMLButtonElement>(
+          "[data-skill-option='brainstorming']",
+        )!
         .click();
     });
     const value = (field("body") as HTMLTextAreaElement).value;
@@ -225,7 +257,9 @@ describe("PromptCommandFormModal · 引用技能", () => {
   it("搜索按技能名过滤", async () => {
     render();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     act(() => {
       typeInto(
@@ -242,12 +276,17 @@ describe("PromptCommandFormModal · 引用技能", () => {
   it("搜索也匹配描述（与斜杠菜单的技能过滤同口径）", async () => {
     render();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     act(() => {
       // humanizer 的 description 是「去 AI 味」。「味」只在描述里出现，
       // 用它才能确定命中的是描述而不是名字（搜 "AI" 会因 br`ai`nstorming 撞上名字）。
-      typeInto(document.querySelector<HTMLInputElement>("[data-skill-search]")!, "味");
+      typeInto(
+        document.querySelector<HTMLInputElement>("[data-skill-search]")!,
+        "味",
+      );
     });
     const names = Array.from(
       document.querySelectorAll<HTMLElement>("[data-skill-option]"),
@@ -258,7 +297,9 @@ describe("PromptCommandFormModal · 引用技能", () => {
   it("无命中时给「没有匹配的技能」，而不是「没有可用的技能」", async () => {
     render();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     act(() => {
       typeInto(
@@ -275,7 +316,9 @@ describe("PromptCommandFormModal · 引用技能", () => {
     getSkills.mockResolvedValueOnce([]);
     render();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     expect(document.body.textContent).toContain("chat.commandSkillEmpty");
     expect(document.body.textContent).not.toContain("chat.commandSkillNoMatch");
@@ -284,7 +327,9 @@ describe("PromptCommandFormModal · 引用技能", () => {
   it("搜索框在滚动容器之外（列表滚动时不会被卷走）", async () => {
     render();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     const scroller = document.querySelector("[data-skill-scroll]")!;
     expect(scroller).not.toBeNull();
@@ -297,16 +342,22 @@ describe("PromptCommandFormModal · 引用技能", () => {
     const onClose = vi.fn();
     render({ onClose });
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
-    const search = document.querySelector<HTMLInputElement>("[data-skill-search]")!;
+    const search = document.querySelector<HTMLInputElement>(
+      "[data-skill-search]",
+    )!;
     expect(document.activeElement).toBe(search);
 
     act(() => {
       typeInto(search, "brain");
     });
     act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", cancelable: true }),
+      );
     });
     // 第一段：查询清空，表单还在
     expect(
@@ -315,7 +366,9 @@ describe("PromptCommandFormModal · 引用技能", () => {
     expect(onClose).not.toHaveBeenCalled();
 
     act(() => {
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", cancelable: true }),
+      );
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -324,7 +377,9 @@ describe("PromptCommandFormModal · 引用技能", () => {
     getSkills.mockRejectedValueOnce(new Error("boom"));
     render();
     await act(async () => {
-      document.querySelector<HTMLButtonElement>("[data-skill-trigger]")!.click();
+      document
+        .querySelector<HTMLButtonElement>("[data-skill-trigger]")!
+        .click();
     });
     expect(document.body.textContent).toContain("chat.commandSkillLoadFailed");
   });

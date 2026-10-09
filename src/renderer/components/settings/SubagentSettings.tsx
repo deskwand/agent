@@ -6,6 +6,7 @@ import { modelDisplay } from "../../utils/subagent-model-display";
 import { resolveProviderDisplayName } from "../../utils/model-label";
 import { DESKWAND_PROVIDER_PREFIX } from "../../../shared/deskwand-provider";
 import { Tooltip } from "../Tooltip";
+import { SettingsFormSelect } from "./shared";
 
 const NAME_I18N_MAP: Record<string, string> = {
   Explore: "subagent.agentExplore",
@@ -164,69 +165,76 @@ export function SubagentSettings() {
               <p className="text-xs text-text-muted mb-1">
                 {t("subagent.modelLabel")}
               </p>
-              <select
-                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+              <SettingsFormSelect
                 value={editingModel}
-                onChange={(e) => setEditingModel(e.target.value)}
-              >
-                <option value="inherit">{t("subagent.inheritMain")}</option>
-                <option value="model">{t("subagent.customModel")}</option>
-              </select>
+                onChange={setEditingModel}
+                label={t("subagent.modelLabel")}
+                testId="subagent-model-mode"
+                options={[
+                  { value: "inherit", label: t("subagent.inheritMain") },
+                  { value: "model", label: t("subagent.customModel") },
+                ]}
+              />
             </div>
 
             {editingModel === "model" && (
               <>
                 <div className="flex gap-2">
-                  <select
-                    className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+                  <SettingsFormSelect
                     value={editingProvider}
-                    onChange={(e) => setEditingProvider(e.target.value)}
-                  >
-                    <option value="">{t("subagent.selectProvider")}</option>
-                    {providerKeys.map((k) => (
-                      <option key={k} value={k}>
-                        {resolveProviderDisplayName(
-                          k,
-                          appConfig?.providers[k]?.name,
-                          t,
-                        ) || k}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="flex-1 rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+                    onChange={setEditingProvider}
+                    label={t("subagent.selectProvider")}
+                    testId="subagent-provider"
+                    triggerClassName="flex-1"
+                    options={[
+                      { value: "", label: t("subagent.selectProvider") },
+                      ...providerKeys.map((k) => ({
+                        value: k,
+                        label:
+                          resolveProviderDisplayName(
+                            k,
+                            appConfig?.providers[k]?.name,
+                            t,
+                          ) || k,
+                      })),
+                    ]}
+                  />
+                  <SettingsFormSelect
                     value={editingModelId}
-                    onChange={(e) => setEditingModelId(e.target.value)}
-                  >
-                    <option value="">{t("subagent.selectModel")}</option>
-                    {(
-                      appConfig?.providers[editingProvider] as
-                        | ApiProviderConfig
-                        | undefined
-                    )?.models.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.label || m.id}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setEditingModelId}
+                    label={t("subagent.selectModel")}
+                    testId="subagent-model-id"
+                    triggerClassName="flex-1"
+                    options={[
+                      { value: "", label: t("subagent.selectModel") },
+                      ...((
+                        appConfig?.providers[editingProvider] as
+                          | ApiProviderConfig
+                          | undefined
+                      )?.models.map((m) => ({
+                        value: m.id,
+                        label: m.label || m.id,
+                      })) ?? []),
+                    ]}
+                  />
                 </div>
 
                 <div>
                   <p className="text-xs text-text-muted mb-1">
                     {t("subagent.thinkingLabel")}
                   </p>
-                  <select
-                    className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+                  <SettingsFormSelect
                     value={editingThinking}
-                    onChange={(e) => setEditingThinking(e.target.value)}
-                  >
-                    <option value="inherit">{t("subagent.inheritMain")}</option>
-                    <option value="off">off</option>
-                    <option value="low">low</option>
-                    <option value="medium">medium</option>
-                    <option value="high">high</option>
-                    <option value="max">max</option>
-                  </select>
+                    onChange={setEditingThinking}
+                    label={t("subagent.thinkingLabel")}
+                    testId="subagent-thinking"
+                    options={[
+                      { value: "inherit", label: t("subagent.inheritMain") },
+                      ...["off", "low", "medium", "high", "max"].map(
+                        (level) => ({ value: level, label: level }),
+                      ),
+                    ]}
+                  />
                 </div>
               </>
             )}

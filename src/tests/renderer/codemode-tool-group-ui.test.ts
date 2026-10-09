@@ -103,6 +103,33 @@ describe("codemode tool group UI", () => {
     return messages[0];
   }
 
+  // 脚本详情 / 子调用详情既是原生 <details>（summary）又是 Radix Collapsible（button）：
+  // 两种触发器都点一次，让下面的断言在迁移前后都成立。
+  function openDetailsByLabel(label: string) {
+    const trigger = [
+      ...container.querySelectorAll<HTMLElement>("summary, button"),
+    ].find((element) => element.textContent?.trim() === label);
+    act(() => trigger?.click());
+  }
+
+  function openFirstDetails() {
+    const trigger = container.querySelector<HTMLElement>("summary, button");
+    act(() => trigger?.click());
+  }
+
+  /**
+   * 卡片自身的开合开关。
+   * 排除两样东西：外层摘要行（它不是工具卡）和 Collapsible 触发器（自带 data-state，
+   * 只是个开关，不算卡片）——这样计数在迁移前后同口径。
+   */
+  function cardToggles(): HTMLButtonElement[] {
+    return [
+      ...container.querySelectorAll<HTMLButtonElement>(
+        "button[aria-expanded]:not([data-state])",
+      ),
+    ];
+  }
+
   it("结果组折叠时失败可见，点击后展开、消费待展开并高亮失败子项", () => {
     const failedChild = child({
       id: "write-1",
@@ -234,18 +261,19 @@ describe("codemode tool group UI", () => {
         ?.click(),
     );
 
+    // 脚本卡迁到 Collapsible 后关闭态会卸载内容 ⇒ 先展开，卡片数才对得上迁移前。
+    openDetailsByLabel(i18n.t("tool.grouped.scriptDetails"));
+
     // 父条目与脚本引用同 ID：脚本详情只渲染一次。
     expect(
       container.textContent?.split(i18n.t("tool.grouped.scriptDetails")).length,
     ).toBe(2); // 出现 1 次
     // 摘要行 + 脚本卡 + 子调用卡；父条目没有被重复渲染成第 4 张卡。
-    expect(container.querySelectorAll("button[aria-expanded]").length).toBe(3);
+    expect(cardToggles().length).toBe(3);
 
-    // 展开脚本卡：父错误原文来自原始消息，不是追加进分组数组的合成结果。
-    const scriptCard = container
-      .querySelector("details")
-      ?.querySelector<HTMLButtonElement>("button[aria-expanded]");
-    act(() => scriptCard?.click());
+    // 脚本卡里的工具卡自己也有开合（索引 1 = 脚本卡，0 是外层摘要行）。
+    act(() => cardToggles()[1]?.click());
+    // 脚本卡已展开：父错误原文来自原始消息，不是追加进分组数组的合成结果。
     expect(
       [...container.querySelectorAll("pre")].some((pre) =>
         pre.textContent?.includes(PARENT_ERROR),
@@ -289,6 +317,9 @@ describe("codemode tool group UI", () => {
         createElement(NestedToolDetails, { item, allBlocks, message }),
       ),
     );
+
+    // 详情迁到 Collapsible 后关闭态会卸载内容 ⇒ 先展开再读正文。
+    openFirstDetails();
 
     const text = container.textContent ?? "";
     expect(text).toContain(item.name);
@@ -338,6 +369,9 @@ describe("codemode tool group UI", () => {
         createElement(NestedToolDetails, { item, allBlocks, message }),
       ),
     );
+
+    // 详情迁到 Collapsible 后关闭态会卸载内容 ⇒ 先展开再读正文。
+    openFirstDetails();
 
     const text = container.textContent ?? "";
     expect(text).toContain(i18n.t("tool.grouped.cancelledOperation"));

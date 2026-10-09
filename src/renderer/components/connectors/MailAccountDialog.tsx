@@ -6,7 +6,8 @@ import {
   MAIL_PROVIDERS,
   type MailProviderId,
 } from "../../../shared/mail-providers";
-import { useBrowserOcclusion } from "../../hooks/useBrowserOcclusion";
+import { OccludingDialog } from "../ui/occluding-dialog";
+import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 import { mailProviderIconUrl } from "./mail-provider-icons";
 
 /**
@@ -27,7 +28,6 @@ export function MailAccountDialog({
   onAdded: () => void;
 }) {
   const { t } = useTranslation();
-  useBrowserOcclusion(isOpen);
   /** null = 第一屏（还没选服务商）。 */
   const [providerId, setProviderId] = useState<MailProviderId | null>(null);
   const [email, setEmail] = useState("");
@@ -56,22 +56,14 @@ export function MailAccountDialog({
     setError("");
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      // busy 时不响应 Esc：请求已经在飞，关掉窗口会让「加成功了吗」变得不确定
-      if (event.key === "Escape" && !busyRef.current) onCloseRef.current();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isOpen]);
-
   // 进第二屏后把光标放在邮箱地址上 —— 用户接下来就该填它
   useEffect(() => {
     if (isOpen && providerId) emailRef.current?.focus();
   }, [isOpen, providerId]);
 
-  if (!isOpen) return null;
+  // Esc 的监听已删除：Radix 接手，busy 守卫移到下面的 onOpenChange。
+  // 原实现是 window keydown 里查 busyRef —— Radix 让关闭路径从 1 条（Esc）变成
+  // 3 条（Esc / 遮罩点击 / 内置关闭键），所以守卫必须统一挡。
 
   const provider = MAIL_PROVIDERS.find((p) => p.id === providerId);
   // 空凭据写进配置会留下一个永远连不上、界面上却显示「已添加」的邮箱。
@@ -107,7 +99,10 @@ export function MailAccountDialog({
       if (!res.ok) {
         // 失败时留在第二屏、保留已填内容，用户改一个字符即可重试
         setError(
-          withoutSecret(res.error ?? t("mail.dialog.failed"), trimmedCredential),
+          withoutSecret(
+            res.error ?? t("mail.dialog.failed"),
+            trimmedCredential,
+          ),
         );
         return;
       }
@@ -123,16 +118,33 @@ export function MailAccountDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay animate-fade-in">
-      <div className="card w-full max-w-lg p-5 m-4 shadow-elevated animate-slide-up">
+    <OccludingDialog
+      open={isOpen}
+      onOpenChange={(next) => {
+        // busy 时忽略一切关闭请求。
+        // 原实现只挡 Esc（window keydown 里查 busyRef）；Radix 引入了另外两条
+        // 关闭路径（遮罩点击、DialogContent 内置的关闭键），所以守卫放在这里统一挡：
+        // 请求已经在飞，关掉窗口会让「加成功了吗」变得不确定。
+        if (!next && !busyRef.current) onCloseRef.current();
+      }}
+    >
+      <DialogContent
+        className="max-w-lg p-5"
+        onInteractOutside={(event) => {
+          // 原实现的遮罩上没有 onClick —— 点遮罩什么都不发生。
+          // Radix 的 Dialog 默认会关闭，所以这里抑制。
+          event.preventDefault();
+        }}
+      >
         {!provider ? (
           <>
-            <p className="text-sm font-medium text-text-primary">
+            <DialogTitle className="text-sm font-medium text-text-primary">
               {t("mail.dialog.title")}
-            </p>
-            <p className="text-xs text-text-muted mt-1">
+            </DialogTitle>
+            {/* Description 供读屏补充一句上下文（Radix 不强制要求） */}
+            <DialogDescription className="text-xs text-text-muted mt-1">
               {t("mail.dialog.providerHint")}
-            </p>
+            </DialogDescription>
             <div className="grid grid-cols-2 gap-2 mt-3">
               {MAIL_PROVIDERS.map((p) => {
                 const iconUrl = mailProviderIconUrl(p.id);
@@ -194,9 +206,9 @@ export function MailAccountDialog({
               >
                 <ArrowLeft className="h-4 w-4 text-text-secondary" />
               </button>
-              <p className="text-sm font-medium text-text-primary">
+              <DialogTitle className="text-sm font-medium text-text-primary">
                 {t(provider.nameKey)}
-              </p>
+              </DialogTitle>
             </div>
 
             <label className="block text-xs text-text-muted mt-3">
@@ -271,7 +283,7 @@ export function MailAccountDialog({
                     href={provider.consoleUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-accent hover:underline"
+                    className="text-primary hover:underline"
                   >
                     {t("mail.dialog.consoleLink")}
                   </a>
@@ -298,15 +310,15 @@ export function MailAccountDialog({
                 data-testid="mail-submit"
                 disabled={!canSubmit || busy}
                 onClick={() => void submit()}
-                className="px-3 py-1.5 rounded-lg bg-accent text-white hover:bg-accent-hover text-sm font-medium transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {t("mail.dialog.submit")}
               </button>
             </div>
           </>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </OccludingDialog>
   );
 }
 

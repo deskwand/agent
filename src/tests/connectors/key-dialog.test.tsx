@@ -64,17 +64,21 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  // 迁到 Radix 后弹窗内容经 Portal 挂到 document.body，清掉以免跨用例污染
+  document
+    .querySelectorAll('[role="dialog"], [role="alertdialog"]')
+    .forEach((el) => el.remove());
   vi.unstubAllGlobals();
 });
 
 function input(): HTMLInputElement {
-  return container.querySelector(
+  return document.body.querySelector(
     '[data-testid="key-credential"]',
   ) as HTMLInputElement;
 }
 
 function submitButton(): HTMLButtonElement {
-  return [...container.querySelectorAll("button")].find((b) =>
+  return [...document.body.querySelectorAll("button")].find((b) =>
     (b.textContent ?? "").includes("connectors.keyDialog.submit"),
   ) as HTMLButtonElement;
 }
@@ -108,21 +112,21 @@ async function type(value: string): Promise<void> {
 describe("KeyDialog", () => {
   it("renders nothing for a null entry", async () => {
     await mount(null);
-    expect(container.textContent).toBe("");
+    expect(document.body.textContent).toBe("");
   });
 
   it("renders nothing for an OAuth entry", async () => {
     // 缺省 auth（= OAuth）的条目走的是浏览器授权，弹这个框只会误导用户去粘凭据
     await mount({ ...ENTRY, auth: { kind: "oauth" } });
-    expect(container.textContent).toBe("");
+    expect(document.body.textContent).toBe("");
   });
 
   it("shows the vendor credential label and the console link", async () => {
     await mount(ENTRY);
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       "connectors.catalog.giteeCredential",
     );
-    const link = container.querySelector("a")!;
+    const link = document.body.querySelector("a")!;
     expect(link.getAttribute("href")).toBe(
       "https://gitee.com/profile/personal_access_tokens",
     );
@@ -131,7 +135,7 @@ describe("KeyDialog", () => {
   it("renders nothing for an entry without auth (default oauth)", async () => {
     // 缺省即 OAuth —— 条目没写 auth 时走的是浏览器授权，弹这个框只会误导用户去粘凭据
     await mount({ ...ENTRY, auth: undefined });
-    expect(container.textContent).toBe("");
+    expect(document.body.textContent).toBe("");
   });
 
   it("sends the trimmed credential keyed by server name", async () => {
@@ -150,7 +154,7 @@ describe("KeyDialog", () => {
       submitButton().click();
     });
     expect(api.connectWithKey).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("connectors.keyDialog.empty");
+    expect(document.body.textContent).toContain("connectors.keyDialog.empty");
   });
 
   it("keeps the input and shows the failure inline", async () => {
@@ -160,7 +164,7 @@ describe("KeyDialog", () => {
     await act(async () => {
       submitButton().click();
     });
-    expect(container.textContent).toContain("boom");
+    expect(document.body.textContent).toContain("boom");
     expect(input().value).toBe("tok");
   });
 
@@ -227,7 +231,14 @@ describe("KeyDialog：父组件重渲染不能吃掉正在粘的凭据", () => {
       );
     });
     await act(async () => {
-      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+      // 派发到 **document** 而不是 window。
+      // 原实现是在 window 上监听 keydown 的，所以旧版测试也派发到 window；
+      // 迁到 Radix 后监听点在 document 上，而事件只向上冒泡、**不会从 window 传到 document**。
+      // 这条用例要锁的东西没变：Esc 必须走**最新的** onClose（查 stale closure），
+      // 只改了事件的落点。
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
     });
     expect(second).toHaveBeenCalled();
     expect(first).not.toHaveBeenCalled();

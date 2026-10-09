@@ -10,6 +10,7 @@ import type {
   ChannelPairingEvent,
 } from "../../../shared/ipc-types";
 import type { ServerEvent } from "../../types";
+import { Switch } from "../ui/switch";
 
 const CHANNEL_TYPES: ChannelRuntimeInstanceType[] = [
   "feishu",
@@ -26,10 +27,7 @@ const TOKEN_CHANNELS: Set<ChannelRuntimeInstanceType> = new Set([
   "slack",
 ]);
 
-const APP_CHANNELS: Set<ChannelRuntimeInstanceType> = new Set([
-  "feishu",
-  "qq",
-]);
+const APP_CHANNELS: Set<ChannelRuntimeInstanceType> = new Set(["feishu", "qq"]);
 
 const STATUS_DOT: Record<ChannelInstanceStatus["state"], string> = {
   connected: "dot-connected",
@@ -83,7 +81,8 @@ function applyPairingEvent(
 function credentialFields(
   type: ChannelRuntimeInstanceType,
 ): Array<{ key: string; label: string }> {
-  if (TOKEN_CHANNELS.has(type)) return [{ key: "botToken", label: "remote.credentialBotToken" }];
+  if (TOKEN_CHANNELS.has(type))
+    return [{ key: "botToken", label: "remote.credentialBotToken" }];
   if (APP_CHANNELS.has(type))
     return [
       { key: "appId", label: "remote.credentialAppId" },
@@ -106,7 +105,9 @@ export function ChannelInstanceCatalog() {
   );
   const [loading, setLoading] = useState(false);
   const [expandedEdit, setExpandedEdit] = useState<Set<string>>(new Set());
-  const [editValues, setEditValues] = useState<Map<string, Record<string, string>>>(new Map());
+  const [editValues, setEditValues] = useState<
+    Map<string, Record<string, string>>
+  >(new Map());
   const [confirming, setConfirming] = useState<string | null>(null);
   const isElectron =
     typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -160,13 +161,11 @@ export function ChannelInstanceCatalog() {
         setPairings((prev) => applyPairingEvent(prev, event.payload));
       }
       if (
-        (
-          event as unknown as { type: string; payload: unknown }
-        ).type === "remote.channelStatus"
+        (event as unknown as { type: string; payload: unknown }).type ===
+        "remote.channelStatus"
       ) {
-        const status = (
-          event as unknown as { payload: ChannelInstanceStatus }
-        ).payload as ChannelInstanceStatus;
+        const status = (event as unknown as { payload: ChannelInstanceStatus })
+          .payload as ChannelInstanceStatus;
         setStatuses((prev) => {
           const idx = prev.findIndex((s) => s.id === status.id);
           if (idx >= 0) {
@@ -379,26 +378,20 @@ export function ChannelInstanceCatalog() {
                         onClick={() => toggleEdit(instance.id, instance)}
                         className="rounded-lg px-2 py-1 text-xs text-text-muted hover:text-text-primary"
                       >
-                        {t(
-                          isEditing
-                            ? "remote.cancelEdit"
-                            : "remote.edit",
-                        )}
+                        {t(isEditing ? "remote.cancelEdit" : "remote.edit")}
                       </button>
                     )}
                     {/* Enable / disable toggle */}
-                    <button
-                      type="button"
-                      className={`toggle-track ${instance.enabled ? "toggle-on" : ""}`}
-                      onClick={() => void toggle(instance)}
+                    <Switch
+                      checked={instance.enabled}
+                      onCheckedChange={() => void toggle(instance)}
                       aria-label={t(
                         instance.enabled
                           ? "remote.disableChannel"
                           : "remote.enableChannel",
                       )}
-                    >
-                      <span className="toggle-knob" />
-                    </button>
+                      className="data-[state=checked]:bg-success flex-none"
+                    />
                     {confirming === instance.id ? (
                       <>
                         <button

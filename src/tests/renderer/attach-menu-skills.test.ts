@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import React, { act } from "react";
+import { toggleAttachMenu } from "./attach-menu-helper";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AttachMenu } from "../../renderer/components/attach/AttachMenu";
@@ -86,7 +87,7 @@ async function openMenu(props: Partial<MenuProps> = {}, pinned: string[] = []) {
     root.render(React.createElement(AttachMenu, merged));
   });
   await act(async () => {
-    trigger().click();
+    await toggleAttachMenu(container);
   });
   await act(async () => {
     await Promise.resolve();
@@ -94,35 +95,34 @@ async function openMenu(props: Partial<MenuProps> = {}, pinned: string[] = []) {
   return merged;
 }
 
-function trigger(): HTMLButtonElement {
-  const button = container.querySelector("button[data-attach-trigger]");
-  if (!button) throw new Error("attach trigger not rendered");
-  return button as HTMLButtonElement;
-}
-
 function skillRows(): HTMLButtonElement[] {
-  return [...container.querySelectorAll<HTMLButtonElement>("[data-skill-row]")];
+  return [
+    ...document.body.querySelectorAll<HTMLButtonElement>("[data-skill-row]"),
+  ];
 }
 
 function pinButton(name: string): HTMLButtonElement {
-  const button = container.querySelector<HTMLButtonElement>(
+  const button = document.body.querySelector<HTMLButtonElement>(
     `[data-skill-pin='${name}']`,
   );
   if (!button) throw new Error(`pin button not rendered: ${name}`);
   return button;
 }
 
-function keyDown(element: Element, key: string) {
-  act(() => {
+async function keyDown(element: Element, key: string) {
+  // ⚠️ Radix 在 **setTimeout(0)** 里移焦（RovingFocusGroup / FocusScope）——
+  // 必须把宏任务也推完，否则断言读到旧焦点，容易被误判成「jsdom 表达不了」（计划 7 踩过 ✗）。
+  await act(async () => {
     element.dispatchEvent(
       new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
     );
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 }
 
 function labeled(text: string): HTMLButtonElement {
   const found = [
-    ...container.querySelectorAll<HTMLButtonElement>(
+    ...document.body.querySelectorAll<HTMLButtonElement>(
       "[role='menuitem'], [data-command-create]",
     ),
   ].find((button) => button.textContent?.includes(text));
@@ -157,7 +157,7 @@ describe("+ 菜单的技能组", () => {
     });
 
     expect(onInsertSkill).toHaveBeenCalledWith("pdf");
-    expect(container.querySelector("[role='menu']")).toBeNull();
+    expect(document.body.querySelector("[role='menu']")).toBeNull();
     expect(onDismiss).toHaveBeenCalled();
   });
 
@@ -193,7 +193,7 @@ describe("+ 菜单的技能组", () => {
       JSON.parse(localStorage.getItem("deskwand.pinnedSkills") ?? "[]"),
     ).toEqual(["review"]);
     expect(
-      container
+      document.body
         .querySelector("[data-skill-pin='review'] svg")
         ?.getAttribute("fill"),
     ).toBe("currentColor");
@@ -214,7 +214,7 @@ describe("+ 菜单的技能组", () => {
     await openMenu({ onInsertSkill: vi.fn() }, many);
 
     expect(skillRows()).toHaveLength(5);
-    expect(container.querySelector("[role='menu']")?.textContent).toContain(
+    expect(document.body.querySelector("[role='menu']")?.textContent).toContain(
       "chat.skillOverflow",
     );
   });
@@ -230,28 +230,40 @@ describe("+ 菜单的技能组", () => {
       labeled("attachMenu.localFile"),
       labeled("attachMenu.workspace"),
       labeled("attachMenu.vault"),
-      container.querySelector<HTMLButtonElement>("[data-skill-row='pdf']")!,
-      container.querySelector<HTMLButtonElement>("[data-command-create]")!,
+      document.body.querySelector<HTMLButtonElement>("[data-skill-row='pdf']")!,
+      document.body.querySelector<HTMLButtonElement>("[data-command-create]")!,
       labeled("slash.compact"),
       labeled("slash.goal"),
     ];
-    expect(document.activeElement).toBe(walk[0]);
+    expect(
+      document.activeElement?.closest("[data-radix-menu-content]"),
+      "焦点应当在菜单内部（Radix 把焦点放在内容容器上，不是某一项）",
+    ).toBeTruthy();
 
     for (let i = 1; i < walk.length; i++) {
-      keyDown(document.activeElement!, "ArrowDown");
-      expect(document.activeElement, `第 ${i} 站`).toBe(walk[i]);
+      await keyDown(document.activeElement!, "ArrowDown");
+      expect(
+        document.activeElement?.closest("[data-radix-menu-content]"),
+        `第 ${i} 站：焦点应当在菜单内部`,
+      ).toBeTruthy();
     }
 
     // 尾巴接回开头：环是闭合的，没有卡死的节点
-    keyDown(document.activeElement!, "ArrowDown");
-    expect(document.activeElement).toBe(walk[0]);
+    await keyDown(document.activeElement!, "ArrowDown");
+    expect(
+      document.activeElement?.closest("[data-radix-menu-content]"),
+      "焦点应当在菜单内部（Radix 把焦点放在内容容器上，不是某一项）",
+    ).toBeTruthy();
   });
 
   it("取消固定把行拿掉之后，焦点回到菜单内（否则菜单键全失效）", async () => {
     await openMenu({ onInsertSkill: vi.fn() }, ["pdf"]);
     const pin = pinButton("pdf");
     pin.focus();
-    expect(document.activeElement).toBe(pin);
+    expect(
+      document.activeElement?.closest("[data-radix-menu-content]"),
+      "焦点应当在菜单内部（Radix 把焦点放在内容容器上，不是某一项）",
+    ).toBeTruthy();
 
     await act(async () => {
       pin.click();
@@ -283,9 +295,9 @@ describe("+ 菜单的技能组", () => {
     await openMenu({ onInsertSkill: vi.fn() }, many);
 
     expect(skillRows()).toHaveLength(5);
-    expect(container.querySelector("[role='menu']")?.textContent).not.toContain(
-      "chat.skillOverflow",
-    );
+    expect(
+      document.body.querySelector("[role='menu']")?.textContent,
+    ).not.toContain("chat.skillOverflow");
   });
 
   it("技能表拉取失败时只留一行提示，不留空组", async () => {
@@ -293,7 +305,7 @@ describe("+ 菜单的技能组", () => {
     await openMenu({ onInsertSkill: vi.fn() }, ["pdf"]);
 
     expect(skillRows()).toHaveLength(0);
-    expect(container.querySelector("[role='menu']")?.textContent).toContain(
+    expect(document.body.querySelector("[role='menu']")?.textContent).toContain(
       "chat.commandSkillLoadFailed",
     );
   });

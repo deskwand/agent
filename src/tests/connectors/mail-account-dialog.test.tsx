@@ -51,12 +51,18 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  // 迁到 Radix 后弹窗内容经 Portal 挂到 document.body，清掉以免跨用例污染
+  document
+    .querySelectorAll('[role="dialog"], [role="alertdialog"]')
+    .forEach((el) => el.remove());
   vi.unstubAllGlobals();
 });
 
 function render(): void {
   act(() => {
-    root.render(<MailAccountDialog isOpen onClose={onClose} onAdded={onAdded} />);
+    root.render(
+      <MailAccountDialog isOpen onClose={onClose} onAdded={onAdded} />,
+    );
   });
 }
 
@@ -67,7 +73,7 @@ function click(node: Element): void {
 }
 
 function byTestId(id: string): HTMLElement {
-  return container.querySelector(`[data-testid="${id}"]`) as HTMLElement;
+  return document.body.querySelector(`[data-testid="${id}"]`) as HTMLElement;
 }
 
 async function fill(value: string, testId: string): Promise<void> {
@@ -130,19 +136,23 @@ describe("MailAccountDialog", () => {
 
   it("goes to the credential screen only after a provider is picked", () => {
     render();
-    expect(container.querySelector('[data-testid="mail-email"]')).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="mail-email"]'),
+    ).toBeNull();
     click(byTestId("mail-provider-qq"));
     expect(byTestId("mail-email")).toBeTruthy();
     expect(byTestId("mail-credential")).toBeTruthy();
     // 预设的主机不展示给用户（只有 custom 才让填）
-    expect(container.querySelector('[data-testid="mail-imap-host"]')).toBeNull();
+    expect(
+      document.body.querySelector('[data-testid="mail-imap-host"]'),
+    ).toBeNull();
   });
 
   it("asks for hosts only when the provider is custom", () => {
     render();
     click(byTestId("mail-provider-qq"));
     // 回到第一屏再选 custom
-    click(container.querySelector("[data-testid=mail-back]") as Element);
+    click(document.body.querySelector("[data-testid=mail-back]") as Element);
     click(byTestId("mail-provider-custom"));
     expect(byTestId("mail-imap-host")).toBeTruthy();
     expect(byTestId("mail-smtp-host")).toBeTruthy();
@@ -170,7 +180,7 @@ describe("MailAccountDialog", () => {
     await act(async () => {
       (byTestId("mail-submit") as HTMLButtonElement).click();
     });
-    expect(container.textContent).toContain("认证失败。请填授权码。");
+    expect(document.body.textContent).toContain("认证失败。请填授权码。");
     expect(onClose).not.toHaveBeenCalled();
     expect(onAdded).not.toHaveBeenCalled();
   });
@@ -200,7 +210,8 @@ describe("MailAccountDialog", () => {
     // 这里模拟真实失败：IMAP/SMTP 库或服务端把认证串原样回显在错误里。
     api.mail.addAccount.mockResolvedValue({
       ok: false,
-      error: 'Authentication failed (535) for user zhangsan@qq.com, code SECRETCODE',
+      error:
+        "Authentication failed (535) for user zhangsan@qq.com, code SECRETCODE",
     });
     render();
     click(byTestId("mail-provider-qq"));
@@ -209,7 +220,7 @@ describe("MailAccountDialog", () => {
     await act(async () => {
       (byTestId("mail-submit") as HTMLButtonElement).click();
     });
-    const alert = container.querySelector('[role="alert"]');
+    const alert = document.body.querySelector('[role="alert"]');
     const text = alert?.textContent ?? "";
     expect(text).not.toContain("SECRETCODE");
     // 断言「确实做了替换」，而不是仅仅「恰好没有」——
@@ -229,7 +240,7 @@ describe("MailAccountDialog", () => {
     });
     // 主进程的 resolveEndpointInput 会抛异常；对话框自己先拦下来，错误照样留在屏幕上
     expect(api.mail.addAccount).not.toHaveBeenCalled();
-    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(document.body.querySelector('[role="alert"]')).not.toBeNull();
     expect(onClose).not.toHaveBeenCalled();
   });
 });

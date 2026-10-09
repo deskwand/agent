@@ -22,6 +22,14 @@ const SHARED = fs.readFileSync(
   path.join(RENDERER, "components/settings/shared.tsx"),
   "utf8",
 );
+// ⚠️ 2026-10-09：`SettingsSwitch` 的手搓实现已换成 **vendored `ui/switch.tsx`** ✗
+// ⇒ 下面那两条「改动探测」断言（本文件自己的注释就是这么称呼它们的 ✓）要跟到**新位置** ✓。
+// ⚠️ **真正的不变量是同文件下一个用例**（「14 个主题块里两种状态的圆点对比都达标」✓）——
+// 那条**没红过** ✓ ⇒ 行为没问题 ✓，只是探测器该换刻度 ✓。
+const SWITCH_UI = fs.readFileSync(
+  path.join(RENDERER, "components/ui/switch.tsx"),
+  "utf8",
+);
 
 /** 解析 color-mix(in srgb, var(--x) N%, var(--color-surface)) —— --color-border 的写法。 */
 function resolvedToken(block: string, name: string): string {
@@ -41,9 +49,15 @@ function resolvedToken(block: string, name: string): string {
 describe("设置开关的圆点在各主题下都看得见", () => {
   // 这两条是有意的「改动探测」：换 token 时它会红，下面那条不变量才是行为判据。
   it("关态轨道用 border、开态用 accent，圆点用 background", () => {
-    expect(SHARED).toContain('checked ? "bg-accent" : "bg-border"');
-    expect(SHARED).toContain("rounded-full bg-background");
-    // 不许再回到硬编码颜色。
+    // ⚠️ 轨道色现在在 **vendored `ui/switch.tsx`** 里 ✓（`SettingsSwitch` 只是薄包装 ✓）。
+    // 语义不变 ✓：关态 `bg-input`（`--color-input = --color-border` ✓）、
+    // 开态 `bg-primary`（`--color-primary = --color-accent` ✓）—— 见 `shared.tsx` 的注释 ✓。
+    expect(SWITCH_UI).toContain("data-[state=unchecked]:bg-input");
+    expect(SWITCH_UI).toContain("data-[state=checked]:bg-primary");
+    // 圆点用 background —— 这条位置没变 ✓（vendored Thumb 里就是这么写的 ✓）。
+    expect(SWITCH_UI).toContain("rounded-full bg-background");
+    // 不许再回到硬编码颜色 —— **意图与实现无关，原样保留** ✓。
+    expect(SWITCH_UI).not.toContain("bg-white");
     expect(SHARED).not.toContain("bg-white");
   });
 

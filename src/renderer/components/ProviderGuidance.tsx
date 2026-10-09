@@ -1,5 +1,10 @@
 import { AlertTriangle, Info, Sparkles } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "./ui/collapsible";
 
 export interface CommonProviderSetupView {
   id: string;
@@ -56,17 +61,22 @@ export function CommonProviderSetupsCard({
   }
 
   return (
-    <details className="rounded-5xl border border-border-subtle bg-background/40 px-4 py-4">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-text-primary">
-        <span className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-accent" />
-          {t("api.guidance.commonSetupsTitle")}
-        </span>
-        <span className="text-xs font-normal text-text-muted">
-          {t("api.guidance.commonSetupsHint")}
-        </span>
-      </summary>
-      <div className="mt-4 overflow-x-auto">
+    <Collapsible className="rounded-5xl border border-border-subtle bg-background/40 px-4 py-4">
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="flex w-full cursor-pointer items-center justify-between gap-3 text-sm font-medium text-text-primary"
+        >
+          <span className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-accent" />
+            {t("api.guidance.commonSetupsTitle")}
+          </span>
+          <span className="text-xs font-normal text-text-muted">
+            {t("api.guidance.commonSetupsHint")}
+          </span>
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-4 overflow-x-auto">
         <table className="min-w-full text-left text-xs text-text-secondary">
           <thead>
             <tr className="border-b border-border-subtle text-text-muted">
@@ -131,7 +141,7 @@ export function CommonProviderSetupsCard({
             ))}
           </tbody>
         </table>
-      </div>
-    </details>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }

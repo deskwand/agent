@@ -18,15 +18,13 @@ import type { VaultSnapshot } from "../../../shared/vault";
 import type { PromptCommandSaveError } from "../../../shared/ipc-types";
 import type { ChatInputAttachedFile } from "../ChatInput";
 import {
-  MENU_BADGE_CLASS,
-  MENU_ITEM_AFTER_SLOT_CLASS,
-  MENU_ITEM_CLASS,
-  MENU_ITEM_DEFAULT_CLASS,
-  MENU_ITEM_DISABLED_CLASS,
-  MENU_LABEL_CLASS,
-  MENU_PANEL_PADDED_CLASS,
-  MENU_SEPARATOR_CLASS,
-} from "../menu-styles";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import {
   MAX_VISIBLE_SKILLS,
   composeSkillShortcuts,
@@ -99,7 +97,6 @@ export function AttachMenu({
   onPickLocalFiles,
   onAddFiles,
   attachedKeys,
-  direction = "up",
   onDismiss,
   onCommandEntry,
   onInsertPromptCommand,
@@ -125,15 +122,15 @@ export function AttachMenu({
   const [skillRowsFailed, setSkillRowsFailed] = useState(false);
   /** 上一次拉到的"可用技能集合"。点星在本地重算，就必须记住它。 */
   const skillEnabledNames = useRef<ReadonlySet<string>>(new Set());
-  const [formInitial, setFormInitial] = useState<PromptCommandFormValue | null>(null);
-  const [formIsCreate, setFormIsCreate] = useState(true);
-  const [formSaving, setFormSaving] = useState(false);
-  const [formNameError, setFormNameError] = useState<PromptCommandSaveError | null>(
+  const [formInitial, setFormInitial] = useState<PromptCommandFormValue | null>(
     null,
   );
+  const [formIsCreate, setFormIsCreate] = useState(true);
+  const [formSaving, setFormSaving] = useState(false);
+  const [formNameError, setFormNameError] =
+    useState<PromptCommandSaveError | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const loadVaultSnapshot = useCallback(async () => {
     try {
@@ -439,350 +436,291 @@ export function AttachMenu({
 
   // 菜单层键盘路径：打开时焦点进第一项，↑/↓ 在项间移动，Esc 关闭并还给触发器。
   // 焦点在菜单项上时，Enter/Space 由按钮自身的 click 处理，不需要额外拦键盘，
-  // 也不会误触触发器上的 Enter。
-  useEffect(() => {
-    if (open && view === "menu") itemRefs.current[0]?.focus();
-  }, [open, view]);
 
   // 焦点环 = 渲染顺序。技能组插在附件与命令之间后，它下面各行的下标必须跟着
   // 技能行数量走：继续写死 3/4/5/6 会让「＋」与命令行在技能行变动时错位。
-  const commandGroupBase = 3 + skillRows.length;
-
-  const moveMenuFocus = (delta: number) => {
-    const items = itemRefs.current.filter(
-      (element): element is HTMLButtonElement => element !== null,
-    );
-    if (items.length === 0) return;
-    const current = items.findIndex(
-      (element) => element === document.activeElement,
-    );
-    const base = current < 0 ? 0 : current;
-    items[(base + delta + items.length) % items.length]?.focus();
-  };
-
-  const handleMenuKeyDown = (event: React.KeyboardEvent) => {
-    if (!open) return;
-    if (event.key === "Escape") {
-      event.preventDefault();
-      closeAndFocusComposer();
-      return;
-    }
-    if (
-      view === "menu" &&
-      (event.key === "ArrowDown" || event.key === "ArrowUp")
-    ) {
-      event.preventDefault();
-      moveMenuFocus(event.key === "ArrowDown" ? 1 : -1);
-    }
-  };
 
   return (
-    <div className="relative" ref={rootRef} onKeyDown={handleMenuKeyDown}>
-      <Tooltip label={t("attachMenu.label")}>
-        <button
-          type="button"
-          data-attach-trigger
-          aria-haspopup="menu"
-          aria-expanded={open}
+    <div className="relative" ref={rootRef}>
+      <DropdownMenu
+        open={open && view === "menu"}
+        onOpenChange={(next: boolean) => (next ? openMenu() : close())}
+      >
+        <Tooltip label={t("attachMenu.label")}>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              data-attach-trigger
+              aria-label={t("attachMenu.label")}
+              className="flex h-9 w-9 items-center justify-center rounded-2xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </DropdownMenuTrigger>
+        </Tooltip>
+
+        <DropdownMenuContent
+          align="start"
+          // ⚠️ Escape 必须显式接管：原实现的容器 keydown 里，Esc 是调
+          // `closeAndFocusComposer()`（**把焦点还给输入区**），而 Radix 默认只把焦点
+          // 还给触发器 —— 不接管就会丢掉「Esc 后直接继续打字」这条路径 ✗。
+          onEscapeKeyDown={(event) => {
+            event.preventDefault();
+            closeAndFocusComposer();
+          }}
+          // ⚠️ loop 必须给：原实现是 `items[(base + delta + items.length) % items.length]`
+          // —— **确实回绕** ✗（计划里那条「原实现没有回绕」的结论是错的，只看了注释没看代码）。
+          loop
           aria-label={t("attachMenu.label")}
-          onClick={() => (open ? close() : openMenu())}
-          className="flex h-9 w-9 items-center justify-center rounded-2xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+          // ⚠️ 不压 max-h：原面板是 `max-h-[60vh]` 但**没有 overflow 规则**，
+          // 超出只会溢出。vendored content 自带的
+          // `max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto`
+          // 是**改善**（有了滚动、上限还随视口自适应），不是回归。
+          className="w-64"
         >
-          <Plus className="h-4 w-4" />
-        </button>
-      </Tooltip>
+          <DropdownMenuItem
+            className="h-7 gap-2"
+            onClick={() => {
+              onPickLocalFiles();
+              closeAndFocusComposer();
+            }}
+          >
+            <Upload className="h-4 w-4 shrink-0 text-text-muted" />
+            {t("attachMenu.localFile")}
+          </DropdownMenuItem>
 
-      {open && view === "menu" && (
-        <div
-          role="menu"
-          aria-label={t("attachMenu.label")}
-          className={`${MENU_PANEL_PADDED_CLASS} absolute left-0 z-30 flex max-h-[60vh] min-h-0 w-64 flex-col ${
-            direction === "down"
-              ? "top-[calc(100%+8px)] animate-menu-in-down"
-              : "bottom-[calc(100%+8px)] animate-menu-in-up"
-          }`}
-        >
-          <>
-            <button
-              type="button"
-              role="menuitem"
-              ref={(element) => {
-                itemRefs.current[0] = element;
-              }}
-              onClick={() => {
-                onPickLocalFiles();
-                closeAndFocusComposer();
-              }}
-              className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-            >
-              <Upload className="h-4 w-4 shrink-0 text-text-muted" />
-              {t("attachMenu.localFile")}
-            </button>
-
-            <button
-              type="button"
-              role="menuitem"
-              ref={(element) => {
-                itemRefs.current[1] = element;
-              }}
-              aria-disabled={Boolean(workspaceDisabledReason)}
-              aria-label={workspaceDisabledReason ?? t("attachMenu.workspace")}
-              onClick={() => {
-                if (workspaceDisabledReason) return;
-                setView("workspace");
-                void loadWorkspace();
-              }}
-              className={`${MENU_ITEM_CLASS} ${
-                workspaceDisabledReason
-                  ? MENU_ITEM_DISABLED_CLASS
-                  : MENU_ITEM_DEFAULT_CLASS
-              }`}
-            >
-              <FolderOpen className="h-4 w-4 shrink-0 text-text-muted" />
-              <span className="min-w-0 flex-1 truncate">
-                {t("attachMenu.workspace")}
+          <DropdownMenuItem
+            disabled={Boolean(workspaceDisabledReason)}
+            aria-label={workspaceDisabledReason ?? t("attachMenu.workspace")}
+            className="h-7 gap-2"
+            onClick={() => {
+              if (workspaceDisabledReason) return;
+              setView("workspace");
+              void loadWorkspace();
+            }}
+          >
+            <FolderOpen className="h-4 w-4 shrink-0 text-text-muted" />
+            <span className="min-w-0 flex-1 truncate">
+              {t("attachMenu.workspace")}
+            </span>
+            {workspaceDisabledReason && (
+              <span className="shrink-0 text-xs">
+                {workspaceDisabledReason}
               </span>
-              {workspaceDisabledReason && (
-                <span className="shrink-0 text-xs">
-                  {workspaceDisabledReason}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              role="menuitem"
-              ref={(element) => {
-                itemRefs.current[2] = element;
-              }}
-              aria-disabled={Boolean(vaultDisabledReason)}
-              aria-label={vaultDisabledReason ?? t("attachMenu.vault")}
-              onClick={() => {
-                if (vaultDisabledReason) return;
-                setView("vault");
-              }}
-              className={`${MENU_ITEM_CLASS} ${
-                vaultDisabledReason
-                  ? MENU_ITEM_DISABLED_CLASS
-                  : MENU_ITEM_DEFAULT_CLASS
-              }`}
-            >
-              <Lock className="h-4 w-4 shrink-0 text-text-muted" />
-              <span className="min-w-0 flex-1 truncate">
-                {t("attachMenu.vault")}
-              </span>
-              {vaultDisabledReason && (
-                <span className="shrink-0 text-xs">{vaultDisabledReason}</span>
-              )}
-            </button>
-
-            {onInsertSkill && (skillRows.length > 0 || skillRowsFailed) && (
-              <>
-                <div className={MENU_SEPARATOR_CLASS} />
-                <div className="flex items-center justify-between pr-1">
-                  <div className={MENU_LABEL_CLASS}>
-                    {t("chat.slashSkills")}
-                  </div>
-                  {skillPinnedAvailable > MAX_VISIBLE_SKILLS && (
-                    <span className="pr-1 text-[11px] text-text-muted">
-                      {t("chat.skillOverflow", {
-                        shown: MAX_VISIBLE_SKILLS,
-                        total: skillPinnedAvailable,
-                      })}
-                    </span>
-                  )}
-                </div>
-
-                {skillRows.map((name, index) => {
-                  const pinned = pinnedNames.includes(name);
-                  const pinLabel = pinned
-                    ? t("chat.skillPinRemove")
-                    : t("chat.skillPinAdd");
-                  return (
-                    <div key={name} className="flex items-center pl-1.5">
-                      <button
-                        type="button"
-                        tabIndex={-1}
-                        data-skill-pin={name}
-                        aria-label={pinLabel}
-                        // 星标刻意不在焦点环里：鼠标按下不抢焦点，否则点完方向键
-                        // 会从第一项重新开始（moveMenuFocus 找不到当前项）。
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => {
-                          // 纯本地：写存储 → 用已加载的集合重算，不重拉 IPC
-                          rebuildSkillRows(togglePinnedSkill(name));
-                          // 取消固定会把这一行甚至整组从 DOM 里拿掉：焦点若正好在
-                          // 被删的节点上会掉到 body，而 ↑/↓ 与 Esc 绑在菜单容器上，
-                          // 菜单键从此全失效。重建后把焦点交回环内（优先原位置）。
-                          requestAnimationFrame(() => {
-                            const stillInside = rootRef.current?.contains(
-                              document.activeElement,
-                            );
-                            if (stillInside) return;
-                            (
-                              itemRefs.current[3 + index] ?? itemRefs.current[0]
-                            )?.focus();
-                          });
-                        }}
-                        className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
-                          pinned ? "text-accent" : "text-text-muted"
-                        }`}
-                      >
-                        <Star
-                          className="w-4 h-4"
-                          fill={pinned ? "currentColor" : "none"}
-                        />
-                      </button>
-                      <button
-                        type="button"
-                        role="menuitem"
-                        data-skill-row={name}
-                        ref={(element) => {
-                          itemRefs.current[3 + index] = element;
-                        }}
-                        onClick={() => runSkillEntry(name)}
-                        className={`${MENU_ITEM_AFTER_SLOT_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{name}</span>
-                      </button>
-                    </div>
-                  );
-                })}
-
-                {skillRowsFailed && (
-                  <div className="px-2.5 py-1 text-xs text-text-muted">
-                    {t("chat.commandSkillLoadFailed")}
-                  </div>
-                )}
-              </>
             )}
+          </DropdownMenuItem>
 
-            {(onCommandEntry || onInsertPromptCommand) && (
-              <>
-                <div className={MENU_SEPARATOR_CLASS} />
-                <div className="flex items-center justify-between pr-1">
-                  <div className={MENU_LABEL_CLASS}>
-                    {t("chat.slashCommands")}
+          <DropdownMenuItem
+            disabled={Boolean(vaultDisabledReason)}
+            aria-label={vaultDisabledReason ?? t("attachMenu.vault")}
+            className="h-7 gap-2"
+            onClick={() => {
+              if (vaultDisabledReason) return;
+              setView("vault");
+            }}
+          >
+            <Lock className="h-4 w-4 shrink-0 text-text-muted" />
+            <span className="min-w-0 flex-1 truncate">
+              {t("attachMenu.vault")}
+            </span>
+            {vaultDisabledReason && (
+              <span className="shrink-0 text-xs">{vaultDisabledReason}</span>
+            )}
+          </DropdownMenuItem>
+
+          {onInsertSkill && (skillRows.length > 0 || skillRowsFailed) && (
+            <>
+              <DropdownMenuSeparator />
+              <div className="flex items-center justify-between pr-1">
+                <DropdownMenuLabel className="px-2.5 py-1 text-xs text-text-muted">
+                  {t("chat.slashSkills")}
+                </DropdownMenuLabel>
+                {skillPinnedAvailable > MAX_VISIBLE_SKILLS && (
+                  <span className="pr-1 text-[11px] text-text-muted">
+                    {t("chat.skillOverflow", {
+                      shown: MAX_VISIBLE_SKILLS,
+                      total: skillPinnedAvailable,
+                    })}
+                  </span>
+                )}
+              </div>
+
+              {skillRows.map((name) => {
+                const pinned = pinnedNames.includes(name);
+                const pinLabel = pinned
+                  ? t("chat.skillPinRemove")
+                  : t("chat.skillPinAdd");
+                return (
+                  <div key={name} className="flex items-center pl-1.5">
+                    {/* 星标刻意**不是**菜单项、也不进焦点环（tabIndex=-1，鼠标专用）——
+                        原实现就是这样。焦点若落到它上面，方向键的起点会错位。
+                        Radix 的 roving focus 只走注册过的 item，所以这个裸按钮
+                        保持「鼠标可达、键盘不可达」的原状 ✓。 */}
+                    <button
+                      type="button"
+                      tabIndex={-1}
+                      data-skill-pin={name}
+                      aria-label={pinLabel}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        // 纯本地：写存储 → 用已加载的集合重算，不重拉 IPC
+                        rebuildSkillRows(togglePinnedSkill(name));
+                        // 取消固定会把这一行甚至整组从 DOM 里拿掉：焦点若正好在**被删的
+                        // 节点**上会掉到 body，而菜单键绑在内容上，菜单键从此全失效 ✗。
+                        // 重建后确认焦点仍在菜单内，不在就把它交回菜单内容。
+                        // （原实现也有这段补丁，只是当时靠 itemRefs 找目标；Radix 只管
+                        //   它注册过的 item，**不管 DOM 被外力删除**，所以这个补丁不能省 ✗。）
+                        requestAnimationFrame(() => {
+                          if (
+                            document.activeElement?.closest(
+                              "[data-radix-menu-content]",
+                            )
+                          ) {
+                            return;
+                          }
+                          document
+                            .querySelector<HTMLElement>(
+                              "[data-radix-menu-content]",
+                            )
+                            ?.focus();
+                        });
+                      }}
+                      className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
+                        pinned ? "text-accent" : "text-text-muted"
+                      }`}
+                    >
+                      <Star
+                        className="w-4 h-4"
+                        fill={pinned ? "currentColor" : "none"}
+                      />
+                    </button>
+                    <DropdownMenuItem
+                      data-skill-row={name}
+                      onClick={() => runSkillEntry(name)}
+                      // 结构与 MENU_ITEM_AFTER_SLOT_CLASS 相同，但不含左内边距：
+                      // 左边距交给外层容器，让星标正好落在别处放行图标的位置。
+                      className="h-7 min-w-0 flex-1 gap-2 pl-1 pr-2.5"
+                    >
+                      <span className="min-w-0 flex-1 truncate">{name}</span>
+                    </DropdownMenuItem>
                   </div>
+                );
+              })}
+
+              {skillRowsFailed && (
+                <div className="px-2.5 py-1 text-xs text-text-muted">
+                  {t("chat.commandSkillLoadFailed")}
+                </div>
+              )}
+            </>
+          )}
+
+          {(onCommandEntry || onInsertPromptCommand) && (
+            <>
+              <DropdownMenuSeparator />
+              <div className="flex items-center justify-between pr-1">
+                <DropdownMenuLabel className="px-2.5 py-1 text-xs text-text-muted">
+                  {t("chat.slashCommands")}
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  data-command-create
+                  aria-label={t("chat.newCommand")}
+                  onClick={openCreateForm}
+                  className="h-6 w-6 justify-center rounded-md p-0 text-text-muted"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </DropdownMenuItem>
+              </div>
+
+              {onCommandEntry && (
+                <>
+                  <DropdownMenuItem
+                    className="h-7 gap-2"
+                    onClick={() => runCommandEntry("compact")}
+                  >
+                    <Archive className="h-4 w-4 shrink-0 text-text-muted" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {t("slash.compact")}
+                    </span>
+                    <span className="inline-flex items-center px-1.5 text-[10px] text-text-secondary">
+                      {t("skillMarket.sourceBuiltin")}
+                    </span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    className="h-7 gap-2"
+                    onClick={() => runCommandEntry("goal")}
+                  >
+                    <Target className="h-4 w-4 shrink-0 text-text-muted" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {t("slash.goal")}
+                    </span>
+                    <span className="inline-flex items-center px-1.5 text-[10px] text-text-secondary">
+                      {t("skillMarket.sourceBuiltin")}
+                    </span>
+                  </DropdownMenuItem>
+                </>
+              )}
+
+              {promptRows.map((row) => (
+                <div
+                  key={row.name}
+                  className={`group flex items-center ${PROMPT_ROW_GAP_CLASS}`}
+                >
+                  <DropdownMenuItem
+                    onClick={() => runPromptEntry(row.name)}
+                    className="h-7 min-w-0 flex-1 gap-2"
+                  >
+                    <FileText className="h-4 w-4 shrink-0 text-text-muted" />
+                    <span className="min-w-0 flex-1 truncate">
+                      {row.displayName || row.name}
+                    </span>
+                    <span className="inline-flex items-center px-1.5 text-[10px] text-text-secondary group-hover:hidden">
+                      {t("skillMarket.sourceCustom")}
+                    </span>
+                  </DropdownMenuItem>
+                  {/* 编辑/删除刻意不是菜单项：原来就是裸按钮、只在 hover 时出现
+                      （group-hover / group-focus-within），保持原状 ✓。 */}
                   <button
                     type="button"
-                    role="menuitem"
-                    data-command-create
-                    aria-label={t("chat.newCommand")}
-                    ref={(element) => {
-                      itemRefs.current[commandGroupBase] = element;
-                    }}
-                    onClick={openCreateForm}
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+                    data-command-edit={row.name}
+                    aria-label={t("common.edit")}
+                    onClick={() => void openEditForm(row.name)}
+                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-primary group-hover:flex group-focus-within:flex"
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    data-command-delete={row.name}
+                    aria-label={t("common.delete")}
+                    onClick={() => setPendingDelete(row.name)}
+                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex group-focus-within:flex"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
+              ))}
 
-                {onCommandEntry && (
-                  <>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      ref={(element) => {
-                        itemRefs.current[commandGroupBase + 1] = element;
-                      }}
-                      onClick={() => runCommandEntry("compact")}
-                      className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-                    >
-                      <Archive className="h-4 w-4 shrink-0 text-text-muted" />
-                      <span className="min-w-0 flex-1 truncate">
-                        {t("slash.compact")}
-                      </span>
-                      <span className={MENU_BADGE_CLASS}>
-                        {t("skillMarket.sourceBuiltin")}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      role="menuitem"
-                      ref={(element) => {
-                        itemRefs.current[commandGroupBase + 2] = element;
-                      }}
-                      onClick={() => runCommandEntry("goal")}
-                      className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS}`}
-                    >
-                      <Target className="h-4 w-4 shrink-0 text-text-muted" />
-                      <span className="min-w-0 flex-1 truncate">
-                        {t("slash.goal")}
-                      </span>
-                      <span className={MENU_BADGE_CLASS}>
-                        {t("skillMarket.sourceBuiltin")}
-                      </span>
-                    </button>
-                  </>
-                )}
-
-                {promptRows.map((row, index) => (
-                  <div
-                    key={row.name}
-                    className={`group flex items-center ${PROMPT_ROW_GAP_CLASS}`}
+              {promptRowsFailed && (
+                <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-text-muted">
+                  <span className="min-w-0 flex-1 truncate">
+                    {t("chat.commandLoadFailed")}
+                  </span>
+                  <button
+                    type="button"
+                    data-command-retry
+                    onClick={() => void loadPromptCommands()}
+                    className="shrink-0 underline"
                   >
-                    <button
-                      type="button"
-                      role="menuitem"
-                      ref={(element) => {
-                        itemRefs.current[commandGroupBase + 3 + index] =
-                          element;
-                      }}
-                      onClick={() => runPromptEntry(row.name)}
-                      className={`${MENU_ITEM_CLASS} ${MENU_ITEM_DEFAULT_CLASS} min-w-0 flex-1`}
-                    >
-                      <FileText className="h-4 w-4 shrink-0 text-text-muted" />
-                      <span className="min-w-0 flex-1 truncate">
-                        {row.displayName || row.name}
-                      </span>
-                      <span className={`${MENU_BADGE_CLASS} group-hover:hidden`}>
-                        {t("skillMarket.sourceCustom")}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      data-command-edit={row.name}
-                      aria-label={t("common.edit")}
-                      onClick={() => void openEditForm(row.name)}
-                      className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-primary group-hover:flex group-focus-within:flex"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      data-command-delete={row.name}
-                      aria-label={t("common.delete")}
-                      onClick={() => setPendingDelete(row.name)}
-                      className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex group-focus-within:flex"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-
-                {promptRowsFailed && (
-                  <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-text-muted">
-                    <span className="min-w-0 flex-1 truncate">
-                      {t("chat.commandLoadFailed")}
-                    </span>
-                    <button
-                      type="button"
-                      data-command-retry
-                      onClick={() => void loadPromptCommands()}
-                      className="shrink-0 underline"
-                    >
-                      {t("chat.commandRetry")}
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        </div>
-      )}
+                    {t("chat.commandRetry")}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
       {open && (view === "vault" || view === "workspace") && (
         <AttachPickerModal

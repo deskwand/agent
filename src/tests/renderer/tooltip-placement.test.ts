@@ -20,10 +20,15 @@ describe("tooltip 方位", () => {
   });
 
   it("rail 三处显式传右侧（图标右侧、垂直居中）", () => {
+    // 账号那一处的 Tooltip 在计划 5 里从 AccountCluster 移到了 AccountMenu ——
+    // 因为 Radix 的 asChild 会把 trigger props/ref 交给它的**直接子元素**，
+    // 而本仓的 Tooltip 不透传 props 也不 forwardRef，所以顺序必须是
+    // Tooltip > Trigger asChild > (调用方的 button)，Tooltip 得在 menu 组件内。
+    // 意图不变（三处都显式右侧），只是第三处的宿主换了文件。
     for (const file of [
       "components/AppRail.tsx",
       "components/HelpMenu.tsx",
-      "components/AccountCluster.tsx",
+      "components/AccountMenu.tsx",
     ]) {
       expect(read(file), `${file} 必须传 placement="right"`).toContain(
         'placement="right"',

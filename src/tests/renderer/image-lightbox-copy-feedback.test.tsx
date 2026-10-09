@@ -79,6 +79,10 @@ afterEach(() => {
   act(() => root.unmount());
   container.remove();
   window.localStorage.clear();
+  // 查看器迁到 shadcn 的 Dialog 后经 Portal 挂在 document.body，清掉以免跨用例污染
+  document
+    .querySelectorAll('[role="dialog"], [role="alertdialog"]')
+    .forEach((el) => el.remove());
 });
 
 async function renderLightbox() {
@@ -94,7 +98,7 @@ async function renderLightbox() {
 }
 
 function copyButton(): HTMLButtonElement {
-  const button = container.querySelector<HTMLButtonElement>(
+  const button = document.body.querySelector<HTMLButtonElement>(
     'button[aria-label="Copy"]',
   );
   expect(button).not.toBeNull();

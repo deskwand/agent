@@ -5,7 +5,7 @@
  * Reuses useScheduleForm hook — same state/logic as SettingsSchedule.
  */
 
-import { useEffect, useCallback, useMemo, useRef, useState } from "react";
+import { useEffect, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X, ChevronDown, Check } from "lucide-react";
 import type { ScheduleTask } from "../types";
@@ -14,8 +14,8 @@ import {
   MENU_ITEM_CLASS,
   MENU_ITEM_DEFAULT_CLASS,
   MENU_ITEM_SELECTED_CLASS,
-  MENU_PANEL_PADDED_CLASS,
 } from "./menu-styles";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useScheduleForm } from "../hooks/useScheduleForm";
 import {
   renderLocalizedBannerMessage,
@@ -62,9 +62,10 @@ export function ScheduleEditModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // Project selector — custom dropdown (matching ChatInputBottomBar model selector style)
+  // Working directory selector — Popover anchored to the trigger. 开关 / 外部点击关闭 /
+  // Escape 三样全交给 Radix（手写的 document mousedown 监听会让面板「刚打开就被关掉」，
+  // 原实现正是如此，随本次迁移删掉）。
   const [isProjectOpen, setIsProjectOpen] = useState(false);
-  const projectMenuRef = useRef<HTMLDivElement>(null);
 
   const sessions = useAppStore((s) => s.sessions);
 
@@ -85,21 +86,6 @@ export function ScheduleEditModal({
     }
     return cwds.sort();
   }, [sessions]);
-
-  // Click-outside to close project dropdown
-  useEffect(() => {
-    if (!isProjectOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        projectMenuRef.current &&
-        !projectMenuRef.current.contains(e.target as Node)
-      ) {
-        setIsProjectOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [isProjectOpen]);
 
   // Initialise form on mount / when task changes
   useEffect(() => {
@@ -223,59 +209,56 @@ export function ScheduleEditModal({
               </div>
 
               {/* Working directory */}
-              <div className="flex items-center gap-1.5" ref={projectMenuRef}>
+              <div className="flex items-center gap-1.5">
                 <span className="text-xs text-text-muted shrink-0">
                   {t("schedule.project")}
                 </span>
-                <div className="relative">
-                  <button
-                    type="button"
-                    className="inline-flex h-9 items-center max-w-[16rem] px-2 rounded-full border border-border-subtle bg-background/60 text-xs text-text-muted transition-colors hover:border-border"
-                    onClick={() => setIsProjectOpen((v) => !v)}
-                  >
-                    <span className="mr-1.5 truncate text-text-primary">
-                      {cwd && !cwd.endsWith(`/${DEFAULT_WORKDIR_DIRNAME}`)
-                        ? cwd.split("/").pop() || cwd
-                        : t("schedule.defaultWorkspace")}
-                    </span>
-                    <ChevronDown
-                      className={`w-3 h-3 shrink-0 text-text-muted transition-transform ${isProjectOpen ? "rotate-180" : ""}`}
-                    />
-                  </button>
-                  {isProjectOpen && (
-                    <div
-                      className={`${MENU_PANEL_PADDED_CLASS} absolute left-0 z-[200] mt-1 w-56 animate-menu-in-down`}
+                <Popover open={isProjectOpen} onOpenChange={setIsProjectOpen}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-9 items-center max-w-[16rem] px-2 rounded-full border border-border-subtle bg-background/60 text-xs text-text-muted transition-colors hover:border-border"
                     >
-                      {[
-                        { value: "", label: t("schedule.defaultWorkspace") },
-                        ...projects.map((p) => ({
-                          value: p,
-                          label: p.split("/").pop() || p,
-                        })),
-                      ].map(({ value, label }) => {
-                        const selected = cwd === value;
-                        return (
-                          <button
-                            key={value}
-                            type="button"
-                            className={`${MENU_ITEM_CLASS} ${
-                              selected
-                                ? MENU_ITEM_SELECTED_CLASS
-                                : MENU_ITEM_DEFAULT_CLASS
-                            }`}
-                            onClick={() => {
-                              setCwd(value);
-                              setIsProjectOpen(false);
-                            }}
-                          >
-                            <span className="truncate">{label}</span>
-                            {selected && <Check className="h-4 w-4 shrink-0" />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
+                      <span className="mr-1.5 truncate text-text-primary">
+                        {cwd && !cwd.endsWith(`/${DEFAULT_WORKDIR_DIRNAME}`)
+                          ? cwd.split("/").pop() || cwd
+                          : t("schedule.defaultWorkspace")}
+                      </span>
+                      <ChevronDown
+                        className={`w-3 h-3 shrink-0 text-text-muted transition-transform ${isProjectOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="w-56 p-1">
+                    {[
+                      { value: "", label: t("schedule.defaultWorkspace") },
+                      ...projects.map((p) => ({
+                        value: p,
+                        label: p.split("/").pop() || p,
+                      })),
+                    ].map(({ value, label }) => {
+                      const selected = cwd === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`${MENU_ITEM_CLASS} ${
+                            selected
+                              ? MENU_ITEM_SELECTED_CLASS
+                              : MENU_ITEM_DEFAULT_CLASS
+                          }`}
+                          onClick={() => {
+                            setCwd(value);
+                            setIsProjectOpen(false);
+                          }}
+                        >
+                          <span className="truncate">{label}</span>
+                          {selected && <Check className="h-4 w-4 shrink-0" />}
+                        </button>
+                      );
+                    })}
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Mode */}

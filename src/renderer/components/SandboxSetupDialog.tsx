@@ -7,7 +7,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { SandboxSetupProgress, SandboxSetupPhase } from "../types";
 import { getSandboxSetupDisplayText } from "../utils/sandbox-i18n";
-import { useBrowserOcclusion } from "../hooks/useBrowserOcclusion";
+import { OccludingAlertDialog } from "./ui/occluding-dialog";
+import {
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "./ui/alert-dialog";
 
 interface Props {
   progress: SandboxSetupProgress | null;
@@ -28,17 +33,42 @@ const phaseConfig: Record<SandboxSetupPhase, { icon: string }> = {
   error: { icon: "❌" },
 };
 
+/**
+ * 沙箱初始化进度弹窗。
+ *
+ * 外壳由 shadcn 的 AlertDialog 承担 —— 选它而不是 Dialog，是因为这个弹窗
+ * **不可关闭**：沙箱还在配，关掉会让用户以为失败了。AlertDialogContent
+ * 天生没有内置关闭键、也不响应遮罩点击，所以下面的 onOpenChange 只作 no-op
+ * 即可，且无需任何 CSS hack。真正的出口只有两个：错误态的两个按钮，
+ * 以及 ready/skipped 的自动关闭。
+ *
+ * occlusion 是**派生**的（Boolean(progress) && isVisible），交给包装组件的 `open`。
+ * 原实现把这个表达式直接交给 useBrowserOcclusion，语义不变。
+ *
+ * `isVisible` 是内部 state（初值 true），不是 prop；`isOccluding` 为假时包装
+ * 组件会释放引用计数。
+ */
 export function SandboxSetupDialog({ progress, onComplete }: Props) {
   const { t } = useTranslation();
   const [isVisible, setIsVisible] = useState(true);
-  useBrowserOcclusion(Boolean(progress) && isVisible);
-  const [fadeOut, setFadeOut] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleClose = useCallback(() => {
-    setFadeOut(true);
+    // 只保留这一段 500ms。原实现先 setFadeOut(true) 驱动一层 CSS 过渡再收起；
+    // 那个 state 已删除（全仓只有「声明 / 置 true / 用在 className」三处）。
+    //
+    // ⚠️ 但要如实说清楚：**淡出效果也随之没了**，并没有被 Radix 的动画接手。
+    // 下面 `if (!progress || !isVisible) return null` 这个早退让派生出来的
+    // `open` 在组件挂载期间**恒为 true** —— Radix 看不到状态迁移，
+    // 所以 `data-[state=closed]` 的退场动画永远不会跑。于是 ready/skipped 之后
+    // 弹窗会满不透明地停 1500ms，再在 2000ms 处瞬间消失（原先是那 500ms 里渐隐）。
+    // 这是 D2 授权范围内的观感变化，已记入 ledger 供 §9.3 截图验收对照。
+    //
+    // **这 500ms 本身要保留** —— 它现在是「收起前的缓冲」，删了会让 onComplete
+    // 提前到 1500ms，而调用方可能依赖 2000ms 这个时机推进流程
+    //（sandbox-setup-dialog-shell.test.tsx 把两段计时钉死了）。
     closeTimerRef.current = setTimeout(() => {
       setIsVisible(false);
       onComplete?.();
@@ -95,21 +125,26 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
   const displayText = getSandboxSetupDisplayText(t, progress);
 
   return (
-    <div
-      className={`fixed inset-0 z-50 flex items-center justify-center modal-overlay-heavy transition-opacity duration-500 ${fadeOut ? "opacity-0" : "opacity-100"}`}
+    <OccludingAlertDialog
+      open={Boolean(progress) && isVisible}
+      onOpenChange={() => {
+        // 不可关闭：沙箱还在配置，关掉会让用户以为失败了。
+        // 出口只有错误态的「继续」「重试」两个按钮，以及 ready/skipped 的自动关闭。
+      }}
     >
-      <div className="bg-background border border-border-subtle rounded-6xl shadow-elevated max-w-md w-full mx-4 overflow-hidden">
+      <AlertDialogContent className="max-w-md w-full overflow-hidden gap-0 p-0">
         {/* Header */}
         <div className="bg-background-secondary/90 px-6 py-5 border-b border-border-muted">
           <div className="flex items-center gap-3">
             <div className="text-3xl animate-pulse">{config.icon}</div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">
+              <AlertDialogTitle className="text-lg font-semibold text-text-primary">
                 {t("sandbox.setupTitle")}
-              </h2>
-              <p className="text-sm text-text-secondary">
+              </AlertDialogTitle>
+              {/* Description 供读屏补充一句上下文（Radix 不强制要求） */}
+              <AlertDialogDescription className="text-sm text-text-secondary">
                 {t("sandbox.setupSubtitle")}
-              </p>
+              </AlertDialogDescription>
             </div>
           </div>
         </div>
@@ -124,7 +159,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                   ? "text-success"
                   : isError
                     ? "text-error"
-                    : "text-accent"
+                    : "text-primary"
               }`}
             >
               {config.icon}
@@ -136,7 +171,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                     ? "text-success"
                     : isError
                       ? "text-error"
-                      : "text-accent"
+                      : "text-primary"
                 }`}
               >
                 {displayText.message}
@@ -155,7 +190,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
               <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all duration-500 ease-out rounded-full ${
-                    isComplete ? "bg-success" : "bg-accent"
+                    isComplete ? "bg-success" : "bg-primary"
                   }`}
                   style={{ width: `${progress.progress}%` }}
                 />
@@ -184,7 +219,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                 <button
                   onClick={handleRetryLima}
                   disabled={isRetrying}
-                  className="w-full py-2.5 px-4 bg-accent hover:bg-accent/90 text-accent-foreground rounded-xl font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {isRetrying
                     ? t("sandbox.retryingLima")
@@ -196,7 +231,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                 className={`w-full py-2.5 px-4 rounded-xl font-medium transition-colors ${
                   isMac
                     ? "bg-surface hover:bg-surface-muted text-text-primary border border-border"
-                    : "bg-accent hover:bg-accent/90 text-accent-foreground"
+                    : "bg-primary hover:bg-primary/90 text-primary-foreground"
                 }`}
               >
                 {t("sandbox.continueNative")}
@@ -228,13 +263,13 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
             </span>
             {!isComplete && !isError && (
               <span className="flex items-center gap-2">
-                <span className="inline-block w-2 h-2 bg-accent rounded-full animate-pulse" />
+                <span className="inline-block w-2 h-2 bg-primary rounded-full animate-pulse" />
                 {t("sandbox.configuring")}
               </span>
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </AlertDialogContent>
+    </OccludingAlertDialog>
   );
 }

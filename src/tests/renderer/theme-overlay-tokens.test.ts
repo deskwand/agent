@@ -55,9 +55,10 @@ describe("overlay token 的承重前提", () => {
     // 因此源码顺序会让顶层 :root 胜出——在 @layer base 的 .light 里声明的同名 token
     // 会静默变成死代码，亮色模式实际拿到暗色的值。
     //
-    // --color-surface-highlight 就踩过这个坑：它在 .light 里写了 transparent，
-    // 但被后面的顶层 :root 的 rgba(255,255,255,.08) 盖掉（已在 Chrome 里实测确认）。
-    // 所以它的亮色覆盖改成了 :root.light，并且由这条断言拦住回归。
+    // ⚠️ 2026-10-09：原文这里拿 `--color-surface-highlight` 举例 ✓ —— 而那个 token
+    // **已随批次 6 删除** ✗（实测它的**唯一**消费者是 `.card` 的 box-shadow ✓，
+    // 而 `.card` 已实测零消费者并被删 ✓✓）。**这个坑本身仍然真实** ✓（下面这条断言守的就是它 ✓），
+    // 只是那个历史例子不再指向存在的 token ✓ —— 保留描述、去掉失效的引用 ✓。
     // 定位到含 --color-overlay-hover 的**那个**顶层 :root：
     // 不能写成 /^:root\s*\{[\s\S]*?--color-overlay-hover/——非贪婪仍然会从文件开头
     // 那个小 :root 起步，把中间的主题块一并圈进来，造成假红。
