@@ -61,7 +61,18 @@ export function FeedListenButton(): JSX.Element | null {
       >
         <span data-testid="feed-listen-button">
           {pausable ? (
-            <Pause className="h-3.5 w-3.5" />
+            /* 出声时把「动作」换成「状态」：Pause 字形说的是「点我会暂停」，
+               这三根跳动的条说的是「正在出声」。暂停态才回到 Play 字形（动作）。 */
+            <span
+              data-testid="feed-listen-eq"
+              className={`listen-eq flex h-[15px] items-center justify-center gap-[2px] ${
+                listen.status === "preparing" ? "listen-eq--preparing" : ""
+              }`}
+            >
+              <span className="listen-eq-bar" />
+              <span className="listen-eq-bar" />
+              <span className="listen-eq-bar" />
+            </span>
           ) : (
             <Play className="h-3.5 w-3.5" />
           )}
