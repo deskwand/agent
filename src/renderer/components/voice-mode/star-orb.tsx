@@ -135,10 +135,13 @@ export const GLOW_BRUSH: GlowBrush = {
  */
 
 /**
- * 注意：`STARS_BRUSH_*` 目前**没有生产使用者** —— 唯一的那颗迷你球（右下角）已在
- * 2026-10-08 搬进 header 并改成静态状态点。保留常量与 `brush.kind === "stars"`
- * 分支是有意的：浮层那颗球永远用 `GLOW_BRUSH`，而 stars 那一支是完整的绘制实现，
- * 删它要动 500 多行的球体核心，收益只是少几十行不可达代码。
+ * 注意：`STARS_BRUSH_*` 这对常量是给 **40px 那档**（旧的后台小球尺寸）调的。它们从
+ * 2026-10-08 起一度没有生产使用者（唯一那颗迷你球搬进 header 后改成了静态状态点）；
+ * 2026-10-09 起由语音小球卡面里那颗 62px 的球使用。
+ * 保留 `brush.kind === "stars"` 分支是有意的：浮层那颗球永远用 `GLOW_BRUSH`，而 stars
+ * 那一支是完整的绘制实现，删它要动 500 多行的球体核心，收益只是少几十行不可达代码。
+ *
+ * 顶栏图标那颗 16px 球**不用这一对**：见下面的 `STARS_BRUSH_ICON_*`。
  */
 export const STARS_BRUSH_LIGHT: StarsBrush = {
   kind: "stars",
@@ -157,6 +160,36 @@ export const STARS_BRUSH_DARK: StarsBrush = {
   core: 40,
   size: 0.75,
   edge: "rgba(190,212,255,0.22)",
+  composite: "lighter",
+};
+
+/**
+ * 图标档（顶栏那颗 24px 画布的球）：为小尺寸**单独调**的一支，不是 40px 那支的缩放。
+ *
+ * 为什么必须另调：球界半径 `R = min(W,H) * 0.335`，24px 画布下只有 8px；而粒子尺寸
+ * 按画布 px 算、不随画布缩 —— 300 颗星塞进 16px 的球就是一坨噪点，反倒是那圈 `edge`
+ * 描边成了最扎眼的元素。砍到 64 颗、粒子放大到 1.5×、描边压到 0.18 之后，16px 下
+ * 读得出来是「一小团星星」。实测探针：`design-docs/star-orb-size/`。
+ *
+ * 顺带：78 颗/帧 vs 40px 档的 340 颗/帧 —— 常驻顶栏也便宜。
+ */
+export const STARS_BRUSH_ICON_LIGHT: StarsBrush = {
+  kind: "stars",
+  palette: ["22,32,88", "43,60,150", "74,90,192", "52,40,120"],
+  stars: 64,
+  core: 14,
+  size: 1.5,
+  edge: "rgba(58,78,178,0.18)",
+  composite: "source-over",
+};
+
+export const STARS_BRUSH_ICON_DARK: StarsBrush = {
+  kind: "stars",
+  palette: ["255,255,255", "214,230,255", "150,180,255", "176,160,255"],
+  stars: 64,
+  core: 14,
+  size: 1.5,
+  edge: "rgba(190,212,255,0.16)",
   composite: "lighter",
 };
 
@@ -325,11 +358,16 @@ export function StarOrb({
       CX = W / 2;
       CY = H / 2;
       R = Math.min(W, H) * 0.335;
+      // 静止档下重画这一帧就够了，循环压根没起
+      if (still) frame(performance.now());
     };
 
     let raf = 0;
     let t = 0;
     let last = 0;
+    // 减少动态：只画一帧，不起循环。球停在一个正常姿态上（静态的一帧本来就是一张
+    // 星空球的画），而顶栏不会留下一直在跑的画布。
+    const still = prefersReducedMotion();
 
     const frame = (now: number) => {
       const dt = last ? Math.min((now - last) / 1000, 0.05) : 0.016;
@@ -464,12 +502,13 @@ export function StarOrb({
       }
 
       ctx.globalCompositeOperation = "source-over";
-      raf = requestAnimationFrame(frame);
+      // 减少动态时不排下一帧：整个效果只有 resize() 触发的那一帧
+      if (!still) raf = requestAnimationFrame(frame);
     };
 
     resize();
     window.addEventListener("resize", resize);
-    raf = requestAnimationFrame(frame);
+    if (!still) raf = requestAnimationFrame(frame);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
@@ -521,4 +560,22 @@ export function orbCoreRadiusFactor(
   level: number,
 ): number {
   return 0.78 * (1 + orbEnergy(state, t, level) * 0.6);
+}
+
+/**
+ * 系统是否要求减少动态。
+ *
+ * `globals.css` 末尾那条 `prefers-reduced-motion` 覆盖**只管得住 CSS 动画**，canvas 得
+ * 自己问 —— 不问的话，常驻顶栏会留下一个永远在跑的绘制循环。
+ *
+ * 不夹缓存：媒体查询本身很便宜，而且用户中途改系统设置时，下一次渲染就该跟上。
+ * （`sidebar-disclosure-motion.tsx` 里有同一份判断，各留本地：那是 UI 组件的实现细节，
+ * 不值得为三行代码开一个共享模块。）
+ */
+export function prefersReducedMotion(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
 }
