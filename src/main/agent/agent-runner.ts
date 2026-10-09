@@ -4624,14 +4624,11 @@ Tool routing:\n
 
         // 语音模式的本轮工具白名单（设计 §2.5）。**每轮都算一次**：上一个 prompt
         // 可能不是语音发的，不恢复就会把只读名单一直留下去。
-        const allToolNames = [
-          ...allCustomTools.map((tool) => tool.name),
-          ...codingTools.map((tool) => tool.name),
-        ];
+        // 名单由 applySessionTurnPolicyToSdk 自己从会话注册表推导 —— 这里不再传手写清单
+        // （拿 allCustomTools + codingTools 当"全部工具"正是 "Tool X not found" 的成因）。
         applySessionTurnPolicyToSdk(
           session,
           turnProfile,
-          allToolNames,
           piSession,
           this.piSessions.get(session.id),
         );
@@ -5397,19 +5394,35 @@ export class TurnOutcomeTracker {
 export function applySessionTurnPolicyToSdk(
   session: Session,
   requestedProfile: TurnProfileName | undefined,
-  availableTools: readonly string[],
-  piSession: Pick<PiAgentSession, "setActiveToolsByName"> & {
+  piSession: Pick<
+    PiAgentSession,
+    "setActiveToolsByName" | "getActiveToolNames"
+  > & {
     getAllTools: () => readonly { name: string; exposure: ToolExposure }[];
   },
   sessionRecord?: { turnProfile?: TurnProfile },
 ): void {
+  const registry = piSession.getAllTools();
+  // 这个函数是 active 集合**唯一**的写入点：该收窄的只有语音轮；非语音轮只是把集合恢复成
+  // 注册表的默认（= pi 建会话时的那一份）。别在这里再写"策略清单"。
+  //
+  // 输入必须来自**会话注册表**：用 DeskBand 自有清单（allCustomTools + codingTools）时，
+  // 扩展注册的工具（pi-subagents 的 Agent / SubagentWorkflow / get_subagent_result /
+  // steer_subagent）与 SDK 基础工具（grep / find / ls / powershell）不在名单里，而
+  // setActiveToolsByName() 是替换语义 ⇒ 每轮策略一跑就把它们摘掉，模型得到
+  // 「Tool X not found」（证据见 design-docs/2026-10-09-turn-loadout-*）。
+  const availableTools = registry
+    .filter(
+      (tool) => tool.exposure === "direct" || tool.exposure === "model-only",
+    )
+    .map((tool) => tool.name);
   const { activeToolNames, profile } = resolveSessionTurnPolicy(
     session,
     requestedProfile,
     availableTools,
   );
   const exposureByName = new Map(
-    piSession.getAllTools().map((tool) => [tool.name, tool.exposure]),
+    registry.map((tool) => [tool.name, tool.exposure]),
   );
   const next = activeToolNames.filter((name) => {
     const exposure = exposureByName.get(name);
@@ -5425,6 +5438,13 @@ export function applySessionTurnPolicyToSdk(
   ) {
     next.push("codemode");
   }
-  piSession.setActiveToolsByName(next);
+  // setActiveToolsByName() 会无条件重建系统提示词（SDK 的 _rebuildSystemPrompt 没有短路；
+  // pi-subagents 的 renarrow() 为此也加了同款守卫）。名单没变就别写 —— 不然稳态每轮白付
+  // 一次重建，而"前缀字节稳定"才是 prompt cache 能命中的前提。
+  const current = piSession.getActiveToolNames();
+  const unchanged =
+    current.length === next.length &&
+    current.every((name, i) => name === next[i]);
+  if (!unchanged) piSession.setActiveToolsByName(next);
   if (sessionRecord) sessionRecord.turnProfile = profile;
 }

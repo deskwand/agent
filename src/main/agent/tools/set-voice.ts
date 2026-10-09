@@ -10,7 +10,7 @@
  * 与 `tts` 工具的分工（两边说明都要点明，否则模型会叫错）：
  * `tts` = 把文字合成成 wav **文件**；`set_voice` = 改**界面说话**的声音。
  *
- * 只在语音会话可见（`VOICE_TURN.tools` + 构造 `allToolNames` 时的过滤），
+ * 只在语音会话可见（`VOICE_TURN.tools` + `VOICE_ONLY_TOOLS` 在普通轮的过滤），
  * 普通文字会话既看不到也调不到。
  */
 import { Type } from "@sinclair/typebox";
