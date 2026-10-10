@@ -515,3 +515,15 @@ describe("筛选后的空列表不能说成「还没有内容」", () => {
     expect(pad("feed-clear-confirm"), "确认键的内边距").toBe("px-3 py-1.5");
   });
 });
+
+describe("未读数对眼睛的去处", () => {
+  it("筛选条上的「未读」chip 带真实数字（图标栏角标去掉数字后，这是唯一的可见去处）", async () => {
+    // 2026-10-10：动态的 rail 角标从「数字 pill」降成「无数字圆点」⇒ 未读几条对眼睛只剩这里。
+    // 上面那条用例只用 startsWith("feed.filterUnread") 找 chip，把 {count: unread} 去掉照样绿。
+    setWindowApi(
+      snapshot(true, [makeItem(), makeItem({ id: "i2" })], makeRun()),
+    );
+    await render();
+    expect(container.textContent).toContain('feed.filterUnread:{"count":2}');
+  });
+});

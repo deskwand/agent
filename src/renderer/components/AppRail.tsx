@@ -59,6 +59,10 @@ export function AppRail({
         const isActive = activeKey === item.key;
         // 未读角标只属于动态；未读为 0 时**不渲染**（不是渲染成透明）
         const unread = item.key === "feed" ? feedUnread : 0;
+        // 已经在动态视图里就不必再提醒：**纯视觉隐藏**，未读数据一个字不动
+        //（离开后仍有未读，角标会回来）。`unread` 只对 feed 项可能非 0
+        // ⇒ `!isActive` 就是「当前不在这一项的视图里」。
+        const showBadge = unread > 0 && !isActive;
         const label =
           unread > 0
             ? t("feed.railLabelUnread", { count: unread })
@@ -79,17 +83,15 @@ export function AppRail({
                   }`}
                 >
                   {Icon ? <Icon className="w-4 h-4" /> : null}
-                  {unread > 0 ? (
+                  {showBadge ? (
                     <span
                       data-testid="feed-badge"
                       aria-hidden
-                      className="absolute -right-0.5 -top-0.5 min-w-[15px] rounded-full bg-primary px-1 text-center text-[9px] font-bold leading-[15px] text-primary-foreground"
+                      className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-primary/70"
                       style={{
                         boxShadow: "0 0 0 2px var(--app-chrome)",
                       }}
-                    >
-                      {unread > 99 ? "99+" : unread}
-                    </span>
+                    />
                   ) : null}
                 </Button>
               </TooltipTrigger>
