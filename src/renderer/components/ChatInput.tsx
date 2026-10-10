@@ -13,6 +13,7 @@ import { useCurrentSession } from "../store/selectors";
 import { useIPC } from "../hooks/useIPC";
 import { stripLeadingSkillToken } from "../utils/reference-tokens";
 import { attachmentKey, mergeAttachedFiles } from "../utils/attached-files";
+import { mergePendingAppend } from "../utils/pending-editor-append";
 import {
   degradeNonLeadingTokens,
   getCaretOffset,
@@ -514,6 +515,22 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
       adjustEditorHeight();
       useAppStore.getState().setPendingEditorText(null);
     }, [pendingEditorText, writeEditorText, adjustEditorHeight]);
+
+    // 「发到当前会话」：与上面那条**覆盖**语义刻意分开 —— 灵感视图把一条想法送进来
+    // 时不能把用户正在写的草稿冲掉，所以走追加。
+    const pendingEditorAppend = useAppStore((s) => s.pendingEditorAppend);
+    useEffect(() => {
+      if (pendingEditorAppend === null) return;
+      // 读当前内容用与 `getPrompt` 同一个 reader，不要自己从 DOM 上抠文本。
+      writeEditorText(mergePendingAppend(getPlainText(), pendingEditorAppend));
+      adjustEditorHeight();
+      useAppStore.getState().setPendingEditorAppend(null);
+    }, [
+      pendingEditorAppend,
+      getPlainText,
+      writeEditorText,
+      adjustEditorHeight,
+    ]);
 
     useEffect(() => {
       if (!showSlashMenu) return;

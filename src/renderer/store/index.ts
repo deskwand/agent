@@ -4,6 +4,7 @@ import {
   DEFAULT_THEME_PRESET,
 } from "../../shared/theme";
 import type { NestedToolRuntimeUi } from "../../shared/nested-tool-calls";
+import type { IdeaSummary } from "../../shared/ideas";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 import { collectCurrentPlan, type CurrentTodos } from "../utils/current-todos";
 import { isLingering } from "../utils/execution-clock";
@@ -210,6 +211,7 @@ let listenRequestToken = 0;
 
 export type ActiveView =
   | "chat"
+  | "ideas"
   | "feed"
   | "apps"
   | "automation"
@@ -229,6 +231,21 @@ interface AppState {
   isLoading: boolean;
   /** Pi 扩展 setEditorText 待写入聊天输入框的内容（写入后清空）。 */
   pendingEditorText: string | null;
+  /**
+   * 「发到当前会话」的追加通道：与 `pendingEditorText` 分开是因为那个是**覆盖**语义
+   * （Pi 扩展 `setEditorText` 的契约），拿它送灵感会冲掉用户正在写的草稿。
+   */
+  pendingEditorAppend: string | null;
+  ideaCaptureOpen: boolean;
+  ideasInbox: IdeaSummary[];
+  ideasArchived: IdeaSummary[];
+  /** 解析不出来的 md 文件数（用户手改坏了），列表顶部会提示。 */
+  ideasSkipped: number;
+  /** 已归档的要不要一并显示（默认收起）。不存在"我在哪个列表"——只有一个列表。 */
+  showArchivedIdeas: boolean;
+  ideasSelectedName: string | null;
+  ideasLoading: boolean;
+  ideasError: string | null;
   sidebarCollapsed: boolean;
   /** 自动折叠前侧栏是否收起；null = 当前没有生效中的自动折叠 */
   sidebarCollapsedBeforePanels: boolean | null;
@@ -369,6 +386,12 @@ interface AppState {
   setSessions: (sessions: Session[]) => void;
   addSession: (session: Session) => void;
   setPendingEditorText: (text: string | null) => void;
+  setPendingEditorAppend: (text: string | null) => void;
+  openIdeaCapture: () => void;
+  closeIdeaCapture: () => void;
+  setShowArchivedIdeas: (show: boolean) => void;
+  selectIdea: (name: string | null) => void;
+  loadIdeas: () => Promise<void>;
   updateSession: (sessionId: string, updates: Partial<Session>) => void;
   removeSession: (sessionId: string) => void;
   removeSessions: (sessionIds: string[]) => void;
@@ -675,6 +698,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   sessionStates: {},
   isLoading: false,
   pendingEditorText: null,
+  pendingEditorAppend: null,
+  ideaCaptureOpen: false,
+  ideasInbox: [],
+  ideasArchived: [],
+  ideasSkipped: 0,
+  showArchivedIdeas: false,
+  ideasSelectedName: null,
+  ideasLoading: false,
+  ideasError: null,
   sidebarCollapsed: false,
   sidebarCollapsedBeforePanels: null,
   sidebarWidth: 280,
@@ -770,6 +802,41 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setPendingEditorText: (text) => set({ pendingEditorText: text }),
+
+  setPendingEditorAppend: (text) => set({ pendingEditorAppend: text }),
+  openIdeaCapture: () => set({ ideaCaptureOpen: true }),
+  closeIdeaCapture: () => set({ ideaCaptureOpen: false }),
+  setShowArchivedIdeas: (showArchivedIdeas) => set({ showArchivedIdeas }),
+  selectIdea: (ideasSelectedName) => set({ ideasSelectedName }),
+
+  loadIdeas: async () => {
+    set({ ideasLoading: true, ideasError: null });
+    try {
+      const list = await window.electronAPI.ideas.list();
+      set((state) => {
+        const visible = selectVisibleIdeas({
+          showArchivedIdeas: state.showArchivedIdeas,
+          ideasInbox: list.inbox,
+          ideasArchived: list.archived,
+        });
+        // 选中项可能已被删或已被筛掉 → 回落到第一条（没有就 null）。
+        const stillVisible = visible.some(
+          (idea) => idea.name === state.ideasSelectedName,
+        );
+        return {
+          ideasInbox: list.inbox,
+          ideasArchived: list.archived,
+          ideasSkipped: list.skipped,
+          ideasLoading: false,
+          ideasSelectedName: stillVisible
+            ? state.ideasSelectedName
+            : (visible[0]?.name ?? null),
+        };
+      });
+    } catch (error) {
+      set({ ideasLoading: false, ideasError: String(error) });
+    }
+  },
 
   addSession: (session) =>
     set((state) => ({
@@ -2210,3 +2277,19 @@ const leaveContextPanel = (
       : candidate;
   return { rightPanelMode: next, lastVisibleContext: null };
 };
+
+/**
+ * 列表里此刻可见的想法：未归档的永远在前，已归档的按开关决定要不要附在后面。
+ *
+ * 只有一个列表 —— 没有"当前在哪个状态里"这回事，所以归档项不是另一个视图，
+ * 而是列表末尾一段灰掉的内容。
+ */
+export function selectVisibleIdeas(state: {
+  showArchivedIdeas: boolean;
+  ideasInbox: IdeaSummary[];
+  ideasArchived: IdeaSummary[];
+}): IdeaSummary[] {
+  return state.showArchivedIdeas
+    ? [...state.ideasInbox, ...state.ideasArchived]
+    : state.ideasInbox;
+}

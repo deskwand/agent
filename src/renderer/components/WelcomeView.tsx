@@ -72,6 +72,7 @@ export function WelcomeView() {
   // 浮层开关放 store：欢迎页的第一句语音会创建会话，随后应用切到聊天视图，
   // 状态留着，浮层就能跟着过去接着用，而不是随本视图卸载而关掉。
   const voiceModeOpen = useAppStore((state) => state.voiceModeOpen);
+  const ideaCaptureOpen = useAppStore((state) => state.ideaCaptureOpen);
   const isConfigured = useAppStore((state) => state.isConfigured);
   const workingDir = useAppStore((state) => state.workingDir);
   const setShowSettings = useAppStore((state) => state.setShowSettings);
@@ -125,7 +126,8 @@ export function WelcomeView() {
         if (voice.status === "recording") voice.toggle();
       },
     },
-    Boolean(voiceEngineConfig?.enabled) && !voiceModeOpen,
+    // 记一笔的浮层开着时也让路，理由同 ChatView。
+    Boolean(voiceEngineConfig?.enabled) && !voiceModeOpen && !ideaCaptureOpen,
   );
   const showConnectCards = appConfig !== null && !isConfigured;
   const projectName = (() => {

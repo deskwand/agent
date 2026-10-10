@@ -22,8 +22,8 @@ const STAGING_DIR = ".vault-staging";
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 /** 顶层目录即模块：索引键、文件的根相对路径都以模块名开头。 */
-export type VaultModule = "files" | "skills";
-export const VAULT_MODULES = ["files", "skills"] as const;
+export type VaultModule = "files" | "skills" | "ideas";
+export const VAULT_MODULES = ["files", "skills", "ideas"] as const;
 const ROOT_INTERNAL = new Set<string>([
   INDEX_FILE,
   KEYCHAIN_FILE,

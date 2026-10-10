@@ -52,6 +52,13 @@ import {
 } from "./desktop-pet/pet-window";
 import { SkillsManager, validateSkillName } from "./skills/skills-manager";
 import { MemoryService } from "./memory/memory-service";
+import { IdeaService } from "./ideas/idea-service";
+import { IdeasExtension } from "./ideas/ideas-extension";
+import type {
+  IdeaCreateInput,
+  IdeaStatus,
+  IdeaUpdatePatch,
+} from "../shared/ideas";
 import { MemoryExtension } from "./memory/memory-extension";
 import { GoalExtension } from "./extensions/goal-extension";
 import {
@@ -312,6 +319,7 @@ let browserViewManager: BrowserViewManager | null = null;
 let sessionManager: SessionManager | null = null;
 let skillsManager: SkillsManager | null = null;
 let memoryService: MemoryService | null = null;
+let ideaService: IdeaService | null = null;
 let feedService: FeedService | null = null;
 let feedScheduler: FeedScheduler | null = null;
 let scheduledTaskManager: ScheduledTaskManager | null = null;
@@ -1176,9 +1184,11 @@ app
     const db = initDatabase();
 
     memoryService = new MemoryService(db);
+    ideaService = new IdeaService();
     const extensionManager = new AgentRuntimeExtensionManager([
       new MemoryExtension(memoryService),
       new GoalExtension(db),
+      new IdeasExtension(ideaService),
     ]);
 
     // Initialize session manager before creating an interactive window.
@@ -4522,6 +4532,35 @@ ipcMain.handle("browser.picker.clearHighlight", () =>
     () => browserViewManager?.clearHighlight() ?? Promise.resolve(),
     Promise.resolve(),
   ),
+);
+
+// ---- 灵感（随手记）----
+// 一条想法 = 一个 md 文件，落在密库的 ideas/ 模块下；这里只做转发与滞后初始化。
+const requireIdeaService = (): IdeaService => {
+  if (!ideaService) throw new Error("IDEA_SERVICE_UNAVAILABLE");
+  return ideaService;
+};
+
+ipcMain.handle("ideas.list", () => requireIdeaService().list());
+
+ipcMain.handle("ideas.read", (_e, name: string) =>
+  requireIdeaService().read(name),
+);
+
+ipcMain.handle("ideas.create", (_e, input: IdeaCreateInput) =>
+  requireIdeaService().create(input),
+);
+
+ipcMain.handle("ideas.update", (_e, name: string, patch: IdeaUpdatePatch) =>
+  requireIdeaService().update(name, patch.content, patch.mtimeMs),
+);
+
+ipcMain.handle("ideas.setStatus", (_e, name: string, status: IdeaStatus) =>
+  requireIdeaService().setStatus(name, status),
+);
+
+ipcMain.handle("ideas.remove", (_e, name: string) =>
+  requireIdeaService().remove(name),
 );
 
 // ---

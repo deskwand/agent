@@ -51,6 +51,9 @@ import { Titlebar } from "./components/Titlebar";
 import { SandboxSetupDialog } from "./components/SandboxSetupDialog";
 import { SandboxSyncToast } from "./components/SandboxSyncToast";
 import { GlobalNoticeToast } from "./components/GlobalNoticeToast";
+import { IdeaCaptureOverlay } from "./components/IdeaCaptureOverlay";
+import { IdeasView } from "./components/IdeasView";
+import { useIdeaCaptureShortcut } from "./hooks/useIdeaCaptureShortcut";
 import { ImageLightbox } from "./components/ImageLightbox";
 import { useImageLightboxState } from "./store/selectors";
 import { PanelErrorBoundary } from "./components/PanelErrorBoundary";
@@ -156,9 +159,12 @@ function App() {
   const { listSessions, isElectron, continueSession, createVoiceSession } =
     useIPC();
   const voiceModeOpen = useAppStore((s) => s.voiceModeOpen);
+  const openIdeaCapture = useAppStore((s) => s.openIdeaCapture);
   const voiceModeSessionId = useAppStore((s) => s.voiceModeSessionId);
   const sessions = useAppStore((s) => s.sessions);
   const closeVoiceMode = useAppStore((s) => s.closeVoiceMode);
+  // 语音模式开着时把 ⇧K 让出去：那个浮层在抢键盘焦点。
+  useIdeaCaptureShortcut(openIdeaCapture, !voiceModeOpen);
   const [voiceCreating, setVoiceCreating] = useState(false);
   const voiceCreateLock = useRef(false);
   const voiceNavigationEpoch = useRef(0);
@@ -599,6 +605,8 @@ function App() {
               </Suspense>
             ) : activeView === "feed" ? (
               <FeedView />
+            ) : activeView === "ideas" ? (
+              <IdeasView />
             ) : activeView === "apps" ? (
               <AppsView />
             ) : activeView === "automation" ? (
@@ -828,6 +836,9 @@ function App() {
 
       {/* Image Lightbox */}
       <ImageLightbox {...lightboxState} />
+
+      {/* 记一笔：快捷键与标题栏按钮共用这一个浮层，与语音模式互斥。 */}
+      <IdeaCaptureOverlay />
 
       {voiceModeOpen &&
       voiceModeSessionId &&

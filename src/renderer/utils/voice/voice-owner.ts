@@ -13,6 +13,9 @@
 /** 底部聊天框的占用者 id。 */
 export const CHAT_INPUT_VOICE_OWNER = "chat-input";
 
+/** 记一笔浮层里那颗麦克风的占用者 id。 */
+export const IDEA_CAPTURE_VOICE_OWNER = "idea-capture";
+
 /** 一个 ask_user 字段的占用者 id 前缀（后面接 `<text|other>:<index>`）。 */
 export function askUserVoiceOwnerPrefix(toolCallId: string): string {
   return `ask-user:${toolCallId}:`;

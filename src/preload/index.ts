@@ -19,6 +19,15 @@ import type {
   MemorySearchScope,
 } from "../renderer/types";
 import type { FeedBodyPayload, FeedSnapshot } from "../shared/feed";
+import type {
+  IdeaCreateInput,
+  IdeaList,
+  IdeaStatus,
+  IdeaSummary,
+  IdeaReadResult,
+  IdeaUpdatePatch,
+  IdeaUpdateResult,
+} from "../shared/ideas";
 import type { DiagnosticInput, DiagnosticResult } from "../renderer/types";
 import type { ChannelPairingEvent } from "../shared/ipc-types";
 import type {
@@ -726,6 +735,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
       topics: string[],
     ): Promise<{ blockedTopics: string[] }> =>
       ipcRenderer.invoke("feed.setBlockedTopics", topics),
+  },
+
+  ideas: {
+    list: (): Promise<IdeaList> => ipcRenderer.invoke("ideas.list"),
+    read: (name: string): Promise<IdeaReadResult> =>
+      ipcRenderer.invoke("ideas.read", name),
+    create: (input: IdeaCreateInput): Promise<IdeaSummary> =>
+      ipcRenderer.invoke("ideas.create", input),
+    update: (name: string, patch: IdeaUpdatePatch): Promise<IdeaUpdateResult> =>
+      ipcRenderer.invoke("ideas.update", name, patch),
+    setStatus: (name: string, status: IdeaStatus): Promise<IdeaSummary> =>
+      ipcRenderer.invoke("ideas.setStatus", name, status),
+    remove: (name: string): Promise<void> =>
+      ipcRenderer.invoke("ideas.remove", name),
   },
 
   schedule: {
@@ -1779,6 +1802,18 @@ declare global {
         setBlockedTopics: (
           topics: string[],
         ) => Promise<{ blockedTopics: string[] }>;
+      };
+      ideas: {
+        list: () => Promise<IdeaList>;
+        read: (name: string) => Promise<IdeaReadResult>;
+        create: (input: IdeaCreateInput) => Promise<IdeaSummary>;
+        // update 多回一个 mtimeMs：编辑器保存后用新值接上下一次比对的基线。
+        update: (
+          name: string,
+          patch: IdeaUpdatePatch,
+        ) => Promise<IdeaUpdateResult>;
+        setStatus: (name: string, status: IdeaStatus) => Promise<IdeaSummary>;
+        remove: (name: string) => Promise<void>;
       };
     };
   }

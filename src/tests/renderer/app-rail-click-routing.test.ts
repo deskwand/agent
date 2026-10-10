@@ -88,4 +88,87 @@ describe("AppRail 点击路由", () => {
     expect(useAppStore.getState().activeView).toBe("chat");
     expect(useAppStore.getState().sidebarCollapsed).toBe(true);
   });
+
+  it("点灵感那颗不让点击把焦点留在按钮上（不然 hover 卡片会赖着不消失）", async () => {
+    // 卡片按 `group-focus-within` 展开，而 `:focus-within` **不区分焦点怎么来的**：
+    // 鼠标点一下也会留下焦点 ⇒ 卡片在鼠标移开后继续可见（浏览器实测见
+    // design-docs/mockups/_repro-rail-card-focus.html）。挡掉 mousedown 的默认行为即可，
+    // click 照常触发、Tab / 回车一概不受影响。
+    await mountRail("chat");
+    const ideas = buttonFor("navRail.ideas");
+    const down = new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+    });
+    await act(async () => ideas.dispatchEvent(down));
+    expect(down.defaultPrevented, "灵感这一格要挡掉 mousedown 的默认焦点").toBe(
+      true,
+    );
+
+    // 别的格子没有卡片，不必跟着改行为
+    const chat = buttonFor("navRail.chat");
+    const other = new MouseEvent("mousedown", {
+      bubbles: true,
+      cancelable: true,
+    });
+    await act(async () => chat.dispatchEvent(other));
+    expect(other.defaultPrevented, "其他格子保持原样").toBe(false);
+  });
+
+  it("点过灵感就立刻收起卡片：指针没离开也算", async () => {
+    await mountRail("chat");
+    const card = container.querySelector('[data-testid="ideas-rail-card"]')!;
+    const reveal = () => card.className.includes("group-hover:visible");
+    expect(reveal(), "初始应当带着展开类（悬停/聚焦时才真正显示）").toBe(true);
+
+    // 指针点击：detail > 0
+    const pointerClick = new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      detail: 1,
+    });
+    await act(async () =>
+      buttonFor("navRail.ideas").dispatchEvent(pointerClick),
+    );
+    expect(reveal(), "点过之后要摘掉展开类（卡片立刻消失）").toBe(false);
+
+    // 指针离开这一格 → 复位，重新悬停照旧展开。
+    // React 的 onMouseLeave 走 `mouseout` 委托（和 onBlur 走 focusout 一样），
+    // 裸派发 mouseleave 收不到；relatedTarget 落在格子外面才会被合成成 leave。
+    const cell = card.parentElement!;
+    await act(async () =>
+      cell.dispatchEvent(
+        new MouseEvent("mouseout", {
+          bubbles: true,
+          relatedTarget: document.body,
+        }),
+      ),
+    );
+    expect(reveal(), "离开后要复位").toBe(true);
+
+    // 再点一次 → 又立刻收起（同样要 bubbles：React 的 onClick 是根上的委托）
+    await act(async () =>
+      buttonFor("navRail.ideas").dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true, detail: 1 }),
+      ),
+    );
+    expect(reveal(), "第二次点击同样要收起").toBe(false);
+
+    // 键盘焦点回到这一格 → 复位（否则"先用鼠标点过、再改用键盘"的人再也看不到卡片）
+    await act(async () => buttonFor("navRail.ideas").focus());
+    expect(reveal(), "聚焦要能把它找回来").toBe(true);
+  });
+
+  it("键盘激活（detail === 0）不摘展开类：Shift+Tab 回来卡片还在", async () => {
+    await mountRail("chat");
+    const card = container.querySelector('[data-testid="ideas-rail-card"]')!;
+    await act(async () =>
+      buttonFor("navRail.ideas").dispatchEvent(
+        new MouseEvent("click", { bubbles: true, cancelable: true, detail: 0 }),
+      ),
+    );
+    expect(card.className, "回车/空格激活不该被当成指针点击").toContain(
+      "group-hover:visible",
+    );
+  });
 });

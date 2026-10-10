@@ -8,6 +8,7 @@ import {
 
 const ALL_VIEWS: ActiveView[] = [
   "chat",
+  "ideas",
   "feed",
   "apps",
   "automation",
@@ -21,6 +22,7 @@ describe("RAIL_ITEMS", () => {
     // 新增顶层视图时必须同步图标栏，否则这里失败
     expect(RAIL_ITEMS.map((item) => item.view)).toEqual([
       "chat",
+      "ideas",
       "feed",
       "automation",
       "apps",

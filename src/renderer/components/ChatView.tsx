@@ -458,6 +458,7 @@ export function ChatView() {
   const voiceEngineConfig = appConfig?.voiceEngine;
   const voiceInputOwner = useAppStore((s) => s.voiceInputOwner);
   const setVoiceInputOwner = useAppStore((s) => s.setVoiceInputOwner);
+  const ideaCaptureOpen = useAppStore((s) => s.ideaCaptureOpen);
   const voiceNoticeSeqRef = useRef(0);
   const notify = (
     messageKey: string,
@@ -545,9 +546,12 @@ export function ChatView() {
     },
     // 浮层打开时禁用按住说话：两处采集同一支麦克风会互相打架（设计 §4 互斥）。
     // 占用者不是自己时同理 —— 卡片正在录，这一键不该抢麦。
+    // 再加一条：记一笔的浮层开着时也不抢 —— 不让路的话，按住右 Option 会转写进
+    // **浮层背后看不见的输入框**。
     Boolean(voiceEngineConfig?.enabled) &&
       !voiceModeOpen &&
       isPushToTalkAllowed(voiceInputOwner) &&
+      !ideaCaptureOpen &&
       (activeSession?.kind !== "voice" || useTextInput),
   );
 

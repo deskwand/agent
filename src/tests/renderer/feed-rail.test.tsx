@@ -35,9 +35,10 @@ afterEach(async () => {
 });
 
 describe("动态入口", () => {
-  it("图标栏里排在 chat 之后", () => {
-    expect(RAIL_ITEMS.map((item) => item.view).slice(0, 2)).toEqual([
+  it("图标栏里排在 chat 之后（中间隔着「灵感」，见 nav-rail.test.ts 的顺序 pin）", () => {
+    expect(RAIL_ITEMS.map((item) => item.view).slice(0, 3)).toEqual([
       "chat",
+      "ideas",
       "feed",
     ]);
   });
