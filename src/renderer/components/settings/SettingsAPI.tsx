@@ -1394,12 +1394,12 @@ export function SettingsAPI({
   if (isLoadingConfig) {
     return (
       <div className="flex flex-col items-center justify-center py-12 space-y-3">
-        <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
+        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
           DeskWand
         </p>
         <div className="flex items-center gap-2">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-          <span className="text-sm text-text-secondary">
+          <Loader2 className="h-5 w-5 animate-spin text-primary-text" />
+          <span className="text-sm text-muted-foreground">
             {t("common.loading")}
           </span>
         </div>
@@ -1410,14 +1410,14 @@ export function SettingsAPI({
   return (
     <>
       {!embedded && (
-        <div className="flex gap-1 border-b border-border-muted mb-5">
+        <div className="flex gap-1 border-b border-border/60 mb-5">
           <Button variant="ghost"
             type="button"
             onClick={() => setActiveTab("main")}
             className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "main"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-muted hover:text-text-secondary"
+                ? "border-primary text-primary-text"
+                : "border-transparent text-muted-foreground hover:text-muted-foreground"
             }`}
           >
             <Bot className="h-3.5 w-3.5" />
@@ -1428,8 +1428,8 @@ export function SettingsAPI({
             onClick={() => setActiveTab("vision")}
             className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "vision"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-muted hover:text-text-secondary"
+                ? "border-primary text-primary-text"
+                : "border-transparent text-muted-foreground hover:text-muted-foreground"
             }`}
           >
             <Eye className="h-3.5 w-3.5" />
@@ -1440,8 +1440,8 @@ export function SettingsAPI({
             onClick={() => setActiveTab("search")}
             className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "search"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-muted hover:text-text-secondary"
+                ? "border-primary text-primary-text"
+                : "border-transparent text-muted-foreground hover:text-muted-foreground"
             }`}
           >
             <Globe2 className="h-3.5 w-3.5" />
@@ -1452,8 +1452,8 @@ export function SettingsAPI({
             onClick={() => setActiveTab("utility")}
             className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "utility"
-                ? "border-primary text-primary"
-                : "border-transparent text-text-muted hover:text-text-secondary"
+                ? "border-primary text-primary-text"
+                : "border-transparent text-muted-foreground hover:text-muted-foreground"
             }`}
           >
             <Zap className="h-3.5 w-3.5" />
@@ -1479,7 +1479,7 @@ export function SettingsAPI({
             <Button variant="ghost"
               type="button"
               onClick={() => openCreate()}
-              className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary-hover h-auto"
+              className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
             >
               <Plus className="h-3.5 w-3.5" />
               {t("api.addApi")}
@@ -1508,18 +1508,18 @@ export function SettingsAPI({
         <div className="max-w-[720px] space-y-5">
           {!isVisionConfigured ? (
             /* ── Empty state ── */
-            <div className="rounded-2xl border border-dashed border-border-muted px-6 py-10 text-center">
+            <div className="rounded-2xl border border-dashed border-border/60 px-6 py-10 text-center">
               <div className="text-3xl mb-3">🔮</div>
-              <h3 className="text-sm font-medium text-text-primary">
+              <h3 className="text-sm font-medium text-foreground">
                 {t("api.visionModelNotConfigured")}
               </h3>
-              <p className="mt-1 text-xs text-text-muted max-w-xs mx-auto">
+              <p className="mt-1 text-xs text-muted-foreground max-w-xs mx-auto">
                 {t("api.visionModelNotConfiguredDesc")}
               </p>
               <Button variant="ghost"
                 type="button"
                 onClick={openVisionEditor}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover h-auto"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 h-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {t("api.visionModelConfigureButton")}
@@ -1528,13 +1528,13 @@ export function SettingsAPI({
           ) : (
             /* ── Configured card ── */
             <div
-              className={`rounded-2xl border border-border-muted bg-background px-4 py-3 shadow-card ${
+              className={`rounded-2xl border border-border/60 bg-background px-4 py-3 shadow-card ${
                 !visionDraft.enabled ? "opacity-60" : ""
               }`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-text-primary">
+                  <p className="flex min-w-0 items-center gap-2 text-sm font-medium text-foreground">
                     <ProviderBrandIcon
                       brand={
                         resolveProviderBrand(
@@ -1555,7 +1555,7 @@ export function SettingsAPI({
                       {visionDraft.model}
                     </span>
                   </p>
-                  <p className="mt-1 truncate text-xs text-text-muted">
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
                     API Key: {maskApiKey(visionDraft.apiKey)}
                     {!visionDraft.enabled && (
                       <span className="ml-1">
@@ -1576,7 +1576,7 @@ export function SettingsAPI({
                   <Button variant="ghost"
                     type="button"
                     onClick={openVisionEditor}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
+                    className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                   >
                     <Pencil className="h-3 w-3" />
                     {t("api.editApi")}
@@ -1600,7 +1600,7 @@ export function SettingsAPI({
               className="m-0 min-w-0 space-y-3 border-0 p-0"
             >
               <label className="block space-y-1.5">
-                <span className="text-xs font-medium text-text-secondary">
+                <span className="text-xs font-medium text-muted-foreground">
                   {t("webAccess.defaultProvider")}
                 </span>
                 <SettingsFormSelect
@@ -1627,7 +1627,7 @@ export function SettingsAPI({
                 return (
                   <div
                     key={provider}
-                    className="rounded-xl border border-border-muted"
+                    className="rounded-xl border border-border/60"
                   >
                     <Button variant="ghost"
                       type="button"
@@ -1640,7 +1640,7 @@ export function SettingsAPI({
                       aria-controls={`web-access-${provider}-settings`}
                       className="flex w-full items-center justify-between px-4 py-3 text-left"
                     >
-                      <span className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <ProviderBrandIcon
                           brand={provider}
                           className="h-4 w-4 flex-shrink-0"
@@ -1648,18 +1648,18 @@ export function SettingsAPI({
                         {t(`webAccess.providers.${provider}`)}
                       </span>
                       {isOpen ? (
-                        <ChevronDown className="h-4 w-4 text-text-muted" />
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-text-muted" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       )}
                     </Button>
                     {isOpen && (
                       <div
                         id={`web-access-${provider}-settings`}
-                        className="space-y-3 border-t border-border-muted px-4 py-3"
+                        className="space-y-3 border-t border-border/60 px-4 py-3"
                       >
                         <label className="block space-y-1">
-                          <span className="text-xs text-text-muted">
+                          <span className="text-xs text-muted-foreground">
                             {t("webAccess.credentialSource")}
                           </span>
                           <SettingsFormSelect
@@ -1694,7 +1694,7 @@ export function SettingsAPI({
                         </label>
                         {credential.source === "inherit" ? (
                           <label className="block space-y-1">
-                            <span className="text-xs text-text-muted">
+                            <span className="text-xs text-muted-foreground">
                               {t("webAccess.profile")}
                             </span>
                             <SettingsFormSelect
@@ -1737,7 +1737,7 @@ export function SettingsAPI({
                         ) : (
                           <>
                             <label className="block space-y-1">
-                              <span className="text-xs text-text-muted">
+                              <span className="text-xs text-muted-foreground">
                                 {t("webAccess.apiKey")}
                               </span>
                               <Input
@@ -1757,11 +1757,11 @@ export function SettingsAPI({
                                       : c,
                                   );
                                 }}
-                                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm h-auto shadow-none"
+                                className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
                               />
                             </label>
                             <label className="block space-y-1">
-                              <span className="text-xs text-text-muted">
+                              <span className="text-xs text-muted-foreground">
                                 {t("webAccess.baseUrl")}
                               </span>
                               <Input
@@ -1779,7 +1779,7 @@ export function SettingsAPI({
                                       : c,
                                   );
                                 }}
-                                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm h-auto shadow-none"
+                                className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
                               />
                             </label>
                           </>
@@ -1803,7 +1803,7 @@ export function SettingsAPI({
                 return (
                   <div
                     key={provider}
-                    className="rounded-xl border border-border-muted"
+                    className="rounded-xl border border-border/60"
                   >
                     <Button variant="ghost"
                       type="button"
@@ -1816,23 +1816,23 @@ export function SettingsAPI({
                       aria-controls={`web-access-${provider}-settings`}
                       className="flex w-full items-center justify-between px-4 py-3 text-left"
                     >
-                      <span className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                      <span className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <Search className="h-4 w-4 flex-shrink-0" />
                         {t(`webAccess.providers.${provider}`)}
                       </span>
                       {isOpen ? (
-                        <ChevronDown className="h-4 w-4 text-text-muted" />
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
                       ) : (
-                        <ChevronRight className="h-4 w-4 text-text-muted" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       )}
                     </Button>
                     {isOpen && (
                       <div
                         id={`web-access-${provider}-settings`}
-                        className="space-y-2 border-t border-border-muted px-4 py-3"
+                        className="space-y-2 border-t border-border/60 px-4 py-3"
                       >
                         <label className="block space-y-1">
-                          <span className="text-xs text-text-muted">
+                          <span className="text-xs text-muted-foreground">
                             {t("webAccess.apiKey")}
                           </span>
                           <Input
@@ -1846,11 +1846,11 @@ export function SettingsAPI({
                               });
                               setSearchMessage(null);
                             }}
-                            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm h-auto shadow-none"
+                            className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm h-auto shadow-none"
                           />
                         </label>
                         {provider === "exa" && (
-                          <p className="text-xs text-text-muted">
+                          <p className="text-xs text-muted-foreground">
                             {t("webAccess.exaZeroConfig")}
                           </p>
                         )}
@@ -1881,13 +1881,13 @@ export function SettingsAPI({
                     }
                   }}
                   disabled={isSearchSaving}
-                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 h-auto"
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                 >
                   {isSearchSaving ? t("common.saving") : t("common.save")}
                 </Button>
                 {searchMessage && (
                   <span
-                    className={`text-xs ${searchMessage === "saved" ? "text-success" : "text-error"}`}
+                    className={`text-xs ${searchMessage === "saved" ? "text-success" : "text-destructive"}`}
                   >
                     {t(
                       searchMessage === "saved"
@@ -1914,7 +1914,7 @@ export function SettingsAPI({
               className="m-0 min-w-0 space-y-4 border-0 p-0"
             >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-text-secondary">
+                <span className="text-xs font-medium text-muted-foreground">
                   {t("api.utilityInheritActive")}
                 </span>
                 <SettingsSwitch
@@ -1934,7 +1934,7 @@ export function SettingsAPI({
               {!utilityDraft.inheritFromActive && (
                 <>
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-medium text-text-secondary">
+                    <span className="text-xs font-medium text-muted-foreground">
                       {t("api.utilityProvider")}
                     </span>
                     <SettingsFormSelect
@@ -1979,7 +1979,7 @@ export function SettingsAPI({
                   </label>
 
                   <label className="block space-y-1.5">
-                    <span className="text-xs font-medium text-text-secondary">
+                    <span className="text-xs font-medium text-muted-foreground">
                       {t("api.utilityModel")}
                     </span>
                     <SettingsFormSelect
@@ -2027,7 +2027,7 @@ export function SettingsAPI({
                     setIsUtilitySaving(false);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary-hover h-auto"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
               >
                 {t("api.saveUtilityModel")}
               </Button>
@@ -2035,7 +2035,7 @@ export function SettingsAPI({
                 <p className="text-xs text-success">{t("common.saved")}</p>
               )}
               {utilityMessage === "error" && (
-                <p className="text-xs text-error">{t("api.saveFailed")}</p>
+                <p className="text-xs text-destructive">{t("api.saveFailed")}</p>
               )}
             </fieldset>
           </SettingsContentSection>
@@ -2045,24 +2045,24 @@ export function SettingsAPI({
       {/* ── Vision model editor modal ── */}
       {visionEditorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 max-h-[88vh] w-full max-w-[560px] overflow-hidden rounded-2xl border border-border-muted bg-background">
-            <div className="flex items-center justify-between border-b border-border-muted px-5 py-4">
-              <h3 className="text-sm font-medium text-text-primary">
+          <div className="mx-4 max-h-[88vh] w-full max-w-[560px] overflow-hidden rounded-2xl border border-border/60 bg-background">
+            <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+              <h3 className="text-sm font-medium text-foreground">
                 {t("api.visionModelEditTitle")}
               </h3>
               <Button variant="ghost"
                 type="button"
                 onClick={closeVisionEditor}
-                className="rounded-lg p-2 hover:bg-surface-hover h-auto"
+                className="rounded-lg p-2 hover:bg-accent h-auto"
               >
-                <X className="h-4 w-4 text-text-secondary" />
+                <X className="h-4 w-4 text-muted-foreground" />
               </Button>
             </div>
             <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
               <div className="space-y-5">
                 {/* Enable toggle */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-text-primary">
+                  <span className="text-sm font-medium text-foreground">
                     {t("api.visionModelEnable")}
                   </span>
                   <SettingsSwitch
@@ -2076,8 +2076,8 @@ export function SettingsAPI({
                 </div>
 
                 {/* Provider selection */}
-                <div className="space-y-3 border-b border-border-muted pb-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                <div className="space-y-3 border-b border-border/60 pb-5">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Server className="h-4 w-4" />
                     {t("api.provider")}
                   </label>
@@ -2105,8 +2105,8 @@ export function SettingsAPI({
                         }}
                         className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                           visionDraft.provider === provider
-                            ? "border-primary bg-primary/10 font-medium text-primary"
-                            : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                            ? "border-primary bg-primary/10 font-medium text-primary-text"
+                            : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                         }`}
                       >
                         <ProviderBrandIcon
@@ -2121,8 +2121,8 @@ export function SettingsAPI({
 
                 {/* Custom protocol selector */}
                 {visionDraft.provider === "custom" && (
-                  <div className="space-y-3 border-b border-border-muted pb-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                  <div className="space-y-3 border-b border-border/60 pb-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Server className="h-4 w-4" />
                       {t("api.protocol")}
                     </label>
@@ -2147,8 +2147,8 @@ export function SettingsAPI({
                             }}
                             className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                               visionDraft.customProtocol === protocol
-                                ? "border-primary bg-primary/10 font-medium text-primary"
-                                : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                                ? "border-primary bg-primary/10 font-medium text-primary-text"
+                                : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                             }`}
                           >
                             {protocol}
@@ -2161,8 +2161,8 @@ export function SettingsAPI({
 
                 {/* Zhipu region selector */}
                 {visionDraft.provider === "zhipu" && (
-                  <div className="space-y-3 border-b border-border-muted pb-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                  <div className="space-y-3 border-b border-border/60 pb-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Globe2 className="h-4 w-4" />
                       {t("api.region")}
                     </label>
@@ -2179,24 +2179,24 @@ export function SettingsAPI({
                           }
                           className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                             visionDraft.baseUrl === region.baseUrl
-                              ? "border-primary bg-primary/10 font-medium text-primary"
-                              : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                              ? "border-primary bg-primary/10 font-medium text-primary-text"
+                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                           }`}
                         >
                           {t(region.labelKey)}
                         </Button>
                       ))}
                     </div>
-                    <p className="text-xs text-text-muted">
+                    <p className="text-xs text-muted-foreground">
                       {t("api.zhipuRegionHint")}
                     </p>
                   </div>
                 )}
 
                 {/* API Key */}
-                <div className="space-y-3 border-b border-border-muted pb-5">
+                <div className="space-y-3 border-b border-border/60 pb-5">
                   <div className="flex items-center justify-between">
-                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Key className="h-4 w-4" />
                       {t("api.apiKey")}
                     </label>
@@ -2206,7 +2206,7 @@ export function SettingsAPI({
                         <Button variant="ghost"
                           type="button"
                           onClick={reuseActiveProviderApiKey}
-                          className="text-xs text-primary hover:underline h-auto"
+                          className="text-xs text-primary-text hover:underline h-auto"
                         >
                           {t("api.reuseMainModelKey")}
                         </Button>
@@ -2222,15 +2222,15 @@ export function SettingsAPI({
                       }))
                     }
                     placeholder={t("api.enterApiKey")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                   />
                 </div>
 
                 {/* Base URL (custom provider or Ollama only) */}
                 {(visionDraft.provider === "custom" ||
                   visionDraft.provider === "ollama") && (
-                  <div className="space-y-3 border-b border-border-muted pb-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                  <div className="space-y-3 border-b border-border/60 pb-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Server className="h-4 w-4" />
                       {t("api.baseUrl")}
                     </label>
@@ -2244,14 +2244,14 @@ export function SettingsAPI({
                         }))
                       }
                       placeholder={t("api.enterBaseUrl")}
-                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                     />
                   </div>
                 )}
 
                 {/* Model */}
-                <div className="space-y-3 border-b border-border-muted pb-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                <div className="space-y-3 border-b border-border/60 pb-5">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Eye className="h-4 w-4" />
                     {t("api.model")}
                   </label>
@@ -2265,7 +2265,7 @@ export function SettingsAPI({
                       }))
                     }
                     placeholder={t("api.visionModelPlaceholder")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                   />
                   {/* Model suggestions based on provider */}
                   {visionDraft.provider !== "custom" && (
@@ -2287,8 +2287,8 @@ export function SettingsAPI({
                             }
                             className={`rounded-md border px-2 py-1 text-xs transition-colors ${
                               visionDraft.model === m.id
-                                ? "border-primary bg-primary/10 text-primary"
-                                : "border-border-muted text-text-muted hover:border-border hover:text-text-secondary"
+                                ? "border-primary bg-primary/10 text-primary-text"
+                                : "border-border/60 text-muted-foreground hover:border-border hover:text-muted-foreground"
                             }`}
                           >
                             {m.name || m.id}
@@ -2301,7 +2301,7 @@ export function SettingsAPI({
 
                 {/* Error / Success */}
                 {visionError && (
-                  <div className="flex items-center gap-2 rounded-lg bg-error/10 px-4 py-3 text-sm text-error">
+                  <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
                     {visionError}
                   </div>
@@ -2318,7 +2318,7 @@ export function SettingsAPI({
                   <Button variant="ghost"
                     type="button"
                     onClick={closeVisionEditor}
-                    className="rounded-lg border border-border-muted px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
+                    className="rounded-lg border border-border/60 px-4 py-2.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                   >
                     {t("common.cancel")}
                   </Button>
@@ -2328,7 +2328,7 @@ export function SettingsAPI({
                       void handleVisionSave();
                     }}
                     disabled={isVisionSaving}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 h-auto"
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                   >
                     {isVisionSaving ? (
                       <>
@@ -2355,14 +2355,14 @@ export function SettingsAPI({
           const p = OAUTH_PROVIDERS.find((pp) => pp.id === pid);
           return (
             <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-              <div className="mx-4 w-full max-w-md rounded-2xl border border-border-muted bg-background shadow-xl">
-                <div className="border-b border-border-muted px-5 py-4">
-                  <h3 className="text-sm font-medium text-text-primary">
+              <div className="mx-4 w-full max-w-md rounded-2xl border border-border/60 bg-background shadow-xl">
+                <div className="border-b border-border/60 px-5 py-4">
+                  <h3 className="text-sm font-medium text-foreground">
                     {t("api.oauthDisconnect")}
                   </h3>
                 </div>
                 <div className="space-y-4 px-5 py-4">
-                  <p className="text-sm text-text-secondary">
+                  <p className="text-sm text-muted-foreground">
                     {t("api.oauthDisconnectConfirm", {
                       name: p?.name || pid,
                     })}
@@ -2371,7 +2371,7 @@ export function SettingsAPI({
                     <Button variant="ghost"
                       type="button"
                       onClick={closeOAuthDisconnectDialog}
-                      className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
+                      className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                     >
                       {t("common.cancel")}
                     </Button>
@@ -2380,7 +2380,7 @@ export function SettingsAPI({
                       onClick={() => {
                         void confirmDisconnectOAuth(pid);
                       }}
-                      className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 h-auto"
+                      className="rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 h-auto"
                     >
                       {t("api.oauthDisconnect")}
                     </Button>
@@ -2393,14 +2393,14 @@ export function SettingsAPI({
 
       {pendingDeleteProfileKey && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-md rounded-2xl border border-border-muted bg-background shadow-xl">
-            <div className="border-b border-border-muted px-5 py-4">
-              <h3 className="text-sm font-medium text-text-primary">
+          <div className="mx-4 w-full max-w-md rounded-2xl border border-border/60 bg-background shadow-xl">
+            <div className="border-b border-border/60 px-5 py-4">
+              <h3 className="text-sm font-medium text-foreground">
                 {t("api.deleteApi")}
               </h3>
             </div>
             <div className="space-y-4 px-5 py-4">
-              <p className="text-sm text-text-secondary">
+              <p className="text-sm text-muted-foreground">
                 {t("api.deleteApiConfirm", {
                   name:
                     appConfig?.providers?.[pendingDeleteProfileKey]?.name ||
@@ -2412,7 +2412,7 @@ export function SettingsAPI({
                   type="button"
                   onClick={closeDeleteDialog}
                   disabled={isDeleting}
-                  className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 h-auto"
+                  className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                 >
                   {t("common.cancel")}
                 </Button>
@@ -2422,7 +2422,7 @@ export function SettingsAPI({
                     void confirmDelete();
                   }}
                   disabled={isDeleting}
-                  className="inline-flex items-center gap-2 rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
+                  className="inline-flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-white hover:bg-destructive/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                 >
                   {isDeleting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -2439,9 +2439,9 @@ export function SettingsAPI({
 
       {planDialogOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-2xl rounded-2xl border border-border-muted bg-background shadow-xl">
-            <div className="border-b border-border-muted px-5 py-4">
-              <h3 className="text-sm font-medium text-text-primary">
+          <div className="mx-4 w-full max-w-2xl rounded-2xl border border-border/60 bg-background shadow-xl">
+            <div className="border-b border-border/60 px-5 py-4">
+              <h3 className="text-sm font-medium text-foreground">
                 {t("api.planDialogTitle")}
               </h3>
             </div>
@@ -2455,7 +2455,7 @@ export function SettingsAPI({
                 <Button variant="ghost"
                   type="button"
                   onClick={() => setPlanDialogOpen(false)}
-                  className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
+                  className="rounded-lg border border-border/60 px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                 >
                   {t("api.done")}
                 </Button>
@@ -2467,23 +2467,23 @@ export function SettingsAPI({
 
       {editorOpen && draft && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="mx-4 max-h-[88vh] w-full max-w-[900px] overflow-hidden rounded-2xl border border-border-muted bg-background">
-            <div className="flex items-center justify-between border-b border-border-muted px-5 py-4">
-              <h3 className="text-sm font-medium text-text-primary">
+          <div className="mx-4 max-h-[88vh] w-full max-w-[900px] overflow-hidden rounded-2xl border border-border/60 bg-background">
+            <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
+              <h3 className="text-sm font-medium text-foreground">
                 {isCreating ? t("api.addApi") : t("api.editApi")}
               </h3>
               <Button variant="ghost"
                 type="button"
                 onClick={closeEditor}
-                className="rounded-lg p-2 hover:bg-surface-hover h-auto"
+                className="rounded-lg p-2 hover:bg-accent h-auto"
               >
-                <X className="h-4 w-4 text-text-secondary" />
+                <X className="h-4 w-4 text-muted-foreground" />
               </Button>
             </div>
             <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
               <div className="space-y-5">
-                <div className="space-y-3 border-b border-border-muted py-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                <div className="space-y-3 border-b border-border/60 py-5">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Server className="h-4 w-4" />
                     {t("api.provider")}
                   </label>
@@ -2495,8 +2495,8 @@ export function SettingsAPI({
                         onClick={() => selectProvider(provider)}
                         className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                           draft.provider === provider
-                            ? "border-primary bg-primary/10 font-medium text-primary"
-                            : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                            ? "border-primary bg-primary/10 font-medium text-primary-text"
+                            : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                         }`}
                       >
                         <ProviderBrandIcon
@@ -2511,8 +2511,8 @@ export function SettingsAPI({
 
                 {(draft.provider === "opencode" ||
                   draft.provider === "opencode-go") && (
-                  <div className="space-y-3 border-b border-border-muted py-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                  <div className="space-y-3 border-b border-border/60 py-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Globe2 className="h-4 w-4" />
                       {t("api.opencodePlan")}
                     </label>
@@ -2524,23 +2524,23 @@ export function SettingsAPI({
                           onClick={() => selectProvider(plan.provider)}
                           className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                             draft.provider === plan.provider
-                              ? "border-primary bg-primary/10 font-medium text-primary"
-                              : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                              ? "border-primary bg-primary/10 font-medium text-primary-text"
+                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                           }`}
                         >
                           {t(plan.labelKey)}
                         </Button>
                       ))}
                     </div>
-                    <p className="text-xs text-text-muted">
+                    <p className="text-xs text-muted-foreground">
                       {t("api.opencodePlanHint")}
                     </p>
                   </div>
                 )}
 
                 {isCustomDraft && (
-                  <div className="space-y-3 border-b border-border-muted py-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                  <div className="space-y-3 border-b border-border/60 py-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <Server className="h-4 w-4" />
                       {t("api.protocol")}
                     </label>
@@ -2553,8 +2553,8 @@ export function SettingsAPI({
                             onClick={() => selectCustomProtocol(protocol)}
                             className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                               draft.customProtocol === protocol
-                                ? "border-primary bg-primary/10 font-medium text-primary"
-                                : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                                ? "border-primary bg-primary/10 font-medium text-primary-text"
+                                : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                             }`}
                           >
                             {protocol}
@@ -2566,19 +2566,19 @@ export function SettingsAPI({
                 )}
 
                 {modelRows.length === 0 && !isCustomDraft && (
-                  <div className="space-y-3 border-b border-border-muted py-5">
-                    <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                  <div className="space-y-3 border-b border-border/60 py-5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <PlugZap className="h-4 w-4" />
                       {t("api.modelsSection")}
                     </label>
-                    <p className="text-xs text-text-muted">
+                    <p className="text-xs text-muted-foreground">
                       {t("api.modelsConnectHint")}
                     </p>
                   </div>
                 )}
 
-                <div className="space-y-3 border-b border-border-muted py-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                <div className="space-y-3 border-b border-border/60 py-5">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Pencil className="h-4 w-4" />
                     {t("api.customName")}
                   </label>
@@ -2589,12 +2589,12 @@ export function SettingsAPI({
                       updateDraft({ name: event.target.value })
                     }
                     placeholder={t("api.customNamePlaceholder")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                   />
                 </div>
 
-                <div className="space-y-3 border-b border-border-muted py-5">
-                  <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                <div className="space-y-3 border-b border-border/60 py-5">
+                  <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <Key className="h-4 w-4" />
                     {t("api.apiKey")}
                   </label>
@@ -2611,14 +2611,14 @@ export function SettingsAPI({
                         presets,
                       ).keyPlaceholder || t("api.enterApiKey")
                     }
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                   />
                 </div>
 
                 {isCustomDraft && (
                   <>
-                    <div className="space-y-3 border-b border-border-muted py-5">
-                      <label className="flex items-center gap-2 text-sm font-medium text-text-primary">
+                    <div className="space-y-3 border-b border-border/60 py-5">
+                      <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <Server className="h-4 w-4" />
                         {t("api.baseUrl")}
                       </label>
@@ -2635,13 +2635,13 @@ export function SettingsAPI({
                             presets,
                           ).baseUrl
                         }
-                        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                       />
                     </div>
 
-                    <div className="space-y-4 border-b border-border-muted py-5">
+                    <div className="space-y-4 border-b border-border/60 py-5">
                       <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-text-primary">
+                        <label className="text-sm font-medium text-foreground">
                           {modelRows.length > 0
                             ? t("api.customModelsManual")
                             : t("api.models")}
@@ -2649,7 +2649,7 @@ export function SettingsAPI({
                         <Button variant="ghost"
                           type="button"
                           onClick={addModel}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
+                          className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                         >
                           <Plus className="h-3 w-3" />
                           {t("api.addCustomModel")}
@@ -2657,7 +2657,7 @@ export function SettingsAPI({
                       </div>
 
                       {draft.models.length === 0 && (
-                        <p className="text-xs text-text-muted">
+                        <p className="text-xs text-muted-foreground">
                           {t("api.selectPresetModelsHint")}
                         </p>
                       )}
@@ -2678,7 +2678,7 @@ export function SettingsAPI({
                                 })
                               }
                               placeholder={t("api.modelId")}
-                              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
+                              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                             />
                             <Input
                               type="number"
@@ -2694,9 +2694,9 @@ export function SettingsAPI({
                               }
                               placeholder={t("api.contextWindowPlaceholder")}
                               title={t("api.contextWindowHint")}
-                              className="w-36 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="w-36 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
-                            <label className="flex items-center gap-1.5 text-sm text-text-secondary flex-shrink-0">
+                            <label className="flex items-center gap-1.5 text-sm text-muted-foreground flex-shrink-0">
                               <input
                                 type="checkbox"
                                 checked={item.input?.includes("image") ?? false}
@@ -2714,7 +2714,7 @@ export function SettingsAPI({
                             <Button variant="ghost"
                               type="button"
                               onClick={() => removeModel(index)}
-                              className="rounded-lg p-2 text-text-muted hover:bg-error/10 hover:text-error h-auto"
+                              className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive h-auto"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -2726,7 +2726,7 @@ export function SettingsAPI({
                 )}
 
                 {connectState === "failed" && diagResult && (
-                  <div className="border-b border-border-muted py-5">
+                  <div className="border-b border-border/60 py-5">
                     <ApiDiagnosticsPanel
                       result={diagResult}
                       isRunning={false}
@@ -2737,12 +2737,12 @@ export function SettingsAPI({
                 )}
 
                 {modelRows.length > 0 && (
-                  <div className="space-y-3 border-b border-border-muted py-5">
+                  <div className="space-y-3 border-b border-border/60 py-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <label className="text-sm font-medium text-text-primary">
+                      <label className="text-sm font-medium text-foreground">
                         {t("api.modelsSection")}
                       </label>
-                      <span className="text-xs text-text-muted">
+                      <span className="text-xs text-muted-foreground">
                         {t("api.modelsEnabledCount", {
                           enabled: modelRows.filter((row) => row.enabled)
                             .length,
@@ -2756,7 +2756,7 @@ export function SettingsAPI({
                       value={modelFilter}
                       onChange={(event) => setModelFilter(event.target.value)}
                       placeholder={t("api.modelsSearch")}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
 
                     <div className="max-h-72 space-y-1 overflow-y-auto">
@@ -2772,7 +2772,7 @@ export function SettingsAPI({
                         .map((row) => (
                           <div
                             key={row.id}
-                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-hover"
+                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-accent"
                           >
                             <input
                               type="checkbox"
@@ -2781,16 +2781,16 @@ export function SettingsAPI({
                               onChange={() => toggleModel(row.id)}
                               className="rounded"
                             />
-                            <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                            <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                               {row.label}
                               {row.label !== row.id && (
-                                <span className="ml-2 text-xs text-text-muted">
+                                <span className="ml-2 text-xs text-muted-foreground">
                                   {row.id}
                                 </span>
                               )}
                             </span>
                             {row.isNew && (
-                              <span className="rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                              <span className="rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary-text">
                                 {t("api.modelsNew")}
                               </span>
                             )}
@@ -2800,8 +2800,8 @@ export function SettingsAPI({
                               disabled={!row.enabled}
                               className={`rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
                                 row.isDefault
-                                  ? "border-primary bg-primary/10 text-primary"
-                                  : "border-border-muted text-text-muted hover:border-border hover:text-text-secondary"
+                                  ? "border-primary bg-primary/10 text-primary-text"
+                                  : "border-border/60 text-muted-foreground hover:border-border hover:text-muted-foreground"
                               } disabled:opacity-40`}
                             >
                               {t("api.modelsDefault")}
@@ -2813,7 +2813,7 @@ export function SettingsAPI({
                 )}
 
                 {error && (
-                  <div className="flex items-center gap-2 rounded-lg bg-error/10 px-4 py-3 text-sm text-error">
+                  <div className="flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
                     <AlertCircle className="h-4 w-4 flex-shrink-0" />
                     {error}
                   </div>
@@ -2829,8 +2829,8 @@ export function SettingsAPI({
                   <p
                     className={`text-xs ${
                       connectState === "failed"
-                        ? "text-error"
-                        : "text-text-secondary"
+                        ? "text-destructive"
+                        : "text-muted-foreground"
                     }`}
                   >
                     {connectMessage}
@@ -2845,7 +2845,7 @@ export function SettingsAPI({
                         void handleSave();
                       }}
                       disabled={isSaving}
-                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 h-auto"
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                     >
                       {isSaving ? (
                         <>
@@ -2864,14 +2864,14 @@ export function SettingsAPI({
                       <Button variant="ghost"
                         type="button"
                         onClick={handleConnect}
-                        className="rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
+                        className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                       >
                         {t("api.reconnect")}
                       </Button>
                       <Button variant="ghost"
                         type="button"
                         onClick={closeEditor}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary-hover h-auto"
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary/90 h-auto"
                       >
                         <CheckCircle className="h-4 w-4" />
                         {t("api.done")}
@@ -2884,14 +2884,14 @@ export function SettingsAPI({
                         onClick={() => {
                           void handleSaveDraft();
                         }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
+                        className="inline-flex items-center gap-2 rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                       >
                         {t("common.save")}
                       </Button>
                       <Button variant="ghost"
                         type="button"
                         onClick={handleConnect}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary-hover h-auto"
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary/90 h-auto"
                       >
                         {t("api.retryConnect")}
                       </Button>
@@ -2901,7 +2901,7 @@ export function SettingsAPI({
                       <Button variant="ghost"
                         type="button"
                         onClick={closeEditor}
-                        className="rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
+                        className="rounded-lg border border-border/60 px-4 py-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground h-auto"
                       >
                         {t("common.cancel")}
                       </Button>
@@ -2909,7 +2909,7 @@ export function SettingsAPI({
                         type="button"
                         onClick={handleConnect}
                         disabled={connectState === "connecting"}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 h-auto"
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                       >
                         {connectState === "connecting" ? (
                           <>

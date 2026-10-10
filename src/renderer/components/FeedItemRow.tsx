@@ -47,8 +47,8 @@ export function FeedItemRow({
         if (isSelectingText()) return;
         onOpen(item.id);
       }}
-      className={`relative flex cursor-pointer items-start gap-3 border-b border-border-subtle px-4 py-2.5 ${
-        selected ? "bg-surface" : "hover:bg-surface-hover"
+      className={`relative flex cursor-pointer items-start gap-3 border-b border-border/40 px-4 py-2.5 ${
+        selected ? "bg-card" : "hover:bg-accent"
       }`}
     >
       {selected ? (
@@ -69,8 +69,8 @@ export function FeedItemRow({
           }}
           className={`flex w-full items-baseline gap-2 text-left text-base leading-[1.4] ${
             unread
-              ? "font-semibold text-text-primary"
-              : "font-normal text-text-muted"
+              ? "font-semibold text-foreground"
+              : "font-normal text-muted-foreground"
           }`}
         >
           {unread ? (
@@ -95,7 +95,7 @@ export function FeedItemRow({
             {item.title}
           </span>
           {item.unprocessed === 1 ? (
-            <span className="shrink-0 rounded-sm bg-surface-active px-1 text-xs text-text-muted">
+            <span className="shrink-0 rounded-sm bg-accent px-1 text-xs text-muted-foreground">
               {t("feed.itemUnprocessed")}
             </span>
           ) : null}
@@ -104,7 +104,7 @@ export function FeedItemRow({
         {item.summary ? (
           <div
             data-testid="feed-summary"
-            className="mt-1 text-sm text-text-muted"
+            className="mt-1 text-sm text-muted-foreground"
             style={{
               lineHeight: 1.8,
               display: "-webkit-box",
@@ -119,11 +119,11 @@ export function FeedItemRow({
 
         <div
           data-testid="feed-meta"
-          className="mt-1.5 flex items-center gap-2 text-xs leading-[1.75] text-text-muted"
+          className="mt-1.5 flex items-center gap-2 text-xs leading-[1.75] text-muted-foreground"
         >
           {item.topic ? (
             // 两栏常驻后列表只有一半宽，长主题会折行 —— 标签必须不换行（宁可挤掉来源域名）
-            <span className="shrink-0 whitespace-nowrap rounded-sm bg-primary-muted px-1.5 py-px text-primary">
+            <span className="shrink-0 whitespace-nowrap rounded-sm bg-primary/10 px-1.5 py-px text-primary-text">
               {item.topic}
             </span>
           ) : null}
@@ -147,7 +147,7 @@ export function FeedItemRow({
                 event.stopPropagation();
                 onRead(item.id);
               }}
-              className="underline decoration-text-muted/50 h-auto hover:bg-transparent hover:text-current"
+              className="underline decoration-muted-foreground/50 h-auto hover:bg-transparent hover:text-current"
             >
               {t("feed.itemRead")}
             </Button>
@@ -158,7 +158,7 @@ export function FeedItemRow({
                 event.stopPropagation();
                 onDismiss(item.id);
               }}
-              className="underline decoration-text-muted/50 h-auto hover:bg-transparent hover:text-current"
+              className="underline decoration-muted-foreground/50 h-auto hover:bg-transparent hover:text-current"
             >
               {t("feed.itemDismiss")}
             </Button>
@@ -167,7 +167,7 @@ export function FeedItemRow({
       </div>
 
       {item.imageUrl ? (
-        <div className="mt-0.5 h-[58px] w-[88px] shrink-0 overflow-hidden rounded-[4px] bg-surface">
+        <div className="mt-0.5 h-[58px] w-[88px] shrink-0 overflow-hidden rounded-[4px] bg-card">
           <img
             src={item.imageUrl}
             alt=""

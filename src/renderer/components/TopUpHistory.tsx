@@ -70,13 +70,13 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
     if (status === "confirmed")
       return <span className="text-success">{t("topUp.statusConfirmed")}</span>;
     if (status === "expired")
-      return <span className="text-error">{t("topUp.statusExpired")}</span>;
-    return <span className="text-text-muted">{t("topUp.statusPending")}</span>;
+      return <span className="text-destructive">{t("topUp.statusExpired")}</span>;
+    return <span className="text-muted-foreground">{t("topUp.statusPending")}</span>;
   };
 
   if (loading) {
     return (
-      <p className="py-6 text-center text-sm text-text-muted">
+      <p className="py-6 text-center text-sm text-muted-foreground">
         {t("topUp.historyLoading")}
       </p>
     );
@@ -85,11 +85,11 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
   if (error) {
     return (
       <div className="flex flex-col items-center gap-2 py-6">
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-muted-foreground">
           {t("topUp.historyLoadFailed")}
         </p>
         <Button variant="ghost"
-          className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-primary h-auto hover:bg-transparent hover:text-current"
+          className="rounded-lg border border-border px-3 py-1.5 text-sm text-foreground h-auto hover:bg-transparent hover:text-current"
           onClick={() => void loadFirstPage()}
         >
           {t("topUp.historyRetry")}
@@ -100,7 +100,7 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
 
   if (orders.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-text-muted">
+      <p className="py-6 text-center text-sm text-muted-foreground">
         {t("topUp.historyEmpty")}
       </p>
     );
@@ -112,10 +112,10 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
         {orders.map((o) => (
           <li key={o.id} className="rounded-lg border border-border p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium text-text-primary">
+              <span className="text-sm font-medium text-foreground">
                 ${(o.amount_cents / 100).toFixed(2)}
                 {o.credited_micro_usd > 0 && (
-                  <span className="ml-1 text-xs text-text-muted">
+                  <span className="ml-1 text-xs text-muted-foreground">
                     ·{" "}
                     {t("topUp.creditedAmount", {
                       usd: formatMicroUsd(o.credited_micro_usd),
@@ -125,13 +125,13 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
               </span>
               {statusBadge(o.status)}
             </div>
-            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-text-muted">
+            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>{formatTopUpTime(o.created_at)}</span>
               <span>{chainLabel(o.chain)}</span>
             </div>
             {o.status === "confirmed" && o.tx_hash && (
               <a
-                className="mt-1 inline-flex items-center gap-1 text-xs text-primary"
+                className="mt-1 inline-flex items-center gap-1 text-xs text-primary-text"
                 href={explorerTxUrl(o.chain, o.tx_hash)}
                 rel="noreferrer"
                 onClick={(e) => {
@@ -150,7 +150,7 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
       </ul>
       {hasMore && (
         <Button variant="ghost"
-          className="w-full rounded-lg border border-border py-2 text-sm text-text-primary disabled:opacity-40 h-auto hover:bg-transparent hover:text-current"
+          className="w-full rounded-lg border border-border py-2 text-sm text-foreground disabled:opacity-40 h-auto hover:bg-transparent hover:text-current"
           disabled={loadMoreLoading}
           onClick={() => void loadMore()}
         >

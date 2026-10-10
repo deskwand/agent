@@ -188,17 +188,17 @@ export const FileToolBlock = memo(function FileToolBlock({
   return (
     <div
       className={`rounded-2xl overflow-hidden transition-colors ${
-        isError ? "bg-error/5" : isRunning ? "bg-primary/5" : "bg-background/40"
+        isError ? "bg-destructive/5" : isRunning ? "bg-primary/5" : "bg-background/40"
       }`}
     >
       {/* Collapsed header */}
       <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
+        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
       >
         {/* Status icon */}
-        <div className="flex-shrink-0 pt-0.5 text-text-muted">
+        <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
           {isRunning ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : isError ? (
@@ -210,26 +210,26 @@ export const FileToolBlock = memo(function FileToolBlock({
 
         {/* Tool icon — uses actual tool name for correct icon */}
         {showIcon ? (
-          <div className="flex-shrink-0 pt-0.5 text-text-muted">
+          <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
             {getToolIcon(block.name)}
           </div>
         ) : null}
 
         {/* Label: action + path + stats */}
         <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-          <span className="whitespace-nowrap text-xs text-text-muted">
+          <span className="whitespace-nowrap text-xs text-muted-foreground">
             {t(isWrite ? "tool.actionWrite" : "tool.actionRead")}
           </span>
-          <span className="min-w-0 flex-1 truncate text-xs font-mono text-text-secondary">
+          <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
             · {shortenPath(path)}
           </span>
           {isRunning ? (
-            <span className="whitespace-nowrap text-xs text-text-muted">
+            <span className="whitespace-nowrap text-xs text-muted-foreground">
               · {isWrite ? t("tool.writeWriting") : t("tool.readReading")}
             </span>
           ) : null}
           <span
-            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-text-muted transition-opacity ${
+            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
               expanded
                 ? "opacity-100"
                 : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -248,7 +248,7 @@ export const FileToolBlock = memo(function FileToolBlock({
       {expanded && (
         <div className="animate-fade-in bg-background/35">
           {/* Meta info bar */}
-          <div className="flex items-center gap-2 px-3 pt-2 pb-1 text-xs text-text-muted">
+          <div className="flex items-center gap-2 px-3 pt-2 pb-1 text-xs text-muted-foreground">
             {durationText && <span>{durationText}</span>}
             {durationText && <span>·</span>}
             <span>{lang}</span>
@@ -256,10 +256,10 @@ export const FileToolBlock = memo(function FileToolBlock({
 
           {/* File path header */}
           <div className="flex items-center gap-2 px-3 py-1.5">
-            <span className="text-text-muted flex-shrink-0">
+            <span className="text-muted-foreground flex-shrink-0">
               {showIcon ? getToolIcon(block.name) : null}
             </span>
-            <span className="text-xs font-mono text-text-secondary truncate">
+            <span className="text-xs font-mono text-muted-foreground truncate">
               {path}
             </span>
           </div>
@@ -267,7 +267,7 @@ export const FileToolBlock = memo(function FileToolBlock({
           {/* Content area */}
           <div className="px-3 pb-3">
             {isError ? (
-              <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto text-error bg-error/5">
+              <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto text-destructive bg-destructive/5">
                 {typeof toolResult?.content === "string"
                   ? toolResult.content
                   : ""}
@@ -275,7 +275,7 @@ export const FileToolBlock = memo(function FileToolBlock({
             ) : displayContent ? (
               <CodeBlock language={lang}>{displayContent}</CodeBlock>
             ) : (
-              <div className="text-xs text-text-muted italic py-2">
+              <div className="text-xs text-muted-foreground italic py-2">
                 {isWrite ? t("tool.writeEmptyFile") : t("tool.readEmptyFile")}
               </div>
             )}

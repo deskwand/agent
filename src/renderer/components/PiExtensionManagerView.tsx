@@ -140,7 +140,7 @@ export function PiExtensionManagerView() {
       ) : (
         <>
           {notice && (
-            <div className="mb-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-danger">
+            <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-destructive">
               {notice}
             </div>
           )}
@@ -197,7 +197,7 @@ export function PiExtensionManagerView() {
                     {t("piExtensions.update")}
                   </Button>
                   <Button variant="ghost"
-                    className="rounded-md border border-danger/40 px-2 py-1 text-xs text-danger h-auto hover:bg-transparent hover:text-current"
+                    className="rounded-md border border-destructive/40 px-2 py-1 text-xs text-destructive h-auto hover:bg-transparent hover:text-current"
                     disabled={busy}
                     onClick={() =>
                       run(() =>
@@ -235,7 +235,7 @@ export function PiExtensionManagerView() {
                 <div className="text-xs text-muted-foreground">
                   {ext.source} · {ext.scope}
                   {ext.error ? (
-                    <span className="ml-2 text-danger">{ext.error}</span>
+                    <span className="ml-2 text-destructive">{ext.error}</span>
                   ) : null}
                 </div>
               </li>
@@ -243,7 +243,7 @@ export function PiExtensionManagerView() {
           </ul>
         )}
         {state.errors.length > 0 && (
-          <ul className="mt-2 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+          <ul className="mt-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             {state.errors.map((err) => (
               <li key={err.path}>
                 <span className="font-mono">{err.path}</span>: {err.error}

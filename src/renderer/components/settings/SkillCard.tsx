@@ -42,7 +42,7 @@ function ToggleButton({
           className={`shrink-0 p-1.5 rounded-md transition-colors ${
             enabled
               ? "bg-success/10 text-success hover:bg-success/20"
-              : "bg-surface-muted text-text-muted hover:bg-surface-active"
+              : "bg-muted text-muted-foreground hover:bg-accent"
           }`}
           aria-label={label}
         >
@@ -102,8 +102,8 @@ export const SKILL_ICON_MAP: Record<
   },
   builtin: {
     icon: Package,
-    bgClass: "bg-surface-muted",
-    iconClass: "text-text-muted",
+    bgClass: "bg-muted",
+    iconClass: "text-muted-foreground",
     strokeWidth: 2,
   },
   marketplace: {
@@ -120,8 +120,8 @@ export const SKILL_ICON_MAP: Record<
   },
   external: {
     icon: FolderOpen,
-    bgClass: "bg-surface-muted",
-    iconClass: "text-text-muted",
+    bgClass: "bg-muted",
+    iconClass: "text-muted-foreground",
     strokeWidth: 2,
   },
 };
@@ -213,10 +213,10 @@ function SkillActionButtons(props: SkillActionButtonsProps) {
         publishStatus === "published"
           ? "bg-success/10 text-success cursor-default"
           : publishStatus === "outdated"
-            ? "bg-primary/10 text-primary hover:bg-primary/20"
+            ? "bg-primary/10 text-primary-text hover:bg-primary/20"
             : isPublishing
-              ? "bg-primary/10 text-primary/50 cursor-wait"
-              : "bg-primary/10 text-primary hover:bg-primary/20"
+              ? "bg-primary/10 text-primary-text/50 cursor-wait"
+              : "bg-primary/10 text-primary-text hover:bg-primary/20"
       }`}
     >
       {isPublishing ? (
@@ -253,8 +253,8 @@ function SkillActionButtons(props: SkillActionButtonsProps) {
               disabled={isLoading || isUpdating}
               className={`p-1.5 rounded-md transition-colors ${
                 isUpdating
-                  ? "bg-primary/10 text-primary/50 cursor-wait"
-                  : "bg-primary/10 text-primary hover:bg-primary/20"
+                  ? "bg-primary/10 text-primary-text/50 cursor-wait"
+                  : "bg-primary/10 text-primary-text hover:bg-primary/20"
               }`}
               aria-label={t("skillMarket.update")}
             >
@@ -276,7 +276,7 @@ function SkillActionButtons(props: SkillActionButtonsProps) {
             <Button variant="ghost"
               onClick={onDelete}
               disabled={isLoading}
-              className="p-1.5 rounded-md bg-error/10 text-error hover:bg-error/20 transition-colors h-auto"
+              className="p-1.5 rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors h-auto"
               aria-label={t("common.delete")}
             >
               <Trash2 className={iconSize} />
@@ -321,21 +321,21 @@ function SkillCardCards(props: SkillCardProps) {
             {onSkillMd ? (
               <Button variant="ghost"
                 onClick={onSkillMd}
-                className="text-base font-semibold text-text-primary hover:text-primary transition-colors truncate text-left h-auto"
+                className="text-base font-semibold text-foreground hover:text-primary-text transition-colors truncate text-left h-auto"
               >
                 {skill.name}
               </Button>
             ) : (
-              <h3 className="text-base font-semibold text-text-primary truncate">
+              <h3 className="text-base font-semibold text-foreground truncate">
                 {skill.name}
               </h3>
             )}
-            <span className="text-xs px-1.5 py-0.5 rounded bg-surface-muted text-text-muted shrink-0 whitespace-nowrap">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0 whitespace-nowrap">
               {sourceLabel}
             </span>
           </div>
           {footer && (
-            <p className="text-sm text-text-secondary line-clamp-2">{footer}</p>
+            <p className="text-sm text-muted-foreground line-clamp-2">{footer}</p>
           )}
         </div>
       </div>
@@ -396,21 +396,21 @@ function SkillCardList(props: SkillCardProps) {
               {onSkillMd ? (
                 <Button variant="ghost"
                   onClick={onSkillMd}
-                  className="text-sm font-medium text-text-primary truncate hover:text-primary transition-colors text-left h-auto"
+                  className="text-sm font-medium text-foreground truncate hover:text-primary-text transition-colors text-left h-auto"
                 >
                   {skill.name}
                 </Button>
               ) : (
-                <span className="text-sm font-medium text-text-primary truncate">
+                <span className="text-sm font-medium text-foreground truncate">
                   {skill.name}
                 </span>
               )}
-              <span className="text-[10px] px-1 py-0.5 rounded bg-surface-muted text-text-muted shrink-0 whitespace-nowrap">
+              <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0 whitespace-nowrap">
                 {sourceLabel}
               </span>
             </div>
             {footer && (
-              <p className="text-xs text-text-muted line-clamp-1">{footer}</p>
+              <p className="text-xs text-muted-foreground line-clamp-1">{footer}</p>
             )}
           </div>
         </div>
@@ -481,21 +481,21 @@ function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
             {onSkillMd ? (
               <Button variant="ghost"
                 onClick={onSkillMd}
-                className="text-base font-semibold text-text-primary hover:text-primary transition-colors truncate text-left h-auto"
+                className="text-base font-semibold text-foreground hover:text-primary-text transition-colors truncate text-left h-auto"
               >
                 {name}
               </Button>
             ) : (
-              <h3 className="text-base font-semibold text-text-primary truncate">
+              <h3 className="text-base font-semibold text-foreground truncate">
                 {name}
               </h3>
             )}
-            <span className="text-xs px-1.5 py-0.5 rounded bg-surface-muted text-text-muted shrink-0 whitespace-nowrap">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0 whitespace-nowrap">
               {sourceLabel}
             </span>
           </div>
           {description && (
-            <p className="text-sm text-text-secondary line-clamp-2">
+            <p className="text-sm text-muted-foreground line-clamp-2">
               {description}
             </p>
           )}
@@ -505,7 +505,7 @@ function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
         <Button variant="ghost"
           onClick={onInstall}
           disabled={installing}
-          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 h-auto"
+          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary-text hover:bg-primary/20 transition-colors disabled:opacity-50 h-auto"
         >
           {installing ? (
             <Loader2 className="w-3 h-3 animate-spin" />
@@ -551,21 +551,21 @@ function CloudOnlyListView(props: CloudOnlySkillCardProps) {
               {onSkillMd ? (
                 <Button variant="ghost"
                   onClick={onSkillMd}
-                  className="text-sm font-medium text-text-primary truncate hover:text-primary transition-colors text-left h-auto"
+                  className="text-sm font-medium text-foreground truncate hover:text-primary-text transition-colors text-left h-auto"
                 >
                   {name}
                 </Button>
               ) : (
-                <span className="text-sm font-medium text-text-primary truncate">
+                <span className="text-sm font-medium text-foreground truncate">
                   {name}
                 </span>
               )}
-              <span className="text-[10px] px-1 py-0.5 rounded bg-surface-muted text-text-muted shrink-0 whitespace-nowrap">
+              <span className="text-[10px] px-1 py-0.5 rounded bg-muted text-muted-foreground shrink-0 whitespace-nowrap">
                 {sourceLabel}
               </span>
             </div>
             {description && (
-              <p className="text-xs text-text-muted line-clamp-1">
+              <p className="text-xs text-muted-foreground line-clamp-1">
                 {description}
               </p>
             )}
@@ -574,7 +574,7 @@ function CloudOnlyListView(props: CloudOnlySkillCardProps) {
         <Button variant="ghost"
           onClick={onInstall}
           disabled={installing}
-          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 h-auto"
+          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary-text hover:bg-primary/20 transition-colors disabled:opacity-50 h-auto"
         >
           {installing ? (
             <Loader2 className="w-3 h-3 animate-spin" />

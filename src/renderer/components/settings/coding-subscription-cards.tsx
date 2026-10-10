@@ -69,30 +69,30 @@ function SubscriptionCard({
   return (
     <div
       data-testid={`${plan.profileKey}-card`}
-      className="rounded-xl border border-border-muted bg-surface px-4 py-3"
+      className="rounded-xl border border-border/60 bg-card px-4 py-3"
     >
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <SubscriptionPlanIcon
             profileKey={plan.profileKey}
-            className="mt-px h-5 w-5 shrink-0 fill-none stroke-current text-text-secondary"
+            className="mt-px h-5 w-5 shrink-0 fill-none stroke-current text-muted-foreground"
           />
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-medium text-text-primary">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <span className="truncate">{plan.name}</span>
             </div>
-            <div className="text-xs text-text-muted">
+            <div className="text-xs text-muted-foreground">
               {configured ? t("api.subscriptionConfigured") : t(plan.noteKey)}
             </div>
             {configured && (
               <div className="mt-1 text-xs text-warning">{t(plan.noteKey)}</div>
             )}
-            <div className="mt-1 text-xs text-text-muted">
+            <div className="mt-1 text-xs text-muted-foreground">
               <a
                 href={plan.keyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-primary hover:underline"
+                className="text-primary-text hover:underline"
               >
                 {t("api.subscriptionGetKey")}
               </a>
@@ -119,8 +119,8 @@ function SubscriptionCard({
           }}
           className={`shrink-0 rounded-lg px-3 py-1.5 text-xs ${
             configured
-              ? "border border-border-muted text-text-secondary hover:bg-surface-hover"
-              : "bg-primary font-medium text-primary-foreground hover:bg-primary-hover"
+              ? "border border-border/60 text-muted-foreground hover:bg-accent"
+              : "bg-primary font-medium text-primary-foreground hover:bg-primary/90"
           }`}
         >
           {t(
@@ -142,7 +142,7 @@ function SubscriptionCard({
             aria-label={t("api.subscriptionKeyLabel")}
             value={key}
             onChange={(event) => setKey(event.target.value)}
-            className="h-auto min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-text-primary shadow-none"
+            className="h-auto min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground shadow-none"
           />
           <Button variant="ghost"
             type="button"
@@ -167,14 +167,14 @@ function SubscriptionCard({
                 data-action="confirm-remove"
                 disabled={busy}
                 onClick={() => void remove()}
-                className="text-xs text-error h-auto hover:bg-transparent hover:text-current"
+                className="text-xs text-destructive h-auto hover:bg-transparent hover:text-current"
               >
                 {t("api.subscriptionDisconnect")}
               </Button>
               <Button variant="ghost"
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="text-xs text-text-secondary h-auto hover:bg-transparent hover:text-current"
+                className="text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
               >
                 {t("common.cancel")}
               </Button>
@@ -187,7 +187,7 @@ function SubscriptionCard({
                 setConfirming(true);
                 setEditing(false);
               }}
-              className="text-xs text-text-secondary hover:text-error h-auto"
+              className="text-xs text-muted-foreground hover:text-destructive h-auto"
             >
               {t("api.subscriptionDisconnect")}
             </Button>
@@ -195,7 +195,7 @@ function SubscriptionCard({
         </div>
       )}
       {error && (
-        <div role="alert" className="mt-2 text-xs text-error">
+        <div role="alert" className="mt-2 text-xs text-destructive">
           {error}
         </div>
       )}

@@ -36,7 +36,7 @@ describe("createReferenceTokenElement", () => {
     expect(el.getAttribute(TOKEN_RAW_ATTR)).toBe("/skill:apple-design");
     expect(el.textContent).toBe("apple-design");
     expect(el.querySelector("svg")).not.toBeNull();
-    expect(el.className).toContain("text-mention");
+    expect(el.className).toContain("text-primary");
   });
 
   it("命令 token 显示含斜杠的原文", () => {

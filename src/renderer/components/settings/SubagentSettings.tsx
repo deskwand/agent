@@ -69,13 +69,13 @@ export function SubagentSettings() {
     <div className="px-2 py-1 space-y-4">
       {/* Agent 列表 */}
       <div>
-        <p className="text-xs text-text-muted mb-2">
+        <p className="text-xs text-muted-foreground mb-2">
           {t("subagent.agentList")}
         </p>
         {agents.map((agent) => (
           <div
             key={agent.name}
-            className="flex items-center justify-between py-2.5 border-b border-border-muted last:border-0"
+            className="flex items-center justify-between py-2.5 border-b border-border/60 last:border-0"
           >
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium">
@@ -83,7 +83,7 @@ export function SubagentSettings() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-text-muted">
+              <span className="text-xs text-muted-foreground">
                 {!agent.markdownModel || agent.markdownModel === "inherit"
                   ? t("subagent.inheritMain")
                   : modelDisplay(
@@ -155,7 +155,7 @@ export function SubagentSettings() {
                       <Button variant="ghost"
                         type="button"
                         aria-label={t("common.delete")}
-                        className="p-1 rounded hover:bg-muted text-text-muted hover:text-red-500 h-auto"
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-red-500 h-auto"
                         onClick={() => setDeletingAgent(agent.name)}
                       >
                         <Trash2 size={14} />
@@ -172,13 +172,13 @@ export function SubagentSettings() {
 
         {/* 编辑模型弹窗 */}
         {editingAgent && (
-          <div className="mt-3 p-4 border border-border-muted rounded-lg space-y-3">
+          <div className="mt-3 p-4 border border-border/60 rounded-lg space-y-3">
             <p className="text-sm font-medium">
               {editingAgent} {t("subagent.editModel")}
             </p>
 
             <div>
-              <p className="text-xs text-text-muted mb-1">
+              <p className="text-xs text-muted-foreground mb-1">
                 {t("subagent.modelLabel")}
               </p>
               <SettingsFormSelect
@@ -236,7 +236,7 @@ export function SubagentSettings() {
                 </div>
 
                 <div>
-                  <p className="text-xs text-text-muted mb-1">
+                  <p className="text-xs text-muted-foreground mb-1">
                     {t("subagent.thinkingLabel")}
                   </p>
                   <SettingsFormSelect
@@ -297,7 +297,7 @@ export function SubagentSettings() {
       {/* 新增 Agent */}
       <Button variant="ghost"
         type="button"
-        className="flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary h-auto"
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-muted-foreground h-auto"
         onClick={() => setShowNewModal(true)}
       >
         <Plus size={14} />
@@ -306,22 +306,22 @@ export function SubagentSettings() {
 
       {/* 新增 Agent 弹窗 */}
       {showNewModal && (
-        <div className="mt-3 p-3 border border-border-muted rounded-lg space-y-2">
+        <div className="mt-3 p-3 border border-border/60 rounded-lg space-y-2">
           <p className="text-sm font-medium">{t("subagent.addAgentTitle")}</p>
           <Input
-            className="h-auto w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary shadow-none"
+            className="h-auto w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground shadow-none"
             placeholder={t("subagent.agentName")}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
           <Input
-            className="h-auto w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary shadow-none"
+            className="h-auto w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground shadow-none"
             placeholder={t("subagent.agentDescription")}
             value={newDesc}
             onChange={(e) => setNewDesc(e.target.value)}
           />
           <Textarea
-            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary shadow-none"
+            className="w-full rounded-lg border border-border/60 bg-background px-3 py-2 text-sm text-foreground shadow-none"
             rows={4}
             placeholder={t("subagent.agentPrompt")}
             value={newPrompt}

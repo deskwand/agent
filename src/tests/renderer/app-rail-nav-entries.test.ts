@@ -25,12 +25,12 @@ describe("AppRail", () => {
   it("keeps the rail narrow, themed and non-resizable", () => {
     expect(rail).toContain("w-14");
     // 图标栏属"外圈"，比会话栏更暗一级（2026-09-29 决策，取代 2026-09-27 的"同色"）。
-    // 注意 toContain 是**子串**匹配：`toContain("bg-background")` 对 `bg-background-chrome`
+    // 注意 toContain 是**子串**匹配：`toContain("bg-background")` 对 `bg-app-chrome`
     // 照样命中，所以这条是弱断言 —— 真正拦住回流的是 panel-boundary.test.ts 里的
     // `\bbg-background(?![\w-])`。
     // themed 的本意不变：仍然只用语义 token。
-    expect(rail).toContain("bg-background-chrome");
-    expect(rail).not.toContain("bg-background-secondary");
+    expect(rail).toContain("bg-app-chrome");
+    expect(rail).not.toContain("bg-muted");
     expect(rail).not.toContain("ResizeHandle");
     expect(rail).not.toContain("sidebarWidth");
   });
@@ -38,7 +38,7 @@ describe("AppRail", () => {
   it("marks the active item and exposes an accessible name", () => {
     expect(rail).toContain('aria-label={t("navRail.label")}');
     expect(rail).toContain("aria-current");
-    expect(rail).toContain("bg-overlay-on text-primary");
+    expect(rail).toContain("bg-accent text-primary");
   });
 
   it("只切视图，不碰侧栏", () => {
@@ -188,6 +188,6 @@ describe("侧栏只挂在聊天视图", () => {
 
   it("does not add a background-secondary literal to App.tsx", () => {
     // panel-boundary.test.ts 断言该字面量在 App.tsx 恰好出现 8 次
-    expect(app.match(/bg-background-secondary/g)?.length).toBe(8);
+    expect(app.match(/bg-muted/g)?.length).toBe(8);
   });
 });

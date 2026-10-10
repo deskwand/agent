@@ -83,7 +83,7 @@ export function ConfirmDialog({
               // 为抹平它去加一个 descriptionClassName prop 是没必要的 API 面积 ——
               // D2 已授权「以 shadcn 默认观感为准」，差异记在 ledger 里。
               // 只有**语气**必须保留，因为那承载语义（告警 vs 说明）。
-              className={descriptionTone === "error" ? "text-error" : undefined}
+              className={descriptionTone === "error" ? "text-destructive" : undefined}
             >
               {description}
             </AlertDialogDescription>
@@ -99,8 +99,8 @@ export function ConfirmDialog({
             }}
             className={
               tone === "primary"
-                ? "bg-primary/10 text-primary hover:bg-primary/20"
-                : "bg-error/10 text-error hover:bg-error/20"
+                ? "bg-primary/10 text-primary-text hover:bg-primary/20"
+                : "bg-destructive/10 text-destructive hover:bg-destructive/20"
             }
           >
             {confirmLabel ?? t("common.delete")}

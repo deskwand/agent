@@ -177,7 +177,7 @@ describe("ConfirmDialog", () => {
   it("gives the two tones different styling", async () => {
     // tone 的有效性：danger 与 primary 必须产出不同的确认键样式。
     //
-    // 不断言具体类名（例如「应含 bg-error」）—— D2 明确接受观感随 shadcn 变，
+    // 不断言具体类名（例如「应含 bg-destructive」）—— D2 明确接受观感随 shadcn 变，
     // 锁死类名会在下次升级 vendored 组件时变成假红。
     await render(
       <ConfirmDialog

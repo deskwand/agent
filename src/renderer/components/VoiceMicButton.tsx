@@ -136,8 +136,8 @@ export function VoiceMicButton({
   // 焦点不能丢：键盘用户用空格开始录音后，按钮一旦换成另一个元素，焦点就掉到 body，
   // 故事就停了（既没被告知录上了，也无法再按空格停下）。所以只换类名与内容。
   const buttonClassName = pillVisible
-    ? "flex h-8 shrink-0 items-center gap-2 rounded-full bg-surface-hover px-2.5 transition-colors hover:bg-surface-active disabled:cursor-not-allowed"
-    : "relative inline-flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50";
+    ? "flex h-8 shrink-0 items-center gap-2 rounded-full bg-accent px-2.5 transition-colors hover:bg-accent disabled:cursor-not-allowed"
+    : "relative inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <div className="flex shrink-0 items-center gap-1">
@@ -145,7 +145,7 @@ export function VoiceMicButton({
         <>
           {/* 下载进度占的正是录音胶囊那一格（原地，不加浮层） */}
           <div
-            className="h-1 w-10 overflow-hidden rounded-full bg-border-muted"
+            className="h-1 w-10 overflow-hidden rounded-full bg-border/60"
             aria-hidden
           >
             <div
@@ -153,14 +153,14 @@ export function VoiceMicButton({
               style={{ width: `${percent}%` }}
             />
           </div>
-          <span className="text-xs tabular-nums text-text-muted">
+          <span className="text-xs tabular-nums text-muted-foreground">
             {percent}%
           </span>
         </>
       )}
 
       {!pillVisible && installFailed && (
-        <span className="px-1 text-xs text-error">
+        <span className="px-1 text-xs text-destructive">
           {t("chat.voiceInstallFailed")}
         </span>
       )}
@@ -183,12 +183,12 @@ export function VoiceMicButton({
                     <span
                       key={slot}
                       data-testid="voice-level-bar"
-                      className="w-[3px] rounded-full bg-text-muted transition-[height] duration-150 ease-out"
+                      className="w-[3px] rounded-full bg-muted-foreground transition-[height] duration-150 ease-out"
                       style={{ height: `${bars[slot]}%` }}
                     />
                   ))}
                 </span>
-                <span className="text-xs tabular-nums text-text-muted">
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {formatSeconds(seconds)}
                 </span>
               </>

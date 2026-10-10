@@ -4,7 +4,7 @@ import { appButtonVariants, shouldLeftAlign } from "@renderer/components/app-but
 import { buttonVariants } from "@renderer/components/ui/button";
 
 /**
- * `app-button` 是 vendored `ui/button` 的**非 vendored 包装层** ✓，只做两处**有意的**差异：
+ * `app-button` 是 vendored `ui/button` 的**非 vendored 包装层** ✓，只做三处**有意的**差异：
  *  ① `ghost` **不带** `hover:text-accent-foreground` ✓（它在部分主题是白色，会把本仓按钮的文字
  *     刷白压在自己的浅色 hover 底上 —— 2026-10-09 用户报障的根因之一 ✓）；
  *  ② 按 token 精确判定后，只给「原生就是居左」的调用方补 `justify-start` ✓。
@@ -47,7 +47,7 @@ describe("app-button 包装层", () => {
     expect(shouldLeftAlign(`flex w-full ${true ? "justify-center p-2.5" : "gap-2.5"}`)).toBe(false);
   });
 
-  it("⚠️ 漂移守卫：与 vendored 变体表逐项比对，只允许两处已记录的差异", () => {
+  it("⚠️ 漂移守卫：与 vendored 变体表逐项比对，只允许三处已记录的差异", () => {
     // 包装层复制了 vendored 的变体表 ⇒ 上游改动**到不了这 105 个文件** ✗（审查 Minor 4）。
     // 这条把「允许的差异」写成可执行的事实 ✓：多一处、少一处都会红 ✓。
     const variants = ["default", "destructive", "outline", "secondary", "ghost", "link"] as const;
@@ -56,7 +56,19 @@ describe("app-button 包装层", () => {
       for (const size of sizes) {
         const vendor = buttonVariants({ variant, size }).split(/\s+/).filter(Boolean).sort();
         const app = appButtonVariants({ variant, size }).split(/\s+/).filter(Boolean).sort();
-        if (variant !== "ghost") {
+        if (variant === "link") {
+          // 第二处有意差异（强调色维度上线后新增）：link 的文字色必须是"强调色文字档"
+          // `--primary-text`，不能用填充色 `--primary` —— 官方 accent 的亮色 lime/neutral
+          // 当文字只有 1.53:1。vendored 文件不知道这个档，所以只能在这里登记。
+          expect(
+            vendor.filter((c) => !app.includes(c)),
+            "link 只允许少 text-primary",
+          ).toEqual(["text-primary"]);
+          expect(
+            app.filter((c) => !vendor.includes(c)),
+            "link 只允许把 text-primary 换成 text-primary-text",
+          ).toEqual(["text-primary-text"]);
+        } else if (variant !== "ghost") {
           expect(app, `${variant}/${size} 不该与 vendored 有差异`).toEqual(vendor);
         } else {
           expect(vendor.filter((c) => !app.includes(c)), "ghost 只允许少这一条").toEqual([

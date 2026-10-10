@@ -83,7 +83,7 @@ describe("斜杠菜单技能行的星标", () => {
   it("未固定是空心 + muted，已固定是实心 + accent", () => {
     renderMenu({ pinnedSkills: [], onToggleSkillPin: () => undefined });
     expect(pinButton().querySelector("svg")?.getAttribute("fill")).toBe("none");
-    expect(pinButton().className).toContain("text-text-muted");
+    expect(pinButton().className).toContain("text-muted-foreground");
 
     renderMenu({ pinnedSkills: ["pdf"], onToggleSkillPin: () => undefined });
     expect(pinButton().querySelector("svg")?.getAttribute("fill")).toBe(

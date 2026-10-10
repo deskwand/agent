@@ -160,7 +160,7 @@ export function PromptCommandFormModal({
             ? t("chat.newCommandTitle")
             : t("chat.editCommandTitle")
         }
-        className="flex max-h-[88vh] w-full max-w-[560px] flex-col gap-0 overflow-hidden border-border-subtle p-0 shadow-elevated"
+        className="flex max-h-[88vh] w-full max-w-[560px] flex-col gap-0 overflow-hidden border-border/40 p-0 shadow-elevated"
         onInteractOutside={(event) => event.preventDefault()}
         onEscapeKeyDown={(event) => {
           // 两段：搜索框里有东西先清空，再按一次才关表单。
@@ -177,8 +177,8 @@ export function PromptCommandFormModal({
           }
         }}
       >
-        <div className="flex items-center gap-3 border-b border-border-muted px-5 py-[14px]">
-          <DialogTitle className="min-w-0 flex-1 text-sm font-semibold text-text-primary">
+        <div className="flex items-center gap-3 border-b border-border/60 px-5 py-[14px]">
+          <DialogTitle className="min-w-0 flex-1 text-sm font-semibold text-foreground">
             {mode === "create"
               ? t("chat.newCommandTitle")
               : t("chat.editCommandTitle")}
@@ -196,14 +196,14 @@ export function PromptCommandFormModal({
           <div className="mb-4">
             <label
               data-field-label
-              className="mb-1.5 block text-xs text-text-secondary"
+              className="mb-1.5 block text-xs text-muted-foreground"
               htmlFor="prompt-name"
             >
               {t("chat.commandName")}
             </label>
             <div
-              className={`flex items-center gap-2 rounded-xl border bg-surface-muted px-3 py-2 ${
-                nameErrorKey ? "border-error" : "border-border"
+              className={`flex items-center gap-2 rounded-xl border bg-muted px-3 py-2 ${
+                nameErrorKey ? "border-destructive" : "border-border"
               }`}
             >
               <Input
@@ -214,19 +214,19 @@ export function PromptCommandFormModal({
                 readOnly={mode === "edit"}
                 onChange={(e) => update({ name: e.target.value })}
                 placeholder={t("chat.commandNamePlaceholder")}
-                className="min-w-0 flex-1 bg-transparent font-mono text-sm text-text-primary outline-none"
+                className="min-w-0 flex-1 bg-transparent font-mono text-sm text-foreground outline-none"
               />
               {mode === "edit" && (
-                <Lock className="h-3.5 w-3.5 shrink-0 text-text-muted" />
+                <Lock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               )}
             </div>
             {mode === "edit" && (
-              <p className="mt-1.5 text-xs text-text-muted">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 {t("chat.commandNameHint")}
               </p>
             )}
             {nameErrorKey && (
-              <p className="mt-1 text-xs text-error">
+              <p className="mt-1 text-xs text-destructive">
                 {t(nameErrorKey, { name: value.name })}
               </p>
             )}
@@ -237,7 +237,7 @@ export function PromptCommandFormModal({
             <div className="mb-1.5 flex items-center justify-between">
               <label
                 data-field-label
-                className="text-xs text-text-secondary"
+                className="text-xs text-muted-foreground"
                 htmlFor="prompt-content"
               >
                 {t("chat.commandBody")}
@@ -247,7 +247,7 @@ export function PromptCommandFormModal({
                 data-skill-trigger
                 aria-label={t("chat.commandInsertSkillHint")}
                 onClick={() => void openSkillList()}
-                className="inline-flex h-6 items-center gap-1 rounded-lg border border-border bg-surface px-2 text-[11.5px] text-text-primary transition-colors hover:bg-surface-hover"
+                className="inline-flex h-6 items-center gap-1 rounded-lg border border-border bg-card px-2 text-[11.5px] text-foreground transition-colors hover:bg-accent"
               >
                 <Plus className="h-3 w-3" />
                 {t("chat.commandInsertSkill")}
@@ -260,8 +260,8 @@ export function PromptCommandFormModal({
                 className="mb-1.5 rounded-xl border border-border bg-background shadow-elevated"
               >
                 {/* 搜索行固定在滚动区之外 —— 否则列表一滚就把搜索框卷走了 */}
-                <div className="relative border-b border-border-muted px-1.5 py-1.5">
-                  <Search className="pointer-events-none absolute left-[17px] top-[17px] h-3.5 w-3.5 text-text-muted" />
+                <div className="relative border-b border-border/60 px-1.5 py-1.5">
+                  <Search className="pointer-events-none absolute left-[17px] top-[17px] h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     ref={skillSearchRef}
                     data-skill-search
@@ -269,7 +269,7 @@ export function PromptCommandFormModal({
                     onChange={(e) => setSkillQuery(e.target.value)}
                     placeholder={t("chat.commandSkillSearchPlaceholder")}
                     aria-label={t("chat.commandSkillSearchPlaceholder")}
-                    className="h-8 w-full rounded-lg border-0 bg-surface-muted pl-7 pr-2.5 text-[13px] text-text-primary shadow-none outline-none placeholder:text-text-muted md:text-[13px]"
+                    className="h-8 w-full rounded-lg border-0 bg-muted pl-7 pr-2.5 text-[13px] text-foreground shadow-none outline-none placeholder:text-muted-foreground md:text-[13px]"
                   />
                 </div>
                 <div data-skill-scroll className="max-h-48 overflow-y-auto p-1">
@@ -279,25 +279,25 @@ export function PromptCommandFormModal({
                       type="button"
                       data-skill-option={skill.name}
                       onClick={() => insertSkillReference(skill.name)}
-                      className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-hover h-auto"
+                      className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-accent h-auto"
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] text-text-primary">
+                        <span className="block truncate text-[13px] text-foreground">
                           {skill.name}
                         </span>
                         {skill.description && (
-                          <span className="block truncate text-xs text-text-muted">
+                          <span className="block truncate text-xs text-muted-foreground">
                             {skill.description}
                           </span>
                         )}
                       </span>
-                      <span className="shrink-0 text-[10px] text-text-secondary">
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
                         {t(SKILL_TYPE_BADGE_KEY[skill.type])}
                       </span>
                     </Button>
                   ))}
                   {visibleSkills.length === 0 && (
-                    <p className="px-2.5 py-2 text-xs text-text-muted">
+                    <p className="px-2.5 py-2 text-xs text-muted-foreground">
                       {skillLoadFailed
                         ? t("chat.commandSkillLoadFailed")
                         : skillQuery.trim()
@@ -323,7 +323,7 @@ export function PromptCommandFormModal({
               onClick={rememberCaret}
               onKeyUp={rememberCaret}
               placeholder={t("chat.commandBodyPlaceholder")}
-              className="min-h-[140px] w-full resize-none rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm leading-relaxed text-text-primary outline-none"
+              className="min-h-[140px] w-full resize-none rounded-xl border border-border bg-muted px-3 py-2 text-sm leading-relaxed text-foreground outline-none"
             />
           </div>
 
@@ -331,7 +331,7 @@ export function PromptCommandFormModal({
           <div>
             <label
               data-field-label
-              className="mb-1.5 block text-xs text-text-secondary"
+              className="mb-1.5 block text-xs text-muted-foreground"
               htmlFor="prompt-display-name"
             >
               {t("chat.commandDisplayName")}
@@ -343,16 +343,16 @@ export function PromptCommandFormModal({
               value={value.displayName}
               onChange={(e) => update({ displayName: e.target.value })}
               placeholder={t("chat.commandDisplayNameHint")}
-              className="h-auto w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm text-text-primary shadow-none outline-none"
+              className="h-auto w-full rounded-xl border border-border bg-muted px-3 py-2 text-sm text-foreground shadow-none outline-none"
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border-muted px-5 py-3.5">
+        <div className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-3.5">
           <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="h-9 rounded-xl border border-border px-4 text-sm text-text-primary transition-colors hover:bg-surface-hover"
+            className="h-9 rounded-xl border border-border px-4 text-sm text-foreground transition-colors hover:bg-accent"
           >
             {t("common.cancel")}
           </Button>
@@ -361,7 +361,7 @@ export function PromptCommandFormModal({
             data-form-save
             disabled={!canSave}
             onClick={() => onSave(value)}
-            className="h-9 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:border disabled:border-border-muted disabled:bg-surface-muted disabled:text-text-muted"
+            className="h-9 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:border disabled:border-border/60 disabled:bg-muted disabled:text-muted-foreground"
           >
             {saving ? t("common.saving") : t("common.save")}
           </Button>

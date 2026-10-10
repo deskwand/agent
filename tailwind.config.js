@@ -4,102 +4,74 @@ module.exports = {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      // 键路径 === 变量名（都无前缀）——由 token-alpha.test.ts 锁定。
+      // 官方 31 个变量：一份官方主题贴进来就齐活。
       colors: {
-        // 语义色一律包 token()。tailwind v3 对 `var(--x)` 整值不支持 /alpha：
-        // withAlphaValue() → parseColor 失败 → 返回 undefined → 整条 utility 被丢弃。
-        // token() 是函数色，tailwind 会把修饰符里的 alpha 交给它，由 color-mix 落地。
-        // 色值真相只有 globals.css 一份，这里只做「键路径 → 变量名」映射。
-        background: {
-          DEFAULT: token("background"),
-          secondary: token("background-secondary"),
-          chrome: token("background-chrome"),
-        },
-        surface: {
-          DEFAULT: token("surface"),
-          hover: token("surface-hover"),
-          active: token("surface-active"),
-          muted: token("surface-muted"),
-        },
-        border: {
-          DEFAULT: token("border"),
-          muted: token("border-muted"),
-          subtle: token("border-subtle"),
-        },
-        accent: {
-          DEFAULT: token("accent"),
-          hover: token("accent-hover"),
-          muted: token("accent-muted"),
-          foreground: token("accent-foreground"),
-        },
-        // ——— shadcn 契约映射（spec §5.1）———————————————————————————
-        // 只收录 vendored 文件实际用到的名字（spec §5.2：枚举后定稿，不凭猜）。
-        //
-        // 每个 key 都指向**同名**的 --color-* 变量 —— 这不是偶然：
-        // token-alpha.test.ts 锁定了「键路径 === 变量名」的不变量。
-        // 那些同名变量在 globals.css 顶层 :root 里用 var() 指向本仓既有 token。
-        //
-        // 注意 primary 与 accent 的区别（两阶段改名，设计文档 §5.2）：
-        // --color-primary 与 --color-accent 同值；变的是 **utility** accent 的
-        // 含义，那是计划 7 的独立一步。
-        primary: {
-          DEFAULT: token("primary"),
-          hover: token("primary-hover"),
-          muted: token("primary-muted"),
-          foreground: token("primary-foreground"),
-        },
-        // ⚠️ secondary 是保留给 shadcn 的**表面**名，不是文字色。
-        // 它同时会生成 utility `text-secondary` —— 那个名字看上去像「次级文字」，
-        // 实际渲染成表面色（深色主题下近乎不可见）且不会报错。
-        // 本仓的次级文字是 `text.text.secondary` → `text-text-secondary`。
-        // 两者的语义区别由 shadcn-token-mapping.test.ts 的「陷阱登记」用例钉住。
-        secondary: {
-          DEFAULT: token("secondary"),
-          foreground: token("secondary-foreground"),
-        },
-        destructive: {
-          DEFAULT: token("destructive"),
-          foreground: token("destructive-foreground"),
-        },
+        background: token("background"),
         foreground: token("foreground"),
-        "muted-foreground": token("muted-foreground"),
-        // 计划 5 追加：vendored dropdown-menu.tsx 用到的名字（枚举后定稿）
-        muted: token("muted"),
+        card: { DEFAULT: token("card"), foreground: token("card-foreground") },
         popover: {
           DEFAULT: token("popover"),
           foreground: token("popover-foreground"),
         },
+        primary: {
+          DEFAULT: token("primary"),
+          foreground: token("primary-foreground"),
+        },
+        secondary: {
+          DEFAULT: token("secondary"),
+          foreground: token("secondary-foreground"),
+        },
+        muted: {
+          DEFAULT: token("muted"),
+          foreground: token("muted-foreground"),
+        },
+        accent: {
+          DEFAULT: token("accent"),
+          foreground: token("accent-foreground"),
+        },
+        // 强调色的"文字档"：官方 accent 的暗色 primary 对暗底只有 1.98–2.81，不能当文字用。
+        // 变量在 globals.css 的固定语义层声明一次（一条 color-mix 公式），不逐块写。
+        "primary-text": token("primary-text"),
+        destructive: {
+          DEFAULT: token("destructive"),
+          // ⚠️ 官方 31 里没有 destructive-foreground：本仓固定语义层提供它
+          //（vendored ui/button.tsx 的 destructive 变体写死了这个类名）。
+          foreground: token("destructive-foreground"),
+        },
+        border: token("border"),
         input: token("input"),
         ring: token("ring"),
-        mention: token("mention"),
-        // 搜索命中 / 高亮的不透明色，声明在 globals.css 顶层 :root（只一次）。
-        // 取值理由与 14 个主题块下的实测对比度见
-        // design-docs/2026-09-26-tailwind-token-alpha-design.md §5.2。
-        highlight: token("highlight"),
-        mcp: {
-          DEFAULT: token("mcp"),
+        "chart-1": token("chart-1"),
+        "chart-2": token("chart-2"),
+        "chart-3": token("chart-3"),
+        "chart-4": token("chart-4"),
+        "chart-5": token("chart-5"),
+        sidebar: {
+          DEFAULT: token("sidebar"),
+          foreground: token("sidebar-foreground"),
+          primary: token("sidebar-primary"),
+          "primary-foreground": token("sidebar-primary-foreground"),
+          accent: token("sidebar-accent"),
+          "accent-foreground": token("sidebar-accent-foreground"),
+          border: token("sidebar-border"),
+          ring: token("sidebar-ring"),
         },
-        file: {
-          media: token("file-media"),
-          doc: token("file-doc"),
-          code: token("file-code"),
-          audio: token("file-audio"),
-          neutral: token("file-neutral"),
+        // ——— 固定语义层：与主题无关，不随 palette 变（只分明暗）———————
+        success: {
+          DEFAULT: token("success"),
+          foreground: token("success-foreground"),
         },
-        text: {
-          primary: token("text-primary"),
-          secondary: token("text-secondary"),
-          muted: token("text-muted"),
+        warning: {
+          DEFAULT: token("warning"),
+          foreground: token("warning-foreground"),
         },
-        success: token("success"),
-        "success-foreground": token("success-foreground"),
-        warning: token("warning"),
-        "warning-foreground": token("warning-foreground"),
-        error: token("error"),
-        overlay: {
-          hover: token("overlay-hover"),
-          press: token("overlay-press"),
-          on: token("overlay-on"),
-        },
+        "file-media": token("file-media"),
+        "file-doc": token("file-doc"),
+        "file-code": token("file-code"),
+        "file-audio": token("file-audio"),
+        "file-neutral": token("file-neutral"),
+        "app-chrome": token("app-chrome"),
         "window-close-hover": token("window-close-hover"),
       },
       fontFamily: {
@@ -126,29 +98,37 @@ module.exports = {
           "monospace",
         ],
       },
+      // 官方（= Tailwind 默认）尺度。fontWeight 400 是本仓护栏（官方无等价物），保留：
+      // 它让 text-* 在继承到非 400 的容器里仍然回到正文字重；fontWeight 工具类排在其后，
+      // `text-sm font-medium` 依旧生效。
       fontSize: {
-        xs: ["0.75rem", { lineHeight: "1rem", fontWeight: "400" }], // 12px — chrome/meta
-        sm: ["0.8125rem", { lineHeight: "1.25rem", fontWeight: "400" }], // 13px — compact body
-        base: ["0.875rem", { lineHeight: "1.5rem", fontWeight: "400" }], // 14px — body / chat prose
-        lg: ["0.9375rem", { lineHeight: "1.5rem", fontWeight: "600" }], // 15px — subtle heading
-        xl: ["1rem", { lineHeight: "1.5rem", fontWeight: "600" }], // 16px — section heading
-        "2xl": ["1.125rem", { lineHeight: "1.5rem", fontWeight: "600" }], // 18px — stat / major heading
+        xs: ["0.75rem", { lineHeight: "1rem", fontWeight: "400" }], // 12px
+        sm: ["0.875rem", { lineHeight: "1.25rem", fontWeight: "400" }], // 14px
+        base: ["1rem", { lineHeight: "1.5rem", fontWeight: "400" }], // 16px
+        lg: ["1.125rem", { lineHeight: "1.75rem", fontWeight: "600" }], // 18px
+        xl: ["1.25rem", { lineHeight: "1.75rem", fontWeight: "600" }], // 20px
+        "2xl": ["1.5rem", { lineHeight: "2rem", fontWeight: "600" }], // 24px
       },
       boxShadow: {
         soft: "var(--shadow-soft)",
         card: "var(--shadow-card)",
         elevated: "var(--shadow-elevated)",
       },
+      // 官方 shadcn 公式：sm/md/lg/xl/2xl/3xl/4xl = --radius 的 0.6/0.8/1/1.4/1.8/2.2/2.6 倍；
+      // 5xl/6xl 官方没有，按同一步长（+0.4）外推。3xl 全仓零引用，但按外科原则保留。
       borderRadius: {
-        control: "5px",
-        container: "12px",
-        lg: "8px",
-        xl: "10px",
-        "2xl": "14px",
-        "3xl": "16px",
-        "4xl": "20px",
-        "5xl": "24px",
-        "6xl": "28px",
+        sm: "calc(var(--radius) * 0.6)",
+        md: "calc(var(--radius) * 0.8)",
+        lg: "calc(var(--radius) * 1)",
+        xl: "calc(var(--radius) * 1.4)",
+        "2xl": "calc(var(--radius) * 1.8)",
+        "3xl": "calc(var(--radius) * 2.2)",
+        "4xl": "calc(var(--radius) * 2.6)",
+        "5xl": "calc(var(--radius) * 3)",
+        "6xl": "calc(var(--radius) * 3.4)",
+        // 本仓语义档：控件 6px、容器 12px（后者恰好与官方 1.2× 相同）
+        control: "calc(var(--radius) * 0.6)",
+        container: "calc(var(--radius) * 1.2)",
       },
       backgroundImage: {
         "grid-pattern": `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4d2cc' fill-opacity='0.4'%3E%3Cpath d='M0 0h1v40H0V0zm39 0h1v40h-1V0z'/%3E%3Cpath d='M0 0h40v1H0V0zm0 39h40v1H0v-1z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
@@ -202,11 +182,11 @@ module.exports = {
 //   无修饰符时是 "var(--tw-bg-opacity, 1)"（保留 bg-opacity 链路）
 //   有修饰符时是 "0.4"
 // 两种情况都走 color-mix，因此色值真相仍然只有 globals.css 一份。
-// 等价于 rgba(var(--color-x), alpha)，color-mix 在 srgb 空间下与之一致。
+// 等价于 rgba(var(--x), alpha)，color-mix 在 srgb 空间下与之一致。
 // 回归测试：src/tests/renderer/token-alpha.test.ts
 function token(name) {
   return ({ opacityValue }) =>
     opacityValue === undefined
-      ? `var(--color-${name})`
-      : `color-mix(in srgb, var(--color-${name}) calc(${opacityValue} * 100%), transparent)`;
+      ? `var(--${name})`
+      : `color-mix(in srgb, var(--${name}) calc(${opacityValue} * 100%), transparent)`;
 }

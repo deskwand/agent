@@ -333,7 +333,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
     <div
       className={`rounded-2xl overflow-hidden transition-colors ${
         effectiveError
-          ? "bg-error/5"
+          ? "bg-destructive/5"
           : effectiveRunning
             ? "bg-primary/5"
             : "bg-background/40"
@@ -343,11 +343,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
+        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
       >
         {/* Status icon — goal tools are status queries, no execution indicator needed */}
         {!isGoalTool && (
-          <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-text-muted">
+          <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
             {effectiveError ? (
               <XCircle className="w-3.5 h-3.5" />
             ) : effectiveRunning ? (
@@ -360,18 +360,18 @@ export const ToolUseBlock = memo(function ToolUseBlock({
 
         {/* Tool icon */}
         {showIcon ? (
-          <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-text-muted">
+          <div className="w-3.5 flex-shrink-0 pt-0.5 flex justify-center text-muted-foreground">
             {getToolIcon(block.name)}
           </div>
         ) : null}
 
         {/* Content cluster */}
         <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-          <span className="min-w-0 truncate text-xs font-mono text-text-secondary">
+          <span className="min-w-0 truncate text-xs font-mono text-muted-foreground">
             {displayLabel}
           </span>
           {!isRunning && collapsedSummary.kind === "diff" && (
-            <span className="whitespace-nowrap text-xs text-text-muted inline-flex items-center gap-1">
+            <span className="whitespace-nowrap text-xs text-muted-foreground inline-flex items-center gap-1">
               ·{" "}
               <span className="diff-add rounded-sm px-0.5">
                 +{collapsedSummary.added}
@@ -386,14 +386,14 @@ export const ToolUseBlock = memo(function ToolUseBlock({
             collapsedSummaryText && (
               <span
                 className={`whitespace-nowrap text-xs ${
-                  isError ? "text-error" : "text-text-muted"
+                  isError ? "text-destructive" : "text-muted-foreground"
                 }`}
               >
                 · {collapsedSummaryText}
               </span>
             )}
           <span
-            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-text-muted transition-opacity ${
+            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
               expanded
                 ? "opacity-100"
                 : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -412,7 +412,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
       {expanded && (
         <div className="animate-fade-in bg-background/35">
           {expandedMetaItems.length > 0 && (
-            <div className="px-3 pt-2 text-xs text-text-muted">
+            <div className="px-3 pt-2 text-xs text-muted-foreground">
               {expandedMetaItems.join(" · ")}
             </div>
           )}
@@ -420,13 +420,13 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           {/* Input section — hidden when diff is available, always hidden for vision_describe */}
           {!toolResult?.diff && !isVisionDescribe && (
             <div className="px-3 py-2">
-              <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
+              <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
                 {t("tool.sectionInput")}
               </div>
               {isWebSearchTool ? (
                 <div className="space-y-1">
                   {block.name === "get_search_content" ? (
-                    <div className="text-xs text-text-secondary">
+                    <div className="text-xs text-muted-foreground">
                       responseId: {String(toolInput.responseId || "")}
                     </div>
                   ) : block.name === "fetch_content" ? (
@@ -437,15 +437,15 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                       ).map((u, i) => (
                         <div
                           key={i}
-                          className="flex items-center gap-1.5 text-xs text-text-secondary"
+                          className="flex items-center gap-1.5 text-xs text-muted-foreground"
                         >
-                          <Globe className="w-3 h-3 text-text-muted flex-shrink-0" />
+                          <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                           <span className="truncate">{u}</span>
                         </div>
                       ))}
                       {toolInput.url && !Array.isArray(toolInput.urls) && (
-                        <div className="flex items-center gap-1.5 text-xs text-text-secondary">
-                          <Globe className="w-3 h-3 text-text-muted flex-shrink-0" />
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Globe className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                           <span className="truncate">
                             {String(toolInput.url)}
                           </span>
@@ -460,15 +460,15 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                     (toolInput.queries as string[]).map((q, i) => (
                       <div
                         key={i}
-                        className="flex items-center gap-1.5 text-xs text-text-secondary"
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
                       >
-                        <Search className="w-3 h-3 text-text-muted flex-shrink-0" />
+                        <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                         <span>{q}</span>
                       </div>
                     ))
                   ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-text-secondary">
-                      <Search className="w-3 h-3 text-text-muted flex-shrink-0" />
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Search className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                       <span>
                         {String(toolInput.query || toolInput.url || "")}
                       </span>
@@ -476,7 +476,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                   )}
                 </div>
               ) : isAgentTool ? (
-                <div className="text-xs text-text-secondary space-y-1">
+                <div className="text-xs text-muted-foreground space-y-1">
                   {(toolInput.subagent_type as string) && (
                     <div className="flex items-center gap-1.5">
                       <span>{toolInput.subagent_type as string}</span>
@@ -489,7 +489,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                   )}
                 </div>
               ) : block.name === "get_subagent_result" ? (
-                <div className="text-xs text-text-secondary">
+                <div className="text-xs text-muted-foreground">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span>
                       {resolvedName
@@ -497,19 +497,19 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                         : t("tool.actionGetSubagentResult")}
                     </span>
                     {toolInput.wait === true && (
-                      <span className="rounded bg-surface-muted px-1 text-[11px] text-text-muted">
+                      <span className="rounded bg-muted px-1 text-[11px] text-muted-foreground">
                         {t("tool.subagentWait")}
                       </span>
                     )}
                     {toolInput.verbose === true && (
-                      <span className="rounded bg-surface-muted px-1 text-[11px] text-text-muted">
+                      <span className="rounded bg-muted px-1 text-[11px] text-muted-foreground">
                         {t("tool.subagentVerbose")}
                       </span>
                     )}
                   </div>
                 </div>
               ) : block.name === "steer_subagent" ? (
-                <div className="text-xs text-text-secondary">
+                <div className="text-xs text-muted-foreground">
                   <div>
                     {resolvedName
                       ? t("tool.subagentSteer", { name: resolvedName })
@@ -517,13 +517,13 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                   </div>
                   {typeof toolInput.message === "string" &&
                     toolInput.message.length > 0 && (
-                      <div className="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5 text-text-secondary">
+                      <div className="mt-1 max-h-[200px] overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-2.5 text-muted-foreground">
                         {toolInput.message}
                       </div>
                     )}
                 </div>
               ) : (
-                <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all bg-surface-muted rounded-lg p-2.5">
+                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all bg-muted rounded-lg p-2.5">
                   {JSON.stringify(block.input, null, 2)}
                 </pre>
               )}
@@ -539,11 +539,11 @@ export const ToolUseBlock = memo(function ToolUseBlock({
             partialToolResult &&
             partialToolResult.content && (
               <div className="px-3 py-2">
-                <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
-                  <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center gap-1.5">
+                  <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
                   {t("tool.sectionStreaming")}
                 </div>
-                <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">
+                <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted">
                   {partialToolResult.content}
                 </pre>
               </div>
@@ -553,7 +553,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
           {toolResult && (
             <div className="px-3 py-2">
               {!toolResult.diff && !isVisionDescribe && (
-                <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
                   {t("tool.sectionOutput")}
                 </div>
               )}
@@ -569,7 +569,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                   </div>
                 ))}
               {toolResult.diff ? (
-                <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted leading-snug">
+                <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted leading-snug">
                   {toolResult.diff.split("\n").map((line, i) => {
                     const prefix = line[0];
                     const bgClass =
@@ -577,7 +577,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                         ? "diff-add"
                         : prefix === "-"
                           ? "diff-del"
-                          : "text-text-secondary";
+                          : "text-muted-foreground";
                     return (
                       <div key={i} className={bgClass}>
                         {line}
@@ -587,9 +587,9 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                 </pre>
               ) : (isWebSearchTool || isAgentTool || isSubagentOutputTool) &&
                 typeof toolResult.content === "string" ? (
-                <div className="text-xs text-text-secondary max-h-[400px] overflow-y-auto">
+                <div className="text-xs text-muted-foreground max-h-[400px] overflow-y-auto">
                   {subagentOutput?.header && (
-                    <div className="mb-2 whitespace-pre-wrap rounded-lg bg-surface-muted p-2.5">
+                    <div className="mb-2 whitespace-pre-wrap rounded-lg bg-muted p-2.5">
                       {subagentOutput.header}
                     </div>
                   )}
@@ -608,8 +608,8 @@ export const ToolUseBlock = memo(function ToolUseBlock({
                   <pre
                     className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
                       isError
-                        ? "text-error bg-error/5"
-                        : "text-text-secondary bg-surface-muted"
+                        ? "text-destructive bg-destructive/5"
+                        : "text-muted-foreground bg-muted"
                     } ${preferImageOutput ? "mt-2" : ""}`}
                   >
                     {isVisionDescribe && visionDescriptionText !== null

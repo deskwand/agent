@@ -294,7 +294,7 @@ export const ContentBlockView = memo(function ContentBlockView({
                 }
               }
             }}
-            className="text-primary hover:text-primary-hover"
+            className="text-primary-text hover:text-primary-text"
           >
             {children}
           </a>
@@ -302,7 +302,7 @@ export const ContentBlockView = memo(function ContentBlockView({
       },
       blockquote({ children }: { children?: React.ReactNode }) {
         return (
-          <blockquote className="border-l-2 border-primary/40 pl-4 text-text-muted">
+          <blockquote className="border-l-2 border-primary/40 pl-4 text-muted-foreground">
             {children}
           </blockquote>
         );
@@ -327,7 +327,7 @@ export const ContentBlockView = memo(function ContentBlockView({
           }
           return (
             <code
-              className="px-1.5 py-0.5 rounded bg-surface-muted text-primary font-mono text-xs"
+              className="px-1.5 py-0.5 rounded bg-muted text-primary-text font-mono text-xs"
               {...props}
             >
               {codeContent}
@@ -371,7 +371,7 @@ export const ContentBlockView = memo(function ContentBlockView({
       }) {
         return (
           <th
-            className="border border-border px-3 py-2 font-semibold text-text-primary bg-surface-muted"
+            className="border border-border px-3 py-2 font-semibold text-foreground bg-muted"
             style={style}
           >
             {children}
@@ -387,7 +387,7 @@ export const ContentBlockView = memo(function ContentBlockView({
       }) {
         return (
           <td
-            className="border border-border px-3 py-2 text-text-primary"
+            className="border border-border px-3 py-2 text-foreground"
             style={style}
           >
             {children}
@@ -400,7 +400,7 @@ export const ContentBlockView = memo(function ContentBlockView({
             type="checkbox"
             checked={checked}
             readOnly
-            className="mr-2 accent-accent"
+            className="mr-2 accent-primary"
             {...props}
           />
         );
@@ -439,7 +439,7 @@ export const ContentBlockView = memo(function ContentBlockView({
 
         if (!text) {
           return (
-            <span className={`text-text-muted italic ${isUser ? "" : "pl-1"}`}>
+            <span className={`text-muted-foreground italic ${isUser ? "" : "pl-1"}`}>
               {t("messageCard.emptyText")}
             </span>
           );
@@ -448,7 +448,7 @@ export const ContentBlockView = memo(function ContentBlockView({
         // Simple text display for user messages, Markdown for assistant
         if (isUser) {
           return (
-            <p className="message-user-text text-text-primary whitespace-pre-wrap break-words text-left">
+            <p className="message-user-text text-foreground whitespace-pre-wrap break-words text-left">
               <UserTextWithTokens
                 text={text}
                 resolveFilePath={resolveFilePath}
@@ -463,14 +463,14 @@ export const ContentBlockView = memo(function ContentBlockView({
           <PanelErrorBoundary
             name="MessageMarkdown"
             fallback={
-              <div className="prose-chat max-w-full pl-1 text-text-primary whitespace-pre-wrap break-words">
+              <div className="prose-chat max-w-full pl-1 text-foreground whitespace-pre-wrap break-words">
                 {normalizedText}
               </div>
             }
           >
             <Suspense
               fallback={
-                <div className="prose-chat max-w-full pl-1 text-text-primary whitespace-pre-wrap break-words">
+                <div className="prose-chat max-w-full pl-1 text-foreground whitespace-pre-wrap break-words">
                   {normalizedText}
                 </div>
               }
@@ -560,7 +560,7 @@ export const ContentBlockView = memo(function ContentBlockView({
 
         return (
           <div
-            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-surface-muted border border-border overflow-hidden ${isInteractive ? "cursor-pointer hover:bg-surface-hover transition-colors" : ""}`}
+            className={`flex max-w-full min-w-0 items-center gap-2 px-3 py-2 rounded-lg bg-muted border border-border overflow-hidden ${isInteractive ? "cursor-pointer hover:bg-accent transition-colors" : ""}`}
             onClick={() => {
               void (async () => {
                 if (!attachmentPath || !isInteractive) return;
@@ -591,9 +591,9 @@ export const ContentBlockView = memo(function ContentBlockView({
               })();
             }}
           >
-            <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+            <FileText className="w-4 h-4 text-primary-text flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-text-primary truncate">
+              <p className="text-xs text-foreground truncate">
                 {fileBlock.filename}
               </p>
             </div>

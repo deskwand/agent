@@ -83,7 +83,7 @@ function VideoThumb({ reference }: { reference: VideoReference }) {
     reference.playbackKind === "inline" && Boolean(src) && !failed;
 
   return (
-    <div className="relative flex h-9 w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-muted">
+    <div className="relative flex h-9 w-[60px] shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
       {showVideo ? (
         <video
           src={src}
@@ -94,7 +94,7 @@ function VideoThumb({ reference }: { reference: VideoReference }) {
           onError={() => setFailed(true)}
         />
       ) : (
-        <Video className="h-4 w-4 text-text-muted" />
+        <Video className="h-4 w-4 text-muted-foreground" />
       )}
       {showVideo ? (
         <CirclePlay className="absolute h-5 w-5 text-white drop-shadow" />
@@ -368,7 +368,7 @@ export const ArtifactCard = memo(function ArtifactCard({
             return (
               <div
                 key={key}
-                className="flex cursor-pointer items-center justify-between rounded-xl border border-border-subtle px-4 py-3.5 transition-colors hover:bg-surface-hover/50"
+                className="flex cursor-pointer items-center justify-between rounded-xl border border-border/40 px-4 py-3.5 transition-colors hover:bg-accent/50"
                 onClick={() => void handleClickVideo(ref)}
                 role="button"
                 tabIndex={0}
@@ -382,7 +382,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                 <div className="flex min-w-0 items-center gap-3">
                   <VideoThumb reference={ref} />
                   <div className="min-w-0">
-                    <div className="truncate text-base font-semibold text-text-primary">
+                    <div className="truncate text-base font-semibold text-foreground">
                       {ref.name}
                     </div>
                   </div>
@@ -390,7 +390,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                 <div className="ml-3 flex shrink-0 items-center gap-1.5">
                   <Button variant="ghost"
                     type="button"
-                    className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-primary hover:bg-primary/5 h-auto"
+                    className="rounded-md border border-border/40 px-2.5 py-1 text-xs text-primary-text hover:bg-primary/5 h-auto"
                     onClick={(e) => {
                       e.stopPropagation();
                       void handleClickVideo(ref);
@@ -415,10 +415,10 @@ export const ArtifactCard = memo(function ArtifactCard({
           return (
             <div
               key={file.path}
-              className={`flex items-center justify-between rounded-xl border border-border-subtle px-4 py-3.5 transition-colors outline-none ${
+              className={`flex items-center justify-between rounded-xl border border-border/40 px-4 py-3.5 transition-colors outline-none ${
                 reverted
                   ? "cursor-default opacity-50"
-                  : "cursor-pointer hover:bg-surface-hover/50"
+                  : "cursor-pointer hover:bg-accent/50"
               }`}
               onClick={() => handleClickFile(file)}
               onKeyDown={(e) => {
@@ -433,7 +433,7 @@ export const ArtifactCard = memo(function ArtifactCard({
             >
               <div className="flex min-w-0 items-center gap-3">
                 <div
-                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-muted text-xs font-semibold text-text-muted ${
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground ${
                     reverted ? "line-through" : ""
                   }`}
                 >
@@ -441,13 +441,13 @@ export const ArtifactCard = memo(function ArtifactCard({
                 </div>
                 <div className="min-w-0">
                   <div
-                    className={`truncate text-base font-semibold text-text-primary ${
-                      reverted ? "line-through text-text-muted" : ""
+                    className={`truncate text-base font-semibold text-foreground ${
+                      reverted ? "line-through text-muted-foreground" : ""
                     }`}
                   >
                     {shortenPath(file.path)}
                   </div>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-text-muted">
+                  <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                     {status === "edited" ? (
                       <>
                         {!file.lineStatsUnavailable && (
@@ -455,7 +455,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                             <span className="text-success">
                               +{file.addedLines}
                             </span>
-                            <span className="text-error">
+                            <span className="text-destructive">
                               -{file.removedLines}
                             </span>
                             <span>·</span>
@@ -470,7 +470,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                             <span className="text-success">
                               +{file.addedLines}
                             </span>
-                            <span className="text-error">
+                            <span className="text-destructive">
                               -{file.removedLines}
                             </span>
                             <span>·</span>
@@ -487,7 +487,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                   <TooltipTrigger asChild>
                     <Button variant="ghost"
                       type="button"
-                      className="rounded-md p-1 text-text-muted hover:bg-surface-hover hover:text-text-secondary h-auto"
+                      className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-muted-foreground h-auto"
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!reverted) handleCopyPath(resolvePath(file.path));
@@ -512,7 +512,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                     <TooltipTrigger asChild>
                       <Button variant="ghost"
                         type="button"
-                        className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-text-muted hover:border-error/20 hover:bg-error/5 hover:text-error h-auto"
+                        className="rounded-md border border-border/40 px-2.5 py-1 text-xs text-muted-foreground hover:border-destructive/20 hover:bg-destructive/5 hover:text-destructive h-auto"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRevertFile(file);
@@ -529,7 +529,7 @@ export const ArtifactCard = memo(function ArtifactCard({
                 ) : null}
                 <Button variant="ghost"
                   type="button"
-                  className="rounded-md border border-border-subtle px-2.5 py-1 text-xs text-primary hover:bg-primary/5 h-auto"
+                  className="rounded-md border border-border/40 px-2.5 py-1 text-xs text-primary-text hover:bg-primary/5 h-auto"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleClickFile(file);
@@ -545,7 +545,7 @@ export const ArtifactCard = memo(function ArtifactCard({
         })}
 
         {revertError ? (
-          <div className="text-xs text-error">{revertError}</div>
+          <div className="text-xs text-destructive">{revertError}</div>
         ) : null}
       </div>
 

@@ -75,41 +75,41 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
         <div className="flex items-start gap-4">
           <div
             className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              isHighRisk ? "bg-warning/10" : "bg-primary-muted"
+              isHighRisk ? "bg-warning/10" : "bg-primary/10"
             }`}
           >
             {isHighRisk ? (
               <AlertTriangle className="w-6 h-6 text-warning" />
             ) : (
-              <Shield className="w-6 h-6 text-primary" />
+              <Shield className="w-6 h-6 text-primary-text" />
             )}
           </div>
 
           <div className="flex-1">
-            <AlertDialogTitle className="text-lg font-semibold text-text-primary">
+            <AlertDialogTitle className="text-lg font-semibold text-foreground">
               {t("permission.permissionRequired")}
             </AlertDialogTitle>
             {/* Description 供读屏补充一句上下文（Radix 不强制要求）。
                 这里用它承载工具描述，读屏用户听到的就是这段。 */}
-            <AlertDialogDescription className="text-sm text-text-secondary mt-1">
+            <AlertDialogDescription className="text-sm text-muted-foreground mt-1">
               {getToolDescription(permission.toolName)}
             </AlertDialogDescription>
           </div>
         </div>
 
         {/* Tool Details */}
-        <div className="mt-4 p-4 bg-surface-muted rounded-xl">
+        <div className="mt-4 p-4 bg-muted rounded-xl">
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-sm font-medium text-text-primary">
+            <span className="text-sm font-medium text-foreground">
               {t("permission.tool")}
             </span>
-            <span className="font-mono text-primary text-sm">
+            <span className="font-mono text-primary-text text-sm">
               {permission.toolName}
             </span>
           </div>
 
-          <div className="text-sm text-text-secondary">
-            <span className="font-medium text-text-primary">
+          <div className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">
               {t("permission.input")}
             </span>
             <pre className="mt-1 text-xs code-block max-h-32 overflow-auto">
@@ -132,7 +132,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
         <div className="mt-6 flex items-center gap-3">
           <Button variant="ghost"
             onClick={() => respondToPermission(permission.toolUseId, "deny")}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-surface-hover h-auto"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent h-auto"
           >
             <X className="w-4 h-4" />
             {t("permission.deny")}
@@ -140,7 +140,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
 
           <Button variant="ghost"
             onClick={() => respondToPermission(permission.toolUseId, "allow")}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover h-auto"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-auto"
           >
             <Check className="w-4 h-4" />
             {t("permission.allow")}
@@ -166,7 +166,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
                 respondToPermission(permission.toolUseId, "allow_always");
               }
             }}
-            className="w-full mt-2 rounded-lg px-3 py-1.5 text-sm text-text-secondary transition-colors hover:bg-surface-hover h-auto"
+            className="w-full mt-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent h-auto"
           >
             {t("permission.alwaysAllow")}
           </Button>
@@ -178,7 +178,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
             <div className="flex gap-2">
               <Button variant="ghost"
                 onClick={() => setPendingAlwaysAllow(false)}
-                className="flex-1 rounded-lg bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-surface-hover h-auto"
+                className="flex-1 rounded-lg bg-card px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-accent h-auto"
               >
                 {t("permission.deny")}
               </Button>
@@ -187,7 +187,7 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
                   setPendingAlwaysAllow(false);
                   respondToPermission(permission.toolUseId, "allow_always");
                 }}
-                className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover h-auto"
+                className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 h-auto"
               >
                 {t("permission.alwaysAllow")}
               </Button>

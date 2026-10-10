@@ -135,15 +135,15 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
     >
       <AlertDialogContent className="max-w-md w-full overflow-hidden gap-0 p-0">
         {/* Header */}
-        <div className="bg-background-secondary/90 px-6 py-5 border-b border-border-muted">
+        <div className="bg-muted/90 px-6 py-5 border-b border-border/60">
           <div className="flex items-center gap-3">
             <div className="text-3xl animate-pulse">{config.icon}</div>
             <div>
-              <AlertDialogTitle className="text-lg font-semibold text-text-primary">
+              <AlertDialogTitle className="text-lg font-semibold text-foreground">
                 {t("sandbox.setupTitle")}
               </AlertDialogTitle>
               {/* Description 供读屏补充一句上下文（Radix 不强制要求） */}
-              <AlertDialogDescription className="text-sm text-text-secondary">
+              <AlertDialogDescription className="text-sm text-muted-foreground">
                 {t("sandbox.setupSubtitle")}
               </AlertDialogDescription>
             </div>
@@ -159,8 +159,8 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                 isComplete
                   ? "text-success"
                   : isError
-                    ? "text-error"
-                    : "text-primary"
+                    ? "text-destructive"
+                    : "text-primary-text"
               }`}
             >
               {config.icon}
@@ -171,14 +171,14 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                   isComplete
                     ? "text-success"
                     : isError
-                      ? "text-error"
-                      : "text-primary"
+                      ? "text-destructive"
+                      : "text-primary-text"
                 }`}
               >
                 {displayText.message}
               </p>
               {displayText.detail && (
-                <p className="text-sm text-text-muted mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   {displayText.detail}
                 </p>
               )}
@@ -188,7 +188,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
           {/* Progress Bar */}
           {progress.progress !== undefined && !isError && (
             <div className="mt-4">
-              <div className="h-2 bg-surface-muted rounded-full overflow-hidden">
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
                 <div
                   className={`h-full transition-all duration-500 ease-out rounded-full ${
                     isComplete ? "bg-success" : "bg-primary"
@@ -196,7 +196,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                   style={{ width: `${progress.progress}%` }}
                 />
               </div>
-              <div className="flex justify-between mt-2 text-xs text-text-muted">
+              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
                 <span>{t("sandbox.progressLabel")}</span>
                 <span>{progress.progress}%</span>
               </div>
@@ -205,9 +205,9 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
 
           {/* Error Display */}
           {isError && progress.error && (
-            <div className="mt-4 p-3 bg-error/10 border border-error/30 rounded-xl">
-              <p className="text-sm text-error">{progress.error}</p>
-              <p className="text-xs text-text-muted mt-2">
+            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/30 rounded-xl">
+              <p className="text-sm text-destructive">{progress.error}</p>
+              <p className="text-xs text-muted-foreground mt-2">
                 {t("sandbox.continuingNative")}
               </p>
             </div>
@@ -231,7 +231,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                 onClick={handleClose}
                 className={`w-full py-2.5 px-4 rounded-xl font-medium transition-colors ${
                   isMac
-                    ? "bg-surface hover:bg-surface-muted text-text-primary border border-border"
+                    ? "bg-card hover:bg-muted text-foreground border border-border"
                     : "bg-primary hover:bg-primary/90 text-primary-foreground"
                 }`}
               >
@@ -253,8 +253,8 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-background-secondary/70 border-t border-border-muted">
-          <div className="flex items-center justify-between text-xs text-text-muted">
+        <div className="px-6 py-4 bg-muted/70 border-t border-border/60">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
               {window.electronAPI?.platform === "win32"
                 ? t("sandbox.footerWsl")

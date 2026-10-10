@@ -442,7 +442,7 @@ export function WelcomeView() {
     <div className="flex-1 flex flex-col items-center justify-center px-5 py-10 md:px-8 md:py-14">
       <div className="max-w-[840px] w-full space-y-7 animate-fade-in">
         <div className="space-y-4 text-center">
-          <p className="text-base font-medium tracking-[-0.02em] text-text-secondary text-center">
+          <p className="text-base font-medium tracking-[-0.02em] text-muted-foreground text-center">
             {showProjectTitle
               ? t("welcome.titleWithProject", { projectName })
               : t("welcome.title")}
@@ -467,7 +467,7 @@ export function WelcomeView() {
                 key={entry.id}
                 type="button"
                 onClick={() => handleQuickEntry(entry)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary h-auto"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border/40 bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground h-auto"
               >
                 <QuickEntryIcon icon={entry.icon} />
                 {t(entry.labelKey)}
@@ -477,7 +477,7 @@ export function WelcomeView() {
         )}
 
         {showConnectCards && (
-          <p className="text-center text-xs text-text-muted">
+          <p className="text-center text-xs text-muted-foreground">
             {t("connect.capabilitySummary")}
           </p>
         )}
@@ -502,7 +502,7 @@ export function WelcomeView() {
               : t("welcome.placeholder")
           }
           cardClassName={`rounded-6xl bg-background/60 shadow-elevated px-5 py-5 space-y-4${showConnectCards ? " cursor-not-allowed" : ""}`}
-          textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed overflow-hidden"
+          textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed overflow-hidden"
           bottomSlot={
             showConnectCards ? undefined : (
               <ChatInputBottomBar
@@ -572,7 +572,7 @@ export function WelcomeView() {
                   }
                 }}
                 contextUsagePercentage={0}
-                contextRingColorClass="text-primary"
+                contextRingColorClass="text-primary-text"
                 contextStatusDetails={{
                   usedLabel: "0",
                   totalLabel: contextWindowTotal,

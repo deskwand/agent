@@ -44,7 +44,7 @@ function appConfigWithProviders(providers: AppConfig["providers"]): AppConfig {
     providers,
     enableDevLogs: false,
     theme: "light",
-    themePreset: "graphite",
+    themePreset: "zinc",
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: {

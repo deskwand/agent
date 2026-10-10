@@ -19,8 +19,8 @@ export function MarketplaceCategorySidebar({
   if (categories.length === 0 && !loading) return null;
 
   return (
-    <div className="w-[160px] border-r border-border-primary pr-3 py-1 shrink-0">
-      <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2 px-2">
+    <div className="w-[160px] border-r border-border pr-3 py-1 shrink-0">
+      <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
         {t("skillMarket.categories")}
       </div>
       <div className="flex flex-col gap-0.5">
@@ -28,8 +28,8 @@ export function MarketplaceCategorySidebar({
           onClick={() => onSelect(null)}
           className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors ${
             selectedCategory === null
-              ? "bg-primary/10 text-primary font-medium"
-              : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+              ? "bg-primary/10 text-primary-text font-medium"
+              : "text-muted-foreground hover:text-foreground hover:bg-accent"
           }`}
         >
           {t("skillMarket.allCategories")}
@@ -38,7 +38,7 @@ export function MarketplaceCategorySidebar({
           ? Array.from({ length: 5 }, (_, i) => (
               <div
                 key={`cat-sk-${i}`}
-                className="h-7 mx-2 rounded-md bg-surface-muted animate-pulse"
+                className="h-7 mx-2 rounded-md bg-muted animate-pulse"
               />
             ))
           : categories.map((cat) => (
@@ -47,8 +47,8 @@ export function MarketplaceCategorySidebar({
                 onClick={() => onSelect(cat.key)}
                 className={`w-full text-left px-2 py-1.5 rounded-md text-sm transition-colors truncate ${
                   selectedCategory === cat.key
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                    ? "bg-primary/10 text-primary-text font-medium"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 {cat.name}

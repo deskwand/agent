@@ -1,32 +1,48 @@
-// 设计文档 design-docs/2026-09-17-inline-reference-tokens-design.md §4.2 的不变量。
+// 行内引用 token（@技能 / /命令 / 文件路径）的识别度不变量。
 //
-// 去掉底色之后，颜色是 token 唯一的识别信号 —— 所以必须锁死"在每一套主题下都看得见"。
-// 色值不写死在断言里：从 globals.css 读，改色只要满足同一条阈值即可。
+// 2026-10 改口径：官方 vocabulary 里没有 mention 色，识别信号从"颜色"改成"底色"——
+// 文字用 --primary、底用 --accent。于是要锁两件事：
+//   1) 两处类串常量确实带上了这两个类（改回去就没信号了）
+//   2) 两者在各主题块下都可读（≥4.5）—— 底是主题色，文字必须跟着主题走
 import { describe, expect, it } from "vitest";
-import { contrast, themeBlocks, tokenOf } from "./theme-css-helpers";
+import fs from "node:fs";
+import path from "node:path";
+import { RENDERER, contrast, themeBlocks, tokenOf } from "./theme-css-helpers";
 
-describe("--color-mention 跨主题可辨识度", () => {
-  it("14 个主题块都声明了 --color-mention", () => {
-    const blocks = themeBlocks();
-    expect(blocks.length).toBe(14);
-    for (const block of blocks) {
-      const head = block.slice(0, 60).replace(/\s+/g, " ");
-      expect(block, `${head} 缺 --color-mention`).toMatch(
-        /--color-mention\s*:/,
-      );
+const referenceToken = fs.readFileSync(
+  path.join(RENDERER, "components/ReferenceToken.tsx"),
+  "utf8",
+);
+const editorContent = fs.readFileSync(
+  path.join(RENDERER, "utils/editor-content.ts"),
+  "utf8",
+);
+
+describe("行内引用 token 的识别度", () => {
+  it("两处类串常量都带 text-primary + bg-accent（识别信号从颜色改到底色）", () => {
+    for (const [name, source] of [
+      ["ReferenceToken.BASE_CLASS", referenceToken],
+      ["editor-content.TOKEN_CLASS", editorContent],
+    ] as const) {
+      expect(source, `${name} 缺 text-primary`).toMatch(/text-primary/);
+      expect(source, `${name} 缺 bg-accent`).toMatch(/bg-accent/);
     }
   });
 
-  it("对 --color-background 的对比度 ≥ 4.5:1（WCAG AA 正文）", () => {
-    for (const block of themeBlocks()) {
+  it("14 个主题块下文字（--primary）对底色（--accent）都 ≥ 4.5", () => {
+    const blocks = themeBlocks();
+    expect(blocks.length).toBe(14);
+    const low: string[] = [];
+    for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
       const ratio = contrast(
-        tokenOf(block, "--color-mention"),
-        tokenOf(block, "--color-background"),
+        tokenOf(block, "--primary"),
+        tokenOf(block, "--accent"),
       );
-      expect(ratio, `${head} 实测 ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(
-        4.5,
-      );
+      if (ratio < 4.5) low.push(`${ratio.toFixed(2)}  ${head}`);
     }
+    expect(low, `以下主题块下 token 文字不可读：\n${low.join("\n")}`).toEqual(
+      [],
+    );
   });
 });

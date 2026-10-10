@@ -118,7 +118,7 @@ export function ConfiguredProviderList({
             key={profileKey}
             testId={`configured-provider-${profileKey}`}
             icon={
-              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-surface-muted">
+              <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-muted">
                 <ProviderBrandIcon
                   brand={rowBrand(profileKey, config)}
                   className="h-5 w-5"
@@ -134,7 +134,7 @@ export function ConfiguredProviderList({
                     type="button"
                     data-testid={`${oauthId}-oauth-disconnect`}
                     onClick={() => onDisconnect(oauthId)}
-                    className="rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                    className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                   >
                     {t("api.oauthDisconnect")}
                   </Button>
@@ -143,7 +143,7 @@ export function ConfiguredProviderList({
                   type="button"
                   data-testid={`${profileKey}-edit`}
                   onClick={() => onEdit(profileKey)}
-                  className="rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                  className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                 >
                   {t("api.editApi")}
                 </Button>
@@ -151,7 +151,7 @@ export function ConfiguredProviderList({
                   type="button"
                   data-testid={`${profileKey}-delete`}
                   onClick={() => onDelete(profileKey)}
-                  className="rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-error/10 hover:text-error"
+                  className="rounded-lg border border-border/60 px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 >
                   {t("api.deleteApi")}
                 </Button>

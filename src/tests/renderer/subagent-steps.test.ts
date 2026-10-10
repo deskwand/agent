@@ -145,7 +145,7 @@ describe("SubagentSteps", () => {
   it("失败态用错误色图标", () => {
     const failed: SubagentActivity = { ...activity, status: "error" };
     act(() => root.render(createElement(SubagentSteps, { activity: failed })));
-    expect(container.querySelectorAll(".text-error").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".text-destructive").length).toBeGreaterThan(0);
   });
 
   it("从未收到 tool_end 的步骤不打勾（空心中点）", () => {

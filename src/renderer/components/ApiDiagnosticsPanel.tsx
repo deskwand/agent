@@ -56,14 +56,14 @@ function StatusBadge({ status }: { status: DiagnosticStepStatus }) {
     case "ok":
       return <CheckCircle className={`${base} text-success`} />;
     case "fail":
-      return <XCircle className={`${base} text-error`} />;
+      return <XCircle className={`${base} text-destructive`} />;
     case "skip":
-      return <MinusCircle className={`${base} text-text-muted`} />;
+      return <MinusCircle className={`${base} text-muted-foreground`} />;
     case "running":
-      return <Loader2 className={`${base} text-primary animate-spin`} />;
+      return <Loader2 className={`${base} text-primary-text animate-spin`} />;
     case "pending":
     default:
-      return <Circle className={`${base} text-text-muted opacity-40`} />;
+      return <Circle className={`${base} text-muted-foreground opacity-40`} />;
   }
 }
 
@@ -79,32 +79,32 @@ function statusColors(status: DiagnosticStepStatus) {
       };
     case "fail":
       return {
-        border: "border-error/50",
-        bg: "bg-error/10",
-        text: "text-error",
-        iconText: "text-error",
+        border: "border-destructive/50",
+        bg: "bg-destructive/10",
+        text: "text-destructive",
+        iconText: "text-destructive",
       };
     case "skip":
       return {
         border: "border-border border-dashed",
         bg: "bg-transparent",
-        text: "text-text-muted",
-        iconText: "text-text-muted",
+        text: "text-muted-foreground",
+        iconText: "text-muted-foreground",
       };
     case "running":
       return {
         border: "border-primary/60",
         bg: "bg-primary/10",
-        text: "text-primary",
-        iconText: "text-primary",
+        text: "text-primary-text",
+        iconText: "text-primary-text",
       };
     case "pending":
     default:
       return {
         border: "border-border",
         bg: "bg-transparent",
-        text: "text-text-muted",
-        iconText: "text-text-muted opacity-40",
+        text: "text-muted-foreground",
+        iconText: "text-muted-foreground opacity-40",
       };
   }
 }
@@ -126,7 +126,7 @@ function Connector({
 
   let lineClass = "flex-1 h-px mx-0.5 transition-colors duration-300 ";
   if (isAfterFail) {
-    lineClass += "bg-error/20 border-t border-dashed border-error/30";
+    lineClass += "bg-destructive/20 border-t border-dashed border-destructive/30";
   } else if (isSkipOrPending) {
     lineClass += "border-t border-dashed border-border";
   } else if (leftStatus === "ok") {
@@ -174,7 +174,7 @@ function PipelineNode({ step }: { step: DiagnosticStep }) {
 
       {/* Latency */}
       {step.latencyMs !== undefined && step.status !== "pending" ? (
-        <span className="text-xs text-text-muted leading-tight">
+        <span className="text-xs text-muted-foreground leading-tight">
           {step.latencyMs}ms
         </span>
       ) : (
@@ -204,9 +204,9 @@ function FailureDetail({ step }: { step: DiagnosticStep }) {
   })();
 
   return (
-    <div className="mt-2 rounded-lg bg-error/10 border border-error/20 px-3 py-2 text-xs">
-      {step.error && <p className="text-error font-medium">{step.error}</p>}
-      {fixText && <p className="mt-1 text-text-secondary">{fixText}</p>}
+    <div className="mt-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs">
+      {step.error && <p className="text-destructive font-medium">{step.error}</p>}
+      {fixText && <p className="mt-1 text-muted-foreground">{fixText}</p>}
     </div>
   );
 }
@@ -265,8 +265,8 @@ export default function ApiDiagnosticsPanel({
               onClick={() => onRunDeepDiagnostics()}
               disabled={disabled || isRunning}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border
-              bg-background text-text-primary text-sm font-medium
-              hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed
+              bg-background text-foreground text-sm font-medium
+              hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed
               transition-colors h-auto"
             >
               <Cpu className="w-4 h-4" />
@@ -298,7 +298,7 @@ export default function ApiDiagnosticsPanel({
           {failedStep && <FailureDetail step={failedStep} />}
 
           {result?.advisoryText && !isRunning && (
-            <div className="mt-3 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2 text-xs text-text-secondary">
+            <div className="mt-3 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
               {t(
                 `api.diagnostic.advisory.${result.advisoryCode ?? ""}`,
                 result.advisoryText,
@@ -308,19 +308,19 @@ export default function ApiDiagnosticsPanel({
 
           {/* Skipped info */}
           {result?.skippedReason && !isRunning && (
-            <div className="mt-3 pt-3 border-t border-border-muted text-sm text-text-muted">
+            <div className="mt-3 pt-3 border-t border-border/60 text-sm text-muted-foreground">
               {t("api.diagnostic.skipped")}
             </div>
           )}
 
           {/* Overall summary */}
           {result && !result.skippedReason && !isRunning && (
-            <div className="mt-3 pt-3 border-t border-border-muted flex items-center justify-between text-sm">
+            <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between text-sm">
               <span
                 className={
                   result.overallOk
                     ? "text-success font-medium"
-                    : "text-error font-medium"
+                    : "text-destructive font-medium"
                 }
               >
                 {result.overallOk
@@ -334,7 +334,7 @@ export default function ApiDiagnosticsPanel({
                         result.failedAt,
                     })}
               </span>
-              <span className="text-text-muted text-xs">
+              <span className="text-muted-foreground text-xs">
                 {result.totalLatencyMs}ms
               </span>
             </div>

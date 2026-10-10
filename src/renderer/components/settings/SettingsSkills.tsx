@@ -1057,13 +1057,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         </div>
       )}
       {publishError && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="w-4 h-4" />
           {publishError}
         </div>
       )}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="w-4 h-4" />
           {error.key ? t(error.key) : error.text}
         </div>
@@ -1078,8 +1078,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
               onClick={() => setFilterKey(f.key)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 filterKey === f.key
-                  ? "bg-primary/10 text-primary"
-                  : "bg-surface-muted text-text-secondary hover:text-text-primary"
+                  ? "bg-primary/10 text-primary-text"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
               {f.label}
@@ -1087,7 +1087,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
           ))}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-text-muted whitespace-nowrap">
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
             {filterKey === "marketplace"
               ? marketplaceTotal
               : filteredSkills.length}{" "}
@@ -1104,8 +1104,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                   aria-label={t("skillMarket.cardView")}
                   className={`p-1.5 transition-colors ${
                     viewMode === "cards"
-                      ? "bg-primary/10 text-primary"
-                      : "text-text-muted hover:text-text-primary"
+                      ? "bg-primary/10 text-primary-text"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <LayoutGrid className="w-3.5 h-3.5" />
@@ -1124,8 +1124,8 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                   aria-label={t("skillMarket.listView")}
                   className={`p-1.5 transition-colors ${
                     viewMode === "list"
-                      ? "bg-primary/10 text-primary"
-                      : "text-text-muted hover:text-text-primary"
+                      ? "bg-primary/10 text-primary-text"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   <List className="w-3.5 h-3.5" />
@@ -1141,13 +1141,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
 
       {/* Search */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t("skillMarket.search")}
-          className="h-auto w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-surface text-sm text-text-primary shadow-none placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
+          className="h-auto w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-card text-sm text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
         />
       </div>
 
@@ -1172,7 +1172,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                     <Button variant="ghost"
                       onClick={handleRefreshMarketplace}
                       disabled={marketplaceLoading}
-                      className="p-1 rounded-md hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+                      className="p-1 rounded-md hover:bg-accent text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                       aria-label={t("skillMarket.refresh")}
                     >
                       <RefreshCw
@@ -1191,13 +1191,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
               )}
               {/* Pagination loading overlay */}
               {marketplaceLoading && marketplaceSkills.length > 0 && (
-                <div className="absolute inset-0 bg-surface/60 flex items-center justify-center rounded-lg z-10">
-                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                <div className="absolute inset-0 bg-card/60 flex items-center justify-center rounded-lg z-10">
+                  <Loader2 className="w-5 h-5 text-primary-text animate-spin" />
                 </div>
               )}
               {/* Empty state */}
               {marketplaceSkills.length === 0 && !marketplaceLoading && (
-                <div className="text-center py-8 text-text-muted">
+                <div className="text-center py-8 text-muted-foreground">
                   <Package className="w-6 h-6 mx-auto mb-2 opacity-40" />
                   <p className="text-sm">
                     {marketplaceCategory
@@ -1261,7 +1261,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                       <Button variant="ghost"
                         onClick={loadMoreMarketplace}
                         disabled={marketplaceLoading}
-                        className="px-4 py-2 rounded-lg bg-surface-muted text-sm text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50 h-auto"
+                        className="px-4 py-2 rounded-lg bg-muted text-sm text-muted-foreground hover:bg-accent transition-colors disabled:opacity-50 h-auto"
                       >
                         {marketplaceLoading ? "..." : t("skillMarket.loadMore")}
                       </Button>
@@ -1280,13 +1280,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
           filterKey === "mycloud" ||
           filterKey === "team") && (
           <div className="rounded-lg border border-border p-6 text-center max-w-sm mx-auto">
-            <Cloud className="w-8 h-8 mx-auto mb-3 text-text-muted" />
-            <p className="text-sm text-text-secondary mb-4">
+            <Cloud className="w-8 h-8 mx-auto mb-3 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground mb-4">
               {t("skillMarket.loginPrompt")}
             </p>
             <Button variant="ghost"
               onClick={() => useAppStore.getState().setShowLoginModal(true)}
-              className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors h-auto"
+              className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors h-auto"
             >
               {t("auth.login")}
             </Button>
@@ -1295,7 +1295,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
 
       {/* 第三方技能默认不进模型：给一句说明，省得用户以为技能丢了 */}
       {filterKey === "external" && (
-        <p className="text-xs text-text-muted">
+        <p className="text-xs text-muted-foreground">
           {t("skills.externalSkillsDesc")}
         </p>
       )}
@@ -1308,7 +1308,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
         ) && (
           <>
             {filteredSkills.length === 0 ? (
-              <div className="text-center py-8 text-text-muted">
+              <div className="text-center py-8 text-muted-foreground">
                 <Package className="w-6 h-6 mx-auto mb-2 opacity-40" />
                 <p className="text-sm">
                   {searchQuery.trim()
@@ -1369,7 +1369,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                             (st: { team_id: string }) =>
                               st.team_id === activeTeamId,
                           ) && (
-                            <span className="flex items-center gap-0.5 text-xs text-text-muted">
+                            <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
                               <span>
                                 {t("skillMarket.sharedTo", {
                                   team: activeTeamName,
@@ -1380,7 +1380,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                                   <Button variant="ghost"
                                     onClick={() => handleUnshare(skill.name)}
                                     aria-label={t("skillMarket.unshare")}
-                                    className="p-0.5 rounded hover:bg-surface-hover hover:text-error transition-colors h-auto"
+                                    className="p-0.5 rounded hover:bg-accent hover:text-destructive transition-colors h-auto"
                                   >
                                     <X className="w-3 h-3" />
                                   </Button>
@@ -1393,7 +1393,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                           )}
                         <Button variant="ghost"
                           onClick={() => handleDeleteCloud(skill.name)}
-                          className="flex items-center gap-1 px-1 py-0.5 rounded text-xs text-text-muted hover:text-error hover:bg-error/5 transition-colors h-auto"
+                          className="flex items-center gap-1 px-1 py-0.5 rounded text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/5 transition-colors h-auto"
                           title={t("skillMarket.deleteCloud")}
                         >
                           <Trash2 className="w-3 h-3" />

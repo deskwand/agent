@@ -119,9 +119,9 @@ const TONE = {
 
 /** 音量条的三种状态共用一套外观。 */
 const GHOST_BUTTON =
-  "rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50";
+  "rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50";
 const PRIMARY_BUTTON =
-  "rounded-control bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-50";
+  "rounded-control bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50";
 
 export function VoiceModeSettings() {
   const { t } = useTranslation();
@@ -577,7 +577,7 @@ export function VoiceModeSettings() {
 
           {preview.error && (
             <div
-              className="px-4 pb-3 text-xs text-error"
+              className="px-4 pb-3 text-xs text-destructive"
               data-testid="voice-preview-error"
             >
               {t(`${VOICE_MODE_KEY}.tonePreviewFailed`)}

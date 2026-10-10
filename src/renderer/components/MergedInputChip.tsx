@@ -196,7 +196,7 @@ export function MergedInputChip({
       onChange={(event) => setModelSearch(event.target.value)}
       onClick={(event) => event.stopPropagation()}
       placeholder={t("chat.searchModel")}
-      className="mb-1.5 h-auto w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-text-primary shadow-none placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+      className="mb-1.5 h-auto w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground shadow-none placeholder:text-muted-foreground focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
     />
   );
 
@@ -204,7 +204,7 @@ export function MergedInputChip({
     <Button variant="ghost"
       type="button"
       onClick={() => setPanelView("list")}
-      className={`${MENU_ITEM_CLASS} text-text-muted hover:bg-surface-hover`}
+      className={`${MENU_ITEM_CLASS} text-muted-foreground hover:bg-accent`}
     >
       <ChevronRight className="h-4 w-4 rotate-180" />
       {t("modelMenu.back")}
@@ -222,7 +222,7 @@ export function MergedInputChip({
         {t("modelMenu.thinkingWithValue", {
           value: t(`chat.thinkingLevel.${thinkingLevel}`),
         })}
-        <ChevronRight className="h-4 w-4 shrink-0 text-text-muted" />
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
       </Button>
     </>
   );
@@ -232,7 +232,7 @@ export function MergedInputChip({
       // 判据用 activeSearch 而不是 showSearch：前者天然覆盖「有搜索框但用户还没输入」
       // （此时列表非空，走不到这里），只有真在筛选时才说「无匹配」。
       return (
-        <div className="px-2.5 py-3 text-center text-xs text-text-muted">
+        <div className="px-2.5 py-3 text-center text-xs text-muted-foreground">
           {activeSearch ? t("chat.noModelMatch") : t("chat.noAvailableModel")}
         </div>
       );
@@ -255,7 +255,7 @@ export function MergedInputChip({
             ref={triggerRef}
             type="button"
             disabled={disabled}
-            className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-border-subtle bg-background/60 px-2 text-xs text-text-primary transition-[width,background-color] duration-150 hover:bg-surface-hover disabled:opacity-50 ${
+            className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-border/40 bg-background/60 px-2 text-xs text-foreground transition-[width,background-color] duration-150 hover:bg-accent disabled:opacity-50 ${
               menuOpen ? "w-[15rem] justify-center" : "max-w-[18rem]"
             }`}
             aria-label={combinedLabel}
@@ -266,7 +266,7 @@ export function MergedInputChip({
             </span>
             <span>{t(`chat.thinkingLevel.${thinkingLevel}`)}</span>
             <ChevronDown
-              className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${
+              className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
                 menuOpen ? "rotate-180" : ""
               }`}
             />

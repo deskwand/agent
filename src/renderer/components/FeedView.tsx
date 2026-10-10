@@ -134,15 +134,15 @@ export function FeedView(): JSX.Element {
         data-testid="feed-view"
         className="flex h-full flex-col bg-background"
       >
-        <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2.5">
+        <div className="flex items-center gap-2 border-b border-border/40 px-4 py-2.5">
           <Button variant="ghost"
             type="button"
             data-testid="feed-back"
             onClick={() => setActiveView("chat")}
             aria-label={t("common.back")}
-            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
+            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
           >
-            <ArrowLeft className="h-5 w-5 text-text-secondary" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Button>
           <span className="text-base font-semibold">{t("feed.railLabel")}</span>
         </div>
@@ -150,11 +150,11 @@ export function FeedView(): JSX.Element {
           <div className="mb-2 text-base font-semibold">
             {t("feed.onboardingTitle")}
           </div>
-          <div className="text-sm text-text-muted" style={{ lineHeight: 1.8 }}>
+          <div className="text-sm text-muted-foreground" style={{ lineHeight: 1.8 }}>
             {t("feed.onboardingBody")}
           </div>
           <ul
-            className="mb-4 mt-3 space-y-1 text-sm text-text-muted"
+            className="mb-4 mt-3 space-y-1 text-sm text-muted-foreground"
             style={{ lineHeight: 1.8 }}
           >
             <li>· {t("feed.onboardingBullet1")}</li>
@@ -180,21 +180,21 @@ export function FeedView(): JSX.Element {
     <div data-testid="feed-view" className="flex h-full flex-col bg-background">
       <style>{`.feed-row:hover [data-testid="feed-actions"],.feed-row:focus-within [data-testid="feed-actions"]{opacity:1 !important}`}</style>
 
-      <div className="flex items-start gap-3 border-b border-border-subtle px-4 pb-2.5 pt-3.5">
+      <div className="flex items-start gap-3 border-b border-border/40 px-4 pb-2.5 pt-3.5">
         <Button variant="ghost"
           type="button"
           data-testid="feed-back"
           onClick={() => setActiveView("chat")}
           aria-label={t("common.back")}
-          className="-ml-1.5 mt-0.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
+          className="-ml-1.5 mt-0.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
         >
-          <ArrowLeft className="h-5 w-5 text-text-secondary" />
+          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Button>
         <div className="min-w-0">
-          <h1 className="text-xl font-semibold text-text-primary">
+          <h1 className="text-xl font-semibold text-foreground">
             {t("feed.railLabel")}
           </h1>
-          <p className="text-xs leading-[1.75] tabular-nums text-text-muted">
+          <p className="text-xs leading-[1.75] tabular-nums text-muted-foreground">
             {phase
               ? t("feed.progress", { phase: t(phaseKey(phase)) })
               : enabled
@@ -217,7 +217,7 @@ export function FeedView(): JSX.Element {
             type="button"
             data-testid="feed-listen-all"
             onClick={() => void startFeedListen()}
-            className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-text-primary h-auto hover:bg-transparent hover:text-current"
+            className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground h-auto hover:bg-transparent hover:text-current"
           >
             {t("feed.listenAll")}
           </Button>
@@ -228,12 +228,12 @@ export function FeedView(): JSX.Element {
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((open) => !open)}
-              className="px-1 text-xs text-text-muted h-auto hover:bg-transparent hover:text-current"
+              className="px-1 text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
             >
               ⋯
             </Button>
             {menuOpen ? (
-              <div className="absolute right-0 top-6 z-10 w-[154px] rounded-md border border-border bg-surface p-1 shadow-elevated">
+              <div className="absolute right-0 top-6 z-10 w-[154px] rounded-md border border-border bg-card p-1 shadow-elevated">
                 <Button variant="ghost"
                   type="button"
                   data-testid="feed-mark-all-read"
@@ -241,7 +241,7 @@ export function FeedView(): JSX.Element {
                     setMenuOpen(false);
                     void markAllFeedRead();
                   }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover h-auto"
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent h-auto"
                 >
                   {t("feed.markAllRead")}
                 </Button>
@@ -252,7 +252,7 @@ export function FeedView(): JSX.Element {
                     setMenuOpen(false);
                     void setFeedEnabled(!enabled);
                   }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover h-auto"
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent h-auto"
                 >
                   {enabled ? t("feed.pauseAuto") : t("feed.resumeAuto")}
                 </Button>
@@ -263,7 +263,7 @@ export function FeedView(): JSX.Element {
                     setMenuOpen(false);
                     setConfirmClear(true);
                   }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover h-auto"
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-accent h-auto"
                 >
                   {t("feed.clearAll")}
                 </Button>
@@ -276,7 +276,7 @@ export function FeedView(): JSX.Element {
       {lastRun?.status === "failed" ? (
         <div
           data-testid="feed-error"
-          className="flex items-center gap-2 border-b border-error/35 bg-error/10 px-4 py-1.5 text-xs text-error"
+          className="flex items-center gap-2 border-b border-destructive/35 bg-destructive/10 px-4 py-1.5 text-xs text-destructive"
         >
           <span>{t("feed.errorSearchFailed")}</span>
           <span className="flex-1" />
@@ -287,13 +287,13 @@ export function FeedView(): JSX.Element {
       ) : null}
 
       {lastRun?.status === "partial" ? (
-        <div className="border-b border-border-subtle px-4 py-1.5 text-xs text-text-muted hover:bg-transparent hover:text-error">
+        <div className="border-b border-border/40 px-4 py-1.5 text-xs text-muted-foreground hover:bg-transparent hover:text-destructive">
           {t("feed.partial")}
         </div>
       ) : null}
 
       {notice ? (
-        <div className="border-b border-border-subtle px-4 py-1.5 text-xs text-text-muted">
+        <div className="border-b border-border/40 px-4 py-1.5 text-xs text-muted-foreground">
           {notice}
         </div>
       ) : null}
@@ -308,7 +308,7 @@ export function FeedView(): JSX.Element {
             setFilter("all");
             setShowActionsOnFirstRow(false);
           }}
-          className={filter === "all" ? "text-primary" : "text-text-muted"}
+          className={filter === "all" ? "text-primary-text" : "text-muted-foreground"}
         >
           {t("feed.filterAll")}
         </Button>
@@ -318,7 +318,7 @@ export function FeedView(): JSX.Element {
             setFilter("unread");
             setShowActionsOnFirstRow(false);
           }}
-          className={filter === "unread" ? "text-primary" : "text-text-muted"}
+          className={filter === "unread" ? "text-primary-text" : "text-muted-foreground"}
         >
           {t("feed.filterUnread", { count: unread })}
         </Button>
@@ -344,12 +344,12 @@ export function FeedView(): JSX.Element {
         >
           {visible.length === 0 ? (
             <div
-              className="px-6 py-6 text-sm text-text-muted"
+              className="px-6 py-6 text-sm text-muted-foreground"
               style={{ lineHeight: 1.8 }}
             >
               {items.length === 0 ? (
                 <>
-                  <div className="mb-1 font-semibold text-text-primary">
+                  <div className="mb-1 font-semibold text-foreground">
                     {t("feed.emptyTitle")}
                   </div>
                   {t("feed.emptyBody")}
@@ -368,7 +368,7 @@ export function FeedView(): JSX.Element {
             return (
               <Fragment key={item.id}>
                 {key !== previousKey ? (
-                  <div className="sticky top-0 z-10 bg-background px-4 pb-1.5 pt-2.5 text-xs font-medium tracking-wider text-text-muted">
+                  <div className="sticky top-0 z-10 bg-background px-4 pb-1.5 pt-2.5 text-xs font-medium tracking-wider text-muted-foreground">
                     {t(key)}
                   </div>
                 ) : null}
@@ -400,7 +400,7 @@ export function FeedView(): JSX.Element {
         {items.length > 0 ? (
           <div
             data-testid="feed-reader"
-            className="min-w-0 flex-1 border-l border-border-subtle"
+            className="min-w-0 flex-1 border-l border-border/40"
           >
             {selected ? (
               <FeedReaderPane
@@ -418,15 +418,15 @@ export function FeedView(): JSX.Element {
         ) : null}
       </div>
 
-      <div className="relative border-t border-border-subtle px-4 py-2 text-xs text-text-muted">
+      <div className="relative border-t border-border/40 px-4 py-2 text-xs text-muted-foreground">
         {confirmClear ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/40">
-            <div className="w-[360px] rounded-lg border border-border bg-surface p-4">
+            <div className="w-[360px] rounded-lg border border-border bg-card p-4">
               <div className="mb-1 text-base font-semibold">
                 {t("feed.clearAllConfirmTitle")}
               </div>
               <div
-                className="mb-3 text-sm text-text-muted"
+                className="mb-3 text-sm text-muted-foreground"
                 style={{ lineHeight: 1.8 }}
               >
                 {t("feed.clearAllConfirmBody")}
@@ -435,7 +435,7 @@ export function FeedView(): JSX.Element {
                 <Button variant="ghost"
                   type="button"
                   onClick={() => setConfirmClear(false)}
-                  className="text-xs text-text-muted h-auto hover:bg-transparent hover:text-current"
+                  className="text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
                 >
                   {t("feed.cancel")}
                 </Button>
@@ -448,7 +448,7 @@ export function FeedView(): JSX.Element {
                       .clearAll()
                       .then(() => refreshFeed());
                   }}
-                  className="rounded-md bg-error px-3 py-1.5 text-xs font-semibold text-error-foreground h-auto hover:bg-transparent hover:text-current"
+                  className="rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold  h-auto hover:bg-transparent hover:text-current"
                 >
                   {t("feed.clearAllConfirm")}
                 </Button>
@@ -464,7 +464,7 @@ export function FeedView(): JSX.Element {
         >
           {t("feed.reasonsTitle")} {reasonsOpen ? "▴" : "▾"}
         </Button>
-        <span className="pl-2.5 tabular-nums hover:bg-transparent hover:text-error">
+        <span className="pl-2.5 tabular-nums hover:bg-transparent hover:text-destructive">
           {t("feed.reasonsSummary", {
             queries: reasons.length,
             candidates: lastRun?.candidate_count ?? 0,
@@ -479,8 +479,8 @@ export function FeedView(): JSX.Element {
               const blocked = blockedTopics.includes(query.topic);
               return (
                 <div key={query.q} className="flex items-center gap-2">
-                  <span className="text-text-primary">{query.q}</span>
-                  <span className="rounded-sm bg-primary-muted px-1.5 text-primary">
+                  <span className="text-foreground">{query.q}</span>
+                  <span className="rounded-sm bg-primary/10 px-1.5 text-primary-text">
                     {query.topic}
                   </span>
                   <span className="text-xs">
@@ -499,7 +499,7 @@ export function FeedView(): JSX.Element {
                           : [...blockedTopics, query.topic],
                       )
                     }
-                    className={blocked ? "text-text-muted" : "text-primary"}
+                    className={blocked ? "text-muted-foreground" : "text-primary-text"}
                   >
                     {blocked
                       ? t("feed.reasonsBlocked")

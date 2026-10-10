@@ -113,7 +113,7 @@ export function Titlebar() {
   );
 
   return (
-    <div className="h-10 bg-background-chrome flex items-center titlebar-drag shrink-0">
+    <div className="h-10 bg-app-chrome flex items-center titlebar-drag shrink-0">
       {/* macOS 红绿灯留白：全屏时没有红绿灯，这一格跟着去掉 */}
       {isMac && !isFullScreen && <div className="w-20 flex-shrink-0" />}
 
@@ -151,7 +151,7 @@ export function Titlebar() {
 
       {/* 标题在左簇与右簇之间居中。注意：不要加 titlebar-no-drag，这一块要保持可拖窗 */}
       <div className="flex-1 min-w-0 px-3 flex justify-center">
-        <span className="min-w-0 truncate text-sm font-medium text-text-primary">
+        <span className="min-w-0 truncate text-sm font-medium text-foreground">
           {showSessionHeader ? activeSessionTitle : ""}
         </span>
       </div>
@@ -175,7 +175,7 @@ export function Titlebar() {
                   type="button"
                   onClick={handleMinimize}
                   aria-label={t("window.minimize")}
-                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                 >
                   <Minus className="w-4 h-4" />
                 </Button>
@@ -194,7 +194,7 @@ export function Titlebar() {
                   aria-label={
                     isMaximized ? t("window.restore") : t("window.maximize")
                   }
-                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
                 >
                   {isMaximized ? (
                     // lucide Copy 的两个错位叠加方框就是 Windows 11 的“还原”字形
@@ -214,7 +214,7 @@ export function Titlebar() {
                   type="button"
                   onClick={handleClose}
                   aria-label={t("window.close")}
-                  className="group w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-window-close-hover transition-colors"
+                  className="group w-12 h-8 my-1 flex items-center justify-center rounded-control text-muted-foreground hover:bg-window-close-hover transition-colors"
                 >
                   <X className="w-4 h-4 group-hover:text-white" />
                 </Button>

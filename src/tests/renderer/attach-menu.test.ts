@@ -260,7 +260,7 @@ describe("AttachMenu", () => {
     await openMenu();
     const menu = document.body.querySelector("[role='menu']");
     if (!menu) throw new Error("menu not rendered");
-    // 同理：原来是共享 token 的 shadow-elevated / border-border-subtle，
+    // 同理：原来是共享 token 的 shadow-elevated / border-border/40，
     // 现在是 shadcn 的 bg-popover + border + shadow-md。
     expect(menu.className).toContain("bg-popover");
     expect(menu.className).not.toContain("shadow-soft");

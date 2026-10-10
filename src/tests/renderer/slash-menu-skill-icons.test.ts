@@ -72,7 +72,7 @@ describe("SlashMenu skill source badges", () => {
           (element) =>
             element.textContent?.trim() === SKILL_TYPE_LABEL_KEY[type],
         );
-        expect(badge?.classList).toContain("text-text-secondary");
+        expect(badge?.classList).toContain("text-muted-foreground");
         // 三类徽章同构：徽章里不允许任何子元素（当年这里放的是 lucide 类型图标）。
         expect(badge?.querySelector("svg")).toBeNull();
       }
@@ -134,7 +134,7 @@ describe("SlashMenu menu rows", () => {
   it("does not paint the keyboard highlight in the old accent tint", () => {
     // selectedIndex=0 → 第一行是键盘高亮行
     const rows = skillRows();
-    expect(rows[0]?.classList).toContain("bg-surface-hover");
+    expect(rows[0]?.classList).toContain("bg-accent");
     expect(rows[0]?.classList).not.toContain("bg-primary/10");
   });
 });
@@ -177,7 +177,7 @@ describe("SlashMenu badges carry no colour", () => {
       .join("|")})$`,
   );
 
-  /** 任何色相文字 token 都算回归（text-text-secondary 这类中性 token 不在内）。 */
+  /** 任何色相文字 token 都算回归（text-muted-foreground 这类中性 token 不在内）。 */
   const HUE_TEXT = /text-(accent|warning|success|error|mcp|danger)\b/;
 
   /** 任何底色（含 hover:/focus: 变体）都算回归。 */
@@ -220,11 +220,11 @@ describe("SlashMenu badges carry no colour", () => {
     ).toBe(1);
 
     for (const badge of badges) {
-      // 白名单：确保拿到的是徽章而不是行的名字 span（名字 span 无 text-text-secondary，不写也会红，
+      // 白名单：确保拿到的是徽章而不是行的名字 span（名字 span 无 text-muted-foreground，不写也会红，
       // 但写出来对读者更诚实）。
       expect(badge.textContent?.trim()).toMatch(BADGE_TEXT);
       expect(badge.children).toHaveLength(0);
-      expect(badge.className).toContain("text-text-secondary");
+      expect(badge.className).toContain("text-muted-foreground");
       expect(badge.className).not.toMatch(HUE_TEXT);
       expect(badge.className).not.toMatch(ANY_BACKGROUND);
     }

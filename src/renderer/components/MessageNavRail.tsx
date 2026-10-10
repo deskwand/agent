@@ -170,8 +170,8 @@ const TickMark = memo(function TickMark({
 }: TickMarkProps) {
   const bg =
     isActive || isPrimary
-      ? "var(--color-text-primary)"
-      : "var(--color-text-secondary)";
+      ? "var(--foreground)"
+      : "var(--muted-foreground)";
 
   const cardTop = y - (assistantPreview ? 28 : 14);
 
@@ -179,14 +179,14 @@ const TickMark = memo(function TickMark({
     <>
       {isPrimary && userPreview && (
         <div
-          className="absolute z-30 bg-surface rounded-lg px-2.5 py-1.5 shadow-elevated text-xs w-[280px] max-h-[7.5rem] overflow-hidden pointer-events-none"
+          className="absolute z-30 bg-card rounded-lg px-2.5 py-1.5 shadow-elevated text-xs w-[280px] max-h-[7.5rem] overflow-hidden pointer-events-none"
           style={{ left: HALF_ZONE + 26, top: cardTop }}
         >
-          <div className="text-text-secondary whitespace-normal leading-relaxed">
+          <div className="text-muted-foreground whitespace-normal leading-relaxed">
             {userPreview}
           </div>
           {assistantPreview && (
-            <div className="text-text-primary whitespace-normal leading-relaxed">
+            <div className="text-foreground whitespace-normal leading-relaxed">
               {assistantPreview}
             </div>
           )}

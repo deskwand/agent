@@ -8,7 +8,7 @@
 
 /** 面板外壳。不含内边距：SlashMenu 内部自带 tab 栏与滚动区，套 p-1 会破版。 */
 export const MENU_PANEL_CLASS =
-  "rounded-xl border border-border-subtle bg-background shadow-elevated";
+  "rounded-xl border border-border/40 bg-background shadow-elevated";
 
 /** 面板外壳 + 简单列表用的内边距（绝大多数菜单用这个） */
 export const MENU_PANEL_PADDED_CLASS = `${MENU_PANEL_CLASS} p-1`;
@@ -17,7 +17,7 @@ export const MENU_PANEL_PADDED_CLASS = `${MENU_PANEL_CLASS} p-1`;
  * 单行菜单项：只放结构与排版，**不放颜色与 hover 底色**。
  *
  * 颜色由四个互斥状态类补齐，调用方按 `disabled → danger → selected → default`
- * 的顺序四选一。若把 text-text-primary 或 hover:bg-surface-hover 放进这里，
+ * 的顺序四选一。若把 text-foreground 或 hover:bg-accent 放进这里，
  * 状态类就必须覆盖它们，而 Tailwind 同名属性的输出顺序由主题里的颜色定义顺序决定、
  * 不由 className 书写顺序决定 —— 覆盖结果不可判定。
  */
@@ -25,24 +25,24 @@ export const MENU_ITEM_CLASS =
   "flex h-7 w-full items-center gap-2 rounded-lg px-2.5 text-left text-sm transition-colors";
 
 /** 普通态 */
-export const MENU_ITEM_DEFAULT_CLASS =
-  "text-text-primary hover:bg-surface-hover";
+export const MENU_ITEM_DEFAULT_CLASS = "text-foreground hover:bg-accent";
 
 /** 选中态（已选值）：底色 + 行尾 Check 图标（图标由使用方渲染） */
-export const MENU_ITEM_SELECTED_CLASS = "text-text-primary bg-surface-hover";
+export const MENU_ITEM_SELECTED_CLASS = "text-foreground bg-accent";
 
 /** 危险操作（删除、丢弃） */
-export const MENU_ITEM_DANGER_CLASS = "text-error hover:bg-error/10";
+export const MENU_ITEM_DANGER_CLASS =
+  "text-destructive hover:bg-destructive/10";
 
 /** 禁用态 */
 export const MENU_ITEM_DISABLED_CLASS =
-  "cursor-not-allowed text-text-muted opacity-50";
+  "cursor-not-allowed text-muted-foreground opacity-50";
 
 /** 分组标题 */
-export const MENU_LABEL_CLASS = "px-2.5 py-1 text-xs text-text-muted";
+export const MENU_LABEL_CLASS = "px-2.5 py-1 text-xs text-muted-foreground";
 
 /** 分隔线 */
-export const MENU_SEPARATOR_CLASS = "mx-2 my-1 border-t border-border-subtle";
+export const MENU_SEPARATOR_CLASS = "mx-2 my-1 border-t border-border/40";
 
 /**
  * 菜单徽章：中性灰字，不带上色、不带给色底、不带图标。
@@ -54,11 +54,12 @@ export const MENU_SEPARATOR_CLASS = "mx-2 my-1 border-t border-border-subtle";
  *
  * 10px 字号下多色相的 `/10` 底在浅色主题里几乎不可辨，且 `warning`/`accent`
  * 在本项目别处另有「警告 / 主色」语义，继续上色会让同一个颜色表示两件事。
- * 用 `text-text-secondary` 而不是 `text-text-muted`：后者在本仓 14 套主题变量下
- * 实测对比度只有 2.45–4.59:1，10px 小字达不到 AA 4.5:1；secondary 是 6.19–8.33:1。
+ * 2026-10 改官方词汇表后，"次级文字"那一档已并入 `muted-foreground`（徽章原本要用的是
+ * 对比度更高的一档，现在只剩这一档可用）—— 这条注释记的正是它为什么必须保持
+ * `muted-foreground`：它是当前唯一满足 10px 小字 AA 的文字色 token。
  */
 export const MENU_BADGE_CLASS =
-  "inline-flex items-center text-[10px] text-text-secondary px-1.5";
+  "inline-flex items-center text-[10px] text-muted-foreground px-1.5";
 
 /**
  * 行首另有一个独立按钮（技能行的星标）时的行按钮。

@@ -27,24 +27,24 @@ export function ToolGroupStatus({ status, onFailure }: ToolGroupStatusProps) {
         <Button variant="ghost"
           type="button"
           data-tool-group-failure
-          className="text-error h-auto hover:bg-transparent hover:text-current"
+          className="text-destructive h-auto hover:bg-transparent hover:text-current"
           onClick={onFailure}
         >
           {t("tool.grouped.failedOperations")}
         </Button>
       )}
       {status.unfinished && (
-        <span className="text-text-muted">
+        <span className="text-muted-foreground">
           {t("tool.grouped.unfinishedOperations")}
         </span>
       )}
       {status.incomplete && (
-        <span className="text-text-muted">
+        <span className="text-muted-foreground">
           {t("tool.grouped.partialDetails")}
         </span>
       )}
       {status.unavailable && (
-        <span className="text-text-muted">
+        <span className="text-muted-foreground">
           {t("tool.grouped.detailsUnavailable")}
         </span>
       )}

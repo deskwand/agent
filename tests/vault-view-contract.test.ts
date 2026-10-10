@@ -395,7 +395,7 @@ describe("VaultView", () => {
     // 的类（语义色当时是 var() 整值，吞掉了透明度修饰符），所以这条护栏一直是
     // 「绿着但禁用态根本没有样式」。改用 disabled:opacity-50 后意图不变（不重刷文字色），
     // 而且禁用态真的可见。
-    expect(upload.className).not.toContain("disabled:text-text-primary");
+    expect(upload.className).not.toContain("disabled:text-foreground");
   });
 
   function liveRegion(): HTMLElement {
@@ -1603,7 +1603,7 @@ describe("VaultView", () => {
     );
     expect(restore?.className).toContain("text-primary-foreground");
     expect(restore?.className).toContain("disabled:opacity-50");
-    expect(restore?.className).not.toContain("disabled:text-text-primary");
+    expect(restore?.className).not.toContain("disabled:text-foreground");
     expect(
       Array.from(container.querySelectorAll("button")).filter(
         (button) => button.textContent === "Discard old backup, start fresh",
@@ -1781,7 +1781,7 @@ describe("VaultView", () => {
     expect(sync.disabled).toBe(true);
     expect(sync.getAttribute("aria-label")).toBe("Sync");
     expect(screenText()).not.toContain("Syncing…");
-    expect(sync.className).toContain("hover:bg-surface-hover");
+    expect(sync.className).toContain("hover:bg-accent");
     expect(sync.className).not.toContain("bg-primary");
     expect(sync.className).toContain("disabled:opacity-50");
 
@@ -1924,7 +1924,7 @@ describe("VaultView", () => {
     // 渲染出的类名是 lucide-triangle-alert，不是 lucide-alert-triangle。
     const alert = sync.querySelector("svg.lucide-triangle-alert");
     expect(alert).not.toBeNull();
-    expect(alert?.getAttribute("class")).toContain("text-error");
+    expect(alert?.getAttribute("class")).toContain("text-destructive");
     // 失败横幅仍在，且图标状态与横幅由同一个 syncFeedback 驱动
     expect(container.querySelector('[role="status"]')?.textContent).toContain(
       "Cloud sync failed",

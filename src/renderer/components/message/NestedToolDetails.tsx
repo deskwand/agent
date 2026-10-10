@@ -50,11 +50,11 @@ export function NestedToolDetails({
 
   return (
     <div className="space-y-1">
-      <span className="text-xs text-text-muted">
+      <span className="text-xs text-muted-foreground">
         {t("tool.grouped.scriptOwner", { id: trace.parentToolCallId })}
       </span>
       {trace.argumentsBytes !== undefined && (
-        <p className="text-xs text-text-muted">
+        <p className="text-xs text-muted-foreground">
           {t("tool.grouped.argumentsOmitted")}
         </p>
       )}
@@ -64,7 +64,7 @@ export function NestedToolDetails({
             <Button variant="ghost"
               type="button"
               className={`cursor-pointer ${
-                trace.status === "error" ? "text-error" : "text-text-muted"
+                trace.status === "error" ? "text-destructive" : "text-muted-foreground"
               }`}
             >
               {item.name} ·{" "}
@@ -79,18 +79,18 @@ export function NestedToolDetails({
           </CollapsibleTrigger>
           <CollapsibleContent>
             {Object.keys(item.input).length > 0 && (
-              <pre className="whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono text-text-secondary">
+              <pre className="whitespace-pre-wrap break-all rounded-lg bg-muted p-2.5 text-xs font-mono text-muted-foreground">
                 {JSON.stringify(item.input, null, 2)}
               </pre>
             )}
             {unavailable && trace.status !== "ok" && (
-              <p className="text-xs text-text-muted">
+              <p className="text-xs text-muted-foreground">
                 {t("tool.grouped.outputUnavailable")}
               </p>
             )}
             {result?.content && (
               <pre
-                className={`whitespace-pre-wrap break-all rounded-lg bg-surface-muted p-2.5 text-xs font-mono ${trace.status === "error" ? "text-error" : "text-text-secondary"}`}
+                className={`whitespace-pre-wrap break-all rounded-lg bg-muted p-2.5 text-xs font-mono ${trace.status === "error" ? "text-destructive" : "text-muted-foreground"}`}
               >
                 {result.content}
               </pre>

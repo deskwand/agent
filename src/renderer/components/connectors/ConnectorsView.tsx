@@ -366,19 +366,19 @@ export function ConnectorsView() {
           type="button"
           onClick={() => setActiveView("chat")}
           aria-label={t("common.back")}
-          className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
+          className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
         >
-          <ArrowLeft className="h-5 w-5 text-text-secondary" />
+          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
         </Button>
-        <h2 className="text-xl font-semibold text-text-primary">
+        <h2 className="text-xl font-semibold text-foreground">
           {t("connectors.title")}
         </h2>
-        <span className="text-xs text-text-muted">
+        <span className="text-xs text-muted-foreground">
           {t("connectors.subtitle")}
         </span>
       </div>
 
-      <div className="flex items-center gap-0.5 px-5 pt-3 border-b border-border-muted flex-none">
+      <div className="flex items-center gap-0.5 px-5 pt-3 border-b border-border/60 flex-none">
         {tabs.map(([id, label]) => (
           <Button variant="ghost"
             key={id}
@@ -386,8 +386,8 @@ export function ConnectorsView() {
             onClick={() => setTab(id)}
             className={`px-3 py-1.5 text-sm -mb-px border-b-2 transition-colors ${
               tab === id
-                ? "border-primary text-text-primary font-semibold"
-                : "border-transparent text-text-secondary hover:text-text-primary"
+                ? "border-primary text-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {label}
@@ -403,8 +403,8 @@ export function ConnectorsView() {
             role={error ? "alert" : "status"}
             className={`absolute top-3 left-5 right-5 z-20 px-4 py-2.5 rounded-lg shadow-elevated text-sm ${
               error
-                ? "bg-error/10 text-error"
-                : "bg-surface-hover text-text-secondary"
+                ? "bg-destructive/10 text-destructive"
+                : "bg-accent text-muted-foreground"
             }`}
           >
             {error || notice}
@@ -444,8 +444,8 @@ export function ConnectorsView() {
                   onClick={() => setAddedOnly((v) => !v)}
                   className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap transition-colors ${
                     addedOnly
-                      ? "bg-primary-muted text-primary border-transparent"
-                      : "border-border-muted text-text-secondary hover:bg-surface-hover"
+                      ? "bg-primary/10 text-primary-text border-transparent"
+                      : "border-border/60 text-muted-foreground hover:bg-accent"
                   }`}
                 >
                   {t("connectors.filter.added")}
@@ -457,7 +457,7 @@ export function ConnectorsView() {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost"
                       type="button"
-                      className="px-3 py-1 rounded-control bg-primary text-white hover:bg-primary-hover text-xs font-medium transition-colors h-auto"
+                      className="px-3 py-1 rounded-control bg-primary text-white hover:bg-primary/90 text-xs font-medium transition-colors h-auto"
                     >
                       {t("connectors.action.add")}
                     </Button>
@@ -482,10 +482,10 @@ export function ConnectorsView() {
                       }}
                       className="flex-col items-start gap-0 px-3 py-2.5"
                     >
-                      <span className="block text-sm font-semibold text-text-primary">
+                      <span className="block text-sm font-semibold text-foreground">
                         {t("connectors.addMenu.server")}
                       </span>
-                      <span className="block text-xs text-text-muted">
+                      <span className="block text-xs text-muted-foreground">
                         {t("connectors.addMenu.serverHint")}
                       </span>
                     </DropdownMenuItem>
@@ -495,12 +495,12 @@ export function ConnectorsView() {
                         setAddMenuOpen(false);
                         setMailOpen(true);
                       }}
-                      className="flex-col items-start gap-0 rounded-none border-t border-border-muted px-3 py-2.5"
+                      className="flex-col items-start gap-0 rounded-none border-t border-border/60 px-3 py-2.5"
                     >
-                      <span className="block text-sm font-semibold text-text-primary">
+                      <span className="block text-sm font-semibold text-foreground">
                         {t("connectors.addMenu.mailbox")}
                       </span>
-                      <span className="block text-xs text-text-muted">
+                      <span className="block text-xs text-muted-foreground">
                         {t("connectors.addMenu.mailboxHint")}
                       </span>
                     </DropdownMenuItem>
@@ -514,14 +514,14 @@ export function ConnectorsView() {
                 <div className="flex flex-col items-center gap-3 py-12">
                   {/* role="status"：屏幕阅读器要听到列表已空 —— 否则开关的 aria-pressed
                       变了、内容却静默换了。 */}
-                  <p role="status" className="text-sm text-text-secondary">
+                  <p role="status" className="text-sm text-muted-foreground">
                     {t("connectors.filter.empty")}
                   </p>
                   <Button variant="ghost"
                     type="button"
                     data-testid="added-filter-show-all"
                     onClick={() => setAddedOnly(false)}
-                    className="text-xs px-3 py-1 rounded-full border border-border-muted text-text-secondary hover:bg-surface-hover transition-colors h-auto"
+                    className="text-xs px-3 py-1 rounded-full border border-border/60 text-muted-foreground hover:bg-accent transition-colors h-auto"
                   >
                     {t("connectors.filter.showAll")}
                   </Button>
@@ -532,10 +532,10 @@ export function ConnectorsView() {
                 <section key={g.id} className="mb-5 last:mb-0">
                   <h3
                     data-testid="section-title"
-                    className="text-sm font-semibold text-text-secondary mb-2 flex items-baseline gap-2"
+                    className="text-sm font-semibold text-muted-foreground mb-2 flex items-baseline gap-2"
                   >
                     {t(`connectors.category.${g.id}`)}
-                    <span className="text-[11px] font-normal text-text-muted">
+                    <span className="text-[11px] font-normal text-muted-foreground">
                       {g.entries.length}
                     </span>
                   </h3>
@@ -633,8 +633,8 @@ function CategoryChip({
       onClick={() => onSelect(id)}
       className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap transition-colors ${
         isActive
-          ? "bg-primary-muted text-primary border-transparent"
-          : "border-border-muted text-text-secondary hover:bg-surface-hover"
+          ? "bg-primary/10 text-primary-text border-transparent"
+          : "border-border/60 text-muted-foreground hover:bg-accent"
       }`}
     >
       {label}

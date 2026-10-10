@@ -10,7 +10,8 @@ describe('theme settings persistence', () => {
   it('persists theme updates in the main process and applies them to native window state', () => {
     const source = fs.readFileSync(mainIndexPath, 'utf8');
 
-    expect(source).toContain('const THEME_PRESET_BG: Record<string, { dark: string; light: string }> = {');
+    // 2026-10-10：这张表改成按官方 ThemePreset 键控（此前是自造 id 的 Record<string,…>）
+    expect(source).toMatch(/const THEME_PRESET_BG: Record<ThemePreset, \{ dark: string; light: string \}> = \{/);
     expect(source).toContain('configStore.update({ theme: nextTheme });');
     // themeSource stays at "system" so OS theme changes reach the renderer;
     // the effective theme is resolved explicitly instead of forcing themeSource

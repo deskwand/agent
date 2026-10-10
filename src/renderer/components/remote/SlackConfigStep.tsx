@@ -50,22 +50,22 @@ export function SlackConfigStep({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium text-text-primary mb-1">
+        <h3 className="text-lg font-medium text-foreground mb-1">
           {t("remote.slackTitle")}
         </h3>
-        <p className="text-sm text-text-secondary">{t("remote.slackDesc")}</p>
+        <p className="text-sm text-muted-foreground">{t("remote.slackDesc")}</p>
       </div>
 
       <div className="grid gap-4">
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             {t("remote.slackBotToken")}
           </label>
           <input
             type="password"
             value={botToken}
             onChange={(e) => onBotTokenChange(e.target.value)}
-            className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+            className="w-full px-4 py-3 bg-accent border border-border rounded-xl text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
             placeholder="xoxb-••••••••••••"
           />
         </div>
@@ -80,10 +80,10 @@ export function SlackConfigStep({
             />
           </Button>
           <div>
-            <div className="text-sm font-medium text-text-primary">
+            <div className="text-sm font-medium text-foreground">
               {t("remote.slackSocketMode")}
             </div>
-            <div className="text-xs text-text-muted">
+            <div className="text-xs text-muted-foreground">
               {t("remote.slackSocketModeDesc")}
             </div>
           </div>
@@ -91,21 +91,21 @@ export function SlackConfigStep({
 
         {useSocketMode && (
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
               {t("remote.slackAppToken")}
             </label>
             <input
               type="password"
               value={appToken}
               onChange={(e) => onAppTokenChange(e.target.value)}
-              className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+              className="w-full px-4 py-3 bg-accent border border-border rounded-xl text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               placeholder="xapp-••••••••••••"
             />
           </div>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-text-secondary mb-2">
+          <label className="block text-sm font-medium text-muted-foreground mb-2">
             {t("remote.dmPolicy")}
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -119,10 +119,10 @@ export function SlackConfigStep({
                     : "border-border hover:border-primary/50"
                 }`}
               >
-                <div className="font-medium text-text-primary text-sm">
+                <div className="font-medium text-foreground text-sm">
                   {option.label}
                 </div>
-                <div className="text-xs text-text-muted mt-0.5">
+                <div className="text-xs text-muted-foreground mt-0.5">
                   {option.desc}
                 </div>
               </Button>
@@ -135,7 +135,7 @@ export function SlackConfigStep({
         href="https://api.slack.com/apps"
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+        className="inline-flex items-center gap-2 text-sm text-primary-text hover:underline"
       >
         <ExternalLink className="w-4 h-4" />
         {t("remote.openSlack")}

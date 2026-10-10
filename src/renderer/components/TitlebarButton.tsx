@@ -37,12 +37,12 @@ export function TitlebarButton({
   children,
 }: TitlebarButtonProps) {
   // 已开启与未开启是两套互斥的 class 组合，不是靠 CSS 优先级叠加：
-  // Tailwind 输出的 hover: 变体晚于无前缀的 bg-overlay-on，同时存在时会把
+  // Tailwind 输出的 hover: 变体晚于无前缀的 bg-accent，同时存在时会把
   // 已开启背景盖掉。
   const stateClasses = isOn
-    ? "bg-overlay-on text-primary active:scale-[0.96] active:duration-75"
-    : `hover:bg-overlay-hover hover:text-text-primary active:bg-overlay-press active:scale-[0.96] active:duration-75 ${
-        tone === "secondary" ? "text-text-secondary" : "text-text-muted"
+    ? "bg-accent text-primary-text active:scale-[0.96] active:duration-75"
+    : `hover:bg-accent hover:text-foreground active:bg-accent active:scale-[0.96] active:duration-75 ${
+        tone === "secondary" ? "text-muted-foreground" : "text-muted-foreground"
       }`;
 
   const button = (

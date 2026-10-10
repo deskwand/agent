@@ -112,7 +112,7 @@ export function serviceIconFor(serverName: string): ServiceIcon {
   return undefined;
 }
 
-/** 窗口轮廓 + 光标箭头。图形走 `currentColor`，由外层给 `text-primary` —— 做成 `<img>`
+/** 窗口轮廓 + 光标箭头。图形走 `currentColor`，由外层给 `text-primary-text` —— 做成 `<img>`
  *  就拿不到主题色了（这正是上面那段注释说的那件事）。 */
 export function FirstPartyServiceIcon() {
   return (

@@ -129,7 +129,7 @@ export function ChatInputBottomBar({
                 type="button"
                 onClick={onToggleExpand}
                 aria-label={expandLabel}
-                className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+                className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
                 {isExpanded ? (
                   <Minimize2 className="w-4 h-4" />
@@ -173,8 +173,8 @@ export function ChatInputBottomBar({
               aria-label={submitLabel}
               className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition-all duration-150 ${
                 canStop
-                  ? "bg-primary text-background hover:bg-primary-hover"
-                  : "bg-primary text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-hover active:scale-95 active:translate-y-px"
+                  ? "bg-primary text-background hover:bg-primary/90"
+                  : "bg-primary text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary/90 active:scale-95 active:translate-y-px"
               }`}
             >
               {canStop ? (

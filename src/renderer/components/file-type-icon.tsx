@@ -38,7 +38,7 @@ const KIND_ICON: Record<FileKind, LucideIcon> = {
  * 文件夹走主题文字 token（跟着 14 档主题自己变），只有文件带类型色。
  */
 const KIND_CLASS: Record<FileKind, string> = {
-  folder: "text-text-secondary",
+  folder: "text-muted-foreground",
   image: "text-file-media",
   video: "text-file-media",
   doc: "text-file-doc",

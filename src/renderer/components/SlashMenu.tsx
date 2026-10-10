@@ -132,7 +132,7 @@ export function SlashMenu({
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === tab.key
                   ? "bg-primary text-primary-foreground"
-                  : "text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
               {tabIcon}
@@ -140,8 +140,8 @@ export function SlashMenu({
               <span
                 className={`text-[10px] leading-none flex-shrink-0 ${
                   activeTab === tab.key
-                    ? "text-primary/60"
-                    : "text-text-muted/50"
+                    ? "text-primary-text/60"
+                    : "text-muted-foreground/50"
                 }`}
               >
                 {count}
@@ -152,12 +152,12 @@ export function SlashMenu({
       </div>
 
       {/* Divider below tabs */}
-      <div className="mx-2 border-t border-border-subtle shrink-0" />
+      <div className="mx-2 border-t border-border/40 shrink-0" />
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-1.5">
         {isEmpty ? (
-          <div className="flex items-center justify-center h-16 text-sm text-text-muted">
+          <div className="flex items-center justify-center h-16 text-sm text-muted-foreground">
             {t("chat.slashNoMatch")}
           </div>
         ) : (
@@ -174,11 +174,11 @@ export function SlashMenu({
                   description={item.command.description}
                   icon={
                     source === "extension" ? (
-                      <Package className="w-4 h-4 text-text-muted flex-shrink-0" />
+                      <Package className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                     ) : source === "prompt" ? (
-                      <FileText className="w-4 h-4 text-text-muted flex-shrink-0" />
+                      <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                     ) : (
-                      <Zap className="w-4 h-4 text-primary flex-shrink-0" />
+                      <Zap className="w-4 h-4 text-primary-text flex-shrink-0" />
                     )
                   }
                   badge={
@@ -226,8 +226,8 @@ export function SlashMenu({
                       event.stopPropagation();
                       onToggleSkillPin(item.skill.name);
                     }}
-                    className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
-                      pinned ? "text-primary" : "text-text-muted"
+                    className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-accent ${
+                      pinned ? "text-primary-text" : "text-muted-foreground"
                     }`}
                   >
                     <Star
@@ -293,7 +293,7 @@ function MenuItem({
       <span className="flex-1 truncate">
         {label}
         {description ? (
-          <span className="text-xs text-text-muted hidden sm:inline">
+          <span className="text-xs text-muted-foreground hidden sm:inline">
             {" "}
             — {description}
           </span>

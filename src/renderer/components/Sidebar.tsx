@@ -54,7 +54,7 @@ const PROJECTS_GROUP_KEY = "__projects__";
 const SIDEBAR_PINS_STORAGE_KEY = "deskwand.sidebarPins";
 const SIDEBAR_GROUP_EXPANSION_STORAGE_KEY = "deskwand.sidebarGroupExpansion";
 const SESSION_OVERFLOW_BUTTON_CLASS =
-  "rounded-lg bg-transparent px-3 py-1.5 text-xs text-text-muted hover:bg-transparent hover:text-text-secondary focus-visible:bg-transparent focus-visible:text-text-secondary transition-colors";
+  "rounded-lg bg-transparent px-3 py-1.5 text-xs text-muted-foreground hover:bg-transparent hover:text-muted-foreground focus-visible:bg-transparent focus-visible:text-muted-foreground transition-colors";
 
 export function Sidebar({
   width = 280,
@@ -708,7 +708,7 @@ export function Sidebar({
     return (
       <>
         {title.slice(0, idx)}
-        <mark className="bg-highlight text-text-primary rounded-sm px-0.5">
+        <mark className="bg-accent text-foreground rounded-sm px-0.5">
           {title.slice(idx, idx + query.length)}
         </mark>
         {title.slice(idx + query.length)}
@@ -744,14 +744,14 @@ export function Sidebar({
           );
         }}
         className={`group relative cursor-pointer rounded-lg px-2.5 py-1 transition-colors ${
-          isActive ? "bg-surface-active" : "hover:bg-surface-hover/60"
+          isActive ? "bg-accent" : "hover:bg-accent/60"
         }`}
       >
         <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1 flex items-center gap-2">
             {session.kind === "voice" ? (
               <Mic
-                className="h-3.5 w-3.5 shrink-0 text-text-muted"
+                className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
                 aria-label={t("voiceMode.sessionLabel")}
               />
             ) : null}
@@ -774,12 +774,12 @@ export function Sidebar({
                     event.currentTarget.blur();
                   }
                 }}
-                className="min-w-0 flex-1 rounded-md border border-border-muted bg-background px-1.5 py-0.5 text-sm text-text-primary outline-none focus:border-primary"
+                className="min-w-0 flex-1 rounded-md border border-border/60 bg-background px-1.5 py-0.5 text-sm text-foreground outline-none focus:border-primary"
                 aria-label={t("sidebar.rename")}
               />
             ) : (
               <div
-                className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? "text-text-primary" : "text-text-secondary"}`}
+                className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? "text-foreground" : "text-muted-foreground"}`}
               >
                 {highlightTitle(session.title, normalizedQuery)}
               </div>
@@ -813,11 +813,11 @@ export function Sidebar({
                     >
                       <Pin
                         aria-hidden="true"
-                        className="h-3 w-3 fill-current text-primary"
+                        className="h-3 w-3 fill-current text-primary-text"
                       />
                     </span>
                   ) : (
-                    <span className="text-sm leading-5 text-text-muted whitespace-nowrap">
+                    <span className="text-sm leading-5 text-muted-foreground whitespace-nowrap">
                       {formatRelativeTime(
                         session.updatedAt || session.createdAt,
                         t,
@@ -848,8 +848,8 @@ export function Sidebar({
                       }}
                       className={`h-6 w-6 rounded-lg flex items-center justify-center transition-colors ${
                         pendingArchiveId === session.id
-                          ? "text-primary bg-primary-muted border border-primary/30"
-                          : "text-text-muted hover:text-primary hover:bg-surface-active"
+                          ? "text-primary-text bg-primary/10 border border-primary/30"
+                          : "text-muted-foreground hover:text-primary-text hover:bg-accent"
                       }`}
                       title={
                         pendingArchiveId === session.id
@@ -879,7 +879,7 @@ export function Sidebar({
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost"
                             type="button"
-                            className="h-6 w-6 rounded-lg flex items-center justify-center text-text-muted hover:text-primary hover:bg-surface-active transition-colors"
+                            className="h-6 w-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-accent transition-colors"
                             aria-label={t("sidebar.moreActions")}
                           >
                             <MoreHorizontal className="h-3 w-3" />
@@ -906,9 +906,9 @@ export function Sidebar({
                         }}
                       >
                         {pinnedSessionIds.has(session.id) ? (
-                          <PinOff className="h-4 w-4 text-text-muted" />
+                          <PinOff className="h-4 w-4 text-muted-foreground" />
                         ) : (
-                          <Pin className="h-4 w-4 text-text-muted" />
+                          <Pin className="h-4 w-4 text-muted-foreground" />
                         )}
                         <span>
                           {t(
@@ -922,14 +922,14 @@ export function Sidebar({
                         className="h-7 gap-2"
                         onClick={() => beginRenameSession(session)}
                       >
-                        <SquarePen className="h-4 w-4 text-text-muted" />
+                        <SquarePen className="h-4 w-4 text-muted-foreground" />
                         <span>{t("sidebar.rename")}</span>
                       </DropdownMenuItem>
                       {session.status !== "running" && (
                         <>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            className="h-7 gap-2 text-error hover:bg-error/10"
+                            className="h-7 gap-2 text-destructive hover:bg-destructive/10"
                             onClick={(event) => {
                               setSessionMenu(null);
                               handleDeleteSession(event, session);
@@ -1018,7 +1018,7 @@ export function Sidebar({
   return (
     <>
       <aside
-        className={`group bg-background-secondary rounded-tl-lg flex flex-col overflow-hidden flex-shrink-0 ${panelWidthTransitionClass(
+        className={`group bg-muted rounded-tl-lg flex flex-col overflow-hidden flex-shrink-0 ${panelWidthTransitionClass(
           dragging,
         )} ${sidebarCollapsed ? "w-0" : ""}`}
         style={{ width: sidebarCollapsed ? 0 : `${width}px` }}
@@ -1028,13 +1028,13 @@ export function Sidebar({
             <div className="px-4 pt-3 pb-1">
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 min-w-0">
-                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                   <Input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t("sidebar.searchPlaceholder")}
-                    className="w-full rounded-xl border border-transparent bg-surface-muted pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border focus:bg-background transition-colors h-auto shadow-none"
+                    className="w-full rounded-xl border border-transparent bg-muted pl-9 pr-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-border focus:bg-background transition-colors h-auto shadow-none"
                   />
                 </div>
                 <div className="relative flex flex-shrink-0">
@@ -1042,7 +1042,7 @@ export function Sidebar({
                     <TooltipTrigger asChild>
                       <Button variant="ghost"
                         onClick={() => startNewSession()}
-                        className="h-8 w-8 rounded-l-xl text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center"
+                        className="h-8 w-8 rounded-l-xl text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center"
                         aria-label={t("sidebar.newChat")}
                       >
                         <SquarePen className="w-4 h-4" />
@@ -1059,7 +1059,7 @@ export function Sidebar({
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost"
                         type="button"
-                        className="w-5 h-8 rounded-r-xl text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center"
+                        className="w-5 h-8 rounded-r-xl text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center"
                       >
                         <ChevronDown className="w-3 h-3" />
                       </Button>
@@ -1077,7 +1077,7 @@ export function Sidebar({
                     >
                       {projectEntries.length > 0 && (
                         <>
-                          <DropdownMenuLabel className="px-2.5 py-1 text-xs text-text-muted">
+                          <DropdownMenuLabel className="px-2.5 py-1 text-xs text-muted-foreground">
                             {t("sidebar.newSessionInProject")}
                           </DropdownMenuLabel>
                           {projectEntries.map(({ name, cwd }) => (
@@ -1089,7 +1089,7 @@ export function Sidebar({
                                 void handleNewSessionInProject(cwd);
                               }}
                             >
-                              <Folder className="h-4 w-4 shrink-0 text-text-muted" />
+                              <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
                               <span className="truncate">{name}</span>
                             </DropdownMenuItem>
                           ))}
@@ -1144,7 +1144,7 @@ export function Sidebar({
                         );
                       }
                     }}
-                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                   >
                     <SidebarGroupIcon
                       kind="sessions"
@@ -1190,7 +1190,7 @@ export function Sidebar({
                           !projectsExpanded,
                         );
                       }}
-                      className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                      className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                     >
                       <SidebarGroupIcon
                         kind="project"
@@ -1203,7 +1203,7 @@ export function Sidebar({
                         )}
                       />
                       <span>{t("sidebar.projects")}</span>
-                      <span className="ml-auto text-xs font-normal text-text-muted">
+                      <span className="ml-auto text-xs font-normal text-muted-foreground">
                         {sessionGroups.projectGroups.length}
                       </span>
                     </Button>
@@ -1254,7 +1254,7 @@ export function Sidebar({
                                       );
                                     }
                                   }}
-                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
+                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-medium leading-5 text-foreground hover:bg-accent transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                                 >
                                   <SidebarGroupIcon
                                     kind="project"
@@ -1267,7 +1267,7 @@ export function Sidebar({
                                     )}
                                   />
                                   <span className="truncate">{group.name}</span>
-                                  <span className="ml-auto text-xs font-normal text-text-muted opacity-0 transition-opacity group-hover/project:opacity-100">
+                                  <span className="ml-auto text-xs font-normal text-muted-foreground opacity-0 transition-opacity group-hover/project:opacity-100">
                                     {group.sessions.length}
                                   </span>
                                 </Button>
@@ -1281,7 +1281,7 @@ export function Sidebar({
                                           group.cwd,
                                         );
                                       }}
-                                      className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                      className="h-8 w-8 flex-shrink-0 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary-text transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
                                       aria-label={t(
                                         "sidebar.newSessionForProject",
                                       )}
@@ -1301,7 +1301,7 @@ export function Sidebar({
                                         event.stopPropagation();
                                         handleDeleteProject(group);
                                       }}
-                                      className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-error/10 hover:text-error transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                      className="h-8 w-8 flex-shrink-0 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
                                       aria-label={t("common.delete")}
                                     >
                                       <Trash2 className="h-3.5 w-3.5" />
@@ -1323,8 +1323,8 @@ export function Sidebar({
                                       }
                                       className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
                                         isProjectPinned
-                                          ? "opacity-100 text-primary hover:bg-primary/10"
-                                          : "opacity-0 pointer-events-none text-text-muted hover:bg-primary/10 hover:text-primary group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                          ? "opacity-100 text-primary-text hover:bg-primary/10"
+                                          : "opacity-0 pointer-events-none text-muted-foreground hover:bg-primary/10 hover:text-primary-text group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
                                       }`}
                                       aria-label={t(
                                         isProjectPinned
@@ -1365,11 +1365,11 @@ export function Sidebar({
                 {sessionGroups.unscopedSessions.length === 0 &&
                   sessionGroups.projectGroups.length === 0 && (
                     <div className="px-3 py-6 text-center">
-                      <p className="text-sm text-text-muted">
+                      <p className="text-sm text-muted-foreground">
                         {t("sidebar.emptyTitle")}
                       </p>
                       {activeSessions.length === 0 && (
-                        <p className="text-xs text-text-muted mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           {t("sidebar.emptyHint")}
                         </p>
                       )}
@@ -1386,7 +1386,7 @@ export function Sidebar({
               isOpen={deleteConfirm !== null}
               title={deleteConfirm?.message ?? ""}
               description={deleteConfirm?.detail}
-              // 「还有 N 个会话在跑」是告警，不是说明 —— 原实现用的就是 text-error
+              // 「还有 N 个会话在跑」是告警，不是说明 —— 原实现用的就是 text-destructive
               descriptionTone="error"
               confirmLabel={t("sidebar.confirmDelete")}
               onConfirm={() => deleteConfirm?.onConfirm()}
@@ -1405,7 +1405,7 @@ export function Sidebar({
               }}
             >
               <DialogContent className="max-w-sm">
-                <DialogTitle className="text-sm font-medium text-text-primary">
+                <DialogTitle className="text-sm font-medium text-foreground">
                   {t("sidebar.createProjectTitle")}
                 </DialogTitle>
                 {/* 用已有的占位提示当描述 —— 不要复述标题，那会让读屏经
@@ -1424,20 +1424,20 @@ export function Sidebar({
                     }
                   }}
                   placeholder={t("sidebar.projectNamePlaceholder")}
-                  className="w-full rounded-xl border border-border-muted bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border h-auto shadow-none"
+                  className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-border h-auto shadow-none"
                 />
                 <div className="flex items-center justify-end gap-2">
                   <Button variant="ghost"
                     onClick={() => setCreateProjectModalOpen(false)}
                     disabled={isCreatingProject}
-                    className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
+                    className="rounded-xl px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
                   >
                     {t("sidebar.cancel")}
                   </Button>
                   <Button variant="ghost"
                     onClick={() => void handleCreateProject()}
                     disabled={isCreatingProject}
-                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
                   >
                     {isCreatingProject
                       ? t("common.loading")

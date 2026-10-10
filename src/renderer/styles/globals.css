@@ -2,641 +2,700 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════
+   固定语义层 —— 与主题无关，不随 palette 变（只有明暗两态）
+
+   放在未被 @layer 包裹的 :root：产物里它位于 @layer base 之后，与主题块
+   同名时会压过它们 —— 所以这里只放主题块里**没有**的 token。
+   官方 31 个主题变量只允许出现在 @layer base 的主题块里。
+   ═══════════════════════════════════════════════════════════════════ */
 :root {
-  --color-success-foreground: #ffffff;
-  --color-warning-foreground: #ffffff;
-  /* 「上色背景上的文字」第三个同类常量。前两个是 success / warning，
-     error 一直缺这个对偶，而 shadcn 的 destructive variant 需要它。 */
-  --color-error-foreground: #ffffff;
+  /* 圆角基准。tailwind.config.js 的 borderRadius 全部由它派生（官方 0.625rem）。 */
+  --radius: 0.625rem;
 
-  /* ——— shadcn 契约别名 ———————————————————————————————————————
-     为什么需要这层：token-alpha.test.ts 锁定了一条本仓不变量 ——
-     colors 的**键路径必须等于 CSS 变量名**
-     （断言 `token()({}) === var(--color-<键路径>)`）。
-     而 shadcn 的组件写的是 bg-primary / text-foreground 这类名，
-     直接把它们映射到 --color-accent / --color-text-primary 会破这条不变量。
+  /* 成功 / 警告：官方主题里没有对偶，值固定（不再随调色板变） */
+  --success: #22c55e;
+  --warning: #eab308;
+  --success-foreground: #ffffff;
+  --warning-foreground: #ffffff;
+  /* destructive 面上的文字。官方没有这个变量，而 vendored ui/button.tsx 的
+     destructive 变体写死了  —— 由这一层提供。 */
+  --destructive-foreground: #18181b;
 
-     因此这里为契约名建立**同名变量**，用 var() 指向本仓既有 token。
-     只声明这一次：var() 在使用时求值，会自动跟随当前生效的主题块，
-     所以 14 个主题块与它们那 451 处声明一处不用改。
+  /* 终端 ANSI */
+  --terminal-bg: #0d1117;
+  --terminal-fg: #e6edf3;
+  --terminal-titlebar-text: #8b949e;
+  --terminal-divider: rgba(255, 255, 255, 0.16);
+  --terminal-success: #3fb950;
+  --terminal-error: #f85149;
+  --terminal-dim: #8b949e;
 
-     注意 --color-accent 与 --color-primary 的关系：两者同值，
-     且 --color-accent 永远是品牌蓝。变的是 **utility** accent 的含义
-     （计划 7 的第二阶段），不是这个变量。 */
-  --color-primary: var(--color-accent);
-  --color-primary-hover: var(--color-accent-hover);
-  --color-primary-muted: var(--color-accent-muted);
-  --color-primary-foreground: var(--color-accent-foreground);
-  --color-secondary: var(--color-surface);
-  --color-secondary-foreground: var(--color-text-primary);
-  --color-destructive: var(--color-error);
-  --color-destructive-foreground: var(--color-error-foreground);
-  --color-foreground: var(--color-text-primary);
-  --color-muted-foreground: var(--color-text-muted);
-  --color-input: var(--color-border);
-  --color-ring: var(--color-accent);
-  /* ——— 计划 5 追加：vendored dropdown-menu.tsx 用到的名字 ———————————
-     按 spec §5.2「枚举后定稿、不凭猜」逐个补。
-     - popover 的语义就是「浮层面板底色」→ 本仓的 --color-background
-       （原 MENU_PANEL_CLASS 用的正是 bg-background）
-     - muted 只被 bg-muted 用到（菜单项的快捷键提示底）→ --color-surface-muted */
-  --color-popover: var(--color-background);
-  --color-popover-foreground: var(--color-foreground);
-  --color-muted: var(--color-surface-muted);
+  /* 文件类型图标 —— 固定语义色，与主题无关 */
+  --file-media: #f0a63c;
+  --file-doc: #34d399;
+  --file-code: #a855f7;
+  --file-audio: #f472b6;
+  --file-neutral: #7c8494;
+
+  /* 特效色：源色改指官方 --primary */
+  --magic: color-mix(in srgb, var(--primary) 70%, #a78bfa);
+  --magic-glow: color-mix(in srgb, var(--primary) 60%, #c4b5fd);
+  --magic-spark: color-mix(in srgb, var(--primary) 30%, #ede9fe);
+
+  /* 窗口最外那圈（图标栏＋标题栏）：比它框住的面板更暗 */
+  /* 强调色的文字档：官方 accent 的暗色 primary 对暗底只有 1.98–2.81，不能当文字用。
+     与 foreground 混到 40% —— 238 个组合（7 底色 × 17 强调色 × 明暗）里对
+     background/card/muted/accent 四个表面的最差对比 6.05（余量 1.55）。
+     只声明一次：var(--primary) 在使用处按当前主题解析。 */
+  --primary-text: color-mix(in srgb, var(--primary) 40%, var(--foreground));
+  --app-chrome: color-mix(in srgb, #000000 50%, var(--background));
+  /* Windows 原生关闭键悬停红，镜像系统配色 */
+  --window-close-hover: #c42b1c;
+
+  --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
+  --shadow-card:
+    0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-elevated:
+    0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* 亮色：只有这几个固定语义值不同（主题变量在 @layer base 的 .light 块里） */
+:root.light {
+  --success: #16a34a;
+  --warning: #ca8a04;
+  --destructive-foreground: #ffffff;
+
+  --terminal-bg: #fafbfc;
+  --terminal-fg: #1a1a2e;
+  --terminal-titlebar-text: #6e6e80;
+  --terminal-divider: rgba(0, 0, 0, 0.16);
+  --terminal-success: #16a34a;
+  --terminal-error: #dc2626;
+  --terminal-dim: #9ca3af;
+
+  --file-media: #b26a00;
+  --file-doc: #059669;
+  --file-code: #7c3aed;
+  --file-audio: #db2777;
+  --file-neutral: #5c6470;
+
+  --app-chrome: color-mix(in srgb, #000000 12%, var(--background));
+
+  --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 @layer base {
   /* ================================================================
-     Theme Presets — dark (default) + light (.light) × 3 presets
+     官方主题层：7 套 shadcn base colour × 明暗 = 14 块，每块 31 个官方变量。
+     取值逐字来自 registry（src/renderer/styles/official-themes.json），
+     回归测试 src/tests/renderer/official-vocabulary.test.ts 逐值比对。
+
+     zinc 占默认槽位：:root（暗）/ .light（亮）；其余 6 套带 data-theme-preset。
+     ⚠️ 选择器形状不要改：themeBlocks() 只认 :root / .light 开头。
      ================================================================ */
 
-  /* ----- Graphite (default) — cool zinc gray, VS Code Dark Modern ----- */
+  /* neutral — 暗 */
+  :root[data-theme-preset="neutral"] {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+  }
+  .light[data-theme-preset="neutral"] {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+  }
+  :root[data-theme-preset="stone"] {
+    --background: oklch(0.147 0.004 49.25);
+    --foreground: oklch(0.985 0.001 106.423);
+    --card: oklch(0.216 0.006 56.043);
+    --card-foreground: oklch(0.985 0.001 106.423);
+    --popover: oklch(0.216 0.006 56.043);
+    --popover-foreground: oklch(0.985 0.001 106.423);
+    --primary: oklch(0.923 0.003 48.717);
+    --primary-foreground: oklch(0.216 0.006 56.043);
+    --secondary: oklch(0.268 0.007 34.298);
+    --secondary-foreground: oklch(0.985 0.001 106.423);
+    --muted: oklch(0.268 0.007 34.298);
+    --muted-foreground: oklch(0.709 0.01 56.259);
+    --accent: oklch(0.268 0.007 34.298);
+    --accent-foreground: oklch(0.985 0.001 106.423);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.553 0.013 58.071);
+    --chart-1: oklch(0.869 0.005 56.366);
+    --chart-2: oklch(0.553 0.013 58.071);
+    --chart-3: oklch(0.444 0.011 73.639);
+    --chart-4: oklch(0.374 0.01 67.558);
+    --chart-5: oklch(0.268 0.007 34.298);
+    --sidebar: oklch(0.216 0.006 56.043);
+    --sidebar-foreground: oklch(0.985 0.001 106.423);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0.001 106.423);
+    --sidebar-accent: oklch(0.268 0.007 34.298);
+    --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.553 0.013 58.071);
+  }
+  .light[data-theme-preset="stone"] {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.147 0.004 49.25);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.147 0.004 49.25);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.147 0.004 49.25);
+    --primary: oklch(0.216 0.006 56.043);
+    --primary-foreground: oklch(0.985 0.001 106.423);
+    --secondary: oklch(0.97 0.001 106.424);
+    --secondary-foreground: oklch(0.216 0.006 56.043);
+    --muted: oklch(0.97 0.001 106.424);
+    --muted-foreground: oklch(0.553 0.013 58.071);
+    --accent: oklch(0.97 0.001 106.424);
+    --accent-foreground: oklch(0.216 0.006 56.043);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.923 0.003 48.717);
+    --input: oklch(0.923 0.003 48.717);
+    --ring: oklch(0.709 0.01 56.259);
+    --chart-1: oklch(0.869 0.005 56.366);
+    --chart-2: oklch(0.553 0.013 58.071);
+    --chart-3: oklch(0.444 0.011 73.639);
+    --chart-4: oklch(0.374 0.01 67.558);
+    --chart-5: oklch(0.268 0.007 34.298);
+    --sidebar: oklch(0.985 0.001 106.423);
+    --sidebar-foreground: oklch(0.147 0.004 49.25);
+    --sidebar-primary: oklch(0.216 0.006 56.043);
+    --sidebar-primary-foreground: oklch(0.985 0.001 106.423);
+    --sidebar-accent: oklch(0.97 0.001 106.424);
+    --sidebar-accent-foreground: oklch(0.216 0.006 56.043);
+    --sidebar-border: oklch(0.923 0.003 48.717);
+    --sidebar-ring: oklch(0.709 0.01 56.259);
+  }
   :root {
-    --color-background: #18181b;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #27272a;
-    --color-surface-hover: #323237;
-    --color-surface-active: #3f3f46;
-    --color-surface-muted: #1b1b1f;
-    --color-tooltip-bg: #464648;
-    --color-tooltip-fg: var(--color-text-primary);
-    /* 由 text-primary 与 surface 派生：同一条描边要同时服务最深到最亮的
-       所有表面，硬编码值做不到（见设计文档 §4.2.1）。 */
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 18%,
-      var(--color-surface)
-    );
-    --color-border-muted: #242428;
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-mcp: #71717a;
-    /* --shadow-soft 目前零引用（14 个主题块各声明一次、无使用点），
-       因为暗色下它合成后对比只有 1.24，看不见。层次改由描边承担（设计文档 §4.3 规则 C），
-       按钮/卡片的阴影用法已删除。保留 token 不删，留给以后的悬浮层。
-       --shadow-card 还有 3 处内联用法在 TSX 里（SettingsAPI.tsx:1114/1290、
-       SettingsConnectors.tsx:489）——那三个卡片属于另一轮清理。 */
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card:
-      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-elevated:
-      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #5b8cff;
-    --color-accent-hover: #7ba3ff;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 16%,
-      transparent
-    );
-    --color-accent-foreground: #0b1220;
-    --color-mention: #6ea8fe;
-    --color-text-primary: #f4f4f5;
-    --color-text-secondary: #a1a1aa;
-    --color-text-muted: #8d8d95;
-    --color-success: #22c55e;
-    --color-warning: #eab308;
-    --color-error: #ef4444;
-    --color-terminal-bg: #0d1117;
-    --color-terminal-fg: #e6edf3;
-    --color-terminal-titlebar-text: #8b949e;
-    --color-terminal-divider: rgba(255, 255, 255, 0.16);
-    --color-terminal-success: #3fb950;
-    --color-terminal-error: #f85149;
-    --color-terminal-dim: #8b949e;
-    /* File type icon colours — fixed semantic colours, independent of presets */
-    --color-file-media: #f0a63c;
-    --color-file-doc: #34d399;
-    --color-file-code: #a855f7;
-    --color-file-audio: #f472b6;
-    --color-file-neutral: #7c8494;
+    --background: oklch(0.141 0.005 285.823);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.21 0.006 285.885);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.21 0.006 285.885);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.92 0.004 286.32);
+    --primary-foreground: oklch(0.21 0.006 285.885);
+    --secondary: oklch(0.274 0.006 286.033);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.274 0.006 286.033);
+    --muted-foreground: oklch(0.705 0.015 286.067);
+    --accent: oklch(0.274 0.006 286.033);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.552 0.016 285.938);
+    --chart-1: oklch(0.871 0.006 286.286);
+    --chart-2: oklch(0.552 0.016 285.938);
+    --chart-3: oklch(0.442 0.017 285.786);
+    --chart-4: oklch(0.37 0.013 285.805);
+    --chart-5: oklch(0.274 0.006 286.033);
+    --sidebar: oklch(0.21 0.006 285.885);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.274 0.006 286.033);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.552 0.016 285.938);
   }
   .light {
-    --color-background: #ffffff;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #ffffff;
-    --color-surface-hover: #f4f4f5;
-    --color-surface-active: #e4e4e7;
-    --color-surface-muted: #fafafa;
-    --color-tooltip-bg: var(--color-text-primary);
-    --color-tooltip-fg: var(--color-background);
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 22%,
-      var(--color-surface)
-    );
-    --color-border-muted: #eaeaed;
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-mcp: #71717a;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #2563eb;
-    --color-accent-hover: #1d4ed8;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 12%,
-      transparent
-    );
-    --color-accent-foreground: #ffffff;
-    --color-mention: #1d4ed8;
-    --color-text-primary: #09090b;
-    --color-text-secondary: #52525b;
-    --color-text-muted: #76767d;
-    --color-success: #16a34a;
-    --color-warning: #ca8a04;
-    --color-error: #dc2626;
-    --color-terminal-bg: #fafbfc;
-    --color-terminal-fg: #1a1a2e;
-    --color-terminal-titlebar-text: #6e6e80;
-    --color-terminal-divider: rgba(0, 0, 0, 0.16);
-    --color-terminal-success: #16a34a;
-    --color-terminal-error: #dc2626;
-    --color-terminal-dim: #9ca3af;
-    /* File type icon colours — fixed semantic colours, independent of presets */
-    --color-file-media: #b26a00;
-    --color-file-doc: #059669;
-    --color-file-code: #7c3aed;
-    --color-file-audio: #db2777;
-    --color-file-neutral: #5c6470;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.141 0.005 285.823);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.141 0.005 285.823);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.141 0.005 285.823);
+    --primary: oklch(0.21 0.006 285.885);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.967 0.001 286.375);
+    --secondary-foreground: oklch(0.21 0.006 285.885);
+    --muted: oklch(0.967 0.001 286.375);
+    --muted-foreground: oklch(0.552 0.016 285.938);
+    --accent: oklch(0.967 0.001 286.375);
+    --accent-foreground: oklch(0.21 0.006 285.885);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.92 0.004 286.32);
+    --input: oklch(0.92 0.004 286.32);
+    --ring: oklch(0.705 0.015 286.067);
+    --chart-1: oklch(0.871 0.006 286.286);
+    --chart-2: oklch(0.552 0.016 285.938);
+    --chart-3: oklch(0.442 0.017 285.786);
+    --chart-4: oklch(0.37 0.013 285.805);
+    --chart-5: oklch(0.274 0.006 286.033);
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.141 0.005 285.823);
+    --sidebar-primary: oklch(0.21 0.006 285.885);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.967 0.001 286.375);
+    --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+    --sidebar-border: oklch(0.92 0.004 286.32);
+    --sidebar-ring: oklch(0.705 0.015 286.067);
+  }
+  :root[data-theme-preset="mauve"] {
+    --background: oklch(0.145 0.008 326);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.212 0.019 322.12);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.212 0.019 322.12);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0.005 325.62);
+    --primary-foreground: oklch(0.212 0.019 322.12);
+    --secondary: oklch(0.263 0.024 320.12);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.263 0.024 320.12);
+    --muted-foreground: oklch(0.711 0.019 323.02);
+    --accent: oklch(0.263 0.024 320.12);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.542 0.034 322.5);
+    --chart-1: oklch(0.865 0.012 325.68);
+    --chart-2: oklch(0.542 0.034 322.5);
+    --chart-3: oklch(0.435 0.029 321.78);
+    --chart-4: oklch(0.364 0.029 323.89);
+    --chart-5: oklch(0.263 0.024 320.12);
+    --sidebar: oklch(0.212 0.019 322.12);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.263 0.024 320.12);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.542 0.034 322.5);
+  }
+  .light[data-theme-preset="mauve"] {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0.008 326);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0.008 326);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0.008 326);
+    --primary: oklch(0.212 0.019 322.12);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.96 0.003 325.6);
+    --secondary-foreground: oklch(0.212 0.019 322.12);
+    --muted: oklch(0.96 0.003 325.6);
+    --muted-foreground: oklch(0.542 0.034 322.5);
+    --accent: oklch(0.96 0.003 325.6);
+    --accent-foreground: oklch(0.212 0.019 322.12);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0.005 325.62);
+    --input: oklch(0.922 0.005 325.62);
+    --ring: oklch(0.711 0.019 323.02);
+    --chart-1: oklch(0.865 0.012 325.68);
+    --chart-2: oklch(0.542 0.034 322.5);
+    --chart-3: oklch(0.435 0.029 321.78);
+    --chart-4: oklch(0.364 0.029 323.89);
+    --chart-5: oklch(0.263 0.024 320.12);
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0.008 326);
+    --sidebar-primary: oklch(0.212 0.019 322.12);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.96 0.003 325.6);
+    --sidebar-accent-foreground: oklch(0.212 0.019 322.12);
+    --sidebar-border: oklch(0.922 0.005 325.62);
+    --sidebar-ring: oklch(0.711 0.019 323.02);
+  }
+  :root[data-theme-preset="olive"] {
+    --background: oklch(0.153 0.006 107.1);
+    --foreground: oklch(0.988 0.003 106.5);
+    --card: oklch(0.228 0.013 107.4);
+    --card-foreground: oklch(0.988 0.003 106.5);
+    --popover: oklch(0.228 0.013 107.4);
+    --popover-foreground: oklch(0.988 0.003 106.5);
+    --primary: oklch(0.93 0.007 106.5);
+    --primary-foreground: oklch(0.228 0.013 107.4);
+    --secondary: oklch(0.286 0.016 107.4);
+    --secondary-foreground: oklch(0.988 0.003 106.5);
+    --muted: oklch(0.286 0.016 107.4);
+    --muted-foreground: oklch(0.737 0.021 106.9);
+    --accent: oklch(0.286 0.016 107.4);
+    --accent-foreground: oklch(0.988 0.003 106.5);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.58 0.031 107.3);
+    --chart-1: oklch(0.88 0.011 106.6);
+    --chart-2: oklch(0.58 0.031 107.3);
+    --chart-3: oklch(0.466 0.025 107.3);
+    --chart-4: oklch(0.394 0.023 107.4);
+    --chart-5: oklch(0.286 0.016 107.4);
+    --sidebar: oklch(0.228 0.013 107.4);
+    --sidebar-foreground: oklch(0.988 0.003 106.5);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.988 0.003 106.5);
+    --sidebar-accent: oklch(0.286 0.016 107.4);
+    --sidebar-accent-foreground: oklch(0.988 0.003 106.5);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.58 0.031 107.3);
+  }
+  .light[data-theme-preset="olive"] {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.153 0.006 107.1);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.153 0.006 107.1);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.153 0.006 107.1);
+    --primary: oklch(0.228 0.013 107.4);
+    --primary-foreground: oklch(0.988 0.003 106.5);
+    --secondary: oklch(0.966 0.005 106.5);
+    --secondary-foreground: oklch(0.228 0.013 107.4);
+    --muted: oklch(0.966 0.005 106.5);
+    --muted-foreground: oklch(0.58 0.031 107.3);
+    --accent: oklch(0.966 0.005 106.5);
+    --accent-foreground: oklch(0.228 0.013 107.4);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.93 0.007 106.5);
+    --input: oklch(0.93 0.007 106.5);
+    --ring: oklch(0.737 0.021 106.9);
+    --chart-1: oklch(0.88 0.011 106.6);
+    --chart-2: oklch(0.58 0.031 107.3);
+    --chart-3: oklch(0.466 0.025 107.3);
+    --chart-4: oklch(0.394 0.023 107.4);
+    --chart-5: oklch(0.286 0.016 107.4);
+    --sidebar: oklch(0.988 0.003 106.5);
+    --sidebar-foreground: oklch(0.153 0.006 107.1);
+    --sidebar-primary: oklch(0.228 0.013 107.4);
+    --sidebar-primary-foreground: oklch(0.988 0.003 106.5);
+    --sidebar-accent: oklch(0.966 0.005 106.5);
+    --sidebar-accent-foreground: oklch(0.228 0.013 107.4);
+    --sidebar-border: oklch(0.93 0.007 106.5);
+    --sidebar-ring: oklch(0.737 0.021 106.9);
+  }
+  :root[data-theme-preset="mist"] {
+    --background: oklch(0.148 0.004 228.8);
+    --foreground: oklch(0.987 0.002 197.1);
+    --card: oklch(0.218 0.008 223.9);
+    --card-foreground: oklch(0.987 0.002 197.1);
+    --popover: oklch(0.218 0.008 223.9);
+    --popover-foreground: oklch(0.987 0.002 197.1);
+    --primary: oklch(0.925 0.005 214.3);
+    --primary-foreground: oklch(0.218 0.008 223.9);
+    --secondary: oklch(0.275 0.011 216.9);
+    --secondary-foreground: oklch(0.987 0.002 197.1);
+    --muted: oklch(0.275 0.011 216.9);
+    --muted-foreground: oklch(0.723 0.014 214.4);
+    --accent: oklch(0.275 0.011 216.9);
+    --accent-foreground: oklch(0.987 0.002 197.1);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.56 0.021 213.5);
+    --chart-1: oklch(0.872 0.007 219.6);
+    --chart-2: oklch(0.56 0.021 213.5);
+    --chart-3: oklch(0.45 0.017 213.2);
+    --chart-4: oklch(0.378 0.015 216);
+    --chart-5: oklch(0.275 0.011 216.9);
+    --sidebar: oklch(0.218 0.008 223.9);
+    --sidebar-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-accent: oklch(0.275 0.011 216.9);
+    --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.56 0.021 213.5);
+  }
+  .light[data-theme-preset="mist"] {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.148 0.004 228.8);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.148 0.004 228.8);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.148 0.004 228.8);
+    --primary: oklch(0.218 0.008 223.9);
+    --primary-foreground: oklch(0.987 0.002 197.1);
+    --secondary: oklch(0.963 0.002 197.1);
+    --secondary-foreground: oklch(0.218 0.008 223.9);
+    --muted: oklch(0.963 0.002 197.1);
+    --muted-foreground: oklch(0.56 0.021 213.5);
+    --accent: oklch(0.963 0.002 197.1);
+    --accent-foreground: oklch(0.218 0.008 223.9);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.925 0.005 214.3);
+    --input: oklch(0.925 0.005 214.3);
+    --ring: oklch(0.723 0.014 214.4);
+    --chart-1: oklch(0.872 0.007 219.6);
+    --chart-2: oklch(0.56 0.021 213.5);
+    --chart-3: oklch(0.45 0.017 213.2);
+    --chart-4: oklch(0.378 0.015 216);
+    --chart-5: oklch(0.275 0.011 216.9);
+    --sidebar: oklch(0.987 0.002 197.1);
+    --sidebar-foreground: oklch(0.148 0.004 228.8);
+    --sidebar-primary: oklch(0.218 0.008 223.9);
+    --sidebar-primary-foreground: oklch(0.987 0.002 197.1);
+    --sidebar-accent: oklch(0.963 0.002 197.1);
+    --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
+    --sidebar-border: oklch(0.925 0.005 214.3);
+    --sidebar-ring: oklch(0.723 0.014 214.4);
+  }
+  :root[data-theme-preset="taupe"] {
+    --background: oklch(0.147 0.004 49.3);
+    --foreground: oklch(0.986 0.002 67.8);
+    --card: oklch(0.214 0.009 43.1);
+    --card-foreground: oklch(0.986 0.002 67.8);
+    --popover: oklch(0.214 0.009 43.1);
+    --popover-foreground: oklch(0.986 0.002 67.8);
+    --primary: oklch(0.922 0.005 34.3);
+    --primary-foreground: oklch(0.214 0.009 43.1);
+    --secondary: oklch(0.268 0.011 36.5);
+    --secondary-foreground: oklch(0.986 0.002 67.8);
+    --muted: oklch(0.268 0.011 36.5);
+    --muted-foreground: oklch(0.714 0.014 41.2);
+    --accent: oklch(0.268 0.011 36.5);
+    --accent-foreground: oklch(0.986 0.002 67.8);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.547 0.021 43.1);
+    --chart-1: oklch(0.868 0.007 39.5);
+    --chart-2: oklch(0.547 0.021 43.1);
+    --chart-3: oklch(0.438 0.017 39.3);
+    --chart-4: oklch(0.367 0.016 35.7);
+    --chart-5: oklch(0.268 0.011 36.5);
+    --sidebar: oklch(0.214 0.009 43.1);
+    --sidebar-foreground: oklch(0.986 0.002 67.8);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.986 0.002 67.8);
+    --sidebar-accent: oklch(0.268 0.011 36.5);
+    --sidebar-accent-foreground: oklch(0.986 0.002 67.8);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.547 0.021 43.1);
+  }
+  .light[data-theme-preset="taupe"] {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.147 0.004 49.3);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.147 0.004 49.3);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.147 0.004 49.3);
+    --primary: oklch(0.214 0.009 43.1);
+    --primary-foreground: oklch(0.986 0.002 67.8);
+    --secondary: oklch(0.96 0.002 17.2);
+    --secondary-foreground: oklch(0.214 0.009 43.1);
+    --muted: oklch(0.96 0.002 17.2);
+    --muted-foreground: oklch(0.547 0.021 43.1);
+    --accent: oklch(0.96 0.002 17.2);
+    --accent-foreground: oklch(0.214 0.009 43.1);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0.005 34.3);
+    --input: oklch(0.922 0.005 34.3);
+    --ring: oklch(0.714 0.014 41.2);
+    --chart-1: oklch(0.868 0.007 39.5);
+    --chart-2: oklch(0.547 0.021 43.1);
+    --chart-3: oklch(0.438 0.017 39.3);
+    --chart-4: oklch(0.367 0.016 35.7);
+    --chart-5: oklch(0.268 0.011 36.5);
+    --sidebar: oklch(0.986 0.002 67.8);
+    --sidebar-foreground: oklch(0.147 0.004 49.3);
+    --sidebar-primary: oklch(0.214 0.009 43.1);
+    --sidebar-primary-foreground: oklch(0.986 0.002 67.8);
+    --sidebar-accent: oklch(0.96 0.002 17.2);
+    --sidebar-accent-foreground: oklch(0.214 0.009 43.1);
+    --sidebar-border: oklch(0.922 0.005 34.3);
+    --sidebar-ring: oklch(0.714 0.014 41.2);
   }
 
-  /* ----- Paper — warm brown & cream, reading-focused ----- */
-  :root[data-theme-preset="paper"] {
-    --color-background: #1c1a16;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #2b2721;
-    --color-surface-hover: #363129;
-    --color-surface-active: #453e34;
-    --color-surface-muted: #1f1c18;
-    --color-tooltip-bg: #48433c;
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 18%,
-      var(--color-surface)
-    );
-    --color-border-muted: #28241e;
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-mcp: #8c8272;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card:
-      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-elevated:
-      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #c4a97d;
-    --color-accent-hover: #d4bd98;
-    --color-accent-muted: rgba(196, 169, 125, 0.12);
-    --color-accent-foreground: #1a1410;
-    --color-mention: #7fa8e8;
-    --color-text-primary: #ede4d5;
-    --color-text-secondary: #b8a997;
-    --color-text-muted: #988e80;
-    --color-success: #22c55e;
-    --color-warning: #eab308;
-    --color-error: #ef4444;
+  :root[data-theme-accent="amber"] {
+    --primary: oklch(0.473 0.137 46.201);
+    --primary-foreground: oklch(0.987 0.022 95.277);
   }
-  .light[data-theme-preset="paper"] {
-    --color-background: #fdfbf7;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #fefdf9;
-    --color-surface-hover: #f5efe0;
-    --color-surface-active: #ede3cd;
-    --color-surface-muted: #faf7ef;
-    --color-tooltip-bg: var(--color-text-primary);
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 22%,
-      var(--color-surface)
-    );
-    --color-border-muted: #ebe3d2;
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-mcp: #8c8272;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #6b5a40;
-    --color-accent-hover: #4d3f2d;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 12%,
-      transparent
-    );
-    --color-accent-foreground: #ffffff;
-    --color-mention: #1e40af;
-    --color-text-primary: #3d3225;
-    --color-text-secondary: #6b5d48;
-    --color-text-muted: #7c7363;
-    --color-success: #16a34a;
-    --color-warning: #ca8a04;
-    --color-error: #dc2626;
+  .light[data-theme-accent="amber"] {
+    --primary: oklch(0.555 0.163 48.998);
+    --primary-foreground: oklch(0.987 0.022 95.277);
   }
-
-  /* ----- Void — pure black OLED, extreme focus ----- */
-  :root[data-theme-preset="void"] {
-    --color-background: #000000;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #111111;
-    --color-surface-hover: #1a1a1a;
-    --color-surface-active: #262626;
-    --color-surface-muted: #050505;
-    --color-tooltip-bg: #343434;
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 18%,
-      var(--color-surface)
-    );
-    --color-border-muted: #171717;
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-mcp: #737373;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card:
-      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-elevated:
-      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #f0b429;
-    --color-accent-hover: #ffc857;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 16%,
-      transparent
-    );
-    --color-accent-foreground: #1a1200;
-    --color-mention: #4c9aff;
-    --color-text-primary: #fafafa;
-    --color-text-secondary: #a3a3a3;
-    --color-text-muted: #7c7c7c;
-    --color-success: #22c55e;
-    --color-warning: #eab308;
-    --color-error: #ef4444;
+  :root[data-theme-accent="blue"] {
+    --primary: oklch(0.424 0.199 265.638);
+    --primary-foreground: oklch(0.97 0.014 254.604);
   }
-  .light[data-theme-preset="void"] {
-    --color-background: #ffffff;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #ffffff;
-    --color-surface-hover: #f5f5f5;
-    --color-surface-active: #ebebeb;
-    --color-surface-muted: #f8f8f8;
-    --color-tooltip-bg: var(--color-text-primary);
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 22%,
-      var(--color-surface)
-    );
-    --color-border-muted: #efefef;
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-mcp: #737373;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #b45309;
-    --color-accent-hover: #92400e;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 12%,
-      transparent
-    );
-    --color-accent-foreground: #ffffff;
-    --color-mention: #1d4ed8;
-    --color-text-primary: #000000;
-    --color-text-secondary: #525252;
-    --color-text-muted: #757575;
-    --color-success: #16a34a;
-    --color-warning: #ca8a04;
-    --color-error: #dc2626;
+  .light[data-theme-accent="blue"] {
+    --primary: oklch(0.488 0.243 264.376);
+    --primary-foreground: oklch(0.97 0.014 254.604);
   }
-
-  /* ----- Ocean — steel blue + teal accent, Linear-style focus ----- */
-  :root[data-theme-preset="ocean"] {
-    --color-background: #0c1222;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #1a2332;
-    --color-surface-hover: #212d40;
-    --color-surface-active: #2a3a54;
-    --color-surface-muted: #0e1526;
-    --color-tooltip-bg: #38414e;
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 18%,
-      var(--color-surface)
-    );
-    --color-border-muted: #172436;
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-mcp: #5b7a9e;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card:
-      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-elevated:
-      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #2dd4bf;
-    --color-accent-hover: #5eead4;
-    --color-accent-muted: rgba(45, 212, 191, 0.12);
-    --color-accent-foreground: #042f2e;
-    --color-mention: #60a5fa;
-    --color-text-primary: #e2e8f0;
-    --color-text-secondary: #94a3b8;
-    --color-text-muted: #7e8b9e;
-    --color-success: #34d399;
-    --color-warning: #f59e0b;
-    --color-error: #f87171;
+  :root[data-theme-accent="cyan"] {
+    --primary: oklch(0.45 0.085 224.283);
+    --primary-foreground: oklch(0.984 0.019 200.873);
   }
-  .light[data-theme-preset="ocean"] {
-    --color-background: #f8fafc;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #ffffff;
-    --color-surface-hover: #eef2f7;
-    --color-surface-active: #e2e8f0;
-    --color-surface-muted: #f4f7fb;
-    --color-tooltip-bg: var(--color-text-primary);
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 22%,
-      var(--color-surface)
-    );
-    --color-border-muted: #e2e8f0;
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-mcp: #64748b;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #0c8176;
-    --color-accent-hover: #0f766e;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 12%,
-      transparent
-    );
-    --color-accent-foreground: #ffffff;
-    --color-mention: #1d4ed8;
-    --color-text-primary: #0f172a;
-    --color-text-secondary: #475569;
-    --color-text-muted: #697483;
-    --color-success: #059669;
-    --color-warning: #d97706;
-    --color-error: #dc2626;
+  .light[data-theme-accent="cyan"] {
+    --primary: oklch(0.52 0.105 223.128);
+    --primary-foreground: oklch(0.984 0.019 200.873);
   }
-
-  /* ----- Forest — pine green + sage accent, organic calm ----- */
-  :root[data-theme-preset="forest"] {
-    --color-background: #111810;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #1d261a;
-    --color-surface-hover: #253220;
-    --color-surface-active: #304128;
-    --color-surface-muted: #131a11;
-    --color-tooltip-bg: #3b4438;
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 18%,
-      var(--color-surface)
-    );
-    --color-border-muted: #1c2518;
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-mcp: #6b7c5e;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card:
-      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-elevated:
-      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #34d399;
-    --color-accent-hover: #6ee7b7;
-    --color-accent-muted: rgba(52, 211, 153, 0.12);
-    --color-accent-foreground: #022c22;
-    --color-mention: #7dd3fc;
-    --color-text-primary: #e6ede3;
-    --color-text-secondary: #9aab93;
-    --color-text-muted: #819076;
-    --color-success: #4ade80;
-    --color-warning: #d97706;
-    --color-error: #ef4444;
+  :root[data-theme-accent="emerald"] {
+    --primary: oklch(0.432 0.095 166.913);
+    --primary-foreground: oklch(0.979 0.021 166.113);
   }
-  .light[data-theme-preset="forest"] {
-    --color-background: #fafbf9;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #ffffff;
-    --color-surface-hover: #eef4ea;
-    --color-surface-active: #e2ebdb;
-    --color-surface-muted: #f5f8f3;
-    --color-tooltip-bg: var(--color-text-primary);
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 22%,
-      var(--color-surface)
-    );
-    --color-border-muted: #e2ebdb;
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-mcp: #6b7c5e;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #04845c;
-    --color-accent-hover: #047857;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 12%,
-      transparent
-    );
-    --color-accent-foreground: #ffffff;
-    --color-mention: #0369a1;
-    --color-text-primary: #1a2415;
-    --color-text-secondary: #4a5a40;
-    --color-text-muted: #6a7763;
-    --color-success: #16a34a;
-    --color-warning: #b45309;
-    --color-error: #dc2626;
+  .light[data-theme-accent="emerald"] {
+    --primary: oklch(0.508 0.118 165.612);
+    --primary-foreground: oklch(0.979 0.021 166.113);
   }
-
-  /* ----- Ember — charcoal + amber accent, warm industrial ----- */
-  :root[data-theme-preset="ember"] {
-    --color-background: #1a1512;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #2b231d;
-    --color-surface-hover: #362d25;
-    --color-surface-active: #45392f;
-    --color-surface-muted: #1c1714;
-    --color-tooltip-bg: #49403a;
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 18%,
-      var(--color-surface)
-    );
-    --color-border-muted: #25201a;
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-mcp: #8c755e;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card:
-      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-elevated:
-      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #fb923c;
-    --color-accent-hover: #fdba74;
-    --color-accent-muted: rgba(251, 146, 60, 0.12);
-    --color-accent-foreground: #2d1600;
-    --color-mention: #93c5fd;
-    --color-text-primary: #f0e6dc;
-    --color-text-secondary: #bfaa95;
-    --color-text-muted: #9d8a76;
-    --color-success: #4ade80;
-    --color-warning: #fbbf24;
-    --color-error: #ef4444;
+  :root[data-theme-accent="fuchsia"] {
+    --primary: oklch(0.452 0.211 324.591);
+    --primary-foreground: oklch(0.977 0.017 320.058);
   }
-  .light[data-theme-preset="ember"] {
-    --color-background: #fdfbf9;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #ffffff;
-    --color-surface-hover: #f5efe6;
-    --color-surface-active: #ede3d5;
-    --color-surface-muted: #faf7f2;
-    --color-tooltip-bg: var(--color-text-primary);
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 22%,
-      var(--color-surface)
-    );
-    --color-border-muted: #ebe1d2;
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-mcp: #8c755e;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #c94b0a;
-    --color-accent-hover: #c2410c;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 12%,
-      transparent
-    );
-    --color-accent-foreground: #ffffff;
-    --color-mention: #1d4ed8;
-    --color-text-primary: #3d2e1f;
-    --color-text-secondary: #6b5640;
-    --color-text-muted: #83715c;
-    --color-success: #16a34a;
-    --color-warning: #d97706;
-    --color-error: #dc2626;
+  .light[data-theme-accent="fuchsia"] {
+    --primary: oklch(0.518 0.253 323.949);
+    --primary-foreground: oklch(0.977 0.017 320.058);
   }
-
-  /* ----- Aurora — deep indigo + lavender accent, creative twilight ----- */
-  :root[data-theme-preset="aurora"] {
-    --color-background: #120f1a;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #211c33;
-    --color-surface-hover: #2b2442;
-    --color-surface-active: #383055;
-    --color-surface-muted: #14111d;
-    --color-tooltip-bg: #3f3a50;
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 18%,
-      var(--color-surface)
-    );
-    --color-border-muted: #1e1933;
-    --color-border-subtle: rgba(255, 255, 255, 0.06);
-    --color-mcp: #7e6da8;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.5);
-    --shadow-card:
-      0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
-    --shadow-elevated:
-      0 8px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    --color-accent: #a78bfa;
-    --color-accent-hover: #c4b5fd;
-    --color-accent-muted: rgba(167, 139, 250, 0.12);
-    --color-accent-foreground: #1a1030;
-    --color-mention: #67e8f9;
-    --color-text-primary: #e8e4f2;
-    --color-text-secondary: #a399c2;
-    --color-text-muted: #9182b6;
-    --color-success: #2dd4bf;
-    --color-warning: #f59e0b;
-    --color-error: #f87171;
+  :root[data-theme-accent="green"] {
+    --primary: oklch(0.448 0.119 151.328);
+    --primary-foreground: oklch(0.982 0.018 155.826);
   }
-  .light[data-theme-preset="aurora"] {
-    --color-background: #faf9fd;
-    --color-background-secondary: color-mix(
-      in srgb,
-      var(--color-text-primary) 5%,
-      var(--color-background)
-    );
-    --color-surface: #ffffff;
-    --color-surface-hover: #efecf7;
-    --color-surface-active: #e4e0f2;
-    --color-surface-muted: #f6f4fb;
-    --color-tooltip-bg: var(--color-text-primary);
-    --color-border: color-mix(
-      in srgb,
-      var(--color-text-primary) 22%,
-      var(--color-surface)
-    );
-    --color-border-muted: #e5e0f2;
-    --color-border-subtle: rgba(0, 0, 0, 0.06);
-    --color-mcp: #7e6da8;
-    --shadow-soft: 0 1px 4px rgba(0, 0, 0, 0.06);
-    --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);
-    --shadow-elevated: 0 4px 12px rgba(0, 0, 0, 0.12);
-    --color-accent: #7c3aed;
-    --color-accent-hover: #6d28d9;
-    --color-accent-muted: color-mix(
-      in srgb,
-      var(--color-accent) 12%,
-      transparent
-    );
-    --color-accent-foreground: #ffffff;
-    --color-mention: #0e7490;
-    --color-text-primary: #1e1640;
-    --color-text-secondary: #5a4e80;
-    --color-text-muted: #766f90;
-    --color-success: #0d9488;
-    --color-warning: #d97706;
-    --color-error: #dc2626;
+  .light[data-theme-accent="green"] {
+    --primary: oklch(0.527 0.154 150.069);
+    --primary-foreground: oklch(0.982 0.018 155.826);
+  }
+  :root[data-theme-accent="indigo"] {
+    --primary: oklch(0.398 0.195 277.366);
+    --primary-foreground: oklch(0.962 0.018 272.314);
+  }
+  .light[data-theme-accent="indigo"] {
+    --primary: oklch(0.457 0.24 277.023);
+    --primary-foreground: oklch(0.962 0.018 272.314);
+  }
+  :root[data-theme-accent="lime"] {
+    --primary: oklch(0.768 0.233 130.85);
+    --primary-foreground: oklch(0.405 0.101 131.063);
+  }
+  .light[data-theme-accent="lime"] {
+    --primary: oklch(0.841 0.238 128.85);
+    --primary-foreground: oklch(0.405 0.101 131.063);
+  }
+  :root[data-theme-accent="orange"] {
+    --primary: oklch(0.47 0.157 37.304);
+    --primary-foreground: oklch(0.98 0.016 73.684);
+  }
+  .light[data-theme-accent="orange"] {
+    --primary: oklch(0.553 0.195 38.402);
+    --primary-foreground: oklch(0.98 0.016 73.684);
+  }
+  :root[data-theme-accent="pink"] {
+    --primary: oklch(0.459 0.187 3.815);
+    --primary-foreground: oklch(0.971 0.014 343.198);
+  }
+  .light[data-theme-accent="pink"] {
+    --primary: oklch(0.525 0.223 3.958);
+    --primary-foreground: oklch(0.971 0.014 343.198);
+  }
+  :root[data-theme-accent="purple"] {
+    --primary: oklch(0.438 0.218 303.724);
+    --primary-foreground: oklch(0.977 0.014 308.299);
+  }
+  .light[data-theme-accent="purple"] {
+    --primary: oklch(0.496 0.265 301.924);
+    --primary-foreground: oklch(0.977 0.014 308.299);
+  }
+  :root[data-theme-accent="red"] {
+    --primary: oklch(0.444 0.177 26.899);
+    --primary-foreground: oklch(0.971 0.013 17.38);
+  }
+  .light[data-theme-accent="red"] {
+    --primary: oklch(0.505 0.213 27.518);
+    --primary-foreground: oklch(0.971 0.013 17.38);
+  }
+  :root[data-theme-accent="rose"] {
+    --primary: oklch(0.455 0.188 13.697);
+    --primary-foreground: oklch(0.969 0.015 12.422);
+  }
+  .light[data-theme-accent="rose"] {
+    --primary: oklch(0.514 0.222 16.935);
+    --primary-foreground: oklch(0.969 0.015 12.422);
+  }
+  :root[data-theme-accent="sky"] {
+    --primary: oklch(0.443 0.11 240.79);
+    --primary-foreground: oklch(0.977 0.013 236.62);
+  }
+  .light[data-theme-accent="sky"] {
+    --primary: oklch(0.5 0.134 242.749);
+    --primary-foreground: oklch(0.977 0.013 236.62);
+  }
+  :root[data-theme-accent="teal"] {
+    --primary: oklch(0.437 0.078 188.216);
+    --primary-foreground: oklch(0.984 0.014 180.72);
+  }
+  .light[data-theme-accent="teal"] {
+    --primary: oklch(0.511 0.096 186.391);
+    --primary-foreground: oklch(0.984 0.014 180.72);
+  }
+  :root[data-theme-accent="violet"] {
+    --primary: oklch(0.432 0.232 292.759);
+    --primary-foreground: oklch(0.969 0.016 293.756);
+  }
+  .light[data-theme-accent="violet"] {
+    --primary: oklch(0.491 0.27 292.581);
+    --primary-foreground: oklch(0.969 0.016 293.756);
+  }
+  :root[data-theme-accent="yellow"] {
+    --primary: oklch(0.795 0.184 86.047);
+    --primary-foreground: oklch(0.421 0.095 57.708);
+  }
+  .light[data-theme-accent="yellow"] {
+    --primary: oklch(0.852 0.199 91.936);
+    --primary-foreground: oklch(0.421 0.095 57.708);
   }
 
   /* ----- Shared typography vars (not per-theme) ----- */
@@ -651,13 +710,6 @@
      16px is the browser default root (1rem = 16px); 14 is the body baseline. */
   html {
     font-size: calc(16px * var(--ui-font-scale, 1));
-  }
-
-  /* ----- Magic effect tokens — theme-aware via accent color ----- */
-  :root {
-    --color-magic: color-mix(in srgb, var(--color-accent) 70%, #a78bfa);
-    --color-magic-glow: color-mix(in srgb, var(--color-accent) 60%, #c4b5fd);
-    --color-magic-spark: color-mix(in srgb, var(--color-accent) 30%, #ede9fe);
   }
 
   * {
@@ -675,8 +727,8 @@
   }
 
   body {
-    background-color: var(--color-background);
-    color: var(--color-text-primary);
+    background-color: var(--background);
+    color: var(--foreground);
     font-family:
       "Geist Variable",
       -apple-system,
@@ -705,7 +757,7 @@
 
   /* 焦点环：宽度 1px，颜色用主题强调色。
      历史坑（2026-09 已修）：语义色原本在 tailwind.config.js 里是
-     `var(--color-accent)` 的整值字符串，没有 <alpha-value> 插槽，
+     `var(--accent)` 的整值字符串，没有 <alpha-value> 插槽，
      `ring-accent/30` 这类透明度修饰符在产物里一条规则都不生成，
      ring-opacity-* 也不被消费，环于是回落到 Tailwind 预置的蓝色。
      现在语义色走 token() 函数色 + color-mix，可以正常写透明度修饰符。
@@ -723,10 +775,12 @@
     @apply focus:outline-none focus-visible:ring-1 focus-visible:ring-primary;
   }
 
-  /* Native checkboxes/radios follow the theme accent instead of OS defaults */
+  /* Native checkboxes/radios follow the theme accent instead of OS defaults.
+     用 `--primary` 而不是 `--accent`：官方 `--accent` 是 hover 表面色，亮色下近白，
+     勾选后的填充就等于看不见（勾还在，但「已选中」一档的观感没了）。 */
   input[type="checkbox"],
   input[type="radio"] {
-    @apply accent-accent;
+    @apply accent-primary;
   }
 
   /* Selects: drop the native arrow, draw a theme-aware chevron instead.
@@ -759,7 +813,7 @@
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      @apply bg-text-muted;
+      @apply bg-muted-foreground;
     }
   }
 
@@ -769,12 +823,12 @@
 @layer components {
   /* Diff line highlighting — theme-aware via color-mix */
   .diff-add {
-    background-color: color-mix(in srgb, var(--color-success) 15%, transparent);
-    color: var(--color-success);
+    background-color: color-mix(in srgb, var(--success) 15%, transparent);
+    color: var(--success);
   }
   .diff-del {
-    background-color: color-mix(in srgb, var(--color-error) 15%, transparent);
-    color: var(--color-error);
+    background-color: color-mix(in srgb, var(--destructive) 15%, transparent);
+    color: var(--destructive);
   }
 
   /* Heading font — for titles and headings */
@@ -804,7 +858,7 @@
 
   /* Message bubbles */
   .message-user {
-    @apply bg-surface-hover rounded-2xl;
+    @apply bg-accent rounded-2xl;
     /* 贴内容但不超容器：fit-content 的下限是 min-content，一行里的长 token
        （粘贴的依赖清单/单行 JSON）会把气泡撑到 1935px 再被父层裁掉。
        100% 相对的是父级 .max-w-[80%] 提供的确定宽度。 */
@@ -836,7 +890,7 @@
   /* contenteditable 没有原生 placeholder，用 :empty 伪元素补。 */
   .chat-editor:empty::before {
     content: attr(data-placeholder);
-    color: var(--color-text-muted);
+    color: var(--muted-foreground);
     pointer-events: none;
   }
 
@@ -1000,8 +1054,16 @@
     overflow-y: hidden;
   }
 
+  /* 正文链接。2026-10-10 官方词汇表切换后 `--accent` 是 hover 表面色（亮色近白、
+     暗色近黑），拿它当链接色等于没有链接色（实测对底色 1.09–1.34:1），
+     即截图里「Sources:」那一串看不清的字。
+     用 `--primary-text` 而不是裸 `--primary`：强调色维度上线后，官方暗色 primary
+     对暗底只有 1.98–2.81、亮色的 lime/neutral 更是 1.53 —— 那是**填充**色，不是文字色；
+     `--primary-text`（primary 40% + foreground）是专门派的文字档（238 组合最差 6.05）。
+     与 app-button 的 link 变体、file-link、各处 `text-primary-text` 同一档。
+     回归：theme-contrast-invariants.test.ts §9-9。 */
   .prose-chat a {
-    color: theme("colors.accent.DEFAULT");
+    color: theme("colors.primary-text");
     text-decoration-line: underline;
     text-decoration-thickness: 0.08em;
     text-underline-offset: 0.22em;
@@ -1020,14 +1082,23 @@
   .prose-chat blockquote {
     margin: 0.75rem 0;
     padding-left: 1rem;
-    border-left: 3px solid theme("colors.accent.DEFAULT / 40%");
-    color: theme("colors.text.secondary");
+    /* ⚠️ 透明度写**小数**不写百分号：`theme("x / 40%")` 生成的是
+       `calc(40% * 100%)`，而 CSS 的 calc 不许两个百分数相乘 —— Chromium 把整条
+       border-left 声明丢掉（实测：`40%` 形式 border-left 是 0px/none，写成 `0.4`
+       就是 3px/solid 的品牌色）。也就是说这条引用块竖线在本次修复前从未渲染过。
+       类名里的 `border-border/40` 不受影响：那条路径给的是小数（calc(0.4 * 100%)）。 */
+    border-left: 3px solid theme("colors.primary.DEFAULT / 0.4");
+    /* 旧的 `colors.text.secondary` 随词汇表切换被删了。解析不出来的 theme() 路径
+       不是报错：Tailwind 把**整条规则**丢掉，于是这条的 margin / padding /
+       边框一起消失（构建仍然成功）。所以这里改的是官方现存的键。 */
+    color: theme("colors.muted.foreground");
   }
 
   .prose-chat .footnotes {
     margin-top: 1rem;
     font-size: 0.875rem;
-    color: theme("colors.text.muted");
+    /* 同上：`colors.text.muted` 已删，官方只剩一档次级文字色 */
+    color: theme("colors.muted.foreground");
   }
 
   .prose-chat .footnotes ol {
@@ -1046,7 +1117,7 @@
     margin: 0.375rem 0;
     padding: 0.875rem 1rem;
     border-radius: 10px;
-    background: var(--color-surface-muted);
+    background: var(--muted);
     overflow-x: auto;
   }
 
@@ -1074,13 +1145,13 @@
     font-size: 0.8125rem;
     padding: 0.125rem 0.25rem;
     border-radius: 4px;
-    background: var(--color-surface-muted);
-    border: 1px solid var(--color-border-subtle);
+    background: var(--muted);
+    border: 1px solid var(--border);
   }
 
   /* Code block */
   .code-block {
-    @apply bg-surface-muted rounded-xl p-4 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-w-full;
+    @apply bg-muted rounded-xl p-4 font-mono text-xs overflow-x-auto whitespace-pre-wrap max-w-full;
   }
 
   /* Override prose pre padding inside CodeBlock - tighter spacing */
@@ -1106,7 +1177,7 @@
     scrollbar-color: transparent transparent;
   }
   .group:hover .sidebar-scroll {
-    scrollbar-color: var(--color-border) transparent;
+    scrollbar-color: var(--border) transparent;
   }
 }
 
@@ -1137,7 +1208,6 @@
     opacity: 1;
   }
 }
-
 
 @keyframes slide-in-right {
   from {
@@ -1234,10 +1304,10 @@
 @keyframes eff-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 var(--color-magic-glow);
+    box-shadow: 0 0 0 0 var(--magic-glow);
   }
   50% {
-    box-shadow: 0 0 16px 4px var(--color-magic-glow);
+    box-shadow: 0 0 16px 4px var(--magic-glow);
   }
 }
 
@@ -1301,7 +1371,7 @@
     height: 1.1em;
     margin-left: 1px;
     border-radius: 1px;
-    background: var(--color-accent);
+    background: var(--primary);
     vertical-align: text-bottom;
     animation: eff-cursor-blink 1s step-end infinite;
   }
@@ -1388,10 +1458,10 @@
     @apply bg-warning motion-safe:animate-pulse;
   }
   .dot-failed {
-    @apply bg-error;
+    @apply bg-destructive;
   }
   .dot-stopped {
-    @apply bg-text-muted;
+    @apply bg-muted-foreground;
   }
 
   .status-connected {
@@ -1404,72 +1474,11 @@
     @apply text-warning;
   }
   .status-failed {
-    @apply text-error;
+    @apply text-destructive;
   }
   .status-stopped {
-    @apply text-text-muted;
+    @apply text-muted-foreground;
   }
-}
-
-/* Tooltip / 控件 hover 叠层
-   ------------------------------------------------------------------
-   只声明一次：值里的 var() 由 color-mix() 在使用处解析，因此这三条会跟着
-   各主题自己的 --color-text-primary / --color-accent 走，7 套预设 × 深浅
-   共 14 种组合自动适配，不需要逐个主题块重复声明。
-   前提：主题类与 data-theme-preset 都挂在 documentElement 上（见 App.tsx）。
-   回归测试：src/tests/renderer/theme-overlay-tokens.test.ts */
-:root {
-  --color-overlay-hover: color-mix(
-    in srgb,
-    var(--color-text-primary) 6%,
-    transparent
-  );
-  --color-overlay-press: color-mix(
-    in srgb,
-    var(--color-text-primary) 14%,
-    transparent
-  );
-  --color-overlay-on: color-mix(in srgb, var(--color-accent) 14%, transparent);
-  /* 搜索命中 / 列表高亮。与 ::selection 同一设计约束（必须不透明，否则会与元素
-     自身底色合成，对比度变成「底下垫着什么」的函数——见
-     theme-contrast-invariants.test.ts §9-7），但百分比故意更轻：
-     选区是一次性、要一眼看到；搜索命中会在同一个列表里同时出现十几行。
-     35% 是 14 个主题块全量算出来的最小值（两条门槛：文字 ≥4.5、对底色可见度
-     ≥1.5），30% 会差 0.01 差过可见度。
-     回归测试：src/tests/renderer/token-alpha.test.ts */
-  --color-highlight: color-mix(
-    in srgb,
-    var(--color-accent) 35%,
-    var(--color-background)
-  );
-  /* 抬升面的顶部内高光：暗色下 inset 0 1px 0 合成后对比 1.28（可辨识）。 */
-  /* Windows 原生关闭键悬停红，镜像系统配色，不随应用主题变化 */
-  --color-window-close-hover: #c42b1c;
-  /* 窗口最外那圈（图标栏＋标题栏）。2026-09-29 起外圈要比它框住的面板更暗：
-     亮色 外圈 < 会话栏 < 内容区，暗色 外圈 < 内容区 < 会话栏。
-     压黑是“减法”，明暗两个方向通吃，所以只声明一条；var(--color-background) 由各主题块解析。
-     void 暗色的 background 已是 #000000，压黑是恒等操作 → 该主题下外圈与内容同色（唯一例外）。
-     回归测试：src/tests/renderer/theme-contrast-invariants.test.ts §9-8 */
-  --color-background-chrome: color-mix(
-    in srgb,
-    #000000 50%,
-    var(--color-background)
-  );
-}
-
-/* 亮色下白色内高光的合成对比只有 1.06–1.11（等于没有），置空。
-   必须写成 :root.light 而不是 @layer base 里的 .light：
-   上面那个顶层 :root 在产物里位于 @layer base 之后，与 .light 特异性相同（0,1,0），
-   因此源码顺序会让顶层 :root 胜出，.light 里的声明会静默变成死代码。
-   :root.light 是 (0,2,0)，不依赖顺序。 */
-:root.light {
-  /* 亮色外圈：向黑压 12%（2026-09-29-outer-ring-depth-design.md §3）。
-     必须先核对 :root.light 的 (0,2,0) 特异性 —— 写成 .light 会被上面的顶层 :root 盖掉。 */
-  --color-background-chrome: color-mix(
-    in srgb,
-    #000000 12%,
-    var(--color-background)
-  );
 }
 
 /* Tooltip 气泡。定位与可见性都由 @floating-ui/react 驱动（见 Tooltip.tsx）：
@@ -1491,8 +1500,8 @@
   font-size: 0.6875rem;
   line-height: 1.5;
   /* 反色气泡：浅色主题深底浅字、深色主题中间灰浅字（见 tooltip-palette.test.ts 的界值） */
-  background: var(--color-tooltip-bg);
-  color: var(--color-tooltip-fg);
+  background: var(--popover);
+  color: var(--popover-foreground);
   box-shadow: var(--shadow-elevated);
 }
 
@@ -1501,17 +1510,18 @@
   /* "No record" cell: dark surface with an inset rim, so it stays visually
      distinct from a recorded-but-tiny day (the lightest success tint). */
   .usage-heatmap-empty {
-    background-color: var(--color-surface);
-    box-shadow: inset 0 0 0 1px var(--color-border-subtle);
+    background-color: var(--card);
+    box-shadow: inset 0 0 0 1px var(--border);
   }
 }
 
 /* 文本选中高亮
    ------------------------------------------------------------------
    不能留给平台默认值。macOS 深色下 Chromium 用不透明的蓝 rgb(94,121,160)
-   画选区，而行内 code 与文件链接的文字色是 --color-accent(#5b8cff)：
-   相对亮度 0.186 vs 0.283，选中后对比度只有 1.41:1 —— 字和底色糊成一片，
-   就是「深色模式下选中看不清字」的由来（截图像素实测）。
+   画选区，而行内 code 与文件链接的文字色曾经是品牌蓝：相对亮度 0.186 vs 0.283，
+   选中后对比度只有 1.41:1 —— 字和底色糊成一片，就是「深色模式下选中看不清字」
+   的由来（截图像素实测）。2026-10 起走官方词汇表：底色 = muted-foreground 与
+   background 的混合、文字 = --foreground。
 
    高亮必须不透明：掺 alpha 时它会与元素自身底色合成，对比度变成「底下垫着
    什么」的函数。按 token 算，同样是 35% 的 alpha，亮色主题的 bg-[#0c0e12]
@@ -1537,29 +1547,45 @@
    位置：写在文件尾部只是排版惯例，不要以为挪进 @layer 就会失效。Tailwind
    会把 @layer 拍平（产物里没有 layer），而且元素自身的 color 与 ::selection
    的 color 是两个不同的层叠目标，本来就不竞争 —— 实测把本规则放进 @layer base，
-   被选中的 text-accent / text-text-muted 仍然是正文色。真正会静默失效的是
+   被选中的 text-accent / text-muted-foreground 仍然是正文色。真正会静默失效的是
    在它之后再造一条 ::selection（同特异性、后者胜），§9-7 守的是这条。
 
    注：本规则与 design-docs/2026-09-13-selected-state-contrast-implementation-plan.md
-   的 Decision 2 用的不是同一个色值 —— 那份计划让 ::selection 复用给 13 处
-   列表/卡片选中态的中调灰 `--color-selected`（文字 3.59~4.51、状态对比 ≥3.0）。
-   这里取文字优先（文字 5.21~10.85、状态 1.86~2.91），因为被选中是文字而不是行。
-   该目录未纳入 git，要长期留档得另落跟踪文件；拍板前不要自行改成任一边。
+   的 Decision 2 用的不是同一个色值 —— 那份计划是让 ::selection 复用给列表/卡片选中态。
+   这里取文字优先（文字优先于行状态），因为被选中是文字而不是行。
+   2026-10 起官方词汇表里只有一档 muted-foreground，这个取舍自然收敛。
 
    回归测试：src/tests/renderer/theme-contrast-invariants.test.ts（§9-7） */
 ::selection {
+  /* 官方没有 highlight 变量：用 muted-foreground 与 background 的混合表达，
+     40% 是实测能同时满足"文字 ≥4.5 / 对底色可见度 ≥1.5"的最小比例。 */
   background-color: color-mix(
     in srgb,
-    var(--color-accent) 45%,
-    var(--color-background)
+    var(--muted-foreground) 40%,
+    var(--background)
   );
-  color: var(--color-text-primary);
+  color: var(--foreground);
 }
 
 /* 朗读时当前句的高亮。CSS Custom Highlight API 只能改颜色/下划线/文字装饰 ——
-   没有圆角与内边距，句子跨行时底色是断开的。这是 API 的限制，不是没做。 */
+   没有圆角与内边距，句子跨行时底色是断开的。这是 API 的限制，不是没做。
+
+   2026-10-10 官方词汇表切换后重算：`--accent` 现在是 hover 表面色（亮色近白、
+   暗色近黑），14 块实测对底色只有 1.05 —— 等于没有高亮。重选时按 238 组合
+   （7 底色 × 17 强调色 × 明暗）量了三个量：
+     · 高亮上的正文 ≥ 4.5；· 对 background / card / muted 都看得见 ≥ 1.5。
+   裸 `--primary` 当填充两头不可兼得：60% 时正文掉到 3.09（olive/默认/暗）；
+   30% 时对底色只有 1.13（olive/violet/暗）—— 暗色下它就是填充色，不是高亮色。
+   取 `--primary-text` 40%：正文最低 5.40、对三个表面最低 1.61，三项全过。
+   混 `--background` 而不是 `transparent` —— 透明底的对比度会变成「底下垫着
+   什么」的函数（正文也可能是 code 块、链接），与 ::selection 同一条理由。
+   回归：theme-contrast-invariants.test.ts §9-10。 */
 ::highlight(tts) {
-  background-color: color-mix(in oklab, var(--color-accent) 22%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--primary-text) 40%,
+    var(--background)
+  );
 }
 
 /* 动态右栏正文：与 chat 共用渲染器（MessageMarkdown），但中文密排的行高与段距

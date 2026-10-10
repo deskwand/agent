@@ -297,12 +297,12 @@ export function ChannelInstanceCatalog() {
   const statusMap = new Map(statuses.map((s) => [s.id, s]));
 
   return (
-    <section className="space-y-4 rounded-6xl border border-border-subtle bg-background/60 p-6">
+    <section className="space-y-4 rounded-6xl border border-border/40 bg-background/60 p-6">
       <div>
-        <h2 className="text-base font-semibold text-text-primary">
+        <h2 className="text-base font-semibold text-foreground">
           {t("remote.channelCatalog")}
         </h2>
-        <p className="mt-1 text-sm text-text-muted">
+        <p className="mt-1 text-sm text-muted-foreground">
           {t("remote.channelCatalogDesc")}
         </p>
       </div>
@@ -317,7 +317,7 @@ export function ChannelInstanceCatalog() {
               aria-disabled={added}
               disabled={added || loading}
               onClick={() => void create(item)}
-              className="flex flex-col items-center gap-1 rounded-xl border border-border-subtle px-2 py-3 text-xs text-text-muted transition-colors hover:border-primary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex flex-col items-center gap-1 rounded-xl border border-border/40 px-2 py-3 text-xs text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChannelLogo type={item} size={24} />
               <span>{t(`channelNames.${item}`)}</span>
@@ -327,7 +327,7 @@ export function ChannelInstanceCatalog() {
         })}
       </div>
       {instances.length === 0 ? (
-        <p className="text-sm text-text-muted">{t("remote.noChannels")}</p>
+        <p className="text-sm text-muted-foreground">{t("remote.noChannels")}</p>
       ) : (
         <ul className="space-y-2">
           {instances.map((instance) => {
@@ -346,7 +346,7 @@ export function ChannelInstanceCatalog() {
               <li
                 key={instance.id}
                 data-channel-instance-id={instance.id}
-                className="rounded-xl border border-border-subtle px-3 py-2"
+                className="rounded-xl border border-border/40 px-3 py-2"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -357,17 +357,17 @@ export function ChannelInstanceCatalog() {
                     />
                     <ChannelLogo type={instance.type} size={20} />
                     <div>
-                      <div className="text-sm text-text-primary">
+                      <div className="text-sm text-foreground">
                         {t(`channelNames.${instance.type}`)}
                       </div>
-                      <div className="flex items-center gap-1 text-xs text-text-muted">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <span
                           className={`status-${instance.enabled ? state : "stopped"}`}
                         >
                           · {t(`remote.channelStatus.${displayState}`)}
                         </span>
                         {st?.error && (
-                          <span className="text-error">· {st.error}</span>
+                          <span className="text-destructive">· {st.error}</span>
                         )}
                       </div>
                     </div>
@@ -378,7 +378,7 @@ export function ChannelInstanceCatalog() {
                         type="button"
                         data-edit
                         onClick={() => toggleEdit(instance.id, instance)}
-                        className="rounded-lg px-2 py-1 text-xs text-text-muted hover:text-text-primary h-auto"
+                        className="rounded-lg px-2 py-1 text-xs text-muted-foreground hover:text-foreground h-auto"
                       >
                         {t(isEditing ? "remote.cancelEdit" : "remote.edit")}
                       </Button>
@@ -404,14 +404,14 @@ export function ChannelInstanceCatalog() {
                             void remove(instance.id);
                             setConfirming(null);
                           }}
-                          className="rounded-lg px-2 py-1 text-xs text-error h-auto hover:bg-transparent hover:text-current"
+                          className="rounded-lg px-2 py-1 text-xs text-destructive h-auto hover:bg-transparent hover:text-current"
                         >
                           {t("remote.confirm")}
                         </Button>
                         <Button variant="ghost"
                           type="button"
                           onClick={() => setConfirming(null)}
-                          className="rounded-lg px-2 py-1 text-xs text-text-muted h-auto hover:bg-transparent hover:text-current"
+                          className="rounded-lg px-2 py-1 text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
                         >
                           {t("remote.cancelEdit")}
                         </Button>
@@ -421,7 +421,7 @@ export function ChannelInstanceCatalog() {
                         type="button"
                         onClick={() => setConfirming(instance.id)}
                         aria-label={t("remote.deleteChannel")}
-                        className="rounded-lg p-2 text-text-muted hover:text-error h-auto"
+                        className="rounded-lg p-2 text-muted-foreground hover:text-destructive h-auto"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -431,10 +431,10 @@ export function ChannelInstanceCatalog() {
 
                 {/* Credential edit */}
                 {isEditing && creds.length > 0 && (
-                  <div className="mt-3 border-t border-border-subtle pt-3 space-y-2">
+                  <div className="mt-3 border-t border-border/40 pt-3 space-y-2">
                     {creds.map((field) => (
                       <div key={field.key}>
-                        <label className="mb-1 block text-xs text-text-muted">
+                        <label className="mb-1 block text-xs text-muted-foreground">
                           {t(field.label)}
                         </label>
                         <Input
@@ -448,7 +448,7 @@ export function ChannelInstanceCatalog() {
                             )
                           }
                           placeholder={t(field.label)}
-                          className="h-auto w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-text-primary shadow-none"
+                          className="h-auto w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm text-foreground shadow-none"
                         />
                       </div>
                     ))}
@@ -462,7 +462,7 @@ export function ChannelInstanceCatalog() {
                             return next;
                           })
                         }
-                        className="rounded-lg px-3 py-1 text-xs text-text-muted hover:text-text-primary h-auto"
+                        className="rounded-lg px-3 py-1 text-xs text-muted-foreground hover:text-foreground h-auto"
                       >
                         {t("remote.cancelEdit")}
                       </Button>
@@ -480,7 +480,7 @@ export function ChannelInstanceCatalog() {
 
                 {/* WeChat QR pairing */}
                 {pairing && pairing.state !== "confirmed" && (
-                  <div className="mt-3 flex gap-4 border-t border-border-subtle pt-3">
+                  <div className="mt-3 flex gap-4 border-t border-border/40 pt-3">
                     {pairing.imageUrl && (
                       <QrImage
                         value={pairing.imageUrl}
@@ -489,11 +489,11 @@ export function ChannelInstanceCatalog() {
                     )}
                     <div>
                       {pairing.imageUrl && (
-                        <div className="text-sm font-medium text-text-primary">
+                        <div className="text-sm font-medium text-foreground">
                           {t("remote.wechatScanTitle")}
                         </div>
                       )}
-                      <div className="mt-1 text-xs text-text-muted">
+                      <div className="mt-1 text-xs text-muted-foreground">
                         {t(`remote.wechatPairingState.${pairing.state}`)}
                       </div>
                     </div>

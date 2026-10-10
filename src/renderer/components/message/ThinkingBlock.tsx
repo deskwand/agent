@@ -32,20 +32,20 @@ export const ThinkingBlock = memo(function ThinkingBlock({
       <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
+        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
       >
-        <Brain className="w-3.5 h-3.5 flex-shrink-0 pt-0.5 text-text-muted" />
+        <Brain className="w-3.5 h-3.5 flex-shrink-0 pt-0.5 text-muted-foreground" />
         <div className="min-w-0 flex flex-1 items-baseline gap-x-1 overflow-hidden">
-          <span className="flex-shrink-0 text-xs font-medium text-text-muted">
+          <span className="flex-shrink-0 text-xs font-medium text-muted-foreground">
             {t("messageCard.thinking")}
           </span>
           {!expanded && (
-            <span className="min-w-0 flex-1 truncate text-xs text-text-muted/60 italic">
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground/60 italic">
               {previewText}
             </span>
           )}
           <span
-            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-start pt-0.5 text-text-muted transition-opacity ${
+            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-start pt-0.5 text-muted-foreground transition-opacity ${
               expanded
                 ? "opacity-100"
                 : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -62,7 +62,7 @@ export const ThinkingBlock = memo(function ThinkingBlock({
 
       {expanded && (
         <div className="px-4 py-3 animate-fade-in">
-          <div className="text-sm text-text-secondary leading-relaxed prose-chat max-w-none">
+          <div className="text-sm text-muted-foreground leading-relaxed prose-chat max-w-none">
             <PanelErrorBoundary
               name="ThinkingMarkdown"
               fallback={<div className="whitespace-pre-wrap">{text}</div>}

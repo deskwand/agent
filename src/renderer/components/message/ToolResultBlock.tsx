@@ -141,23 +141,23 @@ export const ToolResultBlock = memo(function ToolResultBlock({
   return (
     <div
       className={`rounded-2xl overflow-hidden ${
-        block.isError ? "bg-error/5" : "bg-background/40"
+        block.isError ? "bg-destructive/5" : "bg-background/40"
       }`}
     >
       <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
-        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
+        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
       >
         {block.isError ? (
-          <XCircle className="w-3.5 h-3.5 pt-0.5 text-text-muted flex-shrink-0" />
+          <XCircle className="w-3.5 h-3.5 pt-0.5 text-muted-foreground flex-shrink-0" />
         ) : (
-          <CheckCircle2 className="w-3.5 h-3.5 pt-0.5 text-text-muted flex-shrink-0" />
+          <CheckCircle2 className="w-3.5 h-3.5 pt-0.5 text-muted-foreground flex-shrink-0" />
         )}
         <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
           <span
             className={`min-w-0 flex-1 truncate text-xs font-mono ${
-              block.isError ? "text-error" : "text-text-secondary"
+              block.isError ? "text-destructive" : "text-muted-foreground"
             }`}
           >
             {displayName}
@@ -165,14 +165,14 @@ export const ToolResultBlock = memo(function ToolResultBlock({
           {collapsedSummaryText && (
             <span
               className={`whitespace-nowrap text-xs ${
-                block.isError ? "text-error" : "text-text-muted"
+                block.isError ? "text-destructive" : "text-muted-foreground"
               }`}
             >
               · {collapsedSummaryText}
             </span>
           )}
           <span
-            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-text-muted transition-opacity ${
+            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
               expanded
                 ? "opacity-100"
                 : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -190,7 +190,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
       {expanded && (
         <div className="animate-fade-in px-3 py-2">
           {expandedMetaItems.length > 0 && (
-            <div className="pb-2 text-xs text-text-muted">
+            <div className="pb-2 text-xs text-muted-foreground">
               {expandedMetaItems.join(" · ")}
             </div>
           )}
@@ -209,7 +209,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
             </div>
           )}
           {block.diff ? (
-            <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted leading-snug">
+            <pre className="text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted leading-snug">
               {block.diff.split("\n").map((line, i) => {
                 const prefix = line[0];
                 const bgClass =
@@ -217,7 +217,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
                     ? "diff-add"
                     : prefix === "-"
                       ? "diff-del"
-                      : "text-text-secondary";
+                      : "text-muted-foreground";
                 return (
                   <div key={i} className={bgClass}>
                     {line}
@@ -230,8 +230,8 @@ export const ToolResultBlock = memo(function ToolResultBlock({
               <pre
                 className={`text-xs font-mono whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto ${
                   block.isError
-                    ? "text-error bg-error/5"
-                    : "text-text-secondary bg-surface-muted"
+                    ? "text-destructive bg-destructive/5"
+                    : "text-muted-foreground bg-muted"
                 } ${preferImageOutput ? "mt-2" : ""}`}
               >
                 {block.content}

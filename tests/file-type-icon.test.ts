@@ -27,7 +27,7 @@ function render(
 
 /** kind → 期望的颜色 class。文件夹走主题文字 token，不再独占文件语义色。 */
 const KIND_CLASS: Record<FileKind, string> = {
-  folder: "text-text-secondary",
+  folder: "text-muted-foreground",
   image: "text-file-media",
   video: "text-file-media",
   doc: "text-file-doc",
@@ -60,7 +60,7 @@ describe("FileTypeIcon", () => {
 
   it("keeps folders on a theme text token instead of a file colour", () => {
     const html = render("folder");
-    expect(html).toContain("text-text-secondary");
+    expect(html).toContain("text-muted-foreground");
     expect(html).not.toContain("text-file-");
   });
 

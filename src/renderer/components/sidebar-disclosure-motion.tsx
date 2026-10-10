@@ -382,7 +382,7 @@ export function SidebarGroupIcon({
       )}
       {showRunningBadge && (
         <span
-          className="absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_0_2px_var(--color-background-secondary)]"
+          className="absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_0_2px_var(--muted)]"
           aria-hidden="true"
         />
       )}

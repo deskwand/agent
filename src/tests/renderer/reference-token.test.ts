@@ -40,7 +40,7 @@ describe("ReferenceToken", () => {
     );
     const el = container.firstElementChild as HTMLElement;
     expect(el.textContent).toBe("apple-design");
-    expect(el.className).toContain("text-mention");
+    expect(el.className).toContain("text-primary");
     expect(container.querySelector("svg")).not.toBeNull();
     expect(container.querySelector("button")).toBeNull();
     expect(container.querySelector("[class*='underline']")).toBeNull();

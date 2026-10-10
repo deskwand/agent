@@ -39,8 +39,29 @@ describe("heatmap components", () => {
     for (const f of ["UsageCalendarHeatmap.tsx", "UsageHourHeatmap.tsx"]) {
       const text = read(f);
       expect(text).not.toMatch(/#[0-9a-fA-F]{6}/);
-      expect(text).toContain("--color-success");
+      expect(text).toContain("--success");
     }
+  });
+
+  it("命中模式的 HIT_TOKEN 用的是存在的 token（2026-10-10 评审抓到的回归）", () => {
+    // 之前这里只断言 `toContain("--success")` —— 用量分支就能满足它，于是
+    // HIT_TOKEN 里那两个死掉的 --color-* 名（命中模式整块没有底色）照样绿。
+    // 现在按数组逐个核对，并且要求它们真的出现在 HIT_TOKEN 里。
+    const text = read("UsageCalendarHeatmap.tsx");
+    const arr = /const HIT_TOKEN = \[([\s\S]*?)\];/.exec(text)?.[1] ?? "";
+    expect(arr, "找不到 HIT_TOKEN 数组").not.toBe("");
+    const names = [...arr.matchAll(/"(?<tok>--[a-z0-9-]+)"/g)].map(
+      (m) => m.groups!.tok,
+    );
+    expect(names.length).toBe(6);
+    for (const name of names) {
+      expect(name, `HIT_TOKEN 里有不存在的 token：${name}`).toMatch(
+        /^--(warning|success)$/,
+      );
+    }
+    // 两个 token 都要用上：低档 warning、高档 success
+    expect(names).toContain("--warning");
+    expect(names).toContain("--success");
   });
 
   it("renders an empty day differently from a low-usage day", () => {

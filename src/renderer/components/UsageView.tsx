@@ -93,20 +93,20 @@ export function UsageView() {
             type="button"
             onClick={() => setActiveView("chat")}
             aria-label={t("common.back")}
-            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
+            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
           >
-            <ArrowLeft className="h-5 w-5 text-text-secondary" />
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold text-text-primary">
+            <h1 className="text-xl font-semibold text-foreground">
               {t("usage.title")}
             </h1>
-            <p className="mt-1 text-sm text-text-muted">
+            <p className="mt-1 text-sm text-muted-foreground">
               {t("usage.subtitle")}
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
+        <div className="flex flex-wrap gap-0.5 rounded-lg border border-border bg-muted p-0.5">
           {RANGES.map((value) => (
             <Button variant="ghost"
               key={value}
@@ -114,8 +114,8 @@ export function UsageView() {
               onClick={() => setRange(value)}
               className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
                 range === value
-                  ? "bg-surface text-text-primary"
-                  : "text-text-muted hover:text-text-primary"
+                  ? "bg-card text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t(`usage.range.${value}`)}
@@ -127,9 +127,9 @@ export function UsageView() {
 
       <div className="mt-5 flex-1 space-y-4 overflow-y-auto pb-4">
         {error ? (
-          <p className="text-sm text-error">{error}</p>
+          <p className="text-sm text-destructive">{error}</p>
         ) : !snapshot ? (
-          <p className="text-sm text-text-muted">{t("usage.loading")}</p>
+          <p className="text-sm text-muted-foreground">{t("usage.loading")}</p>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 xl:grid-cols-7">
@@ -209,7 +209,7 @@ export function UsageView() {
               title={t("usage.byModel")}
               hint={t("usage.byModelHint")}
               action={
-                <div className="flex gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
+                <div className="flex gap-0.5 rounded-lg border border-border bg-muted p-0.5">
                   {(["output", "cost"] as UsageSortKey[]).map((value) => (
                     <Button variant="ghost"
                       key={value}
@@ -217,8 +217,8 @@ export function UsageView() {
                       onClick={() => setSortKey(value)}
                       className={`rounded-md px-2 py-0.5 text-xs transition-colors ${
                         sortKey === value
-                          ? "bg-surface text-text-primary"
-                          : "text-text-muted hover:text-text-primary"
+                          ? "bg-card text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       {t(`usage.sort.${value}`)}
@@ -251,10 +251,10 @@ function Card({
   hint: string;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-background-secondary px-3 py-2.5">
-      <p className="text-[11px] text-text-muted">{label}</p>
-      <p className="mt-0.5 font-mono text-base text-text-primary">{value}</p>
-      <p className="mt-0.5 text-[10px] text-text-muted">{hint}</p>
+    <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="mt-0.5 font-mono text-base text-foreground">{value}</p>
+      <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p>
     </div>
   );
 }
@@ -271,10 +271,10 @@ function Box({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-background-secondary px-3.5 py-3">
+    <div className="rounded-lg border border-border bg-muted px-3.5 py-3">
       <div className="mb-2.5 flex items-baseline gap-2">
-        <h2 className="text-sm font-medium text-text-primary">{title}</h2>
-        <span className="ml-auto font-mono text-[10px] text-text-muted">
+        <h2 className="text-sm font-medium text-foreground">{title}</h2>
+        <span className="ml-auto font-mono text-[10px] text-muted-foreground">
           {hint}
         </span>
         {action}
@@ -300,7 +300,7 @@ function ModelTable({
   const currencyRate = useAppStore((s) => s.currencyRate);
   const lang = i18n.resolvedLanguage ?? "en";
   if (rows.length === 0) {
-    return <p className="text-sm text-text-muted">{t("usage.empty")}</p>;
+    return <p className="text-sm text-muted-foreground">{t("usage.empty")}</p>;
   }
   const total = rows.reduce(
     (acc, row) => ({
@@ -316,9 +316,9 @@ function ModelTable({
   // （它会把负数/非有限值夹到 0，否则 width 声明失效、条形反而满格）
   const max = Math.max(...rows.map((row) => modelBarValue(row, sortKey)), 1);
   const headClass =
-    "border-b border-border-muted px-2 py-1.5 text-right text-[11px] font-normal text-text-muted";
+    "border-b border-border/60 px-2 py-1.5 text-right text-[11px] font-normal text-muted-foreground";
   const cellClass =
-    "border-b border-border-muted px-2 py-1.5 text-right font-mono text-[11px] text-text-secondary";
+    "border-b border-border/60 px-2 py-1.5 text-right font-mono text-[11px] text-muted-foreground";
 
   return (
     <table className="w-full border-collapse">
@@ -339,10 +339,10 @@ function ModelTable({
       <tbody>
         {sorted.map((row) => (
           <tr key={`${row.model ?? "subagent"}-${row.provider ?? ""}`}>
-            <td className="border-b border-border-muted px-2 py-1.5 text-xs text-text-primary">
+            <td className="border-b border-border/60 px-2 py-1.5 text-xs text-foreground">
               {row.model ?? t("usage.subagentRow")}
               {row.provider ? (
-                <span className="ml-1.5 font-mono text-[10px] text-text-muted">
+                <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">
                   {row.provider}
                 </span>
               ) : null}
@@ -351,7 +351,7 @@ function ModelTable({
             <td className={cellClass}>{compactNumber(row.input)}</td>
             <td className={cellClass}>{compactNumber(row.cacheRead)}</td>
             <td
-              className={`${cellClass} ${row.cost === null ? "text-text-muted" : ""}`}
+              className={`${cellClass} ${row.cost === null ? "text-muted-foreground" : ""}`}
             >
               {formatCost(row.cost, currency, currencyRate, lang)}
             </td>
@@ -363,8 +363,8 @@ function ModelTable({
               {formatHitRate(row.hitRate)}
             </td>
             <td className={cellClass}>{row.calls.toLocaleString()}</td>
-            <td className="border-b border-border-muted px-2 py-1.5">
-              <span className="block h-2 w-14 overflow-hidden rounded-sm bg-surface">
+            <td className="border-b border-border/60 px-2 py-1.5">
+              <span className="block h-2 w-14 overflow-hidden rounded-sm bg-card">
                 <span
                   className="block h-full bg-success opacity-70"
                   style={{
@@ -376,23 +376,23 @@ function ModelTable({
           </tr>
         ))}
         <tr>
-          <td className="px-2 py-1.5 text-xs text-text-secondary">
+          <td className="px-2 py-1.5 text-xs text-muted-foreground">
             {totalRow}
           </td>
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">
+          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {compactNumber(total.output)}
           </td>
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">
+          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {compactNumber(total.input)}
           </td>
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">
+          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {compactNumber(total.cacheRead)}
           </td>
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">
+          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {formatCost(totalCost, currency, currencyRate, lang)}
           </td>
           <td className="px-2 py-1.5" />
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-text-primary">
+          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {total.calls.toLocaleString()}
           </td>
           <td className="px-2 py-1.5" />

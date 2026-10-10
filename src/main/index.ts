@@ -13,6 +13,11 @@
  *               skills-manager, scheduled-task-manager, nav-server, remote-manager
  */
 import "./setup-userdata";
+import {
+  VALID_THEME_ACCENTS,
+  VALID_THEME_PRESETS,
+  type ThemeAccent,
+} from "../shared/theme";
 import { renderOfficePreview } from "./office/office-preview";
 import { findFileByName } from "./utils/find-file-by-name";
 import { resolveFileReference } from "./files/resolve-reference";
@@ -453,14 +458,24 @@ if (!hasSingleInstanceLock) {
 // Tray instance (kept alive to prevent GC)
 let tray: Tray | null = null;
 
-const THEME_PRESET_BG: Record<string, { dark: string; light: string }> = {
-  graphite: { dark: "#18181b", light: "#ffffff" },
-  paper: { dark: "#1c1a16", light: "#fdfbf7" },
-  void: { dark: "#000000", light: "#ffffff" },
-  ocean: { dark: "#0c1222", light: "#f8fafc" },
-  forest: { dark: "#111810", light: "#fafbf9" },
-  ember: { dark: "#1a1512", light: "#fdfbf9" },
-  aurora: { dark: "#120f1a", light: "#faf9fd" },
+/**
+ * 各套官方底色的 `--background`，值 = 官方 oklch 的 sRGB 等值（hex）。
+ *
+ * 为什么不直接用 globals.css 的值：这里是**主进程**，Electron 的
+ * `setBackgroundColor` / `titleBarOverlay` 只吃常规色值，`oklch()` 不在其列。
+ * 回归测试 src/tests/main/theme-preset-bg.test.ts 用仓库自己的解析器复算，防止手抄漂移。
+ *
+ * ⚠️ 2026-10-10：这张表曾是自造调色板的 7 个 id（graphite/paper/…），而三处查找已改成
+ * `|| "zinc"` ⇒ 永远落到 fallback 的旧 hex，原生窗口底色与所选底色脱钩。keyed 成官方 id 修好。
+ */
+const THEME_PRESET_BG: Record<ThemePreset, { dark: string; light: string }> = {
+  zinc: { dark: "#09090b", light: "#ffffff" },
+  neutral: { dark: "#0a0a0a", light: "#ffffff" },
+  stone: { dark: "#0c0a09", light: "#ffffff" },
+  mauve: { dark: "#0c090c", light: "#ffffff" },
+  olive: { dark: "#0c0c09", light: "#ffffff" },
+  mist: { dark: "#090b0c", light: "#ffffff" },
+  taupe: { dark: "#0c0a09", light: "#ffffff" },
 };
 
 function buildMacMenu() {
@@ -632,8 +647,8 @@ function createWindow() {
   // renderer as native-theme.changed. The visual theme is independently
   // controlled by CSS and the window background color.
   const effectiveTheme = resolveEffectiveTheme(savedTheme);
-  const themePreset = (configStore.get("themePreset") as string) || "graphite";
-  const presetBg = THEME_PRESET_BG[themePreset] || THEME_PRESET_BG.graphite;
+  const themePreset = (configStore.get("themePreset") as string) || "zinc";
+  const presetBg = THEME_PRESET_BG[themePreset as ThemePreset] || THEME_PRESET_BG.zinc;
   const THEME =
     effectiveTheme === "dark"
       ? {
@@ -1310,8 +1325,8 @@ app
         mainWindow &&
         !mainWindow.isDestroyed()
       ) {
-        const tp = (configStore.get("themePreset") as string) || "graphite";
-        const presetBg = THEME_PRESET_BG[tp] || THEME_PRESET_BG.graphite;
+        const tp = (configStore.get("themePreset") as string) || "zinc";
+        const presetBg = THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
         mainWindow.setBackgroundColor(
           nativeTheme.shouldUseDarkColors ? presetBg.dark : presetBg.light,
         );
@@ -4835,8 +4850,8 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
         });
         if (mainWindow && !mainWindow.isDestroyed()) {
           const effectiveTheme = resolveEffectiveTheme(nextTheme);
-          const tp = (configStore.get("themePreset") as string) || "graphite";
-          const presetBg = THEME_PRESET_BG[tp] || THEME_PRESET_BG.graphite;
+          const tp = (configStore.get("themePreset") as string) || "zinc";
+          const presetBg = THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
           mainWindow.setBackgroundColor(
             effectiveTheme === "dark" ? presetBg.dark : presetBg.light,
           );
@@ -4849,24 +4864,15 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
           },
         });
       }
-      if (
-        typeof event.payload.themePreset === "string" &&
-        [
-          "graphite",
-          "paper",
-          "void",
-          "ocean",
-          "forest",
-          "ember",
-          "aurora",
-        ].includes(event.payload.themePreset)
-      ) {
+      // ⚠️ 名单必须来自 shared/theme：2026-10-10 之前这里是硬编码的**旧** 7 个 id
+      //（paper/void/…），于是新底色（stone/mauve/…）一律校验不过、静默不落盘。
+      if (VALID_THEME_PRESETS.includes(event.payload.themePreset as ThemePreset)) {
         configStore.update({
           themePreset: event.payload.themePreset as ThemePreset,
         });
         if (mainWindow && !mainWindow.isDestroyed()) {
           const tp = event.payload.themePreset;
-          const presetBg = THEME_PRESET_BG[tp] || THEME_PRESET_BG.graphite;
+          const presetBg = THEME_PRESET_BG[tp as ThemePreset] || THEME_PRESET_BG.zinc;
           const effectiveTheme = resolveEffectiveTheme(
             getSavedThemePreference(),
           );
@@ -4874,6 +4880,19 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
             effectiveTheme === "dark" ? presetBg.dark : presetBg.light,
           );
         }
+        sendToRenderer({
+          type: "config.status",
+          payload: {
+            isConfigured: configStore.isConfigured(),
+            config: configStore.getAll(),
+          },
+        });
+      }
+      // 强调色：与底色同构，但它不影响原生窗口底色，所以没有 setBackgroundColor 那一段。
+      if (VALID_THEME_ACCENTS.includes(event.payload.themeAccent as ThemeAccent)) {
+        configStore.update({
+          themeAccent: event.payload.themeAccent as ThemeAccent,
+        });
         sendToRenderer({
           type: "config.status",
           payload: {

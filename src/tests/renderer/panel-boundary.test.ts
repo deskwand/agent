@@ -78,19 +78,19 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
     // 迁移后类串写在模板字面量里（`${RAIL_BUTTON_CLASS} relative …`），
     // 所以引号形状没了 —— 这里改成匹「反引号内的那一串」，
     // 保住「不扫全文、只匹类串」的性质。
-    expect(helpMenu).toContain("relative text-primary hover:bg-overlay-hover`");
+    expect(helpMenu).toContain("relative text-primary-text hover:bg-accent`");
     expect(helpMenu).not.toContain("hover:bg-primary-muted");
     expect(helpMenu).not.toContain("rounded-full bg-primary");
   });
 
   it("外圈更暗：图标栏与标题栏用 background-chrome，会话栏仍是唯一被抬起的 secondary", () => {
     // 2026-09-29 决策（取代 2026-09-27 的「外圈同色」）：参考图里外圈是最暗的一级。
-    // 负向断言必须排除 `-`：`\bbg-background\b` 对 `bg-background-chrome` 照样命中
+    // 负向断言必须排除 `-`：`\bbg-background\b` 对 `bg-app-chrome` 照样命中
     // （`-` 是词边界），这是本文件已经记录过的教训。
     const bareBackground = /\bbg-background(?![\w-])/;
 
     const rail = read("components/AppRail.tsx");
-    expect(rail).toMatch(/\bbg-background-chrome\b/);
+    expect(rail).toMatch(/\bbg-app-chrome\b/);
     expect(rail).not.toMatch(bareBackground);
 
     // 标题栏这半边用「含 titlebar-drag 的整行」取类串：titlebar-drag 写在 className 中间，
@@ -99,11 +99,11 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
       .split("\n")
       .find((line) => line.includes("titlebar-drag"));
     expect(titlebarLine, "找不到标题栏元素").toBeTruthy();
-    expect(titlebarLine).toMatch(/\bbg-background-chrome\b/);
+    expect(titlebarLine).toMatch(/\bbg-app-chrome\b/);
     expect(titlebarLine).not.toMatch(bareBackground);
 
     const sidebar = read("components/Sidebar.tsx");
-    expect(sidebar).toMatch(/\bbg-background-secondary\b/);
+    expect(sidebar).toMatch(/\bbg-muted\b/);
     // 参考图细节：面板左上角圆角，让外圈在角落里露出来（外圈变暗后这个圆角才第一次看得见）
     expect(sidebar).toMatch(/\brounded-tl-lg\b/);
   });
@@ -126,17 +126,17 @@ describe("右面板：区域级分界靠底色差", () => {
 
   it("四个面板都改用 background-secondary 当底", () => {
     for (const rel of PANEL_FILES) {
-      expect(read(rel), `${rel} 缺少 bg-background-secondary`).toContain(
-        "bg-background-secondary",
+      expect(read(rel), `${rel} 缺少 bg-muted`).toContain(
+        "bg-muted",
       );
     }
   });
 
   it("App.tsx 里的面板占位不再画线", () => {
     const app = read("App.tsx");
-    expect(app).not.toContain("border-l border-border-subtle");
+    expect(app).not.toContain("border-l border-border/40");
     // 改造前 App.tsx 一处 background-secondary 都没有，现在是这 8 处占位
-    expect(app.match(/bg-background-secondary/g)?.length).toBe(8);
+    expect(app.match(/bg-muted/g)?.length).toBe(8);
   });
 
   it("文件预览的活动标签抬到 surface，不与面板底同色", () => {
@@ -144,19 +144,19 @@ describe("右面板：区域级分界靠底色差", () => {
     // 这一条不红、不报错，只是标签看不见了 —— 所以必须单独锁。
     const preview = read("components/FilePreviewPanel.tsx");
     expect(preview).not.toContain(
-      '"bg-background-secondary text-text-primary"',
+      '"bg-muted text-foreground"',
     );
-    expect(preview).toContain('"bg-surface text-text-primary"');
+    expect(preview).toContain('"bg-card text-foreground"');
   });
 });
 
 /**
- * 同一块表面内部的分隔线：从 `--color-border`（1.47–2.07）换成既有的一支软描边。
+ * 同一块表面内部的分隔线：从 `--border`（1.47–2.07）换成既有的一支软描边。
  *
  * 用**精确串**成对断言，不用宽正则 —— 宽正则（如 `border-[rltb] border-border\b`）会误伤
- * `border-border-muted`（`-` 是词边界，`\b` 照样成立），也会把以后合法的用法一起判红。
+ * `border-border/60`（`-` 是词边界，`\b` 照样成立），也会把以后合法的用法一起判红。
  *
- * 注意 UsageView 那一条的 `to` 半边是**空**的：`"border-b border-border-muted px-2`
+ * 注意 UsageView 那一条的 `to` 半边是**空**的：`"border-b border-border/60 px-2`
  * 在文件里本来就有 3 次（表体 320/341/365），所以"必须有 to"永远成立。
  * 真正能拦住漏改的是 `not.toContain(from)` 那半边 —— 别因为看到它绿就以为两边都验到了。
  */
@@ -164,54 +164,54 @@ const IN_SURFACE_DIVIDERS: Array<{ file: string; from: string; to: string }> = [
   {
     file: "components/ScheduleCalendar.tsx",
     from: 'border-l border-border">',
-    to: 'border-l border-border-muted">',
+    to: 'border-l border-border/60">',
   },
   {
     file: "components/ScheduleCalendar.tsx",
     from: "border-b border-border sticky",
-    to: "border-b border-border-muted sticky",
+    to: "border-b border-border/60 sticky",
   },
   {
     file: "components/ScheduleCalendar.tsx",
     from: 'border-b border-border">',
-    to: 'border-b border-border-muted">',
+    to: 'border-b border-border/60">',
   },
   {
     file: "components/ScheduleToolbar.tsx",
-    from: "border-b border-border bg-surface",
-    to: "border-b border-border-muted bg-surface",
+    from: "border-b border-border bg-card",
+    to: "border-b border-border/60 bg-card",
   },
   {
     file: "components/UsageView.tsx",
     from: '"border-b border-border px-2',
-    to: '"border-b border-border-muted px-2',
+    to: '"border-b border-border/60 px-2',
   },
   {
     file: "components/SkillMdModal.tsx",
     from: 'border-b border-border">',
-    to: 'border-b border-border-muted">',
+    to: 'border-b border-border/60">',
   },
   {
     // 设置页的行与行之间的分隔线现在在 SettingsRow 里（SettingsGeneral 已换成卡片行，
     // 分隔线不再内联在页面里）。约束不变：表面内部的分隔线用弱描边。
     file: "components/settings/shared.tsx",
     from: 'border-t border-border">',
-    to: "border-t border-border-muted px-4 py-3",
+    to: "border-t border-border/60 px-4 py-3",
   },
   {
     file: "components/ApiDiagnosticsPanel.tsx",
     from: "border-t border-border text-sm",
-    to: "border-t border-border-muted text-sm",
+    to: "border-t border-border/60 text-sm",
   },
   {
     file: "components/ApiDiagnosticsPanel.tsx",
     from: "border-t border-border flex",
-    to: "border-t border-border-muted flex",
+    to: "border-t border-border/60 flex",
   },
   {
     file: "components/SlashMenu.tsx",
     from: "border-t border-border shrink-0",
-    to: "border-t border-border-subtle shrink-0",
+    to: "border-t border-border/40 shrink-0",
   },
 ];
 
@@ -228,11 +228,11 @@ describe("表面内部的分隔线", () => {
 describe("文件预览面板：-muted 分隔线在新底色上是死的", () => {
   it("不得再有单边 -muted 分隔线", () => {
     // FilePreviewPanel 的整棵子树现在都在 background-secondary 上（根、标签栏、内容区），
-    // 而 --color-border-muted 在新 secondary 上只有 1.004–1.017（暗色 5/7 个预设）。
+    // 而 --border 在新 secondary 上只有 1.004–1.017（暗色 5/7 个预设）。
     // 本轮已经因此删掉标签栏那根 border-b；Path row 那根是同一类，也必须删。
     // 只锁**单边分隔线**，不锁 `border` 全轮廓（那是控件外轮廓，不属于本轮）。
     expect(read("components/FilePreviewPanel.tsx")).not.toMatch(
-      /border-[rltb] border-border-muted/,
+      /border-[rltb] border-border\/60/,
     );
   });
 });

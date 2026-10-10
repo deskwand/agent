@@ -49,24 +49,24 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
       case "completed":
         return <CheckSquare className="w-4 h-4 text-success" />;
       case "in_progress":
-        return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
+        return <Loader2 className="w-4 h-4 text-primary-text animate-spin" />;
       case "cancelled":
-        return <XCircle className="w-4 h-4 text-text-muted" />;
+        return <XCircle className="w-4 h-4 text-muted-foreground" />;
       default: // pending
-        return <Square className="w-4 h-4 text-text-muted" />;
+        return <Square className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
   const getStatusStyle = (status: string) => {
     switch (status) {
       case "completed":
-        return "text-text-muted line-through";
+        return "text-muted-foreground line-through";
       case "in_progress":
-        return "text-primary font-medium";
+        return "text-primary-text font-medium";
       case "cancelled":
-        return "text-text-muted line-through opacity-60";
+        return "text-muted-foreground line-through opacity-60";
       default:
-        return "text-text-primary";
+        return "text-foreground";
     }
   };
 
@@ -78,7 +78,7 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
     return (
       <div className="rounded-xl border border-warning/40 bg-warning/5 px-4 py-3 flex items-center gap-3">
         <AlertTriangle className="w-4 h-4 text-warning shrink-0" />
-        <span className="text-sm text-text-primary">
+        <span className="text-sm text-foreground">
           {rejection.reason === "emptyContent"
             ? t("messageCard.todoRejectedEmptyContent", {
                 index: rejection.index + 1,
@@ -92,39 +92,39 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
   }
 
   return (
-    <div className="rounded-xl border border-border overflow-hidden bg-surface">
+    <div className="rounded-xl border border-border overflow-hidden bg-card">
       {/* Header */}
       <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center gap-3 bg-surface-muted hover:bg-surface-active transition-colors h-auto"
+        className="w-full px-4 py-3 flex items-center gap-3 bg-muted hover:bg-accent transition-colors h-auto"
       >
         <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
-          <ListTodo className="w-3.5 h-3.5 text-primary" />
+          <ListTodo className="w-3.5 h-3.5 text-primary-text" />
         </div>
         <div className="flex-1 text-left">
-          <span className="font-medium text-sm text-text-primary">
+          <span className="font-medium text-sm text-foreground">
             {t("messageCard.taskProgress")}
           </span>
           {inProgressItem && (
-            <span className="text-xs text-text-muted ml-2">
+            <span className="text-xs text-muted-foreground ml-2">
               — {inProgressItem.activeForm || inProgressItem.content}
             </span>
           )}
         </div>
-        <span className="text-xs font-medium text-text-muted mr-2">
+        <span className="text-xs font-medium text-muted-foreground mr-2">
           {completedCount}/{totalCount}
         </span>
         {expanded ? (
-          <ChevronDown className="w-4 h-4 text-text-muted" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-text-muted" />
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
         )}
       </Button>
 
       {/* Progress bar */}
-      <div className="h-0.5 bg-surface-muted">
+      <div className="h-0.5 bg-muted">
         <div
-          className="h-full bg-gradient-to-r from-primary to-primary-hover transition-all duration-500"
+          className="h-full bg-gradient-to-r from-primary to-primary/90 transition-all duration-500"
           style={{ width: `${progress}%` }}
         />
       </div>

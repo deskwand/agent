@@ -147,16 +147,16 @@ export function ProviderCatalogGrid({
                       }
                       onCreateProvider(entry.id as ProviderType);
                     }}
-                    className={`flex h-10 w-full min-w-0 items-center gap-2.5 rounded-control px-2.5 text-left text-sm text-text-primary ${
+                    className={`flex h-10 w-full min-w-0 items-center gap-2.5 rounded-control px-2.5 text-left text-sm text-foreground ${
                       disabled
                         ? "cursor-default opacity-60"
-                        : "hover:bg-surface-hover"
+                        : "hover:bg-accent"
                     }`}
                   >
                     {entry.kind === "plan" ? (
                       <SubscriptionPlanIcon
                         profileKey={entry.id}
-                        className="h-4 w-4 shrink-0 fill-none stroke-current text-text-secondary"
+                        className="h-4 w-4 shrink-0 fill-none stroke-current text-muted-foreground"
                       />
                     ) : (
                       <ProviderBrandIcon
@@ -195,7 +195,7 @@ export function ProviderCatalogGrid({
               <p
                 key={`${category.id}-error-${index}`}
                 role="alert"
-                className="text-xs text-error"
+                className="text-xs text-destructive"
               >
                 {message}
               </p>

@@ -1,7 +1,7 @@
 // 设计文档 §7：圆角收敛为三档 —— 控制件 8px / 容器 12px / 覆盖层 16px。
 // 数值从 tailwind.config.js 读，不写死在断言里（沿用 theme-css-helpers 的原则）。
 import { describe, expect, it } from "vitest";
-import { css, tailwind } from "./theme-css-helpers";
+import { css, radiusPx } from "./theme-css-helpers";
 
 function componentBlock(name: string): string {
   const block = new RegExp(`\\.${name}\\s*\\{[\\s\\S]*?\\n  \\}`).exec(
@@ -12,8 +12,14 @@ function componentBlock(name: string): string {
 }
 
 describe("圆角尺度", () => {
-  it("tailwind 里存在 container 档 = 12px", () => {
-    expect(tailwind.theme.extend.borderRadius.container).toBe("12px");
+  // 2026-10-10：圆角改由官方 --radius（0.625rem）派生，配置里是 calc() 表达式，
+  // 所以断言走 radiusPx 换算（助手会读 globals.css 的 --radius），不再比对字面量。
+  it("container 档 = 12px（官方 1.2 × --radius）", () => {
+    expect(radiusPx("rounded-container")).toBe(12);
+  });
+
+  it("control 档 = 6px（官方 0.6 × --radius）", () => {
+    expect(radiusPx("rounded-control")).toBe(6);
   });
 
   // ⚠️ 2026-10-09：原判据遍历 `.btn` / `.input` / `.tag` / `.card` 四个类 ✓，断言它们的

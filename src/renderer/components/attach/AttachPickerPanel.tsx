@@ -131,7 +131,7 @@ export function AttachPickerPanel({
     <div className="flex min-h-0 flex-1 flex-col" onKeyDown={handleKeyDown}>
       {/* 搜索行 */}
       <div className="relative px-6 pt-3.5 pb-2.5">
-        <Search className="pointer-events-none absolute left-[34px] top-[25px] h-3.5 w-3.5 text-text-muted" />
+        <Search className="pointer-events-none absolute left-[34px] top-[25px] h-3.5 w-3.5 text-muted-foreground" />
         <Input
           ref={searchRef}
           value={query}
@@ -145,18 +145,18 @@ export function AttachPickerPanel({
               : "attachPicker.searchPlaceholder",
           )}
           aria-label={t("attachPicker.searchPlaceholder")}
-          className="h-9 w-full rounded-lg border border-border bg-surface-muted pl-8 pr-3 text-sm text-text-primary shadow-none outline-none placeholder:text-text-muted"
+          className="h-9 w-full rounded-lg border border-border bg-muted pl-8 pr-3 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground"
         />
       </div>
 
       {noticeLabel && (
-        <p className="px-6 pb-1.5 text-xs leading-relaxed text-text-muted">
+        <p className="px-6 pb-1.5 text-xs leading-relaxed text-muted-foreground">
           {noticeLabel}
         </p>
       )}
 
       {/* 列头 */}
-      <div className="flex items-center gap-2 px-6 pb-1.5 text-[11px] text-text-muted">
+      <div className="flex items-center gap-2 px-6 pb-1.5 text-[11px] text-muted-foreground">
         <span className="w-4 shrink-0" />
         <span className="flex-1">{t("attachPicker.columnName")}</span>
         {source === "workspace" && (
@@ -179,25 +179,25 @@ export function AttachPickerPanel({
         className="min-h-[280px] flex-1 overflow-y-auto px-4 pb-2"
       >
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-8 text-sm text-text-muted">
+          <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
             {t("attachPicker.loading")}
           </div>
         ) : errorLabel ? (
           <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
-            <p className="text-sm text-error">{errorLabel}</p>
+            <p className="text-sm text-destructive">{errorLabel}</p>
             <Button variant="ghost"
               type="button"
               data-retry
               onClick={onRetry}
-              className="text-xs text-text-primary underline underline-offset-2 h-auto hover:bg-transparent hover:text-current"
+              className="text-xs text-foreground underline underline-offset-2 h-auto hover:bg-transparent hover:text-current"
             >
               {t("attachPicker.retry")}
             </Button>
           </div>
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-3 py-8 text-center">
-            <p className="text-sm text-text-muted">
+            <p className="text-sm text-muted-foreground">
               {query ? t("attachPicker.empty.search") : emptyLabel}
             </p>
             {query === "" && emptyAction && (
@@ -205,7 +205,7 @@ export function AttachPickerPanel({
                 type="button"
                 data-empty-action
                 onClick={emptyAction.onClick}
-                className="text-xs text-text-primary underline underline-offset-2 h-auto hover:bg-transparent hover:text-current"
+                className="text-xs text-foreground underline underline-offset-2 h-auto hover:bg-transparent hover:text-current"
               >
                 {emptyAction.label}
               </Button>
@@ -234,27 +234,27 @@ export function AttachPickerPanel({
                   added
                     ? "cursor-default opacity-50"
                     : index === highlight
-                      ? "bg-surface-hover"
-                      : "hover:bg-surface-hover"
+                      ? "bg-accent"
+                      : "hover:bg-accent"
                 }`}
               >
                 <span className="w-4 shrink-0">
                   <FileTypeIcon kind={getFileKind(item.name)} size={16} />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                   {item.name}
                 </span>
                 {source === "workspace" && (
-                  <span className="w-[200px] shrink-0 truncate text-xs text-text-muted">
+                  <span className="w-[200px] shrink-0 truncate text-xs text-muted-foreground">
                     {item.dir ?? ""}
                   </span>
                 )}
-                <span className="w-16 shrink-0 text-right text-xs text-text-muted">
+                <span className="w-16 shrink-0 text-right text-xs text-muted-foreground">
                   {added ? t("attachPicker.added") : formatSize(item.size)}
                 </span>
                 <span className="w-4 shrink-0">
                   <Check
-                    className={`h-4 w-4 ${selected ? "text-primary" : "text-transparent"}`}
+                    className={`h-4 w-4 ${selected ? "text-primary-text" : "text-transparent"}`}
                   />
                 </span>
               </Button>

@@ -246,7 +246,7 @@ function DayView({
           {hours.map((h) => (
             <div
               key={h}
-              className="text-xs text-text-muted text-right pr-2"
+              className="text-xs text-muted-foreground text-right pr-2"
               style={{
                 height: HOUR_HEIGHT,
                 lineHeight: `${HOUR_HEIGHT}px`,
@@ -259,11 +259,11 @@ function DayView({
         </div>
 
         {/* Event area */}
-        <div className="relative flex-1 border-l border-border-muted">
+        <div className="relative flex-1 border-l border-border/60">
           {hours.map((h) => (
             <div
               key={h}
-              className="border-t border-border-muted cursor-pointer hover:bg-surface-hover/50"
+              className="border-t border-border/60 cursor-pointer hover:bg-accent/50"
               style={{ height: HOUR_HEIGHT }}
               onClick={() => {
                 const d = new Date(date);
@@ -345,20 +345,20 @@ function WeekView({
   return (
     <div className="flex flex-col h-full overflow-auto">
       {/* Header row */}
-      <div className="flex border-b border-border-muted sticky top-0 bg-surface z-10">
+      <div className="flex border-b border-border/60 sticky top-0 bg-card z-10">
         <div className="w-12 flex-shrink-0" />
         {days.map((day) => {
           const isToday = sameDay(day, today);
           return (
             <div key={day.getTime()} className="flex-1 text-center py-2">
-              <div className="text-xs text-text-muted">
+              <div className="text-xs text-muted-foreground">
                 {t(WEEKDAY_LONG_KEYS[day.getDay()])}
               </div>
               <div
                 className={`text-sm font-medium inline-flex items-center justify-center w-7 h-7 rounded-full ${
                   isToday
                     ? "bg-primary text-primary-foreground"
-                    : "text-text-primary"
+                    : "text-foreground"
                 }`}
               >
                 {day.getDate()}
@@ -374,7 +374,7 @@ function WeekView({
           {hours.map((h) => (
             <div
               key={h}
-              className="text-xs text-text-muted text-right pr-2"
+              className="text-xs text-muted-foreground text-right pr-2"
               style={{
                 height: HOUR_HEIGHT,
                 lineHeight: `${HOUR_HEIGHT}px`,
@@ -386,7 +386,7 @@ function WeekView({
           ))}
         </div>
 
-        <div className="flex flex-1 border-l border-border-muted">
+        <div className="flex flex-1 border-l border-border/60">
           {days.map((day) => {
             const dayStart = dayMidnight(day);
             const dayEnd = addDays(dayStart, 1);
@@ -398,12 +398,12 @@ function WeekView({
             return (
               <div
                 key={day.getTime()}
-                className="relative flex-1 border-r border-border-muted last:border-r-0"
+                className="relative flex-1 border-r border-border/60 last:border-r-0"
               >
                 {hours.map((h) => (
                   <div
                     key={h}
-                    className="border-t border-border-muted cursor-pointer hover:bg-surface-hover/50"
+                    className="border-t border-border/60 cursor-pointer hover:bg-accent/50"
                     style={{ height: HOUR_HEIGHT }}
                     onClick={() => {
                       const d = new Date(day);
@@ -488,11 +488,11 @@ function MonthView({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="grid grid-cols-7 border-b border-border-muted">
+      <div className="grid grid-cols-7 border-b border-border/60">
         {WEEKDAY_SHORT_KEYS.map((key) => (
           <div
             key={key}
-            className="text-center text-xs text-text-muted py-2 font-medium"
+            className="text-center text-xs text-muted-foreground py-2 font-medium"
           >
             {t(key)}
           </div>
@@ -510,7 +510,7 @@ function MonthView({
           return (
             <div
               key={idx}
-              className={`border-r border-b border-border-muted p-1 cursor-pointer hover:bg-surface-hover/30 transition-colors ${
+              className={`border-r border-b border-border/60 p-1 cursor-pointer hover:bg-accent/30 transition-colors ${
                 inMonth ? "" : "opacity-40"
               } ${idx % 7 === 0 ? "border-l" : ""}`}
               onClick={() => {
@@ -525,7 +525,7 @@ function MonthView({
                   className={`text-xs inline-flex items-center justify-center w-6 h-6 rounded-full ${
                     isToday
                       ? "bg-primary text-primary-foreground font-semibold"
-                      : "text-text-secondary"
+                      : "text-muted-foreground"
                   }`}
                 >
                   {day}
@@ -568,7 +568,7 @@ function renderMonthCellEvents(
       const remaining = groups.size - taskCount;
       if (remaining > 0) {
         items.push(
-          <div key="more" className="text-xs text-text-muted pl-1">
+          <div key="more" className="text-xs text-muted-foreground pl-1">
             {t("schedule.monthMoreEvents", { count: remaining })}
           </div>,
         );
@@ -598,7 +598,7 @@ function renderMonthCellEvents(
             style={{ backgroundColor: color }}
           />
           {first.title}
-          <span className="text-text-muted ml-0.5">
+          <span className="text-muted-foreground ml-0.5">
             {t("schedule.monthEventCount", { count: evs.length })}
           </span>
         </div>,

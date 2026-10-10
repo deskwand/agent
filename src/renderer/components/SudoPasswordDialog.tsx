@@ -61,12 +61,12 @@ function PasswordInput({
 
   return (
     <div className="mt-4">
-      <label className="block text-sm font-medium text-text-primary mb-1">
+      <label className="block text-sm font-medium text-foreground mb-1">
         {label}
       </label>
       {/* 2026-10-09 相位 3 ✓：`Input` 是 `forwardRef` ⇒ `inputRef` 照常落到真实 `<input>` 上 ✓。
           本仓聚焦是 `focus:ring-2 ring-primary/50` ✓；base 的 `focus-visible:ring-1 ring-ring` 会**再叠一圈** ✗
-          ⇒ 按口径裁决②**照原样复刻**成 2px 环（`focus-visible:ring-2 focus-visible:ring-primary/50` ✓ —— 本处原串自带 2px 环 ✓，复刻 = 保持现状 ✗ 不是引入新风格 ✓）；其余逐条覆盖（h-auto / rounded-lg / border-border / bg-surface / py-2 / shadow-none）✓。 */}
+          ⇒ 按口径裁决②**照原样复刻**成 2px 环（`focus-visible:ring-2 focus-visible:ring-primary/50` ✓ —— 本处原串自带 2px 环 ✓，复刻 = 保持现状 ✗ 不是引入新风格 ✓）；其余逐条覆盖（h-auto / rounded-lg / border-border / bg-card / py-2 / shadow-none）✓。 */}
       <Input
         ref={inputRef}
         type="password"
@@ -75,7 +75,7 @@ function PasswordInput({
         }}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        className="h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-primary shadow-none placeholder:text-text-tertiary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        className="h-auto w-full rounded-lg border border-border bg-card px-3 py-2 text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         autoComplete="new-password"
       />
     </div>
@@ -151,18 +151,18 @@ export function SudoPasswordDialog({ request }: SudoPasswordDialogProps) {
           </div>
 
           <div className="flex-1">
-            <AlertDialogTitle className="text-lg font-semibold text-text-primary">
+            <AlertDialogTitle className="text-lg font-semibold text-foreground">
               {t("sudo.title")}
             </AlertDialogTitle>
             {/* Description 供读屏补充一句上下文（Radix 不强制要求） */}
-            <AlertDialogDescription className="text-sm text-text-secondary mt-1">
+            <AlertDialogDescription className="text-sm text-muted-foreground mt-1">
               {t("sudo.description")}
             </AlertDialogDescription>
           </div>
         </div>
 
         {/* Command display */}
-        <div className="mt-4 p-4 bg-surface-muted rounded-xl">
+        <div className="mt-4 p-4 bg-muted rounded-xl">
           <pre className="text-xs code-block max-h-32 overflow-auto whitespace-pre-wrap break-all">
             {request.command}
           </pre>
@@ -188,7 +188,7 @@ export function SudoPasswordDialog({ request }: SudoPasswordDialogProps) {
             variant="ghost"
             type="button"
             onClick={handleCancel}
-            className="h-auto flex-1 gap-2 rounded-lg bg-surface px-3 py-1.5 text-sm font-normal text-text-primary hover:bg-surface-hover hover:text-text-primary"
+            className="h-auto flex-1 gap-2 rounded-lg bg-card px-3 py-1.5 text-sm font-normal text-foreground hover:bg-accent hover:text-foreground"
           >
             <X className="w-4 h-4" />
             {t("sudo.cancel")}
@@ -198,7 +198,7 @@ export function SudoPasswordDialog({ request }: SudoPasswordDialogProps) {
             variant="default"
             type="button"
             onClick={handleSubmit}
-            className="h-auto flex-1 gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-primary-hover"
+            className="h-auto flex-1 gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-primary/90"
           >
             <Play className="w-4 h-4" />
             {t("sudo.execute")}

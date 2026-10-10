@@ -37,7 +37,7 @@ describe("MENU_PANEL_CLASS", () => {
   it("统一外壳的四个类都在", () => {
     for (const cls of [
       "rounded-xl",
-      "border-border-subtle",
+      "border-border/40",
       "bg-background",
       "shadow-elevated",
     ]) {
@@ -47,8 +47,9 @@ describe("MENU_PANEL_CLASS", () => {
 
   it("不回退到 Tailwind 内置 shadow-lg，也不用实色边框", () => {
     expect(MENU_PANEL_CLASS).not.toContain("shadow-lg");
-    // border-border-subtle 合法；裸的 border-border（后接空白的实色边框）不合法
-    expect(MENU_PANEL_CLASS).not.toMatch(/border-border(?![-\w])/);
+    // border-border/40 合法（2026-10 起'轻描边'就是官方 --border 的 alpha 形式）；
+    // 裸的 border-border（后面既不跟 /alpha 也不跟别的后缀）不合法
+    expect(MENU_PANEL_CLASS).not.toMatch(/border-border(?![\w-/])/);
   });
 
   it("外壳自身不带内边距；PADDED 版就是它 + p-1", () => {
@@ -99,12 +100,12 @@ describe("MENU_ITEM_CLASS", () => {
 
   it("四个状态类的取值就是契约本身", () => {
     expect(MENU_ITEM_DEFAULT_CLASS).toBe(
-      "text-text-primary hover:bg-surface-hover",
+      "text-foreground hover:bg-accent",
     );
-    expect(MENU_ITEM_SELECTED_CLASS).toBe("text-text-primary bg-surface-hover");
-    expect(MENU_ITEM_DANGER_CLASS).toBe("text-error hover:bg-error/10");
+    expect(MENU_ITEM_SELECTED_CLASS).toBe("text-foreground bg-accent");
+    expect(MENU_ITEM_DANGER_CLASS).toBe("text-destructive hover:bg-destructive/10");
     expect(MENU_ITEM_DISABLED_CLASS).toBe(
-      "cursor-not-allowed text-text-muted opacity-50",
+      "cursor-not-allowed text-muted-foreground opacity-50",
     );
   });
 });
@@ -114,12 +115,12 @@ describe("MENU_LABEL_CLASS / MENU_SEPARATOR_CLASS", () => {
     expect(MENU_LABEL_CLASS).toContain("px-2.5");
     expect(MENU_LABEL_CLASS).toContain("py-1");
     expect(MENU_LABEL_CLASS).toContain("text-xs");
-    expect(MENU_LABEL_CLASS).toContain("text-text-muted");
+    expect(MENU_LABEL_CLASS).toContain("text-muted-foreground");
   });
 
   it("分隔线用 border-subtle，与统一后的面板边框同族", () => {
     expect(MENU_SEPARATOR_CLASS).toContain("border-t");
-    expect(MENU_SEPARATOR_CLASS).toContain("border-border-subtle");
+    expect(MENU_SEPARATOR_CLASS).toContain("border-border/40");
   });
 });
 

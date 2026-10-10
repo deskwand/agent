@@ -72,14 +72,14 @@ export function StatusPopover({
             // onClick / aria-haspopup / aria-expanded 三样都由 Radix 的 Trigger 管 ——
             // 手写会和它打架（两边各切一次 = 等于不切换）
             aria-label={t("statusPopover.ringTooltip")}
-            className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-2xl border border-border-subtle transition-colors ${
+            className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-2xl border border-border/40 transition-colors ${
               open
-                ? "bg-surface-hover"
-                : "bg-background/60 hover:bg-surface-hover"
+                ? "bg-accent"
+                : "bg-background/60 hover:bg-accent"
             }`}
           >
             <svg
-              className="w-5 h-5 -rotate-90 text-text-muted"
+              className="w-5 h-5 -rotate-90 text-muted-foreground"
               viewBox="0 0 24 24"
               aria-hidden="true"
             >
@@ -124,20 +124,20 @@ export function StatusPopover({
         className="w-[340px] p-3 text-xs"
       >
         <div className="flex items-center gap-2">
-          <span className="w-[60px] shrink-0 text-text-secondary">
+          <span className="w-[60px] shrink-0 text-muted-foreground">
             {t("statusPopover.context")}
           </span>
-          <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-surface-hover">
+          <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-accent">
             <span
               className="absolute inset-y-0 left-0 rounded-sm bg-primary"
               style={{ width: `${contextUsagePercentage}%` }}
             />
           </span>
-          <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-text-primary">
+          <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-foreground">
             {Math.round(contextUsagePercentage)}%
           </span>
         </div>
-        <div className="pl-[70px] pt-0.5 text-[11px] tabular-nums text-text-muted">
+        <div className="pl-[70px] pt-0.5 text-[11px] tabular-nums text-muted-foreground">
           {contextStatusDetails.usedLabel} / {contextStatusDetails.totalLabel}
         </div>
 
@@ -145,37 +145,37 @@ export function StatusPopover({
           snapshot.windows.length > 0 ? (
             <div
               key={snapshot.providerId}
-              className="mt-2 border-t border-border-subtle pt-2"
+              className="mt-2 border-t border-border/40 pt-2"
             >
-              <div className="flex items-baseline gap-1.5 pb-1 text-[11px] font-semibold text-text-secondary">
+              <div className="flex items-baseline gap-1.5 pb-1 text-[11px] font-semibold text-muted-foreground">
                 <span>{snapshot.providerName}</span>
                 {snapshot.planName && (
-                  <span className="font-normal text-text-muted">
+                  <span className="font-normal text-muted-foreground">
                     {snapshot.planName}
                   </span>
                 )}
               </div>
-              <div className="border-l-2 border-border-subtle pl-2">
+              <div className="border-l-2 border-border/40 pl-2">
                 {snapshot.windows.map((window) => (
                   <div key={window.kind}>
                     <div className="flex items-center gap-2">
-                      <span className="w-[60px] shrink-0 text-text-secondary">
+                      <span className="w-[60px] shrink-0 text-muted-foreground">
                         {window.kind === "session"
                           ? t("statusPopover.windowSession")
                           : t("statusPopover.windowWeekly")}
                       </span>
-                      <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-surface-hover">
+                      <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-accent">
                         <span
                           className="absolute inset-y-0 left-0 rounded-sm bg-primary"
                           style={{ width: `${window.usedPercent}%` }}
                         />
                       </span>
-                      <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-text-primary">
+                      <span className="w-[38px] shrink-0 text-right font-medium tabular-nums text-foreground">
                         {Math.round(window.usedPercent)}%
                       </span>
                     </div>
                     {window.resetsAt !== undefined && (
-                      <div className="pl-[70px] pt-0.5 text-[11px] tabular-nums text-text-muted">
+                      <div className="pl-[70px] pt-0.5 text-[11px] tabular-nums text-muted-foreground">
                         {t("statusPopover.resetAt", {
                           time: formatResetTime(window.resetsAt),
                         })}
@@ -189,7 +189,7 @@ export function StatusPopover({
         )}
 
         {contextStatusDetails.cacheHitRate !== "--" && (
-          <div className="mt-2 border-t border-border-subtle pt-2 text-[11px] text-text-muted">
+          <div className="mt-2 border-t border-border/40 pt-2 text-[11px] text-muted-foreground">
             {t("statusPopover.cacheHitRate", {
               rate: contextStatusDetails.cacheHitRate,
             })}

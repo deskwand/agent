@@ -105,7 +105,7 @@ export function ExtensionDialogs() {
     <>
       {trustCwd && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-[420px] max-w-[90vw] rounded-xl border border-border bg-panel p-5 shadow-2xl">
+          <div className="w-[420px] max-w-[90vw] rounded-xl border border-border bg-card p-5 shadow-2xl">
             <h3 className="mb-2 text-base font-semibold">
               {t("piExtensions.trustTitle")}
             </h3>
@@ -114,7 +114,7 @@ export function ExtensionDialogs() {
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="ghost"
-                className="rounded-lg px-4 py-2 text-sm bg-danger text-white h-auto hover:bg-transparent hover:text-current"
+                className="rounded-lg px-4 py-2 text-sm bg-destructive text-white h-auto hover:bg-transparent hover:text-current"
                 onClick={() => respondTrust("untrusted")}
               >
                 {t("piExtensions.trustDeny")}
@@ -131,7 +131,7 @@ export function ExtensionDialogs() {
       )}
       {dialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-[420px] max-w-[90vw] rounded-xl border border-border bg-panel p-5 shadow-2xl">
+          <div className="w-[420px] max-w-[90vw] rounded-xl border border-border bg-card p-5 shadow-2xl">
             <h3 className="mb-2 text-base font-semibold">{dialog.title}</h3>
             {dialog.kind === "confirm" && (
               <p className="mb-4 text-sm text-muted-foreground">

@@ -140,10 +140,10 @@ export function PiMarketList({
   }, []);
 
   return (
-    <div className="flex h-[480px] min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background-secondary/60">
-      <div className="shrink-0 border-b border-border-subtle p-2">
+    <div className="flex h-[480px] min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-muted/60">
+      <div className="shrink-0 border-b border-border/40 p-2">
         <Input
-          className="h-auto w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-text-primary shadow-none placeholder:text-text-muted focus:border-primary focus:outline-none"
+          className="h-auto w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus:border-primary focus:outline-none"
           placeholder={t("piExtensions.marketSearchPlaceholder")}
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
@@ -155,22 +155,22 @@ export function PiMarketList({
         className="min-h-0 flex-1 overflow-y-auto"
       >
         {loading && items.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-sm text-text-muted">
+          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
             {t("common.loading")}
           </div>
         ) : error !== null && items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10">
-            <p className="text-center text-sm text-text-secondary">{error}</p>
+            <p className="text-center text-sm text-muted-foreground">{error}</p>
             <Button variant="ghost"
               type="button"
-              className="rounded-lg border border-border bg-surface px-3 py-1 text-sm text-text-primary hover:bg-surface-hover h-auto"
+              className="rounded-lg border border-border bg-card px-3 py-1 text-sm text-foreground hover:bg-accent h-auto"
               onClick={retry}
             >
               {t("piExtensions.marketRetry")}
             </Button>
           </div>
         ) : items.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-sm text-text-muted">
+          <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
             {t("piExtensions.marketEmpty")}
           </div>
         ) : (
@@ -186,12 +186,12 @@ export function PiMarketList({
                       onClick={() => onSelect(pkg)}
                       className={`flex w-full flex-col items-start gap-0.5 border-l-2 px-3 py-2 text-left transition-colors ${
                         selected
-                          ? "border-primary bg-primary-muted"
-                          : "border-transparent hover:bg-surface-hover"
+                          ? "border-primary bg-primary/10"
+                          : "border-transparent hover:bg-accent"
                       }`}
                     >
                       <span className="flex w-full min-w-0 items-center gap-2">
-                        <span className="min-w-0 truncate text-sm font-semibold text-text-primary">
+                        <span className="min-w-0 truncate text-sm font-semibold text-foreground">
                           {pkg.name}
                         </span>
                         {installed && (
@@ -199,11 +199,11 @@ export function PiMarketList({
                             ✓ {t("piExtensions.marketInstalled")}
                           </span>
                         )}
-                        <span className="ml-auto shrink-0 rounded bg-surface px-1.5 py-0.5 text-[10px] text-text-muted">
+                        <span className="ml-auto shrink-0 rounded bg-card px-1.5 py-0.5 text-[10px] text-muted-foreground">
                           {pkg.type}
                         </span>
                       </span>
-                      <span className="w-full min-w-0 line-clamp-1 text-xs text-text-muted">
+                      <span className="w-full min-w-0 line-clamp-1 text-xs text-muted-foreground">
                         {pkg.description || "\u00a0"}
                       </span>
                     </Button>
@@ -212,12 +212,12 @@ export function PiMarketList({
               })}
             </ul>
             {loading && (
-              <div className="flex items-center justify-center py-3 text-xs text-text-muted">
+              <div className="flex items-center justify-center py-3 text-xs text-muted-foreground">
                 {t("common.loading")}
               </div>
             )}
             {stopped && (
-              <div className="border-t border-border-subtle px-3 py-2 text-center text-xs text-text-muted">
+              <div className="border-t border-border/40 px-3 py-2 text-center text-xs text-muted-foreground">
                 {t("piExtensions.marketLoadStopped")}
               </div>
             )}

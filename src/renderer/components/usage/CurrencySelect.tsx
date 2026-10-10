@@ -42,12 +42,12 @@ export function CurrencySelect({ value, onChange }: Props) {
         <Button variant="ghost"
           type="button"
           aria-label={`${t("usage.currency")}, ${value}`}
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-2xl border border-border-subtle bg-background/60 px-2 text-xs whitespace-nowrap text-text-primary transition-[background-color] duration-150 hover:bg-surface-hover"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-2xl border border-border/40 bg-background/60 px-2 text-xs whitespace-nowrap text-foreground transition-[background-color] duration-150 hover:bg-accent"
         >
-          <span className="text-text-muted">{t("usage.currency")}</span>
+          <span className="text-muted-foreground">{t("usage.currency")}</span>
           <span className="font-mono">{value}</span>
           <ChevronDown
-            className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${
+            className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
               open ? "rotate-180" : ""
             }`}
           />

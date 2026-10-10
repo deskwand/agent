@@ -77,7 +77,7 @@ export function SettingsPersonalization() {
               <Button variant="ghost"
                 onClick={() => setPendingDelete(true)}
                 disabled={isBusy}
-                className="rounded-control border border-error/40 px-2.5 py-1 text-xs text-error transition-colors hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-60 h-auto"
+                className="rounded-control border border-destructive/40 px-2.5 py-1 text-xs text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60 h-auto"
               >
                 {t("memory.deleteAction")}
               </Button>
@@ -87,7 +87,7 @@ export function SettingsPersonalization() {
       </SettingsSection>
 
       {status && (
-        <div className="rounded-lg border border-border-muted bg-background-secondary/70 px-4 py-3 text-sm text-text-secondary">
+        <div className="rounded-lg border border-border/60 bg-muted/70 px-4 py-3 text-sm text-muted-foreground">
           {status}
         </div>
       )}

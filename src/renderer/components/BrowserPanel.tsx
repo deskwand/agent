@@ -144,7 +144,7 @@ export function BrowserPanel({ width }: { width: number }) {
     themeSetting === "system" ? systemDarkMode : themeSetting === "dark";
   useEffect(() => {
     const bgColor = getComputedStyle(document.documentElement)
-      .getPropertyValue("--color-background")
+      .getPropertyValue("--background")
       .trim();
     window.electronAPI?.browser.setTheme(
       isDark ? "dark" : "light",
@@ -195,20 +195,18 @@ export function BrowserPanel({ width }: { width: number }) {
     : t("browser.enterFullscreen");
 
   return (
-    <div
-      className="h-full flex flex-col bg-background-secondary"
-      style={{ width }}
-    >
+    <div className="h-full flex flex-col bg-muted" style={{ width }}>
       {/* Header */}
-      <div className="h-10 flex items-center gap-1 px-2 border-b border-border-subtle shrink-0">
+      <div className="h-10 flex items-center gap-1 px-2 border-b border-border/40 shrink-0">
         {/* Nav buttons */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={() => window.electronAPI?.browser.goBack()}
               disabled={!status.canGoBack}
               aria-label={t("browser.back")}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-default"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -219,11 +217,12 @@ export function BrowserPanel({ width }: { width: number }) {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={() => window.electronAPI?.browser.goForward()}
               disabled={!status.canGoForward}
               aria-label={t("browser.forward")}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-30 disabled:cursor-default"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -232,14 +231,15 @@ export function BrowserPanel({ width }: { width: number }) {
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={() =>
                 status.isLoading
                   ? window.electronAPI?.browser.stop()
                   : window.electronAPI?.browser.reload()
               }
               aria-label={reloadLabel}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               {status.isLoading ? (
                 <X className="w-4 h-4" />
@@ -252,11 +252,11 @@ export function BrowserPanel({ width }: { width: number }) {
         </Tooltip>
 
         {/* URL bar */}
-        <div className="flex-1 min-w-0 flex items-center gap-1.5 rounded-lg bg-surface-muted px-2.5 h-7">
+        <div className="flex-1 min-w-0 flex items-center gap-1.5 rounded-lg bg-muted px-2.5 h-7">
           {status.isLoading ? (
-            <Loader2 className="w-3 h-3 text-primary animate-spin shrink-0" />
+            <Loader2 className="w-3 h-3 text-primary-text animate-spin shrink-0" />
           ) : (
-            <Globe className="w-3 h-3 text-text-muted shrink-0" />
+            <Globe className="w-3 h-3 text-muted-foreground shrink-0" />
           )}
           <input
             type="text"
@@ -264,7 +264,7 @@ export function BrowserPanel({ width }: { width: number }) {
             onChange={(e) => setUrlInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t("browser.placeholder")}
-            className="flex-1 min-w-0 bg-transparent text-xs text-text-primary placeholder:text-text-muted outline-none"
+            className="flex-1 min-w-0 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
             spellCheck={false}
           />
         </div>
@@ -272,7 +272,8 @@ export function BrowserPanel({ width }: { width: number }) {
         {/* Element picker (Design Mode v1) */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={() => void handleTogglePicker()}
               disabled={pickerUnavailable}
               aria-pressed={pickerActive}
@@ -283,8 +284,8 @@ export function BrowserPanel({ width }: { width: number }) {
               }
               className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
                 pickerActive
-                  ? "bg-primary/15 text-primary"
-                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+                  ? "bg-primary/15 text-primary-text"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
               }`}
             >
               <MousePointerSquareDashed className="w-3.5 h-3.5" />
@@ -300,7 +301,8 @@ export function BrowserPanel({ width }: { width: number }) {
         {/* External open */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={() => {
                 if (!status.url || status.url === "about:blank") return;
                 window.electronAPI
@@ -311,7 +313,7 @@ export function BrowserPanel({ width }: { width: number }) {
               }}
               disabled={!status.url || status.url === "about:blank"}
               aria-label={t("browser.openExternal")}
-              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </Button>
@@ -324,11 +326,12 @@ export function BrowserPanel({ width }: { width: number }) {
         {/* Fullscreen toggle */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={handleToggleFullscreen}
               disabled={!status.url || status.url === "about:blank"}
               aria-label={fullscreenLabel}
-              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               {isBrowserFullscreen ? (
                 <Minimize2 className="w-3.5 h-3.5" />
@@ -343,10 +346,11 @@ export function BrowserPanel({ width }: { width: number }) {
         {/* Close */}
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               onClick={handleClose}
               aria-label={t("common.close")}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -356,7 +360,7 @@ export function BrowserPanel({ width }: { width: number }) {
       </div>
 
       {status.loadError ? (
-        <div className="shrink-0 border-b border-border-subtle bg-error/10 px-3 py-1.5 text-xs text-error">
+        <div className="shrink-0 border-b border-border/40 bg-destructive/10 px-3 py-1.5 text-xs text-destructive">
           {t("browser.loadFailed")}
           {": "}
           {status.loadError}
@@ -364,10 +368,7 @@ export function BrowserPanel({ width }: { width: number }) {
       ) : null}
 
       {/* Content area — WebContentsView overlays this */}
-      <div
-        ref={contentRef}
-        className="flex-1 min-h-0 bg-background-secondary"
-      />
+      <div ref={contentRef} className="flex-1 min-h-0 bg-muted" />
     </div>
   );
 }

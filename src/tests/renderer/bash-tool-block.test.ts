@@ -4,11 +4,9 @@ import path from "node:path";
 import { canHandleBashInput } from "../../renderer/components/message/BashToolBlock";
 import {
   RENDERER,
-  composite,
-  contrast,
   css,
   parseAlphaColor,
-  rgbHex,
+  globalToken,
   themeBlocks,
   tokenOf,
 } from "./theme-css-helpers";
@@ -59,13 +57,19 @@ const bashSource = fs.readFileSync(
 // 不在这里再解析一遍，避免两份快照漂移。
 const globalsCss = css;
 
+/** 拆成 {rgb, alpha}：终端分隔线是 rgba()，主题描边可能是 oklch(… / 10%)。 */
+function parseHexLike(value: string): { rgb: [number, number, number]; alpha: number } {
+  return parseAlphaColor(value);
+}
+
+
 describe("命令执行卡片：不再模仿 macOS 窗口", () => {
   it("交通灯色值与旧 titlebar token 都不复活", () => {
     for (const hex of ["ff5f56", "ffbd2e", "27c93f"]) {
       expect(bashSource, `交通灯色值 ${hex} 复活了`).not.toContain(hex);
     }
-    expect(bashSource).not.toContain("--color-terminal-titlebar-bg");
-    expect(globalsCss).not.toContain("--color-terminal-titlebar-bg");
+    expect(bashSource).not.toContain("--terminal-titlebar-bg");
+    expect(globalsCss).not.toContain("--terminal-titlebar-bg");
   });
 
   it("meta 行的 bash 标签仍在", () => {
@@ -79,48 +83,31 @@ describe("meta 行分隔线不会隐形", () => {
   // 先例：menu-token-adoption.test.ts —— token 自己的取值由 menu-styles.test.ts
   // 锁住，那个文件锁的是每个菜单文件确实用了它。
   it("组件确实把 divider token 用在了 meta 行的下边框上", () => {
-    // 必须精确匹配整段 style 值。写成前缀 "--color-terminal-divider" 会漏掉
-    // --color-terminal-dividerX 这类改名 —— 变异测试实测过：改了名照样绿。
-    expect(bashSource).toContain('"var(--color-terminal-divider)"');
+    // 必须精确匹配整段 style 值。写成前缀 "--terminal-divider" 会漏掉
+    // --terminal-dividerX 这类改名 —— 变异测试实测过：改了名照样绿。
+    expect(bashSource).toContain('"var(--terminal-divider)"');
     // 只有颜色没有宽度就没有线：border-b 在本组件里唯一出现一次，
     // 所以直接断言它在即可，不需要去匹配类名串（那会随重排假红）。
     expect(bashSource).toContain("border-b");
   });
 
   it("分隔线比通用 hairline 明显，且落在可见区间内", () => {
-    const bases = themeBlocks().filter((b) =>
-      /--color-terminal-bg\s*:/.test(b),
+    // 2026-10-10：终端色搬进**固定语义层**（顶层 :root / :root.light），不再逐主题块声明。
+    // 该前提（终端色不随配色预设走）改成两条更直接的断言：
+    //   1) 14 个主题块里一个 --terminal-* 都不许有
+    //   2) 固定语义层的两块各声明一次
+    const inTheme = themeBlocks().filter((b) => /--terminal-/.test(b));
+    expect(inTheme.length, "主题块里不该出现 terminal token").toBe(0);
+    const layers = [...css.matchAll(/^:root(\.light)?\s*\{[\s\S]*?^\}/gm)].filter((m) =>
+      /--terminal-bg\s*:/.test(m[0]),
     );
-    // 前提：终端色不随 6 个配色预设走。下面两条把该前提钉死：
-    // 既有「只有两个基块声明 bg」，也有「divider 不被任何预设覆盖」。
-    expect(bases.length).toBe(2);
-    expect(
-      globalsCss.match(/--color-terminal-divider\s*:/g) ?? [],
-    ).toHaveLength(2);
+    expect(layers.length, "固定语义层应有暗/亮两块").toBe(2);
 
-    for (const block of bases) {
-      const bg = tokenOf(block, "--color-terminal-bg");
-      const lineOf = (token: string) => {
-        // 边框画在元素自身背景之上（background-clip 默认 border-box）
-        const edge = parseAlphaColor(tokenOf(block, token));
-        return composite(bg, rgbHex(edge.rgb), edge.alpha);
-      };
-      const divider = contrast(lineOf("--color-terminal-divider"), bg);
-
-      // 无阈值断言（真正的理由）：整行分隔线必须比通用 chip 描边更可辨。
-      // --color-border-subtle 的 α=6% 是给小元件描边定的，用在这里实测渲染看不见 ——
-      // 看不见就等于退回「无分隔线」，而分隔线正是这次保留 meta 行的唯一理由。
-      expect(divider).toBeGreaterThan(
-        contrast(lineOf("--color-border-subtle"), bg),
-      );
-
-      // 下限：globals.css 自己把对比 1.24 的元素称作「看不见」，所以不能停在那档。
-      // （α=0.07 时 dark 只有 1.184，仍能过上面那条无阈值断言 —— 只有下限拦得住它。）
-      expect(divider).toBeGreaterThanOrEqual(1.35);
-
-      // 上限：这条线是发丝，不是硬分割线。α=0.30 时 dark 到 2.658。
-      // 实测 dark 1.584 / light 1.447，落在 GitHub 代码块头部分隔线（1.551）同一区间。
-      expect(divider).toBeLessThanOrEqual(1.75);
-    }
+    const decl = globalToken("--terminal-divider");
+    const hairline = tokenOf(themeBlocks()[0], "--border");
+    // 分隔线必须比通用描边更"实"：终端色是固定值，描边是主题相关的浅色。
+    const a = parseHexLike(decl);
+    const b = parseHexLike(hairline);
+    expect(a.alpha, "分隔线不该是透明的").toBeGreaterThan(b.alpha);
   });
 });

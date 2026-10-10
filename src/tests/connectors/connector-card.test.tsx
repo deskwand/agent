@@ -473,9 +473,9 @@ describe("头像", () => {
       container.querySelector('[data-testid="first-party-icon"]'),
     ).not.toBeNull();
     // 这一支画的是 text-primary：深色主题的品牌色放白底上只有 1.86–3.16:1，必须留在淡色底上
-    // ⚠️ 2026-10-09：`accent` → `primary` 改名 ✓（`--color-primary-muted` 与 `--color-accent-muted` **同值** ✓
+    // ⚠️ 2026-10-09：`accent` → `primary` 改名 ✓（`--primary-muted` 与 `--accent-muted` **同值** ✓
     // ⇒ **这条判据的语义一字未变** ✓）；并加**反向钉子** ✗：确认不再残留旧 token 名 ✓。
-    expect(avatar()!.className).toContain("bg-primary-muted");
+    expect(avatar()!.className).toContain("bg-primary/10");
     expect(avatar()!.className).not.toContain("bg-accent-muted");
     expect(avatar()!.className).not.toContain("bg-white");
   });
@@ -531,7 +531,7 @@ describe("头像", () => {
     );
     expect(avatar()!.querySelector("img")).toBeNull();
     expect(avatar()!.textContent?.trim()).toBe("163");
-    expect(avatar()!.className).toContain("bg-primary-muted");
+    expect(avatar()!.className).toContain("bg-primary/10");
     expect(avatar()!.className).not.toContain("bg-white");
   });
 
@@ -551,7 +551,7 @@ describe("头像", () => {
     // 一定要落在**头像方块里面**：容器级 textContent 里本来就有名称行（`MyServer`），
     // 拿它断言「画了首字母」是空的 —— 把首字母那个 span 删掉，那条断言照样绿。
     expect(avatar()!.textContent?.trim()).toBe("M");
-    expect(avatar()!.className).toContain("bg-primary-muted");
+    expect(avatar()!.className).toContain("bg-primary/10");
     expect(avatar()!.className).not.toContain("bg-white");
   });
 });

@@ -95,12 +95,12 @@ export function AccountMenu({
           <>
             {/* 身份区：首字母头像 + 完整邮箱。触发行截断长邮箱，这里是完整版。 */}
             <div className="flex items-center gap-2 px-2.5 py-2">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-text">
                 {avatarInitials(cloudConfig.email ?? "") || (
                   <User className="h-4 w-4" />
                 )}
               </span>
-              <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+              <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                 {cloudConfig.email}
               </span>
             </div>
@@ -121,15 +121,15 @@ export function AccountMenu({
               onOpenChange(false);
             }}
           >
-            <span className="shrink-0 text-text-muted">
+            <span className="shrink-0 text-muted-foreground">
               <Coins className="w-4 h-4" />
             </span>
-            <span className="text-text-muted">{t("accountMenu.balance")}</span>
+            <span className="text-muted-foreground">{t("accountMenu.balance")}</span>
             <span className="min-w-0 truncate font-medium">
               {formatMicroUsd(cloudConfig.balanceMicroUsd)}
             </span>
             <span className="flex-1" />
-            <span className="flex flex-shrink-0 items-center gap-1 text-xs font-medium text-text-primary">
+            <span className="flex flex-shrink-0 items-center gap-1 text-xs font-medium text-foreground">
               <Zap className="h-3.5 w-3.5" />
               {t("accountMenu.topUpAction")}
             </span>
@@ -143,7 +143,7 @@ export function AccountMenu({
             onOpenChange(false);
           }}
         >
-          <span className="shrink-0 text-text-muted">
+          <span className="shrink-0 text-muted-foreground">
             <Settings className="w-4 h-4" />
           </span>
           <span className="truncate">{t("sidebar.settings")}</span>
@@ -157,7 +157,7 @@ export function AccountMenu({
           onSelect={() => updateSettings({ petEnabled: !petEnabled })}
           className="h-7 gap-2"
         >
-          <CircleDot className="w-4 h-4 text-text-muted" />
+          <CircleDot className="w-4 h-4 text-muted-foreground" />
           <span className="flex-1 text-left">
             {t("accountMenu.desktopPet")}
           </span>
@@ -172,7 +172,7 @@ export function AccountMenu({
         <DropdownMenuSeparator />
 
         {cloudRestoring ? (
-          <div className="flex items-center gap-2 px-2.5 py-2 text-sm text-text-muted">
+          <div className="flex items-center gap-2 px-2.5 py-2 text-sm text-muted-foreground">
             <span className="truncate">...</span>
           </div>
         ) : isLoggedIn && cloudConfig ? (
@@ -183,7 +183,7 @@ export function AccountMenu({
               onOpenChange(false);
             }}
           >
-            <span className="shrink-0 text-text-muted">
+            <span className="shrink-0 text-muted-foreground">
               <LogOut className="w-4 h-4" />
             </span>
             <span className="truncate">{t("auth.logout")}</span>
@@ -196,7 +196,7 @@ export function AccountMenu({
               onOpenChange(false);
             }}
           >
-            <span className="shrink-0 text-text-muted">
+            <span className="shrink-0 text-muted-foreground">
               <LogIn className="w-4 h-4" />
             </span>
             <span className="truncate">{t("auth.loginEntry")}</span>

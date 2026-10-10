@@ -41,7 +41,7 @@ function FileTreeRow({
 }) {
   return (
     <div
-      className={`group flex items-center gap-1 py-0.5 px-2 hover:bg-surface-hover rounded cursor-pointer text-xs select-none ${
+      className={`group flex items-center gap-1 py-0.5 px-2 hover:bg-accent rounded cursor-pointer text-xs select-none ${
         selected ? "bg-primary/10 ring-1 ring-primary/20" : ""
       }`}
       style={{ paddingLeft: `${row.depth * 16 + 8}px` }}
@@ -53,11 +53,11 @@ function FileTreeRow({
     >
       {row.isDir ? (
         loading ? (
-          <Loader2 className="w-3 h-3 shrink-0 animate-spin text-text-muted" />
+          <Loader2 className="w-3 h-3 shrink-0 animate-spin text-muted-foreground" />
         ) : row.expanded ? (
-          <ChevronDown className="w-3 h-3 shrink-0 text-text-muted" />
+          <ChevronDown className="w-3 h-3 shrink-0 text-muted-foreground" />
         ) : (
-          <ChevronRight className="w-3 h-3 shrink-0 text-text-muted" />
+          <ChevronRight className="w-3 h-3 shrink-0 text-muted-foreground" />
         )
       ) : (
         <span className="w-3 shrink-0" />
@@ -67,9 +67,9 @@ function FileTreeRow({
         expanded={row.expanded}
         size={16}
       />
-      <span className="truncate text-text-primary">{row.name}</span>
+      <span className="truncate text-foreground">{row.name}</span>
       {!row.isDir && row.size > 0 && (
-        <span className="ml-auto text-xs text-text-muted shrink-0">
+        <span className="ml-auto text-xs text-muted-foreground shrink-0">
           {formatSize(row.size)}
         </span>
       )}
@@ -79,7 +79,7 @@ function FileTreeRow({
         <span className="flex w-5 shrink-0 items-center justify-center">
           {busy ? (
             <Loader2
-              className="h-3 w-3 animate-spin text-primary"
+              className="h-3 w-3 animate-spin text-primary-text"
               data-testid="office-preview-busy"
             />
           ) : (
@@ -215,10 +215,10 @@ export function FileBrowser({ width }: { width: number }) {
   if (!effectiveDir) {
     return (
       <div
-        className="shrink-0 bg-background-secondary flex items-center justify-center"
+        className="shrink-0 bg-muted flex items-center justify-center"
         style={{ width }}
       >
-        <div className="text-text-muted text-xs">
+        <div className="text-muted-foreground text-xs">
           {t("fileBrowser.noWorkdir")}
         </div>
       </div>
@@ -227,25 +227,25 @@ export function FileBrowser({ width }: { width: number }) {
 
   return (
     <div
-      className="shrink-0 bg-background-secondary flex flex-col min-h-0 overflow-hidden"
+      className="shrink-0 bg-muted flex flex-col min-h-0 overflow-hidden"
       style={{ width }}
     >
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border-subtle shrink-0">
-        <div className="flex-1 min-w-0 flex items-center gap-1.5 h-7 px-2 rounded bg-surface-hover text-text-muted">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/40 shrink-0">
+        <div className="flex-1 min-w-0 flex items-center gap-1.5 h-7 px-2 rounded bg-accent text-muted-foreground">
           <Search className="w-3.5 h-3.5 shrink-0" />
           <input
             value={query}
             onChange={(event) => handleQueryChange(event.target.value)}
             placeholder={t("fileBrowser.filterPlaceholder")}
             aria-label={t("fileBrowser.filterPlaceholder")}
-            className="flex-1 min-w-0 bg-transparent outline-none text-xs text-text-primary placeholder:text-text-muted"
+            className="flex-1 min-w-0 bg-transparent outline-none text-xs text-foreground placeholder:text-muted-foreground"
           />
           {filtering && (
             <Button variant="ghost"
               type="button"
               aria-label={t("fileBrowser.clearFilter")}
               onClick={() => handleQueryChange("")}
-              className="shrink-0 w-4 h-4 rounded flex items-center justify-center hover:text-text-primary transition-colors"
+              className="shrink-0 w-4 h-4 rounded flex items-center justify-center hover:text-foreground transition-colors"
             >
               <X className="w-3 h-3" />
             </Button>
@@ -258,12 +258,12 @@ export function FileBrowser({ width }: { width: number }) {
         className={filtering ? "hidden" : "flex-1 min-h-0 overflow-y-auto py-1"}
       >
         {tree.rootLoading && tree.rows.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-text-muted">
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
             <span className="text-xs">{t("common.loading")}</span>
           </div>
         ) : tree.rows.length === 0 ? (
-          <div className="text-center py-8 text-text-muted text-xs">
+          <div className="text-center py-8 text-muted-foreground text-xs">
             {t("fileBrowser.emptyDir")}
           </div>
         ) : (
@@ -280,7 +280,7 @@ export function FileBrowser({ width }: { width: number }) {
               />
               {row.isDir && row.expanded && tree.isEmpty(row.path) && (
                 <div
-                  className="text-xs text-text-muted py-1"
+                  className="text-xs text-muted-foreground py-1"
                   style={{ paddingLeft: `${(row.depth + 1) * 16 + 12}px` }}
                 >
                   {t("fileBrowser.emptyDir")}
@@ -295,7 +295,7 @@ export function FileBrowser({ width }: { width: number }) {
         className={filtering ? "flex-1 min-h-0 overflow-y-auto py-1" : "hidden"}
       >
         {!activeScan ? (
-          <div className="flex items-center justify-center py-8 text-text-muted">
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
             <span className="text-xs">{t("common.loading")}</span>
           </div>
@@ -303,12 +303,12 @@ export function FileBrowser({ width }: { width: number }) {
           <>
             {/* 扫描被截断时必须说，哪怕这一轮一条都没命中（否则就是静默截断） */}
             {activeScan.truncated && (
-              <div className="px-3 py-1 text-xs text-text-muted">
+              <div className="px-3 py-1 text-xs text-muted-foreground">
                 {t("fileBrowser.filterIncomplete")}
               </div>
             )}
             {filterResult.total === 0 ? (
-              <div className="text-center py-8 text-text-muted text-xs">
+              <div className="text-center py-8 text-muted-foreground text-xs">
                 {t("fileBrowser.filterNoMatch")}
               </div>
             ) : (
@@ -333,20 +333,20 @@ export function FileBrowser({ width }: { width: number }) {
                           handleFileOpen(fullPath, name);
                         }
                       }}
-                      className="group w-full flex items-center gap-2 px-2 py-0.5 hover:bg-surface-hover rounded text-xs text-left cursor-pointer"
+                      className="group w-full flex items-center gap-2 px-2 py-0.5 hover:bg-accent rounded text-xs text-left cursor-pointer"
                     >
                       <FileTypeIcon kind={getFileKind(name)} size={16} />
-                      <span className="truncate text-text-primary">{name}</span>
+                      <span className="truncate text-foreground">{name}</span>
                       {dir && (
-                        <span className="truncate text-text-muted">{dir}</span>
+                        <span className="truncate text-muted-foreground">{dir}</span>
                       )}
-                      <span className="ml-auto text-xs text-text-muted shrink-0">
+                      <span className="ml-auto text-xs text-muted-foreground shrink-0">
                         {formatSize(match.size)}
                       </span>
                       <span className="flex w-5 shrink-0 items-center justify-center">
                         {officePreviewBusyPath === fullPath ? (
                           <Loader2
-                            className="h-3 w-3 animate-spin text-primary"
+                            className="h-3 w-3 animate-spin text-primary-text"
                             data-testid="office-preview-busy"
                           />
                         ) : (
@@ -359,7 +359,7 @@ export function FileBrowser({ width }: { width: number }) {
                   );
                 })}
                 {filterResult.total > filterResult.matches.length && (
-                  <div className="px-3 py-1 text-xs text-text-muted">
+                  <div className="px-3 py-1 text-xs text-muted-foreground">
                     {t("fileBrowser.filterCapped", {
                       count: FILTER_RESULT_CAP,
                     })}

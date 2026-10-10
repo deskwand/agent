@@ -73,14 +73,14 @@ describe("ConfirmDialog 的确认键语气", () => {
   it("不传 tone 时仍是 error 语气（守住既有调用点）", async () => {
     await render();
 
-    expect(confirmButton().className).toContain("bg-error/10");
+    expect(confirmButton().className).toContain("bg-destructive/10");
   });
 
   it("tone=primary 时换成品牌色 —— 「下载」不是危险操作", async () => {
     await render("primary");
 
     expect(confirmButton().className).toContain("bg-primary/10");
-    expect(confirmButton().className).not.toContain("bg-error/10");
+    expect(confirmButton().className).not.toContain("bg-destructive/10");
   });
 });
 
@@ -126,7 +126,7 @@ describe("ConfirmDialog 的 description 槽位", () => {
     const p = document.body.querySelector('[role="alertdialog"] p');
     expect(p?.textContent).toBe("还有 2 个会话在跑");
     // muted 时不传 className，让 vendored 的默认色生效
-    expect(p?.className).not.toContain("text-error");
+    expect(p?.className).not.toContain("text-destructive");
   });
 
   it("descriptionTone=error 时描述用 error 色", async () => {
@@ -137,6 +137,6 @@ describe("ConfirmDialog 的 description 槽位", () => {
     });
     const p = document.body.querySelector('[role="alertdialog"] p');
     expect(p?.textContent).toBe("还有 2 个会话在跑");
-    expect(p?.className).toContain("text-error");
+    expect(p?.className).toContain("text-destructive");
   });
 });

@@ -1,4 +1,8 @@
 import { useEffect, useCallback } from "react";
+import {
+  normalizeThemeAccent,
+  normalizeThemePreset,
+} from "../../shared/theme";
 import { useAppStore } from "../store";
 import type {
   AppConfig,
@@ -152,9 +156,16 @@ function registerSharedIpcListener(): () => void {
     store.setIsConfigured(isConfigured);
     store.setAppConfig(config);
     store.setSettings({ theme: config.theme || "light" });
+    // 旧配置里的自造 id（graphite/paper/…）在这里映射到官方 base，避免主题被静默重置。
     if (config.themePreset) {
-      store.setSettings({ themePreset: config.themePreset });
+      store.setSettings({
+        themePreset: normalizeThemePreset(config.themePreset),
+      });
     }
+    // 老配置里没有 themeAccent 字段 ⇒ normalize 落 "default"（不叠 accent 层）。
+    store.setSettings({
+      themeAccent: normalizeThemeAccent(config.themeAccent),
+    });
     store.setSettings({ uiFontSize: config.uiFontSize ?? 14 });
     store.setSettings({ petEnabled: config.petEnabled ?? false });
     store.setSettings({

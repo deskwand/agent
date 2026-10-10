@@ -138,7 +138,7 @@ describe("ToolUseBlock Agent summary", () => {
     expect(header()).not.toBeNull();
     expect(header()?.querySelector(".animate-spin")).toBeNull();
     // 底色与图标出自同一个三元，这里留着是因为它让本条成为"修前也红"的判别用例
-    expect(cardRoot()?.classList.contains("bg-error/5")).toBe(true);
+    expect(cardRoot()?.classList.contains("bg-destructive/5")).toBe(true);
   });
 
   it("工具调用自身失败时优先显示失败（不被快照的 running 掩盖）", async () => {

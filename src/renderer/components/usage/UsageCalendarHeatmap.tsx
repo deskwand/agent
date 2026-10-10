@@ -35,12 +35,12 @@ const VOLUME_ALPHA = ["0", "0.22", "0.42", "0.66", "1"];
 // Index 0 is unused: level 0 means "no record" and is painted by the CSS class.
 const HIT_ALPHA = ["0", "1", "0.5", "0.42", "0.72", "1"];
 const HIT_TOKEN = [
-  "--color-warning",
-  "--color-warning",
-  "--color-warning",
-  "--color-success",
-  "--color-success",
-  "--color-success",
+  "--warning",
+  "--warning",
+  "--warning",
+  "--success",
+  "--success",
+  "--success",
 ];
 
 export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
@@ -89,16 +89,17 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-end">
-        <div className="flex gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
+        <div className="flex gap-0.5 rounded-lg border border-border bg-muted p-0.5">
           {(["usage", "hit", "cost"] as ColorMode[]).map((value) => (
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               key={value}
               type="button"
               onClick={() => setMode(value)}
               className={`rounded-md px-2 py-0.5 text-xs transition-colors ${
                 mode === value
-                  ? "bg-surface text-text-primary"
-                  : "text-text-muted hover:text-text-primary"
+                  ? "bg-card text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t(`usage.colorMode.${value}`)}
@@ -109,7 +110,7 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
 
       <div className="flex gap-0.5 overflow-x-auto pb-1">
         <div
-          className="sticky left-0 z-10 grid shrink-0 items-center bg-background-secondary pt-4 text-[9px] text-text-muted"
+          className="sticky left-0 z-10 grid shrink-0 items-center bg-muted pt-4 text-[9px] text-muted-foreground"
           style={{
             width: GUTTER_PX,
             gridTemplateRows: "repeat(7, 1fr)",
@@ -143,7 +144,7 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
             {columns.map((col, index) => (
               <span
                 key={index}
-                className="whitespace-nowrap text-[9px] text-text-muted"
+                className="whitespace-nowrap text-[9px] text-muted-foreground"
               >
                 {monthLabel(col[0].day, columns, index, monthFormat)}
               </span>
@@ -183,7 +184,7 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 text-[10px] text-text-muted">
+      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
         <span>{t("usage.legend.less")}</span>
         {[1, 2, 3, 4, 5].map((level) => (
           <span
@@ -247,7 +248,7 @@ function swatchStyle(level: number, mode: ColorMode): React.CSSProperties {
   if (level === 0) return {};
   if (mode === "usage" || mode === "cost") {
     return {
-      background: `color-mix(in srgb, var(--color-success) ${
+      background: `color-mix(in srgb, var(--success) ${
         Number(VOLUME_ALPHA[level]) * 100
       }%, transparent)`,
     };

@@ -22,7 +22,7 @@ describe("assistant text alignment with tool-call groups", () => {
     expect(source.match(/pl-1(?![.\d])/g)).toHaveLength(4);
     expect(source).toContain('<div className="pl-1">');
     expect(source).toContain('${isUser ? "" : "pl-1"}');
-    expect(source).toContain("message-user-text text-text-primary");
+    expect(source).toContain("message-user-text text-foreground");
   });
 
   // 元数据行（时间戳 / 复制 / 朗读 / 分叉）原本顶到列的 0 位，比正文左 4px。

@@ -27,7 +27,7 @@ function buildConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     deskWandCodePath: "",
     defaultWorkdir: "",
     theme: "light",
-    themePreset: "graphite",
+    themePreset: "zinc",
     sandboxEnabled: false,
     memoryEnabled: true,
     memoryRuntime: { maxNavSteps: 2, ingestionConcurrency: 4 },

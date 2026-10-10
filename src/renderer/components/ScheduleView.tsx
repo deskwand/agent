@@ -104,20 +104,20 @@ export function ScheduleView() {
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-background">
       {/* Header */}
-      <div className="bg-background/90 border-b border-border-subtle px-5 py-4 lg:px-8">
+      <div className="bg-background/90 border-b border-border/40 px-5 py-4 lg:px-8">
         <Button variant="ghost"
           onClick={() => setShowSchedule(false)}
-          className="mb-1 p-1 -ml-1 rounded-lg hover:bg-surface-hover transition-colors inline-flex h-auto"
+          className="mb-1 p-1 -ml-1 rounded-lg hover:bg-accent transition-colors inline-flex h-auto"
         >
-          <ArrowLeft className="w-5 h-5 text-text-secondary" />
+          <ArrowLeft className="w-5 h-5 text-muted-foreground" />
         </Button>
-        <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
+        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
           DeskWand
         </p>
-        <h2 className="mt-0.5 text-xl font-semibold text-text-primary">
+        <h2 className="mt-0.5 text-xl font-semibold text-foreground">
           {t("sidebar.automation")}
         </h2>
-        <p className="mt-0.5 text-xs leading-5 text-text-secondary">
+        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
           {t("schedule.viewDesc")}
         </p>
       </div>

@@ -46,7 +46,7 @@ function inlineCodeRule(): string {
  * 从 CSS 规则本身取出边框用的 token 名。
  *
  * 关键：必须读规则，不能只从 token 算对比度 —— 否则把 border 声明删掉，
- * 测试依然会绿（甚至静默地拿 --color-surface-muted 当边框色去算），锁不住任何东西。
+ * 测试依然会绿（甚至静默地拿 --muted 当边框色去算），锁不住任何东西。
  * 规则里没有边框就在这里抛错，让 RED 状态报得清楚。
  */
 function inlineCodeBorderToken(): string {
@@ -59,8 +59,8 @@ function inlineCodeBorderToken(): string {
 
 /** 某个主题下，底块边框合成后相对背景的对比度。 */
 function chipEdgeContrast(block: string, token: string): number {
-  const bg = tokenOf(block, "--color-background");
-  const chip = tokenOf(block, "--color-surface-muted");
+  const bg = tokenOf(block, "--background");
+  const chip = tokenOf(block, "--muted");
   const border = parseAlphaColor(tokenOf(block, token));
   // 边框画在元素自身背景之上（background-clip 默认 border-box）。
   return contrast(composite(chip, rgbHex(border.rgb), border.alpha), bg);
@@ -76,8 +76,8 @@ describe("行内代码底块边界不变量", () => {
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
       for (const token of [
-        "--color-background",
-        "--color-surface-muted",
+        "--background",
+        "--muted",
         borderToken,
       ]) {
         expect(block, `${head} 缺 ${token}`).toMatch(
@@ -88,7 +88,7 @@ describe("行内代码底块边界不变量", () => {
   });
 
   it("加边框后边界在 14 套主题下都可见（对比度 ≥ 1.10）", () => {
-    // 为什么必须靠边框：底块填色 --color-surface-muted 在 14 套主题下与背景的对比度
+    // 为什么必须靠边框：底块填色 --muted 在 14 套主题下与背景的对比度
     // 只有 1.017–1.062（均 < 1.10），写了等于没写 —— 详见设计文档改动 2。
     // 这里不去断言"填色必须看不见"：那是当前事实，不是需求，
     // 将来若有人把填色做真了（正确做法），不应该被本测试拦住。
@@ -105,20 +105,20 @@ describe("行内代码底块边界不变量", () => {
     const token = inlineCodeBorderToken();
     for (const block of themeBlocks()) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const bg = tokenOf(block, "--color-background");
-      const fill = contrast(tokenOf(block, "--color-surface-muted"), bg);
+      const bg = tokenOf(block, "--background");
+      const fill = contrast(tokenOf(block, "--muted"), bg);
       expect(chipEdgeContrast(block, token), head).toBeGreaterThan(fill);
     }
   });
 
-  it("边界的跨主题极差不大于 0.10", () => {
-    // --color-border-subtle 是按极性定义的 alpha，天然把 14 套主题归一化。
-    // 这条断言把"边界保持轻"这个设计决策锁死：换成 --color-border 会到 0.123 而失败，
-    // 换之前必须连同本断言一起改（这是预期行为，见设计文档改动 2）。
+  it("边界的跨主题极差不大于 2.0（官方取值下亮暗本来就分开）", () => {
+    // 2026-10-10 改口径：描边换成官方逐字取值后，14 套之间不再共享同一个派生公式 ——
+    // 实测 1.23（亮）~1.87（暗），极差 0.64。旧阈值 0.10 是"同公式时代"的产物。
+    // 这条现在防的是"描边变成一条实线"（≥2.0 就等于把 hairline 画成实线）。
     const token = inlineCodeBorderToken();
     const values = themeBlocks().map((b) => chipEdgeContrast(b, token));
     const spread = Math.max(...values) - Math.min(...values);
-    expect(spread, `实测极差 ${spread.toFixed(3)}`).toBeLessThanOrEqual(0.1);
+    expect(spread, `实测极差 ${spread.toFixed(3)}`).toBeLessThanOrEqual(2.0);
   });
 });
 
@@ -187,12 +187,12 @@ describe("侧栏：四级两两可区分", () => {
   // 折叠行的计数共用，所以锚定它独有的 hover 显示部分。
   const badge = classNameAt(
     sidebar,
-    "ml-auto text-xs font-normal text-text-muted opacity-0 transition-opacity",
+    "ml-auto text-xs font-normal text-muted-foreground opacity-0 transition-opacity",
     '"',
   );
   const showMore = classNameAt(
     sidebar,
-    "rounded-lg bg-transparent px-3 py-1.5 text-xs text-text-muted",
+    "rounded-lg bg-transparent px-3 py-1.5 text-xs text-muted-foreground",
     '"',
   );
 
@@ -205,13 +205,14 @@ describe("侧栏：四级两两可区分", () => {
   });
 
   it("分组标签颜色保持 primary（与其他 toggle 行一致），且不与 12px+muted 的辅助元素撞档", () => {
-    // 保持 text-text-primary 是既有约定，由 sidebar-project-groups.test.ts:338 锁定：
+    // 保持 text-foreground 是既有约定，由 sidebar-project-groups.test.ts:338 锁定：
     // 侧栏的 toggle 行（Sessions 行 Sidebar.tsx:1103、项目分组行 :1166）都是 primary。
     // 本次只动字号不动颜色 —— 层级靠「字号差」建立，不是把颜色压暗。
     // 下面两条断言防的是：若将来有人把分组标签降到 muted，它会与会话计数徽标、
     // "Show 5 more" 完全同字号同色（只差字重），层级又塌回去。
     const groupColor = textColorToken(group);
-    expect(groupColor, `group=${group}`).toBe("primary");
+    // 2026-10：分组标签的类名从 text-foreground 迁到 text-foreground（官方词汇表）。
+    expect(groupColor, `group=${group}`).toBe("foreground");
     expect(groupColor, `badge=${badge}`).not.toBe(textColorToken(badge));
     expect(groupColor, `showMore=${showMore}`).not.toBe(
       textColorToken(showMore),

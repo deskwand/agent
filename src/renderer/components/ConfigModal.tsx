@@ -40,18 +40,18 @@ export function ConfigModal({ isOpen, onClose, isFirstRun }: ConfigModalProps) {
       }}
     >
       <DialogContent className="flex max-h-[88vh] w-full max-w-[960px] flex-col gap-0 overflow-hidden p-0">
-        <div className="flex items-center gap-3 border-b border-border-muted bg-background/90 px-6 py-5">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border-subtle bg-background-secondary/90 text-primary">
+        <div className="flex items-center gap-3 border-b border-border/60 bg-background/90 px-6 py-5">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-border/40 bg-muted/90 text-primary-text">
             <Key className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-xs uppercase tracking-[0.14em] text-text-muted">
+            <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">
               {t("settings.title")}
             </p>
-            <DialogTitle className="mt-1 text-sm font-semibold tracking-[-0.02em] text-text-primary">
+            <DialogTitle className="mt-1 text-sm font-semibold tracking-[-0.02em] text-foreground">
               {isFirstRun ? t("api.firstRunTitle") : t("api.settingsTitle")}
             </DialogTitle>
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-muted-foreground">
               {isFirstRun
                 ? t("api.firstRunSubtitle")
                 : t("api.settingsSubtitle")}

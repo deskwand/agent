@@ -143,7 +143,7 @@ describe("usage currency wiring", () => {
     expect(menu).toContain('t("usage.currency")');
     // 触发按钮照抄输入框模型菜单的形态，不自己发明一套
     expect(menu).toContain(
-      "rounded-2xl border border-border-subtle bg-background/60",
+      "rounded-2xl border border-border/40 bg-background/60",
     );
   });
 

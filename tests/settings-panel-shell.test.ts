@@ -158,7 +158,7 @@ describe("个性化页改卡片行", () => {
 
   it("危险操作不再硬编码玫瑰色", () => {
     expect(personalization).not.toContain("rose-");
-    expect(personalization).toContain("text-error");
+    expect(personalization).toContain("text-destructive");
   });
 
   it("AGENTS.md 编辑器挂到新的分组卡片上", () => {

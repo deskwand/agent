@@ -13,6 +13,6 @@ describe("message card file attachment layout", () => {
     );
     expect(source).toContain("max-w-full min-w-0");
     expect(source).toContain("overflow-hidden");
-    expect(source).toContain("text-xs text-text-primary truncate");
+    expect(source).toContain("text-xs text-foreground truncate");
   });
 });

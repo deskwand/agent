@@ -34,7 +34,7 @@ export function GuidanceInlineHint({
   const toneClass =
     tone === "warning"
       ? "border-warning/30 bg-warning/10 text-warning"
-      : "border-border-subtle bg-background/60 text-text-secondary";
+      : "border-border/40 bg-background/60 text-muted-foreground";
 
   return (
     <div
@@ -62,25 +62,25 @@ export function CommonProviderSetupsCard({
   }
 
   return (
-    <Collapsible className="rounded-5xl border border-border-subtle bg-background/40 px-4 py-4">
+    <Collapsible className="rounded-5xl border border-border/40 bg-background/40 px-4 py-4">
       <CollapsibleTrigger asChild>
         <Button variant="ghost"
           type="button"
-          className="flex w-full cursor-pointer items-center justify-between gap-3 text-sm font-medium text-text-primary h-auto hover:bg-transparent hover:text-current"
+          className="flex w-full cursor-pointer items-center justify-between gap-3 text-sm font-medium text-foreground h-auto hover:bg-transparent hover:text-current"
         >
           <span className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Sparkles className="h-4 w-4 text-primary-text" />
             {t("api.guidance.commonSetupsTitle")}
           </span>
-          <span className="text-xs font-normal text-text-muted">
+          <span className="text-xs font-normal text-muted-foreground">
             {t("api.guidance.commonSetupsHint")}
           </span>
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-4 overflow-x-auto">
-        <table className="min-w-full text-left text-xs text-text-secondary">
+        <table className="min-w-full text-left text-xs text-muted-foreground">
           <thead>
-            <tr className="border-b border-border-subtle text-text-muted">
+            <tr className="border-b border-border/40 text-muted-foreground">
               <th className="px-2 py-2 font-medium">
                 {t("api.guidance.columns.service")}
               </th>
@@ -107,25 +107,25 @@ export function CommonProviderSetupsCard({
                 key={setup.id}
                 className={
                   setup.isDetected
-                    ? "bg-primary/5 text-text-primary"
-                    : "text-text-secondary"
+                    ? "bg-primary/5 text-foreground"
+                    : "text-muted-foreground"
                 }
               >
                 <td className="px-2 py-3 font-medium">
                   <div className="flex items-center gap-2">
                     <span>{setup.name}</span>
                     {setup.isDetected && (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs uppercase tracking-[0.08em] text-primary">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs uppercase tracking-[0.08em] text-primary-text">
                         {t("api.guidance.detectedBadge")}
                       </span>
                     )}
                   </div>
                 </td>
                 <td className="px-2 py-3">{setup.protocolLabel}</td>
-                <td className="px-2 py-3 font-mono text-xs text-text-secondary">
+                <td className="px-2 py-3 font-mono text-xs text-muted-foreground">
                   {setup.baseUrl}
                 </td>
-                <td className="px-2 py-3 font-mono text-xs text-text-secondary">
+                <td className="px-2 py-3 font-mono text-xs text-muted-foreground">
                   {setup.exampleModel}
                 </td>
                 <td className="px-2 py-3 leading-5">{setup.notes}</td>
@@ -133,7 +133,7 @@ export function CommonProviderSetupsCard({
                   <Button variant="ghost"
                     type="button"
                     onClick={() => onApplySetup(setup.id)}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover h-auto"
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent h-auto"
                   >
                     {t("api.guidance.apply")}
                   </Button>

@@ -24,7 +24,8 @@ export interface ReferenceTokenProps {
  * 必须与 utils/editor-content.ts 的 TOKEN_CLASS 保持一致（同一套外观，输入框与气泡共用）。
  * 不要改回 inline-flex —— 容器的基线会取自首个 flex item（svg）的底边，token 会被抬高约 2px。
  */
-const BASE_CLASS = "font-medium text-mention";
+const BASE_CLASS =
+  "font-medium text-primary-text rounded-sm bg-accent px-1 py-0.5 h-auto";
 
 export function ReferenceToken({
   kind,

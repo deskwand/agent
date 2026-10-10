@@ -46,7 +46,7 @@ function CredentialInput({
       spellCheck={false}
       autoComplete="off"
       placeholder={placeholder}
-      className="w-full mt-3 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+      className="w-full mt-3 px-3 py-2 rounded-lg border border-border bg-card font-mono text-xs text-foreground"
     />
   );
 }
@@ -142,17 +142,17 @@ export function KeyDialog({
       }}
     >
       <DialogContent className="max-w-lg p-5">
-        <DialogTitle className="text-sm font-medium text-text-primary">
+        <DialogTitle className="text-sm font-medium text-foreground">
           {t("connectors.keyDialog.title", { name: t(entry.nameKey) })}
         </DialogTitle>
-        <DialogDescription className="text-xs text-text-muted mt-1">
+        <DialogDescription className="text-xs text-muted-foreground mt-1">
           {t(auth.credentialLabelKey)}
           {" · "}
           <a
             href={auth.consoleUrl}
             target="_blank"
             rel="noreferrer"
-            className="text-primary hover:underline"
+            className="text-primary-text hover:underline"
           >
             {t("connectors.keyDialog.consoleLink")}
           </a>
@@ -166,11 +166,11 @@ export function KeyDialog({
           onSubmitKey={() => void submit()}
         />
         {error && (
-          <p role="alert" className="text-xs text-error mt-2">
+          <p role="alert" className="text-xs text-destructive mt-2">
             {error}
           </p>
         )}
-        <p className="text-[11px] text-text-muted mt-2">
+        <p className="text-[11px] text-muted-foreground mt-2">
           {t("connectors.keyDialog.storageHint")}
         </p>
         <div className="flex justify-end gap-2 mt-4">
@@ -178,7 +178,7 @@ export function KeyDialog({
             variant="ghost"
             type="button"
             onClick={onClose}
-            className="h-auto px-3 py-1.5 rounded-lg text-sm font-normal text-text-secondary hover:bg-surface-hover hover:text-text-secondary"
+            className="h-auto px-3 py-1.5 rounded-lg text-sm font-normal text-muted-foreground hover:bg-accent hover:text-muted-foreground"
           >
             {t("connectors.keyDialog.cancel")}
           </Button>
@@ -187,7 +187,7 @@ export function KeyDialog({
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="h-auto px-3 py-1.5 rounded-lg text-sm hover:bg-primary-hover"
+            className="h-auto px-3 py-1.5 rounded-lg text-sm hover:bg-primary/90"
           >
             {t("connectors.keyDialog.submit")}
           </Button>

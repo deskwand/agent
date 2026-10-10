@@ -594,10 +594,10 @@ export function ChatView() {
       : 0;
   const contextRingColorClass =
     contextUsagePercentage > 95
-      ? "text-error"
+      ? "text-destructive"
       : contextUsagePercentage > 80
         ? "text-warning"
-        : "text-primary";
+        : "text-primary-text";
   const showExactUsageDetails = !displayedContextUsage.isEstimated;
   const cacheHitRate =
     showExactUsageDetails &&
@@ -1945,7 +1945,7 @@ export function ChatView() {
 
   if (!activeSession) {
     return (
-      <div className="flex-1 flex items-center justify-center text-text-muted">
+      <div className="flex-1 flex items-center justify-center text-muted-foreground">
         <span>{t("chat.loadingConversation")}</span>
       </div>
     );
@@ -1969,7 +1969,7 @@ export function ChatView() {
             <div className="rounded-full bg-background/85 px-3 py-1 shadow-elevated backdrop-blur-sm">
               <Loader2
                 aria-hidden="true"
-                className="h-4 w-4 animate-spin text-text-muted"
+                className="h-4 w-4 animate-spin text-muted-foreground"
               />
             </div>
           </div>
@@ -1984,11 +1984,11 @@ export function ChatView() {
             className="w-full max-w-[920px] mx-auto py-8 px-5 lg:px-8 space-y-5"
           >
             {mergedTurnEntries.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-28 text-text-muted space-y-3 text-center">
-                <p className="text-xs uppercase tracking-[0.16em] text-text-muted/80">
+              <div className="flex flex-col items-center justify-center py-28 text-muted-foreground space-y-3 text-center">
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground/80">
                   DeskWand
                 </p>
-                <p className="text-base text-text-secondary">
+                <p className="text-base text-muted-foreground">
                   {t(
                     isHydratingHistoryState
                       ? "chat.loadingConversation"
@@ -2054,12 +2054,12 @@ export function ChatView() {
                     <Navigation
                       className={`h-3.5 w-3.5 flex-shrink-0 ${
                         entry.status === "failed"
-                          ? "text-error"
-                          : "text-text-muted"
+                          ? "text-destructive"
+                          : "text-muted-foreground"
                       }`}
                     />
                     <span
-                      className="min-w-0 flex-1 truncate text-text-secondary"
+                      className="min-w-0 flex-1 truncate text-muted-foreground"
                       title={entry.text}
                     >
                       {entry.text}
@@ -2067,8 +2067,8 @@ export function ChatView() {
                     <span
                       className={`flex-shrink-0 ${
                         entry.status === "failed"
-                          ? "text-error"
-                          : "text-text-muted"
+                          ? "text-destructive"
+                          : "text-muted-foreground"
                       }`}
                     >
                       {entry.status === "injecting" && (
@@ -2106,7 +2106,7 @@ export function ChatView() {
           type="button"
           onClick={scrollToBottomByButton}
           aria-label="Scroll to bottom"
-          className={`absolute right-5 lg:right-8 bottom-6 z-20 w-10 h-10 rounded-full bg-surface text-text-secondary hover:bg-surface-hover hover:text-text-primary shadow-elevated transition-all duration-200 flex items-center justify-center ${
+          className={`absolute right-5 lg:right-8 bottom-6 z-20 w-10 h-10 rounded-full bg-card text-muted-foreground hover:bg-accent hover:text-foreground shadow-elevated transition-all duration-200 flex items-center justify-center ${
             showScrollToBottom
               ? "opacity-100 scale-100 pointer-events-auto"
               : "opacity-0 scale-75 pointer-events-none"
@@ -2159,7 +2159,7 @@ export function ChatView() {
                 <Button variant="ghost"
                   type="button"
                   onClick={() => setUseTextInput(true)}
-                  className="rounded-2xl px-3 py-2 text-text-secondary hover:bg-surface-hover h-auto"
+                  className="rounded-2xl px-3 py-2 text-muted-foreground hover:bg-accent h-auto"
                 >
                   {t("voiceMode.useText")}
                 </Button>
@@ -2184,7 +2184,7 @@ export function ChatView() {
               voiceRecording={voice.status === "recording"}
               placeholder={t("chat.typeMessage")}
               cardClassName="p-3.5 rounded-6xl bg-background/50 shadow-elevated"
-              textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-text-primary placeholder:text-text-muted text-sm leading-relaxed py-2 overflow-hidden"
+              textareaClassName="w-full resize-none bg-transparent border-none outline-none focus:ring-0 text-foreground placeholder:text-muted-foreground text-sm leading-relaxed py-2 overflow-hidden"
               bottomSlot={
                 <ChatInputBottomBar
                   onAttach={() => chatInputRef.current?.selectFiles()}

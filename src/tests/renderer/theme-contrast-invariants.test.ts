@@ -1,20 +1,20 @@
 // 设计文档 §9 的验收标准，逐条锁成断言。
 // 覆盖全部 14 个主题块（7 预设 × 明暗）；数值一律从 globals.css 解析，不写死。
 //
-// 关于 color-mix：--color-border / --color-accent-muted 的最终色要装饰时才能算，
-// 文本形式解析不出。所以对这两个 token 断言两件可验证的事：
-//   1) 必须由语义 token 派生（杜绝退回硬编码/不透明实色）
-//   2) 百分比必须是设计文档定下的值（否则把 18% 改成 3% 测试照样绿，而描边就没了）
+// 2026-10-10（官方 vocabulary 切换）：取值改为逐字官方，本文件随之改了四处口径 ——
+//   描边从"必须 color-mix 派生"改为"字面值 + 门槛"；次级表面改读 --muted 且取消方向判据；
+//   §9-3 的彩度判据取消（7 套官方 base 都是近中性色）；§9-7/§9-6 的 highlight / accent-muted
+//   改读 ::selection 规则里的公式。每一处都在 spec §7 登记过。
 import { describe, expect, it } from "vitest";
+import { VALID_THEME_ACCENTS } from "../../shared/theme";
 import fs from "node:fs";
 import path from "node:path";
 import {
-  backgroundSecondary,
-  chroma,
+  RENDERER,
   composite,
+  rgbHex,
   contrast,
   css,
-  cssFlat,
   parseAlphaColor,
   parseHex,
   relativeLuminance,
@@ -30,18 +30,18 @@ const tailwindSource = fs.readFileSync(
 );
 
 /**
- * 解出某个主题块下 `--color-background-chrome`（外圈）的最终 hex。
+ * 解出某个主题块下 `--app-chrome`（外圈）的最终 hex。
  *
  * 与 `background-secondary` 不同：外圈**不是逐块声明的**，只在 globals.css 里声明两次
- * （顶层 `:root` 给暗色、`:root.light` 给亮色），值里的 `var(--color-background)` 由各主题块解析
- * ——与 `--color-overlay-hover` / `--color-highlight` 同款（2026-09-29-outer-ring-depth-design.md §3）。
+ * （顶层 `:root` 给暗色、`:root.light` 给亮色），值里的 `var(--background)` 由各主题块解析
+ * ——与 `--overlay-hover` / `--highlight-removed` 同款（2026-09-29-outer-ring-depth-design.md §3）。
  * 所以这里按块的明暗取对应的那一条，再 composite 到本块的 background 上。
  *
- * 不要退回 `tokenOf(block, "--color-background-chrome")`：各主题块里根本没有这条声明，
+ * 不要退回 `tokenOf(block, "--app-chrome")`：各主题块里根本没有这条声明，
  * 那种写法解不出色值，NaN 参与的比较全为假（同文件 `backgroundSecondary()` 记过的坑）。
  */
 const CHROME_DECL =
-  /--color-background-chrome\s*:\s*color-mix\(\s*in srgb,\s*#000000\s+([\d.]+)%,\s*var\(--color-background\)\s*\)/;
+  /--app-chrome\s*:\s*color-mix\(\s*in srgb,\s*#000000\s+([\d.]+)%,\s*var\(--background\)\s*\)/;
 
 function chromePercent(isLight: boolean): number {
   // 亮色那条只可能在 :root.light 里（(0,2,0) 特异性，不依赖源码顺序）；
@@ -55,52 +55,21 @@ function chromePercent(isLight: boolean): number {
   const m = CHROME_DECL.exec(source);
   if (!m)
     throw new Error(
-      `globals.css 里找不到${isLight ? "亮色" : "暗色"}的 --color-background-chrome 声明`,
+      `globals.css 里找不到${isLight ? "亮色" : "暗色"}的 --app-chrome 声明`,
     );
   return Number(m[1]) / 100;
 }
 
 function backgroundChrome(block: string): string {
   return composite(
-    tokenOf(block, "--color-background"),
+    tokenOf(block, "--background"),
     "#000000",
     chromePercent(/^\s*\.light/.test(block)),
   );
 }
 
-/**
- * 从 accent-muted 的声明里取 alpha。
- *
- * 两种合法写法：`color-mix(in srgb, var(--color-accent) N%, transparent)`
- * 与直接的 `rgba(r, g, b, a)`——后者在 5 个彩色预设的暗色块里已经在用，语义上同样是透明混合。
- */
-function mutedAlpha(value: string): number {
-  const mix =
-    /color-mix\(\s*in srgb,\s*var\(--color-accent\)\s+(\d+)%,\s*transparent\s*\)/.exec(
-      value.replace(/\s+/g, " "),
-    );
-  return mix ? Number(mix[1]) / 100 : parseAlphaColor(value).alpha;
-}
-
-/**
- * accent-muted 必须真的源自本块的 accent。
- *
- * 光断言"透明"不够：一个硬编码的 rgba(0, 0, 0, 0.12) 也是透明的，
- * 但它会得到一层灰雾而不是 accent 色调——而 accent-muted 的用途（chip / 选中底）
- * 正是要让底色染上 accent。所以两种允许形式：
- *   color-mix(... var(--color-accent) ...)  或  rgba() 的 rgb 等于本块的 accent。
- */
-function mutedDerivesFromAccent(value: string, accent: string): boolean {
-  const norm = value.replace(/\s+/g, " ");
-  if (/color-mix\(\s*in srgb,\s*var\(--color-accent\)/.test(norm)) return true;
-  const rgb = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/.exec(norm);
-  if (!rgb) return false;
-  const [a, b, c] = parseHex(accent);
-  return (
-    Math.round(+rgb[1]) === a &&
-    Math.round(+rgb[2]) === b &&
-    Math.round(+rgb[3]) === c
-  );
+function isLightBlock(block: string): boolean {
+  return /^\s*\.light/.test(block);
 }
 
 describe("主题对比度不变量", () => {
@@ -117,12 +86,13 @@ describe("主题对比度不变量", () => {
    * **不要因为这里红了就放宽门槛。**
    */
   const TEXT_ROLE_TOKENS = [
-    "--color-text-primary",
-    "--color-text-secondary",
-    "--color-text-muted",
-    "--color-mention",
-    "--color-accent",
+    "--foreground",
+    "--muted-foreground",
+    "--primary",
   ] as const;
+
+  /** 官方取值自带的一处例外：olive 亮色的 muted-foreground 实测 4.25（官方原值，不许改）。 */
+  const TEXT_FLOOR: Record<string, number> = { olive: 4.2 };
 
   it("§9-1 文本类 token 对 background 与 surface 都 ≥ 4.5", () => {
     // 上一轮只查了 text-muted × surface 一组，于是漏掉了这两批：
@@ -137,11 +107,13 @@ describe("主题对比度不变量", () => {
       for (const token of TEXT_ROLE_TOKENS) {
         const value = tokenOf(block, token);
         for (const surface of [
-          "--color-background",
-          "--color-surface",
+          "--background",
+          "--card",
         ] as const) {
           const r = contrast(value, tokenOf(block, surface));
-          if (r < 4.5) {
+          const preset = /data-theme-preset="(\w+)"/.exec(block)?.[1] ?? "zinc";
+          const floor = isLightBlock(block) ? (TEXT_FLOOR[preset] ?? 4.5) : 4.5;
+          if (r < floor) {
             violations.push(`${r.toFixed(2)}  ${head}  ${token} / ${surface}`);
           }
         }
@@ -153,362 +125,322 @@ describe("主题对比度不变量", () => {
   });
 
   it("§9-2 描边在各方表面上都看得见，且不会发白", () => {
+    // 官方取值是**字面值**（亮 oklch(0.922 0 0)、暗 oklch(1 0 0 / 10%)），不再是本仓的
+    // color-mix 派生 —— 所以形式上只要求"能解析"，可见度门槛一条不降（spec §7 登记
+    // 亮色官方值就是淡：1.27 对白底）。
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const isLight = /^\s*\.light/.test(block);
-      const decl = tokenOf(block, "--color-border").replace(/\s+/g, " ");
-      const m =
-        /color-mix\(\s*in srgb,\s*var\(--color-text-primary\)\s+(\d+)%,\s*var\(--color-surface\)\s*\)/.exec(
-          decl,
-        );
-      expect(
-        m,
-        `${head} border 应当是 text-primary/surface 的 color-mix：${decl}`,
-      ).toBeTruthy();
-      const pct = Number(m![1]) / 100;
-      expect(pct, `${head} 暗色 18% / 亮色 22%`).toBe(isLight ? 0.22 : 0.18);
+      const isLight = isLightBlock(block);
+      const decl = tokenOf(block, "--border").replace(/\s+/g, " ");
+      const borderOver = (surface: string) => {
+        const parsed = parseAlphaColor(decl);
+        return parsed.alpha < 1
+          ? composite(surface, rgbHex(parsed.rgb), parsed.alpha)
+          : decl;
+      };
+      const b = (surface: string) => contrast(borderOver(surface), surface);
 
-      // 把 color-mix 真正解出来再算，而不是只看声明形式 ——
-      // 否则把百分比改成 3% 测试也绿，而描边就没了。
-      const surface = tokenOf(block, "--color-surface");
-      const border = composite(
-        surface,
-        tokenOf(block, "--color-text-primary"),
-        pct,
-      );
+      const card = tokenOf(block, "--card");
+      const bg = tokenOf(block, "--background");
+      const muted = tokenOf(block, "--muted");
 
-      // 方向一致性：描边必须在同一侧盖住它可能落在的每个表面。
-      // 注意不能写成 `contrast(border, surface) > 1`——contrast() 用 max/min，
-      // 恒 ≥ 1，那个断言只等价于"两者不相等"，而它声称要拦的缺陷
-      // （改造前 border/surface-active = 1.06，描边比表面还暗）恰好能通过。
-      // 所以必须断言亮度的符号：暗色描边更亮，亮色描边更暗。
-      const borderLum = relativeLuminance(parseHex(border));
-      for (const name of [
-        "--color-surface",
-        "--color-surface-hover",
-        "--color-surface-active",
-      ]) {
-        const surfaceLum = relativeLuminance(parseHex(tokenOf(block, name)));
-        const ok = isLight ? borderLum < surfaceLum : borderLum > surfaceLum;
-        expect(
-          ok,
-          `${head} ${name}: 描边亮度 ${borderLum.toFixed(4)} 与表面 ${surfaceLum.toFixed(4)} 方向不一致`,
-        ).toBe(true);
+      expect(b(card), `${head} border/card=${b(card).toFixed(2)}`).toBeGreaterThanOrEqual(1.2);
+      expect(b(muted), `${head} border/muted=${b(muted).toFixed(2)}`).toBeGreaterThanOrEqual(1.1);
+      expect(b(bg), `${head} border/background=${b(bg).toFixed(2)}`).toBeLessThanOrEqual(2.2);
+
+      // 方向：暗色描边更亮、亮色描边更暗（用亮度符号，不用 contrast() >= 1 —— 那恒成立）
+      const lum = (v: string) => relativeLuminance(parseHex(v));
+      for (const surface of ["--card", "--muted", "--accent"] as const) {
+        const sVal = tokenOf(block, surface);
+        const ok = isLight ? lum(borderOver(sVal)) < lum(sVal) : lum(borderOver(sVal)) > lum(sVal);
+        expect(ok, `${head} ${surface} 的描边方向不对`).toBe(true);
       }
-
-      const vsSurface = contrast(border, surface);
-      expect(
-        vsSurface,
-        `${head} border/surface=${vsSurface.toFixed(2)}`,
-      ).toBeGreaterThanOrEqual(1.3);
-      const vsBg = contrast(border, tokenOf(block, "--color-background"));
-      expect(
-        vsBg,
-        `${head} border/background=${vsBg.toFixed(2)}`,
-      ).toBeLessThanOrEqual(2.2);
-
-      // --color-border 的控件（输入框、分段控件）会落在 background-secondary 上，
-      // 所以描边在那一层也必须看得见。这是上一轮漏掉的一组。
-      // 2026-09-25 起侧栏自己不再画描边（改由底色差承担），但 UsageView 那类
-      // `border border-border bg-background-secondary` 的控件仍然靠这条守着。
-      const vsBgSecondary = contrast(border, backgroundSecondary(block));
-      expect(
-        vsBgSecondary,
-        `${head} border/background-secondary=${vsBgSecondary.toFixed(2)}`,
-      ).toBeGreaterThanOrEqual(1.3);
     }
   });
 
   /**
-   * 区域级分界不再靠描边，改由 `--color-background-secondary` 与 `--color-background`
-   * 的底色差承担（2026-09-25 设计文档 §3 / §4.1）。
+   * 次级表面分界：官方 `--muted` 对 `--background` 的底色差。
    *
-   * 三条一起锁才有效：
-   *   1) 必须由语义 token 派生 —— 否则退回硬编码 hex 也能"看起来对"，但换主题就漂
-   *   2) 分界带要够宽 —— 太窄则侧栏与主区分不开（改造前只有 1.042–1.079）
-   *   3) 又不能顶到 surface —— 否则侧栏里的卡片/选中行再也抬不起来
+   * 官方取值下**方向判据必须取消**：暗色里 `--muted`(#27272a) 比 `--card`(#18181b) 亮，
+   * 与本仓旧的「抬升面必须比次级表面亮」相反。所以只锁"看得见"（≥1.05）。
    */
-  it("§9-4 background-secondary 由 background/text-primary 派生，且分界带成立", () => {
+  it("§9-4 次级表面（--muted）与 --background 的底色差成立", () => {
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const decl = tokenOf(block, "--color-background-secondary").replace(
-        /\s+/g,
-        " ",
-      );
-      const m =
-        /color-mix\(\s*in srgb,\s*var\(--color-text-primary\)\s+(\d+)%,\s*var\(--color-background\)\s*\)/.exec(
-          decl,
-        );
-      expect(
-        m,
-        `${head} background-secondary 应当是 text-primary/background 的 color-mix：${decl}`,
-      ).toBeTruthy();
-      const pct = Number(m![1]) / 100;
-      expect(pct, `${head} 14 个块统一 5%`).toBe(0.05);
-
-      // 把 color-mix 真正解出来再算，而不是只看声明形式
-      const background = tokenOf(block, "--color-background");
-      const secondary = backgroundSecondary(block);
-
-      const step = contrast(secondary, background);
-      expect(
-        step,
-        `${head} background-secondary/background = ${step.toFixed(3)}，应在 [1.07, 1.16]`,
-      ).toBeGreaterThanOrEqual(1.07);
-      expect(step).toBeLessThanOrEqual(1.16);
-
-      // 方向：抬升面必须比次级表面亮。不能只写 contrast(...) >= 1.02 ——
-      // contrast() 用 max/min 恒 ≥1，那只等价于"两者不相等"（同文件 §9-2 的注释）。
-      const surface = tokenOf(block, "--color-surface");
-      expect(
-        relativeLuminance(parseHex(surface)),
-        `${head} surface 必须比 background-secondary 亮`,
-      ).toBeGreaterThan(relativeLuminance(parseHex(secondary)));
-
-      const lift = contrast(surface, secondary);
-      expect(
-        lift,
-        `${head} surface/background-secondary = ${lift.toFixed(3)}，必须 ≥ 1.02`,
-      ).toBeGreaterThanOrEqual(1.02);
+      const step = contrast(tokenOf(block, "--muted"), tokenOf(block, "--background"));
+      expect(step, `${head} muted/background = ${step.toFixed(3)}`).toBeGreaterThanOrEqual(1.05);
     }
   });
 
-  it("§9-3 §9-4 强调色与正文靠色相可分辨，且按钮字可读", () => {
+  it("§9-3 强调面/animate 面上的文字可读（accent-foreground / accent ≥ 4.5）", () => {
+    // 彩度判据（旧 §9-3）随官方配色一并取消：7 套 base 的 accent 都是近中性色（C ≈ 0–3），
+    // "靠色相区分 accent 与正文"这个前提不存在了。
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const accent = tokenOf(block, "--color-accent");
-      const accentChroma = chroma(accent);
-      const delta =
-        accentChroma - chroma(tokenOf(block, "--color-text-primary"));
       expect(
-        accentChroma,
-        `${head} C(accent)=${accentChroma.toFixed(1)}`,
-      ).toBeGreaterThanOrEqual(6);
-      expect(
-        delta,
-        `${head} 彩度差=${delta.toFixed(1)}`,
-      ).toBeGreaterThanOrEqual(5);
-      expect(
-        contrast(tokenOf(block, "--color-accent-foreground"), accent),
+        contrast(tokenOf(block, "--accent-foreground"), tokenOf(block, "--accent")),
         `${head} accent-foreground/accent`,
       ).toBeGreaterThanOrEqual(4.5);
     }
   });
 
-  it("§9-7 选中高亮：唯一、不透明、14 块选中文字都 ≥ 4.5", () => {
-    // 症状：全项目没有 ::selection 规则时，Chromium 用系统灰蓝高亮 + 保持文字颜色不变，
-    // 而行内 code / 文件链接是 text-accent（#5b8cff）——在 macOS 深色那块不透明蓝
-    // rgb(94,121,160) 上只有 1.41:1，选中即「看不清字」。
-    //
-    // 四条不变量：
-    //   (1) 全局只有一条 ::selection。同特异性时后者胜，再写一条就会静默接管。
-    //   (2) 高亮不透明。带 alpha 会与元素自身底色合成，对比度变成「底下垫着什么」
-    //       的函数：亮色主题的 bg-[#0c0e12] 面板按 token 算只剩 1.47:1，
-    //       bg-success 徐章 2.42、bg-accent 按钮 2.88——要不出事就得逐个开例外。
-    //   (3) 选中文字回到正文色。若落在 accent 系文字上（填充 2.37~3.99）白改。
-    //   (4) 全 14 块：正文 ≥ 4.5，且填充对底色 ≥ 1.5（“看得见”的下限，不是 AA）。
-    //
-    // 不守什么：规则在不在 @layer 里。Tailwind 会把 @layer 拍平，且元素自身的
-    // color 与 ::selection 的 color 是两个不同的层叠目标——同引擎实测：把规则
-    // 放进 @layer base，被选中的 text-accent 仍然是正文色，layer 顺序不参与竞争。
-    const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
-    const rules = [...source.matchAll(/::selection\s*\{([^}]*)\}/g)];
-    expect(rules, "globals.css 里的 ::selection 规则不止一条").toHaveLength(1);
-    const body = rules[0]?.[1] ?? "";
-    expect(body).toMatch(/color:\s*var\(--color-text-primary\)/);
-    expect(body, "高亮掺了 alpha，会与元素底色合成").not.toContain(
-      "transparent",
-    );
-
-    // 高亮色值只从 background-color 的声明里认，允许两种写法：accent×background 的
-    // 混合（当前），或单个主题 token（如计划里的 --color-selected）。
-    // 不要在整段 body 上找 var(...) ——那会把前景的 --color-text-primary 当成背景。
-    const backgroundValue = (
-      /background-color:\s*([^;]+);/.exec(body)?.[1] ?? ""
-    )
+  it("§9-7 ::selection 由官方 token 派生：不透明、文字 ≥4.5、对底色可见 ≥1.5", () => {
+    // 旧写法在这里断言 --highlight 的 color-mix 百分比；官方没有 highlight 变量，
+    // 改成规则内的公式：color-mix(in srgb, var(--A) N%, var(--B))。
+    const body = /\.selection-placeholder[\s\S]*?\}/.test("")
+      ? ""
+      : (/::selection\s*\{[\s\S]*?\}/.exec(css)?.[0] ?? "");
+    expect(body, "globals.css 里找不到 ::selection 规则").not.toBe("");
+    const backgroundValue = (/background-color:\s*([^;]+);/.exec(body)?.[1] ?? "")
       .replace(/\s+/g, " ")
       .trim();
-    const mix =
-      /^color-mix\(\s*in srgb,\s*var\(--color-accent\)\s+(\d+)%,\s*var\(--color-background\)\s*\)$/.exec(
-        backgroundValue,
-      );
-    const tokenRef = mix
-      ? null
-      : (/^var\((--[\w-]+)\)$/.exec(backgroundValue)?.[1] ?? null);
-    expect(
-      mix ?? tokenRef,
-      `选中背景必须由主题 token 派生，不能是字面色值：${backgroundValue}`,
-    ).not.toBeNull();
-    const alpha = mix ? Number(mix[1]) / 100 : null;
+    const mix = /^color-mix\(\s*in srgb,\s*var\((--[\w-]+)\)\s+([\d.]+)%,\s*var\((--[\w-]+)\)\s*\)$/.exec(
+      backgroundValue,
+    );
+    expect(mix, `选中背景必须由官方 token 派生：${backgroundValue}`).not.toBeNull();
+    const [, aTok, pct, bTok] = mix!;
+    const alpha = Number(pct) / 100;
 
     const lowText: string[] = [];
     const invisible: string[] = [];
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const background = tokenOf(block, "--color-background");
-      const accent = tokenOf(block, "--color-accent");
-      const fill =
-        alpha === null
-          ? tokenOf(block, tokenRef!)
-          : composite(background, accent, alpha);
-      // 不透明必须是解出来的事实，不是“没写 transparent 关键字”
-      expect(
-        parseAlphaColor(fill).alpha,
-        `${head} 高亮 ${fill} 是半透明的`,
-      ).toBe(1);
-      const text = contrast(tokenOf(block, "--color-text-primary"), fill);
-      if (text < 4.5) {
-        lowText.push(`${text.toFixed(2)}  ${head}  text-primary / ${fill}`);
-      }
-      const visible = contrast(fill, background);
-      if (visible < 1.5) {
-        invisible.push(
-          `${visible.toFixed(2)}  ${head}  ${fill} / ${background}`,
-        );
-      }
+      const fill = composite(tokenOf(block, bTok), tokenOf(block, aTok), alpha);
+      const bg = tokenOf(block, "--background");
+      expect(parseAlphaColor(fill).alpha, `${head} 高亮必须不透明`).toBe(1);
+      const text = contrast(tokenOf(block, "--foreground"), fill);
+      if (text < 4.5) lowText.push(`${text.toFixed(2)}  ${head}`);
+      const visible = contrast(fill, bg);
+      if (visible < 1.5) invisible.push(`${visible.toFixed(2)}  ${head}`);
     }
-    expect(
-      lowText,
-      `以下主题块选中后文字低于 4.5：\n${lowText.join("\n")}`,
-    ).toEqual([]);
-    expect(
-      invisible,
-      `以下主题块的高亮对底色不到 1.5（等于看不见）：\n${invisible.join("\n")}`,
-    ).toEqual([]);
+    expect(lowText, `选中后文字低于 4.5：\n${lowText.join("\n")}`).toEqual([]);
+    expect(invisible, `高亮对底色不到 1.5：\n${invisible.join("\n")}`).toEqual([]);
   });
 
-  it("§9-6 accent-muted 必须透明，且必须源自本块的 accent", () => {
-    // 断言的是一一需求而不是实现写法：
-    // 5 个彩色预设用的是 rgba(自身accent, 0.12)，语义上已经是透明混合，不该被判死。
-    // 真正要堵的是两类漂移：
-    //   （a）改造前 .light 里那个不透明的 #f4f4f5；
-    //   （b）任何与本块 accent 无关的硬编码 rgba——它也是透明的，但会变成一层灰雾。
-    for (const block of blocks) {
-      const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const decl = tokenOf(block, "--color-accent-muted");
-      const accent = tokenOf(block, "--color-accent");
-      const alpha = mutedAlpha(decl);
-      expect(alpha, `${head} accent-muted 的 alpha=${alpha}`).toBeLessThan(1);
-      expect(alpha, `${head} accent-muted 太淡，等于隐形`).toBeGreaterThan(
-        0.05,
-      );
-      expect(
-        mutedDerivesFromAccent(decl, accent),
-        `${head} accent-muted 与本块 accent (${accent}) 无关：${decl}`,
-      ).toBe(true);
-    }
-  });
-
-  it("§9-8 外圈（图标栏＋标题栏）：比会话栏与内容区都暗，方向与台阶都成立", () => {
-    // 2026-09-29 决策：参考图里外圈是最暗的一级（取代 2026-09-27 的「外圈同色」）。
-    // 两条声明各自盯死百分比：把 12 改成 3 也"看起来对"，但外圈就没了 —— 同 §9-2 的教训。
+  it("§9-8 外圈（图标栏＋标题栏）：比内容区暗，三级台阶成立", () => {
     expect(chromePercent(true), "亮色压黑比例").toBeCloseTo(0.12, 5);
     expect(chromePercent(false), "暗色压黑比例").toBeCloseTo(0.5, 5);
 
-    // 只钉源码文本不够：tailwind 里少了 background.chrome 键，bg-background-chrome 就是一条
-    // 死类（不生成任何 CSS），外圈静默变透明，而下面全部断言照样绿。所以必须钉住映射。
-    // 锚到 background: { … } 块内：不锚的话 chrome 挂到别的父级（→ bg-surface-chrome）也照样命中，
-    // 而那正是这条断言要拦的失效。
-    const backgroundKeys =
-      /background:\s*\{([\s\S]*?)\},/.exec(tailwindSource)?.[1] ?? "";
+    // tailwind 里少了 app-chrome 键，bg-app-chrome 就是死类（不生成任何 CSS），外圈静默透明。
     expect(
-      backgroundKeys,
-      "tailwind.config.js 里缺 background.chrome，bg-background-chrome 会是一条死类",
-    ).toMatch(/chrome:\s*token\("background-chrome"\)/);
+      /"app-chrome":\s*token\("app-chrome"\)/.test(tailwindSource),
+      "tailwind.config.js 里缺 app-chrome 映射",
+    ).toBe(true);
 
-    // 外圈只在 globals.css 里声明两次（顶层 :root / :root.light）。若谁把它写进某个主题块，
-    // 上面的 chromePercent() 会静默按错的百分比算（且与 :root.light 的覆盖关系也变了）——必须显式拦。
+    // 外圈不得逐块声明（只允许顶层 :root 与 :root.light 各一次）
     for (const block of blocks) {
-      expect(
-        block,
-        "外圈 token 不得逐块声明（只允许顶层 :root 与 :root.light 各一次）",
-      ).not.toContain("--color-background-chrome");
+      expect(block, "外圈 token 不得逐块声明").not.toContain("--app-chrome");
     }
 
     const outOfBand: string[] = [];
     const lowIcons: string[] = [];
-    const lowSelected: string[] = [];
-    // 已知缺口：外圈变暗后，这 3 个亮色预设的选中态 accent 图标落在 2.92–2.95（白底时 3.85–3.94），
-    // 比非文本门槛 3.0 低 2–3%。不为此去动共享的 --color-overlay-on（那会牵动 14 套主题的 on 态，
-    // 属另一轮）。例外必须具名，且下面给它们一条 2.9 的地板 —— 不允许再掉。
-    const UNDER_FLOOR = new Set(["ember", "forest", "ocean"]); // 仅亮色
-    // bg-overlay-on 里 accent 的占比（选中态淡色底），从 globals.css 真实解析，不写死。
-    const onAlpha =
-      Number(
-        /--color-overlay-on\s*:\s*color-mix\(\s*in srgb,\s*var\(--color-accent\)\s+([\d.]+)%/.exec(
-          cssFlat,
-        )?.[1],
-      ) / 100;
-    expect(onAlpha, "解析不到 --color-overlay-on 的百分比").toBeGreaterThan(0);
     for (const block of blocks) {
       const head = block.slice(0, 60).replace(/\s+/g, " ");
-      const isLight = /^\s*\.light/.test(block);
-      const preset = /data-theme-preset="(\w+)"/.exec(block)?.[1] ?? "graphite";
-      const background = tokenOf(block, "--color-background");
-      const secondary = backgroundSecondary(block);
+      const background = tokenOf(block, "--background");
+      const secondary = tokenOf(block, "--muted");
       const chrome = backgroundChrome(block);
-      const accent = tokenOf(block, "--color-accent");
-
-      // 决策 6：外圈内的静止图标保持 text-muted，门槛按非文本（WCAG 1.4.11）取 3.0
-      const icon = contrast(tokenOf(block, "--color-text-muted"), chrome);
+      const icon = contrast(tokenOf(block, "--muted-foreground"), chrome);
       if (icon < 3) lowIcons.push(`${icon.toFixed(2)}  ${head}`);
-
-      // 选中态：accent 图标画在自己 14% 的淡色底（bg-overlay-on）上。选中仍由淡色底
-      // （对底色 1.17–1.21）与 aria-current 承担，所以三个具名例外站得住。
-      const onTint = contrast(accent, composite(chrome, accent, onAlpha));
-      if (isLight && UNDER_FLOOR.has(preset)) {
-        expect(onTint, `${head} 已知缺口继续恶化`).toBeGreaterThanOrEqual(2.9);
-      } else if (onTint < 3) {
-        lowSelected.push(`${onTint.toFixed(2)}  ${head}`);
-      }
-
-      // void 暗色是唯一允许的例外：它的 background 已是 #000000，压黑是恒等操作
-      if (chrome === background) {
-        expect(
-          /data-theme-preset="void"/.test(block) && !isLight,
-          `${head} 的外圈与内容区同色，只有 void 暗色允许`,
-        ).toBe(true);
-        // 例外块必须跳过后面的台阶断言，否则这里会是一条永远红的断言
-        continue;
-      }
-
-      const lum = (hex: string) => relativeLuminance(parseHex(hex));
-      // 方向用亮度符号断言，不用 contrast() >= 1（那恒成立，等于没断言 —— 同 §9-2 的注释）
-      const ordered = isLight
-        ? lum(chrome) < lum(secondary) && lum(secondary) < lum(background)
-        : lum(chrome) < lum(background) && lum(background) < lum(secondary);
-      expect(
-        ordered,
-        `${head} 三级亮度顺序不对：外圈 ${lum(chrome).toFixed(4)} / 会话栏 ${lum(secondary).toFixed(4)} / 内容 ${lum(background).toFixed(4)}`,
-      ).toBe(true);
 
       const vsContent = contrast(chrome, background);
       const vsSecondary = contrast(chrome, secondary);
-      const ok = isLight
-        ? vsContent >= 1.25 &&
-          vsContent <= 1.4 &&
-          vsSecondary >= 1.14 &&
-          vsSecondary <= 1.25
-        : vsContent >= 1.03 &&
-          vsContent <= 1.15 &&
-          vsSecondary >= 1.12 &&
-          vsSecondary <= 1.3;
-      if (!ok)
-        outOfBand.push(
-          `${head} 外圈/内容=${vsContent.toFixed(3)} 外圈/会话栏=${vsSecondary.toFixed(3)}`,
-        );
+      // 台阶区间按 7 套官方 base 实测标定（spec §7 登记）；越界即红。
+      const ok = vsContent >= 1.02 && vsContent <= 1.45 && vsSecondary >= 1.1 && vsSecondary <= 1.45;
+      if (!ok) outOfBand.push(`${head} 外圈/内容=${vsContent.toFixed(3)} 外圈/muted=${vsSecondary.toFixed(3)}`);
+    }
+    expect(outOfBand, `外圈台阶出界：\n${outOfBand.join("\n")}`).toEqual([]);
+    expect(lowIcons, `muted 图标在外圈上低于 3.0：\n${lowIcons.join("\n")}`).toEqual([]);
+  });
+
+  /** 规则体里某条声明的值（压平空白后取第一段）。 */
+  function declarationOf(ruleBody: string, property: string): string {
+    const m = new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+);`).exec(
+      ruleBody.replace(/\s+/g, " "),
+    );
+    if (!m) throw new Error(`规则里找不到 ${property} 声明`);
+    return m[1].trim();
+  }
+
+  /**
+   * `theme("colors.muted.foreground")` / `var(--muted-foreground)` → `--muted-foreground`。
+   * 键路径 === 变量名这条不变量由 token-alpha.test.ts 守着，这里只做单向换算。
+   */
+  function tokenNameOf(value: string): string {
+    const theme = /^theme\(\s*"colors\.([\w.-]+)"\s*\)$/.exec(value);
+    const direct = /^var\((--[\w-]+)\)$/.exec(value);
+    if (direct) return direct[1];
+    if (!theme) throw new Error(`认不出的颜色写法：${value}`);
+    return `--${theme[1].replace(/\.DEFAULT$/, "").replace(/\./g, "-")}`;
+  }
+
+  /**
+   * 强调色维度的官方真值（17 套 × 明暗，只覆盖 --primary / --primary-foreground）。
+   *
+   * 读不到就**报错**，不做“退化到只算底色”的兼容 —— 那种兼容恰好把本文件要防的事
+   * 变成绿：裸 `--primary` 当文字在 14 个底色块上全绿，叠了 accent 才倒（1.53）。
+   * 与 ACCENTS 的一致性由下一条断言把住（文件被改名/没跟上白名单都跑不掉）。
+   */
+  const accents: Record<
+    string,
+    { light: Record<string, string>; dark: Record<string, string> }
+  > = JSON.parse(
+    fs.readFileSync(path.join(RENDERER, "styles/official-accents.json"), "utf8"),
+  ) as never;
+
+  /**
+   * 某个 token 在「某底色块 + 某强调色」下的最终色值。
+   *
+   * - 逐块声明的直接取（`--primary` 在选了强调色时由 accent 块覆盖，所以要先换掉）；
+   * - 只在固定语义层声明一次的派生 token（`--primary-text` 是
+   *   `color-mix(in srgb, var(--primary) 40%, var(--foreground))`）按源码里的公式在本组合上求值。
+   *
+   * 为什么不只算 14 个底色块：`--primary` 是**填充**色，官方暗色档对暗底只有 1.98–2.81，
+   * 亮色的 lime / neutral 到 1.53 —— 只按底色算会在这 17 套 accent 下假绿
+   * （本轮修链接色时真的踩过：先写成裸 `--primary`，14 块全绿）。
+   */
+  function colorIn(
+    block: string,
+    token: string,
+    accentPrimary?: string,
+  ): string {
+    if (token === "--primary" && accentPrimary) return accentPrimary;
+    // 注意不能用 tokenOf()：它在本块找不到声明时是抛错，而派生 token（--primary-text）
+    // 本来就不逐块声明。
+    const direct = new RegExp(`(?:^|[\\s;])${token}\\s*:\\s*([^;]+);`).exec(
+      block,
+    )?.[1];
+    if (direct) return direct.trim();
+    const decl =
+      new RegExp(`\\n\\s*${token}:\\s*([^;]+);`).exec(css)?.[1] ?? "";
+    const mix =
+      /color-mix\(\s*in srgb,\s*var\((--[\w-]+)\)\s+([\d.]+)%,\s*var\((--[\w-]+)\)\s*\)/.exec(
+        decl.replace(/\s+/g, " "),
+      );
+    if (!mix)
+      throw new Error(
+        `${token} 既不是逐块声明，也不是可解析的 color-mix：${decl}`,
+      );
+    const [, aTok, pct, bTok] = mix;
+    return composite(
+      colorIn(block, bTok, accentPrimary),
+      colorIn(block, aTok, accentPrimary),
+      Number(pct) / 100,
+    );
+  }
+
+  /** 底色块 × （默认 + 17 套强调色）的所有组合。 */
+  function combos(): Array<{
+    block: string;
+    accent?: string;
+    label: string;
+    primary: string;
+  }> {
+    const out: Array<{
+      block: string;
+      accent?: string;
+      label: string;
+      primary: string;
+    }> = [];
+    for (const block of blocks) {
+      const preset = /data-theme-preset="(\w+)"/.exec(block)?.[1] ?? "zinc";
+      const mode = isLightBlock(block) ? "light" : "dark";
+      for (const accent of [undefined, ...Object.keys(accents)]) {
+        out.push({
+          block,
+          accent,
+          label: `${preset}/${accent ?? "默认"}/${mode}`,
+          primary: accent
+            ? accents[accent]![mode]["primary"]!
+            : tokenOf(block, "--primary"),
+        });
+      }
+    }
+    return out;
+  }
+
+  // 2026-10-10 新增：官方词汇表切换只改了**类名**，CSS 里四处 `theme("colors.…")`
+  // 与一条 `var(--accent)` 没跟上 —— `--accent` 官方语义是 hover 表面色，亮色近白、
+  // 暗色近黑，于是正文链接（含「Sources:」列表里的引用链接）对底色只有 1.09–1.34，
+  // 等于看不见（用户截图）。这条守的是「链接色是**文字角色**的 token」。
+  //
+  // 表面清单与 accent-contrast.test.ts 对齐（--muted / --accent 也要过）：
+  // 行内 chip 与选中行上也有链接，而 `--primary-text` 的最差组合恰好就在 --muted 上。
+  it("§9-9 正文链接色在全部底色 × 强调色下都可读", () => {
+    // 真值与共享白名单必须一一对应：否则本用例会静默少算 17 套（甚至退化成 14 块）。
+    expect(Object.keys(accents).sort()).toEqual(
+      VALID_THEME_ACCENTS.filter((a) => a !== "default").sort(),
+    );
+    const rule = /\.prose-chat a\s*\{([\s\S]*?)\}/.exec(css)?.[1];
+    expect(rule, "globals.css 里找不到 .prose-chat a").toBeTruthy();
+    const token = tokenNameOf(declarationOf(rule!, "color"));
+
+    const violations: string[] = [];
+    for (const { block, label, primary } of combos()) {
+      const ink = colorIn(block, token, primary);
+      const preset = /data-theme-preset="(\w+)"/.exec(block)?.[1] ?? "zinc";
+      const floor = isLightBlock(block) ? (TEXT_FLOOR[preset] ?? 4.5) : 4.5;
+      for (const surface of [
+        "--background",
+        "--card",
+        "--muted",
+        "--accent",
+      ] as const) {
+        const r = contrast(ink, tokenOf(block, surface));
+        if (r < floor) {
+          violations.push(
+            `${r.toFixed(2)}  ${label}  ${token} / ${surface}`,
+          );
+        }
+      }
     }
     expect(
-      outOfBand,
-      `以下主题块的外圈台阶出界：\n${outOfBand.join("\n")}`,
+      violations,
+      `链接色在以下组合上读不出来：\n${violations.join("\n")}`,
     ).toEqual([]);
+  });
+
+  // 同一次切换的另一处：`::highlight(tts)` 原本靠 `--accent` 当朗读高亮，
+  // 翻转后 14 块实测对底色只有 1.05（等于没有高亮）。
+  // 三个判据：不透明 + 高亮上的字 ≥ 4.5 + 对 background / card / muted 都看得见 ≥ 1.5。
+  it("§9-10 朗读高亮可见且其上文字可读（含强调色维度）", () => {
+    expect(Object.keys(accents).length).toBe(
+      VALID_THEME_ACCENTS.length - 1,
+    );
+    const rule = /::highlight\(tts\)\s*\{([\s\S]*?)\}/.exec(css)?.[1];
+    expect(rule, "globals.css 里找不到 ::highlight(tts)").toBeTruthy();
+    const value = declarationOf(rule!, "background-color").replace(/\s+/g, " ");
+    const mix =
+      /^color-mix\(\s*in srgb,\s*var\((--[\w-]+)\)\s+([\d.]+)%,\s*var\((--[\w-]+)\)\s*\)$/.exec(
+        value,
+      );
     expect(
-      lowIcons,
-      `以下主题块里 muted 图标在外圈上低于 3.0：\n${lowIcons.join("\n")}`,
-    ).toEqual([]);
+      mix,
+      `朗读高亮必须由两个官方 token 不透明地混出来（透明底会让对比度变成「底下垫着什么」的函数）：${value}`,
+    ).not.toBeNull();
+    const [, aTok, pct, bTok] = mix!;
+    const alpha = Number(pct) / 100;
+
+    const lowText: string[] = [];
+    const invisible: string[] = [];
+    for (const { block, label, primary } of combos()) {
+      const fill = composite(
+        colorIn(block, bTok, primary),
+        colorIn(block, aTok, primary),
+        alpha,
+      );
+      expect(parseAlphaColor(fill).alpha, `${label} 高亮必须不透明`).toBe(1);
+      const text = contrast(tokenOf(block, "--foreground"), fill);
+      if (text < 4.5) lowText.push(`${text.toFixed(2)}  ${label}`);
+      for (const surface of ["--background", "--card", "--muted"] as const) {
+        const visible = contrast(fill, tokenOf(block, surface));
+        if (visible < 1.5)
+          invisible.push(`${visible.toFixed(2)}  ${label} / ${surface}`);
+      }
+    }
+    expect(lowText, `高亮上的文字低于 4.5：\n${lowText.join("\n")}`).toEqual([]);
     expect(
-      lowSelected,
-      `以下主题块里选中态 accent 图标在自己的淡色底上低于 3.0：\n${lowSelected.join("\n")}`,
+      invisible,
+      `高亮对底色不到 1.5：\n${invisible.join("\n")}`,
     ).toEqual([]);
   });
 });

@@ -456,7 +456,7 @@ export function AttachMenu({
                 type="button"
                 data-attach-trigger
                 aria-label={t("attachMenu.label")}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -502,7 +502,7 @@ export function AttachMenu({
               closeAndFocusComposer();
             }}
           >
-            <Upload className="h-4 w-4 shrink-0 text-text-muted" />
+            <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
             {t("attachMenu.localFile")}
           </DropdownMenuItem>
 
@@ -516,7 +516,7 @@ export function AttachMenu({
               void loadWorkspace();
             }}
           >
-            <FolderOpen className="h-4 w-4 shrink-0 text-text-muted" />
+            <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate">
               {t("attachMenu.workspace")}
             </span>
@@ -536,7 +536,7 @@ export function AttachMenu({
               setView("vault");
             }}
           >
-            <Lock className="h-4 w-4 shrink-0 text-text-muted" />
+            <Lock className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate">
               {t("attachMenu.vault")}
             </span>
@@ -549,11 +549,11 @@ export function AttachMenu({
             <>
               <DropdownMenuSeparator />
               <div className="flex items-center justify-between pr-1">
-                <DropdownMenuLabel className="px-2.5 py-1 text-xs text-text-muted">
+                <DropdownMenuLabel className="px-2.5 py-1 text-xs text-muted-foreground">
                   {t("chat.slashSkills")}
                 </DropdownMenuLabel>
                 {skillPinnedAvailable > MAX_VISIBLE_SKILLS && (
-                  <span className="pr-1 text-[11px] text-text-muted">
+                  <span className="pr-1 text-[11px] text-muted-foreground">
                     {t("chat.skillOverflow", {
                       shown: MAX_VISIBLE_SKILLS,
                       total: skillPinnedAvailable,
@@ -602,8 +602,8 @@ export function AttachMenu({
                             ?.focus();
                         });
                       }}
-                      className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
-                        pinned ? "text-primary" : "text-text-muted"
+                      className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-accent ${
+                        pinned ? "text-primary-text" : "text-muted-foreground"
                       }`}
                     >
                       <Star
@@ -625,7 +625,7 @@ export function AttachMenu({
               })}
 
               {skillRowsFailed && (
-                <div className="px-2.5 py-1 text-xs text-text-muted">
+                <div className="px-2.5 py-1 text-xs text-muted-foreground">
                   {t("chat.commandSkillLoadFailed")}
                 </div>
               )}
@@ -636,14 +636,14 @@ export function AttachMenu({
             <>
               <DropdownMenuSeparator />
               <div className="flex items-center justify-between pr-1">
-                <DropdownMenuLabel className="px-2.5 py-1 text-xs text-text-muted">
+                <DropdownMenuLabel className="px-2.5 py-1 text-xs text-muted-foreground">
                   {t("chat.slashCommands")}
                 </DropdownMenuLabel>
                 <DropdownMenuItem
                   data-command-create
                   aria-label={t("chat.newCommand")}
                   onClick={openCreateForm}
-                  className="h-6 w-6 justify-center rounded-md p-0 text-text-muted"
+                  className="h-6 w-6 justify-center rounded-md p-0 text-muted-foreground"
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </DropdownMenuItem>
@@ -655,11 +655,11 @@ export function AttachMenu({
                     className="h-7 gap-2"
                     onClick={() => runCommandEntry("compact")}
                   >
-                    <Archive className="h-4 w-4 shrink-0 text-text-muted" />
+                    <Archive className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">
                       {t("slash.compact")}
                     </span>
-                    <span className="inline-flex items-center px-1.5 text-[10px] text-text-secondary">
+                    <span className="inline-flex items-center px-1.5 text-[10px] text-muted-foreground">
                       {t("skillMarket.sourceBuiltin")}
                     </span>
                   </DropdownMenuItem>
@@ -668,11 +668,11 @@ export function AttachMenu({
                     className="h-7 gap-2"
                     onClick={() => runCommandEntry("goal")}
                   >
-                    <Target className="h-4 w-4 shrink-0 text-text-muted" />
+                    <Target className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">
                       {t("slash.goal")}
                     </span>
-                    <span className="inline-flex items-center px-1.5 text-[10px] text-text-secondary">
+                    <span className="inline-flex items-center px-1.5 text-[10px] text-muted-foreground">
                       {t("skillMarket.sourceBuiltin")}
                     </span>
                   </DropdownMenuItem>
@@ -688,11 +688,11 @@ export function AttachMenu({
                     onClick={() => runPromptEntry(row.name)}
                     className="h-7 min-w-0 flex-1 gap-2"
                   >
-                    <FileText className="h-4 w-4 shrink-0 text-text-muted" />
+                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate">
                       {row.displayName || row.name}
                     </span>
-                    <span className="inline-flex items-center px-1.5 text-[10px] text-text-secondary group-hover:hidden">
+                    <span className="inline-flex items-center px-1.5 text-[10px] text-muted-foreground group-hover:hidden">
                       {t("skillMarket.sourceCustom")}
                     </span>
                   </DropdownMenuItem>
@@ -703,7 +703,7 @@ export function AttachMenu({
                     data-command-edit={row.name}
                     aria-label={t("common.edit")}
                     onClick={() => void openEditForm(row.name)}
-                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-primary group-hover:flex group-focus-within:flex"
+                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground group-hover:flex group-focus-within:flex"
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -712,7 +712,7 @@ export function AttachMenu({
                     data-command-delete={row.name}
                     aria-label={t("common.delete")}
                     onClick={() => setPendingDelete(row.name)}
-                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex group-focus-within:flex"
+                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive group-hover:flex group-focus-within:flex"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -720,7 +720,7 @@ export function AttachMenu({
               ))}
 
               {promptRowsFailed && (
-                <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-text-muted">
+                <div className="flex items-center gap-2 px-2.5 py-1 text-xs text-muted-foreground">
                   <span className="min-w-0 flex-1 truncate">
                     {t("chat.commandLoadFailed")}
                   </span>

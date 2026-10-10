@@ -64,28 +64,28 @@ export const SubagentSteps = memo(function SubagentSteps({
 
   return (
     <div className="px-3 py-2">
-      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-text-muted">
+      <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {activity.status === "running" ? (
-          <Loader2 className="w-3 h-3 animate-spin text-primary" />
+          <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
         ) : activity.status === "error" ? (
-          <XCircle className="w-3 h-3 text-error" />
+          <XCircle className="w-3 h-3 text-destructive" />
         ) : (
-          <CheckCircle2 className="w-3 h-3 text-text-muted" />
+          <CheckCircle2 className="w-3 h-3 text-muted-foreground" />
         )}
         {t("subagent.stepsTitle")}
         {activity.background && activity.status === "running" && (
-          <span className="normal-case text-primary">
+          <span className="normal-case text-primary-text">
             · {t("subagent.stepsBackground")}
           </span>
         )}
         {activity.name && (
-          <span className="normal-case font-mono text-text-muted">
+          <span className="normal-case font-mono text-muted-foreground">
             @{activity.name}
           </span>
         )}
       </div>
       {activity.current && activity.status === "running" && (
-        <div className="text-xs font-mono text-primary">
+        <div className="text-xs font-mono text-primary-text">
           ◐ {stepLine(activity.current, t)}
         </div>
       )}
@@ -95,17 +95,17 @@ export const SubagentSteps = memo(function SubagentSteps({
           .map((step) => (
             <div
               key={step.id}
-              className="flex items-center gap-1 text-xs font-mono text-text-secondary"
+              className="flex items-center gap-1 text-xs font-mono text-muted-foreground"
             >
               {step.done === false ? (
-                <Circle className="w-3 h-3 flex-shrink-0 text-text-muted" />
+                <Circle className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
               ) : step.isError ? (
-                <XCircle className="w-3 h-3 flex-shrink-0 text-error" />
+                <XCircle className="w-3 h-3 flex-shrink-0 text-destructive" />
               ) : (
-                <CheckCircle2 className="w-3 h-3 flex-shrink-0 text-text-muted" />
+                <CheckCircle2 className="w-3 h-3 flex-shrink-0 text-muted-foreground" />
               )}
               <span className="min-w-0 truncate">{stepLine(step, t)}</span>
-              <span className="flex-shrink-0 text-text-muted">
+              <span className="flex-shrink-0 text-muted-foreground">
                 {step.isError
                   ? `· ${t("subagent.stepFailed")}`
                   : step.durationMs != null
@@ -115,7 +115,7 @@ export const SubagentSteps = memo(function SubagentSteps({
             </div>
           ))}
       </div>
-      <div className="mt-2 border-t pt-2 text-xs text-text-muted">
+      <div className="mt-2 border-t pt-2 text-xs text-muted-foreground">
         {parts.join(" · ")}
       </div>
     </div>

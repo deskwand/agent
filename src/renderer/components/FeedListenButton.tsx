@@ -26,7 +26,7 @@ import { TitlebarButton } from "./TitlebarButton";
 import { Button } from "./app-button";
 
 const CONTROL_CLASS =
-  "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:opacity-40";
+  "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-40";
 
 export function FeedListenButton(): JSX.Element | null {
   const { t } = useTranslation();
@@ -87,7 +87,7 @@ export function FeedListenButton(): JSX.Element | null {
         data-testid="feed-listen-card"
         className="titlebar-no-drag invisible absolute right-0 top-full z-[60] w-[22rem] pt-2 opacity-0 transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
       >
-        <div className="rounded-xl border border-border-subtle bg-background/95 p-2.5 shadow-elevated backdrop-blur">
+        <div className="rounded-xl border border-border/40 bg-background/95 p-2.5 shadow-elevated backdrop-blur">
           <div className="flex gap-2.5">
             {item.imageUrl ? (
               <img
@@ -96,14 +96,14 @@ export function FeedListenButton(): JSX.Element | null {
                 className="h-11 w-11 shrink-0 rounded-lg object-cover"
               />
             ) : (
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-surface-active text-text-muted">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-accent text-muted-foreground">
                 <Headphones className="h-4 w-4" />
               </span>
             )}
             <div className="min-w-0">
               <div
                 data-testid="feed-listen-title"
-                className="text-sm font-semibold leading-[1.4] text-text-primary"
+                className="text-sm font-semibold leading-[1.4] text-foreground"
                 style={{
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
@@ -113,10 +113,10 @@ export function FeedListenButton(): JSX.Element | null {
               >
                 {item.title}
               </div>
-              <div className="mt-0.5 text-xs text-text-muted">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 <span className="truncate">{item.sourceHost}</span>
                 <span className="px-1 opacity-45">·</span>
-                <span className="text-primary">
+                <span className="text-primary-text">
                   {t("feed.listenPosition", {
                     index: session.index + 1,
                     total,
@@ -137,7 +137,7 @@ export function FeedListenButton(): JSX.Element | null {
             </div>
           </div>
           {progress ? (
-            <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-surface-active">
+            <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-accent">
               <div
                 data-testid="feed-listen-progress"
                 className="h-full bg-primary transition-[width] duration-200"
@@ -148,12 +148,12 @@ export function FeedListenButton(): JSX.Element | null {
           {listen.skipped > 0 ? (
             <div
               data-testid="feed-listen-skipped"
-              className="mt-1 text-xs text-error"
+              className="mt-1 text-xs text-destructive"
             >
               {t("feed.listenSkipped", { count: listen.skipped })}
             </div>
           ) : null}
-          <div className="mt-1.5 flex items-center justify-center gap-1 border-t border-border-subtle pt-1.5">
+          <div className="mt-1.5 flex items-center justify-center gap-1 border-t border-border/40 pt-1.5">
             <Button variant="ghost"
               type="button"
               data-testid="feed-listen-prev"
@@ -171,7 +171,7 @@ export function FeedListenButton(): JSX.Element | null {
                 pausable ? t("feed.listenPause") : t("feed.listenPlay")
               }
               onClick={() => feedListenController().toggle()}
-              className={`${CONTROL_CLASS} text-text-primary`}
+              className={`${CONTROL_CLASS} text-foreground`}
             >
               {pausable ? (
                 <Pause className="h-4 w-4" />
@@ -194,7 +194,7 @@ export function FeedListenButton(): JSX.Element | null {
               data-testid="feed-listen-close"
               aria-label={t("feed.listenClose")}
               onClick={() => listen.stop()}
-              className={`${CONTROL_CLASS} hover:text-error`}
+              className={`${CONTROL_CLASS} hover:text-destructive`}
             >
               <X className="h-4 w-4" />
             </Button>

@@ -144,7 +144,7 @@ export function SettingsCapabilities({
                   kind,
                 )
               }
-              className="rounded-control border border-border px-2.5 py-1 text-xs text-text-primary hover:bg-surface-hover h-auto"
+              className="rounded-control border border-border px-2.5 py-1 text-xs text-foreground hover:bg-accent h-auto"
             >
               {t("settings.capabilities.permission.openSettings")}
             </Button>
@@ -199,16 +199,16 @@ export function SettingsCapabilities({
       )}
 
       {loadFailed && (
-        <p className="text-xs text-error" role="alert">
+        <p className="text-xs text-destructive" role="alert">
           {t("settings.capabilities.loadFailed")}
         </p>
       )}
       {actionError && (
-        <p className="text-xs text-error" role="alert">
+        <p className="text-xs text-destructive" role="alert">
           {actionError}
         </p>
       )}
-      {notice && <p className="text-xs text-text-secondary">{notice}</p>}
+      {notice && <p className="text-xs text-muted-foreground">{notice}</p>}
 
       <VoiceCapabilitySettings>{voicePermissions}</VoiceCapabilitySettings>
       <OcrCapabilitySettings />

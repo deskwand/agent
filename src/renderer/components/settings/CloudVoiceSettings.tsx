@@ -31,7 +31,7 @@ export { PRESETS_FOR_UI, PROVIDER_IDS_FOR_UI };
 
 /** 设置卡里没有 raw input 的先例，样式在一处定义，别在 5 个地方各写一遍。 */
 const FIELD_CLASS =
-  "w-64 rounded-control border border-border bg-surface px-2 py-1 text-sm text-text-primary";
+  "w-64 rounded-control border border-border bg-card px-2 py-1 text-sm text-foreground";
 
 const PROVIDERS = [
   {
@@ -257,7 +257,7 @@ export function CloudVoiceSettings({
             <Button variant="ghost"
               type="button"
               data-testid="cloud-preview-button"
-              className="w-20 rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+              className="w-20 rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent disabled:opacity-50"
               onClick={() => {
                 if (preview.state === "playing") preview.stop();
                 else void preview.play(voiceMode.tone ?? "balanced");
@@ -274,7 +274,7 @@ export function CloudVoiceSettings({
                 {/* 四类错误码在这里落成文案（设计 §6「UI 文案与它一一对应」） */}
                 <span
                   data-testid="cloud-preview-error"
-                  className="text-xs text-error"
+                  className="text-xs text-destructive"
                 >
                   {previewError}
                 </span>
@@ -283,7 +283,7 @@ export function CloudVoiceSettings({
                 {preview.errorCode && preview.error && (
                   <span
                     data-testid="cloud-preview-detail"
-                    className="text-xs text-text-muted"
+                    className="text-xs text-muted-foreground"
                   >
                     {preview.error}
                   </span>
@@ -300,7 +300,7 @@ export function CloudVoiceSettings({
           <Button variant="ghost"
             type="button"
             data-testid="cloud-advanced-toggle"
-            className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover"
+            className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent"
             onClick={() => setAdvancedOpen((v) => !v)}
           >
             {advancedOpen
@@ -317,7 +317,7 @@ export function CloudVoiceSettings({
           description={t(`${KEY}.cloud.tierDeclaredNote`)}
           control={
             <div
-              className="text-xs text-text-secondary"
+              className="text-xs text-muted-foreground"
               data-testid="cloud-tier-declared-text"
             >
               {TIERS.map((tone) => (
@@ -350,7 +350,7 @@ export function CloudVoiceSettings({
                   });
                 }}
               />
-              <label className="flex items-center gap-2 text-xs text-text-secondary">
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
                 <input
                   type="checkbox"
                   data-testid="cloud-split-tiers"

@@ -88,7 +88,7 @@ export function OcrCapabilitySettings() {
                 aria-label={t("settings.capabilities.ocr.remove")}
                 disabled={removing}
                 onClick={() => void remove()}
-                className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50 h-auto"
+                className="rounded-control border border-border px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 h-auto"
               >
                 {t("settings.capabilities.install.delete")}
               </Button>
@@ -99,7 +99,7 @@ export function OcrCapabilitySettings() {
                   data-testid="ocr-install"
                   aria-label={t("settings.capabilities.ocr.download")}
                   onClick={() => void window.electronAPI?.ocr.install()}
-                  className="rounded-control bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover h-auto"
+                  className="rounded-control bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 h-auto"
                 >
                   {install?.phase === "error"
                     ? t("settings.capabilities.install.retry")

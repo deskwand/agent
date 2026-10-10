@@ -14,9 +14,9 @@ const noticeToneClass: Record<
   GlobalNotice["type"],
   { border: string; text: string }
 > = {
-  info: { border: "border-border", text: "text-text-primary" },
+  info: { border: "border-border", text: "text-foreground" },
   warning: { border: "border-warning/50", text: "text-warning" },
-  error: { border: "border-error/50", text: "text-error" },
+  error: { border: "border-destructive/50", text: "text-destructive" },
   success: { border: "border-success/50", text: "text-success" },
 };
 
@@ -61,7 +61,7 @@ export function GlobalNoticeToast({ notice, onDismiss, onAction }: Props) {
           <Button variant="ghost"
             type="button"
             onClick={onDismiss}
-            className="text-text-muted hover:text-text-primary transition-colors h-auto"
+            className="text-muted-foreground hover:text-foreground transition-colors h-auto"
             aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
@@ -72,7 +72,7 @@ export function GlobalNoticeToast({ notice, onDismiss, onAction }: Props) {
             <Button variant="ghost"
               type="button"
               onClick={() => onAction(noticeAction)}
-              className="w-full rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/20 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
+              className="w-full rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary-text hover:bg-primary/20 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
             >
               {actionLabel}
             </Button>

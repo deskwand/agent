@@ -41,16 +41,16 @@ export function SkillMdModal({
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="w-full max-w-2xl rounded-xl border border-border bg-surface shadow-elevated animate-slide-up">
-        <div className="flex items-center justify-between px-5 py-3 border-b border-border-muted">
-          <h3 className="text-sm font-semibold text-text-primary truncate pr-4">
+      <div className="w-full max-w-2xl rounded-xl border border-border bg-card shadow-elevated animate-slide-up">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-border/60">
+          <h3 className="text-sm font-semibold text-foreground truncate pr-4">
             {title}
           </h3>
           <Button variant="ghost"
             onClick={onClose}
-            className="p-1 rounded-md hover:bg-surface-hover transition-colors shrink-0 h-auto"
+            className="p-1 rounded-md hover:bg-accent transition-colors shrink-0 h-auto"
           >
-            <X className="w-4 h-4 text-text-muted" />
+            <X className="w-4 h-4 text-muted-foreground" />
           </Button>
         </div>
         <div className="p-5 max-h-[60vh] overflow-y-auto">
@@ -58,10 +58,10 @@ export function SkillMdModal({
             <MessageMarkdown normalizedText={content} />
           ) : loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              <Loader2 className="w-5 h-5 text-primary-text animate-spin" />
             </div>
           ) : (
-            <p className="text-sm text-text-muted text-center py-8">
+            <p className="text-sm text-muted-foreground text-center py-8">
               {t("skillMarket.noContent")}
             </p>
           )}

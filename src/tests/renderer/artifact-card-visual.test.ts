@@ -115,7 +115,7 @@ describe("ArtifactCard visual hierarchy", () => {
     expect(cards).toHaveLength(1);
     const cardEl = cards[0].closest(".rounded-xl");
     expect(cardEl).not.toBeNull();
-    expect(cardEl?.classList.contains("border-border-subtle")).toBe(true);
+    expect(cardEl?.classList.contains("border-border/40")).toBe(true);
   });
 
   it("shows file extension badges instead of paperclip/file icons", async () => {

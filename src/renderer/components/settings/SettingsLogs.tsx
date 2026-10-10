@@ -161,7 +161,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
     <div className="space-y-4">
       {/* Error/Success Messages */}
       {error && (
-        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-error/10 text-error text-sm">
+        <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-destructive/10 text-destructive text-sm">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           {error}
         </div>
@@ -174,13 +174,13 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
       )}
 
       {/* Developer Logs Toggle */}
-      <section className="rounded-2xl border border-border-subtle bg-background px-4 py-4">
+      <section className="rounded-2xl border border-border/40 bg-background px-4 py-4">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <h4 className="text-sm font-semibold text-text-primary">
+            <h4 className="text-sm font-semibold text-foreground">
               {t("logs.enableDevLogs")}
             </h4>
-            <p className="mt-1 text-xs leading-5 text-text-muted">
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
               {t("logs.enableDevLogsDesc")}
             </p>
           </div>
@@ -188,11 +188,11 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
             onClick={handleToggleDevLogs}
             disabled={isLoading}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 flex-shrink-0 ${
-              devLogsEnabled ? "bg-primary" : "bg-surface-muted"
+              devLogsEnabled ? "bg-primary" : "bg-muted"
             }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-text-primary transition-transform ${
+              className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
                 devLogsEnabled ? "translate-x-6" : "translate-x-1"
               }`}
             />
@@ -206,17 +206,17 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
         description={t("logs.inventoryDescription")}
       >
         <div className="grid grid-cols-2 gap-3">
-          <div className="p-4 rounded-xl bg-background border border-border-subtle">
-            <div className="text-2xl font-bold text-text-primary">
+          <div className="p-4 rounded-xl bg-background border border-border/40">
+            <div className="text-2xl font-bold text-foreground">
               {logFiles.length}
             </div>
-            <div className="text-sm text-text-muted">{t("logs.logFiles")}</div>
+            <div className="text-sm text-muted-foreground">{t("logs.logFiles")}</div>
           </div>
-          <div className="p-4 rounded-xl bg-background border border-border-subtle">
-            <div className="text-2xl font-bold text-text-primary">
+          <div className="p-4 rounded-xl bg-background border border-border/40">
+            <div className="text-2xl font-bold text-foreground">
               {formatFileSize(totalSize)}
             </div>
-            <div className="text-sm text-text-muted">{t("logs.totalSize")}</div>
+            <div className="text-sm text-muted-foreground">{t("logs.totalSize")}</div>
           </div>
         </div>
       </SettingsContentSection>
@@ -227,7 +227,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
         description={t("logs.recentDescription")}
       >
         {logFiles.length === 0 ? (
-          <div className="text-center py-8 text-text-muted">
+          <div className="text-center py-8 text-muted-foreground">
             <AlertCircle className="w-10 h-10 mx-auto mb-3 opacity-50" />
             <p>{t("logs.noLogFiles")}</p>
           </div>
@@ -236,14 +236,14 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
             {logFiles.map((file) => (
               <div
                 key={file.path}
-                className="p-3 rounded-xl bg-background border border-border-subtle"
+                className="p-3 rounded-xl bg-background border border-border/40"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <div className="font-mono text-sm text-text-primary truncate">
+                    <div className="font-mono text-sm text-foreground truncate">
                       {file.name}
                     </div>
-                    <div className="text-xs text-text-muted mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       {formatFileSize(file.size)} • {formatDate(file.mtime)}
                     </div>
                   </div>
@@ -260,13 +260,13 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
           title={t("logs.logsDirectory")}
           description={t("logs.directoryDescription")}
         >
-          <div className="p-3 rounded-xl bg-background border border-border-subtle">
-            <div className="text-xs text-text-muted mb-1">
+          <div className="p-3 rounded-xl bg-background border border-border/40">
+            <div className="text-xs text-muted-foreground mb-1">
               {t("logs.logsDirectory")}
             </div>
             <div className="flex items-start gap-2">
               <Button variant="ghost"
-                className="font-mono text-xs text-text-secondary break-all text-left hover:text-primary hover:underline cursor-pointer bg-transparent border-none p-0 h-auto"
+                className="font-mono text-xs text-muted-foreground break-all text-left hover:text-primary-text hover:underline cursor-pointer bg-transparent border-none p-0 h-auto"
                 onClick={() => window.electronAPI.logs.open()}
                 title={t("logs.openFolder")}
               >
@@ -275,7 +275,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button variant="ghost"
-                    className="shrink-0 p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors h-auto"
+                    className="shrink-0 p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors h-auto"
                     onClick={() => navigator.clipboard.writeText(logsDirectory)}
                     aria-label={t("common.copy")}
                   >
@@ -302,7 +302,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
           <Button variant="ghost"
             onClick={handleExport}
             disabled={isLoading}
-            className="py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
+            className="py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -314,7 +314,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
           <Button variant="ghost"
             onClick={handleOpen}
             disabled={isLoading}
-            className="py-3 px-4 rounded-lg bg-background border border-border-subtle text-text-primary font-medium hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
+            className="py-3 px-4 rounded-lg bg-background border border-border/40 text-foreground font-medium hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
           >
             <Globe className="w-4 h-4" />
             <span className="text-sm">{t("logs.openFolder")}</span>
@@ -322,7 +322,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
           <Button variant="ghost"
             onClick={handleClear}
             disabled={isLoading || logFiles.length === 0}
-            className="py-3 px-4 rounded-lg bg-error/10 text-error font-medium hover:bg-error/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
+            className="py-3 px-4 rounded-lg bg-destructive/10 text-destructive font-medium hover:bg-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
           >
             <Trash2 className="w-4 h-4" />
             <span className="text-sm">{t("logs.clearAll")}</span>
@@ -331,7 +331,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
       </SettingsContentSection>
 
       {/* Help Text */}
-      <div className="text-xs text-text-muted text-center space-y-1">
+      <div className="text-xs text-muted-foreground text-center space-y-1">
         <p>{t("logs.helpText1")}</p>
         <p>{t("logs.helpText2")}</p>
       </div>

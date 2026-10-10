@@ -51,11 +51,11 @@ export function ChatInputQueueBar({
       {items.map((item) => (
         <li
           key={item.id}
-          className="flex items-center gap-2 rounded-lg bg-surface-hover/60 px-2.5 py-1.5 text-xs"
+          className="flex items-center gap-2 rounded-lg bg-accent/60 px-2.5 py-1.5 text-xs"
         >
-          <MessageSquareDashed className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
+          <MessageSquareDashed className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
           <span
-            className="min-w-0 flex-1 truncate text-text-primary"
+            className="min-w-0 flex-1 truncate text-foreground"
             title={item.text}
           >
             {displayText(item.text)}
@@ -65,7 +65,7 @@ export function ChatInputQueueBar({
               <span
                 key={`img-${index}`}
                 title={t("steer.imageAttachment")}
-                className="flex items-center gap-1 rounded bg-background/60 px-1.5 py-0.5 text-text-muted"
+                className="flex items-center gap-1 rounded bg-background/60 px-1.5 py-0.5 text-muted-foreground"
               >
                 <ImageIcon className="h-3 w-3" />
                 <span className="max-w-[5rem] truncate">
@@ -77,7 +77,7 @@ export function ChatInputQueueBar({
               <span
                 key={`file-${index}`}
                 title={file.filename}
-                className="flex items-center gap-1 rounded bg-background/60 px-1.5 py-0.5 text-text-muted"
+                className="flex items-center gap-1 rounded bg-background/60 px-1.5 py-0.5 text-muted-foreground"
               >
                 <FileText className="h-3 w-3" />
                 <span className="max-w-[5rem] truncate">{file.filename}</span>
@@ -87,7 +87,7 @@ export function ChatInputQueueBar({
               <span
                 key={`${selection.pageUrl}|${selection.selector}`}
                 title={selection.selector}
-                className="max-w-[8rem] truncate rounded bg-background/60 px-1.5 py-0.5 text-text-muted"
+                className="max-w-[8rem] truncate rounded bg-background/60 px-1.5 py-0.5 text-muted-foreground"
               >
                 {selection.tag}
                 {selection.classes[0] ? `.${selection.classes[0]}` : ""}
@@ -103,7 +103,7 @@ export function ChatInputQueueBar({
               <Button variant="ghost"
                 type="button"
                 disabled={isRunning && Boolean(item.elSelections?.length)}
-                className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-primary/15 text-primary hover:bg-primary/25 transition-[background-color] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed h-auto"
+                className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[background-color] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed h-auto"
                 onClick={() => onSteer(item.id)}
               >
                 <Navigation className="h-3 w-3" />
@@ -119,7 +119,7 @@ export function ChatInputQueueBar({
           <Button variant="ghost"
             type="button"
             aria-label={t("steer.remove")}
-            className="flex-shrink-0 rounded p-1 text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors h-auto"
+            className="flex-shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors h-auto"
             onClick={() => onRemove(item.id)}
           >
             <X className="h-3.5 w-3.5" />

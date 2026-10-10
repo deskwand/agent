@@ -51,7 +51,7 @@ function CodeRow({
 
   return (
     <div style={style} className="flex text-xs leading-5">
-      <div className="text-right pr-3 select-none w-10 shrink-0 text-text-muted">
+      <div className="text-right pr-3 select-none w-10 shrink-0 text-muted-foreground">
         {index + 1}
       </div>
       <div className="flex-1 overflow-hidden whitespace-pre">
@@ -234,9 +234,9 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
   const isMarkdown = [".md", ".mdx", ".markdown"].includes(ext);
 
   return (
-    <div className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden bg-background-secondary">
+    <div className="flex h-full w-full min-w-0 flex-1 flex-col overflow-hidden bg-muted">
       {/* Tab strip */}
-      <div className="flex h-9 shrink-0 items-stretch gap-0.5 overflow-x-auto bg-background-secondary px-2">
+      <div className="flex h-9 shrink-0 items-stretch gap-0.5 overflow-x-auto bg-muted px-2">
         {previewTabs.map((item) => {
           const isActive = item.path === activePreviewTab;
           // 标签只需按扩展名区分视频，避免为了选图标去读每个标签的文件。
@@ -249,8 +249,8 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
               data-active={String(isActive)}
               className={`group flex min-w-0 max-w-[180px] shrink-0 items-center gap-1 self-center rounded-lg pl-2 pr-1 py-1 transition-colors ${
                 isActive
-                  ? "bg-surface text-text-primary"
-                  : "text-text-secondary hover:bg-surface-hover"
+                  ? "bg-card text-foreground"
+                  : "text-muted-foreground hover:bg-accent"
               }`}
             >
               <TabIcon className="h-3.5 w-3.5 shrink-0" />
@@ -267,7 +267,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
                 data-testid="preview-tab-close"
                 aria-label={t("common.close")}
                 onClick={() => closePreviewTab(item.path)}
-                className={`shrink-0 rounded-md p-0.5 transition-colors hover:bg-surface-hover focus-visible:opacity-100 ${
+                className={`shrink-0 rounded-md p-0.5 transition-colors hover:bg-accent focus-visible:opacity-100 ${
                   isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
               >
@@ -281,7 +281,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
       {/* Path row */}
       <div className="flex shrink-0 items-center gap-2 px-3 py-1.5">
         <span
-          className="min-w-0 flex-1 truncate text-xs text-text-muted"
+          className="min-w-0 flex-1 truncate text-xs text-muted-foreground"
           title={filePath}
         >
           {filePath}
@@ -289,7 +289,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
         <Button variant="ghost"
           type="button"
           onClick={handleOpenExternal}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary h-auto"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground h-auto"
         >
           <ExternalLink className="h-3.5 w-3.5" />
           {t("filePreview.openExternal")}
@@ -297,7 +297,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 flex-col overflow-hidden bg-background-secondary p-4 min-h-0">
+      <div className="flex flex-1 flex-col overflow-hidden bg-muted p-4 min-h-0">
         {isVideo ? (
           <VideoPlayer
             filePath={filePath}
@@ -308,14 +308,14 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
           />
         ) : loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin text-text-muted mr-2" />
-            <span className="text-sm text-text-muted">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mr-2" />
+            <span className="text-sm text-muted-foreground">
               {t("filePreview.loading")}
             </span>
           </div>
         ) : !result ? null : result.type === "error" ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2">
-            <span className="text-sm text-text-muted">{result.message}</span>
+            <span className="text-sm text-muted-foreground">{result.message}</span>
           </div>
         ) : result.type === "image" ? (
           <div className="flex-1 overflow-y-auto flex items-center justify-center min-h-[200px]">
@@ -327,7 +327,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
           </div>
         ) : isMarkdown ? (
           <div className="flex-1 overflow-y-auto">
-            <div className="prose-chat text-text-primary">
+            <div className="prose-chat text-foreground">
               <ReactMarkdown
                 remarkPlugins={
                   REMARK_PLUGINS as unknown as Parameters<

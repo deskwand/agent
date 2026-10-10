@@ -59,7 +59,7 @@ function RemoveButton({
         event.stopPropagation();
         onClick();
       }}
-      className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-error text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100 hover:bg-transparent hover:text-current"
+      className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100 hover:bg-transparent hover:text-current"
     >
       <X className="h-3 w-3" />
     </Button>
@@ -97,17 +97,17 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
               <Button variant="ghost"
                 type="button"
                 onClick={tile.onOpen}
-                className="flex h-full w-full flex-col items-start justify-between gap-1 p-2 text-left transition-colors hover:bg-surface-hover"
+                className="flex h-full w-full flex-col items-start justify-between gap-1 p-2 text-left transition-colors hover:bg-accent"
               >
-                <MousePointerSquareDashed className="h-4 w-4 text-text-muted" />
-                <span className="line-clamp-2 break-all text-xs font-medium text-text-primary">
+                <MousePointerSquareDashed className="h-4 w-4 text-muted-foreground" />
+                <span className="line-clamp-2 break-all text-xs font-medium text-foreground">
                   {tile.title}
                 </span>
-                <span className="line-clamp-2 text-[10px] text-text-muted">
+                <span className="line-clamp-2 text-[10px] text-muted-foreground">
                   {tile.summary}
                 </span>
                 {tile.badge ? (
-                  <span className="rounded bg-surface-muted px-1 py-0.5 text-[10px] text-text-muted">
+                  <span className="rounded bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">
                     {t(tile.badge)}
                   </span>
                 ) : null}
@@ -122,13 +122,13 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
             key={tile.key}
             title={tile.hint}
             onClick={tile.onOpen}
-            className={`${TILE_CLASS} flex flex-col items-center justify-center bg-surface-muted px-2${tile.onOpen ? " cursor-pointer hover:bg-surface-hover" : ""}`}
+            className={`${TILE_CLASS} flex flex-col items-center justify-center bg-muted px-2${tile.onOpen ? " cursor-pointer hover:bg-accent" : ""}`}
           >
             <FileText
-              className="h-6 w-6 shrink-0 text-text-muted"
+              className="h-6 w-6 shrink-0 text-muted-foreground"
               aria-hidden="true"
             />
-            <span className="mt-1.5 line-clamp-2 w-full break-all text-center text-[11px] leading-tight text-text-primary">
+            <span className="mt-1.5 line-clamp-2 w-full break-all text-center text-[11px] leading-tight text-foreground">
               {tile.name}
             </span>
             <RemoveButton label={removeLabel} onClick={tile.onRemove} />

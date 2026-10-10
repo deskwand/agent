@@ -71,7 +71,7 @@ function VaultPathLabel({ path }: { path: string }): JSX.Element {
   const { dir, name } = splitRelPath(path);
   return (
     <>
-      {dir ? <span className="text-text-muted">{`${dir}/`}</span> : null}
+      {dir ? <span className="text-muted-foreground">{`${dir}/`}</span> : null}
       {name}
     </>
   );
@@ -707,15 +707,15 @@ export function VaultView(): JSX.Element {
             type="button"
             onClick={() => setActiveView("chat")}
             aria-label={t("common.back")}
-            className="p-1.5 -ml-1.5 rounded-lg hover:bg-surface-hover transition-colors"
+            className="p-1.5 -ml-1.5 rounded-lg hover:bg-accent transition-colors"
           >
-            <ArrowLeft className="w-5 h-5 text-text-secondary" />
+            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-text-primary">
+            <h1 className="text-xl font-semibold text-foreground">
               {t("vault.title")}
             </h1>
-            <p className="mt-1 text-sm text-text-muted">
+            <p className="mt-1 text-sm text-muted-foreground">
               {t("vault.subtitle")}
             </p>
           </div>
@@ -733,14 +733,14 @@ export function VaultView(): JSX.Element {
               <button
                 type="button"
                 aria-label={syncActionLabel}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => void handleSync()}
                 disabled={syncDisabled}
               >
                 {syncFeedback === "success" ? (
                   <Check className="h-4 w-4 text-success" />
                 ) : syncFeedback === "error" ? (
-                  <AlertTriangle className="h-4 w-4 text-error" />
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
                 ) : (
                   <RefreshCw
                     className={`h-4 w-4 ${
@@ -786,7 +786,7 @@ export function VaultView(): JSX.Element {
                         type="button"
                         aria-label={t("vault.menu.more")}
                         disabled={busy}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <MoreHorizontal className="h-4 w-4" />
                       </button>
@@ -803,16 +803,16 @@ export function VaultView(): JSX.Element {
                   // 宽度压回原值（原为 min-w-64 ✗，Radix 默认 w-72 ✗）
                   className="min-w-64"
                 >
-                  {/* 原 MENU_LABEL_CLASS = px-2.5 py-1 text-xs text-text-muted ✓ */}
-                  <DropdownMenuLabel className="px-2.5 py-1 text-xs text-text-muted">
+                  {/* 原 MENU_LABEL_CLASS = px-2.5 py-1 text-xs text-muted-foreground ✓ */}
+                  <DropdownMenuLabel className="px-2.5 py-1 text-xs text-muted-foreground">
                     {t("vault.menu.advanced")}
                   </DropdownMenuLabel>
                   {/* 危险动作：vendored 的 DropdownMenuItem **没有** variant prop ✓
                       （计划 5 已核实它只有 inset ✗）→ 逐字照抄原 MENU_ITEM_DANGER_CLASS
-                      的值 = text-error hover:bg-error/10 ✓ */}
+                      的值 = text-destructive hover:bg-destructive/10 ✓ */}
                   <DropdownMenuItem
                     ref={advancedResetRef}
-                    className="h-7 gap-2 text-error hover:bg-error/10"
+                    className="h-7 gap-2 text-destructive hover:bg-destructive/10"
                     onClick={handleAdvancedReset}
                   >
                     {t("vault.reset.discard")}
@@ -825,14 +825,14 @@ export function VaultView(): JSX.Element {
       </header>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error">
+        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
 
       {syncFeedback === "error" && syncFeedbackMessage && (
         <div
-          className="mt-4 flex items-center justify-between rounded-lg border border-error/30 bg-error/10 px-3 py-2 text-sm text-error"
+          className="mt-4 flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
           role="status"
         >
           <span>{syncFeedbackMessage}</span>
@@ -854,7 +854,7 @@ export function VaultView(): JSX.Element {
 
       {showFiles ? (
         <>
-          <div className="mt-5 flex gap-1 border-b border-border-subtle">
+          <div className="mt-5 flex gap-1 border-b border-border/40">
             {FILTERS.map((item) => (
               <button
                 type="button"
@@ -862,8 +862,8 @@ export function VaultView(): JSX.Element {
                 onClick={() => setFilter(item)}
                 className={`border-b-2 px-3 py-2 text-sm ${
                   filter === item
-                    ? "border-primary text-text-primary"
-                    : "border-transparent text-text-muted hover:text-text-secondary"
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-muted-foreground"
                 }`}
               >
                 {t(`vault.filter.${item}`)}
@@ -874,9 +874,9 @@ export function VaultView(): JSX.Element {
           {showFiles && filter === "skills" && selectedSkills.size > 0 && (
             <div
               data-testid="skills-action-bar"
-              className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl border border-primary bg-primary-muted px-3 py-2"
+              className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl border border-primary bg-primary/10 px-3 py-2"
             >
-              <span className="text-xs font-medium text-text-primary">
+              <span className="text-xs font-medium text-foreground">
                 {t("vault.skills.selectedCount", {
                   count: selectedSkills.size,
                 })}
@@ -884,7 +884,7 @@ export function VaultView(): JSX.Element {
               <span className="flex-1" />
               <button
                 type="button"
-                className="rounded-lg border border-border-subtle px-3 py-1 text-xs text-text-primary hover:bg-surface-hover"
+                className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-accent"
                 onClick={() => setSelectedSkills(new Set())}
               >
                 {t("vault.skills.clearSelection")}
@@ -902,10 +902,10 @@ export function VaultView(): JSX.Element {
 
           {pendingLinkConfirm && (
             <div className="mt-3 rounded-xl border border-warning bg-warning/10 p-3">
-              <p className="text-sm font-medium text-text-primary">
+              <p className="text-sm font-medium text-foreground">
                 {t("vault.skills.addNeedsConfirm")}
               </p>
-              <p className="mt-1 text-xs text-text-secondary">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {t("vault.skills.addNeedsConfirmHint", {
                   count: pendingLinkConfirm.reduce(
                     (total, entry) => total + entry.symlinkedEntries.length,
@@ -913,10 +913,10 @@ export function VaultView(): JSX.Element {
                   ),
                 })}
               </p>
-              <p className="mt-2 text-xs text-text-muted">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {t("vault.skills.symlinked")}
               </p>
-              <ul className="mb-2 list-inside list-disc text-xs text-text-muted">
+              <ul className="mb-2 list-inside list-disc text-xs text-muted-foreground">
                 {pendingLinkConfirm.map((entry) => (
                   <li key={entry.name}>
                     {entry.name} · {entry.symlinkedEntries.length}
@@ -927,7 +927,7 @@ export function VaultView(): JSX.Element {
                 <button
                   type="button"
                   disabled={busy}
-                  className="rounded-lg border border-border-subtle px-3 py-1 text-xs text-text-primary hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg border border-border/40 px-3 py-1 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => setPendingLinkConfirm(null)}
                 >
                   {t("vault.skills.cancelAdd")}
@@ -950,7 +950,7 @@ export function VaultView(): JSX.Element {
           )}
 
           {filter === "skills" && skillAddResult && (
-            <div className="mt-3 flex items-center justify-between rounded-lg border border-border-subtle px-3 py-2 text-xs text-text-secondary">
+            <div className="mt-3 flex items-center justify-between rounded-lg border border-border/40 px-3 py-2 text-xs text-muted-foreground">
               <span>{skillAddResult}</span>
               <button
                 type="button"
@@ -964,7 +964,7 @@ export function VaultView(): JSX.Element {
 
           {filter === "files" && (
             <div className="flex items-center justify-between py-3">
-              <div className="flex flex-col gap-0.5 text-xs text-text-muted">
+              <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
                 <span>
                   {t("vault.fileCount", { count: visibleItems.length })}
                 </span>
@@ -1014,21 +1014,21 @@ export function VaultView(): JSX.Element {
                   value={skillQuery}
                   onChange={(event) => setSkillQuery(event.target.value)}
                   placeholder={t("vault.skills.searchPlaceholder")}
-                  className="w-full rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-text-primary h-auto shadow-none"
+                  className="w-full rounded-lg border border-border/40 bg-card px-2.5 py-1.5 text-xs text-foreground h-auto shadow-none"
                 />
 
                 <div className="flex flex-col gap-1">
-                  <p className="text-xs font-medium text-text-muted">
+                  <p className="text-xs font-medium text-muted-foreground">
                     {t("vault.skills.groupVault", {
                       count: vaultSkillRows.length,
                     })}
                   </p>
                   {vaultSkillRows.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-text-muted">
+                    <p className="py-6 text-center text-sm text-muted-foreground">
                       {t("vault.skills.empty")}
                     </p>
                   ) : (
-                    <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+                    <div className="divide-y divide-border/40 rounded-xl border border-border/40">
                       {vaultSkillRows.map((skill) => (
                         <article
                           key={skill.name}
@@ -1036,10 +1036,10 @@ export function VaultView(): JSX.Element {
                         >
                           <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-medium text-text-primary">
+                            <p className="truncate text-sm font-medium text-foreground">
                               {skill.name}
                             </p>
-                            <p className="mt-1 text-xs text-text-muted">
+                            <p className="mt-1 text-xs text-muted-foreground">
                               {t("vault.skills.summary", {
                                 count: skill.fileCount,
                                 size: formatSize(skill.totalBytes),
@@ -1047,7 +1047,7 @@ export function VaultView(): JSX.Element {
                               · {statusText(skill.syncStatus, t)}
                             </p>
                             {skill.syncStatus === "pending" && (
-                              <p className="mt-0.5 text-xs text-text-muted">
+                              <p className="mt-0.5 text-xs text-muted-foreground">
                                 {t("vault.skills.pendingHint")}
                               </p>
                             )}
@@ -1058,7 +1058,7 @@ export function VaultView(): JSX.Element {
                             aria-label={t("vault.skills.delete", {
                               name: skill.name,
                             })}
-                            className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
+                            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50"
                             onClick={() =>
                               setPendingConfirmation({
                                 kind: "delete-skill",
@@ -1075,39 +1075,39 @@ export function VaultView(): JSX.Element {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <p className="text-xs font-medium text-text-muted">
+                  <p className="text-xs font-medium text-muted-foreground">
                     {t("vault.skills.groupAddable", {
                       count: addableRows.length,
                     })}
                   </p>
                   {addableRows.length === 0 ? (
-                    <p className="py-6 text-center text-sm text-text-muted">
+                    <p className="py-6 text-center text-sm text-muted-foreground">
                       {skillQuery
                         ? t("vault.skills.noMatch")
                         : t("vault.skills.noAddable")}
                     </p>
                   ) : (
-                    <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+                    <div className="divide-y divide-border/40 rounded-xl border border-border/40">
                       {addableRows.map((skill) => {
                         const isSelected = selectedSkills.has(skill.name);
                         return (
                           <label
                             key={skill.name}
                             className={`flex cursor-pointer select-none items-center gap-3 px-4 py-3 ${
-                              isSelected ? "bg-primary-muted" : ""
+                              isSelected ? "bg-primary/10" : ""
                             }`}
                           >
                             <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleSkillSelection(skill.name)}
-                              className="h-4 w-4 shrink-0 accent-accent"
+                              className="h-4 w-4 shrink-0 accent-primary"
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-medium text-text-primary">
+                              <p className="truncate text-sm font-medium text-foreground">
                                 {skill.name}
                               </p>
-                              <p className="mt-0.5 truncate text-xs text-text-muted">
+                              <p className="mt-0.5 truncate text-xs text-muted-foreground">
                                 {skill.description ||
                                   t("vault.skills.missingDescription")}
                               </p>
@@ -1122,18 +1122,18 @@ export function VaultView(): JSX.Element {
             )}
 
             {filter === "sessions" && (
-              <p className="py-12 text-center text-sm text-text-muted">
+              <p className="py-12 text-center text-sm text-muted-foreground">
                 {t("vault.comingSoon")}
               </p>
             )}
 
             {filter === "files" &&
               (visibleItems.length === 0 ? (
-                <p className="py-12 text-center text-sm text-text-muted">
+                <p className="py-12 text-center text-sm text-muted-foreground">
                   {t("vault.empty")}
                 </p>
               ) : (
-                <div className="divide-y divide-border-subtle rounded-xl border border-border-subtle">
+                <div className="divide-y divide-border/40 rounded-xl border border-border/40">
                   {visibleItems.map((item) => (
                     <article
                       key={item.path}
@@ -1142,10 +1142,10 @@ export function VaultView(): JSX.Element {
                     >
                       <FileTypeIcon kind={getFileKind(item.path)} size={24} />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-text-primary">
+                        <p className="truncate text-sm font-medium text-foreground">
                           <VaultPathLabel path={item.path} />
                         </p>
-                        <p className="mt-1 text-xs text-text-muted">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           {formatSize(item.size)} ·{" "}
                           {statusText(item.syncStatus, t)}
                         </p>
@@ -1159,7 +1159,7 @@ export function VaultView(): JSX.Element {
                           aria-label={t("vault.action.export", {
                             name: item.path,
                           })}
-                          className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
                           onClick={(event) => {
                             if (event.detail > 1) return;
                             void runAction(() =>
@@ -1183,7 +1183,7 @@ export function VaultView(): JSX.Element {
                               aria-label={t("vault.action.more", {
                                 name: item.path,
                               })}
-                              className="flex h-7 w-7 items-center justify-center rounded text-text-muted hover:bg-surface-hover hover:text-text-primary"
+                              className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
                             >
                               <MoreHorizontal className="h-4 w-4" />
                             </button>
@@ -1209,7 +1209,7 @@ export function VaultView(): JSX.Element {
                             </DropdownMenuItem>
                             {/* 危险动作：逐字照抄原 MENU_ITEM_DANGER_CLASS ✓ */}
                             <DropdownMenuItem
-                              className="h-7 gap-2 text-error hover:bg-error/10"
+                              className="h-7 gap-2 text-destructive hover:bg-destructive/10"
                               onClick={() => {
                                 setOpenMenu(null);
                                 handleDelete(item);
@@ -1226,27 +1226,27 @@ export function VaultView(): JSX.Element {
               ))}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border-subtle pt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border/40 pt-4">
             {snapshot?.hasLocalMek ? (
-              <span className="text-sm text-text-muted">
+              <span className="text-sm text-muted-foreground">
                 {t("vault.setup.configured")}
               </span>
             ) : (
               <button
                 type="button"
-                className="text-sm text-text-secondary underline-offset-2 hover:underline"
+                className="text-sm text-muted-foreground underline-offset-2 hover:underline"
                 onClick={() => void handleGenerateRecoveryCode()}
               >
                 {t("vault.setup.open")}
               </button>
             )}
             {!token && (
-              <span className="text-xs text-text-muted">
+              <span className="text-xs text-muted-foreground">
                 {t("vault.loginHint")}
               </span>
             )}
             {snapshot && snapshot.pendingCount > 0 && (
-              <span className="text-xs text-text-muted">
+              <span className="text-xs text-muted-foreground">
                 {t("vault.pendingCount", { count: snapshot.pendingCount })}
               </span>
             )}
@@ -1284,14 +1284,14 @@ export function VaultView(): JSX.Element {
           (mode === "local-files" &&
             snapshot !== null &&
             !snapshot.hasLocalMek)) && (
-          <div className="mt-3 rounded-xl border border-border-subtle bg-surface p-4">
-            <h2 className="text-sm font-semibold text-text-primary">
+          <div className="mt-3 rounded-xl border border-border/40 bg-card p-4">
+            <h2 className="text-sm font-semibold text-foreground">
               {t("vault.setup.title")}
             </h2>
-            <p className="mt-2 break-all rounded bg-background px-3 py-2 font-mono text-sm text-text-primary">
+            <p className="mt-2 break-all rounded bg-background px-3 py-2 font-mono text-sm text-foreground">
               {recoveryCode}
             </p>
-            <label className="mt-3 flex items-center gap-2 text-sm text-text-secondary">
+            <label className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
               <input
                 type="checkbox"
                 checked={recoveryConfirmed}
@@ -1303,12 +1303,12 @@ export function VaultView(): JSX.Element {
               <>
                 {remoteStatus.status === "error" && (
                   <>
-                    <p className="mt-2 text-xs text-text-muted">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       {t("vault.restore.remoteError")}
                     </p>
                     <button
                       type="button"
-                      className="mt-2 text-xs text-text-secondary underline-offset-2 hover:underline"
+                      className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:underline"
                       onClick={() => {
                         setRemoteStatus(null);
                         setRemoteStatusRetry((value) => value + 1);
@@ -1395,7 +1395,7 @@ function renderEmptyState(
   if (mode === "resetting") {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-        <p className="text-sm text-text-muted">{t("vault.reset.inProgress")}</p>
+        <p className="text-sm text-muted-foreground">{t("vault.reset.inProgress")}</p>
         <button
           type="button"
           className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1411,8 +1411,8 @@ function renderEmptyState(
   if (mode === "auto-restoring") {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-border-subtle border-t-accent" />
-        <p className="text-sm text-text-muted">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-border/40 border-t-accent" />
+        <p className="text-sm text-muted-foreground">
           {t("vault.restore.restoring")}
         </p>
       </div>
@@ -1422,7 +1422,7 @@ function renderEmptyState(
   if (mode === "remote-error") {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-        <p className="text-sm text-text-muted">
+        <p className="text-sm text-muted-foreground">
           {t("vault.restore.remoteError")}
         </p>
         <button
@@ -1442,7 +1442,7 @@ function renderEmptyState(
   if (mode === "restore-error") {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-        <p className="text-sm text-text-muted">{t("vault.restore.failed")}</p>
+        <p className="text-sm text-muted-foreground">{t("vault.restore.failed")}</p>
         <button
           type="button"
           className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90"
@@ -1457,7 +1457,7 @@ function renderEmptyState(
   if (mode === "recovery-input") {
     return (
       <div className="mx-auto mt-10 flex w-full max-w-md flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4">
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-muted-foreground">
           {t("vault.restore.prompt")}
         </p>
         <Input
@@ -1466,7 +1466,7 @@ function renderEmptyState(
           value={h.restoreCode}
           onChange={(event) => h.setRestoreCode(event.target.value)}
           placeholder={t("vault.recoveryCode")}
-          className="rounded border border-border-subtle bg-background px-2 py-1.5 text-xs text-text-primary h-auto shadow-none"
+          className="rounded border border-border/40 bg-background px-2 py-1.5 text-xs text-foreground h-auto shadow-none"
         />
         <button
           type="button"
@@ -1482,11 +1482,11 @@ function renderEmptyState(
 
   if (mode === "first-setup") {
     return (
-      <div className="mx-auto mt-10 flex w-full max-w-md flex-col gap-3 rounded-xl border border-border-subtle bg-surface p-4">
-        <h2 className="text-sm font-semibold text-text-primary">
+      <div className="mx-auto mt-10 flex w-full max-w-md flex-col gap-3 rounded-xl border border-border/40 bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground">
           {t("vault.firstSetup.title")}
         </h2>
-        <p className="text-sm text-text-muted">{t("vault.firstSetup.body")}</p>
+        <p className="text-sm text-muted-foreground">{t("vault.firstSetup.body")}</p>
         {!h.recoveryCode && (
           <button
             type="button"
@@ -1498,10 +1498,10 @@ function renderEmptyState(
         )}
         {h.recoveryCode && (
           <>
-            <p className="break-all rounded bg-background px-3 py-2 font-mono text-sm text-text-primary">
+            <p className="break-all rounded bg-background px-3 py-2 font-mono text-sm text-foreground">
               {h.recoveryCode}
             </p>
-            <label className="flex items-center gap-2 text-sm text-text-secondary">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <input
                 type="checkbox"
                 checked={h.recoveryConfirmed}
@@ -1528,9 +1528,9 @@ function renderEmptyState(
   if (mode === "empty-ready") {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-        <p className="text-sm text-text-muted">{t("vault.empty")}</p>
+        <p className="text-sm text-muted-foreground">{t("vault.empty")}</p>
         {!h.token && (
-          <p className="text-xs text-text-muted">{t("vault.loginHint")}</p>
+          <p className="text-xs text-muted-foreground">{t("vault.loginHint")}</p>
         )}
         <button
           type="button"
@@ -1547,9 +1547,9 @@ function renderEmptyState(
   // loading
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 py-12 text-center">
-      <p className="text-sm text-text-muted">{t("vault.empty")}</p>
+      <p className="text-sm text-muted-foreground">{t("vault.empty")}</p>
       {!h.token && (
-        <p className="text-xs text-text-muted">{t("vault.loginHint")}</p>
+        <p className="text-xs text-muted-foreground">{t("vault.loginHint")}</p>
       )}
     </div>
   );

@@ -110,16 +110,16 @@ export function ArtifactPanel() {
         absolute top-3 right-3 z-50
         w-[360px] max-h-[55vh]
         bg-background
-        border border-border-subtle rounded-2xl shadow-2xl
+        border border-border/40 rounded-2xl shadow-2xl
         flex flex-col overflow-hidden
         animate-fade-in
       "
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 shrink-0">
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-text-muted" />
-            <span className="text-sm font-medium text-text-primary">
+            <Layers className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">
               {t("artifactPanel.title", "产物")}
             </span>
           </div>
@@ -128,7 +128,7 @@ export function ArtifactPanel() {
         {/* Body */}
         <div className="overflow-y-auto flex-1 py-1">
           {displayArtifacts.length === 0 ? (
-            <div className="flex items-center gap-2 px-4 py-4 text-xs text-text-muted">
+            <div className="flex items-center gap-2 px-4 py-4 text-xs text-muted-foreground">
               <Layers className="w-3.5 h-3.5 shrink-0" />
               <span>{t("context.noArtifactsYet", "尚无产物")}</span>
             </div>
@@ -143,7 +143,7 @@ export function ArtifactPanel() {
                 <div
                   key={artifact.path || artifact.label || `artifact-${index}`}
                   className={`group flex items-center gap-2.5 px-4 py-2 transition-colors ${
-                    canClick ? "cursor-pointer hover:bg-surface-hover" : ""
+                    canClick ? "cursor-pointer hover:bg-accent" : ""
                   }`}
                   onClick={() => {
                     if (!canClick) return;
@@ -152,14 +152,14 @@ export function ArtifactPanel() {
                   title={artifactPath || undefined}
                 >
                   <FileTypeIcon kind={getFileKind(artifactPath)} size={16} />
-                  <span className="text-sm text-text-primary truncate flex-1">
+                  <span className="text-sm text-foreground truncate flex-1">
                     {label}
                   </span>
                   {artifactPath && (
                     <span className="flex w-5 shrink-0 items-center justify-center">
                       {officePreviewBusyPath === artifactPath ? (
                         <Loader2
-                          className="h-3.5 w-3.5 animate-spin text-primary"
+                          className="h-3.5 w-3.5 animate-spin text-primary-text"
                           data-testid="office-preview-busy"
                         />
                       ) : (

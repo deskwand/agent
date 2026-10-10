@@ -148,10 +148,10 @@ export function ScheduleEditModal({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-surface rounded-xl shadow-xl border border-border mx-4 animate-slide-up">
+      <div className="relative w-full max-w-lg max-h-[85vh] overflow-y-auto bg-card rounded-xl shadow-xl border border-border mx-4 animate-slide-up">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-muted">
-          <h3 className="text-sm font-semibold text-text-primary">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60">
+          <h3 className="text-sm font-semibold text-foreground">
             {task
               ? t("schedule.calendarEditTitle")
               : t("schedule.calendarCreateTitle")}
@@ -159,7 +159,7 @@ export function ScheduleEditModal({
           <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md hover:bg-surface-hover text-text-muted transition-colors h-auto"
+            className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors h-auto"
           >
             <X size={16} />
           </Button>
@@ -169,19 +169,19 @@ export function ScheduleEditModal({
         {showDeleteConfirm ? (
           <>
             <div className="px-5 py-6 text-center space-y-3">
-              <p className="text-sm font-medium text-text-primary">
+              <p className="text-sm font-medium text-foreground">
                 {t("schedule.deleteConfirmTitle")}
               </p>
-              <p className="text-xs text-text-muted">
+              <p className="text-xs text-muted-foreground">
                 {t("schedule.deleteConfirmDesc")}
               </p>
             </div>
             {/* Footer */}
-            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border-muted">
+            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border/60">
               <Button variant="ghost"
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-text-secondary hover:bg-surface-hover transition-colors h-auto"
+                className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
               >
                 {t("common.cancel")}
               </Button>
@@ -189,7 +189,7 @@ export function ScheduleEditModal({
                 type="button"
                 onClick={handleDelete}
                 disabled={busy}
-                className="px-4 py-2 text-xs font-medium rounded-lg bg-error text-white hover:bg-error/90 disabled:opacity-50 transition-colors h-auto"
+                className="px-4 py-2 text-xs font-medium rounded-lg bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50 transition-colors h-auto"
               >
                 {t("schedule.confirmDelete")}
               </Button>
@@ -200,11 +200,11 @@ export function ScheduleEditModal({
             <div className="px-5 py-4 space-y-4">
               {/* Prompt */}
               <div className="space-y-1">
-                <label className="text-xs font-medium text-text-secondary">
+                <label className="text-xs font-medium text-muted-foreground">
                   {t("common.prompt")}
                 </label>
                 <Textarea
-                  className="h-24 min-h-0 w-full resize-none rounded-lg border border-border bg-surface-muted px-3 py-2 text-sm text-text-primary shadow-none placeholder:text-text-muted focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                  className="h-24 min-h-0 w-full resize-none rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
                   placeholder={t("schedule.promptPlaceholder")}
                   value={form.prompt}
                   onChange={(e) => form.setPrompt(e.target.value)}
@@ -213,22 +213,22 @@ export function ScheduleEditModal({
 
               {/* Working directory */}
               <div className="flex items-center gap-1.5">
-                <span className="text-xs text-text-muted shrink-0">
+                <span className="text-xs text-muted-foreground shrink-0">
                   {t("schedule.project")}
                 </span>
                 <Popover open={isProjectOpen} onOpenChange={setIsProjectOpen}>
                   <PopoverTrigger asChild>
                     <Button variant="ghost"
                       type="button"
-                      className="inline-flex h-9 items-center max-w-[16rem] px-2 rounded-full border border-border-subtle bg-background/60 text-xs text-text-muted transition-colors hover:border-border"
+                      className="inline-flex h-9 items-center max-w-[16rem] px-2 rounded-full border border-border/40 bg-background/60 text-xs text-muted-foreground transition-colors hover:border-border"
                     >
-                      <span className="mr-1.5 truncate text-text-primary">
+                      <span className="mr-1.5 truncate text-foreground">
                         {cwd && !cwd.endsWith(`/${DEFAULT_WORKDIR_DIRNAME}`)
                           ? cwd.split("/").pop() || cwd
                           : t("schedule.defaultWorkspace")}
                       </span>
                       <ChevronDown
-                        className={`w-3 h-3 shrink-0 text-text-muted transition-transform ${isProjectOpen ? "rotate-180" : ""}`}
+                        className={`w-3 h-3 shrink-0 text-muted-foreground transition-transform ${isProjectOpen ? "rotate-180" : ""}`}
                       />
                     </Button>
                   </PopoverTrigger>
@@ -266,10 +266,10 @@ export function ScheduleEditModal({
 
               {/* Mode */}
               <div className="space-y-1">
-                <label className="text-xs font-medium text-text-secondary">
+                <label className="text-xs font-medium text-muted-foreground">
                   {t("schedule.mode")}
                 </label>
-                <div className="flex gap-1 bg-surface-muted rounded-lg p-0.5 border border-border">
+                <div className="flex gap-1 bg-muted rounded-lg p-0.5 border border-border">
                   {modeOptions.map((m) => (
                     <Button variant="ghost"
                       key={m.value}
@@ -277,8 +277,8 @@ export function ScheduleEditModal({
                       onClick={() => form.setScheduleMode(m.value)}
                       className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
                         form.scheduleMode === m.value
-                          ? "bg-surface text-text-primary shadow-sm"
-                          : "text-text-muted hover:text-text-secondary"
+                          ? "bg-card text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-muted-foreground"
                       }`}
                     >
                       {m.label}
@@ -300,12 +300,12 @@ export function ScheduleEditModal({
               {/* Legacy-interval: keep original datetime-local */}
               {form.scheduleMode === "legacy-interval" && (
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-text-secondary">
+                  <label className="text-xs font-medium text-muted-foreground">
                     {t("schedule.executionTime")}
                   </label>
                   <Input
                     type="datetime-local"
-                    className="w-full px-3 py-2 text-sm bg-surface-muted border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-text-primary"
+                    className="w-full px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
                     value={form.runAt}
                     onChange={(e) => form.setRunAt(e.target.value)}
                   />
@@ -315,14 +315,14 @@ export function ScheduleEditModal({
               {/* Daily: time pickers */}
               {form.scheduleMode === "daily" && (
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-text-secondary">
+                  <label className="text-xs font-medium text-muted-foreground">
                     {t("schedule.times")}
                   </label>
                   <TimePicker
                     selected={form.selectedTimes}
                     onChange={form.setSelectedTimes}
                   />
-                  <p className="text-xs text-text-muted">
+                  <p className="text-xs text-muted-foreground">
                     {t("schedule.dailyHint")}
                   </p>
                 </div>
@@ -332,7 +332,7 @@ export function ScheduleEditModal({
               {form.scheduleMode === "weekly" && (
                 <>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-text-secondary">
+                    <label className="text-xs font-medium text-muted-foreground">
                       {t("schedule.weekday")}
                     </label>
                     <div className="flex gap-1 flex-wrap">
@@ -356,8 +356,8 @@ export function ScheduleEditModal({
                             }}
                             className={`px-2 py-1 text-xs rounded-md border transition-colors ${
                               active
-                                ? "bg-primary/10 border-primary/30 text-primary font-medium"
-                                : "border-border text-text-muted hover:bg-surface-hover"
+                                ? "bg-primary/10 border-primary/30 text-primary-text font-medium"
+                                : "border-border text-muted-foreground hover:bg-accent"
                             }`}
                           >
                             {t(wd.labelKey)}
@@ -367,14 +367,14 @@ export function ScheduleEditModal({
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-text-secondary">
+                    <label className="text-xs font-medium text-muted-foreground">
                       {t("schedule.times")}
                     </label>
                     <TimePicker
                       selected={form.selectedTimes}
                       onChange={form.setSelectedTimes}
                     />
-                    <p className="text-xs text-text-muted">
+                    <p className="text-xs text-muted-foreground">
                       {t("schedule.weeklyHint")}
                     </p>
                   </div>
@@ -383,7 +383,7 @@ export function ScheduleEditModal({
 
               {/* Status banners */}
               {form.error && (
-                <div className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg bg-error/10 text-error">
+                <div className="flex items-center gap-2 px-3 py-2 text-xs rounded-lg bg-destructive/10 text-destructive">
                   {renderLocalizedBannerMessage(form.error, t)}
                 </div>
               )}
@@ -395,14 +395,14 @@ export function ScheduleEditModal({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between px-5 py-3 border-t border-border-muted">
+            <div className="flex items-center justify-between px-5 py-3 border-t border-border/60">
               <div>
                 {task && (
                   <Button variant="ghost"
                     type="button"
                     onClick={() => setShowDeleteConfirm(true)}
                     disabled={busy}
-                    className="px-3 py-2 text-xs font-medium rounded-lg border border-error/30 text-error hover:bg-error/5 disabled:opacity-50 transition-colors h-auto"
+                    className="px-3 py-2 text-xs font-medium rounded-lg border border-destructive/30 text-destructive hover:bg-destructive/5 disabled:opacity-50 transition-colors h-auto"
                   >
                     {t("common.delete")}
                   </Button>
@@ -412,7 +412,7 @@ export function ScheduleEditModal({
                 <Button variant="ghost"
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-text-secondary hover:bg-surface-hover transition-colors h-auto"
+                  className="px-4 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
                 >
                   {t("common.cancel")}
                 </Button>
@@ -457,12 +457,12 @@ function OnceDateTimePicker({
 
   return (
     <div className="space-y-2">
-      <label className="text-xs font-medium text-text-secondary">
+      <label className="text-xs font-medium text-muted-foreground">
         {executionTimeLabel}
       </label>
       <Input
         type="date"
-        className="w-full px-3 py-2 text-sm bg-surface-muted border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-text-primary"
+        className="w-full px-3 py-2 text-sm bg-muted border border-border rounded-lg focus:outline-none focus:ring-1 focus:ring-primary text-foreground"
         value={date}
         onChange={(e) => {
           if (e.target.value) {
@@ -550,13 +550,13 @@ function TimePicker({
           {selected.map((t) => (
             <span
               key={t}
-              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-primary/10 text-primary"
+              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-primary/10 text-primary-text"
             >
               {t}
               <Button variant="ghost"
                 type="button"
                 onClick={() => remove(t)}
-                className="hover:text-error transition-colors leading-none h-auto"
+                className="hover:text-destructive transition-colors leading-none h-auto"
               >
                 ×
               </Button>
@@ -572,17 +572,17 @@ function TimePicker({
           onKeyDown={(e) => e.key === "Enter" && addCustom()}
           placeholder="HH:mm"
           maxLength={5}
-          className="h-auto flex-1 rounded-md border border-border bg-surface-muted px-2 py-1 text-xs text-text-primary shadow-none placeholder:text-text-muted focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+          className="h-auto flex-1 rounded-md border border-border bg-muted px-2 py-1 text-xs text-foreground shadow-none placeholder:text-muted-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-primary"
         />
         <Button variant="ghost"
           type="button"
           onClick={addCustom}
-          className="px-3 py-1 text-xs font-medium rounded-md bg-surface-muted border border-border text-text-secondary hover:bg-surface-hover transition-colors h-auto"
+          className="px-3 py-1 text-xs font-medium rounded-md bg-muted border border-border text-muted-foreground hover:bg-accent transition-colors h-auto"
         >
           {label}
         </Button>
       </div>
-      <div className="h-60 overflow-y-auto bg-surface-muted border border-border rounded-lg">
+      <div className="h-60 overflow-y-auto bg-muted border border-border rounded-lg">
         {TIMES_30MIN.map((time) => {
           const isSelected = selected.includes(time);
           return (
@@ -590,10 +590,10 @@ function TimePicker({
               key={time}
               type="button"
               onClick={() => toggle(time)}
-              className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-surface-hover ${isSelected ? "text-primary bg-primary/5" : "text-text-secondary"}`}
+              className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors hover:bg-accent ${isSelected ? "text-primary-text bg-primary/5" : "text-muted-foreground"}`}
             >
               <span>{time}</span>
-              {isSelected && <span className="text-primary font-bold">✓</span>}
+              {isSelected && <span className="text-primary-text font-bold">✓</span>}
             </Button>
           );
         })}

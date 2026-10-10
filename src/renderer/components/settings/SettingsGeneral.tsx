@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import type { AppTheme, ThemePreset } from "../../types";
+import { VALID_THEME_ACCENTS, type ThemeAccent } from "../../../shared/theme";
+import { VALID_THEME_PRESETS } from "../../../shared/theme";
 import type { CodemodeMode } from "../../../shared/codemode-config";
 import { CODEMODE_MODES } from "../../../shared/codemode-config";
 import {
@@ -64,15 +66,23 @@ export function SettingsGeneral() {
     { value: "system", label: t("general.themeSystem", "System") },
   ];
 
-  const themePresetOptions: Array<{ value: ThemePreset; label: string }> = [
-    { value: "graphite", label: t("general.themePresetGraphite", "Graphite") },
-    { value: "paper", label: t("general.themePresetPaper", "Paper") },
-    { value: "void", label: t("general.themePresetVoid", "Void") },
-    { value: "ocean", label: t("general.themePresetOcean", "Ocean") },
-    { value: "forest", label: t("general.themePresetForest", "Forest") },
-    { value: "ember", label: t("general.themePresetEmber", "Ember") },
-    { value: "aurora", label: t("general.themePresetAurora", "Aurora") },
-  ];
+  // 强调色（与底色正交的第二维）：选项同样从单一真源派生。
+  const themeAccentOptions: Array<{ value: ThemeAccent; label: string }> =
+    VALID_THEME_ACCENTS.map((value) => ({
+      value,
+      label: t(
+        `general.themeAccent${value === "default" ? "Default" : value.charAt(0).toUpperCase() + value.slice(1)}`,
+      ),
+    }));
+
+  // 选项从单一真源派生：加一套官方配色只需改 shared/theme.ts + i18n，这里不用动。
+  const themePresetOptions: Array<{ value: ThemePreset; label: string }> =
+    VALID_THEME_PRESETS.map((value) => ({
+      value,
+      label: t(
+        `general.themePreset${value.charAt(0).toUpperCase()}${value.slice(1)}`,
+      ),
+    }));
 
   const codemodeModeOptions: Array<{ value: CodemodeMode; label: string }> =
     CODEMODE_MODES.map((mode) => ({
@@ -94,15 +104,16 @@ export function SettingsGeneral() {
                 className="flex overflow-hidden rounded-control border border-border"
               >
                 {themeOptions.map((option) => (
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     key={option.value}
                     type="button"
                     aria-pressed={settings.theme === option.value}
                     onClick={() => updateSettings({ theme: option.value })}
                     className={`px-2.5 py-1 text-xs transition-colors ${
                       settings.theme === option.value
-                        ? "bg-surface-active text-text-primary"
-                        : "text-text-secondary hover:bg-surface-hover"
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent"
                     }`}
                   >
                     {option.label}
@@ -123,16 +134,29 @@ export function SettingsGeneral() {
             }
           />
           <SettingsRow
+            title={t("general.themeAccent", "Accent")}
+            control={
+              <SettingsSelect
+                label={t("general.themeAccent", "Accent")}
+                data-testid="theme-accent-select"
+                value={settings.themeAccent}
+                options={themeAccentOptions}
+                onChange={(next) => updateSettings({ themeAccent: next })}
+              />
+            }
+          />
+          <SettingsRow
             title={t("general.uiFontSize")}
             description={t("general.uiFontSizeDesc")}
             control={
               <>
-                <div className="flex items-center rounded-control border border-border bg-surface">
-                  <Button variant="ghost"
+                <div className="flex items-center rounded-control border border-border bg-card">
+                  <Button
+                    variant="ghost"
                     aria-label={t("general.uiFontSizeDecrease")}
                     onClick={() => commitFont(settings.uiFontSize - 1)}
                     disabled={settings.uiFontSize <= 12}
-                    className="px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 h-auto"
+                    className="px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 h-auto"
                   >
                     −
                   </Button>
@@ -147,18 +171,19 @@ export function SettingsGeneral() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleFontDraftCommit();
                     }}
-                    className="h-auto w-12 rounded-none border-x border-border border-y-0 bg-transparent px-0 py-1 text-center text-xs font-medium text-text-primary shadow-none outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="h-auto w-12 rounded-none border-x border-border border-y-0 bg-transparent px-0 py-1 text-center text-xs font-medium text-foreground shadow-none outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     aria-label={t("general.uiFontSizeIncrease")}
                     onClick={() => commitFont(settings.uiFontSize + 1)}
                     disabled={settings.uiFontSize >= 20}
-                    className="px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 h-auto"
+                    className="px-2 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 h-auto"
                   >
                     +
                   </Button>
                 </div>
-                <span className="text-xs text-text-muted">
+                <span className="text-xs text-muted-foreground">
                   {t("general.uiFontSizeUnit", "PX")}
                 </span>
               </>

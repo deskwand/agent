@@ -18,7 +18,8 @@ import {
  * 会被抬起约 2px（见 globals.css 里 .reference-token-icon 的说明与设计文档 §13）。
  * whitespace-nowrap 让 token 不被换行拆开。
  */
-const TOKEN_CLASS = "font-medium text-mention whitespace-nowrap";
+const TOKEN_CLASS =
+  "font-medium text-primary-text whitespace-nowrap rounded-sm bg-accent px-1 py-0.5 h-auto";
 
 /** token 元素上的原文标记：序列化时取它，屏幕上显示的是它的渲染结果。 */
 export const TOKEN_RAW_ATTR = "data-raw";

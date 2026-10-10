@@ -1,4 +1,8 @@
 import { create } from "zustand";
+import {
+  DEFAULT_THEME_ACCENT,
+  DEFAULT_THEME_PRESET,
+} from "../../shared/theme";
 import type { NestedToolRuntimeUi } from "../../shared/nested-tool-calls";
 import type { SubagentActivity } from "../../shared/subagent-activity";
 import { collectCurrentPlan, type CurrentTodos } from "../utils/current-todos";
@@ -596,7 +600,8 @@ interface AppState {
 
 const defaultSettings: Settings = {
   theme: "light",
-  themePreset: "graphite",
+  themePreset: DEFAULT_THEME_PRESET,
+  themeAccent: DEFAULT_THEME_ACCENT,
   uiFontSize: 14,
   petEnabled: false,
   defaultTools: [

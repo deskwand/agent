@@ -58,7 +58,7 @@ function makeConfig(): AppConfig {
       timeoutMs: 180000,
     },
     enableThinking: false,
-    themePreset: "graphite",
+    themePreset: "zinc",
     thinkingLevel: "medium",
     autoSkillLearning: false,
     telemetryEnabled: true,

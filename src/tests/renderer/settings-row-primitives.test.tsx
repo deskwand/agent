@@ -274,7 +274,7 @@ describe("设置行原语", () => {
 
     // 行容器（分隔线 + 内边距）必须完全一致：panel-boundary.test.ts 守着这个字面串。
     expect(parent.className).toContain(
-      "border-t border-border-muted px-4 py-3",
+      "border-t border-border/60 px-4 py-3",
     );
     expect(child.className).toBe(parent.className);
 
@@ -285,9 +285,9 @@ describe("设置行原语", () => {
     expect(textCol(parent).className).toBe("min-w-0 flex-1");
     expect(textCol(child).className).toBe("min-w-0 flex-1 pl-4");
     expect(titleOf(parent).className).toContain(
-      "text-sm font-medium text-text-primary",
+      "text-sm font-medium text-foreground",
     );
-    expect(titleOf(child).className).toContain("text-xs text-text-secondary");
+    expect(titleOf(child).className).toContain("text-xs text-muted-foreground");
   });
 
   it("badge 落在标题行内，标题文字仍是标题节点的第一个文本节点", async () => {
@@ -321,9 +321,9 @@ describe("设置行原语", () => {
     const html = container.innerHTML;
     for (const className of [
       "bg-success",
-      "bg-text-muted",
+      "bg-muted-foreground",
       "bg-primary",
-      "bg-error",
+      "bg-destructive",
     ]) {
       expect(html).toContain(className);
     }

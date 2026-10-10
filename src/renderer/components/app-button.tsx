@@ -11,8 +11,8 @@ import { cn } from "@renderer/utils/cn";
  *
  * **① `ghost` 不能带 `hover:text-accent-foreground`** ✗
  * vendored 的 `ghost` 是 `"hover:bg-accent hover:text-accent-foreground"` ✓，而
- * `--color-accent-foreground` 在**部分主题里是白色** ✗（`globals.css` 有 `#ffffff` ✓）。
- * 本仓的按钮**自带 hover 底色**（多为浅灰 `hover:bg-surface-hover` ✓）而**不带 hover 文字色** ✗
+ * `--accent-foreground` 在**部分主题里是白色** ✗（`globals.css` 有 `#ffffff` ✓）。
+ * 本仓的按钮**自带 hover 底色**（多为浅灰 `hover:bg-accent` ✓）而**不带 hover 文字色** ✗
  * ⇒ 变体那一条会**替它把文字刷成白色** ⇒ **白字压浅灰，hover/聚焦时整行看不见** ✗✗
  *（用户截图：输入框的模型芯片、消息区的工具摘要行 ✓）。
  * ⇒ 本表的 `ghost` **不带任何 `hover:text-*`** ✓：hover 时文字**保持自己的颜色** ✓
@@ -38,7 +38,7 @@ const appButtonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         // ⚠️ 审查 Minor 5：`outline` **仍保留** `hover:text-accent-foreground` ✗ —— 今天无害
-        //（唯一调用方 `SettingsGlobalAgentsMd` 自己写了 `hover:text-text-primary`，在 `cn` 里赢 ✓），
+        //（唯一调用方 `SettingsGlobalAgentsMd` 自己写了 `hover:text-foreground`，在 `cn` 里赢 ✓），
         // 但下一个「outline + 自定义浅色 hover 底」的调用方会**复现同一 bug** ✗ ⇒ 用之前先想清楚 ✓。
         outline:
           "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
@@ -46,7 +46,7 @@ const appButtonVariants = cva(
           "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
         // ⚠️ 与 vendored 的差异①：**没有** `hover:text-accent-foreground` ✓（见文件头说明）。
         ghost: "hover:bg-accent",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-primary-text underline-offset-4 hover:underline",
       },
       size: {
         default: "h-9 px-4 py-2",
@@ -60,7 +60,8 @@ const appButtonVariants = cva(
 );
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends
+    React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof appButtonVariants> {
   /**
    * ⚠️ 审查 Minor 6：**当前全仓零处使用** ✗（`<Button asChild>` 没有调用点），且它是个**雷**：
@@ -85,27 +86,29 @@ export interface ButtonProps
  * · 调用方自己写了 `justify-*`（**含写在三元里的** ✓）就由它赢 ✓ —— `cn` 去重后就只剩它 ✓。
  */
 export function shouldLeftAlign(className: string | undefined): boolean {
-// ⚠️ 判定必须**按 token**，不能用 `\b` ✗ —— 审查员实测：
-// `\b` 把 `-` 当边界，于是 `flex-1` / `flex-shrink-0` / `flex-none` 都会命中 ✗，
-// 而它们只是 **flex 子项**、不是调用方要的 flex **容器** ⇒ 会把原本居中的
-// 弹窗按钮 / 分段控件推左（实测偏移 −118px ✓）。
-const tokens = (className ?? "").split(/\s+/).filter(Boolean);
-const isFlexContainer = tokens.some(
-  (tk) => tk === "flex" || tk === "inline-flex" || /^(?:[a-z-]+:)*(?:inline-)?flex$/.test(tk),
-);
-// ⚠️ 只写 `w-full text-left`、没有 flex 的按钮，**原生也是居左的** ✓（`text-align:left` 有效 ✓）；
-// 而迁移后 base 的 `inline-flex` 让 `text-align` 失效 ✗ ⇒ 实测左内缩从 16px 变 230px（居中 ✗）。
-// ⇒ `text-left` / `text-start` 是「原生居左」的诚实信号 ✓，一并注入 ✓。
-const wantsLeft = tokens.includes("text-left") || tokens.includes("text-start");
-const hasOwnJustify = tokens.some((tk) => /(?:^|:)justify-/.test(tk));
+  // ⚠️ 判定必须**按 token**，不能用 `\b` ✗ —— 审查员实测：
+  // `\b` 把 `-` 当边界，于是 `flex-1` / `flex-shrink-0` / `flex-none` 都会命中 ✗，
+  // 而它们只是 **flex 子项**、不是调用方要的 flex **容器** ⇒ 会把原本居中的
+  // 弹窗按钮 / 分段控件推左（实测偏移 −118px ✓）。
+  const tokens = (className ?? "").split(/\s+/).filter(Boolean);
+  const isFlexContainer = tokens.some(
+    (tk) =>
+      tk === "flex" ||
+      tk === "inline-flex" ||
+      /^(?:[a-z-]+:)*(?:inline-)?flex$/.test(tk),
+  );
+  // ⚠️ 只写 `w-full text-left`、没有 flex 的按钮，**原生也是居左的** ✓（`text-align:left` 有效 ✓）；
+  // 而迁移后 base 的 `inline-flex` 让 `text-align` 失效 ✗ ⇒ 实测左内缩从 16px 变 230px（居中 ✗）。
+  // ⇒ `text-left` / `text-start` 是「原生居左」的诚实信号 ✓，一并注入 ✓。
+  const wantsLeft =
+    tokens.includes("text-left") || tokens.includes("text-start");
+  const hasOwnJustify = tokens.some((tk) => /(?:^|:)justify-/.test(tk));
   return (isFlexContainer || wantsLeft) && !hasOwnJustify;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
-
-
 
     return (
       <Comp

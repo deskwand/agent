@@ -73,8 +73,8 @@ describe("星空球的画笔", () => {
     const blocks = themeBlocks();
     const lightBlock = blocks.find((b) => /^\s*\.light/.test(b))!;
     const darkBlock = blocks.find((b) => /^\s*:root/.test(b))!;
-    const lightBg = parseHex(tokenOf(lightBlock, "--color-background"));
-    const darkBg = parseHex(tokenOf(darkBlock, "--color-background"));
+    const lightBg = parseHex(tokenOf(lightBlock, "--background"));
+    const darkBg = parseHex(tokenOf(darkBlock, "--background"));
 
     expect(
       contrast(rgbHex(meanRgb(STARS_BRUSH_LIGHT.palette)), rgbHex(lightBg)),

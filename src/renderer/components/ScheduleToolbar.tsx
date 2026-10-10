@@ -48,20 +48,20 @@ export function ScheduleToolbar({
       : t("schedule.dateFormatMonth", { year, month });
 
   return (
-    <div className="flex items-center justify-between px-3 py-2 border-b border-border-muted bg-surface">
+    <div className="flex items-center justify-between px-3 py-2 border-b border-border/60 bg-card">
       {/* Left: nav */}
       <div className="flex items-center gap-1">
         <Button variant="ghost"
           type="button"
           onClick={onToday}
-          className="px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-surface-hover text-text-secondary transition-colors h-auto"
+          className="px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-accent text-muted-foreground transition-colors h-auto"
         >
           {t("schedule.today")}
         </Button>
         <Button variant="ghost"
           type="button"
           onClick={onNavigatePrev}
-          className="p-1 rounded-md hover:bg-surface-hover text-text-muted transition-colors h-auto"
+          className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors h-auto"
           aria-label={t("schedule.toolbarPrev")}
         >
           <ChevronLeft size={16} />
@@ -69,19 +69,19 @@ export function ScheduleToolbar({
         <Button variant="ghost"
           type="button"
           onClick={onNavigateNext}
-          className="p-1 rounded-md hover:bg-surface-hover text-text-muted transition-colors h-auto"
+          className="p-1 rounded-md hover:bg-accent text-muted-foreground transition-colors h-auto"
           aria-label={t("schedule.toolbarNext")}
         >
           <ChevronRight size={16} />
         </Button>
-        <span className="ml-2 text-sm font-medium text-text-primary">
+        <span className="ml-2 text-sm font-medium text-foreground">
           {dateHeader}
         </span>
       </div>
 
       {/* Right: view tabs + create */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center bg-surface-muted rounded-lg p-0.5 border border-border">
+        <div className="flex items-center bg-muted rounded-lg p-0.5 border border-border">
           {VIEW_OPTIONS.map((opt) => (
             <Button variant="ghost"
               key={opt.value}
@@ -89,8 +89,8 @@ export function ScheduleToolbar({
               onClick={() => onViewChange(opt.value)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                 view === opt.value
-                  ? "bg-surface text-text-primary shadow-sm"
-                  : "text-text-muted hover:text-text-secondary"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-muted-foreground"
               }`}
             >
               {t(opt.i18nKey)}

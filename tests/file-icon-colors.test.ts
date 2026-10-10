@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import {
+  parseHex,
+  rgbHex,
+} from "../src/tests/renderer/theme-css-helpers";
 
 const stylesPath = path.resolve(
   process.cwd(),
@@ -22,7 +26,7 @@ interface Block {
  *
  * 剥完注释后 globals.css 是扁平的（只有一层 @layer 包裹，块内不再嵌套大括号），
  * 按最内层大括号切块就够：外层 `@layer base {` 切出一个以 "@layer base" 为选择器、
- * 以 "\n  \n  :root " 为 body 的块，它不声明 --color-background，下面的筛选自然排除。
+ * 以 "\n  \n  :root " 为 body 的块，它不声明 --background，下面的筛选自然排除。
  */
 const css = source.replace(/\/\*[\s\S]*?\*\//g, "");
 const BLOCKS: Block[] = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(
@@ -32,22 +36,33 @@ const BLOCKS: Block[] = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(
   }),
 );
 
+/**
+ * 读一个 token 的 hex —— 2026-10 起取值是官方 oklch 原值，用共享解析器换算成 hex
+ * 再做后面的 ΔE / 亮度 / 对比度计算（那些算法都是按 sRGB 写的）。
+ * 带 alpha 的值这里只取 rgb 分量（本文件读的三个 token 都不带 alpha）。
+ */
 function readVar(body: string, name: string): string | undefined {
-  return new RegExp(`${name}:\\s*(#[0-9a-fA-F]{3,8})`).exec(body)?.[1];
+  const m = new RegExp(`${name}\\s*:\\s*([^;]+);`).exec(body);
+  if (!m) return undefined;
+  try {
+    return rgbHex(parseHex(m[1].trim()));
+  } catch {
+    return undefined;
+  }
 }
 
-/** 有专属色值的 5 个文件类型 token（folder 已改走 --color-text-secondary） */
+/** 有专属色值的 5 个文件类型 token（folder 已改走 --muted-foreground） */
 const FILE_TOKENS = ["media", "doc", "code", "audio", "neutral"] as const;
 
 /**
- * 两个基础档：声明了 --color-background、且不是预设块。
- * 文件开头还有一个只声明 --color-success-foreground 的 :root，靠这个条件区分；
+ * 两个基础档：声明了 --background、且不是预设块。
+ * 文件开头还有一个只声明 --success-foreground 的 :root，靠这个条件区分；
  * 浅色档靠选择器里的 `.light` 区分。
  */
 const baseBlocks = BLOCKS.filter(
   (block) =>
     !block.selector.includes("data-theme-preset=") &&
-    readVar(block.body, "--color-background"),
+    readVar(block.body, "--background"),
 );
 const darkBase = baseBlocks.find((block) => !block.selector.includes(".light"));
 const lightBase = baseBlocks.find((block) => block.selector.includes(".light"));
@@ -62,20 +77,33 @@ const themeCombos = [darkBase, lightBase, ...presetBlocks]
     block,
     selector: block.selector,
     isLight: block.selector.includes(".light"),
-    background: readVar(block.body, "--color-background") as string,
+    background: readVar(block.body, "--background") as string,
   }));
 
 type ThemeCombo = (typeof themeCombos)[number];
 
+/**
+ * 2026-10-10：文件类型色搬进了**固定语义层**（顶层未被 @layer 包裹的 :root / :root.light），
+ * 不再逐主题块声明 —— 它们是语义色，不该随调色板变。所以这两档要单独取。
+ */
+const fixedDark = BLOCKS.find(
+  // 第一块的 selector 会带上文件开头的 `@tailwind base; …` 前缀（切块方式的副产物），
+  // 所以用 endsWith 而不是相等。
+  (b) => b.selector.endsWith(":root") && readVar(b.body, "--file-media"),
+);
+const fixedLight = BLOCKS.find(
+  (b) => b.selector === ":root.light" && readVar(b.body, "--file-media"),
+);
+
 /** 一个档位下所有图标颜色：文件夹的 text token + 5 个文件 token。 */
 function iconColoursFor(combo: ThemeCombo): Array<[string, string]> {
-  const block = combo.isLight ? lightBase! : darkBase!;
+  const block = combo.isLight ? fixedLight! : fixedDark!;
   return [
-    // 每个预设块都会重声明 --color-text-secondary，所以文件夹色必须取**它自己那一档**的块
-    ["folder", readVar(combo.block.body, "--color-text-secondary") as string],
+    // 每个预设块都会重声明 --muted-foreground，所以文件夹色必须取**它自己那一档**的块
+    ["folder", readVar(combo.block.body, "--muted-foreground") as string],
     ...FILE_TOKENS.map(
       (token) =>
-        [token, readVar(block.body, `--color-file-${token}`) as string] as [
+        [token, readVar(block.body, `--file-${token}`) as string] as [
           string,
           string,
         ],
@@ -130,36 +158,39 @@ describe("file icon colour tokens", () => {
     }
   });
 
-  it("declares every file token in both base blocks", () => {
+  it("declares every file token in both fixed-layer blocks", () => {
+    expect(fixedDark, "固定语义层的暗色块").toBeTruthy();
+    expect(fixedLight, "固定语义层的亮色块").toBeTruthy();
     for (const token of FILE_TOKENS) {
-      expect(readVar(darkBase!.body, `--color-file-${token}`)).toBeTruthy();
-      expect(readVar(lightBase!.body, `--color-file-${token}`)).toBeTruthy();
+      expect(readVar(fixedDark!.body, `--file-${token}`)).toBeTruthy();
+      expect(readVar(fixedLight!.body, `--file-${token}`)).toBeTruthy();
     }
   });
 
   it("no longer has a folder colour token anywhere", () => {
-    // 文件夹改走 --color-text-secondary 之后 --color-file-folder 就是死 token。
+    // 文件夹改走 --muted-foreground 之后 --file-folder 就是死 token。
     // 这条把「文件夹不再独占语义色」钉死，防止它被顺手加回来。
     // 断言的是剥掉注释的 css：将来若有注释提到这个旧 token（解释历史）不应误报。
-    expect(css).not.toContain("--color-file-folder");
-    expect(tailwindSource).not.toContain("--color-file-folder");
+    expect(css).not.toContain("--file-folder");
+    expect(tailwindSource).not.toContain("--file-folder");
   });
 
   it("never declares the file tokens inside a theme preset block", () => {
     for (const block of presetBlocks) {
-      expect(block.body, block.selector).not.toContain("--color-file-");
+      expect(block.body, block.selector).not.toContain("--file-");
     }
   });
 
   it("keeps every colour pair far enough apart to tell apart at 16px", () => {
     // 只对 5 个文件色成立。文件夹的灰与 neutral（压缩包/通用文件）的灰
     // ΔE 只有 7.7–12.6，靠字形区分——这是方案 A 的既定代价，见设计文档 §3.2。
+    // 文件色在固定语义层（不随主题块），所以取 fixed* 而不是 darkBase/lightBase。
     for (const [name, block] of [
-      ["dark", darkBase!],
-      ["light", lightBase!],
+      ["dark", fixedDark!],
+      ["light", fixedLight!],
     ] as const) {
       const hexes = FILE_TOKENS.map(
-        (token) => readVar(block.body, `--color-file-${token}`) as string,
+        (token) => readVar(block.body, `--file-${token}`) as string,
       );
       for (let i = 0; i < hexes.length; i += 1) {
         for (let j = i + 1; j < hexes.length; j += 1) {
@@ -173,10 +204,10 @@ describe("file icon colour tokens", () => {
   });
 
   it("reads the folder colour from each theme's own block", () => {
-    // 每个预设块都会重声明 --color-text-secondary，所以文件夹色必须逐档取；
+    // 每个预设块都会重声明 --muted-foreground，所以文件夹色必须逐档取；
     // 退回「按浅深取基础档」会漏掉 12 个预设自己的值。
     for (const combo of themeCombos) {
-      const own = readVar(combo.block.body, "--color-text-secondary") as string;
+      const own = readVar(combo.block.body, "--muted-foreground") as string;
       expect(own, combo.selector).toBeTruthy();
       expect(iconColoursFor(combo), combo.selector).toContainEqual([
         "folder",

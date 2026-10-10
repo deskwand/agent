@@ -347,8 +347,8 @@ describe("StatusPopover", () => {
     act(() => trigger().click());
 
     // 按空白切分成 token 再断言：className 字符串包含的话，关闭态的
-    // `hover:bg-surface-hover` 也会让 toContain 通过，那条断言永远不会失败。
-    expect(trigger().className.split(/\s+/)).toContain("bg-surface-hover");
+    // `hover:bg-accent` 也会让 toContain 通过，那条断言永远不会失败。
+    expect(trigger().className.split(/\s+/)).toContain("bg-accent");
   });
 
   it("面板外壳复用浮层共享 token，并带入场动画", () => {
@@ -357,11 +357,11 @@ describe("StatusPopover", () => {
 
     const panel = dialog()!;
     // 逐 token 用 classList 断言，不用字符串 includes ——
-    // `hover:bg-surface-hover` 那类子串会让 toContain 变成恒真。
+    // `hover:bg-accent` 那类子串会让 toContain 变成恒真。
     //
     // ⚠️ 载体换了：原来这 4 个类来自 MENU_PANEL_CLASS，现在面板是 vendored 的
     // PopoverContent —— 它的外壳契约是 data-[state=open]:animate-in（入场动画）
-    // 与 bg-popover（实色底），而不是本仓的 shadow-elevated / border-border-subtle。
+    // 与 bg-popover（实色底），而不是本仓的 shadow-elevated / border-border/40。
     // 约束（面板要有入场动画、不能用回退的阴影/边框）没变，载体变了。
     expect(panel.classList.contains("data-[state=open]:animate-in")).toBe(true);
     expect(panel.classList.contains("bg-popover")).toBe(true);
@@ -376,8 +376,8 @@ describe("StatusPopover", () => {
     expect(panel.classList.contains("p-3")).toBe(true);
     expect(panel.classList.contains("p-1")).toBe(false);
 
-    // 面板内部 3 处分隔线也必须用 `border-border-subtle`（本次一并对齐的部分）。
-    // 属性选择器 `[class~="..."]` 匹配完整 token，不会误伤 `border-border-subtle`。
+    // 面板内部 3 处分隔线也必须用 `border-border/40`（本次一并对齐的部分）。
+    // 属性选择器 `[class~="..."]` 匹配完整 token，不会误伤 `border-border/40`。
     // 面板是只读状态面板、内部没有表单类元素，所以不存在需要 `border-border` 的子元素；
     // 将来若真需要，改成更精确的选择器，而不是放宽这一条。
     expect(panel.querySelectorAll('[class~="border-border"]')).toHaveLength(0);

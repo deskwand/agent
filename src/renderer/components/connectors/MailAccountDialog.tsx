@@ -140,11 +140,11 @@ export function MailAccountDialog({
       >
         {!provider ? (
           <>
-            <DialogTitle className="text-sm font-medium text-text-primary">
+            <DialogTitle className="text-sm font-medium text-foreground">
               {t("mail.dialog.title")}
             </DialogTitle>
             {/* Description 供读屏补充一句上下文（Radix 不强制要求） */}
-            <DialogDescription className="text-xs text-text-muted mt-1">
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
               {t("mail.dialog.providerHint")}
             </DialogDescription>
             <div className="grid grid-cols-2 gap-2 mt-3">
@@ -159,7 +159,7 @@ export function MailAccountDialog({
                       setProviderId(p.id);
                       setError("");
                     }}
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-left hover:bg-surface-hover transition-colors"
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border text-left hover:bg-accent transition-colors"
                   >
                     {/* 有厂商图标就画图标（厂商只发布浅底版 logo，必须白底）；
                         没有的仍画预设表里的字母标记。 */}
@@ -167,7 +167,7 @@ export function MailAccountDialog({
                       className={`w-7 h-7 flex-none flex items-center justify-center rounded-md ${
                         iconUrl
                           ? "bg-white border border-border"
-                          : "bg-surface-hover text-[11px] font-semibold text-text-secondary"
+                          : "bg-accent text-[11px] font-semibold text-muted-foreground"
                       }`}
                     >
                       {iconUrl ? (
@@ -176,7 +176,7 @@ export function MailAccountDialog({
                         p.mark
                       )}
                     </span>
-                    <span className="text-xs text-text-primary">
+                    <span className="text-xs text-foreground">
                       {t(p.nameKey)}
                     </span>
                   </Button>
@@ -187,7 +187,7 @@ export function MailAccountDialog({
               <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors h-auto"
+                className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors h-auto"
               >
                 {t("common.cancel")}
               </Button>
@@ -204,16 +204,16 @@ export function MailAccountDialog({
                   setProviderId(null);
                   setError("");
                 }}
-                className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
+                className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-accent h-auto"
               >
-                <ArrowLeft className="h-4 w-4 text-text-secondary" />
+                <ArrowLeft className="h-4 w-4 text-muted-foreground" />
               </Button>
-              <DialogTitle className="text-sm font-medium text-text-primary">
+              <DialogTitle className="text-sm font-medium text-foreground">
                 {t(provider.nameKey)}
               </DialogTitle>
             </div>
 
-            <label className="block text-xs text-text-muted mt-3">
+            <label className="block text-xs text-muted-foreground mt-3">
               {t("mail.dialog.email")}
             </label>
             <Input
@@ -225,10 +225,10 @@ export function MailAccountDialog({
               spellCheck={false}
               autoComplete="off"
               placeholder="you@example.com"
-              className="mt-1 h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
+              className="mt-1 h-auto w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs text-foreground shadow-none"
             />
 
-            <label className="block text-xs text-text-muted mt-3">
+            <label className="block text-xs text-muted-foreground mt-3">
               {t(provider.credentialLabelKey)}
             </label>
             <Input
@@ -242,14 +242,14 @@ export function MailAccountDialog({
               spellCheck={false}
               autoComplete="off"
               placeholder={t("mail.dialog.credentialPlaceholder")}
-              className="mt-1 h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
+              className="mt-1 h-auto w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs text-foreground shadow-none"
             />
 
             {/* 预设的主机与端口由服务商表提供，只有自定义才让用户填 ——
                 端口刻意不暴露：写错的端口比主机名更难排查，而预设已经验证过。 */}
             {provider.id === "custom" && (
               <>
-                <label className="block text-xs text-text-muted mt-3">
+                <label className="block text-xs text-muted-foreground mt-3">
                   {t("mail.dialog.imapHost")}
                 </label>
                 <Input
@@ -259,9 +259,9 @@ export function MailAccountDialog({
                   spellCheck={false}
                   autoComplete="off"
                   placeholder="imap.example.com"
-                  className="mt-1 h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
+                  className="mt-1 h-auto w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs text-foreground shadow-none"
                 />
-                <label className="block text-xs text-text-muted mt-3">
+                <label className="block text-xs text-muted-foreground mt-3">
                   {t("mail.dialog.smtpHost")}
                 </label>
                 <Input
@@ -271,12 +271,12 @@ export function MailAccountDialog({
                   spellCheck={false}
                   autoComplete="off"
                   placeholder="smtp.example.com"
-                  className="mt-1 h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
+                  className="mt-1 h-auto w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs text-foreground shadow-none"
                 />
               </>
             )}
 
-            <p className="text-[11px] text-text-muted mt-3">
+            <p className="text-[11px] text-muted-foreground mt-3">
               {t(provider.hintKey)}
               {provider.id !== "custom" && (
                 <>
@@ -285,7 +285,7 @@ export function MailAccountDialog({
                     href={provider.consoleUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-primary hover:underline"
+                    className="text-primary-text hover:underline"
                   >
                     {t("mail.dialog.consoleLink")}
                   </a>
@@ -294,7 +294,7 @@ export function MailAccountDialog({
             </p>
 
             {error && (
-              <p role="alert" className="text-xs text-error mt-2">
+              <p role="alert" className="text-xs text-destructive mt-2">
                 {error}
               </p>
             )}
@@ -303,7 +303,7 @@ export function MailAccountDialog({
               <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors h-auto"
+                className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors h-auto"
               >
                 {t("common.cancel")}
               </Button>
@@ -312,7 +312,7 @@ export function MailAccountDialog({
                 data-testid="mail-submit"
                 disabled={!canSubmit || busy}
                 onClick={() => void submit()}
-                className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50 h-auto"
+                className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium transition-colors disabled:opacity-50 h-auto"
               >
                 {t("mail.dialog.submit")}
               </Button>

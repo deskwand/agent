@@ -98,7 +98,7 @@ export function ArtifactInlineFrame({
       <Button variant="ghost"
         type="button"
         onClick={() => onToggle(artifact.path)}
-        className="flex min-h-9 w-full items-center gap-2 rounded-md border border-border bg-surface-muted px-2 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover h-auto"
+        className="flex min-h-9 w-full items-center gap-2 rounded-md border border-border bg-muted px-2 py-1.5 text-left text-xs text-foreground hover:bg-accent h-auto"
       >
         <ChevronRight className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate font-medium">{label}</span>
@@ -108,11 +108,11 @@ export function ArtifactInlineFrame({
 
   return (
     <div className="overflow-hidden rounded-md border border-border bg-card">
-      <div className="flex min-h-9 items-center gap-2 border-b border-border bg-surface-muted px-2 py-1.5">
+      <div className="flex min-h-9 items-center gap-2 border-b border-border bg-muted px-2 py-1.5">
         <Button variant="ghost"
           type="button"
           onClick={() => onToggle(artifact.path)}
-          className="flex min-w-0 items-center gap-2 text-xs text-text-primary h-auto hover:bg-transparent hover:text-current"
+          className="flex min-w-0 items-center gap-2 text-xs text-foreground h-auto hover:bg-transparent hover:text-current"
         >
           <ChevronDown className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate font-medium">{label}</span>
@@ -124,7 +124,7 @@ export function ArtifactInlineFrame({
                 type="button"
                 aria-label={t("artifact.inline.reload")}
                 onClick={() => setReloadToken((token) => token + 1)}
-                className="rounded p-1 text-text-muted hover:bg-surface-hover h-auto"
+                className="rounded p-1 text-muted-foreground hover:bg-accent h-auto"
               >
                 <RotateCw className="h-3.5 w-3.5" />
               </Button>
@@ -141,7 +141,7 @@ export function ArtifactInlineFrame({
                 type="button"
                 aria-label={t("artifact.inline.openInBrowser")}
                 onClick={handleOpenInBrowser}
-                className="rounded p-1 text-text-muted hover:bg-surface-hover h-auto"
+                className="rounded p-1 text-muted-foreground hover:bg-accent h-auto"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
               </Button>
@@ -156,7 +156,7 @@ export function ArtifactInlineFrame({
       {state.kind === "failed" ? (
         <div
           data-testid="artifact-inline-failed"
-          className="flex items-center gap-2 px-3 py-4 text-xs text-error"
+          className="flex items-center gap-2 px-3 py-4 text-xs text-destructive"
         >
           <span>{t("artifact.inline.failed")}</span>
           <Button variant="ghost"
@@ -177,7 +177,7 @@ export function ArtifactInlineFrame({
           {!loaded ? (
             <div
               data-testid="artifact-inline-skeleton"
-              className="absolute inset-x-0 top-0 h-[320px] animate-pulse bg-surface-muted"
+              className="absolute inset-x-0 top-0 h-[320px] animate-pulse bg-muted"
             />
           ) : null}
           {state.kind === "ready" ? (

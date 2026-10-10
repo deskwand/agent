@@ -42,14 +42,14 @@ function statusTextClass(kind: ConnectorInstance["status"]["kind"]): string {
     case "authorized":
       return "text-success/80";
     case "connecting":
-      return "text-primary";
+      return "text-primary-text";
     case "needs-auth":
       return "text-warning";
     case "failed":
-      return "text-error";
+      return "text-destructive";
     case "idle":
     case "off":
-      return "text-text-muted";
+      return "text-muted-foreground";
   }
 }
 
@@ -141,7 +141,7 @@ export function ConnectorCard({
   const transportBadge = (
     <span
       data-testid="transport-badge"
-      className="flex-none w-[34px] text-center text-[10px] leading-4 rounded-sm border border-border-muted text-text-muted"
+      className="flex-none w-[34px] text-center text-[10px] leading-4 rounded-sm border border-border/60 text-muted-foreground"
     >
       {t(
         entry.transport === "stdio"
@@ -195,20 +195,20 @@ export function ConnectorCard({
 
   // grid：发现视图。名称与动作同一行，说明与状态在内容列里各占一行。
   return (
-    <div className="bg-surface border border-border-muted rounded-container p-3.5 flex gap-2.5 shadow-card hover:bg-surface-hover">
-      {/* 三分支头像。白底只给厂商 logo（厂商只发布浅底版图）；另两支画的是 text-primary，
-          深色主题的 accent 放白底上只有 1.86–3.16:1，所以留着 bg-primary-muted。
+    <div className="bg-card border border-border/60 rounded-container p-3.5 flex gap-2.5 shadow-card hover:bg-accent">
+      {/* 三分支头像。白底只给厂商 logo（厂商只发布浅底版图）；另两支画的是 text-primary-text，
+          深色主题的 accent 放白底上只有 1.86–3.16:1，所以留着 bg-primary/10。
           24px 是内缩 4px 后的图形区；六个图标都是 24×24 viewBox，所以 w-6 h-6 够用。 */}
       <div
         data-testid="card-avatar"
         className={`w-8 h-8 rounded-lg grid place-items-center flex-none ${
-          brandIconUrl ? "bg-white border border-border" : "bg-primary-muted"
+          brandIconUrl ? "bg-white border border-border" : "bg-primary/10"
         }`}
       >
         {brandIconUrl ? (
           <img src={brandIconUrl} alt="" className="w-6 h-6" />
         ) : icon?.kind === "firstParty" ? (
-          <span className="text-primary grid place-items-center">
+          <span className="text-primary-text grid place-items-center">
             <FirstPartyServiceIcon />
           </span>
         ) : (
@@ -217,7 +217,7 @@ export function ConnectorCard({
           // 没有标记时才回退显示名首字母 —— 邮箱条目的显示名就是邮箱地址，
           // 首字母只会让每个邮箱看起来一样。
           <span
-            className={`${entry.avatarMark ? "text-[11px]" : "text-sm"} font-bold text-primary`}
+            className={`${entry.avatarMark ? "text-[11px]" : "text-sm"} font-bold text-primary-text`}
           >
             {entry.avatarMark ?? name.slice(0, 1).toUpperCase()}
           </span>
@@ -225,14 +225,14 @@ export function ConnectorCard({
       </div>
       <div className="flex-1 min-w-0 flex flex-col gap-1">
         <div className="flex items-center gap-2 h-5">
-          <div className="text-sm font-semibold text-text-primary flex-1 min-w-0 truncate">
+          <div className="text-sm font-semibold text-foreground flex-1 min-w-0 truncate">
             {name}
           </div>
           {actionGroup}
           {transportBadge}
         </div>
         {/* 单行截断 + 固定高度：多行会让同排卡片高度不齐，状态一变就跳 */}
-        <div className="h-4 text-xs text-text-muted truncate">
+        <div className="h-4 text-xs text-muted-foreground truncate">
           {entry.descriptionKey ? t(entry.descriptionKey) : ""}
         </div>
         {statusLine}
@@ -260,9 +260,9 @@ function renderAction(
   // **whitespace-nowrap 是硬约束**：中文标签一旦分到小于一个字宽的盒子就会竖排。
   // 槽位现在按内容定宽，本来不会挤，但换行与否不该依赖上一层的宽度怎么算出来。
   const primary =
-    "h-auto px-2.5 py-1 text-xs rounded-control bg-primary text-white hover:bg-primary-hover transition-colors whitespace-nowrap shadow-none";
+    "h-auto px-2.5 py-1 text-xs rounded-control bg-primary text-white hover:bg-primary/90 transition-colors whitespace-nowrap shadow-none";
   const ghost =
-    "px-2.5 py-1 text-xs rounded-control border border-border text-text-primary hover:bg-surface-hover hover:text-text-primary transition-colors whitespace-nowrap";
+    "px-2.5 py-1 text-xs rounded-control border border-border text-foreground hover:bg-accent hover:text-foreground transition-colors whitespace-nowrap";
 
   // **邮箱的动作是账号级的**：所有邮箱条目共用 `serverName: "Mail"`，
   // 走 registry 的「移除」会把整台 Mail server（连同其它邮箱）一起删掉。

@@ -242,8 +242,8 @@ describe("Sidebar disclosure motion", () => {
     ) as SVGElement;
     expect(collapsed.style.opacity).toBe("1");
     expect(expanded.style.opacity).toBe("0");
-    expect(collapsed.classList.contains("text-text-muted")).toBe(false);
-    expect(expanded.classList.contains("text-text-muted")).toBe(false);
+    expect(collapsed.classList.contains("text-muted-foreground")).toBe(false);
+    expect(expanded.classList.contains("text-muted-foreground")).toBe(false);
     expect(calls).toHaveLength(0);
 
     await render(sessionIcon(true, 1));

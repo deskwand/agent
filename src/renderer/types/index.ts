@@ -1,4 +1,4 @@
-import type { ThemePreset } from "../../shared/theme";
+import type { ThemePreset, ThemeAccent } from "../../shared/theme";
 import type { CodemodeConfig } from "../../shared/codemode-config";
 import type { VoiceModeConfig, TurnProfileName } from "../../shared/voice-mode";
 import type {
@@ -859,6 +859,7 @@ export type ServerEvent =
 export interface Settings {
   theme: AppTheme;
   themePreset: ThemePreset;
+  themeAccent: ThemeAccent;
   uiFontSize: number;
   petEnabled: boolean;
   apiKey?: string;
@@ -997,6 +998,7 @@ export interface AppConfig {
   defaultWorkdir?: string;
   theme?: AppTheme;
   themePreset?: ThemePreset;
+  themeAccent?: ThemeAccent;
   uiFontSize?: number;
   petEnabled?: boolean;
   sandboxEnabled?: boolean;

@@ -341,7 +341,7 @@ export const MessageCard = memo(function MessageCard({
   if (message.code === "INSUFFICIENT_BALANCE") {
     return (
       <div className="flex flex-col gap-3 rounded-xl border border-border bg-background p-4">
-        <p className="text-sm text-text-primary">
+        <p className="text-sm text-foreground">
           {t("topUp.insufficientCredits")}
         </p>
         <Button variant="ghost"
@@ -394,7 +394,7 @@ export const MessageCard = memo(function MessageCard({
       >
         {showActions ? (
           <>
-            <span className="text-xs text-text-muted select-none">
+            <span className="text-xs text-muted-foreground select-none">
               {timestampLabel}
             </span>
             <Tooltip>
@@ -402,7 +402,7 @@ export const MessageCard = memo(function MessageCard({
                 <Button variant="ghost"
                   onClick={handleCopy}
                   aria-label={t("messageCard.copyMessage")}
-                  className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors h-auto"
+                  className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors h-auto"
                 >
                   {copied ? (
                     <Check className="w-3 h-3 text-success" />
@@ -437,7 +437,7 @@ export const MessageCard = memo(function MessageCard({
                           reader.start(message.id, bodyRef.current);
                         }
                       }}
-                      className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary disabled:opacity-40 h-auto"
+                      className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 h-auto"
                     >
                       {readingThis &&
                       (reader.status === "playing" ||
@@ -471,11 +471,11 @@ export const MessageCard = memo(function MessageCard({
                       data-testid="stop-reading-button"
                       aria-label={t("messageCard.stopReading")}
                       onClick={() => reader.stop()}
-                      className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary h-auto"
+                      className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground h-auto"
                     >
                       <Square className="w-3 h-3" />
                     </Button>
-                    <span className="text-xs text-text-muted tabular-nums">
+                    <span className="text-xs text-muted-foreground tabular-nums">
                       {t("messageCard.readAloudProgress", {
                         current: reader.currentIndex + 1,
                         total: reader.total,
@@ -486,7 +486,7 @@ export const MessageCard = memo(function MessageCard({
                 {/* 没装模型 / 引擎起不来时，错误就落在这里，并指路到设置 ——
                     不做第二条「提示条 + 下载按钮」的 UI 路径，少一条状态就少一批 bug。 */}
                 {readingThis && reader.status === "error" ? (
-                  <span className="text-xs text-error">
+                  <span className="text-xs text-destructive">
                     {t("messageCard.readAloudFailed")}
                   </span>
                 ) : null}
@@ -501,7 +501,7 @@ export const MessageCard = memo(function MessageCard({
                 type="button"
                 onClick={() => onForkMessage(message)}
                 aria-label={t("messageCard.forkMessage")}
-                className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors h-auto"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors h-auto"
               >
                 <GitBranch className="w-3 h-3" />
               </Button>
@@ -531,13 +531,13 @@ export const MessageCard = memo(function MessageCard({
               } ${isCancelled ? "opacity-60" : ""}`}
             >
               {isQueued && (
-                <div className="mb-1 flex items-center gap-1 text-xs text-text-muted">
+                <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="w-3 h-3" />
                   <span>{t("messageCard.queued")}</span>
                 </div>
               )}
               {isCancelled && (
-                <div className="mb-1 flex items-center gap-1 text-xs text-text-muted">
+                <div className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
                   <XCircle className="w-3 h-3" />
                   <span>{t("messageCard.cancelled")}</span>
                 </div>
@@ -547,7 +547,7 @@ export const MessageCard = memo(function MessageCard({
               ) : null}
               {visibleBlocks.length === 0 &&
               !(isUser && message.elSelections?.length) ? (
-                <span className="text-text-muted italic">
+                <span className="text-muted-foreground italic">
                   {t("messageCard.emptyMessage")}
                 </span>
               ) : (

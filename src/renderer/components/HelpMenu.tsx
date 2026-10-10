@@ -87,7 +87,7 @@ export function HelpMenu() {
                 setMenuOpen(false);
                 setShowUpdateDialog(true);
               }}
-              className={`${RAIL_BUTTON_CLASS} relative text-primary hover:bg-overlay-hover`}
+              className={`${RAIL_BUTTON_CLASS} relative text-primary-text hover:bg-accent`}
             >
               <CircleArrowUp className="w-4 h-4" />
             </Button>
@@ -107,7 +107,7 @@ export function HelpMenu() {
                   type="button"
                   aria-label={railLabel}
                   // aria-haspopup / aria-expanded 由 Radix 的 Trigger 管，不要手写
-                  className={`${RAIL_BUTTON_CLASS} relative text-text-muted hover:bg-overlay-hover hover:text-text-primary`}
+                  className={`${RAIL_BUTTON_CLASS} relative text-muted-foreground hover:bg-accent hover:text-foreground`}
                 >
                   <CircleHelp className="w-4 h-4" />
                 </Button>
@@ -121,11 +121,11 @@ export function HelpMenu() {
               className="h-7 gap-2"
               onClick={() => openExternal(MANUAL_URL)}
             >
-              <span className="shrink-0 text-text-muted">
+              <span className="shrink-0 text-muted-foreground">
                 <BookOpen className="w-4 h-4" />
               </span>
               <span className="truncate">{t("help.docs")}</span>
-              <span className="ml-auto shrink-0 text-text-muted">
+              <span className="ml-auto shrink-0 text-muted-foreground">
                 <ArrowUpRight className="w-4 h-4" />
               </span>
             </DropdownMenuItem>
@@ -133,11 +133,11 @@ export function HelpMenu() {
               className="h-7 gap-2"
               onClick={() => openExternal(FEEDBACK_URL)}
             >
-              <span className="shrink-0 text-text-muted">
+              <span className="shrink-0 text-muted-foreground">
                 <Bug className="w-4 h-4" />
               </span>
               <span className="truncate">{t("help.feedback")}</span>
-              <span className="ml-auto shrink-0 text-text-muted">
+              <span className="ml-auto shrink-0 text-muted-foreground">
                 <ArrowUpRight className="w-4 h-4" />
               </span>
             </DropdownMenuItem>
@@ -149,12 +149,12 @@ export function HelpMenu() {
                 store.setActiveView("settings");
               }}
             >
-              <span className="shrink-0 text-text-muted">
+              <span className="shrink-0 text-muted-foreground">
                 <Info className="w-4 h-4" />
               </span>
               <span className="truncate">{t("about.title")}</span>
               {currentAppVersion ? (
-                <span className="ml-auto shrink-0 text-xs text-text-muted">
+                <span className="ml-auto shrink-0 text-xs text-muted-foreground">
                   v{currentAppVersion}
                 </span>
               ) : null}
@@ -171,7 +171,7 @@ export function HelpMenu() {
                 });
               }}
             >
-              <span className="shrink-0 text-text-muted">
+              <span className="shrink-0 text-muted-foreground">
                 <RefreshCw className="w-4 h-4" />
               </span>
               <span className="truncate">{t("about.checkUpdate")}</span>

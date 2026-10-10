@@ -180,8 +180,8 @@ describe("MessageNavRail", () => {
 
       const preview = container.querySelector<HTMLElement>(".shadow-elevated");
       expect(preview).not.toBeNull();
-      expect(preview?.classList.contains("bg-surface")).toBe(true);
-      expect(preview?.classList.contains("bg-surface/90")).toBe(false);
+      expect(preview?.classList.contains("bg-card")).toBe(true);
+      expect(preview?.classList.contains("bg-card/90")).toBe(false);
       expect(preview?.classList.contains("backdrop-blur-sm")).toBe(false);
     } finally {
       await act(async () => root.unmount());

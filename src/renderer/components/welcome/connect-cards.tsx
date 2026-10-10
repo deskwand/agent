@@ -52,7 +52,7 @@ const OAUTH_ROWS: readonly OAuthRow[] = [
 ];
 
 const CARD_CLASS =
-  "flex-1 min-w-[150px] rounded-2xl border border-border-subtle bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-hover";
+  "flex-1 min-w-[150px] rounded-2xl border border-border/40 bg-card px-4 py-3 text-left transition-colors hover:bg-accent";
 
 function errorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -113,7 +113,7 @@ export function ConnectCards({
       <div
         data-testid={`connect-row-error-${id}`}
         role="alert"
-        className="px-2 pb-1 text-xs text-error"
+        className="px-2 pb-1 text-xs text-destructive"
       >
         {error.message}
       </div>
@@ -128,10 +128,10 @@ export function ConnectCards({
           onClick={onOpenCloud}
           className={`${CARD_CLASS} border-primary`}
         >
-          <span className="block text-sm font-medium text-text-primary">
+          <span className="block text-sm font-medium text-foreground">
             {t("connect.cloudTitle")}
           </span>
-          <span className="mt-0.5 block text-xs text-text-muted">
+          <span className="mt-0.5 block text-xs text-muted-foreground">
             {t("connect.cloudDesc")}
           </span>
         </Button>
@@ -142,10 +142,10 @@ export function ConnectCards({
           onClick={() => setExpanded((value) => !value)}
           className={CARD_CLASS}
         >
-          <span className="block text-sm font-medium text-text-primary h-auto hover:bg-transparent hover:text-current">
+          <span className="block text-sm font-medium text-foreground h-auto hover:bg-transparent hover:text-current">
             {t("connect.subscribeTitle")} {expanded ? "▴" : "▾"}
           </span>
-          <span className="mt-0.5 block text-xs text-text-muted">
+          <span className="mt-0.5 block text-xs text-muted-foreground">
             {t("connect.subscribeDesc")}
           </span>
         </Button>
@@ -155,10 +155,10 @@ export function ConnectCards({
           onClick={onOpenApiKey}
           className={CARD_CLASS}
         >
-          <span className="block text-sm font-medium text-text-primary h-auto hover:bg-transparent hover:text-current">
+          <span className="block text-sm font-medium text-foreground h-auto hover:bg-transparent hover:text-current">
             {t("connect.apiKeyTitle")}
           </span>
-          <span className="mt-0.5 block text-xs text-text-muted">
+          <span className="mt-0.5 block text-xs text-muted-foreground">
             {t("connect.apiKeyDesc")}
           </span>
         </Button>
@@ -166,8 +166,8 @@ export function ConnectCards({
 
       {expanded && (
         <div className="space-y-2">
-          <div className="rounded-xl border border-border-muted p-2">
-            <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.1em] text-text-muted">
+          <div className="rounded-xl border border-border/60 p-2">
+            <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
               {t("connect.groupOAuth")}
             </p>
             {OAUTH_ROWS.map((row) => (
@@ -177,13 +177,13 @@ export function ConnectCards({
                   data-testid={`connect-row-${row.id}`}
                   disabled={pending !== null}
                   onClick={() => void runOAuth(row)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-text-secondary transition-colors hover:bg-surface-hover disabled:opacity-40"
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
                 >
                   <span className="truncate">
                     {t(row.labelKey)}
                     {pending === row.id ? ` — ${t("connect.loggingIn")}` : ""}
                   </span>
-                  <span className="ml-auto text-xs text-text-muted">
+                  <span className="ml-auto text-xs text-muted-foreground">
                     {t(row.tagKey)}
                   </span>
                 </Button>
@@ -192,8 +192,8 @@ export function ConnectCards({
             ))}
           </div>
 
-          <div className="rounded-xl border border-border-muted p-2">
-            <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.1em] text-text-muted">
+          <div className="rounded-xl border border-border/60 p-2">
+            <p className="px-2 pb-1 text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
               {t("connect.groupSubscriptionKey")}
             </p>
             {CODING_SUBSCRIPTIONS.map((plan) => (
@@ -208,10 +208,10 @@ export function ConnectCards({
                       current === plan.profileKey ? null : plan.profileKey,
                     )
                   }
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-text-secondary transition-colors hover:bg-surface-hover disabled:opacity-40"
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
                 >
                   <span className="truncate">{plan.name}</span>
-                  <span className="ml-auto text-xs text-text-muted">
+                  <span className="ml-auto text-xs text-muted-foreground">
                     {t("connect.tagPasteKey")}
                   </span>
                 </Button>
@@ -223,14 +223,14 @@ export function ConnectCards({
                       disabled={pending !== null}
                       onChange={(event) => setKeyDraft(event.target.value)}
                       placeholder={t("connect.keyPlaceholder")}
-                      className="h-auto min-w-0 flex-1 rounded-lg border border-border-subtle bg-background px-2 py-1 text-xs text-text-primary shadow-none outline-none focus:border-primary"
+                      className="h-auto min-w-0 flex-1 rounded-lg border border-border/40 bg-background px-2 py-1 text-xs text-foreground shadow-none outline-none focus:border-primary"
                     />
                     <Button variant="ghost"
                       type="button"
                       data-testid={`connect-key-save-${plan.profileKey}`}
                       disabled={pending !== null}
                       onClick={() => void runSubscription(plan.profileKey)}
-                      className="rounded-lg border border-primary px-2 py-1 text-xs text-primary disabled:opacity-40"
+                      className="rounded-lg border border-primary px-2 py-1 text-xs text-primary-text disabled:opacity-40"
                     >
                       {t("common.save")}
                     </Button>

@@ -36,20 +36,20 @@ const PROCESS_ICON_MAP: Record<
   ProcessSummaryFragment["iconType"],
   React.ReactNode
 > = {
-  read: <BookOpen className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  filebrowse: <Folder className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  search: <Search className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  websearch: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  browse: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  memory: <Brain className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
+  read: <BookOpen className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  filebrowse: <Folder className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  search: <Search className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  websearch: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  browse: <Globe className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  memory: <Brain className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
   command: (
-    <MonitorPlay className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />
+    <MonitorPlay className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
   ),
-  subagent: <Bot className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  tool: <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  goal: <Target className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  tasklist: <ListTodo className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
-  tts: <Volume2 className="h-3.5 w-3.5 flex-shrink-0 text-text-muted" />,
+  subagent: <Bot className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  tool: <Wrench className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  goal: <Target className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  tasklist: <ListTodo className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
+  tts: <Volume2 className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />,
 };
 
 interface ProcessSummaryBlockProps {
@@ -133,7 +133,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
           type="button"
           onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
-          className={`group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] text-text-muted transition-colors hover:bg-surface-hover/40 ${
+          className={`group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] text-muted-foreground transition-colors hover:bg-accent/40 ${
             highlighted ? "ring-2 ring-primary/40" : ""
           }`}
         >
@@ -144,12 +144,12 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 className={`inline-flex items-center gap-1 min-w-0 whitespace-nowrap${frag.iconType !== "subagent" ? " flex-shrink-0" : ""}`}
               >
                 {fi > 0 && fi < fragments.length - 1 && (
-                  <span className="text-text-muted">
+                  <span className="text-muted-foreground">
                     {t("tool.grouped.joinComma")}
                   </span>
                 )}
                 {fi > 0 && fi === fragments.length - 1 && (
-                  <span className="text-text-muted">
+                  <span className="text-muted-foreground">
                     {" "}
                     {t("tool.grouped.joinAnd")}{" "}
                   </span>
@@ -161,7 +161,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
               </span>
             ))}
           </span>
-          <span className="inline-flex w-3.5 flex-shrink-0 items-center justify-center text-text-muted">
+          <span className="inline-flex w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground">
             {expanded ? (
               <ChevronDown className="h-3.5 w-3.5" />
             ) : (
@@ -183,7 +183,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
                 <CollapsibleTrigger asChild>
                   <Button variant="ghost"
                     type="button"
-                    className="cursor-pointer text-xs text-text-muted h-auto hover:bg-transparent hover:text-current"
+                    className="cursor-pointer text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
                   >
                     {t("tool.grouped.scriptDetails")}
                   </Button>

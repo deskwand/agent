@@ -1,7 +1,7 @@
 // 焦点环机制的回归守卫。
 //
 // 背景（2026-09 已修）：全局规则原本给焦点环同时加了 accent 色与 30% 透明度，而 accent
-// 在 tailwind.config.js 里是 `var(--color-accent)`（整值、没有 alpha 插槽），于是
+// 在 tailwind.config.js 里是 `var(--accent)`（整值、没有 alpha 插槽），于是
 // ring-opacity-* 设置了却从不被 ring 阴影消费；同样的原因，对 var 色值写透明度修饰符
 // 在产物里一条规则都不生成（当时全仓 24 处、后来长到 358 处），环回落到 Tailwind
 // 预置的蓝色。根因已由 token-alpha.test.ts 的编译不变量锁住；本文件继续守

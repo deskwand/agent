@@ -104,11 +104,13 @@ export function SettingsContentSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-3 py-5 border-b border-border-muted">
+    <section className="space-y-3 py-5 border-b border-border/60">
       <div className="space-y-1">
-        <h4 className="text-sm font-semibold text-text-primary">{title}</h4>
+        <h4 className="text-sm font-semibold text-foreground">{title}</h4>
         {description && (
-          <p className="text-xs leading-5 text-text-muted">{description}</p>
+          <p className="text-xs leading-5 text-muted-foreground">
+            {description}
+          </p>
         )}
       </div>
       <div className="space-y-3">{children}</div>
@@ -141,16 +143,18 @@ export function SettingsSection({
         // 说明不在 h4 里：否则它会并进标题的可访问名，
         // 读屏用户会把「订阅 登录即可，无需密钥」当成一个标题。
         <div className="flex items-baseline gap-2 px-1">
-          <h4 className="text-sm font-medium text-text-primary">{title}</h4>
+          <h4 className="text-sm font-medium text-foreground">{title}</h4>
           {description && (
-            <span className="text-xs text-text-muted">{description}</span>
+            <span className="text-xs text-muted-foreground">{description}</span>
           )}
         </div>
       ) : (
         <div className="space-y-0.5 px-1">
-          <h4 className="text-sm font-medium text-text-primary">{title}</h4>
+          <h4 className="text-sm font-medium text-foreground">{title}</h4>
           {description && (
-            <p className="text-xs leading-5 text-text-muted">{description}</p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {description}
+            </p>
           )}
         </div>
       )}
@@ -161,7 +165,7 @@ export function SettingsSection({
 
 export function SettingsCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-container border border-border-muted bg-surface">
+    <div className="overflow-hidden rounded-container border border-border/60 bg-card">
       {children}
     </div>
   );
@@ -192,14 +196,14 @@ export function SettingsRow({
   return (
     <div
       data-testid={testId}
-      className="flex min-h-[54px] items-center gap-4 border-t border-border-muted px-4 py-3 first:border-t-0"
+      className="flex min-h-[54px] items-center gap-4 border-t border-border/60 px-4 py-3 first:border-t-0"
     >
       <div className={`min-w-0 flex-1${sub ? " pl-4" : ""}`}>
         <div
           className={
             sub
-              ? "text-xs text-text-secondary"
-              : "flex items-center gap-2 text-sm font-medium text-text-primary"
+              ? "text-xs text-muted-foreground"
+              : "flex items-center gap-2 text-sm font-medium text-foreground"
           }
         >
           {icon}
@@ -207,13 +211,15 @@ export function SettingsRow({
           {badge}
         </div>
         {description && (
-          <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-text-muted">
+          <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
             {description}
           </div>
         )}
         {/* note 不截断：要用户去做什么的话不能被行高截掉。 */}
         {note && (
-          <div className="mt-0.5 text-xs leading-5 text-text-muted">{note}</div>
+          <div className="mt-0.5 text-xs leading-5 text-muted-foreground">
+            {note}
+          </div>
         )}
       </div>
       {control && (
@@ -238,11 +244,11 @@ export function SettingsSwitch({
 }) {
   return (
     // vendored Switch（Radix）。轨道/圆点取色与原来的手搓实现同值 —— 关态轨道用
-    // bg-border、圆点用 bg-background：白圆点压 bg-surface-active 在亮色系（1.19–1.29）
+    // bg-border、圆点用 bg-background：白圆点压 bg-accent 在亮色系（1.19–1.29）
     // 和压浅色 accent 在 6 个暗色预设（1.86–2.72）都看不见。换成 background 后关态最小
     // 1.47、开态最小 4.53（14 个主题块），且不再硬编码颜色。
-    // 这两个 token 正好是 vendored Switch 的默认值（--color-input = --color-border、
-    // --color-primary = --color-accent），所以 className 不需要覆盖颜色。
+    // 这两个 token 正好是 vendored Switch 的默认值（--input、
+    // --primary 在官方词汇表里就是强调色），所以 className 不需要覆盖颜色。
     <Switch
       checked={checked}
       onCheckedChange={onChange}
@@ -313,7 +319,8 @@ export function SettingsSelect<T extends string>({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           ref={triggerRef}
           type="button"
           data-testid={testId}
@@ -326,11 +333,11 @@ export function SettingsSelect<T extends string>({
             setOpen(true);
           }}
           aria-label={label}
-          className="inline-flex items-center gap-1.5 rounded-control border border-border bg-surface px-2.5 py-1 text-xs text-text-primary outline-none hover:bg-surface-hover disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-control border border-border bg-card px-2.5 py-1 text-xs text-foreground outline-none hover:bg-accent disabled:opacity-50"
         >
           <span className="whitespace-nowrap">{current?.label ?? value}</span>
           <ChevronDown
-            className={`h-3 w-3 shrink-0 text-text-muted transition-transform ${
+            className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
               open ? "rotate-180" : ""
             }`}
           />
@@ -402,9 +409,9 @@ export type StatusBadgeTone = "ok" | "muted" | "busy" | "error";
 /** 状态徽标的点色。tone → 语义 token，不硬编码色值。 */
 const STATUS_BADGE_DOTS = {
   ok: "bg-success",
-  muted: "bg-text-muted",
+  muted: "bg-muted-foreground",
   busy: "bg-primary",
-  error: "bg-error",
+  error: "bg-destructive",
 } as const;
 
 export function SettingsStatusBadge({
@@ -443,7 +450,7 @@ export function SettingsStatusBadge({
       role="status"
       // flex-none + whitespace-nowrap：这个胶囊一旦落进 flex 行，默认会被压缩，
       // 中文就会一个字一行地竖排并撞穿行高。
-      className="ml-2 inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border-muted bg-surface-muted px-2 py-0.5 text-xs text-text-secondary"
+      className="ml-2 inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 bg-muted px-2 py-0.5 text-xs text-muted-foreground"
     >
       <span
         className={`h-1.5 w-1.5 flex-none rounded-full ${STATUS_BADGE_DOTS[tone]}`}
@@ -524,7 +531,7 @@ export function InstallProgress({
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent}
-        className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
+        className="h-1.5 w-full overflow-hidden rounded-full bg-accent"
       >
         <div
           className="h-full bg-primary transition-all"
@@ -583,18 +590,19 @@ export function SettingsFormSelect<T extends string>({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           data-testid={testId}
           disabled={disabled}
           aria-label={label}
-          className={`flex items-center justify-between gap-2 rounded-lg border border-border-muted bg-background px-3 py-2 text-left text-sm text-text-primary outline-none hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60 ${triggerClassName ?? "w-full"}`}
+          className={`flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background px-3 py-2 text-left text-sm text-foreground outline-none hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60 ${triggerClassName ?? "w-full"}`}
         >
           <span className="truncate">
             {current?.label ?? placeholder ?? value}
           </span>
           <ChevronDown
-            className={`h-4 w-4 shrink-0 text-text-muted transition-transform ${
+            className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
               open ? "rotate-180" : ""
             }`}
           />

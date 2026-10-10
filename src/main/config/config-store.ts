@@ -1,5 +1,11 @@
 import Store, { type Options as StoreOptions } from "electron-store";
 import {
+  VALID_THEME_ACCENTS,
+  DEFAULT_THEME_ACCENT,
+  DEFAULT_THEME_PRESET,
+  type ThemeAccent,
+} from "../../shared/theme";
+import {
   API_PROVIDER_PRESETS,
   PI_AI_CURATED_PRESETS,
 } from "../../shared/api-model-presets";
@@ -144,6 +150,7 @@ export interface AppConfig {
   enableDevLogs: boolean;
   theme: AppTheme;
   themePreset: ThemePreset;
+  themeAccent?: ThemeAccent;
   uiFontSize?: number;
   petEnabled?: boolean;
   petCharacter?: PetCharacter;
@@ -201,6 +208,8 @@ export interface StoredConfig {
   subagent?: SubagentConfig;
   /** 动态（feed）：默认关闭；打开后每 24 小时生成一次。 */
   feed?: FeedConfig;
+  /** 强调色维度（官方 17 套之一或 "default"=不叠）。 */
+  themeAccent?: ThemeAccent;
 }
 
 export interface LegacyEnvBridgeSnapshot {
@@ -294,7 +303,8 @@ export function defaultStoredConfig(): StoredConfig {
     defaultWorkdir: "",
     enableDevLogs: false,
     theme: "light",
-    themePreset: "graphite",
+    themePreset: DEFAULT_THEME_PRESET,
+    themeAccent: DEFAULT_THEME_ACCENT,
     uiFontSize: UI_FONT_SIZE_DEFAULT,
     petEnabled: false,
     petCharacter: DEFAULT_PET_CHARACTER,
@@ -484,6 +494,13 @@ function isThemePreset(value: unknown): value is ThemePreset {
   return (
     typeof value === "string" &&
     VALID_THEME_PRESETS.includes(value as ThemePreset)
+  );
+}
+
+function isThemeAccent(value: unknown): value is ThemeAccent {
+  return (
+    typeof value === "string" &&
+    VALID_THEME_ACCENTS.includes(value as ThemeAccent)
   );
 }
 
@@ -954,6 +971,7 @@ export function buildProjectedConfig(stored: StoredConfig): AppConfig {
     enableDevLogs: stored.enableDevLogs,
     theme: stored.theme,
     themePreset: stored.themePreset,
+    themeAccent: stored.themeAccent,
     uiFontSize: stored.uiFontSize,
     petEnabled: stored.petEnabled ?? false,
     // 配置被外部改坏时回退默认，不抛错：桌宠是装饰功能，不能拖垮主窗口启动。
@@ -1107,6 +1125,8 @@ export class ConfigStore {
     if (isAppTheme(updates.theme)) stored.theme = updates.theme;
     if (isThemePreset(updates.themePreset))
       stored.themePreset = updates.themePreset;
+    if (isThemeAccent(updates.themeAccent))
+      stored.themeAccent = updates.themeAccent;
     if (updates.sandboxEnabled !== undefined)
       stored.sandboxEnabled = updates.sandboxEnabled;
     if (updates.memoryEnabled !== undefined)

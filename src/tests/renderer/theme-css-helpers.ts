@@ -1,7 +1,6 @@
 // 共享工具：从渲染层样式与 tailwind 配置里解析 token、算对比度与尺寸。
 //
-// 由 theme-overlay-tokens.test.ts 与 chat-visual-hierarchy.test.ts 共用。
-// 文件名不含 .test. 所以不会被 vitest 当成测试文件收走。
+// 由多个不变量测试共用。文件名不含 .test. 所以不会被 vitest 当成测试文件收走。
 //
 // 设计原则：**阈值与色值都不写死在测试里** —— 圆角/字号从 tailwind.config.js 读，
 // 颜色从 globals.css 读。这样配置改了测试会跟着动，不会与实现漂移。
@@ -31,11 +30,12 @@ export const tailwind = require("../../../tailwind.config.js") as {
   };
 };
 
-/** 所有定义了主题的 CSS 块（都声明了 --color-background-secondary）。 */
+/** 所有定义了主题的 CSS 块（2026-10 起：每块声明官方 31 个变量之一 --background-secondary 已不复存在，
+ *  改用 --background 作为"这个块是主题块"的判据）。 */
 export function themeBlocks(source: string = css): string[] {
   return (
     source.match(/^ {2}(?::root|\.light)[^{]*\{[\s\S]*?^ {2}\}/gm) ?? []
-  ).filter((b) => /--color-background-secondary\s*:/.test(b));
+  ).filter((b) => /--background\s*:/.test(b));
 }
 
 export function tokenOf(block: string, name: string): string {
@@ -51,20 +51,121 @@ export function globalToken(name: string): string {
   return m[1].trim();
 }
 
-export function parseHex(value: string): [number, number, number] {
-  const h = value.replace("#", "");
-  const full =
-    h.length === 3
-      ? h
-          .split("")
-          .map((c) => c + c)
-          .join("")
-      : h;
-  return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as [
-    number,
-    number,
-    number,
+/** 按选择器取一个主题块（`:root` / `.light` / `:root[data-theme-preset="paper"]` …）。 */
+export function blockBySelector(
+  selector: string,
+  source: string = css,
+): string | undefined {
+  return themeBlocks(source).find(
+    (b) => b.slice(0, b.indexOf("{")).trim() === selector,
+  );
+}
+
+/** 块内全部自定义属性（值里的换行与多余空白归一）。 */
+export function tokensOf(block: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const d of block.matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*([^;]+);/gm)) {
+    out[d[1]] = d[2].trim().replace(/\s+/g, " ");
+  }
+  return out;
+}
+
+/** 官方 7 套 base 的真值快照（`src/renderer/styles/official-themes.json`）。 */
+export function officialThemes(): Record<
+  string,
+  { light: Record<string, string>; dark: Record<string, string> }
+> {
+  return JSON.parse(
+    fs.readFileSync(path.join(RENDERER, "styles/official-themes.json"), "utf8"),
+  );
+}
+
+// ── 颜色解析 ──
+// 2026-10 起主题值写成官方原样的 oklch()，所以解析器必须认它；
+// 认不出时返回 null（不要静默当成黑色 —— NaN 参与的比较全为假，红成一副"阈值不对"的样子）。
+
+/** CSS Color 4 的 oklch → sRGB（含 gamut clamp），取整到 0–255。 */
+export function oklchToRgb(
+  L: number,
+  C: number,
+  hDeg: number,
+): [number, number, number] {
+  const h = (hDeg * Math.PI) / 180;
+  const a = C * Math.cos(h);
+  const b = C * Math.sin(h);
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b;
+  const l = l_ ** 3;
+  const m = m_ ** 3;
+  const s = s_ ** 3;
+  const enc = (v: number) => {
+    const c = v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+    return Math.max(0, Math.min(255, Math.round(c * 255)));
+  };
+  return [
+    enc(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s),
+    enc(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s),
+    enc(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s),
   ];
+}
+
+/** 统一颜色解析入口：hex / rgb() / rgba() / oklch(L C H[ / a|a%])。认不出返回 null。 */
+export function parseCssColor(
+  value: string,
+): { rgb: [number, number, number]; alpha: number } | null {
+  const v = value.trim();
+  const ok =
+    /oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+)%?)?\s*\)/.exec(
+      v,
+    );
+  if (ok) {
+    const raw =
+      ok[4] === undefined
+        ? 1
+        : v.includes("%")
+          ? parseFloat(ok[4]) / 100
+          : parseFloat(ok[4]);
+    return {
+      rgb: oklchToRgb(+ok[1], +ok[2], +ok[3]),
+      alpha: Math.max(0, Math.min(1, raw)),
+    };
+  }
+  const rgb =
+    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+))?\s*\)/.exec(
+      v,
+    );
+  if (rgb) {
+    return {
+      rgb: [+rgb[1], +rgb[2], +rgb[3]],
+      alpha: rgb[4] === undefined ? 1 : +rgb[4],
+    };
+  }
+  if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v)) {
+    const h = v.replace("#", "");
+    const full =
+      h.length === 3
+        ? h
+            .split("")
+            .map((c) => c + c)
+            .join("")
+        : h;
+    return {
+      rgb: [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as [
+        number,
+        number,
+        number,
+      ],
+      alpha: 1,
+    };
+  }
+  return null;
+}
+
+export function parseHex(value: string): [number, number, number] {
+  const parsed = parseCssColor(value);
+  if (!parsed) throw new Error(`无法解析颜色：${value}`);
+  return parsed.rgb;
 }
 
 export function rgbHex(rgb: [number, number, number]): string {
@@ -87,65 +188,23 @@ export function contrast(a: string, b: string): number {
   return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
 }
 
-/** 同时支持 rgba(r,g,b,a) 与 #rrggbb —— 主题 token 两种形式都有。 */
+/** 同时支持 rgba(r,g,b,a) / oklch(… / a) / #rrggbb —— 主题 token 三种形式都有。 */
 export function parseAlphaColor(value: string): {
   rgb: [number, number, number];
   alpha: number;
 } {
-  const m =
-    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+))?\s*\)/.exec(
-      value,
-    );
-  if (m) {
-    return {
-      rgb: [+m[1], +m[2], +m[3]],
-      alpha: m[4] === undefined ? 1 : +m[4],
-    };
-  }
-  const rgb = parseHex(value);
-  if (rgb.some(Number.isNaN)) throw new Error(`无法解析颜色：${value}`);
-  return { rgb, alpha: 1 };
+  const parsed = parseCssColor(value);
+  if (!parsed) throw new Error(`无法解析颜色：${value}`);
+  return parsed;
 }
 
-/** fg（hex）以 alpha 叠在 base 上的合成结果。 */
+/** fg 以 alpha 叠在 base 上的合成结果。 */
 export function composite(base: string, fg: string, alpha: number): string {
   const f = parseHex(fg);
   return rgbHex(
     parseHex(base).map((v, i) =>
       Math.round(v * (1 - alpha) + f[i] * alpha),
     ) as [number, number, number],
-  );
-}
-
-/**
- * 解出某个主题块里 `--color-background-secondary` 的最终 hex。
- *
- * 它从 2026-09-25 起是 `color-mix(in srgb, var(--color-text-primary) 5%, var(--color-background))`，
- * **不再是字面 hex**（2026-09-25-panel-boundary-design.md §4.1）。
- *
- * 所以不要再把 `tokenOf(block, "--color-background-secondary")` 直接喂给 `contrast()` /
- * `parseHex()` —— 那会静默得到 `NaN`，而 NaN 参与的比较**全部为假**：断言确实会红，
- * 但红成一副"阈值不对"的样子，很容易被误诊（本轮就踩过一次）。
- */
-export function backgroundSecondary(block: string): string {
-  const value = tokenOf(block, "--color-background-secondary").replace(
-    /\s+/g,
-    " ",
-  );
-  const mix =
-    /color-mix\(\s*in srgb,\s*var\(--color-text-primary\)\s+([\d.]+)%,\s*var\(--color-background\)\s*\)/.exec(
-      value,
-    );
-  if (!mix) {
-    throw new Error(
-      `--color-background-secondary 不再是 text-primary/background 的 color-mix，` +
-        `用它的地方需要跟着改：${value}`,
-    );
-  }
-  return composite(
-    tokenOf(block, "--color-background"),
-    tokenOf(block, "--color-text-primary"),
-    Number(mix[1]) / 100,
   );
 }
 
@@ -175,28 +234,75 @@ export function classNameAt(
 // ── tailwind 类名 → 数值 ──
 // 全部查 tailwind.config.js，不把 px 写死在测试里。
 
-/** `rounded-xl` → 10（px）。找不到该档位就抛错。 */
+/** `calc(var(--radius) * k)` 或裸 px → px 数值。`radiusRem` 传 `--radius` 的 rem 值。 */
+export function radiusFromCalc(value: string, radiusRem: number): number {
+  const px = /^([\d.]+)px$/.exec(value.trim());
+  if (px) return parseFloat(px[1]);
+  const calc = /calc\(\s*var\(--radius\)\s*\*\s*([\d.]+)\s*\)/.exec(value);
+  if (!calc) throw new Error(`无法解析圆角值：${value}`);
+  return radiusRem * 16 * parseFloat(calc[1]);
+}
+
+/** `--radius` 的 rem 值（固定语义层声明一次）。 */
+function radiusRem(): number {
+  const raw = globalToken("--radius");
+  const m = /^([\d.]+)rem$/.exec(raw);
+  if (!m) throw new Error(`--radius 不是 rem 形式：${raw}`);
+  return parseFloat(m[1]);
+}
+
+/** `rounded-xl` → 14（px）。支持 calc(var(--radius) * k) 与裸 px 两种写法。 */
 export function radiusPx(cls: string): number {
   const m = /(?:^|\s)rounded-([\w]+)(?:\s|$)/.exec(cls);
   if (!m) throw new Error(`未找到 rounded-* 类：${cls}`);
   const v = tailwind.theme.extend.borderRadius[m[1]];
   if (v === undefined)
     throw new Error(`tailwind.config.js 的 borderRadius 里没有 "${m[1]}"`);
-  return parseFloat(v);
+  return radiusFromCalc(v, radiusRem());
 }
 
-/** `text-sm` → 0.8125（rem）。 */
+/** `text-sm` → 0.875（rem）。 */
 export function textSizeRem(cls: string): number {
   const m = /(?:^|\s)text-(xs|sm|base|lg|xl|2xl)(?:\s|$)/.exec(cls);
   if (!m) throw new Error(`未找到 text-<size> 类：${cls}`);
   return parseFloat(tailwind.theme.extend.fontSize[m[1]][0]);
 }
 
-/** `text-text-muted` → "muted"。 */
+/** 非颜色的 text-* 后缀（尺寸/对齐/换行/截断），取文字色 token 时要跳过它们。 */
+const NON_COLOR_TEXT = new Set([
+  "xs",
+  "sm",
+  "base",
+  "lg",
+  "xl",
+  "2xl",
+  "3xl",
+  "left",
+  "right",
+  "center",
+  "justify",
+  "start",
+  "end",
+  "wrap",
+  "nowrap",
+  "balance",
+  "pretty",
+  "ellipsis",
+  "clip",
+]);
+
+/**
+ * 取类串里的文字色 token 名：`text-muted-foreground` → "muted-foreground"；
+ * 旧写法 `text-muted-foreground` → "text-muted"（过渡期仍认，便于迁移中途定位残留）。
+ * 多个 text-* 类时取第一个能当颜色用的（跳过尺寸/对齐/换行）。
+ */
 export function textColorToken(cls: string): string {
-  const m = /(?:^|\s)text-text-(\w+)(?:\s|$)/.exec(cls);
-  if (!m) throw new Error(`未找到 text-text-<color> 类：${cls}`);
-  return m[1];
+  for (const m of cls.matchAll(/(?:^|\s)text-([\w-]+)(?=\s|$)/g)) {
+    const name = m[1];
+    if (NON_COLOR_TEXT.has(name)) continue;
+    return name;
+  }
+  throw new Error(`未找到 text-<color> 类：${cls}`);
 }
 
 /** `py-3` → 0.75（rem）。tailwind 默认 spacing 基数 0.25rem，本项目未覆写。 */
@@ -207,10 +313,9 @@ export function paddingYRem(cls: string): number {
 }
 
 /**
- * globals.css 的 html 根字号基数（`calc(16px * var(--ui-font-scale, 1))`，globals.css:435）。
+ * globals.css 的 html 根字号基数（`calc(16px * var(--ui-font-scale, 1))`）。
  * 从源码解析而不是写死 16 —— 与本模块「数值不写死在测试里」的原则保持一致。
- * 惰性求值：解析失败只影响调它的那个用例，不会让整个模块一 import 就炸
- * （本模块还被 theme-overlay-tokens.test.ts 共用）。
+ * 惰性求值：解析失败只影响调它的那个用例，不会让整个模块一 import 就炸。
  */
 export function rootPx(): number {
   const m =
@@ -228,9 +333,7 @@ export function rootPx(): number {
 /**
  * CIE Lab 彩度 C = √(a²+b²)。
  *
- * 用来判断 accent 与正文是否"靠色相就能分开"——亮度比在这里是错的工具：
- * #6ea8fe 对 #f4f4f5 的亮度比只有 2.20，但一眼就能分开，分的是色相不是亮度。
- *
+ * 用来判断 accent 与正文是否"靠色相就能分开"——亮度比在这里是错的工具。
  * sRGB → 线性 → XYZ(D65) → Lab，与 relativeLuminance 用同一个 0.03928 阈值。
  */
 export function chroma(hex: string): number {

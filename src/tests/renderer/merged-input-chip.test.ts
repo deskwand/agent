@@ -219,7 +219,7 @@ describe("MergedInputChip (single-panel)", () => {
     render();
     await openPanel();
     expect(panel().className).toContain("shadow-elevated");
-    expect(panel().className).toContain("border-border-subtle");
+    expect(panel().className).toContain("border-border/40");
     expect(panel().className).not.toContain("shadow-soft");
   });
 

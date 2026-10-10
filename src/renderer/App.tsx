@@ -105,7 +105,7 @@ const SettingsPanel = lazy(() =>
 function MainPanelFallback() {
   return (
     <div className="flex-1 min-h-0 bg-background px-6 py-6">
-      <div className="h-full rounded-6xl border border-border-subtle bg-background/70" />
+      <div className="h-full rounded-6xl border border-border/40 bg-background/70" />
     </div>
   );
 }
@@ -315,7 +315,18 @@ function App() {
       "data-theme-preset",
       settings.themePreset,
     );
-  }, [effectiveTheme, settings.themePreset]);
+
+    // 强调色维度：`"default"` = 不叠 accent 层（primary 由底色决定），所以要把属性摘掉，
+    // 而不是挂一个 "default" 值 —— CSS 里没有 [data-theme-accent="default"] 这样的块。
+    if (settings.themeAccent === "default") {
+      document.documentElement.removeAttribute("data-theme-accent");
+    } else {
+      document.documentElement.setAttribute(
+        "data-theme-accent",
+        settings.themeAccent,
+      );
+    }
+  }, [effectiveTheme, settings.themePreset, settings.themeAccent]);
 
   // Apply UI font scale to root: scale = uiFontSize / 14 (14 = unchanged baseline).
   // Settings.uiFontSize is non-optional (default 14), so it is always a number.
@@ -673,7 +684,7 @@ function App() {
               }}
               onDraggingChange={setIsPanelDragging}
               position="left"
-              className="hover:bg-border-active w-1 cursor-col-resize transition-colors"
+              className="hover:bg-border w-1 cursor-col-resize transition-colors"
             />
           )}
           <div
@@ -685,10 +696,10 @@ function App() {
             {rightPanelMode === "browser" && (
               <PanelErrorBoundary
                 name="BrowserPanel"
-                fallback={<div className="flex-1 bg-background-secondary" />}
+                fallback={<div className="flex-1 bg-muted" />}
               >
                 <Suspense
-                  fallback={<div className="flex-1 bg-background-secondary" />}
+                  fallback={<div className="flex-1 bg-muted" />}
                 >
                   <BrowserPanel width={contextPanelWidth} />
                 </Suspense>
@@ -706,11 +717,11 @@ function App() {
                 <PanelErrorBoundary
                   name="FilePreviewPanel"
                   resetKey={activePreviewTab ?? undefined}
-                  fallback={<div className="flex-1 bg-background-secondary" />}
+                  fallback={<div className="flex-1 bg-muted" />}
                 >
                   <Suspense
                     fallback={
-                      <div className="flex-1 bg-background-secondary" />
+                      <div className="flex-1 bg-muted" />
                     }
                   >
                     <FilePreviewPanel visible={previewPanelActive} />
@@ -726,11 +737,11 @@ function App() {
                 <PanelErrorBoundary
                   name="ReviewPanel"
                   resetKey={activeSessionId ?? undefined}
-                  fallback={<div className="flex-1 bg-background-secondary" />}
+                  fallback={<div className="flex-1 bg-muted" />}
                 >
                   <Suspense
                     fallback={
-                      <div className="flex-1 bg-background-secondary" />
+                      <div className="flex-1 bg-muted" />
                     }
                   >
                     <ReviewPanel
@@ -752,11 +763,11 @@ function App() {
               >
                 <PanelErrorBoundary
                   name="FileBrowser"
-                  fallback={<div className="flex-1 bg-background-secondary" />}
+                  fallback={<div className="flex-1 bg-muted" />}
                 >
                   <Suspense
                     fallback={
-                      <div className="flex-1 bg-background-secondary" />
+                      <div className="flex-1 bg-muted" />
                     }
                   >
                     <FileBrowser width={panelWidth} />

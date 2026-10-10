@@ -75,7 +75,7 @@ describe("coding subscription cards", () => {
         .querySelector('button[data-action="configure"]')!;
       expect(button.classList.contains("bg-primary")).toBe(true);
       expect(button.classList.contains("text-primary-foreground")).toBe(true);
-      expect(button.classList.contains("border-border-muted")).toBe(false);
+      expect(button.classList.contains("border-border/60")).toBe(false);
     }
   });
 
@@ -225,7 +225,7 @@ describe("coding subscription cards", () => {
       'button[data-action="configure"]',
     )!;
     expect(configuredButton.classList.contains("bg-primary")).toBe(false);
-    expect(configuredButton.classList.contains("border-border-muted")).toBe(
+    expect(configuredButton.classList.contains("border-border/60")).toBe(
       true,
     );
     await act(async () =>

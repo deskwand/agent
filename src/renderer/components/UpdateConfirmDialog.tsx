@@ -63,24 +63,24 @@ export function UpdateConfirmDialog({
       <DialogContent className="max-w-sm gap-0 p-0">
         {/* Icon */}
         <div className="flex justify-center pt-7 pb-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-muted">
-            <RefreshCw className="h-6 w-6 text-primary" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
+            <RefreshCw className="h-6 w-6 text-primary-text" />
           </div>
         </div>
 
         {/* Text */}
         <div className="space-y-1.5 px-6 pb-2 text-center">
-          <DialogTitle className="text-base font-semibold text-text-primary">
+          <DialogTitle className="text-base font-semibold text-foreground">
             {t("update.title")}
           </DialogTitle>
-          <p className="text-sm leading-relaxed text-text-muted">
+          <p className="text-sm leading-relaxed text-muted-foreground">
             {t("update.description", { version: newVersion })}
           </p>
           {currentVersion && (
-            <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-surface-muted px-2.5 py-1 text-xs text-text-secondary">
+            <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1 text-xs text-muted-foreground">
               <span>v{currentVersion}</span>
-              <span className="text-primary">→</span>
-              <span className="font-semibold text-primary">v{newVersion}</span>
+              <span className="text-primary-text">→</span>
+              <span className="font-semibold text-primary-text">v{newVersion}</span>
             </div>
           )}
         </div>
@@ -91,7 +91,7 @@ export function UpdateConfirmDialog({
             role="region"
             aria-label={t("update.notesLabel")}
             tabIndex={0}
-            className="mt-4 max-h-[40vh] overflow-y-auto border-t border-border-muted px-5 pt-3.5 pb-1"
+            className="mt-4 max-h-[40vh] overflow-y-auto border-t border-border/60 px-5 pt-3.5 pb-1"
           >
             <MessageMarkdown
               normalizedText={notes}
@@ -101,10 +101,10 @@ export function UpdateConfirmDialog({
         )}
 
         {/* Actions */}
-        <div className="mt-4 flex items-center gap-2 border-t border-border-muted px-5 py-4">
+        <div className="mt-4 flex items-center gap-2 border-t border-border/60 px-5 py-4">
           <Button variant="ghost"
             onClick={onCancel}
-            className="flex-1 rounded-xl px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover h-auto"
+            className="flex-1 rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent h-auto"
           >
             {t("update.later")}
           </Button>

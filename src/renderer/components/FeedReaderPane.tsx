@@ -28,7 +28,7 @@ export interface FeedReaderPaneProps {
  *
  * 字号用应用 token：标题 text-lg、正文 text-base（与聊天正文同档）、其余 text-xs；
  * 大图用 16:9 的比例锁而不是固定高度 —— 字号变化时图跟着一起缩放，不会被拉成横条。
- * 正文用 text-primary 而不是 muted：浅色主题下 muted 在 background-secondary 上只有 4.06:1，
+ * 正文用 text-primary-text 而不是 muted：浅色主题下 muted 在 background-secondary 上只有 4.06:1，
  * 低于 WCAG AA 对正文的 4.5:1，而这是右栏里唯一要真读的一段字。
  * 「为什么和你相关」与出口同排：它在右栏是第二次出现的解释，不该再占一段 ——
  * 代价是它只剩约 320px 而被 truncate，而右栏又是它唯一的出现处（设计 §8.1），故带 title 兜底。
@@ -42,7 +42,7 @@ export function FeedReaderPlaceholder(): JSX.Element {
   return (
     <div
       data-testid="feed-reader-empty"
-      className="flex h-full items-center justify-center px-6 text-center text-sm text-text-muted"
+      className="flex h-full items-center justify-center px-6 text-center text-sm text-muted-foreground"
       style={{ lineHeight: 1.8 }}
     >
       {t("feed.readerEmpty")}
@@ -73,11 +73,11 @@ export function FeedReaderPane({
   const rendered = excerpt ? excerpt.replace(/\$/g, "\\$") : (raw ?? "");
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto bg-background-secondary px-5 py-3.5">
+    <div className="flex h-full flex-col overflow-y-auto bg-muted px-5 py-3.5">
       {item.imageUrl ? (
         <div
           data-testid="feed-hero"
-          className="mx-auto mb-3 w-full shrink-0 overflow-hidden rounded-md bg-surface"
+          className="mx-auto mb-3 w-full shrink-0 overflow-hidden rounded-md bg-card"
           style={{ maxWidth: "48em", aspectRatio: "16 / 9" }}
         >
           <img
@@ -99,7 +99,7 @@ export function FeedReaderPane({
           {item.title}
         </h2>
 
-        <div className="mb-3 text-xs leading-[1.75] text-text-muted">
+        <div className="mb-3 text-xs leading-[1.75] text-muted-foreground">
           <span>{item.source_host}</span>
           <span className="px-1.5 opacity-45">·</span>
           <span className="tabular-nums">
@@ -114,7 +114,7 @@ export function FeedReaderPane({
 
         {item.summary ? (
           <div
-            className="mb-3 border-l-2 border-primary pl-3 text-sm text-text-primary"
+            className="mb-3 border-l-2 border-primary pl-3 text-sm text-foreground"
             style={{ lineHeight: 1.8 }}
           >
             {item.summary}
@@ -122,7 +122,7 @@ export function FeedReaderPane({
         ) : null}
 
         {body?.bodyStatus === "snippet_only" ? (
-          <div className="mb-3 text-xs text-text-muted">
+          <div className="mb-3 text-xs text-muted-foreground">
             {t("feed.readerSnippetOnly")}
           </div>
         ) : null}
@@ -130,12 +130,12 @@ export function FeedReaderPane({
         {excerpt || raw ? (
           <div
             data-testid="feed-body"
-            className="prose-feed text-base text-text-primary"
+            className="prose-feed text-base text-foreground"
           >
             {excerpt ? null : (
               <p
                 data-testid="feed-raw-note"
-                className="mb-2 text-xs text-text-muted"
+                className="mb-2 text-xs text-muted-foreground"
               >
                 {t("feed.readerRawFallback")}
               </p>
@@ -144,10 +144,10 @@ export function FeedReaderPane({
           </div>
         ) : null}
 
-        <div className="mt-2 flex items-baseline gap-3 border-t border-border-subtle pt-2 text-xs leading-[1.75] text-text-muted">
+        <div className="mt-2 flex items-baseline gap-3 border-t border-border/40 pt-2 text-xs leading-[1.75] text-muted-foreground">
           <span
             data-testid="feed-relevance"
-            className="min-w-0 flex-1 truncate text-primary"
+            className="min-w-0 flex-1 truncate text-primary-text"
             title={item.relevance ?? undefined}
           >
             {item.relevance}
@@ -157,7 +157,7 @@ export function FeedReaderPane({
               type="button"
               data-testid="feed-listen-item"
               onClick={() => void startFeedListen({ fromItemId: item.id })}
-              className="whitespace-nowrap text-primary h-auto hover:bg-transparent hover:text-current"
+              className="whitespace-nowrap text-primary-text h-auto hover:bg-transparent hover:text-current"
             >
               {t("feed.listenItem")}
             </Button>
@@ -166,7 +166,7 @@ export function FeedReaderPane({
             type="button"
             data-testid="feed-open-browser"
             onClick={() => onOpenInBrowser(item.url)}
-            className="whitespace-nowrap text-primary h-auto hover:bg-transparent hover:text-current"
+            className="whitespace-nowrap text-primary-text h-auto hover:bg-transparent hover:text-current"
           >
             {t("feed.readerOpenInBrowser")} ↗
           </Button>

@@ -396,7 +396,7 @@ export function ImageLightbox({
           {/* Error */}
           {!loading && (error || images.every((img) => !img.src)) && (
             <div className="flex flex-col items-center gap-3 text-white/70">
-              <AlertCircle className="w-8 h-8 text-error" />
+              <AlertCircle className="w-8 h-8 text-destructive" />
               <span className="text-sm">
                 {error || t("imageLightbox.loadFailed")}
               </span>

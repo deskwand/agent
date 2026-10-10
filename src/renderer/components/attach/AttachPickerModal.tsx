@@ -82,15 +82,15 @@ export function AttachPickerModal({
           if (event.key === "Escape") onClose();
         }}
       >
-        <div className="flex items-center gap-3 border-b border-border-muted px-6 py-[18px]">
+        <div className="flex items-center gap-3 border-b border-border/60 px-6 py-[18px]">
           <div className="min-w-0 flex-1">
-            <p className="text-[11px] uppercase tracking-[0.14em] text-text-muted">
+            <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
               {t("attachPicker.eyebrow")}
             </p>
-            <DialogTitle className="mt-0.5 text-sm font-semibold text-text-primary">
+            <DialogTitle className="mt-0.5 text-sm font-semibold text-foreground">
               {t(`attachMenu.${source}`)}
             </DialogTitle>
-            <DialogDescription className="mt-0.5 min-h-[18px] truncate text-[13px] text-text-secondary">
+            <DialogDescription className="mt-0.5 min-h-[18px] truncate text-[13px] text-muted-foreground">
               {subtitle}
             </DialogDescription>
           </div>
@@ -98,8 +98,8 @@ export function AttachPickerModal({
 
         {children}
 
-        <div className="flex items-center gap-2.5 border-t border-border-muted px-6 py-3.5">
-          <span className="flex-1 text-xs text-text-muted">
+        <div className="flex items-center gap-2.5 border-t border-border/60 px-6 py-3.5">
+          <span className="flex-1 text-xs text-muted-foreground">
             {selectedCount === 0
               ? t("attachPicker.selectedNone")
               : t("attachPicker.selectedCount", { count: selectedCount })}
@@ -107,7 +107,7 @@ export function AttachPickerModal({
           <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="h-9 rounded-xl border border-border px-4 text-sm text-text-primary transition-colors hover:bg-surface-hover"
+            className="h-9 rounded-xl border border-border px-4 text-sm text-foreground transition-colors hover:bg-accent"
           >
             {t("common.cancel")}
           </Button>
@@ -115,7 +115,7 @@ export function AttachPickerModal({
             type="button"
             disabled={selectedCount === 0}
             onClick={onConfirm}
-            className="h-9 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:border disabled:border-border-muted disabled:bg-surface-muted disabled:text-text-muted"
+            className="h-9 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:border disabled:border-border/60 disabled:bg-muted disabled:text-muted-foreground"
           >
             {t("attachPicker.addCount", { count: selectedCount })}
           </Button>

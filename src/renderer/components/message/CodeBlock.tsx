@@ -50,17 +50,17 @@ export const CodeBlock = memo(function CodeBlock({
   return (
     <div className="relative group my-3 max-w-full overflow-x-hidden">
       <div className="absolute top-2 right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <span className="text-xs text-text-muted px-2 py-1 rounded bg-surface">
+        <span className="text-xs text-muted-foreground px-2 py-1 rounded bg-card">
           {language}
         </span>
         <Button variant="ghost"
           onClick={handleCopy}
-          className="w-7 h-7 flex items-center justify-center rounded bg-surface hover:bg-surface-hover transition-colors"
+          className="w-7 h-7 flex items-center justify-center rounded bg-card hover:bg-accent transition-colors"
         >
           {copied ? (
             <Check className="w-3.5 h-3.5 text-success" />
           ) : (
-            <Copy className="w-3.5 h-3.5 text-text-muted" />
+            <Copy className="w-3.5 h-3.5 text-muted-foreground" />
           )}
         </Button>
       </div>

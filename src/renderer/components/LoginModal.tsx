@@ -225,12 +225,12 @@ export function LoginModal({
           也就是说 loading 中途本来就能点遮罩关掉；新路径没有收紧也没有放宽可中断的时机。
           本弹窗**不加** busy 守卫：原实现也没有（loading 只禁用按钮，不拦关闭）。 */}
       <DialogContent className="max-w-sm p-6">
-        <DialogTitle className="text-base font-semibold text-text-primary mb-5 text-center">
+        <DialogTitle className="text-base font-semibold text-foreground mb-5 text-center">
           {t("auth.loginTitle")}
         </DialogTitle>
 
         {error && (
-          <div className="mb-4 p-2.5 rounded-lg bg-error/10 border border-error/20 text-xs text-error">
+          <div className="mb-4 p-2.5 rounded-lg bg-destructive/10 border border-destructive/20 text-xs text-destructive">
             {error}
           </div>
         )}
@@ -240,7 +240,7 @@ export function LoginModal({
           <Button variant="ghost"
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-background hover:bg-surface-hover border border-border text-text-primary text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 h-auto"
+            className="w-full py-2.5 rounded-lg bg-background hover:bg-accent border border-border text-foreground text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 h-auto"
           >
             <GoogleIcon />
             {t("auth.googleLogin")}
@@ -256,7 +256,7 @@ export function LoginModal({
                 setTimeout(() => emailRef.current?.focus(), 100);
               }}
               disabled={loading}
-              className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 h-auto"
+              className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50 h-auto"
             >
               {t("auth.emailFallback")}
             </Button>
@@ -272,11 +272,11 @@ export function LoginModal({
                   setError(null);
                 }}
                 disabled={loading}
-                className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 h-auto"
+                className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50 h-auto"
               >
                 {t("auth.backToSelect")}
               </Button>
-              <span className="text-xs text-text-secondary font-medium ml-1">
+              <span className="text-xs text-muted-foreground font-medium ml-1">
                 {t("auth.emailLoginTitle")}
               </span>
             </div>
@@ -291,13 +291,13 @@ export function LoginModal({
                 }}
                 placeholder={t("auth.emailPlaceholder")}
                 disabled={loading}
-                className="h-auto w-full rounded-lg border border-border bg-surface-hover px-3 py-2 text-sm text-text-primary shadow-none placeholder:text-text-muted focus:border-primary focus:outline-none disabled:opacity-50"
+                className="h-auto w-full rounded-lg border border-border bg-accent px-3 py-2 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50"
               />
             </div>
             <Button variant="ghost"
               onClick={handleSendCode}
               disabled={loading || !email.trim()}
-              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2 h-auto"
+              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2 h-auto"
             >
               {loading ? t("auth.loading") : t("auth.nextStep")}
             </Button>
@@ -313,11 +313,11 @@ export function LoginModal({
                   setError(null);
                 }}
                 disabled={loading}
-                className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 h-auto"
+                className="text-xs text-muted-foreground hover:text-muted-foreground transition-colors disabled:opacity-50 h-auto"
               >
                 {t("auth.backToSelect")}
               </Button>
-              <span className="text-xs text-text-secondary font-medium ml-1">
+              <span className="text-xs text-muted-foreground font-medium ml-1">
                 {t("auth.emailLoginTitle")}
               </span>
             </div>
@@ -347,20 +347,20 @@ export function LoginModal({
                 placeholder=""
                 maxLength={6}
                 disabled={loading}
-                className="h-auto w-full rounded-lg border border-border bg-surface-hover px-3 py-2 text-sm text-text-primary shadow-none placeholder:text-text-muted focus:border-primary focus:outline-none disabled:opacity-50 text-center tracking-[0.5em]"
+                className="h-auto w-full rounded-lg border border-border bg-accent px-3 py-2 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus:border-primary focus:outline-none disabled:opacity-50 text-center tracking-[0.5em]"
               />
             </div>
             <Button variant="ghost"
               onClick={handleLogin}
               disabled={loading || code.length < 6}
-              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2 h-auto"
+              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2 h-auto"
             >
               {loading ? t("auth.loading") : t("auth.login")}
             </Button>
             <Button variant="ghost"
               onClick={handleSendCode}
               disabled={loading || countdown > 0}
-              className="w-full py-2.5 rounded-lg text-text-secondary hover:bg-surface-hover text-sm transition-colors disabled:opacity-50"
+              className="w-full py-2.5 rounded-lg text-muted-foreground hover:bg-accent text-sm transition-colors disabled:opacity-50"
             >
               {countdown > 0 ? `${countdown}s` : t("auth.resendCode")}
             </Button>

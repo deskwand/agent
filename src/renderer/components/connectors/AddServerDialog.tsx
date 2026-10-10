@@ -85,7 +85,7 @@ function PayloadTextarea({
       onChange={(event) => onChange(event.target.value)}
       spellCheck={false}
       placeholder={placeholder}
-      className="mt-3 h-40 min-h-0 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
+      className="mt-3 h-40 min-h-0 w-full rounded-lg border border-border bg-card px-3 py-2 font-mono text-xs text-foreground shadow-none"
     />
   );
 }
@@ -158,10 +158,10 @@ export function AddServerDialog({
       }}
     >
       <DialogContent className="max-w-lg p-5">
-        <DialogTitle className="text-sm font-medium text-text-primary">
+        <DialogTitle className="text-sm font-medium text-foreground">
           {t("connectors.add.title")}
         </DialogTitle>
-        <DialogDescription className="text-xs text-text-muted mt-1">
+        <DialogDescription className="text-xs text-muted-foreground mt-1">
           {t("connectors.add.hint")}
         </DialogDescription>
         <PayloadTextarea
@@ -173,7 +173,7 @@ export function AddServerDialog({
           onChange={setPayload}
         />
         {error && (
-          <p role="alert" className="text-xs text-error mt-2">
+          <p role="alert" className="text-xs text-destructive mt-2">
             {error}
           </p>
         )}
@@ -181,7 +181,7 @@ export function AddServerDialog({
           <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors h-auto"
+            className="px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-accent transition-colors h-auto"
           >
             {t("common.cancel")}
           </Button>
@@ -189,7 +189,7 @@ export function AddServerDialog({
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50 h-auto"
+            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium transition-colors disabled:opacity-50 h-auto"
           >
             {t("connectors.action.add")}
           </Button>

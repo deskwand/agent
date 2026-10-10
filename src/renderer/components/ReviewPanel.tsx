@@ -312,11 +312,11 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
 
   const toolbar = (
     <div className="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border/20">
-      <GitBranch className="w-4 h-4 text-primary" />
-      <span className="text-sm font-medium text-text-primary">
+      <GitBranch className="w-4 h-4 text-primary-text" />
+      <span className="text-sm font-medium text-foreground">
         {t("reviewPanel.title")}
       </span>
-      <span className="text-xs text-text-muted ml-2">
+      <span className="text-xs text-muted-foreground ml-2">
         {t("reviewPanel.fileCount", { count: diffFiles.length })}
       </span>
       <Tooltip>
@@ -324,7 +324,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
           <Button variant="ghost"
             onClick={loadDiffFiles}
             aria-label={t("reviewPanel.refresh")}
-            className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors ml-2"
+            className="w-6 h-6 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors ml-2"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 ${loadingFiles ? "animate-spin" : ""}`}
@@ -346,7 +346,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
               )
             }
             aria-label={viewModeLabel}
-            className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            className="w-6 h-6 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           >
             <Columns2 className="w-3.5 h-3.5" />
           </Button>
@@ -359,7 +359,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
           <Button variant="ghost"
             onClick={() => setIsFullscreen((f) => !f)}
             aria-label={fullscreenLabel}
-            className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            className="w-7 h-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           >
             {isFullscreen ? (
               <Minimize2 className="w-4 h-4" />
@@ -375,7 +375,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
           <Button variant="ghost"
             onClick={handleClose}
             aria-label={t("common.close")}
-            className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+            className="w-7 h-7 rounded flex items-center justify-center hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
           >
             <X className="w-4 h-4" />
           </Button>
@@ -424,7 +424,7 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
       className={
         isFullscreen
           ? "fixed inset-0 z-50 bg-background flex flex-col"
-          : "flex h-full w-full min-w-0 flex-col overflow-hidden bg-background-secondary"
+          : "flex h-full w-full min-w-0 flex-col overflow-hidden bg-muted"
       }
     >
       {toolbar}
@@ -441,7 +441,7 @@ function renderFileList(
 ) {
   if (loadingFiles && diffFiles.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8 text-text-muted">
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
         <Loader2 className="w-4 h-4 animate-spin mr-2" />
         <span className="text-xs">{i18n.t("common.loading")}</span>
       </div>
@@ -450,7 +450,7 @@ function renderFileList(
 
   if (diffFiles.length === 0) {
     return (
-      <div className="text-center py-8 text-text-muted text-xs">
+      <div className="text-center py-8 text-muted-foreground text-xs">
         {i18n.t("reviewPanel.noDiff")}
       </div>
     );
@@ -462,13 +462,13 @@ function renderFileList(
         <Button variant="ghost"
           key={file.path}
           onClick={() => loadFileDiff(file.path)}
-          className={`w-full text-left px-3 py-1.5 hover:bg-surface-hover transition-colors ${
-            selectedFile === file.path ? "bg-surface-hover" : ""
+          className={`w-full text-left px-3 py-1.5 hover:bg-accent transition-colors ${
+            selectedFile === file.path ? "bg-accent" : ""
           }`}
         >
           <div className="flex items-center gap-1.5 min-w-0">
             <StatusBadge status={file.status} />
-            <span className="text-xs text-text-primary truncate flex-1">
+            <span className="text-xs text-foreground truncate flex-1">
               {file.path}
             </span>
           </div>
@@ -505,7 +505,7 @@ function renderDiffView(
 ) {
   if (!selectedFile) {
     return (
-      <div className="flex items-center justify-center h-full text-text-muted text-sm">
+      <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
         {i18n.t("reviewPanel.selectFileToView")}
       </div>
     );
@@ -513,7 +513,7 @@ function renderDiffView(
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="px-4 py-2 text-xs text-text-muted bg-surface-hover/50 border-b border-border/20 shrink-0 flex items-center gap-2">
+      <div className="px-4 py-2 text-xs text-muted-foreground bg-accent/50 border-b border-border/20 shrink-0 flex items-center gap-2">
         <span className="truncate">{fileName}</span>
       </div>
       <div className="flex-1 overflow-y-auto">
@@ -542,7 +542,7 @@ function renderDiffContent(
 ) {
   if (loadingDiff) {
     return (
-      <div className="flex items-center justify-center py-8 text-text-muted">
+      <div className="flex items-center justify-center py-8 text-muted-foreground">
         <Loader2 className="w-4 h-4 animate-spin mr-2" />
         <span className="text-xs">{i18n.t("reviewPanel.loadingDiff")}</span>
       </div>
@@ -551,7 +551,7 @@ function renderDiffContent(
 
   if (diffData.lines.length === 0) {
     return (
-      <div className="text-center py-8 text-text-muted text-xs space-y-1">
+      <div className="text-center py-8 text-muted-foreground text-xs space-y-1">
         <div>{i18n.t("reviewPanel.noContent")}</div>
         <div className="text-xs opacity-60 space-y-0.5 font-mono">
           <div>dir: {debugCwd || "—"}</div>
@@ -582,7 +582,7 @@ function renderDiffContent(
             return (
               <div
                 key={i}
-                className="text-text-muted font-bold bg-surface-hover/30 px-3 py-px"
+                className="text-muted-foreground font-bold bg-accent/30 px-3 py-px"
               >
                 {row.meta}
               </div>
@@ -594,11 +594,11 @@ function renderDiffContent(
               <div
                 className={`w-1/2 flex ${row.left?.type === "del" ? "bg-red-500/10" : ""}`}
               >
-                <span className="w-12 shrink-0 text-right pr-2 text-text-muted select-none pt-px border-r border-border/20">
+                <span className="w-12 shrink-0 text-right pr-2 text-muted-foreground select-none pt-px border-r border-border/20">
                   {row.left?.oldLine ?? ""}
                 </span>
                 <span
-                  className={`flex-1 whitespace-pre-wrap ${row.left?.type === "del" ? "text-red-700 dark:text-red-300" : "text-text-primary"}`}
+                  className={`flex-1 whitespace-pre-wrap ${row.left?.type === "del" ? "text-red-700 dark:text-red-300" : "text-foreground"}`}
                 >
                   {row.left?.content ?? " "}
                 </span>
@@ -609,11 +609,11 @@ function renderDiffContent(
               <div
                 className={`w-1/2 flex ${row.right?.type === "add" ? "bg-emerald-500/10" : ""}`}
               >
-                <span className="w-12 shrink-0 text-right pr-2 text-text-muted select-none pt-px border-r border-border/20">
+                <span className="w-12 shrink-0 text-right pr-2 text-muted-foreground select-none pt-px border-r border-border/20">
                   {row.right?.newLine ?? ""}
                 </span>
                 <span
-                  className={`flex-1 whitespace-pre-wrap ${row.right?.type === "add" ? "text-emerald-700 dark:text-emerald-300" : "text-text-primary"}`}
+                  className={`flex-1 whitespace-pre-wrap ${row.right?.type === "add" ? "text-emerald-700 dark:text-emerald-300" : "text-foreground"}`}
                 >
                   {row.right?.content ?? " "}
                 </span>
@@ -637,8 +637,8 @@ function renderDiffContent(
               : line.type === "hunk"
                 ? "text-cyan-700 dark:text-cyan-400"
                 : line.type === "meta"
-                  ? "text-text-muted font-bold"
-                  : "text-text-primary";
+                  ? "text-muted-foreground font-bold"
+                  : "text-foreground";
         return (
           <div key={i} className={`${bgClass}`}>
             {line.content || " "}

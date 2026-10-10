@@ -35,7 +35,7 @@ import { Button } from "../app-button";
 
 /** 卡片里那一行控件的统一样式。 */
 const CARD_CONTROL_CLASS =
-  "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary";
+  "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-accent hover:text-foreground";
 
 export function VoiceMiniButton(): JSX.Element | null {
   const { t } = useTranslation();
@@ -106,7 +106,7 @@ export function VoiceMiniButton(): JSX.Element | null {
             setCardOpen(false);
         }}
       >
-        <div className="rounded-xl border border-border-subtle bg-background/95 p-2.5 shadow-elevated backdrop-blur">
+        <div className="rounded-xl border border-border/40 bg-background/95 p-2.5 shadow-elevated backdrop-blur">
           <div className="flex gap-2.5">
             {/* 槽位先占着、球后挂：不然悬停的瞬间卡片会跳一下 */}
             <span className="block h-[62px] w-[62px] shrink-0">
@@ -116,7 +116,7 @@ export function VoiceMiniButton(): JSX.Element | null {
             </span>
             <p
               data-testid="voice-mini-caption"
-              className="text-xs leading-[1.6] text-text-secondary"
+              className="text-xs leading-[1.6] text-muted-foreground"
               style={{
                 display: "-webkit-box",
                 WebkitLineClamp: 3,
@@ -127,7 +127,7 @@ export function VoiceMiniButton(): JSX.Element | null {
               {caption}
             </p>
           </div>
-          <div className="mt-2 flex items-center justify-center gap-1 border-t border-border-subtle pt-1.5">
+          <div className="mt-2 flex items-center justify-center gap-1 border-t border-border/40 pt-1.5">
             <Button variant="ghost"
               type="button"
               data-testid="voice-mini-mute"
@@ -148,7 +148,7 @@ export function VoiceMiniButton(): JSX.Element | null {
               data-testid="voice-mini-end"
               aria-label={t("voiceMode.endVoice")}
               onClick={closeVoiceMode}
-              className={`${CARD_CONTROL_CLASS} hover:text-error`}
+              className={`${CARD_CONTROL_CLASS} hover:text-destructive`}
             >
               <X className="h-3.5 w-3.5" />
             </Button>

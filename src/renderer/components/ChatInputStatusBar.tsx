@@ -268,7 +268,7 @@ export function ChatInputStatusBar({
           >
             {hasPlan ? (
               <>
-                <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-text-muted uppercase">
+                <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-muted-foreground uppercase">
                   <span>{t("activity.planSection")}</span>
                   <span className="ml-auto tracking-normal">
                     {t("activity.planDone", {
@@ -297,20 +297,20 @@ export function ChatInputStatusBar({
                         {shown === "completed" ? (
                           <CheckCircle2 className="h-3.5 w-3.5 text-success" />
                         ) : shown === "in_progress" ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary-text" />
                         ) : shown === "cancelled" ? (
-                          <XCircle className="h-3.5 w-3.5 text-text-muted" />
+                          <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
                         ) : (
-                          <Square className="h-3.5 w-3.5 text-text-muted" />
+                          <Square className="h-3.5 w-3.5 text-muted-foreground" />
                         )}
                       </span>
                       <span
                         className={`min-w-0 flex-1 ${
                           shown === "completed" || shown === "cancelled"
-                            ? "text-text-muted line-through"
+                            ? "text-muted-foreground line-through"
                             : shown === "in_progress"
-                              ? "font-medium text-primary"
-                              : "text-text-primary"
+                              ? "font-medium text-primary-text"
+                              : "text-foreground"
                         }`}
                       >
                         {todo.content}
@@ -321,7 +321,7 @@ export function ChatInputStatusBar({
               </>
             ) : null}
             {rows.length > 0 ? (
-              <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-text-muted uppercase">
+              <div className="flex items-baseline gap-1.5 px-2 pt-1 pb-1 text-[10px] tracking-wide text-muted-foreground uppercase">
                 <span>{t("activity.subagentsSection")}</span>
               </div>
             ) : null}
@@ -333,7 +333,7 @@ export function ChatInputStatusBar({
                   setPanelOpen(false);
                   onSelectBackgroundAgent?.(row.toolCallId);
                 }}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-surface-hover/60 ${
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-accent/60 ${
                   // 已完成的行降一档：面板里可能同时有"上一轮还在跑的"和"本轮已完成的"。
                   // `error` 刻意不降 —— 失败是应该被注意到的信号。
                   row.status === "completed" ? "opacity-60" : ""
@@ -341,10 +341,10 @@ export function ChatInputStatusBar({
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   {/* ① 名字（只有面板内类型不统一时才带后缀） */}
-                  <span className="truncate text-text-primary">
+                  <span className="truncate text-foreground">
                     {row.name ?? row.type ?? row.toolCallId}
                     {showType && row.name && row.type ? (
-                      <span className="text-text-muted">
+                      <span className="text-muted-foreground">
                         {" · "}
                         {row.type}
                       </span>
@@ -352,18 +352,18 @@ export function ChatInputStatusBar({
                   </span>
                   {/* ② 任务描述：始终显示（之前只在没有步骤时才出现） */}
                   {row.description ? (
-                    <span className="truncate text-text-secondary">
+                    <span className="truncate text-muted-foreground">
                       {row.description}
                     </span>
                   ) : null}
                   {/* ③ 当前动作 / 最后一步：没有就不渲染，避免与描述重复同一句话 */}
                   {row.currentLabel ? (
-                    <span className="truncate font-mono text-text-muted">
+                    <span className="truncate font-mono text-muted-foreground">
                       {row.currentLabel}
                     </span>
                   ) : null}
                 </span>
-                <span className="flex flex-shrink-0 items-center gap-1 text-text-muted">
+                <span className="flex flex-shrink-0 items-center gap-1 text-muted-foreground">
                   {row.stepCount > 0 && <span>{row.stepCount}</span>}
                   {row.durationMs > 0 && (
                     <span>
@@ -373,9 +373,9 @@ export function ChatInputStatusBar({
                     </span>
                   )}
                   {row.status === "running" ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                    <Loader2 className="h-3 w-3 animate-spin text-primary-text" />
                   ) : row.status === "error" ? (
-                    <XCircle className="h-3 w-3 text-error" />
+                    <XCircle className="h-3 w-3 text-destructive" />
                   ) : (
                     <CheckCircle2 className="h-3 w-3" />
                   )}
@@ -392,7 +392,7 @@ export function ChatInputStatusBar({
             aria-label={
               hasPlan || countInChip ? undefined : t("activity.panelTitle")
             }
-            className="flex min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-background-secondary px-2 py-0.5 text-left text-text-primary transition-colors hover:bg-surface-active"
+            className="flex min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-foreground transition-colors hover:bg-accent"
           >
             {hasPlan ? (
               <>
@@ -401,7 +401,7 @@ export function ChatInputStatusBar({
                   aria-valuemin={0}
                   aria-valuemax={todos.length}
                   aria-valuenow={completedCount}
-                  className="h-1 w-[34px] flex-none overflow-hidden rounded-full bg-surface-active"
+                  className="h-1 w-[34px] flex-none overflow-hidden rounded-full bg-accent"
                 >
                   <span
                     className="block h-full bg-primary"
@@ -415,19 +415,19 @@ export function ChatInputStatusBar({
                   {completedCount}/{todos.length}
                 </span>
                 {statusLabel ? (
-                  <span className="max-w-[12rem] min-w-0 truncate text-text-muted">
+                  <span className="max-w-[12rem] min-w-0 truncate text-muted-foreground">
                     · {statusLabel}
                   </span>
                 ) : null}
               </>
             ) : null}
             {countInChip ? (
-              <span className={`flex-none ${hasPlan ? "text-text-muted" : ""}`}>
+              <span className={`flex-none ${hasPlan ? "text-muted-foreground" : ""}`}>
                 {hasPlan ? "· " : ""}
                 {t("activity.subagents", { count: rows.length })}
               </span>
             ) : null}
-            <ChevronDown className="h-3 w-3 flex-none text-text-muted" />
+            <ChevronDown className="h-3 w-3 flex-none text-muted-foreground" />
           </Button>
         </PopoverTrigger>
       </span>
@@ -444,7 +444,7 @@ export function ChatInputStatusBar({
       status.type === "goal-budget-limited")
   ) {
     const renderGoalIcon = (type: string) => {
-      const cls = "w-3.5 h-3.5 flex-shrink-0 text-text-muted";
+      const cls = "w-3.5 h-3.5 flex-shrink-0 text-muted-foreground";
       switch (type) {
         case "goal-active":
           return <Target className={cls} />;
@@ -502,7 +502,7 @@ export function ChatInputStatusBar({
     return (
       <div ref={panelRef} className="relative min-h-5 px-1 pb-1">
         <style>{gradientStyles}</style>
-        <div className="flex items-center gap-1.5 text-xs text-text-primary">
+        <div className="flex items-center gap-1.5 text-xs text-foreground">
           {renderGoalIcon(status.type)}
           <span
             className={`min-w-0 truncate ${status.type === "goal-active" ? "gradient-text" : ""}`}
@@ -510,14 +510,14 @@ export function ChatInputStatusBar({
             {status.objective}
           </span>
           <span
-            className={`flex-shrink-0 text-text-muted ${status.type === "goal-active" ? "gradient-text" : ""}`}
+            className={`flex-shrink-0 text-muted-foreground ${status.type === "goal-active" ? "gradient-text" : ""}`}
           >
             {infoText}
           </span>
           {status.type === "goal-active" && onGoalCommand && (
             <Button variant="ghost"
               type="button"
-              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
+              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
               onClick={() => onGoalCommand("goal:pause")}
             >
               {t("goal.pause")}
@@ -527,14 +527,14 @@ export function ChatInputStatusBar({
             <>
               <Button variant="ghost"
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
                 onClick={() => onGoalCommand("goal:resume")}
               >
                 {t("goal.resume")}
               </Button>
               <Button variant="ghost"
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-surface-hover text-text-muted hover:bg-surface-hover/80 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent text-muted-foreground hover:bg-accent/80 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
                 onClick={() => onGoalCommand("goal:clear")}
               >
                 {t("goal.clear")}
@@ -564,55 +564,55 @@ export function ChatInputStatusBar({
     return null;
   })();
   let text = "";
-  let toneClass = "text-text-muted";
+  let toneClass = "text-muted-foreground";
   let isRunning = false;
 
   if (status) {
     switch (status.type) {
       case "sending":
         text = t("chat.sending");
-        toneClass = "text-text-primary";
+        toneClass = "text-foreground";
         isRunning = true;
         break;
       case "thinking":
         text = t("chat.processing");
-        toneClass = "text-text-primary";
+        toneClass = "text-foreground";
         isRunning = true;
         break;
       case "responding":
         text = t("chat.responding");
-        toneClass = "text-text-primary";
+        toneClass = "text-foreground";
         isRunning = true;
         break;
       case "compacting":
         text = t("chat.compacting");
-        toneClass = "text-text-primary";
+        toneClass = "text-foreground";
         isRunning = true;
         break;
       case "compaction-success":
         text = t("chat.compacted");
-        toneClass = "text-text-muted";
+        toneClass = "text-muted-foreground";
         break;
       case "compaction-failed":
         text = t("chat.compactFailed");
-        toneClass = "text-text-muted";
+        toneClass = "text-muted-foreground";
         break;
       case "compaction-aborted":
         text = t("chat.compactAborted");
-        toneClass = "text-text-muted";
+        toneClass = "text-muted-foreground";
         break;
       case "background-agent":
         if (status.done) {
           text = status.hasError
             ? t("subagent.statusFinishedWithErrors", { count: status.count })
             : t("subagent.statusDone", { count: status.count });
-          toneClass = status.hasError ? "text-error" : "text-text-muted";
+          toneClass = status.hasError ? "text-destructive" : "text-muted-foreground";
         } else {
           text = t("subagent.statusRunning", {
             count: status.count,
             detail: status.detail ? ` ${status.detail}` : "",
           });
-          toneClass = "text-text-primary";
+          toneClass = "text-foreground";
           isRunning = true;
         }
         break;
@@ -638,7 +638,7 @@ export function ChatInputStatusBar({
         ) : null}
         {elapsed ? (
           // flex-shrink-0 + 不参与 truncate：长文案先被截断，秒表始终可见。
-          <span className="flex-shrink-0 text-text-muted">
+          <span className="flex-shrink-0 text-muted-foreground">
             {text ? "· " : ""}
             {/* 槽位：两格叠在同一个 grid 单元格，盒宽取两者最大值 ——
                 正常时长下 = 哨兵宽度（恒定），于是 chip 零位移。

@@ -98,8 +98,11 @@ describe("标题栏操作按钮", () => {
     const browser = el.querySelector<HTMLElement>(
       '[aria-label="titlebar.builtInBrowser"]',
     )!;
-    expect(browser.className).toContain("hover:bg-overlay-hover");
-    expect(browser.className).not.toContain("bg-overlay-on");
+    // 2026-10：叠层 token 换成官方 --accent（悬浮底 = hover:bg-accent）。
+    // 注意 "hover:bg-accent" 里含子串 "bg-accent"，所以不能再拿 includes 判"没有 bg-accent" ——
+    // 必须按 token 边界判"没有裸的 bg-accent"。
+    expect(browser.className).toContain("hover:bg-accent");
+    expect(browser.className).not.toMatch(/(?:^|\s)bg-accent(?:\s|$)/);
   });
 
   it("面板开启时该按钮切到 on 叠层", async () => {
@@ -108,7 +111,8 @@ describe("标题栏操作按钮", () => {
     const artifact = el.querySelector<HTMLElement>(
       '[aria-label="artifactPanel.toggle"]',
     )!;
-    expect(artifact.className).toContain("bg-overlay-on");
-    expect(artifact.className).not.toContain("hover:bg-overlay-hover");
+    expect(artifact.className).toMatch(/(?:^|\s)bg-accent(?:\s|$)/);
+    // 开态不再要求"没有 hover:bg-accent"：app-button 的 ghost 变体自带 hover:bg-accent，
+    // 而开态用的是裸 bg-accent（更高一档的实心底）—— 两者共存是预期。
   });
 });

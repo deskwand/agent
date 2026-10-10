@@ -22,7 +22,7 @@ describe("TopUpModal wiring", () => {
     const source = fs.readFileSync(modalPath, "utf8");
     expect(source).toContain("topUp.title");
     expect(source).toContain("bg-primary");
-    expect(source).toContain("text-text-primary");
+    expect(source).toContain("text-foreground");
   });
 
   it("is mounted in App", () => {

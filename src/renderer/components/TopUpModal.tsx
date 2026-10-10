@@ -175,7 +175,7 @@ export function TopUpModal() {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex flex-col gap-4 px-6 pt-6">
-          <h2 className="text-lg font-semibold text-text-primary">
+          <h2 className="text-lg font-semibold text-foreground">
             {t("topUp.title")}
           </h2>
           <div className="flex gap-1 rounded-lg border border-border p-1">
@@ -183,7 +183,7 @@ export function TopUpModal() {
               className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
                 tab === "topup"
                   ? "bg-primary text-primary-foreground"
-                  : "text-text-primary"
+                  : "text-foreground"
               }`}
               onClick={() => setTab("topup")}
             >
@@ -193,7 +193,7 @@ export function TopUpModal() {
               className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
                 tab === "history"
                   ? "bg-primary text-primary-foreground"
-                  : "text-text-primary"
+                  : "text-foreground"
               }`}
               onClick={() => setTab("history")}
             >
@@ -203,30 +203,30 @@ export function TopUpModal() {
         </div>
         <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
           {tab === "topup" && (
-            <p className="text-sm text-text-muted">{t("topUp.subtitle")}</p>
+            <p className="text-sm text-muted-foreground">{t("topUp.subtitle")}</p>
           )}
 
           {tab === "topup" && step === "amount" && (
             <>
-              <label className="text-sm text-text-primary">
+              <label className="text-sm text-foreground">
                 {t("topUp.amountLabel")}
               </label>
               <Input
-                className="h-auto w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary shadow-none outline-none focus:border-primary"
+                className="h-auto w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground shadow-none outline-none focus:border-primary"
                 placeholder={t("topUp.amountPlaceholder")}
                 value={amountInput}
                 onChange={(e) => setAmountInput(e.target.value)}
                 inputMode="decimal"
               />
               {amountInput !== "" && parsedCents === null && (
-                <p className="text-sm text-error">{t("topUp.invalidAmount")}</p>
+                <p className="text-sm text-destructive">{t("topUp.invalidAmount")}</p>
               )}
               <div className="flex flex-wrap gap-2">
                 {QUICK_AMOUNTS.map((cents) => (
                   <Button
                     variant="ghost"
                     key={cents}
-                    className="h-auto rounded-full border border-border px-3 py-1 text-sm text-text-primary hover:border-primary hover:bg-transparent hover:text-text-primary"
+                    className="h-auto rounded-full border border-border px-3 py-1 text-sm text-foreground hover:border-primary hover:bg-transparent hover:text-foreground"
                     onClick={() => setAmountInput((cents / 100).toFixed(2))}
                   >
                     ${cents / 100}
@@ -235,7 +235,7 @@ export function TopUpModal() {
               </div>
               <Button
                 variant="ghost"
-                className="h-auto w-full rounded-lg bg-primary py-2 text-sm text-primary-foreground shadow-none hover:bg-primary-hover disabled:opacity-40"
+                className="h-auto w-full rounded-lg bg-primary py-2 text-sm text-primary-foreground shadow-none hover:bg-primary/90 disabled:opacity-40"
                 disabled={parsedCents === null}
                 onClick={() =>
                   parsedCents !== null &&
@@ -249,7 +249,7 @@ export function TopUpModal() {
 
           {tab === "topup" && step === "chain" && (
             <>
-              <label className="text-sm text-text-primary">
+              <label className="text-sm text-foreground">
                 {t("topUp.chainLabel")}
               </label>
               <div className="flex flex-col gap-2">
@@ -257,7 +257,7 @@ export function TopUpModal() {
                   <Button
                     variant="ghost"
                     key={c}
-                    className={`h-auto rounded-lg border px-3 py-2 text-sm text-text-primary hover:bg-transparent hover:text-text-primary ${
+                    className={`h-auto rounded-lg border px-3 py-2 text-sm text-foreground hover:bg-transparent hover:text-foreground ${
                       chain === c ? "border-primary" : "border-border"
                     }`}
                     onClick={() => setChain(c)}
@@ -270,28 +270,28 @@ export function TopUpModal() {
                   </Button>
                 ))}
               </div>
-              <p className="text-xs text-text-muted">{t("topUp.chainHint")}</p>
+              <p className="text-xs text-muted-foreground">{t("topUp.chainHint")}</p>
               {payStatus === "networkError" && (
-                <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-text-muted">
+                <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-muted-foreground">
                   {t("topUp.networkError")}
                 </p>
               )}
               {payStatus === "tooManyPending" && (
-                <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-text-muted">
+                <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-muted-foreground">
                   {t("topUp.tooManyPending")}
                 </p>
               )}
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
-                  className="h-auto flex-1 rounded-lg border border-border py-2 text-sm text-text-primary hover:bg-transparent hover:text-text-primary"
+                  className="h-auto flex-1 rounded-lg border border-border py-2 text-sm text-foreground hover:bg-transparent hover:text-foreground"
                   onClick={() => setStep("amount")}
                 >
                   {t("topUp.back")}
                 </Button>
                 <Button
                   variant="ghost"
-                  className="h-auto flex-1 rounded-lg bg-primary py-2 text-sm text-primary-foreground shadow-none hover:bg-primary-hover"
+                  className="h-auto flex-1 rounded-lg bg-primary py-2 text-sm text-primary-foreground shadow-none hover:bg-primary/90"
                   disabled={creating}
                   onClick={createOrder}
                 >
@@ -309,37 +309,37 @@ export function TopUpModal() {
                 ) : (
                   <div className="h-40 w-40 rounded-lg bg-background/60" />
                 )}
-                <p className="text-xs text-text-muted">{t("topUp.qrHint")}</p>
+                <p className="text-xs text-muted-foreground">{t("topUp.qrHint")}</p>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-sm text-text-muted">
+                <span className="text-sm text-muted-foreground">
                   {t("topUp.addressLabel")}
                 </span>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 break-all rounded-lg border border-border px-2 py-1.5 text-xs text-text-primary">
+                  <code className="flex-1 break-all rounded-lg border border-border px-2 py-1.5 text-xs text-foreground">
                     {order.deposit_address}
                   </code>
                   <Button
                     variant="ghost"
-                    className="h-auto rounded-lg border border-border px-2 py-1.5 text-xs text-text-primary hover:bg-transparent hover:text-text-primary"
+                    className="h-auto rounded-lg border border-border px-2 py-1.5 text-xs text-foreground hover:bg-transparent hover:text-foreground"
                     onClick={copyAddress}
                   >
                     {copied ? t("topUp.copied") : t("topUp.copy")}
                   </Button>
                 </div>
-                <span className="mt-2 text-sm text-text-muted">
+                <span className="mt-2 text-sm text-muted-foreground">
                   {t("topUp.amountToSend")}
                 </span>
-                <span className="text-base font-semibold text-text-primary">
+                <span className="text-base font-semibold text-foreground">
                   {displayAmount} {chain === "base" ? "USDC" : "USDT/USDC"}
                 </span>
               </div>
-              <p className="text-xs text-text-muted">
+              <p className="text-xs text-muted-foreground">
                 {t("topUp.payHint", { amount: displayAmount })}
               </p>
               <Button
                 variant="ghost"
-                className="h-auto w-full rounded-lg bg-primary py-2 text-sm text-primary-foreground shadow-none hover:bg-primary-hover"
+                className="h-auto w-full rounded-lg bg-primary py-2 text-sm text-primary-foreground shadow-none hover:bg-primary/90"
                 onClick={startWaiting}
               >
                 {t("topUp.next")}
@@ -349,10 +349,10 @@ export function TopUpModal() {
 
           {tab === "topup" && step === "waiting" && (
             <>
-              <p className="text-sm font-medium text-text-primary">
+              <p className="text-sm font-medium text-foreground">
                 {t("topUp.waitingTitle")}
               </p>
-              <p className="text-sm text-text-muted">
+              <p className="text-sm text-muted-foreground">
                 {t("topUp.waitingHint")}
               </p>
               {payStatus === "confirmed" && (
@@ -365,23 +365,23 @@ export function TopUpModal() {
                 </p>
               )}
               {payStatus === "orderExpired" && (
-                <p className="rounded-lg bg-error/10 px-3 py-2 text-sm text-error">
+                <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {t("topUp.orderExpired")}
                 </p>
               )}
               {payStatus === "timeout" && (
-                <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-text-muted">
+                <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-muted-foreground">
                   {t("topUp.timeout")}
                 </p>
               )}
               {payStatus === "tooManyPending" && (
-                <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-text-muted">
+                <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-muted-foreground">
                   {t("topUp.tooManyPending")}
                 </p>
               )}
               <Button
                 variant="ghost"
-                className="h-auto w-full rounded-lg border border-border py-2 text-sm text-text-primary hover:bg-transparent hover:text-text-primary"
+                className="h-auto w-full rounded-lg border border-border py-2 text-sm text-foreground hover:bg-transparent hover:text-foreground"
                 onClick={() => setTopUpOpen(false)}
               >
                 {t("topUp.close")}

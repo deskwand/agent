@@ -72,7 +72,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
     switch (updateStatus) {
       case "checking":
         return (
-          <span className="inline-flex items-center gap-1.5 text-xs text-text-muted">
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <RefreshCw className="w-3 h-3 animate-spin" />
             {t("about.checking")}
           </span>
@@ -86,14 +86,14 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
         );
       case "available":
         return (
-          <span className="inline-flex items-center gap-1 text-xs text-primary">
+          <span className="inline-flex items-center gap-1 text-xs text-primary-text">
             <Download className="w-3 h-3" />
             {t("about.newVersionAvailable", { version: updateVersion })}
           </span>
         );
       case "downloading":
         return (
-          <span className="inline-flex items-center gap-1 text-xs text-primary">
+          <span className="inline-flex items-center gap-1 text-xs text-primary-text">
             <Download className="w-3 h-3 animate-pulse" />
             {t("about.downloading", { percent: updateProgress })}
           </span>
@@ -107,7 +107,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
         );
       case "error":
         return (
-          <span className="inline-flex items-center gap-1 text-xs text-error">
+          <span className="inline-flex items-center gap-1 text-xs text-destructive">
             <AlertCircle className="w-3 h-3" />
             {t("about.updateFailed")}
           </span>
@@ -129,11 +129,11 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
           />
 
           <div className="min-w-0 flex-1">
-            <div className="text-xl font-bold tracking-tight text-text-primary select-none">
+            <div className="text-xl font-bold tracking-tight text-foreground select-none">
               DeskWand
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-surface-muted font-mono text-xs text-text-muted">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-muted font-mono text-xs text-muted-foreground">
                 v{appVersion || "—"}
               </span>
               {statusBadge()}
@@ -145,7 +145,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
               <Button variant="ghost"
                 onClick={handleCheckUpdate}
                 className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-lg
-                  bg-surface text-text-secondary hover:bg-surface-hover
+                  bg-card text-muted-foreground hover:bg-accent
                   ring-1 ring-border-subtle hover:ring-border-muted
                   transition-all duration-150 h-auto"
               >
@@ -158,7 +158,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
               <Button variant="ghost"
                 onClick={handleCheckUpdate}
                 className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-lg
-                  bg-surface text-text-secondary hover:bg-surface-hover
+                  bg-card text-muted-foreground hover:bg-accent
                   ring-1 ring-border-subtle hover:ring-border-muted
                   transition-all duration-150 h-auto"
               >
@@ -171,7 +171,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
               <Button variant="ghost"
                 onClick={handleRestart}
                 className="inline-flex items-center gap-2 text-xs px-5 py-2 rounded-lg
-                  bg-primary text-primary-foreground hover:bg-primary-hover
+                  bg-primary text-primary-foreground hover:bg-primary/90
                   shadow-sm transition-all duration-150 h-auto"
               >
                 {t("about.restartNow")}
@@ -187,7 +187,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={updateProgress}
-            className="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface-muted"
+            className="mt-3 h-1 w-full overflow-hidden rounded-full bg-muted"
           >
             <div
               className="h-full bg-primary rounded-full transition-all duration-300"
@@ -197,7 +197,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
         )}
 
         {updateStatus === "error" && updateError && (
-          <p className="mt-2 text-xs leading-relaxed text-text-muted">
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             {updateError}
           </p>
         )}
@@ -205,7 +205,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
 
       {/* 产品介绍：一段定位 + 6 条核心能力 */}
       <SettingsSection title={t("about.title")}>
-        <p className="px-1 text-sm leading-6 text-text-secondary">
+        <p className="px-1 text-sm leading-6 text-muted-foreground">
           {t("about.intro")}
         </p>
         <SettingsCard>
@@ -227,7 +227,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
             key={link.labelKey}
             type="button"
             onClick={() => void window.electronAPI?.openExternal(link.url)}
-            className="border-b border-border-muted pb-px text-xs text-text-secondary transition-colors hover:text-text-primary h-auto"
+            className="border-b border-border/60 pb-px text-xs text-muted-foreground transition-colors hover:text-foreground h-auto"
           >
             {t(link.labelKey)}
           </Button>

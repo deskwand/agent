@@ -27,7 +27,7 @@ export const MessageMarkdown = memo(function MessageMarkdown({
   components,
 }: MessageMarkdownProps) {
   return (
-    <div className="prose-chat max-w-full text-text-primary">
+    <div className="prose-chat max-w-full text-foreground">
       <ReactMarkdown
         remarkPlugins={
           REMARK_PLUGINS as unknown as Parameters<

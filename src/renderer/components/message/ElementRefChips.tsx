@@ -39,17 +39,17 @@ export function ElementRefChips({
               type="button"
               onClick={() => reveal(selection.selector)}
               aria-label={t("elementRef.reveal")}
-              className="inline-flex max-w-[18rem] items-center gap-1 rounded-md bg-surface-muted px-2 py-0.5 text-[11px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary h-auto"
+              className="inline-flex max-w-[18rem] items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground h-auto"
             >
               <MousePointerSquareDashed className="h-3 w-3 shrink-0" />
               <span className="truncate">{label}</span>
               {selection.text ? (
-                <span className="truncate text-text-muted">
+                <span className="truncate text-muted-foreground">
                   {selection.text}
                 </span>
               ) : null}
               {selection.selectorUnique ? null : (
-                <span className="shrink-0 rounded bg-surface px-1 text-[10px] text-text-muted">
+                <span className="shrink-0 rounded bg-card px-1 text-[10px] text-muted-foreground">
                   {t("attachTile.notUnique")}
                 </span>
               )}

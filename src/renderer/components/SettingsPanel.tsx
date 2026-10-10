@@ -224,7 +224,7 @@ export function SettingsPanel({
     <div className="flex h-full w-full overflow-hidden bg-background">
       {/* Sidebar */}
       <div
-        className={`${compactSidebar ? "w-14" : "w-[220px]"} bg-background-secondary/80 flex flex-col flex-shrink-0`}
+        className={`${compactSidebar ? "w-14" : "w-[220px]"} bg-muted/80 flex flex-col flex-shrink-0`}
       >
         {/* Back button — settings top-left */}
         <div
@@ -234,14 +234,14 @@ export function SettingsPanel({
         >
           <Button variant="ghost"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-surface-hover transition-colors inline-flex h-auto"
+            className="p-2 rounded-lg hover:bg-accent transition-colors inline-flex h-auto"
           >
-            <ArrowLeft className="w-5 h-5 text-text-secondary" />
+            <ArrowLeft className="w-5 h-5 text-muted-foreground" />
           </Button>
         </div>
         {!compactSidebar && (
           <div className="px-5 pt-1 pb-2">
-            <h2 className="text-sm font-semibold text-text-primary">
+            <h2 className="text-sm font-semibold text-foreground">
               {t("settings.title")}
             </h2>
           </div>
@@ -257,7 +257,7 @@ export function SettingsPanel({
               className={compactSidebar ? "space-y-1 py-1" : "py-1.5"}
             >
               {!compactSidebar && (
-                <div className="px-2.5 pb-1 text-xs text-text-muted">
+                <div className="px-2.5 pb-1 text-xs text-muted-foreground">
                   {group.label}
                 </div>
               )}
@@ -277,8 +277,8 @@ export function SettingsPanel({
                           : "gap-2.5 px-2.5 py-2"
                       } ${
                         active
-                          ? "bg-surface font-medium text-text-primary"
-                          : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                          ? "bg-card font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       }`}
                     >
                       <tab.icon className="h-4 w-4 flex-shrink-0" />
@@ -294,7 +294,7 @@ export function SettingsPanel({
         </div>
         {!compactSidebar && (
           <div className="p-4">
-            <p className="text-xs text-text-muted text-center mt-2 select-text">
+            <p className="text-xs text-muted-foreground text-center mt-2 select-text">
               v{appVersion}
             </p>
           </div>
@@ -305,11 +305,11 @@ export function SettingsPanel({
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <div className="flex flex-shrink-0 items-center gap-3 bg-background/90 px-4 py-4 lg:px-8">
           <div>
-            <h3 className="text-2xl font-semibold text-text-primary">
+            <h3 className="text-2xl font-semibold text-foreground">
               {activeTabMeta?.label}
             </h3>
             {activeTabMeta?.description && (
-              <p className="mt-1 text-sm text-text-muted">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {activeTabMeta.description}
               </p>
             )}

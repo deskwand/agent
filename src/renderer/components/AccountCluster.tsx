@@ -109,7 +109,7 @@ export function AccountCluster() {
           <Button variant="ghost"
             type="button"
             aria-label={t("sidebar.user")}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary transition-colors hover:bg-primary/25"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary-text transition-colors hover:bg-primary/25"
           >
             {identityEmail ? (
               avatarInitials(identityEmail)

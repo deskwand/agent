@@ -82,15 +82,15 @@ export function SettingsGlobalAgentsMd() {
         <div className="space-y-3 p-4">
           {/* 2026-10-09 相位 3 ✓：`Textarea` base 自带 min-h-[80px] rounded-md border-input
               bg-transparent px-3 py-2 shadow-sm —— 与本仓观感冲突的逐条覆盖回来 ✗✓（min-h-44 /
-              rounded-lg / border-border-muted / bg-background-secondary / p-3 / shadow-none）。 */}
+              rounded-lg / border-border/60 / bg-muted / p-3 / shadow-none）。 */}
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder={t("agentsMd.placeholder")}
-            className="min-h-44 w-full resize-y rounded-lg border border-border-muted bg-background-secondary p-3 font-mono text-sm text-text-primary shadow-none"
+            className="min-h-44 w-full resize-y rounded-lg border border-border/60 bg-muted p-3 font-mono text-sm text-foreground shadow-none"
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="text-xs text-text-muted">
+            <span className="text-xs text-muted-foreground">
               {t("agentsMd.hint")}
             </span>
             <div className="flex items-center gap-2">
@@ -98,7 +98,7 @@ export function SettingsGlobalAgentsMd() {
                 variant="outline"
                 type="button"
                 onClick={handleInsertTemplate}
-                className="h-auto rounded-lg border-border bg-transparent px-3 py-1.5 text-sm font-normal text-text-primary shadow-none hover:bg-surface-hover hover:text-text-primary"
+                className="h-auto rounded-lg border-border bg-transparent px-3 py-1.5 text-sm font-normal text-foreground shadow-none hover:bg-accent hover:text-foreground"
               >
                 {t("agentsMd.insertTemplate")}
               </Button>
@@ -109,14 +109,14 @@ export function SettingsGlobalAgentsMd() {
                   void handleSave();
                 }}
                 disabled={isBusy || !loaded}
-                className="h-auto rounded-lg px-4 py-1.5 text-sm shadow-none hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-auto rounded-lg px-4 py-1.5 text-sm shadow-none hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {t("agentsMd.save")}
               </Button>
             </div>
           </div>
           {status && (
-            <div className="rounded-lg border border-border-muted bg-background-secondary px-4 py-3 text-sm text-text-secondary">
+            <div className="rounded-lg border border-border/60 bg-muted px-4 py-3 text-sm text-muted-foreground">
               {status}
             </div>
           )}

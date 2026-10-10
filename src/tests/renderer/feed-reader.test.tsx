@@ -201,7 +201,7 @@ describe("FeedReaderPane", () => {
     expect(title.className).toContain("text-lg");
     expect(body.className).toContain("text-base");
     // 正文是右栏里唯一要真读的段落：浅色主题下 muted 在 background-secondary 上只有 4.06:1
-    expect(body.className).toContain("text-text-primary");
+    expect(body.className).toContain("text-foreground");
     expect(hero.className).not.toMatch(/h-\[\d+px\]/);
     expect(container.innerHTML).not.toMatch(/text-\[[0-9.]+px\]/);
   });

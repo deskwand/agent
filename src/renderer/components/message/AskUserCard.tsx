@@ -28,10 +28,10 @@ const ASK_USER_INPUT_MAX_LENGTH = 2000;
 const OPTION_BASE =
   "w-full rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-default";
 const OPTION_IDLE =
-  "border-border-subtle bg-surface-muted hover:bg-surface-hover";
+  "border-border/40 bg-muted hover:bg-accent";
 const OPTION_SELECTED = "border-primary bg-primary/10";
 const INPUT_BASE =
-  "w-full rounded-lg border border-border-subtle bg-surface-muted px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none h-auto shadow-none";
+  "w-full rounded-lg border border-border/40 bg-muted px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none h-auto shadow-none";
 
 export function AskUserCard({
   block,
@@ -183,7 +183,7 @@ export function AskUserCard({
             otherOpen[index] ? OPTION_SELECTED : OPTION_IDLE
           }`}
         >
-          <span className="text-sm text-text-primary">
+          <span className="text-sm text-foreground">
             {t("tool.askUser.other")}
           </span>
         </Button>
@@ -259,11 +259,11 @@ export function AskUserCard({
                 onClick={() => toggleMulti(index, option.label)}
                 className={`${OPTION_BASE} ${selected ? OPTION_SELECTED : OPTION_IDLE}`}
               >
-                <span className="text-sm text-text-primary">
+                <span className="text-sm text-foreground">
                   {option.label}
                 </span>
                 {option.description && (
-                  <span className="mt-0.5 block text-xs text-text-muted">
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
                     {option.description}
                   </span>
                 )}
@@ -291,9 +291,9 @@ export function AskUserCard({
               choice[index] === option.label ? OPTION_SELECTED : OPTION_IDLE
             }`}
           >
-            <span className="text-sm text-text-primary">{option.label}</span>
+            <span className="text-sm text-foreground">{option.label}</span>
             {option.description && (
-              <span className="mt-0.5 block text-xs text-text-muted">
+              <span className="mt-0.5 block text-xs text-muted-foreground">
                 {option.description}
               </span>
             )}
@@ -313,9 +313,9 @@ export function AskUserCard({
       (valueText === "Yes" || valueText === "No");
     if (valueText) {
       return (
-        <div className="text-sm text-text-secondary">
+        <div className="text-sm text-muted-foreground">
           {valueText === ASK_USER_SKIPPED ? (
-            <span className="text-text-muted">
+            <span className="text-muted-foreground">
               {t("tool.askUser.skippedItem")}
             </span>
           ) : isYesNo ? (
@@ -337,7 +337,7 @@ export function AskUserCard({
         {options.map((option) => (
           <div
             key={option.label}
-            className="rounded-lg border border-dashed border-border-subtle px-3 py-1.5 text-xs text-text-muted"
+            className="rounded-lg border border-dashed border-border/40 px-3 py-1.5 text-xs text-muted-foreground"
           >
             {option.label}
           </div>
@@ -347,23 +347,23 @@ export function AskUserCard({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface">
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="flex">
         <div
           className={`w-1 shrink-0 ${
-            isPending ? "bg-primary" : "bg-border-subtle"
+            isPending ? "bg-primary" : "bg-border/40"
           }`}
         />
         <div className="min-w-0 flex-1">
           {/* Header：图标 + 标题 + 题数/终态文案 */}
-          <div className="flex items-center gap-2.5 border-b border-border-subtle px-4 py-3">
+          <div className="flex items-center gap-2.5 border-b border-border/40 px-4 py-3">
             <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10">
-              <HelpCircle className="h-3.5 w-3.5 text-primary" />
+              <HelpCircle className="h-3.5 w-3.5 text-primary-text" />
             </div>
-            <span className="text-sm font-medium text-text-primary">
+            <span className="text-sm font-medium text-foreground">
               {t("tool.askUser.title")}
             </span>
-            <span className="ml-auto text-xs text-text-muted">
+            <span className="ml-auto text-xs text-muted-foreground">
               {statusText}
             </span>
           </div>
@@ -373,16 +373,16 @@ export function AskUserCard({
             <div
               key={index}
               className={
-                index > 0 ? "border-t border-dashed border-border-subtle" : ""
+                index > 0 ? "border-t border-dashed border-border/40" : ""
               }
             >
               <div className="space-y-2 px-4 py-3">
                 {question.header && (
-                  <span className="inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                  <span className="inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary-text">
                     {question.header}
                   </span>
                 )}
-                <p className="text-sm font-medium text-text-primary">
+                <p className="text-sm font-medium text-foreground">
                   {question.question}
                 </p>
                 {isPending
@@ -394,12 +394,12 @@ export function AskUserCard({
 
           {/* 底部按钮区：仅 pending 态 */}
           {isPending && (
-            <div className="flex items-center justify-end gap-2 border-t border-border-subtle px-4 py-2.5">
+            <div className="flex items-center justify-end gap-2 border-t border-border/40 px-4 py-2.5">
               <Button variant="ghost"
                 type="button"
                 disabled={!interactive}
                 onClick={onSkip}
-                className="rounded-lg border border-border-subtle px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50 h-auto"
+                className="rounded-lg border border-border/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-50 h-auto"
               >
                 {t("tool.askUser.skip")}
               </Button>
@@ -407,7 +407,7 @@ export function AskUserCard({
                 type="button"
                 disabled={!canSubmit}
                 onClick={onSubmit}
-                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-50 h-auto"
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 h-auto"
               >
                 {t("tool.askUser.submit")}
               </Button>

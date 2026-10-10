@@ -37,7 +37,7 @@ export function UsageHourHeatmap({ records }: { records: UsageHourRow[] }) {
     >
       {grid.map((row, weekday) => (
         <Fragment key={`row-${weekday}`}>
-          <span className="pr-2 text-[9px] leading-3 text-text-muted">
+          <span className="pr-2 text-[9px] leading-3 text-muted-foreground">
             {labels[weekday]}
           </span>
           {row.map((cell) => {
@@ -53,7 +53,7 @@ export function UsageHourHeatmap({ records }: { records: UsageHourRow[] }) {
                   level === 0
                     ? undefined
                     : {
-                        background: `color-mix(in srgb, var(--color-success) ${
+                        background: `color-mix(in srgb, var(--success) ${
                           Number(RAMP[level]) * 100
                         }%, transparent)`,
                       }

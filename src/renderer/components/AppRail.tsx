@@ -52,7 +52,7 @@ export function AppRail({
   return (
     <nav
       aria-label={t("navRail.label")}
-      className="w-14 flex-shrink-0 bg-background-chrome flex flex-col items-center gap-1 py-2"
+      className="w-14 flex-shrink-0 bg-app-chrome flex flex-col items-center gap-1 py-2"
     >
       {RAIL_ITEMS.map((item) => {
         const Icon = RAIL_ICONS[item.key];
@@ -73,8 +73,8 @@ export function AppRail({
                 aria-current={isActive ? "page" : undefined}
                 className={`${RAIL_BUTTON_CLASS} relative ${
                   isActive
-                    ? "bg-overlay-on text-primary"
-                    : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
+                    ? "bg-accent text-primary-text"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
                 {Icon ? <Icon className="w-4 h-4" /> : null}
@@ -84,7 +84,7 @@ export function AppRail({
                     aria-hidden
                     className="absolute -right-0.5 -top-0.5 min-w-[15px] rounded-full bg-primary px-1 text-center text-[9px] font-bold leading-[15px] text-primary-foreground"
                     style={{
-                      boxShadow: "0 0 0 2px var(--color-background-chrome)",
+                      boxShadow: "0 0 0 2px var(--app-chrome)",
                     }}
                   >
                     {unread > 99 ? "99+" : unread}
@@ -101,7 +101,7 @@ export function AppRail({
                   aria-label={t("navRail.newVoiceSession")}
                   disabled={voiceCreating || !onCreateVoiceSession}
                   onClick={onCreateVoiceSession}
-                  className={`${RAIL_BUTTON_CLASS} text-text-muted hover:bg-overlay-hover hover:text-text-primary disabled:opacity-50`}
+                  className={`${RAIL_BUTTON_CLASS} text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50`}
                 >
                   <AudioLines className="w-4 h-4" />
                 </Button>

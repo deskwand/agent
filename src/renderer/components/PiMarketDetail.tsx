@@ -33,11 +33,11 @@ function initialOf(name: string): string {
 }
 
 const LINK_BUTTON_CLASS =
-  "rounded-md border border-border bg-surface px-2 py-1 text-xs text-text-primary hover:bg-surface-hover";
+  "rounded-md border border-border bg-card px-2 py-1 text-xs text-foreground hover:bg-accent";
 const PRIMARY_BUTTON_CLASS =
-  "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50";
 const DANGER_BUTTON_CLASS =
-  "rounded-md border border-error/40 px-3 py-1.5 text-sm text-error hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-md border border-destructive/40 px-3 py-1.5 text-sm text-destructive hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Pi 扩展市场右栏详情：gallery 预览降级为首字母占位图标 + 安装/更新/卸载。 */
 export function PiMarketDetail({
@@ -190,9 +190,9 @@ export function PiMarketDetail({
   );
 
   return (
-    <div className="flex h-[480px] w-80 shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-background-secondary/60">
+    <div className="flex h-[480px] w-80 shrink-0 flex-col overflow-hidden rounded-lg border border-border bg-muted/60">
       {/* 顶部预览区：固定高度，避免状态切换时布局跳动 */}
-      <div className="h-[120px] w-full shrink-0 overflow-hidden bg-surface">
+      <div className="h-[120px] w-full shrink-0 overflow-hidden bg-card">
         {!name ? null : galleryError ? (
           <div
             className="flex h-full w-full items-center justify-center"
@@ -231,16 +231,16 @@ export function PiMarketDetail({
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         {failed ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center">
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-muted-foreground">
               {t("piExtensions.marketDetailFailed")}
             </p>
             {error && (
-              <p className="max-w-full break-all text-xs text-text-muted">
+              <p className="max-w-full break-all text-xs text-muted-foreground">
                 {error}
               </p>
             )}
             <Button variant="ghost"
-              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-background-secondary/60 h-auto"
+              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-muted/60 h-auto"
               onClick={() => setReloadKey((k) => k + 1)}
             >
               {t("piExtensions.marketRetry")}
@@ -248,36 +248,36 @@ export function PiMarketDetail({
           </div>
         ) : empty ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center">
-            <p className="text-sm text-text-secondary">
+            <p className="text-sm text-muted-foreground">
               {t("piExtensions.marketSelectHint")}
             </p>
-            {error && <p className="text-xs text-text-muted">{error}</p>}
-            <p className="text-xs text-text-muted">
+            {error && <p className="text-xs text-muted-foreground">{error}</p>}
+            <p className="text-xs text-muted-foreground">
               {t("piExtensions.installWarning")}
             </p>
           </div>
         ) : detail === null ? (
-          <div className="flex h-full items-center justify-center text-sm text-text-muted">
+          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             {t("common.loading")}
           </div>
         ) : (
           <div className="flex flex-col gap-3">
             <div>
-              <div className="truncate text-base font-semibold text-text-primary">
+              <div className="truncate text-base font-semibold text-foreground">
                 {detail.name}
               </div>
-              <div className="mt-0.5 text-xs text-text-muted">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 {metaParts.length > 0 ? metaParts.join(" · ") : "\u00a0"}
               </div>
             </div>
 
             {detail.description && (
-              <p className="whitespace-pre-line text-xs leading-relaxed text-text-secondary">
+              <p className="whitespace-pre-line text-xs leading-relaxed text-muted-foreground">
                 {detail.description}
               </p>
             )}
 
-            <div className="text-xs text-text-secondary">
+            <div className="text-xs text-muted-foreground">
               {downloads !== null
                 ? t("piExtensions.marketDownloads", { count: downloads })
                 : "—"}
@@ -345,7 +345,7 @@ export function PiMarketDetail({
               )}
             </div>
 
-            <p className="text-xs text-text-muted">
+            <p className="text-xs text-muted-foreground">
               {t("piExtensions.installWarning")}
             </p>
           </div>

@@ -355,14 +355,14 @@ describe("Sidebar project groups", () => {
     ]);
 
     const ordinary = ordinaryToggle();
-    expect(ordinary.classList.contains("text-text-primary")).toBe(true);
+    expect(ordinary.classList.contains("text-foreground")).toBe(true);
     const collapsedSessionsIcon = ordinary.querySelector(
       ".lucide-message-square",
     ) as SVGElement;
     const expandedSessionsIcon = ordinary.querySelector(
       ".lucide-message-square-text",
     ) as SVGElement;
-    expect(collapsedSessionsIcon.classList.contains("text-text-muted")).toBe(
+    expect(collapsedSessionsIcon.classList.contains("text-muted-foreground")).toBe(
       false,
     );
     // 「最近」默认展开：展开态图标可见、收起态图标隐藏
@@ -380,21 +380,21 @@ describe("Sidebar project groups", () => {
     expect(expandedSessionsIcon.style.opacity).toBe("0");
 
     const project = projectToggle("/work/deskwand");
-    expect(project.classList.contains("text-text-primary")).toBe(true);
+    expect(project.classList.contains("text-foreground")).toBe(true);
     const collapsedProjectIcon = project.querySelector(
       ".lucide-folder",
     ) as SVGElement;
     const expandedProjectIcon = project.querySelector(
       ".lucide-folder-open",
     ) as SVGElement;
-    expect(collapsedProjectIcon.classList.contains("text-text-muted")).toBe(
+    expect(collapsedProjectIcon.classList.contains("text-muted-foreground")).toBe(
       false,
     );
     const projectCount = Array.from(project.querySelectorAll("span")).find(
       (span) => span.textContent?.trim() === "1",
     );
     expect(projectCount).toBeTruthy();
-    expect(projectCount?.classList.contains("text-text-muted")).toBe(true);
+    expect(projectCount?.classList.contains("text-muted-foreground")).toBe(true);
     expect(collapsedProjectIcon.style.opacity).toBe("0");
     expect(expandedProjectIcon.style.opacity).toBe("1");
     expect(project.querySelector(".lucide-chevron-down")).toBeNull();
@@ -996,9 +996,9 @@ describe("Sidebar project groups", () => {
 
     let showMore = findButton(i18n.t("sidebar.showMoreSessions", { count: 5 }));
     expect(showMore).toBeTruthy();
-    expect(showMore?.className).toContain("text-text-muted");
-    expect(showMore?.className).toContain("hover:text-text-secondary");
-    expect(showMore?.className).toContain("focus-visible:text-text-secondary");
+    expect(showMore?.className).toContain("text-muted-foreground");
+    expect(showMore?.className).toContain("hover:text-muted-foreground");
+    expect(showMore?.className).toContain("focus-visible:text-muted-foreground");
     expect(showMore?.className).toContain("bg-transparent");
     expect(showMore?.className).toContain("hover:bg-transparent");
     expect(showMore?.className).toContain("focus-visible:bg-transparent");
@@ -1367,7 +1367,7 @@ describe("Sidebar project groups", () => {
     );
 
     // 那条告警必须是 **error 语气** —— 承载语义（删除会打断正在跑的会话），不是装饰。
-    // 原实现是 `text-sm leading-6 text-error`，迁到 ConfirmDialog 后靠
+    // 原实现是 `text-sm leading-6 text-destructive`，迁到 ConfirmDialog 后靠
     // descriptionTone="error" 保住。计划 4 的 Review Focus #2 要的就是这一条。
     const hint = Array.from(
       document.body.querySelectorAll('[role="alertdialog"] p'),
@@ -1377,7 +1377,7 @@ describe("Sidebar project groups", () => {
       ),
     );
     expect(hint, "告警行必须存在").toBeTruthy();
-    expect(hint!.className, "告警必须是 error 语气").toContain("text-error");
+    expect(hint!.className, "告警必须是 error 语气").toContain("text-destructive");
   });
 
   it("keeps the confirmation open when the delete fails", async () => {
@@ -1440,7 +1440,7 @@ describe("Sidebar project groups", () => {
     );
 
     // 那条告警必须是 **error 语气** —— 承载语义（删除会打断正在跑的会话），不是装饰。
-    // 原实现是 `text-sm leading-6 text-error`，迁到 ConfirmDialog 后靠
+    // 原实现是 `text-sm leading-6 text-destructive`，迁到 ConfirmDialog 后靠
     // descriptionTone="error" 保住。计划 4 的 Review Focus #2 要的就是这一条。
     const hint = Array.from(
       document.body.querySelectorAll('[role="alertdialog"] p'),
@@ -1450,7 +1450,7 @@ describe("Sidebar project groups", () => {
       ),
     );
     expect(hint, "告警行必须存在").toBeTruthy();
-    expect(hint!.className, "告警必须是 error 语气").toContain("text-error");
+    expect(hint!.className, "告警必须是 error 语气").toContain("text-destructive");
   });
 
   it("drops the deleted project's pin and expansion state", async () => {

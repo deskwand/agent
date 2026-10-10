@@ -80,7 +80,7 @@ describe("buildProjectedConfig — thinkingLevel persistence", () => {
       defaultWorkdir: "",
       enableDevLogs: false,
       theme: "light",
-      themePreset: "graphite",
+      themePreset: "zinc",
       sandboxEnabled: false,
       memoryEnabled: true,
       memoryRuntime: {
@@ -213,7 +213,7 @@ describe("buildProjectedConfig — visionModel pass-through", () => {
       defaultWorkdir: "",
       enableDevLogs: false,
       theme: "light",
-      themePreset: "graphite",
+      themePreset: "zinc",
       sandboxEnabled: false,
       memoryEnabled: true,
       memoryRuntime: {

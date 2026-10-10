@@ -29,8 +29,8 @@ interface BashToolBlockProps {
 /** Build a single ansi-to-html converter using CSS custom properties for theme-aware colors */
 function makeAnsiConverter() {
   return new Convert({
-    fg: "var(--color-terminal-fg)",
-    bg: "var(--color-terminal-bg)",
+    fg: "var(--terminal-fg)",
+    bg: "var(--terminal-bg)",
     newline: true,
     escapeXML: true,
   });
@@ -143,7 +143,7 @@ export const BashToolBlock = memo(function BashToolBlock({
   return (
     <div
       className={`rounded-2xl overflow-hidden transition-colors ${
-        isError ? "bg-error/5" : isRunning ? "bg-primary/5" : "bg-background/40"
+        isError ? "bg-destructive/5" : isRunning ? "bg-primary/5" : "bg-background/40"
       }`}
     >
       {/* Collapsed header */}
@@ -152,10 +152,10 @@ export const BashToolBlock = memo(function BashToolBlock({
           setExpanded(!expanded);
         }}
         aria-expanded={expanded}
-        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
+        className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-accent/50 transition-colors"
       >
         {/* Status icon */}
-        <div className="flex-shrink-0 pt-0.5 text-text-muted">
+        <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
           {isRunning ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : isError ? (
@@ -167,23 +167,23 @@ export const BashToolBlock = memo(function BashToolBlock({
 
         {/* Tool icon */}
         {showIcon ? (
-          <div className="flex-shrink-0 pt-0.5 text-text-muted">
+          <div className="flex-shrink-0 pt-0.5 text-muted-foreground">
             {getToolIcon(block.name)}
           </div>
         ) : null}
 
         {/* Label: $ command · exit N */}
         <div className="min-w-0 flex flex-1 items-baseline gap-x-1">
-          <span className="min-w-0 flex-1 truncate text-xs font-mono text-text-secondary">
+          <span className="min-w-0 flex-1 truncate text-xs font-mono text-muted-foreground">
             $ {cmd}
           </span>
           {isRunning ? (
-            <span className="whitespace-nowrap text-xs text-text-muted">
+            <span className="whitespace-nowrap text-xs text-muted-foreground">
               · {t("tool.bashRunning")}
             </span>
           ) : null}
           <span
-            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-text-muted transition-opacity ${
+            className={`inline-flex w-3.5 flex-shrink-0 items-center justify-center self-center text-muted-foreground transition-opacity ${
               expanded
                 ? "opacity-100"
                 : "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100"
@@ -204,29 +204,29 @@ export const BashToolBlock = memo(function BashToolBlock({
         partialToolResult &&
         partialToolResult.content && (
           <div className="animate-fade-in px-3 py-2">
-            <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin text-primary" />
+            <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1 flex items-center gap-1.5">
+              <Loader2 className="w-3 h-3 animate-spin text-primary-text" />
               {t("tool.sectionStreaming")}
             </div>
-            <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">
+            <pre className="text-xs font-mono text-muted-foreground whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-muted">
               {partialToolResult.content}
             </pre>
           </div>
         )}
 
       {expanded && !isRunning && (
-        <div className="animate-fade-in mx-3 mb-3 rounded-lg overflow-hidden border border-surface-muted">
+        <div className="animate-fade-in mx-3 mb-3 rounded-lg overflow-hidden border border-muted">
           {/* Command + output */}
           <div
             className="px-3 py-2 font-mono text-xs leading-snug"
-            style={{ backgroundColor: "var(--color-terminal-bg)" }}
+            style={{ backgroundColor: "var(--terminal-bg)" }}
           >
             {/* Shell + duration meta line (no macOS traffic lights) */}
             <div
               className="mb-2 flex items-center gap-2 border-b pb-2 text-[11px]"
               style={{
-                color: "var(--color-terminal-titlebar-text)",
-                borderColor: "var(--color-terminal-divider)",
+                color: "var(--terminal-titlebar-text)",
+                borderColor: "var(--terminal-divider)",
               }}
             >
               <span className="font-medium">bash</span>
@@ -238,8 +238,8 @@ export const BashToolBlock = memo(function BashToolBlock({
               className="mb-1.5"
               style={{
                 color: isError
-                  ? "var(--color-terminal-error)"
-                  : "var(--color-terminal-success)",
+                  ? "var(--terminal-error)"
+                  : "var(--terminal-success)",
               }}
             >
               $ {cmd}
@@ -254,7 +254,7 @@ export const BashToolBlock = memo(function BashToolBlock({
             ) : (
               <div
                 className="italic"
-                style={{ color: "var(--color-terminal-dim)" }}
+                style={{ color: "var(--terminal-dim)" }}
               >
                 {t("tool.bashNoOutput")}
               </div>
