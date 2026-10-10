@@ -15,11 +15,12 @@ import {
   RotateCw,
 } from "lucide-react";
 import { openFilePathInBrowser } from "../../utils/open-in-browser";
-import { Tooltip } from "../Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { useAppStore } from "../../store";
 import { resolvePathAgainstWorkspace } from "../../../shared/workspace-path";
 import type { Session } from "../../types";
 import type { InlineArtifactInfo } from "../../utils/inline-artifacts";
+import { Button } from "../app-button";
 
 /** 每次展开都重新取 URL：签名是进程内的，应用重启后就失效了。 */
 type LoadState =
@@ -94,48 +95,60 @@ export function ArtifactInlineFrame({
 
   if (!expanded) {
     return (
-      <button
+      <Button variant="ghost"
         type="button"
         onClick={() => onToggle(artifact.path)}
-        className="flex min-h-9 w-full items-center gap-2 rounded-md border border-border bg-surface-muted px-2 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover"
+        className="flex min-h-9 w-full items-center gap-2 rounded-md border border-border bg-surface-muted px-2 py-1.5 text-left text-xs text-text-primary hover:bg-surface-hover h-auto"
       >
         <ChevronRight className="h-3.5 w-3.5 shrink-0" />
         <span className="truncate font-medium">{label}</span>
-      </button>
+      </Button>
     );
   }
 
   return (
     <div className="overflow-hidden rounded-md border border-border bg-card">
       <div className="flex min-h-9 items-center gap-2 border-b border-border bg-surface-muted px-2 py-1.5">
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={() => onToggle(artifact.path)}
-          className="flex min-w-0 items-center gap-2 text-xs text-text-primary"
+          className="flex min-w-0 items-center gap-2 text-xs text-text-primary h-auto hover:bg-transparent hover:text-current"
         >
           <ChevronDown className="h-3.5 w-3.5 shrink-0" />
           <span className="truncate font-medium">{label}</span>
-        </button>
+        </Button>
         <div className="ml-auto flex items-center gap-1">
-          <Tooltip label={t("artifact.inline.reload")}>
-            <button
-              type="button"
-              aria-label={t("artifact.inline.reload")}
-              onClick={() => setReloadToken((token) => token + 1)}
-              className="rounded p-1 text-text-muted hover:bg-surface-hover"
-            >
-              <RotateCw className="h-3.5 w-3.5" />
-            </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost"
+                type="button"
+                aria-label={t("artifact.inline.reload")}
+                onClick={() => setReloadToken((token) => token + 1)}
+                className="rounded p-1 text-text-muted hover:bg-surface-hover h-auto"
+              >
+                <RotateCw className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+                而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+            <TooltipContent side="bottom">
+              {t("artifact.inline.reload")}
+            </TooltipContent>
           </Tooltip>
-          <Tooltip label={t("artifact.inline.openInBrowser")}>
-            <button
-              type="button"
-              aria-label={t("artifact.inline.openInBrowser")}
-              onClick={handleOpenInBrowser}
-              className="rounded p-1 text-text-muted hover:bg-surface-hover"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost"
+                type="button"
+                aria-label={t("artifact.inline.openInBrowser")}
+                onClick={handleOpenInBrowser}
+                className="rounded p-1 text-text-muted hover:bg-surface-hover h-auto"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {t("artifact.inline.openInBrowser")}
+            </TooltipContent>
           </Tooltip>
         </div>
       </div>
@@ -146,13 +159,13 @@ export function ArtifactInlineFrame({
           className="flex items-center gap-2 px-3 py-4 text-xs text-error"
         >
           <span>{t("artifact.inline.failed")}</span>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => setReloadToken((token) => token + 1)}
-            className="underline"
+            className="underline h-auto hover:bg-transparent hover:text-current"
           >
             {t("artifact.inline.retry")}
-          </button>
+          </Button>
         </div>
       ) : (
         <div

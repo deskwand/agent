@@ -13,8 +13,9 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { useThemeSetting, useSystemDarkMode } from "../store/selectors";
+import { Button } from "./app-button";
 
 interface BrowserState {
   visible: boolean;
@@ -201,48 +202,59 @@ export function BrowserPanel({ width }: { width: number }) {
       {/* Header */}
       <div className="h-10 flex items-center gap-1 px-2 border-b border-border-subtle shrink-0">
         {/* Nav buttons */}
-        <Tooltip label={t("browser.back")}>
-          <button
-            onClick={() => window.electronAPI?.browser.goBack()}
-            disabled={!status.canGoBack}
-            aria-label={t("browser.back")}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={() => window.electronAPI?.browser.goBack()}
+              disabled={!status.canGoBack}
+              aria-label={t("browser.back")}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+              而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+          <TooltipContent side="bottom">{t("browser.back")}</TooltipContent>
         </Tooltip>
-        <Tooltip label={t("browser.forward")}>
-          <button
-            onClick={() => window.electronAPI?.browser.goForward()}
-            disabled={!status.canGoForward}
-            aria-label={t("browser.forward")}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={() => window.electronAPI?.browser.goForward()}
+              disabled={!status.canGoForward}
+              aria-label={t("browser.forward")}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors disabled:opacity-30 disabled:cursor-default"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t("browser.forward")}</TooltipContent>
         </Tooltip>
-        <Tooltip label={reloadLabel}>
-          <button
-            onClick={() =>
-              status.isLoading
-                ? window.electronAPI?.browser.stop()
-                : window.electronAPI?.browser.reload()
-            }
-            aria-label={reloadLabel}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-          >
-            {status.isLoading ? (
-              <X className="w-4 h-4" />
-            ) : (
-              <RotateCw className="w-4 h-4" />
-            )}
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={() =>
+                status.isLoading
+                  ? window.electronAPI?.browser.stop()
+                  : window.electronAPI?.browser.reload()
+              }
+              aria-label={reloadLabel}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+            >
+              {status.isLoading ? (
+                <X className="w-4 h-4" />
+              ) : (
+                <RotateCw className="w-4 h-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{reloadLabel}</TooltipContent>
         </Tooltip>
 
         {/* URL bar */}
         <div className="flex-1 min-w-0 flex items-center gap-1.5 rounded-lg bg-surface-muted px-2.5 h-7">
           {status.isLoading ? (
-            <Loader2 className="w-3 h-3 text-accent animate-spin shrink-0" />
+            <Loader2 className="w-3 h-3 text-primary animate-spin shrink-0" />
           ) : (
             <Globe className="w-3 h-3 text-text-muted shrink-0" />
           )}
@@ -258,76 +270,88 @@ export function BrowserPanel({ width }: { width: number }) {
         </div>
 
         {/* Element picker (Design Mode v1) */}
-        <Tooltip
-          label={
-            pickerActive
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={() => void handleTogglePicker()}
+              disabled={pickerUnavailable}
+              aria-pressed={pickerActive}
+              aria-label={
+                pickerActive
+                  ? t("browser.picker.active")
+                  : t("browser.picker.toggle")
+              }
+              className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                pickerActive
+                  ? "bg-primary/15 text-primary"
+                  : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+              }`}
+            >
+              <MousePointerSquareDashed className="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {pickerActive
               ? t("browser.picker.active")
-              : t("browser.picker.toggle")
-          }
-        >
-          <button
-            onClick={() => void handleTogglePicker()}
-            disabled={pickerUnavailable}
-            aria-pressed={pickerActive}
-            aria-label={
-              pickerActive
-                ? t("browser.picker.active")
-                : t("browser.picker.toggle")
-            }
-            className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-              pickerActive
-                ? "bg-accent/15 text-accent"
-                : "text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-            }`}
-          >
-            <MousePointerSquareDashed className="w-3.5 h-3.5" />
-          </button>
+              : t("browser.picker.toggle")}
+          </TooltipContent>
         </Tooltip>
 
         {/* External open */}
-        <Tooltip label={t("browser.openExternal")}>
-          <button
-            onClick={() => {
-              if (!status.url || status.url === "about:blank") return;
-              window.electronAPI
-                ?.openExternal(status.url)
-                ?.catch((err: unknown) => {
-                  console.error("[BrowserPanel] openExternal failed:", err);
-                });
-            }}
-            disabled={!status.url || status.url === "about:blank"}
-            aria-label={t("browser.openExternal")}
-            className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={() => {
+                if (!status.url || status.url === "about:blank") return;
+                window.electronAPI
+                  ?.openExternal(status.url)
+                  ?.catch((err: unknown) => {
+                    console.error("[BrowserPanel] openExternal failed:", err);
+                  });
+              }}
+              disabled={!status.url || status.url === "about:blank"}
+              aria-label={t("browser.openExternal")}
+              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {t("browser.openExternal")}
+          </TooltipContent>
         </Tooltip>
 
         {/* Fullscreen toggle */}
-        <Tooltip label={fullscreenLabel}>
-          <button
-            onClick={handleToggleFullscreen}
-            disabled={!status.url || status.url === "about:blank"}
-            aria-label={fullscreenLabel}
-            className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
-          >
-            {isBrowserFullscreen ? (
-              <Minimize2 className="w-3.5 h-3.5" />
-            ) : (
-              <Maximize2 className="w-3.5 h-3.5" />
-            )}
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={handleToggleFullscreen}
+              disabled={!status.url || status.url === "about:blank"}
+              aria-label={fullscreenLabel}
+              className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-text-secondary hover:text-text-primary hover:bg-surface-hover"
+            >
+              {isBrowserFullscreen ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{fullscreenLabel}</TooltipContent>
         </Tooltip>
 
         {/* Close */}
-        <Tooltip label={t("common.close")}>
-          <button
-            onClick={handleClose}
-            aria-label={t("common.close")}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={handleClose}
+              aria-label={t("common.close")}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-text-secondary hover:text-text-primary hover:bg-surface-hover transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t("common.close")}</TooltipContent>
         </Tooltip>
       </div>
 

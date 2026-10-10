@@ -34,6 +34,7 @@ import {
   stripUpstreamAgentStats,
 } from "../../utils/subagent-card";
 import { MessageMarkdown } from "../MessageMarkdown";
+import { Button } from "../app-button";
 
 /**
  * 输出要按「元信息头 + Markdown 正文」拆开渲染的子代理工具。
@@ -334,12 +335,12 @@ export const ToolUseBlock = memo(function ToolUseBlock({
         effectiveError
           ? "bg-error/5"
           : effectiveRunning
-            ? "bg-accent/5"
+            ? "bg-primary/5"
             : "bg-background/40"
       }`}
     >
       {/* Header — always visible */}
-      <button
+      <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
@@ -405,7 +406,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
             )}
           </span>
         </div>
-      </button>
+      </Button>
 
       {/* Expanded content */}
       {expanded && (
@@ -539,7 +540,7 @@ export const ToolUseBlock = memo(function ToolUseBlock({
             partialToolResult.content && (
               <div className="px-3 py-2">
                 <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
-                  <Loader2 className="w-3 h-3 animate-spin text-accent" />
+                  <Loader2 className="w-3 h-3 animate-spin text-primary" />
                   {t("tool.sectionStreaming")}
                 </div>
                 <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">

@@ -78,9 +78,9 @@ describe("侧栏与标题栏：区域级分界不画线", () => {
     // 迁移后类串写在模板字面量里（`${RAIL_BUTTON_CLASS} relative …`），
     // 所以引号形状没了 —— 这里改成匹「反引号内的那一串」，
     // 保住「不扫全文、只匹类串」的性质。
-    expect(helpMenu).toContain("relative text-accent hover:bg-overlay-hover`");
-    expect(helpMenu).not.toContain("hover:bg-accent-muted");
-    expect(helpMenu).not.toContain("rounded-full bg-accent");
+    expect(helpMenu).toContain("relative text-primary hover:bg-overlay-hover`");
+    expect(helpMenu).not.toContain("hover:bg-primary-muted");
+    expect(helpMenu).not.toContain("rounded-full bg-primary");
   });
 
   it("外圈更暗：图标栏与标题栏用 background-chrome，会话栏仍是唯一被抬起的 secondary", () => {

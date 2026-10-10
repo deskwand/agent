@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 import type { ActionResult, ConnectorEntry } from "../../../shared/connectors";
 import { OccludingDialog } from "../ui/occluding-dialog";
 import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
@@ -32,7 +34,7 @@ function CredentialInput({
   }, [inputRef]);
 
   return (
-    <input
+    <Input
       ref={inputRef}
       data-testid="key-credential"
       type="password"
@@ -172,21 +174,23 @@ export function KeyDialog({
           {t("connectors.keyDialog.storageHint")}
         </p>
         <div className="flex justify-end gap-2 mt-4">
-          <button
+          <Button
+            variant="ghost"
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors"
+            className="h-auto px-3 py-1.5 rounded-lg text-sm font-normal text-text-secondary hover:bg-surface-hover hover:text-text-secondary"
           >
             {t("connectors.keyDialog.cancel")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="default"
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50"
+            className="h-auto px-3 py-1.5 rounded-lg text-sm hover:bg-primary-hover"
           >
             {t("connectors.keyDialog.submit")}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </OccludingDialog>

@@ -89,7 +89,7 @@ describe("斜杠菜单技能行的星标", () => {
     expect(pinButton().querySelector("svg")?.getAttribute("fill")).toBe(
       "currentColor",
     );
-    expect(pinButton().className).toContain("text-accent");
+    expect(pinButton().className).toContain("text-primary");
   });
 
   it("星标按钮的无障碍名随状态切换", () => {

@@ -9,6 +9,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
+import { Button } from "../app-button";
 
 interface Props {
   value: CurrencyCode;
@@ -38,7 +39,7 @@ export function CurrencySelect({ value, onChange }: Props) {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button variant="ghost"
           type="button"
           aria-label={`${t("usage.currency")}, ${value}`}
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-2xl border border-border-subtle bg-background/60 px-2 text-xs whitespace-nowrap text-text-primary transition-[background-color] duration-150 hover:bg-surface-hover"
@@ -50,7 +51,7 @@ export function CurrencySelect({ value, onChange }: Props) {
               open ? "rotate-180" : ""
             }`}
           />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent

@@ -4,6 +4,7 @@ import { MousePointerSquareDashed } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ElementSelectionRef } from "../../../shared/ipc-types";
 import { useAppStore } from "../../store";
+import { Button } from "../app-button";
 
 export function ElementRefChips({
   selections,
@@ -28,17 +29,17 @@ export function ElementRefChips({
           selection.classes.length ? `.${selection.classes[0]}` : ""
         }`;
         return (
-          // title 挂包裹元素而不是 button：仓库禁止 <button title>
+          // title 挂包裹元素而不是 button：仓库禁止 <Button variant="ghost" title>
           <span
             key={`${selection.pageUrl}|${selection.selector}`}
             title={selection.selector}
             className="inline-flex"
           >
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => reveal(selection.selector)}
               aria-label={t("elementRef.reveal")}
-              className="inline-flex max-w-[18rem] items-center gap-1 rounded-md bg-surface-muted px-2 py-0.5 text-[11px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
+              className="inline-flex max-w-[18rem] items-center gap-1 rounded-md bg-surface-muted px-2 py-0.5 text-[11px] text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary h-auto"
             >
               <MousePointerSquareDashed className="h-3 w-3 shrink-0" />
               <span className="truncate">{label}</span>
@@ -52,7 +53,7 @@ export function ElementRefChips({
                   {t("attachTile.notUnique")}
                 </span>
               )}
-            </button>
+            </Button>
           </span>
         );
       })}

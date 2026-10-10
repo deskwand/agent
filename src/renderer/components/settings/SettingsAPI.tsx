@@ -74,6 +74,8 @@ import { CodingSubscriptionCards } from "./coding-subscription-cards";
 import { OAUTH_PROVIDERS } from "./provider-catalog";
 import { ConfiguredProviderList } from "./configured-provider-list";
 import { ProviderCatalogGrid } from "./provider-catalog-grid";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 type ProviderChoice = ProviderType;
 
@@ -1396,7 +1398,7 @@ export function SettingsAPI({
           DeskWand
         </p>
         <div className="flex items-center gap-2">
-          <Loader2 className="h-5 w-5 animate-spin text-accent" />
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
           <span className="text-sm text-text-secondary">
             {t("common.loading")}
           </span>
@@ -1409,54 +1411,54 @@ export function SettingsAPI({
     <>
       {!embedded && (
         <div className="flex gap-1 border-b border-border-muted mb-5">
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => setActiveTab("main")}
             className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "main"
-                ? "border-accent text-accent"
+                ? "border-primary text-primary"
                 : "border-transparent text-text-muted hover:text-text-secondary"
             }`}
           >
             <Bot className="h-3.5 w-3.5" />
             {t("api.mainModelTab")}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             onClick={() => setActiveTab("vision")}
             className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "vision"
-                ? "border-accent text-accent"
+                ? "border-primary text-primary"
                 : "border-transparent text-text-muted hover:text-text-secondary"
             }`}
           >
             <Eye className="h-3.5 w-3.5" />
             {t("api.visionModelTab")}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             onClick={() => setActiveTab("search")}
             className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "search"
-                ? "border-accent text-accent"
+                ? "border-primary text-primary"
                 : "border-transparent text-text-muted hover:text-text-secondary"
             }`}
           >
             <Globe2 className="h-3.5 w-3.5" />
             {t("api.searchModelTab")}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             onClick={() => setActiveTab("utility")}
             className={`inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               activeTab === "utility"
-                ? "border-accent text-accent"
+                ? "border-primary text-primary"
                 : "border-transparent text-text-muted hover:text-text-secondary"
             }`}
           >
             <Zap className="h-3.5 w-3.5" />
             {t("api.utilityModelTab")}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -1474,14 +1476,14 @@ export function SettingsAPI({
           {embedded && configuredList}
 
           {embedded && (
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => openCreate()}
-              className="inline-flex items-center gap-1 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+              className="inline-flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary-hover h-auto"
             >
               <Plus className="h-3.5 w-3.5" />
               {t("api.addApi")}
-            </button>
+            </Button>
           )}
 
           <SettingsSection title={t("api.addApi")}>
@@ -1514,14 +1516,14 @@ export function SettingsAPI({
               <p className="mt-1 text-xs text-text-muted max-w-xs mx-auto">
                 {t("api.visionModelNotConfiguredDesc")}
               </p>
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={openVisionEditor}
-                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover"
+                className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover h-auto"
               >
                 <Plus className="h-3.5 w-3.5" />
                 {t("api.visionModelConfigureButton")}
-              </button>
+              </Button>
             </div>
           ) : (
             /* ── Configured card ── */
@@ -1571,14 +1573,14 @@ export function SettingsAPI({
                     label={t("api.visionModelEnable")}
                     testId="vision-model-enabled"
                   />
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={openVisionEditor}
-                    className="inline-flex items-center gap-1 rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                    className="inline-flex items-center gap-1 rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
                   >
                     <Pencil className="h-3 w-3" />
                     {t("api.editApi")}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -1627,7 +1629,7 @@ export function SettingsAPI({
                     key={provider}
                     className="rounded-xl border border-border-muted"
                   >
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={() =>
                         setSearchExpanded((c) =>
@@ -1650,7 +1652,7 @@ export function SettingsAPI({
                       ) : (
                         <ChevronRight className="h-4 w-4 text-text-muted" />
                       )}
-                    </button>
+                    </Button>
                     {isOpen && (
                       <div
                         id={`web-access-${provider}-settings`}
@@ -1738,7 +1740,7 @@ export function SettingsAPI({
                               <span className="text-xs text-text-muted">
                                 {t("webAccess.apiKey")}
                               </span>
-                              <input
+                              <Input
                                 type="password"
                                 autoComplete="new-password"
                                 value={credential.apiKey}
@@ -1755,14 +1757,14 @@ export function SettingsAPI({
                                       : c,
                                   );
                                 }}
-                                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
+                                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm h-auto shadow-none"
                               />
                             </label>
                             <label className="block space-y-1">
                               <span className="text-xs text-text-muted">
                                 {t("webAccess.baseUrl")}
                               </span>
-                              <input
+                              <Input
                                 value={credential.baseUrl}
                                 onChange={(event) => {
                                   setSearchDraft((c) =>
@@ -1777,7 +1779,7 @@ export function SettingsAPI({
                                       : c,
                                   );
                                 }}
-                                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
+                                className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm h-auto shadow-none"
                               />
                             </label>
                           </>
@@ -1803,7 +1805,7 @@ export function SettingsAPI({
                     key={provider}
                     className="rounded-xl border border-border-muted"
                   >
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={() =>
                         setSearchExpanded((c) =>
@@ -1823,7 +1825,7 @@ export function SettingsAPI({
                       ) : (
                         <ChevronRight className="h-4 w-4 text-text-muted" />
                       )}
-                    </button>
+                    </Button>
                     {isOpen && (
                       <div
                         id={`web-access-${provider}-settings`}
@@ -1833,7 +1835,7 @@ export function SettingsAPI({
                           <span className="text-xs text-text-muted">
                             {t("webAccess.apiKey")}
                           </span>
-                          <input
+                          <Input
                             type="password"
                             autoComplete="new-password"
                             value={String(searchDraft[field])}
@@ -1844,7 +1846,7 @@ export function SettingsAPI({
                               });
                               setSearchMessage(null);
                             }}
-                            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm"
+                            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm h-auto shadow-none"
                           />
                         </label>
                         {provider === "exa" && (
@@ -1859,7 +1861,7 @@ export function SettingsAPI({
               })}
 
               <div className="flex items-center gap-3 pt-2">
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={async () => {
                     if (!searchDraft || !window.electronAPI) return;
@@ -1879,10 +1881,10 @@ export function SettingsAPI({
                     }
                   }}
                   disabled={isSearchSaving}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                 >
                   {isSearchSaving ? t("common.saving") : t("common.save")}
-                </button>
+                </Button>
                 {searchMessage && (
                   <span
                     className={`text-xs ${searchMessage === "saved" ? "text-success" : "text-error"}`}
@@ -2007,7 +2009,7 @@ export function SettingsAPI({
                 </>
               )}
 
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={async () => {
                   if (!window.electronAPI) return;
@@ -2025,10 +2027,10 @@ export function SettingsAPI({
                     setIsUtilitySaving(false);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary-hover h-auto"
               >
                 {t("api.saveUtilityModel")}
-              </button>
+              </Button>
               {utilityMessage === "saved" && (
                 <p className="text-xs text-success">{t("common.saved")}</p>
               )}
@@ -2048,13 +2050,13 @@ export function SettingsAPI({
               <h3 className="text-sm font-medium text-text-primary">
                 {t("api.visionModelEditTitle")}
               </h3>
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={closeVisionEditor}
-                className="rounded-lg p-2 hover:bg-surface-hover"
+                className="rounded-lg p-2 hover:bg-surface-hover h-auto"
               >
                 <X className="h-4 w-4 text-text-secondary" />
-              </button>
+              </Button>
             </div>
             <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
               <div className="space-y-5">
@@ -2081,7 +2083,7 @@ export function SettingsAPI({
                   </label>
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                     {VISION_PROVIDER_ORDER.map((provider) => (
-                      <button
+                      <Button variant="ghost"
                         key={provider}
                         type="button"
                         onClick={() => {
@@ -2103,7 +2105,7 @@ export function SettingsAPI({
                         }}
                         className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                           visionDraft.provider === provider
-                            ? "border-accent bg-accent/10 font-medium text-accent"
+                            ? "border-primary bg-primary/10 font-medium text-primary"
                             : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                         }`}
                       >
@@ -2112,7 +2114,7 @@ export function SettingsAPI({
                           className="h-4 w-4 flex-shrink-0"
                         />
                         {providerOptionLabel(provider, presets, t)}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -2127,7 +2129,7 @@ export function SettingsAPI({
                     <div className="grid grid-cols-3 gap-2">
                       {(["anthropic", "openai", "gemini"] as const).map(
                         (protocol) => (
-                          <button
+                          <Button variant="ghost"
                             key={protocol}
                             type="button"
                             onClick={() => {
@@ -2145,12 +2147,12 @@ export function SettingsAPI({
                             }}
                             className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                               visionDraft.customProtocol === protocol
-                                ? "border-accent bg-accent/10 font-medium text-accent"
+                                ? "border-primary bg-primary/10 font-medium text-primary"
                                 : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                             }`}
                           >
                             {protocol}
-                          </button>
+                          </Button>
                         ),
                       )}
                     </div>
@@ -2166,7 +2168,7 @@ export function SettingsAPI({
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {ZHIPU_REGIONS.map((region) => (
-                        <button
+                        <Button variant="ghost"
                           key={region.id}
                           type="button"
                           onClick={() =>
@@ -2177,12 +2179,12 @@ export function SettingsAPI({
                           }
                           className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                             visionDraft.baseUrl === region.baseUrl
-                              ? "border-accent bg-accent/10 font-medium text-accent"
+                              ? "border-primary bg-primary/10 font-medium text-primary"
                               : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                           }`}
                         >
                           {t(region.labelKey)}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                     <p className="text-xs text-text-muted">
@@ -2201,16 +2203,16 @@ export function SettingsAPI({
                     {appConfig?.activeProviderKey &&
                       appConfig?.providers?.[appConfig.activeProviderKey]
                         ?.apiKey && (
-                        <button
+                        <Button variant="ghost"
                           type="button"
                           onClick={reuseActiveProviderApiKey}
-                          className="text-xs text-accent hover:underline"
+                          className="text-xs text-primary hover:underline h-auto"
                         >
                           {t("api.reuseMainModelKey")}
-                        </button>
+                        </Button>
                       )}
                   </div>
-                  <input
+                  <Input
                     type="password"
                     value={visionDraft.apiKey}
                     onChange={(event) =>
@@ -2220,7 +2222,7 @@ export function SettingsAPI({
                       }))
                     }
                     placeholder={t("api.enterApiKey")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                   />
                 </div>
 
@@ -2232,7 +2234,7 @@ export function SettingsAPI({
                       <Server className="h-4 w-4" />
                       {t("api.baseUrl")}
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={visionDraft.baseUrl || ""}
                       onChange={(event) =>
@@ -2242,7 +2244,7 @@ export function SettingsAPI({
                         }))
                       }
                       placeholder={t("api.enterBaseUrl")}
-                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                      className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                     />
                   </div>
                 )}
@@ -2253,7 +2255,7 @@ export function SettingsAPI({
                     <Eye className="h-4 w-4" />
                     {t("api.model")}
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={visionDraft.model}
                     onChange={(event) =>
@@ -2263,7 +2265,7 @@ export function SettingsAPI({
                       }))
                     }
                     placeholder={t("api.visionModelPlaceholder")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                   />
                   {/* Model suggestions based on provider */}
                   {visionDraft.provider !== "custom" && (
@@ -2274,7 +2276,7 @@ export function SettingsAPI({
                         )[visionDraft.provider];
                         if (!preset?.models) return null;
                         return preset.models.slice(0, 5).map((m) => (
-                          <button
+                          <Button variant="ghost"
                             key={m.id}
                             type="button"
                             onClick={() =>
@@ -2285,12 +2287,12 @@ export function SettingsAPI({
                             }
                             className={`rounded-md border px-2 py-1 text-xs transition-colors ${
                               visionDraft.model === m.id
-                                ? "border-accent bg-accent/10 text-accent"
+                                ? "border-primary bg-primary/10 text-primary"
                                 : "border-border-muted text-text-muted hover:border-border hover:text-text-secondary"
                             }`}
                           >
                             {m.name || m.id}
-                          </button>
+                          </Button>
                         ));
                       })()}
                     </div>
@@ -2313,20 +2315,20 @@ export function SettingsAPI({
 
                 {/* Buttons */}
                 <div className="flex items-center justify-end gap-2">
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={closeVisionEditor}
-                    className="rounded-lg border border-border-muted px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                    className="rounded-lg border border-border-muted px-4 py-2.5 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
                   >
                     {t("common.cancel")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     type="button"
                     onClick={() => {
                       void handleVisionSave();
                     }}
                     disabled={isVisionSaving}
-                    className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                   >
                     {isVisionSaving ? (
                       <>
@@ -2339,7 +2341,7 @@ export function SettingsAPI({
                         {t("api.saveSettings")}
                       </>
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -2366,22 +2368,22 @@ export function SettingsAPI({
                     })}
                   </p>
                   <div className="flex justify-end gap-2">
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={closeOAuthDisconnectDialog}
-                      className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                      className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
                     >
                       {t("common.cancel")}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="ghost"
                       type="button"
                       onClick={() => {
                         void confirmDisconnectOAuth(pid);
                       }}
-                      className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90"
+                      className="rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 h-auto"
                     >
                       {t("api.oauthDisconnect")}
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -2406,21 +2408,21 @@ export function SettingsAPI({
                 })}
               </p>
               <div className="flex justify-end gap-2">
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={closeDeleteDialog}
                   disabled={isDeleting}
-                  className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                 >
                   {t("common.cancel")}
-                </button>
-                <button
+                </Button>
+                <Button variant="ghost"
                   type="button"
                   onClick={() => {
                     void confirmDelete();
                   }}
                   disabled={isDeleting}
-                  className="inline-flex items-center gap-2 rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-error px-4 py-2 text-sm font-medium text-white hover:bg-error/90 disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                 >
                   {isDeleting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -2428,7 +2430,7 @@ export function SettingsAPI({
                     <Trash2 className="h-4 w-4" />
                   )}
                   {t("api.deleteApi")}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -2450,13 +2452,13 @@ export function SettingsAPI({
                 onDelete={handleSubscriptionDelete}
               />
               <div className="flex justify-end">
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => setPlanDialogOpen(false)}
-                  className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                  className="rounded-lg border border-border-muted px-4 py-2 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
                 >
                   {t("api.done")}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -2470,13 +2472,13 @@ export function SettingsAPI({
               <h3 className="text-sm font-medium text-text-primary">
                 {isCreating ? t("api.addApi") : t("api.editApi")}
               </h3>
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={closeEditor}
-                className="rounded-lg p-2 hover:bg-surface-hover"
+                className="rounded-lg p-2 hover:bg-surface-hover h-auto"
               >
                 <X className="h-4 w-4 text-text-secondary" />
-              </button>
+              </Button>
             </div>
             <div className="max-h-[calc(88vh-64px)] overflow-y-auto p-5">
               <div className="space-y-5">
@@ -2487,13 +2489,13 @@ export function SettingsAPI({
                   </label>
                   <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-4">
                     {PROVIDER_ORDER.map((provider) => (
-                      <button
+                      <Button variant="ghost"
                         key={provider}
                         type="button"
                         onClick={() => selectProvider(provider)}
                         className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                           draft.provider === provider
-                            ? "border-accent bg-accent/10 font-medium text-accent"
+                            ? "border-primary bg-primary/10 font-medium text-primary"
                             : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                         }`}
                       >
@@ -2502,7 +2504,7 @@ export function SettingsAPI({
                           className="h-4 w-4 flex-shrink-0"
                         />
                         {providerOptionLabel(provider, presets, t)}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -2516,18 +2518,18 @@ export function SettingsAPI({
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {OPENCODE_PLANS.map((plan) => (
-                        <button
+                        <Button variant="ghost"
                           key={plan.id}
                           type="button"
                           onClick={() => selectProvider(plan.provider)}
                           className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                             draft.provider === plan.provider
-                              ? "border-accent bg-accent/10 font-medium text-accent"
+                              ? "border-primary bg-primary/10 font-medium text-primary"
                               : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                           }`}
                         >
                           {t(plan.labelKey)}
-                        </button>
+                        </Button>
                       ))}
                     </div>
                     <p className="text-xs text-text-muted">
@@ -2545,18 +2547,18 @@ export function SettingsAPI({
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                       {(["anthropic", "openai", "gemini"] as const).map(
                         (protocol) => (
-                          <button
+                          <Button variant="ghost"
                             key={protocol}
                             type="button"
                             onClick={() => selectCustomProtocol(protocol)}
                             className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
                               draft.customProtocol === protocol
-                                ? "border-accent bg-accent/10 font-medium text-accent"
+                                ? "border-primary bg-primary/10 font-medium text-primary"
                                 : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                             }`}
                           >
                             {protocol}
-                          </button>
+                          </Button>
                         ),
                       )}
                     </div>
@@ -2580,14 +2582,14 @@ export function SettingsAPI({
                     <Pencil className="h-4 w-4" />
                     {t("api.customName")}
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={draft.name}
                     onChange={(event) =>
                       updateDraft({ name: event.target.value })
                     }
                     placeholder={t("api.customNamePlaceholder")}
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                   />
                 </div>
 
@@ -2596,7 +2598,7 @@ export function SettingsAPI({
                     <Key className="h-4 w-4" />
                     {t("api.apiKey")}
                   </label>
-                  <input
+                  <Input
                     type="password"
                     value={draft.apiKey}
                     onChange={(event) =>
@@ -2609,7 +2611,7 @@ export function SettingsAPI({
                         presets,
                       ).keyPlaceholder || t("api.enterApiKey")
                     }
-                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                    className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                   />
                 </div>
 
@@ -2620,7 +2622,7 @@ export function SettingsAPI({
                         <Server className="h-4 w-4" />
                         {t("api.baseUrl")}
                       </label>
-                      <input
+                      <Input
                         type="text"
                         value={draft.baseUrl}
                         onChange={(event) =>
@@ -2633,7 +2635,7 @@ export function SettingsAPI({
                             presets,
                           ).baseUrl
                         }
-                        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                        className="w-full rounded-lg border border-border bg-background px-4 py-3 text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                       />
                     </div>
 
@@ -2644,14 +2646,14 @@ export function SettingsAPI({
                             ? t("api.customModelsManual")
                             : t("api.models")}
                         </label>
-                        <button
+                        <Button variant="ghost"
                           type="button"
                           onClick={addModel}
-                          className="inline-flex items-center gap-1 rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                          className="inline-flex items-center gap-1 rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
                         >
                           <Plus className="h-3 w-3" />
                           {t("api.addCustomModel")}
-                        </button>
+                        </Button>
                       </div>
 
                       {draft.models.length === 0 && (
@@ -2666,7 +2668,7 @@ export function SettingsAPI({
                             key={`model-${index}`}
                             className="flex items-center gap-2"
                           >
-                            <input
+                            <Input
                               type="text"
                               value={item.id}
                               onChange={(event) =>
@@ -2676,9 +2678,9 @@ export function SettingsAPI({
                                 })
                               }
                               placeholder={t("api.modelId")}
-                              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                              className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 h-auto shadow-none"
                             />
-                            <input
+                            <Input
                               type="number"
                               value={item.contextWindow ?? ""}
                               onChange={(event) =>
@@ -2692,7 +2694,7 @@ export function SettingsAPI({
                               }
                               placeholder={t("api.contextWindowPlaceholder")}
                               title={t("api.contextWindowHint")}
-                              className="w-36 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                              className="w-36 rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                             />
                             <label className="flex items-center gap-1.5 text-sm text-text-secondary flex-shrink-0">
                               <input
@@ -2709,13 +2711,13 @@ export function SettingsAPI({
                               />
                               {t("api.supportsImage")}
                             </label>
-                            <button
+                            <Button variant="ghost"
                               type="button"
                               onClick={() => removeModel(index)}
-                              className="rounded-lg p-2 text-text-muted hover:bg-error/10 hover:text-error"
+                              className="rounded-lg p-2 text-text-muted hover:bg-error/10 hover:text-error h-auto"
                             >
                               <Trash2 className="h-4 w-4" />
-                            </button>
+                            </Button>
                           </div>
                         ))}
                       </div>
@@ -2749,12 +2751,12 @@ export function SettingsAPI({
                       </span>
                     </div>
 
-                    <input
+                    <Input
                       type="text"
                       value={modelFilter}
                       onChange={(event) => setModelFilter(event.target.value)}
                       placeholder={t("api.modelsSearch")}
-                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+                      className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
                     />
 
                     <div className="max-h-72 space-y-1 overflow-y-auto">
@@ -2788,22 +2790,22 @@ export function SettingsAPI({
                               )}
                             </span>
                             {row.isNew && (
-                              <span className="rounded-md border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-[10px] text-accent">
+                              <span className="rounded-md border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
                                 {t("api.modelsNew")}
                               </span>
                             )}
-                            <button
+                            <Button variant="ghost"
                               type="button"
                               onClick={() => setDefaultModelRow(row.id)}
                               disabled={!row.enabled}
                               className={`rounded-md border px-1.5 py-0.5 text-[10px] transition-colors ${
                                 row.isDefault
-                                  ? "border-accent bg-accent/10 text-accent"
+                                  ? "border-primary bg-primary/10 text-primary"
                                   : "border-border-muted text-text-muted hover:border-border hover:text-text-secondary"
                               } disabled:opacity-40`}
                             >
                               {t("api.modelsDefault")}
-                            </button>
+                            </Button>
                           </div>
                         ))}
                     </div>
@@ -2837,13 +2839,13 @@ export function SettingsAPI({
 
                 <div className="flex items-center justify-end gap-2">
                   {isOpencodeDraft ? (
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={() => {
                         void handleSave();
                       }}
                       disabled={isSaving}
-                      className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                     >
                       {isSaving ? (
                         <>
@@ -2856,58 +2858,58 @@ export function SettingsAPI({
                           {t("api.saveSettings")}
                         </>
                       )}
-                    </button>
+                    </Button>
                   ) : connectState === "connected" ? (
                     <>
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         onClick={handleConnect}
-                        className="rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                        className="rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
                       >
                         {t("api.reconnect")}
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="ghost"
                         type="button"
                         onClick={closeEditor}
-                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground hover:bg-accent-hover"
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary-hover h-auto"
                       >
                         <CheckCircle className="h-4 w-4" />
                         {t("api.done")}
-                      </button>
+                      </Button>
                     </>
                   ) : connectState === "failed" ? (
                     <>
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         onClick={() => {
                           void handleSaveDraft();
                         }}
-                        className="inline-flex items-center gap-2 rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                        className="inline-flex items-center gap-2 rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
                       >
                         {t("common.save")}
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="ghost"
                         type="button"
                         onClick={handleConnect}
-                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground hover:bg-accent-hover"
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary-hover h-auto"
                       >
                         {t("api.retryConnect")}
-                      </button>
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         onClick={closeEditor}
-                        className="rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                        className="rounded-lg border border-border-muted px-4 py-3 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary h-auto"
                       >
                         {t("common.cancel")}
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="ghost"
                         type="button"
                         onClick={handleConnect}
                         disabled={connectState === "connecting"}
-                        className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-3 font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50"
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 h-auto"
                       >
                         {connectState === "connecting" ? (
                           <>
@@ -2920,7 +2922,7 @@ export function SettingsAPI({
                             {t("api.connect")}
                           </>
                         )}
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>

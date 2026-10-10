@@ -34,7 +34,7 @@ import {
   type SidebarPins,
   type SidebarProjectGroup,
 } from "../utils/sidebar-session-groups";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { Input } from "./ui/input";
+import { Button } from "./app-button";
 
 const DEFAULT_VISIBLE_SESSIONS = 5;
 const DEFAULT_EXPANDED_PROJECTS = 3;
@@ -754,7 +756,7 @@ export function Sidebar({
               />
             ) : null}
             {editingSessionId === session.id ? (
-              <input
+              <Input
                 autoFocus
                 maxLength={50}
                 value={editingSessionTitle}
@@ -772,7 +774,7 @@ export function Sidebar({
                     event.currentTarget.blur();
                   }
                 }}
-                className="min-w-0 flex-1 rounded-md border border-border-muted bg-background px-1.5 py-0.5 text-sm text-text-primary outline-none focus:border-accent"
+                className="min-w-0 flex-1 rounded-md border border-border-muted bg-background px-1.5 py-0.5 text-sm text-text-primary outline-none focus:border-primary"
                 aria-label={t("sidebar.rename")}
               />
             ) : (
@@ -801,7 +803,7 @@ export function Sidebar({
                           : "sidebar.running",
                       )}
                     >
-                      <span className="h-2.5 w-2.5 rounded-full bg-accent animate-pulse" />
+                      <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
                     </span>
                   ) : isPinned ? (
                     <span
@@ -811,7 +813,7 @@ export function Sidebar({
                     >
                       <Pin
                         aria-hidden="true"
-                        className="h-3 w-3 fill-current text-accent"
+                        className="h-3 w-3 fill-current text-primary"
                       />
                     </span>
                   ) : (
@@ -833,7 +835,7 @@ export function Sidebar({
                   }`}
                 >
                   {!hasStatusIndicator && (
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
@@ -846,8 +848,8 @@ export function Sidebar({
                       }}
                       className={`h-6 w-6 rounded-lg flex items-center justify-center transition-colors ${
                         pendingArchiveId === session.id
-                          ? "text-accent bg-accent-muted border border-accent/30"
-                          : "text-text-muted hover:text-accent hover:bg-surface-active"
+                          ? "text-primary bg-primary-muted border border-primary/30"
+                          : "text-text-muted hover:text-primary hover:bg-surface-active"
                       }`}
                       title={
                         pendingArchiveId === session.id
@@ -860,7 +862,7 @@ export function Sidebar({
                       ) : (
                         <Archive className="h-3 w-3" />
                       )}
-                    </button>
+                    </Button>
                   )}
                   <DropdownMenu
                     open={sessionMenu === session.id}
@@ -872,16 +874,21 @@ export function Sidebar({
                       setSessionMenu(next ? session.id : null);
                     }}
                   >
-                    <Tooltip label={t("sidebar.moreActions")}>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="h-6 w-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
-                          aria-label={t("sidebar.moreActions")}
-                        >
-                          <MoreHorizontal className="h-3 w-3" />
-                        </button>
-                      </DropdownMenuTrigger>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost"
+                            type="button"
+                            className="h-6 w-6 rounded-lg flex items-center justify-center text-text-muted hover:text-primary hover:bg-surface-active transition-colors"
+                            aria-label={t("sidebar.moreActions")}
+                          >
+                            <MoreHorizontal className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        {t("sidebar.moreActions")}
+                      </TooltipContent>
                     </Tooltip>
                     <DropdownMenuContent
                       align="end"
@@ -975,7 +982,7 @@ export function Sidebar({
         {!normalizedQuery && (hiddenCount > 0 || canShowLess) && (
           <div className="flex items-center">
             {hiddenCount > 0 && (
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => {
                   requestSectionMotion(groupKey);
@@ -988,10 +995,10 @@ export function Sidebar({
                 className={`${SESSION_OVERFLOW_BUTTON_CLASS} flex-1 text-left`}
               >
                 {t("sidebar.showMoreSessions", { count: nextBatchCount })}
-              </button>
+              </Button>
             )}
             {canShowLess && (
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => {
                   requestSectionMotion(groupKey);
@@ -1000,7 +1007,7 @@ export function Sidebar({
                 className={`${SESSION_OVERFLOW_BUTTON_CLASS} ml-auto flex-shrink-0 text-right`}
               >
                 {t("sidebar.showLessSessions")}
-              </button>
+              </Button>
             )}
           </div>
         )}
@@ -1022,35 +1029,40 @@ export function Sidebar({
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 min-w-0">
                   <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-                  <input
+                  <Input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t("sidebar.searchPlaceholder")}
-                    className="w-full rounded-xl border border-transparent bg-surface-muted pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border focus:bg-background transition-colors"
+                    className="w-full rounded-xl border border-transparent bg-surface-muted pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border focus:bg-background transition-colors h-auto shadow-none"
                   />
                 </div>
                 <div className="relative flex flex-shrink-0">
-                  <Tooltip label={t("sidebar.newChat")}>
-                    <button
-                      onClick={() => startNewSession()}
-                      className="h-8 w-8 rounded-l-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
-                      aria-label={t("sidebar.newChat")}
-                    >
-                      <SquarePen className="w-4 h-4" />
-                    </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost"
+                        onClick={() => startNewSession()}
+                        className="h-8 w-8 rounded-l-xl text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center"
+                        aria-label={t("sidebar.newChat")}
+                      >
+                        <SquarePen className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {t("sidebar.newChat")}
+                    </TooltipContent>
                   </Tooltip>
                   <DropdownMenu
                     open={showProjectActions}
                     onOpenChange={setShowProjectActions}
                   >
                     <DropdownMenuTrigger asChild>
-                      <button
+                      <Button variant="ghost"
                         type="button"
-                        className="w-5 h-8 rounded-r-xl text-text-secondary hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center"
+                        className="w-5 h-8 rounded-r-xl text-text-secondary hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center"
                       >
                         <ChevronDown className="w-3 h-3" />
-                      </button>
+                      </Button>
                     </DropdownMenuTrigger>
                     {/* ⚠️ 根必须同时包住触发器与内容 ✗（计划 8 ✓）。这里**没有** Tooltip ✓。
                         宽度压回原值 `w-44` ✓（Radix 默认 `w-72` ✗）。 */}
@@ -1109,7 +1121,7 @@ export function Sidebar({
             >
               <div>
                 <section>
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     aria-expanded={ordinarySessionsExpanded}
                     aria-label={t(
@@ -1132,7 +1144,7 @@ export function Sidebar({
                         );
                       }
                     }}
-                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                    className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                   >
                     <SidebarGroupIcon
                       kind="sessions"
@@ -1146,7 +1158,7 @@ export function Sidebar({
                       )}
                     />
                     <span>{t("sidebar.recents")}</span>
-                  </button>
+                  </Button>
                   <SidebarAnimatedSection
                     expanded={ordinarySessionsExpanded}
                     motionVersion={
@@ -1162,7 +1174,7 @@ export function Sidebar({
 
                 {sessionGroups.projectGroups.length > 0 && (
                   <section className="pt-1.5">
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       aria-expanded={projectsExpanded}
                       aria-label={t(
@@ -1178,7 +1190,7 @@ export function Sidebar({
                           !projectsExpanded,
                         );
                       }}
-                      className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                      className="w-full rounded-lg px-3 py-1 flex items-center gap-2 text-sm font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                     >
                       <SidebarGroupIcon
                         kind="project"
@@ -1194,7 +1206,7 @@ export function Sidebar({
                       <span className="ml-auto text-xs font-normal text-text-muted">
                         {sessionGroups.projectGroups.length}
                       </span>
-                    </button>
+                    </Button>
                     <SidebarAnimatedSection
                       expanded={projectsExpanded}
                       motionVersion={
@@ -1221,7 +1233,7 @@ export function Sidebar({
                                 className="group/project flex items-center justify-between pr-0.5"
                                 title={group.cwd}
                               >
-                                <button
+                                <Button variant="ghost"
                                   type="button"
                                   aria-expanded={isProjectExpanded}
                                   aria-label={t(
@@ -1242,7 +1254,7 @@ export function Sidebar({
                                       );
                                     }
                                   }}
-                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent"
+                                  className="min-w-0 flex-1 rounded-lg px-3 py-1.5 flex items-center gap-2 text-xs font-medium leading-5 text-text-primary hover:bg-surface-hover transition-colors disabled:cursor-default disabled:hover:bg-transparent h-auto"
                                 >
                                   <SidebarGroupIcon
                                     kind="project"
@@ -1258,67 +1270,80 @@ export function Sidebar({
                                   <span className="ml-auto text-xs font-normal text-text-muted opacity-0 transition-opacity group-hover/project:opacity-100">
                                     {group.sessions.length}
                                   </span>
-                                </button>
-                                <Tooltip
-                                  label={t("sidebar.newSessionForProject")}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      void handleNewSessionInProject(group.cwd);
-                                    }}
-                                    className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-accent/10 hover:text-accent transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                                    aria-label={t(
-                                      "sidebar.newSessionForProject",
-                                    )}
-                                  >
-                                    <SquarePen className="h-3.5 w-3.5" />
-                                  </button>
+                                </Button>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost"
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        void handleNewSessionInProject(
+                                          group.cwd,
+                                        );
+                                      }}
+                                      className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                      aria-label={t(
+                                        "sidebar.newSessionForProject",
+                                      )}
+                                    >
+                                      <SquarePen className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom">
+                                    {t("sidebar.newSessionForProject")}
+                                  </TooltipContent>
                                 </Tooltip>
-                                <Tooltip label={t("common.delete")}>
-                                  <button
-                                    type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      handleDeleteProject(group);
-                                    }}
-                                    className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-error/10 hover:text-error transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                                    aria-label={t("common.delete")}
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost"
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleDeleteProject(group);
+                                      }}
+                                      className="h-8 w-8 flex-shrink-0 rounded-lg text-text-muted hover:bg-error/10 hover:text-error transition-colors flex items-center justify-center opacity-0 pointer-events-none group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                      aria-label={t("common.delete")}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom">
+                                    {t("common.delete")}
+                                  </TooltipContent>
                                 </Tooltip>
                                 {/* 钉住的 pin 常显，放最后一个：它的图标中心与
                                     会话行的状态点/时间同一条右边线，hover 才出现
                                     的新建/删除从它左边展开，pin 自己不会挪位。 */}
-                                <Tooltip
-                                  label={t(
-                                    isProjectPinned
-                                      ? "sidebar.unpin"
-                                      : "sidebar.pin",
-                                  )}
-                                >
-                                  <button
-                                    type="button"
-                                    onClick={(event) =>
-                                      handleToggleProjectPin(event, group.key)
-                                    }
-                                    className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
-                                      isProjectPinned
-                                        ? "opacity-100 text-accent hover:bg-accent/10"
-                                        : "opacity-0 pointer-events-none text-text-muted hover:bg-accent/10 hover:text-accent group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
-                                    }`}
-                                    aria-label={t(
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button variant="ghost"
+                                      type="button"
+                                      onClick={(event) =>
+                                        handleToggleProjectPin(event, group.key)
+                                      }
+                                      className={`h-8 w-8 flex-shrink-0 rounded-lg transition-[opacity,color,background-color] flex items-center justify-center ${
+                                        isProjectPinned
+                                          ? "opacity-100 text-primary hover:bg-primary/10"
+                                          : "opacity-0 pointer-events-none text-text-muted hover:bg-primary/10 hover:text-primary group-hover/project:opacity-100 group-hover/project:pointer-events-auto"
+                                      }`}
+                                      aria-label={t(
+                                        isProjectPinned
+                                          ? "sidebar.unpin"
+                                          : "sidebar.pin",
+                                      )}
+                                    >
+                                      <Pin
+                                        className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
+                                      />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom">
+                                    {t(
                                       isProjectPinned
                                         ? "sidebar.unpin"
                                         : "sidebar.pin",
                                     )}
-                                  >
-                                    <Pin
-                                      className={`h-3.5 w-3.5 ${isProjectPinned ? "fill-current" : ""}`}
-                                    />
-                                  </button>
+                                  </TooltipContent>
                                 </Tooltip>
                               </div>
                               <SidebarAnimatedSection
@@ -1388,7 +1413,7 @@ export function Sidebar({
                 <DialogDescription className="sr-only">
                   {t("sidebar.projectNamePlaceholder")}
                 </DialogDescription>
-                <input
+                <Input
                   autoFocus
                   type="text"
                   value={projectName}
@@ -1399,25 +1424,25 @@ export function Sidebar({
                     }
                   }}
                   placeholder={t("sidebar.projectNamePlaceholder")}
-                  className="w-full rounded-xl border border-border-muted bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border"
+                  className="w-full rounded-xl border border-border-muted bg-background px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border h-auto shadow-none"
                 />
                 <div className="flex items-center justify-end gap-2">
-                  <button
+                  <Button variant="ghost"
                     onClick={() => setCreateProjectModalOpen(false)}
                     disabled={isCreatingProject}
-                    className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="rounded-xl px-4 py-2 text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
                   >
                     {t("sidebar.cancel")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     onClick={() => void handleCreateProject()}
                     disabled={isCreatingProject}
-                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed h-auto"
                   >
                     {isCreatingProject
                       ? t("common.loading")
                       : t("sidebar.newProject")}
-                  </button>
+                  </Button>
                 </div>
               </DialogContent>
             </OccludingDialog>

@@ -79,7 +79,7 @@ export function SandboxSyncToast({ status }: Props) {
                   ? "text-success"
                   : isError
                     ? "text-error"
-                    : "text-accent"
+                    : "text-primary"
               }`}
             >
               {displayText.message}
@@ -92,7 +92,7 @@ export function SandboxSyncToast({ status }: Props) {
           </div>
           {!isComplete && !isError && (
             <div className="flex-shrink-0">
-              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
           )}
         </div>
@@ -107,10 +107,10 @@ export function SandboxSyncToast({ status }: Props) {
 
         {/* Explanation for slow sync */}
         {status.phase === "syncing_files" && (
-          <div className="px-4 py-2.5 bg-accent-muted border-t border-border-muted">
+          <div className="px-4 py-2.5 bg-primary-muted border-t border-border-muted">
             <p className="text-xs text-text-secondary leading-relaxed">
               {t("sandbox.syncExplanation")}
-              <span className="text-accent font-medium">
+              <span className="text-primary font-medium">
                 {" "}
                 {t("sandbox.syncFirst")}
               </span>{" "}

@@ -52,7 +52,12 @@ describe("订阅卡片编辑行与文字列对齐", () => {
     // 输入框之前必须恰好一个占位块，且紧邻输入框
     const rowStart = COMPONENT.indexOf(EDIT_ROW_MARKER);
     const inputStart = COMPONENT.indexOf('type="password"', rowStart);
-    const inputTagStart = COMPONENT.lastIndexOf("<input", inputStart);
+    // 2026-10-09 相位 3 ✓：标签从 `<input` 变成了 `<Input` ✗ ⇒ 取两者中**更靠近** inputStart 的那个 ✓
+    //（断言意图一字未改 ✓：占位块恰好一个、紧邻、无水平偏移 ✓）。
+    const inputTagStart = Math.max(
+      COMPONENT.lastIndexOf("<input", inputStart),
+      COMPONENT.lastIndexOf("<Input", inputStart),
+    );
     const beforeInput = COMPONENT.slice(rowStart, inputTagStart);
     const spacers = [...beforeInput.matchAll(/<span[^>]*className="([^"]+)"/g)];
 

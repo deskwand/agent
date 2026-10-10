@@ -6,6 +6,8 @@ import { buildDeskwandProviderPayload } from "../utils/cloud-provider";
 import type { CloudConfig } from "../types";
 import { OccludingDialog } from "./ui/occluding-dialog";
 import { DialogContent, DialogTitle } from "./ui/dialog";
+import { Input } from "./ui/input";
+import { Button } from "./app-button";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -235,51 +237,51 @@ export function LoginModal({
 
         {/* ── Google 登录 ── */}
         {step === "social" && (
-          <button
+          <Button variant="ghost"
             onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-background hover:bg-surface-hover border border-border text-text-primary text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-2.5 rounded-lg bg-background hover:bg-surface-hover border border-border text-text-primary text-sm font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2 h-auto"
           >
             <GoogleIcon />
             {t("auth.googleLogin")}
-          </button>
+          </Button>
         )}
 
         {/* ── 邮箱登录入口 ── */}
         {step === "social" && (
           <div className="text-center mt-4">
-            <button
+            <Button variant="ghost"
               onClick={() => {
                 setStep("email");
                 setTimeout(() => emailRef.current?.focus(), 100);
               }}
               disabled={loading}
-              className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50"
+              className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 h-auto"
             >
               {t("auth.emailFallback")}
-            </button>
+            </Button>
           </div>
         )}
 
         {step === "email" && (
           <>
             <div className="flex items-center gap-2 mb-4">
-              <button
+              <Button variant="ghost"
                 onClick={() => {
                   setStep("social");
                   setError(null);
                 }}
                 disabled={loading}
-                className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50"
+                className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 h-auto"
               >
                 {t("auth.backToSelect")}
-              </button>
+              </Button>
               <span className="text-xs text-text-secondary font-medium ml-1">
                 {t("auth.emailLoginTitle")}
               </span>
             </div>
             <div className="mb-4">
-              <input
+              <Input
                 ref={emailRef}
                 type="email"
                 value={email}
@@ -289,32 +291,32 @@ export function LoginModal({
                 }}
                 placeholder={t("auth.emailPlaceholder")}
                 disabled={loading}
-                className="w-full px-3 py-2 rounded-lg bg-surface-hover border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary disabled:opacity-50"
+                className="h-auto w-full rounded-lg border border-border bg-surface-hover px-3 py-2 text-sm text-text-primary shadow-none placeholder:text-text-muted focus:border-primary focus:outline-none disabled:opacity-50"
               />
             </div>
-            <button
+            <Button variant="ghost"
               onClick={handleSendCode}
               disabled={loading || !email.trim()}
-              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2"
+              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2 h-auto"
             >
               {loading ? t("auth.loading") : t("auth.nextStep")}
-            </button>
+            </Button>
           </>
         )}
 
         {step === "code" && (
           <>
             <div className="flex items-center gap-2 mb-4">
-              <button
+              <Button variant="ghost"
                 onClick={() => {
                   setStep("social");
                   setError(null);
                 }}
                 disabled={loading}
-                className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50"
+                className="text-xs text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 h-auto"
               >
                 {t("auth.backToSelect")}
-              </button>
+              </Button>
               <span className="text-xs text-text-secondary font-medium ml-1">
                 {t("auth.emailLoginTitle")}
               </span>
@@ -323,7 +325,7 @@ export function LoginModal({
               {t("auth.codeSent")} {email}
             </div>
             <div className="mb-4">
-              <input
+              <Input
                 ref={codeRef}
                 type="text"
                 value={code}
@@ -345,23 +347,23 @@ export function LoginModal({
                 placeholder=""
                 maxLength={6}
                 disabled={loading}
-                className="w-full px-3 py-2 rounded-lg bg-surface-hover border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary disabled:opacity-50 text-center tracking-[0.5em]"
+                className="h-auto w-full rounded-lg border border-border bg-surface-hover px-3 py-2 text-sm text-text-primary shadow-none placeholder:text-text-muted focus:border-primary focus:outline-none disabled:opacity-50 text-center tracking-[0.5em]"
               />
             </div>
-            <button
+            <Button variant="ghost"
               onClick={handleLogin}
               disabled={loading || code.length < 6}
-              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2"
+              className="w-full py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-sm font-medium transition-colors disabled:opacity-50 mb-2 h-auto"
             >
               {loading ? t("auth.loading") : t("auth.login")}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               onClick={handleSendCode}
               disabled={loading || countdown > 0}
               className="w-full py-2.5 rounded-lg text-text-secondary hover:bg-surface-hover text-sm transition-colors disabled:opacity-50"
             >
               {countdown > 0 ? `${countdown}s` : t("auth.resendCode")}
-            </button>
+            </Button>
           </>
         )}
       </DialogContent>

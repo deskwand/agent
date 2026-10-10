@@ -135,7 +135,7 @@ describe("SlashMenu menu rows", () => {
     // selectedIndex=0 → 第一行是键盘高亮行
     const rows = skillRows();
     expect(rows[0]?.classList).toContain("bg-surface-hover");
-    expect(rows[0]?.classList).not.toContain("bg-accent/10");
+    expect(rows[0]?.classList).not.toContain("bg-primary/10");
   });
 });
 
@@ -234,7 +234,11 @@ describe("SlashMenu badges carry no colour", () => {
     const rows = [...renderAll().querySelectorAll("button.text-left")];
     expect(rows).toHaveLength(commands.length + SKILL_TYPES.length);
     expect(rows.map((row) => row.outerHTML).join("")).not.toMatch(
-      /bg-(accent|warning|success|mcp|error|danger)(\/\d+)?/,
+      // ⚠️ 2026-10-09 相位 4 ✓：原先 `/NN` 是**可选**的 ✗ ⇒ 会误伤 shadcn `Button` base 里的
+      // `hover:bg-accent`（**无透明度** ✓，那是 hover 色、不是「淡色底」✗）。
+      // 本条测试的名字就是「**free of hue-tinted backgrounds**」✓ ⇒ 收紧为**必须带 `/NN`** ✓✓
+      //（`bg-accent/10` 这种淡色底才是它要拦的 ✓ —— 意图一字未改 ✓）。
+      /bg-(accent|warning|success|mcp|error|danger)\/\d+/,
     );
   });
 });

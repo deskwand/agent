@@ -4,7 +4,7 @@ export type FileTextPart =
 export type FileChildPart = FileTextPart | { type: "node"; value: unknown };
 
 const fileLinkButtonClassName =
-  "text-accent hover:text-accent-hover underline underline-offset-2 text-left break-all inline-block";
+  "text-primary hover:text-primary-hover underline underline-offset-2 text-left break-all inline-block";
 
 export function getFileLinkButtonClassName(): string {
   return fileLinkButtonClassName;

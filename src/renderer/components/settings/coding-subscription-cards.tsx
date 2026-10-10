@@ -4,6 +4,8 @@ import {
   CODING_SUBSCRIPTIONS,
   type CodingSubscription,
 } from "../../../shared/coding-subscriptions";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 type Profiles = Partial<Record<string, { apiKey: string }>>;
 
@@ -90,7 +92,7 @@ function SubscriptionCard({
                 href={plan.keyUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-accent hover:underline"
+                className="text-primary hover:underline"
               >
                 {t("api.subscriptionGetKey")}
               </a>
@@ -106,7 +108,7 @@ function SubscriptionCard({
             </div>
           </div>
         </div>
-        <button
+        <Button variant="ghost"
           type="button"
           data-action="configure"
           onClick={() => {
@@ -118,7 +120,7 @@ function SubscriptionCard({
           className={`shrink-0 rounded-lg px-3 py-1.5 text-xs ${
             configured
               ? "border border-border-muted text-text-secondary hover:bg-surface-hover"
-              : "bg-accent font-medium text-accent-foreground hover:bg-accent-hover"
+              : "bg-primary font-medium text-primary-foreground hover:bg-primary-hover"
           }`}
         >
           {t(
@@ -126,13 +128,13 @@ function SubscriptionCard({
               ? "api.subscriptionEditKey"
               : "api.subscriptionConfigureKey",
           )}
-        </button>
+        </Button>
       </div>
       {editing && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {/* 与上方图标同宽的占位：让输入框左边缘对齐文字列（16 + 20 + 12 = 48px） */}
           <span className="w-5 shrink-0" />
-          <input
+          <Input
             type="password"
             autoComplete="new-password"
             autoCorrect="off"
@@ -140,17 +142,17 @@ function SubscriptionCard({
             aria-label={t("api.subscriptionKeyLabel")}
             value={key}
             onChange={(event) => setKey(event.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-text-primary"
+            className="h-auto min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-text-primary shadow-none"
           />
-          <button
+          <Button variant="ghost"
             type="button"
             data-action="save"
             disabled={busy}
             onClick={() => void save()}
-            className="rounded-lg bg-accent px-3 py-1.5 text-xs text-accent-foreground disabled:opacity-50"
+            className="rounded-lg bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50 h-auto hover:bg-transparent hover:text-current"
           >
             {t("common.save")}
-          </button>
+          </Button>
         </div>
       )}
       {configured && (
@@ -160,35 +162,35 @@ function SubscriptionCard({
               <span className="text-xs text-warning">
                 {t("api.subscriptionDisconnectConfirm")}
               </span>
-              <button
+              <Button variant="ghost"
                 type="button"
                 data-action="confirm-remove"
                 disabled={busy}
                 onClick={() => void remove()}
-                className="text-xs text-error"
+                className="text-xs text-error h-auto hover:bg-transparent hover:text-current"
               >
                 {t("api.subscriptionDisconnect")}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 onClick={() => setConfirming(false)}
-                className="text-xs text-text-secondary"
+                className="text-xs text-text-secondary h-auto hover:bg-transparent hover:text-current"
               >
                 {t("common.cancel")}
-              </button>
+              </Button>
             </div>
           ) : (
-            <button
+            <Button variant="ghost"
               type="button"
               data-action="remove"
               onClick={() => {
                 setConfirming(true);
                 setEditing(false);
               }}
-              className="text-xs text-text-secondary hover:text-error"
+              className="text-xs text-text-secondary hover:text-error h-auto"
             >
               {t("api.subscriptionDisconnect")}
-            </button>
+            </Button>
           )}
         </div>
       )}

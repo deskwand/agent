@@ -43,7 +43,7 @@ const baseProps: ChatInputBottomBarProps = {
   thinkingLevelOptions: ["off", "medium"],
   onSelectThinkingLevel: () => {},
   contextUsagePercentage: 10,
-  contextRingColorClass: "text-accent",
+  contextRingColorClass: "text-primary",
   contextStatusDetails: {
     usedLabel: "26K",
     totalLabel: "258K",

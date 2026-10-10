@@ -11,6 +11,8 @@ import type {
 } from "../../../shared/ipc-types";
 import type { ServerEvent } from "../../types";
 import { Switch } from "../ui/switch";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 const CHANNEL_TYPES: ChannelRuntimeInstanceType[] = [
   "feishu",
@@ -308,19 +310,19 @@ export function ChannelInstanceCatalog() {
         {CHANNEL_TYPES.map((item) => {
           const added = instances.some((i) => i.type === item);
           return (
-            <button
+            <Button variant="ghost"
               key={item}
               type="button"
               data-channel-add={item}
               aria-disabled={added}
               disabled={added || loading}
               onClick={() => void create(item)}
-              className="flex flex-col items-center gap-1 rounded-xl border border-border-subtle px-2 py-3 text-xs text-text-muted transition-colors hover:border-accent hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex flex-col items-center gap-1 rounded-xl border border-border-subtle px-2 py-3 text-xs text-text-muted transition-colors hover:border-primary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
               <ChannelLogo type={item} size={24} />
               <span>{t(`channelNames.${item}`)}</span>
               {added && <span className="text-[10px] text-success">✓</span>}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -372,14 +374,14 @@ export function ChannelInstanceCatalog() {
                   </div>
                   <div className="flex items-center gap-2">
                     {creds.length > 0 && (
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         data-edit
                         onClick={() => toggleEdit(instance.id, instance)}
-                        className="rounded-lg px-2 py-1 text-xs text-text-muted hover:text-text-primary"
+                        className="rounded-lg px-2 py-1 text-xs text-text-muted hover:text-text-primary h-auto"
                       >
                         {t(isEditing ? "remote.cancelEdit" : "remote.edit")}
-                      </button>
+                      </Button>
                     )}
                     {/* Enable / disable toggle */}
                     <Switch
@@ -390,37 +392,39 @@ export function ChannelInstanceCatalog() {
                           ? "remote.disableChannel"
                           : "remote.enableChannel",
                       )}
-                      className="data-[state=checked]:bg-success flex-none"
+                      // 2026-10-09 用户选择 ③(a) ✓：去掉 `data-[state=checked]:bg-success` ⇒ 回到 shadcn 标准的
+                      // `bg-primary`（开态用主题色 ✓，不再自成一套绿色 ✗）。`flex-none` 是布局需要 ✓ 保留。
+                      className="flex-none"
                     />
                     {confirming === instance.id ? (
                       <>
-                        <button
+                        <Button variant="ghost"
                           type="button"
                           onClick={() => {
                             void remove(instance.id);
                             setConfirming(null);
                           }}
-                          className="rounded-lg px-2 py-1 text-xs text-error"
+                          className="rounded-lg px-2 py-1 text-xs text-error h-auto hover:bg-transparent hover:text-current"
                         >
                           {t("remote.confirm")}
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="ghost"
                           type="button"
                           onClick={() => setConfirming(null)}
-                          className="rounded-lg px-2 py-1 text-xs text-text-muted"
+                          className="rounded-lg px-2 py-1 text-xs text-text-muted h-auto hover:bg-transparent hover:text-current"
                         >
                           {t("remote.cancelEdit")}
-                        </button>
+                        </Button>
                       </>
                     ) : (
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         onClick={() => setConfirming(instance.id)}
                         aria-label={t("remote.deleteChannel")}
-                        className="rounded-lg p-2 text-text-muted hover:text-error"
+                        className="rounded-lg p-2 text-text-muted hover:text-error h-auto"
                       >
                         <Trash2 className="h-4 w-4" />
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -433,7 +437,7 @@ export function ChannelInstanceCatalog() {
                         <label className="mb-1 block text-xs text-text-muted">
                           {t(field.label)}
                         </label>
-                        <input
+                        <Input
                           type="password"
                           value={editValues.get(instance.id)?.[field.key] ?? ""}
                           onChange={(event) =>
@@ -444,12 +448,12 @@ export function ChannelInstanceCatalog() {
                             )
                           }
                           placeholder={t(field.label)}
-                          className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-text-primary"
+                          className="h-auto w-full rounded-lg border border-border-subtle bg-background px-3 py-2 text-sm text-text-primary shadow-none"
                         />
                       </div>
                     ))}
                     <div className="flex justify-end gap-2">
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         onClick={() =>
                           setExpandedEdit((prev) => {
@@ -458,18 +462,18 @@ export function ChannelInstanceCatalog() {
                             return next;
                           })
                         }
-                        className="rounded-lg px-3 py-1 text-xs text-text-muted hover:text-text-primary"
+                        className="rounded-lg px-3 py-1 text-xs text-text-muted hover:text-text-primary h-auto"
                       >
                         {t("remote.cancelEdit")}
-                      </button>
-                      <button
+                      </Button>
+                      <Button variant="ghost"
                         type="button"
                         data-save
                         onClick={() => void saveCredentials(instance)}
-                        className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground"
+                        className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground h-auto hover:bg-transparent hover:text-current"
                       >
                         {t("remote.saveCredentials")}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}

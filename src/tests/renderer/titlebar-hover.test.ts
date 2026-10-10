@@ -70,15 +70,24 @@ describe("标题栏操作按钮", () => {
     }
   });
 
-  it("每个按钮都包在 .tt-anchor 里（没有漏包的）", async () => {
+  it("每个按钮都是 Tooltip 的触发器（没有漏包的）", async () => {
+    // ⚠️ 2026-10-09：这条原先断言「`b.closest(".tt-anchor")` 非空」✓ —— 而 `.tt-anchor`
+    // 是**老组件**给子元素套的那层 `<span>` ✗（`Tooltip.tsx` 的 `tt-anchor` 类 ✓），
+    // 迁到 shadcn 的 `TooltipTrigger asChild` 后**那一层没有了** ✗✓。
+    // **意图一字未变** ✓（「每个按钮都被 Tooltip 包住、没有漏包的」✓），换成**新的代理** ✗✓：
+    // Radix 的 `TooltipTrigger` 会在**触发器元素本身**写 `data-state`（"closed" / "delayed-open" ✓）——
+    // 这比 `.tt-anchor` **更强** ✓，因为它证明的是「这个按钮**已注册为触发器**」✓✓，而不只是被套了一层。
     const el = await mountTitlebar();
     const buttons = [...el.querySelectorAll("button")];
     expect(buttons.length).toBeGreaterThan(0);
     for (const b of buttons) {
       expect(
-        b.closest(".tt-anchor"),
+        b.getAttribute("data-state"),
         b.textContent || b.tagName,
       ).not.toBeNull();
+      // ⚠️ 2026-10-09（审查员 M1 ✓）：这里原先还有一条 `aria-describedby ?? closest("[data-state]")`
+      // 的断言 —— 但 `closest` **会匹配元素自身** ✗ ⇒ 上面那条过了它就必然过，**恒真** ✗✓。
+      // 删掉它 ✓：上面那条 `data-state` 才是真正在测「已注册为触发器」✓（判据强度未降 ✓）。
     }
     // 气泡是 hover 时按需挂到 body 的，初始 DOM 里不该有
     expect(el.querySelector('[role="tooltip"]')).toBeNull();

@@ -26,7 +26,9 @@ import type { MarketplaceInstallState } from "./MarketplaceSkillCard";
 import { supportsLocalFileActions } from "./skill-actions";
 import { MarketplaceCategorySidebar } from "./MarketplaceCategorySidebar";
 import { MarketplaceSkeleton } from "./MarketplaceSkeleton";
-import { Tooltip } from "../Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -1071,17 +1073,17 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 flex-wrap">
           {filterChips.map((f) => (
-            <button
+            <Button variant="ghost"
               key={f.key}
               onClick={() => setFilterKey(f.key)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 filterKey === f.key
-                  ? "bg-accent/10 text-accent"
+                  ? "bg-primary/10 text-primary"
                   : "bg-surface-muted text-text-secondary hover:text-text-primary"
               }`}
             >
               {f.label}
-            </button>
+            </Button>
           ))}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1092,31 +1094,46 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             {t("skillMarket.skillCount")}
           </span>
           <div className="flex items-center rounded-lg border border-border overflow-hidden">
-            <Tooltip label={t("skillMarket.cardView")}>
-              <button
-                onClick={() => toggleViewMode("cards")}
-                aria-label={t("skillMarket.cardView")}
-                className={`p-1.5 transition-colors ${
-                  viewMode === "cards"
-                    ? "bg-accent/10 text-accent"
-                    : "text-text-muted hover:text-text-primary"
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-              </button>
+            {/* ⚠️ 这里原先每颗按钮外面还有一层老 Tooltip 的 .tt-anchor span —— 迁移后
+                按钮自己成了 flex item（层数少了一层，观感不变）。分段控件的圆角与
+                分隔由外层 div 的 overflow-hidden / border 继续负责。 */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost"
+                  onClick={() => toggleViewMode("cards")}
+                  aria-label={t("skillMarket.cardView")}
+                  className={`p-1.5 transition-colors ${
+                    viewMode === "cards"
+                      ? "bg-primary/10 text-primary"
+                      : "text-text-muted hover:text-text-primary"
+                  }`}
+                >
+                  <LayoutGrid className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+                  而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+              <TooltipContent side="bottom">
+                {t("skillMarket.cardView")}
+              </TooltipContent>
             </Tooltip>
-            <Tooltip label={t("skillMarket.listView")}>
-              <button
-                onClick={() => toggleViewMode("list")}
-                aria-label={t("skillMarket.listView")}
-                className={`p-1.5 transition-colors ${
-                  viewMode === "list"
-                    ? "bg-accent/10 text-accent"
-                    : "text-text-muted hover:text-text-primary"
-                }`}
-              >
-                <List className="w-3.5 h-3.5" />
-              </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost"
+                  onClick={() => toggleViewMode("list")}
+                  aria-label={t("skillMarket.listView")}
+                  className={`p-1.5 transition-colors ${
+                    viewMode === "list"
+                      ? "bg-primary/10 text-primary"
+                      : "text-text-muted hover:text-text-primary"
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {t("skillMarket.listView")}
+              </TooltipContent>
             </Tooltip>
           </div>
         </div>
@@ -1125,12 +1142,12 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
       {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-        <input
+        <Input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t("skillMarket.search")}
-          className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-surface text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors"
+          className="h-auto w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-surface text-sm text-text-primary shadow-none placeholder:text-text-muted focus:outline-none focus:border-primary transition-colors"
         />
       </div>
 
@@ -1150,17 +1167,22 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             <div className="flex-1 min-w-0 pl-4 relative">
               {/* Refresh button */}
               <div className="flex items-center justify-end mb-2">
-                <Tooltip label={t("skillMarket.refresh")}>
-                  <button
-                    onClick={handleRefreshMarketplace}
-                    disabled={marketplaceLoading}
-                    className="p-1 rounded-md hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
-                    aria-label={t("skillMarket.refresh")}
-                  >
-                    <RefreshCw
-                      className={`w-3.5 h-3.5 ${marketplaceLoading ? "animate-spin" : ""}`}
-                    />
-                  </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost"
+                      onClick={handleRefreshMarketplace}
+                      disabled={marketplaceLoading}
+                      className="p-1 rounded-md hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors disabled:opacity-50"
+                      aria-label={t("skillMarket.refresh")}
+                    >
+                      <RefreshCw
+                        className={`w-3.5 h-3.5 ${marketplaceLoading ? "animate-spin" : ""}`}
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {t("skillMarket.refresh")}
+                  </TooltipContent>
                 </Tooltip>
               </div>
               {/* Initial loading skeleton */}
@@ -1170,7 +1192,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
               {/* Pagination loading overlay */}
               {marketplaceLoading && marketplaceSkills.length > 0 && (
                 <div className="absolute inset-0 bg-surface/60 flex items-center justify-center rounded-lg z-10">
-                  <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                  <Loader2 className="w-5 h-5 text-primary animate-spin" />
                 </div>
               )}
               {/* Empty state */}
@@ -1236,13 +1258,13 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                   </div>
                   {marketplaceSkills.length < marketplaceTotal && (
                     <div className="text-center mt-4">
-                      <button
+                      <Button variant="ghost"
                         onClick={loadMoreMarketplace}
                         disabled={marketplaceLoading}
-                        className="px-4 py-2 rounded-lg bg-surface-muted text-sm text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50"
+                        className="px-4 py-2 rounded-lg bg-surface-muted text-sm text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-50 h-auto"
                       >
                         {marketplaceLoading ? "..." : t("skillMarket.loadMore")}
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </>
@@ -1262,12 +1284,12 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             <p className="text-sm text-text-secondary mb-4">
               {t("skillMarket.loginPrompt")}
             </p>
-            <button
+            <Button variant="ghost"
               onClick={() => useAppStore.getState().setShowLoginModal(true)}
-              className="px-5 py-2 rounded-lg bg-accent text-accent-foreground text-sm font-medium hover:bg-accent-hover transition-colors"
+              className="px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors h-auto"
             >
               {t("auth.login")}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -1353,25 +1375,30 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
                                   team: activeTeamName,
                                 })}
                               </span>
-                              <Tooltip label={t("skillMarket.unshare")}>
-                                <button
-                                  onClick={() => handleUnshare(skill.name)}
-                                  aria-label={t("skillMarket.unshare")}
-                                  className="p-0.5 rounded hover:bg-surface-hover hover:text-error transition-colors"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost"
+                                    onClick={() => handleUnshare(skill.name)}
+                                    aria-label={t("skillMarket.unshare")}
+                                    className="p-0.5 rounded hover:bg-surface-hover hover:text-error transition-colors h-auto"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom">
+                                  {t("skillMarket.unshare")}
+                                </TooltipContent>
                               </Tooltip>
                             </span>
                           )}
-                        <button
+                        <Button variant="ghost"
                           onClick={() => handleDeleteCloud(skill.name)}
-                          className="flex items-center gap-1 px-1 py-0.5 rounded text-xs text-text-muted hover:text-error hover:bg-error/5 transition-colors"
+                          className="flex items-center gap-1 px-1 py-0.5 rounded text-xs text-text-muted hover:text-error hover:bg-error/5 transition-colors h-auto"
                           title={t("skillMarket.deleteCloud")}
                         >
                           <Trash2 className="w-3 h-3" />
                           {t("skillMarket.deleteCloud")}
-                        </button>
+                        </Button>
                       </>
                     ) : undefined;
 

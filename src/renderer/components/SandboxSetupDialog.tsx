@@ -13,6 +13,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { Button } from "./app-button";
 
 interface Props {
   progress: SandboxSetupProgress | null;
@@ -216,17 +217,17 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
           {isError && (
             <div className="mt-4 flex flex-col gap-3">
               {isMac && (
-                <button
+                <Button variant="ghost"
                   onClick={handleRetryLima}
                   disabled={isRetrying}
-                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="w-full py-2.5 px-4 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed h-auto"
                 >
                   {isRetrying
                     ? t("sandbox.retryingLima")
                     : t("sandbox.retryLima")}
-                </button>
+                </Button>
               )}
-              <button
+              <Button variant="ghost"
                 onClick={handleClose}
                 className={`w-full py-2.5 px-4 rounded-xl font-medium transition-colors ${
                   isMac
@@ -235,7 +236,7 @@ export function SandboxSetupDialog({ progress, onComplete }: Props) {
                 }`}
               >
                 {t("sandbox.continueNative")}
-              </button>
+              </Button>
             </div>
           )}
 

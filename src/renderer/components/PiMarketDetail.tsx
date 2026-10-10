@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PiMarketDetailDto } from "../../shared/ipc-types";
 import { useAppStore } from "../store";
+import { Button } from "./app-button";
 
 export interface PiMarketDetailProps {
   name: string;
@@ -34,7 +35,7 @@ function initialOf(name: string): string {
 const LINK_BUTTON_CLASS =
   "rounded-md border border-border bg-surface px-2 py-1 text-xs text-text-primary hover:bg-surface-hover";
 const PRIMARY_BUTTON_CLASS =
-  "rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-50";
+  "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50";
 const DANGER_BUTTON_CLASS =
   "rounded-md border border-error/40 px-3 py-1.5 text-sm text-error hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -233,13 +234,17 @@ export function PiMarketDetail({
             <p className="text-sm text-text-secondary">
               {t("piExtensions.marketDetailFailed")}
             </p>
-            {error && <p className="max-w-full break-all text-xs text-text-muted">{error}</p>}
-            <button
-              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-background-secondary/60"
+            {error && (
+              <p className="max-w-full break-all text-xs text-text-muted">
+                {error}
+              </p>
+            )}
+            <Button variant="ghost"
+              className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-background-secondary/60 h-auto"
               onClick={() => setReloadKey((k) => k + 1)}
             >
               {t("piExtensions.marketRetry")}
-            </button>
+            </Button>
           </div>
         ) : empty ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 px-2 text-center">
@@ -279,62 +284,64 @@ export function PiMarketDetail({
             </div>
 
             <div className="flex flex-wrap gap-1.5">
-              <button
+              <Button variant="ghost"
                 type="button"
                 className={LINK_BUTTON_CLASS}
-                onClick={() => openLink(`https://www.npmjs.com/package/${name}`)}
+                onClick={() =>
+                  openLink(`https://www.npmjs.com/package/${name}`)
+                }
               >
                 {t("piExtensions.marketNpm")}
-              </button>
+              </Button>
               {repository && (
-                <button
+                <Button variant="ghost"
                   type="button"
                   className={LINK_BUTTON_CLASS}
                   onClick={() => openLink(repository)}
                 >
                   {t("piExtensions.marketRepository")}
-                </button>
+                </Button>
               )}
               {homepage && (
-                <button
+                <Button variant="ghost"
                   type="button"
                   className={LINK_BUTTON_CLASS}
                   onClick={() => openLink(homepage)}
                 >
                   {t("piExtensions.marketHomepage")}
-                </button>
+                </Button>
               )}
             </div>
 
             <div className="flex gap-2">
               {installed ? (
                 <>
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     className={PRIMARY_BUTTON_CLASS}
                     disabled={busy}
                     onClick={handleUpdate}
                   >
                     {t("piExtensions.update")}
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     type="button"
                     className={DANGER_BUTTON_CLASS}
                     disabled={busy}
                     onClick={handleRemove}
                   >
                     {t("piExtensions.remove")}
-                  </button>
+                  </Button>
                 </>
               ) : (
-                <button
+                <Button variant="ghost"
                   type="button"
                   className={PRIMARY_BUTTON_CLASS}
                   disabled={busy}
                   onClick={handleInstall}
                 >
                   {t("piExtensions.install")}
-                </button>
+                </Button>
               )}
             </div>
 

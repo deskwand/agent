@@ -8,6 +8,7 @@ import {
   formatHitRate,
   resolveCellLevel,
 } from "../../utils/usage-format";
+import { Button } from "../app-button";
 
 type ColorMode = "usage" | "hit" | "cost";
 
@@ -90,7 +91,7 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
       <div className="flex items-center justify-end">
         <div className="flex gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
           {(["usage", "hit", "cost"] as ColorMode[]).map((value) => (
-            <button
+            <Button variant="ghost"
               key={value}
               type="button"
               onClick={() => setMode(value)}
@@ -101,7 +102,7 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
               }`}
             >
               {t(`usage.colorMode.${value}`)}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

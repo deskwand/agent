@@ -13,6 +13,7 @@ import { getLangFromExt } from "../utils/file-preview";
 import { getVideoPlaybackKind } from "../../shared/video-file";
 import { useAppStore } from "../store";
 import { VideoPlayer } from "./VideoPlayer";
+import { Button } from "./app-button";
 
 // Re-export for external consumers
 export type { ReadFileResult };
@@ -253,15 +254,15 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
               }`}
             >
               <TabIcon className="h-3.5 w-3.5 shrink-0" />
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => openPreview(item)}
                 title={item.path}
-                className="min-w-0 flex-1 truncate text-left text-xs"
+                className="min-w-0 flex-1 truncate text-left text-xs h-auto hover:bg-transparent hover:text-current"
               >
                 {item.name}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 data-testid="preview-tab-close"
                 aria-label={t("common.close")}
@@ -271,7 +272,7 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
                 }`}
               >
                 <X className="h-3 w-3" />
-              </button>
+              </Button>
             </div>
           );
         })}
@@ -285,14 +286,14 @@ export function FilePreviewPanel({ visible = true }: { visible?: boolean }) {
         >
           {filePath}
         </span>
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={handleOpenExternal}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary h-auto"
         >
           <ExternalLink className="h-3.5 w-3.5" />
           {t("filePreview.openExternal")}
-        </button>
+        </Button>
       </div>
 
       {/* Body */}

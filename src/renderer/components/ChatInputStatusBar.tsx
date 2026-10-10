@@ -28,6 +28,7 @@ import {
   formatDurationShort,
   isLingering,
 } from "../utils/execution-clock";
+import { Button } from "./app-button";
 
 export type ChatInputStatus =
   | { type: "sending" }
@@ -296,7 +297,7 @@ export function ChatInputStatusBar({
                         {shown === "completed" ? (
                           <CheckCircle2 className="h-3.5 w-3.5 text-success" />
                         ) : shown === "in_progress" ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-accent" />
+                          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                         ) : shown === "cancelled" ? (
                           <XCircle className="h-3.5 w-3.5 text-text-muted" />
                         ) : (
@@ -308,7 +309,7 @@ export function ChatInputStatusBar({
                           shown === "completed" || shown === "cancelled"
                             ? "text-text-muted line-through"
                             : shown === "in_progress"
-                              ? "font-medium text-accent"
+                              ? "font-medium text-primary"
                               : "text-text-primary"
                         }`}
                       >
@@ -325,7 +326,7 @@ export function ChatInputStatusBar({
               </div>
             ) : null}
             {rows.map((row) => (
-              <button
+              <Button variant="ghost"
                 key={row.toolCallId}
                 type="button"
                 onClick={() => {
@@ -372,19 +373,19 @@ export function ChatInputStatusBar({
                     </span>
                   )}
                   {row.status === "running" ? (
-                    <Loader2 className="h-3 w-3 animate-spin text-accent" />
+                    <Loader2 className="h-3 w-3 animate-spin text-primary" />
                   ) : row.status === "error" ? (
                     <XCircle className="h-3 w-3 text-error" />
                   ) : (
                     <CheckCircle2 className="h-3 w-3" />
                   )}
                 </span>
-              </button>
+              </Button>
             ))}
           </PopoverContent>
         )}
         <PopoverTrigger asChild>
-          <button
+          <Button variant="ghost"
             type="button"
             // 有可见文案（步骤/计数）时不要设 aria-label —— 它会把内容整个盖掉，
             // 读屏用户就听不到"3/5 · 正在写迁移"了。只在只剩一个 chevron 时兜底。
@@ -403,7 +404,7 @@ export function ChatInputStatusBar({
                   className="h-1 w-[34px] flex-none overflow-hidden rounded-full bg-surface-active"
                 >
                   <span
-                    className="block h-full bg-accent"
+                    className="block h-full bg-primary"
                     style={{
                       width: `${(completedCount / todos.length) * 100}%`,
                     }}
@@ -427,7 +428,7 @@ export function ChatInputStatusBar({
               </span>
             ) : null}
             <ChevronDown className="h-3 w-3 flex-none text-text-muted" />
-          </button>
+          </Button>
         </PopoverTrigger>
       </span>
     </Popover>
@@ -514,30 +515,30 @@ export function ChatInputStatusBar({
             {infoText}
           </span>
           {status.type === "goal-active" && onGoalCommand && (
-            <button
+            <Button variant="ghost"
               type="button"
-              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-[transform,background-color,color] active:scale-[0.97]"
+              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
               onClick={() => onGoalCommand("goal:pause")}
             >
               {t("goal.pause")}
-            </button>
+            </Button>
           )}
           {status.type === "goal-paused" && onGoalCommand && (
             <>
-              <button
+              <Button variant="ghost"
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-[transform,background-color,color] active:scale-[0.97]"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
                 onClick={() => onGoalCommand("goal:resume")}
               >
                 {t("goal.resume")}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-surface-hover text-text-muted hover:bg-surface-hover/80 transition-[transform,background-color,color] active:scale-[0.97]"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-surface-hover text-text-muted hover:bg-surface-hover/80 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
                 onClick={() => onGoalCommand("goal:clear")}
               >
                 {t("goal.clear")}
-              </button>
+              </Button>
             </>
           )}
           {rightZone}

@@ -2,7 +2,8 @@ import { ExternalLink } from "lucide-react";
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
+import { Button } from "./app-button";
 
 /**
  * 次级入口：用系统程序打开。预览抢走主点击后，文件树/筛选结果/产物面板里这是
@@ -11,8 +12,8 @@ import { Tooltip } from "./Tooltip";
  * 单动作（不带菜单）：消息附件那处已经有独立的"在文件夹中显示"，把它也塞进来
  * 会在同一位置产生重复入口（见 design §5.5）。
  *
- * 注意：本组件渲染 `<button>`。若宿主行本身是 `<button>`，必须先把宿主换成
- * `<div role="button">` —— 嵌套 `<button>` 是非法 HTML（见 plan Task 8）。
+ * 注意：本组件渲染 `<Button variant="ghost">`。若宿主行本身是 `<Button variant="ghost">`，必须先把宿主换成
+ * `<div role="button">` —— 嵌套 `<Button variant="ghost">` 是非法 HTML（见 plan Task 8）。
  */
 export function OpenWithSystemAppButton({
   filePath,
@@ -42,19 +43,26 @@ export function OpenWithSystemAppButton({
   );
 
   return (
-    <Tooltip label={t("filePreview.openExternal")}>
-      <button
-        type="button"
-        data-testid="open-with-system-app"
-        aria-label={t("filePreview.openExternal")}
-        onClick={handleClick}
-        // 快速双击 ⧉ 时第二次点击会走 dblclick：只拦 click 的话宿主行的
-        // onDoubleClick（打开预览）仍会被触发，于是"用系统程序打开"的同时又跑了预览。
-        onDoubleClick={(event) => event.stopPropagation()}
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors text-text-muted hover:bg-surface-hover hover:text-text-primary ${className ?? ""}`}
-      >
-        <ExternalLink className="h-3.5 w-3.5" />
-      </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost"
+          type="button"
+          data-testid="open-with-system-app"
+          aria-label={t("filePreview.openExternal")}
+          onClick={handleClick}
+          // 快速双击 ⧉ 时第二次点击会走 dblclick：只拦 click 的话宿主行的
+          // onDoubleClick（打开预览）仍会被触发，于是"用系统程序打开"的同时又跑了预览。
+          onDoubleClick={(event) => event.stopPropagation()}
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors text-text-muted hover:bg-surface-hover hover:text-text-primary ${className ?? ""}`}
+        >
+          <ExternalLink className="h-3.5 w-3.5" />
+        </Button>
+      </TooltipTrigger>
+      {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+          而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+      <TooltipContent side="bottom">
+        {t("filePreview.openExternal")}
+      </TooltipContent>
     </Tooltip>
   );
 }

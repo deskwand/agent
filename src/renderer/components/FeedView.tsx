@@ -6,6 +6,7 @@ import { parseRunReasons } from "../../shared/feed";
 import { useAppStore } from "../store";
 import { FeedItemRow } from "./FeedItemRow";
 import { FeedReaderPane, FeedReaderPlaceholder } from "./FeedReaderPane";
+import { Button } from "./app-button";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -134,15 +135,15 @@ export function FeedView(): JSX.Element {
         className="flex h-full flex-col bg-background"
       >
         <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-2.5">
-          <button
+          <Button variant="ghost"
             type="button"
             data-testid="feed-back"
             onClick={() => setActiveView("chat")}
             aria-label={t("common.back")}
-            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
           >
             <ArrowLeft className="h-5 w-5 text-text-secondary" />
-          </button>
+          </Button>
           <span className="text-base font-semibold">{t("feed.railLabel")}</span>
         </div>
         <div className="max-w-[34em] px-6 py-6">
@@ -160,14 +161,14 @@ export function FeedView(): JSX.Element {
             <li>· {t("feed.onboardingBullet2")}</li>
             <li>· {t("feed.onboardingBullet3")}</li>
           </ul>
-          <button
+          <Button variant="ghost"
             type="button"
             data-testid="feed-enable"
             onClick={() => void setFeedEnabled(true)}
-            className="rounded-md bg-accent px-4 py-1.5 text-xs font-semibold text-accent-foreground"
+            className="rounded-md bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground h-auto hover:bg-transparent hover:text-current"
           >
             {t("feed.onboardingCta")}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -180,15 +181,15 @@ export function FeedView(): JSX.Element {
       <style>{`.feed-row:hover [data-testid="feed-actions"],.feed-row:focus-within [data-testid="feed-actions"]{opacity:1 !important}`}</style>
 
       <div className="flex items-start gap-3 border-b border-border-subtle px-4 pb-2.5 pt-3.5">
-        <button
+        <Button variant="ghost"
           type="button"
           data-testid="feed-back"
           onClick={() => setActiveView("chat")}
           aria-label={t("common.back")}
-          className="-ml-1.5 mt-0.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+          className="-ml-1.5 mt-0.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
         >
           <ArrowLeft className="h-5 w-5 text-text-secondary" />
-        </button>
+        </Button>
         <div className="min-w-0">
           <h1 className="text-xl font-semibold text-text-primary">
             {t("feed.railLabel")}
@@ -203,69 +204,69 @@ export function FeedView(): JSX.Element {
         </div>
         <span className="flex-1" />
         <div className="flex items-center gap-2 pt-0.5">
-          <button
+          <Button variant="ghost"
             type="button"
             data-testid="feed-refresh"
             disabled={Boolean(phase)}
             onClick={() => void refreshNow()}
-            className="rounded-md bg-accent px-2.5 py-1.5 text-xs font-semibold text-accent-foreground disabled:opacity-50"
+            className="rounded-md bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50 h-auto hover:bg-transparent hover:text-current"
           >
             {t("feed.refresh")}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             data-testid="feed-listen-all"
             onClick={() => void startFeedListen()}
-            className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-text-primary"
+            className="rounded-md border border-border px-2.5 py-1.5 text-xs font-semibold text-text-primary h-auto hover:bg-transparent hover:text-current"
           >
             {t("feed.listenAll")}
-          </button>
+          </Button>
           <div className="relative">
-            <button
+            <Button variant="ghost"
               type="button"
               data-testid="feed-more"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((open) => !open)}
-              className="px-1 text-xs text-text-muted"
+              className="px-1 text-xs text-text-muted h-auto hover:bg-transparent hover:text-current"
             >
               ⋯
-            </button>
+            </Button>
             {menuOpen ? (
               <div className="absolute right-0 top-6 z-10 w-[154px] rounded-md border border-border bg-surface p-1 shadow-elevated">
-                <button
+                <Button variant="ghost"
                   type="button"
                   data-testid="feed-mark-all-read"
                   onClick={() => {
                     setMenuOpen(false);
                     void markAllFeedRead();
                   }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover h-auto"
                 >
                   {t("feed.markAllRead")}
-                </button>
-                <button
+                </Button>
+                <Button variant="ghost"
                   type="button"
                   data-testid="feed-toggle-auto"
                   onClick={() => {
                     setMenuOpen(false);
                     void setFeedEnabled(!enabled);
                   }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover h-auto"
                 >
                   {enabled ? t("feed.pauseAuto") : t("feed.resumeAuto")}
-                </button>
-                <button
+                </Button>
+                <Button variant="ghost"
                   type="button"
                   data-testid="feed-clear-all"
                   onClick={() => {
                     setMenuOpen(false);
                     setConfirmClear(true);
                   }}
-                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover"
+                  className="block w-full rounded px-2 py-1.5 text-left text-xs hover:bg-surface-hover h-auto"
                 >
                   {t("feed.clearAll")}
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>
@@ -279,14 +280,14 @@ export function FeedView(): JSX.Element {
         >
           <span>{t("feed.errorSearchFailed")}</span>
           <span className="flex-1" />
-          <button type="button" onClick={() => void refreshNow()}>
+          <Button variant="ghost" type="button" onClick={() => void refreshNow()}>
             {t("feed.errorRetry")}
-          </button>
+          </Button>
         </div>
       ) : null}
 
       {lastRun?.status === "partial" ? (
-        <div className="border-b border-border-subtle px-4 py-1.5 text-xs text-text-muted">
+        <div className="border-b border-border-subtle px-4 py-1.5 text-xs text-text-muted hover:bg-transparent hover:text-error">
           {t("feed.partial")}
         </div>
       ) : null}
@@ -301,26 +302,26 @@ export function FeedView(): JSX.Element {
         data-testid="feed-filters"
         className="flex items-center gap-3 px-4 pt-2 text-xs"
       >
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={() => {
             setFilter("all");
             setShowActionsOnFirstRow(false);
           }}
-          className={filter === "all" ? "text-accent" : "text-text-muted"}
+          className={filter === "all" ? "text-primary" : "text-text-muted"}
         >
           {t("feed.filterAll")}
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           onClick={() => {
             setFilter("unread");
             setShowActionsOnFirstRow(false);
           }}
-          className={filter === "unread" ? "text-accent" : "text-text-muted"}
+          className={filter === "unread" ? "text-primary" : "text-text-muted"}
         >
           {t("feed.filterUnread", { count: unread })}
-        </button>
+        </Button>
       </div>
 
       <div className="flex min-h-0 flex-1">
@@ -431,14 +432,14 @@ export function FeedView(): JSX.Element {
                 {t("feed.clearAllConfirmBody")}
               </div>
               <div className="flex justify-end gap-2">
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => setConfirmClear(false)}
-                  className="text-xs text-text-muted"
+                  className="text-xs text-text-muted h-auto hover:bg-transparent hover:text-current"
                 >
                   {t("feed.cancel")}
-                </button>
-                <button
+                </Button>
+                <Button variant="ghost"
                   type="button"
                   data-testid="feed-clear-confirm"
                   onClick={() => {
@@ -447,23 +448,23 @@ export function FeedView(): JSX.Element {
                       .clearAll()
                       .then(() => refreshFeed());
                   }}
-                  className="rounded-md bg-error px-3 py-1.5 text-xs font-semibold text-error-foreground"
+                  className="rounded-md bg-error px-3 py-1.5 text-xs font-semibold text-error-foreground h-auto hover:bg-transparent hover:text-current"
                 >
                   {t("feed.clearAllConfirm")}
-                </button>
+                </Button>
               </div>
             </div>
           </div>
         ) : null}
 
-        <button
+        <Button variant="ghost"
           type="button"
           data-testid="feed-reasons-toggle"
           onClick={() => setReasonsOpen((open) => !open)}
         >
           {t("feed.reasonsTitle")} {reasonsOpen ? "▴" : "▾"}
-        </button>
-        <span className="pl-2.5 tabular-nums">
+        </Button>
+        <span className="pl-2.5 tabular-nums hover:bg-transparent hover:text-error">
           {t("feed.reasonsSummary", {
             queries: reasons.length,
             candidates: lastRun?.candidate_count ?? 0,
@@ -479,14 +480,14 @@ export function FeedView(): JSX.Element {
               return (
                 <div key={query.q} className="flex items-center gap-2">
                   <span className="text-text-primary">{query.q}</span>
-                  <span className="rounded-sm bg-accent-muted px-1.5 text-accent">
+                  <span className="rounded-sm bg-primary-muted px-1.5 text-primary">
                     {query.topic}
                   </span>
                   <span className="text-xs">
                     {query.reason || t("feed.reasonsFromMemory")}
                   </span>
                   <span className="flex-1" />
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     data-testid={`feed-block-${query.topic}`}
                     onClick={() =>
@@ -498,12 +499,12 @@ export function FeedView(): JSX.Element {
                           : [...blockedTopics, query.topic],
                       )
                     }
-                    className={blocked ? "text-text-muted" : "text-accent"}
+                    className={blocked ? "text-text-muted" : "text-primary"}
                   >
                     {blocked
                       ? t("feed.reasonsBlocked")
                       : t("feed.reasonsBlockTopic")}
-                  </button>
+                  </Button>
                 </div>
               );
             })}

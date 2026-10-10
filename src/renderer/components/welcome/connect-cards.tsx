@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CODING_SUBSCRIPTIONS } from "../../../shared/coding-subscriptions";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 export interface ConnectCardsProps {
   onOpenCloud: () => void;
@@ -120,11 +122,11 @@ export function ConnectCards({
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
-        <button
+        <Button variant="ghost"
           type="button"
           data-testid="connect-card-cloud"
           onClick={onOpenCloud}
-          className={`${CARD_CLASS} border-accent`}
+          className={`${CARD_CLASS} border-primary`}
         >
           <span className="block text-sm font-medium text-text-primary">
             {t("connect.cloudTitle")}
@@ -132,34 +134,34 @@ export function ConnectCards({
           <span className="mt-0.5 block text-xs text-text-muted">
             {t("connect.cloudDesc")}
           </span>
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           data-testid="connect-card-subscription"
           aria-expanded={expanded}
           onClick={() => setExpanded((value) => !value)}
           className={CARD_CLASS}
         >
-          <span className="block text-sm font-medium text-text-primary">
+          <span className="block text-sm font-medium text-text-primary h-auto hover:bg-transparent hover:text-current">
             {t("connect.subscribeTitle")} {expanded ? "▴" : "▾"}
           </span>
           <span className="mt-0.5 block text-xs text-text-muted">
             {t("connect.subscribeDesc")}
           </span>
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           data-testid="connect-card-api-key"
           onClick={onOpenApiKey}
           className={CARD_CLASS}
         >
-          <span className="block text-sm font-medium text-text-primary">
+          <span className="block text-sm font-medium text-text-primary h-auto hover:bg-transparent hover:text-current">
             {t("connect.apiKeyTitle")}
           </span>
           <span className="mt-0.5 block text-xs text-text-muted">
             {t("connect.apiKeyDesc")}
           </span>
-        </button>
+        </Button>
       </div>
 
       {expanded && (
@@ -170,7 +172,7 @@ export function ConnectCards({
             </p>
             {OAUTH_ROWS.map((row) => (
               <div key={row.id}>
-                <button
+                <Button variant="ghost"
                   type="button"
                   data-testid={`connect-row-${row.id}`}
                   disabled={pending !== null}
@@ -184,7 +186,7 @@ export function ConnectCards({
                   <span className="ml-auto text-xs text-text-muted">
                     {t(row.tagKey)}
                   </span>
-                </button>
+                </Button>
                 {rowError(row.id)}
               </div>
             ))}
@@ -196,7 +198,7 @@ export function ConnectCards({
             </p>
             {CODING_SUBSCRIPTIONS.map((plan) => (
               <div key={plan.profileKey}>
-                <button
+                <Button variant="ghost"
                   type="button"
                   data-testid={`connect-row-${plan.profileKey}`}
                   disabled={pending !== null}
@@ -212,26 +214,26 @@ export function ConnectCards({
                   <span className="ml-auto text-xs text-text-muted">
                     {t("connect.tagPasteKey")}
                   </span>
-                </button>
+                </Button>
                 {keyRow === plan.profileKey && (
                   <div className="flex gap-1 px-2 pb-1">
-                    <input
+                    <Input
                       data-testid={`connect-key-input-${plan.profileKey}`}
                       value={keyDraft}
                       disabled={pending !== null}
                       onChange={(event) => setKeyDraft(event.target.value)}
                       placeholder={t("connect.keyPlaceholder")}
-                      className="min-w-0 flex-1 rounded-lg border border-border-subtle bg-background px-2 py-1 text-xs text-text-primary outline-none focus:border-accent"
+                      className="h-auto min-w-0 flex-1 rounded-lg border border-border-subtle bg-background px-2 py-1 text-xs text-text-primary shadow-none outline-none focus:border-primary"
                     />
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       data-testid={`connect-key-save-${plan.profileKey}`}
                       disabled={pending !== null}
                       onClick={() => void runSubscription(plan.profileKey)}
-                      className="rounded-lg border border-accent px-2 py-1 text-xs text-accent disabled:opacity-40"
+                      className="rounded-lg border border-primary px-2 py-1 text-xs text-primary disabled:opacity-40"
                     >
                       {t("common.save")}
-                    </button>
+                    </Button>
                   </div>
                 )}
                 {rowError(plan.profileKey)}

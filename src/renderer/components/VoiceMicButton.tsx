@@ -3,10 +3,11 @@ import { Loader2, Mic } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { VoiceInstallState } from "../../shared/ipc-types";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import type { VoiceInputController, VoiceStatus } from "../hooks/useVoiceInput";
 import type { VoiceEngineConfig } from "../types";
 import { holdKeyNameKey, shortcutPlatform } from "../voice-shortcut-labels";
+import { Button } from "./app-button";
 
 export interface VoiceMicButtonProps {
   status: VoiceStatus;
@@ -136,7 +137,7 @@ export function VoiceMicButton({
   // 故事就停了（既没被告知录上了，也无法再按空格停下）。所以只换类名与内容。
   const buttonClassName = pillVisible
     ? "flex h-8 shrink-0 items-center gap-2 rounded-full bg-surface-hover px-2.5 transition-colors hover:bg-surface-active disabled:cursor-not-allowed"
-    : "relative inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50";
+    : "relative inline-flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <div className="flex shrink-0 items-center gap-1">
@@ -148,7 +149,7 @@ export function VoiceMicButton({
             aria-hidden
           >
             <div
-              className="h-full rounded-full bg-accent transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${percent}%` }}
             />
           </div>
@@ -164,49 +165,54 @@ export function VoiceMicButton({
         </span>
       )}
 
-      <Tooltip label={tooltipLabel}>
-        <button
-          type="button"
-          aria-label={ariaLabel}
-          disabled={buttonDisabled}
-          onClick={onToggle}
-          className={buttonClassName}
-        >
-          {pillVisible ? (
-            <>
-              {/* 波形条 `aria-hidden`：它的含义已经在按钮的可访问名（「停止录音」）里。
-                  高度走 inline style —— 电平是运行时数据，Tailwind 不能穷举。 */}
-              <span className="flex h-4 items-end gap-[2px]" aria-hidden>
-                {LEVEL_SLOTS.map((slot) => (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost"
+            type="button"
+            aria-label={ariaLabel}
+            disabled={buttonDisabled}
+            onClick={onToggle}
+            className={buttonClassName}
+          >
+            {pillVisible ? (
+              <>
+                {/* 波形条 `aria-hidden`：它的含义已经在按钮的可访问名（「停止录音」）里。
+                    高度走 inline style —— 电平是运行时数据，Tailwind 不能穷举。 */}
+                <span className="flex h-4 items-end gap-[2px]" aria-hidden>
+                  {LEVEL_SLOTS.map((slot) => (
+                    <span
+                      key={slot}
+                      data-testid="voice-level-bar"
+                      className="w-[3px] rounded-full bg-text-muted transition-[height] duration-150 ease-out"
+                      style={{ height: `${bars[slot]}%` }}
+                    />
+                  ))}
+                </span>
+                <span className="text-xs tabular-nums text-text-muted">
+                  {formatSeconds(seconds)}
+                </span>
+              </>
+            ) : (
+              <>
+                {showPolishRing && (
                   <span
-                    key={slot}
-                    data-testid="voice-level-bar"
-                    className="w-[3px] rounded-full bg-text-muted transition-[height] duration-150 ease-out"
-                    style={{ height: `${bars[slot]}%` }}
+                    aria-hidden
+                    data-testid="voice-polish-ring"
+                    className="pointer-events-none absolute -inset-[3px] rounded-[11px] border-2 border-primary opacity-[0.55] animate-voice-polish-ring"
                   />
-                ))}
-              </span>
-              <span className="text-xs tabular-nums text-text-muted">
-                {formatSeconds(seconds)}
-              </span>
-            </>
-          ) : (
-            <>
-              {showPolishRing && (
-                <span
-                  aria-hidden
-                  data-testid="voice-polish-ring"
-                  className="pointer-events-none absolute -inset-[3px] rounded-[11px] border-2 border-accent opacity-[0.55] animate-voice-polish-ring"
-                />
-              )}
-              {busy || installing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Mic className="h-4 w-4" />
-              )}
-            </>
-          )}
-        </button>
+                )}
+                {busy || installing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </>
+            )}
+          </Button>
+        </TooltipTrigger>
+        {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+            而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+        <TooltipContent side="bottom">{tooltipLabel}</TooltipContent>
       </Tooltip>
     </div>
   );

@@ -17,6 +17,7 @@ import {
   SettingsStatusBadge,
   SettingsSwitch,
 } from "./shared";
+import { Button } from "../app-button";
 
 export function OcrCapabilitySettings() {
   const { t } = useTranslation();
@@ -81,29 +82,29 @@ export function OcrCapabilitySettings() {
           note={t("settings.capabilities.memoryNote")}
           control={
             installed ? (
-              <button
+              <Button variant="ghost"
                 type="button"
                 data-testid="ocr-remove"
                 aria-label={t("settings.capabilities.ocr.remove")}
                 disabled={removing}
                 onClick={() => void remove()}
-                className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50"
+                className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50 h-auto"
               >
                 {t("settings.capabilities.install.delete")}
-              </button>
+              </Button>
             ) : (
               !busy && (
-                <button
+                <Button variant="ghost"
                   type="button"
                   data-testid="ocr-install"
                   aria-label={t("settings.capabilities.ocr.download")}
                   onClick={() => void window.electronAPI?.ocr.install()}
-                  className="rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover"
+                  className="rounded-control bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover h-auto"
                 >
                   {install?.phase === "error"
                     ? t("settings.capabilities.install.retry")
                     : t("settings.capabilities.install.download")}
-                </button>
+                </Button>
               )
             )
           }

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { FeedBodyPayload, FeedItemWithMeta } from "../../shared/feed";
 import { useAppStore } from "../store";
 import { MessageMarkdown } from "./MessageMarkdown";
+import { Button } from "./app-button";
 
 export interface FeedReaderPaneProps {
   item: FeedItemWithMeta;
@@ -113,7 +114,7 @@ export function FeedReaderPane({
 
         {item.summary ? (
           <div
-            className="mb-3 border-l-2 border-accent pl-3 text-sm text-text-primary"
+            className="mb-3 border-l-2 border-primary pl-3 text-sm text-text-primary"
             style={{ lineHeight: 1.8 }}
           >
             {item.summary}
@@ -146,29 +147,29 @@ export function FeedReaderPane({
         <div className="mt-2 flex items-baseline gap-3 border-t border-border-subtle pt-2 text-xs leading-[1.75] text-text-muted">
           <span
             data-testid="feed-relevance"
-            className="min-w-0 flex-1 truncate text-accent"
+            className="min-w-0 flex-1 truncate text-primary"
             title={item.relevance ?? undefined}
           >
             {item.relevance}
           </span>
           {body?.hasScript ? (
-            <button
+            <Button variant="ghost"
               type="button"
               data-testid="feed-listen-item"
               onClick={() => void startFeedListen({ fromItemId: item.id })}
-              className="whitespace-nowrap text-accent"
+              className="whitespace-nowrap text-primary h-auto hover:bg-transparent hover:text-current"
             >
               {t("feed.listenItem")}
-            </button>
+            </Button>
           ) : null}
-          <button
+          <Button variant="ghost"
             type="button"
             data-testid="feed-open-browser"
             onClick={() => onOpenInBrowser(item.url)}
-            className="whitespace-nowrap text-accent"
+            className="whitespace-nowrap text-primary h-auto hover:bg-transparent hover:text-current"
           >
             {t("feed.readerOpenInBrowser")} ↗
-          </button>
+          </Button>
         </div>
       </div>
     </div>

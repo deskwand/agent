@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { CODING_SUBSCRIPTIONS } from "../../../shared/coding-subscriptions";
 import type { ProviderPresets, ProviderType } from "../../types";
-import { Tooltip } from "../Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { SubscriptionPlanIcon } from "./coding-subscription-cards";
 import { ProviderBrandIcon } from "./provider-icons";
 import type { ProviderBrand } from "./provider-icons";
@@ -12,6 +12,7 @@ import {
   type ProviderCatalogEntry,
 } from "./provider-catalog";
 import { SettingsSection, SettingsStatusBadge } from "./shared";
+import { Button } from "../app-button";
 
 export interface ProviderCatalogGridProps {
   presets: ProviderPresets;
@@ -124,7 +125,7 @@ export function ProviderCatalogGrid({
                       : undefined;
 
                 const tile = (
-                  <button
+                  <Button variant="ghost"
                     key={`${entry.kind}:${entry.id}`}
                     type="button"
                     data-catalog-entry={`${entry.kind}:${entry.id}`}
@@ -173,14 +174,17 @@ export function ProviderCatalogGrid({
                         />
                       </span>
                     )}
-                  </button>
+                  </Button>
                 );
 
-                // 仓库禁止 <button title>（title-attrs-migration 不变量）：
+                // 仓库禁止 <Button variant="ghost" title>（title-attrs-migration 不变量）：
                 // 操作提示走 Tooltip，且只在真的有文案时才包一层。
                 return tooltip ? (
-                  <Tooltip key={`${entry.kind}:${entry.id}`} label={tooltip}>
-                    {tile}
+                  <Tooltip key={`${entry.kind}:${entry.id}`}>
+                    <TooltipTrigger asChild>{tile}</TooltipTrigger>
+                    {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+                        而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+                    <TooltipContent side="bottom">{tooltip}</TooltipContent>
                   </Tooltip>
                 ) : (
                   tile

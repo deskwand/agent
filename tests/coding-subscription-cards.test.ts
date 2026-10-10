@@ -73,8 +73,8 @@ describe("coding subscription cards", () => {
       const button = container
         .querySelector(`[data-testid="${key}-card"]`)!
         .querySelector('button[data-action="configure"]')!;
-      expect(button.classList.contains("bg-accent")).toBe(true);
-      expect(button.classList.contains("text-accent-foreground")).toBe(true);
+      expect(button.classList.contains("bg-primary")).toBe(true);
+      expect(button.classList.contains("text-primary-foreground")).toBe(true);
       expect(button.classList.contains("border-border-muted")).toBe(false);
     }
   });
@@ -224,7 +224,7 @@ describe("coding subscription cards", () => {
     const configuredButton = card.querySelector(
       'button[data-action="configure"]',
     )!;
-    expect(configuredButton.classList.contains("bg-accent")).toBe(false);
+    expect(configuredButton.classList.contains("bg-primary")).toBe(false);
     expect(configuredButton.classList.contains("border-border-muted")).toBe(
       true,
     );

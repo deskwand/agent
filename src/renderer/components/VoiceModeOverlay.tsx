@@ -16,6 +16,7 @@ import { CAPTION_KEY, ORB_STATE } from "./voice-mode/orb-state";
 import { voiceCaptionLine } from "../utils/voice/voice-caption";
 import { VOICE_MESSAGE_KEYS } from "../hooks/useVoiceInput";
 import type { VoiceModeView } from "../hooks/useVoiceMode";
+import { Button } from "./app-button";
 
 export interface VoiceModeOverlayProps {
   /** 运行时给出的视图状态。浮层只画，不管。 */
@@ -66,7 +67,7 @@ export function VoiceModeOverlay({
           y=34–40 这 6px 仍是拖窗区，点击落在✕中间就被当成拖窗吞掉（悬停照常亮）。
           两个按钮现在都在这里，都得带这个类。 */}
       <div className="absolute top-4 right-4 flex items-center gap-1">
-        <button
+        <Button variant="ghost"
           type="button"
           data-testid="voice-minimize"
           onClick={onMinimize}
@@ -75,8 +76,8 @@ export function VoiceModeOverlay({
           style={{ color: "#8f8f9b" }}
         >
           <Minus className="h-4 w-4" />
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           data-testid="voice-close"
           onClick={onClose}
@@ -85,7 +86,7 @@ export function VoiceModeOverlay({
           style={{ color: "#8f8f9b" }}
         >
           <X className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="h-[min(620px,62vh)] w-[min(620px,86vw)]">

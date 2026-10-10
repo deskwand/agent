@@ -54,11 +54,13 @@ describe("Win/Linux 窗口控制按钮（非 darwin）", () => {
     }
   });
 
-  it("三个控件也都包在 .tt-anchor 里", async () => {
+  it("三个控件都已注册为 Tooltip 触发器", async () => {
     const el = await mount();
     for (const key of ["window.minimize", "window.maximize", "window.close"]) {
       const btn = el.querySelector(`[aria-label="${key}"]`)!;
-      expect(btn.closest(".tt-anchor"), key).not.toBeNull();
+      // ⚠️ 2026-10-09：`.tt-anchor` 是**老组件**套的 `<span>` ✗，迁到 `app-tooltip` 后按设计没了 ✗✓。
+      // 意图不变 ✓（「三个控件都被 Tooltip 包住」✓）；新代理更强 ✓：Radix 把 `data-state` 写在**触发器本身** ✓。
+      expect(btn.getAttribute("data-state"), key).not.toBeNull();
     }
   });
 

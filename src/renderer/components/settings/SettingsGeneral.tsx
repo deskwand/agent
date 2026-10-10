@@ -11,6 +11,8 @@ import {
   SettingsSelect,
   SettingsSwitch,
 } from "./shared";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 export function SettingsGeneral() {
   const { i18n, t } = useTranslation();
@@ -92,7 +94,7 @@ export function SettingsGeneral() {
                 className="flex overflow-hidden rounded-control border border-border"
               >
                 {themeOptions.map((option) => (
-                  <button
+                  <Button variant="ghost"
                     key={option.value}
                     type="button"
                     aria-pressed={settings.theme === option.value}
@@ -104,7 +106,7 @@ export function SettingsGeneral() {
                     }`}
                   >
                     {option.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             }
@@ -126,15 +128,15 @@ export function SettingsGeneral() {
             control={
               <>
                 <div className="flex items-center rounded-control border border-border bg-surface">
-                  <button
+                  <Button variant="ghost"
                     aria-label={t("general.uiFontSizeDecrease")}
                     onClick={() => commitFont(settings.uiFontSize - 1)}
                     disabled={settings.uiFontSize <= 12}
-                    className="px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                    className="px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 h-auto"
                   >
                     −
-                  </button>
-                  <input
+                  </Button>
+                  <Input
                     type="number"
                     min={12}
                     max={20}
@@ -145,16 +147,16 @@ export function SettingsGeneral() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleFontDraftCommit();
                     }}
-                    className="w-12 border-x border-border bg-transparent py-1 text-center text-xs font-medium text-text-primary outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    className="h-auto w-12 rounded-none border-x border-border border-y-0 bg-transparent px-0 py-1 text-center text-xs font-medium text-text-primary shadow-none outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
-                  <button
+                  <Button variant="ghost"
                     aria-label={t("general.uiFontSizeIncrease")}
                     onClick={() => commitFont(settings.uiFontSize + 1)}
                     disabled={settings.uiFontSize >= 20}
-                    className="px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+                    className="px-2 py-1 text-xs text-text-secondary transition-colors hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 h-auto"
                   >
                     +
-                  </button>
+                  </Button>
                 </div>
                 <span className="text-xs text-text-muted">
                   {t("general.uiFontSizeUnit", "PX")}

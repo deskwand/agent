@@ -159,7 +159,7 @@ export function ArtifactPanel() {
                     <span className="flex w-5 shrink-0 items-center justify-center">
                       {officePreviewBusyPath === artifactPath ? (
                         <Loader2
-                          className="h-3.5 w-3.5 animate-spin text-accent"
+                          className="h-3.5 w-3.5 animate-spin text-primary"
                           data-testid="office-preview-busy"
                         />
                       ) : (

@@ -322,7 +322,7 @@ describe("设置行原语", () => {
     for (const className of [
       "bg-success",
       "bg-text-muted",
-      "bg-accent",
+      "bg-primary",
       "bg-error",
     ]) {
       expect(html).toContain(className);

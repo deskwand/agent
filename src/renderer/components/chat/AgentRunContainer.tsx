@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Bot, Loader2 } from "lucide-react";
+import { Button } from "../app-button";
 
 interface AgentRunContainerProps {
   agentType: string;
@@ -47,7 +48,7 @@ export function AgentRunContainer({
   return (
     <div className="border rounded-lg my-2 bg-muted/30">
       {/* 标题栏 */}
-      <button
+      <Button variant="ghost"
         className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 rounded-t-lg"
         onClick={() => setCollapsed((v) => !v)}
       >
@@ -65,7 +66,7 @@ export function AgentRunContainer({
         {status === "running" && (
           <Loader2 size={12} className="animate-spin text-blue-500" />
         )}
-      </button>
+      </Button>
 
       {/* 统计摘要 */}
       <div className="px-3 pb-1 flex gap-3 text-xs text-muted-foreground">

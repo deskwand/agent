@@ -16,6 +16,7 @@ import type {
   ToolUseContent,
   Message,
 } from "../../types";
+import { Button } from "../app-button";
 
 // Only allow safe image MIME types for data: URI rendering
 const ALLOWED_IMAGE_TYPES = new Set([
@@ -143,7 +144,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
         block.isError ? "bg-error/5" : "bg-background/40"
       }`}
     >
-      <button
+      <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
@@ -184,7 +185,7 @@ export const ToolResultBlock = memo(function ToolResultBlock({
             )}
           </span>
         </div>
-      </button>
+      </Button>
 
       {expanded && (
         <div className="animate-fade-in px-3 py-2">

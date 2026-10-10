@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertCircle, ExternalLink, Loader2, Video } from "lucide-react";
 import { getVideoPlaybackKind } from "../../shared/video-file";
+import { Button } from "./app-button";
 
 export interface VideoPlayerProps {
   filePath: string;
@@ -68,7 +69,7 @@ export function VideoPlayer({
   if (!filePath || kind !== "inline") {
     return (
       <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface-muted p-3">
-        <Video className="h-5 w-5 shrink-0 text-accent" />
+        <Video className="h-5 w-5 shrink-0 text-primary" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs text-text-primary">{fileName}</p>
           <p className="text-xs text-text-muted">
@@ -76,14 +77,14 @@ export function VideoPlayer({
           </p>
         </div>
         {showOpenExternal && (
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => void handleOpenExternal()}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary h-auto"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             {t("videoPlayer.openExternal")}
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -123,14 +124,14 @@ export function VideoPlayer({
           {status === "error" ? t("videoPlayer.playbackFailed") : fileName}
         </p>
         {(showOpenExternal || status === "error") && (
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => void handleOpenExternal()}
-            className="flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary h-auto"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             {t("videoPlayer.openExternal")}
-          </button>
+          </Button>
         )}
       </div>
     </div>

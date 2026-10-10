@@ -48,6 +48,7 @@ import {
   connectCodingSubscription,
   connectOAuthProvider,
 } from "../services/connect-provider";
+import { Button } from "./app-button";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -462,15 +463,15 @@ export function WelcomeView() {
         {visibleEntries.length > 0 && !showConnectCards && (
           <div className="flex flex-wrap justify-center gap-2">
             {visibleEntries.map((entry) => (
-              <button
+              <Button variant="ghost"
                 key={entry.id}
                 type="button"
                 onClick={() => handleQuickEntry(entry)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary h-auto"
               >
                 <QuickEntryIcon icon={entry.icon} />
                 {t(entry.labelKey)}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -571,7 +572,7 @@ export function WelcomeView() {
                   }
                 }}
                 contextUsagePercentage={0}
-                contextRingColorClass="text-accent"
+                contextRingColorClass="text-primary"
                 contextStatusDetails={{
                   usedLabel: "0",
                   totalLabel: contextWindowTotal,

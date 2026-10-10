@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import type { CloudConfig } from "../types";
 import { useAppStore } from "../store";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { CloudApiClient } from "../services/cloud-api";
 import { avatarInitials } from "../utils/identity";
 import {
@@ -80,18 +80,22 @@ export function AccountMenu({
   return (
     <DropdownMenu open={open} onOpenChange={onOpenChange}>
       {/* Tooltip 必须在 Trigger **外面**：Radix 的 asChild 只处理它的直接子元素，
-          所以顺序是 Tooltip > Trigger asChild > (调用方的 button)。
-          反过来（Tooltip 当 trigger）会让 trigger props 全丢 —— 本仓的 Tooltip
-          不透传 props 也不 forwardRef。 */}
-      <Tooltip label={t("sidebar.user")} placement="right">
-        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+          所以顺序必须是 Tooltip > TooltipTrigger asChild > DropdownMenuTrigger asChild
+          > (调用方的 button)。
+          反过来（把 DropdownMenuTrigger 当 Tooltip 的 trigger）会让菜单的 props 全丢。 */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+        </TooltipTrigger>
+        {/* rail 里的账号气泡在图标**右侧**（本仓老 Tooltip 的 placement="right"）。 */}
+        <TooltipContent side="right">{t("sidebar.user")}</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="start" side="right" className="w-64">
         {isLoggedIn && cloudConfig ? (
           <>
             {/* 身份区：首字母头像 + 完整邮箱。触发行截断长邮箱，这里是完整版。 */}
             <div className="flex items-center gap-2 px-2.5 py-2">
-              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
                 {avatarInitials(cloudConfig.email ?? "") || (
                   <User className="h-4 w-4" />
                 )}

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { renderLocalizedBannerMessage } from "./shared";
 import type { LocalizedBanner } from "./shared";
+import { Button } from "../app-button";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -296,7 +297,7 @@ export function SettingsSandbox() {
   if (isLoading && !isInitialized) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-6 h-6 animate-spin text-accent" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
         <span className="ml-2 text-text-secondary">{t("common.loading")}</span>
       </div>
     );
@@ -364,10 +365,10 @@ export function SettingsSandbox() {
             <h3 className="text-sm font-medium text-text-primary">
               {t("sandbox.environmentStatus")}
             </h3>
-            <button
+            <Button variant="ghost"
               onClick={handleCheckStatus}
               disabled={isChecking || isInstalling !== null}
-              className="px-3 py-1.5 rounded-lg bg-surface-hover text-text-secondary text-xs hover:bg-surface-active transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-surface-hover text-text-secondary text-xs hover:bg-surface-active transition-colors disabled:opacity-50 flex items-center gap-1.5 h-auto"
             >
               {isChecking ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -375,7 +376,7 @@ export function SettingsSandbox() {
                 <Settings className="w-3.5 h-3.5" />
               )}
               {t("sandbox.checkStatus")}
-            </button>
+            </Button>
           </div>
 
           {/* Platform Info */}
@@ -559,10 +560,10 @@ export function SettingsSandbox() {
 
       {/* Retry Setup Button */}
       {sandboxEnabled && sandboxAvailable && !sandboxReady && (
-        <button
+        <Button variant="ghost"
           onClick={handleRetrySetup}
           disabled={isInstalling !== null}
-          className="w-full py-3 px-4 rounded-lg bg-accent text-accent-foreground font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+          className="w-full py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
         >
           {isInstalling === "setup" ? (
             <>
@@ -575,7 +576,7 @@ export function SettingsSandbox() {
               {t("sandbox.retrySetup")}
             </>
           )}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -627,18 +628,18 @@ function StatusItem({
         )}
       </div>
       {action && (
-        <button
+        <Button variant="ghost"
           onClick={action.onClick}
           disabled={action.loading}
           className={`px-2.5 py-1 rounded text-xs font-medium transition-colors disabled:opacity-50 flex items-center gap-1 ${
             action.variant === "secondary"
               ? "bg-surface-muted text-text-secondary hover:bg-surface-active"
-              : "bg-accent text-accent-foreground hover:bg-accent-hover"
+              : "bg-primary text-primary-foreground hover:bg-primary-hover"
           }`}
         >
           {action.loading && <Loader2 className="w-3 h-3 animate-spin" />}
           {action.label}
-        </button>
+        </Button>
       )}
     </div>
   );

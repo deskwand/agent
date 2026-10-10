@@ -17,6 +17,7 @@ import type {
   ContentBlock,
   Message,
 } from "../../types";
+import { Button } from "../app-button";
 
 interface BashToolBlockProps {
   block: ToolUseContent;
@@ -142,11 +143,11 @@ export const BashToolBlock = memo(function BashToolBlock({
   return (
     <div
       className={`rounded-2xl overflow-hidden transition-colors ${
-        isError ? "bg-error/5" : isRunning ? "bg-accent/5" : "bg-background/40"
+        isError ? "bg-error/5" : isRunning ? "bg-primary/5" : "bg-background/40"
       }`}
     >
       {/* Collapsed header */}
-      <button
+      <Button variant="ghost"
         onClick={() => {
           setExpanded(!expanded);
         }}
@@ -195,7 +196,7 @@ export const BashToolBlock = memo(function BashToolBlock({
             )}
           </span>
         </div>
-      </button>
+      </Button>
 
       {/* Expanded content — streaming during execution, terminal after */}
       {expanded &&
@@ -204,7 +205,7 @@ export const BashToolBlock = memo(function BashToolBlock({
         partialToolResult.content && (
           <div className="animate-fade-in px-3 py-2">
             <div className="text-xs uppercase tracking-wider text-text-muted font-medium mb-1 flex items-center gap-1.5">
-              <Loader2 className="w-3 h-3 animate-spin text-accent" />
+              <Loader2 className="w-3 h-3 animate-spin text-primary" />
               {t("tool.sectionStreaming")}
             </div>
             <pre className="text-xs font-mono text-text-secondary whitespace-pre-wrap break-all rounded-lg p-2.5 max-h-[300px] overflow-y-auto bg-surface-muted">

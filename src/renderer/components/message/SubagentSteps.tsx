@@ -66,7 +66,7 @@ export const SubagentSteps = memo(function SubagentSteps({
     <div className="px-3 py-2">
       <div className="mb-1 flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-text-muted">
         {activity.status === "running" ? (
-          <Loader2 className="w-3 h-3 animate-spin text-accent" />
+          <Loader2 className="w-3 h-3 animate-spin text-primary" />
         ) : activity.status === "error" ? (
           <XCircle className="w-3 h-3 text-error" />
         ) : (
@@ -74,7 +74,7 @@ export const SubagentSteps = memo(function SubagentSteps({
         )}
         {t("subagent.stepsTitle")}
         {activity.background && activity.status === "running" && (
-          <span className="normal-case text-accent">
+          <span className="normal-case text-primary">
             · {t("subagent.stepsBackground")}
           </span>
         )}
@@ -85,7 +85,7 @@ export const SubagentSteps = memo(function SubagentSteps({
         )}
       </div>
       {activity.current && activity.status === "running" && (
-        <div className="text-xs font-mono text-accent">
+        <div className="text-xs font-mono text-primary">
           ◐ {stepLine(activity.current, t)}
         </div>
       )}

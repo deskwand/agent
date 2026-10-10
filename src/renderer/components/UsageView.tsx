@@ -20,6 +20,7 @@ import {
   sumUnpricedCalls,
   type UsageSortKey,
 } from "../utils/usage-format";
+import { Button } from "./app-button";
 
 const RANGES = ["1d", "7d", "30d", "90d", "all"] as const;
 type Range = (typeof RANGES)[number];
@@ -88,14 +89,14 @@ export function UsageView() {
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-6 py-5">
       <header className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => setActiveView("chat")}
             aria-label={t("common.back")}
-            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+            className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
           >
             <ArrowLeft className="h-5 w-5 text-text-secondary" />
-          </button>
+          </Button>
           <div>
             <h1 className="text-xl font-semibold text-text-primary">
               {t("usage.title")}
@@ -107,7 +108,7 @@ export function UsageView() {
         </div>
         <div className="flex flex-wrap gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
           {RANGES.map((value) => (
-            <button
+            <Button variant="ghost"
               key={value}
               type="button"
               onClick={() => setRange(value)}
@@ -118,7 +119,7 @@ export function UsageView() {
               }`}
             >
               {t(`usage.range.${value}`)}
-            </button>
+            </Button>
           ))}
         </div>
         <CurrencySelect value={currency} onChange={setCurrency} />
@@ -210,7 +211,7 @@ export function UsageView() {
               action={
                 <div className="flex gap-0.5 rounded-lg border border-border bg-background-secondary p-0.5">
                   {(["output", "cost"] as UsageSortKey[]).map((value) => (
-                    <button
+                    <Button variant="ghost"
                       key={value}
                       type="button"
                       onClick={() => setSortKey(value)}
@@ -221,7 +222,7 @@ export function UsageView() {
                       }`}
                     >
                       {t(`usage.sort.${value}`)}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               }

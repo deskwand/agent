@@ -31,6 +31,7 @@ import {
   STARS_BRUSH_ICON_LIGHT,
   STARS_BRUSH_LIGHT,
 } from "./star-orb";
+import { Button } from "../app-button";
 
 /** 卡片里那一行控件的统一样式。 */
 const CARD_CONTROL_CLASS =
@@ -127,7 +128,7 @@ export function VoiceMiniButton(): JSX.Element | null {
             </p>
           </div>
           <div className="mt-2 flex items-center justify-center gap-1 border-t border-border-subtle pt-1.5">
-            <button
+            <Button variant="ghost"
               type="button"
               data-testid="voice-mini-mute"
               aria-label={
@@ -137,12 +138,12 @@ export function VoiceMiniButton(): JSX.Element | null {
               className={CARD_CONTROL_CLASS}
             >
               {muted ? (
-                <MicOff className="h-3.5 w-3.5" />
+                <MicOff className="h-3.5 w-3.5 hover:bg-transparent hover:text-current" />
               ) : (
                 <Mic className="h-3.5 w-3.5" />
               )}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               data-testid="voice-mini-end"
               aria-label={t("voiceMode.endVoice")}
@@ -150,7 +151,7 @@ export function VoiceMiniButton(): JSX.Element | null {
               className={`${CARD_CONTROL_CLASS} hover:text-error`}
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

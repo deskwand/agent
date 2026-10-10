@@ -2,7 +2,7 @@ import { Component } from "react";
 import type { ReactNode, ErrorInfo } from "react";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import i18n from "../i18n/config";
-import { Button } from "./ui/button";
+import { Button } from "./app-button";
 import {
   Collapsible,
   CollapsibleContent,
@@ -75,12 +75,12 @@ export class ErrorBoundary extends Component<
           {this.state.error && (
             <Collapsible className="text-left rounded-xl border border-border-subtle bg-surface-muted px-4 py-3">
               <CollapsibleTrigger asChild>
-                <button
+                <Button variant="ghost"
                   type="button"
-                  className="cursor-pointer text-xs text-text-muted select-none"
+                  className="cursor-pointer text-xs text-text-muted select-none h-auto hover:bg-transparent hover:text-current"
                 >
                   {t("errorBoundary.details")}
-                </button>
+                </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <pre className="mt-2 text-xs text-error/80 whitespace-pre-wrap break-all font-mono">

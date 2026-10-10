@@ -3,6 +3,7 @@ import { Suspense, lazy, useState, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronDown, ChevronRight, Brain } from "lucide-react";
 import { PanelErrorBoundary } from "../PanelErrorBoundary";
+import { Button } from "../app-button";
 
 const MessageMarkdown = lazy(() =>
   import("../MessageMarkdown").then((module) => ({
@@ -28,7 +29,7 @@ export const ThinkingBlock = memo(function ThinkingBlock({
 
   return (
     <div className="rounded-2xl bg-background/40 overflow-hidden">
-      <button
+      <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
@@ -57,7 +58,7 @@ export const ThinkingBlock = memo(function ThinkingBlock({
             )}
           </span>
         </div>
-      </button>
+      </Button>
 
       {expanded && (
         <div className="px-4 py-3 animate-fade-in">

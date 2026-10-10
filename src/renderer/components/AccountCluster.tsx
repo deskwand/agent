@@ -9,6 +9,7 @@ import { CloudApiClient } from "../services/cloud-api";
 import { AccountMenu } from "./AccountMenu";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { LoginModal } from "./LoginModal";
+import { Button } from "./app-button";
 
 /**
  * 图标栏底部的账号簇：头像触发按钮 + 账号弹层 + 它带出的两个弹窗，
@@ -105,17 +106,17 @@ export function AccountCluster() {
              **既不透传 props 也不 forwardRef** → 包着它这些全会丢，
              菜单根本打不开（而且不会有任何报错）。
              Tooltip 由 AccountMenu 自己在 Trigger **外面**加（HelpMenu 同形）。 */
-          <button
+          <Button variant="ghost"
             type="button"
             aria-label={t("sidebar.user")}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/15 text-[10px] font-semibold text-accent transition-colors hover:bg-accent/25"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-[10px] font-semibold text-primary transition-colors hover:bg-primary/25"
           >
             {identityEmail ? (
               avatarInitials(identityEmail)
             ) : (
               <User className="h-4 w-4" />
             )}
-          </button>
+          </Button>
         }
         open={accountMenuOpen}
         onOpenChange={setAccountMenuOpen}

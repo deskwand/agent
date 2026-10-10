@@ -3,7 +3,9 @@ import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
 import { useIPC } from "../../hooks/useIPC";
 import { Search as SearchIcon, RotateCcw, Trash2 } from "lucide-react";
-import { Tooltip } from "../Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 export function SettingsArchived() {
   const { t } = useTranslation();
@@ -76,22 +78,37 @@ export function SettingsArchived() {
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
           <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
-          <input
+          {/* ⚠️ 2026-10-09：换成 shadcn 的 `Input` ✓ —— 本仓输入框是**全自定义观感** ✗，
+              而 `Input` 自带 `h-9 rounded-md border-input bg-transparent shadow-sm text-base md:text-sm
+              focus-visible:ring-1 focus-visible:ring-ring` ✓ ⇒ 凡是与本仓观感冲突的**逐条覆盖回来** ✗✓
+              （`h-auto` / `rounded-xl` / `border-border-muted` / `bg-surface-muted` / `py-2` / `text-sm` /
+              `shadow-none`），**视觉与改前逐字一致** ✓；**不加 `focus-visible:ring-0`** ✗ —— `Input` base 的 `focus-visible:ring-1 ring-ring` 与本仓 `globals.css:714-718` 的 `focus:ring-1 ring-primary` **同色同宽** ✓✓ ⇒ 留着才是逐字一致 ✓（口径裁决① ✓）。
+              **换来的是本仓原本没有的** `disabled:*` 态 ✓ 与统一的 `file:*` 样式 ✓。 */}
+          <Input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("sidebar.search")}
-            className="w-full rounded-xl border border-border-muted bg-surface-muted pl-9 pr-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-border focus:bg-background transition-colors"
+            className="h-auto w-full rounded-xl border border-border-muted bg-surface-muted py-2 pl-9 pr-3 text-sm text-text-primary shadow-none placeholder:text-text-muted transition-colors focus:border-border focus:bg-background focus:outline-none"
           />
         </div>
-        <button
+        {/* ⚠️ 2026-10-09（计划 12 · 相位 4 的范式 ✓）：文字按钮 → `ghost` ✓。
+            变体表达不了的差异**逐条覆盖回来** ✗✓ —— 视觉与改前逐字一致 ✓：
+            · `h-auto`（ghost 是 h-9 ✓，本仓这颗的高度由 gap 与 py-2 决定 ✓）
+            · `px-3 py-2 rounded-xl`（覆盖 base 的 rounded-md ✓）
+            · `hover:bg-surface-hover` + `hover:text-primary`（ghost 自带 `hover:bg-accent hover:text-accent-foreground` ✗ —— 本仓的 hover 是**表面色**不是强调色 ✓）
+            · `disabled:opacity-40 disabled:cursor-not-allowed`（本仓的禁用观感 ✓，与 base 的 `disabled:opacity-50` 不同 ✗）
+            · `transition-colors` 与 base 一致 ⇒ 不写 ✓ */}
+        <Button
+          variant="ghost"
+          type="button"
           onClick={handleBatchRestore}
           disabled={selectedIds.size === 0}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-accent hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="h-auto gap-1.5 px-3 py-2 rounded-xl text-sm font-medium text-primary hover:bg-surface-hover hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           {t("sidebar.batchRestore")}
-        </button>
+        </Button>
       </div>
 
       {/* List */}
@@ -103,14 +120,14 @@ export function SettingsArchived() {
               key={session.id}
               onClick={() => toggleSelect(session.id)}
               className={`group cursor-pointer rounded-lg px-3 py-2 transition-colors ${
-                isSelected ? "bg-accent-muted" : "hover:bg-surface-hover/60"
+                isSelected ? "bg-primary-muted" : "hover:bg-surface-hover/60"
               }`}
             >
               <div className="flex items-center gap-2">
                 <div
                   className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
                     isSelected
-                      ? "bg-accent text-accent-foreground"
+                      ? "bg-primary text-primary-foreground"
                       : "border border-border-muted bg-background"
                   }`}
                 >
@@ -144,29 +161,45 @@ export function SettingsArchived() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Tooltip label={t("sidebar.restore")}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRestore(session.id);
-                      }}
-                      aria-label={t("sidebar.restore")}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-accent hover:bg-surface-active transition-colors"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                    </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRestore(session.id);
+                        }}
+                        aria-label={t("sidebar.restore")}
+                        className="h-6 w-6 rounded-lg text-text-muted hover:text-primary hover:bg-surface-active"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {t("sidebar.restore")}
+                    </TooltipContent>
                   </Tooltip>
-                  <Tooltip label={t("common.delete")}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePermanentDelete(session.id);
-                      }}
-                      aria-label={t("common.delete")}
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-error hover:bg-surface-active transition-colors"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePermanentDelete(session.id);
+                        }}
+                        aria-label={t("common.delete")}
+                        className="h-6 w-6 rounded-lg text-text-muted hover:text-error hover:bg-surface-active"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {t("common.delete")}
+                    </TooltipContent>
                   </Tooltip>
                 </div>
               </div>

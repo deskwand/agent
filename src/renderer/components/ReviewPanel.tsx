@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "../i18n/config";
 import { useAppStore } from "../store";
 import { ResizeHandle } from "./ResizeHandle";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import {
   Maximize2,
   Minimize2,
@@ -15,6 +15,7 @@ import {
   Loader2,
   Columns2,
 } from "lucide-react";
+import { Button } from "./app-button";
 
 interface DiffFile {
   path: string;
@@ -311,59 +312,75 @@ export function ReviewPanel({ visible = true }: { visible?: boolean }) {
 
   const toolbar = (
     <div className="flex items-center gap-2 shrink-0 px-4 py-2 border-b border-border/20">
-      <GitBranch className="w-4 h-4 text-accent" />
+      <GitBranch className="w-4 h-4 text-primary" />
       <span className="text-sm font-medium text-text-primary">
         {t("reviewPanel.title")}
       </span>
       <span className="text-xs text-text-muted ml-2">
         {t("reviewPanel.fileCount", { count: diffFiles.length })}
       </span>
-      <Tooltip label={t("reviewPanel.refresh")}>
-        <button
-          onClick={loadDiffFiles}
-          aria-label={t("reviewPanel.refresh")}
-          className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors ml-2"
-        >
-          <RefreshCw
-            className={`w-3.5 h-3.5 ${loadingFiles ? "animate-spin" : ""}`}
-          />
-        </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost"
+            onClick={loadDiffFiles}
+            aria-label={t("reviewPanel.refresh")}
+            className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors ml-2"
+          >
+            <RefreshCw
+              className={`w-3.5 h-3.5 ${loadingFiles ? "animate-spin" : ""}`}
+            />
+          </Button>
+        </TooltipTrigger>
+        {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+            而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+        <TooltipContent side="bottom">
+          {t("reviewPanel.refresh")}
+        </TooltipContent>
       </Tooltip>
-      <Tooltip label={viewModeLabel}>
-        <button
-          onClick={() =>
-            setDiffViewMode((m) =>
-              m === "unified" ? "side-by-side" : "unified",
-            )
-          }
-          aria-label={viewModeLabel}
-          className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        >
-          <Columns2 className="w-3.5 h-3.5" />
-        </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost"
+            onClick={() =>
+              setDiffViewMode((m) =>
+                m === "unified" ? "side-by-side" : "unified",
+              )
+            }
+            aria-label={viewModeLabel}
+            className="w-6 h-6 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+          >
+            <Columns2 className="w-3.5 h-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{viewModeLabel}</TooltipContent>
       </Tooltip>
       <div className="flex-1" />
-      <Tooltip label={fullscreenLabel}>
-        <button
-          onClick={() => setIsFullscreen((f) => !f)}
-          aria-label={fullscreenLabel}
-          className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        >
-          {isFullscreen ? (
-            <Minimize2 className="w-4 h-4" />
-          ) : (
-            <Maximize2 className="w-4 h-4" />
-          )}
-        </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost"
+            onClick={() => setIsFullscreen((f) => !f)}
+            aria-label={fullscreenLabel}
+            className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+          >
+            {isFullscreen ? (
+              <Minimize2 className="w-4 h-4" />
+            ) : (
+              <Maximize2 className="w-4 h-4" />
+            )}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{fullscreenLabel}</TooltipContent>
       </Tooltip>
-      <Tooltip label={t("common.close")}>
-        <button
-          onClick={handleClose}
-          aria-label={t("common.close")}
-          className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost"
+            onClick={handleClose}
+            aria-label={t("common.close")}
+            className="w-7 h-7 rounded flex items-center justify-center hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom">{t("common.close")}</TooltipContent>
       </Tooltip>
     </div>
   );
@@ -442,7 +459,7 @@ function renderFileList(
   return (
     <div className="py-1">
       {diffFiles.map((file) => (
-        <button
+        <Button variant="ghost"
           key={file.path}
           onClick={() => loadFileDiff(file.path)}
           className={`w-full text-left px-3 py-1.5 hover:bg-surface-hover transition-colors ${
@@ -469,7 +486,7 @@ function renderFileList(
               </span>
             )}
           </div>
-        </button>
+        </Button>
       ))}
     </div>
   );

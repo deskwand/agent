@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { OccludingDialog } from "../ui/occluding-dialog";
 import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
+import { Button } from "../app-button";
 
 export interface AttachPickerModalProps {
   source: "vault" | "workspace";
@@ -103,21 +104,21 @@ export function AttachPickerModal({
               ? t("attachPicker.selectedNone")
               : t("attachPicker.selectedCount", { count: selectedCount })}
           </span>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={onClose}
             className="h-9 rounded-xl border border-border px-4 text-sm text-text-primary transition-colors hover:bg-surface-hover"
           >
             {t("common.cancel")}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             disabled={selectedCount === 0}
             onClick={onConfirm}
             className="h-9 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:border disabled:border-border-muted disabled:bg-surface-muted disabled:text-text-muted"
           >
             {t("attachPicker.addCount", { count: selectedCount })}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </OccludingDialog>

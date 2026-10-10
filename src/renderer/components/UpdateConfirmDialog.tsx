@@ -4,6 +4,7 @@ import { MessageMarkdown } from "./MessageMarkdown";
 import { pickReleaseNotes } from "../utils/release-notes";
 import { OccludingDialog } from "./ui/occluding-dialog";
 import { DialogContent, DialogTitle } from "./ui/dialog";
+import { Button } from "./app-button";
 
 // Notes are plain prose. rehype-sanitize's default schema allows remote images,
 // which would turn opening the dialog into a request to whoever wrote the URL —
@@ -101,18 +102,18 @@ export function UpdateConfirmDialog({
 
         {/* Actions */}
         <div className="mt-4 flex items-center gap-2 border-t border-border-muted px-5 py-4">
-          <button
+          <Button variant="ghost"
             onClick={onCancel}
-            className="flex-1 rounded-xl px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover"
+            className="flex-1 rounded-xl px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-hover h-auto"
           >
             {t("update.later")}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             onClick={onConfirm}
-            className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+            className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 h-auto"
           >
             {t("update.restart")}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </OccludingDialog>

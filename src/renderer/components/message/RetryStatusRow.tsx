@@ -13,7 +13,7 @@ export function RetryStatusRow({ attempt }: RetryStatusRowProps) {
     <div className="flex items-center gap-2.5 py-1">
       <Loader2
         aria-hidden="true"
-        className="h-3.5 w-3.5 flex-shrink-0 animate-spin text-accent"
+        className="h-3.5 w-3.5 flex-shrink-0 animate-spin text-primary"
       />
       <span className="text-[13px] text-text-primary">
         {t("messageCard.retrying")}

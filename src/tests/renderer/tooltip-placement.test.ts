@@ -25,13 +25,15 @@ describe("tooltip 方位", () => {
     // 而本仓的 Tooltip 不透传 props 也不 forwardRef，所以顺序必须是
     // Tooltip > Trigger asChild > (调用方的 button)，Tooltip 得在 menu 组件内。
     // 意图不变（三处都显式右侧），只是第三处的宿主换了文件。
-    for (const file of [
-      "components/AppRail.tsx",
-      "components/HelpMenu.tsx",
-      "components/AccountMenu.tsx",
-    ]) {
-      expect(read(file), `${file} 必须传 placement="right"`).toContain(
-        'placement="right"',
+    // ⚠️ 2026-10-09：宿主分成了两代 ✗✓ —— `AppRail.tsx` 仍用**老组件** `Tooltip.tsx`（吃 `placement` ✓），
+    // 而另外两个已迁到 `app-tooltip`（Radix ✓，吃 `side` ✓）。
+    // ⇒ **必须按文件分开断言** ✗（一刀切换成 `side` 会让 AppRail 那条失去意义 ✓）；**意图一字未变** ✓（「三处都显式右侧」✓）。
+    expect(read("components/AppRail.tsx"), "AppRail 必须传 placement=\"right\"（老组件 ✓）").toContain(
+      'placement="right"',
+    );
+    for (const file of ["components/HelpMenu.tsx", "components/AccountMenu.tsx"]) {
+      expect(read(file), `${file} 必须传 side="right"（已迁到 app-tooltip ✓）`).toContain(
+        'side="right"',
       );
     }
   });

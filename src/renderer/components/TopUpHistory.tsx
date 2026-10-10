@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { ExternalLink } from "lucide-react";
 import type { CloudApiClient, TopUpOrderListItem } from "../services/cloud-api";
 import { explorerTxUrl, formatMicroUsd, formatTopUpTime } from "../utils/topup";
+import { Button } from "./app-button";
 
 const PAGE_SIZE = 20;
 
@@ -87,12 +88,12 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
         <p className="text-sm text-text-muted">
           {t("topUp.historyLoadFailed")}
         </p>
-        <button
-          className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-primary"
+        <Button variant="ghost"
+          className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-primary h-auto hover:bg-transparent hover:text-current"
           onClick={() => void loadFirstPage()}
         >
           {t("topUp.historyRetry")}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -130,7 +131,7 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
             </div>
             {o.status === "confirmed" && o.tx_hash && (
               <a
-                className="mt-1 inline-flex items-center gap-1 text-xs text-accent"
+                className="mt-1 inline-flex items-center gap-1 text-xs text-primary"
                 href={explorerTxUrl(o.chain, o.tx_hash)}
                 rel="noreferrer"
                 onClick={(e) => {
@@ -148,13 +149,13 @@ export function TopUpHistory({ cloudApi }: { cloudApi: CloudApiClient }) {
         ))}
       </ul>
       {hasMore && (
-        <button
-          className="w-full rounded-lg border border-border py-2 text-sm text-text-primary disabled:opacity-40"
+        <Button variant="ghost"
+          className="w-full rounded-lg border border-border py-2 text-sm text-text-primary disabled:opacity-40 h-auto hover:bg-transparent hover:text-current"
           disabled={loadMoreLoading}
           onClick={() => void loadMore()}
         >
           {loadMoreError ? t("topUp.historyRetry") : t("topUp.historyLoadMore")}
-        </button>
+        </Button>
       )}
     </div>
   );

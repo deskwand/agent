@@ -2,7 +2,7 @@
 // 状态判定：findToolResult 找到 result → 解析 answers（answered）或
 // askUserStatus（cancelled）；无 result 且 pendingAskUsers 有本块 → pending；
 // 无 result 且非 pending → interrupted（会话重启/历史重放）。
-// 视觉遵循已确认 mockup：左侧状态色竖条（pending 靛蓝语义 Token bg-accent、
+// 视觉遵循已确认 mockup：左侧状态色竖条（pending 靛蓝语义 Token bg-primary、
 // answered/cancelled 灰）、header 彩色胶囊、题间虚线分隔、底部按钮区。
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -13,6 +13,8 @@ import type { ContentBlock, ToolUseContent, Message } from "../../types";
 import { findToolResult } from "../../utils/tool-result-summary";
 import { useAppStore } from "../../store";
 import { useIPC } from "../../hooks/useIPC";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 interface AskUserCardProps {
   block: ToolUseContent;
@@ -27,9 +29,9 @@ const OPTION_BASE =
   "w-full rounded-lg border px-3 py-2 text-left transition-colors disabled:cursor-default";
 const OPTION_IDLE =
   "border-border-subtle bg-surface-muted hover:bg-surface-hover";
-const OPTION_SELECTED = "border-accent bg-accent/10";
+const OPTION_SELECTED = "border-primary bg-primary/10";
 const INPUT_BASE =
-  "w-full rounded-lg border border-border-subtle bg-surface-muted px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none";
+  "w-full rounded-lg border border-border-subtle bg-surface-muted px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-primary focus:outline-none h-auto shadow-none";
 
 export function AskUserCard({
   block,
@@ -170,7 +172,7 @@ export function AskUserCard({
   function renderOther(index: number) {
     return (
       <>
-        <button
+        <Button variant="ghost"
           type="button"
           disabled={!interactive}
           aria-pressed={Boolean(otherOpen[index])}
@@ -184,9 +186,9 @@ export function AskUserCard({
           <span className="text-sm text-text-primary">
             {t("tool.askUser.other")}
           </span>
-        </button>
+        </Button>
         {otherOpen[index] && (
-          <input
+          <Input
             type="text"
             disabled={!interactive}
             maxLength={ASK_USER_INPUT_MAX_LENGTH}
@@ -207,7 +209,7 @@ export function AskUserCard({
     const options = question.options ?? [];
     if (type === "text") {
       return (
-        <input
+        <Input
           type="text"
           disabled={!interactive}
           maxLength={ASK_USER_INPUT_MAX_LENGTH}
@@ -226,7 +228,7 @@ export function AskUserCard({
       return (
         <div className="flex gap-2">
           {(["Yes", "No"] as const).map((value) => (
-            <button
+            <Button variant="ghost"
               key={value}
               type="button"
               disabled={!interactive}
@@ -237,7 +239,7 @@ export function AskUserCard({
               }`}
             >
               {t(value === "Yes" ? "tool.askUser.yes" : "tool.askUser.no")}
-            </button>
+            </Button>
           ))}
         </div>
       );
@@ -248,7 +250,7 @@ export function AskUserCard({
           {options.map((option) => {
             const selected = (multi[index] ?? []).includes(option.label);
             return (
-              <button
+              <Button variant="ghost"
                 key={option.label}
                 type="button"
                 role="checkbox"
@@ -265,7 +267,7 @@ export function AskUserCard({
                     {option.description}
                   </span>
                 )}
-              </button>
+              </Button>
             );
           })}
           {renderOther(index)}
@@ -275,7 +277,7 @@ export function AskUserCard({
     return (
       <div className="space-y-1.5">
         {options.map((option) => (
-          <button
+          <Button variant="ghost"
             key={option.label}
             type="button"
             role="radio"
@@ -295,7 +297,7 @@ export function AskUserCard({
                 {option.description}
               </span>
             )}
-          </button>
+          </Button>
         ))}
         {renderOther(index)}
       </div>
@@ -349,14 +351,14 @@ export function AskUserCard({
       <div className="flex">
         <div
           className={`w-1 shrink-0 ${
-            isPending ? "bg-accent" : "bg-border-subtle"
+            isPending ? "bg-primary" : "bg-border-subtle"
           }`}
         />
         <div className="min-w-0 flex-1">
           {/* Header：图标 + 标题 + 题数/终态文案 */}
           <div className="flex items-center gap-2.5 border-b border-border-subtle px-4 py-3">
-            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-accent/10">
-              <HelpCircle className="h-3.5 w-3.5 text-accent" />
+            <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10">
+              <HelpCircle className="h-3.5 w-3.5 text-primary" />
             </div>
             <span className="text-sm font-medium text-text-primary">
               {t("tool.askUser.title")}
@@ -376,7 +378,7 @@ export function AskUserCard({
             >
               <div className="space-y-2 px-4 py-3">
                 {question.header && (
-                  <span className="inline-block rounded bg-accent/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent">
+                  <span className="inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
                     {question.header}
                   </span>
                 )}
@@ -393,22 +395,22 @@ export function AskUserCard({
           {/* 底部按钮区：仅 pending 态 */}
           {isPending && (
             <div className="flex items-center justify-end gap-2 border-t border-border-subtle px-4 py-2.5">
-              <button
+              <Button variant="ghost"
                 type="button"
                 disabled={!interactive}
                 onClick={onSkip}
-                className="rounded-lg border border-border-subtle px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+                className="rounded-lg border border-border-subtle px-3 py-1.5 text-xs text-text-secondary transition-colors hover:bg-surface-hover disabled:opacity-50 h-auto"
               >
                 {t("tool.askUser.skip")}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 disabled={!canSubmit}
                 onClick={onSubmit}
-                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground transition-colors hover:bg-accent-hover disabled:opacity-50"
+                className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-50 h-auto"
               >
                 {t("tool.askUser.submit")}
-              </button>
+              </Button>
             </div>
           )}
         </div>

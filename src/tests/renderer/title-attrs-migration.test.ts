@@ -19,7 +19,12 @@ function buttonTitleCount(relPath: string): number {
   const visit = (n: ts.Node) => {
     if (ts.isJsxAttribute(n) && n.name.getText() === "title") {
       const el = n.parent.parent;
-      if (el.tagName && el.tagName.getText() === "button") count += 1;
+      if (el.tagName) {
+        // 2026-10-09 相位 4 ✓：标签从 `<button>` 迁到 shadcn 的 `<Button>` ✗
+        // ⇒ 两者都要数 ✓（**意图一字未改** ✓：数的是「按钮上残留的 title ✓」）。
+        const tag = el.tagName.getText();
+        if (tag === "button" || tag === "Button") count += 1;
+      }
     }
     ts.forEachChild(n, visit);
   };

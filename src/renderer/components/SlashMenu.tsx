@@ -11,6 +11,7 @@ import {
   MENU_ITEM_SELECTED_CLASS,
   MENU_PANEL_CLASS,
 } from "./menu-styles";
+import { Button } from "./app-button";
 
 export type SlashTab = "all" | "commands" | "skills";
 
@@ -121,7 +122,7 @@ export function SlashMenu({
                 ? t("chat.slashTabCommands")
                 : t("chat.slashTabSkills");
           return (
-            <button
+            <Button variant="ghost"
               key={tab.key}
               type="button"
               onMouseDown={(e) => {
@@ -130,7 +131,7 @@ export function SlashMenu({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === tab.key
-                  ? "bg-accent text-accent-foreground"
+                  ? "bg-primary text-primary-foreground"
                   : "text-text-muted hover:bg-surface-hover hover:text-text-primary"
               }`}
             >
@@ -139,13 +140,13 @@ export function SlashMenu({
               <span
                 className={`text-[10px] leading-none flex-shrink-0 ${
                   activeTab === tab.key
-                    ? "text-accent/60"
+                    ? "text-primary/60"
                     : "text-text-muted/50"
                 }`}
               >
                 {count}
               </span>
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -177,7 +178,7 @@ export function SlashMenu({
                     ) : source === "prompt" ? (
                       <FileText className="w-4 h-4 text-text-muted flex-shrink-0" />
                     ) : (
-                      <Zap className="w-4 h-4 text-accent flex-shrink-0" />
+                      <Zap className="w-4 h-4 text-primary flex-shrink-0" />
                     )
                   }
                   badge={
@@ -213,7 +214,7 @@ export function SlashMenu({
                 label={item.skill.name}
                 description={item.skill.description}
                 leading={
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     tabIndex={-1}
                     data-skill-pin={item.skill.name}
@@ -226,14 +227,14 @@ export function SlashMenu({
                       onToggleSkillPin(item.skill.name);
                     }}
                     className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
-                      pinned ? "text-accent" : "text-text-muted"
+                      pinned ? "text-primary" : "text-text-muted"
                     }`}
                   >
                     <Star
                       className="w-4 h-4"
                       fill={pinned ? "currentColor" : "none"}
                     />
-                  </button>
+                  </Button>
                 }
                 badge={
                   <span className={MENU_BADGE_CLASS}>
@@ -276,7 +277,7 @@ function MenuItem({
   badge?: React.ReactNode;
 }) {
   const row = (
-    <button
+    <Button variant="ghost"
       type="button"
       onMouseDown={(e) => {
         e.preventDefault();
@@ -301,7 +302,7 @@ function MenuItem({
         )}
       </span>
       {badge}
-    </button>
+    </Button>
   );
 
   if (!leading) return row;

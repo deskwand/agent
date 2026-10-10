@@ -130,7 +130,7 @@ describe("SettingsAPI OpenCode provider", () => {
 
     const afterSwitch = Array.from(container.querySelectorAll("button"));
     const goActive = afterSwitch.find((b) => b.textContent?.includes("$10/mo"));
-    expect(goActive?.className).toContain("border-accent");
+    expect(goActive?.className).toContain("border-primary");
 
     // 填写 API Key 并切换回 Zen，Key 保留
     const keyInput = container.querySelector('input[type="password"]');

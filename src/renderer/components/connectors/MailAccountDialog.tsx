@@ -9,6 +9,8 @@ import {
 import { OccludingDialog } from "../ui/occluding-dialog";
 import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 import { mailProviderIconUrl } from "./mail-provider-icons";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 /**
  * 「添加邮箱」对话框。两屏：先选服务商，再填地址与凭据。
@@ -149,7 +151,7 @@ export function MailAccountDialog({
               {MAIL_PROVIDERS.map((p) => {
                 const iconUrl = mailProviderIconUrl(p.id);
                 return (
-                  <button
+                  <Button variant="ghost"
                     key={p.id}
                     type="button"
                     data-testid={`mail-provider-${p.id}`}
@@ -177,24 +179,24 @@ export function MailAccountDialog({
                     <span className="text-xs text-text-primary">
                       {t(p.nameKey)}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
             <div className="flex justify-end mt-4">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors"
+                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors h-auto"
               >
                 {t("common.cancel")}
-              </button>
+              </Button>
             </div>
           </>
         ) : (
           <>
             <div className="flex items-center gap-2">
-              <button
+              <Button variant="ghost"
                 type="button"
                 data-testid="mail-back"
                 aria-label={t("mail.dialog.back")}
@@ -202,10 +204,10 @@ export function MailAccountDialog({
                   setProviderId(null);
                   setError("");
                 }}
-                className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+                className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
               >
                 <ArrowLeft className="h-4 w-4 text-text-secondary" />
-              </button>
+              </Button>
               <DialogTitle className="text-sm font-medium text-text-primary">
                 {t(provider.nameKey)}
               </DialogTitle>
@@ -214,7 +216,7 @@ export function MailAccountDialog({
             <label className="block text-xs text-text-muted mt-3">
               {t("mail.dialog.email")}
             </label>
-            <input
+            <Input
               ref={emailRef}
               data-testid="mail-email"
               type="email"
@@ -223,13 +225,13 @@ export function MailAccountDialog({
               spellCheck={false}
               autoComplete="off"
               placeholder="you@example.com"
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+              className="mt-1 h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
             />
 
             <label className="block text-xs text-text-muted mt-3">
               {t(provider.credentialLabelKey)}
             </label>
-            <input
+            <Input
               data-testid="mail-credential"
               type="password"
               value={credential}
@@ -240,7 +242,7 @@ export function MailAccountDialog({
               spellCheck={false}
               autoComplete="off"
               placeholder={t("mail.dialog.credentialPlaceholder")}
-              className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+              className="mt-1 h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
             />
 
             {/* 预设的主机与端口由服务商表提供，只有自定义才让用户填 ——
@@ -250,26 +252,26 @@ export function MailAccountDialog({
                 <label className="block text-xs text-text-muted mt-3">
                   {t("mail.dialog.imapHost")}
                 </label>
-                <input
+                <Input
                   data-testid="mail-imap-host"
                   value={imapHost}
                   onChange={(event) => setImapHost(event.target.value)}
                   spellCheck={false}
                   autoComplete="off"
                   placeholder="imap.example.com"
-                  className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+                  className="mt-1 h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
                 />
                 <label className="block text-xs text-text-muted mt-3">
                   {t("mail.dialog.smtpHost")}
                 </label>
-                <input
+                <Input
                   data-testid="mail-smtp-host"
                   value={smtpHost}
                   onChange={(event) => setSmtpHost(event.target.value)}
                   spellCheck={false}
                   autoComplete="off"
                   placeholder="smtp.example.com"
-                  className="w-full mt-1 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+                  className="mt-1 h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
                 />
               </>
             )}
@@ -298,22 +300,22 @@ export function MailAccountDialog({
             )}
 
             <div className="flex justify-end gap-2 mt-4">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors"
+                className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors h-auto"
               >
                 {t("common.cancel")}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 type="button"
                 data-testid="mail-submit"
                 disabled={!canSubmit || busy}
                 onClick={() => void submit()}
-                className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50 h-auto"
               >
                 {t("mail.dialog.submit")}
-              </button>
+              </Button>
             </div>
           </>
         )}

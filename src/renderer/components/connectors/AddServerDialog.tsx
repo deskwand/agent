@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useTranslation } from "react-i18next";
 import { OccludingDialog } from "../ui/occluding-dialog";
 import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
+import { Textarea } from "../ui/textarea";
+import { Button } from "../app-button";
 
 /**
  * 「一次加一台」在 **UI 层**保证。
@@ -76,14 +78,14 @@ function PayloadTextarea({
   }, [textareaRef]);
 
   return (
-    <textarea
+    <Textarea
       ref={textareaRef}
       data-testid="add-payload"
       value={value}
       onChange={(event) => onChange(event.target.value)}
       spellCheck={false}
       placeholder={placeholder}
-      className="w-full h-40 mt-3 px-3 py-2 rounded-lg border border-border bg-surface font-mono text-xs text-text-primary"
+      className="mt-3 h-40 min-h-0 w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-xs text-text-primary shadow-none"
     />
   );
 }
@@ -176,21 +178,21 @@ export function AddServerDialog({
           </p>
         )}
         <div className="flex justify-end gap-2 mt-4">
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors"
+            className="px-3 py-1.5 rounded-lg text-sm text-text-secondary hover:bg-surface-hover transition-colors h-auto"
           >
             {t("common.cancel")}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             disabled={busy}
             onClick={() => void submit()}
-            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary-hover text-sm font-medium transition-colors disabled:opacity-50 h-auto"
           >
             {t("connectors.action.add")}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </OccludingDialog>

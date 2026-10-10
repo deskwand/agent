@@ -9,6 +9,7 @@ import {
   SettingsSwitch,
 } from "./shared";
 import { SettingsGlobalAgentsMd } from "./SettingsGlobalAgentsMd";
+import { Button } from "../app-button";
 
 export function SettingsPersonalization() {
   const { t } = useTranslation();
@@ -73,13 +74,13 @@ export function SettingsPersonalization() {
             title={t("memory.deleteLocal")}
             description={t("memory.deleteLocalDesc")}
             control={
-              <button
+              <Button variant="ghost"
                 onClick={() => setPendingDelete(true)}
                 disabled={isBusy}
-                className="rounded-control border border-error/40 px-2.5 py-1 text-xs text-error transition-colors hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-control border border-error/40 px-2.5 py-1 text-xs text-error transition-colors hover:bg-error/10 disabled:cursor-not-allowed disabled:opacity-60 h-auto"
               >
                 {t("memory.deleteAction")}
-              </button>
+              </Button>
             }
           />
         </SettingsCard>

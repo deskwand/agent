@@ -36,11 +36,11 @@ describe("焦点环机制", () => {
     // **意图不变** ✓（每条基础规则都必须 `ring-1` + 主题强调色 ✓）；并补一条**反向钉子** ✗：
     // 确认那两个死类的规则**确实没了** ✓，否则将来有人把它们加回来时这条会静默变松 ✗。
     expect(rules).toHaveLength(2);
-    expect(cssFlat).not.toMatch(/\n  \.btn \{/);
-    expect(cssFlat).not.toMatch(/\n  \.input \{/);
+    expect(cssFlat).not.toMatch(/\n {2}\.btn \{/);
+    expect(cssFlat).not.toMatch(/\n {2}\.input \{/);
     for (const rule of rules) {
       expect(rule).toMatch(/focus(-visible)?:ring-1\b/);
-      expect(rule).toMatch(/focus(-visible)?:ring-accent/);
+      expect(rule).toMatch(/focus(-visible)?:ring-primary/);
     }
   });
 });

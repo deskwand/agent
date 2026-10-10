@@ -379,7 +379,7 @@ describe("Sidebar disclosure motion", () => {
     const outerSpan = container.querySelector("span.relative") as HTMLElement;
     expect(outerSpan.classList.contains("overflow-visible")).toBe(true);
     const badge = outerSpan.querySelector(
-      "span.rounded-full.bg-accent.animate-pulse",
+      "span.rounded-full.bg-primary.animate-pulse",
     ) as HTMLElement | null;
     expect(badge).toBeTruthy();
     expect(badge?.classList.contains("h-1.5")).toBe(true);
@@ -389,12 +389,12 @@ describe("Sidebar disclosure motion", () => {
   it("does not render a running badge when showRunningBadge is false or omitted", async () => {
     await render(sessionIcon(false, 0, false));
     expect(
-      container.querySelector("span.rounded-full.bg-accent.animate-pulse"),
+      container.querySelector("span.rounded-full.bg-primary.animate-pulse"),
     ).toBeNull();
 
     await render(sessionIcon(false, 0));
     expect(
-      container.querySelector("span.rounded-full.bg-accent.animate-pulse"),
+      container.querySelector("span.rounded-full.bg-primary.animate-pulse"),
     ).toBeNull();
   });
 });

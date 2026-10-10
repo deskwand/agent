@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ToolGroupStatusUi } from "../../utils/tool-display-blocks";
+import { Button } from "../app-button";
 
 interface ToolGroupStatusProps {
   status?: ToolGroupStatusUi;
@@ -23,14 +24,14 @@ export function ToolGroupStatus({ status, onFailure }: ToolGroupStatusProps) {
         />
       )}
       {status.failed && (
-        <button
+        <Button variant="ghost"
           type="button"
           data-tool-group-failure
-          className="text-error"
+          className="text-error h-auto hover:bg-transparent hover:text-current"
           onClick={onFailure}
         >
           {t("tool.grouped.failedOperations")}
-        </button>
+        </Button>
       )}
       {status.unfinished && (
         <span className="text-text-muted">

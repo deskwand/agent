@@ -97,6 +97,7 @@ import {
   getTurnPreviewText,
   type RailTickEntry,
 } from "./MessageNavRail";
+import { Button } from "./app-button";
 
 function hasUsableProviderConfig(
   profileKey: ProviderProfileKey,
@@ -596,7 +597,7 @@ export function ChatView() {
       ? "text-error"
       : contextUsagePercentage > 80
         ? "text-warning"
-        : "text-accent";
+        : "text-primary";
   const showExactUsageDetails = !displayedContextUsage.isEstimated;
   const cacheHitRate =
     showExactUsageDetails &&
@@ -2101,7 +2102,7 @@ export function ChatView() {
           </div>
         </div>
 
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={scrollToBottomByButton}
           aria-label="Scroll to bottom"
@@ -2112,7 +2113,7 @@ export function ChatView() {
           }`}
         >
           <ChevronsDown className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
 
       {/* Input */}
@@ -2145,23 +2146,23 @@ export function ChatView() {
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">
           {activeSession?.kind === "voice" && activeSessionId ? (
             <div className="flex items-center justify-center gap-3 py-3">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => openVoiceMode(activeSessionId)}
-                className="rounded-2xl bg-accent px-4 py-2 text-accent-foreground hover:opacity-90"
+                className="rounded-2xl bg-primary px-4 py-2 text-primary-foreground hover:opacity-90 h-auto"
               >
                 {t(
                   messages.length > 0 ? "voiceMode.resume" : "voiceMode.start",
                 )}
-              </button>
+              </Button>
               {!useTextInput ? (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={() => setUseTextInput(true)}
-                  className="rounded-2xl px-3 py-2 text-text-secondary hover:bg-surface-hover"
+                  className="rounded-2xl px-3 py-2 text-text-secondary hover:bg-surface-hover h-auto"
                 >
                   {t("voiceMode.useText")}
-                </button>
+                </Button>
               ) : null}
             </div>
           ) : null}

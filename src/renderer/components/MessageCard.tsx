@@ -35,11 +35,12 @@ import { splitArtifactBlocks } from "../utils/inline-artifacts";
 import type { ArtifactExpansion } from "../types";
 import { useAppStore } from "../store";
 import { useReadAloud } from "../hooks/useReadAloud";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import {
   projectNestedToolBlocks,
   projectNestedToolMessages,
 } from "../utils/nested-tool-display";
+import { Button } from "./app-button";
 
 const EMPTY_NESTED_CALLS = {};
 const EMPTY_MESSAGES: Message[] = [];
@@ -343,12 +344,12 @@ export const MessageCard = memo(function MessageCard({
         <p className="text-sm text-text-primary">
           {t("topUp.insufficientCredits")}
         </p>
-        <button
-          className="w-fit rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-foreground"
+        <Button variant="ghost"
+          className="w-fit rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground h-auto hover:bg-transparent hover:text-current"
           onClick={() => useAppStore.getState().setTopUpOpen(true)}
         >
           {t("topUp.goTopUp")}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -396,27 +397,61 @@ export const MessageCard = memo(function MessageCard({
             <span className="text-xs text-text-muted select-none">
               {timestampLabel}
             </span>
-            <Tooltip label={t("messageCard.copyMessage")}>
-              <button
-                onClick={handleCopy}
-                aria-label={t("messageCard.copyMessage")}
-                className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-              >
-                {copied ? (
-                  <Check className="w-3 h-3 text-success" />
-                ) : (
-                  <Copy className="w-3 h-3" />
-                )}
-              </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost"
+                  onClick={handleCopy}
+                  aria-label={t("messageCard.copyMessage")}
+                  className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors h-auto"
+                >
+                  {copied ? (
+                    <Check className="w-3 h-3 text-success" />
+                  ) : (
+                    <Copy className="w-3 h-3" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {t("messageCard.copyMessage")}
+              </TooltipContent>
             </Tooltip>
             {/* 朗读只给助手回复 —— showActions 对用户消息也为真（上面的
                 `message.role !== "assistant"` 分支），所以这里必须自己挡一道。
                 朗读已无能力开关：只要有可读文字就出现按钮，没文字时按钮置灰。 */}
             {!isUser ? (
               <>
-                <Tooltip
-                  label={
-                    voiceRuntimeActive
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost"
+                      type="button"
+                      data-testid="read-aloud-button"
+                      disabled={
+                        voiceRuntimeActive || (!readingThis && !speechAvailable)
+                      }
+                      aria-label={t("messageCard.readAloud")}
+                      onClick={() => {
+                        if (readingThis) {
+                          reader.toggle();
+                        } else if (bodyRef.current) {
+                          startKeyRef.current = getCopyContent();
+                          reader.start(message.id, bodyRef.current);
+                        }
+                      }}
+                      className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary disabled:opacity-40 h-auto"
+                    >
+                      {readingThis &&
+                      (reader.status === "playing" ||
+                        reader.status === "preparing") ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : readingThis && reader.status === "paused" ? (
+                        <Play className="w-3 h-3" />
+                      ) : (
+                        <Volume2 className="w-3 h-3" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {voiceRuntimeActive
                       ? t("messageCard.readAloudBusy")
                       : readingThis && reader.status === "playing"
                         ? t("messageCard.pauseReading")
@@ -424,50 +459,22 @@ export const MessageCard = memo(function MessageCard({
                           ? t("messageCard.resumeReading")
                           : !readingThis && !speechAvailable
                             ? t("messageCard.readAloudEmpty")
-                            : t("messageCard.readAloud")
-                  }
-                >
-                  <button
-                    type="button"
-                    data-testid="read-aloud-button"
-                    disabled={
-                      voiceRuntimeActive || (!readingThis && !speechAvailable)
-                    }
-                    aria-label={t("messageCard.readAloud")}
-                    onClick={() => {
-                      if (readingThis) {
-                        reader.toggle();
-                      } else if (bodyRef.current) {
-                        startKeyRef.current = getCopyContent();
-                        reader.start(message.id, bodyRef.current);
-                      }
-                    }}
-                    className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary disabled:opacity-40"
-                  >
-                    {readingThis &&
-                    (reader.status === "playing" ||
-                      reader.status === "preparing") ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : readingThis && reader.status === "paused" ? (
-                      <Play className="w-3 h-3" />
-                    ) : (
-                      <Volume2 className="w-3 h-3" />
-                    )}
-                  </button>
+                            : t("messageCard.readAloud")}
+                  </TooltipContent>
                 </Tooltip>
                 {readingThis &&
                 reader.status !== "idle" &&
                 reader.status !== "error" ? (
                   <>
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       data-testid="stop-reading-button"
                       aria-label={t("messageCard.stopReading")}
                       onClick={() => reader.stop()}
-                      className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary"
+                      className="flex items-center gap-1 text-xs text-text-muted transition-colors hover:text-text-primary h-auto"
                     >
                       <Square className="w-3 h-3" />
-                    </button>
+                    </Button>
                     <span className="text-xs text-text-muted tabular-nums">
                       {t("messageCard.readAloudProgress", {
                         current: reader.currentIndex + 1,
@@ -488,15 +495,20 @@ export const MessageCard = memo(function MessageCard({
           </>
         ) : null}
         {showFork ? (
-          <Tooltip label={t("messageCard.forkMessage")}>
-            <button
-              type="button"
-              onClick={() => onForkMessage(message)}
-              aria-label={t("messageCard.forkMessage")}
-              className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-            >
-              <GitBranch className="w-3 h-3" />
-            </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost"
+                type="button"
+                onClick={() => onForkMessage(message)}
+                aria-label={t("messageCard.forkMessage")}
+                className="flex items-center gap-1 text-xs text-text-muted hover:text-text-primary transition-colors h-auto"
+              >
+                <GitBranch className="w-3 h-3" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {t("messageCard.forkMessage")}
+            </TooltipContent>
           </Tooltip>
         ) : null}
       </div>

@@ -14,6 +14,8 @@ import {
   MENU_PANEL_PADDED_CLASS,
   MENU_SEPARATOR_CLASS,
 } from "./menu-styles";
+import { Input } from "./ui/input";
+import { Button } from "./app-button";
 
 export interface MergedInputChipProps {
   model: string;
@@ -167,7 +169,7 @@ export function MergedInputChip({
       const selected =
         group.profileKey === activeProviderProfileKey && item.id === model;
       return (
-        <button
+        <Button variant="ghost"
           key={`${group.profileKey}:${item.id}`}
           type="button"
           onClick={() => onSelectModel(group.profileKey, item.id)}
@@ -180,7 +182,7 @@ export function MergedInputChip({
         >
           <span className="truncate">{item.name}</span>
           {selected && <Check className="h-4 w-4 shrink-0" />}
-        </button>
+        </Button>
       );
     });
 
@@ -188,31 +190,31 @@ export function MergedInputChip({
   // 条件就是 showSearch），绑派生值把「不渲染 ⇔ 不过滤」变成结构性保证：将来若这
   // 两个条件被拆开，会立刻表现为输入框打不进字，而不是静默地 value 与过滤源不一致。
   const renderSearchInput = () => (
-    <input
+    <Input
       type="text"
       value={activeSearch}
       onChange={(event) => setModelSearch(event.target.value)}
       onClick={(event) => event.stopPropagation()}
       placeholder={t("chat.searchModel")}
-      className="mb-1.5 w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30"
+      className="mb-1.5 h-auto w-full rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-text-primary shadow-none placeholder:text-text-muted focus:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
     />
   );
 
   const renderBackRow = () => (
-    <button
+    <Button variant="ghost"
       type="button"
       onClick={() => setPanelView("list")}
       className={`${MENU_ITEM_CLASS} text-text-muted hover:bg-surface-hover`}
     >
       <ChevronRight className="h-4 w-4 rotate-180" />
       {t("modelMenu.back")}
-    </button>
+    </Button>
   );
 
   const renderThinkingRow = () => (
     <>
       <div className={MENU_SEPARATOR_CLASS} />
-      <button
+      <Button variant="ghost"
         type="button"
         onClick={() => setPanelView("thinking")}
         className={`${MENU_ITEM_CLASS} justify-between font-medium ${MENU_ITEM_DEFAULT_CLASS}`}
@@ -221,7 +223,7 @@ export function MergedInputChip({
           value: t(`chat.thinkingLevel.${thinkingLevel}`),
         })}
         <ChevronRight className="h-4 w-4 shrink-0 text-text-muted" />
-      </button>
+      </Button>
     </>
   );
 
@@ -249,11 +251,11 @@ export function MergedInputChip({
     <Popover open={menuOpen} onOpenChange={handleOpenChange}>
       <div className="relative inline-flex">
         <PopoverTrigger asChild>
-          <button
+          <Button variant="ghost"
             ref={triggerRef}
             type="button"
             disabled={disabled}
-            className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-2xl border border-border-subtle bg-background/60 px-2 text-xs text-text-primary transition-[width,background-color] duration-150 hover:bg-surface-hover disabled:opacity-50 ${
+            className={`inline-flex h-9 min-w-0 items-center gap-1.5 rounded-full border border-border-subtle bg-background/60 px-2 text-xs text-text-primary transition-[width,background-color] duration-150 hover:bg-surface-hover disabled:opacity-50 ${
               menuOpen ? "w-[15rem] justify-center" : "max-w-[18rem]"
             }`}
             aria-label={combinedLabel}
@@ -268,7 +270,7 @@ export function MergedInputChip({
                 menuOpen ? "rotate-180" : ""
               }`}
             />
-          </button>
+          </Button>
         </PopoverTrigger>
 
         {menuOpen && (
@@ -295,7 +297,7 @@ export function MergedInputChip({
               <>
                 {renderBackRow()}
                 {thinkingLevelOptions.map((level) => (
-                  <button
+                  <Button variant="ghost"
                     key={level}
                     type="button"
                     onClick={() => {
@@ -316,7 +318,7 @@ export function MergedInputChip({
                     {level === thinkingLevel && (
                       <Check className="h-4 w-4 shrink-0" />
                     )}
-                  </button>
+                  </Button>
                 ))}
               </>
             ) : (

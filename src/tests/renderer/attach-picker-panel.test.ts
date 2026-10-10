@@ -245,7 +245,7 @@ describe("AttachPickerPanel", () => {
 
   it("leaves the search field's focus ring to the global rule only", () => {
     render();
-    expect(searchInput().className).not.toContain("focus:border-accent");
+    expect(searchInput().className).not.toContain("focus:border-primary");
   });
 
   it("keeps a stable minimum height so the modal does not jump while filtering", () => {

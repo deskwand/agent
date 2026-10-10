@@ -8,6 +8,7 @@ import {
   Users,
 } from "lucide-react";
 import type { MarketplaceSkill } from "../../types";
+import { Button } from "../app-button";
 
 export type MarketplaceInstallState =
   | "available"
@@ -38,7 +39,7 @@ function MarketplaceCardView({
   return (
     <div className="rounded-lg border border-border-primary p-4">
       <div className="flex items-start gap-3">
-        <div className="rounded-lg flex items-center justify-center shrink-0 bg-accent/10 text-accent w-12 h-12">
+        <div className="rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary w-12 h-12">
           <Package className="w-6 h-6" strokeWidth={2} />
         </div>
         <div className="min-w-0 flex-1">
@@ -82,43 +83,43 @@ function MarketplaceCardView({
         </div>
       </div>
       <div className="flex justify-end gap-2 mt-3">
-        <button
+        <Button variant="ghost"
           onClick={onViewDetail}
-          className="px-2.5 py-1 rounded-md text-xs font-medium bg-surface-muted text-text-secondary hover:bg-surface-hover transition-colors"
+          className="px-2.5 py-1 rounded-md text-xs font-medium bg-surface-muted text-text-secondary hover:bg-surface-hover transition-colors h-auto"
         >
           {t("skillMarket.viewDetail")}
-        </button>
+        </Button>
         {installState === "installing" ? (
-          <button
+          <Button variant="ghost"
             disabled
-            className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-accent/10 text-accent/50"
+            className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary/50 h-auto hover:bg-transparent hover:text-current"
           >
             <Loader2 className="w-3 h-3 animate-spin" />
-          </button>
+          </Button>
         ) : installState === "installed" ? (
-          <button
+          <Button variant="ghost"
             disabled
-            className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-success/10 text-success"
+            className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-success/10 text-success h-auto hover:bg-transparent hover:text-current"
           >
             <Check className="w-3 h-3" />
             {t("skillMarket.installedTip")}
-          </button>
+          </Button>
         ) : installState === "has_update" ? (
-          <button
+          <Button variant="ghost"
             onClick={onInstall}
-            className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors h-auto"
           >
             <RefreshCw className="w-3 h-3" />
             {t("skillMarket.updateAvailable")}
-          </button>
+          </Button>
         ) : (
-          <button
+          <Button variant="ghost"
             onClick={onInstall}
-            className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+            className="flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors h-auto"
           >
             <Download className="w-3 h-3" />
             {t("skillMarket.install")}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -141,7 +142,7 @@ function MarketplaceListView({
     <div className="rounded-lg border border-border-primary p-2.5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <div className="rounded-lg flex items-center justify-center shrink-0 bg-accent/10 text-accent w-9 h-9">
+          <div className="rounded-lg flex items-center justify-center shrink-0 bg-primary/10 text-primary w-9 h-9">
             <Package className="w-4 h-4" strokeWidth={2} />
           </div>
           <div className="min-w-0">
@@ -162,14 +163,14 @@ function MarketplaceListView({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          <button
+          <Button variant="ghost"
             onClick={onViewDetail}
-            className="px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+            className="px-2 py-1 rounded-md text-[11px] text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors h-auto"
           >
             {t("skillMarket.viewDetail")}
-          </button>
+          </Button>
           {installState === "installing" ? (
-            <span className="p-1 text-accent/50">
+            <span className="p-1 text-primary/50">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
             </span>
           ) : installState === "installed" ? (
@@ -178,21 +179,21 @@ function MarketplaceListView({
               {t("skillMarket.installedTip")}
             </span>
           ) : installState === "has_update" ? (
-            <button
+            <Button variant="ghost"
               onClick={onInstall}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors h-auto"
             >
               <RefreshCw className="w-3 h-3" />
               {t("skillMarket.updateAvailable")}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button variant="ghost"
               onClick={onInstall}
-              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors h-auto"
             >
               <Download className="w-3 h-3" />
               {t("skillMarket.install")}
-            </button>
+            </Button>
           )}
         </div>
       </div>

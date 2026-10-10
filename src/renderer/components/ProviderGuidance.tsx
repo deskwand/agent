@@ -5,6 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "./ui/collapsible";
+import { Button } from "./app-button";
 
 export interface CommonProviderSetupView {
   id: string;
@@ -63,18 +64,18 @@ export function CommonProviderSetupsCard({
   return (
     <Collapsible className="rounded-5xl border border-border-subtle bg-background/40 px-4 py-4">
       <CollapsibleTrigger asChild>
-        <button
+        <Button variant="ghost"
           type="button"
-          className="flex w-full cursor-pointer items-center justify-between gap-3 text-sm font-medium text-text-primary"
+          className="flex w-full cursor-pointer items-center justify-between gap-3 text-sm font-medium text-text-primary h-auto hover:bg-transparent hover:text-current"
         >
           <span className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-accent" />
+            <Sparkles className="h-4 w-4 text-primary" />
             {t("api.guidance.commonSetupsTitle")}
           </span>
           <span className="text-xs font-normal text-text-muted">
             {t("api.guidance.commonSetupsHint")}
           </span>
-        </button>
+        </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-4 overflow-x-auto">
         <table className="min-w-full text-left text-xs text-text-secondary">
@@ -106,7 +107,7 @@ export function CommonProviderSetupsCard({
                 key={setup.id}
                 className={
                   setup.isDetected
-                    ? "bg-accent/5 text-text-primary"
+                    ? "bg-primary/5 text-text-primary"
                     : "text-text-secondary"
                 }
               >
@@ -114,7 +115,7 @@ export function CommonProviderSetupsCard({
                   <div className="flex items-center gap-2">
                     <span>{setup.name}</span>
                     {setup.isDetected && (
-                      <span className="rounded-full bg-accent/10 px-2 py-0.5 text-xs uppercase tracking-[0.08em] text-accent">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs uppercase tracking-[0.08em] text-primary">
                         {t("api.guidance.detectedBadge")}
                       </span>
                     )}
@@ -129,13 +130,13 @@ export function CommonProviderSetupsCard({
                 </td>
                 <td className="px-2 py-3 leading-5">{setup.notes}</td>
                 <td className="px-2 py-3 text-right">
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     onClick={() => onApplySetup(setup.id)}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover"
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-hover h-auto"
                   >
                     {t("api.guidance.apply")}
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}

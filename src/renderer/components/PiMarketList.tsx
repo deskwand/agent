@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PiMarketPackageDto } from "../../shared/ipc-types";
+import { Input } from "./ui/input";
+import { Button } from "./app-button";
 
 export interface PiMarketListProps {
   installedNames: string[];
@@ -50,7 +52,11 @@ export function PiMarketList({
    * 加载一页。`append=false` 表示全新搜索（重置列表并自动选中第一项），
    * `append=true` 表示滚动追加。`requestSeqRef` 递增以丢弃过期响应。
    */
-  const loadPage = (searchQuery: string, pageIndex: number, append: boolean) => {
+  const loadPage = (
+    searchQuery: string,
+    pageIndex: number,
+    append: boolean,
+  ) => {
     const seq = ++requestSeqRef.current;
     loadingRef.current = true;
     setLoading(true);
@@ -77,7 +83,8 @@ export function PiMarketList({
       })
       .catch((reason: unknown) => {
         if (requestSeqRef.current !== seq) return;
-        const message = reason instanceof Error ? reason.message : String(reason);
+        const message =
+          reason instanceof Error ? reason.message : String(reason);
         setError(message);
         if (append) setStopped(true); // 后续页失败：终止加载
       })
@@ -110,7 +117,10 @@ export function PiMarketList({
     const el = scrollRef.current;
     if (!el || loadingRef.current || stopped) return;
     if (!hasMorePages(page, total)) return;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - SCROLL_THRESHOLD_PX) {
+    if (
+      el.scrollTop + el.clientHeight >=
+      el.scrollHeight - SCROLL_THRESHOLD_PX
+    ) {
       loadPage(loadedQueryRef.current, page, true);
     }
   };
@@ -122,7 +132,8 @@ export function PiMarketList({
   useEffect(() => {
     runSearch("");
     return () => {
-      if (debounceRef.current !== null) window.clearTimeout(debounceRef.current);
+      if (debounceRef.current !== null)
+        window.clearTimeout(debounceRef.current);
       requestSeqRef.current += 1; // 使卸载时在途请求失效
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -131,8 +142,8 @@ export function PiMarketList({
   return (
     <div className="flex h-[480px] min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-background-secondary/60">
       <div className="shrink-0 border-b border-border-subtle p-2">
-        <input
-          className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:border-accent focus:outline-none"
+        <Input
+          className="h-auto w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-text-primary shadow-none placeholder:text-text-muted focus:border-primary focus:outline-none"
           placeholder={t("piExtensions.marketSearchPlaceholder")}
           value={query}
           onChange={(e) => handleQueryChange(e.target.value)}
@@ -150,13 +161,13 @@ export function PiMarketList({
         ) : error !== null && items.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-10">
             <p className="text-center text-sm text-text-secondary">{error}</p>
-            <button
+            <Button variant="ghost"
               type="button"
-              className="rounded-lg border border-border bg-surface px-3 py-1 text-sm text-text-primary hover:bg-surface-hover"
+              className="rounded-lg border border-border bg-surface px-3 py-1 text-sm text-text-primary hover:bg-surface-hover h-auto"
               onClick={retry}
             >
               {t("piExtensions.marketRetry")}
-            </button>
+            </Button>
           </div>
         ) : items.length === 0 ? (
           <div className="flex items-center justify-center py-10 text-sm text-text-muted">
@@ -170,12 +181,12 @@ export function PiMarketList({
                 const installed = installedNames.includes(pkg.name);
                 return (
                   <li key={pkg.name}>
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       onClick={() => onSelect(pkg)}
                       className={`flex w-full flex-col items-start gap-0.5 border-l-2 px-3 py-2 text-left transition-colors ${
                         selected
-                          ? "border-accent bg-accent-muted"
+                          ? "border-primary bg-primary-muted"
                           : "border-transparent hover:bg-surface-hover"
                       }`}
                     >
@@ -195,7 +206,7 @@ export function PiMarketList({
                       <span className="w-full min-w-0 line-clamp-1 text-xs text-text-muted">
                         {pkg.description || "\u00a0"}
                       </span>
-                    </button>
+                    </Button>
                   </li>
                 );
               })}

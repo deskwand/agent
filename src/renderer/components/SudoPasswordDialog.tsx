@@ -9,6 +9,8 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { Input } from "./ui/input";
+import { Button } from "./app-button";
 
 interface SudoPasswordDialogProps {
   request: SudoPasswordRequest;
@@ -62,7 +64,10 @@ function PasswordInput({
       <label className="block text-sm font-medium text-text-primary mb-1">
         {label}
       </label>
-      <input
+      {/* 2026-10-09 相位 3 ✓：`Input` 是 `forwardRef` ⇒ `inputRef` 照常落到真实 `<input>` 上 ✓。
+          本仓聚焦是 `focus:ring-2 ring-primary/50` ✓；base 的 `focus-visible:ring-1 ring-ring` 会**再叠一圈** ✗
+          ⇒ 按口径裁决②**照原样复刻**成 2px 环（`focus-visible:ring-2 focus-visible:ring-primary/50` ✓ —— 本处原串自带 2px 环 ✓，复刻 = 保持现状 ✗ 不是引入新风格 ✓）；其余逐条覆盖（h-auto / rounded-lg / border-border / bg-surface / py-2 / shadow-none）✓。 */}
+      <Input
         ref={inputRef}
         type="password"
         onChange={(e) => {
@@ -70,7 +75,7 @@ function PasswordInput({
         }}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary/50"
+        className="h-auto w-full rounded-lg border border-border bg-surface px-3 py-2 text-text-primary shadow-none placeholder:text-text-tertiary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
         autoComplete="new-password"
       />
     </div>
@@ -87,7 +92,7 @@ function PasswordInput({
  * 用 Dialog 会多出一个关闭 X，且 Esc 会关掉弹窗而父级仍在等 sudo 应答。
  * AlertDialogContent 天生没有内置关闭键、也不响应遮罩点击。
  *
- * **按钮是普通 `<button>`，不是 AlertDialogAction/Cancel** —— 从 Radix 源码核实：
+ * **按钮是普通 `<Button variant="ghost">`，不是 AlertDialogAction/Cancel** —— 从 Radix 源码核实：
  * `AlertDialogContent` 的 `onOpenAutoFocus` 会 `cancelRef.current?.focus()`，
  * 带上 `AlertDialogCancel` 就会把焦点抢到取消键上，而本弹窗要聚焦密码框
  * （见 PasswordInput）。`cancelRef` 为 null 时那行是 no-op，焦点留在原处。
@@ -179,21 +184,25 @@ export function SudoPasswordDialog({ request }: SudoPasswordDialogProps) {
 
         {/* Actions */}
         <div className="mt-6 flex items-center gap-3">
-          <button
+          <Button
+            variant="ghost"
+            type="button"
             onClick={handleCancel}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-surface-hover"
+            className="h-auto flex-1 gap-2 rounded-lg bg-surface px-3 py-1.5 text-sm font-normal text-text-primary hover:bg-surface-hover hover:text-text-primary"
           >
             <X className="w-4 h-4" />
             {t("sudo.cancel")}
-          </button>
+          </Button>
 
-          <button
+          <Button
+            variant="default"
+            type="button"
             onClick={handleSubmit}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+            className="h-auto flex-1 gap-2 rounded-lg px-3 py-1.5 text-sm hover:bg-primary-hover"
           >
             <Play className="w-4 h-4" />
             {t("sudo.execute")}
-          </button>
+          </Button>
         </div>
       </AlertDialogContent>
     </OccludingAlertDialog>

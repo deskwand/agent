@@ -5,8 +5,11 @@ import type { AppConfig, ApiProviderConfig } from "../../types";
 import { modelDisplay } from "../../utils/subagent-model-display";
 import { resolveProviderDisplayName } from "../../utils/model-label";
 import { DESKWAND_PROVIDER_PREFIX } from "../../../shared/deskwand-provider";
-import { Tooltip } from "../Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { SettingsFormSelect } from "./shared";
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
+import { Button } from "../app-button";
 
 const NAME_I18N_MAP: Record<string, string> = {
   Explore: "subagent.agentExplore",
@@ -89,45 +92,53 @@ export function SubagentSettings() {
                       t,
                     )}
               </span>
-              <Tooltip label={t("subagent.editModel") ?? "Edit model"}>
-                <button
-                  type="button"
-                  className="p-1 rounded hover:bg-muted"
-                  aria-label={t("subagent.editModel") ?? "Edit model"}
-                  onClick={() => {
-                    setEditingAgent(agent.name);
-                    const hasModel =
-                      agent.markdownModel && agent.markdownModel !== "inherit";
-                    setEditingModel(hasModel ? "model" : "inherit");
-                    if (hasModel && agent.markdownModel) {
-                      const slashIdx = agent.markdownModel.indexOf("/");
-                      let provider =
-                        slashIdx > 0
-                          ? agent.markdownModel.slice(0, slashIdx)
-                          : "";
-                      if (provider.startsWith(DESKWAND_PROVIDER_PREFIX)) {
-                        provider = provider.slice(
-                          DESKWAND_PROVIDER_PREFIX.length,
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost"
+                    type="button"
+                    className="p-1 rounded hover:bg-muted h-auto"
+                    aria-label={t("subagent.editModel") ?? "Edit model"}
+                    onClick={() => {
+                      setEditingAgent(agent.name);
+                      const hasModel =
+                        agent.markdownModel &&
+                        agent.markdownModel !== "inherit";
+                      setEditingModel(hasModel ? "model" : "inherit");
+                      if (hasModel && agent.markdownModel) {
+                        const slashIdx = agent.markdownModel.indexOf("/");
+                        let provider =
+                          slashIdx > 0
+                            ? agent.markdownModel.slice(0, slashIdx)
+                            : "";
+                        if (provider.startsWith(DESKWAND_PROVIDER_PREFIX)) {
+                          provider = provider.slice(
+                            DESKWAND_PROVIDER_PREFIX.length,
+                          );
+                        }
+                        setEditingProvider(provider);
+                        setEditingModelId(
+                          slashIdx > 0
+                            ? agent.markdownModel.slice(slashIdx + 1)
+                            : "",
                         );
                       }
-                      setEditingProvider(provider);
-                      setEditingModelId(
-                        slashIdx > 0
-                          ? agent.markdownModel.slice(slashIdx + 1)
-                          : "",
-                      );
-                    }
-                    setEditingThinking(agent.markdownThinking || "inherit");
-                  }}
-                >
-                  <Pencil size={14} />
-                </button>
+                      setEditingThinking(agent.markdownThinking || "inherit");
+                    }}
+                  >
+                    <Pencil size={14} />
+                  </Button>
+                </TooltipTrigger>
+                {/* side 必须显式给 bottom：Radix 的 TooltipContent 默认是 top，
+                    而老 Tooltip 的 placement 默认是下方。 */}
+                <TooltipContent side="bottom">
+                  {t("subagent.editModel") ?? "Edit model"}
+                </TooltipContent>
               </Tooltip>
               {agent.source !== "builtin" &&
                 (deletingAgent === agent.name ? (
-                  <button
+                  <Button variant="ghost"
                     type="button"
-                    className="px-2 py-1 rounded text-xs text-red-500 hover:bg-red-500/10"
+                    className="px-2 py-1 rounded text-xs text-red-500 hover:bg-red-500/10 h-auto"
                     onClick={async () => {
                       await window.electronAPI.subagent.deleteAgent(agent.name);
                       setDeletingAgent(null);
@@ -137,17 +148,22 @@ export function SubagentSettings() {
                     }}
                   >
                     {t("subagent.confirmDelete")}
-                  </button>
+                  </Button>
                 ) : (
-                  <Tooltip label={t("common.delete")}>
-                    <button
-                      type="button"
-                      aria-label={t("common.delete")}
-                      className="p-1 rounded hover:bg-muted text-text-muted hover:text-red-500"
-                      onClick={() => setDeletingAgent(agent.name)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost"
+                        type="button"
+                        aria-label={t("common.delete")}
+                        className="p-1 rounded hover:bg-muted text-text-muted hover:text-red-500 h-auto"
+                        onClick={() => setDeletingAgent(agent.name)}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {t("common.delete")}
+                    </TooltipContent>
                   </Tooltip>
                 ))}
             </div>
@@ -240,13 +256,13 @@ export function SubagentSettings() {
             )}
 
             <div className="flex justify-end gap-2 pt-1">
-              <button
-                className="rounded-lg border px-3 py-1.5 text-sm"
+              <Button variant="ghost"
+                className="rounded-lg border px-3 py-1.5 text-sm h-auto hover:bg-transparent hover:text-current"
                 onClick={() => setEditingAgent(null)}
               >
                 {t("common.cancel") ?? "取消"}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 className="rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground"
                 onClick={async () => {
                   const model =
@@ -266,54 +282,54 @@ export function SubagentSettings() {
                 }}
               >
                 {t("common.save")}
-              </button>
-              <button
-                className="rounded-lg border px-3 py-1.5 text-sm"
+              </Button>
+              <Button variant="ghost"
+                className="rounded-lg border px-3 py-1.5 text-sm h-auto hover:bg-transparent hover:text-current"
                 onClick={() => setEditingAgent(null)}
               >
                 {t("common.cancel") ?? "取消"}
-              </button>
+              </Button>
             </div>
           </div>
         )}
       </div>
 
       {/* 新增 Agent */}
-      <button
+      <Button variant="ghost"
         type="button"
-        className="flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary"
+        className="flex items-center gap-1.5 text-sm text-text-muted hover:text-text-secondary h-auto"
         onClick={() => setShowNewModal(true)}
       >
         <Plus size={14} />
         {t("subagent.addAgent")}
-      </button>
+      </Button>
 
       {/* 新增 Agent 弹窗 */}
       {showNewModal && (
         <div className="mt-3 p-3 border border-border-muted rounded-lg space-y-2">
           <p className="text-sm font-medium">{t("subagent.addAgentTitle")}</p>
-          <input
-            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+          <Input
+            className="h-auto w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary shadow-none"
             placeholder={t("subagent.agentName")}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />
-          <input
-            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+          <Input
+            className="h-auto w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary shadow-none"
             placeholder={t("subagent.agentDescription")}
             value={newDesc}
             onChange={(e) => setNewDesc(e.target.value)}
           />
-          <textarea
-            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary"
+          <Textarea
+            className="w-full rounded-lg border border-border-muted bg-background px-3 py-2 text-sm text-text-primary shadow-none"
             rows={4}
             placeholder={t("subagent.agentPrompt")}
             value={newPrompt}
             onChange={(e) => setNewPrompt(e.target.value)}
           />
           <div className="flex gap-2">
-            <button
-              className="rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+            <Button variant="ghost"
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground h-auto hover:bg-transparent hover:text-current"
               onClick={async () => {
                 if (!newName.trim()) return;
                 await window.electronAPI.subagent.createAgent(
@@ -330,13 +346,13 @@ export function SubagentSettings() {
               }}
             >
               {t("common.save")}
-            </button>
-            <button
-              className="rounded-lg border px-3 py-1.5 text-sm"
+            </Button>
+            <Button variant="ghost"
+              className="rounded-lg border px-3 py-1.5 text-sm h-auto hover:bg-transparent hover:text-current"
               onClick={() => setShowNewModal(false)}
             >
               {t("common.cancel") ?? "取消"}
-            </button>
+            </Button>
           </div>
         </div>
       )}

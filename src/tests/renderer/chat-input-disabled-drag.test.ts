@@ -88,7 +88,7 @@ describe("ChatInput drag guards", () => {
     await act(async () => {
       form().dispatchEvent(dragEvent("dragover", []));
     });
-    expect(cardEl().className).not.toContain("ring-accent");
+    expect(cardEl().className).not.toContain("ring-primary");
 
     await act(async () => {
       form().dispatchEvent(dragEvent("drop", [droppedFile("dropped.pdf")]));
@@ -96,7 +96,7 @@ describe("ChatInput drag guards", () => {
 
     const reported = attachmentsReported(onAttachmentsChange);
     expect(reported.every((files) => files.length === 0)).toBe(true);
-    expect(cardEl().className).not.toContain("ring-accent");
+    expect(cardEl().className).not.toContain("ring-primary");
   });
 
   it("still accepts a dropped file while enabled", async () => {
@@ -106,7 +106,7 @@ describe("ChatInput drag guards", () => {
     await act(async () => {
       form().dispatchEvent(dragEvent("dragover", []));
     });
-    expect(cardEl().className).toContain("ring-accent");
+    expect(cardEl().className).toContain("ring-primary");
 
     await act(async () => {
       form().dispatchEvent(dragEvent("drop", [droppedFile("kept.pdf")]));

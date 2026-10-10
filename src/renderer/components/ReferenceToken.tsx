@@ -3,11 +3,12 @@
 // 不变量（设计文档 §4.1）：三类共用同一个语义色与同一套图标尺寸；
 // 「有下划线的可点击，没有下划线的不可点击」—— 用户不需要记哪个 token 能点。
 import type { ReactNode } from "react";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import {
   REFERENCE_TOKEN_ICON_MARKUP,
   type ReferenceTokenKind,
 } from "./reference-token-visuals";
+import { Button } from "./app-button";
 
 export interface ReferenceTokenProps {
   kind: ReferenceTokenKind;
@@ -51,16 +52,28 @@ export function ReferenceToken({
   );
 
   const body = onClick ? (
-    <button
+    <Button variant="ghost"
       type="button"
       onClick={onClick}
       className={`${BASE_CLASS} break-all text-left`}
     >
       {inner}
-    </button>
+    </Button>
   ) : (
     <span className={`${BASE_CLASS} whitespace-nowrap`}>{inner}</span>
   );
 
-  return tooltip ? <Tooltip label={tooltip}>{body}</Tooltip> : body;
+  // 空 tooltip 必须保持「只渲染 children、不产生气泡」的语义（老 Tooltip 的
+  // `if (!hasLabel) return <>{children}</>`）—— 不要渲染一个空气泡，那会让
+  // aria-describedby 指向不存在的 id。
+  return tooltip ? (
+    <Tooltip>
+      <TooltipTrigger asChild>{body}</TooltipTrigger>
+      {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+          而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+      <TooltipContent side="bottom">{tooltip}</TooltipContent>
+    </Tooltip>
+  ) : (
+    body
+  );
 }

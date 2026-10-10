@@ -26,6 +26,7 @@ import { SettingsLogs } from "./settings/SettingsLogs";
 import { SettingsPersonalization } from "./settings/SettingsPersonalization";
 import { SettingsArchived } from "./settings/SettingsArchived";
 import { SettingsAbout } from "./settings/SettingsAbout";
+import { Button } from "./app-button";
 
 interface SettingsPanelProps {
   onClose: () => void;
@@ -231,12 +232,12 @@ export function SettingsPanel({
             compactSidebar ? "flex justify-center pt-3 pb-1" : "px-4 pt-4 pb-0"
           }
         >
-          <button
+          <Button variant="ghost"
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-surface-hover transition-colors inline-flex"
+            className="p-2 rounded-lg hover:bg-surface-hover transition-colors inline-flex h-auto"
           >
             <ArrowLeft className="w-5 h-5 text-text-secondary" />
-          </button>
+          </Button>
         </div>
         {!compactSidebar && (
           <div className="px-5 pt-1 pb-2">
@@ -264,7 +265,7 @@ export function SettingsPanel({
                 {group.tabs.map((tab) => {
                   const active = activeTab === tab.id;
                   return (
-                    <button
+                    <Button variant="ghost"
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
                       title={compactSidebar ? tab.label : undefined}
@@ -284,7 +285,7 @@ export function SettingsPanel({
                       {!compactSidebar && (
                         <span className="truncate text-sm">{tab.label}</span>
                       )}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>

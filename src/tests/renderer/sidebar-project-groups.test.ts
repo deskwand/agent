@@ -1002,9 +1002,13 @@ describe("Sidebar project groups", () => {
     expect(showMore?.className).toContain("bg-transparent");
     expect(showMore?.className).toContain("hover:bg-transparent");
     expect(showMore?.className).toContain("focus-visible:bg-transparent");
-    expect(showMore?.className).not.toContain("text-accent");
-    expect(showMore?.className).not.toContain("hover:bg-accent");
-    expect(showMore?.className).not.toContain("focus-visible:outline-none");
+    expect(showMore?.className).not.toContain("text-primary");
+    expect(showMore?.className).not.toContain("hover:bg-primary");
+    // ⚠️ 2026-10-09 相位 4 ✓：这条原先是「不许有 `focus-visible:outline-none`」✗ ——
+    // 而 shadcn `Button` 的 base **自带**它 ✗ ⇒ 断言必然失败 ✓；但它同一条 base 里紧跟着
+    // `focus-visible:ring-1 focus-visible:ring-ring` ✓ ⇒ **意图（聚焦时必须看得见 ✓）仍然成立** ✓✓
+    // ⇒ 换成**正面钉子** ✓：必须有聚焦环 ✓（比「不许某一行」更强 ✓ —— 它直接测「看得见」✓）。
+    expect(showMore?.className).toContain("focus-visible:ring");
 
     await act(async () => showMore?.click());
     expect(container.textContent).toContain("Ordinary 10");
@@ -1243,13 +1247,13 @@ describe("Sidebar project groups", () => {
 
     const project = projectToggle("/work/deskwand");
     const badge = project.querySelector(
-      "span.rounded-full.bg-accent.animate-pulse",
+      "span.rounded-full.bg-primary.animate-pulse",
     ) as HTMLElement | null;
     expect(badge).toBeTruthy();
 
     await act(async () => project.click());
     const badgeAfterExpand = project.querySelector(
-      "span.rounded-full.bg-accent.animate-pulse",
+      "span.rounded-full.bg-primary.animate-pulse",
     );
     expect(badgeAfterExpand).toBeTruthy();
   });
@@ -1265,7 +1269,7 @@ describe("Sidebar project groups", () => {
 
     const ordinary = ordinaryToggle();
     const badge = ordinary.querySelector(
-      "span.rounded-full.bg-accent.animate-pulse",
+      "span.rounded-full.bg-primary.animate-pulse",
     ) as HTMLElement | null;
     expect(badge).toBeTruthy();
   });
@@ -1283,7 +1287,7 @@ describe("Sidebar project groups", () => {
 
     expect(
       projectToggle("/work/deskwand").querySelector(
-        "span.rounded-full.bg-accent.animate-pulse",
+        "span.rounded-full.bg-primary.animate-pulse",
       ),
     ).toBeTruthy();
 
@@ -1299,7 +1303,7 @@ describe("Sidebar project groups", () => {
 
     expect(
       projectToggle("/work/deskwand").querySelector(
-        "span.rounded-full.bg-accent.animate-pulse",
+        "span.rounded-full.bg-primary.animate-pulse",
       ),
     ).toBeNull();
   });

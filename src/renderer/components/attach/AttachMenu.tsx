@@ -12,7 +12,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { Tooltip } from "../Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
 import { useAppStore } from "../../store";
 import type { VaultSnapshot } from "../../../shared/vault";
 import type { PromptCommandSaveError } from "../../../shared/ipc-types";
@@ -46,6 +46,7 @@ import {
   splitRelPath,
   type AttachPickerItem,
 } from "./picker-items";
+import { Button } from "../app-button";
 
 type PanelView = "menu" | "vault" | "workspace";
 
@@ -446,17 +447,22 @@ export function AttachMenu({
         open={open && view === "menu"}
         onOpenChange={(next: boolean) => (next ? openMenu() : close())}
       >
-        <Tooltip label={t("attachMenu.label")}>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              data-attach-trigger
-              aria-label={t("attachMenu.label")}
-              className="flex h-9 w-9 items-center justify-center rounded-2xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </DropdownMenuTrigger>
+        <Tooltip>
+          {/* asChild 链：TooltipTrigger 把 props/ref 交给它的直接子元素，
+              菜单的 asChild 再接力交给真正的那颗 button。 */}
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost"
+                type="button"
+                data-attach-trigger
+                aria-label={t("attachMenu.label")}
+                className="flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t("attachMenu.label")}</TooltipContent>
         </Tooltip>
 
         <DropdownMenuContent
@@ -467,6 +473,17 @@ export function AttachMenu({
           onEscapeKeyDown={(event) => {
             event.preventDefault();
             closeAndFocusComposer();
+          }}
+          // ⚠️ 2026-10-09（用户报的 bug #2 ✓ + 我自己踩的坑 ✗）：Radix 关闭菜单时**默认**会在
+          // `setTimeout(0)` 里把焦点**还给触发器**（`+` ✗）—— 于是刚插进输入框的光标又丢了 ✓。
+          // **只 `preventDefault`** ✓：Radix 就不会去抢 ✓（焦点留在原处 ✓）。
+          // ⚠️⚠️ **绝不能在这里无条件 `closeAndFocusComposer()`** ✗✗ —— 那会把焦点从
+          // **刚被菜单项打开的对话框**里抢回输入区 ✓（`attach-menu.test.ts` 的
+          // 「keeps the dialog open when the user clicks inside it」等 6 条会全红 ✓ —— 实测 ✓）。
+          // 需要「回到输入区」的那些项（技能 / 文件 / 命令 ✓）**各自**已经调用
+          // `closeAndFocusComposer()` ✓（本文件里 4 处 ✓）—— **由项的语义决定** ✓✓，不是由关闭决定。
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
           }}
           // ⚠️ loop 必须给：原实现是 `items[(base + delta + items.length) % items.length]`
           // —— **确实回绕** ✗（计划里那条「原实现没有回绕」的结论是错的，只看了注释没看代码）。
@@ -556,7 +573,7 @@ export function AttachMenu({
                         原实现就是这样。焦点若落到它上面，方向键的起点会错位。
                         Radix 的 roving focus 只走注册过的 item，所以这个裸按钮
                         保持「鼠标可达、键盘不可达」的原状 ✓。 */}
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       tabIndex={-1}
                       data-skill-pin={name}
@@ -586,14 +603,14 @@ export function AttachMenu({
                         });
                       }}
                       className={`flex h-6 w-6 flex-none items-center justify-center rounded-md transition-colors hover:bg-surface-hover ${
-                        pinned ? "text-accent" : "text-text-muted"
+                        pinned ? "text-primary" : "text-text-muted"
                       }`}
                     >
                       <Star
                         className="w-4 h-4"
                         fill={pinned ? "currentColor" : "none"}
                       />
-                    </button>
+                    </Button>
                     <DropdownMenuItem
                       data-skill-row={name}
                       onClick={() => runSkillEntry(name)}
@@ -681,7 +698,7 @@ export function AttachMenu({
                   </DropdownMenuItem>
                   {/* 编辑/删除刻意不是菜单项：原来就是裸按钮、只在 hover 时出现
                       （group-hover / group-focus-within），保持原状 ✓。 */}
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     data-command-edit={row.name}
                     aria-label={t("common.edit")}
@@ -689,8 +706,8 @@ export function AttachMenu({
                     className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-surface-hover hover:text-text-primary group-hover:flex group-focus-within:flex"
                   >
                     <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="ghost"
                     type="button"
                     data-command-delete={row.name}
                     aria-label={t("common.delete")}
@@ -698,7 +715,7 @@ export function AttachMenu({
                     className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-error/10 hover:text-error group-hover:flex group-focus-within:flex"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 </div>
               ))}
 
@@ -707,14 +724,14 @@ export function AttachMenu({
                   <span className="min-w-0 flex-1 truncate">
                     {t("chat.commandLoadFailed")}
                   </span>
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     data-command-retry
                     onClick={() => void loadPromptCommands()}
-                    className="shrink-0 underline"
+                    className="shrink-0 underline h-auto hover:bg-transparent hover:text-current"
                   >
                     {t("chat.commandRetry")}
-                  </button>
+                  </Button>
                 </div>
               )}
             </>

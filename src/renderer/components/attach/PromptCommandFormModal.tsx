@@ -14,6 +14,8 @@ import { OccludingDialog } from "../ui/occluding-dialog";
 import { DialogContent, DialogDescription, DialogTitle } from "../ui/dialog";
 import type { PromptCommandSaveError } from "../../../shared/ipc-types";
 import type { Skill } from "../../types";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 export interface PromptCommandFormValue {
   name: string;
@@ -204,7 +206,7 @@ export function PromptCommandFormModal({
                 nameErrorKey ? "border-error" : "border-border"
               }`}
             >
-              <input
+              <Input
                 id="prompt-name"
                 data-field="name"
                 aria-label={t("chat.commandName")}
@@ -240,7 +242,7 @@ export function PromptCommandFormModal({
               >
                 {t("chat.commandBody")}
               </label>
-              <button
+              <Button variant="ghost"
                 type="button"
                 data-skill-trigger
                 aria-label={t("chat.commandInsertSkillHint")}
@@ -249,7 +251,7 @@ export function PromptCommandFormModal({
               >
                 <Plus className="h-3 w-3" />
                 {t("chat.commandInsertSkill")}
-              </button>
+              </Button>
             </div>
 
             {skillListOpen && (
@@ -260,24 +262,24 @@ export function PromptCommandFormModal({
                 {/* 搜索行固定在滚动区之外 —— 否则列表一滚就把搜索框卷走了 */}
                 <div className="relative border-b border-border-muted px-1.5 py-1.5">
                   <Search className="pointer-events-none absolute left-[17px] top-[17px] h-3.5 w-3.5 text-text-muted" />
-                  <input
+                  <Input
                     ref={skillSearchRef}
                     data-skill-search
                     value={skillQuery}
                     onChange={(e) => setSkillQuery(e.target.value)}
                     placeholder={t("chat.commandSkillSearchPlaceholder")}
                     aria-label={t("chat.commandSkillSearchPlaceholder")}
-                    className="h-8 w-full rounded-lg bg-surface-muted pl-7 pr-2.5 text-[13px] text-text-primary outline-none placeholder:text-text-muted"
+                    className="h-8 w-full rounded-lg border-0 bg-surface-muted pl-7 pr-2.5 text-[13px] text-text-primary shadow-none outline-none placeholder:text-text-muted md:text-[13px]"
                   />
                 </div>
                 <div data-skill-scroll className="max-h-48 overflow-y-auto p-1">
                   {visibleSkills.map((skill) => (
-                    <button
+                    <Button variant="ghost"
                       key={skill.id}
                       type="button"
                       data-skill-option={skill.name}
                       onClick={() => insertSkillReference(skill.name)}
-                      className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-hover"
+                      className="flex w-full items-start gap-2 rounded-lg px-2.5 py-1.5 text-left hover:bg-surface-hover h-auto"
                     >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[13px] text-text-primary">
@@ -292,7 +294,7 @@ export function PromptCommandFormModal({
                       <span className="shrink-0 text-[10px] text-text-secondary">
                         {t(SKILL_TYPE_BADGE_KEY[skill.type])}
                       </span>
-                    </button>
+                    </Button>
                   ))}
                   {visibleSkills.length === 0 && (
                     <p className="px-2.5 py-2 text-xs text-text-muted">
@@ -334,27 +336,27 @@ export function PromptCommandFormModal({
             >
               {t("chat.commandDisplayName")}
             </label>
-            <input
+            <Input
               id="prompt-display-name"
               data-field="displayName"
               aria-label={t("chat.commandDisplayName")}
               value={value.displayName}
               onChange={(e) => update({ displayName: e.target.value })}
               placeholder={t("chat.commandDisplayNameHint")}
-              className="w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm text-text-primary outline-none"
+              className="h-auto w-full rounded-xl border border-border bg-surface-muted px-3 py-2 text-sm text-text-primary shadow-none outline-none"
             />
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-border-muted px-5 py-3.5">
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={onClose}
             className="h-9 rounded-xl border border-border px-4 text-sm text-text-primary transition-colors hover:bg-surface-hover"
           >
             {t("common.cancel")}
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             type="button"
             data-form-save
             disabled={!canSave}
@@ -362,7 +364,7 @@ export function PromptCommandFormModal({
             className="h-9 rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:border disabled:border-border-muted disabled:bg-surface-muted disabled:text-text-muted"
           >
             {saving ? t("common.saving") : t("common.save")}
-          </button>
+          </Button>
         </div>
       </DialogContent>
     </OccludingDialog>

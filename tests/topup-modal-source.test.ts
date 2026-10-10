@@ -21,7 +21,7 @@ describe("TopUpModal wiring", () => {
   it("uses i18n keys and semantic tokens only", () => {
     const source = fs.readFileSync(modalPath, "utf8");
     expect(source).toContain("topUp.title");
-    expect(source).toContain("bg-accent");
+    expect(source).toContain("bg-primary");
     expect(source).toContain("text-text-primary");
   });
 

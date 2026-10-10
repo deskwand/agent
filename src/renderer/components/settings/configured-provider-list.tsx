@@ -11,6 +11,7 @@ import {
 } from "./provider-icons";
 import { OAUTH_PROVIDERS } from "./provider-catalog";
 import { SettingsCard, SettingsRow } from "./shared";
+import { Button } from "../app-button";
 
 export interface ConfiguredProviderRow {
   profileKey: string;
@@ -129,31 +130,31 @@ export function ConfiguredProviderList({
             control={
               <>
                 {status?.loggedIn && oauthId && (
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     data-testid={`${oauthId}-oauth-disconnect`}
                     onClick={() => onDisconnect(oauthId)}
                     className="rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
                   >
                     {t("api.oauthDisconnect")}
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button variant="ghost"
                   type="button"
                   data-testid={`${profileKey}-edit`}
                   onClick={() => onEdit(profileKey)}
                   className="rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary"
                 >
                   {t("api.editApi")}
-                </button>
-                <button
+                </Button>
+                <Button variant="ghost"
                   type="button"
                   data-testid={`${profileKey}-delete`}
                   onClick={() => onDelete(profileKey)}
                   className="rounded-lg border border-border-muted px-2.5 py-1.5 text-xs text-text-secondary hover:bg-error/10 hover:text-error"
                 >
                   {t("api.deleteApi")}
-                </button>
+                </Button>
               </>
             }
           />

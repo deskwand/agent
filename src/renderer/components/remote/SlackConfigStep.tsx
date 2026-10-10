@@ -4,6 +4,7 @@
 
 import { useTranslation } from "react-i18next";
 import { ExternalLink } from "lucide-react";
+import { Button } from "../app-button";
 
 interface Props {
   botToken: string;
@@ -64,20 +65,20 @@ export function SlackConfigStep({
             type="password"
             value={botToken}
             onChange={(e) => onBotTokenChange(e.target.value)}
-            className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
+            className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
             placeholder="xoxb-••••••••••••"
           />
         </div>
 
         <div className="flex items-center gap-3">
-          <button
+          <Button variant="ghost"
             onClick={() => onSocketModeChange(!useSocketMode)}
-            className={`relative w-10 h-6 rounded-full transition-colors ${useSocketMode ? "bg-accent" : "bg-border"}`}
+            className={`relative w-10 h-6 rounded-full transition-colors ${useSocketMode ? "bg-primary" : "bg-border"}`}
           >
             <span
               className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${useSocketMode ? "translate-x-5" : "translate-x-1"}`}
             />
-          </button>
+          </Button>
           <div>
             <div className="text-sm font-medium text-text-primary">
               {t("remote.slackSocketMode")}
@@ -97,7 +98,7 @@ export function SlackConfigStep({
               type="password"
               value={appToken}
               onChange={(e) => onAppTokenChange(e.target.value)}
-              className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all"
+              className="w-full px-4 py-3 bg-surface-hover border border-border rounded-xl text-text-primary focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               placeholder="xapp-••••••••••••"
             />
           </div>
@@ -109,13 +110,13 @@ export function SlackConfigStep({
           </label>
           <div className="grid grid-cols-3 gap-2">
             {dmPolicies.map((option) => (
-              <button
+              <Button variant="ghost"
                 key={option.value}
                 onClick={() => onDmPolicyChange(option.value)}
                 className={`p-3 rounded-xl border-2 text-left transition-all ${
                   dmPolicy === option.value
-                    ? "border-accent bg-accent/5"
-                    : "border-border hover:border-accent/50"
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/50"
                 }`}
               >
                 <div className="font-medium text-text-primary text-sm">
@@ -124,7 +125,7 @@ export function SlackConfigStep({
                 <div className="text-xs text-text-muted mt-0.5">
                   {option.desc}
                 </div>
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -134,7 +135,7 @@ export function SlackConfigStep({
         href="https://api.slack.com/apps"
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-2 text-sm text-accent hover:underline"
+        className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
       >
         <ExternalLink className="w-4 h-4" />
         {t("remote.openSlack")}

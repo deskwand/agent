@@ -8,7 +8,8 @@
  * 不能各写一份「长得差不多」的按钮。
  */
 import type { ReactNode } from "react";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
+import { Button } from "./app-button";
 
 export interface TitlebarButtonProps {
   /** 气泡文案，同时用作 aria-label。调用方负责 i18n。 */
@@ -19,7 +20,7 @@ export interface TitlebarButtonProps {
   tone?: "muted" | "secondary";
   /**
    * 不挂 Tooltip。header 里那两个播放控件用 —— 它们悬停时会弹出自己的卡片，
-   * 而 Tooltip 的气泡（向下 6px、约 22px 高、z-60）必然压住卡片第一行；
+   * 而 Tooltip 的气泡（向下、z-50）必然压住卡片第一行；
    * 可访问名仍由 `aria-label` 承担。
    */
   hideTooltip?: boolean;
@@ -39,22 +40,29 @@ export function TitlebarButton({
   // Tailwind 输出的 hover: 变体晚于无前缀的 bg-overlay-on，同时存在时会把
   // 已开启背景盖掉。
   const stateClasses = isOn
-    ? "bg-overlay-on text-accent active:scale-[0.96] active:duration-75"
+    ? "bg-overlay-on text-primary active:scale-[0.96] active:duration-75"
     : `hover:bg-overlay-hover hover:text-text-primary active:bg-overlay-press active:scale-[0.96] active:duration-75 ${
         tone === "secondary" ? "text-text-secondary" : "text-text-muted"
       }`;
 
   const button = (
-    <button
+    <Button variant="ghost"
       type="button"
       onClick={onClick}
       aria-label={label}
       className={`w-7 h-7 rounded-control grid place-items-center transition-[background-color,color,transform] duration-150 ${stateClasses}`}
     >
       {children}
-    </button>
+    </Button>
   );
 
   if (hideTooltip) return button;
-  return <Tooltip label={label}>{button}</Tooltip>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      {/* 老的 Tooltip 默认落在触发元素下方，这里显式写死 —— Radix 的
+          TooltipContent 默认 side="top"，不写会把这颗按钮的气泡翻到上方。 */}
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  );
 }

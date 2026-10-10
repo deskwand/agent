@@ -13,6 +13,7 @@ import {
 import type { VoiceInstallPhase } from "../../../shared/ipc-types";
 import type { ScheduleWeekday } from "../../types";
 import { Switch } from "../ui/switch";
+import { Button } from "../app-button";
 
 // ==================== Shared Types ====================
 
@@ -312,7 +313,7 @@ export function SettingsSelect<T extends string>({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button variant="ghost"
           ref={triggerRef}
           type="button"
           data-testid={testId}
@@ -333,7 +334,7 @@ export function SettingsSelect<T extends string>({
               open ? "rotate-180" : ""
             }`}
           />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
@@ -402,7 +403,7 @@ export type StatusBadgeTone = "ok" | "muted" | "busy" | "error";
 const STATUS_BADGE_DOTS = {
   ok: "bg-success",
   muted: "bg-text-muted",
-  busy: "bg-accent",
+  busy: "bg-primary",
   error: "bg-error",
 } as const;
 
@@ -526,7 +527,7 @@ export function InstallProgress({
         className="h-1.5 w-full overflow-hidden rounded-full bg-surface-hover"
       >
         <div
-          className="h-full bg-accent transition-all"
+          className="h-full bg-primary transition-all"
           style={{ width: `${percent}%` }}
         />
       </div>
@@ -582,7 +583,7 @@ export function SettingsFormSelect<T extends string>({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button variant="ghost"
           type="button"
           data-testid={testId}
           disabled={disabled}
@@ -597,7 +598,7 @@ export function SettingsFormSelect<T extends string>({
               open ? "rotate-180" : ""
             }`}
           />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent

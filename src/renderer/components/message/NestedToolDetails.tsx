@@ -11,6 +11,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
+import { Button } from "../app-button";
 
 interface NestedToolDetailsProps {
   item: ToolUseContent;
@@ -60,7 +61,7 @@ export function NestedToolDetails({
       {needsOwnDetails ? (
         <Collapsible>
           <CollapsibleTrigger asChild>
-            <button
+            <Button variant="ghost"
               type="button"
               className={`cursor-pointer ${
                 trace.status === "error" ? "text-error" : "text-text-muted"
@@ -74,7 +75,7 @@ export function NestedToolDetails({
                   : trace.status === "error"
                     ? t("tool.grouped.failedOperations")
                     : t("tool.grouped.outputUnavailable")}
-            </button>
+            </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
             {Object.keys(item.input).length > 0 && (

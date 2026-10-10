@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "../app-button";
+import { Textarea } from "../ui/textarea";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { GLOBAL_AGENTS_MD_TEMPLATE } from "./globalAgentsMdTemplate";
 import { SettingsCard, SettingsSection } from "./shared";
@@ -78,32 +80,39 @@ export function SettingsGlobalAgentsMd() {
     >
       <SettingsCard>
         <div className="space-y-3 p-4">
-          <textarea
+          {/* 2026-10-09 相位 3 ✓：`Textarea` base 自带 min-h-[80px] rounded-md border-input
+              bg-transparent px-3 py-2 shadow-sm —— 与本仓观感冲突的逐条覆盖回来 ✗✓（min-h-44 /
+              rounded-lg / border-border-muted / bg-background-secondary / p-3 / shadow-none）。 */}
+          <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder={t("agentsMd.placeholder")}
-            className="min-h-44 w-full resize-y rounded-lg border border-border-muted bg-background-secondary p-3 font-mono text-sm text-text-primary"
+            className="min-h-44 w-full resize-y rounded-lg border border-border-muted bg-background-secondary p-3 font-mono text-sm text-text-primary shadow-none"
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-text-muted">
               {t("agentsMd.hint")}
             </span>
             <div className="flex items-center gap-2">
-              <button
+              <Button
+                variant="outline"
+                type="button"
                 onClick={handleInsertTemplate}
-                className="rounded-lg border border-border px-3 py-1.5 text-sm text-text-primary hover:bg-surface-hover"
+                className="h-auto rounded-lg border-border bg-transparent px-3 py-1.5 text-sm font-normal text-text-primary shadow-none hover:bg-surface-hover hover:text-text-primary"
               >
                 {t("agentsMd.insertTemplate")}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="default"
+                type="button"
                 onClick={() => {
                   void handleSave();
                 }}
                 disabled={isBusy || !loaded}
-                className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-accent-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="h-auto rounded-lg px-4 py-1.5 text-sm shadow-none hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {t("agentsMd.save")}
-              </button>
+              </Button>
             </div>
           </div>
           {status && (

@@ -7,8 +7,9 @@ import {
   FileText,
 } from "lucide-react";
 import type { QueuedInput } from "../types";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { resolveLeadingToken } from "../utils/reference-tokens";
+import { Button } from "./app-button";
 
 interface ChatInputQueueBarProps {
   items: QueuedInput[];
@@ -93,31 +94,36 @@ export function ChatInputQueueBar({
               </span>
             ))}
           </span>
-          <Tooltip
-            label={
-              isRunning && item.elSelections?.length
-                ? t("browser.picker.waitForNextTurn")
-                : ""
-            }
-          >
-            <button
-              type="button"
-              disabled={isRunning && Boolean(item.elSelections?.length)}
-              className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-accent/15 text-accent hover:bg-accent/25 transition-[background-color] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
-              onClick={() => onSteer(item.id)}
-            >
-              <Navigation className="h-3 w-3" />
-              {t("steer.label")}
-            </button>
+          {/* 老 Tooltip 的语义：label 为空 =「此刻没有提示」，不渲染气泡。
+              迁到 Radix 后用**条件渲染 TooltipContent** 保持同一语义（Root/Trigger
+              常驻，但没有 Content 就不会有气泡）。老组件的空 label 用例在
+              tests/renderer/tooltip.test.ts，这条调用形态与它同源。 */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost"
+                type="button"
+                disabled={isRunning && Boolean(item.elSelections?.length)}
+                className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-primary/15 text-primary hover:bg-primary/25 transition-[background-color] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed h-auto"
+                onClick={() => onSteer(item.id)}
+              >
+                <Navigation className="h-3 w-3" />
+                {t("steer.label")}
+              </Button>
+            </TooltipTrigger>
+            {isRunning && item.elSelections?.length ? (
+              <TooltipContent side="bottom">
+                {t("browser.picker.waitForNextTurn")}
+              </TooltipContent>
+            ) : null}
           </Tooltip>
-          <button
+          <Button variant="ghost"
             type="button"
             aria-label={t("steer.remove")}
-            className="flex-shrink-0 rounded p-1 text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors"
+            className="flex-shrink-0 rounded p-1 text-text-muted hover:bg-surface-hover hover:text-text-primary transition-colors h-auto"
             onClick={() => onRemove(item.id)}
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         </li>
       ))}
     </ul>

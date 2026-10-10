@@ -2,6 +2,7 @@
 // 卡片高度不再按"一个附件一行"线性增长，改为每行放满为止。
 import { FileText, MousePointerSquareDashed, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { Button } from "../app-button";
 
 export type AttachmentTile =
   | {
@@ -49,7 +50,7 @@ function RemoveButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button variant="ghost"
       type="button"
       aria-label={label}
       // 磁贴本身可能有 onClick（打开大图），删除键不能把事件冒泡上去 ——
@@ -58,10 +59,10 @@ function RemoveButton({
         event.stopPropagation();
         onClick();
       }}
-      className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-error text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100"
+      className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-error text-white opacity-0 transition-opacity focus-visible:opacity-100 group-hover/tile:opacity-100 hover:bg-transparent hover:text-current"
     >
       <X className="h-3 w-3" />
-    </button>
+    </Button>
   );
 }
 
@@ -91,9 +92,9 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
         if (tile.kind === "element") {
           return (
             // title 挂在包裹 div 上而不是 button 上：仓库有全仓不变量禁止
-            // <button title>（操作提示一律走 Tooltip），文件磁贴也是同一形式。
+            // <Button variant="ghost" title>（操作提示一律走 Tooltip），文件磁贴也是同一形式。
             <div key={tile.key} title={tile.hint} className={TILE_CLASS}>
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={tile.onOpen}
                 className="flex h-full w-full flex-col items-start justify-between gap-1 p-2 text-left transition-colors hover:bg-surface-hover"
@@ -110,7 +111,7 @@ export function AttachmentTiles({ tiles }: { tiles: AttachmentTile[] }) {
                     {t(tile.badge)}
                   </span>
                 ) : null}
-              </button>
+              </Button>
               <RemoveButton label={removeLabel} onClick={tile.onRemove} />
             </div>
           );

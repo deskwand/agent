@@ -61,6 +61,7 @@ import {
   SettingsSelect,
   SettingsStatusBadge,
 } from "./shared";
+import { Button } from "../app-button";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -120,7 +121,7 @@ const TONE = {
 const GHOST_BUTTON =
   "rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover hover:text-text-primary disabled:opacity-50";
 const PRIMARY_BUTTON =
-  "rounded-control bg-accent px-2.5 py-1 text-xs font-medium text-accent-foreground hover:bg-accent-hover disabled:opacity-50";
+  "rounded-control bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-50";
 
 export function VoiceModeSettings() {
   const { t } = useTranslation();
@@ -307,7 +308,7 @@ export function VoiceModeSettings() {
    * 宽度按两种语言里最长的那个（英文 Generating）留够。
    */
   const previewButton = (which: TtsTone) => (
-    <button
+    <Button variant="ghost"
       type="button"
       data-testid={`voice-preview-${which}`}
       aria-label={t(
@@ -327,7 +328,7 @@ export function VoiceModeSettings() {
         : preview.state === "playing"
           ? t(`${VOICE_MODE_KEY}.tonePreviewStop`)
           : t(`${VOICE_MODE_KEY}.tonePreview`)}
-    </button>
+    </Button>
   );
 
   return (
@@ -410,7 +411,7 @@ export function VoiceModeSettings() {
                 {!isBest && state.installed && previewButton(tone)}
                 {!isBest &&
                   (state.installed ? (
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       data-testid="voice-voice-remove"
                       aria-label={t(
@@ -421,10 +422,10 @@ export function VoiceModeSettings() {
                       className={GHOST_BUTTON}
                     >
                       {t("settings.capabilities.install.delete")}
-                    </button>
+                    </Button>
                   ) : (
                     !busy && (
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         data-testid={
                           state.phase === "error"
@@ -448,7 +449,7 @@ export function VoiceModeSettings() {
                         {state.phase === "error"
                           ? t("settings.capabilities.install.retry")
                           : t("settings.capabilities.install.download")}
-                      </button>
+                      </Button>
                     )
                   ))}
               </>
@@ -514,7 +515,7 @@ export function VoiceModeSettings() {
                   />
                   {engineState.installed && previewButton("best")}
                   {engineState.installed && engineFailed && (
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       data-testid="voice-engine-reset"
                       aria-label={t(`${VOICE_MODE_KEY}.toneBestRetryFailed`)}
@@ -523,10 +524,10 @@ export function VoiceModeSettings() {
                       className={PRIMARY_BUTTON}
                     >
                       {t("settings.capabilities.install.retry")}
-                    </button>
+                    </Button>
                   )}
                   {engineState.installed ? (
-                    <button
+                    <Button variant="ghost"
                       type="button"
                       data-testid="voice-engine-remove"
                       aria-label={t(`${VOICE_MODE_KEY}.toneBestRemove`)}
@@ -535,11 +536,11 @@ export function VoiceModeSettings() {
                       className={GHOST_BUTTON}
                     >
                       {t("settings.capabilities.install.delete")}
-                    </button>
+                    </Button>
                   ) : (
                     !busy &&
                     !engineBlocked && (
-                      <button
+                      <Button variant="ghost"
                         type="button"
                         data-testid={
                           engineState.phase === "error"
@@ -559,7 +560,7 @@ export function VoiceModeSettings() {
                         {engineState.phase === "error"
                           ? t("settings.capabilities.install.retry")
                           : t(`${VOICE_MODE_KEY}.toneBestInstall`)}
-                      </button>
+                      </Button>
                     )
                   )}
                 </>

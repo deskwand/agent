@@ -17,7 +17,8 @@ import {
   FolderOpen,
 } from "lucide-react";
 import type { Skill, CloudSkill, SkillType } from "../../types";
-import { Tooltip } from "../Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
+import { Button } from "../app-button";
 
 /* ─── tiny internals ─── */
 
@@ -33,23 +34,28 @@ function ToggleButton({
   label: string;
 }) {
   return (
-    <Tooltip label={label}>
-      <button
-        onClick={onToggle}
-        disabled={isLoading}
-        className={`shrink-0 p-1.5 rounded-md transition-colors ${
-          enabled
-            ? "bg-success/10 text-success hover:bg-success/20"
-            : "bg-surface-muted text-text-muted hover:bg-surface-active"
-        }`}
-        aria-label={label}
-      >
-        {enabled ? (
-          <Power className="w-3.5 h-3.5" />
-        ) : (
-          <PowerOff className="w-3.5 h-3.5" />
-        )}
-      </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="ghost"
+          onClick={onToggle}
+          disabled={isLoading}
+          className={`shrink-0 p-1.5 rounded-md transition-colors ${
+            enabled
+              ? "bg-success/10 text-success hover:bg-success/20"
+              : "bg-surface-muted text-text-muted hover:bg-surface-active"
+          }`}
+          aria-label={label}
+        >
+          {enabled ? (
+            <Power className="w-3.5 h-3.5" />
+          ) : (
+            <PowerOff className="w-3.5 h-3.5" />
+          )}
+        </Button>
+      </TooltipTrigger>
+      {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+          而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+      <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
   );
 }
@@ -72,14 +78,14 @@ export const SKILL_ICON_MAP: Record<
 > = {
   ai: {
     icon: Bot,
-    bgClass: "bg-accent",
-    iconClass: "text-accent-foreground",
+    bgClass: "bg-primary",
+    iconClass: "text-primary-foreground",
     strokeWidth: 2,
   },
   mycloud: {
     icon: Cloud,
-    bgClass: "bg-accent",
-    iconClass: "text-accent-foreground",
+    bgClass: "bg-primary",
+    iconClass: "text-primary-foreground",
     strokeWidth: 2,
   },
   team: {
@@ -102,14 +108,14 @@ export const SKILL_ICON_MAP: Record<
   },
   marketplace: {
     icon: Package,
-    bgClass: "bg-accent",
-    iconClass: "text-accent-foreground",
+    bgClass: "bg-primary",
+    iconClass: "text-primary-foreground",
     strokeWidth: 2,
   },
   vault: {
     icon: ShieldCheck,
-    bgClass: "bg-accent",
-    iconClass: "text-accent-foreground",
+    bgClass: "bg-primary",
+    iconClass: "text-primary-foreground",
     strokeWidth: 2,
   },
   external: {
@@ -198,68 +204,85 @@ function SkillActionButtons(props: SkillActionButtonsProps) {
         ? t("skillMarket.publishUpdate")
         : t("skillMarket.publish");
 
+  const publishButton = (
+    <Button variant="ghost"
+      onClick={onPublish}
+      disabled={isLoading || isPublishing || publishStatus === "published"}
+      aria-label={publishTipLabel || undefined}
+      className={`p-1.5 rounded-md transition-colors ${
+        publishStatus === "published"
+          ? "bg-success/10 text-success cursor-default"
+          : publishStatus === "outdated"
+            ? "bg-primary/10 text-primary hover:bg-primary/20"
+            : isPublishing
+              ? "bg-primary/10 text-primary/50 cursor-wait"
+              : "bg-primary/10 text-primary hover:bg-primary/20"
+      }`}
+    >
+      {isPublishing ? (
+        <Loader2 className={`${iconSize} animate-spin`} />
+      ) : publishStatus === "published" ? (
+        <Check className={iconSize} />
+      ) : publishStatus === "outdated" ? (
+        <RefreshCw className={iconSize} />
+      ) : (
+        <CloudUpload className={iconSize} />
+      )}
+    </Button>
+  );
+
   return (
     <>
-      {onPublish && publishStatus !== "has_update" && (
-        <Tooltip label={publishTipLabel}>
-          <button
-            onClick={onPublish}
-            disabled={
-              isLoading || isPublishing || publishStatus === "published"
-            }
-            aria-label={publishTipLabel || undefined}
-            className={`p-1.5 rounded-md transition-colors ${
-              publishStatus === "published"
-                ? "bg-success/10 text-success cursor-default"
-                : publishStatus === "outdated"
-                  ? "bg-accent/10 text-accent hover:bg-accent/20"
-                  : isPublishing
-                    ? "bg-accent/10 text-accent/50 cursor-wait"
-                    : "bg-accent/10 text-accent hover:bg-accent/20"
-            }`}
-          >
-            {isPublishing ? (
-              <Loader2 className={`${iconSize} animate-spin`} />
-            ) : publishStatus === "published" ? (
-              <Check className={iconSize} />
-            ) : publishStatus === "outdated" ? (
-              <RefreshCw className={iconSize} />
-            ) : (
-              <CloudUpload className={iconSize} />
-            )}
-          </button>
-        </Tooltip>
-      )}
+      {/* 空 label ⇒ 真的**不包** Tooltip（老组件 `if (!hasLabel) return <>{children}</>`）：
+          包一个空气泡会让 aria-describedby 指向不存在的 id。 */}
+      {onPublish &&
+        publishStatus !== "has_update" &&
+        (publishTipLabel ? (
+          <Tooltip>
+            <TooltipTrigger asChild>{publishButton}</TooltipTrigger>
+            <TooltipContent side="bottom">{publishTipLabel}</TooltipContent>
+          </Tooltip>
+        ) : (
+          publishButton
+        ))}
       {onUpdate && publishStatus === "has_update" && (
-        <Tooltip label={t("skillMarket.update")}>
-          <button
-            onClick={onUpdate}
-            disabled={isLoading || isUpdating}
-            className={`p-1.5 rounded-md transition-colors ${
-              isUpdating
-                ? "bg-accent/10 text-accent/50 cursor-wait"
-                : "bg-accent/10 text-accent hover:bg-accent/20"
-            }`}
-            aria-label={t("skillMarket.update")}
-          >
-            {isUpdating ? (
-              <Loader2 className={`${iconSize} animate-spin`} />
-            ) : (
-              <Download className={iconSize} />
-            )}
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={onUpdate}
+              disabled={isLoading || isUpdating}
+              className={`p-1.5 rounded-md transition-colors ${
+                isUpdating
+                  ? "bg-primary/10 text-primary/50 cursor-wait"
+                  : "bg-primary/10 text-primary hover:bg-primary/20"
+              }`}
+              aria-label={t("skillMarket.update")}
+            >
+              {isUpdating ? (
+                <Loader2 className={`${iconSize} animate-spin`} />
+              ) : (
+                <Download className={iconSize} />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {t("skillMarket.update")}
+          </TooltipContent>
         </Tooltip>
       )}
       {onDelete && (
-        <Tooltip label={t("common.delete")}>
-          <button
-            onClick={onDelete}
-            disabled={isLoading}
-            className="p-1.5 rounded-md bg-error/10 text-error hover:bg-error/20 transition-colors"
-            aria-label={t("common.delete")}
-          >
-            <Trash2 className={iconSize} />
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              onClick={onDelete}
+              disabled={isLoading}
+              className="p-1.5 rounded-md bg-error/10 text-error hover:bg-error/20 transition-colors h-auto"
+              aria-label={t("common.delete")}
+            >
+              <Trash2 className={iconSize} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t("common.delete")}</TooltipContent>
         </Tooltip>
       )}
     </>
@@ -296,12 +319,12 @@ function SkillCardCards(props: SkillCardProps) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             {onSkillMd ? (
-              <button
+              <Button variant="ghost"
                 onClick={onSkillMd}
-                className="text-base font-semibold text-text-primary hover:text-accent transition-colors truncate text-left"
+                className="text-base font-semibold text-text-primary hover:text-primary transition-colors truncate text-left h-auto"
               >
                 {skill.name}
-              </button>
+              </Button>
             ) : (
               <h3 className="text-base font-semibold text-text-primary truncate">
                 {skill.name}
@@ -371,12 +394,12 @@ function SkillCardList(props: SkillCardProps) {
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               {onSkillMd ? (
-                <button
+                <Button variant="ghost"
                   onClick={onSkillMd}
-                  className="text-sm font-medium text-text-primary truncate hover:text-accent transition-colors text-left"
+                  className="text-sm font-medium text-text-primary truncate hover:text-primary transition-colors text-left h-auto"
                 >
                   {skill.name}
-                </button>
+                </Button>
               ) : (
                 <span className="text-sm font-medium text-text-primary truncate">
                   {skill.name}
@@ -456,12 +479,12 @@ function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
             {onSkillMd ? (
-              <button
+              <Button variant="ghost"
                 onClick={onSkillMd}
-                className="text-base font-semibold text-text-primary hover:text-accent transition-colors truncate text-left"
+                className="text-base font-semibold text-text-primary hover:text-primary transition-colors truncate text-left h-auto"
               >
                 {name}
-              </button>
+              </Button>
             ) : (
               <h3 className="text-base font-semibold text-text-primary truncate">
                 {name}
@@ -479,10 +502,10 @@ function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
         </div>
       </div>
       <div className="flex justify-end mt-3">
-        <button
+        <Button variant="ghost"
           onClick={onInstall}
           disabled={installing}
-          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 h-auto"
         >
           {installing ? (
             <Loader2 className="w-3 h-3 animate-spin" />
@@ -490,7 +513,7 @@ function CloudOnlyCardView(props: CloudOnlySkillCardProps) {
             <Download className="w-3 h-3" />
           )}
           {t("skillMarket.install")}
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -526,12 +549,12 @@ function CloudOnlyListView(props: CloudOnlySkillCardProps) {
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               {onSkillMd ? (
-                <button
+                <Button variant="ghost"
                   onClick={onSkillMd}
-                  className="text-sm font-medium text-text-primary truncate hover:text-accent transition-colors text-left"
+                  className="text-sm font-medium text-text-primary truncate hover:text-primary transition-colors text-left h-auto"
                 >
                   {name}
-                </button>
+                </Button>
               ) : (
                 <span className="text-sm font-medium text-text-primary truncate">
                   {name}
@@ -548,10 +571,10 @@ function CloudOnlyListView(props: CloudOnlySkillCardProps) {
             )}
           </div>
         </div>
-        <button
+        <Button variant="ghost"
           onClick={onInstall}
           disabled={installing}
-          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-accent/10 text-accent hover:bg-accent/20 transition-colors disabled:opacity-50"
+          className="shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors disabled:opacity-50 h-auto"
         >
           {installing ? (
             <Loader2 className="w-3 h-3 animate-spin" />
@@ -559,7 +582,7 @@ function CloudOnlyListView(props: CloudOnlySkillCardProps) {
             <Download className="w-3 h-3" />
           )}
           {t("skillMarket.install")}
-        </button>
+        </Button>
       </div>
     </div>
   );

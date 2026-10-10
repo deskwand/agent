@@ -179,8 +179,20 @@ describe("ProviderCatalogGrid", () => {
     const tile = tiles().find(
       (b) => b.getAttribute("data-catalog-entry") === "oauth:openai-codex",
     );
-    const anchor = tile?.closest(".tt-anchor");
-    expect(anchor, "订阅瓦片应由 Tooltip 包一层").not.toBeNull();
+    // ⚠️ 2026-10-09：`.tt-anchor` 是**老组件**套的那层 `<span>` ✗（`Tooltip.tsx` 的类 ✓），
+    // 迁到 `app-tooltip`（`TooltipTrigger asChild` ✓）后**按设计没有了** ✗✓。
+    // **意图一字未变** ✓（「瓦片被 Tooltip 包住、聚焦后文案能出来」✓），而且**更正确** ✓：
+    // `asChild` 下**触发器就是瓦片本身** ✓（Radix 把 `data-state` 写在它身上 ✓）——
+    // 老实现里那个 `<span>` 其实**不可聚焦** ✗，聚焦是靠外层 `useFocus` 监听的 ✓。
+    const anchor = tile;
+    // ⚠️ 2026-10-09（审查员 M2 ✓）：这里原先写 `not.toBeNull()` —— 但 `tile` 是 `undefined` 时
+    // `undefined !== null` **照样通过** ✗✓ ⇒ 瓦片找不到这条就变成恒真 ✓。
+    // 改成 `toBeDefined()` ✓ —— 恢复它原本要说的「瓦片必须存在」✓（判据强度只增不减 ✓）。
+    expect(anchor, "订阅瓦片应由 Tooltip 包一层").toBeDefined();
+    expect(
+      anchor?.getAttribute("data-state"),
+      "瓦片应已注册为 Tooltip 触发器",
+    ).not.toBeNull();
 
     // focus 打开气泡（useFocus），文案出现在 portal 里
     act(() => {

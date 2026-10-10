@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PiUiRequest } from "../../shared/ipc-types";
 import type { ServerEvent } from "../types";
+import { Textarea } from "./ui/textarea";
+import { Button } from "./app-button";
 
 export type UiDialogState =
   | { id: string; kind: "select"; title: string; options: string[] }
@@ -76,7 +78,7 @@ export function ExtensionDialogs() {
       setInputValue(
         dialog.kind === "editor" || dialog.kind === "input"
           ? dialog.kind === "editor"
-            ? dialog.prefill ?? ""
+            ? (dialog.prefill ?? "")
             : ""
           : "",
       );
@@ -111,18 +113,18 @@ export function ExtensionDialogs() {
               {t("piExtensions.trustMessage", { cwd: trustCwd })}
             </p>
             <div className="flex justify-end gap-2">
-              <button
-                className="rounded-lg px-4 py-2 text-sm bg-danger text-white"
+              <Button variant="ghost"
+                className="rounded-lg px-4 py-2 text-sm bg-danger text-white h-auto hover:bg-transparent hover:text-current"
                 onClick={() => respondTrust("untrusted")}
               >
                 {t("piExtensions.trustDeny")}
-              </button>
-              <button
-                className="rounded-lg px-4 py-2 text-sm bg-primary text-primary-foreground"
+              </Button>
+              <Button variant="ghost"
+                className="rounded-lg px-4 py-2 text-sm bg-primary text-primary-foreground h-auto hover:bg-transparent hover:text-current"
                 onClick={() => respondTrust("trusted")}
               >
                 {t("piExtensions.trustAllow")}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -141,7 +143,7 @@ export function ExtensionDialogs() {
                 {dialog.options.map((option) => (
                   <li
                     key={option}
-                    className="cursor-pointer border-b border-border/50 px-3 py-2 text-sm hover:bg-accent"
+                    className="cursor-pointer border-b border-border/50 px-3 py-2 text-sm hover:bg-primary"
                     onClick={() => respond(option)}
                   >
                     {option}
@@ -150,8 +152,8 @@ export function ExtensionDialogs() {
               </ul>
             )}
             {(dialog.kind === "input" || dialog.kind === "editor") && (
-              <textarea
-                className="mb-4 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              <Textarea
+                className="mb-4 min-h-0 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-none"
                 rows={dialog.kind === "editor" ? 6 : 1}
                 placeholder={dialog.kind === "input" ? dialog.placeholder : ""}
                 value={inputValue}
@@ -159,19 +161,19 @@ export function ExtensionDialogs() {
               />
             )}
             <div className="flex justify-end gap-2">
-              <button
-                className="rounded-lg px-4 py-2 text-sm border border-border"
+              <Button variant="ghost"
+                className="rounded-lg px-4 py-2 text-sm border border-border h-auto hover:bg-transparent hover:text-current"
                 onClick={() => respond(undefined)}
               >
                 {t("common.cancel")}
-              </button>
+              </Button>
               {dialog.kind !== "select" && (
-                <button
-                  className="rounded-lg px-4 py-2 text-sm bg-primary text-primary-foreground"
+                <Button variant="ghost"
+                  className="rounded-lg px-4 py-2 text-sm bg-primary text-primary-foreground h-auto hover:bg-transparent hover:text-current"
                   onClick={() => respond(inputValue)}
                 >
                   {t("common.confirm")}
-                </button>
+                </Button>
               )}
             </div>
           </div>

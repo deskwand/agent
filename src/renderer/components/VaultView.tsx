@@ -17,7 +17,7 @@ import { getFileKind } from "../utils/file-types";
 import { FileTypeIcon } from "./file-type-icon";
 import { splitRelPath } from "./attach/picker-items";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +32,7 @@ import type {
   VaultSnapshot,
   VaultSnapshotItem,
 } from "../../shared/vault";
+import { Input } from "./ui/input";
 
 type Filter = "files" | "skills" | "sessions";
 type SyncFeedback = "idle" | "syncing" | "success" | "error";
@@ -727,26 +728,29 @@ export function VaultView(): JSX.Element {
                 ? (syncFeedbackMessage ?? "")
                 : ""}
           </span>
-          <Tooltip label={syncTooltipLabel}>
-            <button
-              type="button"
-              aria-label={syncActionLabel}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={() => void handleSync()}
-              disabled={syncDisabled}
-            >
-              {syncFeedback === "success" ? (
-                <Check className="h-4 w-4 text-success" />
-              ) : syncFeedback === "error" ? (
-                <AlertTriangle className="h-4 w-4 text-error" />
-              ) : (
-                <RefreshCw
-                  className={`h-4 w-4 ${
-                    syncFeedback === "syncing" ? "animate-spin" : ""
-                  }`}
-                />
-              )}
-            </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-label={syncActionLabel}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => void handleSync()}
+                disabled={syncDisabled}
+              >
+                {syncFeedback === "success" ? (
+                  <Check className="h-4 w-4 text-success" />
+                ) : syncFeedback === "error" ? (
+                  <AlertTriangle className="h-4 w-4 text-error" />
+                ) : (
+                  <RefreshCw
+                    className={`h-4 w-4 ${
+                      syncFeedback === "syncing" ? "animate-spin" : ""
+                    }`}
+                  />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{syncTooltipLabel}</TooltipContent>
           </Tooltip>
           {advancedResetAvailable && (
             <div
@@ -774,18 +778,23 @@ export function VaultView(): JSX.Element {
                 open={advancedMenuOpen}
                 onOpenChange={setAdvancedMenuOpen}
               >
-                <Tooltip label={t("vault.menu.more")}>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      ref={advancedMenuTriggerRef}
-                      type="button"
-                      aria-label={t("vault.menu.more")}
-                      disabled={busy}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
-                  </DropdownMenuTrigger>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        ref={advancedMenuTriggerRef}
+                        type="button"
+                        aria-label={t("vault.menu.more")}
+                        disabled={busy}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-text-secondary transition-colors hover:bg-surface-hover hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    {t("vault.menu.more")}
+                  </TooltipContent>
                 </Tooltip>
                 <DropdownMenuContent
                   id="vault-advanced-menu"
@@ -853,7 +862,7 @@ export function VaultView(): JSX.Element {
                 onClick={() => setFilter(item)}
                 className={`border-b-2 px-3 py-2 text-sm ${
                   filter === item
-                    ? "border-accent text-text-primary"
+                    ? "border-primary text-text-primary"
                     : "border-transparent text-text-muted hover:text-text-secondary"
                 }`}
               >
@@ -865,7 +874,7 @@ export function VaultView(): JSX.Element {
           {showFiles && filter === "skills" && selectedSkills.size > 0 && (
             <div
               data-testid="skills-action-bar"
-              className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl border border-accent bg-accent-muted px-3 py-2"
+              className="sticky bottom-0 mt-3 flex items-center gap-2 rounded-xl border border-primary bg-primary-muted px-3 py-2"
             >
               <span className="text-xs font-medium text-text-primary">
                 {t("vault.skills.selectedCount", {
@@ -882,7 +891,7 @@ export function VaultView(): JSX.Element {
               </button>
               <button
                 type="button"
-                className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={busy}
                 onClick={() => void runAddSkills([...selectedSkills], false)}
               >
@@ -926,7 +935,7 @@ export function VaultView(): JSX.Element {
                 <button
                   type="button"
                   disabled={busy}
-                  className="rounded-lg bg-accent px-3 py-1 text-xs text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() =>
                     void runAddSkills(
                       pendingLinkConfirm.map((entry) => entry.name),
@@ -978,16 +987,21 @@ export function VaultView(): JSX.Element {
                   </span>
                 )}
               </div>
-              <Tooltip label={t("vault.upload")}>
-                <button
-                  type="button"
-                  aria-label={t("vault.upload")}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-accent text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
-                  onClick={handleUpload}
-                  disabled={uploadDisabled}
-                >
-                  <Upload className="h-4 w-4" />
-                </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={t("vault.upload")}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={handleUpload}
+                    disabled={uploadDisabled}
+                  >
+                    <Upload className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {t("vault.upload")}
+                </TooltipContent>
               </Tooltip>
             </div>
           )}
@@ -995,12 +1009,12 @@ export function VaultView(): JSX.Element {
           <div className="min-h-0 flex-1 overflow-y-auto py-3">
             {filter === "skills" && (
               <div className="flex flex-col gap-2 py-3">
-                <input
+                <Input
                   type="search"
                   value={skillQuery}
                   onChange={(event) => setSkillQuery(event.target.value)}
                   placeholder={t("vault.skills.searchPlaceholder")}
-                  className="w-full rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-text-primary"
+                  className="w-full rounded-lg border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-text-primary h-auto shadow-none"
                 />
 
                 <div className="flex flex-col gap-1">
@@ -1020,7 +1034,7 @@ export function VaultView(): JSX.Element {
                           key={skill.name}
                           className="flex select-none items-center gap-4 px-4 py-3"
                         >
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-accent" />
+                          <span className="h-2 w-2 shrink-0 rounded-full bg-primary" />
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-medium text-text-primary">
                               {skill.name}
@@ -1080,7 +1094,7 @@ export function VaultView(): JSX.Element {
                           <label
                             key={skill.name}
                             className={`flex cursor-pointer select-none items-center gap-3 px-4 py-3 ${
-                              isSelected ? "bg-accent-muted" : ""
+                              isSelected ? "bg-primary-muted" : ""
                             }`}
                           >
                             <input
@@ -1309,7 +1323,7 @@ export function VaultView(): JSX.Element {
             )}
             <button
               type="button"
-              className="mt-3 rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-3 rounded bg-primary px-3 py-2 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 h-auto"
               onClick={() => void handleInitialize()}
               disabled={
                 !recoveryConfirmed || busy || setupBlockedByRemoteBackup
@@ -1384,7 +1398,7 @@ function renderEmptyState(
         <p className="text-sm text-text-muted">{t("vault.reset.inProgress")}</p>
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={h.retryReset}
           disabled={h.busy || !h.token}
         >
@@ -1413,7 +1427,7 @@ function renderEmptyState(
         </p>
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90"
+          className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90"
           onClick={() => {
             h.setError(null);
             h.retryRemoteStatus();
@@ -1431,7 +1445,7 @@ function renderEmptyState(
         <p className="text-sm text-text-muted">{t("vault.restore.failed")}</p>
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90"
+          className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90"
           onClick={h.retryAutoRestore}
         >
           {t("vault.restore.retry")}
@@ -1442,21 +1456,21 @@ function renderEmptyState(
 
   if (mode === "recovery-input") {
     return (
-      <div className="mx-auto mt-10 flex w-full max-w-md flex-col gap-3 rounded-xl border border-accent/30 bg-accent/10 p-4">
+      <div className="mx-auto mt-10 flex w-full max-w-md flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4">
         <p className="text-sm text-text-secondary">
           {t("vault.restore.prompt")}
         </p>
-        <input
+        <Input
           type="text"
           aria-label={t("vault.recoveryCode")}
           value={h.restoreCode}
           onChange={(event) => h.setRestoreCode(event.target.value)}
           placeholder={t("vault.recoveryCode")}
-          className="rounded border border-border-subtle bg-background px-2 py-1.5 text-xs text-text-primary"
+          className="rounded border border-border-subtle bg-background px-2 py-1.5 text-xs text-text-primary h-auto shadow-none"
         />
         <button
           type="button"
-          className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 h-auto"
           onClick={h.handleRestore}
           disabled={h.busy || !h.restoreCode}
         >
@@ -1476,7 +1490,7 @@ function renderEmptyState(
         {!h.recoveryCode && (
           <button
             type="button"
-            className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground"
+            className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground h-auto"
             onClick={() => void h.handleGenerateRecoveryCode()}
           >
             {t("vault.setup.open")}
@@ -1499,7 +1513,7 @@ function renderEmptyState(
             </label>
             <button
               type="button"
-              className="rounded bg-accent px-3 py-2 text-sm text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50 h-auto"
               onClick={() => void h.handleInitialize()}
               disabled={!h.recoveryConfirmed || h.busy}
             >
@@ -1520,7 +1534,7 @@ function renderEmptyState(
         )}
         <button
           type="button"
-          className="rounded-lg bg-accent px-3 py-2 text-sm text-accent-foreground hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50"
           onClick={h.handleUpload}
           disabled={h.uploadDisabled}
         >

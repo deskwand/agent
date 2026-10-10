@@ -75,10 +75,14 @@ describe("ReferenceToken", () => {
 
   it("tooltip 为空时不额外包一层（避免给每个 token 加无意义锚点）", () => {
     render(React.createElement(ReferenceToken, { kind: "skill", label: "x" }));
-    expect(container.querySelector(".tt-anchor")).toBeNull();
+    // ⚠️ 2026-10-09：`.tt-anchor` 是**老组件**给子元素套的那层 `<span>` ✗（`Tooltip.tsx` 的类 ✓），
+    // 迁到 `app-tooltip`（`TooltipTrigger asChild` ✓）后**按设计没有了** ✗✓。
+    // **意图一字未变** ✓（「**空 label ⇒ 不包 Tooltip、不产生气泡**」✓），换**新代理** ✗✓：
+    // Radix 的 `TooltipTrigger` 会在触发器元素本身写 `data-state` ✓ ⇒ 它不在 = 没被包 ✓✓。
+    expect(container.querySelector("[data-state]")).toBeNull();
   });
 
-  it("有 tooltip 时渲染 tt-anchor 锚点", () => {
+  it("有 tooltip 时该元素成为 Tooltip 触发器", () => {
     render(
       React.createElement(ReferenceToken, {
         kind: "file",
@@ -87,6 +91,8 @@ describe("ReferenceToken", () => {
         onClick: () => {},
       }),
     );
-    expect(container.querySelector(".tt-anchor")).not.toBeNull();
+    // 同上 ✓：`data-state` 在 = 这个元素**已注册为 Tooltip 触发器** ✓✓
+    //（比 `.tt-anchor` 更强 ✓ —— 它证明的是「被 Radix 接管了」✓，而不只是「被套了一层」✓）。
+    expect(container.querySelector("[data-state]")).not.toBeNull();
   });
 });

@@ -14,10 +14,11 @@ import {
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../store";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { TitlebarButton } from "./TitlebarButton";
 import { VoiceMiniButton } from "./voice-mode/VoiceMiniButton";
 import { FeedListenButton } from "./FeedListenButton";
+import { Button } from "./app-button";
 
 const isMac =
   typeof window !== "undefined" && window.electronAPI?.platform === "darwin";
@@ -168,44 +169,57 @@ export function Titlebar() {
         {/* Window Controls (for Windows/Linux - macOS uses native traffic lights) */}
         {!isMac && (
           <div className="flex items-center titlebar-no-drag h-full">
-            <Tooltip label={t("window.minimize")}>
-              <button
-                type="button"
-                onClick={handleMinimize}
-                aria-label={t("window.minimize")}
-                className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost"
+                  type="button"
+                  onClick={handleMinimize}
+                  aria-label={t("window.minimize")}
+                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+                >
+                  <Minus className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+                  而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+              <TooltipContent side="bottom">
+                {t("window.minimize")}
+              </TooltipContent>
             </Tooltip>
-            <Tooltip
-              label={isMaximized ? t("window.restore") : t("window.maximize")}
-            >
-              <button
-                type="button"
-                onClick={handleMaximize}
-                aria-label={
-                  isMaximized ? t("window.restore") : t("window.maximize")
-                }
-                className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
-              >
-                {isMaximized ? (
-                  // lucide Copy 的两个错位叠加方框就是 Windows 11 的“还原”字形
-                  <Copy className="w-3.5 h-3.5" />
-                ) : (
-                  <Square className="w-3.5 h-3.5" />
-                )}
-              </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost"
+                  type="button"
+                  onClick={handleMaximize}
+                  aria-label={
+                    isMaximized ? t("window.restore") : t("window.maximize")
+                  }
+                  className="w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-overlay-hover hover:text-text-primary transition-colors"
+                >
+                  {isMaximized ? (
+                    // lucide Copy 的两个错位叠加方框就是 Windows 11 的“还原”字形
+                    <Copy className="w-3.5 h-3.5" />
+                  ) : (
+                    <Square className="w-3.5 h-3.5" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {isMaximized ? t("window.restore") : t("window.maximize")}
+              </TooltipContent>
             </Tooltip>
-            <Tooltip label={t("window.close")}>
-              <button
-                type="button"
-                onClick={handleClose}
-                aria-label={t("window.close")}
-                className="group w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-window-close-hover transition-colors"
-              >
-                <X className="w-4 h-4 group-hover:text-white" />
-              </button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost"
+                  type="button"
+                  onClick={handleClose}
+                  aria-label={t("window.close")}
+                  className="group w-12 h-8 my-1 flex items-center justify-center rounded-control text-text-secondary hover:bg-window-close-hover transition-colors"
+                >
+                  <X className="w-4 h-4 group-hover:text-white" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{t("window.close")}</TooltipContent>
             </Tooltip>
           </div>
         )}

@@ -18,12 +18,14 @@ import type {
 } from "../../../shared/voice-mode";
 import { SettingsRow, SettingsSelect, SettingsStatusBadge } from "./shared";
 import { useTtsPreview } from "../../hooks/useTtsPreview";
+import { Input } from "../ui/input";
 
 import {
   CURATED_VOICES_FOR_UI,
   PRESETS_FOR_UI,
   PROVIDER_IDS_FOR_UI,
 } from "./cloud-voice-catalog";
+import { Button } from "../app-button";
 
 export { PRESETS_FOR_UI, PROVIDER_IDS_FOR_UI };
 
@@ -174,7 +176,7 @@ export function CloudVoiceSettings({
           title={t(`${KEY}.cloud.baseUrl`)}
           testId="cloud-baseurl"
           control={
-            <input
+            <Input
               data-testid="cloud-baseurl-input"
               className={FIELD_CLASS}
               value={cloud.baseUrl ?? ""}
@@ -190,7 +192,7 @@ export function CloudVoiceSettings({
         description={t(`${KEY}.${provider.hintKey}`)}
         testId="cloud-credential"
         control={
-          <input
+          <Input
             data-testid="cloud-credential-input"
             type="password"
             className={FIELD_CLASS}
@@ -226,7 +228,7 @@ export function CloudVoiceSettings({
               onChange={(id) => patch({ voiceId: id })}
             />
           ) : (
-            <input
+            <Input
               data-testid="cloud-voice-input"
               className={FIELD_CLASS}
               value={cloud.voiceId ?? ""}
@@ -252,7 +254,7 @@ export function CloudVoiceSettings({
         testId="cloud-preview"
         control={
           <div className="flex flex-col items-start gap-1">
-            <button
+            <Button variant="ghost"
               type="button"
               data-testid="cloud-preview-button"
               className="w-20 rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover disabled:opacity-50"
@@ -266,7 +268,7 @@ export function CloudVoiceSettings({
                 : preview.state === "busy"
                   ? t(`${KEY}.tonePreviewBusy`)
                   : t(`${KEY}.tonePreviewStop`)}
-            </button>
+            </Button>
             {previewError && (
               <div className="flex flex-col gap-0.5">
                 {/* 四类错误码在这里落成文案（设计 §6「UI 文案与它一一对应」） */}
@@ -295,7 +297,7 @@ export function CloudVoiceSettings({
         title={t(`${KEY}.cloud.advanced`)}
         testId="cloud-advanced"
         control={
-          <button
+          <Button variant="ghost"
             type="button"
             data-testid="cloud-advanced-toggle"
             className="rounded-control border border-border px-2.5 py-1 text-xs text-text-secondary hover:bg-surface-hover"
@@ -304,7 +306,7 @@ export function CloudVoiceSettings({
             {advancedOpen
               ? t(`${KEY}.cloud.advancedHide`)
               : t(`${KEY}.cloud.advancedShow`)}
-          </button>
+          </Button>
         }
       />
       {advancedOpen && provider.declaredTiers && (
@@ -335,7 +337,7 @@ export function CloudVoiceSettings({
           testId="cloud-model"
           control={
             <div className="flex flex-col gap-2">
-              <input
+              <Input
                 data-testid="cloud-model-input"
                 className={FIELD_CLASS}
                 value={cloud.models?.balanced ?? ""}
@@ -359,7 +361,7 @@ export function CloudVoiceSettings({
               </label>
               {splitTiers &&
                 TIERS.map((tone) => (
-                  <input
+                  <Input
                     key={tone}
                     data-testid={`cloud-model-${tone}`}
                     className={FIELD_CLASS}

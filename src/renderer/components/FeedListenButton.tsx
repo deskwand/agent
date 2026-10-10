@@ -23,6 +23,7 @@ import {
   useFeedListenInterrupts,
 } from "../hooks/useFeedListen";
 import { TitlebarButton } from "./TitlebarButton";
+import { Button } from "./app-button";
 
 const CONTROL_CLASS =
   "flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary disabled:opacity-40";
@@ -115,7 +116,7 @@ export function FeedListenButton(): JSX.Element | null {
               <div className="mt-0.5 text-xs text-text-muted">
                 <span className="truncate">{item.sourceHost}</span>
                 <span className="px-1 opacity-45">·</span>
-                <span className="text-accent">
+                <span className="text-primary">
                   {t("feed.listenPosition", {
                     index: session.index + 1,
                     total,
@@ -139,7 +140,7 @@ export function FeedListenButton(): JSX.Element | null {
             <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-surface-active">
               <div
                 data-testid="feed-listen-progress"
-                className="h-full bg-accent transition-[width] duration-200"
+                className="h-full bg-primary transition-[width] duration-200"
                 style={{ width: `${percent}%` }}
               />
             </div>
@@ -153,7 +154,7 @@ export function FeedListenButton(): JSX.Element | null {
             </div>
           ) : null}
           <div className="mt-1.5 flex items-center justify-center gap-1 border-t border-border-subtle pt-1.5">
-            <button
+            <Button variant="ghost"
               type="button"
               data-testid="feed-listen-prev"
               aria-label={t("feed.listenPrev")}
@@ -161,9 +162,9 @@ export function FeedListenButton(): JSX.Element | null {
               onClick={() => feedListenController().prev()}
               className={CONTROL_CLASS}
             >
-              <SkipBack className="h-4 w-4" />
-            </button>
-            <button
+              <SkipBack className="h-4 w-4 hover:bg-transparent hover:text-current" />
+            </Button>
+            <Button variant="ghost"
               type="button"
               data-testid="feed-listen-toggle"
               aria-label={
@@ -177,8 +178,8 @@ export function FeedListenButton(): JSX.Element | null {
               ) : (
                 <Play className="h-4 w-4" />
               )}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               data-testid="feed-listen-next"
               aria-label={t("feed.listenNext")}
@@ -186,9 +187,9 @@ export function FeedListenButton(): JSX.Element | null {
               onClick={() => feedListenController().next()}
               className={CONTROL_CLASS}
             >
-              <SkipForward className="h-4 w-4" />
-            </button>
-            <button
+              <SkipForward className="h-4 w-4 hover:bg-transparent hover:text-current" />
+            </Button>
+            <Button variant="ghost"
               type="button"
               data-testid="feed-listen-close"
               aria-label={t("feed.listenClose")}
@@ -196,7 +197,7 @@ export function FeedListenButton(): JSX.Element | null {
               className={`${CONTROL_CLASS} hover:text-error`}
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>

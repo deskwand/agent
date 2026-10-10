@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import type { GlobalNotice, GlobalNoticeAction } from "../store";
+import { Button } from "./app-button";
 
 interface Props {
   notice: GlobalNotice | null;
@@ -57,24 +58,24 @@ export function GlobalNoticeToast({ notice, onDismiss, onAction }: Props) {
           <div className={`flex-1 text-sm leading-relaxed ${tone.text}`}>
             {message}
           </div>
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={onDismiss}
-            className="text-text-muted hover:text-text-primary transition-colors"
+            className="text-text-muted hover:text-text-primary transition-colors h-auto"
             aria-label={t("common.close")}
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
         {noticeAction && actionLabel && (
           <div className="px-4 pb-3">
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => onAction(noticeAction)}
-              className="w-full rounded-xl border border-accent/40 bg-accent/10 px-3 py-2.5 text-sm font-medium text-accent hover:bg-accent/20 transition-[transform,background-color,color] active:scale-[0.97]"
+              className="w-full rounded-xl border border-primary/40 bg-primary/10 px-3 py-2.5 text-sm font-medium text-primary hover:bg-primary/20 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
             >
               {actionLabel}
-            </button>
+            </Button>
           </div>
         )}
       </div>

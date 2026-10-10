@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { CalendarView } from "./ScheduleCalendar";
 import { WEEKDAY_LONG_KEYS } from "../../shared/schedule/weekday-keys";
+import { Button } from "./app-button";
 
 export interface ScheduleToolbarProps {
   view: CalendarView;
@@ -50,29 +51,29 @@ export function ScheduleToolbar({
     <div className="flex items-center justify-between px-3 py-2 border-b border-border-muted bg-surface">
       {/* Left: nav */}
       <div className="flex items-center gap-1">
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={onToday}
-          className="px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-surface-hover text-text-secondary transition-colors"
+          className="px-3 py-1 text-xs font-medium rounded-md border border-border hover:bg-surface-hover text-text-secondary transition-colors h-auto"
         >
           {t("schedule.today")}
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           onClick={onNavigatePrev}
-          className="p-1 rounded-md hover:bg-surface-hover text-text-muted transition-colors"
+          className="p-1 rounded-md hover:bg-surface-hover text-text-muted transition-colors h-auto"
           aria-label={t("schedule.toolbarPrev")}
         >
           <ChevronLeft size={16} />
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           onClick={onNavigateNext}
-          className="p-1 rounded-md hover:bg-surface-hover text-text-muted transition-colors"
+          className="p-1 rounded-md hover:bg-surface-hover text-text-muted transition-colors h-auto"
           aria-label={t("schedule.toolbarNext")}
         >
           <ChevronRight size={16} />
-        </button>
+        </Button>
         <span className="ml-2 text-sm font-medium text-text-primary">
           {dateHeader}
         </span>
@@ -82,7 +83,7 @@ export function ScheduleToolbar({
       <div className="flex items-center gap-2">
         <div className="flex items-center bg-surface-muted rounded-lg p-0.5 border border-border">
           {VIEW_OPTIONS.map((opt) => (
-            <button
+            <Button variant="ghost"
               key={opt.value}
               type="button"
               onClick={() => onViewChange(opt.value)}
@@ -93,17 +94,17 @@ export function ScheduleToolbar({
               }`}
             >
               {t(opt.i18nKey)}
-            </button>
+            </Button>
           ))}
         </div>
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={onCreateClick}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg bg-accent text-accent-foreground hover:bg-accent/90 transition-colors"
+          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors h-auto"
         >
           <Plus size={14} />
           {t("schedule.create")}
-        </button>
+        </Button>
       </div>
     </div>
   );

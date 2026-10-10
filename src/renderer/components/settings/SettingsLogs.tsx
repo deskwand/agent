@@ -12,7 +12,8 @@ import {
 import { formatAppDateTime } from "../../utils/i18n-format";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { SettingsContentSection } from "./shared";
-import { Tooltip } from "../Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../app-tooltip";
+import { Button } from "../app-button";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -183,11 +184,11 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               {t("logs.enableDevLogsDesc")}
             </p>
           </div>
-          <button
+          <Button variant="ghost"
             onClick={handleToggleDevLogs}
             disabled={isLoading}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 disabled:opacity-50 flex-shrink-0 ${
-              devLogsEnabled ? "bg-accent" : "bg-surface-muted"
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 flex-shrink-0 ${
+              devLogsEnabled ? "bg-primary" : "bg-surface-muted"
             }`}
           >
             <span
@@ -195,7 +196,7 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
                 devLogsEnabled ? "translate-x-6" : "translate-x-1"
               }`}
             />
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -264,21 +265,28 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               {t("logs.logsDirectory")}
             </div>
             <div className="flex items-start gap-2">
-              <button
-                className="font-mono text-xs text-text-secondary break-all text-left hover:text-accent hover:underline cursor-pointer bg-transparent border-none p-0"
+              <Button variant="ghost"
+                className="font-mono text-xs text-text-secondary break-all text-left hover:text-primary hover:underline cursor-pointer bg-transparent border-none p-0 h-auto"
                 onClick={() => window.electronAPI.logs.open()}
                 title={t("logs.openFolder")}
               >
                 {logsDirectory}
-              </button>
-              <Tooltip label={t("common.copy")}>
-                <button
-                  className="shrink-0 p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors"
-                  onClick={() => navigator.clipboard.writeText(logsDirectory)}
-                  aria-label={t("common.copy")}
-                >
-                  <Copy className="w-3 h-3" />
-                </button>
+              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost"
+                    className="shrink-0 p-1 rounded hover:bg-surface-hover text-text-muted hover:text-text-primary transition-colors h-auto"
+                    onClick={() => navigator.clipboard.writeText(logsDirectory)}
+                    aria-label={t("common.copy")}
+                  >
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                </TooltipTrigger>
+                {/* side 必须显式给 bottom：vendored TooltipContent 的 Radix 默认是 top，
+                    而老 Tooltip 的 placement 默认是下方 —— 不写会把气泡挪到按钮上方。 */}
+                <TooltipContent side="bottom">
+                  {t("common.copy")}
+                </TooltipContent>
               </Tooltip>
             </div>
           </div>
@@ -291,10 +299,10 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
         description={t("logs.actionsDescription")}
       >
         <div className="grid grid-cols-3 gap-2">
-          <button
+          <Button variant="ghost"
             onClick={handleExport}
             disabled={isLoading}
-            className="py-3 px-4 rounded-lg bg-accent text-accent-foreground font-medium hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+            className="py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
           >
             {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -302,23 +310,23 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               <Save className="w-4 h-4" />
             )}
             <span className="text-sm">{t("logs.exportZip")}</span>
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             onClick={handleOpen}
             disabled={isLoading}
-            className="py-3 px-4 rounded-lg bg-background border border-border-subtle text-text-primary font-medium hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+            className="py-3 px-4 rounded-lg bg-background border border-border-subtle text-text-primary font-medium hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
           >
             <Globe className="w-4 h-4" />
             <span className="text-sm">{t("logs.openFolder")}</span>
-          </button>
-          <button
+          </Button>
+          <Button variant="ghost"
             onClick={handleClear}
             disabled={isLoading || logFiles.length === 0}
-            className="py-3 px-4 rounded-lg bg-error/10 text-error font-medium hover:bg-error/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2"
+            className="py-3 px-4 rounded-lg bg-error/10 text-error font-medium hover:bg-error/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
           >
             <Trash2 className="w-4 h-4" />
             <span className="text-sm">{t("logs.clearAll")}</span>
-          </button>
+          </Button>
         </div>
       </SettingsContentSection>
 

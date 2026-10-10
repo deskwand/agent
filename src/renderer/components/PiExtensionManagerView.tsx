@@ -4,6 +4,8 @@ import type { PiExtensionManagerState } from "../../shared/ipc-types";
 import type { ServerEvent } from "../types";
 import { PiMarketDetail } from "./PiMarketDetail";
 import { PiMarketList } from "./PiMarketList";
+import { Input } from "./ui/input";
+import { Button } from "./app-button";
 
 /**
  * Pi 扩展管理视图：展示兼容 SDK 版本、已安装包与已加载扩展，
@@ -90,7 +92,7 @@ export function PiExtensionManagerView() {
       </div>
 
       <div className="mb-4 inline-flex rounded-lg border border-border bg-muted/50 p-0.5">
-        <button
+        <Button variant="ghost"
           type="button"
           className={
             view === "market"
@@ -100,8 +102,8 @@ export function PiExtensionManagerView() {
           onClick={() => setView("market")}
         >
           {t("piExtensions.viewMarket")}
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           className={
             view === "installed"
@@ -111,7 +113,7 @@ export function PiExtensionManagerView() {
           onClick={() => setView("installed")}
         >
           {t("piExtensions.viewInstalled")}
-        </button>
+        </Button>
       </div>
 
       {view === "market" ? (
@@ -144,8 +146,8 @@ export function PiExtensionManagerView() {
           )}
 
       <div className="mb-6 flex gap-2">
-        <input
-          className="flex-1 rounded-lg border border-border bg-background px-3 py-2"
+        <Input
+          className="h-auto flex-1 rounded-lg border border-border bg-background px-3 py-2 shadow-none"
           placeholder={t("piExtensions.installPlaceholder")}
           value={sourceInput}
           onChange={(e) => setSourceInput(e.target.value)}
@@ -153,13 +155,13 @@ export function PiExtensionManagerView() {
             if (e.key === "Enter") install();
           }}
         />
-        <button
-          className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
+        <Button variant="ghost"
+          className="rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50 h-auto hover:bg-transparent hover:text-current"
           disabled={busy || !sourceInput.trim()}
           onClick={install}
         >
           {t("piExtensions.install")}
-        </button>
+        </Button>
       </div>
       <p className="mb-6 text-xs text-muted-foreground">
         {t("piExtensions.installWarning")}
@@ -183,8 +185,8 @@ export function PiExtensionManagerView() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    className="rounded-md border border-border px-2 py-1 text-xs"
+                  <Button variant="ghost"
+                    className="rounded-md border border-border px-2 py-1 text-xs h-auto hover:bg-transparent hover:text-current"
                     disabled={busy}
                     onClick={() =>
                       run(() =>
@@ -193,9 +195,9 @@ export function PiExtensionManagerView() {
                     }
                   >
                     {t("piExtensions.update")}
-                  </button>
-                  <button
-                    className="rounded-md border border-danger/40 px-2 py-1 text-xs text-danger"
+                  </Button>
+                  <Button variant="ghost"
+                    className="rounded-md border border-danger/40 px-2 py-1 text-xs text-danger h-auto hover:bg-transparent hover:text-current"
                     disabled={busy}
                     onClick={() =>
                       run(() =>
@@ -207,7 +209,7 @@ export function PiExtensionManagerView() {
                     }
                   >
                     {t("piExtensions.remove")}
-                  </button>
+                  </Button>
                 </div>
               </li>
             ))}

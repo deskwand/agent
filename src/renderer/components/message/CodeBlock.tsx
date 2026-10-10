@@ -2,6 +2,7 @@
 import { useState, useMemo, memo } from "react";
 import { Copy, Check } from "lucide-react";
 import hljs from "highlight.js";
+import { Button } from "../app-button";
 
 // Sanitize highlight.js output - only allow highlight span tags
 const sanitizeHighlight = (html: string): string =>
@@ -52,7 +53,7 @@ export const CodeBlock = memo(function CodeBlock({
         <span className="text-xs text-text-muted px-2 py-1 rounded bg-surface">
           {language}
         </span>
-        <button
+        <Button variant="ghost"
           onClick={handleCopy}
           className="w-7 h-7 flex items-center justify-center rounded bg-surface hover:bg-surface-hover transition-colors"
         >
@@ -61,7 +62,7 @@ export const CodeBlock = memo(function CodeBlock({
           ) : (
             <Copy className="w-3.5 h-3.5 text-text-muted" />
           )}
-        </button>
+        </Button>
       </div>
       <pre className="code-block">
         {highlightedHtml ? (

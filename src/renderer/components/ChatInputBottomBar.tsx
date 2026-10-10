@@ -2,11 +2,12 @@ import { useTranslation } from "react-i18next";
 import type { ThinkingLevel, ProviderProfileKey } from "../types";
 import { ArrowUp, Square, Maximize2, Minimize2 } from "lucide-react";
 import { MergedInputChip } from "./MergedInputChip";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { AttachMenu } from "./attach/AttachMenu";
 import { StatusPopover } from "./StatusPopover";
 import { VoiceMicButton, type VoiceMicButtonProps } from "./VoiceMicButton";
 import type { ChatInputAttachedFile } from "./ChatInput";
+import { Button } from "./app-button";
 
 export interface ModelOptionGroup {
   profileKey: ProviderProfileKey;
@@ -122,19 +123,22 @@ export function ChatInputBottomBar({
         />
 
         {onToggleExpand && showExpandButton && (
-          <Tooltip label={expandLabel}>
-            <button
-              type="button"
-              onClick={onToggleExpand}
-              aria-label={expandLabel}
-              className="w-9 h-9 rounded-2xl flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
-            >
-              {isExpanded ? (
-                <Minimize2 className="w-4 h-4" />
-              ) : (
-                <Maximize2 className="w-4 h-4" />
-              )}
-            </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost"
+                type="button"
+                onClick={onToggleExpand}
+                aria-label={expandLabel}
+                className="w-9 h-9 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors"
+              >
+                {isExpanded ? (
+                  <Minimize2 className="w-4 h-4" />
+                ) : (
+                  <Maximize2 className="w-4 h-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{expandLabel}</TooltipContent>
           </Tooltip>
         )}
 
@@ -160,24 +164,30 @@ export function ChatInputBottomBar({
           contextStatusDetails={contextStatusDetails}
         />
 
-        <Tooltip label={submitLabel}>
-          <button
-            type={canStop ? "button" : "submit"}
-            onClick={canStop ? onStop : undefined}
-            disabled={!canStop && (isSubmitting || submitDisabled)}
-            aria-label={submitLabel}
-            className={`w-9 h-9 shrink-0 rounded-2xl flex items-center justify-center transition-all duration-150 ${
-              canStop
-                ? "bg-accent text-background hover:bg-accent-hover animate-pulse"
-                : "bg-accent text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-accent-hover active:scale-95 active:translate-y-px"
-            }`}
-          >
-            {canStop ? (
-              <Square className="w-4 h-4" />
-            ) : (
-              <ArrowUp className="w-4 h-4" />
-            )}
-          </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost"
+              type={canStop ? "button" : "submit"}
+              onClick={canStop ? onStop : undefined}
+              disabled={!canStop && (isSubmitting || submitDisabled)}
+              aria-label={submitLabel}
+              className={`w-9 h-9 shrink-0 rounded-full flex items-center justify-center transition-all duration-150 ${
+                canStop
+                  ? "bg-primary text-background hover:bg-primary-hover"
+                  : "bg-primary text-background disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-hover active:scale-95 active:translate-y-px"
+              }`}
+            >
+              {canStop ? (
+                <Square className="w-4 h-4" />
+              ) : (
+                <ArrowUp className="w-4 h-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          {/* asChild 下 child 的 type="submit" 胜出（Slot 的 child props 覆盖默认的
+              type="button"），且 Trigger 的 onClick 只做 onClose、不 preventDefault —— 
+              回车提交表单的路径不受影响。 */}
+          <TooltipContent side="bottom">{submitLabel}</TooltipContent>
         </Tooltip>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { RefreshCw, AlertCircle, CheckCircle2, Download } from "lucide-react";
 import type { ServerEvent } from "../../types";
 import { SettingsCard, SettingsRow, SettingsSection } from "./shared";
 import appIconUrl from "../../../../resources/icon.png";
+import { Button } from "../app-button";
 
 interface SettingsAboutProps {
   appVersion: string;
@@ -85,14 +86,14 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
         );
       case "available":
         return (
-          <span className="inline-flex items-center gap-1 text-xs text-accent">
+          <span className="inline-flex items-center gap-1 text-xs text-primary">
             <Download className="w-3 h-3" />
             {t("about.newVersionAvailable", { version: updateVersion })}
           </span>
         );
       case "downloading":
         return (
-          <span className="inline-flex items-center gap-1 text-xs text-accent">
+          <span className="inline-flex items-center gap-1 text-xs text-primary">
             <Download className="w-3 h-3 animate-pulse" />
             {t("about.downloading", { percent: updateProgress })}
           </span>
@@ -141,40 +142,40 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
 
           <div className="flex flex-none items-center gap-2">
             {updateStatus === "idle" && (
-              <button
+              <Button variant="ghost"
                 onClick={handleCheckUpdate}
                 className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-lg
                   bg-surface text-text-secondary hover:bg-surface-hover
                   ring-1 ring-border-subtle hover:ring-border-muted
-                  transition-all duration-150"
+                  transition-all duration-150 h-auto"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 {t("about.checkUpdate")}
-              </button>
+              </Button>
             )}
 
             {(updateStatus === "up-to-date" || updateStatus === "error") && (
-              <button
+              <Button variant="ghost"
                 onClick={handleCheckUpdate}
                 className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-lg
                   bg-surface text-text-secondary hover:bg-surface-hover
                   ring-1 ring-border-subtle hover:ring-border-muted
-                  transition-all duration-150"
+                  transition-all duration-150 h-auto"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 {t("about.checkAgain")}
-              </button>
+              </Button>
             )}
 
             {updateStatus === "downloaded" && (
-              <button
+              <Button variant="ghost"
                 onClick={handleRestart}
                 className="inline-flex items-center gap-2 text-xs px-5 py-2 rounded-lg
-                  bg-accent text-accent-foreground hover:bg-accent-hover
-                  shadow-sm transition-all duration-150"
+                  bg-primary text-primary-foreground hover:bg-primary-hover
+                  shadow-sm transition-all duration-150 h-auto"
               >
                 {t("about.restartNow")}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -189,7 +190,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
             className="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface-muted"
           >
             <div
-              className="h-full bg-accent rounded-full transition-all duration-300"
+              className="h-full bg-primary rounded-full transition-all duration-300"
               style={{ width: `${updateProgress}%` }}
             />
           </div>
@@ -222,14 +223,14 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
           不插分隔符 —— 4 个装饰字符不值一个 Fragment 导入 + index 条件。 */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {ABOUT_LINKS.map((link) => (
-          <button
+          <Button variant="ghost"
             key={link.labelKey}
             type="button"
             onClick={() => void window.electronAPI?.openExternal(link.url)}
-            className="border-b border-border-muted pb-px text-xs text-text-secondary transition-colors hover:text-text-primary"
+            className="border-b border-border-muted pb-px text-xs text-text-secondary transition-colors hover:text-text-primary h-auto"
           >
             {t(link.labelKey)}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

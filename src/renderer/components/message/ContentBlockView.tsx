@@ -44,6 +44,7 @@ import {
 } from "../../utils/open-file-by-ext";
 import { openOfficePreview } from "../../utils/office-preview-runner";
 import type { ContentBlockViewProps } from "./types";
+import { Button } from "../app-button";
 
 const MessageMarkdown = lazy(() =>
   import("../MessageMarkdown").then((module) => ({
@@ -168,7 +169,7 @@ export const ContentBlockView = memo(function ContentBlockView({
   );
 
   const renderFileButton = (value: string, key?: string) => (
-    <button
+    <Button variant="ghost"
       key={key}
       type="button"
       onClick={() => handleFilePathClick(value)}
@@ -176,7 +177,7 @@ export const ContentBlockView = memo(function ContentBlockView({
       title={resolveFilePath(value)}
     >
       {value}
-    </button>
+    </Button>
   );
 
   const renderFileMentionParts = (
@@ -252,17 +253,17 @@ export const ContentBlockView = memo(function ContentBlockView({
             }
             void revealInFolder(target);
           };
-          // 四种分流共用同一个按钮外壳：原先四个几乎相同的 <button> 只差 onClick，
+          // 四种分流共用同一个按钮外壳：原先四个几乎相同的 <Button variant="ghost"> 只差 onClick，
           // 合并后少掉 ~40 行重复，也让分流集中在一处。
           return (
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => void openLocalFile()}
               className={getFileLinkButtonClassName()}
               title={localFilePath}
             >
               {children}
-            </button>
+            </Button>
           );
         }
 
@@ -293,7 +294,7 @@ export const ContentBlockView = memo(function ContentBlockView({
                 }
               }
             }}
-            className="text-accent hover:text-accent-hover"
+            className="text-primary hover:text-primary-hover"
           >
             {children}
           </a>
@@ -301,7 +302,7 @@ export const ContentBlockView = memo(function ContentBlockView({
       },
       blockquote({ children }: { children?: React.ReactNode }) {
         return (
-          <blockquote className="border-l-2 border-accent/40 pl-4 text-text-muted">
+          <blockquote className="border-l-2 border-primary/40 pl-4 text-text-muted">
             {children}
           </blockquote>
         );
@@ -326,7 +327,7 @@ export const ContentBlockView = memo(function ContentBlockView({
           }
           return (
             <code
-              className="px-1.5 py-0.5 rounded bg-surface-muted text-accent font-mono text-xs"
+              className="px-1.5 py-0.5 rounded bg-surface-muted text-primary font-mono text-xs"
               {...props}
             >
               {codeContent}
@@ -590,7 +591,7 @@ export const ContentBlockView = memo(function ContentBlockView({
               })();
             }}
           >
-            <FileText className="w-4 h-4 text-accent flex-shrink-0" />
+            <FileText className="w-4 h-4 text-primary flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-xs text-text-primary truncate">
                 {fileBlock.filename}

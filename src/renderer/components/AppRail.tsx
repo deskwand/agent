@@ -16,6 +16,7 @@ import { Tooltip } from "./Tooltip";
 import { HelpMenu } from "./HelpMenu";
 import { RAIL_BUTTON_CLASS } from "./rail-styles";
 import { AccountCluster } from "./AccountCluster";
+import { Button } from "./ui/button";
 
 /** 图标只在这里映射：nav-rail.ts 保持纯数据，不引入 React。 */
 const RAIL_ICONS: Record<string, ComponentType<{ className?: string }>> = {
@@ -65,14 +66,14 @@ export function AppRail({
         return (
           <Fragment key={item.key}>
             <Tooltip label={t(item.labelKey)} placement="right">
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={() => handleItemClick(item.view)}
                 aria-label={label}
                 aria-current={isActive ? "page" : undefined}
                 className={`${RAIL_BUTTON_CLASS} relative ${
                   isActive
-                    ? "bg-overlay-on text-accent"
+                    ? "bg-overlay-on text-primary"
                     : "text-text-muted hover:bg-overlay-hover hover:text-text-primary"
                 }`}
               >
@@ -81,7 +82,7 @@ export function AppRail({
                   <span
                     data-testid="feed-badge"
                     aria-hidden
-                    className="absolute -right-0.5 -top-0.5 min-w-[15px] rounded-full bg-accent px-1 text-center text-[9px] font-bold leading-[15px] text-accent-foreground"
+                    className="absolute -right-0.5 -top-0.5 min-w-[15px] rounded-full bg-primary px-1 text-center text-[9px] font-bold leading-[15px] text-primary-foreground"
                     style={{
                       boxShadow: "0 0 0 2px var(--color-background-chrome)",
                     }}
@@ -89,13 +90,13 @@ export function AppRail({
                     {unread > 99 ? "99+" : unread}
                   </span>
                 ) : null}
-              </button>
+              </Button>
             </Tooltip>
             {item.key === "chat" ? (
               <Tooltip label={t("navRail.newVoiceSession")} placement="right">
                 {/* 刻意不用麦克风：输入框那个 Mic 是听写，两个语音类按钮
                     必须一眼分得开。声波条在栏内的线性图标里也不突兀。 */}
-                <button
+                <Button variant="ghost"
                   type="button"
                   aria-label={t("navRail.newVoiceSession")}
                   disabled={voiceCreating || !onCreateVoiceSession}
@@ -103,7 +104,7 @@ export function AppRail({
                   className={`${RAIL_BUTTON_CLASS} text-text-muted hover:bg-overlay-hover hover:text-text-primary disabled:opacity-50`}
                 >
                   <AudioLines className="w-4 h-4" />
-                </button>
+                </Button>
               </Tooltip>
             ) : null}
           </Fragment>

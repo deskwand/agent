@@ -14,6 +14,7 @@ import {
 import { normalizePlanDone, rejectTodoList } from "../../../shared/todos";
 import type { ToolUseContent } from "../../types";
 import type { TodoItem } from "./types";
+import { Button } from "../app-button";
 
 interface TodoWriteBlockProps {
   block: ToolUseContent;
@@ -48,7 +49,7 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
       case "completed":
         return <CheckSquare className="w-4 h-4 text-success" />;
       case "in_progress":
-        return <Loader2 className="w-4 h-4 text-accent animate-spin" />;
+        return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
       case "cancelled":
         return <XCircle className="w-4 h-4 text-text-muted" />;
       default: // pending
@@ -61,7 +62,7 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
       case "completed":
         return "text-text-muted line-through";
       case "in_progress":
-        return "text-accent font-medium";
+        return "text-primary font-medium";
       case "cancelled":
         return "text-text-muted line-through opacity-60";
       default:
@@ -93,12 +94,12 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
   return (
     <div className="rounded-xl border border-border overflow-hidden bg-surface">
       {/* Header */}
-      <button
+      <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-3 flex items-center gap-3 bg-surface-muted hover:bg-surface-active transition-colors"
+        className="w-full px-4 py-3 flex items-center gap-3 bg-surface-muted hover:bg-surface-active transition-colors h-auto"
       >
-        <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center">
-          <ListTodo className="w-3.5 h-3.5 text-accent" />
+        <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+          <ListTodo className="w-3.5 h-3.5 text-primary" />
         </div>
         <div className="flex-1 text-left">
           <span className="font-medium text-sm text-text-primary">
@@ -118,12 +119,12 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
         ) : (
           <ChevronRight className="w-4 h-4 text-text-muted" />
         )}
-      </button>
+      </Button>
 
       {/* Progress bar */}
       <div className="h-0.5 bg-surface-muted">
         <div
-          className="h-full bg-gradient-to-r from-accent to-accent-hover transition-all duration-500"
+          className="h-full bg-gradient-to-r from-primary to-primary-hover transition-all duration-500"
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -135,7 +136,7 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
             <div
               key={todo.id || index}
               className={`flex items-start gap-2.5 px-2 py-1.5 rounded-lg transition-colors ${
-                todo.status === "in_progress" ? "bg-accent/5" : ""
+                todo.status === "in_progress" ? "bg-primary/5" : ""
               }`}
             >
               <div className="mt-0.5 flex-shrink-0">

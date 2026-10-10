@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
+import { Button } from "./app-button";
 
 export interface ImageSource {
   src: string;
@@ -449,30 +450,30 @@ export function ImageLightbox({
           {!isSingle && !loading && (
             <>
               {currentIndex > 0 && (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     goPrev();
                   }}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors h-auto"
                   aria-label={t("imageLightbox.prev")}
                 >
                   <ChevronLeft className="w-6 h-6" />
-                </button>
+                </Button>
               )}
               {currentIndex < images.length - 1 && (
-                <button
+                <Button variant="ghost"
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     goNext();
                   }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/40 hover:bg-black/60 dark:bg-black/50 dark:hover:bg-black/70 text-white transition-colors h-auto"
                   aria-label={t("imageLightbox.next")}
                 >
                   <ChevronRight className="w-6 h-6" />
-                </button>
+                </Button>
               )}
             </>
           )}
@@ -535,7 +536,7 @@ export function ImageLightbox({
                 <span className="shrink-0 w-px h-4 bg-white/20 mx-0.5" />
               )}
             {canActOnImage && (
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={handleCopy}
                 className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
@@ -547,10 +548,10 @@ export function ImageLightbox({
                   <Copy className="w-4 h-4" />
                 )}
                 <span>{t("imageLightbox.copy")}</span>
-              </button>
+              </Button>
             )}
             {canActOnImage && hasFilePath && (
-              <button
+              <Button variant="ghost"
                 type="button"
                 onClick={handleOpenExternal}
                 className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
@@ -558,16 +559,16 @@ export function ImageLightbox({
               >
                 <ExternalLink className="w-4 h-4" />
                 <span>{t("imageLightbox.openExternal")}</span>
-              </button>
+              </Button>
             )}
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={onClose}
               className="shrink-0 flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors"
               aria-label={t("imageLightbox.close")}
             >
               <X className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
         </div>
       </DialogContent>

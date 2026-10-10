@@ -4,6 +4,7 @@ import type { QuotaSnapshot } from "../../shared/quota";
 import type { ContextStatusDetails } from "./ChatInputBottomBar";
 import { formatResetTime } from "../utils/i18n-format";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Button } from "./app-button";
 
 export interface StatusPopoverProps {
   contextUsagePercentage: number;
@@ -66,7 +67,7 @@ export function StatusPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <span className="relative inline-flex items-center justify-center">
         <PopoverTrigger asChild>
-          <button
+          <Button variant="ghost"
             type="button"
             // onClick / aria-haspopup / aria-expanded 三样都由 Radix 的 Trigger 管 ——
             // 手写会和它打架（两边各切一次 = 等于不切换）
@@ -103,7 +104,7 @@ export function StatusPopover({
                 strokeDasharray={`${(contextUsagePercentage / 100) * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
               />
             </svg>
-          </button>
+          </Button>
         </PopoverTrigger>
       </span>
 
@@ -111,7 +112,7 @@ export function StatusPopover({
         side="top"
         align="end"
         // ⚠️ 这一行是**实测证伪后加上的**，不是投机：先不写它跑那条焦点用例，
-        // 结果红了（`expected <div data-side="top"> … to be <button>`）——
+        // 结果红了（`expected <div data-side="top"> … to be <Button variant="ghost">`）——
         // 即 Radix 的 PopoverContent 打开时确实会把焦点移进内容。
         // 原实现的焦点一直留在环形按钮上（面板只读、没有可聚焦元素），
         // 所以必须阻止，否则键盘用户点开一次就丢了按钮位置。
@@ -128,7 +129,7 @@ export function StatusPopover({
           </span>
           <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-surface-hover">
             <span
-              className="absolute inset-y-0 left-0 rounded-sm bg-accent"
+              className="absolute inset-y-0 left-0 rounded-sm bg-primary"
               style={{ width: `${contextUsagePercentage}%` }}
             />
           </span>
@@ -165,7 +166,7 @@ export function StatusPopover({
                       </span>
                       <span className="relative h-2 flex-1 overflow-hidden rounded-sm bg-surface-hover">
                         <span
-                          className="absolute inset-y-0 left-0 rounded-sm bg-accent"
+                          className="absolute inset-y-0 left-0 rounded-sm bg-primary"
                           style={{ width: `${window.usedPercent}%` }}
                         />
                       </span>

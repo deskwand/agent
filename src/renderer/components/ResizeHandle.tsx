@@ -92,7 +92,7 @@ export function ResizeHandle({
       {/* Visual indicator on hover/drag */}
       <div
         className={`absolute inset-y-0 left-0 w-px transition-colors ${
-          isDragging ? "bg-accent" : "bg-transparent group-hover:bg-accent/30"
+          isDragging ? "bg-primary" : "bg-transparent group-hover:bg-primary/30"
         }`}
       />
     </div>

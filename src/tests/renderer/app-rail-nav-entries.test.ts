@@ -38,7 +38,7 @@ describe("AppRail", () => {
   it("marks the active item and exposes an accessible name", () => {
     expect(rail).toContain('aria-label={t("navRail.label")}');
     expect(rail).toContain("aria-current");
-    expect(rail).toContain("bg-overlay-on text-accent");
+    expect(rail).toContain("bg-overlay-on text-primary");
   });
 
   it("只切视图，不碰侧栏", () => {

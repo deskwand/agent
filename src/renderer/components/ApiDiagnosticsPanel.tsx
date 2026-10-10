@@ -18,6 +18,7 @@ import type {
   DiagnosticStepName,
   DiagnosticStepStatus,
 } from "../types";
+import { Button } from "./app-button";
 
 interface ApiDiagnosticsPanelProps {
   result: DiagnosticResult | null;
@@ -59,7 +60,7 @@ function StatusBadge({ status }: { status: DiagnosticStepStatus }) {
     case "skip":
       return <MinusCircle className={`${base} text-text-muted`} />;
     case "running":
-      return <Loader2 className={`${base} text-accent animate-spin`} />;
+      return <Loader2 className={`${base} text-primary animate-spin`} />;
     case "pending":
     default:
       return <Circle className={`${base} text-text-muted opacity-40`} />;
@@ -92,10 +93,10 @@ function statusColors(status: DiagnosticStepStatus) {
       };
     case "running":
       return {
-        border: "border-accent/60",
-        bg: "bg-accent/10",
-        text: "text-accent",
-        iconText: "text-accent",
+        border: "border-primary/60",
+        bg: "bg-primary/10",
+        text: "text-primary",
+        iconText: "text-primary",
       };
     case "pending":
     default:
@@ -131,7 +132,7 @@ function Connector({
   } else if (leftStatus === "ok") {
     lineClass += "bg-success/40";
   } else if (leftStatus === "running") {
-    lineClass += "bg-accent/30";
+    lineClass += "bg-primary/30";
   } else {
     lineClass += "bg-border";
   }
@@ -240,14 +241,14 @@ export default function ApiDiagnosticsPanel({
     <div className="space-y-3">
       {showActions && (
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button variant="ghost"
             type="button"
             onClick={() => onRunDiagnostics()}
             disabled={disabled || isRunning}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl
-            bg-accent text-accent-foreground text-sm font-medium
-            hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed
-            transition-colors"
+            bg-primary text-primary-foreground text-sm font-medium
+            hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed
+            transition-colors h-auto"
           >
             {isRunning ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -257,20 +258,20 @@ export default function ApiDiagnosticsPanel({
             {onRunDeepDiagnostics
               ? t("api.diagnostic.runQuickDiagnostics", "Quick Diagnose")
               : t("api.diagnostic.runDiagnostics", "Diagnose Connection")}
-          </button>
+          </Button>
           {onRunDeepDiagnostics && (
-            <button
+            <Button variant="ghost"
               type="button"
               onClick={() => onRunDeepDiagnostics()}
               disabled={disabled || isRunning}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-border
               bg-background text-text-primary text-sm font-medium
               hover:bg-surface-hover disabled:opacity-50 disabled:cursor-not-allowed
-              transition-colors"
+              transition-colors h-auto"
             >
               <Cpu className="w-4 h-4" />
               {t("api.diagnostic.runDeepDiagnostics", "Deep Inference Check")}
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -297,7 +298,7 @@ export default function ApiDiagnosticsPanel({
           {failedStep && <FailureDetail step={failedStep} />}
 
           {result?.advisoryText && !isRunning && (
-            <div className="mt-3 rounded-lg bg-accent/10 border border-accent/20 px-3 py-2 text-xs text-text-secondary">
+            <div className="mt-3 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2 text-xs text-text-secondary">
               {t(
                 `api.diagnostic.advisory.${result.advisoryCode ?? ""}`,
                 result.advisoryText,

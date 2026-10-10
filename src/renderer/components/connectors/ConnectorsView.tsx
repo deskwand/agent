@@ -20,6 +20,7 @@ import { SettingsSkills } from "../settings/SettingsSkills";
 import { PiExtensionManagerView } from "../PiExtensionManagerView";
 import { ArrowLeft } from "lucide-react";
 import { useAppStore } from "../../store";
+import { Button } from "../app-button";
 
 type TabId = "connect" | "skills" | "plugins";
 
@@ -361,14 +362,14 @@ export function ConnectorsView() {
   return (
     <div className="flex flex-col h-full w-full overflow-hidden bg-background">
       <div className="flex items-center gap-3 px-5 pt-4 flex-none">
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={() => setActiveView("chat")}
           aria-label={t("common.back")}
-          className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover"
+          className="-ml-1.5 rounded-lg p-1.5 transition-colors hover:bg-surface-hover h-auto"
         >
           <ArrowLeft className="h-5 w-5 text-text-secondary" />
-        </button>
+        </Button>
         <h2 className="text-xl font-semibold text-text-primary">
           {t("connectors.title")}
         </h2>
@@ -379,18 +380,18 @@ export function ConnectorsView() {
 
       <div className="flex items-center gap-0.5 px-5 pt-3 border-b border-border-muted flex-none">
         {tabs.map(([id, label]) => (
-          <button
+          <Button variant="ghost"
             key={id}
             type="button"
             onClick={() => setTab(id)}
             className={`px-3 py-1.5 text-sm -mb-px border-b-2 transition-colors ${
               tab === id
-                ? "border-accent text-text-primary font-semibold"
+                ? "border-primary text-text-primary font-semibold"
                 : "border-transparent text-text-secondary hover:text-text-primary"
             }`}
           >
             {label}
-          </button>
+          </Button>
         ))}
       </div>
 
@@ -436,14 +437,14 @@ export function ConnectorsView() {
                   />
                 ))}
                 <span className="flex-1" />
-                <button
+                <Button variant="ghost"
                   type="button"
                   data-testid="added-filter"
                   aria-pressed={addedOnly}
                   onClick={() => setAddedOnly((v) => !v)}
                   className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap transition-colors ${
                     addedOnly
-                      ? "bg-accent-muted text-accent border-transparent"
+                      ? "bg-primary-muted text-primary border-transparent"
                       : "border-border-muted text-text-secondary hover:bg-surface-hover"
                   }`}
                 >
@@ -451,15 +452,15 @@ export function ConnectorsView() {
                   <span className="text-[11px] opacity-75 ml-1">
                     {added.length}
                   </span>
-                </button>
+                </Button>
                 <DropdownMenu open={addMenuOpen} onOpenChange={setAddMenuOpen}>
                   <DropdownMenuTrigger asChild>
-                    <button
+                    <Button variant="ghost"
                       type="button"
-                      className="px-3 py-1 rounded-control bg-accent text-white hover:bg-accent-hover text-xs font-medium transition-colors"
+                      className="px-3 py-1 rounded-control bg-primary text-white hover:bg-primary-hover text-xs font-medium transition-colors h-auto"
                     >
                       {t("connectors.action.add")}
-                    </button>
+                    </Button>
                   </DropdownMenuTrigger>
                   {/* ⚠️ 根必须同时包住触发器与内容 ✗（计划 8 ✓）。
                       原实现手写在 `<div className="relative">` 里并自己绝对定位 ✓
@@ -516,14 +517,14 @@ export function ConnectorsView() {
                   <p role="status" className="text-sm text-text-secondary">
                     {t("connectors.filter.empty")}
                   </p>
-                  <button
+                  <Button variant="ghost"
                     type="button"
                     data-testid="added-filter-show-all"
                     onClick={() => setAddedOnly(false)}
-                    className="text-xs px-3 py-1 rounded-full border border-border-muted text-text-secondary hover:bg-surface-hover transition-colors"
+                    className="text-xs px-3 py-1 rounded-full border border-border-muted text-text-secondary hover:bg-surface-hover transition-colors h-auto"
                   >
                     {t("connectors.filter.showAll")}
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -624,7 +625,7 @@ function CategoryChip({
 }) {
   const isActive = active === id;
   return (
-    <button
+    <Button variant="ghost"
       type="button"
       data-testid="category-chip"
       data-category={id}
@@ -632,12 +633,12 @@ function CategoryChip({
       onClick={() => onSelect(id)}
       className={`text-xs px-3 py-1 rounded-full border whitespace-nowrap transition-colors ${
         isActive
-          ? "bg-accent-muted text-accent border-transparent"
+          ? "bg-primary-muted text-primary border-transparent"
           : "border-border-muted text-text-secondary hover:bg-surface-hover"
       }`}
     >
       {label}
       <span className="text-[11px] opacity-75 ml-1">{count}</span>
-    </button>
+    </Button>
   );
 }

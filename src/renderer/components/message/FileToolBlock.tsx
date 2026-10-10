@@ -17,6 +17,7 @@ import type {
   ContentBlock,
   Message,
 } from "../../types";
+import { Button } from "../app-button";
 
 interface FileToolBlockProps {
   block: ToolUseContent;
@@ -187,11 +188,11 @@ export const FileToolBlock = memo(function FileToolBlock({
   return (
     <div
       className={`rounded-2xl overflow-hidden transition-colors ${
-        isError ? "bg-error/5" : isRunning ? "bg-accent/5" : "bg-background/40"
+        isError ? "bg-error/5" : isRunning ? "bg-primary/5" : "bg-background/40"
       }`}
     >
       {/* Collapsed header */}
-      <button
+      <Button variant="ghost"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
         className="group w-full flex items-start gap-2.5 py-2 pr-3 text-left hover:bg-surface-hover/50 transition-colors"
@@ -241,7 +242,7 @@ export const FileToolBlock = memo(function FileToolBlock({
             )}
           </span>
         </div>
-      </button>
+      </Button>
 
       {/* Expanded content */}
       {expanded && (

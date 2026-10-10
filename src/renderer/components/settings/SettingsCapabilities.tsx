@@ -10,6 +10,7 @@ import { SettingsCard, SettingsRow, SettingsSwitch } from "./shared";
 import { VoiceModeSettings } from "./VoiceModeSettings";
 import { VoiceCapabilitySettings } from "./VoiceCapabilitySettings";
 import { OcrCapabilitySettings } from "./OcrCapabilitySettings";
+import { Button } from "../app-button";
 
 const isElectron =
   typeof window !== "undefined" && window.electronAPI !== undefined;
@@ -135,7 +136,7 @@ export function SettingsCapabilities({
               : t(`settings.capabilities.permission.${kind}Hint`)
           }
           control={
-            <button
+            <Button variant="ghost"
               type="button"
               data-testid="permission-open"
               onClick={() =>
@@ -143,10 +144,10 @@ export function SettingsCapabilities({
                   kind,
                 )
               }
-              className="rounded-control border border-border px-2.5 py-1 text-xs text-text-primary hover:bg-surface-hover"
+              className="rounded-control border border-border px-2.5 py-1 text-xs text-text-primary hover:bg-surface-hover h-auto"
             >
               {t("settings.capabilities.permission.openSettings")}
-            </button>
+            </Button>
           }
         />
       ));

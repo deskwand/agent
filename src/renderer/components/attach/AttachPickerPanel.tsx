@@ -4,6 +4,8 @@ import { Check, Loader2, Search } from "lucide-react";
 import { FileTypeIcon } from "../file-type-icon";
 import { getFileKind } from "../../utils/file-types";
 import { filterPickerItems, type AttachPickerItem } from "./picker-items";
+import { Input } from "../ui/input";
+import { Button } from "../app-button";
 
 export interface AttachPickerPanelProps {
   /** 数据源标识，用于拼「已添加」的 key（与附件身份 key 同构） */
@@ -130,7 +132,7 @@ export function AttachPickerPanel({
       {/* 搜索行 */}
       <div className="relative px-6 pt-3.5 pb-2.5">
         <Search className="pointer-events-none absolute left-[34px] top-[25px] h-3.5 w-3.5 text-text-muted" />
-        <input
+        <Input
           ref={searchRef}
           value={query}
           onChange={(event) => {
@@ -143,7 +145,7 @@ export function AttachPickerPanel({
               : "attachPicker.searchPlaceholder",
           )}
           aria-label={t("attachPicker.searchPlaceholder")}
-          className="h-9 w-full rounded-lg border border-border bg-surface-muted pl-8 pr-3 text-sm text-text-primary outline-none placeholder:text-text-muted"
+          className="h-9 w-full rounded-lg border border-border bg-surface-muted pl-8 pr-3 text-sm text-text-primary shadow-none outline-none placeholder:text-text-muted"
         />
       </div>
 
@@ -184,14 +186,14 @@ export function AttachPickerPanel({
         ) : errorLabel ? (
           <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
             <p className="text-sm text-error">{errorLabel}</p>
-            <button
+            <Button variant="ghost"
               type="button"
               data-retry
               onClick={onRetry}
-              className="text-xs text-text-primary underline underline-offset-2"
+              className="text-xs text-text-primary underline underline-offset-2 h-auto hover:bg-transparent hover:text-current"
             >
               {t("attachPicker.retry")}
-            </button>
+            </Button>
           </div>
         ) : visible.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-3 py-8 text-center">
@@ -199,14 +201,14 @@ export function AttachPickerPanel({
               {query ? t("attachPicker.empty.search") : emptyLabel}
             </p>
             {query === "" && emptyAction && (
-              <button
+              <Button variant="ghost"
                 type="button"
                 data-empty-action
                 onClick={emptyAction.onClick}
-                className="text-xs text-text-primary underline underline-offset-2"
+                className="text-xs text-text-primary underline underline-offset-2 h-auto hover:bg-transparent hover:text-current"
               >
                 {emptyAction.label}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -214,7 +216,7 @@ export function AttachPickerPanel({
             const added = isAdded(item.id);
             const selected = selectedIds.includes(item.id);
             return (
-              <button
+              <Button variant="ghost"
                 key={item.id}
                 type="button"
                 role="option"
@@ -252,10 +254,10 @@ export function AttachPickerPanel({
                 </span>
                 <span className="w-4 shrink-0">
                   <Check
-                    className={`h-4 w-4 ${selected ? "text-accent" : "text-transparent"}`}
+                    className={`h-4 w-4 ${selected ? "text-primary" : "text-transparent"}`}
                   />
                 </span>
-              </button>
+              </Button>
             );
           })
         )}

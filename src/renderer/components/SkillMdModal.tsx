@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { X, Loader2 } from "lucide-react";
 import { MessageMarkdown } from "./MessageMarkdown";
+import { Button } from "./app-button";
 
 interface SkillMdModalProps {
   isOpen: boolean;
@@ -45,19 +46,19 @@ export function SkillMdModal({
           <h3 className="text-sm font-semibold text-text-primary truncate pr-4">
             {title}
           </h3>
-          <button
+          <Button variant="ghost"
             onClick={onClose}
-            className="p-1 rounded-md hover:bg-surface-hover transition-colors shrink-0"
+            className="p-1 rounded-md hover:bg-surface-hover transition-colors shrink-0 h-auto"
           >
             <X className="w-4 h-4 text-text-muted" />
-          </button>
+          </Button>
         </div>
         <div className="p-5 max-h-[60vh] overflow-y-auto">
           {content ? (
             <MessageMarkdown normalizedText={content} />
           ) : loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-5 h-5 text-accent animate-spin" />
+              <Loader2 className="w-5 h-5 text-primary animate-spin" />
             </div>
           ) : (
             <p className="text-sm text-text-muted text-center py-8">

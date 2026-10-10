@@ -52,7 +52,7 @@ describe("StatusPopover", () => {
       root.render(
         React.createElement(StatusPopover, {
           contextUsagePercentage: 34,
-          contextRingColorClass: "text-accent",
+          contextRingColorClass: "text-primary",
           contextStatusDetails: details,
           ...props,
         }),

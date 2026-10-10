@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 
 import type { FeedItemWithMeta } from "../../shared/feed";
+import { Button } from "./app-button";
 
 export interface FeedItemRowProps {
   item: FeedItemWithMeta;
@@ -53,12 +54,12 @@ export function FeedItemRow({
       {selected ? (
         <span
           aria-hidden
-          className="absolute inset-y-0 left-0 w-0.5 bg-accent"
+          className="absolute inset-y-0 left-0 w-0.5 bg-primary"
         />
       ) : null}
 
       <div className="min-w-0 flex-1">
-        <button
+        <Button variant="ghost"
           type="button"
           data-testid="feed-title"
           onClick={(event) => {
@@ -76,7 +77,7 @@ export function FeedItemRow({
             <span
               data-testid="feed-unread-dot"
               aria-hidden
-              className="relative -top-0.5 h-[5px] w-[5px] shrink-0 rounded-full bg-accent"
+              className="relative -top-0.5 h-[5px] w-[5px] shrink-0 rounded-full bg-primary"
             />
           ) : null}
           {unread ? (
@@ -98,7 +99,7 @@ export function FeedItemRow({
               {t("feed.itemUnprocessed")}
             </span>
           ) : null}
-        </button>
+        </Button>
 
         {item.summary ? (
           <div
@@ -122,7 +123,7 @@ export function FeedItemRow({
         >
           {item.topic ? (
             // 两栏常驻后列表只有一半宽，长主题会折行 —— 标签必须不换行（宁可挤掉来源域名）
-            <span className="shrink-0 whitespace-nowrap rounded-sm bg-accent-muted px-1.5 py-px text-accent">
+            <span className="shrink-0 whitespace-nowrap rounded-sm bg-primary-muted px-1.5 py-px text-primary">
               {item.topic}
             </span>
           ) : null}
@@ -139,28 +140,28 @@ export function FeedItemRow({
               transition: "opacity 120ms",
             }}
           >
-            <button
+            <Button variant="ghost"
               type="button"
               data-testid="feed-read"
               onClick={(event) => {
                 event.stopPropagation();
                 onRead(item.id);
               }}
-              className="underline decoration-text-muted/50"
+              className="underline decoration-text-muted/50 h-auto hover:bg-transparent hover:text-current"
             >
               {t("feed.itemRead")}
-            </button>
-            <button
+            </Button>
+            <Button variant="ghost"
               type="button"
               data-testid="feed-dismiss"
               onClick={(event) => {
                 event.stopPropagation();
                 onDismiss(item.id);
               }}
-              className="underline decoration-text-muted/50"
+              className="underline decoration-text-muted/50 h-auto hover:bg-transparent hover:text-current"
             >
               {t("feed.itemDismiss")}
-            </button>
+            </Button>
           </span>
         </div>
       </div>

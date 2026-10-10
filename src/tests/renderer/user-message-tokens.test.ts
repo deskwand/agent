@@ -68,7 +68,9 @@ describe("UserTextWithTokens", () => {
     const button = container.querySelector("button")!;
     expect(button.textContent).toContain("src/a.ts");
     expect(button.querySelector("[class*='underline']")).not.toBeNull();
-    const anchor = container.querySelector(".tt-anchor");
+    // ⚠️ 2026-10-09：`.tt-anchor`（老组件的包裹层 ✗）迁走后按设计没了 ✗✓；
+    // 意图不变 ✓（「这一支该被 Tooltip 包住」✓），新代理是触发器上的 `data-state` ✓。
+    const anchor = container.querySelector("[data-state]");
     expect(anchor).not.toBeNull();
   });
 
@@ -76,6 +78,7 @@ describe("UserTextWithTokens", () => {
     render("今天天气不错");
     expect(container.textContent).toBe("今天天气不错");
     expect(container.querySelector("button")).toBeNull();
-    expect(container.querySelector(".tt-anchor")).toBeNull();
+    // 反方向同理 ✓（「这一支不该被包」✓）—— 两条一起改才自洽 ✗✓
+    expect(container.querySelector("[data-state]")).toBeNull();
   });
 });

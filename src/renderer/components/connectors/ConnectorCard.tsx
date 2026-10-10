@@ -6,6 +6,7 @@ import type {
   ConnectorInstance,
 } from "../../../shared/connectors";
 import { Switch } from "../ui/switch";
+import { Button } from "../app-button";
 
 interface Props {
   entry: ConnectorEntry;
@@ -41,7 +42,7 @@ function statusTextClass(kind: ConnectorInstance["status"]["kind"]): string {
     case "authorized":
       return "text-success/80";
     case "connecting":
-      return "text-accent";
+      return "text-primary";
     case "needs-auth":
       return "text-warning";
     case "failed":
@@ -195,19 +196,19 @@ export function ConnectorCard({
   // grid：发现视图。名称与动作同一行，说明与状态在内容列里各占一行。
   return (
     <div className="bg-surface border border-border-muted rounded-container p-3.5 flex gap-2.5 shadow-card hover:bg-surface-hover">
-      {/* 三分支头像。白底只给厂商 logo（厂商只发布浅底版图）；另两支画的是 text-accent，
-          深色主题的 accent 放白底上只有 1.86–3.16:1，所以留着 bg-accent-muted。
+      {/* 三分支头像。白底只给厂商 logo（厂商只发布浅底版图）；另两支画的是 text-primary，
+          深色主题的 accent 放白底上只有 1.86–3.16:1，所以留着 bg-primary-muted。
           24px 是内缩 4px 后的图形区；六个图标都是 24×24 viewBox，所以 w-6 h-6 够用。 */}
       <div
         data-testid="card-avatar"
         className={`w-8 h-8 rounded-lg grid place-items-center flex-none ${
-          brandIconUrl ? "bg-white border border-border" : "bg-accent-muted"
+          brandIconUrl ? "bg-white border border-border" : "bg-primary-muted"
         }`}
       >
         {brandIconUrl ? (
           <img src={brandIconUrl} alt="" className="w-6 h-6" />
         ) : icon?.kind === "firstParty" ? (
-          <span className="text-accent grid place-items-center">
+          <span className="text-primary grid place-items-center">
             <FirstPartyServiceIcon />
           </span>
         ) : (
@@ -216,7 +217,7 @@ export function ConnectorCard({
           // 没有标记时才回退显示名首字母 —— 邮箱条目的显示名就是邮箱地址，
           // 首字母只会让每个邮箱看起来一样。
           <span
-            className={`${entry.avatarMark ? "text-[11px]" : "text-sm"} font-bold text-accent`}
+            className={`${entry.avatarMark ? "text-[11px]" : "text-sm"} font-bold text-primary`}
           >
             {entry.avatarMark ?? name.slice(0, 1).toUpperCase()}
           </span>
@@ -259,9 +260,9 @@ function renderAction(
   // **whitespace-nowrap 是硬约束**：中文标签一旦分到小于一个字宽的盒子就会竖排。
   // 槽位现在按内容定宽，本来不会挤，但换行与否不该依赖上一层的宽度怎么算出来。
   const primary =
-    "px-2.5 py-1 text-xs rounded-control bg-accent text-white hover:bg-accent-hover transition-colors whitespace-nowrap";
+    "h-auto px-2.5 py-1 text-xs rounded-control bg-primary text-white hover:bg-primary-hover transition-colors whitespace-nowrap shadow-none";
   const ghost =
-    "px-2.5 py-1 text-xs rounded-control border border-border text-text-primary hover:bg-surface-hover transition-colors whitespace-nowrap";
+    "px-2.5 py-1 text-xs rounded-control border border-border text-text-primary hover:bg-surface-hover hover:text-text-primary transition-colors whitespace-nowrap";
 
   // **邮箱的动作是账号级的**：所有邮箱条目共用 `serverName: "Mail"`，
   // 走 registry 的「移除」会把整台 Mail server（连同其它邮箱）一起删掉。
@@ -271,20 +272,20 @@ function renderAction(
     const account = instance?.id ?? entry.serverName;
     return (
       <>
-        <button
+        <Button variant="ghost"
           type="button"
           className={ghost}
           onClick={() => handlers.onTestMailbox?.(account)}
         >
           {t("connectors.action.test")}
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           className={ghost}
           onClick={() => handlers.onRemoveMailbox?.(account)}
         >
           {t("connectors.action.removeMailbox")}
-        </button>
+        </Button>
       </>
     );
   }
@@ -293,13 +294,13 @@ function renderAction(
   // 之前 `connecting` 只给一个禁用按钮 —— 用户不能取消、不能重试、不能断开，
   // 只能手动去改 mcp.json。任何状态都不该把人困住。
   const removeButton = instance ? (
-    <button
+    <Button variant="ghost"
       type="button"
       className={ghost}
       onClick={() => handlers.onDisconnect(instance.id)}
     >
       {t("connectors.action.remove")}
-    </button>
+    </Button>
   ) : null;
 
   // 本地授权待处理优先于传输状态。未添加的条目此刻还没有实例，
@@ -307,7 +308,7 @@ function renderAction(
   if (authorizing) {
     return (
       <>
-        <button
+        <Button variant="ghost"
           type="button"
           className={primary}
           onClick={() =>
@@ -315,7 +316,7 @@ function renderAction(
           }
         >
           {t("connectors.action.cancel")}
-        </button>
+        </Button>
         {removeButton}
       </>
     );
@@ -323,13 +324,13 @@ function renderAction(
 
   if (!instance) {
     return (
-      <button
+      <Button variant="ghost"
         type="button"
         className={primary}
         onClick={() => handlers.onConnect(entry.serverName)}
       >
         {t("connectors.action.connect")}
-      </button>
+      </Button>
     );
   }
 
@@ -348,9 +349,9 @@ function renderAction(
       // 已配置但当前没有连接活动。给「连接」重试授权，并保留退路。
       return (
         <>
-          <button type="button" className={primary} onClick={retry}>
+          <Button variant="ghost" type="button" className={primary} onClick={retry}>
             {t("connectors.action.connect")}
-          </button>
+          </Button>
           {removeButton}
         </>
       );
@@ -371,13 +372,13 @@ function renderAction(
     case "needs-auth":
       return (
         <>
-          <button type="button" className={primary} onClick={retry}>
+          <Button variant="ghost" type="button" className={primary} onClick={retry}>
             {t(
               entry.auth?.kind === "key"
                 ? "connectors.action.connect"
                 : "connectors.action.reauthorize",
             )}
-          </button>
+          </Button>
           {removeButton}
         </>
       );
@@ -385,9 +386,9 @@ function renderAction(
     case "failed":
       return (
         <>
-          <button type="button" className={ghost} onClick={retry}>
+          <Button variant="ghost" type="button" className={ghost} onClick={retry}>
             {t("connectors.action.retry")}
-          </button>
+          </Button>
           {removeButton}
         </>
       );
@@ -398,13 +399,13 @@ function renderAction(
       // —— 将来远程 server 支持「停用」时，这里就是它该落的地方。
       return (
         <>
-          <button
+          <Button variant="ghost"
             type="button"
             className={primary}
             onClick={() => handlers.onConnect(entry.serverName)}
           >
             {t("connectors.action.connect")}
-          </button>
+          </Button>
           {removeButton}
         </>
       );

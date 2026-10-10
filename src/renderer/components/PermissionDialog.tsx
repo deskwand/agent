@@ -9,6 +9,7 @@ import {
   AlertDialogDescription,
   AlertDialogTitle,
 } from "./ui/alert-dialog";
+import { Button } from "./app-button";
 
 interface PermissionDialogProps {
   permission: PermissionRequest;
@@ -28,7 +29,7 @@ interface PermissionDialogProps {
  * AlertDialogContent 天生没有内置关闭键、也不响应遮罩点击，所以下面的
  * onOpenChange 只作为 no-op 即可完全复现原语义，且无需任何 CSS hack。
  *
- * 按钮继续用普通 `<button>`，不用 AlertDialogAction/Cancel：
+ * 按钮继续用普通 `<Button variant="ghost">`，不用 AlertDialogAction/Cancel：
  * 三个按钮各自对应不同的应答值（deny / allow / allow_always），
  * 且 allow_always 有二次确认状态机；Action/Cancel 的「点击后关闭」默认行为
  * 在此既不需要、也会干扰。
@@ -129,26 +130,26 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
 
         {/* Actions */}
         <div className="mt-6 flex items-center gap-3">
-          <button
+          <Button variant="ghost"
             onClick={() => respondToPermission(permission.toolUseId, "deny")}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-surface-hover"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-surface-hover h-auto"
           >
             <X className="w-4 h-4" />
             {t("permission.deny")}
-          </button>
+          </Button>
 
-          <button
+          <Button variant="ghost"
             onClick={() => respondToPermission(permission.toolUseId, "allow")}
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover h-auto"
           >
             <Check className="w-4 h-4" />
             {t("permission.allow")}
-          </button>
+          </Button>
         </div>
 
         {/* Always Allow option */}
         {!pendingAlwaysAllow ? (
-          <button
+          <Button variant="ghost"
             onClick={() => {
               const dangerousTools = [
                 "bash",
@@ -165,31 +166,31 @@ export function PermissionDialog({ permission }: PermissionDialogProps) {
                 respondToPermission(permission.toolUseId, "allow_always");
               }
             }}
-            className="w-full mt-2 rounded-lg px-3 py-1.5 text-sm text-text-secondary transition-colors hover:bg-surface-hover"
+            className="w-full mt-2 rounded-lg px-3 py-1.5 text-sm text-text-secondary transition-colors hover:bg-surface-hover h-auto"
           >
             {t("permission.alwaysAllow")}
-          </button>
+          </Button>
         ) : (
           <div className="mt-2 p-3 bg-warning/10 border border-warning/20 rounded-xl">
             <p className="text-sm text-warning mb-2">
               {`Are you sure you want to always allow "${permission.toolName}"? This tool can modify your system.`}
             </p>
             <div className="flex gap-2">
-              <button
+              <Button variant="ghost"
                 onClick={() => setPendingAlwaysAllow(false)}
-                className="flex-1 rounded-lg bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-surface-hover"
+                className="flex-1 rounded-lg bg-surface px-3 py-1.5 text-sm text-text-primary transition-colors hover:bg-surface-hover h-auto"
               >
                 {t("permission.deny")}
-              </button>
-              <button
+              </Button>
+              <Button variant="ghost"
                 onClick={() => {
                   setPendingAlwaysAllow(false);
                   respondToPermission(permission.toolUseId, "allow_always");
                 }}
-                className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+                className="flex-1 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover h-auto"
               >
                 {t("permission.alwaysAllow")}
-              </button>
+              </Button>
             </div>
           </div>
         )}

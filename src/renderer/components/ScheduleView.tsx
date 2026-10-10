@@ -13,6 +13,7 @@ import type { ScheduleTask } from "../types";
 import { ScheduleToolbar } from "./ScheduleToolbar";
 import { ScheduleCalendar, type CalendarView } from "./ScheduleCalendar";
 import { ScheduleEditModal } from "./ScheduleEditModal";
+import { Button } from "./app-button";
 
 export function ScheduleView() {
   const { t } = useTranslation();
@@ -104,12 +105,12 @@ export function ScheduleView() {
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-background">
       {/* Header */}
       <div className="bg-background/90 border-b border-border-subtle px-5 py-4 lg:px-8">
-        <button
+        <Button variant="ghost"
           onClick={() => setShowSchedule(false)}
-          className="mb-1 p-1 -ml-1 rounded-lg hover:bg-surface-hover transition-colors inline-flex"
+          className="mb-1 p-1 -ml-1 rounded-lg hover:bg-surface-hover transition-colors inline-flex h-auto"
         >
           <ArrowLeft className="w-5 h-5 text-text-secondary" />
-        </button>
+        </Button>
         <p className="text-xs uppercase tracking-[0.16em] text-text-muted">
           DeskWand
         </p>

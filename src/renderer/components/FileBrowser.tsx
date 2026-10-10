@@ -14,6 +14,7 @@ import {
   filterWorkspaceFiles,
 } from "../utils/workspace-filter";
 import { useFileTree, type TreeRow } from "../hooks/use-file-tree";
+import { Button } from "./app-button";
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -41,7 +42,7 @@ function FileTreeRow({
   return (
     <div
       className={`group flex items-center gap-1 py-0.5 px-2 hover:bg-surface-hover rounded cursor-pointer text-xs select-none ${
-        selected ? "bg-accent/10 ring-1 ring-accent/20" : ""
+        selected ? "bg-primary/10 ring-1 ring-primary/20" : ""
       }`}
       style={{ paddingLeft: `${row.depth * 16 + 8}px` }}
       title={row.path}
@@ -78,7 +79,7 @@ function FileTreeRow({
         <span className="flex w-5 shrink-0 items-center justify-center">
           {busy ? (
             <Loader2
-              className="h-3 w-3 animate-spin text-accent"
+              className="h-3 w-3 animate-spin text-primary"
               data-testid="office-preview-busy"
             />
           ) : (
@@ -240,14 +241,14 @@ export function FileBrowser({ width }: { width: number }) {
             className="flex-1 min-w-0 bg-transparent outline-none text-xs text-text-primary placeholder:text-text-muted"
           />
           {filtering && (
-            <button
+            <Button variant="ghost"
               type="button"
               aria-label={t("fileBrowser.clearFilter")}
               onClick={() => handleQueryChange("")}
               className="shrink-0 w-4 h-4 rounded flex items-center justify-center hover:text-text-primary transition-colors"
             >
               <X className="w-3 h-3" />
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -345,7 +346,7 @@ export function FileBrowser({ width }: { width: number }) {
                       <span className="flex w-5 shrink-0 items-center justify-center">
                         {officePreviewBusyPath === fullPath ? (
                           <Loader2
-                            className="h-3 w-3 animate-spin text-accent"
+                            className="h-3 w-3 animate-spin text-primary"
                             data-testid="office-preview-busy"
                           />
                         ) : (

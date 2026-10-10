@@ -357,7 +357,7 @@ function WeekView({
               <div
                 className={`text-sm font-medium inline-flex items-center justify-center w-7 h-7 rounded-full ${
                   isToday
-                    ? "bg-accent text-accent-foreground"
+                    ? "bg-primary text-primary-foreground"
                     : "text-text-primary"
                 }`}
               >
@@ -524,7 +524,7 @@ function MonthView({
                 <span
                   className={`text-xs inline-flex items-center justify-center w-6 h-6 rounded-full ${
                     isToday
-                      ? "bg-accent text-accent-foreground font-semibold"
+                      ? "bg-primary text-primary-foreground font-semibold"
                       : "text-text-secondary"
                   }`}
                 >

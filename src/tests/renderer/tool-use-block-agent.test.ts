@@ -130,7 +130,7 @@ describe("ToolUseBlock Agent summary", () => {
     await renderCard("running");
     expect(header()).not.toBeNull(); // 否则下面的 not.toBeNull() 在 header 缺失时也会通过
     expect(header()?.querySelector(".animate-spin")).not.toBeNull();
-    expect(cardRoot()?.classList.contains("bg-accent/5")).toBe(true);
+    expect(cardRoot()?.classList.contains("bg-primary/5")).toBe(true);
   });
 
   it("快照为 error 时头部显示失败", async () => {

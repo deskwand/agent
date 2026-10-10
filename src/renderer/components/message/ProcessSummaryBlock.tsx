@@ -30,6 +30,7 @@ import {
 import { NestedToolDetails } from "./NestedToolDetails";
 import { ToolGroupStatus } from "./ToolGroupStatus";
 import { useAppStore } from "../../store";
+import { Button } from "../app-button";
 
 const PROCESS_ICON_MAP: Record<
   ProcessSummaryFragment["iconType"],
@@ -128,12 +129,12 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
   return (
     <div className="overflow-hidden">
       <div className="flex items-center gap-2">
-        <button
+        <Button variant="ghost"
           type="button"
           onClick={() => setExpanded((value) => !value)}
           aria-expanded={expanded}
           className={`group flex min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm leading-[var(--line-height-chat)] text-text-muted transition-colors hover:bg-surface-hover/40 ${
-            highlighted ? "ring-2 ring-accent/40" : ""
+            highlighted ? "ring-2 ring-primary/40" : ""
           }`}
         >
           <span className="flex items-center gap-1.5 min-w-0 overflow-hidden flex-nowrap">
@@ -167,7 +168,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
               <ChevronRight className="h-3.5 w-3.5" />
             )}
           </span>
-        </button>
+        </Button>
         <ToolGroupStatus status={block.status} onFailure={handleFailure} />
       </div>
 
@@ -180,12 +181,12 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
             >
               <Collapsible>
                 <CollapsibleTrigger asChild>
-                  <button
+                  <Button variant="ghost"
                     type="button"
-                    className="cursor-pointer text-xs text-text-muted"
+                    className="cursor-pointer text-xs text-text-muted h-auto hover:bg-transparent hover:text-current"
                   >
                     {t("tool.grouped.scriptDetails")}
-                  </button>
+                  </Button>
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <ToolUseBlock
