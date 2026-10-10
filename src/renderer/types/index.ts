@@ -45,6 +45,7 @@ export interface Session {
   isProjectMode: boolean;
   archived?: boolean;
   archivedAt?: number;
+  completedAt?: number;
   piSessionFile?: string;
   kind?: SessionKind;
   createdAt: number;
@@ -536,6 +537,10 @@ export type ClientEvent =
   | { type: "session.batchArchive"; payload: { sessionIds: string[] } }
   | { type: "session.batchUnarchive"; payload: { sessionIds: string[] } }
   | { type: "session.archiveDelete"; payload: { sessionId: string } }
+  | {
+      type: "session.setCompleted";
+      payload: { sessionId: string; completed: boolean };
+    }
   | { type: "session.list"; payload: Record<string, never> }
   | { type: "session.getMessages"; payload: { sessionId: string } }
   | {

@@ -150,6 +150,7 @@ function createDatabaseInstance(db: DatabaseSync): DatabaseInstance {
     sessions: {
       create: vi.fn(),
       update: vi.fn(),
+      setCompletedAt: vi.fn(),
       get: vi.fn(
         (id: string) =>
           db.prepare("SELECT * FROM sessions WHERE id = ? LIMIT 1").get(id) as

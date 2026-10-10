@@ -745,6 +745,7 @@ export class SessionManager {
       thinking_level: session.thinkingLevel || "medium",
       archived: 0,
       archived_at: null,
+      completed_at: session.completedAt ?? null,
       pi_session_file: session.piSessionFile || null,
       created_at: session.createdAt,
       updated_at: session.updatedAt,
@@ -792,6 +793,7 @@ export class SessionManager {
         "medium") as Session["thinkingLevel"],
       archived: row.archived === 1,
       archivedAt: row.archived_at || undefined,
+      completedAt: row.completed_at || undefined,
       piSessionFile: row.pi_session_file || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -844,6 +846,7 @@ export class SessionManager {
           "medium") as Session["thinkingLevel"],
         archived: row.archived === 1,
         archivedAt: row.archived_at || undefined,
+        completedAt: row.completed_at || undefined,
         piSessionFile: row.pi_session_file || undefined,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -2186,6 +2189,29 @@ export class SessionManager {
       archived_at: Date.now(),
     });
     log("[SessionManager] Session archived:", sessionId);
+  }
+
+  /**
+   * 用户手动标记 / 取消「已完成」。
+   *
+   * 走 db.sessions.setCompletedAt，而不是通用的 db.sessions.update ——
+   * 后者无条件刷新 updated_at，标记一下就会把会话顶到侧栏最前面，而这个标记的
+   * 用途恰恰相反：不碰时间戳，之后别的会话继续活跃，已完成的那些自然沉下去。
+   *
+   * 注意这不冻结会话：它之后若真的又开始干活（用户继续对话、定时任务、远程消息），
+   * updateSessionStatus 会照常刷新 updated_at，它会重新浮上去。
+   *
+   * 刻意不回显给渲染层（不加 sendToRenderer + session.update）：与 session.archive
+   * 等同族事件保持一致，渲染层走乐观更新。代价是写库失败（"Session not found"，
+   * 例如另一个窗口删掉了这个会话）时，渲染层那个勾号不会自己回滚 —— 要等下一次
+   * session.list 才对齐。要修就单独开一条改回显，别在别处顺手加。
+   */
+  setSessionCompleted(sessionId: string, completed: boolean): void {
+    const session = this.loadSession(sessionId);
+    if (!session) throw new Error("Session not found");
+
+    this.db.sessions.setCompletedAt(sessionId, completed ? Date.now() : null);
+    log("[SessionManager] Session completion set:", sessionId, completed);
   }
 
   // Unarchive a single session

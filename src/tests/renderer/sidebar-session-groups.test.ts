@@ -244,6 +244,41 @@ describe("buildSidebarSessionGroups", () => {
       "second",
     ]);
   });
+
+  it("completedAt 不参与排序：位置只由 updatedAt（与 pin 次序）决定", () => {
+    // 这条是踩雷绳，不是回归测试：它今天就会绿。它盯的是本需求被否掉的那几种做法——
+    // 把 completedAt 加进排序比较器、或“已完成统一沉底”。谁这么改，它立刻红。
+    const result = buildSidebarSessionGroups(
+      [
+        session("done-old", { updatedAt: 1, completedAt: 1_700_000_000_000 }),
+        session("fresh", { updatedAt: 20 }),
+      ],
+      "",
+    );
+
+    expect(result.unscopedSessions.map(({ id }) => id)).toEqual([
+      "fresh",
+      "done-old",
+    ]);
+
+    // pin 次序仍然压过时间（与上游既有规则一致），完成标记不插手
+    const pinned = buildSidebarSessionGroups(
+      [
+        session("done-pinned", {
+          updatedAt: 1,
+          completedAt: 1_700_000_000_000,
+        }),
+        session("fresh", { updatedAt: 20 }),
+      ],
+      "",
+      { sessionIds: ["done-pinned"], projectKeys: [] },
+    );
+
+    expect(pinned.unscopedSessions.map(({ id }) => id)).toEqual([
+      "done-pinned",
+      "fresh",
+    ]);
+  });
 });
 
 describe("isSessionBusy", () => {

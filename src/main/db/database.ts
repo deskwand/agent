@@ -31,6 +31,7 @@ export interface DatabaseInstance {
   sessions: {
     create: (session: SessionRow) => void;
     update: (id: string, updates: Partial<SessionRow>) => void;
+    setCompletedAt: (id: string, completedAt: number | null) => void;
     get: (id: string) => SessionRow | undefined;
     getAll: () => SessionRow[];
     delete: (id: string) => void;
@@ -132,6 +133,7 @@ export interface SessionRow {
   thinking_level: string;
   archived: number;
   archived_at: number | null;
+  completed_at: number | null;
   pi_session_file: string | null;
   created_at: number;
   updated_at: number;
@@ -369,6 +371,7 @@ function initializeSchema(database: DatabaseSync): void {
       "archived INTEGER NOT NULL DEFAULT 0",
     );
     ensureColumn(database, "sessions", "archived_at", "archived_at INTEGER");
+    ensureColumn(database, "sessions", "completed_at", "completed_at INTEGER");
     ensureColumn(
       database,
       "sessions",
@@ -635,8 +638,8 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
   // Prepare statements for better performance
   const insertSession = rawDb.prepare(`
     INSERT OR REPLACE INTO sessions
-    (id, title, deskwand_session_id, openai_thread_id, status, cwd, mounted_paths, allowed_tools, memory_enabled, provider_profile_key, model, thinking_level, is_project_mode, archived, archived_at, created_at, updated_at, session_kind)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (id, title, deskwand_session_id, openai_thread_id, status, cwd, mounted_paths, allowed_tools, memory_enabled, provider_profile_key, model, thinking_level, is_project_mode, archived, archived_at, created_at, updated_at, session_kind, completed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   // Note: Dynamic update queries are built in sessions.update() for flexibility
@@ -650,6 +653,11 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
 
   const getAllSessionsStmt = rawDb.prepare(`
     SELECT * FROM sessions ORDER BY updated_at DESC
+  `);
+
+  // 只写 completed_at，绝不碰 updated_at —— 见 sessions.setCompletedAt 的注释。
+  const setSessionCompletedStmt = rawDb.prepare(`
+    UPDATE sessions SET completed_at = ? WHERE id = ?
   `);
 
   const deleteSessionStmt = rawDb.prepare(`
@@ -806,6 +814,7 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
           session.created_at,
           session.updated_at,
           session.session_kind ?? "ordinary",
+          session.completed_at,
         );
       },
 
@@ -837,6 +846,17 @@ export function initDatabase(dbPathOverride?: string): DatabaseInstance {
         rawDb
           .prepare(sql)
           .run(...(values as [SQLInputValue, ...SQLInputValue[]]));
+      },
+
+      /**
+       * 用户手动标记 / 取消「已完成」。
+       *
+       * 不能复用上面的 update()：它无条件追加 `updated_at = ?`，而侧栏按
+       * updated_at 倒序 —— 标记一下就会把会话顶到列表最前面，正是这个标记要
+       * 避免的事（标记的用途是让会话自然沉下去）。所以走这条静态 SQL。
+       */
+      setCompletedAt: (id: string, completedAt: number | null) => {
+        setSessionCompletedStmt.run(completedAt, id);
       },
 
       get: (id: string): SessionRow | undefined => {

@@ -113,6 +113,7 @@ const ALLOWED_CLIENT_EVENTS = new Set([
   "session.batchArchive",
   "session.batchUnarchive",
   "session.archiveDelete",
+  "session.setCompleted",
   "session.delete",
   "session.batchDelete",
   "session.list",

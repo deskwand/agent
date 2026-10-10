@@ -694,9 +694,13 @@ describe("Sidebar project groups", () => {
     await hoverSession("ordinary");
     expect(actionRow?.className).toContain("opacity-100");
     expect(actionRow?.querySelectorAll("button")).toHaveLength(2);
+    // 悬停格现在是「标记完成」+「…」；归档搬进了菜单
+    expect(
+      row.querySelector(`button[title="${i18n.t("sidebar.markComplete")}"]`),
+    ).toBeTruthy();
     expect(
       row.querySelector(`button[title="${i18n.t("sidebar.archive")}"]`),
-    ).toBeTruthy();
+    ).toBeNull();
     expect(
       row.querySelector(`button[title="${i18n.t("common.delete")}"]`),
     ).toBeNull();
@@ -722,42 +726,36 @@ describe("Sidebar project groups", () => {
     expect(findSessionMenu()).toBeTruthy();
   });
 
-  it("offers only pinning for a running session", async () => {
+  it("offers pinning and marking for a running session, but no archive or delete", async () => {
     useAppStore.setState({ activeSessionId: "running" });
     await render([session("running", { status: "running" })]);
 
     const row = sessionRow("running");
+    // 决策 6：运行中允许标记（并行时最想收的往往就是还在跑的那个）
     expect(
-      row.querySelector(`button[title="${i18n.t("sidebar.archive")}"]`),
-    ).toBeNull();
+      row.querySelector(`button[title="${i18n.t("sidebar.markComplete")}"]`),
+    ).toBeTruthy();
 
     await openSessionMenu("running");
     expect(menuAction(i18n.t("sidebar.pin"))).toBeTruthy();
+    expect(menuAction(i18n.t("sidebar.markComplete"))).toBeTruthy();
+    expect(findMenuAction(i18n.t("sidebar.archive"))).toBeUndefined();
     expect(findMenuAction(i18n.t("common.delete"))).toBeUndefined();
   });
 
-  it("keeps archive inline and routes delete through the existing confirmation", async () => {
+  it("archives from the menu without an inline confirm, and still confirms delete", async () => {
     useAppStore.setState({ activeSessionId: "ordinary" });
     await render([session("ordinary", { title: "Ordinary" })]);
-    await hoverSession("ordinary");
 
-    const archiveButton = sessionRow("ordinary").querySelector(
-      `button[title="${i18n.t("sidebar.archive")}"]`,
-    ) as HTMLButtonElement;
-    expect(archiveButton).toBeTruthy();
-
-    await act(async () => archiveButton.click());
-    expect(ipc.archiveSession).not.toHaveBeenCalled();
-    expect(archiveButton.title).toBe(i18n.t("common.confirm"));
-
-    await act(async () => archiveButton.click());
+    // 归档搬进菜单后不再有"点两下"：开菜单点一下就直接归档（可逆，归档页能恢复）
+    vi.clearAllMocks();
+    await openSessionMenu("ordinary");
+    await act(async () => menuAction(i18n.t("sidebar.archive")).click());
+    await flush();
     expect(ipc.archiveSession).toHaveBeenCalledWith("ordinary");
 
-    await act(async () => archiveButton.click());
-    expect(archiveButton.title).toBe(i18n.t("common.confirm"));
+    // 删除仍走确认框 —— 菜单里唯一不可逆的动作
     await openSessionMenu("ordinary");
-    expect(archiveButton.title).toBe(i18n.t("sidebar.archive"));
-
     await act(async () => menuAction(i18n.t("common.delete")).click());
     expect(findSessionMenu()).toBeNull();
     expect(document.body.textContent).toContain(
@@ -1848,12 +1846,12 @@ describe("Sidebar project groups", () => {
     // ⇒ 盒宽被内边距之和撑到 32（比作者写的宽 8px ✗）；补 `px-0` 后 24×24、左右内边距 0 ✓。
     await render([session("ordinary")]);
     const row = sessionRow("ordinary");
-    const archive = row.querySelector<HTMLButtonElement>(
-      `button[title="${i18n.t("sidebar.archive")}"]`,
+    const mark = row.querySelector<HTMLButtonElement>(
+      `button[title="${i18n.t("sidebar.markComplete")}"]`,
     );
     const more = sessionMoreButton("ordinary");
     for (const [label, key] of [
-      ["archive", archive],
+      ["markComplete", mark],
       ["moreActions", more],
     ] as const) {
       expect(key, `${label} 应该渲染出来`).not.toBeNull();

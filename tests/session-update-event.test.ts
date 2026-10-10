@@ -30,4 +30,13 @@ describe('applySessionUpdate', () => {
     const updated = applySessionUpdate([], 's-missing', { title: 'Only Title' });
     expect(updated).toHaveLength(0);
   });
+
+  it('merging completedAt leaves updatedAt untouched', () => {
+    const sessions = [
+      { id: 's1', title: 'T', status: 'idle', updatedAt: 500 } as any,
+    ];
+    const updated = applySessionUpdate(sessions, 's1', { completedAt: 900 });
+    expect(updated[0].completedAt).toBe(900);
+    expect(updated[0].updatedAt).toBe(500);
+  });
 });

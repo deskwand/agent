@@ -9,6 +9,7 @@ import {
   Trash2,
   Search as SearchIcon,
   Check,
+  Undo2,
   Folder,
   Archive,
   ChevronDown,
@@ -91,6 +92,7 @@ export function Sidebar({
     deleteProject,
     renameSession,
     archiveSession,
+    setSessionCompleted,
     getSessionMessagesPage,
     getSessionTraceSteps,
     changeWorkingDir,
@@ -109,7 +111,6 @@ export function Sidebar({
   );
   const [sidebarPins, setSidebarPins] = useState<SidebarPins>(loadSidebarPins);
   const [showProjectActions, setShowProjectActions] = useState(false);
-  const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null);
   const [sessionMenu, setSessionMenu] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingSessionTitle, setEditingSessionTitle] = useState("");
@@ -778,9 +779,6 @@ export function Sidebar({
           setHoveredSessionId((current) =>
             current === session.id ? null : current,
           );
-          setPendingArchiveId((current) =>
-            current === session.id ? null : current,
-          );
         }}
         className={`group relative cursor-pointer rounded-lg px-2.5 py-1 transition-colors ${
           isActive ? "bg-accent" : "hover:bg-accent/60"
@@ -818,7 +816,13 @@ export function Sidebar({
               />
             ) : (
               <div
-                className={`text-sm font-medium leading-5 truncate flex-1 ${isActive ? "text-foreground" : "text-muted-foreground"}`}
+                className={`text-sm font-medium leading-5 truncate flex-1 ${
+                  isActive
+                    ? "text-foreground"
+                    : session.completedAt
+                      ? "text-muted-foreground/60"
+                      : "text-muted-foreground"
+                }`}
               >
                 {highlightTitle(session.title, normalizedQuery)}
               </div>
@@ -832,7 +836,9 @@ export function Sidebar({
                     标记格是 16px 宽的盒子，若把 10px 状态点 **居中**，它的墨迹会自己
                     内缩 3px ⇒ 和上下行的时间错开 ✗（2026-10-11 报障图里那列点比时间
                     靠左就是这么来的 ✓）⇒ `justify-end` 把盒子的右缘交回那条线 ✓。
-                    置顶不再占这一格（和项目行一致）：置顶的会话照常显示相对时间 ✓。 */}
+                    置顶不再占这一格（和项目行一致）：置顶的会话照常显示相对时间 ✓。
+                    「已完成」占这一格（它没有别的落点）；它和运行中一样用 `justify-end`
+                    把墨迹交回那条线，颜色走中性的 `text-muted-foreground`（不是成功色）。 */}
                 <div
                   className={`absolute inset-0 flex items-center justify-end transition-opacity ${
                     showSessionActions
@@ -859,6 +865,14 @@ export function Sidebar({
                         <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
                       )}
                     </span>
+                  ) : session.completedAt ? (
+                    <span
+                      className="h-4 w-4 flex items-center justify-end text-muted-foreground"
+                      role="img"
+                      aria-label={t("sidebar.completed")}
+                    >
+                      <Check aria-hidden="true" className="h-3.5 w-3.5" />
+                    </span>
                   ) : (
                     <span className="text-sm leading-5 text-muted-foreground whitespace-nowrap">
                       {formatRelativeTime(
@@ -881,44 +895,35 @@ export function Sidebar({
                       : "opacity-0 pointer-events-none"
                   }`}
                 >
-                  {!hasStatusIndicator && (
-                    <Button variant="ghost"
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        if (pendingArchiveId === session.id) {
-                          archiveSession(session.id);
-                          setPendingArchiveId(null);
-                        } else {
-                          setPendingArchiveId(session.id);
-                        }
-                      }}
-                      size="iconXs"
-                      className={`rounded-lg flex items-center justify-center transition-colors ${
-                        pendingArchiveId === session.id
-                          ? "text-primary-text bg-primary/10 border border-primary/30"
-                          : "text-muted-foreground hover:text-primary-text hover:bg-accent"
-                      }`}
-                      title={
-                        pendingArchiveId === session.id
-                          ? t("common.confirm")
-                          : t("sidebar.archive")
-                      }
-                    >
-                      {pendingArchiveId === session.id ? (
-                        <Check className="h-3 w-3" />
-                      ) : (
-                        <Archive className="h-3 w-3" />
-                      )}
-                    </Button>
-                  )}
+                  <Button variant="ghost"
+                    type="button"
+                    size="iconXs"
+                    aria-pressed={Boolean(session.completedAt)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setSessionCompleted(session.id, !session.completedAt);
+                    }}
+                    className="rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary-text hover:bg-accent transition-colors"
+                    title={
+                      session.completedAt
+                        ? t("sidebar.markIncomplete")
+                        : t("sidebar.markComplete")
+                    }
+                    aria-label={
+                      session.completedAt
+                        ? t("sidebar.markIncomplete")
+                        : t("sidebar.markComplete")
+                    }
+                  >
+                    {session.completedAt ? (
+                      <Undo2 className="h-3 w-3" />
+                    ) : (
+                      <Check className="h-3 w-3" />
+                    )}
+                  </Button>
                   <DropdownMenu
                     open={sessionMenu === session.id}
                     onOpenChange={(next: boolean) => {
-                      // ⚠️ 原触发器是个纯 onClick 按钮，那个 handler 里还带着
-                      // 「把归档确认态清掉」✗ —— Radix 打开菜单只走 **pointerdown** ✗，
-                      // 所以那件事必须挪到这里 ✓（不然它会永久停在 Confirm 态 ✓）。
-                      setPendingArchiveId(null);
                       setSessionMenu(next ? session.id : null);
                     }}
                   >
@@ -969,6 +974,26 @@ export function Sidebar({
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="h-7 gap-2"
+                        onClick={() => {
+                          setSessionMenu(null);
+                          setSessionCompleted(session.id, !session.completedAt);
+                        }}
+                      >
+                        {session.completedAt ? (
+                          <Undo2 className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Check className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span>
+                          {t(
+                            session.completedAt
+                              ? "sidebar.markIncomplete"
+                              : "sidebar.markComplete",
+                          )}
+                        </span>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="h-7 gap-2"
                         onClick={() => beginRenameSession(session)}
                       >
                         <SquarePen className="h-4 w-4 text-muted-foreground" />
@@ -977,6 +1002,18 @@ export function Sidebar({
                       {session.status !== "running" && (
                         <>
                           <DropdownMenuSeparator />
+                          {!hasStatusIndicator && (
+                            <DropdownMenuItem
+                              className="h-7 gap-2"
+                              onClick={() => {
+                                setSessionMenu(null);
+                                archiveSession(session.id);
+                              }}
+                            >
+                              <Archive className="h-4 w-4 text-muted-foreground" />
+                              <span>{t("sidebar.archive")}</span>
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             className="h-7 gap-2 text-destructive hover:bg-destructive/10"
                             onClick={(event) => {

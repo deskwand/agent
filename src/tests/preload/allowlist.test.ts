@@ -32,6 +32,7 @@ const ALL_CLIENT_EVENT_TYPES = [
   "session.batchArchive",
   "session.batchUnarchive",
   "session.archiveDelete",
+  "session.setCompleted",
   "session.list",
   "session.getMessages",
   "session.getMessagesPage",

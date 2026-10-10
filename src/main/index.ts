@@ -4684,6 +4684,16 @@ async function handleClientEvent(event: ClientEvent): Promise<unknown> {
     case "session.archiveDelete":
       return sm.permanentDeleteArchivedSession(event.payload.sessionId);
 
+    // 刻意不做两件事（与 session.archive 同族一致）：① 不 sendToRenderer 回显
+    // （渲染层乐观更新，代价见 setSessionCompleted 的注释）；② 不把它收进
+    // client-event-utils 的 eventRequiresSessionManager（该事件在 sessionManager
+    // 为 null 时不可达，真发生也会被上面的 try/catch 转成一条 error 事件）。
+    case "session.setCompleted":
+      return sm.setSessionCompleted(
+        event.payload.sessionId,
+        event.payload.completed,
+      );
+
     case "session.list": {
       const result = sm.listSessions();
       sendToRenderer({

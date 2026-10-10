@@ -58,6 +58,7 @@ function makeDb(overrides: Partial<DatabaseInstance> = {}): DatabaseInstance {
       get: vi.fn(() => null),
       getAll: vi.fn(() => []),
       update: vi.fn(),
+      setCompletedAt: vi.fn(),
       delete: vi.fn(),
     },
     messages: {
@@ -408,5 +409,138 @@ describe('SessionManager.deleteProjectByCwd', () => {
     );
     await expect(manager.deleteProjectByCwd('   ')).resolves.toEqual([]);
     expect(deleted).toEqual([]);
+  });
+});
+
+// ------------------------------------------------------------------
+// setSessionCompleted
+// ------------------------------------------------------------------
+describe('SessionManager.setSessionCompleted', () => {
+  it('走专用写入而不是通用 update —— 通用 update 会刷新 updated_at 把会话顶到列表最前', () => {
+    const db = makeDb({
+      sessions: {
+        create: vi.fn(),
+        get: vi.fn(() => ({ id: 's1', title: 'T', updated_at: 1000 })),
+        getAll: vi.fn(() => []),
+        update: vi.fn(),
+        setCompletedAt: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as DatabaseInstance['sessions'],
+    });
+    const manager = new SessionManager(db, vi.fn());
+
+    manager.setSessionCompleted('s1', true);
+
+    expect(db.sessions.setCompletedAt).toHaveBeenCalledWith(
+      's1',
+      expect.any(Number),
+    );
+    expect(db.sessions.update).not.toHaveBeenCalled();
+  });
+
+  it('取消完成写回 null，同样不碰 updated_at', () => {
+    const db = makeDb({
+      sessions: {
+        create: vi.fn(),
+        get: vi.fn(() => ({ id: 's1', title: 'T', updated_at: 1000 })),
+        getAll: vi.fn(() => []),
+        update: vi.fn(),
+        setCompletedAt: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as DatabaseInstance['sessions'],
+    });
+    const manager = new SessionManager(db, vi.fn());
+
+    manager.setSessionCompleted('s1', false);
+
+    expect(db.sessions.setCompletedAt).toHaveBeenCalledWith('s1', null);
+    expect(db.sessions.update).not.toHaveBeenCalled();
+  });
+
+  it('会话不存在时抛错且不写库', () => {
+    const db = makeDb();
+    const manager = new SessionManager(db, vi.fn());
+
+    expect(() => manager.setSessionCompleted('missing', true)).toThrow(
+      'Session not found',
+    );
+    expect(db.sessions.setCompletedAt).not.toHaveBeenCalled();
+  });
+
+  it('loadSession 也把 completed_at 映射成 completedAt（走公开的 findSessionByPiFile）', () => {
+    const piFile = '/tmp/pi/session.json';
+    const row = {
+      id: 's1',
+      title: 'T',
+      deskwand_session_id: null,
+      openai_thread_id: null,
+      status: 'idle',
+      cwd: null,
+      mounted_paths: JSON.stringify([]),
+      allowed_tools: JSON.stringify([]),
+      memory_enabled: 0,
+      is_project_mode: 0,
+      model: null,
+      thinking_level: 'medium',
+      archived: 0,
+      archived_at: null,
+      completed_at: 1_700_000_000_000,
+      pi_session_file: piFile,
+      created_at: 1000,
+      updated_at: 2000,
+    };
+    const db = makeDb({
+      sessions: {
+        create: vi.fn(),
+        get: vi.fn(() => row),
+        getAll: vi.fn(() => [row]),
+        update: vi.fn(),
+        setCompletedAt: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as DatabaseInstance['sessions'],
+    });
+    const manager = new SessionManager(db, vi.fn());
+
+    expect(manager.findSessionByPiFile(piFile)?.completedAt).toBe(
+      1_700_000_000_000,
+    );
+  });
+
+  it('listSessions 把 completed_at 映射成 completedAt', () => {
+    const row = {
+      id: 's1',
+      title: 'My Session',
+      deskwand_session_id: null,
+      openai_thread_id: null,
+      status: 'idle',
+      cwd: null,
+      mounted_paths: JSON.stringify([]),
+      allowed_tools: JSON.stringify([]),
+      memory_enabled: 0,
+      is_project_mode: 0,
+      model: null,
+      thinking_level: 'medium',
+      archived: 0,
+      archived_at: null,
+      completed_at: 1_700_000_000_000,
+      pi_session_file: null,
+      created_at: 1000,
+      updated_at: 2000,
+    };
+    const db = makeDb({
+      sessions: {
+        create: vi.fn(),
+        get: vi.fn(() => null),
+        getAll: vi.fn(() => [row]),
+        update: vi.fn(),
+        setCompletedAt: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as DatabaseInstance['sessions'],
+    });
+    const manager = new SessionManager(db, vi.fn());
+
+    const { sessions } = manager.listSessions();
+
+    expect(sessions[0].completedAt).toBe(1_700_000_000_000);
   });
 });

@@ -1221,6 +1221,23 @@ export function useIPC() {
     [send],
   );
 
+  const setSessionCompleted = useCallback(
+    (sessionId: string, completed: boolean) => {
+      // 只合 completedAt：applySessionUpdate 是纯合并、不碰 updatedAt，
+      // 所以这一下不会让会话在侧栏里跳位 —— 位移只来自之后别的会话活跃。
+      useAppStore.getState().updateSession(sessionId, {
+        completedAt: completed ? Date.now() : undefined,
+      });
+      if (isElectron) {
+        send({
+          type: "session.setCompleted",
+          payload: { sessionId, completed },
+        });
+      }
+    },
+    [send],
+  );
+
   const unarchiveSession = useCallback(
     (sessionId: string) => {
       useAppStore
@@ -1475,6 +1492,7 @@ export function useIPC() {
     deleteSession,
     batchDeleteSessions,
     archiveSession,
+    setSessionCompleted,
     unarchiveSession,
     batchArchiveSessions,
     batchUnarchiveSessions,

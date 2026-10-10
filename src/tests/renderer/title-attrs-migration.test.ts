@@ -72,7 +72,7 @@ const ALLOWED_NATIVE_TITLES: Record<string, number> = {
   "components/message/ContentBlockView.tsx": 2, // 文件链接的完整路径
   "components/message/ElementRefChips.tsx": 1, // 完整 CSS selector
   "components/message/ProcessSummaryBlock.tsx": 1, // 片段全文
-  "components/Sidebar.tsx": 2, // 归档/确认按钮 + 项目分组完整 cwd
+  "components/Sidebar.tsx": 2, // 标记完成按钮 + 项目分组完整 cwd
   // —— 状态说明（说明这个元素为什么不可用，不是操作提示） ——
   "components/message/ArtifactCard.tsx": 1, // 「已回退」：解释该行为何点不动
   // —— 数据值（数据密集，不该给每格挂 Radix） ——
