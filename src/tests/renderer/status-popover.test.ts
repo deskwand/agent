@@ -342,6 +342,21 @@ describe("StatusPopover", () => {
     expect(button.getAttribute("aria-label")).toBe("statusPopover.ringTooltip");
   });
 
+  // 迁移回归守卫（与活动 chip 同族的迁移回归）：环自己写的 `w-5 h-5`（20px）会被
+  // `<Button>` base 的 `[&_svg]:size-4` 顶掉 —— 选择器 `.cls svg` 特指度 0,1,1 > `.h-5` 的 0,1,0。
+  // Chromium + 构建 CSS 实测 16px，写回后 20px == 迁移前的原生 `<button>`（`67889f23^`）。
+  // 这个触发器里只有环一个 svg，所以 `size-5` 不会误伤别处。
+  // ⚠️ jsdom 没有布局引擎 ⇒ 这一条钉的是类名，几何归真机。
+  it("环的尺寸不被 Button 的 base 顶掉", () => {
+    render();
+
+    // 按空白切分成 token 再断言：`className.toContain` 在本文件已经被证明会误报
+    // （关闭态的 `hover:bg-accent` 也会让 toContain 通过）。
+    const tokens = trigger().className.split(/\s+/);
+    expect(tokens).toContain("[&_svg]:size-5");
+    expect(tokens).not.toContain("[&_svg]:size-4");
+  });
+
   it("展开时按钮保持按下背景", () => {
     render();
     act(() => trigger().click());

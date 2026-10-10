@@ -88,6 +88,33 @@ describe("ChatInputQueueBar", () => {
     expect(onRemove).toHaveBeenCalledWith("q2");
   });
 
+  // 迁移回归守卫（与活动 chip / 目标胶囊同一族）：这两个键跟全仓所有手写控件一样
+  // 迁成了 `<Button variant="ghost">`，而 base 自带 `font-medium` 与 `[&_svg]:size-4`
+  // （`.cls svg` 特指度 0,1,1，稳压 svg 自己的 `h-3 w-3` / `h-3.5 w-3.5`）。
+  // Chromium + 构建 CSS 实测：steer 胶囊 11px/500、图标 16px；删除键图标 16px
+  // （迁移前的原生 `<button>` 分别是 400 / 12px 与 14px）。
+  // ⚠️ jsdom 没有布局引擎 ⇒ 这一条钉的是「泄漏的类不在 + 写回的类都在」，几何归真机。
+  it("steer 与删除键不继承 Button 的字重与图标尺寸", async () => {
+    await renderBar({ items, onSteer: vi.fn(), onRemove: vi.fn() });
+    const tokens = (el: Element) => el.className.split(/\s+/);
+    const steer = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("引导"),
+    )!;
+    const remove = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="删除"]',
+    )!;
+
+    const steerTokens = tokens(steer);
+    expect(steerTokens).toContain("font-normal");
+    expect(steerTokens).toContain("[&_svg]:size-3");
+    expect(steerTokens).not.toContain("font-medium");
+    expect(steerTokens).not.toContain("[&_svg]:size-4");
+
+    const removeTokens = tokens(remove);
+    expect(removeTokens).toContain("[&_svg]:size-3.5");
+    expect(removeTokens).not.toContain("[&_svg]:size-4");
+  });
+
   it("renders nothing when empty", async () => {
     await renderBar({ items: [], onSteer: vi.fn(), onRemove: vi.fn() });
     expect(container.innerHTML).toBe("");

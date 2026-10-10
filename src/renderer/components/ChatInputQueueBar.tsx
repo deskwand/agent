@@ -103,7 +103,11 @@ export function ChatInputQueueBar({
               <Button variant="ghost"
                 type="button"
                 disabled={isRunning && Boolean(item.elSelections?.length)}
-                className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[background-color] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed h-auto"
+                // ⚠️ `font-normal [&_svg]:size-3` 是给 `<Button>` base 擦屁股（与活动 chip / 目标胶囊同一族
+                // 的迁移回归）：base 的 `font-medium` 把 11px 胶囊压成 500，`[&_svg]:size-4`（`.cls svg`
+                // 特指度 0,1,1）又顶掉 `Navigation` 自己的 `h-3 w-3` ⇒ 16px。Chromium + 构建 CSS 实测：
+                // 500 / 16px，写回后 400 / 12px == 迁移前的原生 `<button>`（`67889f23^`）。
+                className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[background-color] active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed h-auto font-normal [&_svg]:size-3"
                 onClick={() => onSteer(item.id)}
               >
                 <Navigation className="h-3 w-3" />
@@ -119,7 +123,8 @@ export function ChatInputQueueBar({
           <Button variant="ghost"
             type="button"
             aria-label={t("steer.remove")}
-            className="flex-shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors h-auto"
+            // 同上：`X` 写的 `h-3.5 w-3.5` 被 base 的 `[&_svg]:size-4` 顶成 16px（实测；迁移前 14px）
+            className="flex-shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors h-auto [&_svg]:size-3.5"
             onClick={() => onRemove(item.id)}
           >
             <X className="h-3.5 w-3.5" />

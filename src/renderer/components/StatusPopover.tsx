@@ -72,7 +72,11 @@ export function StatusPopover({
             // onClick / aria-haspopup / aria-expanded 三样都由 Radix 的 Trigger 管 ——
             // 手写会和它打架（两边各切一次 = 等于不切换）
             aria-label={t("statusPopover.ringTooltip")}
-            className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-2xl border border-border/40 transition-colors ${
+            // ⚠️ `[&_svg]:size-5` 是给 `<Button>` base 擦屁股（与活动 chip 同族的迁移回归）：环自己写的
+            // `w-5 h-5`（20px）被 base 的 `[&_svg]:size-4`（`.cls svg` 特指度 0,1,1）顶成 16px ——
+            // Chromium + 构建 CSS 实测 16px，写回后 20px == 迁移前的原生 `<button>`（`67889f23^`）。
+            // 这个触发器里只有环一个 svg，所以 `size-5` 不会误伤别处。
+            className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-2xl border border-border/40 transition-colors [&_svg]:size-5 ${
               open
                 ? "bg-accent"
                 : "bg-background/60 hover:bg-accent"

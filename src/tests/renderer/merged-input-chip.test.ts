@@ -228,6 +228,24 @@ describe("MergedInputChip (single-panel)", () => {
     expect(trigger().textContent).toContain("chat.thinkingLevel.medium");
   });
 
+  // 迁移回归守卫（与活动 chip 同族）：这个 chip 的 `h-9` / `text-xs` 是**有意**写的
+  // （与输入框底行其它 36px 控件同高），但 base 的 `font-medium` 与 `[&_svg]:size-4`
+  // 没人顶 ⇒ Chromium + 构建 CSS 实测字 12px/**500**、chevron **16px**（作者写的是 `h-3 w-3`）；
+  // 迁移前的原生 `<button>` 是 400 / 12px（`67889f23^`）。
+  // ⚠️ jsdom 没有布局引擎 ⇒ 这一条钉的是类名，几何归真机。
+  it("模型 chip 不继承 Button 的字重与图标尺寸", () => {
+    render();
+
+    const tokens = trigger().className.split(/\s+/);
+    expect(tokens).toContain("font-normal");
+    expect(tokens).toContain("[&_svg]:size-3");
+    expect(tokens).not.toContain("font-medium");
+    expect(tokens).not.toContain("[&_svg]:size-4");
+    // 有意写的高度档与字号不许被这条守卫顺手收掉（否则就是越权）
+    expect(tokens).toContain("h-9");
+    expect(tokens).toContain("text-xs");
+  });
+
   it("opens the panel on chip click", async () => {
     render();
     expect(trigger().getAttribute("aria-expanded")).toBe("false");

@@ -553,11 +553,34 @@ describe("activity chip", () => {
     }
     // ⚠️ 高度再按**族**兜一道：上面写死的是今天的缺省档 `h-9`，档位哪天从 `h-9` 调成
     // `h-8`，那条会静默转绿（`h-auto` 是 chip 自己写回的白名单，不属于任何数字档）。
+    const tokens = (chip?.className ?? "").split(/\s+/);
     expect(
-      (chip?.className ?? "")
-        .split(/\s+/)
-        .filter((cls) => /^h-(?:\d|\[)/.test(cls)),
+      tokens.filter((cls) => /^h-(?:\d|\[)/.test(cls)),
       "chip 不该带上任何数字高度档",
     ).toEqual([]);
+    // ⚠️ 另三个轴同理：写死今天的 `text-sm` / `font-medium` / `[&_svg]:size-4`，哪一天 base
+    // 把它们改成 `text-[13px]` / `font-semibold` / `[&_svg]:size-5`，上面那三条就会静默转绿
+    // ⇒ 这三条按**族**钉「chip 上只允许出现它自己写回的那一个值」。
+    // （白名单式而不是硬编码黑名单：`text-left` / `text-foreground` 这类同前缀的别的族不算。）
+    expect(
+      tokens.filter((cls) =>
+        /^text-(?:\[|xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)$/.test(
+          cls,
+        ),
+      ),
+      "chip 只允许 text-xs 这一个字号档",
+    ).toEqual(["text-xs"]);
+    expect(
+      tokens.filter((cls) =>
+        /^font-(?:\[|thin|extralight|light|normal|medium|semibold|bold|extrabold|black)$/.test(
+          cls,
+        ),
+      ),
+      "chip 只允许 font-normal 这一个字重档",
+    ).toEqual(["font-normal"]);
+    expect(
+      tokens.filter((cls) => /^\[&_svg\]:size-/.test(cls)),
+      "chip 只允许 [&_svg]:size-3 这一个图标尺寸档",
+    ).toEqual(["[&_svg]:size-3"]);
   });
 });
