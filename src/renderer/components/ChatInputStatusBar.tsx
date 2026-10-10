@@ -535,7 +535,7 @@ export function ChatInputStatusBar({
           {status.type === "goal-active" && onGoalCommand && (
             <Button variant="ghost"
               type="button"
-              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
+              className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto font-normal"
               onClick={() => onGoalCommand("goal:pause")}
             >
               {t("goal.pause")}
@@ -545,14 +545,14 @@ export function ChatInputStatusBar({
             <>
               <Button variant="ghost"
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-primary/15 text-primary-text hover:bg-primary/25 transition-[transform,background-color,color] active:scale-[0.97] h-auto font-normal"
                 onClick={() => onGoalCommand("goal:resume")}
               >
                 {t("goal.resume")}
               </Button>
               <Button variant="ghost"
                 type="button"
-                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent text-muted-foreground hover:bg-accent/80 transition-[transform,background-color,color] active:scale-[0.97] h-auto"
+                className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] bg-accent text-muted-foreground hover:bg-accent/80 transition-[transform,background-color,color] active:scale-[0.97] h-auto font-normal"
                 onClick={() => onGoalCommand("goal:clear")}
               >
                 {t("goal.clear")}

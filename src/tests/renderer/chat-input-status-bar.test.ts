@@ -388,6 +388,61 @@ describe("ChatInputStatusBar goal elapsed ticking", () => {
       ).toHaveLength(0);
     });
   });
+
+  // 迁移回归守卫：三个 goal 小按钮是 `<Button variant="ghost">`，base 的 `font-medium`（500）
+  // 无条件盖掉了它们从 `body`（400，globals.css:746）继承来的字重 —— 迁移前它们是原生
+  // `<button>`、className 里没有任何字重类。11px 的胶囊用 500、夹在 12px/400 的状态文字里
+  // 会显粗（2026-10-10 与面板行 / chip 同一批报障）。
+  // ⚠️ jsdom 没有布局 ⇒ 这里钉的是「`font-medium` 不在」（真机制：`cn` 把它整条删掉），
+  // **不是**「量出来是 400」—— 两条字重类同时在场时按样式表顺序也能量出 400（假绿）。
+  it("goal 小按钮不继承 Button 的 500 字重", async () => {
+    // 两种状态合起来覆盖三个按钮：active 有「暂停」；paused 有「继续」+「清除」。
+    const cases: { status: ChatInputStatus; labels: string[] }[] = [
+      {
+        status: { type: "goal-active", objective: "fix login", iteration: 2 },
+        labels: ["goal.pause"],
+      },
+      {
+        status: { type: "goal-paused", objective: "fix login", iteration: 2 },
+        labels: ["goal.resume", "goal.clear"],
+      },
+    ];
+    for (const { status, labels } of cases) {
+      await act(async () => {
+        root.render(
+          React.createElement(ChatInputStatusBar, {
+            status,
+            currentTodos: null,
+            currentPlanDone: false,
+            lastNonEmptyTodos: null,
+            lastPlanDone: false,
+            backgroundAgentRows: [],
+            onGoalCommand: vi.fn(),
+          }),
+        );
+      });
+      // 按文案定位（本文件的 `t` mock 对未知 key 返回 key ⇒ 文案就是 “goal.pause” 那几个）：
+      // 按索引取会把「将来多一个按钮」误判成回归。
+      const buttons = Array.from(container.querySelectorAll("button")).filter(
+        (b) => labels.includes(b.textContent ?? ""),
+      );
+      // 「一个都没漏」比「至少有一个」重要：三处 className 是复制粘贴出来的，漏改一处就会静默变粗
+      expect(
+        buttons.map((b) => b.textContent),
+        "按文案定位到的按钮",
+      ).toEqual(labels);
+      for (const button of buttons) {
+        expect(
+          button.classList.contains("font-normal"),
+          String(button.textContent),
+        ).toBe(true);
+        expect(
+          button.classList.contains("font-medium"),
+          String(button.textContent),
+        ).toBe(false);
+      }
+    }
+  });
 });
 
 describe("background subagent entry", () => {
