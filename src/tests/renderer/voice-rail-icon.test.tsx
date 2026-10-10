@@ -4,7 +4,7 @@
 // 这里挂真实 AppRail（含底部 HelpMenu / AccountCluster），并把负断言锁在栏内
 // （nav[aria-label="navRail.label"]）—— 两个正断言先证明底部簇已挂载，否则
 // 那条「栏内没有 svg.lucide-mic」会在「底部根本没渲染」时假通过。
-import { act, type ReactNode } from "react";
+import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { Mic } from "lucide-react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -19,10 +19,6 @@ vi.mock("react-i18next", () => ({
     t: (key: string) => key,
     i18n: { language: "en", resolvedLanguage: "en" },
   }),
-}));
-// 只简化提示气泡本身：它不影响字形，也不影响按钮是否挂载。
-vi.mock("../../renderer/components/Tooltip", () => ({
-  Tooltip: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 let container: HTMLDivElement;
@@ -73,4 +69,31 @@ it("语音会话入口用自己的字形，不再和听写麦克风同形", asyn
 it("对照：lucide 的 Mic 在 DOM 里带 lucide-mic 类", async () => {
   await act(async () => root.render(<Mic className="h-4 w-4" />));
   expect(container.querySelectorAll("svg.lucide-mic")).toHaveLength(1);
+});
+
+// 禁用态的提示必须还能弹出来。
+//
+// 实测（2026-10-09）：浏览器不给 `disabled` 的表单控件派发鼠标/指针事件 ⇒ 提示监听器
+// 若挂在按钮本身，禁用态的提示**永远不出现**，而那正是最需要它的时刻（未接入语音会话
+// 时那颗按钮就是禁用的）。迁移前的 `Tooltip.tsx` 把监听器挂在外层 `.tt-anchor` span 上，
+// 所以那时是能弹的 ⇒ 迁移后必须把锚点留在 span 上。
+//
+// ⚠️ jsdom **复现不了**那条浏览器行为（它会照常把事件派给 disabled 元素），所以这里钉的是
+// **结构**：带 Radix 触发器标记（`data-state`）的元素必须是那个外层 span，而不是按钮本身。
+// 这条能挡住的就是「把 span 去掉、直接 let 按钮当锚点」这个回退。
+it("禁用态的语音入口把提示锚点留在外层 span 上（不是按钮本身）", async () => {
+  // 刻意**不传** onCreateVoiceSession ⇒ 按钮 disabled —— 用例测的就是禁用态。
+  await act(async () => root.render(<AppRail />));
+
+  const voice = container.querySelector<HTMLButtonElement>(
+    'button[aria-label="navRail.newVoiceSession"]',
+  );
+  expect(voice).not.toBeNull();
+  // 前置条件：它真的禁用了。否则这条用例在测另一个状态、而且会因锚点不同而误红。
+  expect(voice!.disabled).toBe(true);
+
+  const anchor = voice!.parentElement;
+  expect(anchor?.tagName).toBe("SPAN");
+  // Radix 把触发器属性（含 data-state）落在锚点上 ⇒ 顺带证明 span 才是触发元素。
+  expect(anchor?.getAttribute("data-state")).not.toBeNull();
 });

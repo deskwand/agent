@@ -1094,7 +1094,7 @@ export function SettingsSkills({ isActive }: { isActive: boolean }) {
             {t("skillMarket.skillCount")}
           </span>
           <div className="flex items-center rounded-lg border border-border overflow-hidden">
-            {/* ⚠️ 这里原先每颗按钮外面还有一层老 Tooltip 的 .tt-anchor span —— 迁移后
+            {/* ⚠️ 这里原先每颗按钮外面还有一层老 Tooltip 的包裹 span —— 迁移后
                 按钮自己成了 flex item（层数少了一层，观感不变）。分段控件的圆角与
                 分隔由外层 div 的 overflow-hidden / border 继续负责。 */}
             <Tooltip>

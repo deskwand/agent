@@ -87,6 +87,25 @@ describe("activity chip", () => {
     expect(container.querySelector("[role='progressbar']")).toBeTruthy();
   });
 
+  // 进度条迁到 vendored `Progress`（经 `app-progress.tsx` 包装）后，有两件事字符串层
+  // 看不到、只能靠单测钉住：① 区间语义是包装层显式写回的（vendored 不把 value 转给
+  // Root）；② 尺寸仍由调用点的 className 压住 vendored 的 `h-2 w-full`（cn 去重），
+  // 否则这条 34px 的窄条会无声变成整行 8px 高的进度条。
+  // 换算与 aria 本身在 `app-progress.test.ts` 里单独钉；这条钉的是 chip 里的接入。
+  it("进度条是 vendored Progress：保留 2/9 的区间语义与 34×4px 的尺寸", () => {
+    render(strip({ currentTodos: TODOS }));
+    const bar = container.querySelector("[role='progressbar']");
+    expect(bar).toBeTruthy();
+    expect(bar?.getAttribute("aria-valuenow")).toBe("1");
+    expect(bar?.getAttribute("aria-valuemax")).toBe("2");
+    for (const cls of ["h-1", "w-[34px]", "flex-none"]) {
+      expect(bar?.classList.contains(cls), cls).toBe(true);
+    }
+    for (const cls of ["h-2", "w-full"]) {
+      expect(bar?.classList.contains(cls), cls).toBe(false);
+    }
+  });
+
   it("renders nothing on the right when there is no activity", () => {
     render(strip());
     expect(container.querySelector("[role='progressbar']")).toBeNull();

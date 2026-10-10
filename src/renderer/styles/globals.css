@@ -1481,30 +1481,6 @@
   }
 }
 
-/* Tooltip 气泡。定位与可见性都由 @floating-ui/react 驱动（见 Tooltip.tsx）：
-   组件只负责给出浮动坐标（position / left / top 走 inline style），这里只描述外观。 */
-.tt-anchor {
-  display: inline-flex;
-}
-
-.tt-bubble {
-  /* position / left / top 由 @floating-ui/react 经 inline style 提供 */
-  pointer-events: none;
-  z-index: 60;
-  max-width: 18rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding: 0.1875rem 0.5rem;
-  border-radius: 6px;
-  font-size: 0.6875rem;
-  line-height: 1.5;
-  /* 反色气泡：浅色主题深底浅字、深色主题中间灰浅字（见 tooltip-palette.test.ts 的界值） */
-  background: var(--popover);
-  color: var(--popover-foreground);
-  box-shadow: var(--shadow-elevated);
-}
-
 /* ── Usage heatmaps ── */
 @layer components {
   /* "No record" cell: dark surface with an inset rim, so it stays visually

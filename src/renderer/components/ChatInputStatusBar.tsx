@@ -18,7 +18,6 @@ import {
   XCircle,
   Square,
 } from "lucide-react";
-import { MENU_PANEL_CLASS } from "./menu-styles";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import type { BackgroundAgentRow } from "../utils/subagent-card";
 import type { CurrentTodos } from "../utils/current-todos";
@@ -28,6 +27,7 @@ import {
   formatDurationShort,
   isLingering,
 } from "../utils/execution-clock";
+import { AppProgress } from "./app-progress";
 import { Button } from "./app-button";
 
 export type ChatInputStatus =
@@ -264,7 +264,11 @@ export function ChatInputStatusBar({
             // role="dialog" 由 Radix 的 PopoverContent 提供，不手写（写了会重复）
             aria-label={t("activity.panelTitle")}
             style={{ maxHeight: panelMaxHeight ?? undefined }}
-            className={`${MENU_PANEL_CLASS} w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs`}
+            // 外壳用 vendored `PopoverContent` 自己的契约（`bg-popover` + `rounded-md`
+            // + `shadow-md` + 入场动画），不再盖 `MENU_PANEL_CLASS` —— 与同族的
+            // `StatusPopover` 面板一致（那边 2026-10-09 迁移时就是这么定的）。
+            // `p-1` 必须留着：vendored 自带 `p-4`，靠 cn()「调用方 className 在最后」压住。
+            className="w-[32rem] max-w-full max-h-[min(70vh,32rem)] overflow-y-auto p-1 text-xs"
           >
             {hasPlan ? (
               <>
@@ -396,20 +400,17 @@ export function ChatInputStatusBar({
           >
             {hasPlan ? (
               <>
-                <span
-                  role="progressbar"
-                  aria-valuemin={0}
-                  aria-valuemax={todos.length}
-                  aria-valuenow={completedCount}
-                  className="h-1 w-[34px] flex-none overflow-hidden rounded-full bg-accent"
-                >
-                  <span
-                    className="block h-full bg-primary"
-                    style={{
-                      width: `${(completedCount / todos.length) * 100}%`,
-                    }}
-                  />
-                </span>
+                {/* 进度条走 vendored shadcn `Progress`（经 `app-progress.tsx` 薄包装层，
+                    不再手搓 `role="progressbar"`）。包装层做的两件事 —— 把 2/9 换成
+                    百分比（vendored 的位移只认 0–100）、把区间语义写回 aria —— 理由
+                    在那边的文件头，两条都是实测。
+                    尺寸靠 className 压住 vendored 的 `h-2 w-full`（cn 去重，调用方赢）：
+                    这条 chip 里它是 34×4px 的窄条，不是整行进度条。 */}
+                <AppProgress
+                  value={completedCount}
+                  max={todos.length}
+                  className="h-1 w-[34px] flex-none"
+                />
                 <span className="flex-none">
                   {planDone ? "✓ " : ""}
                   {completedCount}/{todos.length}

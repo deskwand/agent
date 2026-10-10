@@ -527,6 +527,32 @@ describe("background subagent entry", () => {
     expect(panel?.className).toContain("overflow-y-auto");
   });
 
+  // 外壳契约：面板必须用 vendored `PopoverContent` 自己的契约（实色底 + 入场动画），
+  // 而不是本仓内联外壳 —— 判据与 `status-popover.test.ts` 同源（那次迁移定下的口径），
+  // 只是载体不同。逐 token 用 classList 断言，不用字符串 includes：
+  // `hover:bg-accent` 那类子串会让 toContain 恒真。
+  it("面板外壳走 vendored PopoverContent（bg-popover + 入场动画，无内联外壳）", async () => {
+    renderEntry(rows);
+    await openPanel(container);
+    const panel = findPanel();
+
+    expect(panel?.classList.contains("data-[state=open]:animate-in")).toBe(
+      true,
+    );
+    expect(panel?.classList.contains("bg-popover")).toBe(true);
+    expect(panel?.classList.contains("rounded-md")).toBe(true);
+
+    // 旧内联外壳（MENU_PANEL_CLASS）的三个特征必须消失
+    expect(panel?.classList.contains("rounded-xl")).toBe(false);
+    expect(panel?.classList.contains("bg-background")).toBe(false);
+    expect(panel?.classList.contains("shadow-elevated")).toBe(false);
+
+    // 「丢能力」那一侧：vendored 自带 `p-4`，本面板靠 `p-1` 保住行几何
+    //（分区标题自己还有 px-2）。若哪天忘了压住 p-4，上面几条会全绿而内边距无声变成 16px。
+    expect(panel?.classList.contains("p-1")).toBe(true);
+    expect(panel?.classList.contains("p-4")).toBe(false);
+  });
+
   // 不变量守卫：mousedown 是外部点击关闭的判据，行内按下不能关面板。
   // 注意它**不**区分 panelRef 挂在哪——面板在 DOM 上既是外层容器也是 chip span 的后代，
   // 两种挂法 contains() 都成立（实测：把 ref 挪回 span，本用例仍绿）。

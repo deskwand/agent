@@ -12,7 +12,7 @@ import {
 import type { ActiveView } from "../store";
 import { useAppStore } from "../store";
 import { RAIL_ITEMS, resolveRailActiveKey } from "../utils/nav-rail";
-import { Tooltip } from "./Tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./app-tooltip";
 import { HelpMenu } from "./HelpMenu";
 import { RAIL_BUTTON_CLASS } from "./rail-styles";
 import { AccountCluster } from "./AccountCluster";
@@ -65,46 +65,66 @@ export function AppRail({
             : t(item.labelKey);
         return (
           <Fragment key={item.key}>
-            <Tooltip label={t(item.labelKey)} placement="right">
-              <Button variant="ghost"
-                type="button"
-                onClick={() => handleItemClick(item.view)}
-                aria-label={label}
-                aria-current={isActive ? "page" : undefined}
-                className={`${RAIL_BUTTON_CLASS} relative ${
-                  isActive
-                    ? "bg-accent text-primary-text"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                }`}
-              >
-                {Icon ? <Icon className="w-4 h-4" /> : null}
-                {unread > 0 ? (
-                  <span
-                    data-testid="feed-badge"
-                    aria-hidden
-                    className="absolute -right-0.5 -top-0.5 min-w-[15px] rounded-full bg-primary px-1 text-center text-[9px] font-bold leading-[15px] text-primary-foreground"
-                    style={{
-                      boxShadow: "0 0 0 2px var(--app-chrome)",
-                    }}
-                  >
-                    {unread > 99 ? "99+" : unread}
-                  </span>
-                ) : null}
-              </Button>
-            </Tooltip>
-            {item.key === "chat" ? (
-              <Tooltip label={t("navRail.newVoiceSession")} placement="right">
-                {/* 刻意不用麦克风：输入框那个 Mic 是听写，两个语音类按钮
-                    必须一眼分得开。声波条在栏内的线性图标里也不突兀。 */}
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <Button variant="ghost"
                   type="button"
-                  aria-label={t("navRail.newVoiceSession")}
-                  disabled={voiceCreating || !onCreateVoiceSession}
-                  onClick={onCreateVoiceSession}
-                  className={`${RAIL_BUTTON_CLASS} text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50`}
+                  onClick={() => handleItemClick(item.view)}
+                  aria-label={label}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`${RAIL_BUTTON_CLASS} relative ${
+                    isActive
+                      ? "bg-accent text-primary-text"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`}
                 >
-                  <AudioLines className="w-4 h-4" />
+                  {Icon ? <Icon className="w-4 h-4" /> : null}
+                  {unread > 0 ? (
+                    <span
+                      data-testid="feed-badge"
+                      aria-hidden
+                      className="absolute -right-0.5 -top-0.5 min-w-[15px] rounded-full bg-primary px-1 text-center text-[9px] font-bold leading-[15px] text-primary-foreground"
+                      style={{
+                        boxShadow: "0 0 0 2px var(--app-chrome)",
+                      }}
+                    >
+                      {unread > 99 ? "99+" : unread}
+                    </span>
+                  ) : null}
                 </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">{t(item.labelKey)}</TooltipContent>
+            </Tooltip>
+            {item.key === "chat" ? (
+              /* 刻意不用麦克风：输入框那个 Mic 是听写，两个语音类按钮
+                 必须一眼分得开。声波条在栏内的线性图标里也不突兀。 */
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  {/* ⚠️ 锦点必须是这层 **span**，不能是按钮本身 ✗（2026-10-09 实测 ✓）：
+                      浏览器不给 `disabled` 的表单控件派发鼠标/指针事件 ⇒ 监听器落在按钮上时，
+                      禁用态（`voiceCreating` 或 `onCreateVoiceSession` 未接入）的提示**永不出现** ——
+                      而那正是最需要它的时刻。迁移前的 `Tooltip.tsx` 把监听器挂在外层 `.tt-anchor`
+                      span 上，所以那时是能弹的 ⇒ **这层 span 就是那条行为的载体**。
+                      必须是有**盒子**的元素（`display: contents` 没有盒子 ⇒ 同样收不到事件 ✗）；
+                      `inline-flex` 让它恰好包住 w-8 h-8 的按钮，栏内几何与间距不变 ✓。
+                      同类待办（同一根因，各自迁移批次里带进来的）：
+                      `ChatInputBottomBar.tsx:172` · `BrowserPanel.tsx:207` ·
+                      `SettingsSkills.tsx:1174` · `SkillCard.tsx:41,253,278`。 */}
+                  <span className="inline-flex">
+                    <Button variant="ghost"
+                      type="button"
+                      aria-label={t("navRail.newVoiceSession")}
+                      disabled={voiceCreating || !onCreateVoiceSession}
+                      onClick={onCreateVoiceSession}
+                      className={`${RAIL_BUTTON_CLASS} text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50`}
+                    >
+                      <AudioLines className="w-4 h-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {t("navRail.newVoiceSession")}
+                </TooltipContent>
               </Tooltip>
             ) : null}
           </Fragment>
