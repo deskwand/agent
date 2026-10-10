@@ -9,12 +9,35 @@
 //   1. Esc 只能**调一次** onClose —— 键盘映射里那个 case "Escape" 必须删掉，
 //      否则 Radix（document 捕获阶段）与它（window）各调一次
 //   2. z-index 不能降 —— 降了会被其他弹窗盖住
-import "../../renderer/i18n/config";
-import { act, type ReactNode } from "react";
+import i18n from "../../renderer/i18n/config";
+import { act, forwardRef, type ComponentProps, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../renderer/store";
 import { ImageLightbox } from "../../renderer/components/ImageLightbox";
 import { setupDialogTest } from "../dialog-test-helpers";
+import type * as DialogUiModule from "../../renderer/components/ui/dialog";
+
+// 「关闭键必须是 shadcn 的 DialogClose」这条要求在 jsdom 里观察不到 ——
+// DialogClose 与自绘 `onClick={onClose}` 都是「一个按钮、点一下关掉」。
+// 所以包一层代理：渲染过就记一笔，然后原样委托给真的 DialogClose
+// （asChild / ref / Radix 上下文都走原实现）。其余导出（DialogContent 等）保持真实。
+const { dialogCloseRenders } = vi.hoisted(() => ({
+  dialogCloseRenders: { count: 0 },
+}));
+vi.mock("../../renderer/components/ui/dialog", async (importOriginal) => {
+  const actual = await importOriginal<typeof DialogUiModule>();
+  const RealDialogClose = actual.DialogClose;
+  return {
+    ...actual,
+    DialogClose: forwardRef<
+      HTMLButtonElement,
+      ComponentProps<typeof RealDialogClose>
+    >((props, ref) => {
+      dialogCloseRenders.count += 1;
+      return <RealDialogClose {...props} ref={ref} />;
+    }),
+  };
+});
 
 const onClose = vi.fn();
 
@@ -118,7 +141,63 @@ describe("ImageLightbox 外壳", () => {
       );
     });
     // 只要不抛异常、且弹窗还在（说明方向键没被当成关闭）即可；
-    // 切到第几张由既有的 image-lightbox-toolbar 测试覆盖。
+    // 切到第几张暂无专测，工具条相关的不变量在 image-lightbox-toolbar-anchor.test.tsx。
     expect(shell(), "方向键不该关掉查看器").not.toBeNull();
+  });
+});
+
+// 关闭键只能有一个（2026-10-10 用户截图发现：窗口右上角还有个多余的 ✕）。
+//
+// vendored DialogContent 末尾总会画一个 `absolute right-4 top-4` 的角标（shadcn 的
+// DialogClose，可访问名是上游硬编码的英文 "Close"）；本查看器的关闭键在图片右上角的
+// 工具条里（与复制同一簇、label 走 i18n）。⇒ 在调用点用 `[&>button]:hidden` 藏掉角标，
+// 工具条那一处改成 Radix 的 `DialogClose asChild`，两处的关闭路径从此是同一条
+// （DialogClose → onOpenChange(false) → onClose）。
+describe("图片预览的关闭键", () => {
+  const closeLabel = (): string => i18n.t("imageLightbox.close");
+
+  it("DialogContent 内置的角标关闭键在调用点被屏蔽", async () => {
+    await mount();
+    const content = shell();
+    expect(content, "内容必须存在").not.toBeNull();
+    // jsdom 不跑 CSS，所以断言的是那条类名本身（同本文件 z-[100] 的写法）。
+    expect(
+      content!.className,
+      "必须屏蔽 DialogContent 的内置角标，否则预览里有两个关闭键",
+    ).toContain("[&>button]:hidden");
+    // 角标仍在 DOM 里（由 CSS 隐藏），且它是 DialogContent 唯一直接子 button ——
+    // 即这个选择器不会误伤工具条里的按钮（它们在 absolute w-0 h-0 锚点容器里）。
+    const directButtons = Array.from(
+      document.body.querySelectorAll('[role="dialog"] > button'),
+    );
+    expect(directButtons).toHaveLength(1);
+  });
+
+  it("工具条里恰好一个关闭键，点它恰好调一次 onClose", async () => {
+    await mount();
+    const toolbar = document.body.querySelector(
+      '[data-testid="image-lightbox-toolbar"]',
+    );
+    expect(toolbar, "工具条必须渲染出来").not.toBeNull();
+    const closeButtons = Array.from(toolbar!.querySelectorAll("button")).filter(
+      (button) => button.getAttribute("aria-label") === closeLabel(),
+    );
+    expect(closeButtons, "工具条里的关闭键必须恰好一个").toHaveLength(1);
+
+    await act(async () => {
+      closeButtons[0].click();
+    });
+    expect(
+      onClose,
+      "关闭键必须经 DialogClose → onOpenChange → onClose 关掉预览",
+    ).toHaveBeenCalledTimes(1);
+  });
+
+  it("关闭键来自 shadcn 的 DialogClose，而不是自绘 onClick", async () => {
+    await mount();
+    expect(
+      dialogCloseRenders.count,
+      "工具条的关闭键必须渲染自 ui/dialog 的 DialogClose（改回 onClick={onClose} 会让这条失败）",
+    ).toBeGreaterThan(0);
   });
 });

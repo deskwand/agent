@@ -8,7 +8,12 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { OccludingDialog } from "./ui/occluding-dialog";
-import { DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
+import {
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "./ui/dialog";
 import {
   X,
   ChevronLeft,
@@ -75,6 +80,8 @@ export function ImageLightbox({
   const containerRef = useRef<HTMLDivElement>(null);
   const activePointerIdRef = useRef<number | null>(null);
   const dragSurfaceRef = useRef<HTMLDivElement>(null);
+  // 工具条的 left/top 由弹层的布局盒解析，所以量完还要用它把视口坐标换回本地坐标。
+  const contentRef = useRef<HTMLDivElement>(null);
   const [toolbarAnchor, setToolbarAnchor] = useState<{
     left: number;
     top: number;
@@ -106,11 +113,20 @@ export function ImageLightbox({
   // 工具条锚在图片「未变换」的布局盒右上角：transform 只挂在 img 上，不改变父级
   // 布局盒，所以拖拽面的盒子就是图片在 zoom === 1 时的可见边界，缩放与平移时不动。
   // 盒子还没尺寸（图片未解码）时给 null，让工具条退回预览区右上角。
+  //
+  // ⚠️ getBoundingClientRect 给的是**视口**坐标，而 left/top 由弹层的布局盒解析：
+  // 弹层自己在打开动画里带 translate + scale，两者不相等 —— 必须换成本地坐标，
+  // 否则动画的变换会在工具条上再作用一次（见 toContentLocalAnchor）。
   const measureToolbarAnchor = useCallback(() => {
     const box = dragSurfaceRef.current?.getBoundingClientRect();
+    const content = contentRef.current;
     setToolbarAnchor(
-      box && box.width > 0 && box.height > 0
-        ? { left: box.right, top: box.top }
+      box && content && box.width > 0 && box.height > 0
+        ? toContentLocalAnchor(
+            box,
+            content.getBoundingClientRect(),
+            content.offsetWidth,
+          )
         : null,
     );
   }, []);
@@ -128,7 +144,9 @@ export function ImageLightbox({
   const canActOnImage = !loading && Boolean(imageSrc);
   // 图片已就绪但还没量到盒子（正在解码）时先不画工具条：否则它会先出现在预览区
   // 右上角 —— 正是用户嫌「太远」的那个位置 —— 再跳到图片角上。
-  // 图片真的加载失败时 img 会走 alt 文本框（有尺寸），量到盒子后照常出现。
+  // 加载失败也量：img 会走 alt 文本框（有尺寸）且会发 error —— 不监听它的话
+  // 工具条会一直停在 invisible，而本查看器唯一的关闭键就在工具条里（角标已被
+  // `[&>button]:hidden` 藏掉）⇒ 坏图会连一个可见的关闭键都没有。
   const toolbarPendingMeasure = canActOnImage && !toolbarAnchor;
   // 工具条靠右锚定、向左生长，所以可用宽度由锚点的 x 决定；没有锚点时用视口宽度兜底。
   const toolbarMaxWidth = toolbarAnchor
@@ -353,6 +371,7 @@ export function ImageLightbox({
       }}
     >
       <DialogContent
+        ref={contentRef}
         // 这一串是在**逐项压制 vendored DialogContent 的默认类**。
         // ⚠️ 定位必须用 left-0/top-0 而**不能**用 inset-0：`inset` 与 `left/top`
         // 在 tailwind-merge 里是**不同的组**，两个都会留下，而编译产物里
@@ -364,7 +383,19 @@ export function ImageLightbox({
         // 若内容自己也带半透明底，两层会**叠加**（1-(1-0.8)(1-0.5) ≈ 90% 黑），
         // 那是 jsdom 看不见的观感回归。让 overlay 当唯一背景层即可。
         // 这带来一处已记录的观感变化：浅色模式下 50% → 80%（与其余 11 个弹窗一致）。
-        className="fixed left-0 top-0 z-[100] flex h-full w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 border-0 bg-transparent p-0 shadow-none sm:rounded-none"
+        // ⚠️ `[&>button]:hidden` 屏蔽 vendored DialogContent 末尾那个内置关闭键
+        // （`absolute right-4 top-4`）：它是给普通弹窗用的固定角标，在全屏查看器里
+        // 会离开图片一大截，而且可访问名是上游硬编码的英文 "Close"。本查看器的
+        // 关闭键在工具条里（跟复制同一簇，label 走 i18n），两者并存就是「两个关闭键」
+        // （2026-10-10 用户截图发现的冗余）。选择器只命中 DialogContent 的**直接**子
+        // button —— 工具条在那个 `absolute w-0 h-0` 锚点容器里，不会被误伤。
+        // 上游新版给了 `showCloseButton={false}`，我们 vendored 的是老版本（写死在里面），
+        // 且本仓约定不手改 vendored 文件 ⇒ 在调用点这一层藏掉。
+        // ⚠️ `border-0` 也是锚点数学的前提（别当成装饰删掉）：绝对定位子元素的包含块是
+        // 弹层的 **padding box**，而 getBoundingClientRect().left 是**外边框**边缘 ——
+        // 只有边框宽为 0 时两者才重合，toContentLocalAnchor 的减法（以及去掉边框后的
+        // 工具条位置）才成立。
+        className="fixed left-0 top-0 z-[100] flex h-full w-full max-w-none translate-x-0 translate-y-0 flex-col gap-0 border-0 bg-transparent p-0 shadow-none sm:rounded-none [&>button]:hidden"
       >
         <DialogTitle className="sr-only">
           {images[currentIndex]?.name ??
@@ -434,7 +465,10 @@ export function ImageLightbox({
                 }
                 className="max-w-[90vw] max-h-[80vh] object-contain"
                 draggable={false}
+                // load 与 error 都要量：解码完成时量的是图片盒，失败时量的是 alt 文本框；
+                // 两者都是「img 的布局盒」，工具条才能落到它的右上角。
                 onLoad={measureToolbarAnchor}
+                onError={measureToolbarAnchor}
                 style={{
                   transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
                   transformOrigin: "center center",
@@ -450,7 +484,8 @@ export function ImageLightbox({
           {!isSingle && !loading && (
             <>
               {currentIndex > 0 && (
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -463,7 +498,8 @@ export function ImageLightbox({
                 </Button>
               )}
               {currentIndex < images.length - 1 && (
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -536,7 +572,8 @@ export function ImageLightbox({
                 <span className="shrink-0 w-px h-4 bg-white/20 mx-0.5" />
               )}
             {canActOnImage && (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={handleCopy}
                 className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
@@ -551,7 +588,8 @@ export function ImageLightbox({
               </Button>
             )}
             {canActOnImage && hasFilePath && (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 type="button"
                 onClick={handleOpenExternal}
                 className="shrink-0 flex items-center gap-1.5 h-8 px-2 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors text-sm"
@@ -561,17 +599,61 @@ export function ImageLightbox({
                 <span>{t("imageLightbox.openExternal")}</span>
               </Button>
             )}
-            <Button variant="ghost"
-              type="button"
-              onClick={onClose}
-              className="shrink-0 flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors"
-              aria-label={t("imageLightbox.close")}
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            {/* 走 shadcn 的 DialogClose（Radix Close）：关闭语义归它，
+                和窗口角上那个被藏起来的角标是同一条路径（onOpenChange → onClose）。
+                别改回 `onClick={onClose}` —— 那样这个 ✕ 就成了自绘按钮，
+                「预览里的关闭键是 shadcn 的」这条就不再成立。 */}
+            <DialogClose asChild>
+              <Button
+                variant="ghost"
+                type="button"
+                className="shrink-0 flex items-center justify-center h-8 w-8 rounded-md hover:bg-white/10 dark:hover:bg-white/15 transition-colors"
+                aria-label={t("imageLightbox.close")}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </DialogClose>
           </div>
         </div>
       </DialogContent>
     </OccludingDialog>
   );
+}
+
+/**
+ * 视口坐标 → 弹层局部坐标（导出以便单测）。
+ *
+ * 工具条的 left/top 由弹层的**布局盒**解析，而 getBoundingClientRect 给的是
+ * 变换之后的视觉坐标。vendored DialogContent 打开时自带
+ * `slide-in-from-left-1/2 slide-in-from-top-[48%] zoom-in-95`，于是打开动画期间
+ * 两者不相等：直接写视觉坐标，动画的变换会在工具条上**再作用一次**。
+ *
+ * 2026-10-10 实测（Chromium 1568×819、1024×700 的图）：图片右上角在 (1262.7, 81.9)，
+ * 量到并写进 left/top 的却是 (455.3, -294.8) —— 正好等于动画起始变换
+ * translate(-50%, -48%) ∘ scale(0.95) 作用一次后的位置 ⛔ ⇒ 工具条落在
+ * y = -344.8 的视口外，用户看到的就是「预览页面右上角的按钮都不见了」。
+ * 窗口 resize 会把这次测量重跑一遍（那时动画早已结束）工具条才回来，
+ * 说明量到的只是「动画途中的一刻」。
+ *
+ * 减去弹层原点、再除以当前缩放即得局部坐标：动画期间与动画结束都等于图片右上角
+ * 在弹层里的位置，工具条因此跟图片一起进入，不必等动画结束再补一次测量，
+ * 也就与动画时长无关（jsdom 里没有 animationend 也不受影响）。
+ *
+ * 缩放由「视觉宽度 / 布局宽度」现算：弹层在动画里是整体等比缩放 + 平移，这一个
+ * 比值刚好抵消两者；没有变换时比值是 1，结果与直接写视口坐标一致。
+ * 布局宽度拿不到（jsdom 恒为 0）时退回 1：宁可少减一层，也不把坐标算成 NaN。
+ */
+export function toContentLocalAnchor(
+  box: { right: number; top: number },
+  contentRect: { left: number; top: number; width: number },
+  contentLayoutWidth: number,
+): { left: number; top: number } {
+  const scale =
+    contentLayoutWidth > 0 && contentRect.width > 0
+      ? contentRect.width / contentLayoutWidth
+      : 1;
+  return {
+    left: (box.right - contentRect.left) / scale,
+    top: (box.top - contentRect.top) / scale,
+  };
 }
