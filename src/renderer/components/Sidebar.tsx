@@ -825,6 +825,10 @@ export function Sidebar({
             )}
             {showRelativeTime && (
               <div className="ml-auto h-6 w-[4.5rem] flex-shrink-0 relative">
+                {/* 尾槽只有一条基准线：相对时间文字的右缘（= 行右缘内缩 10px）✓。
+                    标记格是 16px 宽的盒子，若把 10px 状态点 / 12px pin **居中**，它们的
+                    墨迹会自己内缩 3px / 2px ⇒ 和上下行的时间错开 ✗（2026-10-11 报障图里
+                    那列点比时间靠左就是这么来的 ✓）⇒ `justify-end` 把盒子的右缘交回那条线 ✓。 */}
                 <div
                   className={`absolute inset-0 flex items-center justify-end transition-opacity ${
                     showSessionActions
@@ -834,7 +838,7 @@ export function Sidebar({
                 >
                   {hasStatusIndicator ? (
                     <span
-                      className="h-4 w-4 flex items-center justify-center"
+                      className="h-4 w-4 flex items-center justify-end"
                       role="status"
                       aria-label={t(
                         hasPendingAskUser
@@ -853,7 +857,7 @@ export function Sidebar({
                     </span>
                   ) : isPinned ? (
                     <span
-                      className="h-4 w-4 flex items-center justify-center"
+                      className="h-4 w-4 flex items-center justify-end"
                       role="img"
                       aria-label={t("sidebar.pinned")}
                     >
@@ -873,8 +877,12 @@ export function Sidebar({
                   )}
                 </div>
 
+                {/* 动作键是 24px 槽（`size="iconXs"`）里装 16px 图标 ⇒ 图标左右各有 4px
+                    内缩 ✗，直接右对齐会让悬停时那颗「更多」落在基准线左边 4px 处 ✓
+                    ⇒ 整行右移同样的 4px（`-mr-1`），图标格的右缘才回到上面那条线上 ✓。
+                    越出去的是行的右内边距（10px），没越过行的边界，也不会撑出横向滚动 ✓。 */}
                 <div
-                  className={`absolute inset-0 flex items-center justify-end transition-opacity ${
+                  className={`absolute inset-0 -mr-1 flex items-center justify-end transition-opacity ${
                     showSessionActions
                       ? "opacity-100"
                       : "opacity-0 pointer-events-none"
@@ -1045,6 +1053,8 @@ export function Sidebar({
                 {t("sidebar.showMoreSessions", { count: nextBatchCount })}
               </Button>
             )}
+            {/* 「收起」和上一条共用 `px-3` 内边距 ⇒ 比会话行的时间多缩 2px ✗：右拉回 2px
+                落到同一条基准线上 ✓（「展开更多」是左对齐，不在这条线上，不动 ✓）。 */}
             {canShowLess && (
               <Button variant="ghost"
                 type="button"
@@ -1052,7 +1062,7 @@ export function Sidebar({
                   requestSectionMotion(groupKey);
                   setSessionVisibleCount(groupKey, DEFAULT_VISIBLE_SESSIONS);
                 }}
-                className={`${SESSION_OVERFLOW_BUTTON_CLASS} ml-auto flex-shrink-0 text-right`}
+                className={`${SESSION_OVERFLOW_BUTTON_CLASS} ml-auto -mr-0.5 flex-shrink-0 text-right`}
               >
                 {t("sidebar.showLessSessions")}
               </Button>
@@ -1247,7 +1257,10 @@ export function Sidebar({
                         badgeKind={projectsRootBadgeKind}
                       />
                       <span>{t("sidebar.projects")}</span>
-                      <span className="ml-auto text-xs font-normal text-muted-foreground">
+                      {/* -mr-0.5：这行按钮的内边距是 `px-3`（比会话行的 `px-2.5` 多 2px）✗
+                          ⇒ 计数要落回会话行那条基准线，就得往右拉回这 2px ✓。
+                          左边不动：分组图标 / 标签的内缩保持原样 ✓。 */}
+                      <span className="ml-auto -mr-0.5 text-xs font-normal text-muted-foreground">
                         {sessionGroups.projectGroups.length}
                       </span>
                     </Button>

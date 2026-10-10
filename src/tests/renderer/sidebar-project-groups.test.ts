@@ -1737,8 +1737,9 @@ describe("Sidebar project groups", () => {
     const trailing = Array.from(header.querySelectorAll("button[aria-label]"));
     expect(trailing[trailing.length - 1]).toBe(pin);
     expect(header.lastElementChild?.contains(pin)).toBe(true);
-    // 那 2px 内缩才是把 32px 按钮的图标中心推到会话行那条 18px 竖线上的
-    // 机制；jsdom 量不了距离，只能锁类名。
+    // 那 2px 内缩把 32px 按钮里的 16px 图标格（左右各内缩 8px）推到行右缘内缩 10px ——
+    // 正是会话行的相对时间 / 状态标记那条共用右缘 ✓（见「尾槽每个标记的右缘…」那条 ✓）；
+    // jsdom 量不了距离，只能锁类名。
     expect(header.className).toContain("pr-0.5");
   });
 
@@ -1780,6 +1781,68 @@ describe("Sidebar project groups", () => {
     const marker = visible.firstElementChild as HTMLElement;
     expect(marker.getAttribute("role")).toBe("status");
     expect(marker.querySelector("svg")).toBeNull();
+  });
+
+  it("尾槽每个标记的右缘都落在相对时间那条线上", async () => {
+    // 尾槽只在**右缘**上对齐：基准线是相对时间的右缘（= 行右缘内缩 10px，即 `px-2.5` 的
+    // 内容盒边缘 ✓）。两处会自己掉进去的内缩：16px 标记格居中放 10px 状态点 / 12px pin
+    // ⇒ 墨迹各缩 3px / 2px ✗；24px 动作槽（`size="iconXs"`）里装 16px 图标 ⇒ 缩 4px ✗。
+    // 修法就是各交回那条线（`justify-end` / `-mr-1`）；jsdom 量不了距离，只能锁类名 ✓。
+    localStorage.setItem(
+      "deskwand.sidebarPins",
+      JSON.stringify({ sessionIds: ["pinned"], projectKeys: [] }),
+    );
+    await render([
+      session("running", { title: "Running chat", status: "running" }),
+      session("meta-project", {
+        title: "Project chat",
+        isProjectMode: true,
+        cwd: "/work/rail",
+      }),
+      session("pinned", {
+        title: "Pinned chat",
+        isProjectMode: true,
+        cwd: "/work/rail",
+      }),
+      ...Array.from({ length: 6 }, (_, index) =>
+        session(`bulk-${index}`, { title: `Bulk ${index}` }),
+      ),
+    ]);
+
+    const cellOf = (sessionId: string): HTMLElement => {
+      const rail = findSessionRail(sessionId);
+      expect(rail, sessionId).toBeTruthy();
+      const visible = rail!.firstElementChild as HTMLElement;
+      expect(visible.children, sessionId).toHaveLength(1);
+      return visible.firstElementChild as HTMLElement;
+    };
+    // 状态点 / pin 的 16px 标记格右对齐；掉成 `justify-center` 就又退回 3px / 2px 的内缩 ✗
+    for (const sessionId of ["running", "pinned"]) {
+      const cell = cellOf(sessionId);
+      expect(cell.className, sessionId).toContain("h-4");
+      expect(cell.className, sessionId).toContain("w-4");
+      expect(cell.className, sessionId).toContain("justify-end");
+    }
+    // 动作行整体右移 4px：图标右缘才回到基准线（掉 `-mr-1` 就又缩回 4px ✗）
+    const actionRow = findActionRow(sessionMoreButton("bulk-0"));
+    expect(actionRow?.className).toContain("justify-end");
+    expect(actionRow?.className).toContain("-mr-1");
+    // 那 4px 只对得上 24px 档 + 16px 图标（差的一半 ✓）：档位一旦写成别的尺寸，
+    // 同一个 `-mr-1` 就不是 4px 那个数了 ⇒ 档位也得钉住 ✓。
+    expect(sessionMoreButton("bulk-0").className).toContain("h-6");
+    // 「收起」只在场于列表被展开之后 ⇒ 先点一下「展开更多」（就是产品里的那条路径 ✓）
+    await act(async () =>
+      findButton(i18n.t("sidebar.showMoreSessions", { count: 2 }))?.click(),
+    );
+    // 「收起」与「项目」计数：按钮内边距是 `px-3`（比会话行多 2px）⇒ 右拉回 2px ✓
+    expect(findButton(i18n.t("sidebar.showLessSessions"))?.className).toContain(
+      "-mr-0.5",
+    );
+    const projectsCount = Array.from(
+      projectsToggle().querySelectorAll("span"),
+    ).find((span) => /^\d+$/.test(span.textContent ?? ""));
+    expect(projectsCount, "「项目」行的计数").toBeTruthy();
+    expect(projectsCount?.className).toContain("-mr-0.5");
   });
 
   it("会话行的归档/更多键是 24² 槽：缺省档垫子不在场（盒宽不再被撑到 32）", async () => {
