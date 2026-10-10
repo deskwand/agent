@@ -26,7 +26,8 @@ interface SidebarGroupIconProps {
   expanded: boolean;
   motionVersion: number;
   kind: "sessions" | "project";
-  showRunningBadge?: boolean;
+  /** 图标右上角的状态角标：asking = 静态警示色（停下等你），running = 主色脉冲（还在跑） */
+  badgeKind?: "asking" | "running" | null;
 }
 
 function isReducedMotion(): boolean {
@@ -281,7 +282,7 @@ export function SidebarGroupIcon({
   expanded,
   motionVersion,
   kind,
-  showRunningBadge = false,
+  badgeKind = null,
 }: SidebarGroupIconProps) {
   const collapsedRef = useRef<SVGSVGElement>(null);
   const expandedRef = useRef<SVGSVGElement>(null);
@@ -380,9 +381,11 @@ export function SidebarGroupIcon({
           />
         </>
       )}
-      {showRunningBadge && (
+      {badgeKind && (
         <span
-          className="absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_0_2px_var(--muted)]"
+          className={`absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full shadow-[0_0_0_2px_var(--muted)] ${
+            badgeKind === "asking" ? "bg-warning" : "bg-primary animate-pulse"
+          }`}
           aria-hidden="true"
         />
       )}

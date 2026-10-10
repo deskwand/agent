@@ -17,6 +17,7 @@ import {
   Pin,
   PinOff,
   Mic,
+  CircleHelp,
 } from "lucide-react";
 import { panelWidthTransitionClass } from "../utils/panel-width";
 import {
@@ -194,6 +195,44 @@ export function Sidebar({
     }
     return keys;
   }, [sessionGroups, sessionStates, sessionHasPendingAskUser]);
+
+  // 组内有待答提问 → 该组角标走 asking。只读 pending 这个事实，
+  // 不动 runningGroupKeys 的算法。
+  const askingGroupKeys = useMemo(() => {
+    const keys = new Set<string>();
+    if (
+      sessionGroups.unscopedSessions.some((s) => sessionHasPendingAskUser(s.id))
+    ) {
+      keys.add(ORDINARY_SESSION_GROUP_KEY);
+    }
+    for (const group of sessionGroups.projectGroups) {
+      if (group.sessions.some((s) => sessionHasPendingAskUser(s.id))) {
+        keys.add(group.key);
+      }
+    }
+    return keys;
+  }, [sessionGroups, sessionHasPendingAskUser]);
+
+  // 角标种类：组内有一条在等回答就 asking，否则才轮到 running。
+  // 与下面的 resolveProjectExpanded 一样是 render 期普通函数，不包 useCallback。
+  const badgeKindFor = (key: string): "asking" | "running" | null =>
+    askingGroupKeys.has(key)
+      ? "asking"
+      : runningGroupKeys.has(key)
+        ? "running"
+        : null;
+
+  // 「项目」根行：任一项目在等回答就 asking，否则任一项目在跑就 running
+  let projectsRootBadgeKind: "asking" | "running" | null = null;
+  for (const group of sessionGroups.projectGroups) {
+    const groupKind = badgeKindFor(group.key);
+    if (groupKind === "asking") {
+      projectsRootBadgeKind = "asking";
+      break;
+    }
+    if (groupKind === "running") projectsRootBadgeKind = "running";
+  }
+
   const pinnedSessionIds = useMemo(
     () => new Set(sidebarPins.sessionIds),
     [sidebarPins.sessionIds],
@@ -803,7 +842,14 @@ export function Sidebar({
                           : "sidebar.running",
                       )}
                     >
-                      <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
+                      {hasPendingAskUser ? (
+                        <CircleHelp
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 text-primary-text"
+                        />
+                      ) : (
+                        <span className="h-2.5 w-2.5 rounded-full bg-primary animate-pulse" />
+                      )}
                     </span>
                   ) : isPinned ? (
                     <span
@@ -1153,9 +1199,7 @@ export function Sidebar({
                         sectionMotionVersions.get(ORDINARY_SESSION_GROUP_KEY) ??
                         0
                       }
-                      showRunningBadge={runningGroupKeys.has(
-                        ORDINARY_SESSION_GROUP_KEY,
-                      )}
+                      badgeKind={badgeKindFor(ORDINARY_SESSION_GROUP_KEY)}
                     />
                     <span>{t("sidebar.recents")}</span>
                   </Button>
@@ -1198,9 +1242,7 @@ export function Sidebar({
                         motionVersion={
                           sectionMotionVersions.get(PROJECTS_GROUP_KEY) ?? 0
                         }
-                        showRunningBadge={sessionGroups.projectGroups.some(
-                          (group) => runningGroupKeys.has(group.key),
-                        )}
+                        badgeKind={projectsRootBadgeKind}
                       />
                       <span>{t("sidebar.projects")}</span>
                       <span className="ml-auto text-xs font-normal text-muted-foreground">
@@ -1262,9 +1304,7 @@ export function Sidebar({
                                     motionVersion={
                                       sectionMotionVersions.get(group.key) ?? 0
                                     }
-                                    showRunningBadge={runningGroupKeys.has(
-                                      group.key,
-                                    )}
+                                    badgeKind={badgeKindFor(group.key)}
                                   />
                                   <span className="truncate">{group.name}</span>
                                   <span className="ml-auto text-xs font-normal text-muted-foreground opacity-0 transition-opacity group-hover/project:opacity-100">

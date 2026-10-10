@@ -181,13 +181,13 @@ describe("Sidebar disclosure motion", () => {
   function sessionIcon(
     expanded: boolean,
     motionVersion: number,
-    showRunningBadge = false,
+    badgeKind: "asking" | "running" | null = null,
   ): React.ReactElement {
     return React.createElement(SidebarGroupIcon, {
       kind: "sessions",
       expanded,
       motionVersion,
-      showRunningBadge,
+      badgeKind,
     });
   }
 
@@ -373,8 +373,8 @@ describe("Sidebar disclosure motion", () => {
     expect(container.textContent).not.toContain("Conversation");
   });
 
-  it("renders a running badge when showRunningBadge is true", async () => {
-    await render(sessionIcon(false, 0, true));
+  it("renders a running badge when badgeKind is running", async () => {
+    await render(sessionIcon(false, 0, "running"));
 
     const outerSpan = container.querySelector("span.relative") as HTMLElement;
     expect(outerSpan.classList.contains("overflow-visible")).toBe(true);
@@ -386,15 +386,23 @@ describe("Sidebar disclosure motion", () => {
     expect(badge?.classList.contains("w-1.5")).toBe(true);
   });
 
-  it("does not render a running badge when showRunningBadge is false or omitted", async () => {
-    await render(sessionIcon(false, 0, false));
-    expect(
-      container.querySelector("span.rounded-full.bg-primary.animate-pulse"),
-    ).toBeNull();
+  it("renders a static warning badge when badgeKind is asking", async () => {
+    await render(sessionIcon(false, 0, "asking"));
+
+    const badge = container.querySelector(
+      "span.rounded-full.bg-warning",
+    ) as HTMLElement | null;
+    expect(badge).toBeTruthy();
+    expect(badge?.classList.contains("h-1.5")).toBe(true);
+    expect(badge?.classList.contains("w-1.5")).toBe(true);
+    expect(badge?.classList.contains("animate-pulse")).toBe(false);
+  });
+
+  it("does not render a badge when badgeKind is null or omitted", async () => {
+    await render(sessionIcon(false, 0, null));
+    expect(container.querySelector("span.rounded-full")).toBeNull();
 
     await render(sessionIcon(false, 0));
-    expect(
-      container.querySelector("span.rounded-full.bg-primary.animate-pulse"),
-    ).toBeNull();
+    expect(container.querySelector("span.rounded-full")).toBeNull();
   });
 });

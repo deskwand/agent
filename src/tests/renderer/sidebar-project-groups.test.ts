@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "../../renderer/i18n/config";
 import { Sidebar } from "../../renderer/components/Sidebar";
 import { useAppStore } from "../../renderer/store";
-import type { Session } from "../../renderer/types";
+import type { AskUserRequest, Session } from "../../renderer/types";
 
 const ipc = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -69,14 +69,21 @@ describe("Sidebar project groups", () => {
 
   async function render(
     sessions: Session[],
-    options: { expandProjects?: boolean } = {},
+    options: {
+      expandProjects?: boolean;
+      pendingAskUsers?: Record<string, AskUserRequest>;
+    } = {},
   ): Promise<void> {
     // 「项目」默认收起后内层项目行不渲染；本文件测的是内层行为，
     // 所以渲染前把外层折叠行播种为展开。只有 3 个「存储值回退」用例需要
     // 保留脏存储，它们传 { expandProjects: false } 并在渲染后点击展开。
     if (options.expandProjects !== false) seedProjectsExpanded();
     await act(async () => {
-      useAppStore.setState({ sessions });
+      useAppStore.setState({
+        sessions,
+        // 每条用例都显式重置：反复 render 的用例不会带上一条的待答提问
+        pendingAskUsers: options.pendingAskUsers ?? {},
+      });
       root.render(React.createElement(Sidebar, { width: 280 }));
     });
     await flush();
@@ -975,6 +982,97 @@ describe("Sidebar project groups", () => {
     ).toBe(i18n.t("sidebar.running"));
   });
 
+  it("shows a help icon instead of the pulsing dot while ask_user waits", async () => {
+    await render(
+      [
+        session("waiting", { title: "Waiting on me", updatedAt: 20 }),
+        session("running-sibling", {
+          title: "Running sibling",
+          updatedAt: 10,
+          status: "running",
+        }),
+      ],
+      {
+        pendingAskUsers: {
+          t1: { sessionId: "waiting", toolCallId: "t1", questions: [] },
+        },
+      },
+    );
+
+    // 这一条的状态是 idle：图标只能由 pending 这个事实驱动
+    const waitingStatus =
+      sessionRow("waiting").querySelector('[role="status"]');
+    expect(waitingStatus).toBeTruthy();
+    // aria-label 今天就已经是 asking（既有三元）；本用例的新契约是形状
+    expect(waitingStatus?.getAttribute("aria-label")).toBe(
+      i18n.t("sidebar.asking"),
+    );
+    expect(waitingStatus?.querySelector("svg")).toBeTruthy();
+    // 钉住「与 AskUserCard 同一张脸」：图标身份 + 尺寸 + 色 token。
+    // ⚠️ 实际类名是 lucide-circle-question-mark：本版 lucide 的现名是
+    // CircleQuestionMark，CircleHelp 只是别名（渲染出的是同一个字形）。
+    // 不断言 aria-hidden：lucide-react@1.8.0 的 Icon.js 在无 children、
+    // 无 a11y 属性时自己就补了 aria-hidden="true"，这条断言无法被证伪。
+    const waitingIcon = waitingStatus?.querySelector("svg");
+    expect(waitingIcon?.getAttribute("class")).toContain(
+      "lucide-circle-question-mark",
+    );
+    expect(waitingIcon?.getAttribute("class")).toContain("h-3.5");
+    expect(waitingIcon?.getAttribute("class")).toContain("w-3.5");
+    expect(waitingIcon?.getAttribute("class")).toContain("text-primary-text");
+    expect(
+      waitingStatus?.querySelector("span.rounded-full.animate-pulse"),
+    ).toBeNull();
+
+    const runningStatus =
+      sessionRow("running-sibling").querySelector('[role="status"]');
+    expect(runningStatus?.getAttribute("aria-label")).toBe(
+      i18n.t("sidebar.running"),
+    );
+    expect(
+      runningStatus?.querySelector(
+        "span.rounded-full.bg-primary.animate-pulse",
+      ),
+    ).toBeTruthy();
+    expect(runningStatus?.querySelector("svg")).toBeNull();
+  });
+
+  it("falls back to the pulsing dot once the question is answered", async () => {
+    const sessions = [
+      session("answering", {
+        title: "Answering",
+        updatedAt: 20,
+        status: "running",
+      }),
+    ];
+
+    await render(sessions, {
+      pendingAskUsers: {
+        t1: { sessionId: "answering", toolCallId: "t1", questions: [] },
+      },
+    });
+    const askingStatus =
+      sessionRow("answering").querySelector('[role="status"]');
+    expect(askingStatus?.getAttribute("aria-label")).toBe(
+      i18n.t("sidebar.asking"),
+    );
+    expect(askingStatus?.querySelector("svg")).toBeTruthy();
+
+    // 回答完：pending 清掉、主轮次还在跑 → 立刻退回脉冲点
+    await render(sessions, { pendingAskUsers: {} });
+    const runningStatus =
+      sessionRow("answering").querySelector('[role="status"]');
+    expect(runningStatus?.getAttribute("aria-label")).toBe(
+      i18n.t("sidebar.running"),
+    );
+    expect(runningStatus?.querySelector("svg")).toBeNull();
+    expect(
+      runningStatus?.querySelector(
+        "span.rounded-full.bg-primary.animate-pulse",
+      ),
+    ).toBeTruthy();
+  });
+
   it("does not expose obsolete task-slot state", () => {
     const state: object = useAppStore.getState();
     expect("taskSlots" in state).toBe(false);
@@ -1305,6 +1403,85 @@ describe("Sidebar project groups", () => {
       projectToggle("/work/deskwand").querySelector(
         "span.rounded-full.bg-primary.animate-pulse",
       ),
+    ).toBeNull();
+  });
+
+  it("shows a warning badge on a group whose session waits for an answer", async () => {
+    await render(
+      [
+        session("waiting-project", {
+          title: "Waiting project chat",
+          isProjectMode: true,
+          cwd: "/work/waiting",
+          updatedAt: 20,
+        }),
+        session("running-project", {
+          title: "Running project chat",
+          isProjectMode: true,
+          cwd: "/work/running",
+          updatedAt: 10,
+          status: "running",
+        }),
+        // 同一个等待项目里再放一条 running 会话：角标必须仍然是 asking（琥珀），
+        // 这样「组内 asking 压过 running」才真的被钉住
+        session("running-in-waiting-project", {
+          title: "Running inside waiting project",
+          isProjectMode: true,
+          cwd: "/work/waiting",
+          updatedAt: 15,
+          status: "running",
+        }),
+        // 无项目归属的在等回答会话：「最近」根行的琥珀角标就是需求的主场景
+        session("waiting-ordinary", {
+          title: "Waiting ordinary chat",
+          updatedAt: 25,
+        }),
+      ],
+      {
+        pendingAskUsers: {
+          t1: { sessionId: "waiting-project", toolCallId: "t1", questions: [] },
+          t2: {
+            sessionId: "waiting-ordinary",
+            toolCallId: "t2",
+            questions: [],
+          },
+        },
+      },
+    );
+
+    const waitingToggle = projectToggle("/work/waiting");
+    expect(
+      waitingToggle.querySelector("span.rounded-full.bg-warning"),
+    ).toBeTruthy();
+    expect(
+      waitingToggle.querySelector("span.rounded-full.animate-pulse"),
+    ).toBeNull();
+
+    const runningToggle = projectToggle("/work/running");
+    expect(
+      runningToggle.querySelector("span.rounded-full.bg-primary.animate-pulse"),
+    ).toBeTruthy();
+    expect(
+      runningToggle.querySelector("span.rounded-full.bg-warning"),
+    ).toBeNull();
+
+    const projectsRoot = Array.from(
+      container.querySelectorAll("button[aria-expanded]"),
+    ).find((candidate) =>
+      candidate.textContent?.includes(i18n.t("sidebar.projects")),
+    );
+    expect(projectsRoot).toBeTruthy();
+    expect(
+      projectsRoot?.querySelector("span.rounded-full.bg-warning"),
+    ).toBeTruthy();
+    expect(
+      projectsRoot?.querySelector("span.rounded-full.animate-pulse"),
+    ).toBeNull();
+
+    const ordinary = ordinaryToggle();
+    expect(ordinary.querySelector("span.rounded-full.bg-warning")).toBeTruthy();
+    expect(
+      ordinary.querySelector("span.rounded-full.animate-pulse"),
     ).toBeNull();
   });
 
