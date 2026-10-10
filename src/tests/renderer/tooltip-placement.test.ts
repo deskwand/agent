@@ -40,7 +40,7 @@ describe("tooltip 方位", () => {
     expect(read("components/app-tooltip.tsx")).toMatch(/delayDuration=\{200\}/);
   });
 
-  // 说明（写在这里而不是只写在计划里）：jsdom 没有布局引擎，Radix 与 floating-ui
-  // 算出的坐标都不参与断言，**行为上区分不了 bottom 与 right**。所以方位只能做
+  // 说明（写在这里而不是只写在计划里）：jsdom 没有布局引擎，Radix 算出的坐标
+  // 不参与断言，**行为上区分不了 bottom 与 right**。所以方位只能做
   // 源码级断言 + 手工验收，不要把它当成"位置已被单测证明"。
 });
