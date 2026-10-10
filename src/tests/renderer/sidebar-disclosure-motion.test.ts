@@ -405,4 +405,12 @@ describe("Sidebar disclosure motion", () => {
     await render(sessionIcon(false, 0));
     expect(container.querySelector("span.rounded-full")).toBeNull();
   });
+
+  it("hides the badge while the group is expanded", async () => {
+    await render(sessionIcon(true, 0, "running"));
+    expect(container.querySelector("span.rounded-full")).toBeNull();
+
+    await render(sessionIcon(true, 0, "asking"));
+    expect(container.querySelector("span.rounded-full")).toBeNull();
+  });
 });

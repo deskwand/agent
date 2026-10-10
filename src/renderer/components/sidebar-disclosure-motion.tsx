@@ -26,7 +26,8 @@ interface SidebarGroupIconProps {
   expanded: boolean;
   motionVersion: number;
   kind: "sessions" | "project";
-  /** 图标右上角的状态角标：asking = 静态警示色（停下等你），running = 主色脉冲（还在跑） */
+  /** 图标右上角的状态角标：asking = 静态警示色（停下等你），running = 主色脉冲（还在跑）。
+   *  只在分组收起时画 —— 展开了就由子层自己说。 */
   badgeKind?: "asking" | "running" | null;
 }
 
@@ -381,7 +382,7 @@ export function SidebarGroupIcon({
           />
         </>
       )}
-      {badgeKind && (
+      {badgeKind && !expanded && (
         <span
           className={`absolute right-[-2px] top-[-2px] h-1.5 w-1.5 rounded-full shadow-[0_0_0_2px_var(--muted)] ${
             badgeKind === "asking" ? "bg-warning" : "bg-primary animate-pulse"

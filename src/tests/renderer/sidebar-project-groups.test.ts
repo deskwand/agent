@@ -1332,7 +1332,7 @@ describe("Sidebar project groups", () => {
     );
   });
 
-  it("shows running badge on project group icon when a session is running", async () => {
+  it("shows running badge on project group icon only while it is collapsed", async () => {
     await render([
       session("running-project", {
         title: "Running project chat",
@@ -1343,20 +1343,17 @@ describe("Sidebar project groups", () => {
       }),
     ]);
 
-    const project = projectToggle("/work/deskwand");
-    const badge = project.querySelector(
-      "span.rounded-full.bg-primary.animate-pulse",
-    ) as HTMLElement | null;
-    expect(badge).toBeTruthy();
+    const badge = "span.rounded-full.bg-primary.animate-pulse";
+    // 默认展开 → 父行不画角标，信号由会话行自己那颗点承担。
+    // 同一个选择器也匹配组角标，所以第二条断言限定在会话行内（那颗 2.5px 的点）。
+    expect(projectToggle("/work/deskwand").querySelector(badge)).toBeNull();
+    expect(sessionRow("running-project").querySelector(badge)).toBeTruthy();
 
-    await act(async () => project.click());
-    const badgeAfterExpand = project.querySelector(
-      "span.rounded-full.bg-primary.animate-pulse",
-    );
-    expect(badgeAfterExpand).toBeTruthy();
+    await act(async () => projectToggle("/work/deskwand").click());
+    expect(projectToggle("/work/deskwand").querySelector(badge)).toBeTruthy();
   });
 
-  it("shows running badge on ordinary group icon when an ordinary session is running", async () => {
+  it("shows running badge on ordinary group icon only while it is collapsed", async () => {
     await render([
       session("ordinary-running", {
         title: "Running ordinary",
@@ -1365,11 +1362,12 @@ describe("Sidebar project groups", () => {
       }),
     ]);
 
-    const ordinary = ordinaryToggle();
-    const badge = ordinary.querySelector(
-      "span.rounded-full.bg-primary.animate-pulse",
-    ) as HTMLElement | null;
-    expect(badge).toBeTruthy();
+    const badge = "span.rounded-full.bg-primary.animate-pulse";
+    // 「最近」默认展开 → 无角标
+    expect(ordinaryToggle().querySelector(badge)).toBeNull();
+
+    await act(async () => ordinaryToggle().click());
+    expect(ordinaryToggle().querySelector(badge)).toBeTruthy();
   });
 
   it("hides running badge when all sessions become idle", async () => {
@@ -1383,11 +1381,10 @@ describe("Sidebar project groups", () => {
       }),
     ]);
 
-    expect(
-      projectToggle("/work/deskwand").querySelector(
-        "span.rounded-full.bg-primary.animate-pulse",
-      ),
-    ).toBeTruthy();
+    const badge = "span.rounded-full.bg-primary.animate-pulse";
+    // 收起后父行才画角标，所以先收起，再断言「忙 ⇒ 有角标」
+    await act(async () => projectToggle("/work/deskwand").click());
+    expect(projectToggle("/work/deskwand").querySelector(badge)).toBeTruthy();
 
     await render([
       session("run-then-idle", {
@@ -1399,12 +1396,48 @@ describe("Sidebar project groups", () => {
       }),
     ]);
 
-    expect(
-      projectToggle("/work/deskwand").querySelector(
-        "span.rounded-full.bg-primary.animate-pulse",
-      ),
-    ).toBeNull();
+    // 收起态必须跨过这次 re-render 存活；否则下面这条会因为「展开」而空过
+    expect(projectToggle("/work/deskwand").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+    expect(projectToggle("/work/deskwand").querySelector(badge)).toBeNull();
   });
+
+  it("shows the projects row running badge only while it is collapsed", async () => {
+    await render([
+      session("root-running-project", {
+        title: "Root running project chat",
+        isProjectMode: true,
+        cwd: "/work/root-running",
+        updatedAt: 20,
+        status: "running",
+      }),
+    ]);
+
+    const pulse = "span.rounded-full.bg-primary.animate-pulse";
+    const warning = "span.rounded-full.bg-warning";
+
+    // 本文件的 render() 会把「项目」播种为展开 → 根行不画角标
+    expect(projectsToggle().querySelector(pulse)).toBeNull();
+
+    await act(async () => projectsToggle().click());
+    expect(projectsToggle().querySelector(pulse)).toBeTruthy();
+    expect(projectsToggle().querySelector(warning)).toBeNull();
+
+    // 再点一下展开：角标随「展开」消失 —— 这就是需求里的那个交互
+    await act(async () => projectsToggle().click());
+    expect(projectsToggle().querySelector(pulse)).toBeNull();
+  });
+
+  function projectsToggle(): HTMLButtonElement {
+    const button = Array.from(
+      container.querySelectorAll("button[aria-expanded]"),
+    ).find((candidate) =>
+      candidate.textContent?.includes(i18n.t("sidebar.projects")),
+    );
+    expect(button).toBeTruthy();
+    return button as HTMLButtonElement;
+  }
 
   it("shows a warning badge on a group whose session waits for an answer", async () => {
     await render(
@@ -1449,40 +1482,31 @@ describe("Sidebar project groups", () => {
       },
     );
 
-    const waitingToggle = projectToggle("/work/waiting");
-    expect(
-      waitingToggle.querySelector("span.rounded-full.bg-warning"),
-    ).toBeTruthy();
-    expect(
-      waitingToggle.querySelector("span.rounded-full.animate-pulse"),
-    ).toBeNull();
+    const warning = "span.rounded-full.bg-warning";
+    const pulse = "span.rounded-full.animate-pulse";
 
-    const runningToggle = projectToggle("/work/running");
-    expect(
-      runningToggle.querySelector("span.rounded-full.bg-primary.animate-pulse"),
-    ).toBeTruthy();
-    expect(
-      runningToggle.querySelector("span.rounded-full.bg-warning"),
-    ).toBeNull();
+    // 全部展开时父行一律不画角标：展开了就由子层自己说
+    expect(projectToggle("/work/waiting").querySelector(warning)).toBeNull();
+    expect(projectToggle("/work/running").querySelector(pulse)).toBeNull();
+    expect(projectsToggle().querySelector(warning)).toBeNull();
+    expect(ordinaryToggle().querySelector(warning)).toBeNull();
 
-    const projectsRoot = Array.from(
-      container.querySelectorAll("button[aria-expanded]"),
-    ).find((candidate) =>
-      candidate.textContent?.includes(i18n.t("sidebar.projects")),
-    );
-    expect(projectsRoot).toBeTruthy();
-    expect(
-      projectsRoot?.querySelector("span.rounded-full.bg-warning"),
-    ).toBeTruthy();
-    expect(
-      projectsRoot?.querySelector("span.rounded-full.animate-pulse"),
-    ).toBeNull();
+    // 收起后：组内 asking 压过 running
+    await act(async () => projectToggle("/work/waiting").click());
+    await act(async () => projectToggle("/work/running").click());
+    await act(async () => ordinaryToggle().click());
 
-    const ordinary = ordinaryToggle();
-    expect(ordinary.querySelector("span.rounded-full.bg-warning")).toBeTruthy();
-    expect(
-      ordinary.querySelector("span.rounded-full.animate-pulse"),
-    ).toBeNull();
+    expect(projectToggle("/work/waiting").querySelector(warning)).toBeTruthy();
+    expect(projectToggle("/work/waiting").querySelector(pulse)).toBeNull();
+    expect(projectToggle("/work/running").querySelector(warning)).toBeNull();
+    expect(projectToggle("/work/running").querySelector(pulse)).toBeTruthy();
+    expect(ordinaryToggle().querySelector(warning)).toBeTruthy();
+    expect(ordinaryToggle().querySelector(pulse)).toBeNull();
+
+    // 「项目」根行收起后：任一项目在等回答 ⇒ 琥珀（asking 压过 running）
+    await act(async () => projectsToggle().click());
+    expect(projectsToggle().querySelector(warning)).toBeTruthy();
+    expect(projectsToggle().querySelector(pulse)).toBeNull();
   });
 
   it("deletes a project through the header trash action", async () => {
