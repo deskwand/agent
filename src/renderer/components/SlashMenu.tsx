@@ -122,7 +122,8 @@ export function SlashMenu({
                 ? t("chat.slashTabCommands")
                 : t("chat.slashTabSkills");
           return (
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               key={tab.key}
               type="button"
               onMouseDown={(e) => {
@@ -131,7 +132,7 @@ export function SlashMenu({
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === tab.key
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground"
               }`}
             >
@@ -214,7 +215,8 @@ export function SlashMenu({
                 label={item.skill.name}
                 description={item.skill.description}
                 leading={
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     tabIndex={-1}
                     data-skill-pin={item.skill.name}
@@ -277,7 +279,8 @@ function MenuItem({
   badge?: React.ReactNode;
 }) {
   const row = (
-    <Button variant="ghost"
+    <Button
+      variant="ghost"
       type="button"
       onMouseDown={(e) => {
         e.preventDefault();

@@ -71,9 +71,10 @@ export function SlackConfigStep({
         </div>
 
         <div className="flex items-center gap-3">
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             onClick={() => onSocketModeChange(!useSocketMode)}
-            className={`relative w-10 h-6 rounded-full transition-colors ${useSocketMode ? "bg-primary" : "bg-border"}`}
+            className={`relative w-10 h-6 rounded-full transition-colors ${useSocketMode ? "bg-primary hover:bg-primary/90" : "bg-border"}`}
           >
             <span
               className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${useSocketMode ? "translate-x-5" : "translate-x-1"}`}
@@ -110,7 +111,8 @@ export function SlackConfigStep({
           </label>
           <div className="grid grid-cols-3 gap-2">
             {dmPolicies.map((option) => (
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 key={option.value}
                 onClick={() => onDmPolicyChange(option.value)}
                 className={`p-3 rounded-xl border-2 text-left transition-all ${

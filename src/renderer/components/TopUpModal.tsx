@@ -179,20 +179,22 @@ export function TopUpModal() {
             {t("topUp.title")}
           </h2>
           <div className="flex gap-1 rounded-lg border border-border p-1">
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
                 tab === "topup"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "text-foreground"
               }`}
               onClick={() => setTab("topup")}
             >
               {t("topUp.topupTab")}
             </Button>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               className={`flex-1 rounded-md px-3 py-1.5 text-sm ${
                 tab === "history"
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "text-foreground"
               }`}
               onClick={() => setTab("history")}
@@ -203,7 +205,9 @@ export function TopUpModal() {
         </div>
         <div className="mt-4 flex flex-1 flex-col gap-4 overflow-y-auto px-6 pb-6">
           {tab === "topup" && (
-            <p className="text-sm text-muted-foreground">{t("topUp.subtitle")}</p>
+            <p className="text-sm text-muted-foreground">
+              {t("topUp.subtitle")}
+            </p>
           )}
 
           {tab === "topup" && step === "amount" && (
@@ -219,7 +223,9 @@ export function TopUpModal() {
                 inputMode="decimal"
               />
               {amountInput !== "" && parsedCents === null && (
-                <p className="text-sm text-destructive">{t("topUp.invalidAmount")}</p>
+                <p className="text-sm text-destructive">
+                  {t("topUp.invalidAmount")}
+                </p>
               )}
               <div className="flex flex-wrap gap-2">
                 {QUICK_AMOUNTS.map((cents) => (
@@ -270,7 +276,9 @@ export function TopUpModal() {
                   </Button>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">{t("topUp.chainHint")}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("topUp.chainHint")}
+              </p>
               {payStatus === "networkError" && (
                 <p className="rounded-lg bg-background/60 px-3 py-2 text-sm text-muted-foreground">
                   {t("topUp.networkError")}
@@ -309,7 +317,9 @@ export function TopUpModal() {
                 ) : (
                   <div className="h-40 w-40 rounded-lg bg-background/60" />
                 )}
-                <p className="text-xs text-muted-foreground">{t("topUp.qrHint")}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t("topUp.qrHint")}
+                </p>
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-sm text-muted-foreground">

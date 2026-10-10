@@ -2102,7 +2102,8 @@ export function ChatView() {
           </div>
         </div>
 
-        <Button variant="ghost"
+        <Button
+          variant="ghost"
           type="button"
           onClick={scrollToBottomByButton}
           aria-label="Scroll to bottom"
@@ -2146,17 +2147,24 @@ export function ChatView() {
         <div className="max-w-[920px] mx-auto px-5 lg:px-8 pt-0.5 pb-5">
           {activeSession?.kind === "voice" && activeSessionId ? (
             <div className="flex items-center justify-center gap-3 py-3">
-              <Button variant="ghost"
+              {/* 主色胶囊：走 default 变体，别用 ghost —— ghost 自带 `hover:bg-accent`
+                  （浅灰的 hover 表面色），它在产物里排在 `.bg-primary` 之后，会把这里
+                  的主色底顶掉而文字仍是近白的 `--primary-foreground`（2026-10-10 截图：
+                  hover 即 1.03:1）。变体自己管底色/文字/hover，这里只保留胶囊几何，
+                  `shadow-none` 是因为原按钮本来没有投影（default 变体自带 `shadow`）。 */}
+              <Button
+                variant="default"
                 type="button"
                 onClick={() => openVoiceMode(activeSessionId)}
-                className="rounded-2xl bg-primary px-4 py-2 text-primary-foreground hover:opacity-90 h-auto"
+                className="rounded-2xl px-4 py-2 h-auto shadow-none"
               >
                 {t(
                   messages.length > 0 ? "voiceMode.resume" : "voiceMode.start",
                 )}
               </Button>
               {!useTextInput ? (
-                <Button variant="ghost"
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => setUseTextInput(true)}
                   className="rounded-2xl px-3 py-2 text-muted-foreground hover:bg-accent h-auto"

@@ -111,6 +111,38 @@ it("defaults empty voice history to speech, types in the same record without a v
   await act(async () => clickLabel("voiceMode.start"));
   expect(useAppStore.getState().voiceModeSessionId).toBe("V");
 });
+// 语音 CTA 的 hover 底必须是主色本身。
+//
+// 背景（2026-10-10 用户截图）：这颗胶囊按钮曾经挂在 `variant="ghost"` 上、靠
+// className 手写 `bg-primary text-primary-foreground`。ghost 变体自带
+// `hover:bg-accent`（`--accent` 是 hover 表面色，亮色主题下 ≈ #f4f4f5），它在产物里
+// 排在 `.bg-primary` 之后 ⇒ hover 时底色被换成浅灰，而文字还是近白的
+// `--primary-foreground` ⇒ 对比度 1.03:1，亮色主题下 hover 即整行看不见。
+// 断言的是**真实渲染出来的** className（jsdom 里没有 hover，锁的是类名）：
+// ① hover 底只能有 `hover:bg-primary/90` 一条 —— 光断言「有 `bg-primary`」是空的，
+// `hover:bg-primary/90` 本身就含这个子串；② 胶囊几何也一并锁住（它们曾经是手写类的全部意义）。
+it("keeps the voice CTA's rendered classes on its own primary hover surface", async () => {
+  useAppStore.getState().addSession(record("V", "voice"));
+  useAppStore.getState().setActiveSession("V");
+  await act(async () => root.render(<ChatView />));
+  const cta = [...container.querySelectorAll("button")].find(
+    (b) => b.textContent === "voiceMode.start",
+  );
+  expect(cta).toBeTruthy();
+  const tokens = cta!.className.split(/\s+/);
+  for (const token of [
+    "bg-primary",
+    "text-primary-foreground",
+    "rounded-2xl",
+    "h-auto",
+    "shadow-none",
+  ]) {
+    expect(tokens).toContain(token);
+  }
+  expect(tokens.filter((t) => t.startsWith("hover:bg-"))).toEqual([
+    "hover:bg-primary/90",
+  ]);
+});
 it("offers resume for populated voice history, and resets text choice on selection", async () => {
   const store = useAppStore.getState();
   store.addSession(record("V", "voice"));

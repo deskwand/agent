@@ -94,7 +94,8 @@ export function SubagentSettings() {
               </span>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     className="p-1 rounded hover:bg-muted h-auto"
                     aria-label={t("subagent.editModel") ?? "Edit model"}
@@ -136,7 +137,8 @@ export function SubagentSettings() {
               </Tooltip>
               {agent.source !== "builtin" &&
                 (deletingAgent === agent.name ? (
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     type="button"
                     className="px-2 py-1 rounded text-xs text-red-500 hover:bg-red-500/10 h-auto"
                     onClick={async () => {
@@ -152,7 +154,8 @@ export function SubagentSettings() {
                 ) : (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <Button variant="ghost"
+                      <Button
+                        variant="ghost"
                         type="button"
                         aria-label={t("common.delete")}
                         className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-red-500 h-auto"
@@ -256,14 +259,16 @@ export function SubagentSettings() {
             )}
 
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 className="rounded-lg border px-3 py-1.5 text-sm h-auto hover:bg-transparent hover:text-current"
                 onClick={() => setEditingAgent(null)}
               >
                 {t("common.cancel") ?? "取消"}
               </Button>
-              <Button variant="ghost"
-                className="rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+              <Button
+                variant="ghost"
+                className="rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:bg-primary/90"
                 onClick={async () => {
                   const model =
                     editingModel === "model"
@@ -283,7 +288,8 @@ export function SubagentSettings() {
               >
                 {t("common.save")}
               </Button>
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 className="rounded-lg border px-3 py-1.5 text-sm h-auto hover:bg-transparent hover:text-current"
                 onClick={() => setEditingAgent(null)}
               >
@@ -295,7 +301,8 @@ export function SubagentSettings() {
       </div>
 
       {/* 新增 Agent */}
-      <Button variant="ghost"
+      <Button
+        variant="ghost"
         type="button"
         size="xs"
         // ⚠️ `text-sm` 是**有意**的：`xs` 档自带 `text-xs`，而这行要保留原本的 14px 字号 ——
@@ -331,7 +338,8 @@ export function SubagentSettings() {
             onChange={(e) => setNewPrompt(e.target.value)}
           />
           <div className="flex gap-2">
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               className="rounded-lg bg-primary px-3 py-1.5 text-sm text-primary-foreground h-auto hover:bg-transparent hover:text-current"
               onClick={async () => {
                 if (!newName.trim()) return;
@@ -350,7 +358,8 @@ export function SubagentSettings() {
             >
               {t("common.save")}
             </Button>
-            <Button variant="ghost"
+            <Button
+              variant="ghost"
               className="rounded-lg border px-3 py-1.5 text-sm h-auto hover:bg-transparent hover:text-current"
               onClick={() => setShowNewModal(false)}
             >

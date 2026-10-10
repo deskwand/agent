@@ -184,11 +184,12 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               {t("logs.enableDevLogsDesc")}
             </p>
           </div>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             onClick={handleToggleDevLogs}
             disabled={isLoading}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 flex-shrink-0 ${
-              devLogsEnabled ? "bg-primary" : "bg-muted"
+              devLogsEnabled ? "bg-primary hover:bg-primary/90" : "bg-muted"
             }`}
           >
             <span
@@ -210,13 +211,17 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
             <div className="text-2xl font-bold text-foreground">
               {logFiles.length}
             </div>
-            <div className="text-sm text-muted-foreground">{t("logs.logFiles")}</div>
+            <div className="text-sm text-muted-foreground">
+              {t("logs.logFiles")}
+            </div>
           </div>
           <div className="p-4 rounded-xl bg-background border border-border/40">
             <div className="text-2xl font-bold text-foreground">
               {formatFileSize(totalSize)}
             </div>
-            <div className="text-sm text-muted-foreground">{t("logs.totalSize")}</div>
+            <div className="text-sm text-muted-foreground">
+              {t("logs.totalSize")}
+            </div>
           </div>
         </div>
       </SettingsContentSection>
@@ -265,7 +270,8 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               {t("logs.logsDirectory")}
             </div>
             <div className="flex items-start gap-2">
-              <Button variant="ghost"
+              <Button
+                variant="ghost"
                 className="font-mono text-xs text-muted-foreground break-all text-left hover:text-primary-text hover:underline cursor-pointer bg-transparent border-none p-0 h-auto"
                 onClick={() => window.electronAPI.logs.open()}
                 title={t("logs.openFolder")}
@@ -274,7 +280,8 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
               </Button>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost"
+                  <Button
+                    variant="ghost"
                     className="shrink-0 p-1 rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors h-auto"
                     onClick={() => navigator.clipboard.writeText(logsDirectory)}
                     aria-label={t("common.copy")}
@@ -299,7 +306,8 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
         description={t("logs.actionsDescription")}
       >
         <div className="grid grid-cols-3 gap-2">
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             onClick={handleExport}
             disabled={isLoading}
             className="py-3 px-4 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
@@ -311,7 +319,8 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
             )}
             <span className="text-sm">{t("logs.exportZip")}</span>
           </Button>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             onClick={handleOpen}
             disabled={isLoading}
             className="py-3 px-4 rounded-lg bg-background border border-border/40 text-foreground font-medium hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
@@ -319,7 +328,8 @@ export function SettingsLogs({ isActive }: { isActive: boolean }) {
             <Globe className="w-4 h-4" />
             <span className="text-sm">{t("logs.openFolder")}</span>
           </Button>
-          <Button variant="ghost"
+          <Button
+            variant="ghost"
             onClick={handleClear}
             disabled={isLoading || logFiles.length === 0}
             className="py-3 px-4 rounded-lg bg-destructive/10 text-destructive font-medium hover:bg-destructive/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors active:scale-[0.98] flex items-center justify-center gap-2 h-auto"
