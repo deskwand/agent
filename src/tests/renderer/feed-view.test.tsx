@@ -489,4 +489,29 @@ describe("筛选后的空列表不能说成「还没有内容」", () => {
       container.querySelector('[data-testid="feed-reader-empty"]'),
     ).toBeTruthy();
   });
+
+  it("清空确认框的取消键与确认键内边距一致（此前取消键白吃 base 的 px-4 py-2）", async () => {
+    // 2026-10-10：取消键原先只写 `h-auto` ⇒ `cn` 合并后 base 的 `px-4 py-2` 留下 ⇒ 32px 高，
+    // 而确认键是 `px-3 py-1.5`（28px）⇒ 两个键不齐 ✗。修法是给取消键补同样的内边距 ✓。
+    // jsdom 量不到高度 ⇒ 锁「两个键的内边距类一致」这个等价条件 ✓。
+    setWindowApi(snapshot(true, [makeItem()], makeRun()));
+    await render();
+    for (const id of ["feed-more", "feed-clear-all"]) {
+      await act(async () => {
+        (
+          container.querySelector(`[data-testid="${id}"]`) as HTMLElement
+        ).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      });
+    }
+    const pad = (id: string) =>
+      (
+        container.querySelector(`[data-testid="${id}"]`) as HTMLElement
+      ).className
+        .split(/\s+/)
+        .filter((token) => /^(p|px|py)-/.test(token))
+        .sort()
+        .join(" ");
+    expect(pad("feed-clear-cancel"), "取消键的内边距").toBe("px-3 py-1.5");
+    expect(pad("feed-clear-confirm"), "确认键的内边距").toBe("px-3 py-1.5");
+  });
 });

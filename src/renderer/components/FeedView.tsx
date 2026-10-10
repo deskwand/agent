@@ -434,8 +434,9 @@ export function FeedView(): JSX.Element {
               <div className="flex justify-end gap-2">
                 <Button variant="ghost"
                   type="button"
+                  data-testid="feed-clear-cancel"
                   onClick={() => setConfirmClear(false)}
-                  className="text-xs text-muted-foreground h-auto hover:bg-transparent hover:text-current"
+                  className="text-xs text-muted-foreground h-auto px-3 py-1.5 hover:bg-transparent hover:text-current"
                 >
                   {t("feed.cancel")}
                 </Button>

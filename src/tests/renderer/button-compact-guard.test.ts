@@ -25,9 +25,6 @@ const HORIZONTAL = /^-?px?-/; // `p-*` 或 `px-*`
  * 离开这张表 ✓，不需要 `p-0`。
  */
 const COMPACT_PENDING = new Set([
-  "components/FeedItemRow.tsx",
-  "components/FeedReaderPane.tsx",
-  "components/FeedView.tsx",
   "components/LoginModal.tsx",
   "components/ProviderGuidance.tsx",
   "components/attach/AttachMenu.tsx",

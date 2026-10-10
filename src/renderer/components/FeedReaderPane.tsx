@@ -157,7 +157,7 @@ export function FeedReaderPane({
               type="button"
               data-testid="feed-listen-item"
               onClick={() => void startFeedListen({ fromItemId: item.id })}
-              className="whitespace-nowrap text-primary-text h-auto hover:bg-transparent hover:text-current"
+              className="whitespace-nowrap text-primary-text h-auto px-0 hover:bg-transparent hover:text-current"
             >
               {t("feed.listenItem")}
             </Button>
@@ -166,7 +166,7 @@ export function FeedReaderPane({
             type="button"
             data-testid="feed-open-browser"
             onClick={() => onOpenInBrowser(item.url)}
-            className="whitespace-nowrap text-primary-text h-auto hover:bg-transparent hover:text-current"
+            className="whitespace-nowrap text-primary-text h-auto px-0 hover:bg-transparent hover:text-current"
           >
             {t("feed.readerOpenInBrowser")} ↗
           </Button>

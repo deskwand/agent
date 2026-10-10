@@ -147,7 +147,7 @@ export function FeedItemRow({
                 event.stopPropagation();
                 onRead(item.id);
               }}
-              className="underline decoration-muted-foreground/50 h-auto hover:bg-transparent hover:text-current"
+              className="underline decoration-muted-foreground/50 h-auto px-0 hover:bg-transparent hover:text-current"
             >
               {t("feed.itemRead")}
             </Button>
@@ -158,7 +158,7 @@ export function FeedItemRow({
                 event.stopPropagation();
                 onDismiss(item.id);
               }}
-              className="underline decoration-muted-foreground/50 h-auto hover:bg-transparent hover:text-current"
+              className="underline decoration-muted-foreground/50 h-auto px-0 hover:bg-transparent hover:text-current"
             >
               {t("feed.itemDismiss")}
             </Button>
