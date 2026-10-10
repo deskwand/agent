@@ -11,7 +11,7 @@ import {
   Volume2,
   Play,
   Loader2,
-  Square,
+  Pause,
 } from "lucide-react";
 import type {
   Message,
@@ -402,6 +402,19 @@ export const MessageCard = memo(function MessageCard({
     // ⇒ 图标会贴着左边（2026-10-10 实测：左 0 / 右 12；显式 `justify-center` 后 6 / 6 ✓）。
     // ⚠️ `hover:bg-transparent` 也是**有意**的：这排只要颜色反馈、不要灰底（`cn` 合并后 ghost 的
     // `hover:bg-accent` 会被删掉 ✓；2026-10-10 用户：图标带底色看着重）。
+    // 读屏名与 tooltip 同一份来源：图标会在四个字形间变，读屏用户听到的必须是当前那一下的动作。
+    const readAloudLabel = voiceRuntimeActive
+      ? t("messageCard.readAloudBusy")
+      : readingThis && reader.status === "preparing"
+        ? t("messageCard.stopReading")
+        : readingThis && reader.status === "playing"
+          ? t("messageCard.pauseReading")
+          : readingThis && reader.status === "paused"
+            ? t("messageCard.resumeReading")
+            : !readingThis && !speechAvailable
+              ? t("messageCard.readAloudEmpty")
+              : t("messageCard.readAloud");
+
     return (
       <div
         className={`flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-[opacity,transform] duration-200 scale-90 group-hover:scale-100${extraClass ? ` ${extraClass}` : ""}`}
@@ -444,21 +457,32 @@ export const MessageCard = memo(function MessageCard({
                       disabled={
                         voiceRuntimeActive || (!readingThis && !speechAvailable)
                       }
-                      aria-label={t("messageCard.readAloud")}
+                      aria-label={readAloudLabel}
                       onClick={() => {
-                        if (readingThis) {
+                        // 删掉停止键后，这颗键是唯一入口 ⇒ 两条「点了没反应」的路必须补上：
+                        // ① preparing（首块音频还没到，`toggle()` 是 no-op）⇒ 这一下是取消；
+                        // ② error（图标回落到音量、tooltip 写着「朗读这条回复」）⇒ 这一下是重试。
+                        if (readingThis && reader.status === "preparing") {
+                          reader.stop();
+                          return;
+                        }
+                        if (readingThis && reader.status !== "error") {
                           reader.toggle();
-                        } else if (bodyRef.current) {
+                          return;
+                        }
+                        if (bodyRef.current) {
                           startKeyRef.current = getCopyContent();
                           reader.start(message.id, bodyRef.current);
                         }
                       }}
                       className="flex items-center justify-center hover:bg-transparent text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
                     >
-                      {readingThis &&
-                      (reader.status === "playing" ||
-                        reader.status === "preparing") ? (
+                      {readingThis && reader.status === "preparing" ? (
                         <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : readingThis && reader.status === "playing" ? (
+                        // 2026-10-10：播放中给「暂停」条。旧版这里是转圈 —— 转圈是「忙」的
+                        // 语汇，不是「能点」的语汇，而它这一下点的正是暂停。
+                        <Pause className="w-3 h-3" />
                       ) : readingThis && reader.status === "paused" ? (
                         <Play className="w-3 h-3" />
                       ) : (
@@ -467,39 +491,13 @@ export const MessageCard = memo(function MessageCard({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                    {voiceRuntimeActive
-                      ? t("messageCard.readAloudBusy")
-                      : readingThis && reader.status === "playing"
-                        ? t("messageCard.pauseReading")
-                        : readingThis && reader.status === "paused"
-                          ? t("messageCard.resumeReading")
-                          : !readingThis && !speechAvailable
-                            ? t("messageCard.readAloudEmpty")
-                            : t("messageCard.readAloud")}
+                    {readAloudLabel}
                   </TooltipContent>
                 </Tooltip>
-                {readingThis &&
-                reader.status !== "idle" &&
-                reader.status !== "error" ? (
-                  <>
-                    <Button variant="ghost"
-                      type="button"
-                      size="iconSm"
-                      data-testid="stop-reading-button"
-                      aria-label={t("messageCard.stopReading")}
-                      onClick={() => reader.stop()}
-                      className="flex items-center justify-center hover:bg-transparent text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <Square className="w-3 h-3" />
-                    </Button>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {t("messageCard.readAloudProgress", {
-                        current: reader.currentIndex + 1,
-                        total: reader.total,
-                      })}
-                    </span>
-                  </>
-                ) : null}
+                {/* 停止键与「第 X / Y 句」进度已删（2026-10-10 用户：朗读就一个图标 ✓）。
+                    停下来的路径都不在这排里：消息卸载与正文变化（上面的两个 effect）、
+                    语音会话（useVoiceMode.ts:241）、收听（store/index.ts:1466）各自 stopReadAloud；
+                    还没出声时的取消由这颗键自己承担（preparing 分支）。 */}
                 {/* 没装模型 / 引擎起不来时，错误就落在这里，并指路到设置 ——
                     不做第二条「提示条 + 下载按钮」的 UI 路径，少一条状态就少一批 bug。 */}
                 {readingThis && reader.status === "error" ? (
@@ -594,7 +592,7 @@ export const MessageCard = memo(function MessageCard({
       ) : (
         // Assistant message — no bubble, direct content with action bar below
         <div className="group space-y-1.5">
-          {/* bodyRef 只圈正文块：下面的操作栏（时间戳 / 进度）不参与切句。 */}
+          {/* bodyRef 只圈正文块：下面的操作栏（时间戳）不参与切句。 */}
           <div ref={bodyRef} className="space-y-1.5">
             {renderGroups.map((group, gi) => {
               if (group.kind === "summary-group") {

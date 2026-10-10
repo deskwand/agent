@@ -1302,7 +1302,6 @@
     "pauseReading": "Pause",
     "resumeReading": "Resume",
     "stopReading": "Stop",
-    "readAloudProgress": "Sentence {{current}} / {{total}}",
     "readAloudEmpty": "No readable text in this message",
     "readAloudFailed": "Read aloud failed. Check the speech model in Settings → Capabilities",
     "readAloudBusy": "The voice session is running. End it before reading a message"

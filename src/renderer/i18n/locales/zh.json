@@ -1301,7 +1301,6 @@
     "pauseReading": "暂停",
     "resumeReading": "继续",
     "stopReading": "停止",
-    "readAloudProgress": "第 {{current}} / {{total}} 句",
     "readAloudEmpty": "这条没有可读的文字",
     "readAloudFailed": "朗读失败，去设置 → 能力里检查语音模型",
     "readAloudBusy": "语音会话正在运行，先结束语音再朗读"
