@@ -12,7 +12,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsSelect } from "../../renderer/components/settings/shared";
-import { openMenu } from "./settings-menu-helper";
+import { openMenu, menuTrigger } from "./settings-menu-helper";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "zh" } }),
@@ -112,5 +112,78 @@ describe("SettingsSelect 迁到 Radix 后必须仍成立的三条契约", () => 
     );
     expect(checked, "恰好一项被标记为选中").toHaveLength(1);
     expect(checked[0].dataset.testid).toBe(`${TEST_ID}-option-${VALUE}`);
+  });
+});
+
+// 色卡（`options[].swatch`）的契约：它是**每个选项自己的**装饰，不是全局装饰 ——
+// 触发器跟当前值走、每项排在文字之前。设置页用它在调色板/强调色下拉里显示颜色。
+describe("色卡", () => {
+  const SWATCH = "probe-swatch";
+
+  /** 上面的 beforeEach 渲染的是**不带色卡**的那一份，这里自己再渲染一份带色卡的。 */
+  function renderWithSwatches(): void {
+    act(() => {
+      root.render(
+        <SettingsSelect
+          value={VALUE}
+          options={[
+            {
+              value: "a",
+              label: "A",
+              swatch: <i data-testid={`${SWATCH}-a`} />,
+            },
+            {
+              value: "b",
+              label: "B",
+              swatch: <i data-testid={`${SWATCH}-b`} />,
+            },
+            // 没给色卡的项：不该凭空多出一个占位
+            { value: "c", label: "C" },
+          ]}
+          onChange={onChange}
+          label="调色板"
+          testId={TEST_ID}
+        />,
+      );
+    });
+  }
+
+  it("触发器显示**当前值那一项**的色卡，且色卡排在文字之前", () => {
+    renderWithSwatches();
+    const trigger = menuTrigger(container, TEST_ID);
+    const swatch = trigger.querySelector(`[data-testid="${SWATCH}-b"]`);
+    expect(swatch, "触发器必须显示当前值（b）的色卡").toBeTruthy();
+    expect(
+      trigger.querySelector(`[data-testid="${SWATCH}-a"]`),
+      "不该显示别的选项的色卡",
+    ).toBeNull();
+    // 顺序即契约：色卡是标签的前缀，不是后缀
+    expect(swatch!.nextElementSibling?.textContent).toBe("B");
+  });
+
+  it("每个下拉项带自己的色卡，没给的项照常渲染", async () => {
+    renderWithSwatches();
+    await openMenu(container, TEST_ID);
+
+    for (const value of ["a", "b"]) {
+      const item = document.querySelector<HTMLElement>(
+        `[data-testid="${TEST_ID}-option-${value}"]`,
+      );
+      expect(item, `${value} 项必须存在`).toBeTruthy();
+      const swatch = item!.querySelector(`[data-testid="${SWATCH}-${value}"]`);
+      expect(swatch, `${value} 项缺色卡`).toBeTruthy();
+      expect(
+        swatch!.nextElementSibling?.textContent,
+        `${value} 项的色卡必须排在文字之前`,
+      ).toBe(value.toUpperCase());
+    }
+
+    const noSwatch = document.querySelector<HTMLElement>(
+      `[data-testid="${TEST_ID}-option-c"]`,
+    );
+    expect(
+      noSwatch!.querySelector(`[data-testid^="${SWATCH}-"]`),
+      "没给色卡的项不该有占位元素",
+    ).toBeNull();
   });
 });

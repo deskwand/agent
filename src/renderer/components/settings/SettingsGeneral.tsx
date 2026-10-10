@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useAppStore } from "../../store";
+import { useEffectiveTheme } from "../../store/selectors";
 import type { AppTheme, ThemePreset } from "../../types";
 import { VALID_THEME_ACCENTS, type ThemeAccent } from "../../../shared/theme";
 import { VALID_THEME_PRESETS } from "../../../shared/theme";
@@ -15,6 +16,10 @@ import {
 } from "./shared";
 import { Input } from "../ui/input";
 import { Button } from "../app-button";
+import {
+  accentSwatchColor,
+  paletteSwatchColor,
+} from "../../utils/theme-swatch";
 
 export function SettingsGeneral() {
   const { i18n, t } = useTranslation();
@@ -66,23 +71,40 @@ export function SettingsGeneral() {
     { value: "system", label: t("general.themeSystem", "System") },
   ];
 
+  // 色卡取色见 utils/theme-swatch.ts。强调色跟随当前生效主题（"跟随系统"在这里已经解析完）；
+  // 调色板取的是该套配色的中性中间调，官方两套里是同一个值，所以不用传明暗。
+  const effectiveTheme = useEffectiveTheme();
+
   // 强调色（与底色正交的第二维）：选项同样从单一真源派生。
-  const themeAccentOptions: Array<{ value: ThemeAccent; label: string }> =
-    VALID_THEME_ACCENTS.map((value) => ({
-      value,
-      label: t(
-        `general.themeAccent${value === "default" ? "Default" : value.charAt(0).toUpperCase() + value.slice(1)}`,
-      ),
-    }));
+  const themeAccentOptions: Array<{
+    value: ThemeAccent;
+    label: string;
+    swatch: ReactNode;
+  }> = VALID_THEME_ACCENTS.map((value) => ({
+    value,
+    label: t(
+      `general.themeAccent${value === "default" ? "Default" : value.charAt(0).toUpperCase() + value.slice(1)}`,
+    ),
+    swatch: (
+      <Swatch
+        color={accentSwatchColor(value, effectiveTheme, settings.themePreset)}
+        shape="dot"
+      />
+    ),
+  }));
 
   // 选项从单一真源派生：加一套官方配色只需改 shared/theme.ts + i18n，这里不用动。
-  const themePresetOptions: Array<{ value: ThemePreset; label: string }> =
-    VALID_THEME_PRESETS.map((value) => ({
-      value,
-      label: t(
-        `general.themePreset${value.charAt(0).toUpperCase()}${value.slice(1)}`,
-      ),
-    }));
+  const themePresetOptions: Array<{
+    value: ThemePreset;
+    label: string;
+    swatch: ReactNode;
+  }> = VALID_THEME_PRESETS.map((value) => ({
+    value,
+    label: t(
+      `general.themePreset${value.charAt(0).toUpperCase()}${value.slice(1)}`,
+    ),
+    swatch: <Swatch color={paletteSwatchColor(value)} shape="block" />,
+  }));
 
   const codemodeModeOptions: Array<{ value: CodemodeMode; label: string }> =
     CODEMODE_MODES.map((mode) => ({
@@ -249,5 +271,25 @@ export function SettingsGeneral() {
         </SettingsCard>
       </SettingsSection>
     </div>
+  );
+}
+
+/**
+ * 下拉项与触发器上的色卡。两种形状对应两个维度：调色板是圆角方块（该套底色的中性色），
+ * 强调色是圆点（那个颜色本身）—— 形状不同，一眼能分清哪排是哪排。
+ *
+ * 纯装饰：标签文字本来就写着颜色名，所以 aria-hidden，读屏不会多出一个空元素。
+ * 圆角不用 rounded-sm/control（最小的那档是 6px）—— 那在 12px 的块上正好是一半，
+ * 方块会圆得跟圆点一样，形状的区分就没了。
+ */
+function Swatch({ color, shape }: { color: string; shape: "block" | "dot" }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`h-3 w-3 flex-none ring-1 ring-inset ring-border ${
+        shape === "dot" ? "rounded-full" : "rounded-[3px]"
+      }`}
+      style={{ backgroundColor: color }}
+    />
   );
 }

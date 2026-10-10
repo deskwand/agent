@@ -1,6 +1,6 @@
 // Shared types, constants, and components used across settings tab files.
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import type { TFunction } from "i18next";
 import {
@@ -289,7 +289,15 @@ export function SettingsSelect<T extends string>({
   disabled = false,
 }: {
   value: T;
-  options: Array<{ value: T; label: string }>;
+  options: Array<{
+    value: T;
+    label: string;
+    /**
+     * 文字前的装饰色卡（色块 / 色点）。纯装饰：无障碍名走的仍是 `label`，
+     * 所以调用方给的节点自带 `aria-hidden`，这里不再包一层语义。
+     */
+    swatch?: ReactNode;
+  }>;
   onChange: (next: T) => void;
   label: string;
   testId?: string;
@@ -335,6 +343,7 @@ export function SettingsSelect<T extends string>({
           aria-label={label}
           className="inline-flex items-center gap-1.5 rounded-control border border-border bg-card px-2.5 py-1 text-xs text-foreground outline-none hover:bg-accent disabled:opacity-50"
         >
+          {current?.swatch}
           <span className="whitespace-nowrap">{current?.label ?? value}</span>
           <ChevronDown
             className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
@@ -395,6 +404,7 @@ export function SettingsSelect<T extends string>({
               }
               className="h-7 gap-2 pr-2"
             >
+              {option.swatch}
               <span className="truncate">{option.label}</span>
             </DropdownMenuRadioItem>
           ))}

@@ -57,6 +57,23 @@ describe("强调色接线", () => {
     );
   });
 
+  it("两个下拉的选项都带色卡，且强调色跟随当前生效主题", () => {
+    // 少一行 `swatch:` 就静默退化成纯文字（下拉照常能用，只是没颜色）；
+    // 色卡取色走官方快照（utils/theme-swatch.ts），这里只钉住"接上了"。
+    expect(settings, "调色板选项缺色卡").toMatch(
+      /swatch:[\s\S]{0,160}?paletteSwatchColor\(\s*value\s*\)/,
+    );
+    // 强调色那条必须把**当前生效主题**传下去：写死任何一边的检查在明暗下就错了，
+    // 而色调本身对不对由 theme-swatch.test.ts 对着 globals.css 管。
+    expect(settings, "强调色选项缺色卡").toMatch(
+      /swatch:[\s\S]{0,160}?accentSwatchColor\(/,
+    );
+    expect(settings).toMatch(/const effectiveTheme = useEffectiveTheme\(\)/);
+    expect(settings, "default 那一项的色卡要跟着当前底色走").toMatch(
+      /accentSwatchColor\(\s*value,\s*effectiveTheme,\s*settings\.themePreset,?\s*\)/,
+    );
+  });
+
   it("没人直接用 vendored Button 的 link 变体（它写的是裸 text-primary）", () => {
     // vendored `ui/button.tsx` 的 link 变体是 `text-primary` —— 强调色上线后那是**填充**色，
     // 官方暗色对暗底只有 1.98–2.81、亮色 lime/neutral 只有 1.53，链接会读不清。
