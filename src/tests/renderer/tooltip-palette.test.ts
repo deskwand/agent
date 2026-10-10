@@ -1,38 +1,24 @@
 // 气泡与浮层的配色不变量。
 //
-// 2026-10-10 第三次改口径：气泡统一到 shadcn 上游默认 —— vendored `TooltipContent` 的
-// `bg-primary` / `text-primary-foreground`（选定的皮肤见
-// design-docs/2026-10-10-tooltip-skin-preview.html 的 C）。三件事随之变：
-//   1) 断言对象从已删除的 `.tt-bubble` 换成 vendored Content 实际在用的类名；
-//   2) 气泡取色从 --popover 换成 --primary（那对色就写在 ui/tooltip.tsx 里）；
-//   3) --popover 那一对的 14 主题断言**保留** —— 它们现在守的是下拉/浮层
-//      （ui/popover、ui/dropdown-menu、ui/sheet 仍在用 bg-popover），不是死代码。
-import fs from "node:fs";
-import path from "node:path";
+// 2026-10-10 第四次改口径：气泡皮肤落在**应用侧**（`app-tooltip.tsx` 的
+// `APP_TOOLTIP_SKIN`），取 `--secondary` / `--secondary-foreground`。
+//   1) 第一次口径（自造 --tooltip-bg/fg 反色）→ 第二次（官方 --popover）都随实现删除；
+//   2) 第三次选的官方 `--primary` 被否掉了 —— 它在深色主题下是近白（离页面底色 15.7:1），
+//      用户反馈「太打扰」；
+//   3) 现在这一对的实测（全 14 主题）：文字对比 **13.79–16.42**（AA 下限 4.5 ✓），
+//      气泡离页面底色 **1.09（浅）/ 1.31–1.37（深）** —— 靠色调差分离，不抢眼。
+// 「覆写真的生效」由 app-tooltip-skin.test.tsx 的 DOM 断言守着，本文件只管**颜色**。
+// --popover 那一对**保留** —— 它们现在守的是下拉/浮层（ui/popover、ui/dropdown-menu、
+// ui/sheet 仍在用 bg-popover），不是死代码。
 import { describe, expect, it } from "vitest";
-import { RENDERER, contrast, themeBlocks, tokenOf } from "./theme-css-helpers";
+import { contrast, themeBlocks, tokenOf } from "./theme-css-helpers";
 
-/** 气泡那一对（vendored Content 用的就是这两个类）。 */
-const BUBBLE_BG = "--primary";
-const BUBBLE_FG = "--primary-foreground";
+/** 气泡那一对（app-tooltip 的 APP_TOOLTIP_SKIN 用的是这两个变量）。 */
+const BUBBLE_BG = "--secondary";
+const BUBBLE_FG = "--secondary-foreground";
 /** 浮层那一对（下拉 / 浮层仍在用）。 */
 const PANEL_BG = "--popover";
 const PANEL_FG = "--popover-foreground";
-
-/**
- * 取某个文件里所有双引号字符串字面量的空白分词结果。
- *
- * 不用 `\b` 匹配类名：`\b` 把 `-` 当边界，`bg-primary` 会连 `bg-primary-foreground`
- * 一起命中 —— 本仓在 `app-button.tsx` 的 `shouldLeftAlign` 上踩过同一个坑。
- */
-function classTokens(file: string): Set<string> {
-  const source = fs.readFileSync(path.join(RENDERER, file), "utf8");
-  return new Set(
-    (source.match(/"[^"]*"/g) ?? [])
-      .flatMap((q) => q.slice(1, -1).split(/\s+/))
-      .filter(Boolean),
-  );
-}
 
 /**
  * 某个 token 是否**真的被声明**在这个主题块里。
@@ -67,15 +53,6 @@ function missingDecls(bg: string, fg: string): string[] {
 }
 
 describe("气泡与浮层配色", () => {
-  it("vendored TooltipContent 用的就是这两条官方类名", () => {
-    const tokens = classTokens("components/ui/tooltip.tsx");
-    expect(tokens.has("bg-primary"), "气泡底色应取 bg-primary").toBe(true);
-    expect(
-      tokens.has("text-primary-foreground"),
-      "气泡字色应取 text-primary-foreground",
-    ).toBe(true);
-  });
-
   it("14 个主题块都声明了气泡那一对官方变量", () => {
     expect(themeBlocks().length).toBe(14);
     expect(missingDecls(BUBBLE_BG, BUBBLE_FG)).toEqual([]);
