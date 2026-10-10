@@ -2205,8 +2205,9 @@ export function SettingsAPI({
                         ?.apiKey && (
                         <Button variant="ghost"
                           type="button"
+                          size="xs"
                           onClick={reuseActiveProviderApiKey}
-                          className="text-xs text-primary-text hover:underline h-auto"
+                          className="text-xs text-primary-text hover:underline"
                         >
                           {t("api.reuseMainModelKey")}
                         </Button>

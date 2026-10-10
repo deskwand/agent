@@ -227,7 +227,7 @@ export function SettingsAbout({ appVersion }: SettingsAboutProps) {
             key={link.labelKey}
             type="button"
             onClick={() => void window.electronAPI?.openExternal(link.url)}
-            className="border-b border-border/60 pb-px text-xs text-muted-foreground transition-colors hover:text-foreground h-auto"
+            className="border-b border-border/60 pb-px text-xs text-muted-foreground transition-colors hover:text-foreground h-auto px-0"
           >
             {t(link.labelKey)}
           </Button>

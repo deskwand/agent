@@ -37,8 +37,6 @@ const COMPACT_PENDING = new Set([
   "components/message/ArtifactInlineFrame.tsx",
   "components/message/ProcessSummaryBlock.tsx",
   "components/message/ResultSummaryBlock.tsx",
-  "components/settings/SettingsAPI.tsx",
-  "components/settings/SettingsAbout.tsx",
 ]);
 
 /** className 的 token 视图：引号/反引号/花括号/`$` 全当分隔符（模板串与三元里的类也看得见 ✓）。 */
