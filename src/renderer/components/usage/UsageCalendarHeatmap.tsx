@@ -8,7 +8,7 @@ import {
   formatHitRate,
   resolveCellLevel,
 } from "../../utils/usage-format";
-import { Button } from "../app-button";
+import { SegmentedToggle } from "./SegmentedToggle";
 
 type ColorMode = "usage" | "hit" | "cost";
 
@@ -42,6 +42,9 @@ const HIT_TOKEN = [
   "--success",
   "--success",
 ];
+// 数量类（用量 / 金额）两档共用基色：跟主题色走（`--primary`），于是选了强调色时整页跟着
+// 变色。⚠️ 命中率档不吃它：那一档的黄/绿是真语义（低命中黄、高命中绿）。
+const VOLUME_TOKEN = "--primary";
 
 export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
   const { t, i18n } = useTranslation();
@@ -89,23 +92,15 @@ export function UsageCalendarHeatmap({ rows, weeks, now }: Props) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-end">
-        <div className="flex gap-0.5 rounded-lg border border-border bg-muted p-0.5">
-          {(["usage", "hit", "cost"] as ColorMode[]).map((value) => (
-            <Button
-              variant="ghost"
-              key={value}
-              type="button"
-              onClick={() => setMode(value)}
-              className={`rounded-md px-2 py-0.5 text-xs transition-colors ${
-                mode === value
-                  ? "bg-card text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t(`usage.colorMode.${value}`)}
-            </Button>
-          ))}
-        </div>
+        <SegmentedToggle
+          value={mode}
+          onChange={setMode}
+          testId="usage-color-mode"
+          options={(["usage", "hit", "cost"] as ColorMode[]).map((value) => ({
+            value,
+            label: t(`usage.colorMode.${value}`),
+          }))}
+        />
       </div>
 
       <div className="flex gap-0.5 overflow-x-auto pb-1">
@@ -248,7 +243,7 @@ function swatchStyle(level: number, mode: ColorMode): React.CSSProperties {
   if (level === 0) return {};
   if (mode === "usage" || mode === "cost") {
     return {
-      background: `color-mix(in srgb, var(--success) ${
+      background: `color-mix(in srgb, var(${VOLUME_TOKEN}) ${
         Number(VOLUME_ALPHA[level]) * 100
       }%, transparent)`,
     };

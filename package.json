@@ -95,6 +95,8 @@
     "@radix-ui/react-progress": "^1.1.17",
     "@radix-ui/react-slot": "^1.4.0",
     "@radix-ui/react-switch": "^1.3.8",
+    "@radix-ui/react-toggle": "^1.1.19",
+    "@radix-ui/react-toggle-group": "^1.1.20",
     "@radix-ui/react-tooltip": "^1.3.0",
     "@rowanmanning/feed-parser": "^2.1.5",
     "@sinclair/typebox": "^0.34.49",

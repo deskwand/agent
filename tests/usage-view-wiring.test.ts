@@ -72,9 +72,14 @@ describe("usage view wiring", () => {
     const view = read("src/renderer/components/UsageView.tsx");
     expect(view).toMatch(/useState<Range>\(DEFAULT_USAGE_RANGE\)/);
     expect(view).not.toContain('useState<Range>("30d")');
-    // 默认只在初始化时生效：唯一的 setRange 调用点必须是区间按钮的点击处理。
+    // 默认只在初始化时生效：唯一的写入口必须是区间档位的 onChange。
     // （源码级断言抓不到“挂载后被 effect 覆盖”，但能抓住新增第二个写入口。）
-    expect(view.match(/setRange\(/g) ?? []).toHaveLength(1);
+    // 2026-10-10：分段控件迁到 `SegmentedToggle` 后，写法从
+    // `onClick={() => setRange(value)}` 变成 `onChange={setRange}` ⇒ 旧的
+    // `setRange(` 计数恒为 0。改成两条：直接调用必须**零**次（新增写入口会命中它）、
+    // 而档位的 onChange 必须**恰好一次** —— 判据强度不降。
+    expect(view.match(/setRange\(/g) ?? []).toHaveLength(0);
+    expect(view.match(/onChange=\{setRange\}/g) ?? []).toHaveLength(1);
   });
 
   it("always shows 53 weeks instead of switching on window width", () => {

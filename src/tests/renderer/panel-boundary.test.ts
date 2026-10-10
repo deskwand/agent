@@ -182,9 +182,12 @@ const IN_SURFACE_DIVIDERS: Array<{ file: string; from: string; to: string }> = [
     to: "border-b border-border/60 bg-card",
   },
   {
+    // 2026-10-10：表体换成 shadcn `Table` 后，下框线由 `TableRow`（上游自带 `border-b`）
+    // 承担、内边距落在 `TableCell` 上 ⇒ 探针跟着搬家。判据不变（表面内分隔线必须是 /60 的
+    // 软描边，不是满值 border），强度不降：`from` 那半边一条不改。
     file: "components/UsageView.tsx",
     from: '"border-b border-border px-2',
-    to: '"border-b border-border/60 px-2',
+    to: '"border-border/60"',
   },
   {
     file: "components/SkillMdModal.tsx",
