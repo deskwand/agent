@@ -640,6 +640,23 @@ describe("VaultView", () => {
     expect(screenText()).toContain("Cloud backup storage is full");
   });
 
+  it("surfaces the real code behind Electron's IPC error wrapper", async () => {
+    // 真实链路：主进程 throw → ipcRenderer.invoke 包成
+    // `Error invoking remote method '<channel>': Error: <message>`。
+    // 不剥壳的话下面每一条错误码匹配都落空，用户只会看到「云端同步失败」。
+    api.getSnapshot.mockRejectedValueOnce(
+      new Error(
+        "Error invoking remote method 'vault.getSnapshot': Error: VAULT_UNSUPPORTED_PATH:.DS_Store",
+      ),
+    );
+
+    await renderVault();
+    await flush();
+
+    expect(screenText()).toContain(".DS_Store cannot sync across devices");
+    expect(screenText()).not.toContain("Cloud sync failed");
+  });
+
   it("renders the local snapshot without requiring cloud access", async () => {
     await renderVault();
 

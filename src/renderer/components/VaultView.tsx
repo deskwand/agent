@@ -14,6 +14,7 @@ import { useAppStore } from "../store";
 import { isBrowserOpenableExt, isPreviewableExt } from "../utils/file-preview";
 import { openFilePathInBrowser } from "../utils/open-in-browser";
 import { getFileKind } from "../utils/file-types";
+import { ipcErrorMessage } from "../utils/ipc-error";
 import { FileTypeIcon } from "./file-type-icon";
 import { splitRelPath } from "./attach/picker-items";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -103,7 +104,9 @@ function errorText(
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
   if (!(error instanceof Error)) return t("vault.error.localOperation");
-  const message = error.message;
+  // 主进程的错误带着 Electron 的 IPC 包装壳，先剥掉再匹配：否则下面每一条
+  // 都匹配不上，全部退化成兜底文案。
+  const message = ipcErrorMessage(error);
   if (message === "VAULT_FILE_TOO_LARGE") return t("vault.error.fileTooLarge");
   if (message.startsWith("VAULT_INVALID_SKILL_NAME")) {
     return t("vault.skills.error.invalidName");
