@@ -299,7 +299,10 @@ export function ChatInputStatusBar({
                     >
                       <span className="mt-0.5 flex-none">
                         {shown === "completed" ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                          // 完成态走中性色：绿标记的是「一次操作成功收尾 / 健康」（保存回执、
+                          // `.dot-connected`、diff 的 +N），而「这一项已完成」是持续状态，行里的
+                          // 删除线已经说过一次。本面板里 goal-complete 的 BadgeCheck 同样是中性色。
+                          <CheckCircle2 className="h-3.5 w-3.5 text-muted-foreground" />
                         ) : shown === "in_progress" ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary-text" />
                         ) : shown === "cancelled" ? (

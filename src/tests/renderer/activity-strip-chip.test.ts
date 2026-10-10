@@ -583,4 +583,31 @@ describe("activity chip", () => {
       "chip 只允许 [&_svg]:size-3 这一个图标尺寸档",
     ).toEqual(["[&_svg]:size-3"]);
   });
+
+  // 面板里「计划」区的完成态图标：与 TodoWriteBlock 同一条规则 —— 完成态走中性色，
+  // 完成与否由删除线＋图标形状表达，不再叠一层成功色。
+  // 同一面板里 goal-complete 的 BadgeCheck 也是 text-muted-foreground。
+  it("计划里的完成态用中性色图标，不占用成功绿", async () => {
+    render(strip({ currentTodos: TODOS }));
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>("button")?.click();
+    });
+    await flushMacrotask();
+    const panel = document.body.querySelector("[role='dialog']");
+    expect(panel).toBeTruthy();
+    // CheckCircle2 在 lucide-react v1.8.0 走 circle-check（别名不改渲染出的类名）
+    const done = panel?.querySelector(".lucide-circle-check");
+    expect(done).toBeTruthy();
+    // closest 而不是只查图标自己：写成 <span className="text-success"><svg/></span>
+    // 时图标照旧是绿的，只查 classList 的断言会全过。
+    expect(done?.closest(".text-success")).toBeNull();
+    expect(done?.closest(".text-muted-foreground")).toBeTruthy();
+    // 面板里不得再有成功色图标
+    expect(panel?.querySelector(".text-success")).toBeNull();
+    // 用 Loader2 自己的类名限定：只写 svg.text-primary-text 的话，与面板外那个
+    // 强调色图标撞上也能过，删掉进行中的强调色这条断言照样绿。
+    expect(
+      panel?.querySelector(".lucide-loader-circle.text-primary-text"),
+    ).toBeTruthy();
+  });
 });

@@ -161,4 +161,28 @@ describe("todo_write 卡片", () => {
     expect(container.textContent).toContain("全部做完了");
     expect(container.textContent).not.toContain("任务清单未生效");
   });
+
+  // 完成态用中性色：它原来是整张卡片最饱和的一笔（在非绿色强调色下尤其明显），
+  // 而完成与否已经由删除线＋图标形状表达，再叠一层色是重复编码。
+  it("完成态用中性色图标，不占用成功绿", async () => {
+    await act(async () => {
+      root.render(
+        createElement(ToolUseBlock, { block, allBlocks: [block], message }),
+      );
+    });
+    // CheckSquare 在 lucide-react v1.8.0 走 square-check-big（别名不改渲染出的类名）
+    const done = container.querySelector(".lucide-square-check-big");
+    expect(done).toBeTruthy();
+    // closest 而不是只查图标自己：写成 <span className="text-success"><svg/></span>
+    // 时图标照旧是绿的，只查 classList 的断言会全过。
+    expect(done?.closest(".text-success")).toBeNull();
+    expect(done?.closest(".text-muted-foreground")).toBeTruthy();
+    // 整张卡片不再出现任何成功色图标
+    expect(container.querySelector(".text-success")).toBeNull();
+    // 必须用 Loader2 自己的类名限定：卡片头部的 ListTodo 恒带 text-primary-text，
+    // 只写 svg.text-primary-text 的话，把进行中的强调色删掉这条断言照样绿。
+    expect(
+      container.querySelector(".lucide-loader-circle.text-primary-text"),
+    ).toBeTruthy();
+  });
 });

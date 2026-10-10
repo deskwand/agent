@@ -46,8 +46,12 @@ export const TodoWriteBlock = memo(function TodoWriteBlock({
 
   const getStatusIcon = (status: string) => {
     switch (status) {
+      // 完成态**不上**成功色：绿在本仓标记的是「一次操作成功收尾 / 健康 / 新增」
+      // （设置里的保存回执、`.dot-connected`、diff 的 +N），而清单里「这一项已完成」
+      // 是持续状态，同一行已经有删除线 —— 再叠一层绿是重复编码，且在 zinc + orange
+      // 这类非绿色强调色下，它会成为整张卡片最饱和的一笔。
       case "completed":
-        return <CheckSquare className="w-4 h-4 text-success" />;
+        return <CheckSquare className="w-4 h-4 text-muted-foreground" />;
       case "in_progress":
         return <Loader2 className="w-4 h-4 text-primary-text animate-spin" />;
       case "cancelled":
