@@ -53,7 +53,8 @@ export function UsageHourHeatmap({ records }: { records: UsageHourRow[] }) {
                   level === 0
                     ? undefined
                     : {
-                        background: `color-mix(in srgb, var(--success) ${
+                        // 数量图，跟主题色走（与日历图的用量/金额档同一基色）
+                        background: `color-mix(in srgb, var(--primary) ${
                           Number(RAMP[level]) * 100
                         }%, transparent)`,
                       }

@@ -39,8 +39,16 @@ describe("heatmap components", () => {
     for (const f of ["UsageCalendarHeatmap.tsx", "UsageHourHeatmap.tsx"]) {
       const text = read(f);
       expect(text).not.toMatch(/#[0-9a-fA-F]{6}/);
-      expect(text).toContain("--success");
+      // 2026-10-10 方案二：数量类（用量 / 金额）跟主题色，用 --primary
+      expect(text).toContain("--primary");
     }
+    // ⚠️ 光断言 `toContain("--primary")` 抓不到「swatchStyle 退回 --success」——
+    // 常量声明自己就能满足它。所以再加一条：日历图里不该再有 var(--success) 的用量底（2026-10-10 评审）。
+    expect(read("UsageCalendarHeatmap.tsx")).not.toContain("var(--success)");
+    expect(read("UsageCalendarHeatmap.tsx")).toContain("var(${VOLUME_TOKEN})");
+    // 命中率档的黄→绿是真语义（低命中黄、高命中绿），必须留着 ——
+    // 只有日历图有这一档，时段图的 ramp 是纯数量的。
+    expect(read("UsageCalendarHeatmap.tsx")).toContain("--success");
   });
 
   it("命中模式的 HIT_TOKEN 用的是存在的 token（2026-10-10 评审抓到的回归）", () => {

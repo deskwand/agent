@@ -21,9 +21,22 @@ import {
   type UsageSortKey,
 } from "../utils/usage-format";
 import { Button } from "./app-button";
+import { SegmentedToggle } from "./usage/SegmentedToggle";
+import { Card, CardContent, CardHeader } from "./ui/card";
+import { AppProgress } from "./app-progress";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
 
 const RANGES = ["1d", "7d", "30d", "90d", "all"] as const;
 type Range = (typeof RANGES)[number];
+
+const SORT_KEYS: readonly UsageSortKey[] = ["output", "cost"];
 
 /** 热力图固定显示 53 周：格子宽度随卡片自适应，不再按窗口宽度切换周数。 */
 const WEEKS = 53;
@@ -106,22 +119,15 @@ export function UsageView() {
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-0.5 rounded-lg border border-border bg-muted p-0.5">
-          {RANGES.map((value) => (
-            <Button variant="ghost"
-              key={value}
-              type="button"
-              onClick={() => setRange(value)}
-              className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
-                range === value
-                  ? "bg-card text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t(`usage.range.${value}`)}
-            </Button>
-          ))}
-        </div>
+        <SegmentedToggle
+          value={range}
+          onChange={setRange}
+          testId="usage-range"
+          options={RANGES.map((value) => ({
+            value,
+            label: t(`usage.range.${value}`),
+          }))}
+        />
         <CurrencySelect value={currency} onChange={setCurrency} />
       </header>
 
@@ -133,27 +139,27 @@ export function UsageView() {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 xl:grid-cols-7">
-              <Card
+              <StatCard
                 label={t("usage.cards.input")}
                 value={compactNumber(snapshot.totals.input)}
                 hint={snapshot.totals.input.toLocaleString()}
               />
-              <Card
+              <StatCard
                 label={t("usage.cards.output")}
                 value={compactNumber(snapshot.totals.output)}
                 hint={snapshot.totals.output.toLocaleString()}
               />
-              <Card
+              <StatCard
                 label={t("usage.cards.cacheRead")}
                 value={compactNumber(snapshot.totals.cacheRead)}
                 hint={snapshot.totals.cacheRead.toLocaleString()}
               />
-              <Card
+              <StatCard
                 label={t("usage.cards.cacheHitRate")}
                 value={formatHitRate(snapshot.totals.hitRate)}
                 hint={t("usage.cards.hitRateHint")}
               />
-              <Card
+              <StatCard
                 label={t("usage.cards.cacheWrite")}
                 value={cacheWrite === 0 ? "0" : compactNumber(cacheWrite)}
                 hint={
@@ -162,7 +168,7 @@ export function UsageView() {
                     : cacheWrite.toLocaleString()
                 }
               />
-              <Card
+              <StatCard
                 label={t("usage.cards.calls")}
                 value={callCount.toLocaleString()}
                 hint={
@@ -175,7 +181,7 @@ export function UsageView() {
                     : ""
                 }
               />
-              <Card
+              <StatCard
                 label={t("usage.cards.cost")}
                 value={formatCost(
                   snapshot.totals.cost,
@@ -209,22 +215,14 @@ export function UsageView() {
               title={t("usage.byModel")}
               hint={t("usage.byModelHint")}
               action={
-                <div className="flex gap-0.5 rounded-lg border border-border bg-muted p-0.5">
-                  {(["output", "cost"] as UsageSortKey[]).map((value) => (
-                    <Button variant="ghost"
-                      key={value}
-                      type="button"
-                      onClick={() => setSortKey(value)}
-                      className={`rounded-md px-2 py-0.5 text-xs transition-colors ${
-                        sortKey === value
-                          ? "bg-card text-foreground"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {t(`usage.sort.${value}`)}
-                    </Button>
-                  ))}
-                </div>
+                <SegmentedToggle
+                  value={sortKey}
+                  onChange={setSortKey}
+                  options={SORT_KEYS.map((value) => ({
+                    value,
+                    label: t(`usage.sort.${value}`),
+                  }))}
+                />
               }
             >
               <ModelTable
@@ -241,7 +239,7 @@ export function UsageView() {
   );
 }
 
-function Card({
+function StatCard({
   label,
   value,
   hint,
@@ -250,12 +248,15 @@ function Card({
   value: string;
   hint: string;
 }) {
+  // 上游 Card 根节点没有内边距（`p-6` 在 CardHeader/CardContent 上）⇒ 这里只补紧凑档。
+  // ⚠️ `border-border` 不能省：tailwind.config.js 没有 borderColor.DEFAULT，上游 Card 的
+  //    裸 `border` 会落到 Tailwind 默认的 gray-200 —— 深色主题下是一条亮线。
   return (
-    <div className="rounded-lg border border-border bg-muted px-3 py-2.5">
+    <Card className="border-border px-3 py-2.5">
       <p className="text-[11px] text-muted-foreground">{label}</p>
       <p className="mt-0.5 font-mono text-base text-foreground">{value}</p>
       <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p>
-    </div>
+    </Card>
   );
 }
 
@@ -270,17 +271,24 @@ function Box({
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  // 名字保留 `Box`（改名是多余的改动，只碰必须碰的）；内部已经是 shadcn Card 三件套。
   return (
-    <div className="rounded-lg border border-border bg-muted px-3.5 py-3">
-      <div className="mb-2.5 flex items-baseline gap-2">
-        <h2 className="text-sm font-medium text-foreground">{title}</h2>
+    <Card className="border-border">
+      {/* 上游 CardHeader 是 `flex flex-col space-y-1.5 p-6` ⇒ 这里改回一行、把 space-y 归零
+          （三个子元素各带 6px margin-top 会错位）、内边距收到与旧实现等值的 12/10px。 */}
+      <CardHeader className="flex-row items-baseline space-y-0 gap-2 px-3.5 pb-2.5 pt-3">
+        {/* ⚠️ 不用 CardTitle：上游的 CardTitle 是 div，会把这里的 <h2> 降级。
+            样式逐字对齐 CardTitle 的 font-medium leading-none tracking-tight。 */}
+        <h2 className="text-sm font-medium leading-none tracking-tight text-foreground">
+          {title}
+        </h2>
         <span className="ml-auto font-mono text-[10px] text-muted-foreground">
           {hint}
         </span>
         {action}
-      </div>
-      {children}
-    </div>
+      </CardHeader>
+      <CardContent className="px-3.5 pb-3 pt-0">{children}</CardContent>
+    </Card>
   );
 }
 
@@ -315,89 +323,123 @@ function ModelTable({
   // 条形与排序同一口径（key 决定看输出还是成本），逐行取值统一走 modelBarValue
   // （它会把负数/非有限值夹到 0，否则 width 声明失效、条形反而满格）
   const max = Math.max(...rows.map((row) => modelBarValue(row, sortKey)), 1);
+  // 上游 TableHead 是 `h-10 … font-medium`、TableCell 是 `p-2` ⇒ 这里各收一档；
+  // `text-right` / `font-normal` 覆盖上游的 `text-left` / `font-medium`。
+  // ⚠️ `headClass` **不带** text-align：模型列表头与它的单元格一样是左对齐的（与表体的
+  // cellClass 同构：数值档自带 text-right，模型档自己写）。不能靠「两边都写、让 CSS 顺序
+  // 判胜」—— 生成顺序里 `.text-right` 在 `.text-left` 之后，那会让模型表头变成右对齐，
+  // 与它左对齐的单元格不一致（2026-10-10 评审发现：main 上就是这个不一致）。
   const headClass =
-    "border-b border-border/60 px-2 py-1.5 text-right text-[11px] font-normal text-muted-foreground";
+    "h-8 px-2 py-1.5 text-[11px] font-normal text-muted-foreground";
   const cellClass =
-    "border-b border-border/60 px-2 py-1.5 text-right font-mono text-[11px] text-muted-foreground";
+    "px-2 py-1.5 text-right font-mono text-[11px] text-muted-foreground";
 
   return (
-    <table className="w-full border-collapse">
-      <thead>
-        <tr>
-          <th className={`${headClass} text-left`}>
+    <Table>
+      {/* ⚠️ `[&_tr]:border-border/60` 不能省：上游 TableHeader 的 `[&_tr]:border-b` 只有宽度，
+          颜色会落到 Tailwind 默认的 gray-200（深色主题下一条亮线）。
+          这也接住了 panel-boundary.test.ts 的「表面内分隔线用弱描边」契约。 */}
+      <TableHeader className="[&_tr]:border-border/60">
+        <TableRow className="hover:bg-transparent">
+          <TableHead className={headClass}>
             {t("usage.columns.model")}
-          </th>
-          <th className={headClass}>{t("usage.columns.output")}</th>
-          <th className={headClass}>{t("usage.columns.input")}</th>
-          <th className={headClass}>{t("usage.columns.cacheRead")}</th>
-          <th className={headClass}>{t("usage.columns.cost")}</th>
-          <th className={headClass}>{t("usage.columns.hitRate")}</th>
-          <th className={headClass}>{t("usage.columns.calls")}</th>
-          <th className={headClass} />
-        </tr>
-      </thead>
-      <tbody>
+          </TableHead>
+          <TableHead className={`${headClass} text-right`}>
+            {t("usage.columns.output")}
+          </TableHead>
+          <TableHead className={`${headClass} text-right`}>
+            {t("usage.columns.input")}
+          </TableHead>
+          <TableHead className={`${headClass} text-right`}>
+            {t("usage.columns.cacheRead")}
+          </TableHead>
+          <TableHead className={`${headClass} text-right`}>
+            {t("usage.columns.cost")}
+          </TableHead>
+          <TableHead className={`${headClass} text-right`}>
+            {t("usage.columns.hitRate")}
+          </TableHead>
+          <TableHead className={`${headClass} text-right`}>
+            {t("usage.columns.calls")}
+          </TableHead>
+          <TableHead className={headClass} />
+        </TableRow>
+      </TableHeader>
+      <TableBody>
         {sorted.map((row) => (
-          <tr key={`${row.model ?? "subagent"}-${row.provider ?? ""}`}>
-            <td className="border-b border-border/60 px-2 py-1.5 text-xs text-foreground">
+          <TableRow
+            key={`${row.model ?? "subagent"}-${row.provider ?? ""}`}
+            className="border-border/60"
+          >
+            <TableCell className="px-2 py-1.5 text-xs text-foreground">
               {row.model ?? t("usage.subagentRow")}
               {row.provider ? (
                 <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">
                   {row.provider}
                 </span>
               ) : null}
-            </td>
-            <td className={cellClass}>{compactNumber(row.output)}</td>
-            <td className={cellClass}>{compactNumber(row.input)}</td>
-            <td className={cellClass}>{compactNumber(row.cacheRead)}</td>
-            <td
+            </TableCell>
+            <TableCell className={cellClass}>
+              {compactNumber(row.output)}
+            </TableCell>
+            <TableCell className={cellClass}>
+              {compactNumber(row.input)}
+            </TableCell>
+            <TableCell className={cellClass}>
+              {compactNumber(row.cacheRead)}
+            </TableCell>
+            <TableCell
               className={`${cellClass} ${row.cost === null ? "text-muted-foreground" : ""}`}
             >
               {formatCost(row.cost, currency, currencyRate, lang)}
-            </td>
-            <td
+            </TableCell>
+            <TableCell
               className={`${cellClass} ${
                 row.hitRate !== null && row.hitRate < 90 ? "text-warning" : ""
               }`}
             >
               {formatHitRate(row.hitRate)}
-            </td>
-            <td className={cellClass}>{row.calls.toLocaleString()}</td>
-            <td className="border-b border-border/60 px-2 py-1.5">
-              <span className="block h-2 w-14 overflow-hidden rounded-sm bg-card">
-                <span
-                  className="block h-full bg-success opacity-70"
-                  style={{
-                    width: `${(modelBarValue(row, sortKey) / max) * 100}%`,
-                  }}
-                />
-              </span>
-            </td>
-          </tr>
+            </TableCell>
+            <TableCell className={cellClass}>
+              {row.calls.toLocaleString()}
+            </TableCell>
+            <TableCell className="px-2 py-1.5">
+              {/* 条形跟主题色，用 Progress 默认的 bg-primary；同时白拿 role="progressbar"
+                  + aria-valuenow（旧的 <span> 对读屏隐形）。`w-14` 覆盖上游 Root 的
+                  `w-full`，靠 cn 的冲突合并。 */}
+              <AppProgress
+                value={modelBarValue(row, sortKey)}
+                max={max}
+                className="h-2 w-14"
+              />
+            </TableCell>
+          </TableRow>
         ))}
-        <tr>
-          <td className="px-2 py-1.5 text-xs text-muted-foreground">
+        {/* 合计行：TableBody 的 `[&_tr:last-child]:border-0` 已经去掉下框线，这里只需要
+            压掉上游 TableRow 的行悬停高亮（合计行不是数据行）。 */}
+        <TableRow className="hover:bg-transparent">
+          <TableCell className="px-2 py-1.5 text-xs text-muted-foreground">
             {totalRow}
-          </td>
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
+          </TableCell>
+          <TableCell className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {compactNumber(total.output)}
-          </td>
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
+          </TableCell>
+          <TableCell className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {compactNumber(total.input)}
-          </td>
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
+          </TableCell>
+          <TableCell className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {compactNumber(total.cacheRead)}
-          </td>
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
+          </TableCell>
+          <TableCell className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {formatCost(totalCost, currency, currencyRate, lang)}
-          </td>
-          <td className="px-2 py-1.5" />
-          <td className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
+          </TableCell>
+          <TableCell className="px-2 py-1.5" />
+          <TableCell className="px-2 py-1.5 text-right font-mono text-[11px] text-foreground">
             {total.calls.toLocaleString()}
-          </td>
-          <td className="px-2 py-1.5" />
-        </tr>
-      </tbody>
-    </table>
+          </TableCell>
+          <TableCell className="px-2 py-1.5" />
+        </TableRow>
+      </TableBody>
+    </Table>
   );
 }
