@@ -312,7 +312,7 @@ describe("nested group states", () => {
     expect(block.status).toMatchObject({ running: true, failed: false });
   });
 
-  it("marks missing history as unavailable without calling it incomplete", () => {
+  it("marks missing history as unavailable", () => {
     const item = toolUse(
       "c1",
       "read",
@@ -327,7 +327,6 @@ describe("nested group states", () => {
     const block = buildProcessSummaryDisplayBlock([item], [item]);
     expect(block.summary.readCount).toBe(0);
     expect(block.status).toMatchObject({
-      incomplete: false,
       unavailable: true,
       unfinished: true,
     });
@@ -347,24 +346,8 @@ describe("nested group states", () => {
     );
     const block = buildProcessSummaryDisplayBlock([item], [item]);
     expect(block.status).toMatchObject({
-      incomplete: true,
       unavailable: true,
       unfinished: true,
-    });
-  });
-
-  it("keeps legacy snapshots marked incomplete", () => {
-    const item = toolUse(
-      "c1",
-      "read",
-      {},
-      trace({ source: "legacy", complete: false }),
-    );
-    const block = buildProcessSummaryDisplayBlock([item], [item]);
-    expect(block.summary.readCount).toBe(0);
-    expect(block.status).toMatchObject({
-      incomplete: true,
-      unavailable: false,
     });
   });
 

@@ -178,7 +178,7 @@ describe("ProcessSummaryBlock highlight and expand", () => {
     expect(container.textContent).toContain("建表");
   });
 
-  it("折叠时保留失败提示，点击失败按钮展开并定位首个失败子项", () => {
+  it("折叠态不再显示失败提示，外部高亮请求仍展开并定位首个失败子项", () => {
     const failedBlock = {
       ...block,
       items: [
@@ -200,7 +200,6 @@ describe("ProcessSummaryBlock highlight and expand", () => {
         running: false,
         failed: true,
         unfinished: false,
-        incomplete: false,
         unavailable: false,
         firstFailedToolCallId: "child",
       },
@@ -216,36 +215,28 @@ describe("ProcessSummaryBlock highlight and expand", () => {
       ),
     );
 
-    // 折叠态即可断言失败标签，不需要先打开详情。
-    expect(container.textContent).toContain(
+    // 提示条整条移除（2026-10-10 决定）：折叠态既不显示失败标签，也没有任何失败按钮。
+    expect(container.textContent).not.toContain(
       i18n.t("tool.grouped.failedOperations"),
     );
+    expect(container.querySelector("[data-tool-group-failure]")).toBeNull();
     expect(
       container
         .querySelector("button[aria-expanded]")
         ?.getAttribute("aria-expanded"),
     ).toBe("false");
 
-    act(() =>
-      container
-        .querySelector<HTMLButtonElement>("[data-tool-group-failure]")
-        ?.click(),
-    );
+    // 外部高亮请求（从活动面板 / 后台代理列表点进来）仍然展开、一次性消费并把失败子项滚进视野。
+    act(() => useAppStore.getState().highlightToolCallId("child"));
     expect(
       container
         .querySelector("button[aria-expanded]")
         ?.getAttribute("aria-expanded"),
     ).toBe("true");
+    expect(useAppStore.getState().pendingExpandToolCallId).toBeNull();
     expect(useAppStore.getState().highlightedToolCallId).toBe("child");
     // 失败条目由 ref 滚进视野，而不是 querySelector 查业务 DOM。
     expect(scrollIntoViewSpy).toHaveBeenCalled();
-    const previousScrolls = scrollIntoViewSpy.mock.calls.length;
-    act(() =>
-      container
-        .querySelector<HTMLButtonElement>("[data-tool-group-failure]")
-        ?.click(),
-    );
-    expect(scrollIntoViewSpy.mock.calls.length).toBe(previousScrolls + 1);
   });
 
   it("命中被投影掉的父脚本 ID 时也展开脚本详情并高亮", () => {

@@ -1727,8 +1727,6 @@
       "runningScript": "正在执行脚本",
       "failedOperations": "存在失败操作",
       "unfinishedOperations": "操作未完成",
-      "partialDetails": "部分操作明细",
-      "detailsUnavailable": "内部操作明细不可用",
       "outputUnavailable": "历史未保存此调用的完整输出",
       "argumentsOmitted": "参数因大小限制未保存",
       "cancelledOperation": "已取消",

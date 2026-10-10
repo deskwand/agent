@@ -28,7 +28,6 @@ import {
   CollapsibleTrigger,
 } from "../ui/collapsible";
 import { NestedToolDetails } from "./NestedToolDetails";
-import { ToolGroupStatus } from "./ToolGroupStatus";
 import { useAppStore } from "../../store";
 import { Button } from "../app-button";
 
@@ -65,7 +64,6 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
 }: ProcessSummaryBlockProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
-  const [failureScrollRequest, setFailureScrollRequest] = useState(0);
   const fragments = getProcessSummaryFragments(block.summary, t, block.status);
   const failedToolCallId = block.status?.firstFailedToolCallId;
   const failedItemRef = useRef<HTMLDivElement | null>(null);
@@ -111,15 +109,7 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
     if (typeof element?.scrollIntoView === "function") {
       element.scrollIntoView({ block: "nearest" });
     }
-  }, [expanded, failedToolCallId, failureScrollRequest]);
-
-  const handleFailure = () => {
-    setExpanded(true);
-    setFailureScrollRequest((value) => value + 1);
-    if (failedToolCallId) {
-      useAppStore.getState().highlightToolCallId(failedToolCallId);
-    }
-  };
+  }, [expanded, failedToolCallId]);
 
   const scriptIds = new Set((block.scripts ?? []).map((script) => script.id));
   const visibleItems = block.items.filter((item) => !scriptIds.has(item.id));
@@ -169,7 +159,6 @@ export const ProcessSummaryBlock = memo(function ProcessSummaryBlock({
             )}
           </span>
         </Button>
-        <ToolGroupStatus status={block.status} onFailure={handleFailure} />
       </div>
 
       {expanded ? (

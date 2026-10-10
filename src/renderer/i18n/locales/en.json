@@ -1728,8 +1728,6 @@
       "runningScript": "Running script",
       "failedOperations": "Some operations failed",
       "unfinishedOperations": "Operations unfinished",
-      "partialDetails": "Partial operation details",
-      "detailsUnavailable": "Nested operation details unavailable",
       "outputUnavailable": "Full output was not saved for this call",
       "argumentsOmitted": "Arguments omitted due to size limits",
       "cancelledOperation": "Cancelled",

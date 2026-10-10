@@ -41,7 +41,6 @@ it("distinguishes successful empty scripts from running or failed scripts with E
     running: false,
     failed: true,
     unfinished: false,
-    incomplete: false,
     unavailable: false,
   };
   expect(

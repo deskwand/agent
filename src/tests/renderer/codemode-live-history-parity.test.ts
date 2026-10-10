@@ -392,7 +392,6 @@ describe("codemode live and history parity", () => {
     source: NestedToolCallsUi["source"];
     complete: boolean;
     unavailable: boolean;
-    incomplete: boolean;
     scriptCount: number;
     childIds: string[];
   }> = [
@@ -403,7 +402,6 @@ describe("codemode live and history parity", () => {
       source: "final",
       complete: true,
       unavailable: false,
-      incomplete: false,
       scriptCount: 1,
       childIds: [],
     },
@@ -414,7 +412,6 @@ describe("codemode live and history parity", () => {
       source: "legacy",
       complete: false,
       unavailable: false,
-      incomplete: true,
       scriptCount: 0,
       childIds: ["p:legacy:0"],
     },
@@ -425,7 +422,6 @@ describe("codemode live and history parity", () => {
       source: "missing",
       complete: false,
       unavailable: true,
-      incomplete: false,
       scriptCount: 1,
       childIds: [],
     },
@@ -442,7 +438,6 @@ describe("codemode live and history parity", () => {
       source: "final",
       complete: false,
       unavailable: false,
-      incomplete: true,
       scriptCount: 0,
       childIds: ["c1"],
     },
@@ -450,16 +445,7 @@ describe("codemode live and history parity", () => {
 
   it.each(recordCases)(
     "matches both projections for $name",
-    ({
-      raw,
-      legacy,
-      source,
-      complete,
-      unavailable,
-      incomplete,
-      scriptCount,
-      childIds,
-    }) => {
+    ({ raw, legacy, source, complete, unavailable, scriptCount, childIds }) => {
       const live = runLive([], {}, { raw, legacy });
       const history = renderHistory(raw, legacy, "ok");
       expectParity(live, history);
@@ -471,7 +457,6 @@ describe("codemode live and history parity", () => {
       const group = live.groups.find((item) => item.type === "process-summary");
       expect(group?.summary.scriptCount).toBe(scriptCount);
       expect(group?.status?.unavailable).toBe(unavailable);
-      expect(group?.status?.incomplete).toBe(incomplete);
     },
   );
 

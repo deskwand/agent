@@ -45,7 +45,6 @@ const groupedStatus = (
   running: false,
   failed: true,
   unfinished: false,
-  incomplete: false,
   unavailable: false,
   ...(firstFailedToolCallId ? { firstFailedToolCallId } : {}),
 });
@@ -130,7 +129,7 @@ describe("codemode tool group UI", () => {
     ];
   }
 
-  it("结果组折叠时失败可见，点击后展开、消费待展开并高亮失败子项", () => {
+  it("结果组折叠时不再显示失败提示，外部高亮请求仍展开并高亮失败子项", () => {
     const failedChild = child({
       id: "write-1",
       name: "write",
@@ -175,21 +174,19 @@ describe("codemode tool group UI", () => {
       ),
     );
 
-    // 折叠态就能看到失败，不必先展开详情。
-    expect(container.textContent).toContain(
+    // 提示条整条移除（2026-10-10 决定）：折叠态只剩摘要行，失败明细在展开里。
+    expect(container.textContent).not.toContain(
       i18n.t("tool.grouped.failedOperations"),
     );
+    expect(container.querySelector("[data-tool-group-failure]")).toBeNull();
     expect(
       container
         .querySelector("button[aria-expanded]")
         ?.getAttribute("aria-expanded"),
     ).toBe("false");
 
-    act(() =>
-      container
-        .querySelector<HTMLButtonElement>("[data-tool-group-failure]")
-        ?.click(),
-    );
+    // 外部高亮请求（从活动面板点进来）仍然展开详情并一次性消费待展开标记。
+    act(() => useAppStore.getState().highlightToolCallId("write-1"));
 
     expect(container.textContent).toContain(
       i18n.t("tool.grouped.scriptDetails"),

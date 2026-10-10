@@ -46,7 +46,6 @@ export interface ToolGroupStatusUi {
   running: boolean;
   failed: boolean;
   unfinished: boolean;
-  incomplete: boolean;
   unavailable: boolean;
   firstFailedToolCallId?: string;
 }
@@ -421,9 +420,6 @@ function buildGroupStatus(
     unfinished: traces.some(
       (trace) =>
         trace.status === "unfinished" || trace.parentStatus === "unfinished",
-    ),
-    incomplete: traces.some(
-      (trace) => !trace.complete && trace.source !== "missing",
     ),
     unavailable: traces.some(
       (trace) =>

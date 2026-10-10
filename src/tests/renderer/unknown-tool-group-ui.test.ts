@@ -86,15 +86,15 @@ describe("unknown tool name stays inside the tool group", () => {
     act(() => root.render(createElement(MessageCard, { message })));
   }
 
-  it("折叠时只显示摘要行与失败标记，展开后才是工具行", () => {
+  it("折叠时只显示摘要行，展开后才是工具行", () => {
     render();
 
-    // 折叠态：失败行不占正文位置，名字与错误文本都不该出现。
+    // 折叠态：失败行不占正文位置，名字与错误文本都不该出现；也没有任何失败提示条。
     expect(container.textContent).not.toContain(UNKNOWN_TOOL);
-    const failure = container.querySelector<HTMLButtonElement>(
-      "[data-tool-group-failure]",
+    expect(container.querySelector("[data-tool-group-failure]")).toBeNull();
+    expect(container.textContent).not.toContain(
+      i18n.t("tool.grouped.failedOperations"),
     );
-    expect(failure).not.toBeNull();
 
     // 相邻的 bash 调用与这次未登记调用合成**同一行**摘要（这是"把摘要切成两段"
     // 的服务端症状在 UI 层的勒线）。
@@ -102,7 +102,11 @@ describe("unknown tool name stays inside the tool group", () => {
       "已执行了 1 条命令 并 已使用 1 个工具",
     );
 
-    act(() => failure?.click());
+    act(() =>
+      container
+        .querySelector<HTMLButtonElement>("button[aria-expanded]")
+        ?.click(),
+    );
 
     // 展开后工具行出现在摘要组内部（同一个节点树里），错误文本可见。
     expect(container.textContent).toContain(UNKNOWN_TOOL);
