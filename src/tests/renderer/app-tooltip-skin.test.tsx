@@ -73,6 +73,14 @@ describe("气泡皮肤（应用侧覆写）", () => {
     ).toBe(false);
   });
 
+  it("阴影在：浅色下那 1.09 的色调差不靠它就是不可见的容器", async () => {
+    // 审查员 2026-10-10 实测：气泡离 --background 只 1.09，落在侧栏上时只有 **1.04** ✗
+    // ⇒ 无阴影时浅色主题看到的是「几行游离的深色文字」而不是一个气泡。
+    // 这条把它钉住，免得后人把 `shadow-elevated` 当成多余装饰删掉。
+    const bubble = await renderBubble();
+    expect(bubble.classList.contains("shadow-elevated")).toBe(true);
+  });
+
   it("调用方自己的 className 仍然能赢（不会被默认皮肤顶掉）", async () => {
     const bubble = await renderBubble("bg-destructive");
     expect(bubble.classList.contains("bg-destructive")).toBe(true);

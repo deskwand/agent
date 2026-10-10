@@ -1,24 +1,50 @@
 // 气泡与浮层的配色不变量。
 //
-// 2026-10-10 第四次改口径：气泡皮肤落在**应用侧**（`app-tooltip.tsx` 的
-// `APP_TOOLTIP_SKIN`），取 `--secondary` / `--secondary-foreground`。
-//   1) 第一次口径（自造 --tooltip-bg/fg 反色）→ 第二次（官方 --popover）都随实现删除；
-//   2) 第三次选的官方 `--primary` 被否掉了 —— 它在深色主题下是近白（离页面底色 15.7:1），
-//      用户反馈「太打扰」；
-//   3) 现在这一对的实测（全 14 主题）：文字对比 **13.79–16.42**（AA 下限 4.5 ✓），
-//      气泡离页面底色 **1.09（浅）/ 1.31–1.37（深）** —— 靠色调差分离，不抢眼。
+// 2026-10-10 的口径：气泡皮肤落在**应用侧**（`app-tooltip.tsx` 的 `APP_TOOLTIP_SKIN`）。
+// 前三次口径（自造 --tooltip-bg/fg 反色 → 官方 --popover → 官方 --primary）都随实现删除或
+// 被否：`--primary` 在深色下是近白（离页面底色 15.7:1），用户反馈「太打扰」。
+//
+// ⚠️ **本文件不写死 token 名**（审查员 2026-10-10 指出）：早先的版本把 `--secondary` 写在
+// 常量里，于是把 `APP_TOOLTIP_SKIN` 改成 `bg-accent` 之后，本文件会继续替 `--secondary`
+// 算 14 套对比度并全绿 —— 一份名为「气泡配色」的守卫静默地不再守气泡 ✗。
+// ⇒ 现在从 `app-tooltip.tsx` **反推**类名 → token，两侧任一改动都会对撞 ✓。
 // 「覆写真的生效」由 app-tooltip-skin.test.tsx 的 DOM 断言守着，本文件只管**颜色**。
-// --popover 那一对**保留** —— 它们现在守的是下拉/浮层（ui/popover、ui/dropdown-menu、
-// ui/sheet 仍在用 bg-popover），不是死代码。
+// --popover 那一对**保留** —— 它守的是下拉/浮层（ui/popover、ui/dropdown-menu、ui/sheet
+// 仍在用 bg-popover），不是死代码。
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { contrast, themeBlocks, tokenOf } from "./theme-css-helpers";
+import { RENDERER, contrast, themeBlocks, tokenOf } from "./theme-css-helpers";
 
-/** 气泡那一对（app-tooltip 的 APP_TOOLTIP_SKIN 用的是这两个变量）。 */
-const BUBBLE_BG = "--secondary";
-const BUBBLE_FG = "--secondary-foreground";
 /** 浮层那一对（下拉 / 浮层仍在用）。 */
 const PANEL_BG = "--popover";
 const PANEL_FG = "--popover-foreground";
+
+/** 从 `app-tooltip.tsx` 读出 `APP_TOOLTIP_SKIN` 的字面量。 */
+function readSkin(): string {
+  const source = fs.readFileSync(
+    path.join(RENDERER, "components/app-tooltip.tsx"),
+    "utf8",
+  );
+  const m = /const APP_TOOLTIP_SKIN =\s*\n?\s*"([^"]*)"/.exec(source);
+  expect(m, "app-tooltip.tsx 里找不到 APP_TOOLTIP_SKIN").not.toBeNull();
+  return m![1];
+}
+
+/**
+ * 把皮肤里的 `bg-x` / `text-x` 映射回 CSS 变量名（`--x`）。
+ *
+ * 只看以 `bg-` / `text-` **开头**的 token ⇒ `shadow-elevated`、`hover:bg-x` 之类
+ * 天然被跳过，不会误当成颜色。
+ */
+function skinTokens(skin: string): { bg: string; fg: string } {
+  const tokens = skin.split(/\s+/).filter(Boolean);
+  const bg = tokens.find((t) => t.startsWith("bg-"))?.slice(3);
+  const fg = tokens.find((t) => t.startsWith("text-"))?.slice(5);
+  expect(bg, `皮肤里找不到 bg-*：${skin}`).toBeTruthy();
+  expect(fg, `皮肤里找不到 text-*：${skin}`).toBeTruthy();
+  return { bg: `--${bg}`, fg: `--${fg}` };
+}
 
 /**
  * 某个 token 是否**真的被声明**在这个主题块里。
@@ -53,13 +79,15 @@ function missingDecls(bg: string, fg: string): string[] {
 }
 
 describe("气泡与浮层配色", () => {
-  it("14 个主题块都声明了气泡那一对官方变量", () => {
+  it("气泡皮肤反推出来的 token 在 14 个主题块里都有声明", () => {
     expect(themeBlocks().length).toBe(14);
-    expect(missingDecls(BUBBLE_BG, BUBBLE_FG)).toEqual([]);
+    const { bg, fg } = skinTokens(readSkin());
+    expect(missingDecls(bg, fg)).toEqual([]);
   });
 
   it("14 个主题下气泡文字都 ≥ 4.5:1", () => {
-    const low = belowAA(BUBBLE_FG, BUBBLE_BG);
+    const { bg, fg } = skinTokens(readSkin());
+    const low = belowAA(fg, bg);
     expect(low, `以下主题气泡文字不可读：\n${low.join("\n")}`).toEqual([]);
   });
 

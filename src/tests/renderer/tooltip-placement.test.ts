@@ -15,10 +15,16 @@ describe("tooltip 方位", () => {
     // `DropdownMenuContent` 上**（`AccountMenu:93`、`HelpMenu:119`）⇒ 裸断言
     // `toContain('side="right"')` 会被菜单那两处侥幸通过，而它们跟 tooltip 方位
     // 毫无关系。这正是仓库反复栽过的「判据假绿」（plan-12 §29 的裸 grep）。
+    // ⚠️ 必须**计数**，不能用「存在至少一处」（`toContain`）—— AppRail 有 2 个站点：
+    // 导航项（在 `RAIL_ITEMS.map` 里渲染 6 次）与语音项（`item.key === "chat"` 分支）。
+    // 只查存在性时，把语音那处改成 `side="top"` 或整处删掉，判据**照样全绿** ✗
+    //（审查员 2026-10-10 指出的假绿面）。
     const rail = read("components/AppRail.tsx");
-    expect(rail, 'AppRail 必须给 TooltipContent 传 side="right"').toContain(
-      '<TooltipContent side="right"',
-    );
+    const railSites = rail.match(/<TooltipContent side="right"/g) ?? [];
+    expect(
+      railSites,
+      'AppRail 的两处 TooltipContent 都要 side="right"',
+    ).toHaveLength(2);
     expect(rail, "AppRail 不该再用旧组件的 placement prop").not.toContain(
       "placement=",
     );

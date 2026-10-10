@@ -109,7 +109,15 @@ export function AppRail({
                       `inline-flex` 让它恰好包住 w-8 h-8 的按钮，栏内几何与间距不变 ✓。
                       同类待办（同一根因，各自迁移批次里带进来的）：
                       `ChatInputBottomBar.tsx:172` · `BrowserPanel.tsx:207` ·
-                      `SettingsSkills.tsx:1174` · `SkillCard.tsx:41,253,278`。 */}
+                      `SettingsSkills.tsx:1174` · `SkillCard.tsx:41,253,278`。
+
+                      ⚠️ 已记账的代价（审查员 2026-10-10 指出，**有意接受** ✓）：这层 span 成了
+                      Radix 的 trigger 元素 ⇒ `aria-describedby` 写在 **span** 上，而真正可聚焦、
+                      带 `aria-label` 的是它内部的 Button ⇒ 语音按钮**启用**时读屏不会括报气泡文案。
+                      导航项没这个问题（`asChild` 直接落在 Button 上）。
+                      要根治得让 Button 自己当触发器（`aria-disabled` + onClick 守卫替代 `disabled` ✗
+                      —— 但那是改写 `disabled` 语义、还得到处改 `disabled:` 变体，不属本轮 ✗）。
+                      ⇒ 与上面四处同根因的位置一起，在下一轮那层抽象里收口。 */}
                   <span className="inline-flex">
                     <Button variant="ghost"
                       type="button"

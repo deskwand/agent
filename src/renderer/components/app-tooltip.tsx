@@ -53,12 +53,18 @@ export function Tooltip(props: React.ComponentProps<typeof BaseTooltip>) {
  * · 气泡离页面底色 **1.09（浅）/ 1.31–1.37（深）** —— 而 `--primary` 是 17.9 / 15.7 ✗
  * ⇒ 选它是因为**不打扰**：靠色调差分离，而不是靠高对比。
  *
- * ⚠️ 代价知悉：vendored 的 Content **既无描边也无阴影** ✗ ⇒ 浅色下那 1.09 相当含蓄。
- * 观感不够时加一条 `border border-border` 即可 —— `--border` 在浅色下比气泡底深，能勾出边 ✓。
- * 这条判断由 `src/tests/renderer/tooltip-palette.test.ts`（颜色）与
- * `app-tooltip-skin.test.tsx`（覆写真生效）一起守着。
+ * ⚠️ `shadow-elevated` **不是可选的装饰，是浅色下唯一的分隔** ✓（已实测 ✗→✓）：
+ * 气泡离 `--background` 只 1.09，而 AppRail 的气泡落在 `--sidebar` 上时只有 **1.04** ⇒
+ * 无阴影时浅色主题看到的是「几行游离的深色文字盖在侧栏上」，容器不可辨 ✗。
+ * 它取自 `--shadow-elevated`（`0 4px 12px rgba(0,0,0,.12)`）—— 与人类审皮肤时看的
+ * `design-docs/2026-10-10-tooltip-skin-preview.html` 里那个 `--raise` **同值** ✓。
+ * ⇒ **被挑战时别先删它**；要改先重算上面那两个数。
+ *
+ * 这条判断由 `src/tests/renderer/tooltip-palette.test.ts`（颜色，token 名从本常量**反推** ✓）
+ * 与 `app-tooltip-skin.test.tsx`（覆写真的生效 + 阴影在 ✓）一起守着。
  */
-const APP_TOOLTIP_SKIN = "bg-secondary text-secondary-foreground";
+const APP_TOOLTIP_SKIN =
+  "bg-secondary text-secondary-foreground shadow-elevated";
 
 export const TooltipContent = React.forwardRef<
   React.ElementRef<typeof BaseTooltipContent>,

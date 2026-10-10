@@ -5,7 +5,14 @@ import { describe, expect, it } from "vitest";
 
 const RENDERER = path.resolve(import.meta.dirname, "../../renderer");
 
-/** 会把 `title` 透传到原生元素的自有组件（大写开头，必须显式列出）。 */
+/**
+ * 会把 `title` 透传到原生元素的自有组件（大写开头，必须显式列出）。
+ *
+ * ⚠️ 这是个**手维护的名单**：口径是「小写标签一律监管 + 大写标签默认放行（只认下列这三个）」。
+ * 前提是「透传 `title` 的自有组件就这么三个」（2026-10-10 核过全仓大写标签上的 `title=`：
+ * 只剩 `SettingsSection` 与 `UsageView` 的局部 `Box`，两者都把 `title` 渲染成 `<h2>` ✗）。
+ * ⇒ 新增一个「透传 title 到原生元素」的自有组件时，**必须补到这里**，否则它会绕过监管。
+ */
 const TITLE_FORWARDING_COMPONENTS = new Set(["Button", "Input", "Textarea"]);
 
 /**
