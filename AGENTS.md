@@ -14,12 +14,17 @@
 npm run dev                      # 开发模式
 npm run build                    # 生产构建（当前平台；macOS 构建 .dmg）
 npm run build:win-x64            # 构建 Windows .exe
-npx vitest run                   # 全部测试（`npm test` 会进 watch 模式）
+npx vitest run <改动相关路径>      # 默认只跑这个
 npx vitest run <file> -t "<name>"  # 聚焦单个测试用例
+npx vitest run                   # 全量，很慢：只在改到共享面时跑
 npx eslint <改动文件> --fix && npx prettier --check <改动文件>   # 提交前检查
 ```
 
-提交前必跑：`npx eslint <改动文件> --fix && npx prettier --check <改动文件> && npx vitest run`
+提交前必跑：`npx eslint <改动文件> --fix && npx prettier --check <改动文件> && npx vitest run <改动相关路径>`
+
+测试只跑本次改动涉及的范围，**不要默认跑全量**：本仓 600+ 个测试文件，多数改动只碰少数模块，
+全量的失败多半与本次改动无关。只有改到被广泛引用的共享面才跑全量——`src/shared/`、
+`src/main/ipc/`、`src/preload/`、vitest/vite/tsconfig 配置，或 `src/tests/` 下的跨模块守卫测试。
 
 两个全仓脚本（`npm run lint`、`npm run format`）不能当门禁：全仓既有 5 个 eslint error、
 约 119 个文件不合 `prettier --check`，跑它们只会淹掉本次改动的问题（`--fix` 还会顺手改掉
@@ -57,7 +62,7 @@ npx eslint <改动文件> --fix && npx prettier --check <改动文件>   # 提�
 
 1. 从 `dev` 拉最新，创建 `feature/xxx` 或 `fix/xxx` 分支
 2. 开发中遵守上述约束；新增功能必须同步写 Vitest 测试
-3. 提交前跑 §2 检查命令，提交后创建 PR → `dev`（紧急修复 → `main`）
+3. 提交前跑 §2 检查命令（测试只跑改动相关范围，别顺手跑全量），提交后创建 PR → `dev`（紧急修复 → `main`）
 
 ### 高风险区域（改动前先阅读相关文件上下文）
 
