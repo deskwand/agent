@@ -404,7 +404,16 @@ export function ChatInputStatusBar({
             aria-label={
               hasPlan || countInChip ? undefined : t("activity.panelTitle")
             }
-            className="flex min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-foreground transition-colors hover:bg-accent"
+            // ⚠️ 这四条类必须显式写回（与面板行同一族的迁移回归）：`<Button>` base 的 `text-sm` /
+            // `font-medium` / `[&_svg]:size-4` 与缺省档的 `h-9` 会盖掉这枚 chip 自己写的
+            // `min-h-5`（min-height 顶不掉 36px 定高）和 chevron 的 `h-3 w-3`（`[&_svg]:size-4`
+            // 的选择器是 `.cls svg`，比 `.h-3` 高一级 ⇒ 16px）。真机实测（Chromium + 构建 CSS，
+            // 2026-10-10）：chip 盒 32×36px、chevron 16px、字 14px/500，而同一行左侧的状态文案是
+            // 12px/高 16px ⇒ 一枚 36px 圆钮杵在 12px 文案旁边（用户报障「子代理这个图标太高了」）；
+            // 写回后实测 28×20px、chevron 12px、字 12px/400 == `min-h-5`。
+            // ⚠️ `[&_svg]:size-3` 的作用面是**这枚 chip 里所有 svg** —— 目前只有右侧那个 chevron
+            // （进度条是 div，面板走 portal 不在此列），往 chip 里再加图标的人要回读这句。
+            className="flex h-auto min-h-5 min-w-0 items-center gap-1.5 rounded-full bg-muted px-2 py-0.5 text-left text-xs font-normal text-foreground transition-colors hover:bg-accent [&_svg]:size-3"
           >
             {hasPlan ? (
               <>

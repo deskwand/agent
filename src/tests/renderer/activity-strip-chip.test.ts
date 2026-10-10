@@ -525,4 +525,39 @@ describe("activity chip", () => {
       expect(rowButton?.classList.contains(cls), cls).toBe(false);
     }
   });
+
+  // 迁移回归守卫，与上面那条面板行同族：chip 是 `PopoverTrigger asChild` 里的
+  // `<Button variant="ghost">`，于是 base 的 `text-sm`(14px) / `font-medium` / `[&_svg]:size-4`
+  // 和缺省档的 `h-9`(36px 定高) 一起泄漏进来 —— chip 自己写的 `min-h-5`(20px) 是 min-height，
+  // 顶不掉定高；chevron 的 `h-3 w-3` 也顶不掉 `[&_svg]:size-4`（它的选择器是 `.cls svg`，
+  // 比 `.h-3` 高一级 ⇒ 16px）。chip 出生时这里是原生 `<button>`，四者都是继承来的。
+  // 真机实测（Chromium + 构建 CSS，2026-10-10）：chip 盒 32×36px、chevron 16px、字 14px/500，
+  // 而同一行左侧的状态文案是 12px/高 16px ⇒ 一枚 36px 圆钮杵在 12px 文案旁边（用户报障
+  // 「子代理这个图标太高了」）；写回四条后实测 28×20px、chevron 12px、字 12px/400 == `min-h-5`。
+  // ⚠️ jsdom 没有布局引擎 ⇒ 这一条钉的是「泄漏的类不在 + 写回的类都在」，几何归真机目视。
+  it("chip 不继承 Button 的高度 / 字号 / 字重 / 图标尺寸", () => {
+    render(
+      strip({
+        status: { type: "background-agent", count: 1, done: true },
+        backgroundAgentRows: [row("completed")],
+      }),
+    );
+    // 这条路径里计数由左区承载 ⇒ chip 里只剩 chevron，正是报障截图的那一帧
+    const chip = container.querySelector("button[aria-haspopup='dialog']");
+    expect(chip, "chip 应存在").toBeTruthy();
+    for (const cls of ["h-auto", "text-xs", "font-normal", "[&_svg]:size-3"]) {
+      expect(chip?.classList.contains(cls), cls).toBe(true);
+    }
+    for (const cls of ["h-9", "text-sm", "font-medium", "[&_svg]:size-4"]) {
+      expect(chip?.classList.contains(cls), cls).toBe(false);
+    }
+    // ⚠️ 高度再按**族**兜一道：上面写死的是今天的缺省档 `h-9`，档位哪天从 `h-9` 调成
+    // `h-8`，那条会静默转绿（`h-auto` 是 chip 自己写回的白名单，不属于任何数字档）。
+    expect(
+      (chip?.className ?? "")
+        .split(/\s+/)
+        .filter((cls) => /^h-(?:\d|\[)/.test(cls)),
+      "chip 不该带上任何数字高度档",
+    ).toEqual([]);
+  });
 });
