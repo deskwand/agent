@@ -60,46 +60,37 @@ export function MergedInputChip({
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelSearch, setModelSearch] = useState("");
   const [panelView, setPanelView] = useState<"list" | "thinking">("list");
-  // ⚠️ 显式标注为**可变** ref ✗ —— React 19 的类型把 `useRef<T>(null)` 的 `current`
-  // 推成只读 ✓，而下面的 callback ref（`attachPanel`）要给它赋值 ✗ ⇒ 会报 TS2540 ✓。
-  const menuRef = useRef<HTMLDivElement | null>(
-    null,
-  ) as React.MutableRefObject<HTMLDivElement | null>;
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const [panelNode, setPanelNode] = useState<HTMLDivElement | null>(null);
   const [panelMaxHeight, setPanelMaxHeight] = useState<number | null>(null);
 
   // WelcomeView 的输入框垂直居中，芯片上方的可用空间远小于 100vh - 12rem。
   // 超出 main 的 overflow-hidden 的顶部会被裁掉且点不到，因此按面板上方的实际可用高度取上限。
+  //
+  // 量的是**触发器**，不是面板。面板的坐标由 Radix 异步给出：首帧 wrapper 带
+  // translate(0, -200%) 停在视口上方，定位要到 floating-ui 的 computePosition().then()
+  // 才落到触发器上方，而那一帧不会带来新的重渲染 —— 打开时的这次 layout 量测就是唯一一次。
+  // 量面板的写法正死在这里：量到负的 bottom 就直接放弃，只剩 className 上
+  // 100vh - 12rem 的兜底，WelcomeView 里那笔账是超的（窗口高 747、芯片顶边 433 时，
+  // 实测面板顶部溢到窗口外 64.6px）。
+  // 触发器在打开之前就已布局完成，且 side="top" + sideOffset=8 把面板底边与它锁死：
+  // 面板底边 = 触发器顶边 - 8（与原实现 bottom-[calc(100%_+_8px)] 同源）。
   const updatePanelMaxHeight = useCallback(() => {
-    // Radix 定位是异步的：定位完成前 wrapper 上带着 translate(0, -200%)，那一帧
-    // 量到的 bottom <= 0。此时退回量触发器顶边 —— side="top" + sideOffset=8 时，
-    // 面板底边就等于触发器顶边减 8（与原实现 bottom-[calc(100%_+_8px)] 同源）。
-    const panel = menuRef.current;
-    const anchor = panel ?? triggerRef.current;
-    if (!anchor) return;
-    const rect = anchor.getBoundingClientRect();
-    const bottom = panel ? rect.bottom : rect.top - MENU_PANEL_OFFSET_PX;
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const bottom = trigger.getBoundingClientRect().top - MENU_PANEL_OFFSET_PX;
     // 无布局信息（jsdom 等）时保留 className 上的默认上限
     if (bottom <= 0) return;
     const available = Math.max(0, Math.floor(bottom - MENU_TOP_SAFE_AREA_PX));
     setPanelMaxHeight(Math.min(MODEL_MENU_MAX_HEIGHT_PX, available));
   }, []);
 
-  // 面板经 portal 与 Radix 的 Presence 延后一面挂载，只依赖 menuOpen 会在面板
-  // 还没进 DOM 时量空；把节点本身也当成依赖，面板真正挂载后再量。
-  const attachPanel = useCallback((node: HTMLDivElement | null) => {
-    menuRef.current = node;
-    setPanelNode(node);
-  }, []);
-
   // 打开时先量一次（layout 阶段，避免首帧闪烁），窗口尺寸变化时重量。
   useLayoutEffect(() => {
-    if (!menuOpen || !panelNode) return;
+    if (!menuOpen) return;
     updatePanelMaxHeight();
     window.addEventListener("resize", updatePanelMaxHeight);
     return () => window.removeEventListener("resize", updatePanelMaxHeight);
-  }, [menuOpen, panelNode, updatePanelMaxHeight]);
+  }, [menuOpen, updatePanelMaxHeight]);
 
   // 云分组只在登录时进入列表：未登录时残留的 custom:deskwand 用的是失效 token。
   // 顺序上云分组排最前：provider 顺序来自配置写入顺序（config-store.saveProvider 追加新
@@ -275,7 +266,6 @@ export function MergedInputChip({
 
         {menuOpen && (
           <PopoverContent
-            ref={attachPanel}
             side="top"
             align="end"
             sideOffset={MENU_PANEL_OFFSET_PX}

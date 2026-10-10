@@ -145,7 +145,7 @@ export function ChatInputStatusBar({
 
   // 面板贴着状态栏往上长，而祖先链上有 overflow-hidden：矮窗口 / 放大字号时
   // 70vh 会超过实际可用高度、顶部被裁且点不到。按锚点上方实测可用高度取上限
-  // （做法与取值同 MergedInputChip.tsx:64-80）。
+  // （做法与取值同 MergedInputChip.tsx:77-85）。
   const updatePanelMaxHeight = useCallback(() => {
     const anchor = panelRef.current;
     if (!anchor) return;

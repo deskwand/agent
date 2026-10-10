@@ -155,21 +155,42 @@ describe("MergedInputChip (single-panel)", () => {
 
   // 面板经 portal 挂到 document.body（触发器仍在 container 里）—— 面板与触发器分开查。
 
-  // jsdom 没有布局，手动给出面板底部坐标，模拟 WelcomeView 中输入框垂直居中、
+  // jsdom 没有布局，手动给出触发器与面板的坐标，模拟 WelcomeView 中输入框垂直居中、
   // 面板上方空间不足的场景（真实修复前的值可参考菜单高度 ≈ 100vh - 12rem）。
-  function stubPanelBottom(bottom: number) {
+  // panelBottom 默认给 Radix 定位完成前的那一帧：wrapper 带着 translate(0, -200%)，
+  // 面板整个落在视口上方，getBoundingClientRect 的 bottom 是负的。
+  function stubLayout({
+    triggerTop,
+    panelBottom = triggerTop - 512,
+  }: {
+    triggerTop: number;
+    panelBottom?: number;
+  }) {
     HTMLElement.prototype.getBoundingClientRect = function () {
+      if (this.getAttribute?.("aria-haspopup")) {
+        return {
+          top: triggerTop,
+          bottom: triggerTop + 36,
+          left: 0,
+          right: 0,
+          width: 0,
+          height: 36,
+          x: 0,
+          y: triggerTop,
+          toJSON: () => ({}),
+        } as DOMRect;
+      }
       const role = this.getAttribute?.("role");
       if (role === "menu" || role === "dialog") {
         return {
-          top: bottom - 100,
-          bottom,
+          top: panelBottom - 100,
+          bottom: panelBottom,
           left: 0,
           right: 0,
           width: 0,
           height: 100,
           x: 0,
-          y: bottom - 100,
+          y: panelBottom - 100,
           toJSON: () => ({}),
         } as DOMRect;
       }
@@ -225,17 +246,30 @@ describe("MergedInputChip (single-panel)", () => {
 
   it("caps the panel to the space available above the chip", async () => {
     render();
-    stubPanelBottom(300);
+    // 面板底边 = 触发器顶边 - 8(sideOffset)，再让开 48(标题栏安全区)：300 - 8 - 48
+    stubLayout({ triggerTop: 300 });
     await openPanel();
-    // 300 - 48(标题栏安全区)
-    expect(panel().style.maxHeight).toBe("252px");
+    expect(panel().style.maxHeight).toBe("244px");
   });
 
   it("keeps the 32rem ceiling when there is plenty of room", async () => {
     render();
-    stubPanelBottom(2000);
+    stubLayout({ triggerTop: 2000 });
     await openPanel();
     expect(panel().style.maxHeight).toBe("512px");
+  });
+
+  // Radix 在首帧把面板摆在 translate(0, -200%)（视口上方）等待定位，定位在
+  // floating-ui 的 computePosition().then() 里才完成 —— 那之后没有新的重渲染，
+  // 打开时的这次量测就是唯一一次。量面板就会量到这个负的 bottom 而放弃，
+  // 只剩 className 上的 100vh - 12rem 兜底 —— WelcomeView 里那笔账是超的。
+  // 所以量测必须锚在触发器上：它在打开之前就已布局完成，坐标与定位结果无关。
+  it("caps by the trigger even before Radix has positioned the panel", async () => {
+    render();
+    // panelBottom 取实测的定位前坐标：面板高 512，wrapper translate(0, -200%)
+    stubLayout({ triggerTop: 300, panelBottom: -512 });
+    await openPanel();
+    expect(panel().style.maxHeight).toBe("244px");
   });
 
   it("shows every group plus thinking row when logged out", async () => {
